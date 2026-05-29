@@ -2,6 +2,34 @@
 import Link from 'next/link';
 import { Logo } from '@/components/Logo';
 
+// Reusable CTA components — keeps the page consistent and easy to update
+
+function CtaButton({
+  size = 'md',
+  label = 'Start a thought session',
+  href = '/chat',
+}: {
+  size?: 'sm' | 'md' | 'lg' | 'xl';
+  label?: string;
+  href?: string;
+}) {
+  const dims =
+    size === 'sm' ? 'h-10 px-5 text-sm' :
+    size === 'lg' ? 'h-13 px-8 text-base' :
+    size === 'xl' ? 'h-14 px-9 text-lg' :
+    'h-12 px-7 text-base';
+
+  return (
+    <Link
+      href={href}
+      className={`inline-flex items-center gap-2 font-medium tracking-tight transition-all duration-200 rounded-full bg-moss-600 text-paper hover:bg-moss-700 hover:-translate-y-px shadow-sm hover:shadow-md ${dims}`}
+    >
+      {label}
+      <span aria-hidden className="transition-transform group-hover:translate-x-0.5">→</span>
+    </Link>
+  );
+}
+
 export default function LandingPage() {
   return (
     <div className="min-h-dvh">
@@ -15,12 +43,7 @@ export default function LandingPage() {
             <a href="#how" className="hover:text-ink transition-colors">How it works</a>
             <a href="#philosophy" className="hover:text-ink transition-colors">Philosophy</a>
           </nav>
-          <Link
-            href="/chat"
-            className="inline-flex items-center justify-center font-medium tracking-tight transition-all duration-200 rounded-full bg-moss-600 text-paper hover:bg-moss-700 h-9 px-4 text-sm"
-          >
-            Try Socria
-          </Link>
+          <CtaButton size="sm" />
         </div>
       </header>
 
@@ -62,19 +85,21 @@ export default function LandingPage() {
             className="mt-10 flex flex-wrap items-center gap-3 animate-fade-up"
             style={{ animationDelay: '340ms' }}
           >
-            <Link
-              href="/chat"
-              className="inline-flex items-center justify-center font-medium tracking-tight transition-all duration-200 rounded-full bg-moss-600 text-paper hover:bg-moss-700 h-12 px-7 text-base"
-            >
-              Try Socria
-            </Link>
+            <CtaButton size="xl" label="Try Socria — start a thought session" />
             <a
               href="#what"
-              className="inline-flex items-center justify-center font-medium tracking-tight transition-all duration-200 rounded-full bg-transparent text-ink border border-ink/15 hover:border-ink/40 hover:bg-ink/5 h-12 px-7 text-base"
+              className="inline-flex items-center justify-center font-medium tracking-tight transition-all duration-200 rounded-full bg-transparent text-ink border border-ink/15 hover:border-ink/40 hover:bg-ink/5 h-14 px-7 text-base"
             >
               Learn more
             </a>
           </div>
+
+          <p
+            className="mt-6 text-sm text-ink/50 animate-fade-up"
+            style={{ animationDelay: '420ms' }}
+          >
+            Free to try. No sign-up required.
+          </p>
         </div>
         <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-ink/10 to-transparent" />
       </section>
@@ -108,6 +133,10 @@ export default function LandingPage() {
             <p className="mt-3 font-serif text-3xl md:text-4xl leading-[1.2] text-moss-700 italic">
               It&rsquo;s artificial thinking.
             </p>
+
+            <div className="mt-10">
+              <CtaButton label="Start a thought session" />
+            </div>
           </div>
         </div>
       </section>
@@ -138,6 +167,10 @@ export default function LandingPage() {
             <p className="mt-2 font-serif text-2xl md:text-3xl leading-tight text-moss-700 italic">
               It helps you think more clearly.
             </p>
+
+            <div className="mt-8">
+              <CtaButton size="sm" label="Try it now" />
+            </div>
           </div>
         </div>
       </section>
@@ -174,6 +207,13 @@ export default function LandingPage() {
               body="You arrive at your own conclusions instead of inheriting someone else's."
             />
           </div>
+
+          <div className="mt-20 flex flex-wrap items-center gap-4">
+            <CtaButton label="Begin your first session" />
+            <span className="text-sm text-ink/50">
+              Takes 30 seconds to start thinking.
+            </span>
+          </div>
         </div>
       </section>
 
@@ -209,6 +249,10 @@ export default function LandingPage() {
               body="Because execution starts with clarity."
             />
           </div>
+
+          <div className="mt-12 text-center">
+            <CtaButton size="lg" label="Bring your moment to Socria" />
+          </div>
         </div>
       </section>
 
@@ -238,6 +282,10 @@ export default function LandingPage() {
             <p className="mt-2 font-serif text-2xl md:text-3xl text-moss-700 italic leading-tight">
               The goal is to think better.
             </p>
+
+            <div className="mt-10">
+              <CtaButton label="Begin thinking better" />
+            </div>
           </div>
         </div>
       </section>
@@ -281,13 +329,12 @@ export default function LandingPage() {
           </p>
 
           <div className="mt-14 flex justify-center">
-            <Link
-              href="/chat"
-              className="inline-flex items-center justify-center font-medium tracking-tight transition-all duration-200 rounded-full bg-moss-600 text-paper hover:bg-moss-700 h-14 px-9 text-lg"
-            >
-              Start thinking with Socria
-            </Link>
+            <CtaButton size="xl" label="Start thinking with Socria" />
           </div>
+
+          <p className="mt-6 text-sm text-ink/50">
+            Free. No account required. Just bring a question.
+          </p>
         </div>
       </section>
 
@@ -312,6 +359,17 @@ export default function LandingPage() {
           <span className="font-serif italic">Human-first intelligence</span>
         </div>
       </footer>
+
+      {/* Floating persistent CTA — appears bottom-right on all scroll positions */}
+      <Link
+        href="/chat"
+        className="fixed bottom-6 right-6 z-40 inline-flex items-center gap-2 font-medium tracking-tight rounded-full bg-moss-600 text-paper hover:bg-moss-700 hover:-translate-y-0.5 transition-all duration-200 shadow-lg hover:shadow-xl h-12 px-6 text-[15px] backdrop-blur"
+        aria-label="Start a thought session"
+      >
+        <span className="hidden sm:inline">Start a thought session</span>
+        <span className="sm:hidden">Start session</span>
+        <span aria-hidden>→</span>
+      </Link>
     </div>
   );
 }
