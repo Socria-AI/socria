@@ -483,6 +483,25 @@ export default function ChatPage() {
                     </button>
                   ))}
                 </div>
+
+                <SignedOut>
+                  <div className="mt-8 p-5 rounded-xl border border-moss-200/60 bg-moss-50/40 text-left flex items-center gap-4">
+                    <div className="flex-1">
+                      <p className="text-[14px] text-ink/80 leading-relaxed">
+                        Your sessions are saved on this device only.
+                      </p>
+                      <p className="mt-1 text-[13px] text-ink/60 font-serif italic leading-relaxed">
+                        Create a free account to save them across every device.
+                      </p>
+                    </div>
+                    <SignInButton mode="modal">
+                      <button className="shrink-0 inline-flex items-center gap-2 rounded-full bg-moss-600 text-paper hover:bg-moss-700 transition-colors h-10 px-5 text-[13px] font-medium">
+                        Create account
+                        <span aria-hidden>→</span>
+                      </button>
+                    </SignInButton>
+                  </div>
+                </SignedOut>
               </div>
             )}
 

@@ -111,7 +111,8 @@ export default function LandingPage() {
             className="mt-6 text-sm text-ink/50 animate-fade-up"
             style={{ animationDelay: '420ms' }}
           >
-            Free to try. No sign-up required.
+            Free to try. Create a free account to save your sessions
+            across devices.
           </p>
         </div>
         <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-ink/10 to-transparent" />
@@ -346,7 +347,7 @@ export default function LandingPage() {
           </div>
 
           <p className="mt-6 text-sm text-ink/50">
-            Free. No account required. Just bring a question.
+            Free to start. Create an account to save your sessions.
           </p>
         </div>
       </section>
