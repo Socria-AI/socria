@@ -2,7 +2,13 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import Link from 'next/link';
+import {
+  SignedIn,
+  SignedOut,
+  SignInButton,
+  UserButton,
+  useUser,
+} from '@clerk/nextjs';
 import { Logo } from '@/components/Logo';
 
 type Role = 'user' | 'assistant';
@@ -19,11 +25,12 @@ interface Conversation {
 
 const STORAGE_KEY = 'socria.conversations.v1';
 const ACTIVE_KEY = 'socria.activeConversationId.v1';
+const MIGRATED_KEY = 'socria.cloudMigrated.v1';
 
 const STARTER_PROMPTS = [
-  'I don\u2019t know what decision to make',
+  'I don’t know what decision to make',
   'Help me think through this idea',
-  'I\u2019m stuck on what to build',
+  'I’m stuck on what to build',
   'Challenge my reasoning',
 ];
 
@@ -31,7 +38,7 @@ function uid() {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
 
-function loadConversations(): Conversation[] {
+function loadLocal(): Conversation[] {
   if (typeof window === 'undefined') return [];
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -43,15 +50,16 @@ function loadConversations(): Conversation[] {
   }
 }
 
-function saveConversations(convos: Conversation[]) {
+function saveLocal(convos: Conversation[]) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(convos));
   } catch (e) {
-    console.error('Could not save conversations:', e);
+    console.error('Could not save conversations locally:', e);
   }
 }
 
 export default function ChatPage() {
+  const { isLoaded, isSignedIn, user } = useUser();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [input, setInput] = useState('');
@@ -59,31 +67,115 @@ export default function ChatPage() {
   const [streamed, setStreamed] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [hydrating, setHydrating] = useState(true);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Load from localStorage on mount
-  useEffect(() => {
-    const stored = loadConversations();
-    setConversations(stored);
-    const lastActive = localStorage.getItem(ACTIVE_KEY);
-    if (lastActive && stored.some((c) => c.id === lastActive)) {
-      setActiveId(lastActive);
-    } else if (stored.length > 0) {
-      setActiveId(stored[0].id);
-    }
-  }, []);
+  const mode: 'cloud' | 'local' = isSignedIn ? 'cloud' : 'local';
 
-  // Persist active id
+  // Load conversations whenever auth state resolves or flips.
   useEffect(() => {
+    if (!isLoaded) return;
+    let cancelled = false;
+
+    async function hydrate() {
+      setHydrating(true);
+      setError(null);
+
+      if (isSignedIn) {
+        // First sign-in for this browser: push localStorage into the cloud.
+        try {
+          const migratedFor = localStorage.getItem(MIGRATED_KEY);
+          const local = loadLocal();
+          if (user?.id && migratedFor !== user.id && local.length > 0) {
+            await fetch('/api/conversations', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ conversations: local }),
+            });
+            localStorage.removeItem(STORAGE_KEY);
+            localStorage.removeItem(ACTIVE_KEY);
+          }
+          if (user?.id) localStorage.setItem(MIGRATED_KEY, user.id);
+        } catch (e) {
+          console.error('Migration failed:', e);
+        }
+
+        try {
+          const res = await fetch('/api/conversations', { cache: 'no-store' });
+          if (!res.ok) throw new Error('Failed to load conversations');
+          const json = await res.json();
+          if (cancelled) return;
+          const list: Conversation[] = json.conversations || [];
+          setConversations(list);
+          setActiveId(list[0]?.id ?? null);
+        } catch (e: any) {
+          if (!cancelled) setError(e?.message || 'Failed to load conversations');
+        }
+      } else {
+        const stored = loadLocal();
+        if (cancelled) return;
+        setConversations(stored);
+        const lastActive =
+          typeof window !== 'undefined'
+            ? localStorage.getItem(ACTIVE_KEY)
+            : null;
+        if (lastActive && stored.some((c) => c.id === lastActive)) {
+          setActiveId(lastActive);
+        } else {
+          setActiveId(stored[0]?.id ?? null);
+        }
+      }
+
+      if (!cancelled) setHydrating(false);
+    }
+
+    hydrate();
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoaded, isSignedIn, user?.id]);
+
+  // Persist active id locally for anonymous users.
+  useEffect(() => {
+    if (mode !== 'local') return;
     if (activeId) localStorage.setItem(ACTIVE_KEY, activeId);
-  }, [activeId]);
+  }, [activeId, mode]);
 
   // Scroll to bottom when messages or stream changes
   const active = conversations.find((c) => c.id === activeId);
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [active?.messages.length, streamed]);
+
+  async function persistConversation(c: Conversation, allConvos: Conversation[]) {
+    if (mode === 'cloud') {
+      try {
+        await fetch('/api/conversations', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ conversation: c }),
+        });
+      } catch (e) {
+        console.error('Could not save conversation to cloud:', e);
+      }
+    } else {
+      saveLocal(allConvos);
+    }
+  }
+
+  async function removeConversation(id: string) {
+    if (mode === 'cloud') {
+      try {
+        await fetch(`/api/conversations/${encodeURIComponent(id)}`, {
+          method: 'DELETE',
+        });
+      } catch (e) {
+        console.error('Could not delete conversation in cloud:', e);
+      }
+    }
+    // For local mode, saveLocal is called by the caller after state update.
+  }
 
   function newSession() {
     const id = uid();
@@ -95,20 +187,22 @@ export default function ChatPage() {
     };
     const next = [fresh, ...conversations];
     setConversations(next);
-    saveConversations(next);
     setActiveId(id);
     setSidebarOpen(false);
     setError(null);
+    // Don't write empty sessions to the cloud; they'll be saved on first message.
+    if (mode === 'local') saveLocal(next);
   }
 
-  function deleteSession(id: string) {
+  async function deleteSession(id: string) {
     if (!confirm('Delete this thought session?')) return;
     const next = conversations.filter((c) => c.id !== id);
     setConversations(next);
-    saveConversations(next);
     if (activeId === id) {
       setActiveId(next.length > 0 ? next[0].id : null);
     }
+    if (mode === 'local') saveLocal(next);
+    await removeConversation(id);
   }
 
   function handleInputChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
@@ -156,7 +250,7 @@ export default function ChatPage() {
         : c
     );
     setConversations(withUser);
-    saveConversations(withUser);
+    if (mode === 'local') saveLocal(withUser);
 
     setInput('');
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
@@ -203,20 +297,26 @@ export default function ChatPage() {
             }
           : c
       );
-      // Re-sort so most recent floats to top
       withAssistant.sort((a, b) => b.updatedAt - a.updatedAt);
       setConversations(withAssistant);
-      saveConversations(withAssistant);
+
+      const updated = withAssistant.find((c) => c.id === workingId)!;
+      await persistConversation(updated, withAssistant);
     } catch (e: any) {
       setError(e?.message || 'Failed to send');
-      // Roll back the user message we just added
-      const rolledBack = withUser.map((c) =>
-        c.id === workingId
-          ? { ...c, messages: c.messages.slice(0, -1) }
-          : c
-      );
+      // Roll back the user message we just added.
+      const rolledBack = withUser
+        .map((c) =>
+          c.id === workingId
+            ? { ...c, messages: c.messages.slice(0, -1) }
+            : c
+        )
+        .filter((c) => c.messages.length > 0 || c.id !== workingId);
       setConversations(rolledBack);
-      saveConversations(rolledBack);
+      if (mode === 'local') saveLocal(rolledBack);
+      if (!rolledBack.some((c) => c.id === workingId)) {
+        setActiveId(rolledBack[0]?.id ?? null);
+      }
       setInput(text);
     } finally {
       setSending(false);
@@ -262,7 +362,11 @@ export default function ChatPage() {
         </div>
 
         <div className="flex-1 overflow-y-auto px-2 pb-2">
-          {conversations.length === 0 ? (
+          {hydrating ? (
+            <p className="px-3 py-2 text-xs text-ink/40 font-serif italic">
+              Loading sessions…
+            </p>
+          ) : conversations.length === 0 ? (
             <p className="px-3 py-2 text-xs text-ink/40 font-serif italic">
               No sessions yet. Start one.
             </p>
@@ -299,8 +403,25 @@ export default function ChatPage() {
           )}
         </div>
 
-        <div className="border-t border-border/60 p-4 text-[11px] text-ink/40 font-serif italic">
-          Socria Core 2.0 — saved on this device
+        <div className="border-t border-border/60 p-4">
+          <SignedIn>
+            <div className="flex items-center gap-3">
+              <UserButton afterSignOutUrl="/chat" />
+              <div className="text-[11px] text-ink/50 font-serif italic leading-tight">
+                Synced across your devices
+              </div>
+            </div>
+          </SignedIn>
+          <SignedOut>
+            <SignInButton mode="modal">
+              <button className="w-full text-left text-[12px] text-ink/70 hover:text-ink font-serif italic">
+                Sign in to sync across devices →
+              </button>
+            </SignInButton>
+            <p className="mt-2 text-[10px] text-ink/40 font-serif italic">
+              Saved on this device only
+            </p>
+          </SignedOut>
         </div>
       </aside>
 
@@ -321,9 +442,21 @@ export default function ChatPage() {
           <span className="text-[11px] uppercase tracking-[0.18em] text-ink/50">
             Thought session
           </span>
-          <span className="font-serif italic text-ink/40 text-sm hidden sm:inline">
-            Socria Core 2.0
-          </span>
+          <div className="flex items-center gap-3">
+            <span className="font-serif italic text-ink/40 text-sm hidden sm:inline">
+              Socria Core 2.0
+            </span>
+            <SignedOut>
+              <SignInButton mode="modal">
+                <button className="text-[13px] text-ink/70 hover:text-ink transition-colors">
+                  Sign in
+                </button>
+              </SignInButton>
+            </SignedOut>
+            <SignedIn>
+              <UserButton afterSignOutUrl="/chat" />
+            </SignedIn>
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto">

@@ -1,5 +1,6 @@
 // app/page.tsx
 import Link from 'next/link';
+import { SignedIn, SignedOut, SignInButton, UserButton } from '@clerk/nextjs';
 import { Logo } from '@/components/Logo';
 
 // Reusable CTA components — keeps the page consistent and easy to update
@@ -43,7 +44,19 @@ export default function LandingPage() {
             <a href="#how" className="hover:text-ink transition-colors">How it works</a>
             <a href="#philosophy" className="hover:text-ink transition-colors">Philosophy</a>
           </nav>
-          <CtaButton size="sm" />
+          <div className="flex items-center gap-3">
+            <SignedOut>
+              <SignInButton mode="modal">
+                <button className="text-[14px] text-ink/70 hover:text-ink transition-colors">
+                  Sign in
+                </button>
+              </SignInButton>
+            </SignedOut>
+            <SignedIn>
+              <UserButton afterSignOutUrl="/" />
+            </SignedIn>
+            <CtaButton size="sm" />
+          </div>
         </div>
       </header>
 
