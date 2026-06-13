@@ -35,24 +35,35 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const { data, error } = await supabaseAdmin()
-    .from('conversations')
-    .select('id, title, messages, updated_at')
-    .eq('user_id', userId)
-    .order('updated_at', { ascending: false });
+  try {
+    const { data, error } = await supabaseAdmin()
+      .from('conversations')
+      .select('id, title, messages, updated_at')
+      .eq('user_id', userId)
+      .order('updated_at', { ascending: false });
 
-  if (error) {
-    console.error('GET conversations error:', error);
-    return NextResponse.json({ error: 'Failed to load' }, { status: 500 });
+    if (error) {
+      console.error('GET conversations error:', error);
+      return NextResponse.json(
+        { error: `Supabase: ${error.message}` },
+        { status: 500 }
+      );
+    }
+
+    const conversations = (data || []).map((c) => ({
+      id: c.id,
+      title: c.title,
+      messages: c.messages,
+      updatedAt: Number(c.updated_at),
+    }));
+    return NextResponse.json({ conversations });
+  } catch (e: any) {
+    console.error('GET conversations threw:', e);
+    return NextResponse.json(
+      { error: e?.message || 'Internal error' },
+      { status: 500 }
+    );
   }
-
-  const conversations = (data || []).map((c) => ({
-    id: c.id,
-    title: c.title,
-    messages: c.messages,
-    updatedAt: Number(c.updated_at),
-  }));
-  return NextResponse.json({ conversations });
 }
 
 export async function PUT(req: NextRequest) {
@@ -72,19 +83,30 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid conversation' }, { status: 400 });
   }
 
-  const { error } = await supabaseAdmin().from('conversations').upsert({
-    id: c.id,
-    user_id: userId,
-    title: c.title.slice(0, MAX_TITLE),
-    messages: sanitizeMessages(c.messages),
-    updated_at: Number(c.updatedAt) || Date.now(),
-  });
+  try {
+    const { error } = await supabaseAdmin().from('conversations').upsert({
+      id: c.id,
+      user_id: userId,
+      title: c.title.slice(0, MAX_TITLE),
+      messages: sanitizeMessages(c.messages),
+      updated_at: Number(c.updatedAt) || Date.now(),
+    });
 
-  if (error) {
-    console.error('PUT conversation error:', error);
-    return NextResponse.json({ error: 'Failed to save' }, { status: 500 });
+    if (error) {
+      console.error('PUT conversation error:', error);
+      return NextResponse.json(
+        { error: `Supabase: ${error.message}` },
+        { status: 500 }
+      );
+    }
+    return NextResponse.json({ ok: true });
+  } catch (e: any) {
+    console.error('PUT conversation threw:', e);
+    return NextResponse.json(
+      { error: e?.message || 'Internal error' },
+      { status: 500 }
+    );
   }
-  return NextResponse.json({ ok: true });
 }
 
 export async function POST(req: NextRequest) {
@@ -123,10 +145,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, imported: 0 });
   }
 
-  const { error } = await supabaseAdmin().from('conversations').upsert(rows);
-  if (error) {
-    console.error('POST conversations error:', error);
-    return NextResponse.json({ error: 'Failed to import' }, { status: 500 });
+  try {
+    const { error } = await supabaseAdmin().from('conversations').upsert(rows);
+    if (error) {
+      console.error('POST conversations error:', error);
+      return NextResponse.json(
+        { error: `Supabase: ${error.message}` },
+        { status: 500 }
+      );
+    }
+    return NextResponse.json({ ok: true, imported: rows.length });
+  } catch (e: any) {
+    console.error('POST conversations threw:', e);
+    return NextResponse.json(
+      { error: e?.message || 'Internal error' },
+      { status: 500 }
+    );
   }
-  return NextResponse.json({ ok: true, imported: rows.length });
 }

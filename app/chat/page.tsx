@@ -103,7 +103,12 @@ export default function ChatPage() {
 
         try {
           const res = await fetch('/api/conversations', { cache: 'no-store' });
-          if (!res.ok) throw new Error('Failed to load conversations');
+          if (!res.ok) {
+            const body = await res.json().catch(() => ({}));
+            throw new Error(
+              body.error || `Failed to load conversations (HTTP ${res.status})`
+            );
+          }
           const json = await res.json();
           if (cancelled) return;
           const list: Conversation[] = json.conversations || [];
