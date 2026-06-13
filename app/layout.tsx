@@ -1,6 +1,7 @@
 // app/layout.tsx
 import type { Metadata } from 'next';
 import { Instrument_Serif, Inter } from 'next/font/google';
+import { ClerkProvider } from '@clerk/nextjs';
 import './globals.css';
 
 const serif = Instrument_Serif({
@@ -29,8 +30,17 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${serif.variable} ${sans.variable}`}>
-      <body className="paper-bg antialiased">{children}</body>
-    </html>
+    <ClerkProvider
+      appearance={{
+        variables: {
+          colorPrimary: '#3d6b3a',
+          fontFamily: 'var(--font-sans)',
+        },
+      }}
+    >
+      <html lang="en" className={`${serif.variable} ${sans.variable}`}>
+        <body className="paper-bg antialiased">{children}</body>
+      </html>
+    </ClerkProvider>
   );
 }
