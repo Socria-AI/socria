@@ -21,6 +21,7 @@ export default function LandingPage() {
               <a href="#what">What is Socria</a>
               <a href="#how">How it works</a>
               <a href="#philosophy">Philosophy</a>
+              <Link href="/blog">Blog</Link>
             </nav>
             <SignedOut>
               <SignInButton mode="modal">
@@ -429,6 +430,7 @@ export default function LandingPage() {
             <a href="#what">What is Socria</a>
             <a href="#how">How it works</a>
             <a href="#philosophy">Philosophy</a>
+            <Link href="/blog">Blog</Link>
           </div>
         </div>
         <div className="foot-bottom">
