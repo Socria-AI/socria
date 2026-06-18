@@ -4,7 +4,8 @@ export default clerkMiddleware();
 
 export const config = {
   matcher: [
-    '/((?!_next|favicon.ico|socria-mark.png|.*\\..*).*)',
+    // Skip _next assets, static files, the Sanity Studio route, and favicons.
+    '/((?!_next|favicon.ico|socria-mark.png|socria-logo.png|studio|.*\\..*).*)',
     '/api/(.*)',
   ],
 };

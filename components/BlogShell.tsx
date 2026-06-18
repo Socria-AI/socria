@@ -1,23 +1,42 @@
+'use client';
+
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { SignedIn, SignedOut, SignInButton, UserButton } from '@clerk/nextjs';
 
 export function BlogNav() {
+  const pathname = usePathname();
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () =>
+      setScrolled((window.scrollY || document.documentElement.scrollTop) > 8);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  const onJournal = pathname?.startsWith('/blog');
+
   return (
-    <header className="blog-nav">
-      <div className="blog-nav-inner">
-        <Link className="blog-brand" href="/" aria-label="Socria home">
+    <header className={`nav blognav${scrolled ? ' scrolled' : ''}`}>
+      <div className="nav-inner">
+        <Link className="brand" href="/" aria-label="Socria home">
           <img src="/socria-logo.png" alt="" />
           <span className="name">Socria</span>
         </Link>
-        <div className="blog-nav-right">
-          <nav className="blog-nav-links">
-            <Link href="/">Home</Link>
-            <Link href="/blog">Blog</Link>
-            <Link href="/chat">Chat</Link>
+        <div className="nav-right">
+          <nav className="nav-links">
+            <Link href="/#what">What is Socria</Link>
+            <Link href="/#how">How it works</Link>
+            <Link href="/blog" className={onJournal ? 'cur' : undefined}>
+              Journal
+            </Link>
           </nav>
           <SignedOut>
             <SignInButton mode="modal">
-              <button type="button" className="blog-nav-signin">
+              <button type="button" className="nav-signin">
                 Sign in
               </button>
             </SignInButton>
@@ -25,8 +44,8 @@ export function BlogNav() {
           <SignedIn>
             <UserButton afterSignOutUrl="/" />
           </SignedIn>
-          <Link href="/chat" className="blog-nav-cta">
-            Start a thought session <span aria-hidden>→</span>
+          <Link href="/chat" className="btn btn-nav">
+            Start a thought session <span className="arrow">→</span>
           </Link>
         </div>
       </div>
@@ -34,11 +53,28 @@ export function BlogNav() {
   );
 }
 
-export function BlogFoot() {
+export function BlogFooter() {
   return (
-    <footer className="blog-foot">
-      <span>© {new Date().getFullYear()} Socria</span>
-      <span className="it">Think before the machine.</span>
+    <footer>
+      <div className="foot-top">
+        <div>
+          <div className="foot-brand">
+            <img src="/socria-logo.png" alt="" />
+            <span className="name">Socria</span>
+          </div>
+          <p className="foot-tag">Think before the machine.</p>
+        </div>
+        <div className="foot-links">
+          <Link href="/#what">What is Socria</Link>
+          <Link href="/#how">How it works</Link>
+          <Link href="/blog">Journal</Link>
+          <Link href="/#philosophy">Philosophy</Link>
+        </div>
+      </div>
+      <div className="foot-bottom">
+        <span>© {new Date().getFullYear()} Socria</span>
+        <span className="it">Human-first intelligence</span>
+      </div>
     </footer>
   );
 }

@@ -518,9 +518,9 @@ export default function ChatPage() {
 
             {sending && !streamed && (
               <div className="my-6 flex items-center gap-1 text-ink/50">
-                <span className="dot" />
-                <span className="dot" />
-                <span className="dot" />
+                <span className="thinking-dot" />
+                <span className="thinking-dot" />
+                <span className="thinking-dot" />
                 <span className="ml-2 font-serif italic text-sm">thinking</span>
               </div>
             )}
