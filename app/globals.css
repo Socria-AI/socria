@@ -610,3 +610,110 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
   gap: 8px;
 }
 .blog-foot .it { font-family: var(--serif); font-style: italic; }
+
+/* ===== 404 ===== */
+.nf-root { min-height: 100vh; display: flex; flex-direction: column; }
+.nf-root h1, .nf-root h2, .nf-root h3 {
+  font-family: var(--serif);
+  font-weight: 400;
+  margin: 0;
+  letter-spacing: -0.02em;
+  line-height: 0.96;
+}
+.nf-root p { margin: 0; }
+.nf-root a { color: inherit; text-decoration: none; }
+.nf-root img { display: block; max-width: 100%; }
+
+.nf-main { flex: 1; display: flex; }
+.nf-block {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: clamp(96px, 12vh, 160px) var(--edge) clamp(48px, 6vw, 80px);
+  position: relative;
+  overflow: hidden;
+}
+
+.nf-code {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.34em;
+  font-family: var(--serif);
+  font-size: clamp(5.5rem, 22vw, 17rem);
+  line-height: 0.8;
+  letter-spacing: -0.04em;
+}
+.nf-code .glyph { margin: 0 0.04em; }
+.nf-code .glyph svg { height: 0.62em; }
+.nf-code .glyph svg [stroke] { stroke: var(--sage); }
+
+.nf-head {
+  font-size: clamp(2.2rem, 5.6vw, 4.6rem);
+  line-height: 1;
+  max-width: 16ch;
+  margin-top: clamp(28px, 4vw, 52px);
+}
+.nf-head .b { font-style: italic; color: var(--sage); }
+.nf-sub {
+  margin-top: 24px;
+  font-size: clamp(1.05rem, 1.6vw, 1.32rem);
+  line-height: 1.5;
+  max-width: 46ch;
+  opacity: 0.82;
+}
+.nf-sub .serif { font-family: var(--serif); font-style: italic; }
+
+.nf-row {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-top: clamp(34px, 5vw, 52px);
+  flex-wrap: wrap;
+}
+
+.nf-paths {
+  margin-top: clamp(40px, 5vw, 60px);
+  border-top: 1px solid var(--line-dark);
+  padding-top: clamp(28px, 3vw, 40px);
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background: var(--line-dark);
+}
+@media (max-width: 760px) { .nf-paths { grid-template-columns: 1fr; } }
+.nf-path {
+  background: var(--moss);
+  padding: 22px 4px 22px 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  transition: transform 0.25s, opacity 0.25s;
+  opacity: 0.9;
+}
+.nf-path:hover { opacity: 1; transform: translateX(6px); }
+.nf-path .pn { font-size: 0.74rem; letter-spacing: 0.16em; text-transform: uppercase; opacity: 0.6; font-weight: 600; }
+.nf-path .pt { font-family: var(--serif); font-size: clamp(1.3rem, 2vw, 1.7rem); line-height: 1.04; }
+.nf-path .pa { margin-left: auto; font-size: 1.2rem; transition: transform 0.25s; }
+.nf-path:hover .pa { transform: translateX(4px); }
+
+.nf-mark {
+  position: absolute;
+  right: -6%;
+  top: 50%;
+  transform: translateY(-50%);
+  width: min(46%, 520px);
+  filter: invert(1);
+  opacity: 0.06;
+  pointer-events: none;
+}
+
+/* The 404 reuses .nav / .btn / .eyebrow / .reveal / .foot-bottom from the
+   landing design system. Surface the nav/footer for the .nf-root scope. */
+.nf-root header.nav { position: absolute; top: 0; left: 0; right: 0; z-index: 60; padding: 22px var(--edge); }
+.nf-root footer {
+  background: transparent;
+  color: rgba(245, 243, 235, 0.7);
+  padding: clamp(32px, 4vw, 56px) var(--edge);
+}
+.nf-root .foot-bottom { color: rgba(245, 243, 235, 0.7); }
