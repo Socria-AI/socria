@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=1080, height=1920" />
+<title>Socria — Think For Yourself</title>
+<meta name="ext-resource-dependency" content="./logo.png" data-resource-id="logo" />
+<meta name="ext-resource-dependency" content="./logo-light.png" data-resource-id="logoLight" />
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 1080px;
+    height: 1920px;
+    background: #0a0a0a;
+    overflow: hidden;
+  }
+  * { box-sizing: border-box; }
+  #root {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 1080px;
+    height: 1920px;
+  }
+</style>
+</head>
+<body>
+<div id="root"
+     data-composition-id="socria-ad"
+     data-start="0"
+     data-duration="15"
+     data-width="1080"
+     data-height="1920"></div>
+
+<script src="vendor/react.production.min.js"></script>
+<script src="vendor/react-dom.production.min.js"></script>
+<script src="vendor/babel.min.js"></script>
+
+<script type="text/babel" src="animations.jsx"></script>
+
+<!-- Hyperframes bridge: replace Stage with a non-scaling version and
+     register a GSAP-compatible timeline on window.__timelines. -->
+<script type="text/babel">
+(function () {
+  const DURATION = 15;
+  const COMP_ID = 'socria-ad';
+
+  const TimelineContext = window.TimelineContext;
+
+  let stageSetTime = null;
+  let lastTime = 0;
+
+  function Stage({ width = 1080, height = 1920, duration = DURATION, background = '#f5f3eb', children }) {
+    const [time, setTime] = React.useState(0);
+
+    React.useEffect(() => {
+      stageSetTime = setTime;
+      return () => { if (stageSetTime === setTime) stageSetTime = null; };
+    }, []);
+
+    const ctxValue = React.useMemo(
+      () => ({ time, duration, playing: false, setTime, setPlaying: () => {} }),
+      [time, duration]
+    );
+
+    return (
+      <div
+        id="anim-canvas"
+        style={{
+          position: 'absolute', top: 0, left: 0,
+          width, height, background, overflow: 'hidden',
+        }}
+      >
+        <TimelineContext.Provider value={ctxValue}>
+          {children}
+        </TimelineContext.Provider>
+      </div>
+    );
+  }
+
+  window.Stage = Stage;
+
+  window.__timelines = window.__timelines || {};
+  window.__timelines[COMP_ID] = {
+    seek(t /*, suppress */) {
+      const v = Math.max(0, Math.min(DURATION, Number(t) || 0));
+      lastTime = v;
+      if (stageSetTime) stageSetTime(v);
+      return this;
+    },
+    pause() { return this; },
+    play() { return this; },
+    duration() { return DURATION; },
+    totalDuration() { return DURATION; },
+    progress() { return lastTime / DURATION; },
+    time() { return lastTime; },
+    isActive() { return false; },
+    paused() { return true; },
+  };
+})();
+</script>
+
+<script type="text/babel" src="ad.jsx"></script>
+</body>
+</html>
