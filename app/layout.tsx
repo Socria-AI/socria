@@ -2,6 +2,7 @@
 import type { Metadata } from 'next';
 import { Instrument_Serif, Inter } from 'next/font/google';
 import { ClerkProvider } from '@clerk/nextjs';
+import { Analytics } from '@vercel/analytics/react';
 import './globals.css';
 
 const serif = Instrument_Serif({
@@ -39,7 +40,10 @@ export default function RootLayout({
       }}
     >
       <html lang="en" className={`${serif.variable} ${sans.variable}`}>
-        <body className="paper-bg antialiased">{children}</body>
+        <body className="paper-bg antialiased">
+          {children}
+          <Analytics />
+        </body>
       </html>
     </ClerkProvider>
   );
