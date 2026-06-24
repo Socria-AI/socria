@@ -7,6 +7,7 @@ import {
   SignedOut,
   SignInButton,
   UserButton,
+  useClerk,
   useUser,
 } from '@clerk/nextjs';
 import { Logo } from '@/components/Logo';
@@ -26,6 +27,10 @@ interface Conversation {
 const STORAGE_KEY = 'socria.conversations.v1';
 const ACTIVE_KEY = 'socria.activeConversationId.v1';
 const MIGRATED_KEY = 'socria.cloudMigrated.v1';
+// Set the first time an anonymous user finishes a thought session (gets an
+// AI reply). From then on, starting a *second* anonymous session requires
+// sign-in — even if they delete the first one. Cleared on sign-in.
+const USED_FREE_KEY = 'socria.usedFreeConvo.v1';
 
 const STARTER_PROMPTS = [
   'I don’t know what decision to make',
@@ -58,8 +63,25 @@ function saveLocal(convos: Conversation[]) {
   }
 }
 
+function readUsedFree(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    return localStorage.getItem(USED_FREE_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function writeUsedFree(v: boolean) {
+  try {
+    if (v) localStorage.setItem(USED_FREE_KEY, '1');
+    else localStorage.removeItem(USED_FREE_KEY);
+  } catch {}
+}
+
 export default function ChatPage() {
   const { isLoaded, isSignedIn, user } = useUser();
+  const { openSignIn } = useClerk();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [input, setInput] = useState('');
@@ -68,10 +90,16 @@ export default function ChatPage() {
   const [error, setError] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [hydrating, setHydrating] = useState(true);
+  const [usedFree, setUsedFree] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const mode: 'cloud' | 'local' = isSignedIn ? 'cloud' : 'local';
+
+  // Anonymous users get one free thought session. They're "locked out" of
+  // starting a new one once that flag is set OR they're already mid-session.
+  const lockedOut =
+    !isSignedIn && (usedFree || conversations.length >= 1);
 
   // Load conversations whenever auth state resolves or flips.
   useEffect(() => {
@@ -83,6 +111,9 @@ export default function ChatPage() {
       setError(null);
 
       if (isSignedIn) {
+        // Signed-in users have no per-session cap; clear the local flag.
+        writeUsedFree(false);
+        setUsedFree(false);
         // First sign-in for this browser: push localStorage into the cloud.
         try {
           const migratedFor = localStorage.getItem(MIGRATED_KEY);
@@ -121,6 +152,7 @@ export default function ChatPage() {
         const stored = loadLocal();
         if (cancelled) return;
         setConversations(stored);
+        setUsedFree(readUsedFree());
         const lastActive =
           typeof window !== 'undefined'
             ? localStorage.getItem(ACTIVE_KEY)
@@ -183,6 +215,11 @@ export default function ChatPage() {
   }
 
   function newSession() {
+    // Anonymous users only get one session; nudge to sign-in for a second.
+    if (lockedOut) {
+      openSignIn({});
+      return;
+    }
     const id = uid();
     const fresh: Conversation = {
       id,
@@ -223,6 +260,13 @@ export default function ChatPage() {
     const text = content.trim();
     if (!text || sending) return;
     setError(null);
+
+    // Anonymous user trying to spin up a *second* session — gate to sign-in.
+    // (They can keep messaging inside their existing session; activeId is set.)
+    if (!isSignedIn && !activeId && (usedFree || conversations.length >= 1)) {
+      openSignIn({});
+      return;
+    }
 
     // Ensure we have an active conversation
     let workingId = activeId;
@@ -307,6 +351,13 @@ export default function ChatPage() {
 
       const updated = withAssistant.find((c) => c.id === workingId)!;
       await persistConversation(updated, withAssistant);
+
+      // Anonymous user just finished one full exchange — they've used their
+      // free session. Any new-session attempt from here on opens the sign-in.
+      if (!isSignedIn) {
+        writeUsedFree(true);
+        setUsedFree(true);
+      }
     } catch (e: any) {
       setError(e?.message || 'Failed to send');
       // Roll back the user message we just added.
@@ -354,10 +405,17 @@ export default function ChatPage() {
           <button
             onClick={newSession}
             className="w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-lg border border-ink/15 hover:border-moss-600 hover:bg-moss-50/40 transition-all group"
+            title={
+              lockedOut
+                ? 'Sign in to start more sessions'
+                : 'Start a new thought session'
+            }
           >
-            <span className="text-moss-700 text-lg leading-none">+</span>
+            <span className="text-moss-700 text-lg leading-none">
+              {lockedOut ? '↗' : '+'}
+            </span>
             <span className="text-[14px] text-ink/80 group-hover:text-ink font-medium">
-              New thought session
+              {lockedOut ? 'Sign in for more sessions' : 'New thought session'}
             </span>
           </button>
         </div>
@@ -466,7 +524,29 @@ export default function ChatPage() {
 
         <div className="flex-1 overflow-y-auto">
           <div className="max-w-2xl mx-auto px-6 py-10">
-            {!hasMessages && (
+            {!hasMessages && !isSignedIn && usedFree ? (
+              // Anon user who used their free convo but has no active one
+              // (either never created another or deleted the first). Hard
+              // gate: no starter prompts, just a sign-in CTA.
+              <div className="text-center mt-12 animate-fade-up">
+                <h2 className="font-serif text-3xl md:text-4xl text-ink leading-tight">
+                  You&rsquo;ve used your free session.
+                </h2>
+                <p className="mt-3 text-ink/60 font-serif italic max-w-md mx-auto">
+                  Create a free account to keep thinking with Socria. Your
+                  sessions sync across every device.
+                </p>
+                <SignInButton mode="modal">
+                  <button className="mt-8 inline-flex items-center gap-2 rounded-full bg-moss-600 text-paper hover:bg-moss-700 transition-colors h-12 px-7 text-[15px] font-medium">
+                    Create a free account
+                    <span aria-hidden>→</span>
+                  </button>
+                </SignInButton>
+                <p className="mt-4 text-[12px] text-ink/40">
+                  Takes 30 seconds. No credit card.
+                </p>
+              </div>
+            ) : !hasMessages ? (
               <div className="text-center mt-12 animate-fade-up">
                 <h2 className="font-serif text-3xl md:text-4xl text-ink leading-tight">
                   What would you like to think through?
@@ -493,10 +573,8 @@ export default function ChatPage() {
                   <div className="mt-8 p-5 rounded-xl border border-moss-200/60 bg-moss-50/40 text-left flex items-center gap-4">
                     <div className="flex-1">
                       <p className="text-[14px] text-ink/80 leading-relaxed">
-                        Your sessions are saved on this device only.
-                      </p>
-                      <p className="mt-1 text-[13px] text-ink/60 font-serif italic leading-relaxed">
-                        Create a free account to save them across every device.
+                        Your first session is free. After that, sign in to
+                        keep thinking and sync across devices.
                       </p>
                     </div>
                     <SignInButton mode="modal">
@@ -508,7 +586,7 @@ export default function ChatPage() {
                   </div>
                 </SignedOut>
               </div>
-            )}
+            ) : null}
 
             {messages.map((m, i) => (
               <Bubble key={i} role={m.role} content={m.content} />
@@ -537,6 +615,18 @@ export default function ChatPage() {
 
         <div className="border-t border-border/60 bg-paper/80 backdrop-blur-sm">
           <div className="max-w-2xl mx-auto px-6 py-4">
+            {!isSignedIn && hasMessages && (
+              <div className="mb-3 flex items-center justify-between gap-3 px-1 text-[12px] text-ink/55">
+                <span className="font-serif italic">
+                  This is your free session — sign in to start more.
+                </span>
+                <SignInButton mode="modal">
+                  <button className="text-moss-700 hover:text-moss-800 font-medium">
+                    Sign in →
+                  </button>
+                </SignInButton>
+              </div>
+            )}
             <div className="flex items-end gap-3 rounded-2xl border border-ink/15 bg-white px-4 py-3 focus-within:border-moss-600 transition-colors">
               <textarea
                 ref={textareaRef}
