@@ -11,6 +11,8 @@ import {
   useUser,
 } from '@clerk/nextjs';
 import { Logo } from '@/components/Logo';
+import { ModelPicker } from '@/components/ModelPicker';
+import { SOCRIA_MODELS, type SocriaModel } from '@/lib/socria-prompt';
 
 type Role = 'user' | 'assistant';
 interface Message {
@@ -31,6 +33,17 @@ const MIGRATED_KEY = 'socria.cloudMigrated.v1';
 // AI reply). From then on, starting a *second* anonymous session requires
 // sign-in — even if they delete the first one. Cleared on sign-in.
 const USED_FREE_KEY = 'socria.usedFreeConvo.v1';
+const MODEL_KEY = 'socria.model.v1';
+
+function readModel(): SocriaModel {
+  if (typeof window === 'undefined') return 'core-2';
+  try {
+    const raw = localStorage.getItem(MODEL_KEY);
+    return raw === 'core-3' ? 'core-3' : 'core-2';
+  } catch {
+    return 'core-2';
+  }
+}
 
 const STARTER_PROMPTS = [
   'I don’t know what decision to make',
@@ -91,6 +104,7 @@ export default function ChatPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [hydrating, setHydrating] = useState(true);
   const [usedFree, setUsedFree] = useState(false);
+  const [model, setModel] = useState<SocriaModel>('core-2');
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -178,6 +192,17 @@ export default function ChatPage() {
     if (mode !== 'local') return;
     if (activeId) localStorage.setItem(ACTIVE_KEY, activeId);
   }, [activeId, mode]);
+
+  // Hydrate + persist the selected Socria model.
+  useEffect(() => {
+    setModel(readModel());
+  }, []);
+  function pickModel(next: SocriaModel) {
+    setModel(next);
+    try {
+      localStorage.setItem(MODEL_KEY, next);
+    } catch {}
+  }
 
   // Scroll to bottom when messages or stream changes
   const active = conversations.find((c) => c.id === activeId);
@@ -311,7 +336,10 @@ export default function ChatPage() {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: convoForRequest.messages }),
+        body: JSON.stringify({
+          messages: convoForRequest.messages,
+          model,
+        }),
       });
 
       if (!res.ok) {
@@ -506,9 +534,9 @@ export default function ChatPage() {
             Thought session
           </span>
           <div className="flex items-center gap-3">
-            <span className="font-serif italic text-ink/40 text-sm hidden sm:inline">
-              Socria Core 2.0
-            </span>
+            <div className="hidden sm:block">
+              <ModelPicker value={model} onChange={pickModel} />
+            </div>
             <SignedOut>
               <SignInButton mode="modal">
                 <button className="text-[13px] text-ink/70 hover:text-ink transition-colors">
@@ -676,9 +704,36 @@ function Bubble({ role, content }: { role: Role; content: string }) {
           </div>
         )}
         <div className={`prose-socria ${isUser ? 'text-ink' : 'text-ink/90 text-[15.5px]'}`}>
-          {content}
+          {isUser ? content : renderEmphasis(content)}
         </div>
       </div>
     </div>
   );
+}
+
+// Parse single-asterisk `*emphasis*` runs and render them as italic
+// Instrument Serif in the brand green. Anything outside asterisks renders
+// as plain text. Streaming-safe: a dangling `*` at the end of the buffer
+// (mid-token) is rendered literally until the closing `*` arrives.
+function renderEmphasis(text: string): React.ReactNode {
+  const parts: React.ReactNode[] = [];
+  const re = /\*([^*\n]+)\*/g;
+  let last = 0;
+  let m: RegExpExecArray | null;
+  let key = 0;
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > last) parts.push(text.slice(last, m.index));
+    parts.push(
+      <em
+        key={key++}
+        className="font-serif italic text-moss-700"
+        style={{ fontStyle: 'italic' }}
+      >
+        {m[1]}
+      </em>
+    );
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) parts.push(text.slice(last));
+  return parts;
 }

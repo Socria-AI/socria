@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
-import { SOCRIA_SYSTEM_PROMPT } from '@/lib/socria-prompt';
+import { resolveModel } from '@/lib/socria-prompt';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -25,6 +25,7 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json().catch(() => null);
     const messages = body?.messages;
+    const modelConfig = resolveModel(body?.model);
 
     if (!Array.isArray(messages) || messages.length === 0) {
       return NextResponse.json(
@@ -60,12 +61,20 @@ export async function POST(req: NextRequest) {
       .map((m: any) => ({ role: m.role, content: m.content }));
 
     const openai = new OpenAI({ apiKey });
-    const model = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+
+    // Each Socria model can have its OpenAI mapping overridden via env so
+    // you can swap to a cheaper model without code changes:
+    //   OPENAI_MODEL          (Core 2, default gpt-4o-mini)
+    //   OPENAI_MODEL_CORE_3   (Core 3, default gpt-4o)
+    const openaiModel =
+      (modelConfig.id === 'core-3'
+        ? process.env.OPENAI_MODEL_CORE_3
+        : process.env.OPENAI_MODEL) || modelConfig.defaultOpenAIModel;
 
     const completion = await openai.chat.completions.create({
-      model,
+      model: openaiModel,
       messages: [
-        { role: 'system', content: SOCRIA_SYSTEM_PROMPT },
+        { role: 'system', content: modelConfig.prompt },
         ...clean,
       ],
       temperature: 0.7,

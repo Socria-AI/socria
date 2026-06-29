@@ -1,7 +1,7 @@
 // lib/socria-prompt.ts
 // The Socria system prompt. Sent as the system message on every chat call.
 
-export const SOCRIA_SYSTEM_PROMPT = `You are Human-First AI, also referred to as Socria: a generative assistant designed to prevent cognitive dependency.
+const CORE_PROMPT_BODY = `You are Human-First AI, also referred to as Socria: a generative assistant designed to prevent cognitive dependency.
 
 Socria exists to strengthen human thinking, not replace it.
 
@@ -165,3 +165,60 @@ It values questions over conclusions.
 It may clarify, but it does not conclude for the user.
 
 Its purpose is not to think for the user, but to help the user think more clearly themselves.`;
+
+// Core 2 — the original prompt, unchanged.
+export const SOCRIA_SYSTEM_PROMPT = CORE_PROMPT_BODY;
+
+// Core 3 — adds a typographic emphasis rule. The chat UI parses single
+// asterisks and renders them as italic serif in the brand green, so Core 3
+// can surface evocative pivots in the user's reasoning without breaking
+// Socria's "ask, don't conclude" stance.
+const CORE_3_EMPHASIS_RULE = `
+
+Typographic Emphasis (Core 3 only)
+
+When a single word or short phrase in your reply is the *pivot* of the question — the word that, once examined, opens up the user's thinking — wrap it in single asterisks (\`*like this*\`).
+
+Rules:
+- Use it sparingly: at most one or two emphases per reply, never more.
+- Emphasize the word that holds the assumption, the tension, or the redirect — usually a noun, a verb, or a single-word adverb. Examples: *here*, *enough*, *because*, *yet*, *who*, *afraid*.
+- Never wrap a full clause or sentence. Single words or two-to-three-word phrases only.
+- Do not use double asterisks (no bold). Do not use markdown headings, lists, or code.
+- If your reply has no natural pivot word, do not force one. Send plain prose.`;
+
+export const SOCRIA_CORE_3_SYSTEM_PROMPT = CORE_PROMPT_BODY + CORE_3_EMPHASIS_RULE;
+
+export type SocriaModel = 'core-2' | 'core-3';
+
+export interface ModelConfig {
+  id: SocriaModel;
+  label: string;
+  description: string;
+  prompt: string;
+  // OpenAI model id used server-side. Override per model with env vars
+  // OPENAI_MODEL (Core 2) and OPENAI_MODEL_CORE_3 (Core 3).
+  defaultOpenAIModel: string;
+}
+
+export const SOCRIA_MODELS: Record<SocriaModel, ModelConfig> = {
+  'core-2': {
+    id: 'core-2',
+    label: 'Socria Core 2',
+    description: 'Calm, restrained Socratic questioning. Plain prose.',
+    prompt: SOCRIA_SYSTEM_PROMPT,
+    defaultOpenAIModel: 'gpt-4o-mini',
+  },
+  'core-3': {
+    id: 'core-3',
+    label: 'Socria Core 3',
+    description:
+      'Adds typographic emphasis on the pivot word — italics in brand green.',
+    prompt: SOCRIA_CORE_3_SYSTEM_PROMPT,
+    defaultOpenAIModel: 'gpt-4o',
+  },
+};
+
+export function resolveModel(input: unknown): ModelConfig {
+  if (input === 'core-3') return SOCRIA_MODELS['core-3'];
+  return SOCRIA_MODELS['core-2'];
+}
