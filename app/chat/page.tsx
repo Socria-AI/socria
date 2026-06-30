@@ -444,7 +444,7 @@ export default function ChatPage() {
   const hasMessages = messages.length > 0;
 
   return (
-    <div className="flex min-h-dvh">
+    <div className="flex h-dvh">
       {/* Sidebar */}
       <aside
         className={`${
@@ -544,7 +544,7 @@ export default function ChatPage() {
 
       {/* Main */}
       <div className="flex-1 flex flex-col min-w-0">
-        <div className="border-b border-border/60 px-4 md:px-6 h-16 flex items-center justify-between shrink-0 bg-paper/70 backdrop-blur-sm">
+        <div className="sticky top-0 z-20 border-b border-border/60 px-4 md:px-6 h-16 flex items-center justify-between shrink-0 bg-paper/85 backdrop-blur-md">
           <button
             onClick={() => setSidebarOpen((v) => !v)}
             className="md:hidden text-ink/70 hover:text-ink p-2 -ml-2"
