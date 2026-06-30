@@ -380,29 +380,56 @@ export default function ChatPage() {
       if (reader) {
         // Two parallel loops:
         //  1. Receive: pull chunks from the OpenAI stream into `received`.
-        //  2. Reveal:  drip `received` into `revealed` on a timer so the
-        //              text appears at a deliberate, readable pace instead
-        //              of the unsteady raw-chunk cadence.
-        // Reveal speeds up when it's far behind so the final catch-up is
-        // never more than a beat or two after the stream ends.
+        //  2. Reveal:  drip `received` into `revealed` one *complete word*
+        //              at a time so each word can pop in with its own CSS
+        //              entrance animation.
+        // We never reveal a partial word mid-stream: we only advance once
+        // we have a word followed by trailing whitespace in the buffer.
+        // When the stream ends, any trailing partial word is flushed.
+        // Speed-up rules keep the lag bounded once the buffer's ahead.
         let received = '';
         let streamDone = false;
 
         const reveal = new Promise<void>((resolve) => {
-          const TICK_MS = 14;
+          const BASE_MS = 78;
           let revealed = '';
           const tick = () => {
             const lag = received.length - revealed.length;
+
             if (lag > 0) {
-              const advance = lag > 140 ? 6 : lag > 60 ? 3 : 1;
-              revealed = received.slice(0, revealed.length + advance);
-              setStreamed(revealed);
-            } else if (streamDone) {
+              const remaining = received.slice(revealed.length);
+              // Take one full word + its trailing whitespace.
+              const m = remaining.match(/^(\s*\S+\s+)/);
+              if (m) {
+                const advanceWords =
+                  lag > 220 ? 4 : lag > 100 ? 2 : 1;
+                let take = 0;
+                let rest = remaining;
+                for (let i = 0; i < advanceWords; i++) {
+                  const mi = rest.match(/^(\s*\S+\s+)/);
+                  if (!mi) break;
+                  take += mi[0].length;
+                  rest = rest.slice(mi[0].length);
+                }
+                revealed = received.slice(0, revealed.length + take);
+                setStreamed(revealed);
+              } else if (streamDone) {
+                // Trailing partial word (no closing space). Flush it.
+                revealed = received;
+                setStreamed(revealed);
+              }
+            }
+
+            if (revealed.length >= received.length && streamDone) {
               assistantText = revealed;
               resolve();
               return;
             }
-            setTimeout(tick, TICK_MS);
+
+            // Faster cadence when we're behind; gentler when caught up.
+            const next =
+              lag > 220 ? 28 : lag > 100 ? 50 : BASE_MS;
+            setTimeout(tick, next);
           };
           tick();
         });
@@ -685,7 +712,9 @@ export default function ChatPage() {
               <Bubble key={i} role={m.role} content={m.content} />
             ))}
 
-            {streamed && <Bubble role="assistant" content={streamed} />}
+            {streamed && (
+              <Bubble role="assistant" content={streamed} animate />
+            )}
 
             {sending && !streamed && (
               <div className="my-6 flex items-center gap-1 text-ink/50">
@@ -752,7 +781,15 @@ export default function ChatPage() {
   );
 }
 
-function Bubble({ role, content }: { role: Role; content: string }) {
+function Bubble({
+  role,
+  content,
+  animate = false,
+}: {
+  role: Role;
+  content: string;
+  animate?: boolean;
+}) {
   const isUser = role === 'user';
   return (
     <div className={`my-6 flex ${isUser ? 'justify-end' : 'justify-start'}`}>
@@ -769,17 +806,19 @@ function Bubble({ role, content }: { role: Role; content: string }) {
           </div>
         )}
         <div className={`prose-socria ${isUser ? 'text-ink' : 'text-ink/90 text-[15.5px]'}`}>
-          {isUser ? content : renderEmphasis(content)}
+          {isUser
+            ? content
+            : animate
+              ? renderAnimated(content)
+              : renderEmphasis(content)}
         </div>
       </div>
     </div>
   );
 }
 
-// Parse single-asterisk `*emphasis*` runs and render them as italic
-// Instrument Serif in the brand green. Anything outside asterisks renders
-// as plain text. Streaming-safe: a dangling `*` at the end of the buffer
-// (mid-token) is rendered literally until the closing `*` arrives.
+// Static renderer for persisted assistant messages. Wraps single-asterisk
+// `*emphasis*` runs in italic moss serif and leaves the rest as plain text.
 function renderEmphasis(text: string): React.ReactNode {
   const parts: React.ReactNode[] = [];
   const re = /\*([^*\n]+)\*/g;
@@ -801,4 +840,48 @@ function renderEmphasis(text: string): React.ReactNode {
   }
   if (last < text.length) parts.push(text.slice(last));
   return parts;
+}
+
+// Animated renderer for the *currently streaming* assistant bubble: every
+// word becomes a span with the bubbleIn CSS entrance animation. Stable
+// keys mean existing words don't replay the animation as the bubble re-
+// renders — only the newly arrived word at the end pops in.
+function renderAnimated(text: string): React.ReactNode {
+  // First pass: split content into typed segments (plain | em) using the
+  // same `*…*` rule as renderEmphasis.
+  type Seg = { type: 'plain' | 'em'; text: string };
+  const segs: Seg[] = [];
+  const re = /\*([^*\n]+)\*/g;
+  let last = 0;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > last) segs.push({ type: 'plain', text: text.slice(last, m.index) });
+    segs.push({ type: 'em', text: m[1] });
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) segs.push({ type: 'plain', text: text.slice(last) });
+
+  // Second pass: split each segment by whitespace, keep whitespace as
+  // text nodes, wrap each non-whitespace word in a `.bubble-word` span.
+  // Keys are stable: `${segIndex}-${partIndex}`.
+  const out: React.ReactNode[] = [];
+  segs.forEach((seg, si) => {
+    const parts = seg.text.split(/(\s+)/);
+    parts.forEach((p, pi) => {
+      if (p === '') return;
+      if (/^\s+$/.test(p)) {
+        out.push(p);
+        return;
+      }
+      out.push(
+        <span
+          key={`${si}-${pi}`}
+          className={`bubble-word${seg.type === 'em' ? ' em' : ''}`}
+        >
+          {p}
+        </span>
+      );
+    });
+  });
+  return out;
 }
