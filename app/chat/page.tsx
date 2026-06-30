@@ -378,12 +378,48 @@ export default function ChatPage() {
       let assistantText = '';
 
       if (reader) {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          assistantText += decoder.decode(value, { stream: true });
-          setStreamed(assistantText);
-        }
+        // Two parallel loops:
+        //  1. Receive: pull chunks from the OpenAI stream into `received`.
+        //  2. Reveal:  drip `received` into `revealed` on a timer so the
+        //              text appears at a deliberate, readable pace instead
+        //              of the unsteady raw-chunk cadence.
+        // Reveal speeds up when it's far behind so the final catch-up is
+        // never more than a beat or two after the stream ends.
+        let received = '';
+        let streamDone = false;
+
+        const reveal = new Promise<void>((resolve) => {
+          const TICK_MS = 14;
+          let revealed = '';
+          const tick = () => {
+            const lag = received.length - revealed.length;
+            if (lag > 0) {
+              const advance = lag > 140 ? 6 : lag > 60 ? 3 : 1;
+              revealed = received.slice(0, revealed.length + advance);
+              setStreamed(revealed);
+            } else if (streamDone) {
+              assistantText = revealed;
+              resolve();
+              return;
+            }
+            setTimeout(tick, TICK_MS);
+          };
+          tick();
+        });
+
+        const receive = (async () => {
+          try {
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              received += decoder.decode(value, { stream: true });
+            }
+          } finally {
+            streamDone = true;
+          }
+        })();
+
+        await Promise.all([reveal, receive]);
       }
 
       // Persist assistant message
