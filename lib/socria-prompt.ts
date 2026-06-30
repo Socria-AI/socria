@@ -418,6 +418,7 @@ export interface ModelConfig {
   description: string;
   defaultOpenAIModel: string;
   supportsDepth: boolean;
+  requiresAuth: boolean;
 }
 
 export const SOCRIA_MODELS: Record<SocriaModel, ModelConfig> = {
@@ -427,6 +428,7 @@ export const SOCRIA_MODELS: Record<SocriaModel, ModelConfig> = {
     description: 'Calm, restrained Socratic questioning. Plain prose.',
     defaultOpenAIModel: 'gpt-4o-mini',
     supportsDepth: false,
+    requiresAuth: false,
   },
   'core-3': {
     id: 'core-3',
@@ -435,6 +437,7 @@ export const SOCRIA_MODELS: Record<SocriaModel, ModelConfig> = {
       'Language-noticing with typographic emphasis. Adjustable thinking depth.',
     defaultOpenAIModel: 'gpt-4o',
     supportsDepth: true,
+    requiresAuth: true,
   },
 };
 

@@ -216,7 +216,23 @@ export default function ChatPage() {
     setModel(readModel());
     setDepth(readDepth());
   }, []);
+  // Anonymous users may have a Core 3 selection saved from a previous
+  // signed-in session — downgrade to Core 2 until they sign in again so
+  // the API gate doesn't bounce every message they send.
+  useEffect(() => {
+    if (!isLoaded) return;
+    if (!isSignedIn && SOCRIA_MODELS[model].requiresAuth) {
+      setModel('core-2');
+      try {
+        localStorage.setItem(MODEL_KEY, 'core-2');
+      } catch {}
+    }
+  }, [isLoaded, isSignedIn, model]);
   function pickModel(next: SocriaModel) {
+    if (SOCRIA_MODELS[next].requiresAuth && !isSignedIn) {
+      openSignIn({});
+      return;
+    }
     setModel(next);
     try {
       localStorage.setItem(MODEL_KEY, next);
@@ -624,7 +640,12 @@ export default function ChatPage() {
           </span>
           <div className="flex items-center gap-3">
             <div className="hidden sm:flex items-center gap-3">
-              <ModelPicker value={model} onChange={pickModel} />
+              <ModelPicker
+                value={model}
+                onChange={pickModel}
+                isSignedIn={!!isSignedIn}
+                onLockedAttempt={() => openSignIn({})}
+              />
               {SOCRIA_MODELS[model].supportsDepth && (
                 <DepthPicker value={depth} onChange={pickDepth} />
               )}

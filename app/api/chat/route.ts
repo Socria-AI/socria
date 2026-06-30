@@ -5,7 +5,12 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
-import { buildSystemPrompt, resolveOpenAIModel } from '@/lib/socria-prompt';
+import { auth } from '@clerk/nextjs/server';
+import {
+  buildSystemPrompt,
+  resolveOpenAIModel,
+  SOCRIA_MODELS,
+} from '@/lib/socria-prompt';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -25,6 +30,25 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json().catch(() => null);
     const messages = body?.messages;
+
+    // Server-side gate: models flagged requiresAuth need a Clerk session.
+    // Even if the client UI is bypassed, anon users can't hit Core 3.
+    const { userId } = auth();
+    const requestedModelId = body?.model;
+    const requestedConfig =
+      requestedModelId === 'core-3'
+        ? SOCRIA_MODELS['core-3']
+        : SOCRIA_MODELS['core-2'];
+    if (requestedConfig.requiresAuth && !userId) {
+      return NextResponse.json(
+        {
+          error: `Sign in to use ${requestedConfig.label}.`,
+          requiresAuth: true,
+        },
+        { status: 401 }
+      );
+    }
+
     const { prompt: systemPrompt, model } = buildSystemPrompt(
       body?.model,
       body?.depth
