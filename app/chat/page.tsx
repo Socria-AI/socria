@@ -12,7 +12,12 @@ import {
 } from '@clerk/nextjs';
 import { Logo } from '@/components/Logo';
 import { ModelPicker } from '@/components/ModelPicker';
-import { SOCRIA_MODELS, type SocriaModel } from '@/lib/socria-prompt';
+import { DepthPicker } from '@/components/DepthPicker';
+import {
+  SOCRIA_MODELS,
+  type SocriaModel,
+  type ThinkingDepth,
+} from '@/lib/socria-prompt';
 
 type Role = 'user' | 'assistant';
 interface Message {
@@ -34,6 +39,7 @@ const MIGRATED_KEY = 'socria.cloudMigrated.v1';
 // sign-in — even if they delete the first one. Cleared on sign-in.
 const USED_FREE_KEY = 'socria.usedFreeConvo.v1';
 const MODEL_KEY = 'socria.model.v1';
+const DEPTH_KEY = 'socria.depth.v1';
 
 function readModel(): SocriaModel {
   if (typeof window === 'undefined') return 'core-2';
@@ -42,6 +48,17 @@ function readModel(): SocriaModel {
     return raw === 'core-3' ? 'core-3' : 'core-2';
   } catch {
     return 'core-2';
+  }
+}
+
+function readDepth(): ThinkingDepth {
+  if (typeof window === 'undefined') return 'balanced';
+  try {
+    const raw = localStorage.getItem(DEPTH_KEY);
+    if (raw === 'quick' || raw === 'deep' || raw === 'abstract') return raw;
+    return 'balanced';
+  } catch {
+    return 'balanced';
   }
 }
 
@@ -105,6 +122,7 @@ export default function ChatPage() {
   const [hydrating, setHydrating] = useState(true);
   const [usedFree, setUsedFree] = useState(false);
   const [model, setModel] = useState<SocriaModel>('core-2');
+  const [depth, setDepth] = useState<ThinkingDepth>('balanced');
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -193,14 +211,21 @@ export default function ChatPage() {
     if (activeId) localStorage.setItem(ACTIVE_KEY, activeId);
   }, [activeId, mode]);
 
-  // Hydrate + persist the selected Socria model.
+  // Hydrate + persist the selected Socria model and thinking depth.
   useEffect(() => {
     setModel(readModel());
+    setDepth(readDepth());
   }, []);
   function pickModel(next: SocriaModel) {
     setModel(next);
     try {
       localStorage.setItem(MODEL_KEY, next);
+    } catch {}
+  }
+  function pickDepth(next: ThinkingDepth) {
+    setDepth(next);
+    try {
+      localStorage.setItem(DEPTH_KEY, next);
     } catch {}
   }
 
@@ -339,6 +364,7 @@ export default function ChatPage() {
         body: JSON.stringify({
           messages: convoForRequest.messages,
           model,
+          depth,
         }),
       });
 
@@ -534,8 +560,11 @@ export default function ChatPage() {
             Thought session
           </span>
           <div className="flex items-center gap-3">
-            <div className="hidden sm:block">
+            <div className="hidden sm:flex items-center gap-3">
               <ModelPicker value={model} onChange={pickModel} />
+              {SOCRIA_MODELS[model].supportsDepth && (
+                <DepthPicker value={depth} onChange={pickDepth} />
+              )}
             </div>
             <SignedOut>
               <SignInButton mode="modal">
@@ -726,7 +755,7 @@ function renderEmphasis(text: string): React.ReactNode {
     parts.push(
       <em
         key={key++}
-        className="font-serif italic text-moss-700"
+        className="font-serif italic text-moss-700 text-[1.18em] leading-[1]"
         style={{ fontStyle: 'italic' }}
       >
         {m[1]}
