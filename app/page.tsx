@@ -119,7 +119,7 @@ export default function LandingPage() {
               src="/socria-logo.png"
               alt="Socria — light reaching a foundation"
             />
-            <span className="cap">Think before the machine.</span>
+            <span className="cap">Think for yourself.</span>
           </div>
           <div className="sc-product">
             <div className="chat-frame reveal">
@@ -423,7 +423,7 @@ export default function LandingPage() {
               <img src="/socria-logo.png" alt="" />
               <span className="name">Socria</span>
             </div>
-            <p className="foot-tag">Think before the machine.</p>
+            <p className="foot-tag">Think for yourself.</p>
           </div>
           <div className="foot-links">
             <a href="#problem">The problem</a>

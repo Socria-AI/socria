@@ -118,7 +118,7 @@ export default function NotFound() {
           style={{ marginTop: 0, borderTop: 'none', paddingTop: 0 }}
         >
           <span>© {year} Socria</span>
-          <span className="it">Think before the machine.</span>
+          <span className="it">Think for yourself.</span>
         </div>
       </footer>
     </div>

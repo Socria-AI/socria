@@ -77,7 +77,7 @@ export default function AccountPage() {
       </main>
 
       <footer className="px-6 md:px-10 py-6 text-[12px] text-ink/40 font-serif italic text-center border-t border-border/60">
-        Think before the machine.
+        Think for yourself.
       </footer>
     </div>
   );

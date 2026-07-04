@@ -62,7 +62,7 @@ export function BlogFooter() {
             <img src="/socria-logo.png" alt="" />
             <span className="name">Socria</span>
           </div>
-          <p className="foot-tag">Think before the machine.</p>
+          <p className="foot-tag">Think for yourself.</p>
         </div>
         <div className="foot-links">
           <Link href="/#what">What is Socria</Link>

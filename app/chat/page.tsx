@@ -13,6 +13,7 @@ import {
 import { Logo } from '@/components/Logo';
 import { ModelPicker } from '@/components/ModelPicker';
 import { DepthPicker } from '@/components/DepthPicker';
+import { TryCore3Pill } from '@/components/TryCore3Pill';
 import {
   SOCRIA_MODELS,
   type SocriaModel,
@@ -649,6 +650,11 @@ export default function ChatPage() {
               {SOCRIA_MODELS[model].supportsDepth && (
                 <DepthPicker value={depth} onChange={pickDepth} />
               )}
+              <TryCore3Pill
+                currentModel={model}
+                isSignedIn={!!isSignedIn}
+                onTry={() => pickModel('core-3')}
+              />
             </div>
             <SignedOut>
               <SignInButton >

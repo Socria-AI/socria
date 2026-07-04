@@ -426,6 +426,63 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
 }
 .prose-socria p + p { margin-top: 0.75em; }
 
+/* Try Core 3 pill — soft pulse on the badge, and a cycling emphasis
+   demo on the word "might" inside the hover popover. */
+@keyframes tryCore3PulseGlow {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(94, 118, 51, 0.32);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(94, 118, 51, 0);
+  }
+}
+.try-core3-pill {
+  animation: tryCore3PulseGlow 2.4s ease-in-out infinite;
+}
+.try-core3-pill:hover {
+  animation-play-state: paused;
+}
+
+@keyframes tryCore3Cycle {
+  0%, 18% {
+    color: var(--ink);
+    font-style: normal;
+    font-family: inherit;
+    font-size: 1em;
+    letter-spacing: 0;
+  }
+  36%, 62% {
+    color: var(--moss-700);
+    font-style: italic;
+    font-family: var(--font-serif), "Instrument Serif", Georgia, serif;
+    font-size: 1.2em;
+    letter-spacing: 0.005em;
+  }
+  82%, 100% {
+    color: var(--ink);
+    font-style: normal;
+    font-family: inherit;
+    font-size: 1em;
+    letter-spacing: 0;
+  }
+}
+.try-core3-word {
+  display: inline-block;
+  animation: tryCore3Cycle 3s ease-in-out infinite;
+  transform-origin: center bottom;
+  will-change: color, font-size, font-family, font-style;
+}
+@media (prefers-reduced-motion: reduce) {
+  .try-core3-pill { animation: none; }
+  .try-core3-word {
+    animation: none;
+    color: var(--moss-700);
+    font-style: italic;
+    font-family: var(--font-serif), "Instrument Serif", Georgia, serif;
+    font-size: 1.18em;
+  }
+}
+
 /* Clerk auth pages — make the Clerk-rendered card feel at home in
    Socria's shell. The layout-level appearance prop styles Clerk's own
    internal elements; this handles the container padding and shadow. */

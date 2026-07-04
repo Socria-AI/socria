@@ -19,7 +19,7 @@ export const revalidate = 60;
 export const metadata: Metadata = {
   title: 'The Socria Journal — Notes on thinking clearly',
   description:
-    'Essays on reasoning, metacognition, and human-first AI. Think before the machine.',
+    'Essays on reasoning, metacognition, and human-first AI. Think for yourself.',
 };
 
 function formatDate(iso: string) {
