@@ -24,14 +24,14 @@ export default function LandingPage() {
               <Link href="/blog">Blog</Link>
             </nav>
             <SignedOut>
-              <SignInButton mode="modal">
+              <SignInButton >
                 <button className="nav-signin" type="button">
                   Sign in
                 </button>
               </SignInButton>
             </SignedOut>
             <SignedIn>
-              <UserButton afterSignOutUrl="/" />
+              <UserButton afterSignOutUrl="/" userProfileMode="navigation" userProfileUrl="/account" />
             </SignedIn>
             <Link href="/chat" className="btn btn-nav">
               Start a thought session <span className="arrow">→</span>

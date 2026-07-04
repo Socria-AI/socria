@@ -21,14 +21,14 @@ export default function NotFound() {
               <Link href="/blog">Blog</Link>
             </nav>
             <SignedOut>
-              <SignInButton mode="modal">
+              <SignInButton >
                 <button type="button" className="nav-signin">
                   Sign in
                 </button>
               </SignInButton>
             </SignedOut>
             <SignedIn>
-              <UserButton afterSignOutUrl="/" />
+              <UserButton afterSignOutUrl="/" userProfileMode="navigation" userProfileUrl="/account" />
             </SignedIn>
             <Link href="/chat" className="btn btn-nav">
               Start a thought session <span className="arrow">→</span>

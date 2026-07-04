@@ -2,12 +2,12 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   SignedIn,
   SignedOut,
   SignInButton,
   UserButton,
-  useClerk,
   useUser,
 } from '@clerk/nextjs';
 import { Logo } from '@/components/Logo';
@@ -111,7 +111,7 @@ function writeUsedFree(v: boolean) {
 
 export default function ChatPage() {
   const { isLoaded, isSignedIn, user } = useUser();
-  const { openSignIn } = useClerk();
+  const router = useRouter();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [input, setInput] = useState('');
@@ -230,7 +230,7 @@ export default function ChatPage() {
   }, [isLoaded, isSignedIn, model]);
   function pickModel(next: SocriaModel) {
     if (SOCRIA_MODELS[next].requiresAuth && !isSignedIn) {
-      openSignIn({});
+      router.push('/sign-in?redirect_url=/chat');
       return;
     }
     setModel(next);
@@ -283,7 +283,7 @@ export default function ChatPage() {
   function newSession() {
     // Anonymous users only get one session; nudge to sign-in for a second.
     if (lockedOut) {
-      openSignIn({});
+      router.push('/sign-in?redirect_url=/chat');
       return;
     }
     const id = uid();
@@ -330,7 +330,7 @@ export default function ChatPage() {
     // Anonymous user trying to spin up a *second* session — gate to sign-in.
     // (They can keep messaging inside their existing session; activeId is set.)
     if (!isSignedIn && !activeId && (usedFree || conversations.length >= 1)) {
-      openSignIn({});
+      router.push('/sign-in?redirect_url=/chat');
       return;
     }
 
@@ -602,14 +602,14 @@ export default function ChatPage() {
         <div className="border-t border-border/60 p-4">
           <SignedIn>
             <div className="flex items-center gap-3">
-              <UserButton afterSignOutUrl="/chat" />
+              <UserButton afterSignOutUrl="/chat" userProfileMode="navigation" userProfileUrl="/account" />
               <div className="text-[11px] text-ink/50 font-serif italic leading-tight">
                 Synced across your devices
               </div>
             </div>
           </SignedIn>
           <SignedOut>
-            <SignInButton mode="modal">
+            <SignInButton >
               <button className="w-full text-left text-[12px] text-ink/70 hover:text-ink font-serif italic">
                 Sign in to sync across devices →
               </button>
@@ -644,21 +644,21 @@ export default function ChatPage() {
                 value={model}
                 onChange={pickModel}
                 isSignedIn={!!isSignedIn}
-                onLockedAttempt={() => openSignIn({})}
+                onLockedAttempt={() => router.push('/sign-in?redirect_url=/chat')}
               />
               {SOCRIA_MODELS[model].supportsDepth && (
                 <DepthPicker value={depth} onChange={pickDepth} />
               )}
             </div>
             <SignedOut>
-              <SignInButton mode="modal">
+              <SignInButton >
                 <button className="text-[13px] text-ink/70 hover:text-ink transition-colors">
                   Sign in
                 </button>
               </SignInButton>
             </SignedOut>
             <SignedIn>
-              <UserButton afterSignOutUrl="/chat" />
+              <UserButton afterSignOutUrl="/chat" userProfileMode="navigation" userProfileUrl="/account" />
             </SignedIn>
           </div>
         </div>
@@ -677,7 +677,7 @@ export default function ChatPage() {
                   Create a free account to keep thinking with Socria. Your
                   sessions sync across every device.
                 </p>
-                <SignInButton mode="modal">
+                <SignInButton >
                   <button className="mt-8 inline-flex items-center gap-2 rounded-full bg-moss-600 text-paper hover:bg-moss-700 transition-colors h-12 px-7 text-[15px] font-medium">
                     Create a free account
                     <span aria-hidden>→</span>
@@ -718,7 +718,7 @@ export default function ChatPage() {
                         keep thinking and sync across devices.
                       </p>
                     </div>
-                    <SignInButton mode="modal">
+                    <SignInButton >
                       <button className="shrink-0 inline-flex items-center gap-2 rounded-full bg-moss-600 text-paper hover:bg-moss-700 transition-colors h-10 px-5 text-[13px] font-medium">
                         Create account
                         <span aria-hidden>→</span>
@@ -763,7 +763,7 @@ export default function ChatPage() {
                 <span className="font-serif italic">
                   This is your free session — sign in to start more.
                 </span>
-                <SignInButton mode="modal">
+                <SignInButton >
                   <button className="text-moss-700 hover:text-moss-800 font-medium">
                     Sign in →
                   </button>

@@ -426,6 +426,27 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
 }
 .prose-socria p + p { margin-top: 0.75em; }
 
+/* Clerk auth pages — make the Clerk-rendered card feel at home in
+   Socria's shell. The layout-level appearance prop styles Clerk's own
+   internal elements; this handles the container padding and shadow. */
+.socria-clerk-card {
+  width: 100%;
+}
+.socria-clerk-card .cl-rootBox,
+.socria-clerk-card .cl-card {
+  width: 100%;
+}
+.socria-clerk-card .cl-card {
+  padding: 32px 28px;
+}
+.socria-clerk-userprofile .cl-rootBox,
+.socria-clerk-userprofile .cl-card {
+  max-width: none;
+}
+.socria-clerk-userprofile .cl-card {
+  padding: 0;
+}
+
 /* Word-by-word pop reveal for streaming assistant replies. Each word span
    mounts with bubbleIn; spans that already exist across re-renders keep
    their stable key and do not replay the animation. */
