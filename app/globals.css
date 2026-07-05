@@ -10,7 +10,13 @@
   --ink-60: rgba(31, 31, 31, 0.6);
   --ink-40: rgba(31, 31, 31, 0.4);
   --moss: #5e7633;
+  /* Numeric aliases used by non-Tailwind CSS (modal, pill, etc.) */
+  --moss-50:  #f4f6ee;
+  --moss-100: #e4eada;
+  --moss-200: #cad5b6;
+  --moss-600: #5e7633;
   --moss-700: #475a28;
+  --moss-800: #38481f;
   --sage: #9CB874;
   --sage-bright: #aecb86;
   --forest: #2c3b18;
