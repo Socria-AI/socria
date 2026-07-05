@@ -14,6 +14,9 @@ import { Logo } from '@/components/Logo';
 import { ModelPicker } from '@/components/ModelPicker';
 import { DepthPicker } from '@/components/DepthPicker';
 import { TryCore3Pill } from '@/components/TryCore3Pill';
+import { Core3IntroModal } from '@/components/Core3IntroModal';
+
+const CORE3_INTRO_DISMISS_KEY = 'socria.core3IntroDontShowAgain.v1';
 import {
   SOCRIA_MODELS,
   type SocriaModel,
@@ -124,6 +127,9 @@ export default function ChatPage() {
   const [usedFree, setUsedFree] = useState(false);
   const [model, setModel] = useState<SocriaModel>('core-2');
   const [depth, setDepth] = useState<ThinkingDepth>('balanced');
+  const [core3ModalOpen, setCore3ModalOpen] = useState(false);
+  const [core3Dismissed, setCore3Dismissed] = useState(false);
+  const [autoOpenChecked, setAutoOpenChecked] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -244,6 +250,46 @@ export default function ChatPage() {
     try {
       localStorage.setItem(DEPTH_KEY, next);
     } catch {}
+  }
+
+  // Auto-open the Core 3 intro modal once per mount, unless the user has
+  // permanently dismissed it or is already using Core 3.
+  useEffect(() => {
+    if (!isLoaded || autoOpenChecked) return;
+    setAutoOpenChecked(true);
+    try {
+      const dismissed =
+        localStorage.getItem(CORE3_INTRO_DISMISS_KEY) === '1';
+      setCore3Dismissed(dismissed);
+      const currentModel = localStorage.getItem(MODEL_KEY);
+      if (!dismissed && currentModel !== 'core-3') {
+        setCore3ModalOpen(true);
+      }
+    } catch {}
+  }, [isLoaded, autoOpenChecked]);
+
+  function handleCore3ModalClose(dontShowAgain: boolean) {
+    if (dontShowAgain) {
+      try {
+        localStorage.setItem(CORE3_INTRO_DISMISS_KEY, '1');
+      } catch {}
+      setCore3Dismissed(true);
+    }
+    setCore3ModalOpen(false);
+  }
+
+  function handleCore3ModalTry() {
+    // Signed-in users trying it means they've discovered it — no need to
+    // nudge them again. Anon users get redirected to sign-in without a
+    // permanent dismiss so the modal returns for them once they come back.
+    if (isSignedIn) {
+      try {
+        localStorage.setItem(CORE3_INTRO_DISMISS_KEY, '1');
+      } catch {}
+      setCore3Dismissed(true);
+    }
+    setCore3ModalOpen(false);
+    pickModel('core-3');
   }
 
   // Scroll to bottom when messages or stream changes
@@ -525,6 +571,12 @@ export default function ChatPage() {
 
   return (
     <div className="flex h-dvh">
+      <Core3IntroModal
+        open={core3ModalOpen}
+        onClose={handleCore3ModalClose}
+        onTry={handleCore3ModalTry}
+        isSignedIn={!!isSignedIn}
+      />
       {/* Sidebar */}
       <aside
         className={`${
@@ -652,8 +704,8 @@ export default function ChatPage() {
               )}
               <TryCore3Pill
                 currentModel={model}
-                isSignedIn={!!isSignedIn}
-                onTry={() => pickModel('core-3')}
+                visible={!core3Dismissed}
+                onOpen={() => setCore3ModalOpen(true)}
               />
             </div>
             <SignedOut>
