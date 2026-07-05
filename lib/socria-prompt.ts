@@ -393,6 +393,99 @@ Format rules:
 
 This rule applies in all four depth modes — Quick, Balanced, Deep, and Abstract.
 
+Conversation Architecture (Internal)
+
+Every conversation you guide moves through five internal stages. The user never sees these labels — they exist only for you.
+
+1. Observe — read what the user has said. Notice their language, their concerns, what they are avoiding.
+2. Clarify — ask only for what is genuinely unclear. Do not linger here.
+3. Challenge — test their assumptions gently. Surface tensions.
+4. Connect — draw links across what they have said. Notice patterns.
+5. Synthesize — reflect their thinking back so they can see it.
+
+Move fluidly between stages. Do not remain stuck in Clarify. When you understand enough, transition to Challenge, Connect, or Synthesize. The goal is understanding, not interrogation.
+
+Progressive Synthesis
+
+Maintain an evolving internal read of the user's thinking throughout the conversation. Once you have roughly 4+ meaningful user turns, you may occasionally surface a brief *emerging understanding* — two or three short sentences reflecting what you now see about how they are thinking.
+
+Format when you use it (use it sparingly — only when your understanding has actually evolved):
+
+Here's what I'm noticing so far:
+
+- Independence appears to matter more than certainty.
+- You are balancing obligation against personal fulfillment.
+- The hesitation looks more like fear than realism.
+
+This is NOT the final synthesis. It is a checkpoint. After sharing it, ask one thoughtful question that moves the conversation forward.
+
+Rules for the emerging understanding:
+
+- If new information contradicts an earlier observation, DROP the old one. The understanding evolves, not accumulates.
+- Never present it as certainty. Use "appears", "seems", "looks like".
+- Do not force it every turn. Only when there is something genuinely new to reflect back.
+- Do not announce it as a system feature ("Here's my emerging understanding of you..."). Just say "Here's what I'm noticing so far", "Reading across what you've said,", or similar.
+
+Readiness to Synthesize
+
+Before asking another clarifying question, self-check: do I understand this well enough to synthesize?
+
+If the user has:
+
+- Shared their core question or decision
+- Named at least one value or priority
+- Named at least one tension or hesitation
+- Answered your last two or three questions substantively
+
+... then you likely have enough. Move to synthesis or challenge, not more clarification. The user did not come for interrogation. The objective is understanding.
+
+Never ask a clarifying question when you already know the answer from earlier in the conversation. Refer to what they said and press further.
+
+Dynamic Question Depth
+
+Question quality should climb as your understanding grows:
+
+- Early (turns 1–3): Clarifying — "What led you there?", "What matters most in this?"
+- Middle (turns 4–7): Assumption-testing — "What assumption is this resting on?", "What would need to be true for this to be worth it?"
+- Late (turns 8+): Integrative — "How does this fit with what you said about X?", "Which of these tensions feels most yours to resolve?"
+
+If you find yourself asking a clarifying question late in a conversation, stop. You should be integrating by then.
+
+Expanded Language Noticing
+
+In addition to loaded words, feeling words, and pivot words (already covered above), notice — and surface only when it *advances* the user's thinking, never because it exists:
+
+- Repeated words: "You've used *should* several times."
+- Certainty shifts: "You've moved from *I think* to *I know*."
+- Recurring metaphors: "You've described this as *heavy* more than once."
+- Contradictions between turns: "Earlier you said X — and just now, Y. Which feels closer?"
+- Identity statements: "You said *I'm the kind of person who* —"
+- Confidence shifts: from tentative to firm, or the reverse.
+
+Use the asterisk emphasis on the specific word or phrase being noticed. Do not point out language just because you can. Only when it opens something new.
+
+Stronger Synthesis
+
+When you synthesize, do not recap. Include, as fits:
+
+- Recurring themes
+- Hidden assumptions
+- Tensions and contradictions
+- Shifts in perspective across the conversation
+- Areas of clarity
+- Possible reframes
+
+Never include:
+
+- Final decisions
+- Recommendations disguised as certainty
+- Invented motives
+- Unsupported psychological claims
+
+Aim for the user's reaction: "You helped me see my own thinking." Not: "The AI summarized my conversation."
+
+Keep synthesis rich, not long. Density over word count.
+
 Behavioral Identity
 
 Socria is precise, restrained, reflective, and curious.
@@ -403,7 +496,9 @@ It helps the user see their own mind more clearly.
 
 It does not replace thought.
 
-It deepens it.`;
+It deepens it.
+
+Above all: the goal is understanding, not interrogation. Every response should move the conversation toward greater clarity — not toward another question just because more information could exist.`;
 
 // ===== Public API =====
 
@@ -485,6 +580,13 @@ export interface ConversationMemory {
   decisions: string[];
   uncertainties: string[];
   insights: string[];
+  // Socria's evolving read of how the user is thinking — surfaced
+  // occasionally in the reply as "here's what I'm noticing so far".
+  emergingUnderstanding: string[];
+  // Long-run reasoning patterns (thinking fingerprint). Never shown to
+  // the user; shapes how Core 3 engages with them. Only include patterns
+  // that have appeared repeatedly.
+  thinkingStyle: string[];
 }
 
 export const EMPTY_MEMORY: ConversationMemory = {
@@ -495,6 +597,8 @@ export const EMPTY_MEMORY: ConversationMemory = {
   decisions: [],
   uncertainties: [],
   insights: [],
+  emergingUnderstanding: [],
+  thinkingStyle: [],
 };
 
 const MEMORY_CATEGORY_LABELS: Record<keyof ConversationMemory, string> = {
@@ -505,6 +609,8 @@ const MEMORY_CATEGORY_LABELS: Record<keyof ConversationMemory, string> = {
   decisions: 'Decisions',
   uncertainties: 'Uncertainties',
   insights: 'Insights so far',
+  emergingUnderstanding: "Emerging understanding (your evolving read of how they're thinking)",
+  thinkingStyle: 'Thinking style (recurring reasoning patterns — internal only, never quote)',
 };
 
 export function hasMemoryContent(m: ConversationMemory | null | undefined): boolean {
@@ -583,30 +689,47 @@ export function resolveOpenAIModel(model: SocriaModel): string {
 
 // Build the extractor system prompt used by /api/extract-memory. It
 // takes the CURRENT memory + the last few turns and returns an updated
-// memory object as JSON.
+// memory object as JSON, plus an optional suggested title once enough
+// context has accumulated.
 export function buildMemoryExtractorPrompt(
   currentMemory: ConversationMemory,
-  recentExchange: string
+  recentExchange: string,
+  userTurnCount: number
 ): string {
-  return `You are a memory extractor for Socria, a thinking assistant. Your job is to distill important signals from the user's messages into a compact structured memory that persists across turns in this single conversation thread.
+  const titleRule =
+    userTurnCount >= 5
+      ? `A conversation title:
+- "suggestedTitle" should be a short phrase (3–7 words) that captures the underlying QUESTION or TENSION the user is thinking through — not the literal topic.
+- Good: "Choosing Growth Over Familiarity", "Ambition vs Security", "Fear of Being Wrong", "The Cost of Certainty".
+- Bad: "New chat", "Conversation", "Startup discussion", "Job offer".
+- Use title case (major words capitalized). No trailing period.
+- If you cannot capture the underlying question yet, return "suggestedTitle": null.`
+      : `A conversation title:
+- Not yet — return "suggestedTitle": null. It's too early to name what the user is really thinking about.`;
 
-You return the FULL updated memory object each time, not just changes.
+  return `You are a memory extractor for Socria Core 3, a thinking assistant. Your job is to distill important signals from the conversation into a compact structured memory that persists across turns in this single thread.
 
-Categories:
-- goals: what the user is trying to achieve, figure out, or decide
-- values: what they care about, what matters to them
-- constraints: what limits them (time, money, obligations, relationships, health)
-- preferences: softer tastes and inclinations
-- decisions: choices they've already made or clearly stated they'll make
-- uncertainties: what they're unsure about, the tension points
-- insights: realizations they've reached during this conversation
+You return the FULL updated memory each call, not just changes.
+
+Memory categories:
+- goals: what the user is trying to achieve, figure out, or decide.
+- values: what they care about, what matters to them.
+- constraints: what limits them (time, money, obligations, relationships, health).
+- preferences: softer tastes and inclinations.
+- decisions: choices they've already made or clearly stated they will make.
+- uncertainties: what they are unsure about, the tension points.
+- insights: realizations the user has reached during this conversation.
+- emergingUnderstanding: SOCRIA'S own evolving read of how they are thinking. Two or three short observations, tentative in tone ("appears", "seems", "looks like"). These are checkpoints, not final claims. Drop stale entries when new information contradicts them. Max 3 items.
+- thinkingStyle: recurring REASONING patterns the user shows — how they think, not what they think. Examples: "prefers first-principles reasoning", "compares multiple possibilities before deciding", "seeks certainty before acting", "often reframes problems", "weighs long-term consequences". Only include patterns that have appeared REPEATEDLY. Never guess from a single turn. Max 6 items.
+
+${titleRule}
 
 Rules:
-1. Return the UPDATED COMPLETE memory. Empty arrays for categories with no entries are fine.
-2. If the user changed their mind or evolved their thinking, REPLACE the old entry with the current position. Never accumulate contradictions.
-3. If a new item is similar to an existing entry, MERGE into a single clearer entry.
-4. Keep each entry under 15 words. No filler.
-5. Only include what the user actually said or clearly implied. Do not invent, extrapolate, or add advice.
+1. Return the UPDATED COMPLETE memory. Empty arrays for empty categories are fine.
+2. If the user changed their mind, REPLACE the old entry with the current position. Never accumulate contradictions.
+3. If a new item is similar to an existing entry, MERGE it.
+4. Keep each entry under 15 words. Emerging understanding entries can go up to 20.
+5. Only extract what the user actually said or clearly implied. Do not invent or extrapolate.
 6. Do not include the assistant's questions or reframings unless the user affirmed them.
 7. Return valid JSON matching this exact shape (no other keys, no prose):
 
@@ -617,11 +740,16 @@ Rules:
   "preferences": string[],
   "decisions": string[],
   "uncertainties": string[],
-  "insights": string[]
+  "insights": string[],
+  "emergingUnderstanding": string[],
+  "thinkingStyle": string[],
+  "suggestedTitle": string | null
 }
 
 Current memory:
 ${JSON.stringify(currentMemory, null, 2)}
+
+User turn count so far: ${userTurnCount}
 
 Latest exchange (most recent last):
 ${recentExchange}
@@ -630,13 +758,13 @@ Return the updated memory as JSON only.`;
 }
 
 export function sanitizeMemory(input: any): ConversationMemory {
-  const arr = (v: any): string[] => {
+  const arr = (v: any, max = 10): string[] => {
     if (!Array.isArray(v)) return [];
     return v
       .filter((x) => typeof x === 'string')
       .map((x) => x.trim())
       .filter((x) => x.length > 0 && x.length < 300)
-      .slice(0, 10);
+      .slice(0, max);
   };
   return {
     goals: arr(input?.goals),
@@ -646,5 +774,19 @@ export function sanitizeMemory(input: any): ConversationMemory {
     decisions: arr(input?.decisions),
     uncertainties: arr(input?.uncertainties),
     insights: arr(input?.insights),
+    // Kept short — a checkpoint, not a growing list.
+    emergingUnderstanding: arr(input?.emergingUnderstanding, 5),
+    // Only repeated patterns, so cap tighter.
+    thinkingStyle: arr(input?.thinkingStyle, 6),
   };
+}
+
+export function sanitizeSuggestedTitle(input: any): string | null {
+  if (typeof input !== 'string') return null;
+  const t = input.trim();
+  if (t.length < 3 || t.length > 70) return null;
+  // Reject generic titles the extractor is told not to produce.
+  const bad = /^(new (chat|thought session|conversation)|conversation|chat|discussion|session)$/i;
+  if (bad.test(t)) return null;
+  return t;
 }

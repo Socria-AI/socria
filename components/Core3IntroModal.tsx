@@ -121,12 +121,42 @@ export function Core3IntroModal({
             </div>
           </div>
 
-          <p className="core3-modal-summary reveal-in" style={{ animationDelay: '360ms' }}>
-            Notices your loaded words in italic serif green — and adjusts its
-            register from casual to <em>philosophical</em>.
+          <div className="core3-modal-caps reveal-in" style={{ animationDelay: '340ms' }}>
+            <span className="core3-modal-cap">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                <path d="M12 3v3M12 18v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M3 12h3M18 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1" strokeLinecap="round" />
+              </svg>
+              Language noticing
+            </span>
+            <span className="core3-modal-cap">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                <rect x="3.5" y="4" width="17" height="14" rx="3" />
+                <path d="M8 9h8M8 13h5" strokeLinecap="round" />
+              </svg>
+              Thread memory
+            </span>
+            <span className="core3-modal-cap">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                <circle cx="8" cy="9" r="2.2" />
+                <circle cx="16" cy="9" r="2.2" />
+                <path d="M6 20c1-3 3-4 6-4s5 1 6 4" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              Progressive synthesis
+            </span>
+            <span className="core3-modal-cap">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                <path d="M4 12h16M4 12l4-4M4 12l4 4M20 12l-4-4M20 12l-4 4" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              Adjustable depth
+            </span>
+          </div>
+          <p className="core3-modal-summary reveal-in" style={{ animationDelay: '440ms' }}>
+            Notices your loaded words in italic serif green, remembers the
+            thread, and adjusts its register from casual to{' '}
+            <em>philosophical</em>.
           </p>
 
-          <div className="core3-modal-footer reveal-in" style={{ animationDelay: '460ms' }}>
+          <div className="core3-modal-footer reveal-in" style={{ animationDelay: '520ms' }}>
             <label className="core3-modal-checkbox">
               <input
                 type="checkbox"

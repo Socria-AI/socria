@@ -731,8 +731,33 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
   flex-direction: column;
   gap: 10px;
 }
-.core3-modal-summary {
+.core3-modal-caps {
   margin: 12px 0 0 0;
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+.core3-modal-cap {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(94, 118, 51, 0.09);
+  color: var(--moss-700);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  border: 1px solid rgba(94, 118, 51, 0.14);
+}
+.core3-modal-cap svg {
+  width: 10px;
+  height: 10px;
+  flex: 0 0 auto;
+}
+.core3-modal-summary {
+  margin: 10px 0 0 0;
   font-size: 12.5px;
   line-height: 1.5;
   color: rgba(31, 31, 31, 0.62);

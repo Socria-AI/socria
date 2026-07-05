@@ -15,6 +15,7 @@ import {
   EMPTY_MEMORY,
   buildMemoryExtractorPrompt,
   sanitizeMemory,
+  sanitizeSuggestedTitle,
 } from '@/lib/socria-prompt';
 
 export const runtime = 'nodejs';
@@ -44,14 +45,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ memory: currentMemory });
   }
 
+  const validMessages = messages.filter(
+    (m: any) =>
+      m &&
+      (m.role === 'user' || m.role === 'assistant') &&
+      typeof m.content === 'string'
+  );
+  const userTurnCount = validMessages.filter(
+    (m: any) => m.role === 'user'
+  ).length;
+
   // Format the most recent turns for the extractor.
-  const recent = messages
-    .filter(
-      (m: any) =>
-        m &&
-        (m.role === 'user' || m.role === 'assistant') &&
-        typeof m.content === 'string'
-    )
+  const recent = validMessages
     .slice(-MAX_MESSAGES_CONSIDERED)
     .map(
       (m: any) =>
@@ -61,14 +66,18 @@ export async function POST(req: NextRequest) {
 
   try {
     const openai = new OpenAI({ apiKey });
-    const extractorPrompt = buildMemoryExtractorPrompt(currentMemory, recent);
+    const extractorPrompt = buildMemoryExtractorPrompt(
+      currentMemory,
+      recent,
+      userTurnCount
+    );
     const extractorModel = process.env.OPENAI_MEMORY_MODEL || 'gpt-4o-mini';
 
     const completion = await openai.chat.completions.create({
       model: extractorModel,
       messages: [{ role: 'system', content: extractorPrompt }],
       temperature: 0.2,
-      max_tokens: 900,
+      max_tokens: 1000,
       response_format: { type: 'json_object' },
     });
 
@@ -80,12 +89,13 @@ export async function POST(req: NextRequest) {
       parsed = currentMemory;
     }
     const memory = sanitizeMemory(parsed);
+    const suggestedTitle = sanitizeSuggestedTitle(parsed?.suggestedTitle);
 
-    return NextResponse.json({ memory });
+    return NextResponse.json({ memory, suggestedTitle });
   } catch (e: any) {
     console.error('extract-memory error:', e);
     // Fail soft: return the current memory rather than 500'ing. Losing an
     // extraction is fine; blocking the flow isn't.
-    return NextResponse.json({ memory: currentMemory });
+    return NextResponse.json({ memory: currentMemory, suggestedTitle: null });
   }
 }

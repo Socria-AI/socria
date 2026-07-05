@@ -39,6 +39,11 @@ interface Conversation {
   // future turns. Optional so Core 2 conversations don't carry an unused
   // field.
   memory?: ConversationMemory;
+  // Last title Core 3's extractor auto-suggested. If the current title
+  // still matches this string, we treat the title as "auto" and are free
+  // to replace it with a newer suggestion. If the user renamed manually,
+  // c.title will no longer match c.autoTitledAs and we won't override.
+  autoTitledAs?: string;
 }
 
 const STORAGE_KEY = 'socria.conversations.v1';
@@ -322,13 +327,38 @@ export default function ChatPage() {
       if (!res.ok) return;
       const json = await res.json();
       const nextMemory: ConversationMemory | undefined = json?.memory;
+      const suggestedTitle: string | null = json?.suggestedTitle ?? null;
       if (!nextMemory) return;
 
       let latestPatched: Conversation | undefined;
       setConversations((prev) => {
-        const next = prev.map((c) =>
-          c.id === convoId ? { ...c, memory: nextMemory } : c
-        );
+        const next = prev.map((c) => {
+          if (c.id !== convoId) return c;
+          const patch: Partial<Conversation> = { memory: nextMemory };
+          // Auto-title: only replace if the current title is either the
+          // default, the first-user-message stub, or a prior auto-suggestion.
+          // Once the user renames manually (via a future rename UI), the
+          // stored title no longer matches `autoTitledAs` and we won't touch it.
+          if (suggestedTitle) {
+            const firstUser = c.messages.find((m) => m.role === 'user');
+            const firstUserStub = firstUser
+              ? firstUser.content
+                  .slice(0, 60)
+                  .replace(/\s+/g, ' ')
+                  .trim()
+              : null;
+            const looksAuto =
+              c.title === 'New thought session' ||
+              c.title === c.autoTitledAs ||
+              (firstUserStub != null && c.title === firstUserStub);
+            if (looksAuto && suggestedTitle !== c.title) {
+              patch.title = suggestedTitle;
+              patch.autoTitledAs = suggestedTitle;
+              patch.updatedAt = Date.now();
+            }
+          }
+          return { ...c, ...patch };
+        });
         latestPatched = next.find((c) => c.id === convoId);
         if (mode === 'local') saveLocal(next);
         return next;
