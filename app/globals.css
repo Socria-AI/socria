@@ -533,69 +533,228 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
 .core3-modal-card {
   position: relative;
   width: 100%;
-  max-width: 560px;
-  max-height: 90vh;
+  max-width: 600px;
+  max-height: 92vh;
   overflow-y: auto;
-  padding: 40px 36px 32px;
+  padding: 0;
   background: var(--paper);
   border: 1px solid var(--border);
-  border-radius: 24px;
-  box-shadow: 0 40px 100px -30px rgba(0, 0, 0, 0.35);
-  animation: core3ModalPop 340ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  border-radius: 28px;
+  box-shadow:
+    0 60px 120px -40px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(94, 118, 51, 0.08);
+  animation: core3ModalPop 400ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  overflow-x: hidden;
+}
+.core3-modal-content {
+  padding: 34px 36px 28px;
+}
+@media (max-width: 560px) {
+  .core3-modal-content { padding: 26px 22px 22px; }
+}
+
+/* Hero band — dramatic gradient with animated Socria mark glyphs */
+@keyframes core3HeroSweep {
+  0%   { transform: translateX(-40%) skewX(-14deg); opacity: 0; }
+  30%  { opacity: 1; }
+  70%  { opacity: 1; }
+  100% { transform: translateX(120%) skewX(-14deg); opacity: 0; }
+}
+@keyframes core3GlyphBreathe {
+  0%, 100% { transform-origin: 72px 60px; transform: scale(1); }
+  50%      { transform-origin: 72px 60px; transform: scale(1.08); }
+}
+@keyframes core3GlyphSpin {
+  0%   { transform-origin: 172px 60px; transform: rotate(0deg); }
+  100% { transform-origin: 172px 60px; transform: rotate(360deg); }
+}
+@keyframes core3BeamPulse {
+  0%, 100% { opacity: 0.25; stroke-dashoffset: 0; }
+  50%      { opacity: 0.9;  stroke-dashoffset: -16; }
+}
+@keyframes core3Sparkle {
+  0%, 100% { opacity: 0; transform: scale(0.4); }
+  50%      { opacity: 1; transform: scale(1.4); }
+}
+.core3-modal-hero {
+  position: relative;
+  height: 190px;
+  background:
+    radial-gradient(ellipse at 30% 40%, rgba(156, 184, 116, 0.30), transparent 60%),
+    linear-gradient(135deg, #6b8339 0%, #475a28 55%, #2c3b18 100%);
+  color: var(--paper);
+  overflow: hidden;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+@media (max-width: 560px) {
+  .core3-modal-hero { height: 150px; }
+}
+.core3-modal-hero-sweep {
+  position: absolute;
+  top: -20%;
+  bottom: -20%;
+  width: 40%;
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.14) 45%, rgba(255, 255, 255, 0.28) 50%, rgba(255, 255, 255, 0.14) 55%, transparent 100%);
+  animation: core3HeroSweep 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  pointer-events: none;
+}
+.core3-modal-hero-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    repeating-linear-gradient(0deg,   rgba(255, 255, 255, 0.045) 0 1px, transparent 1px 22px),
+    repeating-linear-gradient(90deg,  rgba(255, 255, 255, 0.045) 0 1px, transparent 1px 22px);
+  mask-image: radial-gradient(ellipse at center, black 40%, transparent 80%);
+  -webkit-mask-image: radial-gradient(ellipse at center, black 40%, transparent 80%);
+  pointer-events: none;
+}
+.core3-modal-hero-glyphs {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--sage);
+  filter: drop-shadow(0 0 12px rgba(156, 184, 116, 0.5));
+}
+.core3-modal-hero-glyphs svg {
+  overflow: visible;
+}
+.core3-glyph-circle {
+  animation: core3GlyphBreathe 3.6s ease-in-out infinite;
+}
+.core3-glyph-diamond {
+  animation: core3GlyphSpin 22s linear infinite;
+}
+.core3-glyph-beam {
+  animation: core3BeamPulse 2.4s ease-in-out infinite;
+  stroke: rgba(245, 243, 235, 0.85);
+}
+.core3-modal-sparkle {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: rgba(245, 243, 235, 0.95);
+  box-shadow: 0 0 10px rgba(245, 243, 235, 0.8), 0 0 20px rgba(156, 184, 116, 0.6);
+  animation: core3Sparkle 3.4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* Staggered reveal for content rows */
+@keyframes core3RevealIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.reveal-in {
+  animation: core3RevealIn 620ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .reveal-in { animation: none; }
+  .core3-modal-hero-sweep,
+  .core3-glyph-circle,
+  .core3-glyph-diamond,
+  .core3-glyph-beam,
+  .core3-modal-sparkle { animation: none; }
 }
 .core3-modal-close {
   position: absolute;
-  top: 16px;
-  right: 16px;
+  top: 14px;
+  right: 14px;
   width: 34px;
   height: 34px;
   border-radius: 50%;
-  background: transparent;
+  background: rgba(31, 31, 31, 0.25);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   border: 0;
-  color: rgba(31, 31, 31, 0.55);
+  color: rgba(245, 243, 235, 0.85);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.2s, color 0.2s;
+  transition: background 0.2s, color 0.2s, transform 0.2s;
+  z-index: 3;
 }
 .core3-modal-close:hover {
-  background: rgba(31, 31, 31, 0.06);
-  color: var(--ink);
+  background: rgba(31, 31, 31, 0.4);
+  color: var(--paper);
+  transform: rotate(90deg);
 }
 .core3-modal-eyebrow {
   font-size: 11px;
-  letter-spacing: 0.22em;
+  letter-spacing: 0.24em;
   text-transform: uppercase;
   color: var(--moss-700);
   font-weight: 600;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 .core3-modal-title {
   font-family: var(--font-serif), "Instrument Serif", Georgia, serif;
-  font-size: clamp(2rem, 5vw, 2.6rem);
+  font-size: clamp(2.2rem, 5.6vw, 2.9rem);
   line-height: 1;
   color: var(--ink);
-  letter-spacing: -0.02em;
+  letter-spacing: -0.025em;
   margin: 0 0 14px 0;
+}
+@keyframes core3TitleShimmer {
+  0%   { background-position: -180% 0; }
+  100% { background-position: 280% 0; }
+}
+.core3-modal-title-accent {
+  font-style: italic;
+  background: linear-gradient(
+    100deg,
+    var(--moss-700) 0%,
+    var(--moss-700) 30%,
+    #9CB874 50%,
+    var(--moss-700) 70%,
+    var(--moss-700) 100%
+  );
+  background-size: 220% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: core3TitleShimmer 4.2s ease-in-out infinite;
 }
 .core3-modal-lede {
   font-family: var(--font-serif), "Instrument Serif", Georgia, serif;
   font-style: italic;
   font-size: 17px;
-  color: rgba(31, 31, 31, 0.6);
+  color: rgba(31, 31, 31, 0.68);
   line-height: 1.5;
-  margin: 0 0 32px 0;
-  max-width: 44ch;
+  margin: 0 0 30px 0;
+  max-width: 46ch;
 }
-.core3-modal-section { margin-bottom: 26px; }
+.core3-modal-lede em {
+  color: var(--moss-700);
+  font-style: italic;
+}
+.core3-modal-section {
+  margin-bottom: 22px;
+  padding: 18px 18px 16px;
+  background: linear-gradient(180deg, rgba(94, 118, 51, 0.05), rgba(94, 118, 51, 0));
+  border: 1px solid rgba(94, 118, 51, 0.14);
+  border-radius: 16px;
+}
 .core3-modal-section-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   font-size: 11px;
-  letter-spacing: 0.22em;
+  letter-spacing: 0.24em;
   text-transform: uppercase;
   color: var(--moss-700);
   font-weight: 600;
   margin: 0 0 12px 0;
+}
+.core3-modal-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--moss-600);
+  box-shadow: 0 0 0 3px rgba(94, 118, 51, 0.18);
+  display: inline-block;
 }
 .core3-modal-demo-bubble {
   background: white;
@@ -603,9 +762,29 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
   border-left: 3px solid var(--moss-600);
   border-radius: 12px;
   padding: 18px 20px;
-  font-size: 15px;
-  line-height: 1.6;
+  font-size: 15.5px;
+  line-height: 1.65;
   color: var(--ink);
+  box-shadow: 0 6px 22px -14px rgba(31, 31, 31, 0.35);
+  position: relative;
+  overflow: hidden;
+}
+.core3-modal-demo-bubble::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    circle at 50% 60%,
+    rgba(94, 118, 51, 0.08),
+    transparent 60%
+  );
+  pointer-events: none;
+  opacity: 0;
+  animation: bubbleGlow 3s ease-in-out infinite;
+}
+@keyframes bubbleGlow {
+  0%, 100% { opacity: 0; }
+  30%, 70% { opacity: 1; }
 }
 .core3-modal-bubble-label {
   display: block;
@@ -618,26 +797,60 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
 }
 .core3-modal-section-desc {
   font-size: 13px;
-  color: rgba(31, 31, 31, 0.6);
-  line-height: 1.55;
+  color: rgba(31, 31, 31, 0.62);
+  line-height: 1.6;
   margin: 12px 0 0 0;
+}
+.core3-modal-section-desc em {
+  font-style: italic;
+  color: var(--moss-700);
+  font-family: var(--font-serif), "Instrument Serif", Georgia, serif;
+  font-size: 1.08em;
 }
 .core3-modal-depth-pills {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
 }
+@keyframes depthPillHighlight {
+  0%, 5% {
+    background: transparent;
+    color: rgba(31, 31, 31, 0.55);
+    border-color: rgba(31, 31, 31, 0.15);
+    box-shadow: 0 0 0 0 rgba(94, 118, 51, 0);
+    transform: translateY(0);
+  }
+  10%, 20% {
+    background: var(--moss-600);
+    color: var(--paper);
+    border-color: var(--moss-600);
+    box-shadow: 0 8px 22px -6px rgba(94, 118, 51, 0.55), 0 0 0 4px rgba(94, 118, 51, 0.14);
+    transform: translateY(-2px);
+  }
+  25%, 100% {
+    background: transparent;
+    color: rgba(31, 31, 31, 0.55);
+    border-color: rgba(31, 31, 31, 0.15);
+    box-shadow: 0 0 0 0 rgba(94, 118, 51, 0);
+    transform: translateY(0);
+  }
+}
 .core3-modal-depth-pills .depth-cycle-pill {
-  height: 34px;
-  padding: 0 16px;
+  height: 36px;
+  padding: 0 18px;
   border-radius: 999px;
   border: 1px solid rgba(31, 31, 31, 0.15);
   background: transparent;
-  color: rgba(31, 31, 31, 0.5);
+  color: rgba(31, 31, 31, 0.55);
   font-size: 13px;
   font-weight: 500;
   display: inline-flex;
   align-items: center;
+  animation: depthPillHighlight 4s ease-in-out infinite;
+  transition: background 0.3s, color 0.3s, border-color 0.3s, box-shadow 0.3s, transform 0.3s;
+}
+@media (prefers-reduced-motion: reduce) {
+  .core3-modal-depth-pills .depth-cycle-pill { animation: none; }
 }
 .core3-modal-footer {
   margin-top: 28px;
@@ -664,28 +877,63 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
   accent-color: var(--moss-600);
   cursor: pointer;
 }
+@keyframes core3PrimaryGlow {
+  0%, 100% { box-shadow: 0 10px 26px -10px rgba(94, 118, 51, 0.55), 0 0 0 0 rgba(94, 118, 51, 0.35); }
+  50%      { box-shadow: 0 10px 26px -10px rgba(94, 118, 51, 0.75), 0 0 0 8px rgba(94, 118, 51, 0);     }
+}
+@keyframes core3PrimaryShine {
+  0%   { transform: translateX(-160%) skewX(-24deg); }
+  100% { transform: translateX(360%)  skewX(-24deg); }
+}
+@keyframes core3PrimaryArrow {
+  0%, 60%, 100% { transform: translateX(0); }
+  80%           { transform: translateX(4px); }
+}
 .core3-modal-primary {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  height: 44px;
-  padding: 0 24px;
-  background: var(--moss-600);
+  height: 46px;
+  padding: 0 26px;
+  background: linear-gradient(135deg, var(--moss-600) 0%, var(--moss-700) 100%);
   color: var(--paper);
   border: 0;
   border-radius: 999px;
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 600;
   font-family: inherit;
+  letter-spacing: -0.005em;
   cursor: pointer;
-  transition: background 0.2s, transform 0.2s;
+  overflow: hidden;
+  transition: transform 0.2s;
+  animation: core3PrimaryGlow 2.4s ease-in-out infinite;
 }
-.core3-modal-primary:hover {
-  background: var(--moss-700);
-  transform: translateY(-1px);
+.core3-modal-primary:hover { transform: translateY(-1px); }
+.core3-modal-primary-shine {
+  position: absolute;
+  top: -50%;
+  bottom: -50%;
+  width: 60px;
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.55) 50%, transparent 100%);
+  animation: core3PrimaryShine 3s ease-in-out infinite;
+  pointer-events: none;
+}
+.core3-modal-primary-label {
+  position: relative;
+  z-index: 1;
+}
+.core3-modal-primary-arrow {
+  position: relative;
+  z-index: 1;
+  animation: core3PrimaryArrow 2s ease-in-out infinite;
 }
 @media (prefers-reduced-motion: reduce) {
   .core3-modal-backdrop, .core3-modal-card { animation: none; }
+  .core3-modal-primary { animation: none; }
+  .core3-modal-primary-shine { animation: none; opacity: 0; }
+  .core3-modal-primary-arrow { animation: none; }
+  .core3-modal-title-accent { animation: none; }
 }
 
 /* Clerk auth pages — make the Clerk-rendered card feel at home in
