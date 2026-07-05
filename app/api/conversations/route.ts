@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { supabaseAdmin } from '@/lib/supabase';
+import { sanitizeMemory, EMPTY_MEMORY } from '@/lib/socria-prompt';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -38,7 +39,7 @@ export async function GET() {
   try {
     const { data, error } = await supabaseAdmin()
       .from('conversations')
-      .select('id, title, messages, updated_at')
+      .select('id, title, messages, memory, updated_at')
       .eq('user_id', userId)
       .order('updated_at', { ascending: false });
 
@@ -50,10 +51,11 @@ export async function GET() {
       );
     }
 
-    const conversations = (data || []).map((c) => ({
+    const conversations = (data || []).map((c: any) => ({
       id: c.id,
       title: c.title,
       messages: c.messages,
+      memory: c.memory ?? EMPTY_MEMORY,
       updatedAt: Number(c.updated_at),
     }));
     return NextResponse.json({ conversations });
@@ -89,6 +91,7 @@ export async function PUT(req: NextRequest) {
       user_id: userId,
       title: c.title.slice(0, MAX_TITLE),
       messages: sanitizeMessages(c.messages),
+      memory: sanitizeMemory(c.memory ?? EMPTY_MEMORY),
       updated_at: Number(c.updatedAt) || Date.now(),
     });
 
@@ -138,6 +141,7 @@ export async function POST(req: NextRequest) {
         MAX_TITLE
       ),
       messages: sanitizeMessages(c.messages),
+      memory: sanitizeMemory(c.memory ?? EMPTY_MEMORY),
       updated_at: Number(c.updatedAt) || Date.now(),
     }));
 

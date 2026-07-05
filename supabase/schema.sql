@@ -8,9 +8,15 @@ create table if not exists conversations (
   user_id text not null,
   title text not null default 'New thought session',
   messages jsonb not null default '[]'::jsonb,
+  memory jsonb not null default '{}'::jsonb,
   updated_at bigint not null,
   created_at timestamptz not null default now()
 );
+
+-- If the conversations table already existed from an earlier deploy, add
+-- the memory column. Safe to re-run.
+alter table conversations
+  add column if not exists memory jsonb not null default '{}'::jsonb;
 
 create index if not exists conversations_user_updated_idx
   on conversations (user_id, updated_at desc);

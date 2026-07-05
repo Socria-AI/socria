@@ -19,8 +19,10 @@ import { Core3IntroModal } from '@/components/Core3IntroModal';
 const CORE3_INTRO_DISMISS_KEY = 'socria.core3IntroDontShowAgain.v1';
 import {
   SOCRIA_MODELS,
+  EMPTY_MEMORY,
   type SocriaModel,
   type ThinkingDepth,
+  type ConversationMemory,
 } from '@/lib/socria-prompt';
 
 type Role = 'user' | 'assistant';
@@ -33,6 +35,10 @@ interface Conversation {
   title: string;
   messages: Message[];
   updatedAt: number;
+  // Core 3 thread memory — extracted from user messages, injected into
+  // future turns. Optional so Core 2 conversations don't carry an unused
+  // field.
+  memory?: ConversationMemory;
 }
 
 const STORAGE_KEY = 'socria.conversations.v1';
@@ -298,6 +304,53 @@ export default function ChatPage() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [active?.messages.length, streamed]);
 
+  // Fire-and-forget: extract updated thread memory from the latest exchange,
+  // patch the conversation with it, and persist to cloud/local. Core 3 only.
+  async function extractAndPersistMemory(
+    convoId: string,
+    convo: Conversation
+  ) {
+    try {
+      const res = await fetch('/api/extract-memory', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: convo.messages,
+          currentMemory: convo.memory ?? EMPTY_MEMORY,
+        }),
+      });
+      if (!res.ok) return;
+      const json = await res.json();
+      const nextMemory: ConversationMemory | undefined = json?.memory;
+      if (!nextMemory) return;
+
+      let latestPatched: Conversation | undefined;
+      setConversations((prev) => {
+        const next = prev.map((c) =>
+          c.id === convoId ? { ...c, memory: nextMemory } : c
+        );
+        latestPatched = next.find((c) => c.id === convoId);
+        if (mode === 'local') saveLocal(next);
+        return next;
+      });
+
+      if (mode === 'cloud' && latestPatched) {
+        // Persist the memory update to Supabase without waiting.
+        try {
+          await fetch('/api/conversations', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ conversation: latestPatched }),
+          });
+        } catch (e) {
+          console.error('Persist memory update failed:', e);
+        }
+      }
+    } catch (e) {
+      console.error('Memory extraction failed:', e);
+    }
+  }
+
   async function persistConversation(c: Conversation, allConvos: Conversation[]) {
     if (mode === 'cloud') {
       try {
@@ -428,6 +481,7 @@ export default function ChatPage() {
           messages: convoForRequest.messages,
           model,
           depth,
+          memory: convoForRequest.memory ?? EMPTY_MEMORY,
         }),
       });
 
@@ -537,6 +591,13 @@ export default function ChatPage() {
       if (!isSignedIn) {
         writeUsedFree(true);
         setUsedFree(true);
+      }
+
+      // Core 3 thread memory: extract in the background. The next turn
+      // will read whatever's in the conversation's memory field. If this
+      // fails, the conversation still works — memory just doesn't update.
+      if (isSignedIn && model === 'core-3') {
+        void extractAndPersistMemory(workingId!, updated);
       }
     } catch (e: any) {
       setError(e?.message || 'Failed to send');

@@ -51,7 +51,8 @@ export async function POST(req: NextRequest) {
 
     const { prompt: systemPrompt, model } = buildSystemPrompt(
       body?.model,
-      body?.depth
+      body?.depth,
+      body?.memory
     );
 
     if (!Array.isArray(messages) || messages.length === 0) {

@@ -407,8 +407,6 @@ It deepens it.`;
 
 // ===== Public API =====
 
-export const SOCRIA_SYSTEM_PROMPT = CORE_2_PROMPT;
-
 export type SocriaModel = 'core-2' | 'core-3';
 export type ThinkingDepth = 'quick' | 'balanced' | 'deep' | 'abstract';
 
@@ -477,11 +475,86 @@ export function resolveModel(input: unknown): SocriaModel {
   return input === 'core-3' ? 'core-3' : 'core-2';
 }
 
+// ===== Thread memory (Core 3 only) =====
+
+export interface ConversationMemory {
+  goals: string[];
+  values: string[];
+  constraints: string[];
+  preferences: string[];
+  decisions: string[];
+  uncertainties: string[];
+  insights: string[];
+}
+
+export const EMPTY_MEMORY: ConversationMemory = {
+  goals: [],
+  values: [],
+  constraints: [],
+  preferences: [],
+  decisions: [],
+  uncertainties: [],
+  insights: [],
+};
+
+const MEMORY_CATEGORY_LABELS: Record<keyof ConversationMemory, string> = {
+  goals: 'Goals',
+  values: 'Values',
+  constraints: 'Constraints',
+  preferences: 'Preferences',
+  decisions: 'Decisions',
+  uncertainties: 'Uncertainties',
+  insights: 'Insights so far',
+};
+
+export function hasMemoryContent(m: ConversationMemory | null | undefined): boolean {
+  if (!m) return false;
+  return (Object.keys(MEMORY_CATEGORY_LABELS) as Array<keyof ConversationMemory>).some(
+    (k) => Array.isArray(m[k]) && m[k].length > 0
+  );
+}
+
+// Renders a compact, human-readable memory block for injection into
+// Core 3's system prompt. Skips empty categories, caps individual lines.
+export function renderMemoryForPrompt(m: ConversationMemory): string {
+  const rows: string[] = [];
+  (Object.keys(MEMORY_CATEGORY_LABELS) as Array<keyof ConversationMemory>).forEach((k) => {
+    const items = (m[k] || []).slice(0, 8);
+    if (!items.length) return;
+    rows.push(`${MEMORY_CATEGORY_LABELS[k]}:`);
+    items.forEach((it) => rows.push(`- ${it}`));
+  });
+  return rows.join('\n');
+}
+
+const MEMORY_INSTRUCTION = `
+
+=== Thread Memory ===
+
+The user has been sharing context in this conversation. Below is what they've said or clearly implied so far — a lightweight record you keep across turns in this single thread.
+
+Use it naturally. Do not repeat questions the user has already answered. If a topic they've already discussed becomes relevant, refer back to what they said in your own words — "you mentioned earlier that…", "you said…", "you're leaning toward…", "you're worried that…". Let it feel continuous, like you've been listening.
+
+Do NOT say:
+- "According to your profile…"
+- "As stored in memory…"
+- "Based on what you told me earlier at step 3…"
+- Any language that reveals a memory system exists.
+
+If the user has evolved their thinking or reversed a position, honor the current state — don't hold them to what they said three turns ago.
+
+Empty categories below are fine. Ignore them. Do not force references.
+
+`;
+
 // Build the full system prompt for a (model, depth) pair. Core 2 ignores
-// depth. Core 3 appends an "Active mode" line that locks the depth in.
+// depth. Core 3 appends an "Active mode" line that locks the depth in,
+// and (if provided and non-empty) a "Thread Memory" block so Core 3 can
+// reference earlier turns naturally.
 export function buildSystemPrompt(
   modelInput: unknown,
-  depthInput: unknown
+  depthInput: unknown,
+  memory?: ConversationMemory | null
 ): { prompt: string; model: SocriaModel; depth: ThinkingDepth } {
   const model = resolveModel(modelInput);
   const depth = resolveDepth(depthInput);
@@ -489,9 +562,14 @@ export function buildSystemPrompt(
     return { prompt: CORE_2_PROMPT, model, depth };
   }
   const depthLabel = THINKING_DEPTHS.find((d) => d.id === depth)!.label;
-  const prompt =
+  let prompt =
     CORE_3_PROMPT +
     `\n\n=== Active Thinking Depth: ${depthLabel} ===\nThe user has selected ${depthLabel} for this conversation. Apply both the ${depthLabel} pacing AND the ${depthLabel} voice/register from the Thinking Depth Modes section above. The voice difference is real: as depth increases, the register elevates — *Quick* sounds like a sharp friend, *Balanced* like a thoughtful mentor, *Deep* like a rigorous interlocutor, *Abstract* like a philosophically literate companion. Match the level you've been assigned, but never perform intellectualism — elevated words are licensed only when they are more precise than plain ones.`;
+
+  if (memory && hasMemoryContent(memory)) {
+    prompt += MEMORY_INSTRUCTION + renderMemoryForPrompt(memory);
+  }
+
   return { prompt, model, depth };
 }
 
@@ -501,4 +579,72 @@ export function resolveOpenAIModel(model: SocriaModel): string {
       ? process.env.OPENAI_MODEL_CORE_3
       : process.env.OPENAI_MODEL;
   return envOverride || SOCRIA_MODELS[model].defaultOpenAIModel;
+}
+
+// Build the extractor system prompt used by /api/extract-memory. It
+// takes the CURRENT memory + the last few turns and returns an updated
+// memory object as JSON.
+export function buildMemoryExtractorPrompt(
+  currentMemory: ConversationMemory,
+  recentExchange: string
+): string {
+  return `You are a memory extractor for Socria, a thinking assistant. Your job is to distill important signals from the user's messages into a compact structured memory that persists across turns in this single conversation thread.
+
+You return the FULL updated memory object each time, not just changes.
+
+Categories:
+- goals: what the user is trying to achieve, figure out, or decide
+- values: what they care about, what matters to them
+- constraints: what limits them (time, money, obligations, relationships, health)
+- preferences: softer tastes and inclinations
+- decisions: choices they've already made or clearly stated they'll make
+- uncertainties: what they're unsure about, the tension points
+- insights: realizations they've reached during this conversation
+
+Rules:
+1. Return the UPDATED COMPLETE memory. Empty arrays for categories with no entries are fine.
+2. If the user changed their mind or evolved their thinking, REPLACE the old entry with the current position. Never accumulate contradictions.
+3. If a new item is similar to an existing entry, MERGE into a single clearer entry.
+4. Keep each entry under 15 words. No filler.
+5. Only include what the user actually said or clearly implied. Do not invent, extrapolate, or add advice.
+6. Do not include the assistant's questions or reframings unless the user affirmed them.
+7. Return valid JSON matching this exact shape (no other keys, no prose):
+
+{
+  "goals": string[],
+  "values": string[],
+  "constraints": string[],
+  "preferences": string[],
+  "decisions": string[],
+  "uncertainties": string[],
+  "insights": string[]
+}
+
+Current memory:
+${JSON.stringify(currentMemory, null, 2)}
+
+Latest exchange (most recent last):
+${recentExchange}
+
+Return the updated memory as JSON only.`;
+}
+
+export function sanitizeMemory(input: any): ConversationMemory {
+  const arr = (v: any): string[] => {
+    if (!Array.isArray(v)) return [];
+    return v
+      .filter((x) => typeof x === 'string')
+      .map((x) => x.trim())
+      .filter((x) => x.length > 0 && x.length < 300)
+      .slice(0, 10);
+  };
+  return {
+    goals: arr(input?.goals),
+    values: arr(input?.values),
+    constraints: arr(input?.constraints),
+    preferences: arr(input?.preferences),
+    decisions: arr(input?.decisions),
+    uncertainties: arr(input?.uncertainties),
+    insights: arr(input?.insights),
+  };
 }
