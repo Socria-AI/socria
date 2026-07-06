@@ -79,6 +79,18 @@ export function LandingMotion() {
     if (reduce || !('IntersectionObserver' in window)) {
       revealEls.forEach((el) => el.classList.add('in'));
     } else {
+      // Mark everything currently in the viewport as .in BEFORE turning
+      // on js-anim, so above-the-fold content is guaranteed visible even
+      // if the IntersectionObserver never fires (StrictMode double-mount,
+      // hydration timing, headless viewport, etc.).
+      const vh0 = window.innerHeight;
+      const belowFold: Element[] = [];
+      revealEls.forEach((el) => {
+        const r = el.getBoundingClientRect();
+        const visibleNow = r.top < vh0 * 0.95 && r.bottom > 0;
+        if (visibleNow) el.classList.add('in');
+        else belowFold.push(el);
+      });
       doc.classList.add('js-anim');
       io = new IntersectionObserver(
         (entries) => {
@@ -91,7 +103,7 @@ export function LandingMotion() {
         },
         { threshold: 0.16, rootMargin: '0px 0px -8% 0px' }
       );
-      revealEls.forEach((el) => io!.observe(el));
+      belowFold.forEach((el) => io!.observe(el));
       const safetyTimer = window.setTimeout(() => {
         const vh = window.innerHeight;
         const broken = revealEls.some((el) => {

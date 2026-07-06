@@ -76,6 +76,22 @@ export function BlogMotion() {
     if (reduce || !('IntersectionObserver' in window)) {
       revealEls.forEach((el) => el.classList.add('in'));
     } else {
+      // Mark everything currently in-viewport as .in BEFORE turning on
+      // js-anim. This guarantees above-the-fold content stays visible
+      // even if the IntersectionObserver never fires (SSR hydration
+      // timing, StrictMode double-mount, etc.), which was hiding the
+      // whole blog page.
+      const vh = window.innerHeight;
+      const belowFold: Element[] = [];
+      revealEls.forEach((el) => {
+        const r = el.getBoundingClientRect();
+        const visibleNow = r.top < vh * 0.95 && r.bottom > 0;
+        if (visibleNow) {
+          el.classList.add('in');
+        } else {
+          belowFold.push(el);
+        }
+      });
       doc.classList.add('js-anim');
       io = new IntersectionObserver(
         (entries) => {
@@ -88,12 +104,16 @@ export function BlogMotion() {
         },
         { threshold: 0.16, rootMargin: '0px 0px -8% 0px' }
       );
-      revealEls.forEach((el) => io!.observe(el));
+      belowFold.forEach((el) => io!.observe(el));
+
+      // Safety net: if for any reason a below-fold element enters view
+      // but never gets .in (paused observer, printing, screenshotter,
+      // etc.), force-reveal after 1.5s.
       const t = window.setTimeout(() => {
-        const vh = window.innerHeight;
+        const vh2 = window.innerHeight;
         const broken = revealEls.some((el) => {
           const r = el.getBoundingClientRect();
-          if (!(r.top < vh * 0.9 && r.bottom > 0)) return false;
+          if (!(r.top < vh2 * 0.95 && r.bottom > 0)) return false;
           return (
             !el.classList.contains('in') ||
             getComputedStyle(el).opacity === '0'
