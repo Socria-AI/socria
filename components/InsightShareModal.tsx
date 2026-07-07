@@ -52,8 +52,10 @@ export function InsightShareModal({
           await (document as any).fonts.ready;
         }
       } catch {}
+      // Load the Socria mark so we can draw it on the card footer.
+      const logo = await loadLogo();
       if (cancelled) return;
-      renderInsightCanvas(canvas, format, insight);
+      renderInsightCanvas(canvas, format, insight, logo);
     })();
 
     return () => {
@@ -195,10 +197,30 @@ export function InsightShareModal({
 
 // ---------- Canvas renderer ----------
 
+// Load the Socria logo once, cached, for canvas drawing. Resolves null
+// if it fails so the renderer can fall back to a drawn glyph.
+let logoPromise: Promise<HTMLImageElement | null> | null = null;
+function loadLogo(): Promise<HTMLImageElement | null> {
+  if (logoPromise) return logoPromise;
+  logoPromise = new Promise((resolve) => {
+    try {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => resolve(img);
+      img.onerror = () => resolve(null);
+      img.src = '/socria-logo.png';
+    } catch {
+      resolve(null);
+    }
+  });
+  return logoPromise;
+}
+
 function renderInsightCanvas(
   canvas: HTMLCanvasElement,
   format: ShareFormat,
-  insight: Insight
+  insight: Insight,
+  logo: HTMLImageElement | null
 ) {
   const { canvasW, canvasH } = FORMAT_META[format];
   canvas.width = canvasW;
@@ -281,12 +303,24 @@ function renderInsightCanvas(
   // ---- Footer / branding ----
   const footerY = isStory ? canvasH * 0.90 : canvasH * 0.88;
 
-  // Small mark (circle glyph)
-  ctx.strokeStyle = '#5e7633';
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.arc(canvasW * 0.5, footerY - 42, 14, 0, Math.PI * 2);
-  ctx.stroke();
+  // Socria mark — draw the real logo, contained in a small box above the
+  // wordmark. Falls back to a drawn circle glyph if the image didn't load.
+  const markSize = isStory ? 56 : 50;
+  const markY = footerY - 46 - markSize / 2;
+  if (logo && logo.width > 0) {
+    const ratio = logo.width / logo.height || 1;
+    let dw = markSize;
+    let dh = markSize;
+    if (ratio >= 1) dh = markSize / ratio;
+    else dw = markSize * ratio;
+    ctx.drawImage(logo, canvasW * 0.5 - dw / 2, markY + (markSize - dh) / 2, dw, dh);
+  } else {
+    ctx.strokeStyle = '#5e7633';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(canvasW * 0.5, footerY - 42, 14, 0, Math.PI * 2);
+    ctx.stroke();
+  }
 
   // Socria wordmark
   ctx.fillStyle = '#1F1F1F';
