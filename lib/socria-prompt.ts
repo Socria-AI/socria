@@ -587,7 +587,29 @@ export interface ConversationMemory {
   // the user; shapes how Core 3 engages with them. Only include patterns
   // that have appeared repeatedly.
   thinkingStyle: string[];
+  // Insight Card state — attached to memory so it rides the same jsonb
+  // column. The extractor never modifies these; the insight endpoint
+  // does. Client dismisses by setting latestInsight to null.
+  latestInsight?: Insight | null;
+  lastInsightAtTurn?: number;
 }
+
+export interface Insight {
+  id: string;
+  headerLabel: string;
+  text: string;
+  generatedAt: number;
+  atTurn: number;
+}
+
+export const INSIGHT_HEADER_LABELS = [
+  'One thing I noticed…',
+  "Today's insight",
+  'One reflection…',
+  "Here's the thread…",
+] as const;
+
+export type InsightHeaderLabel = (typeof INSIGHT_HEADER_LABELS)[number];
 
 export const EMPTY_MEMORY: ConversationMemory = {
   goals: [],
@@ -599,9 +621,24 @@ export const EMPTY_MEMORY: ConversationMemory = {
   insights: [],
   emergingUnderstanding: [],
   thinkingStyle: [],
+  latestInsight: null,
+  lastInsightAtTurn: 0,
 };
 
-const MEMORY_CATEGORY_LABELS: Record<keyof ConversationMemory, string> = {
+// Only string-array categories go into the rendered memory block. The
+// insight fields are internal state, not something Core 3 references.
+type MemoryArrayKey =
+  | 'goals'
+  | 'values'
+  | 'constraints'
+  | 'preferences'
+  | 'decisions'
+  | 'uncertainties'
+  | 'insights'
+  | 'emergingUnderstanding'
+  | 'thinkingStyle';
+
+const MEMORY_CATEGORY_LABELS: Record<MemoryArrayKey, string> = {
   goals: 'Goals',
   values: 'Values',
   constraints: 'Constraints',
@@ -615,7 +652,7 @@ const MEMORY_CATEGORY_LABELS: Record<keyof ConversationMemory, string> = {
 
 export function hasMemoryContent(m: ConversationMemory | null | undefined): boolean {
   if (!m) return false;
-  return (Object.keys(MEMORY_CATEGORY_LABELS) as Array<keyof ConversationMemory>).some(
+  return (Object.keys(MEMORY_CATEGORY_LABELS) as Array<MemoryArrayKey>).some(
     (k) => Array.isArray(m[k]) && m[k].length > 0
   );
 }
@@ -624,7 +661,7 @@ export function hasMemoryContent(m: ConversationMemory | null | undefined): bool
 // Core 3's system prompt. Skips empty categories, caps individual lines.
 export function renderMemoryForPrompt(m: ConversationMemory): string {
   const rows: string[] = [];
-  (Object.keys(MEMORY_CATEGORY_LABELS) as Array<keyof ConversationMemory>).forEach((k) => {
+  (Object.keys(MEMORY_CATEGORY_LABELS) as Array<MemoryArrayKey>).forEach((k) => {
     const items = (m[k] || []).slice(0, 8);
     if (!items.length) return;
     rows.push(`${MEMORY_CATEGORY_LABELS[k]}:`);
@@ -757,6 +794,30 @@ ${recentExchange}
 Return the updated memory as JSON only.`;
 }
 
+export function sanitizeInsight(input: any): Insight | null {
+  if (!input || typeof input !== 'object') return null;
+  const text = typeof input.text === 'string' ? input.text.trim() : '';
+  if (!text || text.length > 500) return null;
+  const rawLabel =
+    typeof input.headerLabel === 'string' ? input.headerLabel.trim() : '';
+  const headerLabel = (INSIGHT_HEADER_LABELS as readonly string[]).includes(
+    rawLabel
+  )
+    ? rawLabel
+    : INSIGHT_HEADER_LABELS[0];
+  const id =
+    typeof input.id === 'string' && input.id.length > 3
+      ? input.id
+      : `ins_${Math.random().toString(36).slice(2, 10)}`;
+  const generatedAt =
+    typeof input.generatedAt === 'number' && input.generatedAt > 0
+      ? input.generatedAt
+      : 0;
+  const atTurn =
+    typeof input.atTurn === 'number' && input.atTurn >= 0 ? input.atTurn : 0;
+  return { id, headerLabel, text, generatedAt, atTurn };
+}
+
 export function sanitizeMemory(input: any): ConversationMemory {
   const arr = (v: any, max = 10): string[] => {
     if (!Array.isArray(v)) return [];
@@ -778,7 +839,61 @@ export function sanitizeMemory(input: any): ConversationMemory {
     emergingUnderstanding: arr(input?.emergingUnderstanding, 5),
     // Only repeated patterns, so cap tighter.
     thinkingStyle: arr(input?.thinkingStyle, 6),
+    // Insight-card state — preserved by the extractor via merge.
+    latestInsight: sanitizeInsight(input?.latestInsight),
+    lastInsightAtTurn:
+      typeof input?.lastInsightAtTurn === 'number'
+        ? Math.max(0, Math.floor(input.lastInsightAtTurn))
+        : 0,
   };
+}
+
+// Build the extractor system prompt used by /api/generate-insight. It
+// takes the full conversation and the current memory and returns
+// exactly one insight — the single most meaningful realization,
+// tension, shift, or pattern that emerged. Not a summary. Not motivational.
+export function buildInsightPrompt(
+  memory: ConversationMemory,
+  fullExchange: string
+): string {
+  return `You are the Insight generator for Socria Core 3, a thinking assistant. Your job is to distill the SINGLE most meaningful realization, tension, shift, or pattern that emerged during this conversation into ONE concise insight the user will actually recognize as their own.
+
+The target reaction: "That's exactly what I realized." Never: "That's a nice AI quote."
+
+Rules:
+1. Generate exactly ONE insight.
+2. 1–3 sentences total, under 260 characters.
+3. Ground it ENTIRELY in what the user actually said. If the conversation doesn't clearly support a real insight, return an empty string for "text".
+4. Choose your source from: recurring themes, emerging values, hidden assumptions, recurring tension, noticeable shifts in thinking, contradictions that became clearer, patterns the user seemed to recognize.
+5. Speak in second person ("you"). Reflect their thinking. Do not summarize the conversation.
+6. Do NOT:
+   - recommend what they should do
+   - give life advice or motivational content
+   - use "believe in yourself", "follow your heart", "growth requires courage", etc.
+   - invent motives, feelings, or fears the user didn't express
+   - exaggerate certainty
+   - become poetic for its own sake
+7. Choose a header label from this EXACT list (pick the one that best fits):
+   - "One thing I noticed…"
+   - "Today's insight"
+   - "One reflection…"
+   - "Here's the thread…"
+8. Return valid JSON matching this exact shape (no other keys, no prose):
+
+{
+  "headerLabel": string,
+  "text": string
+}
+
+The insight should feel earned, not generated.
+
+Current memory (context — do not quote directly):
+${JSON.stringify(memory, null, 2)}
+
+Full conversation:
+${fullExchange}
+
+Return the insight as JSON only.`;
 }
 
 export function sanitizeSuggestedTitle(input: any): string | null {

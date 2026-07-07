@@ -15,6 +15,15 @@ import { ModelPicker } from '@/components/ModelPicker';
 import { DepthPicker } from '@/components/DepthPicker';
 import { TryCore3Pill } from '@/components/TryCore3Pill';
 import { Core3IntroModal } from '@/components/Core3IntroModal';
+import { InsightCard } from '@/components/InsightCard';
+import { InsightShareModal } from '@/components/InsightShareModal';
+import type { Insight } from '@/lib/socria-prompt';
+
+// Core 3 auto-generates an Insight Card once the conversation has passed
+// this many user turns, and only if we haven't shown one in the last
+// INSIGHT_MIN_GAP turns.
+const INSIGHT_MIN_USER_TURNS = 6;
+const INSIGHT_MIN_GAP = 3;
 
 const CORE3_INTRO_DISMISS_KEY = 'socria.core3IntroDontShowAgain.v1';
 import {
@@ -141,6 +150,7 @@ export default function ChatPage() {
   const [core3ModalOpen, setCore3ModalOpen] = useState(false);
   const [core3Dismissed, setCore3Dismissed] = useState(false);
   const [autoOpenChecked, setAutoOpenChecked] = useState(false);
+  const [shareInsight, setShareInsight] = useState<Insight | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -378,6 +388,90 @@ export default function ChatPage() {
       }
     } catch (e) {
       console.error('Memory extraction failed:', e);
+    }
+  }
+
+  // Generate an Insight Card in the background. Only fires when the
+  // conversation has meaningful depth and we haven't shown one recently.
+  async function maybeGenerateInsight(convoId: string, convo: Conversation) {
+    const userTurns = convo.messages.filter(
+      (m) => m.role === 'user'
+    ).length;
+    if (userTurns < INSIGHT_MIN_USER_TURNS) return;
+    const lastAt = convo.memory?.lastInsightAtTurn ?? 0;
+    if (userTurns - lastAt < INSIGHT_MIN_GAP) return;
+    // Don't stack a new insight on top of an unread one.
+    if (convo.memory?.latestInsight) return;
+
+    try {
+      const res = await fetch('/api/generate-insight', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: convo.messages,
+          memory: convo.memory ?? EMPTY_MEMORY,
+          atTurn: userTurns,
+        }),
+      });
+      if (!res.ok) return;
+      const json = await res.json();
+      const insight: Insight | null = json?.insight ?? null;
+      if (!insight) return;
+
+      let latestPatched: Conversation | undefined;
+      setConversations((prev) => {
+        const next = prev.map((c) => {
+          if (c.id !== convoId) return c;
+          const nextMemory = {
+            ...(c.memory ?? EMPTY_MEMORY),
+            latestInsight: insight,
+            lastInsightAtTurn: userTurns,
+          };
+          return { ...c, memory: nextMemory };
+        });
+        latestPatched = next.find((c) => c.id === convoId);
+        if (mode === 'local') saveLocal(next);
+        return next;
+      });
+
+      if (mode === 'cloud' && latestPatched) {
+        try {
+          await fetch('/api/conversations', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ conversation: latestPatched }),
+          });
+        } catch (e) {
+          console.error('Persist insight failed:', e);
+        }
+      }
+    } catch (e) {
+      console.error('Insight generation failed:', e);
+    }
+  }
+
+  function dismissInsight(convoId: string) {
+    let latestPatched: Conversation | undefined;
+    setConversations((prev) => {
+      const next = prev.map((c) => {
+        if (c.id !== convoId) return c;
+        const nextMemory = {
+          ...(c.memory ?? EMPTY_MEMORY),
+          latestInsight: null,
+        };
+        return { ...c, memory: nextMemory };
+      });
+      latestPatched = next.find((c) => c.id === convoId);
+      if (mode === 'local') saveLocal(next);
+      return next;
+    });
+    if (mode === 'cloud' && latestPatched) {
+      // Fire and forget — server-side just needs the cleared state.
+      fetch('/api/conversations', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversation: latestPatched }),
+      }).catch((e) => console.error('Persist insight dismiss failed:', e));
     }
   }
 
@@ -628,6 +722,9 @@ export default function ChatPage() {
       // fails, the conversation still works — memory just doesn't update.
       if (isSignedIn && model === 'core-3') {
         void extractAndPersistMemory(workingId!, updated);
+        // Also consider generating an Insight Card. Runs in parallel and
+        // dedupes internally against the memory turn markers.
+        void maybeGenerateInsight(workingId!, updated);
       }
     } catch (e: any) {
       setError(e?.message || 'Failed to send');
@@ -667,6 +764,11 @@ export default function ChatPage() {
         onClose={handleCore3ModalClose}
         onTry={handleCore3ModalTry}
         isSignedIn={!!isSignedIn}
+      />
+      <InsightShareModal
+        open={!!shareInsight}
+        onClose={() => setShareInsight(null)}
+        insight={shareInsight}
       />
       {/* Sidebar */}
       <aside
@@ -885,6 +987,21 @@ export default function ChatPage() {
             {streamed && (
               <Bubble role="assistant" content={streamed} animate />
             )}
+
+            {/* Insight Card — appears after the assistant reply once
+                enough depth is reached. Not while a stream is in flight. */}
+            {!sending &&
+              !streamed &&
+              active?.memory?.latestInsight &&
+              active.id && (
+                <InsightCard
+                  insight={active.memory.latestInsight}
+                  onContinue={() => dismissInsight(active.id)}
+                  onShare={() =>
+                    setShareInsight(active.memory?.latestInsight ?? null)
+                  }
+                />
+              )}
 
             {sending && !streamed && (
               <div className="my-6 flex items-center gap-1 text-ink/50">

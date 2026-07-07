@@ -88,7 +88,13 @@ export async function POST(req: NextRequest) {
     } catch {
       parsed = currentMemory;
     }
-    const memory = sanitizeMemory(parsed);
+    const extracted = sanitizeMemory(parsed);
+    // Preserve insight state — the extractor never touches it.
+    const memory: typeof extracted = {
+      ...extracted,
+      latestInsight: currentMemory.latestInsight ?? null,
+      lastInsightAtTurn: currentMemory.lastInsightAtTurn ?? 0,
+    };
     const suggestedTitle = sanitizeSuggestedTitle(parsed?.suggestedTitle);
 
     return NextResponse.json({ memory, suggestedTitle });
