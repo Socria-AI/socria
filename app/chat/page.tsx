@@ -344,7 +344,21 @@ export default function ChatPage() {
       setConversations((prev) => {
         const next = prev.map((c) => {
           if (c.id !== convoId) return c;
-          const patch: Partial<Conversation> = { memory: nextMemory };
+          // Preserve any insight state that lives in the CURRENT conversation
+          // memory. The extractor ran on a snapshot captured before the
+          // insight was generated (both fire in parallel), so its response's
+          // insight fields are stale — merging live state here prevents the
+          // insight card from being wiped a beat after it appears.
+          const mergedMemory: ConversationMemory = {
+            ...nextMemory,
+            latestInsight:
+              c.memory?.latestInsight ?? nextMemory.latestInsight ?? null,
+            lastInsightAtTurn: Math.max(
+              c.memory?.lastInsightAtTurn ?? 0,
+              nextMemory.lastInsightAtTurn ?? 0
+            ),
+          };
+          const patch: Partial<Conversation> = { memory: mergedMemory };
           // Auto-title: only replace if the current title is either the
           // default, the first-user-message stub, or a prior auto-suggestion.
           // Once the user renames manually (via a future rename UI), the

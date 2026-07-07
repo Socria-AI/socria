@@ -432,21 +432,26 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
 }
 .prose-socria p + p { margin-top: 0.75em; }
 
-/* Try Core 3 pill — soft pulse on the badge, and a cycling emphasis
-   demo on the word "might" inside the hover popover. */
-@keyframes tryCore3PulseGlow {
-  0%, 100% {
-    box-shadow: 0 0 0 0 rgba(94, 118, 51, 0.32);
-  }
-  50% {
-    box-shadow: 0 0 0 6px rgba(94, 118, 51, 0);
-  }
+/* Try Core 3 pill — refined premium chip. A soft breathing glow (not an
+   expanding ring) plus a slowly twinkling sparkle icon so it draws the
+   eye without nagging. Emphasis-cycle demo lives in the intro modal. */
+@keyframes tryCore3Breathe {
+  0%, 100% { box-shadow: 0 1px 6px -2px rgba(94, 118, 51, 0.28); }
+  50%      { box-shadow: 0 2px 14px -2px rgba(94, 118, 51, 0.5); }
+}
+@keyframes tryCore3Twinkle {
+  0%, 100% { opacity: 0.65; transform: scale(0.9) rotate(0deg); }
+  50%      { opacity: 1;    transform: scale(1.12) rotate(45deg); }
 }
 .try-core3-pill {
-  animation: tryCore3PulseGlow 2.4s ease-in-out infinite;
+  animation: tryCore3Breathe 3s ease-in-out infinite;
 }
 .try-core3-pill:hover {
   animation-play-state: paused;
+}
+.try-core3-pill svg {
+  animation: tryCore3Twinkle 3s ease-in-out infinite;
+  transform-origin: center;
 }
 
 @keyframes tryCore3Cycle {
