@@ -17,6 +17,8 @@ import { TryCore3Pill } from '@/components/TryCore3Pill';
 import { Core3IntroModal } from '@/components/Core3IntroModal';
 import { InsightCard } from '@/components/InsightCard';
 import { InsightShareModal } from '@/components/InsightShareModal';
+import { SynthesisCard, SynthesisPending } from '@/components/SynthesisCard';
+import { parseMessage } from '@/lib/synthesis';
 import type { Insight } from '@/lib/socria-prompt';
 
 // Core 3 auto-generates an Insight Card once the conversation has passed
@@ -1092,27 +1094,47 @@ function Bubble({
   animate?: boolean;
 }) {
   const isUser = role === 'user';
-  return (
-    <div className={`my-6 flex ${isUser ? 'justify-end' : 'justify-start'}`}>
-      <div
-        className={`max-w-[85%] ${
-          isUser
-            ? 'bg-moss-50 border border-moss-200/60 rounded-2xl rounded-br-md px-5 py-3'
-            : ''
-        }`}
-      >
-        {!isUser && (
-          <div className="text-[10px] uppercase tracking-[0.16em] text-moss-700 mb-1.5 font-medium">
-            Socria
-          </div>
-        )}
-        <div className={`prose-socria ${isUser ? 'text-ink' : 'text-ink/90 text-[15.5px]'}`}>
-          {isUser
-            ? content
-            : animate
-              ? renderAnimated(content)
-              : renderEmphasis(content)}
+
+  if (isUser) {
+    return (
+      <div className="my-6 flex justify-end">
+        <div className="max-w-[85%] bg-moss-50 border border-moss-200/60 rounded-2xl rounded-br-md px-5 py-3">
+          <div className="prose-socria text-ink">{content}</div>
         </div>
+      </div>
+    );
+  }
+
+  // Assistant message — may contain a structured synthesis block. Parse it
+  // into segments so the synthesis renders as an interactive card and the
+  // surrounding prose renders normally.
+  const segments = parseMessage(content);
+  const hasCard = segments.some(
+    (s) => s.type === 'synthesis' || s.type === 'synthesis-pending'
+  );
+
+  return (
+    <div className="my-6 flex justify-start">
+      <div className={hasCard ? 'w-full' : 'max-w-[85%]'}>
+        <div className="text-[10px] uppercase tracking-[0.16em] text-moss-700 mb-1.5 font-medium">
+          Socria
+        </div>
+        {segments.map((seg, i) => {
+          if (seg.type === 'synthesis') {
+            return <SynthesisCard key={i} data={seg.data} />;
+          }
+          if (seg.type === 'synthesis-pending') {
+            return <SynthesisPending key={i} />;
+          }
+          return (
+            <div
+              key={i}
+              className="prose-socria text-ink/90 text-[15.5px]"
+            >
+              {animate ? renderAnimated(seg.text) : renderEmphasis(seg.text)}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
