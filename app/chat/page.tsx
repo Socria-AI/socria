@@ -18,7 +18,8 @@ import { Core3IntroModal } from '@/components/Core3IntroModal';
 import { InsightCard } from '@/components/InsightCard';
 import { InsightShareModal } from '@/components/InsightShareModal';
 import { SynthesisCard, SynthesisPending } from '@/components/SynthesisCard';
-import { parseMessage } from '@/lib/synthesis';
+import { ChoiceChips } from '@/components/ChoiceChips';
+import { parseMessage, splitChoices } from '@/lib/synthesis';
 import type { Insight } from '@/lib/socria-prompt';
 
 // Core 3 auto-generates an Insight Card once the conversation has passed
@@ -996,12 +997,40 @@ export default function ChatPage() {
               </div>
             ) : null}
 
-            {messages.map((m, i) => (
-              <Bubble key={i} role={m.role} content={m.content} />
-            ))}
+            {messages.map((m, i) => {
+              const isAssistant = m.role === 'assistant';
+              const { body, choices } = isAssistant
+                ? splitChoices(m.content)
+                : { body: m.content, choices: [] as string[] };
+              const isLast = i === messages.length - 1;
+              // Only the newest assistant message's choices stay actionable,
+              // and only when we're idle (not streaming a reply).
+              const showChoices =
+                isAssistant &&
+                isLast &&
+                choices.length > 0 &&
+                !sending &&
+                !streamed;
+              return (
+                <div key={i}>
+                  <Bubble role={m.role} content={body} />
+                  {showChoices && (
+                    <ChoiceChips
+                      choices={choices}
+                      onPick={(t) => send(t)}
+                      disabled={sending}
+                    />
+                  )}
+                </div>
+              );
+            })}
 
             {streamed && (
-              <Bubble role="assistant" content={streamed} animate />
+              <Bubble
+                role="assistant"
+                content={splitChoices(streamed).body}
+                animate
+              />
             )}
 
             {/* Insight Card — appears after the assistant reply once

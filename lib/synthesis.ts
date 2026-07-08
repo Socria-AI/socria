@@ -103,3 +103,45 @@ export function parseMessage(content: string): MessageSegment[] {
 export function hasSynthesis(content: string): boolean {
   return content.includes(OPEN) && content.includes(CLOSE);
 }
+
+// ===== Guided answer choices =====
+
+const CHOICES_OPEN = '::choices';
+const CHOICES_CLOSE = '::end';
+const MAX_CHOICES = 6;
+
+// Extract the ::choices block from an assistant message. Returns the
+// content with the block removed (so it never renders as raw text) plus
+// the parsed choice strings. While streaming, an unclosed ::choices block
+// is stripped from the body and yields no choices yet.
+export function splitChoices(content: string): {
+  body: string;
+  choices: string[];
+} {
+  const openIdx = content.indexOf(CHOICES_OPEN);
+  if (openIdx === -1) return { body: content, choices: [] };
+
+  const afterOpen = openIdx + CHOICES_OPEN.length;
+  const closeIdx = content.indexOf(CHOICES_CLOSE, afterOpen);
+
+  if (closeIdx === -1) {
+    // Block still streaming — hide it until complete.
+    return { body: content.slice(0, openIdx).trimEnd(), choices: [] };
+  }
+
+  const block = content.slice(afterOpen, closeIdx);
+  const choices = block
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => l.startsWith('-') || l.startsWith('*') || l.startsWith('•'))
+    .map((l) => l.replace(/^[-*•]\s*/, '').trim())
+    .filter((l) => l.length > 0 && l.length <= 140)
+    .slice(0, MAX_CHOICES);
+
+  const body =
+    (content.slice(0, openIdx) + content.slice(closeIdx + CHOICES_CLOSE.length))
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+
+  return { body, choices };
+}
