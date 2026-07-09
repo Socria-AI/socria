@@ -46,7 +46,7 @@ export function DepthPicker({
             onClick={() => setOpen(false)}
             aria-hidden
           />
-          <div className="absolute right-0 mt-2 w-72 rounded-xl border border-ink/10 bg-white shadow-lg z-40 overflow-hidden">
+          <div className="absolute left-0 mt-2 w-72 max-w-[calc(100vw-1.5rem)] rounded-xl border border-ink/10 bg-white shadow-lg z-40 overflow-hidden">
             <div className="px-4 pt-3 pb-2 text-[10px] uppercase tracking-[0.18em] text-ink/40 border-b border-ink/5">
               Thinking depth
             </div>

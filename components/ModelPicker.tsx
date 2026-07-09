@@ -47,7 +47,7 @@ export function ModelPicker({
             onClick={() => setOpen(false)}
             aria-hidden
           />
-          <div className="absolute right-0 mt-2 w-72 rounded-xl border border-ink/10 bg-white shadow-lg z-40 overflow-hidden">
+          <div className="absolute left-0 mt-2 w-72 max-w-[calc(100vw-1.5rem)] rounded-xl border border-ink/10 bg-white shadow-lg z-40 overflow-hidden">
             {(Object.keys(SOCRIA_MODELS) as SocriaModel[]).map((id) => {
               const m = SOCRIA_MODELS[id];
               const active = id === value;

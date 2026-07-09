@@ -2,9 +2,30 @@
 import Link from 'next/link';
 import { SignedIn, SignedOut, SignInButton, UserButton } from '@clerk/nextjs';
 import { ScrollyMotion } from '@/components/ScrollyMotion';
+import { listPosts, getFeaturedPost } from '@/sanity/lib/queries';
 
-export default function LandingPage() {
+export const revalidate = 60;
+
+function landingDate(iso: string) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+}
+
+export default async function LandingPage() {
   const year = new Date().getFullYear();
+
+  // Pull real journal posts for the blog teaser. Falls back gracefully to a
+  // single "visit the journal" card if Sanity isn't configured or empty.
+  const [featuredPost, allPosts] = await Promise.all([
+    getFeaturedPost(),
+    listPosts(),
+  ]);
+  const feature = featuredPost ?? allPosts[0] ?? null;
+  const gridPosts = allPosts
+    .filter((p) => !feature || p._id !== feature._id)
+    .slice(0, 3);
 
   return (
     <div className="scrolly-root">
@@ -369,7 +390,7 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* SCENE · BLOG */}
+        {/* SCENE · BLOG — real posts from Sanity */}
         <section className="scene s-blog" id="blog">
           <div className="inner">
             <div className="head">
@@ -382,50 +403,71 @@ export default function LandingPage() {
               </Link>
             </div>
 
-            <Link href="/blog" className="blog-feature fade">
-              <div className="art">
-                <span className="halo" />
-                <img className="mark" src="/socria-logo.png" alt="" />
-              </div>
-              <div className="body">
-                <div className="tagrow">
-                  Announcement <span className="dt">· July 2026</span>
+            {feature ? (
+              <Link
+                href={`/blog/${feature.slug}`}
+                className="blog-feature fade"
+              >
+                <div className="art">
+                  <span className="halo" />
+                  <img className="mark" src="/socria-logo.png" alt="" />
                 </div>
-                <h3>Introducing Socria Core 3</h3>
-                <p>
-                  Adjustable thinking depth, language noticing, progressive
-                  synthesis, and thread memory — the biggest step yet toward an
-                  AI that strengthens how you think instead of thinking for you.
-                </p>
-                <span className="read">
-                  Read the announcement <span className="go">→</span>
-                </span>
-              </div>
-            </Link>
+                <div className="body">
+                  <div className="tagrow">
+                    {feature.category?.name || 'Essay'}
+                    {landingDate(feature.publishedAt) && (
+                      <span className="dt">· {landingDate(feature.publishedAt)}</span>
+                    )}
+                  </div>
+                  <h3>{feature.title}</h3>
+                  {feature.excerpt && <p>{feature.excerpt}</p>}
+                  <span className="read">
+                    Read the essay <span className="go">→</span>
+                  </span>
+                </div>
+              </Link>
+            ) : (
+              // No posts yet — a graceful placeholder that still routes to the
+              // journal so the section is never empty or broken.
+              <Link href="/blog" className="blog-feature fade">
+                <div className="art">
+                  <span className="halo" />
+                  <img className="mark" src="/socria-logo.png" alt="" />
+                </div>
+                <div className="body">
+                  <div className="tagrow">The Socria Journal</div>
+                  <h3>Notes on thinking, coming soon.</h3>
+                  <p>
+                    Essays on reasoning, metacognition, and building AI that
+                    strengthens human judgment instead of replacing it.
+                  </p>
+                  <span className="read">
+                    Visit the journal <span className="go">→</span>
+                  </span>
+                </div>
+              </Link>
+            )}
 
-            <div className="blog-grid">
-              <Link href="/blog" className="blog-card">
-                <div className="tagrow">
-                  Essay <span className="dt">· Jun 2026</span>
-                </div>
-                <h4>The quiet cost of the instant answer.</h4>
-                <p>What we lose when we stop sitting with our own questions.</p>
-              </Link>
-              <Link href="/blog" className="blog-card">
-                <div className="tagrow">
-                  Method <span className="dt">· May 2026</span>
-                </div>
-                <h4>Why Socria asks before it answers.</h4>
-                <p>A short primer on the Socratic method behind the product.</p>
-              </Link>
-              <Link href="/blog" className="blog-card">
-                <div className="tagrow">
-                  Perspective <span className="dt">· Apr 2026</span>
-                </div>
-                <h4>Thinking is a skill. Use it or lose it.</h4>
-                <p>On cognitive dependency, and designing tools that push back.</p>
-              </Link>
-            </div>
+            {gridPosts.length > 0 && (
+              <div className="blog-grid">
+                {gridPosts.map((p) => (
+                  <Link
+                    key={p._id}
+                    href={`/blog/${p.slug}`}
+                    className="blog-card"
+                  >
+                    <div className="tagrow">
+                      {p.category?.name || 'Essay'}
+                      {landingDate(p.publishedAt) && (
+                        <span className="dt">· {landingDate(p.publishedAt)}</span>
+                      )}
+                    </div>
+                    <h4>{p.title}</h4>
+                    {p.excerpt && <p>{p.excerpt}</p>}
+                  </Link>
+                ))}
+              </div>
+            )}
           </div>
         </section>
 

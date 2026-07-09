@@ -787,14 +787,33 @@ export default function ChatPage() {
         onClose={() => setShareInsight(null)}
         insight={shareInsight}
       />
-      {/* Sidebar */}
+      {/* Mobile backdrop when sidebar is open */}
+      {sidebarOpen && (
+        <div
+          className="md:hidden fixed inset-0 z-30 bg-ink/30 backdrop-blur-[2px]"
+          onClick={() => setSidebarOpen(false)}
+          aria-hidden
+        />
+      )}
+
+      {/* Sidebar — overlay on mobile, static column on desktop */}
       <aside
         className={`${
           sidebarOpen ? 'flex' : 'hidden'
-        } md:flex flex-col w-72 shrink-0 border-r border-border/60 h-dvh sticky top-0 bg-paper/80 backdrop-blur-sm z-20`}
+        } md:flex flex-col w-[min(18rem,84vw)] md:w-72 shrink-0 border-r border-border/60 h-dvh fixed md:static top-0 left-0 z-40 bg-paper md:bg-paper/80 backdrop-blur-sm`}
       >
-        <div className="px-5 h-16 flex items-center border-b border-border/60">
+        <div className="px-5 h-16 flex items-center justify-between border-b border-border/60">
           <Logo />
+          <button
+            onClick={() => setSidebarOpen(false)}
+            className="md:hidden text-ink/50 hover:text-ink p-1 -mr-1"
+            aria-label="Close sidebar"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
         </div>
 
         <div className="p-3">
@@ -886,32 +905,34 @@ export default function ChatPage() {
 
       {/* Main */}
       <div className="flex-1 flex flex-col min-w-0">
-        <div className="sticky top-0 z-20 border-b border-border/60 px-4 md:px-6 h-16 flex items-center justify-between shrink-0 bg-paper/85 backdrop-blur-md">
-          <button
-            onClick={() => setSidebarOpen((v) => !v)}
-            className="md:hidden text-ink/70 hover:text-ink p-2 -ml-2"
-            aria-label="Toggle sidebar"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="3" y1="6" x2="21" y2="6" />
-              <line x1="3" y1="12" x2="21" y2="12" />
-              <line x1="3" y1="18" x2="21" y2="18" />
-            </svg>
-          </button>
-          <span className="text-[11px] uppercase tracking-[0.18em] text-ink/50">
-            Thought session
-          </span>
-          <div className="flex items-center gap-3">
-            <div className="hidden sm:flex items-center gap-3">
-              <ModelPicker
-                value={model}
-                onChange={pickModel}
-                isSignedIn={!!isSignedIn}
-                onLockedAttempt={() => router.push('/sign-in?redirect_url=/chat')}
-              />
-              {SOCRIA_MODELS[model].supportsDepth && (
-                <DepthPicker value={depth} onChange={pickDepth} />
-              )}
+        <div className="sticky top-0 z-20 border-b border-border/60 px-3 md:px-6 h-16 flex items-center justify-between gap-2 shrink-0 bg-paper/85 backdrop-blur-md">
+          {/* Left: sidebar toggle (mobile) + model/depth pickers (all sizes) */}
+          <div className="flex items-center gap-2 min-w-0">
+            <button
+              onClick={() => setSidebarOpen((v) => !v)}
+              className="md:hidden text-ink/70 hover:text-ink p-2 -ml-1 shrink-0"
+              aria-label="Toggle sidebar"
+            >
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="3" y1="6" x2="21" y2="6" />
+                <line x1="3" y1="12" x2="21" y2="12" />
+                <line x1="3" y1="18" x2="21" y2="18" />
+              </svg>
+            </button>
+            <ModelPicker
+              value={model}
+              onChange={pickModel}
+              isSignedIn={!!isSignedIn}
+              onLockedAttempt={() => router.push('/sign-in?redirect_url=/chat')}
+            />
+            {SOCRIA_MODELS[model].supportsDepth && (
+              <DepthPicker value={depth} onChange={pickDepth} />
+            )}
+          </div>
+
+          {/* Right: try-core-3 pill (desktop) + auth */}
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="hidden sm:block">
               <TryCore3Pill
                 currentModel={model}
                 visible={!core3Dismissed}
@@ -920,7 +941,7 @@ export default function ChatPage() {
             </div>
             <SignedOut>
               <SignInButton >
-                <button className="text-[13px] text-ink/70 hover:text-ink transition-colors">
+                <button className="text-[13px] text-ink/70 hover:text-ink transition-colors whitespace-nowrap">
                   Sign in
                 </button>
               </SignInButton>
