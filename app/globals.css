@@ -1461,9 +1461,31 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
   color: rgba(31, 31, 31, 0.55);
   margin: 0;
 }
+.insight-share-hint {
+  margin: 12px 0 0 0;
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: rgba(31, 31, 31, 0.5);
+  text-align: center;
+}
 @media (prefers-reduced-motion: reduce) {
   .insight-share-backdrop, .insight-share-card { animation: none; }
   .insight-share-primary-shine { animation: none; opacity: 0; }
+}
+
+/* Insight card + share modal — mobile tightening */
+@media (max-width: 560px) {
+  .insight-card { padding: 18px 16px 16px; border-radius: 18px; }
+  .insight-card-label { font-size: 14px; }
+  .insight-card-text { font-size: 1.15rem; line-height: 1.4; }
+  .insight-card-actions { margin-top: 16px; gap: 8px; }
+  .insight-card-secondary,
+  .insight-card-primary { flex: 1 1 auto; justify-content: center; height: 42px; }
+
+  .insight-share-card { padding: 22px 18px 18px; border-radius: 20px; }
+  .insight-share-title { font-size: 1.35rem; }
+  .insight-share-primary { width: 100%; justify-content: center; height: 46px; }
+  .insight-share-actions { flex-direction: column; align-items: stretch; }
 }
 
 /* Clerk auth pages — make the Clerk-rendered card feel at home in

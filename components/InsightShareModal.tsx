@@ -25,6 +25,36 @@ const FORMAT_META: Record<
   },
 };
 
+// Resolve the *actual* font-family string the browser uses for our serif /
+// sans CSS variables. next/font emits an obfuscated family name (e.g.
+// "__Instrument_Serif_abc123"), so a canvas that hard-codes "Instrument
+// Serif" silently falls back to Georgia. Probing the computed style gives
+// us the real stack to hand to the canvas.
+function resolveFontStack(cssValue: string, fallback: string): string {
+  if (typeof document === 'undefined') return fallback;
+  try {
+    const probe = document.createElement('span');
+    probe.style.fontFamily = cssValue;
+    probe.style.position = 'absolute';
+    probe.style.visibility = 'hidden';
+    probe.style.pointerEvents = 'none';
+    document.body.appendChild(probe);
+    const fam = getComputedStyle(probe).fontFamily;
+    probe.remove();
+    return fam || fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function isMobileViewport(): boolean {
+  if (typeof window === 'undefined') return false;
+  return (
+    window.matchMedia('(pointer: coarse)').matches ||
+    window.innerWidth < 640
+  );
+}
+
 export function InsightShareModal({
   open,
   onClose,
@@ -34,10 +64,26 @@ export function InsightShareModal({
   onClose: () => void;
   insight: Insight | null;
 }) {
+  // Default to Story (portrait) on phones — that's what Instagram Stories
+  // wants and where the native share sheet exposes it.
   const [format, setFormat] = useState<ShareFormat>('square');
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
+  const [canFileShare, setCanFileShare] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    if (isMobileViewport()) setFormat('story');
+    // Feature-detect file sharing (Web Share Level 2).
+    try {
+      const nav: any = navigator;
+      const testFile = new File([new Blob()], 't.png', { type: 'image/png' });
+      setCanFileShare(!!nav?.canShare?.({ files: [testFile] }));
+    } catch {
+      setCanFileShare(false);
+    }
+  }, [open]);
 
   useEffect(() => {
     if (!open || !insight) return;
@@ -55,7 +101,15 @@ export function InsightShareModal({
       // Load the Socria mark so we can draw it on the card footer.
       const logo = await loadLogo();
       if (cancelled) return;
-      renderInsightCanvas(canvas, format, insight, logo);
+      const serif = resolveFontStack(
+        'var(--font-serif), "Instrument Serif", Georgia, serif',
+        'Georgia, serif'
+      );
+      const sans = resolveFontStack(
+        'var(--font-sans), Inter, system-ui, sans-serif',
+        'system-ui, sans-serif'
+      );
+      renderInsightCanvas(canvas, format, insight, logo, { serif, sans });
     })();
 
     return () => {
@@ -161,7 +215,7 @@ export function InsightShareModal({
             >
               {FORMAT_META[f].label}
               <span className="insight-share-format-dims">
-                {FORMAT_META[f].canvasW}×{FORMAT_META[f].canvasH}
+                {f === 'story' ? 'Instagram Story' : 'Post · 1:1'}
               </span>
             </button>
           ))}
@@ -184,12 +238,23 @@ export function InsightShareModal({
           >
             <span className="insight-share-primary-shine" aria-hidden />
             <span className="insight-share-primary-label">
-              {busy ? 'Preparing…' : 'Share'}
+              {busy
+                ? 'Preparing…'
+                : canFileShare
+                  ? format === 'story'
+                    ? 'Share to Stories'
+                    : 'Share'
+                  : 'Download image'}
             </span>
             <span aria-hidden>→</span>
           </button>
           {status && <p className="insight-share-status">{status}</p>}
         </div>
+        <p className="insight-share-hint">
+          {canFileShare
+            ? 'Opens your share sheet — pick Instagram to post to your Story.'
+            : 'Saves a PNG you can upload to your Instagram Story.'}
+        </p>
       </div>
     </div>
   );
@@ -220,8 +285,10 @@ function renderInsightCanvas(
   canvas: HTMLCanvasElement,
   format: ShareFormat,
   insight: Insight,
-  logo: HTMLImageElement | null
+  logo: HTMLImageElement | null,
+  fonts: { serif: string; sans: string }
 ) {
+  const { serif, sans } = fonts;
   const { canvasW, canvasH } = FORMAT_META[format];
   canvas.width = canvasW;
   canvas.height = canvasH;
@@ -266,7 +333,7 @@ function renderInsightCanvas(
   // ---- Header label ----
   const headerY = isStory ? canvasH * 0.18 : canvasH * 0.16;
   ctx.fillStyle = '#475a28';
-  ctx.font = `600 ${isStory ? 26 : 24}px "Inter", system-ui, sans-serif`;
+  ctx.font = `600 ${isStory ? 26 : 24}px ${sans}`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   drawSpacedText(
@@ -285,7 +352,7 @@ function renderInsightCanvas(
   // ---- Main insight text ----
   ctx.fillStyle = '#1F1F1F';
   const insightSize = isStory ? 78 : 68;
-  ctx.font = `italic 400 ${insightSize}px "Instrument Serif", Georgia, serif`;
+  ctx.font = `italic 400 ${insightSize}px ${serif}`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
 
@@ -324,14 +391,14 @@ function renderInsightCanvas(
 
   // Socria wordmark
   ctx.fillStyle = '#1F1F1F';
-  ctx.font = `400 ${isStory ? 46 : 42}px "Instrument Serif", Georgia, serif`;
+  ctx.font = `400 ${isStory ? 46 : 42}px ${serif}`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText('Socria', canvasW * 0.5, footerY);
 
   // Tagline
   ctx.fillStyle = '#475a28';
-  ctx.font = `500 ${isStory ? 20 : 18}px "Inter", system-ui, sans-serif`;
+  ctx.font = `500 ${isStory ? 20 : 18}px ${sans}`;
   drawSpacedText(
     ctx,
     'THINK FOR YOURSELF.',
@@ -342,7 +409,7 @@ function renderInsightCanvas(
 
   // Handle
   ctx.fillStyle = 'rgba(31, 31, 31, 0.42)';
-  ctx.font = `400 ${isStory ? 18 : 16}px "Inter", system-ui, sans-serif`;
+  ctx.font = `400 ${isStory ? 18 : 16}px ${sans}`;
   ctx.fillText('@socriaai', canvasW * 0.5, footerY + (isStory ? 64 : 58));
 }
 
