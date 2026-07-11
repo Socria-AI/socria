@@ -89,11 +89,13 @@ export async function POST(req: NextRequest) {
       parsed = currentMemory;
     }
     const extracted = sanitizeMemory(parsed);
-    // Preserve insight state — the extractor never touches it.
+    // Preserve insight + synthesis state — the extractor never touches them.
     const memory: typeof extracted = {
       ...extracted,
       latestInsight: currentMemory.latestInsight ?? null,
       lastInsightAtTurn: currentMemory.lastInsightAtTurn ?? 0,
+      latestSynthesis: currentMemory.latestSynthesis ?? null,
+      lastSynthesisAtTurn: currentMemory.lastSynthesisAtTurn ?? 0,
     };
     const suggestedTitle = sanitizeSuggestedTitle(parsed?.suggestedTitle);
 

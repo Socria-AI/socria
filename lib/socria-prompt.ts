@@ -1,6 +1,8 @@
 // lib/socria-prompt.ts
 // The Socria system prompts. Sent as the system message on every chat call.
 
+import type { SynthesisData } from './synthesis';
+
 // ===== Core 2 — the original prompt =====
 
 const CORE_2_PROMPT = `You are Human-First AI, also referred to as Socria: a generative assistant designed to prevent cognitive dependency.
@@ -660,6 +662,12 @@ export interface ConversationMemory {
   // does. Client dismisses by setting latestInsight to null.
   latestInsight?: Insight | null;
   lastInsightAtTurn?: number;
+  // Auto-synthesis state — a structured synthesis generated on a
+  // depth-paced cadence and rendered as an interactive card. Dismissed
+  // by setting latestSynthesis to null; lastSynthesisAtTurn tracks the
+  // cooldown so it re-synthesizes as the conversation grows.
+  latestSynthesis?: SynthesisData | null;
+  lastSynthesisAtTurn?: number;
 }
 
 export interface Insight {
@@ -691,6 +699,8 @@ export const EMPTY_MEMORY: ConversationMemory = {
   thinkingStyle: [],
   latestInsight: null,
   lastInsightAtTurn: 0,
+  latestSynthesis: null,
+  lastSynthesisAtTurn: 0,
 };
 
 // Only string-array categories go into the rendered memory block. The
@@ -886,6 +896,28 @@ export function sanitizeInsight(input: any): Insight | null {
   return { id, headerLabel, text, generatedAt, atTurn };
 }
 
+export function sanitizeSynthesisData(input: any): SynthesisData | null {
+  if (!input || typeof input !== 'object') return null;
+  const rawSections = Array.isArray(input.sections) ? input.sections : [];
+  const sections = rawSections
+    .map((s: any) => ({
+      label: typeof s?.label === 'string' ? s.label.trim().slice(0, 60) : '',
+      items: (Array.isArray(s?.items) ? s.items : [])
+        .filter((x: any) => typeof x === 'string')
+        .map((x: string) => x.trim())
+        .filter((x: string) => x.length > 0 && x.length <= 240)
+        .slice(0, 4),
+    }))
+    .filter((s: any) => s.label && s.items.length > 0)
+    .slice(0, 6);
+  if (!sections.length) return null;
+  const title =
+    typeof input.title === 'string' && input.title.trim()
+      ? input.title.trim().slice(0, 80)
+      : undefined;
+  return { title, sections };
+}
+
 export function sanitizeMemory(input: any): ConversationMemory {
   const arr = (v: any, max = 10): string[] => {
     if (!Array.isArray(v)) return [];
@@ -913,7 +945,84 @@ export function sanitizeMemory(input: any): ConversationMemory {
       typeof input?.lastInsightAtTurn === 'number'
         ? Math.max(0, Math.floor(input.lastInsightAtTurn))
         : 0,
+    // Auto-synthesis state.
+    latestSynthesis: sanitizeSynthesisData(input?.latestSynthesis),
+    lastSynthesisAtTurn:
+      typeof input?.lastSynthesisAtTurn === 'number'
+        ? Math.max(0, Math.floor(input.lastSynthesisAtTurn))
+        : 0,
   };
+}
+
+// How eagerly auto-synthesis fires, by thinking depth. firstAt is the user
+// turn count at which the first synthesis appears; gap is how many more
+// user turns before the next one. Deeper modes hold off longer and give
+// the thinking more room to develop before reflecting it back.
+export function synthesisCadence(depth: ThinkingDepth): {
+  firstAt: number;
+  gap: number;
+} {
+  switch (depth) {
+    case 'quick':
+      return { firstAt: 4, gap: 4 };
+    case 'deep':
+      return { firstAt: 9, gap: 7 };
+    case 'abstract':
+      return { firstAt: 11, gap: 8 };
+    case 'balanced':
+    default:
+      return { firstAt: 6, gap: 6 };
+  }
+}
+
+// Prompt for /api/generate-synthesis. Produces a structured synthesis of
+// the conversation so far as JSON — the same shape the SynthesisCard
+// renders. Reflection, never conclusion.
+export function buildSynthesisPrompt(
+  memory: ConversationMemory,
+  fullExchange: string,
+  depthLabel: string
+): string {
+  return `You are the synthesis engine for Socria Core 3, a thinking assistant. Reflect the user's OWN thinking back to them as a structured synthesis they can see at a glance. This is a checkpoint in an ongoing conversation, not an ending.
+
+Thinking depth for this conversation: ${depthLabel}. Deeper depth = more precise distinctions, not more words.
+
+Produce a synthesis with:
+- A short title (5 words max) naming the underlying question or tension they are working through.
+- 2 to 5 sections, each a heading with 1–3 one-line bullets. Choose only sections that actually have content from these: "Recurring themes", "Tensions", "Hidden assumptions", "Shifts in thinking", "Areas of clarity", "Possible reframes".
+
+Rules:
+1. Ground everything in what the user actually said. Do not invent.
+2. Each bullet is ONE plain line, under 20 words, in second person or neutral phrasing.
+3. NEVER include: final decisions, recommendations, advice disguised as certainty, invented motives, or unsupported psychological claims.
+4. Density over length. Drop any section that has nothing real in it.
+5. Aim for the user's reaction: "you helped me see my own thinking" — not "the AI summarized my chat".
+6. Return valid JSON only, matching exactly:
+
+{
+  "title": string,
+  "sections": [ { "label": string, "items": string[] } ]
+}
+
+If the conversation is too thin to synthesize honestly, return { "title": "", "sections": [] }.
+
+Current memory (context — do not quote verbatim):
+${JSON.stringify(
+    {
+      goals: memory.goals,
+      values: memory.values,
+      constraints: memory.constraints,
+      uncertainties: memory.uncertainties,
+      emergingUnderstanding: memory.emergingUnderstanding,
+    },
+    null,
+    2
+  )}
+
+Conversation so far:
+${fullExchange}
+
+Return the synthesis as JSON only.`;
 }
 
 // Build the extractor system prompt used by /api/generate-insight. It

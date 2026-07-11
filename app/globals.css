@@ -1001,6 +1001,49 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
   .choice-chips, .choice-chip { animation: none; }
 }
 
+/* ===== Auto-synthesis wrapper (depth-paced card in chat) ===== */
+.synthesis-auto {
+  margin: 20px 0 8px;
+}
+.synthesis-auto-eyebrow {
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--moss-700);
+  font-weight: 600;
+  margin: 0 2px 8px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.synthesis-auto-eyebrow::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--moss-600);
+  box-shadow: 0 0 0 3px rgba(94, 118, 51, 0.16);
+}
+.synthesis-auto-continue {
+  margin-top: 10px;
+  background: transparent;
+  border: 1px solid rgba(31, 31, 31, 0.15);
+  color: rgba(31, 31, 31, 0.7);
+  padding: 8px 16px;
+  height: 38px;
+  border-radius: 999px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+.synthesis-auto-continue:hover {
+  background: rgba(31, 31, 31, 0.03);
+  color: var(--ink);
+  border-color: rgba(31, 31, 31, 0.3);
+}
+
 /* ===== Synthesis Card (interactive organized synthesis) ===== */
 @keyframes synthesisCardIn {
   from { opacity: 0; transform: translateY(12px); }

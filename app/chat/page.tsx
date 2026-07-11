@@ -19,8 +19,8 @@ import { InsightCard } from '@/components/InsightCard';
 import { InsightShareModal } from '@/components/InsightShareModal';
 import { SynthesisCard, SynthesisPending } from '@/components/SynthesisCard';
 import { ChoiceChips } from '@/components/ChoiceChips';
-import { parseMessage, splitChoices } from '@/lib/synthesis';
-import type { Insight } from '@/lib/socria-prompt';
+import { parseMessage, splitChoices, type SynthesisData } from '@/lib/synthesis';
+import { synthesisCadence, type Insight } from '@/lib/socria-prompt';
 
 // Core 3 auto-generates an Insight Card once the conversation has passed
 // this many user turns, and only if we haven't shown one in the last
@@ -360,6 +360,12 @@ export default function ChatPage() {
               c.memory?.lastInsightAtTurn ?? 0,
               nextMemory.lastInsightAtTurn ?? 0
             ),
+            latestSynthesis:
+              c.memory?.latestSynthesis ?? nextMemory.latestSynthesis ?? null,
+            lastSynthesisAtTurn: Math.max(
+              c.memory?.lastSynthesisAtTurn ?? 0,
+              nextMemory.lastSynthesisAtTurn ?? 0
+            ),
           };
           const patch: Partial<Conversation> = { memory: mergedMemory };
           // Auto-title: only replace if the current title is either the
@@ -489,6 +495,91 @@ export default function ChatPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ conversation: latestPatched }),
       }).catch((e) => console.error('Persist insight dismiss failed:', e));
+    }
+  }
+
+  // Auto-synthesis: on a depth-paced cadence, generate a structured
+  // synthesis of the conversation and store it as an interactive card.
+  // Re-fires as the conversation grows (larger gap for later syntheses).
+  async function maybeGenerateSynthesis(convoId: string, convo: Conversation) {
+    const userTurns = convo.messages.filter((m) => m.role === 'user').length;
+    const { firstAt, gap } = synthesisCadence(depth);
+    const lastAt = convo.memory?.lastSynthesisAtTurn ?? 0;
+    // Not enough conversation yet for the first synthesis.
+    if (userTurns < firstAt) return;
+    // Respect the cadence gap after a prior synthesis.
+    if (lastAt > 0 && userTurns - lastAt < gap) return;
+    // Don't stack a new synthesis on top of an unread one.
+    if (convo.memory?.latestSynthesis) return;
+
+    try {
+      const res = await fetch('/api/generate-synthesis', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: convo.messages,
+          memory: convo.memory ?? EMPTY_MEMORY,
+          depth,
+          atTurn: userTurns,
+        }),
+      });
+      if (!res.ok) return;
+      const json = await res.json();
+      const synthesis: SynthesisData | null = json?.synthesis ?? null;
+      if (!synthesis || !synthesis.sections?.length) return;
+
+      let latestPatched: Conversation | undefined;
+      setConversations((prev) => {
+        const next = prev.map((c) => {
+          if (c.id !== convoId) return c;
+          const nextMemory = {
+            ...(c.memory ?? EMPTY_MEMORY),
+            latestSynthesis: synthesis,
+            lastSynthesisAtTurn: userTurns,
+          };
+          return { ...c, memory: nextMemory };
+        });
+        latestPatched = next.find((c) => c.id === convoId);
+        if (mode === 'local') saveLocal(next);
+        return next;
+      });
+
+      if (mode === 'cloud' && latestPatched) {
+        try {
+          await fetch('/api/conversations', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ conversation: latestPatched }),
+          });
+        } catch (e) {
+          console.error('Persist synthesis failed:', e);
+        }
+      }
+    } catch (e) {
+      console.error('Synthesis generation failed:', e);
+    }
+  }
+
+  function dismissSynthesis(convoId: string) {
+    let latestPatched: Conversation | undefined;
+    setConversations((prev) => {
+      const next = prev.map((c) => {
+        if (c.id !== convoId) return c;
+        return {
+          ...c,
+          memory: { ...(c.memory ?? EMPTY_MEMORY), latestSynthesis: null },
+        };
+      });
+      latestPatched = next.find((c) => c.id === convoId);
+      if (mode === 'local') saveLocal(next);
+      return next;
+    });
+    if (mode === 'cloud' && latestPatched) {
+      fetch('/api/conversations', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversation: latestPatched }),
+      }).catch((e) => console.error('Persist synthesis dismiss failed:', e));
     }
   }
 
@@ -739,9 +830,10 @@ export default function ChatPage() {
       // fails, the conversation still works — memory just doesn't update.
       if (isSignedIn && model === 'core-3') {
         void extractAndPersistMemory(workingId!, updated);
-        // Also consider generating an Insight Card. Runs in parallel and
-        // dedupes internally against the memory turn markers.
+        // Also consider generating an Insight Card + auto-synthesis. Both
+        // run in parallel and dedupe internally against their turn markers.
         void maybeGenerateInsight(workingId!, updated);
+        void maybeGenerateSynthesis(workingId!, updated);
       }
     } catch (e: any) {
       setError(e?.message || 'Failed to send');
@@ -1053,6 +1145,28 @@ export default function ChatPage() {
                 animate
               />
             )}
+
+            {/* Auto-synthesis — a depth-paced interactive synthesis card,
+                shown after the reply. Dismiss to keep chatting; it re-
+                generates as the conversation grows. */}
+            {!sending &&
+              !streamed &&
+              active?.memory?.latestSynthesis?.sections?.length &&
+              active.id ? (
+                <div className="synthesis-auto">
+                  <div className="synthesis-auto-eyebrow">
+                    Socria synthesized where your thinking is
+                  </div>
+                  <SynthesisCard data={active.memory.latestSynthesis} />
+                  <button
+                    type="button"
+                    className="synthesis-auto-continue"
+                    onClick={() => dismissSynthesis(active.id)}
+                  >
+                    Keep thinking →
+                  </button>
+                </div>
+              ) : null}
 
             {/* Insight Card — appears after the assistant reply once
                 enough depth is reached. Not while a stream is in flight. */}
