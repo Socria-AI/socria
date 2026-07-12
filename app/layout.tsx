@@ -19,10 +19,33 @@ const sans = Inter({
   display: 'swap',
 });
 
+const siteUrl =
+  process.env.NEXT_PUBLIC_SITE_URL || 'https://socria.app';
+
 export const metadata: Metadata = {
-  title: 'Socria — AI that sharpens your thinking',
+  metadataBase: new URL(siteUrl),
+  title: {
+    default: 'Socria — AI that sharpens your thinking',
+    template: '%s — Socria',
+  },
   description:
     'Socria helps you reason through ideas, decisions, and uncertainty without outsourcing your thinking. Human-first AI.',
+  applicationName: 'Socria',
+  alternates: { canonical: '/' },
+  openGraph: {
+    type: 'website',
+    url: siteUrl,
+    siteName: 'Socria',
+    title: 'Socria — AI that sharpens your thinking',
+    description:
+      'Human-first AI that strengthens how you think instead of thinking for you. Think for yourself.',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Socria — AI that sharpens your thinking',
+    description:
+      'Human-first AI that strengthens how you think instead of thinking for you.',
+  },
 };
 
 export default function RootLayout({

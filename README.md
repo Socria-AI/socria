@@ -51,8 +51,7 @@ synced across every device.
    **Production** dataset. Free tier covers 3 users / 10k documents /
    100k API requests per month — plenty for a blog.
 2. **API** tab → **CORS origins** → add `http://localhost:3000` and
-   your production URL (e.g. `https://socria.vercel.app`). No
-   credentials needed.
+   your production URL (`https://socria.app`). No credentials needed.
 3. Copy the **Project ID** from the dashboard.
 4. After deploy, go to `https://your-domain/studio`, sign in with the
    email you used to create the Sanity project, and the full editor is
