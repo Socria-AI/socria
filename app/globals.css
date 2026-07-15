@@ -1982,7 +1982,9 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
 .scrolly-root .nav-right { display: flex; align-items: center; gap: 22px; }
 .scrolly-root .nav-signin { font-size: .88rem; font-weight: 500; opacity: .75; transition: opacity .2s; }
 .scrolly-root .nav-signin:hover { opacity: 1; }
-.scrolly-root .btn-nav { display: inline-flex; align-items: center; gap: .5em; height: 42px; padding: 0 20px; border-radius: 999px; background: var(--ink); color: var(--paper); font-size: .9rem; font-weight: 500; transition: background .25s, transform .25s; }
+.scrolly-root .btn-nav { display: inline-flex; align-items: center; gap: .5em; height: 42px; padding: 0 20px; border-radius: 999px; background: var(--ink); color: var(--paper); font-size: .9rem; font-weight: 500; white-space: nowrap; flex-shrink: 0; line-height: 1; transition: background .25s, transform .25s; }
+.scrolly-root .nav-right { flex-wrap: nowrap; }
+.scrolly-root .nav-signin { white-space: nowrap; }
 .scrolly-root .btn-nav:hover { background: var(--moss); transform: translateY(-1px); }
 .scrolly-root .btn-nav .arrow { transition: transform .2s; }
 .scrolly-root .btn-nav:hover .arrow { transform: translateX(3px); }
