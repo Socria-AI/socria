@@ -52,12 +52,17 @@ export type ConversationGuidance = {
 // model just used one, we tell it not to reuse the pattern.
 const BANNED_PATTERNS: { re: RegExp; label: string }[] = [
   { re: /\bit sounds like\b/i, label: '"it sounds like"' },
+  { re: /\bit seems like\b/i, label: '"it seems like"' },
   { re: /\bthat sounds\b/i, label: '"that sounds…"' },
+  { re: /\bthat suggests\b/i, label: '"that suggests…"' },
+  { re: /\bthis could mean\b/i, label: '"this could mean…"' },
+  { re: /\bit'?s important to\b/i, label: '"it\'s important to…"' },
   { re: /\bthat'?s understandable\b/i, label: '"that\'s understandable"' },
   { re: /\bthat'?s (perfectly )?okay\b/i, label: '"that\'s okay"' },
   { re: /\bthat makes sense\b/i, label: '"that makes sense"' },
   { re: /\bwhat are the main (factors|considerations|concerns|reasons)\b/i, label: 'broad "what are the main…" intake questions' },
   { re: /\bwhat are you hoping to (find|get|achieve)\b/i, label: '"what are you hoping to find" questions' },
+  { re: /\bwhat kind of .{0,20}\bexcite/i, label: '"what kind of … excites you" questions' },
   { re: /\bcan you (tell me more|elaborate)\b/i, label: '"tell me more / elaborate"' },
   { re: /\bhow does that make you feel\b/i, label: '"how does that make you feel"' },
   { re: /\bsignificant decision\b/i, label: 'calling the topic a "significant decision"' },
@@ -216,9 +221,12 @@ export function renderTurnDirective(g: ConversationGuidance): string {
   const lines: string[] = [];
   lines.push('=== THIS TURN (highest priority — overrides general guidance if they conflict) ===');
   lines.push('');
+  lines.push('Answer what changed in your understanding, not the message itself.');
   lines.push(`Current move: ${g.stage}. ${STAGE_HINT[g.stage]}`);
   if (g.previousMove) {
-    lines.push(`Your previous reply was a ${g.previousMove}.`);
+    lines.push(
+      `Your previous reply was a ${g.previousMove}. Vary the shape this turn — do not reuse the same reflection→question rhythm.`
+    );
   }
   lines.push(`What changed this turn: ${g.conversationDelta}`);
   if (g.currentUnderstanding) {
