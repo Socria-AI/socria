@@ -45,8 +45,15 @@ export type ConversationGuidance = {
   unresolvedTension: string | null;
   userEngagement: 'low' | 'medium' | 'high';
   synthesisReadiness: 'low' | 'medium' | 'high';
+  turnNumber: number;
+  openingConcern: string | null;
   avoidNext: string[];
 };
+
+function clip(s: string, n = 120): string {
+  const t = s.replace(/\s+/g, ' ').trim();
+  return t.length > n ? t.slice(0, n - 1).trimEnd() + '…' : t;
+}
 
 // Generic-coaching tells we watch for in the assistant's recent turns. If the
 // model just used one, we tell it not to reuse the pattern.
@@ -189,6 +196,11 @@ export function computeGuidance(
       'The user added substantive new information. State explicitly what is now clearer or different from a moment ago, and connect it to something they said earlier.';
   }
 
+  const openingConcern =
+    userTurns.length >= 3 && userTurns[0]?.content
+      ? clip(userTurns[0].content)
+      : null;
+
   return {
     stage,
     previousMove,
@@ -199,6 +211,8 @@ export function computeGuidance(
     unresolvedTension: firstNonEmptyLine(memory, 'uncertainties'),
     userEngagement,
     synthesisReadiness,
+    turnNumber: userCount,
+    openingConcern,
     avoidNext,
   };
 }
@@ -229,6 +243,11 @@ export function renderTurnDirective(g: ConversationGuidance): string {
     );
   }
   lines.push(`What changed this turn: ${g.conversationDelta}`);
+  if (g.openingConcern) {
+    lines.push(
+      `Thread arc: this is turn ${g.turnNumber}. It opened with — "${g.openingConcern}". Hold that against where the conversation is now. If the focus has quietly drifted from the opening, naming that drift ("we started on X; most of this has actually become about Y") is often the most valuable thing you can say — prefer it over another question.`
+    );
+  }
   if (g.currentUnderstanding) {
     lines.push(`Working understanding so far: ${g.currentUnderstanding}`);
   }

@@ -105,9 +105,15 @@ export async function POST(req: NextRequest) {
     // is the forcing function that keeps 3.1 from falling into the generic
     // reassure → paraphrase → broad-question loop. Deterministic — no extra
     // model call. Core 2 is untouched.
+    // Dev-only A/B knob: the eval harness sends this to compare controller-on
+    // vs controller-off replies against the same server. Ignored in production.
+    const controllerDisabled =
+      process.env.NODE_ENV !== 'production' &&
+      req.headers.get('x-socria-no-controller') === '1';
+
     let systemPrompt = basePrompt;
     let guidance: ReturnType<typeof computeGuidance> | null = null;
-    if (model === 'core-3') {
+    if (model === 'core-3' && !controllerDisabled) {
       guidance = computeGuidance(clean, body?.memory);
       systemPrompt = `${basePrompt}\n\n${renderTurnDirective(guidance)}`;
     }

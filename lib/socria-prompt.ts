@@ -1369,7 +1369,7 @@ Empty categories below are fine. Ignore them. Do not force references.
 
 // Bump whenever the Core 3.1 prompt's behavior meaningfully changes, so dev
 // logs can confirm the active version is the one we think is deployed.
-export const SOCRIA_PROMPT_VERSION = 'core-3.1-progression-v3';
+export const SOCRIA_PROMPT_VERSION = 'core-3.1-progression-v4';
 
 // Build the full system prompt for a (model, depth) pair. Core 2 ignores
 // depth. Core 3 appends an "Active mode" line that locks the depth in,
