@@ -265,6 +265,9 @@ export function renderTurnDirective(g: ConversationGuidance): string {
   lines.push(
     'Keep it short: two to four sentences, often fewer. Cut anything that repeats, paraphrases, or explains the obvious.'
   );
+  lines.push(
+    'Mark the one pivot or loaded word that carries this turn in *single asterisks* (Socria\'s green-serif signature) — one per reply, on a word that genuinely lands, never decorative.'
+  );
   if (g.synthesisReadiness === 'high') {
     lines.push('The conversation is ready for synthesis before it starts repeating — prefer reflecting the shape of their thinking over another question.');
   }
