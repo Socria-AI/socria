@@ -1370,7 +1370,7 @@ Empty categories below are fine. Ignore them. Do not force references.
 
 // Bump whenever the Core 3.1 prompt's behavior meaningfully changes, so dev
 // logs can confirm the active version is the one we think is deployed.
-export const SOCRIA_PROMPT_VERSION = 'core-3.1-progression-v6';
+export const SOCRIA_PROMPT_VERSION = 'core-3.1-progression-v7-state';
 
 // Build the full system prompt for a (model, depth) pair. Core 2 ignores
 // depth. Core 3 appends an "Active mode" line that locks the depth in,
@@ -1404,6 +1404,100 @@ export function resolveOpenAIModel(model: SocriaModel): string {
       ? process.env.OPENAI_MODEL_CORE_3
       : process.env.OPENAI_MODEL;
   return envOverride || SOCRIA_MODELS[model].defaultOpenAIModel;
+}
+
+// ===== Living conversation state (Core 3.1 per-turn semantic pass) =====
+//
+// The deterministic controller can't know what a message MEANS — only its
+// shape. This is the semantic layer: a cheap model reads the thread and
+// reports how the latest message updated the assistant's understanding, so
+// Core 3.1 responds FROM an evolving model of the conversation instead of
+// reacting to the last message in isolation.
+
+export type ConversationDelta =
+  | 'confirm'
+  | 'refine'
+  | 'contradict'
+  | 'replace'
+  | 'none';
+
+export interface ConversationState {
+  understanding: string; // living one-sentence read, updated to now
+  delta: ConversationDelta; // how the latest message changed it
+  whatChanged: string; // the shift itself — never a paraphrase
+  resolved: string | null; // a prior question the latest message answered
+  nextFocus: string | null; // the next layer worth moving toward
+}
+
+// System prompt for the cheap state model. The recent transcript is sent as
+// the user message; this returns strict JSON.
+export function buildConversationStatePrompt(
+  priorUnderstanding: string | null
+): string {
+  return `You maintain the LIVING UNDERSTANDING of a reflective conversation for Socria, a thinking assistant. You never talk to the user. You read the conversation and report how the assistant's understanding should update after the user's LATEST message.
+
+${
+    priorUnderstanding
+      ? `Understanding before the latest message: ${priorUnderstanding}`
+      : 'There is no prior understanding yet — build the first one.'
+  }
+
+Return ONLY JSON, no prose, matching exactly:
+{
+  "understanding": "one sentence: what the user is really working through, updated to include the latest message",
+  "delta": "confirm" | "refine" | "contradict" | "replace" | "none",
+  "whatChanged": "one sentence naming the SHIFT the latest message caused — what became clearer, narrowed, was answered, or newly tense. NEVER a paraphrase of the message.",
+  "resolved": "a question or uncertainty the latest message just ANSWERED so the assistant should stop investigating it, or null",
+  "nextFocus": "the next layer worth exploring now that this is settled (e.g. why hesitation remains though the question is answered), or null"
+}
+
+Definitions of delta:
+- confirm: the message supports/restates the current understanding.
+- refine: it narrows or sharpens the understanding.
+- contradict: it conflicts with something established earlier.
+- replace: it changes what the actual question is.
+- none: it adds nothing new.
+
+Critical: if the user just answered their own earlier question (e.g. "should I do X?" then "I need X for Y"), set "resolved" to that original question and point "nextFocus" at what now actually matters (usually why it still feels hard). Do not treat the answered question as still open. Be terse.`;
+}
+
+export function sanitizeConversationState(raw: any): ConversationState | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const deltas: ConversationDelta[] = [
+    'confirm',
+    'refine',
+    'contradict',
+    'replace',
+    'none',
+  ];
+  const str = (v: any, n: number) =>
+    typeof v === 'string' ? v.trim().slice(0, n) : '';
+  const understanding = str(raw.understanding, 260);
+  const whatChanged = str(raw.whatChanged, 260);
+  if (!understanding && !whatChanged) return null;
+  const nullable = (v: any, n: number) => {
+    const s = str(v, n);
+    return s && !/^null$/i.test(s) && s.toLowerCase() !== 'none' ? s : null;
+  };
+  return {
+    understanding,
+    delta: deltas.includes(raw.delta) ? raw.delta : 'none',
+    whatChanged,
+    resolved: nullable(raw.resolved, 220),
+    nextFocus: nullable(raw.nextFocus, 220),
+  };
+}
+
+// Flatten the recent thread into a plain transcript for the state model.
+export function renderTranscriptForState(
+  messages: { role: string; content: string }[],
+  maxTurns = 12
+): string {
+  return messages
+    .filter((m) => m.role === 'user' || m.role === 'assistant')
+    .slice(-maxTurns)
+    .map((m) => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`)
+    .join('\n');
 }
 
 // Build the extractor system prompt used by /api/extract-memory. It

@@ -21,7 +21,11 @@
 //   OPENAI_API_KEY    optional; adds gpt-4o-mini judge for semantic checks
 //   JUDGE_MODEL       default gpt-4o-mini
 //   LIMIT             cap scenarios (default all)
-//   VARIANTS          "controller,baseline" (default) | "controller" only
+//   VARIANTS          "controller,baseline" (default). Any two of:
+//                       controller = full stack (deterministic + semantic state)
+//                       nostate    = deterministic controller only, no state pass
+//                       baseline   = bare prompt (no controller, no state)
+//                     e.g. VARIANTS=controller,nostate isolates the state pass.
 //
 // The controller-off variant requires NODE_ENV !== production on the server
 // (it honors the x-socria-no-controller header only in dev).
@@ -108,9 +112,10 @@ async function judge(thread, reply) {
   }
 }
 
-async function ask(messages, { controller = true, depth = 'balanced' } = {}) {
+async function ask(messages, { controller = true, state = true, depth = 'balanced' } = {}) {
   const headers = { 'Content-Type': 'application/json', 'x-socria-key': ACCESS_KEY };
   if (!controller) headers['x-socria-no-controller'] = '1';
+  if (!state) headers['x-socria-no-state'] = '1';
   const res = await fetch(`${BASE_URL}/api/chat`, { method: 'POST', headers, body: JSON.stringify({ messages, model: 'core-3', depth }) });
   if (!res.ok) throw new Error(`HTTP ${res.status} ${(await res.text().catch(() => '')).slice(0, 160)}`);
   return (await res.text()).trim();
@@ -133,13 +138,22 @@ async function scoreReply(messagesBefore, reply, userMsg, turnIndex) {
   };
 }
 
-async function runVariant(sc, controller) {
+// variant → request flags. baseline = bare prompt; nostate = deterministic
+// controller but no semantic state pass; controller = full (state on).
+const VARIANT_FLAGS = {
+  controller: { controller: true, state: true },
+  nostate: { controller: true, state: false },
+  baseline: { controller: false, state: false },
+};
+
+async function runVariant(sc, variant) {
+  const flags = VARIANT_FLAGS[variant] || VARIANT_FLAGS.controller;
   const messages = [];
   const scores = [];
   const replies = [];
   for (let i = 0; i < sc.turns.length; i++) {
     messages.push({ role: 'user', content: sc.turns[i] });
-    const reply = await ask(messages, { controller });
+    const reply = await ask(messages, flags);
     const score = await scoreReply(messages.slice(0, -1).concat({ role: 'user', content: sc.turns[i] }), reply, sc.turns[i], i);
     scores.push(score);
     replies.push(reply);
@@ -163,19 +177,18 @@ async function main() {
   for (const sc of scenarios) {
     const perVariant = {};
     for (const v of VARIANTS) {
-      const controller = v === 'controller';
       try {
-        const r = await runVariant(sc, controller);
+        const r = await runVariant(sc, v);
         perVariant[v] = r;
         for (const s of r.scores) for (const m of METRICS) { agg[v][m].total++; if (s[m]) agg[v][m].pass++; }
       } catch (e) {
         console.error(`  ${sc.name} [${v}] failed: ${e.message}`);
       }
     }
-    // Capture the last-turn reply of each variant for human side-by-side.
-    if (perVariant.controller && perVariant.baseline) {
-      const li = perVariant.controller.replies.length - 1;
-      sampleDiffs.push({ name: sc.name, user: sc.turns[li], controller: perVariant.controller.replies[li], baseline: perVariant.baseline.replies[li] });
+    // Capture the last-turn reply of the two compared variants for human diff.
+    if (VARIANTS.length === 2 && perVariant[VARIANTS[0]] && perVariant[VARIANTS[1]]) {
+      const li = perVariant[VARIANTS[0]].replies.length - 1;
+      sampleDiffs.push({ name: sc.name, user: sc.turns[li], a: perVariant[VARIANTS[0]].replies[li], b: perVariant[VARIANTS[1]].replies[li] });
     }
     process.stdout.write('.');
   }
@@ -187,39 +200,44 @@ async function main() {
 
   console.log('Metric'.padEnd(30) + VARIANTS.map((v) => v.padStart(12)).join('') + (VARIANTS.length === 2 ? '     Δ' : ''));
   console.log('─'.repeat(30 + VARIANTS.length * 12 + 6));
+  const [A, B] = VARIANTS;
+  const showDelta = VARIANTS.length === 2;
   for (const m of METRICS) {
     let row = m.padEnd(30) + VARIANTS.map((v) => pct(rate(v, m)).padStart(12)).join('');
-    if (VARIANTS.length === 2) {
-      const d = Math.round((rate('controller', m) - rate('baseline', m)) * 100);
+    if (showDelta) {
+      const d = Math.round((rate(A, m) - rate(B, m)) * 100);
       row += `   ${d >= 0 ? '+' : ''}${d}%`;
     }
     console.log(row);
   }
   console.log('─'.repeat(30 + VARIANTS.length * 12 + 6));
   let orow = 'OVERALL'.padEnd(30) + VARIANTS.map((v) => pct(overall(v)).padStart(12)).join('');
-  if (VARIANTS.length === 2) orow += `   ${overall('controller') - overall('baseline') >= 0 ? '+' : ''}${Math.round((overall('controller') - overall('baseline')) * 100)}%`;
+  if (showDelta) orow += `   ${overall(A) - overall(B) >= 0 ? '+' : ''}${Math.round((overall(A) - overall(B)) * 100)}%`;
   console.log(orow);
+  if (showDelta) console.log(`(Δ = ${A} minus ${B})`);
 
   // A few human-readable side-by-side samples.
-  console.log('\n── Side-by-side (final turn of a few scenarios) ─────────────');
-  for (const d of sampleDiffs.slice(0, 5)) {
-    console.log(`\n[${d.name}] user: ${d.user}`);
-    console.log(`  baseline:   ${d.baseline.replace(/\n+/g, ' ').slice(0, 220)}`);
-    console.log(`  controller: ${d.controller.replace(/\n+/g, ' ').slice(0, 220)}`);
+  if (sampleDiffs.length) {
+    console.log(`\n── Side-by-side (final turn) — top: ${A}, bottom: ${B} ─────────`);
+    for (const d of sampleDiffs.slice(0, 5)) {
+      console.log(`\n[${d.name}] user: ${d.user}`);
+      console.log(`  ${A.padEnd(10)}: ${d.a.replace(/\n+/g, ' ').slice(0, 220)}`);
+      console.log(`  ${B.padEnd(10)}: ${d.b.replace(/\n+/g, ' ').slice(0, 220)}`);
+    }
   }
 
-  // Depth comparison (controller on).
-  console.log('\n── Depth comparison (controller on) ─────────────────────────');
+  // Depth comparison (full stack on).
+  console.log('\n── Depth comparison (controller + state on) ─────────────────');
   for (const depth of ['quick', 'balanced', 'deep', 'abstract']) {
     try {
-      const reply = await ask([{ role: 'user', content: DEPTH_SCENARIO.turns[0] }], { controller: true, depth });
+      const reply = await ask([{ role: 'user', content: DEPTH_SCENARIO.turns[0] }], { controller: true, state: true, depth });
       console.log(`  [${depth}] ${reply.replace(/\n+/g, ' ').slice(0, 200)}`);
     } catch (e) { console.log(`  [${depth}] error: ${e.message}`); }
   }
 
-  if (VARIANTS.length === 2) {
-    const delta = Math.round((overall('controller') - overall('baseline')) * 100);
-    console.log(`\nResult: controller ${delta >= 0 ? 'improves' : 'regresses'} overall progression by ${Math.abs(delta)}% vs baseline.`);
+  if (showDelta) {
+    const delta = Math.round((overall(A) - overall(B)) * 100);
+    console.log(`\nResult: ${A} ${delta >= 0 ? 'improves' : 'regresses'} overall progression by ${Math.abs(delta)}% vs ${B}.`);
   }
 }
 

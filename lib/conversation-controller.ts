@@ -13,7 +13,7 @@
 // shape matches a structured controller so a model-backed pass can be
 // swapped in later without changing callers.
 
-import type { ConversationMemory } from './socria-prompt';
+import type { ConversationMemory, ConversationState } from './socria-prompt';
 
 export type ControllerMessage = {
   role: 'user' | 'assistant' | 'system';
@@ -231,7 +231,10 @@ const STAGE_HINT: Record<ConversationStage, string> = {
  * Deliberately short so it sits at the END of the prompt (high attention)
  * without bloating token count.
  */
-export function renderTurnDirective(g: ConversationGuidance): string {
+export function renderTurnDirective(
+  g: ConversationGuidance,
+  opts: { hasSemanticState?: boolean } = {}
+): string {
   const lines: string[] = [];
   lines.push('=== THIS TURN (highest priority — overrides general guidance if they conflict) ===');
   lines.push('');
@@ -242,16 +245,21 @@ export function renderTurnDirective(g: ConversationGuidance): string {
       `Your previous reply was a ${g.previousMove}. Vary the shape this turn — do not reuse the same reflection→question rhythm.`
     );
   }
-  lines.push(`What changed this turn: ${g.conversationDelta}`);
+  // When the semantic state pass ran, it supplies a far better "what changed"
+  // and living understanding — skip the deterministic-lite versions here to
+  // avoid a weaker, conflicting read.
+  if (!opts.hasSemanticState) {
+    lines.push(`What changed this turn: ${g.conversationDelta}`);
+  }
   if (g.openingConcern) {
     lines.push(
       `Thread arc: this is turn ${g.turnNumber}. It opened with — "${g.openingConcern}". Hold that against where the conversation is now. If the focus has quietly drifted from the opening, naming that drift ("we started on X; most of this has actually become about Y") is often the most valuable thing you can say — prefer it over another question.`
     );
   }
-  if (g.currentUnderstanding) {
+  if (!opts.hasSemanticState && g.currentUnderstanding) {
     lines.push(`Working understanding so far: ${g.currentUnderstanding}`);
   }
-  if (g.unresolvedTension) {
+  if (!opts.hasSemanticState && g.unresolvedTension) {
     lines.push(`Unresolved tension to advance: ${g.unresolvedTension}`);
   }
   if (g.avoidNext.length) {
@@ -271,5 +279,42 @@ export function renderTurnDirective(g: ConversationGuidance): string {
   if (g.synthesisReadiness === 'high') {
     lines.push('The conversation is ready for synthesis before it starts repeating — prefer reflecting the shape of their thinking over another question.');
   }
+  return lines.join('\n');
+}
+
+const DELTA_VERB: Record<ConversationState['delta'], string> = {
+  confirm: 'confirmed',
+  refine: 'refined',
+  contradict: 'contradicted',
+  replace: 'replaced the question behind',
+  none: 'added little to',
+};
+
+/**
+ * Render the living-understanding directive from the semantic state pass.
+ * This is the answer to "what changed because of the last message?" — the
+ * reply must be built from it, not from the last message in isolation.
+ */
+export function renderStateDirective(s: ConversationState): string {
+  const lines: string[] = [];
+  lines.push('=== CONVERSATION STATE (respond FROM this, not from the last message) ===');
+  lines.push('');
+  lines.push(`Living understanding: ${s.understanding}`);
+  if (s.whatChanged) {
+    lines.push(`The last message ${DELTA_VERB[s.delta]} the understanding — ${s.whatChanged}`);
+  }
+  if (s.resolved) {
+    const r = s.resolved.replace(/[.\s]+$/, '');
+    lines.push(
+      `Resolved — do NOT keep investigating this: ${r}. The user has answered it; treat it as settled and do not re-explain it.`
+    );
+  }
+  if (s.nextFocus) {
+    lines.push(`Next layer to move toward: ${s.nextFocus}`);
+  }
+  lines.push('');
+  lines.push(
+    'Build the reply around this change and where the conversation now stands — never around restating the last message. Name what shifted, not the fact the user reported. If the earlier question is resolved, do not re-explain it; move to the difficulty or hesitation that remains.'
+  );
   return lines.join('\n');
 }
