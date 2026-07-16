@@ -1059,6 +1059,16 @@ export const SOCRIA_MODELS: Record<SocriaModel, ModelConfig> = {
   },
 };
 
+// A typed access key that unlocks auth-gated models (e.g. Core 3.1) without
+// signing in. Entered in the Core 3 intro modal, saved to localStorage, and
+// sent to the gated API routes via the `x-socria-key` header so the server
+// can honor it. Kept deliberately simple — this is a soft gate, not a secret.
+export const CORE3_ACCESS_KEY = 'SMART';
+
+export function isValidAccessKey(key: unknown): boolean {
+  return typeof key === 'string' && key.trim() === CORE3_ACCESS_KEY;
+}
+
 export const THINKING_DEPTHS: Array<{
   id: ThinkingDepth;
   label: string;

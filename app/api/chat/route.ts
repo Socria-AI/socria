@@ -10,6 +10,7 @@ import {
   buildSystemPrompt,
   resolveOpenAIModel,
   SOCRIA_MODELS,
+  isValidAccessKey,
 } from '@/lib/socria-prompt';
 
 export const runtime = 'nodejs';
@@ -31,15 +32,20 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => null);
     const messages = body?.messages;
 
-    // Server-side gate: models flagged requiresAuth need a Clerk session.
-    // Even if the client UI is bypassed, anon users can't hit Core 3.
+    // Server-side gate: models flagged requiresAuth need a Clerk session OR
+    // a valid access key (typed by the user, sent via the x-socria-key
+    // header). Even if the client UI is bypassed, anon users without either
+    // can't hit Core 3.
     const { userId } = auth();
+    const keyUnlocked = isValidAccessKey(
+      req.headers.get('x-socria-key') ?? body?.accessKey
+    );
     const requestedModelId = body?.model;
     const requestedConfig =
       requestedModelId === 'core-3'
         ? SOCRIA_MODELS['core-3']
         : SOCRIA_MODELS['core-2'];
-    if (requestedConfig.requiresAuth && !userId) {
+    if (requestedConfig.requiresAuth && !userId && !keyUnlocked) {
       return NextResponse.json(
         {
           error: `Sign in to use ${requestedConfig.label}.`,

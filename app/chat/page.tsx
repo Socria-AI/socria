@@ -29,9 +29,14 @@ const INSIGHT_MIN_USER_TURNS = 6;
 const INSIGHT_MIN_GAP = 3;
 
 const CORE3_INTRO_DISMISS_KEY = 'socria.core3IntroDontShowAgain.v1';
+// Set to '1' once the user unlocks auth-gated models with the typed access
+// key. Lets anonymous (not-signed-in) users reach Core 3.1.
+const SMART_KEY_STORAGE = 'socria.core3AccessKey.v1';
 import {
   SOCRIA_MODELS,
   EMPTY_MEMORY,
+  CORE3_ACCESS_KEY,
+  isValidAccessKey,
   type SocriaModel,
   type ThinkingDepth,
   type ConversationMemory,
@@ -86,6 +91,15 @@ function readDepth(): ThinkingDepth {
     return 'balanced';
   } catch {
     return 'balanced';
+  }
+}
+
+function readSmartUnlocked(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    return localStorage.getItem(SMART_KEY_STORAGE) === '1';
+  } catch {
+    return false;
   }
 }
 
@@ -150,6 +164,7 @@ export default function ChatPage() {
   const [usedFree, setUsedFree] = useState(false);
   const [model, setModel] = useState<SocriaModel>('core-2');
   const [depth, setDepth] = useState<ThinkingDepth>('balanced');
+  const [smartUnlocked, setSmartUnlocked] = useState(false);
   const [core3ModalOpen, setCore3ModalOpen] = useState(false);
   const [core3Dismissed, setCore3Dismissed] = useState(false);
   const [autoOpenChecked, setAutoOpenChecked] = useState(false);
@@ -159,10 +174,19 @@ export default function ChatPage() {
 
   const mode: 'cloud' | 'local' = isSignedIn ? 'cloud' : 'local';
 
+  // Signed in OR unlocked with the typed access key → may use Core 3.1.
+  const canUseCore3 = !!isSignedIn || smartUnlocked;
+
   // Anonymous users get one free thought session. They're "locked out" of
   // starting a new one once that flag is set OR they're already mid-session.
+  // Unlocking with the access key lifts the cap too, so Core 3.1 is usable.
   const lockedOut =
-    !isSignedIn && (usedFree || conversations.length >= 1);
+    !isSignedIn && !smartUnlocked && (usedFree || conversations.length >= 1);
+
+  // Header sent to gated API routes when the user unlocked via access key
+  // instead of signing in. Harmless (and omitted) for signed-in users.
+  const keyHeaders = (): Record<string, string> =>
+    smartUnlocked && !isSignedIn ? { 'x-socria-key': CORE3_ACCESS_KEY } : {};
 
   // Load conversations whenever auth state resolves or flips.
   useEffect(() => {
@@ -246,28 +270,41 @@ export default function ChatPage() {
   useEffect(() => {
     setModel(readModel());
     setDepth(readDepth());
+    setSmartUnlocked(readSmartUnlocked());
   }, []);
-  // Anonymous users may have a Core 3 selection saved from a previous
-  // signed-in session — downgrade to Core 2 until they sign in again so
+  // Anonymous users without the access key may have a Core 3 selection saved
+  // from a previous signed-in (or unlocked) session — downgrade to Core 2 so
   // the API gate doesn't bounce every message they send.
   useEffect(() => {
     if (!isLoaded) return;
-    if (!isSignedIn && SOCRIA_MODELS[model].requiresAuth) {
+    if (!canUseCore3 && SOCRIA_MODELS[model].requiresAuth) {
       setModel('core-2');
       try {
         localStorage.setItem(MODEL_KEY, 'core-2');
       } catch {}
     }
-  }, [isLoaded, isSignedIn, model]);
+  }, [isLoaded, canUseCore3, model]);
   function pickModel(next: SocriaModel) {
-    if (SOCRIA_MODELS[next].requiresAuth && !isSignedIn) {
-      router.push('/sign-in?redirect_url=/chat');
+    // Gated model, and the user hasn't signed in or unlocked with the key:
+    // open the intro modal, which offers both the key entry and sign-in.
+    if (SOCRIA_MODELS[next].requiresAuth && !canUseCore3) {
+      setCore3ModalOpen(true);
       return;
     }
     setModel(next);
     try {
       localStorage.setItem(MODEL_KEY, next);
     } catch {}
+  }
+
+  // Validate + persist a typed access key. Returns true when accepted.
+  function handleUnlockKey(key: string): boolean {
+    if (!isValidAccessKey(key)) return false;
+    setSmartUnlocked(true);
+    try {
+      localStorage.setItem(SMART_KEY_STORAGE, '1');
+    } catch {}
+    return true;
   }
   function pickDepth(next: ThinkingDepth) {
     setDepth(next);
@@ -303,17 +340,39 @@ export default function ChatPage() {
   }
 
   function handleCore3ModalTry() {
-    // Signed-in users trying it means they've discovered it — no need to
-    // nudge them again. Anon users get redirected to sign-in without a
-    // permanent dismiss so the modal returns for them once they come back.
-    if (isSignedIn) {
+    // Signed-in or key-unlocked users who tap "Try" have access — switch to
+    // Core 3.1 and stop nudging them. Anon users without the key are sent to
+    // sign-in without a permanent dismiss so the modal returns later.
+    if (canUseCore3) {
       try {
         localStorage.setItem(CORE3_INTRO_DISMISS_KEY, '1');
       } catch {}
       setCore3Dismissed(true);
+      setCore3ModalOpen(false);
+      setModel('core-3');
+      try {
+        localStorage.setItem(MODEL_KEY, 'core-3');
+      } catch {}
+      return;
     }
     setCore3ModalOpen(false);
-    pickModel('core-3');
+    router.push('/sign-in?redirect_url=/chat');
+  }
+
+  // Called by the intro modal when the user submits a valid access key.
+  // Unlock, switch straight to Core 3.1, and close.
+  function handleCore3ModalUnlock(key: string): boolean {
+    if (!handleUnlockKey(key)) return false;
+    try {
+      localStorage.setItem(CORE3_INTRO_DISMISS_KEY, '1');
+    } catch {}
+    setCore3Dismissed(true);
+    setCore3ModalOpen(false);
+    setModel('core-3');
+    try {
+      localStorage.setItem(MODEL_KEY, 'core-3');
+    } catch {}
+    return true;
   }
 
   // Scroll to bottom when messages or stream changes
@@ -331,7 +390,7 @@ export default function ChatPage() {
     try {
       const res = await fetch('/api/extract-memory', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...keyHeaders() },
         body: JSON.stringify({
           messages: convo.messages,
           currentMemory: convo.memory ?? EMPTY_MEMORY,
@@ -429,7 +488,7 @@ export default function ChatPage() {
     try {
       const res = await fetch('/api/generate-insight', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...keyHeaders() },
         body: JSON.stringify({
           messages: convo.messages,
           memory: convo.memory ?? EMPTY_MEMORY,
@@ -515,7 +574,7 @@ export default function ChatPage() {
     try {
       const res = await fetch('/api/generate-synthesis', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...keyHeaders() },
         body: JSON.stringify({
           messages: convo.messages,
           memory: convo.memory ?? EMPTY_MEMORY,
@@ -661,7 +720,13 @@ export default function ChatPage() {
 
     // Anonymous user trying to spin up a *second* session — gate to sign-in.
     // (They can keep messaging inside their existing session; activeId is set.)
-    if (!isSignedIn && !activeId && (usedFree || conversations.length >= 1)) {
+    // Key-unlocked users bypass the cap.
+    if (
+      !isSignedIn &&
+      !smartUnlocked &&
+      !activeId &&
+      (usedFree || conversations.length >= 1)
+    ) {
       router.push('/sign-in?redirect_url=/chat');
       return;
     }
@@ -708,7 +773,7 @@ export default function ChatPage() {
       const convoForRequest = withUser.find((c) => c.id === workingId)!;
       const res = await fetch('/api/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...keyHeaders() },
         body: JSON.stringify({
           messages: convoForRequest.messages,
           model,
@@ -828,7 +893,7 @@ export default function ChatPage() {
       // Core 3 thread memory: extract in the background. The next turn
       // will read whatever's in the conversation's memory field. If this
       // fails, the conversation still works — memory just doesn't update.
-      if (isSignedIn && model === 'core-3') {
+      if (canUseCore3 && model === 'core-3') {
         void extractAndPersistMemory(workingId!, updated);
         // Also consider generating an Insight Card + auto-synthesis. Both
         // run in parallel and dedupe internally against their turn markers.
@@ -872,7 +937,9 @@ export default function ChatPage() {
         open={core3ModalOpen}
         onClose={handleCore3ModalClose}
         onTry={handleCore3ModalTry}
+        onUnlock={handleCore3ModalUnlock}
         isSignedIn={!!isSignedIn}
+        canUseCore3={canUseCore3}
       />
       <InsightShareModal
         open={!!shareInsight}
@@ -1014,8 +1081,8 @@ export default function ChatPage() {
             <ModelPicker
               value={model}
               onChange={pickModel}
-              isSignedIn={!!isSignedIn}
-              onLockedAttempt={() => router.push('/sign-in?redirect_url=/chat')}
+              isSignedIn={canUseCore3}
+              onLockedAttempt={() => setCore3ModalOpen(true)}
             />
             {SOCRIA_MODELS[model].supportsDepth && (
               <DepthPicker value={depth} onChange={pickDepth} />
@@ -1046,10 +1113,11 @@ export default function ChatPage() {
 
         <div className="flex-1 overflow-y-auto">
           <div className="max-w-2xl mx-auto px-6 py-10">
-            {!hasMessages && !isSignedIn && usedFree ? (
+            {!hasMessages && !isSignedIn && !smartUnlocked && usedFree ? (
               // Anon user who used their free convo but has no active one
               // (either never created another or deleted the first). Hard
-              // gate: no starter prompts, just a sign-in CTA.
+              // gate: no starter prompts, just a sign-in CTA. Key-unlocked
+              // users skip this wall entirely.
               <div className="text-center mt-12 animate-fade-up">
                 <h2 className="font-serif text-3xl md:text-4xl text-ink leading-tight">
                   You&rsquo;ve used your free session.
@@ -1204,7 +1272,7 @@ export default function ChatPage() {
 
         <div className="border-t border-border/60 bg-paper/80 backdrop-blur-sm">
           <div className="max-w-2xl mx-auto px-6 py-4">
-            {!isSignedIn && hasMessages && (
+            {!isSignedIn && !smartUnlocked && hasMessages && (
               <div className="mb-3 flex items-center justify-between gap-3 px-1 text-[12px] text-ink/55">
                 <span className="font-serif italic">
                   This is your free session — sign in to start more.

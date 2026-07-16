@@ -16,6 +16,7 @@ import {
   buildMemoryExtractorPrompt,
   sanitizeMemory,
   sanitizeSuggestedTitle,
+  isValidAccessKey,
 } from '@/lib/socria-prompt';
 
 export const runtime = 'nodejs';
@@ -25,7 +26,8 @@ const MAX_MESSAGES_CONSIDERED = 8;
 
 export async function POST(req: NextRequest) {
   const { userId } = auth();
-  if (!userId) {
+  const keyUnlocked = isValidAccessKey(req.headers.get('x-socria-key'));
+  if (!userId && !keyUnlocked) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

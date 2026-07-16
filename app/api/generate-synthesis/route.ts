@@ -15,6 +15,7 @@ import {
   buildSynthesisPrompt,
   sanitizeMemory,
   sanitizeSynthesisData,
+  isValidAccessKey,
   type ThinkingDepth,
 } from '@/lib/socria-prompt';
 
@@ -25,7 +26,8 @@ const MAX_MESSAGES = 40;
 
 export async function POST(req: NextRequest) {
   const { userId } = auth();
-  if (!userId) {
+  const keyUnlocked = isValidAccessKey(req.headers.get('x-socria-key'));
+  if (!userId && !keyUnlocked) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

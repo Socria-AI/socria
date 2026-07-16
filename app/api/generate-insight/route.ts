@@ -16,6 +16,7 @@ import {
   INSIGHT_HEADER_LABELS,
   buildInsightPrompt,
   sanitizeMemory,
+  isValidAccessKey,
   type Insight,
 } from '@/lib/socria-prompt';
 
@@ -26,7 +27,8 @@ const MAX_MESSAGES = 30;
 
 export async function POST(req: NextRequest) {
   const { userId } = auth();
-  if (!userId) {
+  const keyUnlocked = isValidAccessKey(req.headers.get('x-socria-key'));
+  if (!userId && !keyUnlocked) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

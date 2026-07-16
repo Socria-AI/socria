@@ -6,14 +6,20 @@ export function Core3IntroModal({
   open,
   onClose,
   onTry,
+  onUnlock,
   isSignedIn,
+  canUseCore3,
 }: {
   open: boolean;
   onClose: (dontShowAgain: boolean) => void;
   onTry: () => void;
+  onUnlock: (key: string) => boolean;
   isSignedIn: boolean;
+  canUseCore3: boolean;
 }) {
   const [dontShow, setDontShow] = useState(false);
+  const [keyInput, setKeyInput] = useState('');
+  const [keyError, setKeyError] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -25,6 +31,20 @@ export function Core3IntroModal({
   }, [open, dontShow, onClose]);
 
   if (!open) return null;
+
+  // Anonymous users who haven't unlocked yet can type an access key instead
+  // of signing in. Signed-in / already-unlocked users skip straight to "Try".
+  const showKeyEntry = !isSignedIn && !canUseCore3;
+
+  function submitKey() {
+    const ok = onUnlock(keyInput.trim());
+    if (!ok) {
+      setKeyError(true);
+      return;
+    }
+    setKeyError(false);
+    setKeyInput('');
+  }
 
   return (
     <div
@@ -156,6 +176,54 @@ export function Core3IntroModal({
             <em>philosophical</em>.
           </p>
 
+          {showKeyEntry && (
+            <div
+              className="core3-modal-key reveal-in"
+              style={{ animationDelay: '500ms' }}
+            >
+              <label className="core3-modal-key-label" htmlFor="core3-access-key">
+                Have an access key?
+              </label>
+              <div className="core3-modal-key-row">
+                <input
+                  id="core3-access-key"
+                  type="text"
+                  autoCapitalize="characters"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  placeholder="Enter key"
+                  value={keyInput}
+                  onChange={(e) => {
+                    setKeyInput(e.target.value);
+                    if (keyError) setKeyError(false);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      submitKey();
+                    }
+                  }}
+                  className={`core3-modal-key-input${
+                    keyError ? ' core3-modal-key-input-error' : ''
+                  }`}
+                  aria-invalid={keyError}
+                />
+                <button
+                  type="button"
+                  onClick={submitKey}
+                  className="core3-modal-key-btn"
+                >
+                  Unlock
+                </button>
+              </div>
+              {keyError && (
+                <span className="core3-modal-key-error" role="alert">
+                  That key isn&rsquo;t right.
+                </span>
+              )}
+            </div>
+          )}
+
           <div className="core3-modal-footer reveal-in" style={{ animationDelay: '520ms' }}>
             <label className="core3-modal-checkbox">
               <input
@@ -172,7 +240,7 @@ export function Core3IntroModal({
             >
               <span className="core3-modal-primary-shine" aria-hidden />
               <span className="core3-modal-primary-label">
-                {isSignedIn ? 'Try Core 3' : 'Sign in to unlock'}
+                {canUseCore3 ? 'Try Core 3' : 'Sign in to unlock'}
               </span>
               <span aria-hidden className="core3-modal-primary-arrow">→</span>
             </button>
