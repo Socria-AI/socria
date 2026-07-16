@@ -10,8 +10,13 @@ import {
   buildSystemPrompt,
   resolveOpenAIModel,
   SOCRIA_MODELS,
+  SOCRIA_PROMPT_VERSION,
   isValidAccessKey,
 } from '@/lib/socria-prompt';
+import {
+  computeGuidance,
+  renderTurnDirective,
+} from '@/lib/conversation-controller';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -55,7 +60,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { prompt: systemPrompt, model } = buildSystemPrompt(
+    const { prompt: basePrompt, model, depth } = buildSystemPrompt(
       body?.model,
       body?.depth,
       body?.memory
@@ -93,6 +98,39 @@ export async function POST(req: NextRequest) {
       )
       .slice(-MAX_HISTORY)
       .map((m: any) => ({ role: m.role, content: m.content }));
+
+    // Core 3.1 per-turn conversation controller: compute compact guidance from
+    // the thread (what changed this turn, anti-loop "do not" list) and append
+    // it to the END of the system prompt, where the model attends most. This
+    // is the forcing function that keeps 3.1 from falling into the generic
+    // reassure → paraphrase → broad-question loop. Deterministic — no extra
+    // model call. Core 2 is untouched.
+    let systemPrompt = basePrompt;
+    let guidance: ReturnType<typeof computeGuidance> | null = null;
+    if (model === 'core-3') {
+      guidance = computeGuidance(clean, body?.memory);
+      systemPrompt = `${basePrompt}\n\n${renderTurnDirective(guidance)}`;
+    }
+
+    if (process.env.NODE_ENV !== 'production') {
+      const userTurns = clean.filter((m) => m.role === 'user').length;
+      const assistantTurns = clean.filter((m) => m.role === 'assistant').length;
+      // Dev-only. Never logs conversation content — only routing + shape.
+      console.log('[socria/chat]', {
+        socriaModel: model,
+        openaiModel: resolveOpenAIModel(model),
+        depth,
+        promptVersion: model === 'core-3' ? SOCRIA_PROMPT_VERSION : 'core-2',
+        promptChars: systemPrompt.length,
+        approxPromptTokens: Math.round(systemPrompt.length / 4),
+        memoryInjected: model === 'core-3' && !!body?.memory,
+        userTurns,
+        assistantTurns,
+        stage: guidance?.stage ?? null,
+        previousMove: guidance?.previousMove ?? null,
+        avoidNext: guidance?.avoidNext ?? null,
+      });
+    }
 
     const openai = new OpenAI({ apiKey });
     const openaiModel = resolveOpenAIModel(model);

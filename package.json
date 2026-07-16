@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "eval:core3": "node evals/core3-progression.mjs"
   },
   "dependencies": {
     "@clerk/nextjs": "^5.7.0",

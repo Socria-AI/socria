@@ -1,0 +1,242 @@
+// lib/conversation-controller.ts
+//
+// A lightweight, per-turn conversation controller for Socria Core 3.1.
+//
+// The static system prompt tells the model HOW to behave in general. This
+// controller adds the missing per-turn signal: given the thread so far, it
+// computes compact guidance ("what changed this turn", "you already asked
+// two questions — don't ask a third", "don't reuse the phrasing you just
+// used") and renders a short directive that is appended to the Core 3.1
+// system prompt for THIS request only.
+//
+// It is deterministic — no extra LLM call, no added latency or cost. The
+// shape matches a structured controller so a model-backed pass can be
+// swapped in later without changing callers.
+
+import type { ConversationMemory } from './socria-prompt';
+
+export type ControllerMessage = {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+};
+
+export type ConversationStage =
+  | 'observe'
+  | 'clarify'
+  | 'challenge'
+  | 'connect'
+  | 'synthesize'
+  | 'close';
+
+export type ConversationMove =
+  | 'question'
+  | 'reflection'
+  | 'challenge'
+  | 'connection'
+  | 'explanation'
+  | 'synthesis'
+  | 'reassurance';
+
+export type ConversationGuidance = {
+  stage: ConversationStage;
+  previousMove: ConversationMove | null;
+  conversationDelta: string;
+  currentUnderstanding: string | null;
+  unresolvedTension: string | null;
+  userEngagement: 'low' | 'medium' | 'high';
+  synthesisReadiness: 'low' | 'medium' | 'high';
+  avoidNext: string[];
+};
+
+// Generic-coaching tells we watch for in the assistant's recent turns. If the
+// model just used one, we tell it not to reuse the pattern.
+const BANNED_PATTERNS: { re: RegExp; label: string }[] = [
+  { re: /\bit sounds like\b/i, label: '"it sounds like"' },
+  { re: /\bthat sounds\b/i, label: '"that sounds…"' },
+  { re: /\bthat'?s understandable\b/i, label: '"that\'s understandable"' },
+  { re: /\bthat'?s (perfectly )?okay\b/i, label: '"that\'s okay"' },
+  { re: /\bthat makes sense\b/i, label: '"that makes sense"' },
+  { re: /\bwhat are the main (factors|considerations|concerns|reasons)\b/i, label: 'broad "what are the main…" intake questions' },
+  { re: /\bwhat are you hoping to (find|get|achieve)\b/i, label: '"what are you hoping to find" questions' },
+  { re: /\bcan you (tell me more|elaborate)\b/i, label: '"tell me more / elaborate"' },
+  { re: /\bhow does that make you feel\b/i, label: '"how does that make you feel"' },
+  { re: /\bsignificant decision\b/i, label: 'calling the topic a "significant decision"' },
+  { re: /\bi'?m noticing\b/i, label: '"I\'m noticing…"' },
+];
+
+const UNCERTAIN_RE = /^\s*(hmm+|idk|i (don'?t|do not) know|not sure|no idea|maybe|dunno|i guess|unsure)\b/i;
+
+function endsWithQuestion(text: string): boolean {
+  const t = text.trim();
+  if (!t) return false;
+  // Last non-empty line ends with a question mark.
+  const lines = t.split('\n').map((l) => l.trim()).filter(Boolean);
+  const last = lines[lines.length - 1] || '';
+  return last.endsWith('?');
+}
+
+function inferMove(assistant: string): ConversationMove {
+  const t = assistant.toLowerCase();
+  if (t.includes('::synthesis')) return 'synthesis';
+  if (/\b(you said|you mentioned|earlier you|you keep returning|across the conversation|you'?ve (repeatedly|consistently))\b/i.test(assistant)) {
+    return 'connection';
+  }
+  if (/\b(that'?s understandable|that'?s okay|you'?re not|it makes sense that|you do not sound|you are not going in circles)\b/i.test(assistant)) {
+    return 'reassurance';
+  }
+  if (endsWithQuestion(assistant)) return 'question';
+  return 'reflection';
+}
+
+function firstNonEmptyLine(m: ConversationMemory | null | undefined, key: keyof ConversationMemory): string | null {
+  if (!m) return null;
+  const v = (m as any)[key];
+  if (Array.isArray(v) && v.length && typeof v[0] === 'string') return v[0];
+  return null;
+}
+
+/**
+ * Compute per-turn guidance from the thread. `messages` is the full cleaned
+ * history (user/assistant only is fine; system messages are ignored). The
+ * last message is expected to be the user's newest turn.
+ */
+export function computeGuidance(
+  messages: ControllerMessage[],
+  memory?: ConversationMemory | null
+): ConversationGuidance {
+  const convo = messages.filter((m) => m.role === 'user' || m.role === 'assistant');
+  const userTurns = convo.filter((m) => m.role === 'user');
+  const assistantTurns = convo.filter((m) => m.role === 'assistant');
+  const userCount = userTurns.length;
+
+  const latestUser = userTurns[userTurns.length - 1]?.content?.trim() ?? '';
+  const lastAssistant = assistantTurns[assistantTurns.length - 1]?.content ?? '';
+  const prevAssistant = assistantTurns[assistantTurns.length - 2]?.content ?? '';
+
+  const previousMove: ConversationMove | null = lastAssistant
+    ? inferMove(lastAssistant)
+    : null;
+
+  // Engagement: short, low-content or repeated-"I don't know" replies read low.
+  const recentUser = userTurns.slice(-3).map((m) => m.content.trim());
+  const avgLen = recentUser.length
+    ? recentUser.reduce((a, b) => a + b.length, 0) / recentUser.length
+    : 0;
+  const uncertainStreak = recentUser.filter((c) => UNCERTAIN_RE.test(c)).length;
+  const userEngagement: ConversationGuidance['userEngagement'] =
+    avgLen < 24 || uncertainStreak >= 2 ? 'low' : avgLen < 90 ? 'medium' : 'high';
+
+  // Synthesis readiness climbs with turns and accumulated memory signal.
+  const memoryDepth =
+    (memory?.uncertainties?.length ?? 0) +
+    (memory?.values?.length ?? 0) +
+    (memory?.goals?.length ?? 0) +
+    (memory?.emergingUnderstanding?.length ?? 0);
+  const synthesisReadiness: ConversationGuidance['synthesisReadiness'] =
+    userCount >= 6 || memoryDepth >= 4 ? 'high' : userCount >= 3 ? 'medium' : 'low';
+
+  // Stage: rough, monotonic-ish read of where the conversation is.
+  let stage: ConversationStage;
+  if (userCount <= 1) stage = 'observe';
+  else if (userCount === 2) stage = 'clarify';
+  else if (synthesisReadiness === 'high') stage = 'synthesize';
+  else if (userCount >= 4) stage = 'connect';
+  else stage = 'challenge';
+
+  // --- Anti-loop: build the "do not" list from recent assistant behavior ---
+  const avoidNext: string[] = [];
+
+  const lastWasQuestion = lastAssistant && endsWithQuestion(lastAssistant);
+  const prevWasQuestion = prevAssistant && endsWithQuestion(prevAssistant);
+  if (lastWasQuestion && prevWasQuestion) {
+    avoidNext.push(
+      'ask another question — your last two replies both ended in one; make an observation, connection, or synthesis instead'
+    );
+  } else if (lastWasQuestion) {
+    avoidNext.push('open with another broad clarifying question');
+  }
+
+  // Ban reuse of any generic phrase used in the last two assistant turns.
+  const recentAssistantText = `${lastAssistant}\n${prevAssistant}`;
+  for (const { re, label } of BANNED_PATTERNS) {
+    if (re.test(recentAssistantText)) avoidNext.push(`reuse the ${label} pattern`);
+  }
+
+  // Standing guardrails once the topic is established.
+  if (userCount >= 2) {
+    avoidNext.push('generic reassurance that adds no new understanding');
+    avoidNext.push('paraphrasing the latest message back without adding a connection, distinction, or inference');
+  }
+
+  // --- conversationDelta: what changed this turn (deterministic-lite) ---
+  let conversationDelta: string;
+  if (userCount <= 1) {
+    conversationDelta =
+      'The user has opened the conversation. Establish the actual question before anything else.';
+  } else if (UNCERTAIN_RE.test(latestUser)) {
+    conversationDelta =
+      'The user answered with uncertainty rather than new content. Do not re-ask broadly — offer a distinction or a small read of where things stand that gives them something to react to.';
+  } else if (latestUser.length < 40) {
+    conversationDelta =
+      'The user added a short but pointed statement. Treat it as a shift in the picture, not a new topic — say what it changes about the decision so far, then (optionally) one narrow question.';
+  } else {
+    conversationDelta =
+      'The user added substantive new information. State explicitly what is now clearer or different from a moment ago, and connect it to something they said earlier.';
+  }
+
+  return {
+    stage,
+    previousMove,
+    conversationDelta,
+    currentUnderstanding:
+      firstNonEmptyLine(memory, 'emergingUnderstanding') ??
+      firstNonEmptyLine(memory, 'goals'),
+    unresolvedTension: firstNonEmptyLine(memory, 'uncertainties'),
+    userEngagement,
+    synthesisReadiness,
+    avoidNext,
+  };
+}
+
+const STAGE_HINT: Record<ConversationStage, string> = {
+  observe: 'Establish the real question. One focused move.',
+  clarify: 'Resolve only ambiguity that changes the discussion. Do not linger here.',
+  challenge: 'Test an assumption or framing rather than gathering more intake.',
+  connect: 'Link this turn to something said earlier; make the structure visible.',
+  synthesize: 'Enough has accumulated — reflect the shape of their thinking back, not another question.',
+  close: 'Help them articulate where they have arrived; do not reopen.',
+};
+
+/**
+ * Render the compact turn directive appended to the Core 3.1 system prompt.
+ * Deliberately short so it sits at the END of the prompt (high attention)
+ * without bloating token count.
+ */
+export function renderTurnDirective(g: ConversationGuidance): string {
+  const lines: string[] = [];
+  lines.push('=== THIS TURN (highest priority — overrides general guidance if they conflict) ===');
+  lines.push('');
+  lines.push(`Current move: ${g.stage}. ${STAGE_HINT[g.stage]}`);
+  if (g.previousMove) {
+    lines.push(`Your previous reply was a ${g.previousMove}.`);
+  }
+  lines.push(`What changed this turn: ${g.conversationDelta}`);
+  if (g.currentUnderstanding) {
+    lines.push(`Working understanding so far: ${g.currentUnderstanding}`);
+  }
+  if (g.unresolvedTension) {
+    lines.push(`Unresolved tension to advance: ${g.unresolvedTension}`);
+  }
+  if (g.avoidNext.length) {
+    lines.push('Do NOT:');
+    for (const a of g.avoidNext) lines.push(`- ${a}`);
+  }
+  lines.push('');
+  lines.push(
+    'Update the conversation’s understanding using the new information. Ask at most one narrow question, and only if it genuinely advances the unresolved tension. It is good for this reply to contain no question.'
+  );
+  if (g.synthesisReadiness === 'high') {
+    lines.push('The conversation is ready for synthesis before it starts repeating — prefer reflecting the shape of their thinking over another question.');
+  }
+  return lines.join('\n');
+}
