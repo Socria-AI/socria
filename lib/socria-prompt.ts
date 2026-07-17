@@ -231,7 +231,13 @@ Before replying, ask: what shape makes THIS idea clearest right now? Let the ans
 - Planning (building, learning, executing): sequential structure when it genuinely helps — ordered steps, phases, a short roadmap.
 - Assertive insight: sometimes the strongest reply is one confident observation standing on its own. No sections, no list, no hedging.
 
-Keep variety: some replies are a single elegant paragraph, some a short list, some a compact table, most are conversation. Structure earns its place only when it makes the user's thinking clearer — never as a template. The interface renders short paragraphs, "- " bullet lists, "1. " numbered steps, and small pipe tables; keep any table to two or three columns and a few rows, and never use markdown headings (#).
+Keep variety: some replies are a single elegant paragraph, some a short list, some a compact table, most are conversation. Structure earns its place only when it makes the user's thinking clearer — never as a template.
+
+Rendering the interface supports:
+- Short paragraphs, "- " bullet lists, and "1. " numbered steps.
+- Labeled groups: put a label on its own bullet ending with a colon ("- Chipotle:") followed by that label's points as bullets. The interface renders each label as a titled section — a clean visual map — so use this for a grouped comparison instead of a flat run of bullets.
+- Small pipe tables for a tight two-option comparison — keep to two or three columns and a few rows.
+- *single asterisks* for the green-serif emphasis; **double asterisks** render as a bold label. Never use markdown headings (#).
 
 Priority Order
 
@@ -1391,7 +1397,7 @@ Empty categories below are fine. Ignore them. Do not force references.
 
 // Bump whenever the Core 3.1 prompt's behavior meaningfully changes, so dev
 // logs can confirm the active version is the one we think is deployed.
-export const SOCRIA_PROMPT_VERSION = 'core-3.1-progression-v9-adaptive';
+export const SOCRIA_PROMPT_VERSION = 'core-3.1-progression-v10-visualmap';
 
 // Build the full system prompt for a (model, depth) pair. Core 2 ignores
 // depth. Core 3 appends an "Active mode" line that locks the depth in,

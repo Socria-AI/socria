@@ -1372,25 +1372,35 @@ function Bubble({
   );
 }
 
-// Inline renderer: wraps single-asterisk `*emphasis*` runs in italic moss
-// serif (Core 3.1's language-noticing signature) and leaves the rest plain.
+// Inline renderer: `*emphasis*` → italic moss serif (Core 3.1's language-
+// noticing signature); `**bold**` → bold label (the model uses it for list
+// headings). Handling both keeps stray asterisks from ever leaking through.
 function renderInline(text: string, keyBase: string): React.ReactNode[] {
   const parts: React.ReactNode[] = [];
-  const re = /\*([^*\n]+)\*/g;
+  // Bold first so `**x**` isn't mistaken for two single-asterisk runs.
+  const re = /\*\*([^*\n]+)\*\*|\*([^*\n]+)\*/g;
   let last = 0;
   let m: RegExpExecArray | null;
   let key = 0;
   while ((m = re.exec(text)) !== null) {
     if (m.index > last) parts.push(text.slice(last, m.index));
-    parts.push(
-      <em
-        key={`${keyBase}-e${key++}`}
-        className="font-serif italic text-moss-700 text-[1.18em] leading-[1]"
-        style={{ fontStyle: 'italic' }}
-      >
-        {m[1]}
-      </em>
-    );
+    if (m[1] !== undefined) {
+      parts.push(
+        <strong key={`${keyBase}-b${key++}`} className="socria-strong">
+          {m[1]}
+        </strong>
+      );
+    } else {
+      parts.push(
+        <em
+          key={`${keyBase}-e${key++}`}
+          className="font-serif italic text-moss-700 text-[1.18em] leading-[1]"
+          style={{ fontStyle: 'italic' }}
+        >
+          {m[2]}
+        </em>
+      );
+    }
     last = m.index + m[0].length;
   }
   if (last < text.length) parts.push(text.slice(last));
@@ -1408,6 +1418,17 @@ function splitTableRow(line: string): string[] {
     .replace(/\|$/, '')
     .split('|')
     .map((c) => c.trim());
+}
+
+// A bullet item is a group "header" when it's a short label ending in a colon
+// (e.g. "**Chipotle:**", "Mood-based decision:") rather than a full point.
+// These become titled sections so a labeled list reads as a clean visual map.
+function stripMarks(s: string): string {
+  return s.replace(/\*+/g, '').trim();
+}
+function isGroupHeader(item: string): boolean {
+  const s = stripMarks(item);
+  return /:$/.test(s) && s.length <= 42;
 }
 
 // Static renderer for persisted assistant messages. Core 3.1 formats
@@ -1476,6 +1497,45 @@ function renderRichText(text: string): React.ReactNode {
         i++;
       }
       const k = key++;
+
+      // If the list uses "Label:" headers, render it as titled groups — a
+      // light visual map — instead of one flat bullet run.
+      if (items.some(isGroupHeader) && items.some((it) => !isGroupHeader(it))) {
+        const groups: { header: string | null; items: string[] }[] = [];
+        let cur: { header: string | null; items: string[] } = { header: null, items: [] };
+        for (const it of items) {
+          if (isGroupHeader(it)) {
+            if (cur.header || cur.items.length) groups.push(cur);
+            cur = { header: it, items: [] };
+          } else {
+            cur.items.push(it);
+          }
+        }
+        if (cur.header || cur.items.length) groups.push(cur);
+
+        blocks.push(
+          <div key={`grp-${k}`} className="socria-groups">
+            {groups.map((g, gi) => (
+              <div key={gi} className="socria-group">
+                {g.header && (
+                  <div className="socria-group-head">
+                    {stripMarks(g.header).replace(/:$/, '')}
+                  </div>
+                )}
+                {g.items.length > 0 && (
+                  <ul>
+                    {g.items.map((it, ii) => (
+                      <li key={ii}>{renderInline(it, `grp-${k}-${gi}-${ii}`)}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            ))}
+          </div>
+        );
+        continue;
+      }
+
       blocks.push(
         <ul key={`ul-${k}`}>
           {items.map((it, ii) => (
@@ -1536,14 +1596,15 @@ function renderAnimated(text: string): React.ReactNode {
   // First pass: split content into typed segments (plain | em) using the
   // same `*…*` rule as renderInline. (Streaming stays plain-flow — block
   // structures like lists/tables only render once persisted via renderRichText.)
-  type Seg = { type: 'plain' | 'em'; text: string };
+  type Seg = { type: 'plain' | 'em' | 'bold'; text: string };
   const segs: Seg[] = [];
-  const re = /\*([^*\n]+)\*/g;
+  const re = /\*\*([^*\n]+)\*\*|\*([^*\n]+)\*/g;
   let last = 0;
   let m: RegExpExecArray | null;
   while ((m = re.exec(text)) !== null) {
     if (m.index > last) segs.push({ type: 'plain', text: text.slice(last, m.index) });
-    segs.push({ type: 'em', text: m[1] });
+    if (m[1] !== undefined) segs.push({ type: 'bold', text: m[1] });
+    else segs.push({ type: 'em', text: m[2] });
     last = m.index + m[0].length;
   }
   if (last < text.length) segs.push({ type: 'plain', text: text.slice(last) });
@@ -1563,7 +1624,7 @@ function renderAnimated(text: string): React.ReactNode {
       out.push(
         <span
           key={`${si}-${pi}`}
-          className={`bubble-word${seg.type === 'em' ? ' em' : ''}`}
+          className={`bubble-word${seg.type === 'em' ? ' em' : seg.type === 'bold' ? ' bold' : ''}`}
         >
           {p}
         </span>

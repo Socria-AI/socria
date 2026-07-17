@@ -458,6 +458,28 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
   vertical-align: top;
 }
 .prose-socria th { font-weight: 600; background: rgba(0, 0, 0, 0.025); }
+.prose-socria .socria-strong { font-weight: 650; color: var(--ink, #1f1f1f); }
+/* Titled groups — a labeled list rendered as a light visual map. */
+.prose-socria .socria-groups {
+  margin: 0.6em 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9em;
+}
+.prose-socria .socria-group {
+  border-left: 2px solid var(--moss-200, #d7e0c6);
+  padding-left: 0.85em;
+}
+.prose-socria .socria-group-head {
+  font-family: var(--serif);
+  font-style: italic;
+  color: var(--moss-700);
+  font-size: 1.12em;
+  line-height: 1.2;
+  margin-bottom: 0.15em;
+  white-space: normal;
+}
+.prose-socria .socria-group ul { margin: 0.2em 0 0; }
 
 /* Try Core 3 pill — refined premium chip. A soft breathing glow (not an
    expanding ring) plus a slowly twinkling sparkle icon so it draws the
@@ -1657,6 +1679,7 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
   font-size: 1.18em;
   line-height: 1;
 }
+.bubble-word.bold { font-weight: 650; }
 
 .thinking-dot {
   display: inline-block;
