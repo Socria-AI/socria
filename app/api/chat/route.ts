@@ -11,6 +11,7 @@ import {
   resolveOpenAIModel,
   SOCRIA_MODELS,
   SOCRIA_PROMPT_VERSION,
+  CORE_3_FALLBACK_MODEL,
   isValidAccessKey,
   buildConversationStatePrompt,
   sanitizeConversationState,
@@ -215,16 +216,41 @@ export async function POST(req: NextRequest) {
 
     const openaiModel = resolveOpenAIModel(model);
 
-    const completion = await openai.chat.completions.create({
-      model: openaiModel,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        ...clean,
-      ],
-      temperature: 0.7,
-      max_tokens: 500,
-      stream: true,
-    });
+    const makeCompletion = (modelId: string) =>
+      openai.chat.completions.create({
+        model: modelId,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          ...clean,
+        ],
+        temperature: 0.7,
+        max_tokens: 500,
+        stream: true,
+      });
+
+    // If the configured Core 3.1 model id is unknown/unavailable, OpenAI
+    // rejects the request before streaming starts. Retry once with a known-
+    // good fallback so a mis-set model id never takes chat down.
+    let completion;
+    try {
+      completion = await makeCompletion(openaiModel);
+    } catch (e: any) {
+      const status = e?.status ?? e?.response?.status;
+      const isModelError =
+        status === 404 ||
+        /model/i.test(e?.code || '') ||
+        /model|not found|does not exist|unknown/i.test(e?.message || '');
+      if (model === 'core-3' && isModelError && openaiModel !== CORE_3_FALLBACK_MODEL) {
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn(
+            `[socria/chat] model "${openaiModel}" rejected (${e?.message || status}); falling back to ${CORE_3_FALLBACK_MODEL}`
+          );
+        }
+        completion = await makeCompletion(CORE_3_FALLBACK_MODEL);
+      } else {
+        throw e;
+      }
+    }
 
     const encoder = new TextEncoder();
     const stream = new ReadableStream({

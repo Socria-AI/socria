@@ -196,6 +196,8 @@ Four rules override all others. A reply that breaks one is wrong no matter how p
 
 5. BE SHORT. Assume every extra sentence costs attention. Write the shortest response that still advances the conversation. Prefer one powerful observation over three explanatory paragraphs. If a sentence merely repeats, paraphrases, or elaborates on an idea the user almost certainly already understands, remove it. Do not explain obvious implications — reveal a less obvious pattern instead. Most replies are two to four sentences; a single sharp line is often the strongest.
 
+6. FORMAT LIKE A CONVERSATION, NOT AN ESSAY. Write the way people text, not the way people write essays. Break your reply into short paragraphs of one to three sentences, separated by a blank line. Let an important observation or question stand alone on its own line. Use whitespace on purpose; never send a dense block. Do not write five or more sentences in a single paragraph unless the user explicitly asks for a long explanation. Aim for the rhythm of a thoughtful iMessage exchange — observation, a beat, a short reflection, a beat, maybe a question.
+
 Never open with these tells — they expose the mechanism: "It sounds like…", "That suggests…", "That's understandable", "That makes sense", "It seems like…", "This could mean…", "It's important to…", "What are the main factors/considerations". Communicate understanding by demonstrating it, not by announcing it.
 
 Worked progressions — study the difference, do not copy the wording:
@@ -1174,6 +1176,14 @@ export interface ModelConfig {
   requiresAuth: boolean;
 }
 
+// Primary chat model for Core 3.1 ("GPT 5.6 Luna"). If OpenAI exposes Luna
+// under a different API string than this, set OPENAI_MODEL_CORE_3 to the exact
+// id (takes effect with no redeploy — see resolveOpenAIModel). Should the id
+// ever be rejected as unknown, the chat route automatically retries with
+// CORE_3_FALLBACK_MODEL so conversations never break.
+export const CORE_3_MODEL = 'gpt-5.6-luna';
+export const CORE_3_FALLBACK_MODEL = 'gpt-4o';
+
 export const SOCRIA_MODELS: Record<SocriaModel, ModelConfig> = {
   'core-2': {
     id: 'core-2',
@@ -1188,7 +1198,7 @@ export const SOCRIA_MODELS: Record<SocriaModel, ModelConfig> = {
     label: 'Socria Core 3.1',
     description:
       'Language-noticing with typographic emphasis. Adjustable thinking depth.',
-    defaultOpenAIModel: 'gpt-4o',
+    defaultOpenAIModel: CORE_3_MODEL,
     supportsDepth: true,
     requiresAuth: true,
   },
@@ -1370,7 +1380,7 @@ Empty categories below are fine. Ignore them. Do not force references.
 
 // Bump whenever the Core 3.1 prompt's behavior meaningfully changes, so dev
 // logs can confirm the active version is the one we think is deployed.
-export const SOCRIA_PROMPT_VERSION = 'core-3.1-progression-v7-state';
+export const SOCRIA_PROMPT_VERSION = 'core-3.1-progression-v8-format';
 
 // Build the full system prompt for a (model, depth) pair. Core 2 ignores
 // depth. Core 3 appends an "Active mode" line that locks the depth in,

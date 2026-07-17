@@ -274,6 +274,9 @@ export function renderTurnDirective(
     'Keep it short: two to four sentences, often fewer. Cut anything that repeats, paraphrases, or explains the obvious.'
   );
   lines.push(
+    'Format like a text conversation: short paragraphs of 1–3 sentences with blank lines between them; let a key observation or the question stand on its own line. No dense blocks.'
+  );
+  lines.push(
     'Mark the one pivot or loaded word that carries this turn in *single asterisks* (Socria\'s green-serif signature) — one per reply, on a word that genuinely lands, never decorative.'
   );
   if (g.synthesisReadiness === 'high') {
