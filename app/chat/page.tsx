@@ -1363,7 +1363,7 @@ function Bubble({
               key={i}
               className="prose-socria text-ink/90 text-[15.5px]"
             >
-              {animate ? renderAnimated(seg.text) : renderEmphasis(seg.text)}
+              {animate ? renderAnimated(seg.text) : renderRichText(seg.text)}
             </div>
           );
         })}
@@ -1372,9 +1372,9 @@ function Bubble({
   );
 }
 
-// Static renderer for persisted assistant messages. Wraps single-asterisk
-// `*emphasis*` runs in italic moss serif and leaves the rest as plain text.
-function renderEmphasis(text: string): React.ReactNode {
+// Inline renderer: wraps single-asterisk `*emphasis*` runs in italic moss
+// serif (Core 3.1's language-noticing signature) and leaves the rest plain.
+function renderInline(text: string, keyBase: string): React.ReactNode[] {
   const parts: React.ReactNode[] = [];
   const re = /\*([^*\n]+)\*/g;
   let last = 0;
@@ -1384,7 +1384,7 @@ function renderEmphasis(text: string): React.ReactNode {
     if (m.index > last) parts.push(text.slice(last, m.index));
     parts.push(
       <em
-        key={key++}
+        key={`${keyBase}-e${key++}`}
         className="font-serif italic text-moss-700 text-[1.18em] leading-[1]"
         style={{ fontStyle: 'italic' }}
       >
@@ -1397,13 +1397,145 @@ function renderEmphasis(text: string): React.ReactNode {
   return parts;
 }
 
+const BULLET_RE = /^\s*([-•]|\*)\s+(.*)$/;
+const ORDERED_RE = /^\s*\d+[.)]\s+(.*)$/;
+const TABLE_SEP_RE = /^\s*\|?[\s:|-]*-{2,}[\s:|-]*\|?\s*$/;
+
+function splitTableRow(line: string): string[] {
+  return line
+    .trim()
+    .replace(/^\|/, '')
+    .replace(/\|$/, '')
+    .split('|')
+    .map((c) => c.trim());
+}
+
+// Static renderer for persisted assistant messages. Core 3.1 formats
+// adaptively — mostly conversational prose, but bullet lists, numbered
+// steps, and small pipe tables when comparing or planning. Parse those
+// blocks so they render as real lists/tables instead of raw markup;
+// everything inside still gets inline `*emphasis*`.
+function renderRichText(text: string): React.ReactNode {
+  const lines = text.replace(/\r/g, '').split('\n');
+  const blocks: React.ReactNode[] = [];
+  let i = 0;
+  let key = 0;
+
+  while (i < lines.length) {
+    const line = lines[i];
+    if (line.trim() === '') {
+      i++;
+      continue;
+    }
+
+    // Table: a `|` line immediately followed by a separator row.
+    if (
+      line.includes('|') &&
+      i + 1 < lines.length &&
+      TABLE_SEP_RE.test(lines[i + 1]) &&
+      lines[i + 1].includes('-')
+    ) {
+      const header = splitTableRow(line);
+      i += 2;
+      const rows: string[][] = [];
+      while (i < lines.length && lines[i].includes('|') && lines[i].trim() !== '') {
+        rows.push(splitTableRow(lines[i]));
+        i++;
+      }
+      const k = key++;
+      blocks.push(
+        <div key={`tbl-${k}`} className="socria-table-wrap">
+          <table>
+            <thead>
+              <tr>
+                {header.map((c, ci) => (
+                  <th key={ci}>{renderInline(c, `tbl-${k}-h${ci}`)}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r, ri) => (
+                <tr key={ri}>
+                  {r.map((c, ci) => (
+                    <td key={ci}>{renderInline(c, `tbl-${k}-${ri}-${ci}`)}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
+      continue;
+    }
+
+    // Bullet list.
+    if (BULLET_RE.test(line)) {
+      const items: string[] = [];
+      while (i < lines.length && BULLET_RE.test(lines[i])) {
+        items.push(lines[i].replace(BULLET_RE, '$2'));
+        i++;
+      }
+      const k = key++;
+      blocks.push(
+        <ul key={`ul-${k}`}>
+          {items.map((it, ii) => (
+            <li key={ii}>{renderInline(it, `ul-${k}-${ii}`)}</li>
+          ))}
+        </ul>
+      );
+      continue;
+    }
+
+    // Numbered / ordered list.
+    if (ORDERED_RE.test(line)) {
+      const items: string[] = [];
+      while (i < lines.length && ORDERED_RE.test(lines[i])) {
+        items.push(lines[i].replace(ORDERED_RE, '$1'));
+        i++;
+      }
+      const k = key++;
+      blocks.push(
+        <ol key={`ol-${k}`}>
+          {items.map((it, ii) => (
+            <li key={ii}>{renderInline(it, `ol-${k}-${ii}`)}</li>
+          ))}
+        </ol>
+      );
+      continue;
+    }
+
+    // Paragraph: gather until a blank line or a structural line.
+    const para: string[] = [];
+    while (
+      i < lines.length &&
+      lines[i].trim() !== '' &&
+      !BULLET_RE.test(lines[i]) &&
+      !ORDERED_RE.test(lines[i]) &&
+      !(
+        lines[i].includes('|') &&
+        i + 1 < lines.length &&
+        TABLE_SEP_RE.test(lines[i + 1]) &&
+        lines[i + 1].includes('-')
+      )
+    ) {
+      para.push(lines[i]);
+      i++;
+    }
+    const k = key++;
+    blocks.push(<p key={`p-${k}`}>{renderInline(para.join('\n'), `p-${k}`)}</p>);
+  }
+
+  return blocks;
+}
+
 // Animated renderer for the *currently streaming* assistant bubble: every
 // word becomes a span with the bubbleIn CSS entrance animation. Stable
 // keys mean existing words don't replay the animation as the bubble re-
 // renders — only the newly arrived word at the end pops in.
 function renderAnimated(text: string): React.ReactNode {
   // First pass: split content into typed segments (plain | em) using the
-  // same `*…*` rule as renderEmphasis.
+  // same `*…*` rule as renderInline. (Streaming stays plain-flow — block
+  // structures like lists/tables only render once persisted via renderRichText.)
   type Seg = { type: 'plain' | 'em'; text: string };
   const segs: Seg[] = [];
   const re = /\*([^*\n]+)\*/g;

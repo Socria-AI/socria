@@ -431,6 +431,33 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
   word-wrap: break-word;
 }
 .prose-socria p + p { margin-top: 0.75em; }
+/* Adaptive presentation: Core 3.1 uses lists/tables when comparing or
+   planning. These blocks opt out of the container's pre-wrap. */
+.prose-socria ul,
+.prose-socria ol {
+  margin: 0.55em 0;
+  padding-left: 1.35em;
+  white-space: normal;
+}
+.prose-socria ul { list-style: disc; }
+.prose-socria ol { list-style: decimal; }
+.prose-socria li { margin: 0.25em 0; padding-left: 0.15em; }
+.prose-socria li::marker { color: var(--moss-700); }
+.socria-table-wrap { overflow-x: auto; margin: 0.7em 0; }
+.prose-socria table {
+  border-collapse: collapse;
+  width: 100%;
+  white-space: normal;
+  font-size: 0.94em;
+}
+.prose-socria th,
+.prose-socria td {
+  border: 1px solid var(--border);
+  padding: 6px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+.prose-socria th { font-weight: 600; background: rgba(0, 0, 0, 0.025); }
 
 /* Try Core 3 pill — refined premium chip. A soft breathing glow (not an
    expanding ring) plus a slowly twinkling sparkle icon so it draws the
