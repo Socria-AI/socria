@@ -28,7 +28,7 @@ export function BlogNav() {
         </Link>
         <div className="nav-right">
           <nav className="nav-links">
-            <Link href="/#core31">What&rsquo;s new</Link>
+            <Link href="/#core3">What&rsquo;s new</Link>
             <Link href="/blog" className={onJournal ? 'cur' : undefined}>
               Journal
             </Link>
@@ -109,7 +109,7 @@ export function BlogFooter() {
           </div>
         </div>
         <div className="foot-links">
-          <Link href="/#core31">What&rsquo;s new in 3.1</Link>
+          <Link href="/#core3">What&rsquo;s new in 3.1</Link>
           <Link href="/blog">Journal</Link>
           <Link href="/chat">Try Socria</Link>
           <Link href="/studio">Studio</Link>
