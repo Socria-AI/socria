@@ -74,6 +74,10 @@ const BANNED_PATTERNS: { re: RegExp; label: string }[] = [
   { re: /\bhow does that make you feel\b/i, label: '"how does that make you feel"' },
   { re: /\bsignificant decision\b/i, label: 'calling the topic a "significant decision"' },
   { re: /\bi'?m noticing\b/i, label: '"I\'m noticing…"' },
+  { re: /\bone possibility is\b/i, label: '"one possibility is…" hedging' },
+  { re: /\bit might be that\b/i, label: '"it might be that…" hedging' },
+  { re: /\byou may be (experiencing|feeling|facing)\b/i, label: '"you may be experiencing…" hedging' },
+  { re: /\bperhaps you\b/i, label: '"perhaps you…" hedging' },
 ];
 
 const UNCERTAIN_RE = /^\s*(hmm+|idk|i (don'?t|do not) know|not sure|no idea|maybe|dunno|i guess|unsure)\b/i;
@@ -270,8 +274,17 @@ export function renderTurnDirective(
   lines.push(
     'Update the conversation’s understanding using the new information. Ask at most one narrow question, and only if it genuinely advances the unresolved tension. It is good for this reply to contain no question.'
   );
+  if (g.synthesisReadiness === 'high') {
+    lines.push(
+      'Match length to value: if this turn is a full synthesis, use the ::synthesis structured format — tight bullets, no filler. Otherwise keep it to two to four sentences.'
+    );
+  } else {
+    lines.push(
+      'Keep it short: two to four sentences, often fewer. Cut anything that repeats, paraphrases, or explains the obvious. (Structured blocks — ::synthesis, ::choices, a comparison — are exempt; trim per bullet, not the structure.)'
+    );
+  }
   lines.push(
-    'Keep it short: two to four sentences, often fewer. Cut anything that repeats, paraphrases, or explains the obvious.'
+    'Speak like a mentor: if the thread already supports the observation, state it plainly with no hedging ("I think you\'re focusing on the wrong question"). Reserve hedges for genuinely early or uncertain reads.'
   );
   lines.push(
     'Format like a text conversation: short paragraphs of 1–3 sentences with blank lines between them; let a key observation or the question stand on its own line. No dense blocks.'
