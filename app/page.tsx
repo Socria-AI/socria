@@ -1,539 +1,341 @@
-// app/page.tsx — Socria scrollytelling landing
+// app/page.tsx — Socria homepage: the Journal, led by what's new in Core 3.1.
+import type { Metadata } from 'next';
 import Link from 'next/link';
-import { SignedIn, SignedOut, SignInButton, UserButton } from '@clerk/nextjs';
-import { ScrollyMotion } from '@/components/ScrollyMotion';
-import { listPosts, getFeaturedPost } from '@/sanity/lib/queries';
+import { BlogNav, BlogFooter } from '@/components/BlogShell';
+import { BlogMotion } from '@/components/BlogMotion';
+import { CoverArt } from '@/components/CoverArt';
+import { TopicFilter } from '@/components/TopicFilter';
+import { SubscribeForm } from '@/components/SubscribeForm';
+import {
+  listPosts,
+  getFeaturedPost,
+  listCategoriesWithCount,
+  totalPostCount,
+  type PostListItem,
+} from '@/sanity/lib/queries';
 
 export const revalidate = 60;
 
-function landingDate(iso: string) {
+export const metadata: Metadata = {
+  title: 'Socria — Think for yourself',
+  description:
+    'A Human-First AI that strengthens your thinking instead of replacing it. Essays on reasoning, and what’s new in Core 3.1.',
+};
+
+function formatDate(iso: string) {
   if (!iso) return '';
   const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-export default async function LandingPage() {
-  const year = new Date().getFullYear();
+function authorInitial(name: string) {
+  return (name?.trim()?.[0] || '·').toUpperCase();
+}
 
-  // Pull real journal posts for the blog teaser. Falls back gracefully to a
-  // single "visit the journal" card if Sanity isn't configured or empty.
-  const [featuredPost, allPosts] = await Promise.all([
-    getFeaturedPost(),
+// What's new in Core 3.1 — the featured band on the homepage.
+const CORE31_FEATURES = [
+  {
+    n: '01',
+    h: 'It sounds human.',
+    p: 'Core 3.1 talks like a person thinking alongside you — not a template running acknowledge → paraphrase → question on repeat.',
+  },
+  {
+    n: '02',
+    h: 'The conversation builds.',
+    p: 'It tracks how your thinking evolves and responds to what actually changed this turn — connecting ideas across the thread instead of reacting to your last message.',
+  },
+  {
+    n: '03',
+    h: 'Clearer on the page.',
+    p: 'When you’re comparing options or planning, it lays things out in neat titled lists and tables — a light visual map, never a wall of text.',
+  },
+  {
+    n: '04',
+    h: 'Notices your language.',
+    p: 'It marks the words that carry your reasoning, remembers the thread, and adjusts from a quick gut-check to genuinely abstract.',
+  },
+];
+
+export default async function Home() {
+  const [allPosts, featured, categories, total] = await Promise.all([
     listPosts(),
+    getFeaturedPost(),
+    listCategoriesWithCount(),
+    totalPostCount(),
   ]);
-  const feature = featuredPost ?? allPosts[0] ?? null;
-  const gridPosts = allPosts
-    .filter((p) => !feature || p._id !== feature._id)
-    .slice(0, 3);
+
+  const gridPosts = allPosts.filter((p) => !featured || p._id !== featured._id);
 
   return (
-    <div className="scrolly-root">
-      <div className="thread" aria-hidden="true">
-        <span className="rail-line" />
-        <span className="fill" />
-        <span className="orb" />
-      </div>
+    <div className="blog-page">
+      <div className="progress" aria-hidden="true" />
 
-      <header className="nav">
-        <Link className="brand" href="#top" aria-label="Socria home">
-          <img src="/socria-logo.png" alt="" />
-          <span className="name">Socria</span>
-        </Link>
-        <div className="nav-right">
-          <SignedOut>
-            <SignInButton>
-              <button type="button" className="nav-signin">
-                Sign in
-              </button>
-            </SignInButton>
-          </SignedOut>
-          <SignedIn>
-            <UserButton afterSignOutUrl="/" userProfileMode="navigation" userProfileUrl="/account" />
-          </SignedIn>
-          <Link href="/chat" className="btn-nav">
-            Try Socria <span className="arrow">→</span>
-          </Link>
-        </div>
-      </header>
+      <BlogNav />
 
       <main id="top">
-        {/* SCENE 1 · HERO */}
-        <section className="scene s-hero">
-          <div className="stack">
-            <Link href="/blog" className="announce fade">
-              <span className="spark">✦</span> Introducing Socria Core 3
-              <span className="new">NEW</span>
-              <span className="go">→</span>
-            </Link>
-            <img
-              className="mark fade d1"
-              src="/socria-logo.png"
-              alt="Socria mark — light reaching a foundation"
-            />
-            <h1 data-split>
-              AI that sharpens <span className="it">your</span> thinking.
-            </h1>
-            <p className="sub fade d2">
-              Socria helps you reason through ideas, decisions, and uncertainty
-              — without outsourcing your thinking.
-            </p>
-          </div>
-          <div className="hint">
-            <span>Scroll to think</span>
-            <span className="ln" />
-          </div>
-        </section>
-
-        {/* SCENE 2 · PROBLEM (pinned) */}
-        <section className="scene pin s-problem" id="problem">
-          <div className="stage">
-            <div className="inner">
-              <span className="kicker">The problem</span>
-              <p className="lead" data-split>
-                Many people are using AI to replace thinking rather than
-                strengthen it.
-              </p>
-              <div className="gen">
-                <p className="gen-line">
-                  <span className="no">01</span>{' '}
-                  <span className="v">We generate essays</span>{' '}
-                  <span className="t">instead of forming arguments.</span>
-                </p>
-                <p className="gen-line">
-                  <span className="no">02</span>{' '}
-                  <span className="v">We generate ideas</span>{' '}
-                  <span className="t">instead of understanding them.</span>
-                </p>
-                <p className="gen-line">
-                  <span className="no">03</span>{' '}
-                  <span className="v">We generate decisions</span>{' '}
-                  <span className="t">instead of reasoning through them.</span>
-                </p>
-              </div>
-              <p className="coda">
-                The result is a growing dependence on answers without
-                understanding.
-              </p>
-            </div>
-          </div>
-        </section>
-
-        {/* SCENE 3 · RISK */}
-        <section className="scene pin s-risk">
-          <div className="stage">
-            <div className="inner">
-              <p className="lead" data-split>
-                The biggest risk of advanced AI isn&rsquo;t artificial
-                intelligence.
-              </p>
-              <p className="punch">It&rsquo;s artificial thinking.</p>
-            </div>
-          </div>
-        </section>
-
-        {/* SCENE 4 · WHAT */}
-        <section className="scene s-what" id="what">
+        {/* MASTHEAD */}
+        <section className="mast bg-paper">
           <div className="inner">
-            <span className="kicker">What is Socria</span>
-            <h2 data-split>Socria is a Human-First AI.</h2>
-            <p className="lede fade">
-              Instead of giving you conclusions, it helps you think through
-              them.
-            </p>
-            <div className="cols">
-              <p className="body fade d1">
-                Built on the principles of the Socratic method and
-                metacognition, Socria asks questions, surfaces assumptions, and
-                helps you clarify your own reasoning.
+            <div className="kicker">
+              <span className="eyebrow reveal">
+                <span className="tick" />
+                The Socria Journal
+              </span>
+              <span
+                className="dim reveal"
+                style={{
+                  fontSize: '.8rem',
+                  letterSpacing: '.16em',
+                  textTransform: 'uppercase',
+                }}
+              >
+                Think for yourself
+              </span>
+            </div>
+            <h1>
+              Notes on{' '}
+              <span className="glyph">
+                <svg viewBox="0 0 40 40">
+                  <circle
+                    cx="20"
+                    cy="20"
+                    r="16"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="3.5"
+                  />
+                </svg>
+              </span>{' '}
+              thinking <span className="b">clearly.</span>
+            </h1>
+            <div className="lead-row reveal d1">
+              <p className="blurb">
+                From the team building a Human-First AI that strengthens your
+                judgment instead of replacing it. Plus what&rsquo;s new in
+                Socria Core 3.1.
               </p>
-              <div className="couplet fade d2">
-                <p>It doesn&rsquo;t think for you.</p>
-                <p className="b">It helps you think more clearly.</p>
-              </div>
+              <p className="count">
+                {total}
+                <small>
+                  {total === 1 ? 'Essay published' : 'Essays published'}
+                </small>
+              </p>
             </div>
           </div>
         </section>
 
-        {/* SCENE 5 · MOVEMENTS (pinned) */}
-        <section className="scene pin s-mv" id="how">
-          <div className="stage">
-            <div className="inner">
-              <div className="mv-visual" aria-hidden="true">
-                <span className="src" />
-                <span className="trk">
-                  <span className="trk-fill" />
-                </span>
-                <span className="lit-dot" />
-                <span className="base" />
-                <span className="cap">01 · Reflection</span>
-              </div>
-              <div className="mv-right">
-                <span className="kicker">How Socria works</span>
-                <div className="mv-steps">
-                  <div className="mv-step on">
-                    <span className="n">01</span>
-                    <h3>Reflection</h3>
-                    <p>
-                      Socria helps you slow down and understand what
-                      you&rsquo;re actually trying to solve.
-                    </p>
-                  </div>
-                  <div className="mv-step">
-                    <span className="n">02</span>
-                    <h3>Clarification</h3>
-                    <p>
-                      It identifies vague thinking, hidden assumptions, and
-                      unclear reasoning.
-                    </p>
-                  </div>
-                  <div className="mv-step">
-                    <span className="n">03</span>
-                    <h3>Exploration</h3>
-                    <p>Socria helps you examine ideas from multiple perspectives.</p>
-                  </div>
-                  <div className="mv-step">
-                    <span className="n">04</span>
-                    <h3>Ownership</h3>
-                    <p>
-                      You arrive at your own conclusions instead of inheriting
-                      someone else&rsquo;s.
-                    </p>
-                  </div>
-                  <div className="mv-progress" aria-hidden="true">
-                    <span><i /></span>
-                    <span><i /></span>
-                    <span><i /></span>
-                    <span><i /></span>
-                  </div>
+        {/* WHAT'S NEW · CORE 3.1 */}
+        <section className="c31" id="core31">
+          <div className="inner">
+            <span className="c31-eyebrow reveal">What&rsquo;s new · Core 3.1</span>
+            <h2 className="reveal d1">
+              More human. More useful.{' '}
+              <span className="b">Less like a chatbot.</span>
+            </h2>
+            <p className="lede reveal d1">
+              Core 3.1 is our biggest step toward a conversation that genuinely
+              develops — one that listens across the whole thread and hands the
+              thinking back to you.
+            </p>
+
+            <div className="c31-grid">
+              {CORE31_FEATURES.map((f, i) => (
+                <div
+                  className={`cell reveal${i % 2 ? ' d1' : ''}`}
+                  key={f.n}
+                >
+                  <span className="n">{f.n}</span>
+                  <h4>{f.h}</h4>
+                  <p>{f.p}</p>
                 </div>
-              </div>
+              ))}
+            </div>
+
+            <div className="c31-cta reveal d1">
+              <Link href="/chat" className="c31-btn">
+                Start a thought session <span aria-hidden>→</span>
+              </Link>
+              <span className="note">Free to start. No credit card.</span>
             </div>
           </div>
         </section>
 
-        {/* SCENE · INTRODUCING CORE 3 (pinned) */}
-        <section className="scene pin s-core3" id="core3">
-          <div className="stage">
-            <div className="c3-head">
-              <span className="c3-eyebrow">Introducing · Socria Core 3</span>
-              <h2 className="c3-title">
-                The next generation of{' '}
-                <span className="b">thinking with you.</span>
-              </h2>
-            </div>
-            <div className="c3-scene">
-              <div className="c3-features">
-                <div className="c3-feat on">
-                  <div className="txt">
-                    <span className="fno">01 · Adjustable depth</span>
-                    <h3>Choose how deep to think.</h3>
-                    <p>
-                      Four registers, from a quick gut-check to genuinely
-                      abstract. Socria matches your pace and your level — never
-                      talking down, never showing off.
-                    </p>
-                    <div className="modes">
-                      <span>Quick</span>
-                      <span className="dact">Balanced</span>
-                      <span>Deep</span>
-                      <span>Abstract</span>
-                    </div>
-                  </div>
-                  <div className="c3-viz">
-                    <div className="depth-viz">
-                      <span className="lvl">Quick</span>
-                      <span className="lvl on">Balanced</span>
-                      <span className="lvl">Deep</span>
-                      <span className="lvl">Abstract</span>
-                    </div>
-                  </div>
-                </div>
+        {/* TOPIC RAIL */}
+        <section className="topics">
+          <TopicFilter topics={categories} totalCount={total} />
+        </section>
 
-                <div className="c3-feat">
-                  <div className="txt">
-                    <span className="fno">02 · Language noticing</span>
-                    <h3>It notices how you say it.</h3>
-                    <p>
-                      Repeated words, quiet contradictions, the moment certainty
-                      creeps in. Core 3 catches the tells in your own language
-                      and reflects them back — gently.
-                    </p>
+        {/* FEATURED ESSAY */}
+        {featured && (
+          <section className="feature">
+            <article className="inner reveal">
+              <div className="cover">
+                <CoverArt
+                  color={featured.coverColor}
+                  shape={featured.coverShape}
+                  label="Cover · light meets foundation"
+                />
+              </div>
+              <div className="body">
+                <div>
+                  <div className="tagline">
+                    <span className="pill">{featured.category?.name}</span>
+                    <span className="dot" />
+                    <span className="feat-flag">Editor&rsquo;s note</span>
                   </div>
-                  <div className="c3-viz">
-                    <div className="lang-viz">
-                      <span className="ln">
-                        You keep coming back to the word <em>should</em>.
-                      </span>
-                      <span className="ln2">
-                        You&rsquo;ve moved from <em>I think</em> to{' '}
-                        <em>I know</em>.
-                      </span>
-                    </div>
-                  </div>
+                  <h2>
+                    <Link href={`/blog/${featured.slug}`}>{featured.title}</Link>
+                  </h2>
+                  <p className="excerpt">{featured.excerpt}</p>
                 </div>
-
-                <div className="c3-feat">
-                  <div className="txt">
-                    <span className="fno">03 · Progressive synthesis</span>
-                    <h3>Your thinking, reflected back.</h3>
-                    <p>
-                      As a conversation builds, Socria surfaces what it&rsquo;s
-                      noticing — the themes, tensions, and assumptions emerging.
-                      Never a conclusion. Always your clarity.
-                    </p>
-                  </div>
-                  <div className="c3-viz">
-                    <div className="rings">
-                      <span className="ring" style={{ width: '74%', aspectRatio: 1 }} />
-                      <span className="ring" style={{ width: '50%', aspectRatio: 1 }} />
-                      <span className="ring" style={{ width: '27%', aspectRatio: 1 }} />
-                    </div>
-                    <span
-                      className="mono"
-                      style={{
-                        fontSize: 'clamp(1rem,2vw,1.4rem)',
-                        maxWidth: '16ch',
-                        textAlign: 'center',
-                        lineHeight: 1.3,
-                        fontStyle: 'italic',
-                      }}
-                    >
-                      Here&rsquo;s what I&rsquo;m noticing so far…
+                <div className="foot">
+                  <div className="byline">
+                    <span className="ava bg-moss">
+                      {authorInitial(featured.authorName)}
+                    </span>
+                    <span className="who">
+                      <span className="nm">{featured.authorName}</span>
+                      <span className="mt">
+                        {[
+                          featured.authorRole,
+                          featured.readingMinutes
+                            ? `${featured.readingMinutes} min read`
+                            : null,
+                          formatDate(featured.publishedAt),
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')}
+                      </span>
                     </span>
                   </div>
-                </div>
-
-                <div className="c3-feat">
-                  <div className="txt">
-                    <span className="fno">04 · Thread memory</span>
-                    <h3>It remembers how you think.</h3>
-                    <p>
-                      Every thread carries what matters — your values, tensions,
-                      and the way you reason — across the conversation and across
-                      every device. Pick up exactly where your thinking left off.
-                    </p>
-                  </div>
-                  <div className="c3-viz">
-                    <div className="c3-dots">
-                      <span className="d">
-                        <img src="/socria-logo.png" alt="" />
-                      </span>
-                      <span className="lnk" />
-                      <span className="d">
-                        <img src="/socria-logo.png" alt="" />
-                      </span>
-                      <span className="lnk" />
-                      <span className="d">
-                        <img src="/socria-logo.png" alt="" />
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="c3-steps" aria-hidden="true">
-              <span><i /></span>
-              <span><i /></span>
-              <span><i /></span>
-              <span><i /></span>
-            </div>
-          </div>
-        </section>
-
-        {/* SCENE 6 · TRY IT */}
-        <section className="scene s-try" id="try">
-          <div className="inner">
-            <span className="kicker">Try it</span>
-            <h2 data-split>Ask Socria anything. Get a better question back.</h2>
-            <p className="sub fade">
-              This is the whole product in one exchange — type something
-              you&rsquo;re actually weighing, or pick one below.
-            </p>
-            <div className="try-box fade d1">
-              <div className="try-head">
-                <img src="/socria-logo.png" alt="" />
-                <span className="t">Socria</span>
-                <span className="st">Thinking with you</span>
-              </div>
-              <div className="try-body" id="try-body">
-                <p className="try-empty" id="try-empty">
-                  Your conversation will appear here.
-                </p>
-              </div>
-              <div className="try-chips">
-                <button className="try-chip">
-                  Should I take the higher-paying job?
-                </button>
-                <button className="try-chip">
-                  Is my startup idea worth pursuing?
-                </button>
-                <button className="try-chip">Should I move to a new city?</button>
-              </div>
-              <div className="try-foot">
-                <input
-                  id="try-input"
-                  type="text"
-                  placeholder="Type what's actually on your mind…"
-                  aria-label="Ask Socria"
-                />
-                <button className="try-send" id="try-send" aria-label="Send">
-                  →
-                </button>
-              </div>
-            </div>
-            <div className="try-cta">
-              <Link href="/chat" className="try-cta-link">
-                Open the full Socria <span aria-hidden>→</span>
-              </Link>
-            </div>
-          </div>
-        </section>
-
-        {/* SCENE · BLOG — real posts from Sanity */}
-        <section className="scene s-blog" id="blog">
-          <div className="inner">
-            <div className="head">
-              <div>
-                <span className="kicker">From the Socria journal</span>
-                <h2 data-split>Notes on thinking.</h2>
-              </div>
-              <Link href="/blog" className="all fade">
-                All writing <span className="go">→</span>
-              </Link>
-            </div>
-
-            {feature ? (
-              <Link
-                href={`/blog/${feature.slug}`}
-                className="blog-feature fade"
-              >
-                <div className="art">
-                  <span className="halo" />
-                  <img className="mark" src="/socria-logo.png" alt="" />
-                </div>
-                <div className="body">
-                  <div className="tagrow">
-                    {feature.category?.name || 'Essay'}
-                    {landingDate(feature.publishedAt) && (
-                      <span className="dt">· {landingDate(feature.publishedAt)}</span>
-                    )}
-                  </div>
-                  <h3>{feature.title}</h3>
-                  {feature.excerpt && <p>{feature.excerpt}</p>}
-                  <span className="read">
-                    Read the essay <span className="go">→</span>
-                  </span>
-                </div>
-              </Link>
-            ) : (
-              // No posts yet — a graceful placeholder that still routes to the
-              // journal so the section is never empty or broken.
-              <Link href="/blog" className="blog-feature fade">
-                <div className="art">
-                  <span className="halo" />
-                  <img className="mark" src="/socria-logo.png" alt="" />
-                </div>
-                <div className="body">
-                  <div className="tagrow">The Socria Journal</div>
-                  <h3>Notes on thinking, coming soon.</h3>
-                  <p>
-                    Essays on reasoning, metacognition, and building AI that
-                    strengthens human judgment instead of replacing it.
-                  </p>
-                  <span className="read">
-                    Visit the journal <span className="go">→</span>
-                  </span>
-                </div>
-              </Link>
-            )}
-
-            {gridPosts.length > 0 && (
-              <div className="blog-grid">
-                {gridPosts.map((p) => (
-                  <Link
-                    key={p._id}
-                    href={`/blog/${p.slug}`}
-                    className="blog-card"
-                  >
-                    <div className="tagrow">
-                      {p.category?.name || 'Essay'}
-                      {landingDate(p.publishedAt) && (
-                        <span className="dt">· {landingDate(p.publishedAt)}</span>
-                      )}
-                    </div>
-                    <h4>{p.title}</h4>
-                    {p.excerpt && <p>{p.excerpt}</p>}
+                  <Link href={`/blog/${featured.slug}`} className="readlink">
+                    Read essay{' '}
+                    <span className="circ" aria-hidden="true">
+                      →
+                    </span>
                   </Link>
+                </div>
+              </div>
+            </article>
+          </section>
+        )}
+
+        {/* POSTS GRID */}
+        <section className="posts" id="essays">
+          <div className="inner">
+            <div className="grid-head reveal">
+              <h3>Latest essays</h3>
+              <span className="nt">Fresh thinking, slowly</span>
+            </div>
+            {gridPosts.length === 0 ? (
+              <p
+                className="dim"
+                style={{
+                  fontFamily: 'var(--serif)',
+                  fontStyle: 'italic',
+                  fontSize: '1.1rem',
+                }}
+              >
+                No essays yet. Visit{' '}
+                <Link
+                  href="/studio"
+                  style={{ color: 'var(--moss-700)', textDecoration: 'underline' }}
+                >
+                  /studio
+                </Link>{' '}
+                to publish the first one.
+              </p>
+            ) : (
+              <div className="grid">
+                {gridPosts.map((p, i) => (
+                  <PostCard key={p._id} post={p} delay={(i % 3) as 0 | 1 | 2} />
                 ))}
               </div>
             )}
           </div>
         </section>
 
-        {/* SCENE 7 · WHY */}
-        <section className="scene s-why" id="philosophy">
+        {/* MARQUEE */}
+        <div className="marquee" aria-hidden="true">
+          <div className="marquee-track">
+            {[
+              'Questions before conclusions.',
+              'Read slowly.',
+              'Think for yourself.',
+              'Clarity over convenience.',
+              'Questions before conclusions.',
+              'Read slowly.',
+              'Think for yourself.',
+              'Clarity over convenience.',
+            ].map((s, i) => (
+              <span className="it" key={i}>
+                {s}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {/* SUBSCRIBE */}
+        <section className="subscribe bg-forest">
           <div className="inner">
-            <span className="kicker">Why Socria exists</span>
-            <p className="big" data-split>
-              Most AI optimizes for speed.{' '}
-              <span className="b">Socria optimizes for understanding.</span>
-            </p>
-            <div className="pair fade">
-              <p>
-                The goal isn&rsquo;t to think less.
+            <div>
+              <h2>
+                One essay a week.
                 <br />
-                <span className="b">The goal is to think better.</span>
+                <span className="b">No noise.</span>
+              </h2>
+              <p className="sub">
+                Slow ideas about thinking well, delivered when they&rsquo;re
+                ready — never on a content calendar. Unsubscribe in one click.
               </p>
-              <p>
-                The best AI doesn&rsquo;t replace you.
-                <br />
-                <span className="b">It helps you become more capable.</span>
+              <SubscribeForm />
+              <p className="fine">
+                For people who&rsquo;d rather think than skim.
               </p>
             </div>
-          </div>
-        </section>
-
-        {/* SCENE 8 · FINAL */}
-        <section className="scene s-final" id="start">
-          <div className="glow" aria-hidden="true" />
-          <div className="inner">
-            <img className="mark fade" src="/socria-logo.png" alt="" />
-            <h2 data-split>
-              Don&rsquo;t outsource your thinking.{' '}
-              <span className="b">Try Socria today.</span>
-            </h2>
-            <div className="row fade d1">
-              <Link href="/chat" className="btn-xl">
-                Start thinking with Socria <span className="arrow">→</span>
-              </Link>
-              <p className="note">
-                Free to start. Create an account to save your sessions.
+            <div className="aside reveal d2">
+              <p className="q">
+                &ldquo;The goal isn&rsquo;t to think less. The goal is to think
+                better.&rdquo;
               </p>
+              <p className="meta">From the Socria manifesto</p>
             </div>
           </div>
         </section>
       </main>
 
-      <footer>
-        <div className="foot">
-          <div className="fb">
-            <img src="/socria-logo.png" alt="" />
-            <span className="name">Socria</span>
-          </div>
-          <nav>
-            <a href="#problem">Problem</a>
-            <a href="#core3">Core 3</a>
-            <a href="#how">Method</a>
-            <a href="#try">Try it</a>
-            <Link href="/blog">Blog</Link>
-          </nav>
-          <span className="tag">Think For Yourself.</span>
-          <span>© {year} Socria</span>
-        </div>
-      </footer>
-
-      <ScrollyMotion />
+      <BlogFooter />
+      <BlogMotion />
     </div>
+  );
+}
+
+function PostCard({ post, delay }: { post: PostListItem; delay: 0 | 1 | 2 }) {
+  const delayClass = delay === 1 ? ' d1' : delay === 2 ? ' d2' : '';
+  return (
+    <article className={`card reveal${delayClass}`} data-topic={post.category?.slug}>
+      <Link className="surface" href={`/blog/${post.slug}`}>
+        <div className="cover">
+          <CoverArt
+            color={post.coverColor}
+            shape={post.coverShape}
+            label={post.category?.name}
+            className="ovl"
+          />
+        </div>
+        <div className="meta-top">
+          <span className="pill">{post.category?.name}</span>
+          {post.readingMinutes && (
+            <span className="rt">{post.readingMinutes} min</span>
+          )}
+        </div>
+        <h4>{post.title}</h4>
+        <p className="ex">{post.excerpt}</p>
+        <p className="by">
+          <span className="nb">{post.authorName}</span> ·{' '}
+          {formatDate(post.publishedAt)}
+        </p>
+      </Link>
+    </article>
   );
 }

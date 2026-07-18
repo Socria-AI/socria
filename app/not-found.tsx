@@ -15,10 +15,9 @@ export default function NotFound() {
           </Link>
           <div className="nav-right">
             <nav className="nav-links">
-              <Link href="/#what">What is Socria</Link>
-              <Link href="/#how">How it works</Link>
-              <Link href="/#philosophy">Philosophy</Link>
-              <Link href="/blog">Blog</Link>
+              <Link href="/#core31">What&rsquo;s new</Link>
+              <Link href="/blog">Journal</Link>
+              <Link href="/chat">Try Socria</Link>
             </nav>
             <SignedOut>
               <SignInButton >
@@ -87,23 +86,23 @@ export default function NotFound() {
           </div>
 
           <div className="nf-paths in">
-            <Link className="nf-path" href="/#what">
+            <Link className="nf-path" href="/#core31">
               <span className="pn">01</span>
-              <span className="pt">What is Socria</span>
+              <span className="pt">What&rsquo;s new in Core 3.1</span>
               <span className="pa" aria-hidden="true">
                 →
               </span>
             </Link>
-            <Link className="nf-path" href="/#how">
+            <Link className="nf-path" href="/blog">
               <span className="pn">02</span>
-              <span className="pt">How it works</span>
+              <span className="pt">The Journal</span>
               <span className="pa" aria-hidden="true">
                 →
               </span>
             </Link>
-            <Link className="nf-path" href="/#philosophy">
+            <Link className="nf-path" href="/chat">
               <span className="pn">03</span>
-              <span className="pt">Why it exists</span>
+              <span className="pt">Start a thought session</span>
               <span className="pa" aria-hidden="true">
                 →
               </span>
