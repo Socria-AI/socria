@@ -36,6 +36,10 @@ const SMART_KEY_STORAGE = 'socria.core3AccessKey.v1';
 // Profile imported from another AI ("import your history"). Kept locally and,
 // for signed-in users, mirrored to the cloud via /api/profile.
 const PROFILE_KEY = 'socria.importedProfile.v1';
+// Cross-conversation thinking journey (evolving understanding, open threads,
+// timeline). Same storage pattern as the profile; refreshed every few turns.
+const JOURNEY_KEY = 'socria.journey.v1';
+const JOURNEY_EVERY_TURNS = 4;
 import {
   SOCRIA_MODELS,
   EMPTY_MEMORY,
@@ -43,7 +47,10 @@ import {
   isValidAccessKey,
   type SocriaModel,
   type ThinkingDepth,
+  sanitizeUserUnderstanding,
+  hasJourneyContent,
   type ConversationMemory,
+  type UserUnderstanding,
 } from '@/lib/socria-prompt';
 
 type Role = 'user' | 'assistant';
@@ -175,6 +182,10 @@ export default function ChatPage() {
   const [shareInsight, setShareInsight] = useState<Insight | null>(null);
   const [importedProfile, setImportedProfile] = useState('');
   const [importOpen, setImportOpen] = useState(false);
+  const [journey, setJourney] = useState<UserUnderstanding | null>(null);
+  // Freshest journey, immune to stale closures (the cadence update fires from
+  // async flows that captured an older render).
+  const journeyRef = useRef<UserUnderstanding | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -280,6 +291,18 @@ export default function ChatPage() {
     try {
       setImportedProfile(localStorage.getItem(PROFILE_KEY) || '');
     } catch {}
+    try {
+      const rawJourney = localStorage.getItem(JOURNEY_KEY);
+      if (rawJourney) {
+        const parsed = sanitizeUserUnderstanding(JSON.parse(rawJourney));
+        // Clamp corrupt future timestamps so cloud sync can't be blocked.
+        if (parsed.updatedAt > Date.now()) parsed.updatedAt = Date.now();
+        if (hasJourneyContent(parsed)) {
+          setJourney(parsed);
+          journeyRef.current = parsed;
+        }
+      }
+    } catch {}
   }, []);
 
   // Signed-in users: sync the imported profile with the cloud. Cloud value
@@ -314,12 +337,61 @@ export default function ChatPage() {
             body: JSON.stringify({ profile: local }),
           }).catch(() => {});
         }
+
+        // Journey: newest copy wins (both sides carry updatedAt).
+        const cloudJourney: UserUnderstanding | null = json?.understanding
+          ? sanitizeUserUnderstanding(json.understanding)
+          : null;
+        const localJourney = journeyRef.current;
+        if (
+          cloudJourney &&
+          hasJourneyContent(cloudJourney) &&
+          (!localJourney ||
+            (cloudJourney.updatedAt || 0) >= (localJourney.updatedAt || 0))
+        ) {
+          setJourney(cloudJourney);
+          journeyRef.current = cloudJourney;
+          try {
+            localStorage.setItem(JOURNEY_KEY, JSON.stringify(cloudJourney));
+          } catch {}
+        } else if (
+          localJourney &&
+          (!cloudJourney ||
+            (localJourney.updatedAt || 0) > (cloudJourney.updatedAt || 0))
+        ) {
+          // Local copy is newer (e.g. built anonymously with the access key
+          // before signing in) — push it up so other devices see it.
+          void fetch('/api/profile', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ understanding: localJourney }),
+          }).catch(() => {});
+        }
       } catch {}
     })();
     return () => {
       cancelled = true;
     };
   }, [isLoaded, isSignedIn]);
+
+  function saveJourney(next: UserUnderstanding) {
+    // Never regress: a slow in-flight update resolving late must not
+    // overwrite a newer journey (and then propagate via newest-wins sync).
+    const cur = journeyRef.current;
+    if (cur && (next.updatedAt || 0) < (cur.updatedAt || 0)) return;
+    setJourney(next);
+    journeyRef.current = next;
+    try {
+      localStorage.setItem(JOURNEY_KEY, JSON.stringify(next));
+    } catch {}
+    if (isSignedIn) {
+      void fetch('/api/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ understanding: next }),
+      }).catch(() => {});
+    }
+  }
 
   function saveImportedProfile(next: string) {
     setImportedProfile(next);
@@ -531,6 +603,32 @@ export default function ChatPage() {
         } catch (e) {
           console.error('Persist memory update failed:', e);
         }
+      }
+
+      // Cross-conversation journey: every few turns, fold this
+      // conversation's evolving memory into the user-level understanding
+      // (narrative, open threads, timeline). Fire-and-forget; failures
+      // leave the previous journey intact.
+      const journeyTurns = convo.messages.filter(
+        (m) => m.role === 'user'
+      ).length;
+      if (journeyTurns >= JOURNEY_EVERY_TURNS && journeyTurns % JOURNEY_EVERY_TURNS === 0) {
+        try {
+          const jr = await fetch('/api/update-understanding', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...keyHeaders() },
+            body: JSON.stringify({
+              understanding: journeyRef.current ?? undefined,
+              memory: latestPatched?.memory ?? nextMemory,
+              title: latestPatched?.title ?? convo.title,
+              messages: convo.messages,
+            }),
+          });
+          if (jr.ok) {
+            const jj = await jr.json();
+            if (jj?.understanding) saveJourney(jj.understanding);
+          }
+        } catch {}
       }
     } catch (e) {
       console.error('Memory extraction failed:', e);
@@ -844,6 +942,7 @@ export default function ChatPage() {
           depth,
           memory: convoForRequest.memory ?? EMPTY_MEMORY,
           profile: importedProfile || undefined,
+          understanding: journey ?? undefined,
         }),
       });
 

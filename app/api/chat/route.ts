@@ -13,6 +13,9 @@ import {
   SOCRIA_PROMPT_VERSION,
   CORE_3_FALLBACK_MODEL,
   isValidAccessKey,
+  sanitizeUserUnderstanding,
+  hasJourneyContent,
+  renderJourneyBrief,
   buildConversationStatePrompt,
   sanitizeConversationState,
   renderTranscriptForState,
@@ -39,7 +42,8 @@ const STATE_TIMEOUT_MS = 4500;
 async function computeConversationState(
   openai: OpenAI,
   messages: { role: string; content: string }[],
-  priorUnderstanding: string | null
+  priorUnderstanding: string | null,
+  journeyBrief?: string | null
 ): Promise<ConversationState | null> {
   const model =
     process.env.OPENAI_STATE_MODEL ||
@@ -52,7 +56,10 @@ async function computeConversationState(
       max_tokens: 220,
       response_format: { type: 'json_object' },
       messages: [
-        { role: 'system', content: buildConversationStatePrompt(priorUnderstanding) },
+        {
+          role: 'system',
+          content: buildConversationStatePrompt(priorUnderstanding, journeyBrief),
+        },
         { role: 'user', content: renderTranscriptForState(messages) },
       ],
     })
@@ -108,11 +115,26 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Cross-conversation journey: the client sends the user's evolving
+    // understanding; a fresh conversation (first user turn) may open with a
+    // natural check-in on an unfinished thread.
+    const understanding = body?.understanding
+      ? sanitizeUserUnderstanding(body.understanding)
+      : null;
+    const rawUserTurns = Array.isArray(messages)
+      ? messages.filter((m: any) => m?.role === 'user').length
+      : 0;
+    const journey =
+      understanding && hasJourneyContent(understanding)
+        ? { understanding, conversationStart: rawUserTurns <= 1 }
+        : null;
+
     const { prompt: basePrompt, model, depth } = buildSystemPrompt(
       body?.model,
       body?.depth,
       body?.memory,
-      typeof body?.profile === 'string' ? body.profile : null
+      typeof body?.profile === 'string' ? body.profile : null,
+      journey
     );
 
     if (!Array.isArray(messages) || messages.length === 0) {
@@ -183,12 +205,25 @@ export async function POST(req: NextRequest) {
           (Array.isArray(body?.memory?.emergingUnderstanding) &&
             body.memory.emergingUnderstanding[0]) ||
           null;
-        state = await computeConversationState(openai, clean, priorUnderstanding);
+        state = await computeConversationState(
+          openai,
+          clean,
+          priorUnderstanding,
+          journey ? renderJourneyBrief(journey.understanding) : null
+        );
       }
 
       const parts = [basePrompt];
       if (state) parts.push(renderStateDirective(state));
-      parts.push(renderTurnDirective(guidance, { hasSemanticState: !!state }));
+      parts.push(
+        renderTurnDirective(guidance, {
+          hasSemanticState: !!state,
+          journeyCheckIn:
+            !!journey &&
+            journey.conversationStart &&
+            journey.understanding.openThreads.length > 0,
+        })
+      );
       systemPrompt = parts.join('\n\n');
     }
 
@@ -205,6 +240,7 @@ export async function POST(req: NextRequest) {
         approxPromptTokens: Math.round(systemPrompt.length / 4),
         memoryInjected: model === 'core-3' && !!body?.memory,
         profileInjected: model === 'core-3' && !!body?.profile,
+        journeyInjected: model === 'core-3' && !!journey,
         userTurns,
         assistantTurns,
         stage: guidance?.stage ?? null,

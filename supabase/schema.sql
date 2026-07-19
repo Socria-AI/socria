@@ -29,3 +29,8 @@ create table if not exists user_profiles (
   updated_at bigint not null,
   created_at timestamptz not null default now()
 );
+
+-- Cross-conversation thinking journey (evolving understanding, open
+-- threads, timeline). Safe to re-run.
+alter table user_profiles
+  add column if not exists understanding jsonb not null default '{}'::jsonb;

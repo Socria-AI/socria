@@ -254,7 +254,7 @@ const STAGE_HINT: Record<ConversationStage, string> = {
  */
 export function renderTurnDirective(
   g: ConversationGuidance,
-  opts: { hasSemanticState?: boolean } = {}
+  opts: { hasSemanticState?: boolean; journeyCheckIn?: boolean } = {}
 ): string {
   const lines: string[] = [];
   lines.push('=== THIS TURN (highest priority — overrides general guidance if they conflict) ===');
@@ -271,6 +271,11 @@ export function renderTurnDirective(
   // avoid a weaker, conflicting read.
   if (!opts.hasSemanticState) {
     lines.push(`What changed this turn: ${g.conversationDelta}`);
+  }
+  if (opts.journeyCheckIn) {
+    lines.push(
+      'They have unfinished threads from earlier conversations (see Their Thinking Journey above). If the opener is open-ended or touches one of them, a natural check-in on that thread IS how you establish the actual question — it satisfies the one-question budget.'
+    );
   }
   if (g.openingConcern) {
     lines.push(
