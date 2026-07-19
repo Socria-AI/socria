@@ -18,6 +18,7 @@ import { Core3IntroModal } from '@/components/Core3IntroModal';
 import { InsightCard } from '@/components/InsightCard';
 import { InsightShareModal } from '@/components/InsightShareModal';
 import { ImportProfileModal } from '@/components/ImportProfileModal';
+import { JourneyDebugModal } from '@/components/JourneyDebugModal';
 import { SynthesisCard, SynthesisPending } from '@/components/SynthesisCard';
 import { ChoiceChips } from '@/components/ChoiceChips';
 import { parseMessage, splitChoices, type SynthesisData } from '@/lib/synthesis';
@@ -182,6 +183,7 @@ export default function ChatPage() {
   const [shareInsight, setShareInsight] = useState<Insight | null>(null);
   const [importedProfile, setImportedProfile] = useState('');
   const [importOpen, setImportOpen] = useState(false);
+  const [journeyDebugOpen, setJourneyDebugOpen] = useState(false);
   const [journey, setJourney] = useState<UserUnderstanding | null>(null);
   // Freshest journey, immune to stale closures (the cadence update fires from
   // async flows that captured an older render).
@@ -1116,6 +1118,11 @@ export default function ChatPage() {
         profile={importedProfile}
         onSave={saveImportedProfile}
       />
+      <JourneyDebugModal
+        open={journeyDebugOpen}
+        onClose={() => setJourneyDebugOpen(false)}
+        journey={journey}
+      />
       {/* Mobile backdrop when sidebar is open */}
       {sidebarOpen && (
         <div
@@ -1230,6 +1237,27 @@ export default function ChatPage() {
                 <span className="text-moss-700 font-medium">· active</span>
               ) : (
                 <span className="text-ink/40">from other AIs</span>
+              )}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setJourneyDebugOpen(true);
+              setSidebarOpen(false);
+            }}
+            className="mb-3 w-full flex items-center gap-2 text-left text-[12.5px] text-ink/70 hover:text-ink transition-colors"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-moss-700">
+              <circle cx="12" cy="12" r="9" />
+              <path d="M12 8v4l2.5 2.5" strokeLinecap="round" />
+            </svg>
+            <span>
+              Thinking journey{' '}
+              {journey ? (
+                <span className="text-moss-700 font-medium">· view</span>
+              ) : (
+                <span className="text-ink/40">· empty so far</span>
               )}
             </span>
           </button>
