@@ -165,7 +165,7 @@ export async function POST(req: NextRequest) {
     let guidance: ReturnType<typeof computeGuidance> | null = null;
     let state: ConversationState | null = null;
     if (model === 'core-3' && !controllerDisabled) {
-      guidance = computeGuidance(clean, body?.memory);
+      guidance = computeGuidance(clean, body?.memory, depth);
 
       // Living-understanding pass — the semantic layer. Runs from the 2nd
       // user turn on (nothing to compare against on turn 1), unless disabled.
@@ -209,6 +209,7 @@ export async function POST(req: NextRequest) {
         previousMove: guidance?.previousMove ?? null,
         avoidNext: guidance?.avoidNext ?? null,
         stateDelta: state?.delta ?? null,
+        stateStakes: state?.stakes ?? null,
         stateResolved: state?.resolved ?? null,
         stateActive: !!state,
       });

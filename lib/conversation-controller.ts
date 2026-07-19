@@ -78,6 +78,8 @@ const BANNED_PATTERNS: { re: RegExp; label: string }[] = [
   { re: /\bit might be that\b/i, label: '"it might be that…" hedging' },
   { re: /\byou may be (experiencing|feeling|facing)\b/i, label: '"you may be experiencing…" hedging' },
   { re: /\bperhaps you\b/i, label: '"perhaps you…" hedging' },
+  { re: /\bisn'?t (just|really|only) about\b/i, label: '"this isn\'t just about…" manufactured depth' },
+  { re: /\bthe (real|deeper) question (is|here)\b/i, label: '"the real question is…" manufactured depth' },
 ];
 
 const UNCERTAIN_RE = /^\s*(hmm+|idk|i (don'?t|do not) know|not sure|no idea|maybe|dunno|i guess|unsure)\b/i;
@@ -116,9 +118,19 @@ function firstNonEmptyLine(m: ConversationMemory | null | undefined, key: keyof 
  * history (user/assistant only is fine; system messages are ignored). The
  * last message is expected to be the user's newest turn.
  */
+// Depth-paced synthesis-readiness: Quick users want a wrap-up early; Abstract
+// conversations earn their synthesis later. Mirrors the prompt's cadences.
+const READINESS_TURNS: Record<string, number> = {
+  quick: 4,
+  balanced: 6,
+  deep: 7,
+  abstract: 8,
+};
+
 export function computeGuidance(
   messages: ControllerMessage[],
-  memory?: ConversationMemory | null
+  memory?: ConversationMemory | null,
+  depth?: string
 ): ConversationGuidance {
   const convo = messages.filter((m) => m.role === 'user' || m.role === 'assistant');
   const userTurns = convo.filter((m) => m.role === 'user');
@@ -148,8 +160,13 @@ export function computeGuidance(
     (memory?.values?.length ?? 0) +
     (memory?.goals?.length ?? 0) +
     (memory?.emergingUnderstanding?.length ?? 0);
+  const readyAt = READINESS_TURNS[depth ?? 'balanced'] ?? 6;
   const synthesisReadiness: ConversationGuidance['synthesisReadiness'] =
-    userCount >= 6 || memoryDepth >= 4 ? 'high' : userCount >= 3 ? 'medium' : 'low';
+    userCount >= readyAt || memoryDepth >= 4
+      ? 'high'
+      : userCount >= Math.ceil(readyAt / 2)
+        ? 'medium'
+        : 'low';
 
   // Stage: rough, monotonic-ish read of where the conversation is.
   let stage: ConversationStage;
@@ -311,10 +328,20 @@ const DELTA_VERB: Record<ConversationState['delta'], string> = {
  * This is the answer to "what changed because of the last message?" — the
  * reply must be built from it, not from the last message in isolation.
  */
+const STAKES_HINT: Record<ConversationState['stakes'], string> = {
+  everyday:
+    'Stakes: everyday/practical. Be a helpful, grounded friend — direct, conversational, useful. NO hidden-meaning excavation, no psychological framing, no "this isn\'t really about…". A practical suggestion plus at most one practical question is the right shape.',
+  meaningful:
+    'Stakes: a real decision or concern. Thoughtful help with light reflection where it earns its place.',
+  weighty:
+    'Stakes: this genuinely matters to them. Engage the full depth their selected mode invites.',
+};
+
 export function renderStateDirective(s: ConversationState): string {
   const lines: string[] = [];
   lines.push('=== CONVERSATION STATE (respond FROM this, not from the last message) ===');
   lines.push('');
+  lines.push(STAKES_HINT[s.stakes]);
   lines.push(`Living understanding: ${s.understanding}`);
   if (s.whatChanged) {
     lines.push(`The last message ${DELTA_VERB[s.delta]} the understanding — ${s.whatChanged}`);
