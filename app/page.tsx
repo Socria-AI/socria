@@ -1,7 +1,13 @@
 // app/page.tsx — Socria homepage: "The Socria Journal", an editorial magazine.
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { SignedIn, SignedOut, SignInButton, UserButton } from '@clerk/nextjs';
+import {
+  SignedIn,
+  SignedOut,
+  UserButton,
+  ClerkLoading,
+  ClerkLoaded,
+} from '@clerk/nextjs';
 import { MagazineMotion } from '@/components/MagazineMotion';
 import { listPosts, getFeaturedPost } from '@/sanity/lib/queries';
 
@@ -68,16 +74,25 @@ export default async function Home() {
         </div>
         <div className="mh-center label">A place for thinking for yourself</div>
         <div className="mh-right">
-          <SignedOut>
-            <SignInButton>
-              <button type="button" className="signin">
+          {/* Sign-in must survive Clerk being slow or misconfigured in
+              production: show a real /sign-in link during load and when
+              signed out, and only swap to the avatar once Clerk confirms a
+              session. If Clerk never initializes, the link still shows. */}
+          <ClerkLoading>
+            <Link href="/sign-in" className="signin">
+              Sign in
+            </Link>
+          </ClerkLoading>
+          <ClerkLoaded>
+            <SignedOut>
+              <Link href="/sign-in" className="signin">
                 Sign in
-              </button>
-            </SignInButton>
-          </SignedOut>
-          <SignedIn>
-            <UserButton afterSignOutUrl="/" userProfileMode="navigation" userProfileUrl="/account" />
-          </SignedIn>
+              </Link>
+            </SignedOut>
+            <SignedIn>
+              <UserButton afterSignOutUrl="/" userProfileMode="navigation" userProfileUrl="/account" />
+            </SignedIn>
+          </ClerkLoaded>
           <Link href="/chat" className="ask">
             Ask Socria
           </Link>

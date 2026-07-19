@@ -3,7 +3,13 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { SignedIn, SignedOut, SignInButton, UserButton } from '@clerk/nextjs';
+import {
+  SignedIn,
+  SignedOut,
+  UserButton,
+  ClerkLoading,
+  ClerkLoaded,
+} from '@clerk/nextjs';
 
 export function BlogNav() {
   const pathname = usePathname();
@@ -33,16 +39,21 @@ export function BlogNav() {
               Journal
             </Link>
           </nav>
-          <SignedOut>
-            <SignInButton >
-              <button type="button" className="nav-signin">
+          <ClerkLoading>
+            <Link href="/sign-in" className="nav-signin">
+              Sign in
+            </Link>
+          </ClerkLoading>
+          <ClerkLoaded>
+            <SignedOut>
+              <Link href="/sign-in" className="nav-signin">
                 Sign in
-              </button>
-            </SignInButton>
-          </SignedOut>
-          <SignedIn>
-            <UserButton afterSignOutUrl="/" userProfileMode="navigation" userProfileUrl="/account" />
-          </SignedIn>
+              </Link>
+            </SignedOut>
+            <SignedIn>
+              <UserButton afterSignOutUrl="/" userProfileMode="navigation" userProfileUrl="/account" />
+            </SignedIn>
+          </ClerkLoaded>
           <Link href="/chat" className="btn btn-nav">
             Start a thought session <span className="arrow">→</span>
           </Link>

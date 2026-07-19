@@ -2,6 +2,31 @@
 
 import { useEffect, useState } from 'react';
 
+// A short editorial "release note" for Socria Core 3.1 — styled like a page
+// from the Socria Journal rather than a product-tour popup.
+const DISPATCHES: { n: string; h: string; p: string }[] = [
+  {
+    n: 'i',
+    h: 'A conversation, not a script',
+    p: 'It sounds like a person thinking with you — building on what you said, not restarting on every message.',
+  },
+  {
+    n: 'ii',
+    h: 'Four depths, four registers',
+    p: 'Quick stays fast and grounded; Deep goes rich and exploratory. The mode you pick changes the whole conversation.',
+  },
+  {
+    n: 'iii',
+    h: 'It notices your language',
+    p: 'The words you lean on surface in italic green — the moment a “maybe” hardens into a “definitely.”',
+  },
+  {
+    n: 'iv',
+    h: 'Clearer on the page',
+    p: 'When you’re weighing options or planning, it lays the thinking out in tidy lists and comparisons — never a wall of text.',
+  },
+];
+
 export function Core3IntroModal({
   open,
   onClose,
@@ -32,8 +57,6 @@ export function Core3IntroModal({
 
   if (!open) return null;
 
-  // Anonymous users who haven't unlocked yet can type an access key instead
-  // of signing in. Signed-in / already-unlocked users skip straight to "Try".
   const showKeyEntry = !isSignedIn && !canUseCore3;
 
   function submitKey() {
@@ -54,7 +77,7 @@ export function Core3IntroModal({
       aria-modal="true"
       aria-labelledby="core3-modal-title"
     >
-      <div className="core3-modal-card" onClick={(e) => e.stopPropagation()}>
+      <div className="core3-modal-card j3-card" onClick={(e) => e.stopPropagation()}>
         <button
           type="button"
           onClick={() => onClose(dontShow)}
@@ -67,68 +90,44 @@ export function Core3IntroModal({
           </svg>
         </button>
 
-        {/* Compact hero band */}
-        <div className="core3-modal-hero" aria-hidden="true">
-          <div className="core3-modal-hero-sweep" />
-          <div className="core3-modal-hero-grid" />
-          <span className="core3-modal-sparkle" style={{ top: '20%', left: '18%', animationDelay: '0s' }} />
-          <span className="core3-modal-sparkle" style={{ top: '68%', left: '26%', animationDelay: '0.7s' }} />
-          <span className="core3-modal-sparkle" style={{ top: '34%', left: '78%', animationDelay: '1.4s' }} />
-          <span className="core3-modal-sparkle" style={{ top: '76%', left: '84%', animationDelay: '2.1s' }} />
-          <div className="core3-modal-hero-glyphs">
-            <svg
-              viewBox="0 0 220 100"
-              width="200"
-              height="90"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="3"
-              aria-hidden
-            >
-              <circle className="core3-glyph-circle" cx="72" cy="50" r="28" />
-              <line
-                className="core3-glyph-beam"
-                x1="104"
-                y1="50"
-                x2="140"
-                y2="50"
-                strokeDasharray="2 6"
-              />
-              <rect
-                className="core3-glyph-diamond"
-                x="150"
-                y="28"
-                width="44"
-                height="44"
-                transform="rotate(45 172 50)"
-              />
-            </svg>
-          </div>
+        <div className="j3-masthead">
+          <span className="j3-brand">Socria</span>
+          <span className="j3-folio">Issue №&nbsp;3 · Core&nbsp;3.1</span>
         </div>
 
-        <div className="core3-modal-content">
-          <p className="core3-modal-eyebrow reveal-in" style={{ animationDelay: '80ms' }}>
-            Introducing
+        <div className="j3-body">
+          <p className="j3-kicker reveal-in" style={{ animationDelay: '60ms' }}>
+            Now live
           </p>
-          <h2
-            id="core3-modal-title"
-            className="core3-modal-title reveal-in"
-            style={{ animationDelay: '160ms' }}
-          >
-            Socria <span className="core3-modal-title-accent">Core 3</span>
+          <h2 id="core3-modal-title" className="j3-title reveal-in" style={{ animationDelay: '130ms' }}>
+            A conversation that thinks{' '}
+            <span className="j3-title-em">with</span> you.
           </h2>
+          <p className="j3-standfirst reveal-in" style={{ animationDelay: '200ms' }}>
+            The biggest step yet toward an AI that strengthens your thinking
+            instead of doing it for you — and the one that finally stops
+            sounding like one.
+          </p>
 
-          {/* Combined compact feature preview */}
-          <div className="core3-modal-preview reveal-in" style={{ animationDelay: '260ms' }}>
-            <div className="core3-modal-demo-bubble">
-              <span className="core3-modal-bubble-label">Socria</span>
-              You said{' '}
-              <span className="try-core3-word" aria-label="might">
-                might
-              </span>{' '}
-              — not fully convinced yet.
-            </div>
-            <div className="core3-modal-depth-pills">
+          <ol className="j3-dispatches">
+            {DISPATCHES.map((d, i) => (
+              <li
+                key={d.n}
+                className="j3-dispatch reveal-in"
+                style={{ animationDelay: `${280 + i * 70}ms` }}
+              >
+                <span className="j3-dispatch-n">{d.n}.</span>
+                <div>
+                  <h3>{d.h}</h3>
+                  <p>{d.p}</p>
+                </div>
+              </li>
+            ))}
+          </ol>
+
+          <div className="j3-depths reveal-in" style={{ animationDelay: '580ms' }}>
+            <span className="j3-depths-label">Set the depth</span>
+            <div className="j3-depth-pills">
               {['Quick', 'Balanced', 'Deep', 'Abstract'].map((label, i) => (
                 <span
                   key={label}
@@ -141,46 +140,8 @@ export function Core3IntroModal({
             </div>
           </div>
 
-          <div className="core3-modal-caps reveal-in" style={{ animationDelay: '340ms' }}>
-            <span className="core3-modal-cap">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-                <path d="M12 3v3M12 18v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M3 12h3M18 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1" strokeLinecap="round" />
-              </svg>
-              Language noticing
-            </span>
-            <span className="core3-modal-cap">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-                <rect x="3.5" y="4" width="17" height="14" rx="3" />
-                <path d="M8 9h8M8 13h5" strokeLinecap="round" />
-              </svg>
-              Thread memory
-            </span>
-            <span className="core3-modal-cap">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-                <circle cx="8" cy="9" r="2.2" />
-                <circle cx="16" cy="9" r="2.2" />
-                <path d="M6 20c1-3 3-4 6-4s5 1 6 4" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-              Progressive synthesis
-            </span>
-            <span className="core3-modal-cap">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-                <path d="M4 12h16M4 12l4-4M4 12l4 4M20 12l-4-4M20 12l-4 4" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-              Adjustable depth
-            </span>
-          </div>
-          <p className="core3-modal-summary reveal-in" style={{ animationDelay: '440ms' }}>
-            Notices your loaded words in italic serif green, remembers the
-            thread, and adjusts its register from casual to{' '}
-            <em>philosophical</em>.
-          </p>
-
           {showKeyEntry && (
-            <div
-              className="core3-modal-key reveal-in"
-              style={{ animationDelay: '500ms' }}
-            >
+            <div className="core3-modal-key reveal-in" style={{ animationDelay: '640ms' }}>
               <label className="core3-modal-key-label" htmlFor="core3-access-key">
                 Have an access key?
               </label>
@@ -203,16 +164,10 @@ export function Core3IntroModal({
                       submitKey();
                     }
                   }}
-                  className={`core3-modal-key-input${
-                    keyError ? ' core3-modal-key-input-error' : ''
-                  }`}
+                  className={`core3-modal-key-input${keyError ? ' core3-modal-key-input-error' : ''}`}
                   aria-invalid={keyError}
                 />
-                <button
-                  type="button"
-                  onClick={submitKey}
-                  className="core3-modal-key-btn"
-                >
+                <button type="button" onClick={submitKey} className="core3-modal-key-btn">
                   Unlock
                 </button>
               </div>
@@ -224,7 +179,7 @@ export function Core3IntroModal({
             </div>
           )}
 
-          <div className="core3-modal-footer reveal-in" style={{ animationDelay: '520ms' }}>
+          <div className="core3-modal-footer reveal-in" style={{ animationDelay: '700ms' }}>
             <label className="core3-modal-checkbox">
               <input
                 type="checkbox"
@@ -233,14 +188,10 @@ export function Core3IntroModal({
               />
               <span>Don&rsquo;t show again</span>
             </label>
-            <button
-              type="button"
-              onClick={onTry}
-              className="core3-modal-primary"
-            >
+            <button type="button" onClick={onTry} className="core3-modal-primary">
               <span className="core3-modal-primary-shine" aria-hidden />
               <span className="core3-modal-primary-label">
-                {canUseCore3 ? 'Try Core 3' : 'Sign in to unlock'}
+                {canUseCore3 ? 'Enter Core 3.1' : 'Sign in to unlock'}
               </span>
               <span aria-hidden className="core3-modal-primary-arrow">→</span>
             </button>

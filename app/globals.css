@@ -2676,3 +2676,32 @@ html.js-anim .scrolly-root .fade.d3 { transition-delay: .3s; }
 .import-btn.primary:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
 .import-btn.danger { color: #c0492f; border-color: rgba(192, 73, 47, 0.35); }
 .import-fine { margin-top: 10px; font-size: 11.5px; color: rgba(31, 31, 31, 0.5); line-height: 1.45; }
+
+/* ===== Core 3.1 intro — editorial "Socria Journal" release note ===== */
+.core3-modal-card.j3-card { max-width: 480px; max-height: 90dvh; overflow-y: auto; }
+.j3-masthead {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 26px 13px; border-bottom: 1px solid var(--border);
+}
+.j3-brand { font-family: var(--serif); font-size: 1.35rem; letter-spacing: 0.01em; color: var(--ink); }
+.j3-folio { font-size: 10px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: var(--moss-700); }
+.j3-body { padding: 20px 26px 22px; }
+@media (max-width: 500px) { .j3-masthead { padding: 14px 20px 11px; } .j3-body { padding: 18px 20px 20px; } }
+.j3-kicker { font-size: 10.5px; font-weight: 600; letter-spacing: 0.2em; text-transform: uppercase; color: var(--moss-700); }
+.j3-title {
+  margin-top: 8px; font-family: var(--serif); font-weight: 400;
+  font-size: clamp(1.9rem, 6vw, 2.5rem); line-height: 1.02; letter-spacing: -0.02em; color: var(--ink);
+}
+.j3-title-em { font-style: italic; color: var(--moss-700); }
+.j3-standfirst {
+  margin-top: 12px; font-family: var(--serif); font-style: italic;
+  font-size: 1.06rem; line-height: 1.4; color: rgba(31, 31, 31, 0.62); max-width: 40ch;
+}
+.j3-dispatches { list-style: none; margin: 20px 0 0; padding: 0; border-top: 1px solid var(--border); }
+.j3-dispatch { display: flex; gap: 14px; padding: 15px 0; border-bottom: 1px solid var(--border); }
+.j3-dispatch-n { flex: 0 0 auto; font-family: var(--serif); font-style: italic; font-size: 1.05rem; color: var(--moss-700); width: 1.4em; }
+.j3-dispatch h3 { font-family: var(--serif); font-weight: 400; font-size: 1.16rem; line-height: 1.1; color: var(--ink); letter-spacing: -0.01em; }
+.j3-dispatch p { margin-top: 4px; font-size: 12.8px; line-height: 1.5; color: rgba(31, 31, 31, 0.6); }
+.j3-depths { margin-top: 18px; }
+.j3-depths-label { font-size: 10.5px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: rgba(31, 31, 31, 0.45); }
+.j3-depth-pills { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
