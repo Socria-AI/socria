@@ -111,7 +111,8 @@ export async function POST(req: NextRequest) {
     const { prompt: basePrompt, model, depth } = buildSystemPrompt(
       body?.model,
       body?.depth,
-      body?.memory
+      body?.memory,
+      typeof body?.profile === 'string' ? body.profile : null
     );
 
     if (!Array.isArray(messages) || messages.length === 0) {
@@ -203,6 +204,7 @@ export async function POST(req: NextRequest) {
         promptChars: systemPrompt.length,
         approxPromptTokens: Math.round(systemPrompt.length / 4),
         memoryInjected: model === 'core-3' && !!body?.memory,
+        profileInjected: model === 'core-3' && !!body?.profile,
         userTurns,
         assistantTurns,
         stage: guidance?.stage ?? null,

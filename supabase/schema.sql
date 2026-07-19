@@ -20,3 +20,12 @@ alter table conversations
 
 create index if not exists conversations_user_updated_idx
   on conversations (user_id, updated_at desc);
+
+-- Imported "about you" profiles (AI history import). One row per user;
+-- stores the profile the user pasted from another AI. Safe to re-run.
+create table if not exists user_profiles (
+  user_id text primary key,
+  profile text not null default '',
+  updated_at bigint not null,
+  created_at timestamptz not null default now()
+);

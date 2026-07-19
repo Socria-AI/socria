@@ -17,6 +17,7 @@ import { TryCore3Pill } from '@/components/TryCore3Pill';
 import { Core3IntroModal } from '@/components/Core3IntroModal';
 import { InsightCard } from '@/components/InsightCard';
 import { InsightShareModal } from '@/components/InsightShareModal';
+import { ImportProfileModal } from '@/components/ImportProfileModal';
 import { SynthesisCard, SynthesisPending } from '@/components/SynthesisCard';
 import { ChoiceChips } from '@/components/ChoiceChips';
 import { parseMessage, splitChoices, type SynthesisData } from '@/lib/synthesis';
@@ -32,6 +33,9 @@ const CORE3_INTRO_DISMISS_KEY = 'socria.core3IntroDontShowAgain.v1';
 // Set to '1' once the user unlocks auth-gated models with the typed access
 // key. Lets anonymous (not-signed-in) users reach Core 3.1.
 const SMART_KEY_STORAGE = 'socria.core3AccessKey.v1';
+// Profile imported from another AI ("import your history"). Kept locally and,
+// for signed-in users, mirrored to the cloud via /api/profile.
+const PROFILE_KEY = 'socria.importedProfile.v1';
 import {
   SOCRIA_MODELS,
   EMPTY_MEMORY,
@@ -169,6 +173,8 @@ export default function ChatPage() {
   const [core3Dismissed, setCore3Dismissed] = useState(false);
   const [autoOpenChecked, setAutoOpenChecked] = useState(false);
   const [shareInsight, setShareInsight] = useState<Insight | null>(null);
+  const [importedProfile, setImportedProfile] = useState('');
+  const [importOpen, setImportOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -271,7 +277,65 @@ export default function ChatPage() {
     setModel(readModel());
     setDepth(readDepth());
     setSmartUnlocked(readSmartUnlocked());
+    try {
+      setImportedProfile(localStorage.getItem(PROFILE_KEY) || '');
+    } catch {}
   }, []);
+
+  // Signed-in users: sync the imported profile with the cloud. Cloud value
+  // wins when present; a local-only profile is pushed up once. All failures
+  // are silent — the feature degrades to local-only.
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/profile', { cache: 'no-store' });
+        if (!res.ok) return;
+        const json = await res.json();
+        if (cancelled) return;
+        const cloud: string = json?.profile || '';
+        const local = (() => {
+          try {
+            return localStorage.getItem(PROFILE_KEY) || '';
+          } catch {
+            return '';
+          }
+        })();
+        if (cloud) {
+          setImportedProfile(cloud);
+          try {
+            localStorage.setItem(PROFILE_KEY, cloud);
+          } catch {}
+        } else if (local) {
+          void fetch('/api/profile', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ profile: local }),
+          }).catch(() => {});
+        }
+      } catch {}
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoaded, isSignedIn]);
+
+  function saveImportedProfile(next: string) {
+    setImportedProfile(next);
+    try {
+      if (next) localStorage.setItem(PROFILE_KEY, next);
+      else localStorage.removeItem(PROFILE_KEY);
+    } catch {}
+    if (isSignedIn) {
+      void fetch('/api/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profile: next }),
+      }).catch(() => {});
+    }
+  }
+
   // Anonymous users without the access key may have a Core 3 selection saved
   // from a previous signed-in (or unlocked) session — downgrade to Core 2 so
   // the API gate doesn't bounce every message they send.
@@ -779,6 +843,7 @@ export default function ChatPage() {
           model,
           depth,
           memory: convoForRequest.memory ?? EMPTY_MEMORY,
+          profile: importedProfile || undefined,
         }),
       });
 
@@ -946,6 +1011,12 @@ export default function ChatPage() {
         onClose={() => setShareInsight(null)}
         insight={shareInsight}
       />
+      <ImportProfileModal
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        profile={importedProfile}
+        onSave={saveImportedProfile}
+      />
       {/* Mobile backdrop when sidebar is open */}
       {sidebarOpen && (
         <div
@@ -1041,6 +1112,28 @@ export default function ChatPage() {
         </div>
 
         <div className="border-t border-border/60 p-4">
+          <button
+            type="button"
+            onClick={() => {
+              setImportOpen(true);
+              setSidebarOpen(false);
+            }}
+            className="mb-3 w-full flex items-center gap-2 text-left text-[12.5px] text-ink/70 hover:text-ink transition-colors"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-moss-700">
+              <path d="M12 3v12" />
+              <path d="M7 10l5 5 5-5" />
+              <path d="M4 19h16" />
+            </svg>
+            <span>
+              Import your history{' '}
+              {importedProfile ? (
+                <span className="text-moss-700 font-medium">· active</span>
+              ) : (
+                <span className="text-ink/40">from other AIs</span>
+              )}
+            </span>
+          </button>
           <SignedIn>
             <div className="flex items-center gap-3">
               <UserButton afterSignOutUrl="/chat" userProfileMode="navigation" userProfileUrl="/account" />
