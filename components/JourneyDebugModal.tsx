@@ -1,8 +1,8 @@
 'use client';
 
-// A lightweight viewer for the cross-conversation thinking journey — not a
-// product surface, just a way to inspect what Socria has actually captured
-// while testing. Read-only.
+// The user's cross-conversation thinking journey — an evolving understanding,
+// open threads, and a timeline of meaningful developments. Read-only; presented
+// as a quiet editorial page rather than a data dump.
 
 import { useEffect } from 'react';
 import type { UserUnderstanding } from '@/lib/socria-prompt';
@@ -14,7 +14,7 @@ function timeAgo(ts: number): string {
   if (d === 1) return 'yesterday';
   if (d < 30) return `${d} days ago`;
   const m = Math.round(d / 30);
-  return m <= 1 ? 'about a month ago' : `about ${m} months ago`;
+  return m <= 1 ? 'a month ago' : `${m} months ago`;
 }
 
 export function JourneyDebugModal({
@@ -37,15 +37,15 @@ export function JourneyDebugModal({
 
   if (!open) return null;
 
+  const narrative = journey?.narrative ?? [];
+  const threads = journey?.openThreads ?? [];
+  const timeline = journey?.timeline ?? [];
   const hasContent =
-    !!journey &&
-    (journey.narrative.length > 0 ||
-      journey.openThreads.length > 0 ||
-      journey.timeline.length > 0);
+    narrative.length > 0 || threads.length > 0 || timeline.length > 0;
 
   return (
-    <div className="core3-modal-backdrop" onClick={onClose} role="dialog" aria-modal="true">
-      <div className="core3-modal-card import-modal" onClick={(e) => e.stopPropagation()}>
+    <div className="core3-modal-backdrop" onClick={onClose} role="dialog" aria-modal="true" aria-labelledby="jrn-title">
+      <div className="core3-modal-card jrn-card" onClick={(e) => e.stopPropagation()}>
         <button type="button" onClick={onClose} className="core3-modal-close" aria-label="Close">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
             <line x1="18" y1="6" x2="6" y2="18" />
@@ -53,70 +53,88 @@ export function JourneyDebugModal({
           </svg>
         </button>
 
-        <div className="core3-modal-content">
-          <p className="core3-modal-eyebrow">Debug view</p>
-          <h2 className="core3-modal-title">
-            Thinking <span className="core3-modal-title-accent">journey</span>
-          </h2>
-          <p className="import-modal-sub">
-            What Socria has captured about you across conversations, on this
-            device{journey?.updatedAt ? ` — last updated ${timeAgo(journey.updatedAt)}` : ''}.
-          </p>
+        <div className="jrn-body">
+          <header className="jrn-head">
+            <span className="jrn-eyebrow">Across your conversations</span>
+            <h2 id="jrn-title" className="jrn-title">
+              Your thinking <span className="jrn-title-em">journey</span>
+            </h2>
+            <p className="jrn-sub">
+              What Socria has come to understand about how you think — held
+              quietly, and brought up only when it helps.
+              {journey?.updatedAt ? ` Updated ${timeAgo(journey.updatedAt)}.` : ''}
+            </p>
+          </header>
 
           {!hasContent && (
-            <p className="import-fine" style={{ marginTop: 16 }}>
-              Nothing yet. This fills in every 4 messages once a conversation
-              has some substance — check back after a longer exchange.
-            </p>
+            <div className="jrn-empty">
+              <span className="jrn-empty-mark" aria-hidden="true">
+                <svg viewBox="0 0 40 40" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="20" cy="20" r="13" />
+                  <path d="M20 14v6l4 3" strokeLinecap="round" />
+                </svg>
+              </span>
+              <p className="jrn-empty-title">Nothing recorded yet.</p>
+              <p className="jrn-empty-note">
+                This begins to fill in once a conversation has some real
+                substance — a few exchanges into something that matters. Come
+                back after a longer talk.
+              </p>
+            </div>
           )}
 
-          {!!journey?.narrative.length && (
-            <div className="import-step">
-              <div className="import-step-head">
-                <span>Understanding</span>
-              </div>
-              <ul style={{ marginTop: 8, paddingLeft: 18, fontSize: 13, lineHeight: 1.6, color: 'rgba(31,31,31,0.75)' }}>
-                {journey.narrative.map((n, i) => (
+          {narrative.length > 0 && (
+            <section className="jrn-section">
+              <span className="jrn-label">Understanding</span>
+              <ul className="jrn-notes">
+                {narrative.map((n, i) => (
                   <li key={i}>{n}</li>
                 ))}
               </ul>
-            </div>
+            </section>
           )}
 
-          {!!journey?.openThreads.length && (
-            <div className="import-step">
-              <div className="import-step-head">
-                <span>Open threads</span>
-              </div>
-              <ul style={{ marginTop: 8, paddingLeft: 18, fontSize: 13, lineHeight: 1.6, color: 'rgba(31,31,31,0.75)' }}>
-                {journey.openThreads.map((t, i) => (
-                  <li key={i}>
-                    <strong>{t.topic}</strong> — {t.status}
-                    {t.lastTouched && (
-                      <span style={{ color: 'rgba(31,31,31,0.4)' }}> ({timeAgo(t.lastTouched)})</span>
-                    )}
-                  </li>
+          {threads.length > 0 && (
+            <section className="jrn-section">
+              <span className="jrn-label">Open threads</span>
+              <div className="jrn-threads">
+                {threads.map((t, i) => (
+                  <div key={i} className="jrn-thread">
+                    <div className="jrn-thread-top">
+                      <span className="jrn-thread-topic">{t.topic}</span>
+                      {t.lastTouched > 0 && (
+                        <span className="jrn-thread-age">{timeAgo(t.lastTouched)}</span>
+                      )}
+                    </div>
+                    <p className="jrn-thread-status">{t.status}</p>
+                  </div>
                 ))}
-              </ul>
-            </div>
+              </div>
+            </section>
           )}
 
-          {!!journey?.timeline.length && (
-            <div className="import-step">
-              <div className="import-step-head">
-                <span>Timeline</span>
-              </div>
-              <ul style={{ marginTop: 8, paddingLeft: 18, fontSize: 13, lineHeight: 1.6, color: 'rgba(31,31,31,0.75)' }}>
-                {journey.timeline.map((e, i) => (
-                  <li key={i}>
-                    <span style={{ color: 'rgba(31,31,31,0.4)' }}>
-                      {new Date(e.at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}:
-                    </span>{' '}
-                    {e.event}
+          {timeline.length > 0 && (
+            <section className="jrn-section">
+              <span className="jrn-label">The journey so far</span>
+              <ol className="jrn-timeline">
+                {timeline.map((e, i) => (
+                  <li key={i} className="jrn-tl-item">
+                    <span className="jrn-tl-rail" aria-hidden="true">
+                      <span className="jrn-tl-dot" />
+                    </span>
+                    <div className="jrn-tl-content">
+                      <span className="jrn-tl-month">
+                        {new Date(e.at).toLocaleDateString('en-US', {
+                          month: 'long',
+                          year: 'numeric',
+                        })}
+                      </span>
+                      <span className="jrn-tl-event">{e.event}</span>
+                    </div>
                   </li>
                 ))}
-              </ul>
-            </div>
+              </ol>
+            </section>
           )}
         </div>
       </div>
