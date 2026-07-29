@@ -26,6 +26,7 @@ import {
   renderTurnDirective,
   renderStateDirective,
 } from '@/lib/conversation-controller';
+import { enforceRateLimit } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -114,6 +115,12 @@ export async function POST(req: NextRequest) {
         { status: 401 }
       );
     }
+
+    // Rate limit before any expensive work — the main defense against
+    // cost-abuse. Anonymous callers (open Core 2 / access key) get a stricter
+    // budget; the aux background routes have their own pool.
+    const limited = await enforceRateLimit(req, userId, 'chat');
+    if (limited) return limited;
 
     // Cross-conversation journey: the client sends the user's evolving
     // understanding; a fresh conversation (first user turn) may open with a
