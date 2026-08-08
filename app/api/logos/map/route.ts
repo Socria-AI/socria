@@ -14,6 +14,7 @@ import {
   LOGOS_FALLBACK_MODEL,
   EMPTY_MAP,
 } from '@/lib/logos';
+import { isValidAccessKey } from '@/lib/socria-prompt';
 import { enforceRateLimit } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
@@ -23,6 +24,11 @@ const MAX_HISTORY = 16;
 
 export async function POST(req: NextRequest) {
   const { userId } = auth();
+  const keyUnlocked = isValidAccessKey(req.headers.get('x-socria-key'));
+  if (!userId && !keyUnlocked) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   const limited = await enforceRateLimit(req, userId, 'aux');
   if (limited) return limited;
 

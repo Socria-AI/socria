@@ -3112,3 +3112,77 @@ html.js-anim .scrolly-root .fade.d3 { transition-delay: .3s; }
   .logos-root .lg-thinking span,
   .logos-root .lg-panel-state.is-working { animation: none; }
 }
+
+/* Logos — access gate */
+.logos-root .lg-gate {
+  height: 100%;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+.logos-root .lg-gate-card {
+  width: min(420px, 100%);
+  animation: lgFade 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.logos-root .lg-gate-card h1 {
+  margin-top: 18px;
+  font-size: 1.85rem;
+  font-weight: 500;
+  letter-spacing: -0.025em;
+  line-height: 1.1;
+  color: var(--lg-primary);
+}
+.logos-root .lg-gate-card > p {
+  margin-top: 12px;
+  font-size: 14.5px;
+  line-height: 1.65;
+  color: var(--lg-ink-60);
+}
+.logos-root .lg-gate-row { display: flex; gap: 8px; margin-top: 26px; }
+.logos-root .lg-gate-row input {
+  flex: 1;
+  min-width: 0;
+  padding: 11px 14px;
+  font: inherit;
+  font-size: 14px;
+  letter-spacing: 0.06em;
+  background: #fff;
+  border: 1px solid var(--lg-line);
+  border-radius: 11px;
+  color: var(--lg-ink);
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.logos-root .lg-gate-row input:focus {
+  border-color: rgba(53, 70, 32, 0.4);
+  box-shadow: 0 0 0 4px rgba(53, 70, 32, 0.06);
+}
+.logos-root .lg-gate-row input.is-error {
+  border-color: var(--lg-tension);
+  box-shadow: 0 0 0 4px rgba(156, 91, 60, 0.08);
+}
+.logos-root .lg-gate-row button {
+  flex: 0 0 auto;
+  padding: 0 20px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  border: none;
+  border-radius: 11px;
+  background: var(--lg-primary);
+  color: var(--lg-paper);
+  cursor: pointer;
+  transition: transform 0.2s, opacity 0.2s;
+}
+.logos-root .lg-gate-row button:hover { transform: translateY(-1px); }
+.logos-root .lg-gate-error {
+  display: block;
+  margin-top: 10px;
+  font-size: 12.5px;
+  color: var(--lg-tension);
+}
+.logos-root .lg-gate-fine {
+  margin-top: 22px;
+  font-size: 12px;
+  color: var(--lg-ink-40);
+}

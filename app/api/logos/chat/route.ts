@@ -1,13 +1,15 @@
 // app/api/logos/chat/route.ts
 // POST /api/logos/chat  → streaming plain-text conversational reply.
 //
-// Prototype: no auth (so it can be demoed on preview URLs), but rate limited
-// like every other model-backed route.
+// Gated like Core 3.1: a Clerk session OR the typed access key (sent as
+// x-socria-key), so it stays demoable on preview URLs where sign-in is
+// unavailable. Rate limited either way.
 
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { auth } from '@clerk/nextjs/server';
 import { LOGOS_CHAT_PROMPT, LOGOS_MODEL, LOGOS_FALLBACK_MODEL } from '@/lib/logos';
+import { isValidAccessKey } from '@/lib/socria-prompt';
 import { enforceRateLimit } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
@@ -24,6 +26,15 @@ export async function POST(req: NextRequest) {
     }
 
     const { userId } = auth();
+    // Same gate as Core 3.1: a Clerk session or the typed access key.
+    const keyUnlocked = isValidAccessKey(req.headers.get('x-socria-key'));
+    if (!userId && !keyUnlocked) {
+      return NextResponse.json(
+        { error: 'Logos requires an access key.', requiresKey: true },
+        { status: 401 }
+      );
+    }
+
     const limited = await enforceRateLimit(req, userId, 'chat');
     if (limited) return limited;
 

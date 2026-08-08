@@ -8,10 +8,15 @@
 // still arriving, which is the whole interaction being tested here.
 
 import { useEffect, useRef, useState } from 'react';
+import { useUser } from '@clerk/nextjs';
 import { ThinkingMap } from '@/components/ThinkingMap';
 import { EMPTY_MAP, type ThinkingMap as TMap } from '@/lib/logos';
+import { CORE3_ACCESS_KEY, isValidAccessKey } from '@/lib/socria-prompt';
 
 type Msg = { role: 'user' | 'assistant'; content: string };
+
+// Shared with Core 3.1 — unlocking once covers both.
+const KEY_STORAGE = 'socria.core3AccessKey.v1';
 
 const STARTERS = [
   'I’m debating whether to build Logos now.',
@@ -20,6 +25,14 @@ const STARTERS = [
 ];
 
 export default function LogosPage() {
+  const { isLoaded, isSignedIn } = useUser();
+  const [unlocked, setUnlocked] = useState(false);
+  // Don't hang behind Clerk: if it never initializes (preview builds), fall
+  // through to the key gate rather than showing nothing forever.
+  const [authSettled, setAuthSettled] = useState(false);
+  const [keyInput, setKeyInput] = useState('');
+  const [keyError, setKeyError] = useState(false);
+
   const [messages, setMessages] = useState<Msg[]>([]);
   const [map, setMap] = useState<TMap>(EMPTY_MAP);
   const [input, setInput] = useState('');
@@ -36,6 +49,37 @@ export default function LogosPage() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages.length, streaming]);
+
+  useEffect(() => {
+    try {
+      if (localStorage.getItem(KEY_STORAGE) === '1') setUnlocked(true);
+    } catch {}
+    const t = setTimeout(() => setAuthSettled(true), 1200);
+    return () => clearTimeout(t);
+  }, []);
+
+  useEffect(() => {
+    if (isLoaded) setAuthSettled(true);
+  }, [isLoaded]);
+
+  const hasAccess = unlocked || !!isSignedIn;
+
+  // Anonymous but key-unlocked callers identify with the header; signed-in
+  // users are authorized by their session alone.
+  const keyHeaders = (): Record<string, string> =>
+    unlocked && !isSignedIn ? { 'x-socria-key': CORE3_ACCESS_KEY } : {};
+
+  function submitKey() {
+    if (!isValidAccessKey(keyInput.trim())) {
+      setKeyError(true);
+      return;
+    }
+    setKeyError(false);
+    setUnlocked(true);
+    try {
+      localStorage.setItem(KEY_STORAGE, '1');
+    } catch {}
+  }
 
   async function send(text: string) {
     const content = text.trim();
@@ -55,7 +99,7 @@ export default function LogosPage() {
       try {
         const res = await fetch('/api/logos/map', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...keyHeaders() },
           body: JSON.stringify({ messages: next, map: mapRef.current }),
         });
         if (res.ok) {
@@ -73,7 +117,7 @@ export default function LogosPage() {
     try {
       const res = await fetch('/api/logos/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...keyHeaders() },
         body: JSON.stringify({ messages: next }),
       });
       if (!res.ok) {
@@ -101,6 +145,59 @@ export default function LogosPage() {
     } finally {
       setBusy(false);
     }
+  }
+
+  if (!hasAccess) {
+    return (
+      <div className="logos-root">
+        <div className="lg-gate">
+          {authSettled && (
+            <div className="lg-gate-card">
+              <span className="lg-word">Logos</span>
+              <h1>A reasoning environment.</h1>
+              <p>
+                An early prototype: you think out loud, and the shape of your
+                reasoning is drawn beside you as you talk.
+              </p>
+              <div className="lg-gate-row">
+                <input
+                  type="text"
+                  autoCapitalize="characters"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  placeholder="Access key"
+                  value={keyInput}
+                  onChange={(e) => {
+                    setKeyInput(e.target.value);
+                    if (keyError) setKeyError(false);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      submitKey();
+                    }
+                  }}
+                  className={keyError ? 'is-error' : undefined}
+                  aria-invalid={keyError}
+                  aria-label="Access key"
+                />
+                <button type="button" onClick={submitKey}>
+                  Enter
+                </button>
+              </div>
+              {keyError && (
+                <span className="lg-gate-error" role="alert">
+                  That key isn&rsquo;t right.
+                </span>
+              )}
+              <p className="lg-gate-fine">
+                Signed-in Socria accounts have access automatically.
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+    );
   }
 
   return (
