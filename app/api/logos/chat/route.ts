@@ -1,0 +1,116 @@
+// app/api/logos/chat/route.ts
+// POST /api/logos/chat  → streaming plain-text conversational reply.
+//
+// Prototype: no auth (so it can be demoed on preview URLs), but rate limited
+// like every other model-backed route.
+
+import { NextRequest, NextResponse } from 'next/server';
+import OpenAI from 'openai';
+import { auth } from '@clerk/nextjs/server';
+import { LOGOS_CHAT_PROMPT, LOGOS_MODEL, LOGOS_FALLBACK_MODEL } from '@/lib/logos';
+import { enforceRateLimit } from '@/lib/rate-limit';
+
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
+const MAX_INPUT_LEN = 4000;
+const MAX_HISTORY = 24;
+
+export async function POST(req: NextRequest) {
+  try {
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      return NextResponse.json({ error: 'OpenAI key not configured' }, { status: 500 });
+    }
+
+    const { userId } = auth();
+    const limited = await enforceRateLimit(req, userId, 'chat');
+    if (limited) return limited;
+
+    const body = await req.json().catch(() => null);
+    const messages = body?.messages;
+    if (!Array.isArray(messages) || messages.length === 0) {
+      return NextResponse.json({ error: 'messages array required' }, { status: 400 });
+    }
+    const last = messages[messages.length - 1];
+    if (!last || last.role !== 'user' || typeof last.content !== 'string') {
+      return NextResponse.json({ error: 'last message must be from user' }, { status: 400 });
+    }
+    if (last.content.length > MAX_INPUT_LEN) {
+      return NextResponse.json(
+        { error: `Message too long (max ${MAX_INPUT_LEN} chars).` },
+        { status: 400 }
+      );
+    }
+
+    const clean = messages
+      .filter(
+        (m: any) =>
+          m &&
+          (m.role === 'user' || m.role === 'assistant') &&
+          typeof m.content === 'string'
+      )
+      .slice(-MAX_HISTORY)
+      .map((m: any) => ({ role: m.role, content: m.content }));
+
+    const openai = new OpenAI({ apiKey });
+    const configured = process.env.OPENAI_MODEL_LOGOS || LOGOS_MODEL;
+
+    const make = (model: string) =>
+      openai.chat.completions.create({
+        model,
+        messages: [{ role: 'system', content: LOGOS_CHAT_PROMPT }, ...clean],
+        temperature: 0.7,
+        max_tokens: 300,
+        stream: true,
+      });
+
+    let completion;
+    try {
+      completion = await make(configured);
+    } catch (e: any) {
+      const status = e?.status ?? e?.response?.status;
+      const isModelError =
+        status === 404 ||
+        /model/i.test(e?.code || '') ||
+        /model|not found|does not exist|unknown/i.test(e?.message || '');
+      if (isModelError && configured !== LOGOS_FALLBACK_MODEL) {
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn(
+            `[logos] model "${configured}" rejected; falling back to ${LOGOS_FALLBACK_MODEL}`
+          );
+        }
+        completion = await make(LOGOS_FALLBACK_MODEL);
+      } else {
+        throw e;
+      }
+    }
+
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      async start(controller) {
+        try {
+          for await (const chunk of completion) {
+            const delta = chunk.choices?.[0]?.delta?.content ?? '';
+            if (delta) controller.enqueue(encoder.encode(delta));
+          }
+        } catch {
+          controller.enqueue(encoder.encode('\n\n[Connection interrupted.]'));
+        } finally {
+          controller.close();
+        }
+      },
+    });
+
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'Cache-Control': 'no-cache, no-transform',
+        'X-Content-Type-Options': 'nosniff',
+      },
+    });
+  } catch (e: any) {
+    console.error('logos chat error:', e);
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
+  }
+}
