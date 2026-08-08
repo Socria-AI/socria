@@ -1194,7 +1194,7 @@ It should feel like a conversation that develops naturally, accumulates insight,
 
 // ===== Public API =====
 
-export type SocriaModel = 'core-2' | 'core-3';
+export type SocriaModel = 'core-2' | 'core-3' | 'logos';
 export type ThinkingDepth = 'quick' | 'balanced' | 'deep' | 'abstract';
 
 export interface ModelConfig {
@@ -1204,6 +1204,10 @@ export interface ModelConfig {
   defaultOpenAIModel: string;
   supportsDepth: boolean;
   requiresAuth: boolean;
+  // Models whose experience lives on their own route (Logos needs the split
+  // screen for its Thinking Map). Picking one navigates instead of swapping
+  // the model in place.
+  href?: string;
 }
 
 // Primary chat model for Core 3.1 ("GPT 5.6 Luna"). If OpenAI exposes Luna
@@ -1231,6 +1235,16 @@ export const SOCRIA_MODELS: Record<SocriaModel, ModelConfig> = {
     defaultOpenAIModel: CORE_3_MODEL,
     supportsDepth: true,
     requiresAuth: true,
+  },
+  logos: {
+    id: 'logos',
+    label: 'Socria Logos',
+    description:
+      'Maps your reasoning as you talk. Opens the split-screen Thinking Map.',
+    defaultOpenAIModel: 'gpt-5.6-sol',
+    supportsDepth: false,
+    requiresAuth: true,
+    href: '/logos',
   },
 };
 

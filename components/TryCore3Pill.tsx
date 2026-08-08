@@ -1,12 +1,14 @@
 'use client';
 
+import type { SocriaModel } from '@/lib/socria-prompt';
+
 export function TryCore3Pill({
   onOpen,
   currentModel,
   visible,
 }: {
   onOpen: () => void;
-  currentModel: 'core-2' | 'core-3';
+  currentModel: SocriaModel;
   visible: boolean;
 }) {
   if (!visible || currentModel === 'core-3') return null;

@@ -423,10 +423,16 @@ export default function ChatPage() {
     }
   }, [isLoaded, canUseCore3, model]);
   function pickModel(next: SocriaModel) {
+    const config = SOCRIA_MODELS[next];
     // Gated model, and the user hasn't signed in or unlocked with the key:
     // open the intro modal, which offers both the key entry and sign-in.
-    if (SOCRIA_MODELS[next].requiresAuth && !canUseCore3) {
+    if (config.requiresAuth && !canUseCore3) {
       setCore3ModalOpen(true);
+      return;
+    }
+    // Logos lives on its own route — it needs the split screen for the map.
+    if (config.href) {
+      router.push(config.href);
       return;
     }
     setModel(next);

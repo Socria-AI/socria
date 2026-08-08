@@ -208,6 +208,9 @@ export default function LogosPage() {
           <header className="lg-head">
             <span className="lg-word">Logos</span>
             <span className="lg-head-note">A reasoning environment</span>
+            <a href="/chat" className="lg-back">
+              Socria chat <span aria-hidden="true">→</span>
+            </a>
           </header>
 
           <div className="lg-thread">

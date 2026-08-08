@@ -2816,6 +2816,14 @@ html.js-anim .scrolly-root .fade.d3 { transition-delay: .3s; }
   letter-spacing: 0.04em;
   color: var(--lg-ink-40);
 }
+.logos-root .lg-back {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--lg-ink-40);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+.logos-root .lg-back:hover { color: var(--lg-primary); }
 
 .logos-root .lg-thread {
   flex: 1;

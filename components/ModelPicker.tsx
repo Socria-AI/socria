@@ -93,7 +93,14 @@ export function ModelPicker({
                       <span className="text-moss-700 text-xs shrink-0">●</span>
                     ) : locked ? (
                       <span className="text-[11px] uppercase tracking-wider text-moss-700 font-medium shrink-0">
-                        Sign in
+                        Unlock
+                      </span>
+                    ) : m.href ? (
+                      <span
+                        className="text-[13px] text-ink/30 shrink-0"
+                        aria-label="Opens its own view"
+                      >
+                        ↗
                       </span>
                     ) : null}
                   </div>
