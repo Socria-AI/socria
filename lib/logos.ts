@@ -5,8 +5,9 @@
 // message: a short conversational reply, and a structural extraction that
 // rebuilds the map.
 //
-// Prototype scope is deliberately narrow: six node types, four relations,
-// no editing, no persistence.
+// One extraction feeds several lenses (graph, structure, tensions,
+// evidence) — the map is the data, the lens is how you look at it.
+// No editing, no persistence.
 
 export const LOGOS_MODEL = 'gpt-5.6-sol';
 // If the Sol id is ever rejected as unknown, the routes retry with this so a
@@ -15,15 +16,26 @@ export const LOGOS_FALLBACK_MODEL = 'gpt-4o';
 
 export const NODE_TYPES = [
   'goal',
+  'decision',
+  'value',
+  'belief',
   'idea',
   'assumption',
   'evidence',
   'question',
   'tension',
+  'consequence',
 ] as const;
 export type LogosNodeType = (typeof NODE_TYPES)[number];
 
-export const RELATIONS = ['supports', 'conflicts', 'depends', 'relates'] as const;
+export const RELATIONS = [
+  'supports',
+  'conflicts',
+  'depends',
+  'relates',
+  'leads_to',
+  'revises',
+] as const;
 export type LogosRelation = (typeof RELATIONS)[number];
 
 export interface LogosNode {
@@ -45,9 +57,9 @@ export interface ThinkingMap {
 
 export const EMPTY_MAP: ThinkingMap = { nodes: [], edges: [] };
 
-// Keep the map legible. Past ~14 nodes it stops being a thinking aid and
+// Keep the map legible. Past ~16 nodes it stops being a thinking aid and
 // starts being a diagram, so the extractor is told to merge rather than grow.
-const MAX_NODES = 14;
+const MAX_NODES = 16;
 const MAX_EDGES = 22;
 const MAX_LABEL = 60;
 
@@ -138,16 +150,28 @@ ${currentBlock}
 
 Return ONLY JSON, exactly this shape:
 {
-  "nodes": [{"id": "short_snake_case_id", "type": "goal|idea|assumption|evidence|question|tension", "label": "a short phrase in the user's own framing"}],
-  "edges": [{"from": "node_id", "to": "node_id", "relation": "supports|conflicts|depends|relates"}]
+  "nodes": [{"id": "short_snake_case_id", "type": "goal|decision|value|belief|idea|assumption|evidence|question|tension|consequence", "label": "a short phrase in the user's own framing"}],
+  "edges": [{"from": "node_id", "to": "node_id", "relation": "supports|conflicts|depends|relates|leads_to|revises"}]
 }
 
 Rules:
 - Return the COMPLETE updated map every time, not a diff.
 - REUSE the exact existing id for any node that persists. Only mint a new id for genuinely new thinking. Stable ids keep the map from jumping around.
-- Node types mean: goal = what they're trying to achieve; idea = a possible path or option; assumption = something taken as true but unexamined; evidence = a fact or observation they offered; question = something genuinely unresolved; tension = two things pulling against each other.
+- Node types mean:
+  goal = what they're trying to achieve
+  decision = a choice they are actively making or have made
+  value = what matters to them underneath the goal (freedom, impact, security)
+  belief = something they hold to be true about the world or themselves
+  idea = a possible path or option
+  assumption = taken as true but unexamined
+  evidence = a fact, observation, or data point they offered
+  question = genuinely unresolved
+  tension = two things pulling against each other
+  consequence = what follows from a choice (a cost or a gain)
+- Relations mean: supports (A is a reason for B), conflicts (A pulls against B), depends (B requires A), relates (loose association), leads_to (A produces consequence B), revises (A is a later version of an earlier belief B).
 - Labels are short phrases (2–8 words) in THEIR language, not yours. Never full sentences.
-- Maximum 14 nodes. When it would grow past that, merge or drop the least load-bearing node instead. A small sharp map beats a big one.
+- Prefer typing precisely: a stated priority is a value, not an idea; "I've decided X" is a decision; a cost of a choice is a consequence.
+- Maximum 16 nodes. When it would grow past that, merge or drop the least load-bearing node instead. A small sharp map beats a big one.
 - Only include what the conversation actually supports. Never invent reasoning they haven't expressed.
 - Connect nodes wherever a real relationship exists — an unconnected node is usually a sign the map is wrong.
 - If the latest message adds nothing structural, return the current map unchanged.`;
