@@ -14,6 +14,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ThinkingMap as TMap, LogosRelation } from '@/lib/logos';
+import { NodeGlyph } from './NodeGlyph';
 import {
   LENSES,
   RELATION_LABEL,
@@ -425,7 +426,10 @@ export function ThinkingMap({
                   setFocused((f) => (f === p.id ? null : p.id));
                 }}
               >
-                <span className="lg-node-type">{p.node.type}</span>
+                <span className="lg-node-head">
+                  <NodeGlyph type={p.node.type} />
+                  <span className="lg-node-type">{p.node.type}</span>
+                </span>
                 <span className="lg-node-label">{p.node.label}</span>
               </button>
             </div>

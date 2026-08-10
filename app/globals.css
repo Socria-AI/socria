@@ -3266,3 +3266,77 @@ html.js-anim .scrolly-root .fade.d3 { transition-delay: .3s; }
   font-style: italic;
   fill: var(--lg-ink-40);
 }
+
+/* ── per-type card forms ─────────────────────────────────────────────
+   Each type gets its own silhouette, not just its own colour: the shape
+   and border carry meaning (an assumption is dashed because it hasn't
+   been examined; evidence is square-cornered because it's grounded). */
+.logos-root .lg-node-head {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 4px;
+}
+.logos-root .lg-node-glyph {
+  width: 11px;
+  height: 11px;
+  flex: 0 0 auto;
+  opacity: 0.85;
+}
+.logos-root .lg-node-type { margin-bottom: 0; }
+
+/* goal — the anchor: filled, weightier, a faint ring of importance */
+.logos-root .lg-node-goal {
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(35, 36, 31, 0.06), 0 0 0 3px rgba(34, 55, 79, 0.07);
+}
+/* decision — filled, with a committed edge on the left */
+.logos-root .lg-node-decision {
+  border-radius: 10px;
+  border-left: 3px solid #91A97A;
+}
+/* value — soft and foundational: the roundest form */
+.logos-root .lg-node-value { border-radius: 16px; }
+/* belief — a position held: double rule down the left */
+.logos-root .lg-node-belief {
+  border-radius: 8px;
+  border-left: 3px double #A8AB94;
+  padding-left: 11px;
+}
+/* idea — lifted slightly off the page */
+.logos-root .lg-node-idea {
+  border-radius: 11px;
+  box-shadow: 0 2px 3px rgba(38, 70, 83, 0.07), 0 6px 14px -10px rgba(38, 70, 83, 0.4);
+}
+/* assumption — provisional until examined */
+.logos-root .lg-node-assumption {
+  border-radius: 10px;
+  border-style: dashed;
+}
+/* evidence — grounded: crisp corners, a record's margin rule */
+.logos-root .lg-node-evidence {
+  border-radius: 3px;
+  border-left: 2px solid #A9BC96;
+}
+/* question — open at the bottom */
+.logos-root .lg-node-question {
+  border-radius: 10px;
+  border-bottom-style: dashed;
+}
+/* tension — pulled in two directions */
+.logos-root .lg-node-tension {
+  border-radius: 10px;
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgba(156, 91, 60, 0.06) 0 5px,
+    transparent 5px 11px
+  );
+}
+/* consequence — downstream: offset, lighter, trailing from a choice */
+.logos-root .lg-node-consequence {
+  border-radius: 10px;
+  border-style: solid;
+  border-top-left-radius: 3px;
+  border-left: 2px solid #CFC2A2;
+}
+.logos-root .lg-node-consequence .lg-node-label { font-style: italic; }

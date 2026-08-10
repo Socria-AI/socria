@@ -91,7 +91,16 @@ export function availableLenses(map: ThinkingMap): LensId[] {
 // Roots are goals/decisions (or anything nothing points down into). Depth
 // comes from a BFS over "downward" relations, so the hierarchy reads as
 // goal → the thinking beneath it.
-const DOWNWARD: LogosRelation[] = ['supports', 'depends', 'leads_to', 'relates'];
+// Which end of an edge sits higher in the hierarchy. "A supports B" and
+// "B depends on A" both put B above A — but "A leads to B" is the other way
+// round, since a consequence hangs beneath the choice that produced it.
+// 'revises' is a timeline relation, not a hierarchy, so it's excluded.
+const HIERARCHY: Partial<Record<LogosRelation, 'to-above' | 'from-above'>> = {
+  supports: 'to-above',
+  depends: 'to-above',
+  relates: 'to-above',
+  leads_to: 'from-above',
+};
 
 export function layoutStructure(map: ThinkingMap, w: number, h: number): Layout {
   const { nodes, edges } = map;
@@ -101,10 +110,10 @@ export function layoutStructure(map: ThinkingMap, w: number, h: number): Layout 
   const children = new Map<string, string[]>();
   const hasParent = new Set<string>();
   for (const e of edges) {
-    if (!DOWNWARD.includes(e.relation)) continue;
-    // "A supports B" reads as B above, A beneath it.
-    const parent = e.to;
-    const child = e.from;
+    const dir = HIERARCHY[e.relation];
+    if (!dir) continue;
+    const parent = dir === 'to-above' ? e.to : e.from;
+    const child = dir === 'to-above' ? e.from : e.to;
     if (!byId.has(parent) || !byId.has(child)) continue;
     if (!children.has(parent)) children.set(parent, []);
     if (children.get(parent)!.includes(child)) continue;
@@ -193,7 +202,10 @@ export function layoutStructure(map: ThinkingMap, w: number, h: number): Layout 
       if (!k || k.y <= p.y) continue;
       const midY = (p.y + p.h / 2 + (k.y - k.h / 2)) / 2;
       const rel =
-        edges.find((e) => e.from === c && e.to === parent)?.relation || 'relates';
+        edges.find(
+          (e) =>
+            (e.from === c && e.to === parent) || (e.from === parent && e.to === c)
+        )?.relation || 'relates';
       connectors.push({
         key: `${parent}~${c}`,
         // right-angle routing, the reference's tree grammar
