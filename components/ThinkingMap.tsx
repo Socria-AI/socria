@@ -56,11 +56,14 @@ export function ThinkingMap({
   map,
   initialLens = 'graph',
   onExplore,
+  explored,
 }: {
   map: TMap;
   initialLens?: LensId;
   /** clicking a card asks to look closer at that piece of reasoning */
   onExplore?: (node: { id: string; label: string; type: TMap['nodes'][number]['type'] }) => void;
+  /** ids already looked at — marked so you can see what you've examined */
+  explored?: Set<string>;
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const posRef = useRef<Map<string, P>>(new Map());
@@ -419,7 +422,9 @@ export function ThinkingMap({
                 style={{ width: p.w }}
                 className={`lg-node lg-node-${p.node.type}${
                   focused === p.id ? ' is-focused' : ''
-                }${related && on && active !== p.id ? ' is-lit' : ''}`}
+                }${related && on && active !== p.id ? ' is-lit' : ''}${
+                  explored?.has(p.id) ? ' is-explored' : ''
+                }`}
                 onMouseEnter={() => setHovered(p.id)}
                 onMouseLeave={() => setHovered(null)}
                 onFocus={() => setHovered(p.id)}

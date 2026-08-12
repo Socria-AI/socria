@@ -3490,3 +3490,55 @@ html.js-anim .scrolly-root .fade.d3 { transition-delay: .3s; }
   border-top: 1px solid var(--lg-line);
   font-size: 11.5px; font-style: italic; color: var(--lg-ink-40);
 }
+
+/* explore: image source link, cited badge, no-sources note */
+.logos-root .lg-x-imgsrc {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  z-index: 2;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(20, 21, 17, 0.62);
+  backdrop-filter: blur(6px);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 10px;
+  letter-spacing: 0.02em;
+  text-decoration: none;
+  opacity: 0;
+  transition: opacity 0.25s, background 0.2s;
+}
+.logos-root .lg-x-frame:hover .lg-x-imgsrc { opacity: 1; }
+.logos-root .lg-x-imgsrc:hover { background: rgba(20, 21, 17, 0.82); }
+.logos-root .lg-x-cited {
+  margin-left: 7px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(53, 70, 32, 0.1);
+  color: var(--lg-primary);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  vertical-align: 1px;
+}
+.logos-root .lg-x-nosources {
+  margin-top: 22px;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--lg-ink-40);
+}
+
+/* a card you've already looked into */
+.logos-root .lg-node.is-explored::after {
+  content: "";
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--lg-accent);
+  opacity: 0.55;
+}
+.logos-root .lg-node { position: relative; }

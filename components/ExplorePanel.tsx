@@ -9,6 +9,14 @@ import type { LogosNodeType } from '@/lib/logos';
 import type { ExploreResult } from '@/lib/logos-explore';
 import { NodeGlyph } from './NodeGlyph';
 
+function hostOf(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return 'source';
+  }
+}
+
 export function ExplorePanel({
   open,
   loading,
@@ -110,6 +118,17 @@ export function ExplorePanel({
                       }
                     />
                   ))}
+                  {images[slide]?.link && (
+                    <a
+                      className="lg-x-imgsrc"
+                      href={images[slide].link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title={images[slide].title || 'Open image source'}
+                    >
+                      {hostOf(images[slide].link!)} <span aria-hidden="true">↗</span>
+                    </a>
+                  )}
                 </div>
                 {images.length > 1 && (
                   <div className="lg-x-dots">
@@ -141,13 +160,23 @@ export function ExplorePanel({
                 <span className="lg-x-sources-label">Sources</span>
                 {data.sources.map((s) => (
                   <a key={s.url} href={s.url} target="_blank" rel="noopener noreferrer">
-                    <span className="lg-x-src-title">{s.title}</span>
+                    <span className="lg-x-src-title">
+                      {s.title}
+                      {s.cited && <span className="lg-x-cited">cited</span>}
+                    </span>
                     <span className="lg-x-src-site">
                       {s.site} <span aria-hidden="true">↗</span>
                     </span>
                   </a>
                 ))}
               </div>
+            )}
+
+            {data.sources.length === 0 && (
+              <p className="lg-x-nosources">
+                No web sources for this one — the framing above is conceptual,
+                and nothing was cited.
+              </p>
             )}
 
             <p className="lg-x-fine">

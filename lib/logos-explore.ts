@@ -16,6 +16,8 @@ export interface ExploreSource {
   title: string;
   url: string;
   site: string;
+  /** true when the framing above actually drew on this one */
+  cited?: boolean;
 }
 
 export interface ExploreImage {
@@ -243,15 +245,21 @@ export function sanitizeExplore(
   const question = str(raw.question, 320);
   if (!framing && !question) return null;
 
-  // Only sources the model actually cited, and only ones we really fetched.
+  // Sources the model actually cited come first, then the rest of what we
+  // genuinely fetched — so a panel is never left without somewhere to read
+  // further. Everything here was really retrieved; nothing is invented.
   const idxs = Array.isArray(raw.sourceIndexes) ? raw.sourceIndexes : [];
-  const picked = idxs
+  const cited = idxs
     .map((i: any) => search.results[Number(i) - 1])
-    .filter(Boolean)
-    .slice(0, MAX_SOURCES);
-  const sources: ExploreSource[] = (picked.length ? picked : search.results.slice(0, 3)).map(
-    (s: any) => ({ title: s.title, url: s.url, site: s.site })
-  );
+    .filter(Boolean);
+  const citedUrls = new Set(cited.map((s: any) => s.url));
+  const ordered = [...cited, ...search.results.filter((s) => !citedUrls.has(s.url))];
+  const sources: ExploreSource[] = ordered.slice(0, MAX_SOURCES).map((s: any) => ({
+    title: s.title,
+    url: s.url,
+    site: s.site,
+    cited: citedUrls.has(s.url),
+  }));
 
   return {
     concept: str(concept, 80) || 'Related thinking',

@@ -51,6 +51,8 @@ export default function LogosPage() {
     open: boolean;
   }>({ node: null, data: null, loading: false, error: null, open: false });
   const exploreSeq = useRef(0);
+  const exploreCache = useRef<Map<string, ExploreResult>>(new Map());
+  const [exploredIds, setExploredIds] = useState<Set<string>>(new Set());
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
@@ -93,6 +95,17 @@ export default function LogosPage() {
   }
 
   async function openExplore(node: { id: string; label: string; type: LogosNodeType }) {
+    // Generated once per node, then reused — reopening is instant and costs
+    // nothing. Keyed on the label too, so a node the map rewords is treated
+    // as a different idea and looked up again.
+    const cacheKey = `${node.id}::${node.label}`;
+    const cached = exploreCache.current.get(cacheKey);
+    if (cached) {
+      exploreSeq.current++; // cancel anything still in flight
+      setExplore({ node, data: cached, loading: false, error: null, open: true });
+      return;
+    }
+
     const seq = ++exploreSeq.current;
     setExplore({ node, data: null, loading: true, error: null, open: true });
     try {
@@ -105,7 +118,12 @@ export default function LogosPage() {
       const json = await res.json();
       // A newer click may have landed while this was in flight.
       if (seq !== exploreSeq.current) return;
-      setExplore((e) => ({ ...e, data: json?.explore ?? null, loading: false }));
+      const result: ExploreResult | null = json?.explore ?? null;
+      if (result) {
+        exploreCache.current.set(cacheKey, result);
+        setExploredIds((prev) => new Set(prev).add(node.id));
+      }
+      setExplore((e) => ({ ...e, data: result, loading: false }));
     } catch (err: any) {
       if (seq !== exploreSeq.current) return;
       setExplore((e) => ({
@@ -341,7 +359,7 @@ export default function LogosPage() {
                   : 'empty'}
             </span>
           </header>
-          <ThinkingMap map={map} onExplore={openExplore} />
+          <ThinkingMap map={map} onExplore={openExplore} explored={exploredIds} />
           <ExplorePanel
             open={explore.open}
             loading={explore.loading}
