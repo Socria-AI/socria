@@ -10,7 +10,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { useUser } from '@clerk/nextjs';
 import { ThinkingMap } from '@/components/ThinkingMap';
-import { EMPTY_MAP, type ThinkingMap as TMap } from '@/lib/logos';
+import { ExplorePanel } from '@/components/ExplorePanel';
+import { EMPTY_MAP, type ThinkingMap as TMap, type LogosNodeType } from '@/lib/logos';
+import type { ExploreResult } from '@/lib/logos-explore';
 import { CORE3_ACCESS_KEY, isValidAccessKey } from '@/lib/socria-prompt';
 
 type Msg = { role: 'user' | 'assistant'; content: string };
@@ -40,6 +42,15 @@ export default function LogosPage() {
   const [busy, setBusy] = useState(false);
   const [mapping, setMapping] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [explore, setExplore] = useState<{
+    node: { label: string; type: LogosNodeType } | null;
+    data: ExploreResult | null;
+    loading: boolean;
+    error: string | null;
+    open: boolean;
+  }>({ node: null, data: null, loading: false, error: null, open: false });
+  const exploreSeq = useRef(0);
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
@@ -79,6 +90,30 @@ export default function LogosPage() {
     try {
       localStorage.setItem(KEY_STORAGE, '1');
     } catch {}
+  }
+
+  async function openExplore(node: { id: string; label: string; type: LogosNodeType }) {
+    const seq = ++exploreSeq.current;
+    setExplore({ node, data: null, loading: true, error: null, open: true });
+    try {
+      const res = await fetch('/api/logos/explore', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...keyHeaders() },
+        body: JSON.stringify({ label: node.label, type: node.type, messages }),
+      });
+      if (!res.ok) throw new Error('Could not look that up right now.');
+      const json = await res.json();
+      // A newer click may have landed while this was in flight.
+      if (seq !== exploreSeq.current) return;
+      setExplore((e) => ({ ...e, data: json?.explore ?? null, loading: false }));
+    } catch (err: any) {
+      if (seq !== exploreSeq.current) return;
+      setExplore((e) => ({
+        ...e,
+        loading: false,
+        error: err?.message || 'Could not look that up right now.',
+      }));
+    }
   }
 
   async function send(text: string) {
@@ -306,7 +341,15 @@ export default function LogosPage() {
                   : 'empty'}
             </span>
           </header>
-          <ThinkingMap map={map} />
+          <ThinkingMap map={map} onExplore={openExplore} />
+          <ExplorePanel
+            open={explore.open}
+            loading={explore.loading}
+            error={explore.error}
+            node={explore.node}
+            data={explore.data}
+            onClose={() => setExplore((e) => ({ ...e, open: false }))}
+          />
         </section>
       </div>
     </div>

@@ -55,9 +55,12 @@ function boxExit(dx: number, dy: number): number {
 export function ThinkingMap({
   map,
   initialLens = 'graph',
+  onExplore,
 }: {
   map: TMap;
   initialLens?: LensId;
+  /** clicking a card asks to look closer at that piece of reasoning */
+  onExplore?: (node: { id: string; label: string; type: TMap['nodes'][number]['type'] }) => void;
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const posRef = useRef<Map<string, P>>(new Map());
@@ -423,7 +426,8 @@ export function ThinkingMap({
                 onBlur={() => setHovered(null)}
                 onClick={(ev) => {
                   ev.stopPropagation();
-                  setFocused((f) => (f === p.id ? null : p.id));
+                  setFocused(p.id);
+                  onExplore?.({ id: p.id, label: p.node.label, type: p.node.type });
                 }}
               >
                 <span className="lg-node-head">

@@ -3340,3 +3340,153 @@ html.js-anim .scrolly-root .fade.d3 { transition-delay: .3s; }
   border-left: 2px solid #CFC2A2;
 }
 .logos-root .lg-node-consequence .lg-node-label { font-style: italic; }
+
+/* ── Explore drawer: what's known about one piece of reasoning ────── */
+.logos-root .lg-explore {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(420px, 92%);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  background: var(--lg-paper);
+  border-left: 1px solid var(--lg-line);
+  box-shadow: -24px 0 60px -40px rgba(35, 36, 31, 0.5);
+  animation: lgSlideIn 0.42s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes lgSlideIn { from { opacity: 0; transform: translateX(18px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .logos-root .lg-explore { animation: none; } }
+
+.logos-root .lg-x-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 20px 20px 14px;
+  border-bottom: 1px solid var(--lg-line);
+}
+.logos-root .lg-x-title { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+.logos-root .lg-x-chip {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 8.5px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--lg-line);
+}
+.logos-root .lg-x-chip .lg-node-glyph { width: 10px; height: 10px; }
+.logos-root .lg-x-label {
+  font-size: 1.15rem;
+  line-height: 1.25;
+  color: var(--lg-ink);
+  letter-spacing: -0.012em;
+}
+.logos-root .lg-x-close {
+  flex: 0 0 auto;
+  width: 28px; height: 28px;
+  border: none; border-radius: 50%;
+  background: rgba(35, 36, 31, 0.05);
+  color: var(--lg-ink-60);
+  display: grid; place-items: center;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+.logos-root .lg-x-close:hover { background: rgba(35, 36, 31, 0.1); color: var(--lg-ink); }
+
+.logos-root .lg-x-body { flex: 1; min-height: 0; overflow-y: auto; padding: 18px 20px 26px; }
+.logos-root .lg-x-loading { display: flex; flex-direction: column; gap: 12px; padding: 26px 0; color: var(--lg-ink-40); font-size: 13px; }
+.logos-root .lg-x-error { font-size: 13px; color: var(--lg-tension); }
+
+/* slideshow */
+.logos-root .lg-x-slides { margin-bottom: 20px; }
+.logos-root .lg-x-frame {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--lg-panel);
+  border: 1px solid var(--lg-line);
+}
+.logos-root .lg-x-frame img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transform: scale(1.02);
+  transition: opacity 0.7s ease, transform 3.6s ease;
+}
+.logos-root .lg-x-frame img.is-on { opacity: 1; transform: scale(1); }
+.logos-root .lg-x-dots { display: flex; gap: 5px; justify-content: center; margin-top: 10px; }
+.logos-root .lg-x-dots button {
+  width: 5px; height: 5px; padding: 0;
+  border: none; border-radius: 50%;
+  background: var(--lg-ink-24);
+  cursor: pointer;
+  transition: background 0.25s, transform 0.25s;
+}
+.logos-root .lg-x-dots button.is-on { background: var(--lg-primary); transform: scale(1.35); }
+
+.logos-root .lg-x-concept {
+  display: block;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--lg-accent);
+}
+.logos-root .lg-x-framing {
+  margin-top: 10px;
+  font-size: 14.5px;
+  line-height: 1.65;
+  color: var(--lg-ink);
+}
+/* the line that ties research back to their own words */
+.logos-root .lg-x-connection {
+  margin-top: 16px;
+  padding-left: 13px;
+  border-left: 2px solid var(--lg-secondary);
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--lg-ink-60);
+}
+/* the point of the whole panel: it ends in a question */
+.logos-root .lg-x-question {
+  margin-top: 20px;
+  padding: 15px 16px;
+  border-radius: 12px;
+  background: rgba(53, 70, 32, 0.055);
+  font-size: 15.5px;
+  line-height: 1.5;
+  color: var(--lg-primary);
+  letter-spacing: -0.008em;
+}
+
+.logos-root .lg-x-sources { margin-top: 24px; display: flex; flex-direction: column; gap: 2px; }
+.logos-root .lg-x-sources-label {
+  font-size: 10px; font-weight: 600; letter-spacing: 0.18em;
+  text-transform: uppercase; color: var(--lg-ink-40); margin-bottom: 6px;
+}
+.logos-root .lg-x-sources a {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 9px 10px; margin: 0 -10px;
+  border-radius: 8px; text-decoration: none;
+  transition: background 0.2s;
+}
+.logos-root .lg-x-sources a:hover { background: rgba(35, 36, 31, 0.04); }
+.logos-root .lg-x-src-title { font-size: 13px; line-height: 1.4; color: var(--lg-ink); }
+.logos-root .lg-x-src-site { font-size: 11px; color: var(--lg-accent); }
+.logos-root .lg-x-fine {
+  margin-top: 22px; padding-top: 14px;
+  border-top: 1px solid var(--lg-line);
+  font-size: 11.5px; font-style: italic; color: var(--lg-ink-40);
+}
