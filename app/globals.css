@@ -3529,6 +3529,83 @@ html.js-anim .scrolly-root .fade.d3 { transition-delay: .3s; }
   color: var(--lg-ink-40);
 }
 
+/* ── the node's own thread: keep thinking about this one piece ────── */
+.logos-root .lg-x-thread {
+  margin-top: 24px;
+  padding-top: 18px;
+  border-top: 1px solid var(--lg-line);
+}
+.logos-root .lg-x-thread-label {
+  display: block;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.18em;
+  text-transform: uppercase; color: var(--lg-ink-40);
+  margin-bottom: 14px;
+}
+.logos-root .lg-x-turn {
+  margin-bottom: 16px;
+  font-size: 14.5px;
+  line-height: 1.62;
+  white-space: pre-wrap;
+  animation: lgFade 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.logos-root .lg-x-turn-user {
+  margin-left: auto;
+  width: fit-content;
+  max-width: 88%;
+  padding: 10px 14px;
+  border-radius: 14px 14px 4px 14px;
+  background: rgba(53, 70, 32, 0.07);
+  color: var(--lg-ink);
+}
+.logos-root .lg-x-turn-assistant {
+  color: var(--lg-ink);
+  padding-left: 12px;
+  border-left: 2px solid rgba(53, 70, 32, 0.16);
+}
+@media (prefers-reduced-motion: reduce) { .logos-root .lg-x-turn { animation: none; } }
+
+.logos-root .lg-x-ask {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  margin: 0 16px 16px;
+  padding: 8px 8px 8px 14px;
+  background: #fff;
+  border: 1px solid var(--lg-line);
+  border-radius: 14px;
+  transition: border-color 0.25s, box-shadow 0.25s;
+}
+.logos-root .lg-x-ask:focus-within {
+  border-color: rgba(53, 70, 32, 0.38);
+  box-shadow: 0 0 0 4px rgba(53, 70, 32, 0.06);
+}
+.logos-root .lg-x-ask textarea {
+  flex: 1;
+  border: none; outline: none; resize: none;
+  background: transparent;
+  font: inherit;
+  font-size: 14.5px;
+  line-height: 1.5;
+  padding: 5px 0;
+  color: var(--lg-ink);
+  max-height: 120px;
+}
+.logos-root .lg-x-ask textarea::placeholder { color: var(--lg-ink-40); }
+.logos-root .lg-x-ask button {
+  flex: 0 0 auto;
+  width: 30px; height: 30px;
+  border: none; border-radius: 50%;
+  background: var(--lg-primary);
+  color: var(--lg-paper);
+  display: grid; place-items: center;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.2s;
+}
+.logos-root .lg-x-ask button svg { width: 14px; height: 14px; }
+.logos-root .lg-x-ask button:disabled { opacity: 0.25; cursor: default; }
+.logos-root .lg-x-ask button:not(:disabled):hover { transform: translateY(-1px); }
+
 /* a card you've already looked into */
 .logos-root .lg-node.is-explored::after {
   content: "";

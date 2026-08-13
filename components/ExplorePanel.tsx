@@ -4,10 +4,12 @@
 // back to the person's own words, ending in a question rather than an
 // answer. A drawer over the map, never a replacement for it.
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { LogosNodeType } from '@/lib/logos';
 import type { ExploreResult } from '@/lib/logos-explore';
 import { NodeGlyph } from './NodeGlyph';
+
+export type FocusMsg = { role: 'user' | 'assistant'; content: string };
 
 function hostOf(url: string): string {
   try {
@@ -23,6 +25,11 @@ export function ExplorePanel({
   error,
   node,
   data,
+  thread,
+  streaming,
+  busy,
+  threadError,
+  onSend,
   onClose,
 }: {
   open: boolean;
@@ -30,17 +37,53 @@ export function ExplorePanel({
   error: string | null;
   node: { label: string; type: LogosNodeType } | null;
   data: ExploreResult | null;
+  thread: FocusMsg[];
+  streaming: string;
+  busy: boolean;
+  threadError: string | null;
+  onSend: (text: string) => void;
   onClose: () => void;
 }) {
   const [slide, setSlide] = useState(0);
   const [broken, setBroken] = useState<Set<string>>(new Set());
   const [paused, setPaused] = useState(false);
+  const [draft, setDraft] = useState('');
+  const taRef = useRef<HTMLTextAreaElement>(null);
+  const endRef = useRef<HTMLDivElement>(null);
 
   const images = (data?.images ?? []).filter((i) => !broken.has(i.url));
 
   useEffect(() => {
     setSlide(0);
   }, [data]);
+
+  // Each node keeps its own draft; switching nodes shouldn't carry text over.
+  useEffect(() => {
+    setDraft('');
+    if (taRef.current) taRef.current.style.height = 'auto';
+  }, [node?.label]);
+
+  // Follow the conversation as it grows — but never on open. Reopening a node
+  // should land you back on the framing, not scrolled past it.
+  const settled = useRef<string | null>(null);
+  useEffect(() => {
+    const here = node?.label ?? null;
+    if (settled.current !== here) {
+      settled.current = here;
+      return;
+    }
+    if (thread.length || streaming) {
+      endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    }
+  }, [thread.length, streaming, node?.label]);
+
+  function submit() {
+    const text = draft.trim();
+    if (!text || busy) return;
+    setDraft('');
+    if (taRef.current) taRef.current.style.height = 'auto';
+    onSend(text);
+  }
 
   useEffect(() => {
     if (!open) return;
@@ -184,7 +227,68 @@ export function ExplorePanel({
             </p>
           </>
         )}
+
+        {/* The node's own thread — narrower than the main conversation,
+            kept with the node so reopening it resumes where you left off. */}
+        {(thread.length > 0 || streaming || threadError) && (
+          <div className="lg-x-thread">
+            <span className="lg-x-thread-label">Thinking about this</span>
+            {thread.map((m, i) => (
+              <div key={i} className={`lg-x-turn lg-x-turn-${m.role}`}>
+                {m.content}
+              </div>
+            ))}
+            {streaming && (
+              <div className="lg-x-turn lg-x-turn-assistant">{streaming}</div>
+            )}
+            {busy && !streaming && (
+              <div className="lg-x-turn lg-x-turn-assistant">
+                <span className="lg-thinking" aria-label="Thinking">
+                  <span /> <span /> <span />
+                </span>
+              </div>
+            )}
+            {threadError && <p className="lg-x-error">{threadError}</p>}
+          </div>
+        )}
+        <div ref={endRef} />
       </div>
+
+      {!loading && (data || thread.length > 0) && (
+        <div className="lg-x-ask">
+          <textarea
+            ref={taRef}
+            rows={1}
+            value={draft}
+            placeholder={
+              thread.length ? 'Keep going…' : 'Answer it, push back, or think out loud…'
+            }
+            disabled={busy}
+            onChange={(e) => {
+              setDraft(e.target.value);
+              const el = e.target;
+              el.style.height = 'auto';
+              el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                submit();
+              }
+            }}
+          />
+          <button
+            type="button"
+            onClick={submit}
+            disabled={!draft.trim() || busy}
+            aria-label="Send"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 19V5M5 12l7-7 7 7" />
+            </svg>
+          </button>
+        </div>
+      )}
     </div>
   );
 }

@@ -128,6 +128,39 @@ Openings to avoid entirely: "That's a great question", "That's a significant dec
 
 Instead, open with something you actually noticed in what they said. Then one focused question.`;
 
+// A node you clicked into gets its own small thread. Same voice, same refusal
+// to answer — only the aperture narrows. The preamble exists to stop the model
+// re-opening the whole conversation when the person is deliberately looking at
+// one piece of it.
+export function buildFocusPrompt(focus: {
+  label: string;
+  type: string;
+  concept?: string;
+  framing?: string;
+}): string {
+  const lens = [
+    focus.concept ? `Concept it points at: ${focus.concept}` : '',
+    focus.framing ? `Frame already offered to them: ${focus.framing}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  return `${LOGOS_CHAT_PROMPT}
+
+---
+
+They have pulled ONE piece of their own reasoning aside to look at it more closely:
+
+  ${focus.type}: "${focus.label}"
+${lens}
+
+For this thread:
+- Stay on this piece. Do not restate the whole conversation or drift back to the wider question unless they take it there themselves.
+- They already read the frame above. Do not repeat it back to them — build past it.
+- Still no verdict. Examining something closely is not the same as resolving it; if they push for an answer, show them what the answer would rest on.
+- Even shorter than usual: one or two sentences, then one question.`;
+}
+
 // ===== Map extraction =====
 
 export function buildMapPrompt(current: ThinkingMap): string {
@@ -174,5 +207,6 @@ Rules:
 - Maximum 16 nodes. When it would grow past that, merge or drop the least load-bearing node instead. A small sharp map beats a big one.
 - Only include what the conversation actually supports. Never invent reasoning they haven't expressed.
 - Connect nodes wherever a real relationship exists — an unconnected node is usually a sign the map is wrong.
+- A user message beginning with [on "…"] was said while they were looking closely at that specific node. Attach what it adds to that node — sharpen, extend or revise it — rather than creating a parallel node beside it.
 - If the latest message adds nothing structural, return the current map unchanged.`;
 }

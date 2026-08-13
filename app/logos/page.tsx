@@ -44,20 +44,32 @@ export default function LogosPage() {
   const [error, setError] = useState<string | null>(null);
 
   const [explore, setExplore] = useState<{
+    key: string;
     node: { label: string; type: LogosNodeType } | null;
     data: ExploreResult | null;
     loading: boolean;
     error: string | null;
     open: boolean;
-  }>({ node: null, data: null, loading: false, error: null, open: false });
+  }>({ key: '', node: null, data: null, loading: false, error: null, open: false });
   const exploreSeq = useRef(0);
   const exploreCache = useRef<Map<string, ExploreResult>>(new Map());
   const [exploredIds, setExploredIds] = useState<Set<string>>(new Set());
+
+  // Each explored node keeps its own thread, so reopening it resumes rather
+  // than restarts. Lives for the session only, like everything else here.
+  const [threads, setThreads] = useState<Record<string, Msg[]>>({});
+  const [focusStream, setFocusStream] = useState('');
+  const [focusBusy, setFocusBusy] = useState(false);
+  const [focusError, setFocusError] = useState<string | null>(null);
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
   const mapRef = useRef<TMap>(EMPTY_MAP);
   mapRef.current = map;
+
+  // Everything said anywhere, in the order it was said. The map reads from
+  // this — thinking done inside a node is still thinking, and belongs in it.
+  const chronRef = useRef<Msg[]>([]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -94,20 +106,45 @@ export default function LogosPage() {
     } catch {}
   }
 
+  // Rebuild the map from everything said so far, wherever it was said.
+  function refreshMap() {
+    setMapping(true);
+    void (async () => {
+      try {
+        const res = await fetch('/api/logos/map', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...keyHeaders() },
+          body: JSON.stringify({ messages: chronRef.current, map: mapRef.current }),
+        });
+        if (res.ok) {
+          const json = await res.json();
+          if (json?.map) setMap(json.map);
+        }
+      } catch {
+        // The map is allowed to lag or skip a turn — never break the chat.
+      } finally {
+        setMapping(false);
+      }
+    })();
+  }
+
   async function openExplore(node: { id: string; label: string; type: LogosNodeType }) {
     // Generated once per node, then reused — reopening is instant and costs
     // nothing. Keyed on the label too, so a node the map rewords is treated
     // as a different idea and looked up again.
     const cacheKey = `${node.id}::${node.label}`;
+    setFocusStream('');
+    setFocusError(null);
+
     const cached = exploreCache.current.get(cacheKey);
     if (cached) {
       exploreSeq.current++; // cancel anything still in flight
-      setExplore({ node, data: cached, loading: false, error: null, open: true });
+      setExplore({ key: cacheKey, node, data: cached, loading: false, error: null, open: true });
       return;
     }
 
     const seq = ++exploreSeq.current;
-    setExplore({ node, data: null, loading: true, error: null, open: true });
+    setExplore({ key: cacheKey, node, data: null, loading: true, error: null, open: true });
     try {
       const res = await fetch('/api/logos/explore', {
         method: 'POST',
@@ -134,6 +171,75 @@ export default function LogosPage() {
     }
   }
 
+  // A turn inside an opened node. Same model, narrower aperture: it sees the
+  // main conversation for context, then this node's own thread.
+  async function sendFocused(text: string) {
+    const content = text.trim();
+    const node = explore.node;
+    const key = explore.key;
+    if (!content || focusBusy || !node || !key) return;
+
+    setFocusError(null);
+    const prior = threads[key] ?? [];
+    const nextThread: Msg[] = [...prior, { role: 'user', content }];
+    setThreads((t) => ({ ...t, [key]: nextThread }));
+    setFocusBusy(true);
+    setFocusStream('');
+
+    // Reasoning done here is still reasoning — it belongs in the map. Marked
+    // so the extractor knows which node the person was looking at.
+    const marked: Msg = { role: 'user', content: `[on “${node.label}”] ${content}` };
+    chronRef.current = [...chronRef.current, marked];
+    refreshMap();
+
+    // Main conversation first for context, then the focused exchange.
+    const payload = [
+      ...messages.slice(-8),
+      ...nextThread,
+    ];
+
+    try {
+      const res = await fetch('/api/logos/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...keyHeaders() },
+        body: JSON.stringify({
+          messages: payload,
+          focus: {
+            label: node.label,
+            type: node.type,
+            concept: explore.data?.concept,
+            framing: explore.data?.framing,
+          },
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || 'Something went wrong.');
+      }
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
+      let acc = '';
+      if (reader) {
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          acc += decoder.decode(value, { stream: true });
+          setFocusStream(acc);
+        }
+      }
+      setFocusStream('');
+      setThreads((t) => ({ ...t, [key]: [...nextThread, { role: 'assistant', content: acc }] }));
+      chronRef.current = [...chronRef.current, { role: 'assistant', content: acc }];
+    } catch (e: any) {
+      setFocusStream('');
+      setFocusError(e?.message || 'Something went wrong.');
+      setThreads((t) => ({ ...t, [key]: prior }));
+      chronRef.current = chronRef.current.filter((m) => m !== marked);
+    } finally {
+      setFocusBusy(false);
+    }
+  }
+
   async function send(text: string) {
     const content = text.trim();
     if (!content || busy) return;
@@ -141,30 +247,15 @@ export default function LogosPage() {
     setInput('');
     if (taRef.current) taRef.current.style.height = 'auto';
 
-    const next = [...messages, { role: 'user' as const, content }];
+    const turn: Msg = { role: 'user', content };
+    const next = [...messages, turn];
     setMessages(next);
+    chronRef.current = [...chronRef.current, turn];
     setBusy(true);
     setStreaming('');
 
     // Independent pass: rebuild the map from the conversation so far.
-    setMapping(true);
-    void (async () => {
-      try {
-        const res = await fetch('/api/logos/map', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...keyHeaders() },
-          body: JSON.stringify({ messages: next, map: mapRef.current }),
-        });
-        if (res.ok) {
-          const json = await res.json();
-          if (json?.map) setMap(json.map);
-        }
-      } catch {
-        // The map is allowed to lag or skip a turn — never break the chat.
-      } finally {
-        setMapping(false);
-      }
-    })();
+    refreshMap();
 
     // Conversational reply.
     try {
@@ -190,10 +281,14 @@ export default function LogosPage() {
       }
       setStreaming('');
       setMessages([...next, { role: 'assistant', content: acc }]);
+      chronRef.current = [...chronRef.current, { role: 'assistant', content: acc }];
     } catch (e: any) {
       setStreaming('');
       setError(e?.message || 'Something went wrong.');
       setMessages(messages);
+      // Drop the turn that never landed, by identity — a focused reply may
+      // have appended to the transcript while this was in flight.
+      chronRef.current = chronRef.current.filter((m) => m !== turn);
       setInput(content);
     } finally {
       setBusy(false);
@@ -366,6 +461,11 @@ export default function LogosPage() {
             error={explore.error}
             node={explore.node}
             data={explore.data}
+            thread={threads[explore.key] ?? []}
+            streaming={focusStream}
+            busy={focusBusy}
+            threadError={focusError}
+            onSend={sendFocused}
             onClose={() => setExplore((e) => ({ ...e, open: false }))}
           />
         </section>

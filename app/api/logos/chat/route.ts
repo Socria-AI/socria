@@ -8,7 +8,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { auth } from '@clerk/nextjs/server';
-import { LOGOS_CHAT_PROMPT, LOGOS_MODEL, LOGOS_FALLBACK_MODEL } from '@/lib/logos';
+import {
+  LOGOS_CHAT_PROMPT,
+  LOGOS_MODEL,
+  LOGOS_FALLBACK_MODEL,
+  NODE_TYPES,
+  buildFocusPrompt,
+} from '@/lib/logos';
 import { isValidAccessKey } from '@/lib/socria-prompt';
 import { enforceRateLimit } from '@/lib/rate-limit';
 
@@ -64,13 +70,28 @@ export async function POST(req: NextRequest) {
       .slice(-MAX_HISTORY)
       .map((m: any) => ({ role: m.role, content: m.content }));
 
+    // Optional: this turn belongs to a node the person opened, not to the
+    // main thread. Same prompt, narrower aperture.
+    const f = body?.focus;
+    const trim = (v: any, n: number) =>
+      typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().slice(0, n) : '';
+    const focusLabel = trim(f?.label, 120);
+    const system = focusLabel
+      ? buildFocusPrompt({
+          label: focusLabel,
+          type: NODE_TYPES.includes(f?.type) ? f.type : 'idea',
+          concept: trim(f?.concept, 100) || undefined,
+          framing: trim(f?.framing, 700) || undefined,
+        })
+      : LOGOS_CHAT_PROMPT;
+
     const openai = new OpenAI({ apiKey });
     const configured = process.env.OPENAI_MODEL_LOGOS || LOGOS_MODEL;
 
     const make = (model: string) =>
       openai.chat.completions.create({
         model,
-        messages: [{ role: 'system', content: LOGOS_CHAT_PROMPT }, ...clean],
+        messages: [{ role: 'system', content: system }, ...clean],
         temperature: 0.7,
         max_tokens: 300,
         stream: true,
