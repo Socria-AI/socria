@@ -1,15 +1,28 @@
 'use client';
 
-// Clicking a node opens this: what the world knows about that idea, tied
-// back to the person's own words, ending in a question rather than an
-// answer. A drawer over the map, never a replacement for it.
+// Acting on a node opens this. Four modes share the drawer — explore the idea,
+// challenge it, research the evidence, trace where it came from — and all four
+// stop short of resolving it. Whatever the mode, the node keeps ONE thread, so
+// the conversation about a piece of reasoning survives switching lenses on it.
 
 import { useEffect, useRef, useState } from 'react';
 import type { LogosNodeType } from '@/lib/logos';
-import type { ExploreResult } from '@/lib/logos-explore';
+import { MODE_META, type ExploreResult, type NodeMode } from '@/lib/logos-explore';
 import { NodeGlyph } from './NodeGlyph';
 
 export type FocusMsg = { role: 'user' | 'assistant'; content: string };
+
+const LOADING_COPY: Record<NodeMode, string> = {
+  explore: 'Looking at what’s known about this…',
+  challenge: 'Working out where this would break…',
+  research: 'Checking what the evidence actually says…',
+  trace: 'Retracing where this came from…',
+};
+
+const POINTS_LABEL: Partial<Record<NodeMode, string>> = {
+  challenge: 'Where it takes weight',
+  research: 'What the material shows',
+};
 
 function hostOf(url: string): string {
   try {
@@ -21,27 +34,34 @@ function hostOf(url: string): string {
 
 export function ExplorePanel({
   open,
+  mode,
   loading,
   error,
   node,
   data,
+  lineage,
   thread,
   streaming,
   busy,
   threadError,
   onSend,
+  onMode,
   onClose,
 }: {
   open: boolean;
+  mode: NodeMode;
   loading: boolean;
   error: string | null;
   node: { label: string; type: LogosNodeType } | null;
   data: ExploreResult | null;
+  /** how this node sits in the map right now — computed, never model-authored */
+  lineage: string[];
   thread: FocusMsg[];
   streaming: string;
   busy: boolean;
   threadError: string | null;
   onSend: (text: string) => void;
+  onMode: (mode: NodeMode) => void;
   onClose: () => void;
 }) {
   const [slide, setSlide] = useState(0);
@@ -123,13 +143,29 @@ export function ExplorePanel({
         </button>
       </header>
 
+      {/* Switch how you're looking at the same node without losing the thread. */}
+      <div className="lg-x-modes" role="tablist" aria-label="How to look at this">
+        {(Object.keys(MODE_META) as NodeMode[]).map((m) => (
+          <button
+            key={m}
+            type="button"
+            role="tab"
+            aria-selected={mode === m}
+            className={`lg-x-mode${mode === m ? ' is-on' : ''}`}
+            onClick={() => onMode(m)}
+          >
+            {MODE_META[m].label}
+          </button>
+        ))}
+      </div>
+
       <div className="lg-x-body">
         {loading && (
           <div className="lg-x-loading">
-            <span className="lg-thinking" aria-label="Looking">
+            <span className="lg-thinking" aria-label="Working">
               <span /> <span /> <span />
             </span>
-            <p>Looking at what&rsquo;s known about this…</p>
+            <p>{LOADING_COPY[mode]}</p>
           </div>
         )}
 
@@ -189,8 +225,47 @@ export function ExplorePanel({
               </div>
             )}
 
-            <span className="lg-x-concept">{data.concept}</span>
+            {MODE_META[mode].searches && (
+              <span className="lg-x-concept">{data.concept}</span>
+            )}
             {data.framing && <p className="lg-x-framing">{data.framing}</p>}
+
+            {/* Trace: the actual moments this grew out of, sliced from the
+                transcript rather than written by the model. */}
+            {!!data.origins?.length && (
+              <div className="lg-x-origins">
+                <span className="lg-x-block-label">First said</span>
+                {data.origins.map((o, i) => (
+                  <blockquote key={i} className={`lg-x-origin lg-x-origin-${o.who}`}>
+                    <span className="lg-x-origin-who">{o.who === 'you' ? 'You' : 'Logos'}</span>
+                    {o.quote}
+                  </blockquote>
+                ))}
+              </div>
+            )}
+
+            {mode === 'trace' && lineage.length > 0 && (
+              <div className="lg-x-lineage">
+                <span className="lg-x-block-label">Where it sits now</span>
+                <ul>
+                  {lineage.map((l, i) => (
+                    <li key={i}>{l}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Challenge: pressure points. Research: findings. Same shape. */}
+            {!!data.points?.length && (
+              <div className={`lg-x-points lg-x-points-${mode}`}>
+                <span className="lg-x-block-label">{POINTS_LABEL[mode] ?? 'Points'}</span>
+                <ul>
+                  {data.points.map((p, i) => (
+                    <li key={i}>{p}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             {data.connection && (
               <p className="lg-x-connection">{data.connection}</p>
@@ -215,7 +290,7 @@ export function ExplorePanel({
               </div>
             )}
 
-            {data.sources.length === 0 && (
+            {MODE_META[mode].searches && data.sources.length === 0 && (
               <p className="lg-x-nosources">
                 No web sources for this one — the framing above is conceptual,
                 and nothing was cited.
@@ -223,7 +298,11 @@ export function ExplorePanel({
             )}
 
             <p className="lg-x-fine">
-              Context, not conclusions — the thinking stays yours.
+              {mode === 'challenge'
+                ? 'Pressure, not a verdict — whether it holds is yours to test.'
+                : mode === 'trace'
+                  ? 'A record of how you got here, not a judgement on it.'
+                  : 'Context, not conclusions — the thinking stays yours.'}
             </p>
           </>
         )}

@@ -12,7 +12,13 @@
 // Pure functions except the force lens, which carries positions between
 // frames so the graph settles rather than jumping.
 
-import type { LogosEdge, LogosNode, LogosRelation, ThinkingMap } from './logos';
+import type {
+  LogosEdge,
+  LogosEdgeStrength,
+  LogosNode,
+  LogosRelation,
+  ThinkingMap,
+} from './logos';
 
 export type LensId = 'graph' | 'structure' | 'tensions' | 'evidence';
 
@@ -29,6 +35,8 @@ export interface Connector {
   key: string;
   path: string;
   relation: LogosRelation;
+  /** a connection that stopped carrying weight is drawn lighter, not removed */
+  strength?: LogosEdgeStrength;
   label?: string;
   /** midpoint, for drawing the label */
   lx?: number;
@@ -201,16 +209,15 @@ export function layoutStructure(map: ThinkingMap, w: number, h: number): Layout 
       const k = pos.get(c);
       if (!k || k.y <= p.y) continue;
       const midY = (p.y + p.h / 2 + (k.y - k.h / 2)) / 2;
-      const rel =
-        edges.find(
-          (e) =>
-            (e.from === c && e.to === parent) || (e.from === parent && e.to === c)
-        )?.relation || 'relates';
+      const edge = edges.find(
+        (e) => (e.from === c && e.to === parent) || (e.from === parent && e.to === c)
+      );
       connectors.push({
         key: `${parent}~${c}`,
         // right-angle routing, the reference's tree grammar
         path: `M ${p.x} ${p.y + p.h / 2} V ${midY} H ${k.x} V ${k.y - k.h / 2}`,
-        relation: rel,
+        relation: edge?.relation || 'relates',
+        strength: edge?.strength,
       });
     }
   }
@@ -246,6 +253,7 @@ export function layoutTensions(map: ThinkingMap, w: number, h: number): Layout {
       key: `t~${e.from}~${e.to}`,
       path: `M ${pa.x + pa.w / 2} ${y} H ${pb.x - pb.w / 2}`,
       relation: 'conflicts',
+      strength: e.strength,
       label: 'pulls against',
       lx: w / 2,
       ly: y,
@@ -339,6 +347,10 @@ export function layoutEvidence(map: ThinkingMap, w: number, h: number): Layout {
         key: `e~${claim.id}~${kid}`,
         path: `M ${top.x} ${top.y + top.h / 2} V ${midY} H ${p.x} V ${p.y - p.h / 2}`,
         relation: 'supports',
+        strength: map.edges.find(
+          (e) =>
+            (e.from === kid && e.to === claim.id) || (e.from === claim.id && e.to === kid)
+        )?.strength,
       });
     });
   });

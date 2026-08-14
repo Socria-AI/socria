@@ -21,6 +21,14 @@ alter table conversations
 create index if not exists conversations_user_updated_idx
   on conversations (user_id, updated_at desc);
 
+-- Logos sessions share this table with ordinary chats so both surfaces can
+-- list one another's work. 'kind' tells them apart; 'map' holds the Thinking
+-- Map for logos rows and stays null for chats.
+alter table conversations
+  add column if not exists kind text not null default 'chat';
+alter table conversations
+  add column if not exists map jsonb;
+
 -- Imported "about you" profiles (AI history import). One row per user;
 -- stores the profile the user pasted from another AI. Safe to re-run.
 create table if not exists user_profiles (

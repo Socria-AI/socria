@@ -14,7 +14,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ThinkingMap as TMap, LogosRelation } from '@/lib/logos';
+import { MODE_META, NODE_MODES, type NodeMode } from '@/lib/logos-explore';
 import { NodeGlyph } from './NodeGlyph';
+import { StatusMark } from './StatusMark';
 import {
   LENSES,
   RELATION_LABEL,
@@ -45,6 +47,8 @@ const GAP = 14;
 const SEPARATION_PASSES = 3;
 const TRIM_W = 84;
 const TRIM_H = 26;
+// Roughly the action menu's height — only used to decide which side to open on.
+const MENU_H = 200;
 
 function boxExit(dx: number, dy: number): number {
   const tx = dx === 0 ? Infinity : TRIM_W / Math.abs(dx);
@@ -52,18 +56,23 @@ function boxExit(dx: number, dy: number): number {
   return Math.min(tx, ty, 0.5);
 }
 
+export type MapNodeRef = { id: string; label: string; type: TMap['nodes'][number]['type'] };
+
 export function ThinkingMap({
   map,
   initialLens = 'graph',
-  onExplore,
+  onAction,
   explored,
+  changed,
 }: {
   map: TMap;
   initialLens?: LensId;
-  /** clicking a card asks to look closer at that piece of reasoning */
-  onExplore?: (node: { id: string; label: string; type: TMap['nodes'][number]['type'] }) => void;
+  /** a card is never inert: pick what to do with this piece of reasoning */
+  onAction?: (mode: NodeMode, node: MapNodeRef) => void;
   /** ids already looked at — marked so you can see what you've examined */
   explored?: Set<string>;
+  /** ids that moved in the last extraction, briefly highlighted */
+  changed?: Set<string>;
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const posRef = useRef<Map<string, P>>(new Map());
@@ -79,6 +88,30 @@ export function ThinkingMap({
   const [size, setSize] = useState({ w: 800, h: 600 });
   const [focused, setFocused] = useState<string | null>(null);
   const [hovered, setHovered] = useState<string | null>(null);
+  // The action menu is anchored in map coordinates and drawn in its own layer
+  // above every card — nesting it inside a card leaves it fighting the
+  // neighbours it overlaps for paint order.
+  const [menu, setMenu] = useState<{
+    id: string;
+    x: number;
+    y: number;
+    above: boolean;
+  } | null>(null);
+  const menuFor = menu?.id ?? null;
+
+  // Hold the graph still while a menu is open — a target that drifts out from
+  // under the cursor is the fastest way to make this feel cheap.
+  const frozenRef = useRef(false);
+  frozenRef.current = menu !== null;
+
+  useEffect(() => {
+    if (!menuFor) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMenu(null);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [menuFor]);
 
   const lenses = useMemo(() => availableLenses(map), [map]);
 
@@ -178,7 +211,7 @@ export function ThinkingMap({
     if (lens !== 'graph') return;
     const step = () => {
       const alpha = alphaRef.current;
-      if (alpha > ALPHA_MIN) {
+      if (alpha > ALPHA_MIN && !frozenRef.current) {
         const { w, h } = sizeRef.current;
         const pos = posRef.current;
         const nodes = mapRef.current.nodes;
@@ -278,6 +311,8 @@ export function ThinkingMap({
       sizeRef.current = { w: r.width, h: r.height };
       setSize({ w: r.width, h: r.height });
       alphaRef.current = Math.max(alphaRef.current, 0.4);
+      // The menu is pinned to coordinates that no longer mean anything.
+      setMenu(null);
     };
     const ro = new ResizeObserver(apply);
     ro.observe(el);
@@ -307,6 +342,7 @@ export function ThinkingMap({
           key: edgeKey(e),
           path: '',
           relation: e.relation as LogosRelation,
+          strength: e.strength,
         }))
       : (staticLayout?.connectors ?? []);
 
@@ -324,6 +360,7 @@ export function ThinkingMap({
               onClick={() => {
                 setLens(l.id);
                 setFocused(null);
+                setMenu(null);
               }}
             >
               {l.label}
@@ -332,7 +369,14 @@ export function ThinkingMap({
         </div>
       )}
 
-      <div className="lg-map" ref={wrapRef} onClick={() => setFocused(null)}>
+      <div
+        className="lg-map"
+        ref={wrapRef}
+        onClick={() => {
+          setFocused(null);
+          setMenu(null);
+        }}
+      >
         {map.nodes.length === 0 && (
           <div className="lg-map-empty">
             <span className="lg-map-empty-mark" aria-hidden="true">
@@ -370,7 +414,12 @@ export function ThinkingMap({
           {connectors.map((c) => {
             const on = related ? related.edges.has(c.key) : true;
             return (
-              <g key={c.key} className={`lg-conn lg-conn-${c.relation}${dim(on)}${related && on ? ' is-lit' : ''}`}>
+              <g
+                key={c.key}
+                className={`lg-conn lg-conn-${c.relation} lg-str-${c.strength ?? 'normal'}${dim(on)}${
+                  related && on ? ' is-lit' : ''
+                }`}
+              >
                 <path
                   ref={
                     lens === 'graph'
@@ -410,7 +459,7 @@ export function ThinkingMap({
                     }
                   : undefined
               }
-              className={`lg-node-pos${dim(on)}`}
+              className={`lg-node-pos${dim(on)}${menuFor === p.id ? ' is-menu' : ''}`}
               style={
                 lens === 'graph'
                   ? undefined
@@ -420,11 +469,15 @@ export function ThinkingMap({
               <button
                 type="button"
                 style={{ width: p.w }}
-                className={`lg-node lg-node-${p.node.type}${
+                className={`lg-node lg-node-${p.node.type} lg-st-${p.node.status ?? 'open'}${
                   focused === p.id ? ' is-focused' : ''
                 }${related && on && active !== p.id ? ' is-lit' : ''}${
                   explored?.has(p.id) ? ' is-explored' : ''
+                }${changed?.has(p.id) ? ' is-changed' : ''}${
+                  menuFor === p.id ? ' is-open' : ''
                 }`}
+                aria-haspopup="menu"
+                aria-expanded={menuFor === p.id}
                 onMouseEnter={() => setHovered(p.id)}
                 onMouseLeave={() => setHovered(null)}
                 onFocus={() => setHovered(p.id)}
@@ -432,18 +485,74 @@ export function ThinkingMap({
                 onClick={(ev) => {
                   ev.stopPropagation();
                   setFocused(p.id);
-                  onExplore?.({ id: p.id, label: p.node.label, type: p.node.type });
+                  if (menu?.id === p.id) {
+                    setMenu(null);
+                    return;
+                  }
+                  const card = ev.currentTarget.getBoundingClientRect();
+                  const box = wrapRef.current?.getBoundingClientRect();
+                  if (!box) return;
+                  // Flip above the card when there isn't room beneath it.
+                  const above = card.bottom - box.top + MENU_H > box.height;
+                  setMenu({
+                    id: p.id,
+                    x: card.left - box.left + card.width / 2,
+                    y: above ? card.top - box.top - 8 : card.bottom - box.top + 8,
+                    above,
+                  });
                 }}
               >
                 <span className="lg-node-head">
                   <NodeGlyph type={p.node.type} />
                   <span className="lg-node-type">{p.node.type}</span>
+                  {p.node.status && p.node.status !== 'open' && (
+                    <StatusMark status={p.node.status} />
+                  )}
                 </span>
                 <span className="lg-node-label">{p.node.label}</span>
+                {!!p.node.merged?.length && (
+                  <span
+                    className="lg-node-merged"
+                    title={`Folded in: ${p.node.merged.join('; ')}`}
+                  >
+                    +{p.node.merged.length} folded in
+                  </span>
+                )}
               </button>
+
             </div>
           );
         })}
+
+        {menu &&
+          (() => {
+            const node = map.nodes.find((n) => n.id === menu.id);
+            if (!node) return null;
+            return (
+              <div
+                className={`lg-acts${menu.above ? ' is-above' : ''}`}
+                role="menu"
+                style={{ left: menu.x, top: menu.y }}
+                onClick={(ev) => ev.stopPropagation()}
+              >
+                {NODE_MODES.map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    role="menuitem"
+                    className={`lg-act lg-act-${m}`}
+                    onClick={() => {
+                      setMenu(null);
+                      onAction?.(m, { id: node.id, label: node.label, type: node.type });
+                    }}
+                  >
+                    <span className="lg-act-label">{MODE_META[m].label}</span>
+                    <span className="lg-act-blurb">{MODE_META[m].blurb}</span>
+                  </button>
+                ))}
+              </div>
+            );
+          })()}
 
         {related && active && lens === 'graph' && (
           <div className="lg-legend" aria-live="polite">

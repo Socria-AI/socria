@@ -2784,11 +2784,134 @@ html.js-anim .scrolly-root .fade.d3 { transition-delay: .3s; }
 
 .logos-root .lg-split {
   display: grid;
-  grid-template-columns: minmax(400px, 1fr) 1.12fr;
+  grid-template-columns: 232px minmax(360px, 1fr) 1.12fr;
   height: 100%;
 }
+.logos-root .lg-split.rail-closed { grid-template-columns: 46px minmax(360px, 1fr) 1.12fr; }
+@media (max-width: 1180px) {
+  .logos-root .lg-split { grid-template-columns: 200px minmax(320px, 1fr) 1.05fr; }
+}
 @media (max-width: 900px) {
-  .logos-root .lg-split { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; }
+  .logos-root .lg-split,
+  .logos-root .lg-split.rail-closed {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr 1fr;
+  }
+}
+
+/* ---------- rail: every line of thinking, with its map ---------- */
+.logos-root .lg-rail {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-right: 1px solid var(--lg-line);
+  background: rgba(250, 248, 242, 0.6);
+}
+.logos-root .lg-rail-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 54px;
+  padding: 0 10px;
+  flex: 0 0 auto;
+}
+.logos-root .lg-rail-toggle {
+  width: 26px; height: 26px;
+  display: grid; place-items: center;
+  border: none; background: transparent;
+  border-radius: 6px;
+  color: var(--lg-ink-40);
+  cursor: pointer;
+  transition: color 0.2s, background 0.2s;
+}
+.logos-root .lg-rail-toggle:hover { color: var(--lg-primary); background: rgba(53, 70, 32, 0.07); }
+.logos-root .lg-rail-toggle svg { width: 15px; height: 15px; }
+.logos-root .lg-rail-title {
+  font-size: 10px; font-weight: 600; letter-spacing: 0.16em;
+  text-transform: uppercase; color: var(--lg-ink-40);
+}
+.logos-root .lg-rail-new {
+  flex: 0 0 auto;
+  margin: 0 10px 10px;
+  padding: 8px 11px;
+  text-align: left;
+  border: 1px dashed rgba(53, 70, 32, 0.28);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--lg-ink-60);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
+}
+.logos-root .lg-rail-new:hover {
+  border-color: var(--lg-primary);
+  color: var(--lg-primary);
+  background: rgba(53, 70, 32, 0.04);
+}
+.logos-root .lg-rail-list { flex: 1; min-height: 0; overflow-y: auto; padding: 0 6px 8px; }
+.logos-root .lg-rail-note {
+  padding: 6px 10px;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--lg-ink-40);
+  font-style: italic;
+}
+.logos-root .lg-rail-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 8px;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: background 0.18s;
+}
+.logos-root .lg-rail-item:hover { background: rgba(35, 36, 31, 0.045); }
+.logos-root .lg-rail-item.is-active { background: rgba(53, 70, 32, 0.085); }
+.logos-root .lg-thumb {
+  flex: 0 0 auto;
+  width: 42px; height: 28px;
+  border-radius: 6px;
+  background: #fff;
+  border: 1px solid var(--lg-line);
+  display: block;
+  overflow: hidden;
+  color: var(--lg-ink);
+}
+.logos-root .lg-thumb svg { width: 100%; height: 100%; display: block; }
+.logos-root .lg-rail-meta { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.logos-root .lg-rail-name {
+  font-size: 12.5px;
+  line-height: 1.3;
+  color: var(--lg-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.logos-root .lg-rail-sub { font-size: 10.5px; color: var(--lg-ink-40); }
+.logos-root .lg-rail-del {
+  flex: 0 0 auto;
+  border: none; background: transparent;
+  color: var(--lg-ink-24);
+  font-size: 15px; line-height: 1;
+  padding: 2px 4px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.18s, color 0.18s;
+}
+.logos-root .lg-rail-item:hover .lg-rail-del { opacity: 1; }
+.logos-root .lg-rail-del:hover { color: var(--lg-tension); }
+.logos-root .lg-rail-foot {
+  flex: 0 0 auto;
+  padding: 10px 12px;
+  border-top: 1px solid var(--lg-line);
+  font-size: 10.5px;
+  font-style: italic;
+  color: var(--lg-ink-40);
+}
+@media (max-width: 900px) {
+  .logos-root .lg-rail { border-right: none; border-bottom: 1px solid var(--lg-line); }
+  .logos-root .lg-rail-list { max-height: 30vh; }
 }
 
 /* ---------- conversation ---------- */
@@ -3035,10 +3158,13 @@ html.js-anim .scrolly-root .fade.d3 { transition-delay: .3s; }
 .logos-root .lg-node-pos {
   position: absolute;
   top: 0; left: 0;
-  will-change: transform;
+  /* will-change promotes each card to its own layer; without an explicit
+     z-index those layers outrank the action menu whatever it asks for. */
+  z-index: 1;
   transition: opacity 0.35s;
 }
 .logos-root .lg-node-pos.is-dim { opacity: 0.28; }
+.logos-root .lg-node-pos.is-menu { z-index: 2; }
 .logos-root .lg-node {
   display: block;
   text-align: left;
@@ -3605,6 +3731,193 @@ html.js-anim .scrolly-root .fade.d3 { transition-delay: .3s; }
 .logos-root .lg-x-ask button svg { width: 14px; height: 14px; }
 .logos-root .lg-x-ask button:disabled { opacity: 0.25; cursor: default; }
 .logos-root .lg-x-ask button:not(:disabled):hover { transform: translateY(-1px); }
+
+/* ── node status: reasoning that has settled ─────────────────────── */
+.logos-root .lg-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: auto;
+  padding: 1px 5px 1px 4px;
+  border-radius: 999px;
+  font-size: 8.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.logos-root .lg-status svg { width: 9px; height: 9px; flex: 0 0 auto; }
+.logos-root .lg-status-resolved { background: rgba(53, 70, 32, 0.12); color: var(--lg-primary); }
+.logos-root .lg-status-supported { background: rgba(38, 70, 83, 0.12); color: var(--lg-accent); }
+.logos-root .lg-status-revised { background: rgba(35, 36, 31, 0.08); color: var(--lg-ink-40); }
+
+/* a resolved node stays on the map — it just stops asking for attention */
+.logos-root .lg-node.lg-st-resolved .lg-node-label { opacity: 0.62; }
+.logos-root .lg-node.lg-st-revised {
+  opacity: 0.5;
+  border-style: dashed;
+}
+.logos-root .lg-node.lg-st-revised .lg-node-label { text-decoration: line-through; text-decoration-thickness: 1px; text-decoration-color: var(--lg-ink-24); }
+.logos-root .lg-node.lg-st-supported { border-color: rgba(38, 70, 83, 0.38); }
+
+.logos-root .lg-node-merged {
+  display: block;
+  margin-top: 5px;
+  font-size: 9.5px;
+  letter-spacing: 0.04em;
+  color: var(--lg-ink-40);
+}
+
+/* a connection that stopped carrying weight */
+.logos-root .lg-conn.lg-str-weak .lg-edge {
+  opacity: 0.3;
+  stroke-dasharray: 3 4;
+  stroke-width: 1;
+}
+.logos-root .lg-conn.lg-str-strong .lg-edge { stroke-width: 2.1; opacity: 0.9; }
+
+/* what the last extraction moved */
+.logos-root .lg-node.is-changed {
+  animation: lgSettle 2.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes lgSettle {
+  0% { box-shadow: 0 0 0 0 rgba(53, 70, 32, 0.34); }
+  22% { box-shadow: 0 0 0 5px rgba(53, 70, 32, 0.11); }
+  100% { box-shadow: 0 0 0 0 rgba(53, 70, 32, 0); }
+}
+@media (prefers-reduced-motion: reduce) { .logos-root .lg-node.is-changed { animation: none; } }
+.logos-root .lg-panel-delta {
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--lg-accent);
+  animation: lgFade 0.4s ease both;
+}
+
+/* ── the action menu on a card ───────────────────────────────────── */
+.logos-root .lg-node.is-open { border-color: var(--lg-primary); }
+.logos-root .lg-acts {
+  position: absolute;
+  transform: translateX(-50%);
+  z-index: 40;
+  will-change: transform;
+  width: 186px;
+  padding: 5px;
+  background: #fff;
+  border: 1px solid var(--lg-line);
+  border-radius: 12px;
+  box-shadow: 0 18px 40px -22px rgba(35, 36, 31, 0.55);
+  animation: lgPop 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.logos-root .lg-acts.is-above { transform: translate(-50%, -100%); }
+@keyframes lgPop { from { opacity: 0; transform: translateX(-50%) translateY(-4px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+@keyframes lgPopUp { from { opacity: 0; transform: translate(-50%, calc(-100% + 4px)); } to { opacity: 1; transform: translate(-50%, -100%); } }
+.logos-root .lg-acts.is-above { animation-name: lgPopUp; }
+@media (prefers-reduced-motion: reduce) { .logos-root .lg-acts { animation: none; } }
+.logos-root .lg-act {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 7px 9px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+  transition: background 0.16s;
+}
+.logos-root .lg-act:hover { background: rgba(53, 70, 32, 0.07); }
+.logos-root .lg-act-label { display: block; font-size: 12.5px; color: var(--lg-ink); }
+.logos-root .lg-act-blurb { display: block; font-size: 10.5px; color: var(--lg-ink-40); margin-top: 1px; }
+.logos-root .lg-act-challenge:hover { background: rgba(156, 91, 60, 0.09); }
+.logos-root .lg-act-challenge:hover .lg-act-label { color: var(--lg-tension); }
+
+/* ── explore drawer: mode tabs and mode-specific blocks ──────────── */
+.logos-root .lg-x-modes {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 2px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--lg-line);
+}
+.logos-root .lg-x-mode {
+  flex: 1;
+  padding: 9px 4px 8px;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: 11.5px;
+  color: var(--lg-ink-40);
+  cursor: pointer;
+  border-bottom: 1.5px solid transparent;
+  margin-bottom: -1px;
+  transition: color 0.2s, border-color 0.2s;
+}
+.logos-root .lg-x-mode:hover { color: var(--lg-ink); }
+.logos-root .lg-x-mode.is-on { color: var(--lg-primary); border-bottom-color: var(--lg-primary); }
+
+.logos-root .lg-x-block-label {
+  display: block;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.18em;
+  text-transform: uppercase; color: var(--lg-ink-40);
+  margin-bottom: 8px;
+}
+.logos-root .lg-x-points { margin-top: 22px; }
+.logos-root .lg-x-points ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px; }
+.logos-root .lg-x-points li {
+  position: relative;
+  padding-left: 16px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--lg-ink);
+}
+.logos-root .lg-x-points li::before {
+  content: "";
+  position: absolute;
+  left: 0; top: 8px;
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--lg-accent);
+  opacity: 0.55;
+}
+.logos-root .lg-x-points-challenge li::before {
+  border-radius: 1px;
+  background: var(--lg-tension);
+  transform: rotate(45deg);
+}
+
+.logos-root .lg-x-origins { margin-top: 20px; }
+.logos-root .lg-x-origin {
+  margin: 0 0 10px;
+  padding: 10px 13px;
+  border-left: 2px solid var(--lg-line);
+  border-radius: 0 8px 8px 0;
+  background: rgba(35, 36, 31, 0.028);
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--lg-ink-60);
+}
+.logos-root .lg-x-origin-you { border-left-color: rgba(53, 70, 32, 0.4); }
+.logos-root .lg-x-origin-who {
+  display: block;
+  font-size: 9.5px; font-weight: 600; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--lg-ink-40);
+  margin-bottom: 4px;
+}
+.logos-root .lg-x-lineage { margin-top: 20px; }
+.logos-root .lg-x-lineage ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 5px; }
+.logos-root .lg-x-lineage li {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--lg-ink-60);
+  padding-left: 13px;
+  position: relative;
+}
+.logos-root .lg-x-lineage li::before {
+  content: "—";
+  position: absolute;
+  left: 0;
+  color: var(--lg-ink-24);
+}
 
 /* a card you've already looked into */
 .logos-root .lg-node.is-explored::after {

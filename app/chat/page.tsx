@@ -166,6 +166,11 @@ export default function ChatPage() {
   const { isLoaded, isSignedIn, user } = useUser();
   const router = useRouter();
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  // Logos sessions live in the same store; listed here so one sidebar shows
+  // everything you've been thinking about, whichever surface produced it.
+  const [logosSessions, setLogosSessions] = useState<
+    { id: string; title: string; nodes: number }[]
+  >([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
@@ -248,7 +253,19 @@ export default function ChatPage() {
           }
           const json = await res.json();
           if (cancelled) return;
-          const list: Conversation[] = json.conversations || [];
+          const all: Conversation[] = json.conversations || [];
+          // Logos sessions share this store but not this UI — they're listed
+          // separately and opened in Logos, where their map lives.
+          const list = all.filter((c: any) => c.kind !== 'logos');
+          setLogosSessions(
+            all
+              .filter((c: any) => c.kind === 'logos')
+              .map((c: any) => ({
+                id: c.id,
+                title: c.title,
+                nodes: c.map?.nodes?.length ?? 0,
+              }))
+          );
           setConversations(list);
           setActiveId(list[0]?.id ?? null);
         } catch (e: any) {
@@ -1220,6 +1237,26 @@ export default function ChatPage() {
                 </div>
               );
             })
+          )}
+
+          {logosSessions.length > 0 && (
+            <>
+              <div className="px-3 pt-4 pb-1 text-[10px] uppercase tracking-wider text-ink/40">
+                Logos
+              </div>
+              {logosSessions.map((s) => (
+                <a
+                  key={s.id}
+                  href={`/logos?s=${encodeURIComponent(s.id)}`}
+                  className="group flex items-center justify-between gap-2 px-3 py-2 rounded-md text-[13px] text-ink/70 hover:bg-ink/5 hover:text-ink transition-colors"
+                >
+                  <span className="truncate flex-1">{s.title}</span>
+                  <span className="text-[10px] text-ink/35 shrink-0">
+                    {s.nodes ? `${s.nodes} nodes` : 'no map'}
+                  </span>
+                </a>
+              ))}
+            </>
           )}
         </div>
 

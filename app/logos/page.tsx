@@ -1,21 +1,37 @@
 'use client';
 
-// Logos — conversation on the left, live Thinking Map on the right.
+// Logos — sessions on the left, conversation in the middle, live Thinking Map
+// on the right.
 //
 // Every user message fires two independent requests in parallel: the
 // conversational reply (streamed) and a fresh map extraction. The map is
-// deliberately not derived from the reply — it grows while the answer is
-// still arriving, which is the whole interaction being tested here.
+// deliberately not derived from the reply — it grows and REORGANIZES while the
+// answer is still arriving, which is the whole interaction being tested here.
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useUser } from '@clerk/nextjs';
-import { ThinkingMap } from '@/components/ThinkingMap';
+import { ThinkingMap, type MapNodeRef } from '@/components/ThinkingMap';
 import { ExplorePanel } from '@/components/ExplorePanel';
-import { EMPTY_MAP, type ThinkingMap as TMap, type LogosNodeType } from '@/lib/logos';
-import type { ExploreResult } from '@/lib/logos-explore';
+import { LogosRail } from '@/components/LogosRail';
+import {
+  EMPTY_MAP,
+  describeLineage,
+  diffMaps,
+  summarizeDelta,
+  type ThinkingMap as TMap,
+} from '@/lib/logos';
+import type { ExploreResult, NodeMode } from '@/lib/logos-explore';
+import {
+  emptySession,
+  loadLocal,
+  saveLocal,
+  sortSessions,
+  titleFor,
+  UNTITLED,
+  type LogosMsg as Msg,
+  type LogosSession,
+} from '@/lib/logos-sessions';
 import { CORE3_ACCESS_KEY, isValidAccessKey } from '@/lib/socria-prompt';
-
-type Msg = { role: 'user' | 'assistant'; content: string };
 
 // Shared with Core 3.1 — unlocking once covers both.
 const KEY_STORAGE = 'socria.core3AccessKey.v1';
@@ -26,6 +42,9 @@ const STARTERS = [
   'We keep shipping features but retention is flat.',
 ];
 
+// Long enough to notice the map settle, short enough not to nag.
+const CHANGE_FLASH_MS = 4200;
+
 export default function LogosPage() {
   const { isLoaded, isSignedIn } = useUser();
   const [unlocked, setUnlocked] = useState(false);
@@ -35,28 +54,36 @@ export default function LogosPage() {
   const [keyInput, setKeyInput] = useState('');
   const [keyError, setKeyError] = useState(false);
 
-  const [messages, setMessages] = useState<Msg[]>([]);
-  const [map, setMap] = useState<TMap>(EMPTY_MAP);
+  const [sessions, setSessions] = useState<LogosSession[]>([]);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [hydrating, setHydrating] = useState(true);
+  const [railOpen, setRailOpen] = useState(true);
+
   const [input, setInput] = useState('');
   const [streaming, setStreaming] = useState('');
   const [busy, setBusy] = useState(false);
   const [mapping, setMapping] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // What the last extraction actually reorganized, so it can be seen happening.
+  const [changed, setChanged] = useState<Set<string>>(new Set());
+  const [deltaNote, setDeltaNote] = useState<string | null>(null);
+
   const [explore, setExplore] = useState<{
     key: string;
-    node: { label: string; type: LogosNodeType } | null;
+    mode: NodeMode;
+    node: MapNodeRef | null;
     data: ExploreResult | null;
     loading: boolean;
     error: string | null;
     open: boolean;
-  }>({ key: '', node: null, data: null, loading: false, error: null, open: false });
+  }>({ key: '', mode: 'explore', node: null, data: null, loading: false, error: null, open: false });
   const exploreSeq = useRef(0);
   const exploreCache = useRef<Map<string, ExploreResult>>(new Map());
   const [exploredIds, setExploredIds] = useState<Set<string>>(new Set());
 
-  // Each explored node keeps its own thread, so reopening it resumes rather
-  // than restarts. Lives for the session only, like everything else here.
+  // One thread per node, shared across all four modes — switching from Explore
+  // to Challenge is a change of lens, not a new conversation.
   const [threads, setThreads] = useState<Record<string, Msg[]>>({});
   const [focusStream, setFocusStream] = useState('');
   const [focusBusy, setFocusBusy] = useState(false);
@@ -64,12 +91,24 @@ export default function LogosPage() {
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
+  const sessionsRef = useRef<LogosSession[]>([]);
+  sessionsRef.current = sessions;
+  const activeIdRef = useRef<string | null>(null);
+  activeIdRef.current = activeId;
+
+  // Everything said anywhere in this session, in the order it was said. The map
+  // reads from this — thinking done inside a node is still thinking.
+  const chronRef = useRef<Msg[]>([]);
+
+  const cloud = !!isSignedIn;
+  const active = useMemo(
+    () => sessions.find((s) => s.id === activeId) ?? null,
+    [sessions, activeId]
+  );
+  const messages = active?.messages ?? [];
+  const map = active?.map ?? EMPTY_MAP;
   const mapRef = useRef<TMap>(EMPTY_MAP);
   mapRef.current = map;
-
-  // Everything said anywhere, in the order it was said. The map reads from
-  // this — thinking done inside a node is still thinking, and belongs in it.
-  const chronRef = useRef<Msg[]>([]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -91,8 +130,145 @@ export default function LogosPage() {
 
   // Anonymous but key-unlocked callers identify with the header; signed-in
   // users are authorized by their session alone.
-  const keyHeaders = (): Record<string, string> =>
-    unlocked && !isSignedIn ? { 'x-socria-key': CORE3_ACCESS_KEY } : {};
+  const keyHeaders = useCallback(
+    (): Record<string, string> =>
+      unlocked && !isSignedIn ? { 'x-socria-key': CORE3_ACCESS_KEY } : {},
+    [unlocked, isSignedIn]
+  );
+
+  // ── sessions ───────────────────────────────────────────────────────
+  const applySessions = useCallback(
+    (next: LogosSession[]) => {
+      const sorted = sortSessions(next);
+      sessionsRef.current = sorted;
+      setSessions(sorted);
+      if (!cloud) saveLocal(sorted);
+    },
+    [cloud]
+  );
+
+  const persist = useCallback(
+    async (s: LogosSession) => {
+      if (!cloud) {
+        saveLocal(sessionsRef.current);
+        return;
+      }
+      try {
+        await fetch('/api/conversations', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ conversation: { ...s, kind: 'logos' } }),
+        });
+      } catch {
+        // A failed save must never interrupt thinking. The session stays in
+        // memory and the next turn tries again.
+      }
+    },
+    [cloud]
+  );
+
+  /** Update the active session and save it. */
+  const patchActive = useCallback(
+    (fn: (s: LogosSession) => LogosSession, save = true) => {
+      const id = activeIdRef.current;
+      if (!id) return;
+      const current = sessionsRef.current.find((s) => s.id === id);
+      if (!current) return;
+      const updated = { ...fn(current), updatedAt: Date.now() };
+      updated.title =
+        updated.title && updated.title !== UNTITLED ? updated.title : titleFor(updated.messages);
+      applySessions(sessionsRef.current.map((s) => (s.id === id ? updated : s)));
+      if (save) void persist(updated);
+    },
+    [applySessions, persist]
+  );
+
+  // Load the session list once access resolves.
+  useEffect(() => {
+    if (!hasAccess || !authSettled) return;
+    let cancelled = false;
+
+    (async () => {
+      let list: LogosSession[] = [];
+      if (isSignedIn) {
+        try {
+          const res = await fetch('/api/conversations', { cache: 'no-store' });
+          if (res.ok) {
+            const json = await res.json();
+            list = (json.conversations || [])
+              .filter((c: any) => c.kind === 'logos')
+              .map((c: any) => ({
+                id: c.id,
+                title: c.title,
+                messages: Array.isArray(c.messages) ? c.messages : [],
+                map: c.map?.nodes ? c.map : { ...EMPTY_MAP },
+                updatedAt: Number(c.updatedAt) || 0,
+              }));
+          }
+        } catch {
+          // Fall through to an empty list rather than blocking the page.
+        }
+      } else {
+        list = loadLocal();
+      }
+      if (cancelled) return;
+
+      // Deep-link from elsewhere in the app: /logos?s=<id>
+      let wanted: string | null = null;
+      try {
+        wanted = new URLSearchParams(window.location.search).get('s');
+      } catch {}
+
+      if (list.length === 0) list = [emptySession()];
+      const sorted = sortSessions(list);
+      sessionsRef.current = sorted;
+      setSessions(sorted);
+      const target = (wanted && sorted.find((s) => s.id === wanted)?.id) || sorted[0].id;
+      setActiveId(target);
+      activeIdRef.current = target;
+      chronRef.current = [...(sorted.find((s) => s.id === target)?.messages ?? [])];
+      setHydrating(false);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [hasAccess, authSettled, isSignedIn]);
+
+  function switchSession(id: string) {
+    if (id === activeIdRef.current) return;
+    setActiveId(id);
+    activeIdRef.current = id;
+    chronRef.current = [...(sessionsRef.current.find((s) => s.id === id)?.messages ?? [])];
+    // Everything below is about one session's nodes — none of it carries over.
+    exploreCache.current.clear();
+    setExploredIds(new Set());
+    setThreads({});
+    setExplore((e) => ({ ...e, open: false, data: null, node: null }));
+    setChanged(new Set());
+    setDeltaNote(null);
+    setError(null);
+    setStreaming('');
+  }
+
+  function newSession() {
+    const fresh = emptySession();
+    applySessions([fresh, ...sessionsRef.current]);
+    switchSession(fresh.id);
+    // A brand-new empty session isn't worth a round trip until it has content.
+  }
+
+  async function deleteSession(id: string) {
+    const remaining = sessionsRef.current.filter((s) => s.id !== id);
+    const next = remaining.length ? remaining : [emptySession()];
+    applySessions(next);
+    if (activeIdRef.current === id) switchSession(next[0].id);
+    if (cloud) {
+      try {
+        await fetch(`/api/conversations/${encodeURIComponent(id)}`, { method: 'DELETE' });
+      } catch {}
+    }
+  }
 
   function submitKey() {
     if (!isValidAccessKey(keyInput.trim())) {
@@ -106,8 +282,9 @@ export default function LogosPage() {
     } catch {}
   }
 
-  // Rebuild the map from everything said so far, wherever it was said.
+  // ── map ────────────────────────────────────────────────────────────
   function refreshMap() {
+    const forSession = activeIdRef.current;
     setMapping(true);
     void (async () => {
       try {
@@ -118,7 +295,14 @@ export default function LogosPage() {
         });
         if (res.ok) {
           const json = await res.json();
-          if (json?.map) setMap(json.map);
+          // A map that arrives after the reader has moved on belongs to a
+          // different line of thinking — drop it rather than cross the wires.
+          if (json?.map && activeIdRef.current === forSession) {
+            const delta = diffMaps(mapRef.current, json.map);
+            patchActive((s) => ({ ...s, map: json.map }));
+            setChanged(new Set(delta.changed));
+            setDeltaNote(summarizeDelta(delta));
+          }
         }
       } catch {
         // The map is allowed to lag or skip a turn — never break the chat.
@@ -128,28 +312,46 @@ export default function LogosPage() {
     })();
   }
 
-  async function openExplore(node: { id: string; label: string; type: LogosNodeType }) {
-    // Generated once per node, then reused — reopening is instant and costs
-    // nothing. Keyed on the label too, so a node the map rewords is treated
-    // as a different idea and looked up again.
-    const cacheKey = `${node.id}::${node.label}`;
+  // Let the highlight fade on its own; a permanent marker stops meaning much.
+  useEffect(() => {
+    if (!changed.size && !deltaNote) return;
+    const t = setTimeout(() => {
+      setChanged(new Set());
+      setDeltaNote(null);
+    }, CHANGE_FLASH_MS);
+    return () => clearTimeout(t);
+  }, [changed, deltaNote]);
+
+  // ── acting on a node ───────────────────────────────────────────────
+  async function runAction(mode: NodeMode, node: MapNodeRef) {
+    // Generated once per node per mode, then reused — reopening is instant and
+    // costs nothing. Keyed on the label too, so a node the map rewords is
+    // treated as a different idea and looked up again.
+    const cacheKey = `${mode}::${node.id}::${node.label}`;
     setFocusStream('');
     setFocusError(null);
 
     const cached = exploreCache.current.get(cacheKey);
     if (cached) {
       exploreSeq.current++; // cancel anything still in flight
-      setExplore({ key: cacheKey, node, data: cached, loading: false, error: null, open: true });
+      setExplore({ key: cacheKey, mode, node, data: cached, loading: false, error: null, open: true });
       return;
     }
 
     const seq = ++exploreSeq.current;
-    setExplore({ key: cacheKey, node, data: null, loading: true, error: null, open: true });
+    setExplore({ key: cacheKey, mode, node, data: null, loading: true, error: null, open: true });
     try {
       const res = await fetch('/api/logos/explore', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...keyHeaders() },
-        body: JSON.stringify({ label: node.label, type: node.type, messages }),
+        body: JSON.stringify({
+          mode,
+          label: node.label,
+          type: node.type,
+          nodeId: node.id,
+          messages,
+          map: mode === 'trace' ? map : undefined,
+        }),
       });
       if (!res.ok) throw new Error('Could not look that up right now.');
       const json = await res.json();
@@ -171,13 +373,14 @@ export default function LogosPage() {
     }
   }
 
+  // ── conversation ───────────────────────────────────────────────────
   // A turn inside an opened node. Same model, narrower aperture: it sees the
   // main conversation for context, then this node's own thread.
   async function sendFocused(text: string) {
     const content = text.trim();
     const node = explore.node;
-    const key = explore.key;
-    if (!content || focusBusy || !node || !key) return;
+    if (!content || focusBusy || !node) return;
+    const key = `${node.id}::${node.label}`;
 
     setFocusError(null);
     const prior = threads[key] ?? [];
@@ -192,11 +395,7 @@ export default function LogosPage() {
     chronRef.current = [...chronRef.current, marked];
     refreshMap();
 
-    // Main conversation first for context, then the focused exchange.
-    const payload = [
-      ...messages.slice(-8),
-      ...nextThread,
-    ];
+    const payload = [...messages.slice(-8), ...nextThread];
 
     try {
       const res = await fetch('/api/logos/chat', {
@@ -242,19 +441,20 @@ export default function LogosPage() {
 
   async function send(text: string) {
     const content = text.trim();
-    if (!content || busy) return;
+    if (!content || busy || !activeIdRef.current) return;
     setError(null);
     setInput('');
     if (taRef.current) taRef.current.style.height = 'auto';
 
     const turn: Msg = { role: 'user', content };
-    const next = [...messages, turn];
-    setMessages(next);
+    const before = messages;
+    const next = [...before, turn];
+    patchActive((s) => ({ ...s, messages: next }), false);
     chronRef.current = [...chronRef.current, turn];
     setBusy(true);
     setStreaming('');
 
-    // Independent pass: rebuild the map from the conversation so far.
+    // Independent pass: rebuild the map from everything said so far.
     refreshMap();
 
     // Conversational reply.
@@ -280,12 +480,12 @@ export default function LogosPage() {
         }
       }
       setStreaming('');
-      setMessages([...next, { role: 'assistant', content: acc }]);
+      patchActive((s) => ({ ...s, messages: [...next, { role: 'assistant', content: acc }] }));
       chronRef.current = [...chronRef.current, { role: 'assistant', content: acc }];
     } catch (e: any) {
       setStreaming('');
       setError(e?.message || 'Something went wrong.');
-      setMessages(messages);
+      patchActive((s) => ({ ...s, messages: before }), false);
       // Drop the turn that never landed, by identity — a focused reply may
       // have appended to the transcript while this was in flight.
       chronRef.current = chronRef.current.filter((m) => m !== turn);
@@ -350,7 +550,19 @@ export default function LogosPage() {
 
   return (
     <div className="logos-root">
-      <div className="lg-split">
+      <div className={`lg-split${railOpen ? '' : ' rail-closed'}`}>
+        <LogosRail
+          sessions={sessions}
+          activeId={activeId}
+          open={railOpen}
+          syncing={hydrating}
+          cloud={cloud}
+          onSelect={switchSession}
+          onNew={newSession}
+          onDelete={deleteSession}
+          onToggle={() => setRailOpen((v) => !v)}
+        />
+
         {/* ── Conversation ───────────────────────────────── */}
         <section className="lg-convo" aria-label="Conversation">
           <header className="lg-head">
@@ -446,26 +658,40 @@ export default function LogosPage() {
         <section className="lg-panel" aria-label="Thinking map">
           <header className="lg-panel-head">
             <span className="lg-panel-title">Thinking Map</span>
-            <span className={`lg-panel-state${mapping ? ' is-working' : ''}`}>
-              {mapping
-                ? 'reading'
-                : map.nodes.length
-                  ? `${map.nodes.length} node${map.nodes.length === 1 ? '' : 's'}`
-                  : 'empty'}
-            </span>
+            {deltaNote && !mapping ? (
+              <span className="lg-panel-delta">{deltaNote}</span>
+            ) : (
+              <span className={`lg-panel-state${mapping ? ' is-working' : ''}`}>
+                {mapping
+                  ? 'reading'
+                  : map.nodes.length
+                    ? `${map.nodes.length} node${map.nodes.length === 1 ? '' : 's'}`
+                    : 'empty'}
+              </span>
+            )}
           </header>
-          <ThinkingMap map={map} onExplore={openExplore} explored={exploredIds} />
+          <ThinkingMap
+            map={map}
+            onAction={runAction}
+            explored={exploredIds}
+            changed={changed}
+          />
           <ExplorePanel
             open={explore.open}
+            mode={explore.mode}
             loading={explore.loading}
             error={explore.error}
             node={explore.node}
             data={explore.data}
-            thread={threads[explore.key] ?? []}
+            lineage={explore.node ? describeLineage(map, explore.node.id) : []}
+            thread={
+              explore.node ? (threads[`${explore.node.id}::${explore.node.label}`] ?? []) : []
+            }
             streaming={focusStream}
             busy={focusBusy}
             threadError={focusError}
             onSend={sendFocused}
+            onMode={(m) => explore.node && runAction(m, explore.node)}
             onClose={() => setExplore((e) => ({ ...e, open: false }))}
           />
         </section>

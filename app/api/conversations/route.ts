@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { sanitizeMemory, EMPTY_MEMORY } from '@/lib/socria-prompt';
+import { EMPTY_MAP, sanitizeMap } from '@/lib/logos';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -30,6 +31,11 @@ function sanitizeMessages(raw: unknown): Msg[] {
     .map((m: any) => ({ role: m.role, content: m.content }));
 }
 
+// Logos sessions live in the same table as ordinary chats, so both surfaces
+// list one another's work instead of each keeping a private drawer.
+type Kind = 'chat' | 'logos';
+const asKind = (v: unknown): Kind => (v === 'logos' ? 'logos' : 'chat');
+
 export async function GET() {
   const { userId } = auth();
   if (!userId) {
@@ -39,7 +45,7 @@ export async function GET() {
   try {
     const { data, error } = await supabaseAdmin()
       .from('conversations')
-      .select('id, title, messages, memory, updated_at')
+      .select('id, title, messages, memory, kind, map, updated_at')
       .eq('user_id', userId)
       .order('updated_at', { ascending: false });
 
@@ -56,6 +62,8 @@ export async function GET() {
       title: c.title,
       messages: c.messages,
       memory: c.memory ?? EMPTY_MEMORY,
+      kind: asKind(c.kind),
+      map: c.map ?? EMPTY_MAP,
       updatedAt: Number(c.updated_at),
     }));
     return NextResponse.json({ conversations });
@@ -92,6 +100,8 @@ export async function PUT(req: NextRequest) {
       title: c.title.slice(0, MAX_TITLE),
       messages: sanitizeMessages(c.messages),
       memory: sanitizeMemory(c.memory ?? EMPTY_MEMORY),
+      kind: asKind(c.kind),
+      map: sanitizeMap(c.map ?? EMPTY_MAP),
       updated_at: Number(c.updatedAt) || Date.now(),
     });
 
@@ -142,6 +152,8 @@ export async function POST(req: NextRequest) {
       ),
       messages: sanitizeMessages(c.messages),
       memory: sanitizeMemory(c.memory ?? EMPTY_MEMORY),
+      kind: asKind(c.kind),
+      map: sanitizeMap(c.map ?? EMPTY_MAP),
       updated_at: Number(c.updatedAt) || Date.now(),
     }));
 

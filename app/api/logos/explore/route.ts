@@ -1,28 +1,45 @@
 // app/api/logos/explore/route.ts
-// POST /api/logos/explore → { explore } for a single clicked node.
+// POST /api/logos/explore → { explore } for one action on one node.
 //
-// Three steps: turn the node into a research query, search the web, then
-// compose a framing + connection + question from what came back. Never a
-// recommendation — see lib/logos-explore.ts for the rule.
+// Four modes, one pipeline. Explore and Research look the idea up on the web;
+// Challenge and Trace work purely from the person's own reasoning. None of
+// them are allowed to hand back a verdict — see lib/logos-explore.ts.
 
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { auth } from '@clerk/nextjs/server';
-import { LOGOS_MODEL, LOGOS_FALLBACK_MODEL, NODE_TYPES } from '@/lib/logos';
+import {
+  LOGOS_MODEL,
+  LOGOS_FALLBACK_MODEL,
+  NODE_TYPES,
+  describeLineage,
+  sanitizeMap,
+} from '@/lib/logos';
 import { isValidAccessKey } from '@/lib/socria-prompt';
 import { enforceRateLimit } from '@/lib/rate-limit';
 import {
+  MODE_META,
+  NODE_MODES,
+  buildChallengePrompt,
   buildExplorePrompt,
   buildQueryPrompt,
+  buildResearchPrompt,
+  buildTracePrompt,
   runSearch,
   sanitizeExplore,
   searchConfigured,
+  type NodeMode,
 } from '@/lib/logos-explore';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const MAX_HISTORY = 12;
+// Trace looks further back than the others — the point is finding where an
+// idea entered, which is usually not in the last handful of messages.
+const MAX_TRACE_HISTORY = 30;
+
+type Turn = { role: 'user' | 'assistant'; content: string };
 
 export async function POST(req: NextRequest) {
   const { userId } = auth();
@@ -42,17 +59,26 @@ export async function POST(req: NextRequest) {
   const label =
     typeof body?.label === 'string' ? body.label.replace(/\s+/g, ' ').trim().slice(0, 120) : '';
   const type = NODE_TYPES.includes(body?.type) ? body.type : 'idea';
+  const mode: NodeMode = NODE_MODES.includes(body?.mode) ? body.mode : 'explore';
   if (!label) {
     return NextResponse.json({ error: 'label required' }, { status: 400 });
   }
 
-  const conversation = (Array.isArray(body?.messages) ? body.messages : [])
+  const window = mode === 'trace' ? MAX_TRACE_HISTORY : MAX_HISTORY;
+  const turns: Turn[] = (Array.isArray(body?.messages) ? body.messages : [])
     .filter(
       (m: any) =>
         m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string'
     )
-    .slice(-MAX_HISTORY)
-    .map((m: any) => `${m.role === 'user' ? 'Thinker' : 'Logos'}: ${m.content.slice(0, 500)}`)
+    .slice(-window)
+    .map((m: any) => ({ role: m.role, content: m.content.slice(0, 500) }));
+
+  const conversation = turns
+    .map((m) => `${m.role === 'user' ? 'Thinker' : 'Logos'}: ${m.content}`)
+    .join('\n');
+  // Trace picks moments by number, so it needs the same numbering we hold.
+  const indexed = turns
+    .map((m, i) => `[${i}] ${m.role === 'user' ? 'Thinker' : 'Logos'}: ${m.content}`)
     .join('\n');
 
   const openai = new OpenAI({ apiKey });
@@ -82,41 +108,56 @@ export async function POST(req: NextRequest) {
   };
 
   try {
-    // 1. What should we actually look up?
-    let query = label;
     let concept = label;
-    try {
-      const q = await complete(
-        buildQueryPrompt(),
-        `${type}: "${label}"\n\nContext:\n${conversation || '(none)'}`,
-        160
-      );
-      const parsed = JSON.parse(q.choices?.[0]?.message?.content || '{}');
-      if (typeof parsed?.query === 'string' && parsed.query.trim()) query = parsed.query.trim();
-      if (typeof parsed?.concept === 'string' && parsed.concept.trim())
-        concept = parsed.concept.trim();
-    } catch {
-      // Fall back to searching the raw label.
+    let search = { results: [], images: [], provider: null } as Awaited<
+      ReturnType<typeof runSearch>
+    >;
+
+    // 1. Only the modes that look outward pay for a query + a search.
+    if (MODE_META[mode].searches) {
+      let query = label;
+      try {
+        const q = await complete(
+          buildQueryPrompt(mode),
+          `${type}: "${label}"\n\nContext:\n${conversation || '(none)'}`,
+          160
+        );
+        const parsed = JSON.parse(q.choices?.[0]?.message?.content || '{}');
+        if (typeof parsed?.query === 'string' && parsed.query.trim()) query = parsed.query.trim();
+        if (typeof parsed?.concept === 'string' && parsed.concept.trim())
+          concept = parsed.concept.trim();
+      } catch {
+        // Fall back to searching the raw label.
+      }
+      search = await runSearch(query);
     }
 
-    // 2. Look it up (no-op when no provider is configured).
-    const search = await runSearch(query);
+    // 2. Compose the panel for this mode.
+    const convoOrNone = conversation || '(no conversation yet)';
+    let system: string;
+    if (mode === 'challenge') {
+      system = buildChallengePrompt(label, type, convoOrNone);
+    } else if (mode === 'trace') {
+      const lineage = describeLineage(sanitizeMap(body?.map), String(body?.nodeId ?? ''))
+        .map((l) => `  - ${l}`)
+        .join('\n');
+      system = buildTracePrompt(label, type, indexed || '(no conversation yet)', lineage);
+    } else if (mode === 'research') {
+      system = buildResearchPrompt(label, type, convoOrNone, concept, search.results);
+    } else {
+      system = buildExplorePrompt(label, type, convoOrNone, concept, search.results);
+    }
 
-    // 3. Compose the lens.
-    const composed = await complete(
-      buildExplorePrompt(label, type, conversation || '(no conversation yet)', concept, search.results),
-      'Compose the panel.',
-      600
-    );
+    const composed = await complete(system, 'Compose the panel.', 700);
     const parsed = JSON.parse(composed.choices?.[0]?.message?.content || '{}');
-    const explore = sanitizeExplore(parsed, search, concept);
+    const explore = sanitizeExplore(parsed, search, concept, mode, turns);
     if (!explore) {
       return NextResponse.json({ error: 'Could not compose' }, { status: 502 });
     }
 
     return NextResponse.json({
       explore,
-      searchAvailable: searchConfigured(),
+      searchAvailable: MODE_META[mode].searches ? searchConfigured() : true,
     });
   } catch (e) {
     console.error('logos explore error:', e);
