@@ -64,6 +64,9 @@ export function ThinkingMap({
   onAction,
   explored,
   changed,
+  relevant,
+  canFocus,
+  onFocus,
 }: {
   map: TMap;
   initialLens?: LensId;
@@ -73,6 +76,11 @@ export function ThinkingMap({
   explored?: Set<string>;
   /** ids that moved in the last extraction, briefly highlighted */
   changed?: Set<string>;
+  /** ids the passage being written touches — a soft, persistent light */
+  relevant?: Set<string>;
+  /** the draft is open, so a node can be held in view while writing */
+  canFocus?: boolean;
+  onFocus?: (node: MapNodeRef) => void;
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const posRef = useRef<Map<string, P>>(new Map());
@@ -475,7 +483,7 @@ export function ThinkingMap({
                   explored?.has(p.id) ? ' is-explored' : ''
                 }${changed?.has(p.id) ? ' is-changed' : ''}${
                   menuFor === p.id ? ' is-open' : ''
-                }`}
+                }${relevant?.has(p.id) ? ' is-relevant' : ''}`}
                 aria-haspopup="menu"
                 aria-expanded={menuFor === p.id}
                 onMouseEnter={() => setHovered(p.id)}
@@ -550,6 +558,22 @@ export function ThinkingMap({
                     <span className="lg-act-blurb">{MODE_META[m].blurb}</span>
                   </button>
                 ))}
+                {/* Only offered while the draft is open — it holds the node
+                    beside the writing, and copies nothing into it. */}
+                {canFocus && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="lg-act lg-act-focus"
+                    onClick={() => {
+                      setMenu(null);
+                      onFocus?.({ id: node.id, label: node.label, type: node.type });
+                    }}
+                  >
+                    <span className="lg-act-label">Hold in view</span>
+                    <span className="lg-act-blurb">Keep this beside the draft</span>
+                  </button>
+                )}
               </div>
             );
           })()}

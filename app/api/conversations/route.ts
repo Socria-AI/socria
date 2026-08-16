@@ -46,6 +46,17 @@ function sanitizeMessages(raw: unknown): Msg[] {
 type Kind = 'chat' | 'logos';
 const asKind = (v: unknown): Kind => (v === 'logos' ? 'logos' : 'chat');
 
+// The draft is the person's own writing, so it is stored verbatim — only
+// bounded, never reformatted or cleaned up on their behalf.
+const MAX_DRAFT_HTML = 200_000;
+function sanitizeDraft(raw: any): { title: string; html: string } | null {
+  if (!raw || typeof raw !== 'object' || typeof raw.html !== 'string') return null;
+  return {
+    title: typeof raw.title === 'string' ? raw.title.slice(0, MAX_TITLE) : '',
+    html: raw.html.slice(0, MAX_DRAFT_HTML),
+  };
+}
+
 export async function GET() {
   const { userId } = auth();
   if (!userId) {
@@ -55,7 +66,7 @@ export async function GET() {
   try {
     const { data, error } = await supabaseAdmin()
       .from('conversations')
-      .select('id, title, messages, memory, kind, map, updated_at')
+      .select('id, title, messages, memory, kind, map, draft, updated_at')
       .eq('user_id', userId)
       .order('updated_at', { ascending: false });
 
@@ -74,6 +85,7 @@ export async function GET() {
       memory: c.memory ?? EMPTY_MEMORY,
       kind: asKind(c.kind),
       map: c.map ?? EMPTY_MAP,
+      draft: c.draft ?? null,
       updatedAt: Number(c.updated_at),
     }));
     return NextResponse.json({ conversations });
@@ -112,6 +124,7 @@ export async function PUT(req: NextRequest) {
       memory: sanitizeMemory(c.memory ?? EMPTY_MEMORY),
       kind: asKind(c.kind),
       map: sanitizeMap(c.map ?? EMPTY_MAP),
+      draft: sanitizeDraft(c.draft),
       updated_at: Number(c.updatedAt) || Date.now(),
     });
 

@@ -14,8 +14,12 @@ import { ThinkingMap, type MapNodeRef } from '@/components/ThinkingMap';
 import { ExplorePanel } from '@/components/ExplorePanel';
 import { LogosRail } from '@/components/LogosRail';
 import { AttachmentList, LogosComposer, type Draft } from '@/components/LogosComposer';
+import { DraftSpace, type DraftHandle, type DraftSelection } from '@/components/DraftSpace';
+import { DraftResponsePanel } from '@/components/DraftResponsePanel';
 import type { Attachment } from '@/lib/logos-attachments';
+import { relevantNodes, type DraftAction, type DraftResponse } from '@/lib/logos-draft';
 import {
+  CONTEXT_LABEL,
   EMPTY_MAP,
   describeLineage,
   diffMaps,
@@ -92,6 +96,23 @@ export default function LogosPage() {
   const [focusBusy, setFocusBusy] = useState(false);
   const [focusError, setFocusError] = useState<string | null>(null);
 
+  // ── draft space ────────────────────────────────────────────────────
+  // The third surface. Off by default: someone opening Logos for the first
+  // time should meet a conversation, not a workspace.
+  const [draftOpen, setDraftOpen] = useState(false);
+  const [draftFocus, setDraftFocus] = useState<MapNodeRef | null>(null);
+  const [relevant, setRelevant] = useState<Set<string>>(new Set());
+  const [dr, setDr] = useState<{
+    open: boolean;
+    action: DraftAction;
+    selection: string;
+    data: DraftResponse | null;
+    loading: boolean;
+    error: string | null;
+  }>({ open: false, action: 'clarify', selection: '', data: null, loading: false, error: null });
+  const drSeq = useRef(0);
+  const draftRef = useRef<DraftHandle>(null);
+
   const bottomRef = useRef<HTMLDivElement>(null);
   const sessionsRef = useRef<LogosSession[]>([]);
   sessionsRef.current = sessions;
@@ -109,6 +130,7 @@ export default function LogosPage() {
   );
   const messages = active?.messages ?? [];
   const map = active?.map ?? EMPTY_MAP;
+  const draft = active?.draft ?? { title: '', html: '' };
   const mapRef = useRef<TMap>(EMPTY_MAP);
   mapRef.current = map;
 
@@ -323,6 +345,75 @@ export default function LogosPage() {
     }, CHANGE_FLASH_MS);
     return () => clearTimeout(t);
   }, [changed, deltaNote]);
+
+  // ── draft ──────────────────────────────────────────────────────────
+  // Writing is saved on a timer rather than per keystroke: a network round
+  // trip per character would be absurd, and losing a sentence would be worse.
+  const draftSave = useRef<ReturnType<typeof setTimeout> | null>(null);
+  function patchDraft(next: { title?: string; html?: string }) {
+    patchActive(
+      (s) => ({ ...s, draft: { ...(s.draft ?? { title: '', html: '' }), ...next } }),
+      false
+    );
+    if (draftSave.current) clearTimeout(draftSave.current);
+    draftSave.current = setTimeout(() => {
+      const id = activeIdRef.current;
+      const s = sessionsRef.current.find((x) => x.id === id);
+      if (s) void persist(s);
+    }, 1200);
+  }
+
+  // Save whatever is unsaved before the tab goes away.
+  useEffect(() => {
+    const flush = () => {
+      if (!draftSave.current) return;
+      clearTimeout(draftSave.current);
+      draftSave.current = null;
+      const s = sessionsRef.current.find((x) => x.id === activeIdRef.current);
+      if (s) void persist(s);
+    };
+    window.addEventListener('beforeunload', flush);
+    return () => {
+      window.removeEventListener('beforeunload', flush);
+      flush();
+    };
+  }, [persist]);
+
+  /** The map softly lights whatever the passage being written touches. */
+  function onDraftSelect(sel: DraftSelection | null) {
+    const passage = sel?.text.trim() || sel?.around || '';
+    setRelevant(new Set(passage ? relevantNodes(mapRef.current, passage) : []));
+  }
+
+  async function runDraftAction(action: DraftAction, sel: DraftSelection) {
+    const seq = ++drSeq.current;
+    setDr({ open: true, action, selection: sel.text, data: null, loading: true, error: null });
+    try {
+      const res = await fetch('/api/logos/draft', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...keyHeaders() },
+        body: JSON.stringify({
+          action,
+          selection: sel.text,
+          around: sel.around,
+          map: mapRef.current,
+        }),
+      });
+      if (!res.ok) {
+        const b = await res.json().catch(() => ({}));
+        throw new Error(b.error || 'Could not work with that passage.');
+      }
+      const json = await res.json();
+      if (seq !== drSeq.current) return;
+      const result: DraftResponse | null = json?.result ?? null;
+      setDr((d) => ({ ...d, data: result, loading: false }));
+      // Trace lights the reasoning the passage actually rests on.
+      if (result?.action === 'trace') setRelevant(new Set(result.nodeIds ?? []));
+    } catch (e: any) {
+      if (seq !== drSeq.current) return;
+      setDr((d) => ({ ...d, loading: false, error: e?.message || 'Something went wrong.' }));
+    }
+  }
 
   // ── acting on a node ───────────────────────────────────────────────
   async function runAction(mode: NodeMode, node: MapNodeRef) {
@@ -591,7 +682,9 @@ export default function LogosPage() {
 
   return (
     <div className="logos-root">
-      <div className={`lg-split${railOpen ? '' : ' rail-closed'}`}>
+      <div
+        className={`lg-split${railOpen ? '' : ' rail-closed'}${draftOpen ? ' draft-open' : ''}`}
+      >
         <LogosRail
           sessions={sessions}
           activeId={activeId}
@@ -609,6 +702,19 @@ export default function LogosPage() {
           <header className="lg-head">
             <span className="lg-word">Logos</span>
             <span className="lg-head-note">A reasoning environment</span>
+            {/* Deep ceiling, quiet door. It nudges only once the thinking
+                has actually turned into something worth writing. */}
+            <button
+              type="button"
+              className={`lg-draft-open${
+                !draftOpen && (map.context === 'writing' || map.context === 'creating')
+                  ? ' is-nudged'
+                  : ''
+              }${draftOpen ? ' is-on' : ''}`}
+              onClick={() => setDraftOpen((v) => !v)}
+            >
+              Draft
+            </button>
             <a href="/chat" className="lg-back">
               Socria chat <span aria-hidden="true">→</span>
             </a>
@@ -676,7 +782,12 @@ export default function LogosPage() {
         {/* ── Thinking Map ───────────────────────────────── */}
         <section className="lg-panel" aria-label="Thinking map">
           <header className="lg-panel-head">
-            <span className="lg-panel-title">Thinking Map</span>
+            <span className="lg-panel-title">
+              Thinking Map
+              {/* What kind of thinking this turned out to be — read from the
+                  conversation, never chosen from a menu. */}
+              {map.context && <em className="lg-panel-context">{CONTEXT_LABEL[map.context]}</em>}
+            </span>
             {deltaNote && !mapping ? (
               <span className="lg-panel-delta">{deltaNote}</span>
             ) : (
@@ -694,6 +805,9 @@ export default function LogosPage() {
             onAction={runAction}
             explored={exploredIds}
             changed={changed}
+            relevant={relevant}
+            canFocus={draftOpen}
+            onFocus={(node) => setDraftFocus(node)}
           />
           <ExplorePanel
             open={explore.open}
@@ -714,6 +828,42 @@ export default function LogosPage() {
             onClose={() => setExplore((e) => ({ ...e, open: false }))}
           />
         </section>
+
+        {/* ── Draft ──────────────────────────────────────── */}
+        {draftOpen && (
+          <div className="lg-draft-col">
+            <DraftSpace
+              ref={draftRef}
+              html={draft.html}
+              onChange={(html) => patchDraft({ html })}
+              title={draft.title}
+              onTitle={(title) => patchDraft({ title })}
+              focus={
+                draftFocus
+                  ? { ...draftFocus, lineage: describeLineage(map, draftFocus.id) }
+                  : null
+              }
+              onClearFocus={() => setDraftFocus(null)}
+              onSelect={onDraftSelect}
+              onAction={runDraftAction}
+              busy={dr.loading}
+              onClose={() => setDraftOpen(false)}
+            />
+            <DraftResponsePanel
+              open={dr.open}
+              loading={dr.loading}
+              error={dr.error}
+              action={dr.action}
+              selection={dr.selection}
+              data={dr.data}
+              onApply={(text) => {
+                draftRef.current?.applyProposal(text);
+                setDr((d) => ({ ...d, open: false }));
+              }}
+              onClose={() => setDr((d) => ({ ...d, open: false }))}
+            />
+          </div>
+        )}
       </div>
     </div>
   );

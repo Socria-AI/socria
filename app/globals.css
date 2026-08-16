@@ -2788,6 +2788,24 @@ html.js-anim .scrolly-root .fade.d3 { transition-delay: .3s; }
   height: 100%;
 }
 .logos-root .lg-split.rail-closed { grid-template-columns: 46px minmax(360px, 1fr) 1.12fr; }
+/* Three surfaces at once is a lot of room to ask for, so the rail steps
+   aside rather than the map being taken away. */
+.logos-root .lg-split.draft-open,
+.logos-root .lg-split.draft-open.rail-closed {
+  /* The rail is removed from the grid entirely, not just hidden — leaving its
+     column behind shunts every surface one slot to the left. */
+  grid-template-columns: minmax(300px, 0.82fr) 1fr minmax(380px, 1.06fr);
+}
+.logos-root .lg-split.draft-open .lg-rail { display: none; }
+@media (max-width: 1500px) {
+  /* Below this the map and the draft can't both be usable — the draft is
+     what you opened, so the map folds away and the chat stays. */
+  .logos-root .lg-split.draft-open,
+  .logos-root .lg-split.draft-open.rail-closed {
+    grid-template-columns: minmax(300px, 0.8fr) minmax(400px, 1.1fr);
+  }
+  .logos-root .lg-split.draft-open .lg-panel { display: none; }
+}
 @media (max-width: 1180px) {
   .logos-root .lg-split { grid-template-columns: 200px minmax(320px, 1fr) 1.05fr; }
 }
@@ -3154,6 +3172,38 @@ html.js-anim .scrolly-root .fade.d3 { transition-delay: .3s; }
   text-decoration: underline;
   text-underline-offset: 2px;
 }
+.logos-root .lg-att-origin {
+  flex-basis: 100%;
+  display: flex;
+  gap: 3px;
+  margin-top: 2px;
+}
+.logos-root .lg-att-origin button {
+  padding: 3px 9px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  font: inherit;
+  font-size: 10.5px;
+  color: var(--lg-ink-40);
+  cursor: pointer;
+  transition: color 0.18s, background 0.18s, border-color 0.18s;
+}
+.logos-root .lg-att-origin button:hover { color: var(--lg-ink); }
+.logos-root .lg-att-origin button.is-on {
+  background: #fff;
+  border-color: var(--lg-line);
+  color: var(--lg-primary);
+}
+.logos-root .lg-att-origin-tag {
+  margin-left: 8px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(38, 70, 83, 0.1);
+  color: var(--lg-accent);
+  font-size: 9.5px;
+  letter-spacing: 0.04em;
+}
 .logos-root .lg-att-x {
   flex: 0 0 auto;
   border: none; background: transparent;
@@ -3225,6 +3275,17 @@ html.js-anim .scrolly-root .fade.d3 { transition-delay: .3s; }
   letter-spacing: 0.2em;
   text-transform: uppercase;
   color: var(--lg-ink-40);
+}
+.logos-root .lg-panel-context {
+  margin-left: 9px;
+  padding-left: 9px;
+  border-left: 1px solid var(--lg-line);
+  font-style: normal;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  color: var(--lg-accent);
+  opacity: 0.8;
+  animation: lgFade 0.5s ease both;
 }
 .logos-root .lg-panel-state {
   font-size: 11px;
@@ -3346,6 +3407,27 @@ html.js-anim .scrolly-root .fade.d3 { transition-delay: .3s; }
 .logos-root .lg-node-tension .lg-node-type { color: var(--lg-tension); }
 .logos-root .lg-node-consequence { background: #F7F4EC; border-color: #E2DAC6; }
 .logos-root .lg-node-consequence .lg-node-type { color: #7A6A4A; }
+
+/* types that carry writing, research, learning, making and planning —
+   same grammar as above so a map reads as one family whatever it is of */
+.logos-root .lg-node-claim      { background: #FFFDF7; border-color: #DCD3B8; }
+.logos-root .lg-node-claim .lg-node-type { color: #7A6A3A; }
+.logos-root .lg-node-counterpoint { background: #FAF0EC; border-color: #E4C6B8; }
+.logos-root .lg-node-counterpoint .lg-node-type { color: var(--lg-tension); }
+.logos-root .lg-node-source     { background: #fff; border-color: #D3DCE2; }
+.logos-root .lg-node-source .lg-node-type { color: var(--lg-accent); }
+.logos-root .lg-node-concept    { background: #F2F4F0; border-color: #D2DACB; }
+.logos-root .lg-node-concept .lg-node-type { color: #4F6247; }
+.logos-root .lg-node-misconception { background: #FAF1EF; border-color: #E6C9C2; }
+.logos-root .lg-node-misconception .lg-node-type { color: #9C5B4C; }
+.logos-root .lg-node-theme      { background: #F4F1F6; border-color: #DAD2E0; }
+.logos-root .lg-node-theme .lg-node-type { color: #6B5F7A; }
+.logos-root .lg-node-character  { background: #FBF3EC; border-color: #E6D2BE; }
+.logos-root .lg-node-character .lg-node-type { color: #8A6B4A; }
+.logos-root .lg-node-constraint { background: #F2F2EE; border-color: #D6D6CB; }
+.logos-root .lg-node-constraint .lg-node-type { color: #6B6B5C; }
+.logos-root .lg-node-milestone  { background: #EDF3E8; border-color: #C7D9BA; }
+.logos-root .lg-node-milestone .lg-node-type { color: #4F6B3C; }
 
 .logos-root .lg-legend {
   position: absolute;
@@ -3502,6 +3584,10 @@ html.js-anim .scrolly-root .fade.d3 { transition-delay: .3s; }
 .logos-root .lg-conn-revises   { color: #8E8C7A; }
 .logos-root .lg-conn-conflicts { color: var(--lg-tension); }
 .logos-root .lg-conn-relates   { color: rgba(35, 36, 31, 0.22); }
+.logos-root .lg-conn-precedes  { color: #8A9BA6; }
+.logos-root .lg-conn-part_of   { color: rgba(53, 70, 32, 0.3); }
+/* chronology reads as a sequence, not a claim of cause */
+.logos-root .lg-conn-precedes .lg-edge { stroke-dasharray: 5 3; }
 .logos-root .lg-conn.is-dim { opacity: 0.12; }
 .logos-root .lg-conn.is-lit .lg-edge { stroke-width: 1.9; }
 .logos-root .lg-conn-label {
@@ -3584,6 +3670,53 @@ html.js-anim .scrolly-root .fade.d3 { transition-delay: .3s; }
   border-left: 2px solid #CFC2A2;
 }
 .logos-root .lg-node-consequence .lg-node-label { font-style: italic; }
+/* claim — asserted, and therefore arguable: planted on a firm left edge */
+.logos-root .lg-node-claim {
+  border-radius: 4px 10px 10px 4px;
+  border-left: 2px solid #C4B482;
+}
+/* counterpoint — the case coming back the other way */
+.logos-root .lg-node-counterpoint {
+  border-radius: 10px 4px 4px 10px;
+  border-right: 2px solid #D8A992;
+}
+.logos-root .lg-node-counterpoint .lg-node-label { font-style: italic; }
+/* source — a spine, like a book on a shelf */
+.logos-root .lg-node-source {
+  border-radius: 3px;
+  border-left: 3px double var(--lg-accent);
+}
+/* concept — held, not argued */
+.logos-root .lg-node-concept { border-radius: 999px; padding-left: 15px; padding-right: 15px; }
+/* misconception — understood wrongly, and marked as such */
+.logos-root .lg-node-misconception {
+  border-radius: 10px;
+  border-style: dashed;
+  background-image: repeating-linear-gradient(
+    45deg,
+    rgba(156, 91, 76, 0.05) 0 5px,
+    transparent 5px 11px
+  );
+}
+/* theme — a thread that keeps returning */
+.logos-root .lg-node-theme {
+  border-radius: 14px;
+  border-top: 2px solid #C4B6D0;
+}
+.logos-root .lg-node-theme .lg-node-label { font-style: italic; }
+/* character — a figure, given a rounded head */
+.logos-root .lg-node-character { border-radius: 16px 16px 8px 8px; }
+/* constraint — a fixed limit: squared off, no give */
+.logos-root .lg-node-constraint {
+  border-radius: 2px;
+  border-width: 1px 3px;
+}
+/* milestone — a marker on the way */
+.logos-root .lg-node-milestone {
+  border-radius: 4px;
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%);
+  padding-right: 20px;
+}
 
 /* ── Explore drawer: what's known about one piece of reasoning ────── */
 .logos-root .lg-explore {
@@ -4050,3 +4183,293 @@ html.js-anim .scrolly-root .fade.d3 { transition-delay: .3s; }
   opacity: 0.55;
 }
 .logos-root .lg-node { position: relative; }
+
+/* ── Draft Space: the third surface ──────────────────────────────── */
+.logos-root .lg-draft-col {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  border-left: 1px solid var(--lg-line);
+  background: var(--lg-panel);
+}
+.logos-root .lg-draft {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
+.logos-root .lg-draft-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 18px 26px 10px;
+  flex: 0 0 auto;
+}
+.logos-root .lg-draft-title {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--lg-ink);
+}
+.logos-root .lg-draft-title::placeholder { color: var(--lg-ink-24); }
+.logos-root .lg-draft-count { font-size: 10.5px; color: var(--lg-ink-24); white-space: nowrap; }
+.logos-root .lg-draft-close {
+  flex: 0 0 auto;
+  width: 26px; height: 26px;
+  display: grid; place-items: center;
+  border: none; border-radius: 50%;
+  background: transparent;
+  color: var(--lg-ink-40);
+  cursor: pointer;
+  transition: color 0.2s, background 0.2s;
+}
+.logos-root .lg-draft-close:hover { color: var(--lg-ink); background: rgba(35, 36, 31, 0.07); }
+
+/* a node held beside the writing — context, never content */
+.logos-root .lg-draft-focus {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0 26px 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--lg-line);
+  border-radius: 10px;
+  background: #fff;
+  animation: lgFade 0.4s ease both;
+}
+.logos-root .lg-draft-focus-body { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 1px; }
+.logos-root .lg-draft-focus-body strong {
+  font-size: 12.5px; font-weight: 500; color: var(--lg-ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.logos-root .lg-draft-focus-body em {
+  font-size: 10.5px; font-style: italic; color: var(--lg-ink-40);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.logos-root .lg-draft-focus > button {
+  flex: 0 0 auto;
+  border: none; background: transparent;
+  color: var(--lg-ink-24);
+  font-size: 15px; line-height: 1;
+  padding: 2px 4px; cursor: pointer;
+}
+.logos-root .lg-draft-focus > button:hover { color: var(--lg-tension); }
+
+/* four controls, not a toolbar */
+.logos-root .lg-draft-tools {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 2px;
+  padding: 0 26px 8px;
+  opacity: 0.5;
+  transition: opacity 0.25s;
+}
+.logos-root .lg-draft-col:hover .lg-draft-tools,
+.logos-root .lg-draft-col:focus-within .lg-draft-tools { opacity: 1; }
+.logos-root .lg-draft-tools button {
+  min-width: 26px; height: 24px;
+  padding: 0 7px;
+  border: none; border-radius: 6px;
+  background: transparent;
+  font: inherit; font-size: 11px;
+  color: var(--lg-ink-40);
+  cursor: pointer;
+  transition: color 0.18s, background 0.18s;
+}
+.logos-root .lg-draft-tools button:hover { color: var(--lg-primary); background: rgba(53, 70, 32, 0.07); }
+
+.logos-root .lg-draft-sheet { position: relative; flex: 1; min-height: 0; overflow-y: auto; }
+.logos-root .lg-draft-body {
+  min-height: 100%;
+  padding: 6px 26px 40vh;
+  outline: none;
+  font-size: 16px;
+  line-height: 1.75;
+  color: var(--lg-ink);
+  caret-color: var(--lg-primary);
+}
+.logos-root .lg-draft-body:empty::before,
+.logos-root .lg-draft-body > p:only-child:empty::before {
+  content: attr(data-placeholder);
+  color: var(--lg-ink-24);
+  pointer-events: none;
+}
+.logos-root .lg-draft-body:empty::before { content: attr(data-placeholder); }
+.logos-root .lg-draft-body p { margin: 0 0 1em; }
+.logos-root .lg-draft-body h2 {
+  margin: 1.5em 0 0.5em;
+  font-size: 21px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  line-height: 1.3;
+}
+.logos-root .lg-draft-body h3 {
+  margin: 1.3em 0 0.4em;
+  font-size: 16.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.logos-root .lg-draft-body blockquote {
+  margin: 0 0 1em;
+  padding-left: 14px;
+  border-left: 2px solid var(--lg-line);
+  color: var(--lg-ink-60);
+  font-style: italic;
+}
+.logos-root .lg-draft-body ::selection { background: rgba(53, 70, 32, 0.16); }
+
+/* the only affordance in the room, and only once you've selected your words */
+.logos-root .lg-draft-menu {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  z-index: 25;
+  display: flex;
+  gap: 1px;
+  padding: 3px;
+  background: #fff;
+  border: 1px solid var(--lg-line);
+  border-radius: 10px;
+  box-shadow: 0 14px 34px -20px rgba(35, 36, 31, 0.6);
+  /* Its own keyframes: lgFade ends at transform:none, which would wipe out
+     the translate that lifts this clear of the line being read. */
+  animation: lgMenuIn 0.16s ease both;
+}
+@keyframes lgMenuIn {
+  from { opacity: 0; transform: translate(-50%, calc(-100% + 5px)); }
+  to { opacity: 1; transform: translate(-50%, -100%); }
+}
+@media (prefers-reduced-motion: reduce) { .logos-root .lg-draft-menu { animation: none; } }
+.logos-root .lg-draft-menu button {
+  padding: 5px 9px;
+  border: none; border-radius: 7px;
+  background: transparent;
+  font: inherit; font-size: 11.5px;
+  color: var(--lg-ink-60);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.16s, background 0.16s;
+}
+.logos-root .lg-draft-menu button:hover { color: var(--lg-primary); background: rgba(53, 70, 32, 0.08); }
+.logos-root .lg-draft-menu button:disabled { opacity: 0.4; cursor: default; }
+
+/* the quiet door to the draft */
+.logos-root .lg-draft-open {
+  margin-left: auto;
+  padding: 4px 11px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  font: inherit; font-size: 11.5px;
+  letter-spacing: 0.04em;
+  color: var(--lg-ink-40);
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s, background 0.2s;
+}
+.logos-root .lg-draft-open:hover { color: var(--lg-primary); border-color: var(--lg-line); }
+.logos-root .lg-draft-open.is-on { color: var(--lg-primary); border-color: var(--lg-line); background: #fff; }
+.logos-root .lg-draft-open.is-nudged { color: var(--lg-accent); border-color: rgba(38, 70, 83, 0.28); }
+.logos-root .lg-head .lg-back { margin-left: 14px; }
+
+/* ── what a draft action gave back ───────────────────────────────── */
+.logos-root .lg-dr {
+  flex: 0 0 auto;
+  max-height: 52%;
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--lg-line);
+  background: #fff;
+  animation: lgFade 0.3s ease both;
+}
+.logos-root .lg-dr-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 20px 6px;
+  flex: 0 0 auto;
+}
+.logos-root .lg-dr-action {
+  font-size: 10px; font-weight: 600; letter-spacing: 0.18em;
+  text-transform: uppercase; color: var(--lg-primary);
+}
+.logos-root .lg-dr-sel {
+  flex: 0 0 auto;
+  margin: 0 20px 8px;
+  padding-left: 11px;
+  border-left: 2px solid rgba(53, 70, 32, 0.28);
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--lg-ink-40);
+  max-height: 3.2em;
+  overflow: hidden;
+}
+.logos-root .lg-dr-body { flex: 1; min-height: 0; overflow-y: auto; padding: 0 20px 18px; }
+.logos-root .lg-dr-prose { font-size: 14.5px; line-height: 1.65; color: var(--lg-ink); }
+.logos-root .lg-dr-points {
+  list-style: none; padding: 0; margin: 14px 0 0;
+  display: flex; flex-direction: column; gap: 9px;
+}
+.logos-root .lg-dr-points li {
+  position: relative; padding-left: 15px;
+  font-size: 13.5px; line-height: 1.6; color: var(--lg-ink-60);
+}
+.logos-root .lg-dr-points li::before {
+  content: ""; position: absolute; left: 0; top: 8px;
+  width: 5px; height: 5px; border-radius: 50%;
+  background: var(--lg-accent); opacity: 0.5;
+}
+.logos-root .lg-dr-proposal {
+  margin-top: 16px;
+  padding: 14px 15px;
+  border: 1px solid var(--lg-line);
+  border-radius: 12px;
+  background: rgba(53, 70, 32, 0.035);
+}
+.logos-root .lg-dr-proposal > p {
+  margin: 0;
+  font-size: 14.5px;
+  line-height: 1.65;
+  color: var(--lg-ink);
+}
+.logos-root .lg-dr-changes {
+  list-style: none; padding: 0; margin: 12px 0 0;
+  display: flex; flex-direction: column; gap: 5px;
+}
+.logos-root .lg-dr-changes li {
+  font-size: 11.5px; line-height: 1.5; color: var(--lg-ink-40);
+  padding-left: 12px; position: relative;
+}
+.logos-root .lg-dr-changes li::before { content: "—"; position: absolute; left: 0; color: var(--lg-ink-24); }
+.logos-root .lg-dr-actions { display: flex; gap: 7px; margin-top: 14px; }
+.logos-root .lg-dr-apply {
+  padding: 7px 14px;
+  border: none; border-radius: 9px;
+  background: var(--lg-primary); color: var(--lg-paper);
+  font: inherit; font-size: 12.5px; cursor: pointer;
+  transition: transform 0.2s;
+}
+.logos-root .lg-dr-apply:hover { transform: translateY(-1px); }
+.logos-root .lg-dr-keep {
+  padding: 7px 14px;
+  border: 1px solid var(--lg-line); border-radius: 9px;
+  background: transparent; color: var(--lg-ink-60);
+  font: inherit; font-size: 12.5px; cursor: pointer;
+}
+.logos-root .lg-dr-keep:hover { color: var(--lg-ink); }
+.logos-root .lg-dr-fine {
+  margin-top: 10px;
+  font-size: 11px; font-style: italic; color: var(--lg-ink-40);
+}
+
+/* a node the passage being written actually touches */
+.logos-root .lg-node.is-relevant {
+  border-color: rgba(38, 70, 83, 0.45);
+  box-shadow: 0 0 0 3px rgba(38, 70, 83, 0.09);
+}
+.logos-root .lg-act-focus .lg-act-label { color: var(--lg-accent); }

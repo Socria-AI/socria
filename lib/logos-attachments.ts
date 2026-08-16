@@ -14,10 +14,25 @@
 
 export type AttachmentKind = 'note' | 'image';
 
+// Whose thinking this is. The distinction is load-bearing: a map that turns a
+// quoted author's position into the user's own belief is worse than a map that
+// missed it, because they'd be looking at a picture of someone else's mind and
+// believing it was theirs.
+export const ORIGINS = ['mine', 'source', 'context'] as const;
+export type AttachmentOrigin = (typeof ORIGINS)[number];
+
+export const ORIGIN_LABEL: Record<AttachmentOrigin, string> = {
+  mine: 'My thinking',
+  source: 'Source material',
+  context: 'Context',
+};
+
 export interface Attachment {
   kind: AttachmentKind;
   /** original file name, when it came from one */
   name?: string;
+  /** whose thinking this is — defaults to a guess, always correctable */
+  origin?: AttachmentOrigin;
   /** note: the full text */
   text?: string;
   /** note: word count, shown on the chip */
@@ -51,6 +66,21 @@ function clip(v: unknown, n: number): string {
   return typeof v === 'string' ? v.slice(0, n) : '';
 }
 
+/**
+ * A first guess at whose words these are, so the common case needs no
+ * decision. Deliberately crude and deliberately biased toward "source": being
+ * wrongly asked to confirm is cheap, and quietly adopting someone else's
+ * convictions as the user's is not.
+ */
+export function guessOrigin(text: string): AttachmentOrigin {
+  const sample = text.slice(0, 4000);
+  const words = Math.max(wordCount(sample), 1);
+  const first = (sample.match(/\b(I|I'm|I’m|I've|I’ve|my|me|myself)\b/gi) || []).length;
+  // Roughly one first-person marker every forty words reads as someone
+  // writing about their own thinking.
+  return first / words > 0.025 ? 'mine' : 'source';
+}
+
 /** Trust nothing from the client: shape, size and count are all enforced here. */
 export function sanitizeAttachments(raw: unknown): Attachment[] {
   if (!Array.isArray(raw)) return [];
@@ -63,6 +93,7 @@ export function sanitizeAttachments(raw: unknown): Attachment[] {
       out.push({
         kind: 'note',
         name: clip(a.name, MAX_NAME) || undefined,
+        origin: ORIGINS.includes(a.origin) ? (a.origin as AttachmentOrigin) : guessOrigin(text),
         text,
         words: wordCount(text),
       });
@@ -100,13 +131,22 @@ export function renderMessageForModel(m: RenderableMsg, full = false): string {
 
   for (const a of m.attachments ?? []) {
     if (a.kind === 'note') {
-      const label = a.name ? `Attached note “${a.name}”` : 'Attached note';
+      const named = a.name ? `Attached note “${a.name}”` : 'Attached note';
+      // The tag is the whole point of the block — it tells everything
+      // downstream whether these convictions may be attributed to the user.
+      const whose =
+        a.origin === 'source'
+          ? 'source material — NOT the user’s own position'
+          : a.origin === 'context'
+            ? 'context they supplied but do not necessarily endorse'
+            : 'my thinking — the user’s own words';
       const text = a.text ?? '';
+      const count = a.words ?? wordCount(text);
       if (full || text.length <= HISTORY_NOTE_CHARS) {
-        parts.push(`[${label} — ${a.words ?? wordCount(text)} words]\n${text}`);
+        parts.push(`[${named} — ${whose} — ${count} words]\n${text}`);
       } else {
         parts.push(
-          `[${label} — ${a.words ?? wordCount(text)} words, opening only]\n${text.slice(
+          `[${named} — ${whose} — ${count} words, opening only]\n${text.slice(
             0,
             HISTORY_NOTE_CHARS
           )}…`

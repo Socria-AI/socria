@@ -8,8 +8,16 @@
 // work from the same material.
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import type { Attachment } from '@/lib/logos-attachments';
-import { NOTE_THRESHOLD, MAX_ATTACHMENTS, MAX_NOTE_CHARS, wordCount } from '@/lib/logos-attachments';
+import type { Attachment, AttachmentOrigin } from '@/lib/logos-attachments';
+import {
+  NOTE_THRESHOLD,
+  MAX_ATTACHMENTS,
+  MAX_NOTE_CHARS,
+  ORIGINS,
+  ORIGIN_LABEL,
+  guessOrigin,
+  wordCount,
+} from '@/lib/logos-attachments';
 import { isImageFile, isTextFile, prepareImage, readTextFile } from '@/lib/logos-upload';
 
 export interface Draft extends Attachment {
@@ -24,9 +32,12 @@ const nextId = () => `att_${++seq}_${Date.now().toString(36)}`;
 export function AttachmentList({
   items,
   onRemove,
+  onOrigin,
 }: {
   items: (Attachment & { id?: string; status?: string; error?: string })[];
   onRemove?: (id: string) => void;
+  /** correcting whose thinking a note is — only offered while it's a draft */
+  onOrigin?: (id: string, origin: AttachmentOrigin) => void;
 }) {
   const [openNote, setOpenNote] = useState<string | null>(null);
   if (!items.length) return null;
@@ -71,6 +82,9 @@ export function AttachmentList({
                   <span className="lg-att-name">{a.name || 'Pasted note'}</span>
                   <span className="lg-att-sub">
                     {(a.words ?? wordCount(a.text ?? '')).toLocaleString()} words
+                    {!onOrigin && a.origin && a.origin !== 'mine' && (
+                      <span className="lg-att-origin-tag">{ORIGIN_LABEL[a.origin]}</span>
+                    )}
                     {a.text ? (
                       <button
                         type="button"
@@ -94,6 +108,25 @@ export function AttachmentList({
               >
                 ×
               </button>
+            )}
+
+            {/* Whose words these are. Guessed, shown quietly, always
+                correctable — the map treats the three very differently. */}
+            {onOrigin && a.id && a.kind === 'note' && (
+              <div className="lg-att-origin" role="radiogroup" aria-label="Whose thinking is this?">
+                {ORIGINS.map((o) => (
+                  <button
+                    key={o}
+                    type="button"
+                    role="radio"
+                    aria-checked={(a.origin ?? 'mine') === o}
+                    className={(a.origin ?? 'mine') === o ? 'is-on' : undefined}
+                    onClick={() => onOrigin(a.id!, o)}
+                  >
+                    {ORIGIN_LABEL[o]}
+                  </button>
+                ))}
+              </div>
             )}
 
             {isOpen && a.text && <pre className="lg-att-full">{a.text}</pre>}
@@ -162,6 +195,7 @@ export function LogosComposer({
       id: nextId(),
       kind: 'note',
       name,
+      origin: guessOrigin(clipped),
       text: clipped,
       words: wordCount(clipped),
       status: 'ready',
@@ -263,6 +297,9 @@ export function LogosComposer({
         <AttachmentList
           items={drafts}
           onRemove={(id) => setDrafts((prev) => prev.filter((d) => d.id !== id))}
+          onOrigin={(id, origin) =>
+            setDrafts((prev) => prev.map((d) => (d.id === id ? { ...d, origin } : d)))
+          }
         />
 
         <div className="lg-composer-row">

@@ -23,6 +23,15 @@ const TONE: Record<LogosNodeType, string> = {
   question: 'var(--lg-ink-40)',
   tension: 'var(--lg-tension)',
   consequence: 'var(--lg-accent)',
+  claim: 'var(--lg-secondary)',
+  counterpoint: 'var(--lg-tension)',
+  source: 'var(--lg-accent)',
+  concept: 'var(--lg-primary)',
+  misconception: 'var(--lg-tension)',
+  theme: '#6B5F7A',
+  character: '#8A6B4A',
+  constraint: 'var(--lg-ink-40)',
+  milestone: 'var(--lg-primary)',
 };
 
 function hash(s: string): number {

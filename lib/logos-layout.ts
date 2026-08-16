@@ -68,6 +68,8 @@ export const RELATION_LABEL: Record<LogosRelation, string> = {
   relates: 'relates to',
   leads_to: 'leads to',
   revises: 'revises',
+  precedes: 'comes before',
+  part_of: 'sits inside',
 };
 
 const CARD_W = 150;
@@ -87,11 +89,13 @@ export function availableLenses(map: ThinkingMap): LensId[] {
   if (map.nodes.length > 1) out.push('structure');
   if (
     map.edges.some((e) => e.relation === 'conflicts') ||
-    map.nodes.some((n) => n.type === 'tension')
+    map.nodes.some((n) => n.type === 'tension' || n.type === 'counterpoint')
   ) {
     out.push('tensions');
   }
-  if (map.nodes.some((n) => n.type === 'evidence')) out.push('evidence');
+  // Support means the same thing whether it's evidence under a decision or
+  // evidence under a claim in an essay.
+  if (map.nodes.some((n) => n.type === 'evidence' || n.type === 'source')) out.push('evidence');
   return out;
 }
 
@@ -108,6 +112,8 @@ const HIERARCHY: Partial<Record<LogosRelation, 'to-above' | 'from-above'>> = {
   depends: 'to-above',
   relates: 'to-above',
   leads_to: 'from-above',
+  // a section hangs beneath the piece it belongs to
+  part_of: 'to-above',
 };
 
 export function layoutStructure(map: ThinkingMap, w: number, h: number): Layout {
@@ -133,21 +139,34 @@ export function layoutStructure(map: ThinkingMap, w: number, h: number): Layout 
   // from crowding the top row next to the goal.
   const BAND: Record<string, number> = {
     goal: 0,
+    theme: 1,
     decision: 1,
     value: 1,
+    concept: 1,
+    character: 1,
     belief: 2,
     idea: 2,
+    claim: 2,
+    constraint: 2,
+    milestone: 2,
     question: 3,
     tension: 3,
     assumption: 3,
+    misconception: 3,
+    counterpoint: 3,
     evidence: 4,
+    source: 4,
     consequence: 4,
   };
 
-  // Prefer real anchors as roots: goals, else decisions, else whatever has
-  // no parent. Everything else hangs beneath rather than sitting alongside.
-  const anchors = nodes.filter((n) => n.type === 'goal' && !hasParent.has(n.id));
-  const fallback = nodes.filter((n) => n.type === 'decision' && !hasParent.has(n.id));
+  // Prefer real anchors as roots: whatever the piece is actually about, then
+  // choices, then whatever has no parent. Everything else hangs beneath.
+  const anchors = nodes.filter(
+    (n) => (n.type === 'goal' || n.type === 'theme') && !hasParent.has(n.id)
+  );
+  const fallback = nodes.filter(
+    (n) => (n.type === 'decision' || n.type === 'concept') && !hasParent.has(n.id)
+  );
   const roots = (anchors.length ? anchors : fallback.length ? fallback : nodes.filter((n) => !hasParent.has(n.id)));
   if (!roots.length) return emptyLayout('structure', 'Not enough structure yet.');
 
@@ -229,7 +248,9 @@ export function layoutStructure(map: ThinkingMap, w: number, h: number): Layout 
 export function layoutTensions(map: ThinkingMap, w: number, h: number): Layout {
   const conflicts = map.edges.filter((e) => e.relation === 'conflicts');
   const byId = new Map(map.nodes.map((n) => [n.id, n]));
-  const tensionNodes = map.nodes.filter((n) => n.type === 'tension');
+  const tensionNodes = map.nodes.filter(
+    (n) => n.type === 'tension' || n.type === 'counterpoint'
+  );
 
   if (!conflicts.length && !tensionNodes.length) {
     return emptyLayout('tensions', 'No tensions surfaced yet.');
@@ -279,7 +300,7 @@ export function layoutTensions(map: ThinkingMap, w: number, h: number): Layout {
 
 // ── evidence: claims and what supports them ─────────────────────────
 export function layoutEvidence(map: ThinkingMap, w: number, h: number): Layout {
-  const evidence = map.nodes.filter((n) => n.type === 'evidence');
+  const evidence = map.nodes.filter((n) => n.type === 'evidence' || n.type === 'source');
   if (!evidence.length) return emptyLayout('evidence', 'No evidence offered yet.');
 
   const byId = new Map(map.nodes.map((n) => [n.id, n]));
@@ -288,7 +309,8 @@ export function layoutEvidence(map: ThinkingMap, w: number, h: number): Layout {
   const supportOf = new Map<string, string[]>();
   for (const e of map.edges) {
     if (e.relation !== 'supports') continue;
-    if (byId.get(e.from)?.type !== 'evidence') continue;
+    const fromType = byId.get(e.from)?.type;
+    if (fromType !== 'evidence' && fromType !== 'source') continue;
     claimIds.add(e.to);
     if (!supportOf.has(e.to)) supportOf.set(e.to, []);
     supportOf.get(e.to)!.push(e.from);

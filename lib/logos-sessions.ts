@@ -18,11 +18,20 @@ export interface LogosMsg {
   attachments?: Attachment[];
 }
 
+/** What the person actually wrote. Theirs — Logos never writes into it. */
+export interface LogosDraft {
+  title: string;
+  html: string;
+}
+
+export const EMPTY_DRAFT: LogosDraft = { title: '', html: '' };
+
 export interface LogosSession {
   id: string;
   title: string;
   messages: LogosMsg[];
   map: ThinkingMap;
+  draft?: LogosDraft;
   updatedAt: number;
 }
 
@@ -42,6 +51,7 @@ export function emptySession(): LogosSession {
     title: UNTITLED,
     messages: [],
     map: { ...EMPTY_MAP },
+    draft: { ...EMPTY_DRAFT },
     updatedAt: Date.now(),
   };
 }
@@ -82,6 +92,10 @@ export function loadLocal(): LogosSession[] {
         title: typeof s.title === 'string' ? s.title : UNTITLED,
         messages: s.messages,
         map: s.map && Array.isArray(s.map.nodes) ? s.map : { ...EMPTY_MAP },
+        draft:
+          s.draft && typeof s.draft.html === 'string'
+            ? { title: String(s.draft.title ?? ''), html: s.draft.html }
+            : undefined,
         updatedAt: Number(s.updatedAt) || 0,
       }));
   } catch {

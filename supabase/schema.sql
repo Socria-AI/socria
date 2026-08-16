@@ -28,6 +28,10 @@ alter table conversations
   add column if not exists kind text not null default 'chat';
 alter table conversations
   add column if not exists map jsonb;
+-- The Draft Space: the person's own writing, kept with the session that
+-- produced it. Null for chats and for logos sessions nobody has written in.
+alter table conversations
+  add column if not exists draft jsonb;
 
 -- Imported "about you" profiles (AI history import). One row per user;
 -- stores the profile the user pasted from another AI. Safe to re-run.
