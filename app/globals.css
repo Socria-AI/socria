@@ -3041,19 +3041,26 @@ html.js-anim .scrolly-root .fade.d3 { transition-delay: .3s; }
 .logos-root .lg-composer { padding: 12px 40px 30px; }
 @media (max-width: 900px) { .logos-root .lg-composer { padding: 10px 22px 20px; } }
 .logos-root .lg-composer-box {
+  position: relative;
   display: flex;
-  align-items: flex-end;
-  gap: 10px;
+  flex-direction: column;
+  gap: 8px;
   background: #fff;
   border: 1px solid var(--lg-line);
   border-radius: 16px;
-  padding: 10px 10px 10px 16px;
+  padding: 10px 10px 10px 12px;
   transition: border-color 0.25s, box-shadow 0.25s;
 }
 .logos-root .lg-composer-box:focus-within {
   border-color: rgba(53, 70, 32, 0.38);
   box-shadow: 0 0 0 4px rgba(53, 70, 32, 0.06);
 }
+.logos-root .lg-composer-box.is-dropping {
+  border-color: var(--lg-primary);
+  border-style: dashed;
+  box-shadow: 0 0 0 4px rgba(53, 70, 32, 0.08);
+}
+.logos-root .lg-composer-row { display: flex; align-items: flex-end; gap: 8px; }
 .logos-root .lg-composer textarea {
   flex: 1;
   border: none;
@@ -3065,8 +3072,119 @@ html.js-anim .scrolly-root .fade.d3 { transition-delay: .3s; }
   line-height: 1.55;
   padding: 6px 0;
   color: var(--lg-ink);
-  max-height: 160px;
 }
+.logos-root .lg-file { display: none; }
+.logos-root .lg-attach {
+  flex: 0 0 auto;
+  width: 32px; height: 32px;
+  display: grid; place-items: center;
+  border: none; border-radius: 50%;
+  background: transparent;
+  color: var(--lg-ink-40);
+  cursor: pointer;
+  transition: color 0.2s, background 0.2s;
+}
+.logos-root .lg-attach svg { width: 17px; height: 17px; }
+.logos-root .lg-attach:hover:not(:disabled) { color: var(--lg-primary); background: rgba(53, 70, 32, 0.07); }
+.logos-root .lg-attach:disabled { opacity: 0.3; cursor: default; }
+.logos-root .lg-drop-hint {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 16px;
+  background: rgba(245, 243, 235, 0.9);
+  color: var(--lg-primary);
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  pointer-events: none;
+}
+.logos-root .lg-composer-note {
+  margin: 7px 4px 0;
+  font-size: 11.5px;
+  font-style: italic;
+  color: var(--lg-ink-40);
+}
+
+/* ── attachments: notes and images brought into the conversation ─── */
+.logos-root .lg-atts { display: flex; flex-direction: column; gap: 6px; }
+.logos-root .lg-att {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 8px;
+  border: 1px solid var(--lg-line);
+  border-radius: 10px;
+  background: rgba(53, 70, 32, 0.035);
+  flex-wrap: wrap;
+}
+.logos-root .lg-att-thumb {
+  flex: 0 0 auto;
+  width: 40px; height: 34px;
+  object-fit: cover;
+  border-radius: 6px;
+  background: #fff;
+  border: 1px solid var(--lg-line);
+}
+.logos-root .lg-att-thumb.is-blank { display: block; }
+.logos-root .lg-att-glyph {
+  flex: 0 0 auto;
+  width: 40px; height: 34px;
+  display: grid; place-items: center;
+  border-radius: 6px;
+  background: #fff;
+  border: 1px solid var(--lg-line);
+  color: var(--lg-ink-40);
+}
+.logos-root .lg-att-glyph svg { width: 15px; height: 15px; }
+.logos-root .lg-att-meta { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 1px; }
+.logos-root .lg-att-name {
+  font-size: 12.5px;
+  color: var(--lg-ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.logos-root .lg-att-sub { font-size: 10.5px; color: var(--lg-ink-40); }
+.logos-root .lg-att-peek {
+  margin-left: 8px;
+  border: none; background: transparent; padding: 0;
+  font: inherit; font-size: 10.5px;
+  color: var(--lg-accent);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.logos-root .lg-att-x {
+  flex: 0 0 auto;
+  border: none; background: transparent;
+  color: var(--lg-ink-24);
+  font-size: 16px; line-height: 1;
+  padding: 2px 5px;
+  cursor: pointer;
+  transition: color 0.18s;
+}
+.logos-root .lg-att-x:hover { color: var(--lg-tension); }
+.logos-root .lg-att-full {
+  flex-basis: 100%;
+  margin: 4px 0 0;
+  max-height: 220px;
+  overflow: auto;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #fff;
+  border: 1px solid var(--lg-line);
+  font: inherit;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--lg-ink-60);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+/* attachments as they appear inside a sent message */
+.logos-root .lg-msg-stack { display: flex; flex-direction: column; gap: 8px; }
+.logos-root .lg-msg-user .lg-msg-stack { align-items: flex-end; max-width: 80%; margin-left: auto; }
+.logos-root .lg-msg-user .lg-atts { width: 100%; }
+.logos-root .lg-msg-user .lg-att { background: rgba(53, 70, 32, 0.05); }
 .logos-root .lg-composer textarea::placeholder { color: var(--lg-ink-40); }
 .logos-root .lg-send {
   flex: 0 0 auto;

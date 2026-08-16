@@ -8,6 +8,7 @@ import { auth } from '@clerk/nextjs/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { sanitizeMemory, EMPTY_MEMORY } from '@/lib/socria-prompt';
 import { EMPTY_MAP, sanitizeMap } from '@/lib/logos';
+import { sanitizeAttachments } from '@/lib/logos-attachments';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -16,7 +17,11 @@ const MAX_TITLE = 200;
 const MAX_MESSAGES_PER_CONVO = 200;
 const MAX_BULK_CONVOS = 200;
 
-type Msg = { role: 'user' | 'assistant'; content: string };
+type Msg = {
+  role: 'user' | 'assistant';
+  content: string;
+  attachments?: ReturnType<typeof sanitizeAttachments>;
+};
 
 function sanitizeMessages(raw: unknown): Msg[] {
   if (!Array.isArray(raw)) return [];
@@ -28,7 +33,12 @@ function sanitizeMessages(raw: unknown): Msg[] {
         typeof m.content === 'string'
     )
     .slice(-MAX_MESSAGES_PER_CONVO)
-    .map((m: any) => ({ role: m.role, content: m.content }));
+    .map((m: any) => {
+      const attachments = sanitizeAttachments(m.attachments);
+      return attachments.length
+        ? { role: m.role, content: m.content, attachments }
+        : { role: m.role, content: m.content };
+    });
 }
 
 // Logos sessions live in the same table as ordinary chats, so both surfaces

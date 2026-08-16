@@ -9,10 +9,13 @@
 // to, so they get the same thing in localStorage.
 
 import { EMPTY_MAP, type ThinkingMap } from './logos';
+import type { Attachment } from './logos-attachments';
 
 export interface LogosMsg {
   role: 'user' | 'assistant';
   content: string;
+  /** notes and images brought into the conversation with this turn */
+  attachments?: Attachment[];
 }
 
 export interface LogosSession {
@@ -45,7 +48,17 @@ export function emptySession(): LogosSession {
 
 /** A session is named by the thought that started it, not by a summary. */
 export function titleFor(messages: LogosMsg[]): string {
-  const first = messages.find((m) => m.role === 'user')?.content?.trim();
+  const firstTurn = messages.find((m) => m.role === 'user');
+  // A turn can be nothing but an attachment — name it after that rather than
+  // leaving the session untitled forever.
+  const first =
+    firstTurn?.content?.trim() ||
+    firstTurn?.attachments?.[0]?.name ||
+    (firstTurn?.attachments?.length
+      ? firstTurn.attachments[0].kind === 'image'
+        ? 'An image'
+        : 'A note'
+      : '');
   if (!first) return UNTITLED;
   const clean = first.replace(/\s+/g, ' ');
   return clean.length > 52 ? clean.slice(0, 52).trimEnd() + '…' : clean;

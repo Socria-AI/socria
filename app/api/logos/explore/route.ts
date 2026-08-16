@@ -15,6 +15,7 @@ import {
   describeLineage,
   sanitizeMap,
 } from '@/lib/logos';
+import { renderMessageForModel, sanitizeAttachments } from '@/lib/logos-attachments';
 import { isValidAccessKey } from '@/lib/socria-prompt';
 import { enforceRateLimit } from '@/lib/rate-limit';
 import {
@@ -71,7 +72,17 @@ export async function POST(req: NextRequest) {
         m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string'
     )
     .slice(-window)
-    .map((m: any) => ({ role: m.role, content: m.content.slice(0, 500) }));
+    .map((m: any) => ({
+      role: m.role,
+      // Attachments flattened in, so a node drawn from a pasted page can still
+      // be traced back to the words that produced it.
+      content: renderMessageForModel({
+        role: m.role,
+        content: m.content,
+        attachments: sanitizeAttachments(m.attachments),
+      }).slice(0, 700),
+    }))
+    .filter((m: Turn) => m.content.trim());
 
   const conversation = turns
     .map((m) => `${m.role === 'user' ? 'Thinker' : 'Logos'}: ${m.content}`)

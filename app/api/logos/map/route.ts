@@ -14,6 +14,7 @@ import {
   LOGOS_FALLBACK_MODEL,
   EMPTY_MAP,
 } from '@/lib/logos';
+import { renderMessageForModel, sanitizeAttachments } from '@/lib/logos-attachments';
 import { isValidAccessKey } from '@/lib/socria-prompt';
 import { enforceRateLimit } from '@/lib/rate-limit';
 
@@ -41,15 +42,30 @@ export async function POST(req: NextRequest) {
   const current = sanitizeMap(body?.map);
   const messages = Array.isArray(body?.messages) ? body.messages : [];
 
-  const transcript = messages
+  const kept = messages
     .filter(
       (m: any) =>
         m &&
         (m.role === 'user' || m.role === 'assistant') &&
         typeof m.content === 'string'
     )
-    .slice(-MAX_HISTORY)
-    .map((m: any) => `${m.role === 'user' ? 'Thinker' : 'Logos'}: ${m.content.slice(0, 700)}`)
+    .slice(-MAX_HISTORY);
+
+  // The extractor sees attachments too — a pasted page of notes or a photo of
+  // a whiteboard is structural material, and a map blind to it would be a map
+  // of half the conversation. The newest turn gets more room than the rest.
+  const transcript = kept
+    .map((m: any, i: number) => {
+      const rendered = renderMessageForModel(
+        { role: m.role, content: m.content, attachments: sanitizeAttachments(m.attachments) },
+        i === kept.length - 1
+      );
+      const room = i === kept.length - 1 ? 6_000 : 700;
+      return rendered.trim()
+        ? `${m.role === 'user' ? 'Thinker' : 'Logos'}: ${rendered.slice(0, room)}`
+        : '';
+    })
+    .filter(Boolean)
     .join('\n');
 
   // Nothing to extract from — hand back what we already have.

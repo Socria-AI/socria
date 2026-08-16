@@ -13,6 +13,8 @@ import { useUser } from '@clerk/nextjs';
 import { ThinkingMap, type MapNodeRef } from '@/components/ThinkingMap';
 import { ExplorePanel } from '@/components/ExplorePanel';
 import { LogosRail } from '@/components/LogosRail';
+import { AttachmentList, LogosComposer, type Draft } from '@/components/LogosComposer';
+import type { Attachment } from '@/lib/logos-attachments';
 import {
   EMPTY_MAP,
   describeLineage,
@@ -60,6 +62,7 @@ export default function LogosPage() {
   const [railOpen, setRailOpen] = useState(true);
 
   const [input, setInput] = useState('');
+  const [drafts, setDrafts] = useState<Draft[]>([]);
   const [streaming, setStreaming] = useState('');
   const [busy, setBusy] = useState(false);
   const [mapping, setMapping] = useState(false);
@@ -90,7 +93,6 @@ export default function LogosPage() {
   const [focusError, setFocusError] = useState<string | null>(null);
 
   const bottomRef = useRef<HTMLDivElement>(null);
-  const taRef = useRef<HTMLTextAreaElement>(null);
   const sessionsRef = useRef<LogosSession[]>([]);
   sessionsRef.current = sessions;
   const activeIdRef = useRef<string | null>(null);
@@ -439,14 +441,46 @@ export default function LogosPage() {
     }
   }
 
-  async function send(text: string) {
+  /** Hand off an image for its one-time reading. */
+  const readImage = useCallback(
+    async (dataUrl: string): Promise<string> => {
+      const res = await fetch('/api/logos/read', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...keyHeaders() },
+        body: JSON.stringify({ image: dataUrl }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || 'could not be read');
+      }
+      const json = await res.json();
+      if (!json?.reading) throw new Error('could not be read');
+      return json.reading as string;
+    },
+    [keyHeaders]
+  );
+
+  function sendFromComposer() {
+    // Anything still being read, or that failed, is left behind rather than
+    // sent as a silent blank.
+    const ready: Attachment[] = drafts
+      .filter((d) => d.status === 'ready')
+      .map(({ id, status, error: _e, ...rest }) => rest);
+    setDrafts([]);
+    void send(input, ready);
+  }
+
+  async function send(text: string, atts: Attachment[] = []) {
     const content = text.trim();
-    if (!content || busy || !activeIdRef.current) return;
+    if ((!content && !atts.length) || busy || !activeIdRef.current) return;
     setError(null);
     setInput('');
-    if (taRef.current) taRef.current.style.height = 'auto';
 
-    const turn: Msg = { role: 'user', content };
+    const turn: Msg = {
+      role: 'user',
+      content,
+      ...(atts.length ? { attachments: atts } : {}),
+    };
     const before = messages;
     const next = [...before, turn];
     patchActive((s) => ({ ...s, messages: next }), false);
@@ -490,6 +524,13 @@ export default function LogosPage() {
       // have appended to the transcript while this was in flight.
       chronRef.current = chronRef.current.filter((m) => m !== turn);
       setInput(content);
+      // Hand the attachments back so a failed turn doesn't lose them.
+      if (atts.length) {
+        setDrafts((prev) => [
+          ...prev,
+          ...atts.map((a, i) => ({ ...a, id: `re_${Date.now()}_${i}`, status: 'ready' as const })),
+        ]);
+      }
     } finally {
       setBusy(false);
     }
@@ -594,7 +635,10 @@ export default function LogosPage() {
             {messages.map((m, i) => (
               <div key={i} className={`lg-msg lg-msg-${m.role}`}>
                 {m.role === 'assistant' && <span className="lg-msg-who">Logos</span>}
-                <div className="lg-msg-body">{m.content}</div>
+                <div className="lg-msg-stack">
+                  {!!m.attachments?.length && <AttachmentList items={m.attachments} />}
+                  {m.content && <div className="lg-msg-body">{m.content}</div>}
+                </div>
               </div>
             ))}
 
@@ -618,40 +662,15 @@ export default function LogosPage() {
             <div ref={bottomRef} />
           </div>
 
-          <div className="lg-composer">
-            <div className="lg-composer-box">
-              <textarea
-                ref={taRef}
-                value={input}
-                rows={1}
-                placeholder="What are you working through?"
-                disabled={busy}
-                onChange={(e) => {
-                  setInput(e.target.value);
-                  const el = e.target;
-                  el.style.height = 'auto';
-                  el.style.height = Math.min(el.scrollHeight, 160) + 'px';
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    send(input);
-                  }
-                }}
-              />
-              <button
-                type="button"
-                className="lg-send"
-                onClick={() => send(input)}
-                disabled={!input.trim() || busy}
-                aria-label="Send"
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 19V5M5 12l7-7 7 7" />
-                </svg>
-              </button>
-            </div>
-          </div>
+          <LogosComposer
+            value={input}
+            onChange={setInput}
+            drafts={drafts}
+            setDrafts={setDrafts}
+            onSend={sendFromComposer}
+            busy={busy}
+            readImage={readImage}
+          />
         </section>
 
         {/* ── Thinking Map ───────────────────────────────── */}

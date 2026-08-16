@@ -15,13 +15,16 @@ import {
   NODE_TYPES,
   buildFocusPrompt,
 } from '@/lib/logos';
+import { renderMessageForModel, sanitizeAttachments } from '@/lib/logos-attachments';
 import { isValidAccessKey } from '@/lib/socria-prompt';
 import { enforceRateLimit } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const MAX_INPUT_LEN = 4000;
+// Generous: people paste whole journal entries in here. Anything much longer
+// arrives as a note attachment instead, which has its own budget.
+const MAX_INPUT_LEN = 12_000;
 const MAX_HISTORY = 24;
 
 export async function POST(req: NextRequest) {
@@ -60,15 +63,30 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const clean = messages
+    const kept = messages
       .filter(
         (m: any) =>
           m &&
           (m.role === 'user' || m.role === 'assistant') &&
           typeof m.content === 'string'
       )
-      .slice(-MAX_HISTORY)
-      .map((m: any) => ({ role: m.role, content: m.content }));
+      .slice(-MAX_HISTORY);
+
+    // Attachments are flattened into the text the model reads. Only the turn
+    // being answered carries a long note in full.
+    const clean = kept
+      .map((m: any, i: number) => ({
+        role: m.role as 'user' | 'assistant',
+        content: renderMessageForModel(
+          { role: m.role, content: m.content, attachments: sanitizeAttachments(m.attachments) },
+          i === kept.length - 1
+        ),
+      }))
+      .filter((m) => m.content.trim());
+
+    if (!clean.length) {
+      return NextResponse.json({ error: 'Nothing to respond to.' }, { status: 400 });
+    }
 
     // Optional: this turn belongs to a node the person opened, not to the
     // main thread. Same prompt, narrower aperture.
