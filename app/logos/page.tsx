@@ -17,6 +17,7 @@ import { AttachmentList, LogosComposer, type Draft } from '@/components/LogosCom
 import { DraftSpace, type DraftHandle, type DraftSelection } from '@/components/DraftSpace';
 import { DraftResponsePanel } from '@/components/DraftResponsePanel';
 import { LogosGuide, GUIDE_SEEN_KEY } from '@/components/LogosGuide';
+import { LogosMark } from '@/components/LogosMark';
 import type { Attachment } from '@/lib/logos-attachments';
 import { relevantNodes, type DraftAction, type DraftResponse } from '@/lib/logos-draft';
 import {
@@ -650,7 +651,10 @@ export default function LogosPage() {
         <div className="lg-gate">
           {authSettled && (
             <div className="lg-gate-card">
-              <span className="lg-word">Logos</span>
+              <span className="lg-word">
+                <LogosMark size={44} />
+                <span className="lg-sr">Logos</span>
+              </span>
               <h1>A reasoning environment.</h1>
               <p>
                 An early prototype: you think out loud, and the shape of your
@@ -718,7 +722,10 @@ export default function LogosPage() {
         {/* ── Conversation ───────────────────────────────── */}
         <section className="lg-convo" aria-label="Conversation">
           <header className="lg-head">
-            <span className="lg-word">Logos</span>
+            <span className="lg-word">
+              <LogosMark size={26} />
+              <span className="lg-sr">Logos</span>
+            </span>
             <span className="lg-head-note">A reasoning environment</span>
             <button
               type="button"
