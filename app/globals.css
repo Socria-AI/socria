@@ -4347,6 +4347,13 @@ html.js-anim .scrolly-root .fade.d3 { transition-delay: .3s; }
   from { opacity: 0; transform: translate(-50%, calc(-100% + 5px)); }
   to { opacity: 1; transform: translate(-50%, -100%); }
 }
+/* No room above the line — open underneath it instead of being clipped by
+   the sheet's overflow. */
+.logos-root .lg-draft-menu.is-below { animation-name: lgMenuInDown; }
+@keyframes lgMenuInDown {
+  from { opacity: 0; transform: translate(-50%, -5px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
 @media (prefers-reduced-motion: reduce) { .logos-root .lg-draft-menu { animation: none; } }
 .logos-root .lg-draft-menu button {
   padding: 5px 9px;
@@ -4473,3 +4480,279 @@ html.js-anim .scrolly-root .fade.d3 { transition-delay: .3s; }
   box-shadow: 0 0 0 3px rgba(38, 70, 83, 0.09);
 }
 .logos-root .lg-act-focus .lg-act-label { color: var(--lg-accent); }
+
+/* ── the walkthrough ─────────────────────────────────────────────── */
+.logos-root .lgg-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(35, 36, 31, 0.32);
+  backdrop-filter: blur(3px);
+  animation: lgFadeIn 0.3s ease both;
+}
+@keyframes lgFadeIn { from { opacity: 0; } to { opacity: 1; } }
+.logos-root .lgg {
+  width: min(560px, 100%);
+  max-height: 100%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  background: var(--lg-paper);
+  border: 1px solid var(--lg-line);
+  border-radius: 18px;
+  box-shadow: 0 40px 90px -50px rgba(35, 36, 31, 0.7);
+  animation: lggIn 0.44s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes lggIn { from { opacity: 0; transform: translateY(14px) scale(0.985); } to { opacity: 1; transform: none; } }
+
+.logos-root .lgg-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18px 22px 0;
+}
+.logos-root .lgg-kicker {
+  font-size: 10px; font-weight: 600; letter-spacing: 0.2em;
+  text-transform: uppercase; color: var(--lg-accent); opacity: 0.75;
+}
+.logos-root .lgg-skip {
+  border: none; background: transparent; padding: 2px 4px;
+  font: inherit; font-size: 11.5px; color: var(--lg-ink-40);
+  cursor: pointer; transition: color 0.2s;
+}
+.logos-root .lgg-skip:hover { color: var(--lg-ink); }
+
+.logos-root .lgg-stage {
+  margin: 14px 22px 0;
+  height: 178px;
+  border-radius: 14px;
+  background: var(--lg-panel);
+  border: 1px solid var(--lg-line);
+  background-image: radial-gradient(circle, rgba(53, 70, 32, 0.07) 1px, transparent 1px);
+  background-size: 22px 22px;
+  overflow: hidden;
+  position: relative;
+}
+.logos-root .lgg-demo { position: absolute; inset: 0; }
+
+.logos-root .lgg-copy { padding: 20px 22px 4px; }
+.logos-root .lgg-copy h2 {
+  margin: 0;
+  font-size: 21px; font-weight: 600; letter-spacing: -0.02em;
+  color: var(--lg-ink);
+  animation: lgFade 0.45s 0.05s cubic-bezier(0.16,1,0.3,1) both;
+}
+.logos-root .lgg-copy p {
+  margin: 9px 0 0;
+  font-size: 14.5px; line-height: 1.65; color: var(--lg-ink-60);
+  animation: lgFade 0.45s 0.12s cubic-bezier(0.16,1,0.3,1) both;
+}
+.logos-root .lgg-example {
+  font-size: 13px !important;
+  font-style: italic;
+  color: var(--lg-ink-40) !important;
+  animation-delay: 0.19s !important;
+}
+
+.logos-root .lgg-foot {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18px 22px 20px;
+}
+.logos-root .lgg-dots { display: flex; gap: 6px; }
+.logos-root .lgg-dots button {
+  width: 6px; height: 6px; padding: 0;
+  border: none; border-radius: 50%;
+  background: var(--lg-ink-24);
+  cursor: pointer;
+  transition: background 0.25s, transform 0.25s;
+}
+.logos-root .lgg-dots button.is-on { background: var(--lg-primary); transform: scale(1.35); }
+.logos-root .lgg-nav { display: flex; gap: 8px; }
+.logos-root .lgg-back {
+  padding: 8px 15px; border: 1px solid var(--lg-line); border-radius: 10px;
+  background: transparent; font: inherit; font-size: 13px;
+  color: var(--lg-ink-60); cursor: pointer;
+}
+.logos-root .lgg-back:hover { color: var(--lg-ink); }
+.logos-root .lgg-next {
+  padding: 8px 17px; border: none; border-radius: 10px;
+  background: var(--lg-primary); color: var(--lg-paper);
+  font: inherit; font-size: 13px; cursor: pointer;
+  transition: transform 0.2s;
+}
+.logos-root .lgg-next:hover { transform: translateY(-1px); }
+
+/* demo: shared node chip */
+.logos-root .lgg-node {
+  position: absolute;
+  padding: 7px 10px;
+  border-radius: 9px;
+  background: #fff;
+  border: 1px solid var(--lg-line);
+  font-size: 11.5px; line-height: 1.35;
+  color: var(--lg-ink);
+  box-shadow: 0 1px 2px rgba(35,36,31,0.04);
+  max-width: 132px;
+}
+.logos-root .lgg-node::before {
+  content: attr(data-t);
+  display: block;
+  font-size: 8px; font-weight: 600; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--lg-ink-40);
+  margin-bottom: 3px;
+}
+.logos-root .lgg-node[data-t="tension"] { background: #FBEEE9; border-color: #EBC8B8; }
+.logos-root .lgg-node[data-t="value"] { background: #EDF3E8; border-color: #CFE0C0; }
+.logos-root .lgg-node[data-t="claim"] { background: #FFFDF7; border-color: #DCD3B8; border-left: 2px solid #C4B482; }
+.logos-root .lgg-node[data-t="question"] { border-bottom-style: dashed; }
+
+/* 1 — talk */
+.logos-root .lgg-talk { padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; }
+.logos-root .lgg-bubble { font-size: 12px; line-height: 1.55; max-width: 84%; }
+.logos-root .lgg-bubble-user {
+  align-self: flex-end;
+  background: rgba(53,70,32,0.08);
+  padding: 8px 12px; border-radius: 12px 12px 3px 12px;
+  animation: lggRise 0.5s cubic-bezier(0.16,1,0.3,1) both;
+}
+.logos-root .lgg-bubble-logos {
+  color: var(--lg-ink-60);
+  animation: lggRise 0.5s 0.75s cubic-bezier(0.16,1,0.3,1) both;
+}
+.logos-root .lgg-who {
+  display: block; font-size: 8px; font-weight: 600; letter-spacing: 0.18em;
+  text-transform: uppercase; color: var(--lg-primary); opacity: 0.7; margin-bottom: 4px;
+}
+@keyframes lggRise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+/* 2 — the map forming */
+.logos-root .lgg-map { }
+.logos-root .lgg-wires { position: absolute; inset: 0; width: 100%; height: 100%; }
+.logos-root .lgg-wire {
+  fill: none; stroke: #7C9463; stroke-width: 1.4;
+  stroke-dasharray: 120; stroke-dashoffset: 120;
+  animation: lggDraw 0.7s cubic-bezier(0.16,1,0.3,1) both;
+}
+.logos-root .lgg-wire-1 { animation-delay: 0.85s; }
+.logos-root .lgg-wire-2 { animation-delay: 1.15s; }
+@keyframes lggDraw { to { stroke-dashoffset: 0; } }
+.logos-root .lgg-node-a { left: 22px; top: 26px; animation: lggPop 0.5s 0.1s cubic-bezier(0.16,1,0.3,1) both; }
+.logos-root .lgg-node-b { right: 20px; top: 30px; animation: lggPop 0.5s 0.45s cubic-bezier(0.16,1,0.3,1) both; }
+.logos-root .lgg-node-c { left: 50%; margin-left: -66px; bottom: 22px; animation: lggPop 0.5s 1.35s cubic-bezier(0.16,1,0.3,1) both; }
+@keyframes lggPop { from { opacity: 0; transform: scale(0.9) translateY(6px); } to { opacity: 1; transform: none; } }
+
+/* 3 — actions */
+.logos-root .lgg-actions { display: grid; place-items: center; }
+.logos-root .lgg-node-still { position: static; margin-bottom: 6px; animation: lggPop 0.4s both; }
+.logos-root .lgg-menu {
+  display: flex; flex-direction: column; gap: 1px;
+  padding: 4px; width: 150px;
+  background: #fff; border: 1px solid var(--lg-line);
+  border-radius: 10px;
+  box-shadow: 0 14px 30px -20px rgba(35,36,31,0.6);
+  animation: lggPop 0.3s 0.4s both;
+}
+.logos-root .lgg-menu span {
+  padding: 4px 8px; border-radius: 6px;
+  font-size: 11px; color: var(--lg-ink-60);
+  animation: lggRise 0.3s both;
+}
+.logos-root .lgg-menu span:nth-child(2) { background: rgba(156,91,60,0.08); color: var(--lg-tension); }
+
+/* 4 — reorganizing */
+.logos-root .lgg-reorg { }
+.logos-root .lgg-merge-a { left: 20px; top: 22px; animation: lggMergeA 2.6s cubic-bezier(0.16,1,0.3,1) both; }
+.logos-root .lgg-merge-b { left: 20px; top: 74px; animation: lggMergeB 2.6s cubic-bezier(0.16,1,0.3,1) both; }
+.logos-root .lgg-merge-c { left: 20px; top: 46px; animation: lggMergeC 2.6s cubic-bezier(0.16,1,0.3,1) both; }
+.logos-root .lgg-merge-c em {
+  display: block; font-style: normal; font-size: 9px;
+  color: var(--lg-ink-40); margin-top: 3px;
+}
+@keyframes lggMergeA {
+  0%, 30% { opacity: 1; transform: none; }
+  55%, 100% { opacity: 0; transform: translateY(24px) scale(0.96); }
+}
+@keyframes lggMergeB {
+  0%, 30% { opacity: 1; transform: none; }
+  55%, 100% { opacity: 0; transform: translateY(-28px) scale(0.96); }
+}
+@keyframes lggMergeC {
+  0%, 45% { opacity: 0; transform: scale(0.94); }
+  70%, 100% { opacity: 1; transform: none; }
+}
+.logos-root .lgg-resolve {
+  right: 20px; top: 48px;
+  animation: lggPop 0.5s 1.5s cubic-bezier(0.16,1,0.3,1) both;
+}
+.logos-root .lgg-resolve b {
+  display: inline-block; margin-top: 4px;
+  padding: 1px 6px; border-radius: 999px;
+  background: rgba(53,70,32,0.12); color: var(--lg-primary);
+  font-size: 8.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+}
+
+/* 5 — material */
+.logos-root .lgg-material { padding: 18px; display: flex; flex-direction: column; gap: 8px; }
+.logos-root .lgg-chip {
+  display: flex; align-items: center; gap: 9px;
+  padding: 7px 9px; border-radius: 10px;
+  background: #fff; border: 1px solid var(--lg-line);
+}
+.logos-root .lgg-chip-1 { animation: lggRise 0.45s 0.05s both; }
+.logos-root .lgg-chip-2 { animation: lggRise 0.45s 0.28s both; }
+.logos-root .lgg-chip i {
+  flex: 0 0 auto; width: 30px; height: 24px; border-radius: 5px;
+  background: var(--lg-panel); border: 1px solid var(--lg-line);
+}
+.logos-root .lgg-chip i.is-img { background: linear-gradient(135deg, #E7EADF 0%, #D6DCC9 100%); }
+.logos-root .lgg-chip span { font-size: 11.5px; color: var(--lg-ink); }
+.logos-root .lgg-chip em { display: block; font-style: normal; font-size: 9.5px; color: var(--lg-ink-40); }
+.logos-root .lgg-origins { display: flex; gap: 4px; animation: lggRise 0.45s 0.55s both; }
+.logos-root .lgg-origins span {
+  padding: 3px 9px; border-radius: 999px;
+  font-size: 10px; color: var(--lg-ink-40);
+  border: 1px solid transparent;
+}
+.logos-root .lgg-origins span.is-on {
+  background: #fff; border-color: var(--lg-line); color: var(--lg-accent);
+}
+
+/* 6 — the draft */
+.logos-root .lgg-draft { padding: 22px 20px; }
+.logos-root .lgg-draft p {
+  margin: 0; font-size: 13px; line-height: 1.75; color: var(--lg-ink);
+  animation: lggRise 0.45s both;
+}
+.logos-root .lgg-draft mark {
+  background: rgba(53,70,32,0.16); color: inherit;
+  animation: lggMark 0.5s 0.55s both;
+}
+@keyframes lggMark { from { background: transparent; } to { background: rgba(53,70,32,0.16); } }
+.logos-root .lgg-menu-draft {
+  flex-direction: row; width: auto; margin-top: 12px;
+  animation: lggPop 0.3s 0.85s both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .logos-root .lgg-veil *,
+  .logos-root .lgg-veil { animation: none !important; }
+  .logos-root .lgg-wire { stroke-dashoffset: 0; }
+  .logos-root .lgg-merge-a, .logos-root .lgg-merge-b { display: none; }
+}
+
+/* the door back to the walkthrough */
+.logos-root .lg-guide-open {
+  width: 22px; height: 22px;
+  margin-left: 10px;
+  display: inline-grid; place-items: center;
+  border: 1px solid var(--lg-line); border-radius: 50%;
+  background: transparent;
+  font: inherit; font-size: 11px;
+  color: var(--lg-ink-40);
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s;
+}
+.logos-root .lg-guide-open:hover { color: var(--lg-primary); border-color: rgba(53,70,32,0.4); }
+/* the chat column is narrow with three surfaces open */
+.logos-root .lg-split.draft-open .lg-head-note { display: none; }

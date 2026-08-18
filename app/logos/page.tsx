@@ -16,6 +16,7 @@ import { LogosRail } from '@/components/LogosRail';
 import { AttachmentList, LogosComposer, type Draft } from '@/components/LogosComposer';
 import { DraftSpace, type DraftHandle, type DraftSelection } from '@/components/DraftSpace';
 import { DraftResponsePanel } from '@/components/DraftResponsePanel';
+import { LogosGuide, GUIDE_SEEN_KEY } from '@/components/LogosGuide';
 import type { Attachment } from '@/lib/logos-attachments';
 import { relevantNodes, type DraftAction, type DraftResponse } from '@/lib/logos-draft';
 import {
@@ -100,6 +101,8 @@ export default function LogosPage() {
   // The third surface. Off by default: someone opening Logos for the first
   // time should meet a conversation, not a workspace.
   const [draftOpen, setDraftOpen] = useState(false);
+  // Shown once, the first time someone gets through the gate.
+  const [guideOpen, setGuideOpen] = useState(false);
   const [draftFocus, setDraftFocus] = useState<MapNodeRef | null>(null);
   const [relevant, setRelevant] = useState<Set<string>>(new Set());
   const [dr, setDr] = useState<{
@@ -151,6 +154,20 @@ export default function LogosPage() {
   }, [isLoaded]);
 
   const hasAccess = unlocked || !!isSignedIn;
+
+  useEffect(() => {
+    if (!hasAccess) return;
+    try {
+      if (localStorage.getItem(GUIDE_SEEN_KEY) !== '1') setGuideOpen(true);
+    } catch {}
+  }, [hasAccess]);
+
+  function closeGuide() {
+    setGuideOpen(false);
+    try {
+      localStorage.setItem(GUIDE_SEEN_KEY, '1');
+    } catch {}
+  }
 
   // Anonymous but key-unlocked callers identify with the header; signed-in
   // users are authorized by their session alone.
@@ -682,6 +699,7 @@ export default function LogosPage() {
 
   return (
     <div className="logos-root">
+      <LogosGuide open={guideOpen} onClose={closeGuide} />
       <div
         className={`lg-split${railOpen ? '' : ' rail-closed'}${draftOpen ? ' draft-open' : ''}`}
       >
@@ -702,6 +720,15 @@ export default function LogosPage() {
           <header className="lg-head">
             <span className="lg-word">Logos</span>
             <span className="lg-head-note">A reasoning environment</span>
+            <button
+              type="button"
+              className="lg-guide-open"
+              onClick={() => setGuideOpen(true)}
+              aria-label="What Logos does"
+              title="What Logos does"
+            >
+              ?
+            </button>
             {/* Deep ceiling, quiet door. It nudges only once the thinking
                 has actually turned into something worth writing. */}
             <button

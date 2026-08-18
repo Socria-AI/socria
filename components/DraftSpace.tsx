@@ -29,6 +29,10 @@ export interface DraftSelection {
   around: string;
 }
 
+// Enough to decide which side of the line the menu opens on.
+const MENU_H = 40;
+const MENU_W = 310;
+
 const BLOCKS: { tag: string; label: string; title: string }[] = [
   { tag: 'h2', label: 'H1', title: 'Heading' },
   { tag: 'h3', label: 'H2', title: 'Subheading' },
@@ -59,7 +63,13 @@ export const DraftSpace = forwardRef<DraftHandle, {
   handleRef
 ) {
   const ref = useRef<HTMLDivElement>(null);
-  const [menu, setMenu] = useState<{ x: number; y: number; sel: DraftSelection } | null>(null);
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const [menu, setMenu] = useState<{
+    x: number;
+    y: number;
+    below: boolean;
+    sel: DraftSelection;
+  } | null>(null);
   const [words, setWords] = useState(0);
   // The passage an action was run on, held so a proposal accepted minutes
   // later still lands in the right place.
@@ -131,10 +141,19 @@ export const DraftSpace = forwardRef<DraftHandle, {
       setMenu(null);
       return;
     }
+    // Room is measured against the visible scroll area, not the document, or
+    // a selection sitting near the top of the view gets a menu placed outside
+    // the sheet — where overflow quietly clips it out of existence.
+    const sheet = sheetRef.current?.getBoundingClientRect();
+    const roomAbove = sheet ? rect.top - sheet.top : rect.top - box.top;
+    const below = roomAbove < MENU_H + 10;
+    const half = MENU_W / 2 + 6;
     setMenu({
-      x: rect.left - box.left + rect.width / 2,
-      // Clear of the line being read, not sitting on top of it.
-      y: rect.top - box.top - 14,
+      x: Math.min(Math.max(rect.left - box.left + rect.width / 2, half), box.width - half),
+      y: below
+        ? rect.bottom - box.top + 10
+        : rect.top - box.top - 12,
+      below,
       sel,
     });
   }
@@ -197,7 +216,7 @@ export const DraftSpace = forwardRef<DraftHandle, {
         ))}
       </div>
 
-      <div className="lg-draft-sheet">
+      <div className="lg-draft-sheet" ref={sheetRef}>
         <div
           ref={ref}
           className="lg-draft-body"
@@ -224,8 +243,8 @@ export const DraftSpace = forwardRef<DraftHandle, {
 
         {menu && (
           <div
-            className="lg-draft-menu"
-            style={{ left: menu.x, top: Math.max(menu.y, 8) }}
+            className={`lg-draft-menu${menu.below ? ' is-below' : ''}`}
+            style={{ left: menu.x, top: menu.y }}
             onMouseDown={(e) => e.preventDefault()}
           >
             {DRAFT_ACTIONS.map((a) => (
