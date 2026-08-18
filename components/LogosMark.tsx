@@ -2,57 +2,62 @@
 // than one closed outline — the gaps are the point, since the thing it stands
 // for is thinking in pieces that haven't joined up yet.
 //
-// Inline SVG on currentColor so it inherits whatever it sits in, stays crisp
-// at any size, and needs no network request. The viewBox is cropped tight to
-// the drawing, so `size` is the height the mark actually occupies rather than
-// the height of a mostly-empty square.
+// Traced in the original artwork's 1080 coordinate space and then cropped by
+// viewBox, so the proportions and stroke weight stay exactly as drawn. The two
+// mid-branches are deliberately not mirrored: the right one starts lower than
+// the left in the original, and that asymmetry is what keeps it from reading
+// like a piece of clip art.
+
+const VB = { x: 280, y: 245, w: 550, h: 626 };
+const RATIO = VB.w / VB.h;
 
 export function LogosMark({
   size = 26,
   className,
 }: {
+  /** rendered height in px; the width follows the artwork's proportions */
   size?: number;
   className?: string;
 }) {
   return (
     <svg
       className={className ? `lg-mark ${className}` : 'lg-mark'}
-      width={size}
+      width={Math.round(size * RATIO)}
       height={size}
-      viewBox="234 228 644 656"
+      viewBox={`${VB.x} ${VB.y} ${VB.w} ${VB.h}`}
       fill="none"
       stroke="currentColor"
-      strokeWidth="31"
+      strokeWidth="22"
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
       focusable="false"
     >
-      {/* the longitudinal fissure, broken in the middle */}
-      <path d="M556 250 C 552 344 546 468 546 590" />
-      <path d="M551 602 C 549 690 548 762 547 838" />
+      {/* longitudinal fissure, broken just below the middle */}
+      <path d="M553 258 C 551 350 549 470 548 588" />
+      <path d="M551 601 C 550 690 548 764 547 838" />
 
-      {/* left hemisphere, four arcs with air between them */}
-      <path d="M505 262 C 462 272 424 300 385 348" />
-      <path d="M370 380 C 342 434 320 494 310 554" />
-      <path d="M301 598 C 299 662 317 718 352 764" />
-      <path d="M390 778 C 428 818 472 846 524 862" />
+      {/* left hemisphere: four arcs with air between them */}
+      <path d="M497 256 C 448 266 398 300 360 383" />
+      <path d="M352 415 C 336 465 310 520 303 578" />
+      <path d="M293 622 C 291 682 303 738 352 772" />
+      <path d="M392 782 C 414 818 458 846 528 860" />
 
       {/* right hemisphere */}
-      <path d="M607 262 C 650 272 688 300 727 348" />
-      <path d="M742 380 C 770 434 792 494 802 554" />
-      <path d="M811 598 C 813 662 795 718 760 764" />
-      <path d="M722 778 C 684 818 640 846 588 862" />
+      <path d="M613 256 C 662 266 712 300 750 383" />
+      <path d="M758 415 C 774 465 800 520 807 578" />
+      <path d="M817 622 C 819 682 807 738 758 772" />
+      <path d="M718 782 C 696 818 652 846 582 860" />
 
       {/* folds, left */}
-      <path d="M430 374 C 460 410 490 455 515 500" />
-      <path d="M358 494 C 404 518 452 546 487 578 C 494 610 496 650 497 690" />
-      <path d="M356 698 C 379 674 407 651 435 632" />
+      <path d="M432 372 C 458 402 490 448 518 500" />
+      <path d="M352 497 C 400 520 452 550 485 578 C 492 612 494 650 495 690" />
+      <path d="M348 700 C 370 678 404 652 437 632" />
 
       {/* folds, right */}
-      <path d="M684 374 C 654 410 624 455 599 500" />
-      <path d="M752 500 C 706 524 658 550 625 580 C 616 612 612 652 610 690" />
-      <path d="M756 698 C 733 674 705 651 677 632" />
+      <path d="M678 372 C 652 402 620 448 592 500" />
+      <path d="M748 520 C 706 538 656 556 625 578 C 618 612 616 650 615 690" />
+      <path d="M762 700 C 740 678 706 652 673 632" />
     </svg>
   );
 }
