@@ -112,6 +112,29 @@ const Draft = (
   </div>
 );
 
+const Ground = (
+  <div className="lgg-demo lgg-ground">
+    <span className="lgg-node lgg-ground-node" data-t="question">
+      Launch Socria One in September?
+      <b className="lgg-ground-badge">⎘ 1</b>
+    </span>
+    <div className="lgg-ground-srcs">
+      {['Drive', 'Notion', 'Calendar', 'Gmail', 'Web', 'Paste'].map((x, i) => (
+        <span key={x} style={{ animationDelay: `${0.45 + i * 0.08}s` }}>
+          {x}
+        </span>
+      ))}
+    </div>
+    <div className="lgg-ground-doc">
+      <i />
+      <span>
+        Socria One — launch plan
+        <em>Google Drive · source material</em>
+      </span>
+    </div>
+  </div>
+);
+
 const STEPS: Step[] = [
   {
     kicker: 'Start here',
@@ -147,6 +170,13 @@ const STEPS: Step[] = [
     body: 'Long text becomes an attached note instead of swallowing the box. Images are read once, so the map sees what you saw.',
     example: 'Tag anything you didn’t write as source material, and Logos won’t mistake its author’s convictions for yours.',
     demo: Material,
+  },
+  {
+    kicker: 'Any card, again',
+    title: 'Ground it in your real material.',
+    body: 'Add context to one piece of thinking straight from Drive, Notion, your calendar, your inbox, a page you’re reading, or a paste — chosen by you, attached to that node.',
+    example: 'Your material gives Logos context, never authority. The planning doc informs the September question; it doesn’t get to answer it.',
+    demo: Ground,
   },
   {
     kicker: 'When you’re ready',

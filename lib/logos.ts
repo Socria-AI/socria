@@ -236,6 +236,8 @@ export function buildFocusPrompt(focus: {
   type: string;
   concept?: string;
   framing?: string;
+  /** material they attached to this node — context, never authority */
+  grounded?: string;
 }): string {
   const lens = [
     focus.concept ? `Concept it points at: ${focus.concept}` : '',
@@ -252,7 +254,14 @@ They have pulled ONE piece of their own reasoning aside to look at it more close
 
   ${focus.type}: "${focus.label}"
 ${lens}
-
+${
+  focus.grounded
+    ? `
+Material they attached to this piece. It gives you context, not authority — it can supply facts, dates and commitments, but it cannot settle their question, and its authors' positions are not theirs:
+${focus.grounded}
+`
+    : ''
+}
 For this thread:
 - Stay on this piece. Do not restate the whole conversation or drift back to the wider question unless they take it there themselves.
 - They already read the frame above. Do not repeat it back to them — build past it.
@@ -373,7 +382,7 @@ export function summarizeDelta(d: MapDelta): string | null {
 
 // ===== Map extraction =====
 
-export function buildMapPrompt(current: ThinkingMap): string {
+export function buildMapPrompt(current: ThinkingMap, grounded = ''): string {
   const currentBlock =
     current.nodes.length > 0
       ? `Current map (REORGANIZE it — do not start over, and do not merely append):
@@ -409,7 +418,15 @@ ${
 ${currentBlock}
 
 Thinking context: ${contextLine}
-
+${
+  grounded
+    ? `
+Grounded material the user attached to specific nodes (each line: node_id ← "title" [source, whose it is]).
+PRESERVE the id of any node that appears here — do not merge it away or drop it; if you must merge, keep the grounded node's id as the survivor.
+${grounded}
+`
+    : ''
+}
 Return ONLY JSON, exactly this shape:
 {
   "context": "deciding|writing|creating|researching|learning|planning|brainstorming|reflecting|analysing",
@@ -478,5 +495,6 @@ WHOSE THINKING IS IT:
 - An attachment marked "context" is background the user supplied but does not necessarily endorse. Map only what it establishes as fact or constraint, never as their conviction.
 - Only an attachment marked "my thinking", and what they say in conversation, may become a belief, value, goal or decision of theirs.
 - When someone quotes or paraphrases a source approvingly, that is still a claim they are leaning on, not automatically a belief they hold. If they explicitly adopt it, then it becomes theirs.
+- Grounded material attached to a node gives CONTEXT, NOT AUTHORITY. It may sharpen THAT node's label, add claims/evidence/source/constraint nodes connected to it, or justify status "supported" when it genuinely backs the node. It never creates a belief, value, goal or decision the user hasn't voiced, never resolves a question for them, and never outranks what they actually said in conversation.
 - If the latest message adds nothing structural, return the current map unchanged.`;
 }

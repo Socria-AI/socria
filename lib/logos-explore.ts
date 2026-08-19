@@ -242,12 +242,24 @@ Return ONLY JSON: {"query": "...", "concept": "..."}
 - Never include the person's private details in the query. Search the CONCEPT, not the person.`;
 }
 
+
+// Material the person attached to this node from their own sources. Every
+// prompt that receives it carries the same rule: context, not authority.
+function groundedBlock(grounded: string): string {
+  if (!grounded) return '';
+  return `
+Material they attached to this piece. It gives you context, not authority — it can supply facts, dates, numbers and commitments, and show what they are drawing on; it cannot settle their question, and its authors' positions are not theirs:
+${grounded}
+`;
+}
+
 export function buildExplorePrompt(
   nodeLabel: string,
   nodeType: string,
   conversation: string,
   concept: string,
-  sources: SearchBundle['results']
+  sources: SearchBundle['results'],
+  grounded = ''
 ): string {
   const sourceBlock = sources.length
     ? sources
@@ -260,7 +272,7 @@ export function buildExplorePrompt(
 The piece they clicked:
   ${nodeType}: "${nodeLabel}"
 Concept it points at: ${concept}
-
+${groundedBlock(grounded)}
 Their conversation so far:
 ${conversation}
 
@@ -290,13 +302,19 @@ Absolute rules:
 export function buildChallengePrompt(
   nodeLabel: string,
   nodeType: string,
-  conversation: string
+  conversation: string,
+  grounded = ''
 ): string {
   return `You are Logos. Someone has pointed at one piece of their own reasoning and asked you to put pressure on it. You do NOT tell them it is wrong. You show them where it would break, and leave the testing to them.
 
 The piece:
   ${nodeType}: "${nodeLabel}"
-
+${groundedBlock(grounded)}${
+    grounded
+      ? `You may draw on the attached material for pressure points — a date, a number, a commitment in their own documents that cuts against this piece — and when you do, name it ("your attached …"). The material informs the test; it does not decide it.
+`
+      : ''
+  }
 Their conversation so far:
 ${conversation}
 
@@ -324,7 +342,8 @@ export function buildTracePrompt(
   nodeLabel: string,
   nodeType: string,
   indexedConversation: string,
-  lineage: string
+  lineage: string,
+  grounded = ''
 ): string {
   return `You are Logos. Someone wants to see where one piece of their reasoning came from. You retrace it — you do not extend it.
 
@@ -333,7 +352,7 @@ The piece:
 
 Its place in the map right now:
 ${lineage || '(standing on its own so far)'}
-
+${groundedBlock(grounded)}
 Their conversation, numbered:
 ${indexedConversation}
 
@@ -357,7 +376,8 @@ export function buildResearchPrompt(
   nodeType: string,
   conversation: string,
   concept: string,
-  sources: SearchBundle['results']
+  sources: SearchBundle['results'],
+  grounded = ''
 ): string {
   const sourceBlock = sources.length
     ? sources.map((s, i) => `[${i + 1}] ${s.title} — ${s.site}\n${s.snippet}`).join('\n\n')
@@ -368,7 +388,7 @@ export function buildResearchPrompt(
 The piece:
   ${nodeType}: "${nodeLabel}"
 Concept: ${concept}
-
+${groundedBlock(grounded)}
 Their conversation so far:
 ${conversation}
 

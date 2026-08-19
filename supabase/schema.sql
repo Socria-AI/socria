@@ -32,6 +32,11 @@ alter table conversations
 -- produced it. Null for chats and for logos sessions nobody has written in.
 alter table conversations
   add column if not exists draft jsonb;
+-- Grounded context: material the user attached to specific Thinking Map
+-- nodes (from Drive, Notion, Calendar, Gmail, the web, pastes, uploads).
+-- Keyed by node id. Null for chats and ungrounded sessions.
+alter table conversations
+  add column if not exists contexts jsonb;
 
 -- Imported "about you" profiles (AI history import). One row per user;
 -- stores the profile the user pasted from another AI. Safe to re-run.

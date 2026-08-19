@@ -16,6 +16,7 @@ import {
   buildFocusPrompt,
 } from '@/lib/logos';
 import { renderMessageForModel, sanitizeAttachments } from '@/lib/logos-attachments';
+import { renderContextsForNode, sanitizeNodeContextList } from '@/lib/logos-sources';
 import { isValidAccessKey } from '@/lib/socria-prompt';
 import { enforceRateLimit } from '@/lib/rate-limit';
 
@@ -94,12 +95,16 @@ export async function POST(req: NextRequest) {
     const trim = (v: any, n: number) =>
       typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().slice(0, n) : '';
     const focusLabel = trim(f?.label, 120);
+    const focusContexts = sanitizeNodeContextList(f?.contexts);
     const system = focusLabel
       ? buildFocusPrompt({
           label: focusLabel,
           type: NODE_TYPES.includes(f?.type) ? f.type : 'idea',
           concept: trim(f?.concept, 100) || undefined,
           framing: trim(f?.framing, 700) || undefined,
+          grounded: focusContexts.length
+            ? renderContextsForNode(focusContexts, 2_000)
+            : undefined,
         })
       : LOGOS_CHAT_PROMPT;
 

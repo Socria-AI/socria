@@ -48,7 +48,7 @@ const SEPARATION_PASSES = 3;
 const TRIM_W = 84;
 const TRIM_H = 26;
 // Roughly the action menu's height — only used to decide which side to open on.
-const MENU_H = 200;
+const MENU_H = 246;
 
 function boxExit(dx: number, dy: number): number {
   const tx = dx === 0 ? Infinity : TRIM_W / Math.abs(dx);
@@ -67,6 +67,8 @@ export function ThinkingMap({
   relevant,
   canFocus,
   onFocus,
+  grounded,
+  onAddContext,
 }: {
   map: TMap;
   initialLens?: LensId;
@@ -81,6 +83,10 @@ export function ThinkingMap({
   /** the draft is open, so a node can be held in view while writing */
   canFocus?: boolean;
   onFocus?: (node: MapNodeRef) => void;
+  /** how many pieces of grounded context each node carries */
+  grounded?: Record<string, number>;
+  /** open the Add-context picker for this node */
+  onAddContext?: (node: MapNodeRef) => void;
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const posRef = useRef<Map<string, P>>(new Map());
@@ -516,6 +522,17 @@ export function ThinkingMap({
                   {p.node.status && p.node.status !== 'open' && (
                     <StatusMark status={p.node.status} />
                   )}
+                  {!!grounded?.[p.id] && (
+                    <span
+                      className="lg-node-ctxn"
+                      title={`Grounded in ${grounded[p.id]} piece${grounded[p.id] === 1 ? '' : 's'} of your material`}
+                    >
+                      <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" aria-hidden="true">
+                        <path d="M8.8 5.2 5.6 8.4a1.8 1.8 0 0 1-2.6-2.6l3.9-3.9a1.3 1.3 0 0 1 1.9 1.9L5.2 7.4" />
+                      </svg>
+                      {grounded[p.id]}
+                    </span>
+                  )}
                 </span>
                 <span className="lg-node-label">{p.node.label}</span>
                 {!!p.node.merged?.length && (
@@ -558,6 +575,20 @@ export function ThinkingMap({
                     <span className="lg-act-blurb">{MODE_META[m].blurb}</span>
                   </button>
                 ))}
+                {/* Ground this piece in real material — a doc, a page, the
+                    calendar. Context, never authority. */}
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="lg-act lg-act-context"
+                  onClick={() => {
+                    setMenu(null);
+                    onAddContext?.({ id: node.id, label: node.label, type: node.type });
+                  }}
+                >
+                  <span className="lg-act-label">Add context</span>
+                  <span className="lg-act-blurb">Ground it in your material</span>
+                </button>
                 {/* Only offered while the draft is open — it holds the node
                     beside the writing, and copies nothing into it. */}
                 {canFocus && (

@@ -15,6 +15,7 @@ import {
   EMPTY_MAP,
 } from '@/lib/logos';
 import { renderMessageForModel, sanitizeAttachments } from '@/lib/logos-attachments';
+import { renderContextsForMap, sanitizeContexts } from '@/lib/logos-sources';
 import { isValidAccessKey } from '@/lib/socria-prompt';
 import { enforceRateLimit } from '@/lib/rate-limit';
 
@@ -41,6 +42,9 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
   const current = sanitizeMap(body?.map);
   const messages = Array.isArray(body?.messages) ? body.messages : [];
+  // Grounded material attached to nodes — the extractor sees what is attached
+  // and to which node, tagged with whose thinking it is.
+  const grounded = renderContextsForMap(sanitizeContexts(body?.contexts));
 
   const kept = messages
     .filter(
@@ -83,7 +87,7 @@ export async function POST(req: NextRequest) {
         max_tokens: 900,
         response_format: { type: 'json_object' },
         messages: [
-          { role: 'system', content: buildMapPrompt(current) },
+          { role: 'system', content: buildMapPrompt(current, grounded) },
           { role: 'user', content: transcript },
         ],
       });

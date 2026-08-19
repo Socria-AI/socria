@@ -10,6 +10,7 @@
 
 import { EMPTY_MAP, type ThinkingMap } from './logos';
 import type { Attachment } from './logos-attachments';
+import { sanitizeContexts, type NodeContexts } from './logos-sources';
 
 export interface LogosMsg {
   role: 'user' | 'assistant';
@@ -32,6 +33,8 @@ export interface LogosSession {
   messages: LogosMsg[];
   map: ThinkingMap;
   draft?: LogosDraft;
+  /** grounded material, keyed by the node it grounds */
+  contexts?: NodeContexts;
   updatedAt: number;
 }
 
@@ -52,6 +55,7 @@ export function emptySession(): LogosSession {
     messages: [],
     map: { ...EMPTY_MAP },
     draft: { ...EMPTY_DRAFT },
+    contexts: {},
     updatedAt: Date.now(),
   };
 }
@@ -96,6 +100,7 @@ export function loadLocal(): LogosSession[] {
           s.draft && typeof s.draft.html === 'string'
             ? { title: String(s.draft.title ?? ''), html: s.draft.html }
             : undefined,
+        contexts: sanitizeContexts(s.contexts),
         updatedAt: Number(s.updatedAt) || 0,
       }));
   } catch {

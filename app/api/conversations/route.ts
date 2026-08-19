@@ -9,6 +9,7 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { sanitizeMemory, EMPTY_MEMORY } from '@/lib/socria-prompt';
 import { EMPTY_MAP, sanitizeMap } from '@/lib/logos';
 import { sanitizeAttachments } from '@/lib/logos-attachments';
+import { sanitizeContexts } from '@/lib/logos-sources';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -66,7 +67,7 @@ export async function GET() {
   try {
     const { data, error } = await supabaseAdmin()
       .from('conversations')
-      .select('id, title, messages, memory, kind, map, draft, updated_at')
+      .select('id, title, messages, memory, kind, map, draft, contexts, updated_at')
       .eq('user_id', userId)
       .order('updated_at', { ascending: false });
 
@@ -86,6 +87,7 @@ export async function GET() {
       kind: asKind(c.kind),
       map: c.map ?? EMPTY_MAP,
       draft: c.draft ?? null,
+      contexts: c.contexts ?? null,
       updatedAt: Number(c.updated_at),
     }));
     return NextResponse.json({ conversations });
@@ -125,6 +127,7 @@ export async function PUT(req: NextRequest) {
       kind: asKind(c.kind),
       map: sanitizeMap(c.map ?? EMPTY_MAP),
       draft: sanitizeDraft(c.draft),
+      contexts: sanitizeContexts(c.contexts),
       updated_at: Number(c.updatedAt) || Date.now(),
     });
 

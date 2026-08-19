@@ -16,6 +16,7 @@ import {
   sanitizeMap,
 } from '@/lib/logos';
 import { renderMessageForModel, sanitizeAttachments } from '@/lib/logos-attachments';
+import { renderContextsForNode, sanitizeNodeContextList } from '@/lib/logos-sources';
 import { isValidAccessKey } from '@/lib/socria-prompt';
 import { enforceRateLimit } from '@/lib/rate-limit';
 import {
@@ -92,6 +93,10 @@ export async function POST(req: NextRequest) {
     .map((m, i) => `[${i}] ${m.role === 'user' ? 'Thinker' : 'Logos'}: ${m.content}`)
     .join('\n');
 
+  // Material the person attached to this node — context, not authority.
+  const nodeContexts = sanitizeNodeContextList(body?.contexts);
+  const grounded = nodeContexts.length ? renderContextsForNode(nodeContexts) : '';
+
   const openai = new OpenAI({ apiKey });
   const configured = process.env.OPENAI_MODEL_LOGOS || LOGOS_MODEL;
 
@@ -147,16 +152,16 @@ export async function POST(req: NextRequest) {
     const convoOrNone = conversation || '(no conversation yet)';
     let system: string;
     if (mode === 'challenge') {
-      system = buildChallengePrompt(label, type, convoOrNone);
+      system = buildChallengePrompt(label, type, convoOrNone, grounded);
     } else if (mode === 'trace') {
       const lineage = describeLineage(sanitizeMap(body?.map), String(body?.nodeId ?? ''))
         .map((l) => `  - ${l}`)
         .join('\n');
-      system = buildTracePrompt(label, type, indexed || '(no conversation yet)', lineage);
+      system = buildTracePrompt(label, type, indexed || '(no conversation yet)', lineage, grounded);
     } else if (mode === 'research') {
-      system = buildResearchPrompt(label, type, convoOrNone, concept, search.results);
+      system = buildResearchPrompt(label, type, convoOrNone, concept, search.results, grounded);
     } else {
-      system = buildExplorePrompt(label, type, convoOrNone, concept, search.results);
+      system = buildExplorePrompt(label, type, convoOrNone, concept, search.results, grounded);
     }
 
     const composed = await complete(system, 'Compose the panel.', 700);

@@ -18,7 +18,9 @@ import { DraftSpace, type DraftHandle, type DraftSelection } from '@/components/
 import { DraftResponsePanel } from '@/components/DraftResponsePanel';
 import { LogosGuide, GUIDE_SEEN_KEY } from '@/components/LogosGuide';
 import { LogosMark } from '@/components/LogosMark';
-import type { Attachment } from '@/lib/logos-attachments';
+import { ContextPanel } from '@/components/ContextPanel';
+import type { Attachment, AttachmentOrigin } from '@/lib/logos-attachments';
+import { MAX_CONTEXTS_PER_NODE, sanitizeContexts, type NodeContext } from '@/lib/logos-sources';
 import { relevantNodes, type DraftAction, type DraftResponse } from '@/lib/logos-draft';
 import {
   CONTEXT_LABEL,
@@ -91,6 +93,13 @@ export default function LogosPage() {
   const exploreCache = useRef<Map<string, ExploreResult>>(new Map());
   const [exploredIds, setExploredIds] = useState<Set<string>>(new Set());
 
+  // "Add context" — grounding one node in real material. One panel at a time:
+  // opening this closes the explore drawer and vice versa.
+  const [ctxPanel, setCtxPanel] = useState<{ open: boolean; node: MapNodeRef | null }>({
+    open: false,
+    node: null,
+  });
+
   // One thread per node, shared across all four modes — switching from Explore
   // to Challenge is a change of lens, not a new conversation.
   const [threads, setThreads] = useState<Record<string, Msg[]>>({});
@@ -135,6 +144,14 @@ export default function LogosPage() {
   const messages = active?.messages ?? [];
   const map = active?.map ?? EMPTY_MAP;
   const draft = active?.draft ?? { title: '', html: '' };
+  const contexts = active?.contexts ?? {};
+  const contextsRef = useRef<Record<string, NodeContext[]>>({});
+  contextsRef.current = contexts;
+  const groundedCounts = useMemo(() => {
+    const out: Record<string, number> = {};
+    for (const [id, list] of Object.entries(contexts)) if (list?.length) out[id] = list.length;
+    return out;
+  }, [contexts]);
   const mapRef = useRef<TMap>(EMPTY_MAP);
   mapRef.current = map;
 
@@ -244,6 +261,11 @@ export default function LogosPage() {
                 title: c.title,
                 messages: Array.isArray(c.messages) ? c.messages : [],
                 map: c.map?.nodes ? c.map : { ...EMPTY_MAP },
+                draft:
+                  c.draft && typeof c.draft.html === 'string'
+                    ? { title: String(c.draft.title ?? ''), html: c.draft.html }
+                    : undefined,
+                contexts: sanitizeContexts(c.contexts),
                 updatedAt: Number(c.updatedAt) || 0,
               }));
           }
@@ -287,6 +309,7 @@ export default function LogosPage() {
     setExploredIds(new Set());
     setThreads({});
     setExplore((e) => ({ ...e, open: false, data: null, node: null }));
+    setCtxPanel({ open: false, node: null });
     setChanged(new Set());
     setDeltaNote(null);
     setError(null);
@@ -325,7 +348,7 @@ export default function LogosPage() {
   }
 
   // ── map ────────────────────────────────────────────────────────────
-  function refreshMap() {
+  function refreshMap(contextsOverride?: Record<string, NodeContext[]>) {
     const forSession = activeIdRef.current;
     setMapping(true);
     void (async () => {
@@ -333,7 +356,14 @@ export default function LogosPage() {
         const res = await fetch('/api/logos/map', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...keyHeaders() },
-          body: JSON.stringify({ messages: chronRef.current, map: mapRef.current }),
+          body: JSON.stringify({
+            messages: chronRef.current,
+            map: mapRef.current,
+            // contextsRef is only reassigned on render, so a just-attached
+            // context isn't in it yet — callers that just changed grounding
+            // pass the fresh map explicitly.
+            contexts: contextsOverride ?? contextsRef.current,
+          }),
         });
         if (res.ok) {
           const json = await res.json();
@@ -341,7 +371,20 @@ export default function LogosPage() {
           // different line of thinking — drop it rather than cross the wires.
           if (json?.map && activeIdRef.current === forSession) {
             const delta = diffMaps(mapRef.current, json.map);
-            patchActive((s) => ({ ...s, map: json.map }));
+            const liveIds = new Set(json.map.nodes.map((n: any) => n.id));
+            patchActive((s) => {
+              // A node the extractor merged or dropped takes its id with it;
+              // grounding keyed on that id would linger invisibly. Only prune
+              // when the map genuinely has nodes (never on an empty blip).
+              let contexts = s.contexts ?? {};
+              if (json.map.nodes.length) {
+                const kept = Object.fromEntries(
+                  Object.entries(contexts).filter(([id]) => liveIds.has(id))
+                );
+                if (Object.keys(kept).length !== Object.keys(contexts).length) contexts = kept;
+              }
+              return { ...s, map: json.map, contexts };
+            });
             setChanged(new Set(delta.changed));
             setDeltaNote(summarizeDelta(delta));
           }
@@ -433,12 +476,57 @@ export default function LogosPage() {
     }
   }
 
+  // ── grounding a node in real material ──────────────────────────────
+  function openAddContext(node: MapNodeRef) {
+    setExplore((e) => ({ ...e, open: false }));
+    setCtxPanel({ open: true, node });
+  }
+
+  // Anything an action generated for this node was composed under the old
+  // grounding, so drop it when the grounding changes.
+  function dropExploreCacheForNode(nodeId: string) {
+    for (const key of Array.from(exploreCache.current.keys())) {
+      if (key.split('::')[1] === nodeId) exploreCache.current.delete(key);
+    }
+  }
+
+  function attachContext(nodeId: string, ctx: NodeContext) {
+    const all = { ...(contextsRef.current ?? {}) };
+    all[nodeId] = [...(all[nodeId] ?? []), ctx].slice(0, MAX_CONTEXTS_PER_NODE);
+    patchActive((s) => ({ ...s, contexts: all }));
+    dropExploreCacheForNode(nodeId);
+    // The extractor should see the new grounding — it may sharpen the node.
+    refreshMap(all);
+  }
+
+  function removeContext(nodeId: string, ctxId: string) {
+    const all = { ...(contextsRef.current ?? {}) };
+    all[nodeId] = (all[nodeId] ?? []).filter((c) => c.id !== ctxId);
+    if (!all[nodeId].length) delete all[nodeId];
+    patchActive((s) => ({ ...s, contexts: all }));
+    dropExploreCacheForNode(nodeId);
+    refreshMap(all);
+  }
+
+  function setContextOrigin(nodeId: string, ctxId: string, origin: AttachmentOrigin) {
+    const all = { ...(contextsRef.current ?? {}) };
+    all[nodeId] = (all[nodeId] ?? []).map((c) => (c.id === ctxId ? { ...c, origin } : c));
+    patchActive((s) => ({ ...s, contexts: all }));
+    // Whose-thinking-it-is changes what every action would say about it.
+    dropExploreCacheForNode(nodeId);
+    refreshMap(all);
+  }
+
   // ── acting on a node ───────────────────────────────────────────────
   async function runAction(mode: NodeMode, node: MapNodeRef) {
     // Generated once per node per mode, then reused — reopening is instant and
     // costs nothing. Keyed on the label too, so a node the map rewords is
     // treated as a different idea and looked up again.
-    const cacheKey = `${mode}::${node.id}::${node.label}`;
+    const groundingMark = (contextsRef.current[node.id] ?? [])
+      .map((c) => `${c.id}:${c.origin}`)
+      .join(',');
+    const cacheKey = `${mode}::${node.id}::${node.label}::${groundingMark}`;
+    setCtxPanel((c) => ({ ...c, open: false }));
     setFocusStream('');
     setFocusError(null);
 
@@ -462,6 +550,7 @@ export default function LogosPage() {
           nodeId: node.id,
           messages,
           map: mode === 'trace' ? map : undefined,
+          contexts: contextsRef.current[node.id] ?? [],
         }),
       });
       if (!res.ok) throw new Error('Could not look that up right now.');
@@ -519,6 +608,7 @@ export default function LogosPage() {
             type: node.type,
             concept: explore.data?.concept,
             framing: explore.data?.framing,
+            contexts: contextsRef.current[node.id] ?? [],
           },
         }),
       });
@@ -842,6 +932,8 @@ export default function LogosPage() {
             relevant={relevant}
             canFocus={draftOpen}
             onFocus={(node) => setDraftFocus(node)}
+            grounded={groundedCounts}
+            onAddContext={openAddContext}
           />
           <ExplorePanel
             open={explore.open}
@@ -860,6 +952,17 @@ export default function LogosPage() {
             onSend={sendFocused}
             onMode={(m) => explore.node && runAction(m, explore.node)}
             onClose={() => setExplore((e) => ({ ...e, open: false }))}
+          />
+          <ContextPanel
+            open={ctxPanel.open}
+            node={ctxPanel.node}
+            attached={ctxPanel.node ? (contexts[ctxPanel.node.id] ?? []) : []}
+            authHeaders={keyHeaders}
+            readImage={readImage}
+            onAttach={attachContext}
+            onRemove={removeContext}
+            onOrigin={setContextOrigin}
+            onClose={() => setCtxPanel((c) => ({ ...c, open: false }))}
           />
         </section>
 
