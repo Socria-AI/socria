@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
   if (!kind) return NextResponse.json({ error: 'Unknown source.' }, { status: 400 });
 
   try {
-    const context = await fetchSource(kind, { id, url });
+    const context = await fetchSource(kind, { id, url }, { userId });
     return NextResponse.json({ context });
   } catch (e: any) {
     if (e instanceof ConnectError) {

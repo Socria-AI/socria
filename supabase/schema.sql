@@ -51,3 +51,17 @@ create table if not exists user_profiles (
 -- threads, timeline). Safe to re-run.
 alter table user_profiles
   add column if not exists understanding jsonb not null default '{}'::jsonb;
+
+
+-- Per-user OAuth connections for Logos "Add context" (Google, Notion).
+-- The token bundle is stored encrypted in `secret` (AES-256-GCM via
+-- CONNECTION_SECRET); this table never holds a plaintext token.
+create table if not exists logos_connections (
+  user_id text not null,
+  provider text not null,
+  secret text not null,
+  account text,
+  updated_at bigint not null,
+  created_at timestamptz not null default now(),
+  primary key (user_id, provider)
+);

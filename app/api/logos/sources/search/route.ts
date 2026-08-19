@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
   if (!kind) return NextResponse.json({ error: 'Unknown source.' }, { status: 400 });
 
   try {
-    const items = await searchSource(kind, query);
+    const items = await searchSource(kind, query, { userId });
     return NextResponse.json({ items });
   } catch (e: any) {
     if (e instanceof ConnectError) {

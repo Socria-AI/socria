@@ -6,13 +6,12 @@
 // silently — every byte that reaches a prompt was individually chosen by the
 // person, for a specific node.
 //
-// Auth model, honestly stated: Logos is a gated prototype, so connections are
-// configured per deployment with env credentials (a Google OAuth refresh
-// token, a Notion integration token) rather than a per-user OAuth dance.
-// The adapters are written against the plain REST APIs so swapping the token
-// source for real per-user OAuth later changes googleToken() and nothing else.
-// A source that isn't configured reports itself as not connected, with the
-// hint for connecting it — it never half-works.
+// Auth model: each signed-in person authorizes Google/Notion themselves
+// (read-only) via the OAuth flow in lib/logos-oauth.ts; the tokens are stored
+// encrypted per user (lib/logos-connections.ts). Deployment-wide env
+// credentials are still honoured as a fallback so older setups keep working.
+// Every call resolves a token for the acting user, so one person's connection
+// never reads another's material.
 
 import type { SourceKind } from './logos-sources';
 import { MAX_CONTEXT_TEXT, MAX_CONTEXT_TITLE } from './logos-sources';
@@ -20,7 +19,13 @@ import { MAX_CONTEXT_TEXT, MAX_CONTEXT_TITLE } from './logos-sources';
 export interface SourceStatus {
   kind: SourceKind;
   connected: boolean;
-  /** how to connect it, shown verbatim in the picker when not connected */
+  /** true when the user can start an OAuth connect for this source right here */
+  canConnect?: boolean;
+  /** which provider a Connect button would authorize */
+  provider?: 'google' | 'notion';
+  /** the connected account/workspace, for display */
+  account?: string;
+  /** shown in the picker when not connected */
   hint?: string;
 }
 
@@ -49,25 +54,27 @@ export class ConnectError extends Error {
 // Either a raw access token (quick local testing) or client credentials plus
 // a refresh token (survives the hour). Cached in module scope per instance.
 
-let gCache: { token: string; exp: number } | null = null;
+// The acting user. Passed to every search/fetch so a token is resolved for the
+// person making the request, never shared.
+export type Auth = { userId: string | null };
 
-function googleConfigured(): boolean {
-  return !!(
-    process.env.GOOGLE_ACCESS_TOKEN ||
-    (process.env.GOOGLE_OAUTH_CLIENT_ID &&
-      process.env.GOOGLE_OAUTH_CLIENT_SECRET &&
-      process.env.GOOGLE_REFRESH_TOKEN)
-  );
-}
+let gEnvCache: { token: string; exp: number } | null = null;
 
-async function googleToken(): Promise<string> {
+// A Google access token for the acting user: their stored OAuth grant first,
+// then deployment env credentials as a fallback.
+async function googleToken(auth: Auth): Promise<string> {
+  if (auth.userId) {
+    const { googleAccessTokenFor } = await import('./logos-oauth');
+    const t = await googleAccessTokenFor(auth.userId);
+    if (t) return t;
+  }
+  // Fallback: deployment-wide env credentials.
   if (process.env.GOOGLE_ACCESS_TOKEN) return process.env.GOOGLE_ACCESS_TOKEN;
   const id = process.env.GOOGLE_OAUTH_CLIENT_ID;
   const secret = process.env.GOOGLE_OAUTH_CLIENT_SECRET;
   const refresh = process.env.GOOGLE_REFRESH_TOKEN;
   if (!id || !secret || !refresh) throw new ConnectError('Google is not connected.', 400);
-  if (gCache && Date.now() < gCache.exp - 60_000) return gCache.token;
-
+  if (gEnvCache && Date.now() < gEnvCache.exp - 60_000) return gEnvCache.token;
   const res = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -82,12 +89,22 @@ async function googleToken(): Promise<string> {
   if (!res.ok) throw new ConnectError('Google sign-in has expired — reconnect it.', 502);
   const json = await res.json();
   if (!json?.access_token) throw new ConnectError('Google sign-in has expired — reconnect it.', 502);
-  gCache = { token: json.access_token, exp: Date.now() + (Number(json.expires_in) || 3000) * 1000 };
-  return gCache.token;
+  gEnvCache = { token: json.access_token, exp: Date.now() + (Number(json.expires_in) || 3000) * 1000 };
+  return gEnvCache.token;
 }
 
-async function gGet(url: string): Promise<any> {
-  const token = await googleToken();
+async function notionToken(auth: Auth): Promise<string> {
+  if (auth.userId) {
+    const { notionTokenFor } = await import('./logos-oauth');
+    const t = await notionTokenFor(auth.userId);
+    if (t) return t;
+  }
+  if (process.env.NOTION_API_KEY) return process.env.NOTION_API_KEY;
+  throw new ConnectError('Notion is not connected.', 400);
+}
+
+async function gGet(url: string, auth: Auth): Promise<any> {
+  const token = await googleToken(auth);
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },
     cache: 'no-store',
@@ -99,8 +116,8 @@ async function gGet(url: string): Promise<any> {
   return res.json();
 }
 
-async function gGetText(url: string): Promise<string> {
-  const token = await googleToken();
+async function gGetText(url: string, auth: Auth): Promise<string> {
+  const token = await googleToken(auth);
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },
     cache: 'no-store',
@@ -111,24 +128,38 @@ async function gGetText(url: string): Promise<string> {
 
 // ── which sources exist right now ───────────────────────────────────
 
-export function listSources(): SourceStatus[] {
-  const google = googleConfigured();
-  const gHint =
-    'Set GOOGLE_OAUTH_CLIENT_ID, GOOGLE_OAUTH_CLIENT_SECRET and GOOGLE_REFRESH_TOKEN (or GOOGLE_ACCESS_TOKEN for testing).';
+export async function listSources(auth: Auth): Promise<SourceStatus[]> {
+  const { connectionStatus } = await import('./logos-connections');
+  const { providerConfig } = await import('./logos-oauth');
+  const status = await connectionStatus(auth.userId);
+
+  // Connected if the user has authorized it OR the deployment set env creds.
+  const envGoogle = !!(
+    process.env.GOOGLE_ACCESS_TOKEN ||
+    (process.env.GOOGLE_OAUTH_CLIENT_ID &&
+      process.env.GOOGLE_OAUTH_CLIENT_SECRET &&
+      process.env.GOOGLE_REFRESH_TOKEN)
+  );
+  const google = status.google || envGoogle;
+  const notion = status.notion || !!process.env.NOTION_API_KEY;
+  // Can the user START a connection here? (OAuth app configured + signed in.)
+  const canConnectGoogle = providerConfig('google').configured && !!auth.userId;
+  const canConnectNotion = providerConfig('notion').configured && !!auth.userId;
+
+  const gHint = auth.userId
+    ? 'Connect your Google account to bring in Docs, Sheets, Calendar and Gmail.'
+    : 'Sign in, then connect your Google account.';
+  const nHint = auth.userId
+    ? 'Connect your Notion workspace to bring in pages you share.'
+    : 'Sign in, then connect your Notion workspace.';
+
   return [
-    { kind: 'drive', connected: google, hint: google ? undefined : gHint },
-    { kind: 'sheets', connected: google, hint: google ? undefined : gHint },
-    { kind: 'calendar', connected: google, hint: google ? undefined : gHint },
-    { kind: 'gmail', connected: google, hint: google ? undefined : gHint },
-    {
-      kind: 'notion',
-      connected: !!process.env.NOTION_API_KEY,
-      hint: process.env.NOTION_API_KEY
-        ? undefined
-        : 'Set NOTION_API_KEY to a Notion internal integration token, and share the pages with it.',
-    },
-    // These three always work — the interaction should never be locked
-    // behind someone else's OAuth console.
+    { kind: 'drive', connected: google, canConnect: canConnectGoogle, provider: 'google', account: status.accounts.google, hint: google ? undefined : gHint },
+    { kind: 'sheets', connected: google, canConnect: canConnectGoogle, provider: 'google', account: status.accounts.google, hint: google ? undefined : gHint },
+    { kind: 'calendar', connected: google, canConnect: canConnectGoogle, provider: 'google', account: status.accounts.google, hint: google ? undefined : gHint },
+    { kind: 'gmail', connected: google, canConnect: canConnectGoogle, provider: 'google', account: status.accounts.google, hint: google ? undefined : gHint },
+    { kind: 'notion', connected: notion, canConnect: canConnectNotion, provider: 'notion', account: status.accounts.notion, hint: notion ? undefined : nHint },
+    // These three always work — the interaction is never locked behind OAuth.
     { kind: 'web', connected: true },
     { kind: 'paste', connected: true },
     { kind: 'upload', connected: true },
@@ -139,7 +170,7 @@ export function listSources(): SourceStatus[] {
 
 const esc = (q: string) => q.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 
-async function searchDrive(query: string, sheetsOnly: boolean): Promise<SourceItem[]> {
+async function searchDrive(query: string, sheetsOnly: boolean, auth: Auth): Promise<SourceItem[]> {
   const mime = sheetsOnly ? ` and mimeType='application/vnd.google-apps.spreadsheet'` : '';
   const base = 'https://www.googleapis.com/drive/v3/files';
   const fields = 'files(id,name,mimeType,modifiedTime)';
@@ -150,7 +181,7 @@ async function searchDrive(query: string, sheetsOnly: boolean): Promise<SourceIt
         `trashed=false${mime} and (name contains '${esc(query)}' or fullText contains '${esc(query)}')`
       )}&pageSize=12&fields=${encodeURIComponent(fields)}`
     : `${base}?q=${encodeURIComponent(`trashed=false${mime}`)}&orderBy=modifiedTime desc&pageSize=12&fields=${encodeURIComponent(fields)}`;
-  const json = await gGet(url);
+  const json = await gGet(url, auth);
   return (json?.files ?? []).map((f: any) => ({
     id: String(f.id),
     title: String(f.name ?? 'Untitled'),
@@ -166,7 +197,7 @@ function mimeLabel(m: string): string {
   return 'File';
 }
 
-async function searchCalendar(query: string): Promise<SourceItem[]> {
+async function searchCalendar(query: string, auth: Auth): Promise<SourceItem[]> {
   const now = new Date();
   const timeMin = new Date(now.getTime() - 7 * 86400_000).toISOString();
   const timeMax = new Date(now.getTime() + 60 * 86400_000).toISOString();
@@ -174,7 +205,7 @@ async function searchCalendar(query: string): Promise<SourceItem[]> {
     `https://www.googleapis.com/calendar/v3/calendars/primary/events?singleEvents=true&orderBy=startTime` +
     `&timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}&maxResults=15` +
     (query.trim() ? `&q=${encodeURIComponent(query)}` : '');
-  const json = await gGet(url);
+  const json = await gGet(url, auth);
   return (json?.items ?? []).map((e: any) => ({
     id: String(e.id),
     title: String(e.summary ?? '(no title)'),
@@ -190,16 +221,17 @@ function fmtEventTime(e: any): string {
     .join(' → ');
 }
 
-async function searchGmail(query: string): Promise<SourceItem[]> {
+async function searchGmail(query: string, auth: Auth): Promise<SourceItem[]> {
   const url =
     `https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=10` +
     (query.trim() ? `&q=${encodeURIComponent(query)}` : '');
-  const json = await gGet(url);
+  const json = await gGet(url, auth);
   const ids: string[] = (json?.messages ?? []).slice(0, 8).map((m: any) => String(m.id));
   const metas = await Promise.all(
     ids.map((id) =>
       gGet(
-        `https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=Date`
+        `https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=Date`,
+        auth
       ).catch(() => null)
     )
   );
@@ -217,9 +249,8 @@ async function searchGmail(query: string): Promise<SourceItem[]> {
     .filter(Boolean) as SourceItem[];
 }
 
-async function searchNotion(query: string): Promise<SourceItem[]> {
-  const key = process.env.NOTION_API_KEY;
-  if (!key) throw new ConnectError('Notion is not connected.', 400);
+async function searchNotion(query: string, auth: Auth): Promise<SourceItem[]> {
+  const key = await notionToken(auth);
   const res = await fetch('https://api.notion.com/v1/search', {
     method: 'POST',
     headers: {
@@ -253,18 +284,22 @@ function notionTitle(page: any): string {
   return 'Untitled';
 }
 
-export async function searchSource(kind: SourceKind, query: string): Promise<SourceItem[]> {
+export async function searchSource(
+  kind: SourceKind,
+  query: string,
+  auth: Auth
+): Promise<SourceItem[]> {
   switch (kind) {
     case 'drive':
-      return searchDrive(query, false);
+      return searchDrive(query, false, auth);
     case 'sheets':
-      return searchDrive(query, true);
+      return searchDrive(query, true, auth);
     case 'calendar':
-      return searchCalendar(query);
+      return searchCalendar(query, auth);
     case 'gmail':
-      return searchGmail(query);
+      return searchGmail(query, auth);
     case 'notion':
-      return searchNotion(query);
+      return searchNotion(query, auth);
     default:
       throw new ConnectError('That source is not searchable.', 400);
   }
@@ -274,9 +309,10 @@ export async function searchSource(kind: SourceKind, query: string): Promise<Sou
 
 const cap = (s: string) => s.replace(/\r\n/g, '\n').trim().slice(0, MAX_CONTEXT_TEXT);
 
-async function fetchDriveFile(id: string): Promise<FetchedContext> {
+async function fetchDriveFile(id: string, auth: Auth): Promise<FetchedContext> {
   const meta = await gGet(
-    `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}?fields=id,name,mimeType,webViewLink`
+    `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}?fields=id,name,mimeType,webViewLink`,
+    auth
   );
   const name = String(meta?.name ?? 'Untitled');
   const mime = String(meta?.mimeType ?? '');
@@ -284,15 +320,15 @@ async function fetchDriveFile(id: string): Promise<FetchedContext> {
   const base = `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}`;
 
   if (mime === 'application/vnd.google-apps.document') {
-    const text = await gGetText(`${base}/export?mimeType=${encodeURIComponent('text/plain')}`);
+    const text = await gGetText(`${base}/export?mimeType=${encodeURIComponent('text/plain')}`, auth);
     return { title: name, ref, text: cap(text) };
   }
   if (mime === 'application/vnd.google-apps.spreadsheet') {
-    const text = await gGetText(`${base}/export?mimeType=${encodeURIComponent('text/csv')}`);
+    const text = await gGetText(`${base}/export?mimeType=${encodeURIComponent('text/csv')}`, auth);
     return { title: name, ref, text: cap(text) };
   }
   if (mime.startsWith('text/') || mime === 'application/json') {
-    const text = await gGetText(`${base}?alt=media`);
+    const text = await gGetText(`${base}?alt=media`, auth);
     return { title: name, ref, text: cap(text) };
   }
   throw new ConnectError(
@@ -301,9 +337,10 @@ async function fetchDriveFile(id: string): Promise<FetchedContext> {
   );
 }
 
-async function fetchCalendarEvent(id: string): Promise<FetchedContext> {
+async function fetchCalendarEvent(id: string, auth: Auth): Promise<FetchedContext> {
   const e = await gGet(
-    `https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(id)}`
+    `https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(id)}`,
+    auth
   );
   const parts = [
     `Event: ${e?.summary ?? '(no title)'}`,
@@ -346,9 +383,10 @@ function gmailBody(payload: any): string {
   return '';
 }
 
-async function fetchGmailMessage(id: string): Promise<FetchedContext> {
+async function fetchGmailMessage(id: string, auth: Auth): Promise<FetchedContext> {
   const m = await gGet(
-    `https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(id)}?format=full`
+    `https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(id)}?format=full`,
+    auth
   );
   const h = (name: string) =>
     (m?.payload?.headers ?? []).find((x: any) => x?.name === name)?.value ?? '';
@@ -364,9 +402,8 @@ async function fetchGmailMessage(id: string): Promise<FetchedContext> {
   return { title: String(h('Subject') || '(no subject)').slice(0, 140), text: cap(text) };
 }
 
-async function notionBlocks(id: string, depth: number, budget: { left: number }): Promise<string[]> {
+async function notionBlocks(id: string, depth: number, budget: { left: number }, key: string): Promise<string[]> {
   if (depth > 2 || budget.left <= 0) return [];
-  const key = process.env.NOTION_API_KEY!;
   const res = await fetch(
     `https://api.notion.com/v1/blocks/${encodeURIComponent(id)}/children?page_size=100`,
     {
@@ -394,21 +431,20 @@ async function notionBlocks(id: string, depth: number, budget: { left: number })
       }
     }
     if (b?.has_children && b?.id) {
-      lines.push(...(await notionBlocks(String(b.id), depth + 1, budget)));
+      lines.push(...(await notionBlocks(String(b.id), depth + 1, budget, key)));
     }
   }
   return lines;
 }
 
-async function fetchNotionPage(id: string): Promise<FetchedContext> {
-  const key = process.env.NOTION_API_KEY;
-  if (!key) throw new ConnectError('Notion is not connected.', 400);
+async function fetchNotionPage(id: string, auth: Auth): Promise<FetchedContext> {
+  const key = await notionToken(auth);
   const pageRes = await fetch(`https://api.notion.com/v1/pages/${encodeURIComponent(id)}`, {
     headers: { Authorization: `Bearer ${key}`, 'Notion-Version': '2022-06-28' },
     cache: 'no-store',
   });
   const page = pageRes.ok ? await pageRes.json() : null;
-  const lines = await notionBlocks(id, 0, { left: 300 });
+  const lines = await notionBlocks(id, 0, { left: 300 }, key);
   if (!lines.length) throw new ConnectError('That page has no readable text.', 422);
   return {
     title: page ? notionTitle(page) : 'Notion page',
@@ -616,22 +652,23 @@ export async function fetchWeb(rawUrl: string): Promise<FetchedContext> {
 
 export async function fetchSource(
   kind: SourceKind,
-  ref: { id?: string; url?: string }
+  ref: { id?: string; url?: string },
+  auth: Auth
 ): Promise<FetchedContext> {
   switch (kind) {
     case 'drive':
     case 'sheets':
       if (!ref.id) throw new ConnectError('Pick a file first.', 400);
-      return fetchDriveFile(ref.id);
+      return fetchDriveFile(ref.id, auth);
     case 'calendar':
       if (!ref.id) throw new ConnectError('Pick an event first.', 400);
-      return fetchCalendarEvent(ref.id);
+      return fetchCalendarEvent(ref.id, auth);
     case 'gmail':
       if (!ref.id) throw new ConnectError('Pick a message first.', 400);
-      return fetchGmailMessage(ref.id);
+      return fetchGmailMessage(ref.id, auth);
     case 'notion':
       if (!ref.id) throw new ConnectError('Pick a page first.', 400);
-      return fetchNotionPage(ref.id);
+      return fetchNotionPage(ref.id, auth);
     case 'web':
       if (!ref.url) throw new ConnectError('Give it a URL first.', 400);
       return fetchWeb(ref.url);

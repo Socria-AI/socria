@@ -38,6 +38,9 @@ interface SourceInfo {
   blurb: string;
   searches: boolean;
   connected: boolean;
+  canConnect?: boolean;
+  provider?: 'google' | 'notion';
+  account?: string;
   hint?: string;
 }
 
@@ -64,6 +67,8 @@ export function ContextPanel({
   onAttach,
   onRemove,
   onOrigin,
+  reloadKey,
+  onConnect,
   onClose,
 }: {
   open: boolean;
@@ -75,6 +80,10 @@ export function ContextPanel({
   onAttach: (nodeId: string, ctx: NodeContext) => void;
   onRemove: (nodeId: string, ctxId: string) => void;
   onOrigin: (nodeId: string, ctxId: string, origin: AttachmentOrigin) => void;
+  /** bumped when a connection changes, so the source list re-reads */
+  reloadKey?: number;
+  /** open the Connections screen to authorize Google/Notion */
+  onConnect?: () => void;
   onClose: () => void;
 }) {
   const [sources, setSources] = useState<SourceInfo[] | null>(null);
@@ -97,7 +106,7 @@ export function ContextPanel({
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch('/api/logos/sources', { headers: authHeaders() });
+        const res = await fetch('/api/logos/sources', { headers: authHeaders(), cache: 'no-store' });
         if (!res.ok) throw new Error();
         const json = await res.json();
         if (!cancelled) setSources(json?.sources ?? []);
@@ -116,7 +125,7 @@ export function ContextPanel({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }, [open, reloadKey]);
 
   // Fresh node, fresh panel.
   useEffect(() => {
@@ -394,9 +403,16 @@ export function ContextPanel({
 
         {/* per-source flow */}
         {!full && activeInfo && !activeInfo.connected && (
-          <p className="lg-ctxp-hint">
-            {activeInfo.label} isn&rsquo;t connected yet. {activeInfo.hint}
-          </p>
+          <div className="lg-ctxp-connect">
+            <p className="lg-ctxp-hint">
+              {activeInfo.label} isn&rsquo;t connected yet. {activeInfo.hint}
+            </p>
+            {activeInfo.canConnect && onConnect && (
+              <button type="button" className="lg-ctxp-connectbtn" onClick={onConnect}>
+                Connect {activeInfo.label} →
+              </button>
+            )}
+          </div>
         )}
 
         {!full && activeInfo?.connected && activeInfo.searches && (

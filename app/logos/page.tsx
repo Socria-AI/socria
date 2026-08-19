@@ -19,6 +19,7 @@ import { DraftResponsePanel } from '@/components/DraftResponsePanel';
 import { LogosGuide, GUIDE_SEEN_KEY } from '@/components/LogosGuide';
 import { LogosMark } from '@/components/LogosMark';
 import { ContextPanel } from '@/components/ContextPanel';
+import { ConnectionsModal } from '@/components/ConnectionsModal';
 import type { Attachment, AttachmentOrigin } from '@/lib/logos-attachments';
 import { MAX_CONTEXTS_PER_NODE, sanitizeContexts, type NodeContext } from '@/lib/logos-sources';
 import { relevantNodes, type DraftAction, type DraftResponse } from '@/lib/logos-draft';
@@ -99,6 +100,10 @@ export default function LogosPage() {
     open: false,
     node: null,
   });
+  const [connOpen, setConnOpen] = useState(false);
+  // Bumped when a connection changes so the picker re-reads which sources are live.
+  const [connEpoch, setConnEpoch] = useState(0);
+  const [connBanner, setConnBanner] = useState<string | null>(null);
 
   // One thread per node, shared across all four modes — switching from Explore
   // to Challenge is a change of lens, not a new conversation.
@@ -186,6 +191,39 @@ export default function LogosPage() {
       localStorage.setItem(GUIDE_SEEN_KEY, '1');
     } catch {}
   }
+
+  // Returning from an OAuth consent screen: /logos?connect=ok|denied|error|signin
+  useEffect(() => {
+    let params: URLSearchParams;
+    try {
+      params = new URLSearchParams(window.location.search);
+    } catch {
+      return;
+    }
+    const c = params.get('connect');
+    if (!c) return;
+    const provider = params.get('provider') ?? 'that source';
+    if (c === 'ok') {
+      setConnBanner(`${provider === 'google' ? 'Google' : provider === 'notion' ? 'Notion' : provider} connected.`);
+      setConnEpoch((n) => n + 1);
+    } else if (c === 'denied') {
+      setConnBanner('Connection cancelled — nothing was shared.');
+    } else if (c === 'signin') {
+      setConnBanner('Sign in first, then connect your accounts.');
+      setConnOpen(true);
+    } else if (c === 'error') {
+      setConnBanner(params.get('msg') || 'That connection didn’t go through.');
+      setConnOpen(true);
+    }
+    // Clean the URL so a refresh doesn't replay the banner.
+    try {
+      const url = new URL(window.location.href);
+      ['connect', 'provider', 'msg'].forEach((k) => url.searchParams.delete(k));
+      window.history.replaceState({}, '', url.pathname + url.search);
+    } catch {}
+    const t = setTimeout(() => setConnBanner(null), 6000);
+    return () => clearTimeout(t);
+  }, []);
 
   // Anonymous but key-unlocked callers identify with the header; signed-in
   // users are authorized by their session alone.
@@ -794,6 +832,17 @@ export default function LogosPage() {
   return (
     <div className="logos-root">
       <LogosGuide open={guideOpen} onClose={closeGuide} />
+      <ConnectionsModal
+        open={connOpen}
+        authHeaders={keyHeaders}
+        onClose={() => setConnOpen(false)}
+        onChanged={() => setConnEpoch((n) => n + 1)}
+      />
+      {connBanner && (
+        <div className="lg-conn-banner" role="status">
+          {connBanner}
+        </div>
+      )}
       <div
         className={`lg-split${railOpen ? '' : ' rail-closed'}${draftOpen ? ' draft-open' : ''}`}
       >
@@ -825,6 +874,18 @@ export default function LogosPage() {
               title="What Logos does"
             >
               ?
+            </button>
+            <button
+              type="button"
+              className="lg-conn-open"
+              onClick={() => setConnOpen(true)}
+              aria-label="Connections"
+              title="Connect Google, Notion, and more"
+            >
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M9 11a4 4 0 0 1 0-5l1-1a4 4 0 0 1 6 6l-1 1" />
+                <path d="M15 13a4 4 0 0 1 0 5l-1 1a4 4 0 0 1-6-6l1-1" />
+              </svg>
             </button>
             {/* Deep ceiling, quiet door. It nudges only once the thinking
                 has actually turned into something worth writing. */}
@@ -962,6 +1023,8 @@ export default function LogosPage() {
             onAttach={attachContext}
             onRemove={removeContext}
             onOrigin={setContextOrigin}
+            reloadKey={connEpoch}
+            onConnect={() => setConnOpen(true)}
             onClose={() => setCtxPanel((c) => ({ ...c, open: false }))}
           />
         </section>

@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
   if (!userId && !keyUnlocked) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
-  const sources = listSources().map((s) => ({
+  const sources = (await listSources({ userId })).map((s) => ({
     ...s,
     label: SOURCE_META[s.kind].label,
     blurb: SOURCE_META[s.kind].blurb,
