@@ -1,3 +1,4 @@
+@import 'katex/dist/katex.min.css';
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -5077,3 +5078,148 @@ html.js-anim .scrolly-root .fade.d3 { transition-delay: .3s; }
   transition: transform 0.2s;
 }
 .logos-root .lg-ctxp-connectbtn:hover { transform: translateY(-1px); }
+
+/* ── mathematics: LaTeX, flags, notes ────────────────────────────── */
+.logos-root .lg-tex { line-height: 1.2; }
+.logos-root .lg-tex-block {
+  display: block;
+  margin: 8px 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+/* KaTeX default is a touch large next to Inter; settle it down in the map */
+.logos-root .lg-node .katex { font-size: 1em; }
+.logos-root .lg-msg-body .katex { font-size: 1.02em; }
+/* a malformed expression falls back to monospace so it's legibly "raw" */
+.logos-root .lg-tex-raw {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 0.92em;
+  color: var(--lg-tension);
+  background: rgba(156, 91, 60, 0.06);
+  padding: 0 3px;
+  border-radius: 3px;
+}
+
+/* a short note / repair hint under a node's label */
+.logos-root .lg-node-note {
+  display: block;
+  margin-top: 5px;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--lg-ink-60);
+  font-style: italic;
+}
+
+/* an error step — where the reasoning diverged */
+.logos-root .lg-node.lg-flag-error {
+  border-color: var(--lg-tension);
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgba(156, 91, 60, 0.05) 0 6px,
+    transparent 6px 12px
+  );
+}
+.logos-root .lg-node.lg-flag-error .lg-node-note { color: var(--lg-tension); font-style: normal; }
+.logos-root .lg-node.lg-flag-error::before {
+  content: "";
+  position: absolute;
+  left: -1px; top: -1px; bottom: -1px;
+  width: 3px;
+  border-radius: 9px 0 0 9px;
+  background: var(--lg-tension);
+}
+/* a verified step — checked */
+.logos-root .lg-node.lg-flag-verified { border-color: rgba(53, 70, 32, 0.4); }
+.logos-root .lg-node.lg-flag-verified::before {
+  content: "";
+  position: absolute;
+  left: -1px; top: -1px; bottom: -1px;
+  width: 3px;
+  border-radius: 9px 0 0 9px;
+  background: var(--lg-primary);
+}
+.logos-root .lg-node { position: relative; }
+
+/* math node type colours + forms — same grammar as the rest */
+.logos-root .lg-node-given      { background: #F0F4F6; border-color: #CBD9E0; }
+.logos-root .lg-node-given .lg-node-type { color: var(--lg-accent); }
+.logos-root .lg-node-unknown    { background: #F6F3EA; border-color: #E0D3AE; border-style: dashed; }
+.logos-root .lg-node-unknown .lg-node-type { color: #7A6A3A; }
+.logos-root .lg-node-equation   { background: #fff; border-color: #D6DCC8; }
+.logos-root .lg-node-equation .lg-node-type { color: var(--lg-primary); }
+.logos-root .lg-node-definition { background: #F0F4F6; border-color: #CBD9E0; border-left: 2px solid var(--lg-accent); border-radius: 3px 9px 9px 3px; }
+.logos-root .lg-node-definition .lg-node-type { color: var(--lg-accent); }
+.logos-root .lg-node-transformation { background: #F5F4F0; border-color: #DAD6C8; }
+.logos-root .lg-node-transformation .lg-node-type { color: var(--lg-ink-60); }
+.logos-root .lg-node-theorem    { background: #F4F1F6; border-color: #D8D0E0; }
+.logos-root .lg-node-theorem .lg-node-type { color: #6B5F7A; }
+.logos-root .lg-node-step       { background: #fff; border-color: var(--lg-line); }
+.logos-root .lg-node-step .lg-node-type { color: var(--lg-primary); }
+.logos-root .lg-node-inference  { background: #EFF3EC; border-color: #CFDDC5; }
+.logos-root .lg-node-inference .lg-node-type { color: var(--lg-primary); }
+.logos-root .lg-node-verification { background: #EDF3E8; border-color: #C7D9BA; }
+.logos-root .lg-node-verification .lg-node-type { color: #4F6B3C; }
+.logos-root .lg-node-result     { background: #EDF3E8; border-color: #9FBE86; border-width: 1.5px; }
+.logos-root .lg-node-result .lg-node-type { color: var(--lg-primary); }
+.logos-root .lg-node-result .lg-node-label { font-weight: 500; }
+.logos-root .lg-node-error      { background: #FBEEE9; border-color: #EBC8B8; }
+.logos-root .lg-node-error .lg-node-type { color: var(--lg-tension); }
+
+/* ── plot lens: the function graph ───────────────────────────────── */
+.logos-root .lg-plot {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+}
+.logos-root .lg-plot-svg { flex: 1; min-height: 0; width: 100%; }
+.logos-root .lg-plot-grid { stroke: rgba(53, 70, 32, 0.08); stroke-width: 1; }
+.logos-root .lg-plot-axis { stroke: rgba(35, 36, 31, 0.35); stroke-width: 1.2; }
+.logos-root .lg-plot-tick { fill: var(--lg-ink-40); font-size: 10px; }
+.logos-root .lg-plot-curve { stroke-linecap: round; stroke-linejoin: round; }
+.logos-root .lg-plot-legend {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 10px 4px 2px;
+  justify-content: center;
+}
+.logos-root .lg-plot-key { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--lg-ink); }
+.logos-root .lg-plot-key i { width: 14px; height: 3px; border-radius: 2px; }
+
+/* solution-chain op labels ride a little chip on the spine */
+.logos-root .lg-conn-transforms_to .lg-edge { stroke: #7C9463; }
+.logos-root .lg-conn-implies .lg-edge { stroke: var(--lg-accent); }
+.logos-root .lg-conn-justifies .lg-edge { stroke: #B8A9CE; stroke-dasharray: 3 3; }
+.logos-root .lg-conn-transforms_to .lg-conn-label,
+.logos-root .lg-conn-implies .lg-conn-label {
+  fill: var(--lg-ink-60);
+  font-size: 11px;
+  font-style: italic;
+}
+/* the solution chain reads as a column: give the cards a touch more presence */
+.logos-root .lg-node-result { box-shadow: 0 2px 4px rgba(35,36,31,0.05), 0 0 0 3px rgba(53,70,32,0.08); }
+
+/* guide: the math solution-chain demo */
+.logos-root .lgg-math { padding: 14px 18px; display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.logos-root .lgg-math .lgg-node { position: static; animation: lggRise 0.4s both; }
+.logos-root .lgg-math-1 { animation-delay: 0.05s; }
+.logos-root .lgg-math-2 { animation-delay: 0.5s; }
+.logos-root .lgg-math-3 { animation-delay: 1.4s; }
+.logos-root .lgg-node.is-err {
+  border-color: var(--lg-tension);
+  background: #FBEEE9;
+}
+.logos-root .lgg-math-op {
+  font-size: 9.5px; font-style: italic; color: var(--lg-ink-40);
+  animation: lggRise 0.4s both;
+}
+.logos-root .lgg-math-op-1 { animation-delay: 0.28s; }
+.logos-root .lgg-math-op-2 { animation-delay: 0.95s; }
+.logos-root .lgg-math-flag {
+  display: block; margin-top: 3px;
+  font-size: 8.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--lg-tension);
+}

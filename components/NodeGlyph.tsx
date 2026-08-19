@@ -128,6 +128,78 @@ const PATHS: Record<LogosNodeType, JSX.Element> = {
       <path d="M5 3.4h6.6l-1.2 2.2 1.2 2.2H5" fill="currentColor" fillOpacity="0.14" />
     </>
   ),
+
+  // ── mathematics ──
+  // given — a value handed to you, in brackets
+  given: (
+    <>
+      <path d="M6 3H4.2v10H6M10 3h1.8v10H10" />
+      <path d="M8 7.6v.8" />
+    </>
+  ),
+  // unknown — the x you solve for
+  unknown: <path d="M4.5 4.5l7 7M11.5 4.5l-7 7" />,
+  // equation — the balance of an equals sign
+  equation: (
+    <>
+      <path d="M3 6.4h10M3 9.6h10" />
+    </>
+  ),
+  // definition — a labelled marker (≝)
+  definition: (
+    <>
+      <path d="M3 6h10M3 9h10" />
+      <path d="M8 3.4v.6M8 11.4v.6" />
+    </>
+  ),
+  // transformation — an operation carrying one thing to another
+  transformation: (
+    <>
+      <path d="M3 8h8" />
+      <path d="M8.4 5.4 11 8l-2.6 2.6" />
+      <circle cx="3" cy="8" r="0.6" fill="currentColor" />
+    </>
+  ),
+  // theorem — a rule invoked, a stamped seal
+  theorem: (
+    <>
+      <circle cx="8" cy="8" r="5.4" />
+      <path d="M5.6 8.2 7.2 9.8 10.4 6.4" />
+    </>
+  ),
+  // step — one stair on the way down
+  step: (
+    <path d="M3 4.5h3.5V8H10v3.5h3" strokeLinejoin="round" />
+  ),
+  // inference — therefore (∴)
+  inference: (
+    <>
+      <circle cx="8" cy="4.6" r="0.7" fill="currentColor" />
+      <circle cx="5.4" cy="10" r="0.7" fill="currentColor" />
+      <circle cx="10.6" cy="10" r="0.7" fill="currentColor" />
+    </>
+  ),
+  // verification — a checked box
+  verification: (
+    <>
+      <rect x="3.2" y="3.6" width="9.6" height="8.8" rx="1.4" />
+      <path d="M5.6 8.2 7.2 9.8 10.6 6" />
+    </>
+  ),
+  // result — the boxed answer, doubled edge
+  result: (
+    <>
+      <rect x="2.8" y="4" width="10.4" height="8" rx="1" />
+      <rect x="4.4" y="5.6" width="7.2" height="4.8" rx="0.6" opacity="0.5" />
+    </>
+  ),
+  // error — where it diverged
+  error: (
+    <>
+      <path d="M8 2.8 14 12.6H2Z" />
+      <path d="M8 6.4v3M8 11h.01" />
+    </>
+  ),
 };
 
 export function NodeGlyph({ type }: { type: LogosNodeType }) {

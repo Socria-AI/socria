@@ -32,6 +32,18 @@ const TONE: Record<LogosNodeType, string> = {
   character: '#8A6B4A',
   constraint: 'var(--lg-ink-40)',
   milestone: 'var(--lg-primary)',
+  // math
+  given: 'var(--lg-accent)',
+  unknown: 'var(--lg-secondary)',
+  equation: 'var(--lg-primary)',
+  definition: 'var(--lg-accent)',
+  transformation: 'var(--lg-ink-40)',
+  theorem: '#6B5F7A',
+  step: 'var(--lg-primary)',
+  inference: 'var(--lg-accent)',
+  verification: 'var(--lg-primary)',
+  result: 'var(--lg-primary)',
+  error: 'var(--lg-tension)',
 };
 
 function hash(s: string): number {

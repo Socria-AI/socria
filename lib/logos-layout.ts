@@ -19,8 +19,9 @@ import type {
   LogosRelation,
   ThinkingMap,
 } from './logos';
+import { compileFunction, type CompiledFn } from './logos-math';
 
-export type LensId = 'graph' | 'structure' | 'tensions' | 'evidence';
+export type LensId = 'graph' | 'structure' | 'tensions' | 'evidence' | 'solve' | 'plot';
 
 export interface Placed {
   id: string;
@@ -59,6 +60,8 @@ export const LENSES: { id: LensId; label: string; caption: string }[] = [
   { id: 'structure', label: 'Structure', caption: 'What am I trying to accomplish?' },
   { id: 'tensions', label: 'Tensions', caption: 'What’s pulling me in different directions?' },
   { id: 'evidence', label: 'Evidence', caption: 'Why do I believe this?' },
+  { id: 'solve', label: 'Solution', caption: 'Follow the work, step by step.' },
+  { id: 'plot', label: 'Plot', caption: 'See the function.' },
 ];
 
 export const RELATION_LABEL: Record<LogosRelation, string> = {
@@ -70,6 +73,9 @@ export const RELATION_LABEL: Record<LogosRelation, string> = {
   revises: 'revises',
   precedes: 'comes before',
   part_of: 'sits inside',
+  transforms_to: 'becomes',
+  implies: 'implies',
+  justifies: 'justifies',
 };
 
 const CARD_W = 150;
@@ -96,6 +102,53 @@ export function availableLenses(map: ThinkingMap): LensId[] {
   // Support means the same thing whether it's evidence under a decision or
   // evidence under a claim in an essay.
   if (map.nodes.some((n) => n.type === 'evidence' || n.type === 'source')) out.push('evidence');
+
+  // Mathematics gets its own two lenses, offered only for math work.
+  if (map.context === 'math') {
+    const chainNodes = map.nodes.filter((n) => CHAIN_TYPES.has(n.type));
+    const chainEdges = map.edges.filter((e) => CHAIN_REL.has(e.relation));
+    if (chainNodes.length >= 2 || chainEdges.length >= 1) out.unshift('solve');
+    if (plottableNodes(map).length) out.push('plot');
+  }
+  return out;
+}
+
+const CHAIN_TYPES = new Set<LogosNode['type']>([
+  'given',
+  'unknown',
+  'equation',
+  'definition',
+  'transformation',
+  'theorem',
+  'step',
+  'inference',
+  'verification',
+  'result',
+  'error',
+]);
+const CHAIN_REL = new Set<LogosRelation>(['transforms_to', 'implies', 'precedes']);
+
+/** Nodes whose label/tex is a plottable single-variable function. */
+export function plottableNodes(map: ThinkingMap): { id: string; node: LogosNode; fn: CompiledFn }[] {
+  const out: { id: string; node: LogosNode; fn: CompiledFn }[] = [];
+  const seen = new Set<string>();
+  for (const n of map.nodes) {
+    if (n.type === 'error' || n.flag === 'error') continue; // don't plot a wrong line
+    if (n.type === 'given' || n.type === 'unknown') continue; // a label, not a curve
+    const src = n.tex || n.label;
+    // a real function has an operation or a call — a bare "x" or "42" is not
+    // worth a graph.
+    if (!/[+\-*/^]|\b(sin|cos|tan|ln|log|sqrt|exp|abs)\b/i.test(src)) continue;
+    const fn = compileFunction(src);
+    if (!fn) continue;
+    // dedupe identical expressions so the same equation restated doesn't
+    // draw twice.
+    const key = src.replace(/\s+/g, '');
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ id: n.id, node: n, fn });
+    if (out.length >= 4) break;
+  }
   return out;
 }
 
@@ -378,6 +431,168 @@ export function layoutEvidence(map: ThinkingMap, w: number, h: number): Layout {
   });
 
   return { placed, connectors, caption: capOf('evidence') };
+}
+
+// ── solve: the solution chain, top to bottom ────────────────────────
+// Setup (givens, unknowns, constraints, definitions) across the top; the work
+// flows down the centre, one state per row, ordered by how far each is from
+// the start; theorems/justifications sit to the right of the step they support;
+// the result and any check settle at the bottom. An error step keeps its place
+// in the chain — the whole point is to see where it diverged, not hide it.
+const SOLVE_W = 236;
+const SETUP_TYPES = new Set<LogosNode['type']>(['given', 'unknown', 'constraint']);
+const ASIDE_TYPES = new Set<LogosNode['type']>(['theorem', 'definition']);
+
+function solveCardH(n: LogosNode, w: number) {
+  const len = (n.tex || n.label).length + (n.note ? n.note.length * 0.5 : 0);
+  if (len * 6.6 > (w - 26) * 2) return 76;
+  return len * 6.6 > w - 26 ? 58 : 42;
+}
+
+export function layoutSolve(map: ThinkingMap, w: number, h: number): Layout {
+  const { nodes, edges } = map;
+  if (!nodes.length) return emptyLayout('solve', 'The work will appear here as you solve.');
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+
+  // A definition/theorem is an "aside" only when it justifies a step; otherwise
+  // it's part of the setup.
+  const justifies = edges.filter((e) => e.relation === 'justifies');
+  const asideOf = new Map<string, string>(); // asideId -> chain node it justifies
+  for (const e of justifies) {
+    if (ASIDE_TYPES.has(byId.get(e.from)?.type as any) && byId.has(e.to)) asideOf.set(e.from, e.to);
+  }
+
+  const setup = nodes.filter(
+    (n) => SETUP_TYPES.has(n.type) || (ASIDE_TYPES.has(n.type) && !asideOf.has(n.id))
+  );
+  const asides = nodes.filter((n) => asideOf.has(n.id));
+  const setupIds = new Set(setup.map((n) => n.id));
+  const asideIds = new Set(asides.map((n) => n.id));
+  const chain = nodes.filter((n) => !setupIds.has(n.id) && !asideIds.has(n.id));
+  if (!chain.length) return emptyLayout('solve', 'No worked steps yet.');
+
+  // Longest-path depth along the chain relations.
+  const preds = new Map<string, string[]>();
+  for (const e of edges) {
+    if (!CHAIN_REL.has(e.relation)) continue;
+    if (!byId.has(e.from) || !byId.has(e.to)) continue;
+    (preds.get(e.to) ?? preds.set(e.to, []).get(e.to)!).push(e.from);
+  }
+  const depthMemo = new Map<string, number>();
+  const depthOf = (id: string, seen = new Set<string>()): number => {
+    if (depthMemo.has(id)) return depthMemo.get(id)!;
+    if (seen.has(id)) return 0; // cycle guard
+    seen.add(id);
+    const ps = (preds.get(id) ?? []).filter((p) => !setupIds.has(p) && !asideIds.has(p));
+    const d = ps.length ? Math.max(...ps.map((p) => depthOf(p, seen))) + 1 : 0;
+    depthMemo.set(id, d);
+    return d;
+  };
+  let maxD = 0;
+  for (const n of chain) maxD = Math.max(maxD, depthOf(n.id));
+  // Force the ending to the bottom even if edges are missing.
+  const rank = (n: LogosNode) =>
+    n.type === 'verification' ? maxD + 2 : n.type === 'result' ? maxD + 1 : depthOf(n.id);
+
+  const ordered = [...chain].sort(
+    (a, b) => rank(a) - rank(b) || chain.indexOf(a) - chain.indexOf(b)
+  );
+
+  const placed: Placed[] = [];
+  const pos = new Map<string, Placed>();
+  const cx = w / 2;
+
+  // setup row
+  const topPad = 44;
+  if (setup.length) {
+    const gap = Math.min(200, (w - 60) / Math.max(setup.length, 1));
+    const total = gap * (setup.length - 1);
+    setup.forEach((n, i) => {
+      const p: Placed = {
+        id: n.id,
+        node: n,
+        x: cx - total / 2 + i * gap,
+        y: topPad,
+        w: Math.min(SOLVE_W, gap - 12),
+        h: solveCardH(n, Math.min(SOLVE_W, gap - 12)),
+      };
+      placed.push(p);
+      pos.set(n.id, p);
+    });
+  }
+
+  // the chain, one row per node
+  const rowGap = 92;
+  const chainTop = topPad + (setup.length ? 96 : 0);
+  ordered.forEach((n, i) => {
+    const p: Placed = {
+      id: n.id,
+      node: n,
+      x: cx,
+      y: chainTop + i * rowGap,
+      w: SOLVE_W,
+      h: solveCardH(n, SOLVE_W),
+    };
+    placed.push(p);
+    pos.set(n.id, p);
+  });
+
+  // asides to the right of the step they justify
+  for (const a of asides) {
+    const target = pos.get(asideOf.get(a.id)!);
+    if (!target) continue;
+    const asideW = 168;
+    const p: Placed = {
+      id: a.id,
+      node: a,
+      // sit to the right of the step, but never past the map's edge
+      x: Math.min(target.x + SOLVE_W / 2 + 40 + asideW / 2, w - asideW / 2 - 10),
+      y: target.y,
+      w: asideW,
+      h: solveCardH(a, asideW),
+    };
+    placed.push(p);
+    pos.set(a.id, p);
+  }
+
+  // connectors
+  const connectors: Connector[] = [];
+  for (const e of edges) {
+    const a = pos.get(e.from);
+    const b = pos.get(e.to);
+    if (!a || !b) continue;
+    if (CHAIN_REL.has(e.relation)) {
+      // vertical spine, arrowed, op label to the right of the midpoint
+      const y1 = a.y + a.h / 2;
+      const y2 = b.y - b.h / 2;
+      if (y2 <= y1) continue; // only draw forward/downward
+      const midY = (y1 + y2) / 2;
+      const path =
+        Math.abs(a.x - b.x) < 1
+          ? `M ${a.x} ${y1} V ${y2}`
+          : `M ${a.x} ${y1} V ${midY} H ${b.x} V ${y2}`;
+      connectors.push({
+        key: `${e.from}>${e.to}`,
+        path,
+        relation: e.relation,
+        arrow: true,
+        label: e.op || undefined,
+        lx: Math.max(a.x, b.x) + 12,
+        ly: midY,
+      });
+    } else if (e.relation === 'justifies') {
+      // short horizontal tie from the aside into the step
+      const y = (a.y + b.y) / 2;
+      connectors.push({
+        key: `j~${e.from}~${e.to}`,
+        path: `M ${a.x - a.w / 2} ${a.y} H ${b.x + b.w / 2}`,
+        relation: 'justifies',
+        strength: e.strength,
+      });
+    }
+  }
+
+  return { placed, connectors, caption: capOf('solve') };
 }
 
 function capOf(id: LensId) {

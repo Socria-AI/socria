@@ -39,6 +39,18 @@ export const NODE_TYPES = [
   // planning
   'constraint',
   'milestone',
+  // mathematics / quantitative reasoning
+  'given', // a quantity or fact the problem hands you
+  'unknown', // what you are solving for
+  'equation', // an equation or expression, a state in the work
+  'definition', // a definition being used
+  'transformation', // an operation applied (when it's the object of attention)
+  'theorem', // a property, rule or theorem invoked
+  'step', // an intermediate result on the way to the answer
+  'inference', // a logical deduction (proofs, logic)
+  'verification', // a check of the work
+  'result', // the final answer
+  'error', // a mistake, or where the reasoning diverged
 ] as const;
 export type LogosNodeType = (typeof NODE_TYPES)[number];
 
@@ -53,8 +65,19 @@ export const RELATIONS = [
   'precedes',
   /** structure — one thing sits inside another */
   'part_of',
+  /** math: one expression becomes the next via an operation (solution chain) */
+  'transforms_to',
+  /** logic: A logically implies B (proofs) */
+  'implies',
+  /** a theorem, definition or property justifies a step */
+  'justifies',
 ] as const;
 export type LogosRelation = (typeof RELATIONS)[number];
+
+// Whether a mathematical step is where the reasoning went wrong, or one that
+// has been checked. Rendered in place so an error is repaired, not replaced.
+export const MATH_FLAGS = ['error', 'verified'] as const;
+export type MathFlag = (typeof MATH_FLAGS)[number];
 
 // What kind of thinking is happening. Inferred from the conversation, never
 // chosen from a menu — asking someone to categorize their own thinking before
@@ -70,6 +93,7 @@ export const THINKING_CONTEXTS = [
   'brainstorming',
   'reflecting',
   'analysing',
+  'math',
 ] as const;
 export type ThinkingContext = (typeof THINKING_CONTEXTS)[number];
 
@@ -84,7 +108,13 @@ export const CONTEXT_LABEL: Record<ThinkingContext, string> = {
   brainstorming: 'Exploring',
   reflecting: 'Reflecting',
   analysing: 'Analysing',
+  math: 'Math',
 };
+
+// How the person is engaging with a mathematical problem — inferred, and it
+// changes what Logos does: teach, check, just compute, or explain.
+export const MATH_INTENTS = ['learning', 'verification', 'utility', 'exploration'] as const;
+export type MathIntent = (typeof MATH_INTENTS)[number];
 
 // Reasoning doesn't only accumulate — it settles. A question gets answered, an
 // assumption earns its evidence, a belief is replaced by a later one. Status is
@@ -103,6 +133,12 @@ export interface LogosNode {
   status?: LogosNodeStatus;
   /** labels folded into this node by a merge — kept so the merge is visible */
   merged?: string[];
+  /** LaTeX to render for the label, when this node is mathematical */
+  tex?: string;
+  /** a diverged step (error) or a checked one (verified) — rendered in place */
+  flag?: MathFlag;
+  /** a short annotation: a repair hint on an error, a note on a step (may hold $…$) */
+  note?: string;
 }
 
 export interface LogosEdge {
@@ -110,6 +146,8 @@ export interface LogosEdge {
   to: string;
   relation: LogosRelation;
   strength?: LogosEdgeStrength;
+  /** math: the operation that turns `from` into `to`, e.g. "−6 both sides" */
+  op?: string;
 }
 
 export interface ThinkingMap {
@@ -123,34 +161,57 @@ export const EMPTY_MAP: ThinkingMap = { nodes: [], edges: [] };
 
 // Keep the map legible. Past ~16 nodes it stops being a thinking aid and
 // starts being a diagram, so the extractor is told to merge rather than grow.
+// Math maps can carry more nodes — a solution chain is legitimately longer
+// than a decision — so the cap lifts a little for mathematical work.
 const MAX_NODES = 16;
+const MAX_NODES_MATH = 26;
 const MAX_EDGES = 22;
-const MAX_LABEL = 60;
+const MAX_EDGES_MATH = 34;
+const MAX_LABEL = 100; // equations are longer than a decision's phrasing
 const MAX_MERGED = 4;
+const MAX_TEX = 240;
+const MAX_NOTE = 220;
+const MAX_OP = 60;
 
 export function sanitizeMap(raw: any): ThinkingMap {
   if (!raw || typeof raw !== 'object') return { ...EMPTY_MAP };
+
+  const context: ThinkingContext | undefined = THINKING_CONTEXTS.includes(raw.context)
+    ? (raw.context as ThinkingContext)
+    : undefined;
+  const isMath = context === 'math';
+  const str = (v: any, n: number) =>
+    typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().slice(0, n) : '';
 
   const seen = new Set<string>();
   const nodes: LogosNode[] = (Array.isArray(raw.nodes) ? raw.nodes : [])
     .map((n: any) => {
       const id = typeof n?.id === 'string' ? n.id.trim().slice(0, 40) : '';
       const type = NODE_TYPES.includes(n?.type) ? (n.type as LogosNodeType) : null;
-      const label =
-        typeof n?.label === 'string'
-          ? n.label.replace(/\s+/g, ' ').trim().slice(0, MAX_LABEL)
-          : '';
+      const label = str(n?.label, MAX_LABEL);
       if (!id || !type || !label) return null;
       const status: LogosNodeStatus = NODE_STATUSES.includes(n?.status)
         ? (n.status as LogosNodeStatus)
         : 'open';
       const merged = (Array.isArray(n?.merged) ? n.merged : [])
-        .map((m: any) =>
-          typeof m === 'string' ? m.replace(/\s+/g, ' ').trim().slice(0, MAX_LABEL) : ''
-        )
+        .map((m: any) => str(m, MAX_LABEL))
         .filter((m: string) => m && m !== label)
         .slice(0, MAX_MERGED);
-      return { id, type, label, status, ...(merged.length ? { merged } : {}) };
+      const tex = str(n?.tex, MAX_TEX);
+      const flag: MathFlag | undefined = MATH_FLAGS.includes(n?.flag)
+        ? (n.flag as MathFlag)
+        : undefined;
+      const note = str(n?.note, MAX_NOTE);
+      return {
+        id,
+        type,
+        label,
+        status,
+        ...(merged.length ? { merged } : {}),
+        ...(tex ? { tex } : {}),
+        ...(flag ? { flag } : {}),
+        ...(note ? { note } : {}),
+      };
     })
     .filter((n: LogosNode | null): n is LogosNode => {
       if (!n) return false;
@@ -158,7 +219,7 @@ export function sanitizeMap(raw: any): ThinkingMap {
       seen.add(n.id);
       return true;
     })
-    .slice(0, MAX_NODES);
+    .slice(0, isMath ? MAX_NODES_MATH : MAX_NODES);
 
   const ids = new Set(nodes.map((n) => n.id));
   const edgeSeen = new Set<string>();
@@ -173,22 +234,24 @@ export function sanitizeMap(raw: any): ThinkingMap {
       const strength: LogosEdgeStrength = EDGE_STRENGTHS.includes(e?.strength)
         ? (e.strength as LogosEdgeStrength)
         : 'normal';
-      return { from, to, relation, strength };
+      const op = str(e?.op, MAX_OP);
+      return { from, to, relation, strength, ...(op ? { op } : {}) };
     })
     .filter((e: LogosEdge | null): e is LogosEdge => {
       // Drop dangling edges — they'd render as lines into empty space.
       if (!e || e.from === e.to) return false;
       if (!ids.has(e.from) || !ids.has(e.to)) return false;
-      const key = [e.from, e.to].sort().join('~') + e.relation;
+      // transforms_to is directional and ordered, so two opposite ones are
+      // distinct; other relations are keyed order-independent.
+      const key =
+        e.relation === 'transforms_to' || e.relation === 'implies'
+          ? `${e.from}>${e.to}:${e.relation}`
+          : [e.from, e.to].sort().join('~') + e.relation;
       if (edgeSeen.has(key)) return false;
       edgeSeen.add(key);
       return true;
     })
-    .slice(0, MAX_EDGES);
-
-  const context: ThinkingContext | undefined = THINKING_CONTEXTS.includes(raw.context)
-    ? (raw.context as ThinkingContext)
-    : undefined;
+    .slice(0, isMath ? MAX_EDGES_MATH : MAX_EDGES);
 
   return { nodes, edges, ...(context ? { context } : {}) };
 }
@@ -223,9 +286,17 @@ So:
 - "What does this study actually say?" → explain it. Understanding is not authorship.
 When a request would hand you the authorship, do not lecture them about it. Ask the question that gets them to the part only they can supply.
 
+MATHEMATICS AND QUANTITATIVE REASONING.
+When the work is mathematical, read what they are actually here for and match it — the goal is never to withhold an answer artificially, only to avoid replacing reasoning they are trying to build:
+- LEARNING (they are working a problem to understand it): preserve their reasoning. Guide with a question or a hint toward the next step. Do not hand them the full worked solution; that takes the learning away.
+- VERIFICATION (they did the work and want it checked): check it. If it's right, say so and why. If it's wrong, find the FIRST step where it diverged, name exactly what went wrong there, and help them repair THAT step — do not silently rewrite the whole thing with a clean solution. Locating the error is the help.
+- UTILITY (a quick calculation where teaching would be friction — "what's 18% of 340", "convert this"): just compute it, plainly. No Socratic detour.
+- EXPLORATION (they want to understand a concept or relationship): explain it, and where a function or relationship is involved, describe it so it can be seen.
+Write mathematics in LaTeX: inline as $…$ and displayed as $$…$$. Notation renders, so use it — $x^2$, $\\frac{a}{b}$, $\\int_0^1 f(x)\\,dx$ — rather than ascii. Keep prose spare around it.
+
 Openings to avoid entirely: "That's a great question", "That's a significant decision", "I understand how difficult", "There are several factors to consider."
 
-Instead, open with something you actually noticed in what they said. Then one focused question.`;
+Instead, open with something you actually noticed in what they said. Then one focused question — unless they're plainly after a utility calculation, in which case just give it.`;
 
 // A node you clicked into gets its own small thread. Same voice, same refusal
 // to answer — only the aperture narrows. The preamble exists to stop the model
@@ -353,6 +424,9 @@ const LINEAGE_PHRASE: Record<LogosRelation, [string, string]> = {
   revises: ['revises', 'was revised by'],
   precedes: ['comes before', 'comes after'],
   part_of: ['sits inside', 'contains'],
+  transforms_to: ['becomes', 'came from'],
+  implies: ['implies', 'follows from'],
+  justifies: ['justifies', 'is justified by'],
 };
 
 /** How one node sits against the rest of the map, in plain language. */
@@ -429,9 +503,9 @@ ${grounded}
 }
 Return ONLY JSON, exactly this shape:
 {
-  "context": "deciding|writing|creating|researching|learning|planning|brainstorming|reflecting|analysing",
-  "nodes": [{"id": "short_snake_case_id", "type": "<node type>", "label": "a short phrase in their own framing", "status": "open|supported|resolved|revised", "merged": ["label of a node folded into this one"]}],
-  "edges": [{"from": "node_id", "to": "node_id", "relation": "supports|conflicts|depends|relates|leads_to|revises|precedes|part_of", "strength": "weak|normal|strong"}]
+  "context": "deciding|writing|creating|researching|learning|planning|brainstorming|reflecting|analysing|math",
+  "nodes": [{"id": "short_snake_case_id", "type": "<node type>", "label": "a short phrase in their own framing", "status": "open|supported|resolved|revised", "merged": ["label of a node folded into this one"], "tex": "LaTeX for this node, if mathematical", "flag": "error|verified", "note": "a short annotation or repair hint"}],
+  "edges": [{"from": "node_id", "to": "node_id", "relation": "supports|conflicts|depends|relates|leads_to|revises|precedes|part_of|transforms_to|implies|justifies", "strength": "weak|normal|strong", "op": "the operation on a transforms_to edge"}]
 }
 
 READ THE CONTEXT FIRST.
@@ -446,8 +520,18 @@ People do not only make decisions. Work out what kind of thinking is actually ha
   brainstorming ideas, how they cluster (relates), unexplored branches (question)
   reflecting    themes, tensions, motivations, values, questions
   analysing     claims, evidence, counterpoints, assumptions, uncertainty
+  math          givens, unknowns, equations, definitions, transformations, theorems, steps, inferences, constraints, verification, results, and errors
 
 A conversation may move between contexts. Follow it. Do not force earlier framing onto later thinking.
+
+MATHEMATICS. When the work is quantitative — solving, proving, calculating, or reasoning about quantities — set context to "math" and build a map of the WORK, not a mind-map about it:
+- Put the LaTeX of each mathematical node in its "tex" field (e.g. tex: "x^2 - 5x + 6 = 0"); keep "label" a short plain-text summary. Non-mathematical math nodes (a definition in words, a given like "a right triangle") need no tex.
+- Model the solution as a CHAIN: connect each state to the next with a "transforms_to" edge, and put the operation on the edge's "op" ("−6 both sides", "factor", "√ both sides"). A proof uses "implies" instead. Order matters — from is the earlier state, to is the later one.
+- givens/unknowns/constraints are the setup. equation/step nodes are the work. result is the final answer. verification is a check.
+- A theorem, definition or property that justifies a step connects to that step with "justifies".
+- ERRORS ARE THE POINT. If the person's work diverges, do NOT silently replace it with a correct chain. Keep their steps, and on the FIRST wrong one set flag:"error" and put the specific mistake + how to repair it in "note" ("subtracted 6 but the term is +6; add instead"). Everything after a genuine error is suspect — mark the error where it first occurs, not everywhere.
+- When a step is confirmed correct (verification), you may set flag:"verified" on it.
+- Only mark flag:"error" for a real mathematical mistake the person actually made, never for a step you would have done differently. Never fabricate an error.
 
 Node types mean:
   goal = what they're trying to achieve, or the central idea of a piece
@@ -469,8 +553,19 @@ Node types mean:
   character = a person or figure in a creative work
   constraint = a fixed limit on what is possible: time, money, scope, capability
   milestone = a point that marks progress toward a goal
+  given = a quantity or fact the problem hands you
+  unknown = what they are solving for
+  equation = an equation or expression — a state in the work
+  definition = a definition being used
+  transformation = an operation, when it is the object of attention (usually prefer a transforms_to edge)
+  theorem = a property, rule or theorem invoked
+  step = an intermediate result on the way to the answer
+  inference = a logical deduction (proofs, logic)
+  verification = a check of the work
+  result = the final answer
+  error = a mistake, or where the reasoning diverged
 
-Relations mean: supports (A is a reason for B), conflicts (A pulls against B), depends (B requires A, including a prerequisite), relates (loose association), leads_to (A produces B), revises (A is a later version of B), precedes (A comes before B in time or sequence), part_of (A sits inside B — a section within a piece, a scene within an act).
+Relations mean: supports (A is a reason for B), conflicts (A pulls against B), depends (B requires A, including a prerequisite), relates (loose association), leads_to (A produces B), revises (A is a later version of B), precedes (A comes before B in time or sequence), part_of (A sits inside B — a section within a piece, a scene within an act), transforms_to (expression A becomes expression B via an operation — the solution chain), implies (A logically implies B — proofs), justifies (a theorem/definition/property justifies a step).
 - Labels are short phrases (2–8 words) in THEIR language, not yours. Never full sentences.
 - Prefer typing precisely: a stated priority is a value, not an idea; "I've decided X" is a decision; a cost of a choice is a consequence.
 - Maximum 16 nodes. When it would grow past that, merge or drop the least load-bearing node instead. A small sharp map beats a big one.

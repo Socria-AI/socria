@@ -135,6 +135,19 @@ const Ground = (
   </div>
 );
 
+const MathDemo = (
+  <div className="lgg-demo lgg-math">
+    <span className="lgg-node lgg-math-1" data-t="equation">2x + 6 = 14</span>
+    <span className="lgg-math-op lgg-math-op-1">−6 both sides</span>
+    <span className="lgg-node lgg-math-2 is-err" data-t="step">
+      2x = 20
+      <b className="lgg-math-flag">where it diverged</b>
+    </span>
+    <span className="lgg-math-op lgg-math-op-2">÷ 2</span>
+    <span className="lgg-node lgg-math-3" data-t="result">x = 10</span>
+  </div>
+);
+
 const STEPS: Step[] = [
   {
     kicker: 'Start here',
@@ -163,6 +176,13 @@ const STEPS: Step[] = [
     body: 'Ideas that turn out to be the same thing merge. Questions you answer are marked resolved. Beliefs you change are kept beside the ones that replaced them.',
     example: 'Nothing is deleted quietly — watching a belief get replaced is the point.',
     demo: Reorganize,
+  },
+  {
+    kicker: 'Numbers too',
+    title: 'It follows your math, and shows the work.',
+    body: 'Solve, prove, or calculate and Logos lays the work out as a chain — givens, each step, the result — with equations set in real notation.',
+    example: 'Make a slip and it marks the first step that diverged and helps you repair it, instead of pasting a clean solution over your work.',
+    demo: MathDemo,
   },
   {
     kicker: 'Bring your own',

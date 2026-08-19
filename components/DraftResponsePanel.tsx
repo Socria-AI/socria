@@ -5,6 +5,7 @@
 // a suggestion lands on the page by itself the authorship has moved.
 
 import { DRAFT_ACTION_META, type DraftResponse } from '@/lib/logos-draft';
+import { MathText } from './TeX';
 
 export function DraftResponsePanel({
   open,
@@ -57,12 +58,16 @@ export function DraftResponsePanel({
 
         {data && !loading && (
           <>
-            {data.body && <p className="lg-dr-prose">{data.body}</p>}
+            {data.body && (
+              <p className="lg-dr-prose">
+                <MathText>{data.body}</MathText>
+              </p>
+            )}
 
             {!!data.points?.length && (
               <ul className="lg-dr-points">
                 {data.points.map((p, i) => (
-                  <li key={i}>{p}</li>
+                  <li key={i}><MathText>{p}</MathText></li>
                 ))}
               </ul>
             )}
@@ -70,11 +75,11 @@ export function DraftResponsePanel({
             {data.proposal && (
               <div className="lg-dr-proposal">
                 <span className="lg-x-block-label">Proposed wording</span>
-                <p>{data.proposal}</p>
+                <p><MathText>{data.proposal}</MathText></p>
                 {!!data.changes?.length && (
                   <ul className="lg-dr-changes">
                     {data.changes.map((c, i) => (
-                      <li key={i}>{c}</li>
+                      <li key={i}><MathText>{c}</MathText></li>
                     ))}
                   </ul>
                 )}
@@ -114,7 +119,11 @@ export function DraftResponsePanel({
               </div>
             )}
 
-            {data.question && <p className="lg-x-question">{data.question}</p>}
+            {data.question && (
+              <p className="lg-x-question">
+                <MathText>{data.question}</MathText>
+              </p>
+            )}
           </>
         )}
       </div>

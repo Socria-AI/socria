@@ -17,6 +17,8 @@ import type { ThinkingMap as TMap, LogosRelation } from '@/lib/logos';
 import { MODE_META, NODE_MODES, type NodeMode } from '@/lib/logos-explore';
 import { NodeGlyph } from './NodeGlyph';
 import { StatusMark } from './StatusMark';
+import { TeX, MathText } from './TeX';
+import { MathPlot } from './MathPlot';
 import {
   LENSES,
   RELATION_LABEL,
@@ -24,6 +26,7 @@ import {
   layoutEvidence,
   layoutStructure,
   layoutTensions,
+  layoutSolve,
   cardH,
   GRAPH_W,
   type Connector,
@@ -99,6 +102,8 @@ export function ThinkingMap({
   mapRef.current = map;
 
   const [lens, setLens] = useState<LensId>(initialLens);
+  // Once the person picks a lens by hand, stop auto-switching for them.
+  const lensManual = useRef(false);
   const [size, setSize] = useState({ w: 800, h: 600 });
   const [focused, setFocused] = useState<string | null>(null);
   const [hovered, setHovered] = useState<string | null>(null);
@@ -132,6 +137,8 @@ export function ThinkingMap({
   // If the active lens loses its content, fall back to the graph.
   useEffect(() => {
     if (lenses.length && !lenses.includes(lens)) setLens(lenses[0]);
+    // Math work leads with the Solution chain unless they've chosen otherwise.
+    else if (!lensManual.current && lenses.includes('solve') && lens !== 'solve') setLens('solve');
   }, [lenses, lens]);
 
   const edgeKey = (e: { from: string; to: string; relation: string }) =>
@@ -154,10 +161,11 @@ export function ThinkingMap({
 
   // ── static lenses ────────────────────────────────────────────────
   const staticLayout = useMemo(() => {
-    if (lens === 'graph') return null;
+    if (lens === 'graph' || lens === 'plot') return null;
     const { w, h } = size;
     if (lens === 'structure') return layoutStructure(map, w, h);
     if (lens === 'tensions') return layoutTensions(map, w, h);
+    if (lens === 'solve') return layoutSolve(map, w, h);
     return layoutEvidence(map, w, h);
   }, [lens, map, size]);
 
@@ -336,7 +344,7 @@ export function ThinkingMap({
 
   const dim = (on: boolean) => (related && !on ? ' is-dim' : '');
   const caption =
-    staticLayout?.caption ?? LENSES.find((l) => l.id === 'graph')!.caption;
+    staticLayout?.caption ?? LENSES.find((l) => l.id === lens)!.caption;
 
   const cards: Placed[] =
     lens === 'graph'
@@ -372,6 +380,7 @@ export function ThinkingMap({
               aria-selected={lens === l.id}
               className={`lg-lens${lens === l.id ? ' is-on' : ''}`}
               onClick={() => {
+                lensManual.current = true;
                 setLens(l.id);
                 setFocused(null);
                 setMenu(null);
@@ -410,6 +419,9 @@ export function ThinkingMap({
             <p>{staticLayout.empty}</p>
           </div>
         )}
+
+        {/* the plot lens draws the function itself, not cards */}
+        {lens === 'plot' && <MathPlot map={map} width={size.w} height={size.h} />}
 
         <svg className="lg-edges" aria-hidden="true">
           <defs>
@@ -489,7 +501,9 @@ export function ThinkingMap({
                   explored?.has(p.id) ? ' is-explored' : ''
                 }${changed?.has(p.id) ? ' is-changed' : ''}${
                   menuFor === p.id ? ' is-open' : ''
-                }${relevant?.has(p.id) ? ' is-relevant' : ''}`}
+                }${relevant?.has(p.id) ? ' is-relevant' : ''}${
+                  p.node.flag ? ` lg-flag-${p.node.flag}` : ''
+                }`}
                 aria-haspopup="menu"
                 aria-expanded={menuFor === p.id}
                 onMouseEnter={() => setHovered(p.id)}
@@ -534,7 +548,15 @@ export function ThinkingMap({
                     </span>
                   )}
                 </span>
-                <span className="lg-node-label">{p.node.label}</span>
+                <span className="lg-node-label">
+                  {p.node.tex ? <TeX tex={p.node.tex} /> : p.node.label}
+                </span>
+                {/* a repair hint on an error, or a short note on a step */}
+                {p.node.note && (
+                  <span className="lg-node-note">
+                    <MathText>{p.node.note}</MathText>
+                  </span>
+                )}
                 {!!p.node.merged?.length && (
                   <span
                     className="lg-node-merged"

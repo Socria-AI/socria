@@ -18,6 +18,7 @@ import { DraftSpace, type DraftHandle, type DraftSelection } from '@/components/
 import { DraftResponsePanel } from '@/components/DraftResponsePanel';
 import { LogosGuide, GUIDE_SEEN_KEY } from '@/components/LogosGuide';
 import { LogosMark } from '@/components/LogosMark';
+import { MathText } from '@/components/TeX';
 import { ContextPanel } from '@/components/ContextPanel';
 import { ConnectionsModal } from '@/components/ConnectionsModal';
 import type { Attachment, AttachmentOrigin } from '@/lib/logos-attachments';
@@ -928,7 +929,11 @@ export default function LogosPage() {
                 {m.role === 'assistant' && <span className="lg-msg-who">Logos</span>}
                 <div className="lg-msg-stack">
                   {!!m.attachments?.length && <AttachmentList items={m.attachments} />}
-                  {m.content && <div className="lg-msg-body">{m.content}</div>}
+                  {m.content && (
+                    <div className="lg-msg-body">
+                      <MathText>{m.content}</MathText>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
@@ -936,7 +941,9 @@ export default function LogosPage() {
             {streaming && (
               <div className="lg-msg lg-msg-assistant">
                 <span className="lg-msg-who">Logos</span>
-                <div className="lg-msg-body">{streaming}</div>
+                <div className="lg-msg-body">
+                  <MathText>{streaming}</MathText>
+                </div>
               </div>
             )}
 

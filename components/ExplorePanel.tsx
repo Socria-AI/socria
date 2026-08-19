@@ -9,6 +9,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { LogosNodeType } from '@/lib/logos';
 import { MODE_META, type ExploreResult, type NodeMode } from '@/lib/logos-explore';
 import { NodeGlyph } from './NodeGlyph';
+import { MathText } from './TeX';
 
 export type FocusMsg = { role: 'user' | 'assistant'; content: string };
 
@@ -228,7 +229,11 @@ export function ExplorePanel({
             {MODE_META[mode].searches && (
               <span className="lg-x-concept">{data.concept}</span>
             )}
-            {data.framing && <p className="lg-x-framing">{data.framing}</p>}
+            {data.framing && (
+              <p className="lg-x-framing">
+                <MathText>{data.framing}</MathText>
+              </p>
+            )}
 
             {/* Trace: the actual moments this grew out of, sliced from the
                 transcript rather than written by the model. */}
@@ -238,7 +243,7 @@ export function ExplorePanel({
                 {data.origins.map((o, i) => (
                   <blockquote key={i} className={`lg-x-origin lg-x-origin-${o.who}`}>
                     <span className="lg-x-origin-who">{o.who === 'you' ? 'You' : 'Logos'}</span>
-                    {o.quote}
+                    <MathText>{o.quote}</MathText>
                   </blockquote>
                 ))}
               </div>
@@ -261,17 +266,23 @@ export function ExplorePanel({
                 <span className="lg-x-block-label">{POINTS_LABEL[mode] ?? 'Points'}</span>
                 <ul>
                   {data.points.map((p, i) => (
-                    <li key={i}>{p}</li>
+                    <li key={i}><MathText>{p}</MathText></li>
                   ))}
                 </ul>
               </div>
             )}
 
             {data.connection && (
-              <p className="lg-x-connection">{data.connection}</p>
+              <p className="lg-x-connection">
+                <MathText>{data.connection}</MathText>
+              </p>
             )}
 
-            {data.question && <p className="lg-x-question">{data.question}</p>}
+            {data.question && (
+              <p className="lg-x-question">
+                <MathText>{data.question}</MathText>
+              </p>
+            )}
 
             {data.sources.length > 0 && (
               <div className="lg-x-sources">
@@ -314,11 +325,13 @@ export function ExplorePanel({
             <span className="lg-x-thread-label">Thinking about this</span>
             {thread.map((m, i) => (
               <div key={i} className={`lg-x-turn lg-x-turn-${m.role}`}>
-                {m.content}
+                <MathText>{m.content}</MathText>
               </div>
             ))}
             {streaming && (
-              <div className="lg-x-turn lg-x-turn-assistant">{streaming}</div>
+              <div className="lg-x-turn lg-x-turn-assistant">
+                <MathText>{streaming}</MathText>
+              </div>
             )}
             {busy && !streaming && (
               <div className="lg-x-turn lg-x-turn-assistant">
