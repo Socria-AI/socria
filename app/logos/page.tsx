@@ -19,6 +19,8 @@ import { DraftResponsePanel } from '@/components/DraftResponsePanel';
 import { LogosGuide, GUIDE_SEEN_KEY } from '@/components/LogosGuide';
 import { LogosMark } from '@/components/LogosMark';
 import { MathText } from '@/components/TeX';
+import { THINKING_DEPTHS, type ThinkingDepth } from '@/lib/socria-prompt';
+import type { GuardSignal } from '@/lib/logos-guidance';
 import { ContextPanel } from '@/components/ContextPanel';
 import { ConnectionsModal } from '@/components/ConnectionsModal';
 import type { Attachment, AttachmentOrigin } from '@/lib/logos-attachments';
@@ -47,6 +49,9 @@ import { CORE3_ACCESS_KEY, isValidAccessKey } from '@/lib/socria-prompt';
 
 // Shared with Core 3.1 — unlocking once covers both.
 const KEY_STORAGE = 'socria.core3AccessKey.v1';
+// Depth is shared with the Core chat, so switching there carries over.
+const DEPTH_KEY = 'socria.depth.v1';
+const REVEALED_KEY = 'socria.logos.revealed.v1';
 
 const STARTERS = [
   'I’m debating whether to build Logos now.',
@@ -70,6 +75,11 @@ export default function LogosPage() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [hydrating, setHydrating] = useState(true);
   const [railOpen, setRailOpen] = useState(true);
+  // Depth: how deeply Logos helps you think (global). Answer Guard: which
+  // learning sessions the person has chosen to reveal the solution for.
+  const [depth, setDepth] = useState<ThinkingDepth>('balanced');
+  const [depthOpen, setDepthOpen] = useState(false);
+  const [revealedIds, setRevealedIds] = useState<Set<string>>(new Set());
 
   const [input, setInput] = useState('');
   const [drafts, setDrafts] = useState<Draft[]>([]);
@@ -161,6 +171,50 @@ export default function LogosPage() {
   const mapRef = useRef<TMap>(EMPTY_MAP);
   mapRef.current = map;
 
+  // The Answer Guard is one shared state: on only while LEARNING math and the
+  // person hasn't chosen to reveal this session's solution. Every surface reads
+  // the same signal, so Chat can't hide an answer that the map or board leaks.
+  const guard: GuardSignal =
+    map.context === 'math' && map.intent === 'learning'
+      ? revealedIds.has(activeId ?? '')
+        ? 'reveal'
+        : 'guard'
+      : '';
+  const guarded = guard === 'guard';
+  // async closures (refreshMap, sends) read the latest through refs
+  const depthRef = useRef<ThinkingDepth>('balanced');
+  depthRef.current = depth;
+  const guardRef = useRef<GuardSignal>('');
+  guardRef.current = guard;
+  /** the two fields every Logos generation request carries */
+  const guidance = () => ({ depth: depthRef.current, guard: guardRef.current });
+
+  function pickDepth(next: ThinkingDepth) {
+    setDepth(next);
+    setDepthOpen(false);
+    try {
+      localStorage.setItem(DEPTH_KEY, next);
+    } catch {}
+  }
+
+  function reveal() {
+    const id = activeIdRef.current;
+    if (!id) return;
+    setRevealedIds((prev) => {
+      const n = new Set(prev).add(id);
+      try {
+        localStorage.setItem(REVEALED_KEY, JSON.stringify([...n]));
+      } catch {}
+      return n;
+    });
+    // guardRef updates on the next render, but the refresh below fires now —
+    // set it explicitly so the re-extraction runs with the guard already lifted
+    // (otherwise "Show solution" would refresh under the old, still-guarded state).
+    guardRef.current = 'reveal';
+    // let every surface re-generate now that the guard is lifted
+    refreshMap();
+  }
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages.length, streaming]);
@@ -168,6 +222,10 @@ export default function LogosPage() {
   useEffect(() => {
     try {
       if (localStorage.getItem(KEY_STORAGE) === '1') setUnlocked(true);
+      const d = localStorage.getItem(DEPTH_KEY);
+      if (d === 'quick' || d === 'balanced' || d === 'deep' || d === 'abstract') setDepth(d);
+      const rev = JSON.parse(localStorage.getItem(REVEALED_KEY) || '[]');
+      if (Array.isArray(rev)) setRevealedIds(new Set(rev.filter((x) => typeof x === 'string')));
     } catch {}
     const t = setTimeout(() => setAuthSettled(true), 1200);
     return () => clearTimeout(t);
@@ -402,6 +460,7 @@ export default function LogosPage() {
             // context isn't in it yet — callers that just changed grounding
             // pass the fresh map explicitly.
             contexts: contextsOverride ?? contextsRef.current,
+            ...guidance(),
           }),
         });
         if (res.ok) {
@@ -497,6 +556,7 @@ export default function LogosPage() {
           selection: sel.text,
           around: sel.around,
           map: mapRef.current,
+          ...guidance(),
         }),
       });
       if (!res.ok) {
@@ -590,6 +650,7 @@ export default function LogosPage() {
           messages,
           map: mode === 'trace' ? map : undefined,
           contexts: contextsRef.current[node.id] ?? [],
+          ...guidance(),
         }),
       });
       if (!res.ok) throw new Error('Could not look that up right now.');
@@ -649,6 +710,7 @@ export default function LogosPage() {
             framing: explore.data?.framing,
             contexts: contextsRef.current[node.id] ?? [],
           },
+          ...guidance(),
         }),
       });
       if (!res.ok) {
@@ -734,7 +796,7 @@ export default function LogosPage() {
       const res = await fetch('/api/logos/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...keyHeaders() },
-        body: JSON.stringify({ messages: next }),
+        body: JSON.stringify({ messages: next, ...guidance() }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -901,6 +963,43 @@ export default function LogosPage() {
             >
               Draft
             </button>
+            {/* Depth — how deeply Logos helps you think, everywhere at once. */}
+            <div className="lg-depth">
+              <button
+                type="button"
+                className="lg-depth-btn"
+                onClick={() => setDepthOpen((v) => !v)}
+                aria-haspopup="listbox"
+                aria-expanded={depthOpen}
+                title="Thinking depth — how deeply Logos helps you think"
+              >
+                {THINKING_DEPTHS.find((d) => d.id === depth)!.label}
+                <svg viewBox="0 0 24 24" width="9" height="9" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden="true">
+                  <path d="M6 9l6 6 6-6" />
+                </svg>
+              </button>
+              {depthOpen && (
+                <>
+                  <div className="lg-depth-scrim" onClick={() => setDepthOpen(false)} />
+                  <div className="lg-depth-menu" role="listbox">
+                    {THINKING_DEPTHS.map((d) => (
+                      <button
+                        key={d.id}
+                        type="button"
+                        role="option"
+                        aria-selected={depth === d.id}
+                        className={`lg-depth-opt${depth === d.id ? ' is-on' : ''}`}
+                        onClick={() => pickDepth(d.id)}
+                      >
+                        <span className="lg-depth-opt-label">{d.label}</span>
+                        <span className="lg-depth-opt-desc">{d.description}</span>
+                      </button>
+                    ))}
+                    <p className="lg-depth-foot">Depth changes how deeply Logos helps you think — never how quickly it gives answers.</p>
+                  </div>
+                </>
+              )}
+            </div>
             <a href="/chat" className="lg-back">
               Socria chat <span aria-hidden="true">→</span>
             </a>
@@ -960,6 +1059,29 @@ export default function LogosPage() {
             <div ref={bottomRef} />
           </div>
 
+          {/* Answer Guard: while learning math, Logos gives hints, not
+              answers — but never traps you. You can ask for another hint or
+              deliberately reveal the whole solution. */}
+          {guarded && (
+            <div className="lg-guard" role="note">
+              <span className="lg-guard-dot" aria-hidden="true" />
+              <span className="lg-guard-text">
+                Guiding, not solving — you&rsquo;re working this one out.
+              </span>
+              <button
+                type="button"
+                className="lg-guard-hint"
+                disabled={busy}
+                onClick={() => send('Can I have another hint?')}
+              >
+                Another hint
+              </button>
+              <button type="button" className="lg-guard-reveal" onClick={reveal}>
+                Show solution
+              </button>
+            </div>
+          )}
+
           <LogosComposer
             value={input}
             onChange={setInput}
@@ -1002,6 +1124,7 @@ export default function LogosPage() {
             onFocus={(node) => setDraftFocus(node)}
             grounded={groundedCounts}
             onAddContext={openAddContext}
+            guarded={guarded}
           />
           <ExplorePanel
             open={explore.open}

@@ -21,7 +21,7 @@ import type {
 } from './logos';
 import { compileFunction, type CompiledFn } from './logos-math';
 
-export type LensId = 'graph' | 'structure' | 'tensions' | 'evidence' | 'solve' | 'plot';
+export type LensId = 'graph' | 'structure' | 'tensions' | 'evidence' | 'solve' | 'plot' | 'board';
 
 export interface Placed {
   id: string;
@@ -62,6 +62,7 @@ export const LENSES: { id: LensId; label: string; caption: string }[] = [
   { id: 'evidence', label: 'Evidence', caption: 'Why do I believe this?' },
   { id: 'solve', label: 'Solution', caption: 'Follow the work, step by step.' },
   { id: 'plot', label: 'Plot', caption: 'See the function.' },
+  { id: 'board', label: 'Board', caption: 'Work it out by hand.' },
 ];
 
 export const RELATION_LABEL: Record<LogosRelation, string> = {
@@ -109,6 +110,7 @@ export function availableLenses(map: ThinkingMap): LensId[] {
     const chainEdges = map.edges.filter((e) => CHAIN_REL.has(e.relation));
     if (chainNodes.length >= 2 || chainEdges.length >= 1) out.unshift('solve');
     if (plottableNodes(map).length) out.push('plot');
+    if (map.nodes.length) out.push('board');
   }
   return out;
 }

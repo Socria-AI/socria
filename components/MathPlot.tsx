@@ -12,7 +12,17 @@ import { TeX } from './TeX';
 
 const CURVE_COLORS = ['var(--lg-primary)', 'var(--lg-accent)', 'var(--lg-tension)', '#6B5F7A'];
 
-export function MathPlot({ map, width, height }: { map: ThinkingMap; width: number; height: number }) {
+export function MathPlot({
+  map,
+  width,
+  height,
+  guarded,
+}: {
+  map: ThinkingMap;
+  width: number;
+  height: number;
+  guarded?: boolean;
+}) {
   const curves = useMemo(() => {
     const fns = plottableNodes(map);
     return fns
@@ -111,6 +121,15 @@ export function MathPlot({ map, width, height }: { map: ThinkingMap; width: numb
           </span>
         ))}
       </div>
+      {/* Under the Answer Guard the curve stays — a faithful drawing of a
+          function they already hold is a thinking aid, not the tool stating a
+          result — but the plot never annotates roots, intercepts or extrema
+          with their values, so it can't hand over what Chat is withholding. */}
+      {guarded && (
+        <p className="lg-plot-guardnote">
+          reading the shape is one way in — the exact values stay yours until you reveal them
+        </p>
+      )}
     </div>
   );
 }

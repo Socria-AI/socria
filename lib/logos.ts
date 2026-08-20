@@ -155,6 +155,8 @@ export interface ThinkingMap {
   edges: LogosEdge[];
   /** the kind of thinking the map currently reflects, inferred not chosen */
   context?: ThinkingContext;
+  /** for math: how they're engaging — learning drives the Answer Guard */
+  intent?: MathIntent;
 }
 
 export const EMPTY_MAP: ThinkingMap = { nodes: [], edges: [] };
@@ -180,6 +182,8 @@ export function sanitizeMap(raw: any): ThinkingMap {
     ? (raw.context as ThinkingContext)
     : undefined;
   const isMath = context === 'math';
+  const intent: MathIntent | undefined =
+    isMath && MATH_INTENTS.includes(raw.intent) ? (raw.intent as MathIntent) : undefined;
   const str = (v: any, n: number) =>
     typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().slice(0, n) : '';
 
@@ -253,7 +257,7 @@ export function sanitizeMap(raw: any): ThinkingMap {
     })
     .slice(0, isMath ? MAX_EDGES_MATH : MAX_EDGES);
 
-  return { nodes, edges, ...(context ? { context } : {}) };
+  return { nodes, edges, ...(context ? { context } : {}), ...(intent ? { intent } : {}) };
 }
 
 // ===== Conversation =====
@@ -504,6 +508,7 @@ ${grounded}
 Return ONLY JSON, exactly this shape:
 {
   "context": "deciding|writing|creating|researching|learning|planning|brainstorming|reflecting|analysing|math",
+  "intent": "learning|verification|utility|exploration",  // ONLY for context=math
   "nodes": [{"id": "short_snake_case_id", "type": "<node type>", "label": "a short phrase in their own framing", "status": "open|supported|resolved|revised", "merged": ["label of a node folded into this one"], "tex": "LaTeX for this node, if mathematical", "flag": "error|verified", "note": "a short annotation or repair hint"}],
   "edges": [{"from": "node_id", "to": "node_id", "relation": "supports|conflicts|depends|relates|leads_to|revises|precedes|part_of|transforms_to|implies|justifies", "strength": "weak|normal|strong", "op": "the operation on a transforms_to edge"}]
 }
@@ -523,6 +528,13 @@ People do not only make decisions. Work out what kind of thinking is actually ha
   math          givens, unknowns, equations, definitions, transformations, theorems, steps, inferences, constraints, verification, results, and errors
 
 A conversation may move between contexts. Follow it. Do not force earlier framing onto later thinking.
+
+MATH INTENT. When context is "math", also set "intent" to why they are here, because it changes how much help is appropriate:
+  learning     — working a problem to understand it (they're solving, showing attempts, stuck). The Answer Guard engages: help without revealing the answer.
+  verification — they did the work and want it checked ("is this right?", "did I mess up?").
+  utility      — a quick calculation where teaching would be friction ("what's 18% of 340", "convert this").
+  exploration  — understanding a concept or relationship, not solving a specific assigned problem.
+When unsure between learning and utility, prefer learning if there is a specific problem being worked; prefer utility only for a plainly transactional one-off calculation.
 
 MATHEMATICS. When the work is quantitative — solving, proving, calculating, or reasoning about quantities — set context to "math" and build a map of the WORK, not a mind-map about it:
 - Put the LaTeX of each mathematical node in its "tex" field (e.g. tex: "x^2 - 5x + 6 = 0"); keep "label" a short plain-text summary. Non-mathematical math nodes (a definition in words, a given like "a right triangle") need no tex.

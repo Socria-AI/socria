@@ -17,6 +17,7 @@ import {
   sanitizeDraftResponse,
   type DraftAction,
 } from '@/lib/logos-draft';
+import { guidanceBlock, resolveDepth, resolveGuard } from '@/lib/logos-guidance';
 import { buildQueryPrompt, runSearch } from '@/lib/logos-explore';
 import { isValidAccessKey } from '@/lib/socria-prompt';
 import { enforceRateLimit } from '@/lib/rate-limit';
@@ -100,8 +101,9 @@ export async function POST(req: NextRequest) {
       search = await runSearch(query);
     }
 
+    const guide = guidanceBlock(resolveDepth(body?.depth), resolveGuard(body?.guard), 'surface');
     const composed = await complete(
-      buildDraftPrompt(action, selection, around, map, search.results),
+      buildDraftPrompt(action, selection, around, map, search.results) + guide,
       'Respond.',
       action === 'refine' ? 1400 : 800
     );

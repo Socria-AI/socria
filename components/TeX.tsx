@@ -85,8 +85,8 @@ export function splitMath(input: string): Seg[] {
     }
     if (best.index > 0) segs.push({ kind: 'text', body: rest.slice(0, best.index) });
     // a single-$ span is math only if its body actually looks mathematical.
-    // "$5-$10" and "$100$" are money; "$x=3$", "$\pi$", "$a^2$" are math.
-    if (best.kind === 'inline' && !/[a-zA-Z\\^_{}]/.test(best.body)) {
+    // "$5-$10" and "$100$" are money; "$x=3$", "$\pi$", "$14 - 6 = 8$" are math.
+    if (best.kind === 'inline' && !looksMath(best.body)) {
       segs.push({ kind: 'text', body: rest.slice(0, best.index + best.len) });
     } else {
       segs.push({ kind: best.kind, body: best.body });
@@ -96,9 +96,23 @@ export function splitMath(input: string): Seg[] {
   return segs;
 }
 
+// A single-$ body is math when it carries a real signal: a letter, a LaTeX
+// command, a super/subscript or brace, an equals, or a spaced arithmetic
+// operator between numbers ("14 - 6"). Bare amounts ("5", "5-", "100") are money.
+function looksMath(body: string): boolean {
+  return /[a-zA-Z\\^_{}=]/.test(body) || /\d\s*[-+*/×÷^]\s*\d/.test(body);
+}
+
 export function hasMath(input: string): boolean {
-  // block/paren math, or single-$ inline whose body carries a math signal
-  return /\$\$[\s\S]+?\$\$|\\\[[\s\S]+?\\\]|\\\([\s\S]+?\\\)|\$(?!\s)(?=[^$\n]*[a-zA-Z\\^_{}])[^$\n]*?[^\s$]\$/.test(input);
+  if (/\$\$[\s\S]+?\$\$|\\\[[\s\S]+?\\\]|\\\([\s\S]+?\\\)/.test(input)) return true;
+  // Scan EVERY single-$ span, not just the first: "$5$ then $x+2=0$" is math
+  // because of the second span, even though the first reads as money. Matches
+  // splitMath's per-span judgement so the gate and the splitter never disagree.
+  const re = /\$(?!\s)([^$\n]*?[^\s$])\$/g;
+  for (let m = re.exec(input); m; m = re.exec(input)) {
+    if (looksMath(m[1])) return true;
+  }
+  return false;
 }
 
 /** Render a string that mixes prose and LaTeX. */

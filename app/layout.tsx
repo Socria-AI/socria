@@ -1,6 +1,6 @@
 // app/layout.tsx
 import type { Metadata } from 'next';
-import { Instrument_Serif, Inter } from 'next/font/google';
+import { Instrument_Serif, Inter, Kalam, STIX_Two_Text } from 'next/font/google';
 import { ClerkProvider } from '@clerk/nextjs';
 import { Analytics } from '@vercel/analytics/react';
 import './globals.css';
@@ -16,6 +16,22 @@ const serif = Instrument_Serif({
 const sans = Inter({
   subsets: ['latin'],
   variable: '--font-sans',
+  display: 'swap',
+});
+
+// The Board's two voices: Kalam for handwritten notes/annotations, STIX Two
+// Math for equations. Loaded here so the whole app can reach them via CSS vars.
+const hand = Kalam({
+  subsets: ['latin'],
+  weight: ['300', '400', '700'],
+  variable: '--font-hand',
+  display: 'swap',
+});
+
+const stix = STIX_Two_Text({
+  subsets: ['latin'],
+  weight: ['400'],
+  variable: '--font-stix',
   display: 'swap',
 });
 
@@ -117,7 +133,7 @@ export default function RootLayout({
         },
       }}
     >
-      <html lang="en" className={`${serif.variable} ${sans.variable}`}>
+      <html lang="en" className={`${serif.variable} ${sans.variable} ${hand.variable} ${stix.variable}`}>
         <body className="paper-bg antialiased">
           {children}
           <Analytics />

@@ -19,6 +19,7 @@ import { NodeGlyph } from './NodeGlyph';
 import { StatusMark } from './StatusMark';
 import { TeX, MathText } from './TeX';
 import { MathPlot } from './MathPlot';
+import { MathBoard } from './MathBoard';
 import {
   LENSES,
   RELATION_LABEL,
@@ -72,6 +73,7 @@ export function ThinkingMap({
   onFocus,
   grounded,
   onAddContext,
+  guarded,
 }: {
   map: TMap;
   initialLens?: LensId;
@@ -90,6 +92,8 @@ export function ThinkingMap({
   grounded?: Record<string, number>;
   /** open the Add-context picker for this node */
   onAddContext?: (node: MapNodeRef) => void;
+  /** Answer Guard is on — the board must not reveal a withheld result */
+  guarded?: boolean;
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const posRef = useRef<Map<string, P>>(new Map());
@@ -161,7 +165,7 @@ export function ThinkingMap({
 
   // ── static lenses ────────────────────────────────────────────────
   const staticLayout = useMemo(() => {
-    if (lens === 'graph' || lens === 'plot') return null;
+    if (lens === 'graph' || lens === 'plot' || lens === 'board') return null;
     const { w, h } = size;
     if (lens === 'structure') return layoutStructure(map, w, h);
     if (lens === 'tensions') return layoutTensions(map, w, h);
@@ -421,7 +425,13 @@ export function ThinkingMap({
         )}
 
         {/* the plot lens draws the function itself, not cards */}
-        {lens === 'plot' && <MathPlot map={map} width={size.w} height={size.h} />}
+        {lens === 'plot' && (
+          <MathPlot map={map} width={size.w} height={size.h} guarded={guarded} />
+        )}
+        {/* the board is worked-by-hand notebook, not cards */}
+        {lens === 'board' && (
+          <MathBoard map={map} width={size.w} height={size.h} guarded={guarded} />
+        )}
 
         <svg className="lg-edges" aria-hidden="true">
           <defs>
@@ -474,6 +484,12 @@ export function ThinkingMap({
 
         {cards.map((p) => {
           const on = related ? related.nodes.has(p.id) : true;
+          // Answer Guard backstop on the card lenses (Structure is the default
+          // math lens): mask a concluding node — a stated result, or a
+          // verification that restates it — so the map can't reveal an answer
+          // Chat is withholding. The working nodes stay visible.
+          const hideVal =
+            !!guarded && (p.node.type === 'result' || p.node.type === 'verification');
           return (
             <div
               key={p.id}
@@ -549,10 +565,17 @@ export function ThinkingMap({
                   )}
                 </span>
                 <span className="lg-node-label">
-                  {p.node.tex ? <TeX tex={p.node.tex} /> : p.node.label}
+                  {hideVal ? (
+                    <TeX tex={'=\\ ?'} />
+                  ) : p.node.tex ? (
+                    <TeX tex={p.node.tex} />
+                  ) : (
+                    p.node.label
+                  )}
                 </span>
-                {/* a repair hint on an error, or a short note on a step */}
-                {p.node.note && (
+                {/* a repair hint on an error, or a short note on a step —
+                    hidden on a guarded conclusion, where it spells the answer */}
+                {p.node.note && !hideVal && (
                   <span className="lg-node-note">
                     <MathText>{p.node.note}</MathText>
                   </span>

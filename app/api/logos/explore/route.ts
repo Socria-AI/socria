@@ -17,6 +17,7 @@ import {
 } from '@/lib/logos';
 import { renderMessageForModel, sanitizeAttachments } from '@/lib/logos-attachments';
 import { renderContextsForNode, sanitizeNodeContextList } from '@/lib/logos-sources';
+import { guidanceBlock, resolveDepth, resolveGuard } from '@/lib/logos-guidance';
 import { isValidAccessKey } from '@/lib/socria-prompt';
 import { enforceRateLimit } from '@/lib/rate-limit';
 import {
@@ -164,7 +165,8 @@ export async function POST(req: NextRequest) {
       system = buildExplorePrompt(label, type, convoOrNone, concept, search.results, grounded);
     }
 
-    const composed = await complete(system, 'Compose the panel.', 700);
+    const guided = system + guidanceBlock(resolveDepth(body?.depth), resolveGuard(body?.guard), 'surface');
+    const composed = await complete(guided, 'Compose the panel.', 700);
     const parsed = JSON.parse(composed.choices?.[0]?.message?.content || '{}');
     const explore = sanitizeExplore(parsed, search, concept, mode, turns);
     if (!explore) {

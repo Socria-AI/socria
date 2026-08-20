@@ -17,6 +17,7 @@ import {
 } from '@/lib/logos';
 import { renderMessageForModel, sanitizeAttachments } from '@/lib/logos-attachments';
 import { renderContextsForNode, sanitizeNodeContextList } from '@/lib/logos-sources';
+import { guidanceBlock, resolveDepth, resolveGuard } from '@/lib/logos-guidance';
 import { isValidAccessKey } from '@/lib/socria-prompt';
 import { enforceRateLimit } from '@/lib/rate-limit';
 
@@ -108,13 +109,18 @@ export async function POST(req: NextRequest) {
         })
       : LOGOS_CHAT_PROMPT;
 
+    // Depth (how deeply to help them think) + the Answer Guard (learning math:
+    // hints, not answers). The guard is the same one every surface honours.
+    const guided =
+      system + guidanceBlock(resolveDepth(body?.depth), resolveGuard(body?.guard), 'chat');
+
     const openai = new OpenAI({ apiKey });
     const configured = process.env.OPENAI_MODEL_LOGOS || LOGOS_MODEL;
 
     const make = (model: string) =>
       openai.chat.completions.create({
         model,
-        messages: [{ role: 'system', content: system }, ...clean],
+        messages: [{ role: 'system', content: guided }, ...clean],
         temperature: 0.7,
         max_tokens: 300,
         stream: true,

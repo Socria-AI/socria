@@ -16,6 +16,7 @@ import {
 } from '@/lib/logos';
 import { renderMessageForModel, sanitizeAttachments } from '@/lib/logos-attachments';
 import { renderContextsForMap, sanitizeContexts } from '@/lib/logos-sources';
+import { guidanceBlock, resolveDepth, resolveGuard } from '@/lib/logos-guidance';
 import { isValidAccessKey } from '@/lib/socria-prompt';
 import { enforceRateLimit } from '@/lib/rate-limit';
 
@@ -45,6 +46,9 @@ export async function POST(req: NextRequest) {
   // Grounded material attached to nodes — the extractor sees what is attached
   // and to which node, tagged with whose thinking it is.
   const grounded = renderContextsForMap(sanitizeContexts(body?.contexts));
+  // The extractor is itself an answer-revealing surface — while the guard is on
+  // it must not populate the result. Depth also shapes how much it extracts.
+  const guidance = guidanceBlock(resolveDepth(body?.depth), resolveGuard(body?.guard), 'surface');
 
   const kept = messages
     .filter(
@@ -87,7 +91,7 @@ export async function POST(req: NextRequest) {
         max_tokens: 900,
         response_format: { type: 'json_object' },
         messages: [
-          { role: 'system', content: buildMapPrompt(current, grounded) },
+          { role: 'system', content: buildMapPrompt(current, grounded) + guidance },
           { role: 'user', content: transcript },
         ],
       });
