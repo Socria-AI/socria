@@ -13,6 +13,7 @@
 import { useMemo } from 'react';
 import type { LogosNode, ThinkingMap } from '@/lib/logos';
 import { TeX, MathText } from './TeX';
+import { LogosMark } from './LogosMark';
 
 // ── seeded, stable pseudo-randomness per node ───────────────────────
 function seed(s: string): () => number {
@@ -60,6 +61,9 @@ export function MathBoard({
   if (!map.nodes.length) {
     return (
       <div className="lg-map-empty">
+        <span className="lg-map-empty-mark" aria-hidden="true">
+          <LogosMark size={46} />
+        </span>
         <p className="lg-board-empty">The board is clear. Start working.</p>
       </div>
     );

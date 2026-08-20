@@ -9,6 +9,7 @@ import type { ThinkingMap } from '@/lib/logos';
 import { plottableNodes } from '@/lib/logos-layout';
 import { samplePlot } from '@/lib/logos-math';
 import { TeX } from './TeX';
+import { LogosMark } from './LogosMark';
 
 const CURVE_COLORS = ['var(--lg-primary)', 'var(--lg-accent)', 'var(--lg-tension)', '#6B5F7A'];
 
@@ -36,6 +37,9 @@ export function MathPlot({
   if (!curves.length) {
     return (
       <div className="lg-map-empty">
+        <span className="lg-map-empty-mark" aria-hidden="true">
+          <LogosMark size={46} />
+        </span>
         <p>No function to plot yet.</p>
       </div>
     );

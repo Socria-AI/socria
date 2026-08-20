@@ -20,6 +20,7 @@ import { StatusMark } from './StatusMark';
 import { TeX, MathText } from './TeX';
 import { MathPlot } from './MathPlot';
 import { MathBoard } from './MathBoard';
+import { LogosMark } from './LogosMark';
 import {
   LENSES,
   RELATION_LABEL,
@@ -407,12 +408,7 @@ export function ThinkingMap({
         {map.nodes.length === 0 && (
           <div className="lg-map-empty">
             <span className="lg-map-empty-mark" aria-hidden="true">
-              <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="1.2">
-                <circle cx="24" cy="14" r="5" />
-                <circle cx="12" cy="34" r="5" />
-                <circle cx="36" cy="34" r="5" />
-                <path d="M21 18.5 14.5 29.5M27 18.5 33.5 29.5M17 34h14" strokeLinecap="round" />
-              </svg>
+              <LogosMark size={46} />
             </span>
             <p>Your reasoning will take shape here.</p>
           </div>
