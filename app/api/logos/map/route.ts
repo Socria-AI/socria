@@ -18,6 +18,8 @@ import { renderMessageForModel, sanitizeAttachments } from '@/lib/logos-attachme
 import { renderContextsForMap, sanitizeContexts } from '@/lib/logos-sources';
 import { guidanceBlock, resolveDepth, resolveGuard } from '@/lib/logos-guidance';
 import { isValidAccessKey } from '@/lib/socria-prompt';
+import { capMapForFree, depthForPlan } from '@/lib/socria-one';
+import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { enforceRateLimit } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
@@ -48,7 +50,11 @@ export async function POST(req: NextRequest) {
   const grounded = renderContextsForMap(sanitizeContexts(body?.contexts));
   // The extractor is itself an answer-revealing surface — while the guard is on
   // it must not populate the result. Depth also shapes how much it extracts.
-  const guidance = guidanceBlock(resolveDepth(body?.depth), resolveGuard(body?.guard), 'surface');
+  // Depth is one of the things One opens, so a free request is answered at
+  // Balanced whatever it asked for — clamped here rather than trusted.
+  const plan = resolvePlanForRequest(req, userId);
+  const depth = depthForPlan(resolveDepth(body?.depth), plan);
+  const guidance = guidanceBlock(depth, resolveGuard(body?.guard), 'surface');
 
   const kept = messages
     .filter(
@@ -126,6 +132,14 @@ export async function POST(req: NextRequest) {
     // Never let a malformed extraction blank a map the user has built up.
     if (next.nodes.length === 0 && current.nodes.length > 0) {
       return NextResponse.json({ map: current });
+    }
+    // A free map stops taking on NEW nodes at its boundary; everything already
+    // on it — including anything the extractor has since refined — is kept.
+    // `capped` tells the client the thinking outgrew the free map, so it can
+    // say so once, quietly, instead of the map just going still.
+    if (plan === 'free') {
+      const held = capMapForFree(next, current);
+      return NextResponse.json({ map: held.map, capped: held.capped });
     }
     return NextResponse.json({ map: next });
   } catch (e) {

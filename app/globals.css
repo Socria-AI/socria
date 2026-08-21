@@ -2770,6 +2770,10 @@ html.js-anim .scrolly-root .fade.d3 { transition-delay: .3s; }
   --lg-ink-40: rgba(35, 36, 31, 0.4);
   --lg-ink-24: rgba(35, 36, 31, 0.24);
   --lg-line: rgba(53, 70, 32, 0.14);
+  /* Socria One — the one place Logos reaches for Prussian blue */
+  --lg-one: #4A6FA5;
+  --lg-one-soft: rgba(74, 111, 165, 0.1);
+  --lg-one-line: rgba(74, 111, 165, 0.32);
   --lg-sans: var(--font-sans), Inter, system-ui, sans-serif;
   --lg-hand: var(--font-hand), 'Comic Sans MS', cursive;
   --lg-stix: var(--font-stix), 'STIX Two Math', 'Cambria Math', Georgia, serif;
@@ -4083,6 +4087,11 @@ html.js-anim .scrolly-root .fade.d3 { transition-delay: .3s; }
 }
 .logos-root .lg-acts.is-above { transform: translate(-50%, -100%); }
 @keyframes lgPop { from { opacity: 0; transform: translateX(-50%) translateY(-4px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+/* lgPop is for the node menu, which is anchored at its own centre and so
+   carries a permanent translateX(-50%). Anything positioned by its own
+   edges needs a rise WITHOUT that shift, or it sits half a width to the
+   left of where its CSS says it is. */
+@keyframes lgRise { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 @keyframes lgPopUp { from { opacity: 0; transform: translate(-50%, calc(-100% + 4px)); } to { opacity: 1; transform: translate(-50%, -100%); } }
 .logos-root .lg-acts.is-above { animation-name: lgPopUp; }
 @media (prefers-reduced-motion: reduce) { .logos-root .lg-acts { animation: none; } }
@@ -5258,7 +5267,7 @@ html.js-anim .scrolly-root .fade.d3 { transition-delay: .3s; }
   width: 248px; padding: 5px;
   background: #fff; border: 1px solid var(--lg-line); border-radius: 12px;
   box-shadow: 0 18px 40px -22px rgba(35,36,31,0.55);
-  animation: lgPop 0.18s cubic-bezier(0.16,1,0.3,1) both;
+  animation: lgRise 0.18s cubic-bezier(0.16,1,0.3,1) both;
 }
 .logos-root .lg-depth-opt {
   display: block; width: 100%; text-align: left;
@@ -5464,3 +5473,140 @@ html.js-anim .scrolly-root .fade.d3 { transition-delay: .3s; }
 }
 .logos-root .lg-board-empty { font-family: var(--lg-hand); font-size: 15px; }
 @media (prefers-reduced-motion: reduce) { .logos-root .lg-board-item { animation: none; } }
+
+
+/* ── Socria One ───────────────────────────────────────────────────── */
+/* The lock: small, blue, never in the way. It marks a boundary; it does not
+   argue with the person about it. */
+.logos-root .lg-onelock {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 16px; height: 16px; flex: 0 0 auto;
+  padding: 0; border: none; border-radius: 5px;
+  background: var(--lg-one-soft); color: var(--lg-one);
+  cursor: pointer; transition: background 0.18s, transform 0.18s;
+}
+.logos-root .lg-onelock:hover { background: rgba(74,111,165,0.2); transform: translateY(-1px); }
+.logos-root span.lg-onelock { cursor: default; }
+
+/* A line of copy at a boundary — the map has stopped growing, said once. */
+.logos-root .lg-one-note {
+  display: flex; align-items: center; gap: 10px;
+  margin: 0 40px 10px; padding: 9px 14px;
+  border: 1px solid var(--lg-one-line); border-radius: 12px;
+  background: rgba(74,111,165,0.05);
+  animation: lgFade 0.4s ease both;
+}
+@media (max-width: 900px) { .logos-root .lg-one-note { margin: 0 22px 10px; } }
+.logos-root .lg-one-note-text { flex: 1; font-size: 12.5px; line-height: 1.5; color: var(--lg-one); }
+.logos-root .lg-one-note-text b { font-weight: 500; }
+.logos-root .lg-one-note-go {
+  flex: 0 0 auto; padding: 5px 12px; border: none; border-radius: 999px;
+  background: var(--lg-one); color: #fff;
+  font: inherit; font-size: 11.5px; cursor: pointer; transition: opacity 0.18s;
+}
+.logos-root .lg-one-note-go:hover { opacity: 0.88; }
+.logos-root .lg-one-note-x {
+  flex: 0 0 auto; border: none; background: transparent; cursor: pointer;
+  color: var(--lg-one); opacity: 0.5; font-size: 15px; line-height: 1; padding: 2px 4px;
+}
+.logos-root .lg-one-note-x:hover { opacity: 1; }
+
+/* The screen itself. */
+.logos-root .lg-one-scrim { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; padding: 24px; }
+.logos-root .lg-one-back { position: absolute; inset: 0; background: rgba(24,28,22,0.42); backdrop-filter: blur(3px); }
+.logos-root .lg-one-sheet {
+  position: relative; z-index: 1;
+  width: min(560px, 100%); max-height: calc(100vh - 48px); overflow-y: auto;
+  padding: 40px 42px 34px;
+  background: var(--lg-paper);
+  border: 1px solid var(--lg-one-line); border-radius: 18px;
+  box-shadow: 0 40px 90px -40px rgba(24,28,22,0.6);
+  animation: lgRise 0.24s cubic-bezier(0.16,1,0.3,1) both;
+}
+@media (max-width: 560px) { .logos-root .lg-one-sheet { padding: 30px 22px 26px; } }
+.logos-root .lg-one-x {
+  position: absolute; top: 14px; right: 16px;
+  border: none; background: transparent; cursor: pointer;
+  font-size: 22px; line-height: 1; color: var(--lg-ink-40);
+}
+.logos-root .lg-one-x:hover { color: var(--lg-ink); }
+
+.logos-root .lg-one-head { text-align: center; }
+.logos-root .lg-one-mark { display: inline-flex; color: var(--lg-one); }
+.logos-root .lg-one-title {
+  margin: 10px 0 0; font-family: var(--font-serif), 'Instrument Serif', Georgia, serif;
+  font-size: 34px; font-weight: 400; letter-spacing: -0.01em; color: var(--lg-ink);
+}
+.logos-root .lg-one-price { margin: 6px 0 0; color: var(--lg-one); }
+.logos-root .lg-one-amount { font-size: 19px; font-weight: 500; }
+.logos-root .lg-one-per { font-size: 13px; opacity: 0.7; }
+.logos-root .lg-one-lede {
+  margin: 14px auto 0; max-width: 38ch;
+  font-size: 13.5px; line-height: 1.55; color: var(--lg-ink-60);
+}
+
+.logos-root .lg-one-list {
+  list-style: none; margin: 26px 0 0; padding: 22px 0 0;
+  border-top: 1px solid var(--lg-line);
+  display: grid; gap: 15px;
+}
+.logos-root .lg-one-item { display: flex; gap: 11px; align-items: flex-start; }
+.logos-root .lg-one-tick {
+  flex: 0 0 auto; width: 6px; height: 6px; margin-top: 6px;
+  border-radius: 50%; background: var(--lg-one);
+}
+.logos-root .lg-one-item-body { display: block; }
+.logos-root .lg-one-item-title { display: block; font-size: 13.5px; font-weight: 500; color: var(--lg-ink); }
+.logos-root .lg-one-item-blurb { display: block; margin-top: 2px; font-size: 12.5px; line-height: 1.5; color: var(--lg-ink-60); }
+
+.logos-root .lg-one-keep {
+  margin: 24px 0 0; padding: 12px 14px;
+  border-radius: 10px; background: rgba(53,70,32,0.05);
+  font-size: 12px; font-style: italic; line-height: 1.55; color: var(--lg-ink-60);
+}
+
+.logos-root .lg-one-actions { display: flex; flex-direction: column; gap: 9px; margin-top: 22px; }
+.logos-root .lg-one-go {
+  padding: 12px 18px; border: none; border-radius: 999px;
+  background: var(--lg-one); color: #fff;
+  font: inherit; font-size: 14px; font-weight: 500; cursor: pointer;
+  transition: opacity 0.18s, transform 0.18s;
+}
+.logos-root .lg-one-go:hover { opacity: 0.92; transform: translateY(-1px); }
+.logos-root .lg-one-not {
+  padding: 4px; border: none; background: transparent;
+  font: inherit; font-size: 12.5px; color: var(--lg-ink-40); cursor: pointer;
+}
+.logos-root .lg-one-not:hover { color: var(--lg-ink); }
+
+.logos-root .lg-one-key { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--lg-line); }
+.logos-root .lg-one-key-label { display: block; font-size: 11px; letter-spacing: 0.04em; color: var(--lg-ink-40); }
+.logos-root .lg-one-key-row { display: flex; gap: 8px; margin-top: 7px; }
+.logos-root .lg-one-input {
+  flex: 1; min-width: 0; padding: 8px 12px;
+  border: 1px solid var(--lg-line); border-radius: 9px;
+  background: #fff; font: inherit; font-size: 13px; color: var(--lg-ink);
+}
+.logos-root .lg-one-input:focus { outline: none; border-color: var(--lg-one-line); }
+.logos-root .lg-one-input.is-bad { border-color: rgba(156,91,60,0.6); }
+.logos-root .lg-one-apply {
+  flex: 0 0 auto; padding: 8px 15px;
+  border: 1px solid var(--lg-one-line); border-radius: 9px;
+  background: transparent; color: var(--lg-one);
+  font: inherit; font-size: 12.5px; cursor: pointer; transition: background 0.18s;
+}
+.logos-root .lg-one-apply:hover { background: var(--lg-one-soft); }
+.logos-root .lg-one-bad { margin: 7px 0 0; font-size: 11.5px; color: #9C5B3C; }
+
+/* Locked surfaces stay legible and clickable — they lead somewhere, they are
+   not dead. Dimming them to grey would read as "broken" rather than "more". */
+.logos-root .lg-lens.is-locked { opacity: 0.62; gap: 5px; }
+.logos-root .lg-lens.is-locked:hover { opacity: 0.85; }
+.logos-root .lg-lens { display: inline-flex; align-items: center; gap: 5px; }
+.logos-root .lg-act.is-locked .lg-act-label { display: flex; align-items: center; gap: 6px; }
+.logos-root .lg-act.is-locked { opacity: 0.72; }
+.logos-root .lg-act.is-locked:hover { opacity: 1; }
+.logos-root .lg-depth-opt-label { gap: 6px; }
+.logos-root .lg-depth-opt .lg-onelock { margin-left: 6px; vertical-align: -2px; }
+.logos-root .lg-draft-lock { margin-left: 6px; vertical-align: -3px; }
+.logos-root .lg-draft-open { display: inline-flex; align-items: center; }

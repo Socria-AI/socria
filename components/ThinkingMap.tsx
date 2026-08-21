@@ -21,6 +21,7 @@ import { TeX, MathText } from './TeX';
 import { MathPlot } from './MathPlot';
 import { MathBoard } from './MathBoard';
 import { LogosMark } from './LogosMark';
+import { OneLock } from './OneLock';
 import {
   LENSES,
   RELATION_LABEL,
@@ -75,6 +76,9 @@ export function ThinkingMap({
   grounded,
   onAddContext,
   guarded,
+  lensesLocked,
+  onLocked,
+  researchLocked,
 }: {
   map: TMap;
   initialLens?: LensId;
@@ -95,6 +99,11 @@ export function ThinkingMap({
   onAddContext?: (node: MapNodeRef) => void;
   /** Answer Guard is on — the board must not reveal a withheld result */
   guarded?: boolean;
+  /** free tier: the alternate lenses are Socria One's, the default stays open */
+  lensesLocked?: boolean;
+  onLocked?: () => void;
+  /** free tier: Research has been spent in this conversation */
+  researchLocked?: boolean;
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const posRef = useRef<Map<string, P>>(new Map());
@@ -138,6 +147,17 @@ export function ThinkingMap({
   }, [menuFor]);
 
   const lenses = useMemo(() => availableLenses(map), [map]);
+
+  // A free reader keeps the lens this map leads with — the signature view,
+  // never a stub. The other readings of the same reasoning are One's. The
+  // auto-switch below lands on exactly this lens, so nobody is ever dropped
+  // onto something they can't open.
+  const freeLens: LensId | null = lenses.length
+    ? lenses.includes('solve')
+      ? 'solve'
+      : lenses[0]
+    : null;
+  const lensLocked = (id: LensId) => !!lensesLocked && id !== freeLens;
 
   // If the active lens loses its content, fall back to the graph.
   useEffect(() => {
@@ -383,8 +403,14 @@ export function ThinkingMap({
               type="button"
               role="tab"
               aria-selected={lens === l.id}
-              className={`lg-lens${lens === l.id ? ' is-on' : ''}`}
+              className={`lg-lens${lens === l.id ? ' is-on' : ''}${
+                lensLocked(l.id) ? ' is-locked' : ''
+              }`}
               onClick={() => {
+                if (lensLocked(l.id)) {
+                  onLocked?.();
+                  return;
+                }
                 lensManual.current = true;
                 setLens(l.id);
                 setFocused(null);
@@ -392,6 +418,7 @@ export function ThinkingMap({
               }}
             >
               {l.label}
+              {lensLocked(l.id) && <OneLock />}
             </button>
           ))}
         </div>
@@ -606,13 +633,18 @@ export function ThinkingMap({
                     key={m}
                     type="button"
                     role="menuitem"
-                    className={`lg-act lg-act-${m}`}
+                    className={`lg-act lg-act-${m}${
+                      m === 'research' && researchLocked ? ' is-locked' : ''
+                    }`}
                     onClick={() => {
                       setMenu(null);
                       onAction?.(m, { id: node.id, label: node.label, type: node.type });
                     }}
                   >
-                    <span className="lg-act-label">{MODE_META[m].label}</span>
+                    <span className="lg-act-label">
+                      {MODE_META[m].label}
+                      {m === 'research' && researchLocked && <OneLock />}
+                    </span>
                     <span className="lg-act-blurb">{MODE_META[m].blurb}</span>
                   </button>
                 ))}

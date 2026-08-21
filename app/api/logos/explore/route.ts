@@ -19,6 +19,8 @@ import { renderMessageForModel, sanitizeAttachments } from '@/lib/logos-attachme
 import { renderContextsForNode, sanitizeNodeContextList } from '@/lib/logos-sources';
 import { guidanceBlock, resolveDepth, resolveGuard } from '@/lib/logos-guidance';
 import { isValidAccessKey } from '@/lib/socria-prompt';
+import { FREE_LIMITS, depthForPlan } from '@/lib/socria-one';
+import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { enforceRateLimit } from '@/lib/rate-limit';
 import {
   MODE_META,
@@ -65,6 +67,26 @@ export async function POST(req: NextRequest) {
   const mode: NodeMode = NODE_MODES.includes(body?.mode) ? body.mode : 'explore';
   if (!label) {
     return NextResponse.json({ error: 'label required' }, { status: 400 });
+  }
+
+  const plan = resolvePlanForRequest(req, userId);
+  // Research is the one mode a free reader meets a boundary in — they get to
+  // run it and see what it does, and it's the SECOND reach for the evidence
+  // that One opens. Explore, Challenge and Trace stay open: Trace especially,
+  // since seeing where your own thought came from is never a paid feature.
+  // The count is the client's word (nothing here is persisted per user), so
+  // this is a boundary, not a lock — the honest shape for a soft gate.
+  if (plan === 'free' && mode === 'research') {
+    const used = Number.isFinite(body?.researchUsed) ? Number(body.researchUsed) : 0;
+    if (used >= FREE_LIMITS.research) {
+      return NextResponse.json(
+        {
+          error: 'Research beyond the first is part of Socria One.',
+          upgrade: 'research',
+        },
+        { status: 402 }
+      );
+    }
   }
 
   const window = mode === 'trace' ? MAX_TRACE_HISTORY : MAX_HISTORY;
@@ -165,7 +187,13 @@ export async function POST(req: NextRequest) {
       system = buildExplorePrompt(label, type, convoOrNone, concept, search.results, grounded);
     }
 
-    const guided = system + guidanceBlock(resolveDepth(body?.depth), resolveGuard(body?.guard), 'surface');
+    const guided =
+      system +
+      guidanceBlock(
+        depthForPlan(resolveDepth(body?.depth), plan),
+        resolveGuard(body?.guard),
+        'surface'
+      );
     const composed = await complete(guided, 'Compose the panel.', 700);
     const parsed = JSON.parse(composed.choices?.[0]?.message?.content || '{}');
     const explore = sanitizeExplore(parsed, search, concept, mode, turns);

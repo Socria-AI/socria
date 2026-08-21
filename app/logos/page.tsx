@@ -20,6 +20,16 @@ import { DraftResponsePanel } from '@/components/DraftResponsePanel';
 import { LogosGuide, GUIDE_SEEN_KEY } from '@/components/LogosGuide';
 import { LogosMark } from '@/components/LogosMark';
 import { ModelGlyph } from '@/components/ModelGlyph';
+import { SocriaOneModal } from '@/components/SocriaOneModal';
+import { OneLock } from '@/components/OneLock';
+import {
+  FREE_LIMITS,
+  SOCRIA_ONE_KEY,
+  isValidOneKey,
+  meaningfulNodes,
+  type OneFeature,
+  type Plan,
+} from '@/lib/socria-one';
 import { MathText } from '@/components/TeX';
 import {
   SOCRIA_MODELS,
@@ -61,6 +71,10 @@ const DEPTH_KEY = 'socria.depth.v1';
 // Same store the Core chat reads, so picking a model here lands there.
 const MODEL_KEY = 'socria.model.v1';
 const REVEALED_KEY = 'socria.logos.revealed.v1';
+// Socria One, held client-side the way the Core 3 key already is. The routes
+// re-decide this for themselves; nothing here is the authority.
+const ONE_KEY_STORAGE = 'socria.one.v1';
+const RESEARCH_KEY = 'socria.logos.research.v1';
 
 const STARTERS = [
   'I’m debating whether to build Logos now.',
@@ -90,6 +104,18 @@ export default function LogosPage() {
   const [depthOpen, setDepthOpen] = useState(false);
   const [modelOpen, setModelOpen] = useState(false);
   const router = useRouter();
+
+  // ── Socria One ────────────────────────────────────────────────────
+  const [plan, setPlan] = useState<Plan>('free');
+  const [oneOpen, setOneOpen] = useState(false);
+  const [oneReason, setOneReason] = useState<string | undefined>();
+  // Research runs already spent, per session id.
+  const [researchUsed, setResearchUsed] = useState<Record<string, number>>({});
+  // The boundary note is dismissible — said once, not nagged.
+  const [limitNoteOff, setLimitNoteOff] = useState(false);
+  // The extraction wanted to add something and the free map was full.
+  const [mapCapped, setMapCapped] = useState(false);
+  const one = plan === 'one';
   const [revealedIds, setRevealedIds] = useState<Set<string>>(new Set());
 
   const [input, setInput] = useState('');
@@ -201,6 +227,12 @@ export default function LogosPage() {
   const guidance = () => ({ depth: depthRef.current, guard: guardRef.current });
 
   function pickDepth(next: ThinkingDepth) {
+    // Free thinking happens at Balanced; the other registers are One's. The
+    // routes clamp this too, so the menu and the answer always agree.
+    if (!one && next !== 'balanced') {
+      askOne('Quick, Deep and Abstract change how far Logos thinks with you. Socria One opens all four.');
+      return;
+    }
     setDepth(next);
     setDepthOpen(false);
     try {
@@ -249,6 +281,9 @@ export default function LogosPage() {
       if (d === 'quick' || d === 'balanced' || d === 'deep' || d === 'abstract') setDepth(d);
       const rev = JSON.parse(localStorage.getItem(REVEALED_KEY) || '[]');
       if (Array.isArray(rev)) setRevealedIds(new Set(rev.filter((x) => typeof x === 'string')));
+      if (localStorage.getItem(ONE_KEY_STORAGE) === '1') setPlan('one');
+      const spent = JSON.parse(localStorage.getItem(RESEARCH_KEY) || '{}');
+      if (spent && typeof spent === 'object') setResearchUsed(spent);
     } catch {}
     const t = setTimeout(() => setAuthSettled(true), 1200);
     return () => clearTimeout(t);
@@ -310,10 +345,34 @@ export default function LogosPage() {
   // Anonymous but key-unlocked callers identify with the header; signed-in
   // users are authorized by their session alone.
   const keyHeaders = useCallback(
-    (): Record<string, string> =>
-      unlocked && !isSignedIn ? { 'x-socria-key': CORE3_ACCESS_KEY } : {},
-    [unlocked, isSignedIn]
+    (): Record<string, string> => ({
+      ...(unlocked && !isSignedIn ? { 'x-socria-key': CORE3_ACCESS_KEY } : {}),
+      // What the client believes it holds. The routes check for themselves.
+      ...(plan === 'one' ? { 'x-socria-one': SOCRIA_ONE_KEY } : {}),
+    }),
+    [unlocked, isSignedIn, plan]
   );
+
+  /** Open the Socria One screen, saying which boundary they walked into. */
+  const askOne = useCallback((reason?: string) => {
+    setOneReason(reason);
+    setOneOpen(true);
+  }, []);
+
+  /**
+   * Take up Socria One. With no billing wired yet, the button and a valid
+   * access code do the same thing — this is the single place a real checkout
+   * replaces.
+   */
+  function takeOne(typed: string): boolean {
+    if (typed && !isValidOneKey(typed)) return false;
+    setPlan('one');
+    setOneOpen(false);
+    try {
+      localStorage.setItem(ONE_KEY_STORAGE, '1');
+    } catch {}
+    return true;
+  }
 
   // ── sessions ───────────────────────────────────────────────────────
   const applySessions = useCallback(
@@ -432,11 +491,25 @@ export default function LogosPage() {
     setCtxPanel({ open: false, node: null });
     setChanged(new Set());
     setDeltaNote(null);
+    // The boundary belongs to a map, not to the reader — a different line of
+    // thinking gets its own room and its own notice.
+    setMapCapped(false);
+    setLimitNoteOff(false);
     setError(null);
     setStreaming('');
   }
 
   function newSession() {
+    // A free reader keeps two lines of thinking. Both stay entirely usable —
+    // it's starting a THIRD that One opens, and an empty unused session
+    // doesn't count against them.
+    if (!one) {
+      const used = sessionsRef.current.filter((x) => x.messages.length > 0).length;
+      if (used >= FREE_LIMITS.conversations) {
+        askOne('You have both of your free lines of thinking open. Socria One keeps as many as you have.');
+        return;
+      }
+    }
     const fresh = emptySession();
     applySessions([fresh, ...sessionsRef.current]);
     switchSession(fresh.id);
@@ -508,6 +581,8 @@ export default function LogosPage() {
             });
             setChanged(new Set(delta.changed));
             setDeltaNote(summarizeDelta(delta));
+            // The server says whether this line of thinking outgrew a free map.
+            setMapCapped(!!json.capped);
           }
         }
       } catch {
@@ -640,7 +715,22 @@ export default function LogosPage() {
   }
 
   // ── acting on a node ───────────────────────────────────────────────
+  /** The free map is full: new thinking will no longer be added to it. */
+  const atMapBoundary = !one && meaningfulNodes(map) >= FREE_LIMITS.mapNodes;
+
+  /** Research runs already spent in the conversation on screen. */
+  const researchSpent = researchUsed[activeId ?? ''] ?? 0;
+  /** Research is the only node action a free reader can run out of. */
+  const researchLocked = !one && researchSpent >= FREE_LIMITS.research;
+
   async function runAction(mode: NodeMode, node: MapNodeRef) {
+    // Explore, Challenge and Trace stay open at every tier — Trace especially,
+    // since seeing where your own thinking came from is not a feature to sell.
+    // Research is the one that has a free edge, and only on the second reach.
+    if (mode === 'research' && researchLocked) {
+      askOne('You have seen what Research does. Socria One takes any node on the map out to the evidence, as often as the thinking needs.');
+      return;
+    }
     // Generated once per node per mode, then reused — reopening is instant and
     // costs nothing. Keyed on the label too, so a node the map rewords is
     // treated as a different idea and looked up again.
@@ -660,6 +750,18 @@ export default function LogosPage() {
     }
 
     const seq = ++exploreSeq.current;
+    // Spend the run only when we actually go and look — a cached result
+    // reopened costs nothing and shouldn't count against them.
+    if (mode === 'research' && !one) {
+      const sid = activeIdRef.current ?? '';
+      setResearchUsed((prev) => {
+        const next = { ...prev, [sid]: (prev[sid] ?? 0) + 1 };
+        try {
+          localStorage.setItem(RESEARCH_KEY, JSON.stringify(next));
+        } catch {}
+        return next;
+      });
+    }
     setExplore({ key: cacheKey, mode, node, data: null, loading: true, error: null, open: true });
     try {
       const res = await fetch('/api/logos/explore', {
@@ -673,6 +775,7 @@ export default function LogosPage() {
           messages,
           map: mode === 'trace' ? map : undefined,
           contexts: contextsRef.current[node.id] ?? [],
+          researchUsed: researchSpent,
           ...guidance(),
         }),
       });
@@ -918,6 +1021,13 @@ export default function LogosPage() {
   return (
     <div className="logos-root">
       <LogosGuide open={guideOpen} onClose={closeGuide} />
+      <SocriaOneModal
+        open={oneOpen}
+        onClose={() => setOneOpen(false)}
+        onUnlock={takeOne}
+        reason={oneReason}
+      />
+
       <ConnectionsModal
         open={connOpen}
         authHeaders={keyHeaders}
@@ -964,9 +1074,13 @@ export default function LogosPage() {
             <button
               type="button"
               className="lg-conn-open"
-              onClick={() => setConnOpen(true)}
+              onClick={() =>
+                one
+                  ? setConnOpen(true)
+                  : askOne('Socria One reads your own material — Drive, Docs, Notion and pasted work — into the thinking rather than around it.')
+              }
               aria-label="Connections"
-              title="Connect Google, Notion, and more"
+              title={one ? 'Connect Google, Notion, and more' : 'Connected sources are part of Socria One'}
             >
               <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M9 11a4 4 0 0 1 0-5l1-1a4 4 0 0 1 6 6l-1 1" />
@@ -982,9 +1096,14 @@ export default function LogosPage() {
                   ? ' is-nudged'
                   : ''
               }${draftOpen ? ' is-on' : ''}`}
-              onClick={() => setDraftOpen((v) => !v)}
+              onClick={() =>
+                one
+                  ? setDraftOpen((v) => !v)
+                  : askOne('Draft Space lets you write beside your map with the reasoning still in view. It is part of Socria One.')
+              }
             >
               Draft
+              {!one && <OneLock className="lg-draft-lock" />}
             </button>
             <a href="/chat" className="lg-back">
               Socria chat <span aria-hidden="true">→</span>
@@ -1068,6 +1187,34 @@ export default function LogosPage() {
             </div>
           )}
 
+          {/* The free map has grown as far as it goes. Said plainly, once,
+              and dismissible — the map itself stays exactly as it is. */}
+          {!one && !limitNoteOff && atMapBoundary && (
+            <div className="lg-one-note" role="note">
+              <span className="lg-one-note-text">
+                <b>Your free Thinking Map has reached its limit.</b> Everything here
+                stays open — Socria One lets it keep growing with your thinking.
+              </span>
+              <button
+                type="button"
+                className="lg-one-note-go"
+                onClick={() =>
+                  askOne('This line of thinking has more in it than a free map holds. Socria One lets the map keep growing.')
+                }
+              >
+                Socria One
+              </button>
+              <button
+                type="button"
+                className="lg-one-note-x"
+                onClick={() => setLimitNoteOff(true)}
+                aria-label="Dismiss"
+              >
+                ×
+              </button>
+            </div>
+          )}
+
           <LogosComposer
             value={input}
             onChange={setInput}
@@ -1109,7 +1256,10 @@ export default function LogosPage() {
                         className={`lg-depth-opt${depth === d.id ? ' is-on' : ''}`}
                         onClick={() => pickDepth(d.id)}
                       >
-                        <span className="lg-depth-opt-label">{d.label}</span>
+                        <span className="lg-depth-opt-label">
+                          {d.label}
+                          {!one && d.id !== 'balanced' && <OneLock />}
+                        </span>
                         <span className="lg-depth-opt-desc">{d.description}</span>
                       </button>
                     ))}
@@ -1192,6 +1342,11 @@ export default function LogosPage() {
           <ThinkingMap
             map={map}
             onAction={runAction}
+            lensesLocked={!one}
+            onLocked={() =>
+              askOne('Structure, Board and the other lenses read the same reasoning different ways. Socria One opens them.')
+            }
+            researchLocked={researchLocked}
             explored={exploredIds}
             changed={changed}
             relevant={relevant}
