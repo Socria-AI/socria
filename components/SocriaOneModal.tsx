@@ -1,19 +1,55 @@
 'use client';
 
-// The Socria One screen.
+// The Socria One screen, styled after the design project's invitation spread:
+// a Prussian-blue plate with an inner rule, the italic "I" monogram in its
+// ring, serif headline, six capabilities with hand-drawn glyphs, and a cream
+// call-to-action. Logos keeps its greens; this is the one place it reaches
+// for blue.
 //
-// It is not a pricing table. What someone is deciding here is whether to keep
-// the reasoning environment they have just been using, so the page reads like
-// the frontispiece of a volume rather than a plan comparison: the mark, the
-// name, one line about what it is, then what it opens — each written as a
-// capability of thinking, never as an amount of AI.
-//
-// Prussian blue is One's colour; Logos keeps its greens. That's the whole
-// visual difference, and it's enough.
+// It is not a pricing table. What someone decides here is whether to keep the
+// reasoning environment they have just been using, so every line is written
+// as a capability of thinking, never as an amount of AI.
 
 import { useEffect, useState } from 'react';
-import { LogosMark } from './LogosMark';
-import { ONE_FEATURES, SOCRIA_ONE } from '@/lib/socria-one';
+import { ONE_FEATURES, SOCRIA_ONE, type OneFeature } from '@/lib/socria-one';
+
+// The design's glyph per feature family.
+function Glyph({ kind }: { kind: OneFeature }) {
+  const inner =
+    kind === 'map' || kind === 'lenses' || kind === 'conversations' ? (
+      <>
+        <path d="M3,15 L9,9 M9,9 L5,3 M9,9 L15,4" />
+        <circle cx="3" cy="15" r="1.4" />
+        <circle cx="5" cy="3" r="1.4" />
+        <circle cx="15" cy="4" r="1.4" />
+      </>
+    ) : kind === 'research' ? (
+      <>
+        <circle cx="8" cy="8" r="5" />
+        <path d="M12,12 L16,16" />
+      </>
+    ) : kind === 'draft' || kind === 'images' ? (
+      <path d="M14,3 C10,5 6,9 4,14 M4,14 L3,15 M4,14 L8,13" />
+    ) : kind === 'history' ? (
+      <>
+        <path d="M2,12 C5,8 8,14 11,10 C13,7 15,8 16,6" />
+        <circle cx="2" cy="12" r="1.4" />
+        <circle cx="16" cy="6" r="1.4" />
+      </>
+    ) : kind === 'connections' ? (
+      <>
+        <circle cx="6" cy="9" r="4" />
+        <circle cx="12" cy="9" r="4" />
+      </>
+    ) : (
+      <circle cx="9" cy="9" r="6.5" />
+    );
+  return (
+    <span className="lg-one-gl" aria-hidden="true">
+      <svg viewBox="0 0 18 18">{inner}</svg>
+    </span>
+  );
+}
 
 export function SocriaOneModal({
   open,
@@ -59,38 +95,34 @@ export function SocriaOneModal({
         </button>
 
         <header className="lg-one-head">
-          <span className="lg-one-mark" aria-hidden="true">
-            <LogosMark size={30} />
+          <span className="lg-one-mono" aria-hidden="true">
+            <span>I</span>
           </span>
-          <h2 className="lg-one-title">Socria One</h2>
+          <h2 className="lg-one-title">
+            Socria <span className="lg-one-title-one">One</span>
+          </h2>
           <p className="lg-one-price">
             <span className="lg-one-amount">
               {SOCRIA_ONE.currency}
               {SOCRIA_ONE.price}
             </span>
-            <span className="lg-one-per">/{SOCRIA_ONE.period}</span>
+            <span className="lg-one-per">/ {SOCRIA_ONE.period}</span>
           </p>
           <p className="lg-one-lede">
-            {reason ?? 'The complete reasoning environment, opened.'}
+            {reason ?? 'Membership in the complete reasoning environment.'}
           </p>
         </header>
 
         <ul className="lg-one-list">
           {ONE_FEATURES.map((f) => (
             <li key={f.id} className="lg-one-item">
-              <span className="lg-one-tick" aria-hidden="true" />
-              <span className="lg-one-item-body">
-                <span className="lg-one-item-title">{f.title}</span>
-                <span className="lg-one-item-blurb">{f.blurb}</span>
+              <Glyph kind={f.id} />
+              <span className="lg-one-item-text">
+                <em>{f.title}</em> — {f.blurb}
               </span>
             </li>
           ))}
         </ul>
-
-        <p className="lg-one-keep">
-          Everything you have already thought stays yours — your maps, their
-          lineage and your corrections remain open and editable, on any plan.
-        </p>
 
         {error && <p className="lg-one-err">{error}</p>}
 
@@ -101,12 +133,21 @@ export function SocriaOneModal({
             onClick={() => void onUnlock('')}
             disabled={busy}
           >
-            {busy ? 'Opening checkout…' : 'Continue to Socria One'}
+            {busy ? 'Opening checkout…' : `Become a member — ${SOCRIA_ONE.currency}${SOCRIA_ONE.price}/${SOCRIA_ONE.period}`}{' '}
+            <span aria-hidden="true">→</span>
           </button>
           <button type="button" className="lg-one-not" onClick={onClose}>
-            Not now
+            continue with the free tier
           </button>
+          <a className="lg-one-more" href="/one">
+            see everything One opens →
+          </a>
         </div>
+
+        <p className="lg-one-keep">
+          Cancel anytime. Your maps, their lineage and your corrections remain
+          open and editable, at every tier.
+        </p>
 
         <form
           className="lg-one-key"

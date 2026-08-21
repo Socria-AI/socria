@@ -66,52 +66,34 @@ export type OneFeature =
 
 export const ONE_FEATURES: { id: OneFeature; title: string; blurb: string }[] = [
   {
-    id: 'map',
-    title: 'Thinking Maps without a ceiling',
-    blurb:
-      'Let a map grow for as long as the thinking does — every claim, tension and dependency it finds, not the first few.',
+    id: 'depth',
+    title: 'Deeper thinking',
+    blurb: 'all four depth modes, at your pace.',
   },
   {
-    id: 'lenses',
-    title: 'Structure, Graph and Board',
-    blurb:
-      'The same reasoning read four ways: as a living graph, as layered structure, as opposing tensions, and worked by hand on the Board.',
+    id: 'map',
+    title: 'Full Thinking Maps',
+    blurb: 'unbounded branching and every view.',
   },
   {
     id: 'research',
-    title: 'Research across the whole map',
-    blurb:
-      'Take any node out to the evidence and bring back what actually holds — as often as the argument needs it.',
-  },
-  {
-    id: 'depth',
-    title: 'Every depth of thinking',
-    blurb:
-      'Quick, Balanced, Deep and Abstract. Depth changes how far Logos thinks with you — never how quickly it hands over an answer.',
+    title: 'Research',
+    blurb: 'across the whole map, as often as it\u2019s needed.',
   },
   {
     id: 'draft',
-    title: 'Draft Space',
-    blurb:
-      'Write beside your map, with the reasoning still in view — and keep the pen in your own hand.',
-  },
-  {
-    id: 'connections',
-    title: 'Your own material',
-    blurb:
-      'Long-form and pasted work, images, and connected sources like Drive, Docs and Notion, read into the thinking rather than around it.',
-  },
-  {
-    id: 'conversations',
-    title: 'Every line of thinking you keep',
-    blurb:
-      'Hold as many separate enquiries as you have, each with its own map, returned to whenever you come back.',
+    title: 'Advanced Logos tools',
+    blurb: 'Draft Space, long-form, multimodal.',
   },
   {
     id: 'history',
-    title: 'Reasoning that persists',
-    blurb:
-      'Your maps, lineage and corrections carried forward, so returning is picking up rather than starting again.',
+    title: 'Persistent reasoning',
+    blurb: 'your history and personalization, kept.',
+  },
+  {
+    id: 'connections',
+    title: 'Connected context',
+    blurb: 'Drive, Docs, and Notion, when available.',
   },
 ];
 
