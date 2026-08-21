@@ -1200,6 +1200,9 @@ export type ThinkingDepth = 'quick' | 'balanced' | 'deep' | 'abstract';
 export interface ModelConfig {
   id: SocriaModel;
   label: string;
+  /** the name alone, for places that show the mark beside it and don't need
+      "Socria" repeated three times down a menu */
+  short: string;
   description: string;
   defaultOpenAIModel: string;
   supportsDepth: boolean;
@@ -1222,6 +1225,7 @@ export const SOCRIA_MODELS: Record<SocriaModel, ModelConfig> = {
   'core-2': {
     id: 'core-2',
     label: 'Socria Core 2',
+    short: 'Core 2',
     description: 'Calm, restrained Socratic questioning. Plain prose.',
     defaultOpenAIModel: 'gpt-4o-mini',
     supportsDepth: false,
@@ -1230,6 +1234,7 @@ export const SOCRIA_MODELS: Record<SocriaModel, ModelConfig> = {
   'core-3': {
     id: 'core-3',
     label: 'Socria Core 3.1',
+    short: 'Core 3.1',
     description:
       'Language-noticing with typographic emphasis. Adjustable thinking depth.',
     defaultOpenAIModel: CORE_3_MODEL,
@@ -1239,6 +1244,7 @@ export const SOCRIA_MODELS: Record<SocriaModel, ModelConfig> = {
   logos: {
     id: 'logos',
     label: 'Socria Logos',
+    short: 'Logos',
     description:
       'Maps your reasoning as you talk. Opens the split-screen Thinking Map.',
     defaultOpenAIModel: 'gpt-5.6-sol',

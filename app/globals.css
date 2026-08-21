@@ -5268,11 +5268,31 @@ html.js-anim .scrolly-root .fade.d3 { transition-delay: .3s; }
 .logos-root .lg-depth-opt:hover { background: rgba(53,70,32,0.06); }
 .logos-root .lg-depth-opt.is-on { background: rgba(53,70,32,0.09); }
 .logos-root .lg-depth-opt-label { display: block; font-size: 13px; color: var(--lg-ink); }
+/* model rows carry their mark beside the name */
+.logos-root .lg-model .lg-depth-opt-label { display: flex; align-items: center; gap: 7px; }
+.logos-root .lg-model .lg-depth-opt-desc { padding-left: 21px; }
 .logos-root .lg-depth-opt-desc { display: block; font-size: 11px; color: var(--lg-ink-40); margin-top: 1px; }
 .logos-root .lg-depth-foot {
   margin: 6px 4px 2px; padding-top: 8px;
   border-top: 1px solid var(--lg-line);
   font-size: 10.5px; font-style: italic; line-height: 1.45; color: var(--lg-ink-40);
+}
+
+/* ── model glyphs ─────────────────────────────────────────────────── */
+/* Core 3.1's mark catches the light: a quick sweep, then a long rest, so it
+   reads as polished rather than as something demanding attention. */
+.socria-glyph { display: block; flex: 0 0 auto; }
+@keyframes socriaShine {
+  0%   { transform: rotate(18deg) translateX(0); }
+  14%  { transform: rotate(18deg) translateX(34px); }
+  100% { transform: rotate(18deg) translateX(34px); }
+}
+.socria-shine {
+  transform-origin: 12px 12px;
+  animation: socriaShine 4.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .socria-shine { animation: none; opacity: 0; }
 }
 
 /* Sitting at the bottom of the screen, these menus have to open upward —

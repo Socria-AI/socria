@@ -19,6 +19,7 @@ import { DraftSpace, type DraftHandle, type DraftSelection } from '@/components/
 import { DraftResponsePanel } from '@/components/DraftResponsePanel';
 import { LogosGuide, GUIDE_SEEN_KEY } from '@/components/LogosGuide';
 import { LogosMark } from '@/components/LogosMark';
+import { ModelGlyph } from '@/components/ModelGlyph';
 import { MathText } from '@/components/TeX';
 import {
   SOCRIA_MODELS,
@@ -1129,8 +1130,8 @@ export default function LogosPage() {
                 aria-expanded={modelOpen}
                 title="Which Socria you're thinking with"
               >
-                <LogosMark size={13} />
-                <span className="lg-model-name">{SOCRIA_MODELS.logos.label}</span>
+                <ModelGlyph model="logos" size={14} />
+                <span className="lg-model-name">{SOCRIA_MODELS.logos.short}</span>
                 <svg viewBox="0 0 24 24" width="9" height="9" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden="true">
                   <path d="M6 9l6 6 6-6" />
                 </svg>
@@ -1152,7 +1153,8 @@ export default function LogosPage() {
                           onClick={() => pickModel(id)}
                         >
                           <span className="lg-depth-opt-label">
-                            {m.label}
+                            <ModelGlyph model={id} size={14} />
+                            {m.short}
                             {!on && <span className="lg-model-go" aria-hidden="true"> →</span>}
                           </span>
                           <span className="lg-depth-opt-desc">{m.description}</span>

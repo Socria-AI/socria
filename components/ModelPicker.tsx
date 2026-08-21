@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { SOCRIA_MODELS, type SocriaModel } from '@/lib/socria-prompt';
+import { ModelGlyph } from './ModelGlyph';
 
 export function ModelPicker({
   value,
@@ -31,7 +32,8 @@ export function ModelPicker({
         aria-haspopup="listbox"
         aria-expanded={open}
       >
-        <span>{current.label}</span>
+        <ModelGlyph model={value} size={15} className="text-moss-700" />
+        <span>{current.short}</span>
         <svg
           width="10"
           height="10"
@@ -83,7 +85,8 @@ export function ModelPicker({
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="font-serif text-[15px] text-ink flex items-center gap-2">
-                      {m.label}
+                      <ModelGlyph model={id} size={15} className="text-moss-700" />
+                      {m.short}
                       {locked && (
                         <svg
                           width="11"
