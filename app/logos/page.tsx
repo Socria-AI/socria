@@ -9,6 +9,7 @@
 // answer is still arriving, which is the whole interaction being tested here.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useUser } from '@clerk/nextjs';
 import { ThinkingMap, type MapNodeRef } from '@/components/ThinkingMap';
 import { ExplorePanel } from '@/components/ExplorePanel';
@@ -19,7 +20,12 @@ import { DraftResponsePanel } from '@/components/DraftResponsePanel';
 import { LogosGuide, GUIDE_SEEN_KEY } from '@/components/LogosGuide';
 import { LogosMark } from '@/components/LogosMark';
 import { MathText } from '@/components/TeX';
-import { THINKING_DEPTHS, type ThinkingDepth } from '@/lib/socria-prompt';
+import {
+  SOCRIA_MODELS,
+  THINKING_DEPTHS,
+  type SocriaModel,
+  type ThinkingDepth,
+} from '@/lib/socria-prompt';
 import type { GuardSignal } from '@/lib/logos-guidance';
 import { ContextPanel } from '@/components/ContextPanel';
 import { ConnectionsModal } from '@/components/ConnectionsModal';
@@ -51,6 +57,8 @@ import { CORE3_ACCESS_KEY, isValidAccessKey } from '@/lib/socria-prompt';
 const KEY_STORAGE = 'socria.core3AccessKey.v1';
 // Depth is shared with the Core chat, so switching there carries over.
 const DEPTH_KEY = 'socria.depth.v1';
+// Same store the Core chat reads, so picking a model here lands there.
+const MODEL_KEY = 'socria.model.v1';
 const REVEALED_KEY = 'socria.logos.revealed.v1';
 
 const STARTERS = [
@@ -79,6 +87,8 @@ export default function LogosPage() {
   // learning sessions the person has chosen to reveal the solution for.
   const [depth, setDepth] = useState<ThinkingDepth>('balanced');
   const [depthOpen, setDepthOpen] = useState(false);
+  const [modelOpen, setModelOpen] = useState(false);
+  const router = useRouter();
   const [revealedIds, setRevealedIds] = useState<Set<string>>(new Set());
 
   const [input, setInput] = useState('');
@@ -195,6 +205,18 @@ export default function LogosPage() {
     try {
       localStorage.setItem(DEPTH_KEY, next);
     } catch {}
+  }
+
+  // Logos is one of the models, so switching away from it is a navigation,
+  // not a setting. Write the choice where the Core chat reads it, then go —
+  // /chat picks it up on mount instead of opening on whatever was there last.
+  function pickModel(next: SocriaModel) {
+    setModelOpen(false);
+    if (next === 'logos') return;
+    try {
+      localStorage.setItem(MODEL_KEY, next);
+    } catch {}
+    router.push(SOCRIA_MODELS[next].href ?? '/chat');
   }
 
   function reveal() {
@@ -963,43 +985,6 @@ export default function LogosPage() {
             >
               Draft
             </button>
-            {/* Depth — how deeply Logos helps you think, everywhere at once. */}
-            <div className="lg-depth">
-              <button
-                type="button"
-                className="lg-depth-btn"
-                onClick={() => setDepthOpen((v) => !v)}
-                aria-haspopup="listbox"
-                aria-expanded={depthOpen}
-                title="Thinking depth — how deeply Logos helps you think"
-              >
-                {THINKING_DEPTHS.find((d) => d.id === depth)!.label}
-                <svg viewBox="0 0 24 24" width="9" height="9" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden="true">
-                  <path d="M6 9l6 6 6-6" />
-                </svg>
-              </button>
-              {depthOpen && (
-                <>
-                  <div className="lg-depth-scrim" onClick={() => setDepthOpen(false)} />
-                  <div className="lg-depth-menu" role="listbox">
-                    {THINKING_DEPTHS.map((d) => (
-                      <button
-                        key={d.id}
-                        type="button"
-                        role="option"
-                        aria-selected={depth === d.id}
-                        className={`lg-depth-opt${depth === d.id ? ' is-on' : ''}`}
-                        onClick={() => pickDepth(d.id)}
-                      >
-                        <span className="lg-depth-opt-label">{d.label}</span>
-                        <span className="lg-depth-opt-desc">{d.description}</span>
-                      </button>
-                    ))}
-                    <p className="lg-depth-foot">Depth changes how deeply Logos helps you think — never how quickly it gives answers.</p>
-                  </div>
-                </>
-              )}
-            </div>
             <a href="/chat" className="lg-back">
               Socria chat <span aria-hidden="true">→</span>
             </a>
@@ -1091,6 +1076,94 @@ export default function LogosPage() {
             busy={busy}
             readImage={readImage}
           />
+
+          {/* Which mind you're talking to, and how deep it goes — kept beside
+              the box you type in rather than parked up in the header. Both
+              menus open upward; they sit at the bottom of the screen. */}
+          <div className="lg-tools">
+            <div className="lg-depth">
+              <button
+                type="button"
+                className="lg-depth-btn"
+                onClick={() => setDepthOpen((v) => !v)}
+                aria-haspopup="listbox"
+                aria-expanded={depthOpen}
+                title="Thinking depth — how deeply Logos helps you think"
+              >
+                {THINKING_DEPTHS.find((d) => d.id === depth)!.label}
+                <svg viewBox="0 0 24 24" width="9" height="9" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden="true">
+                  <path d="M6 9l6 6 6-6" />
+                </svg>
+              </button>
+              {depthOpen && (
+                <>
+                  <div className="lg-depth-scrim" onClick={() => setDepthOpen(false)} />
+                  <div className="lg-depth-menu is-up is-right" role="listbox">
+                    {THINKING_DEPTHS.map((d) => (
+                      <button
+                        key={d.id}
+                        type="button"
+                        role="option"
+                        aria-selected={depth === d.id}
+                        className={`lg-depth-opt${depth === d.id ? ' is-on' : ''}`}
+                        onClick={() => pickDepth(d.id)}
+                      >
+                        <span className="lg-depth-opt-label">{d.label}</span>
+                        <span className="lg-depth-opt-desc">{d.description}</span>
+                      </button>
+                    ))}
+                    <p className="lg-depth-foot">Depth changes how deeply Logos helps you think — never how quickly it gives answers.</p>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Logos is itself one of the models, so this is the same switch
+                the Core chat carries — picking another one navigates there. */}
+            <div className="lg-model">
+              <button
+                type="button"
+                className="lg-model-btn"
+                onClick={() => setModelOpen((v) => !v)}
+                aria-haspopup="listbox"
+                aria-expanded={modelOpen}
+                title="Which Socria you're thinking with"
+              >
+                <LogosMark size={13} />
+                <span className="lg-model-name">{SOCRIA_MODELS.logos.label}</span>
+                <svg viewBox="0 0 24 24" width="9" height="9" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden="true">
+                  <path d="M6 9l6 6 6-6" />
+                </svg>
+              </button>
+              {modelOpen && (
+                <>
+                  <div className="lg-depth-scrim" onClick={() => setModelOpen(false)} />
+                  <div className="lg-depth-menu is-up is-right" role="listbox">
+                    {(Object.keys(SOCRIA_MODELS) as SocriaModel[]).map((id) => {
+                      const m = SOCRIA_MODELS[id];
+                      const on = id === 'logos';
+                      return (
+                        <button
+                          key={id}
+                          type="button"
+                          role="option"
+                          aria-selected={on}
+                          className={`lg-depth-opt${on ? ' is-on' : ''}`}
+                          onClick={() => pickModel(id)}
+                        >
+                          <span className="lg-depth-opt-label">
+                            {m.label}
+                            {!on && <span className="lg-model-go" aria-hidden="true"> →</span>}
+                          </span>
+                          <span className="lg-depth-opt-desc">{m.description}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
         </section>
 
         {/* ── Thinking Map ───────────────────────────────── */}

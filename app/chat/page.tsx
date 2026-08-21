@@ -1328,7 +1328,8 @@ export default function ChatPage() {
       {/* Main */}
       <div className="flex-1 flex flex-col min-w-0">
         <div className="sticky top-0 z-20 border-b border-border/60 px-3 md:px-6 h-16 flex items-center justify-between gap-2 shrink-0 bg-paper/85 backdrop-blur-md">
-          {/* Left: sidebar toggle (mobile) + model/depth pickers (all sizes) */}
+          {/* Left: sidebar toggle (mobile) — the model and depth pickers now live
+              down beside the composer, where the typing happens */}
           <div className="flex items-center gap-2 min-w-0">
             <button
               onClick={() => setSidebarOpen((v) => !v)}
@@ -1341,15 +1342,6 @@ export default function ChatPage() {
                 <line x1="3" y1="18" x2="21" y2="18" />
               </svg>
             </button>
-            <ModelPicker
-              value={model}
-              onChange={pickModel}
-              isSignedIn={canUseCore3}
-              onLockedAttempt={() => setCore3ModalOpen(true)}
-            />
-            {SOCRIA_MODELS[model].supportsDepth && (
-              <DepthPicker value={depth} onChange={pickDepth} />
-            )}
           </div>
 
           {/* Right: try-core-3 pill (desktop) + auth */}
@@ -1569,9 +1561,27 @@ export default function ChatPage() {
                 </svg>
               </button>
             </div>
-            <p className="mt-2 text-[11px] text-ink/40 text-center font-serif italic">
-              Socria asks. You think. Press Enter to send, Shift+Enter for a new line.
-            </p>
+            {/* Which mind you're talking to, and how deep it goes — kept
+                within reach of the box you type in rather than parked in the
+                header. Both menus open upward; they sit at the screen's edge. */}
+            <div className="mt-2 flex items-center justify-between gap-3">
+              <p className="hidden sm:block text-[11px] text-ink/40 font-serif italic min-w-0 truncate">
+                Socria asks. You think. Enter to send, Shift+Enter for a new line.
+              </p>
+              <div className="flex items-center gap-2 shrink-0 ml-auto">
+                {SOCRIA_MODELS[model].supportsDepth && (
+                  <DepthPicker value={depth} onChange={pickDepth} dropUp align="right" />
+                )}
+                <ModelPicker
+                  value={model}
+                  onChange={pickModel}
+                  isSignedIn={canUseCore3}
+                  onLockedAttempt={() => setCore3ModalOpen(true)}
+                  dropUp
+                  align="right"
+                />
+              </div>
+            </div>
           </div>
         </div>
       </div>

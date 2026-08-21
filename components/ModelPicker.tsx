@@ -8,11 +8,16 @@ export function ModelPicker({
   onChange,
   isSignedIn = true,
   onLockedAttempt,
+  dropUp = false,
+  align = 'left',
 }: {
   value: SocriaModel;
   onChange: (next: SocriaModel) => void;
   isSignedIn?: boolean;
   onLockedAttempt?: (locked: SocriaModel) => void;
+  /** open the menu above the button — it sits at the bottom of the screen */
+  dropUp?: boolean;
+  align?: 'left' | 'right';
 }) {
   const [open, setOpen] = useState(false);
   const current = SOCRIA_MODELS[value];
@@ -34,7 +39,9 @@ export function ModelPicker({
           fill="none"
           stroke="currentColor"
           strokeWidth="2.5"
-          className={`transition-transform ${open ? 'rotate-180' : ''}`}
+          className={`transition-transform ${
+            dropUp ? (open ? '' : 'rotate-180') : open ? 'rotate-180' : ''
+          }`}
         >
           <path d="M6 9l6 6 6-6" />
         </svg>
@@ -47,7 +54,11 @@ export function ModelPicker({
             onClick={() => setOpen(false)}
             aria-hidden
           />
-          <div className="absolute left-0 mt-2 w-72 max-w-[calc(100vw-1.5rem)] rounded-xl border border-ink/10 bg-white shadow-lg z-40 overflow-hidden">
+          <div
+            className={`absolute ${align === 'right' ? 'right-0' : 'left-0'} ${
+              dropUp ? 'bottom-full mb-2' : 'mt-2'
+            } w-72 max-w-[calc(100vw-1.5rem)] rounded-xl border border-ink/10 bg-white shadow-lg z-40 overflow-hidden`}
+          >
             {(Object.keys(SOCRIA_MODELS) as SocriaModel[]).map((id) => {
               const m = SOCRIA_MODELS[id];
               const active = id === value;

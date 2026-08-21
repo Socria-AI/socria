@@ -6,9 +6,14 @@ import { THINKING_DEPTHS, type ThinkingDepth } from '@/lib/socria-prompt';
 export function DepthPicker({
   value,
   onChange,
+  dropUp = false,
+  align = 'left',
 }: {
   value: ThinkingDepth;
   onChange: (next: ThinkingDepth) => void;
+  /** open the menu above the button — it sits at the bottom of the screen */
+  dropUp?: boolean;
+  align?: 'left' | 'right';
 }) {
   const [open, setOpen] = useState(false);
   const current = THINKING_DEPTHS.find((d) => d.id === value)!;
@@ -33,7 +38,9 @@ export function DepthPicker({
           fill="none"
           stroke="currentColor"
           strokeWidth="2.5"
-          className={`transition-transform ${open ? 'rotate-180' : ''}`}
+          className={`transition-transform ${
+            dropUp ? (open ? '' : 'rotate-180') : open ? 'rotate-180' : ''
+          }`}
         >
           <path d="M6 9l6 6 6-6" />
         </svg>
@@ -46,7 +53,11 @@ export function DepthPicker({
             onClick={() => setOpen(false)}
             aria-hidden
           />
-          <div className="absolute left-0 mt-2 w-72 max-w-[calc(100vw-1.5rem)] rounded-xl border border-ink/10 bg-white shadow-lg z-40 overflow-hidden">
+          <div
+            className={`absolute ${align === 'right' ? 'right-0' : 'left-0'} ${
+              dropUp ? 'bottom-full mb-2' : 'mt-2'
+            } w-72 max-w-[calc(100vw-1.5rem)] rounded-xl border border-ink/10 bg-white shadow-lg z-40 overflow-hidden`}
+          >
             <div className="px-4 pt-3 pb-2 text-[10px] uppercase tracking-[0.18em] text-ink/40 border-b border-ink/5">
               Thinking depth
             </div>

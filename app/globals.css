@@ -5275,6 +5275,41 @@ html.js-anim .scrolly-root .fade.d3 { transition-delay: .3s; }
   font-size: 10.5px; font-style: italic; line-height: 1.45; color: var(--lg-ink-40);
 }
 
+/* Sitting at the bottom of the screen, these menus have to open upward —
+   and hug the right edge so a 248px panel never runs off it. */
+.logos-root .lg-depth-menu.is-up { top: auto; bottom: calc(100% + 8px); }
+.logos-root .lg-depth-menu.is-right { left: auto; right: 0; }
+
+/* ── the control row beside the composer ─────────────────────────── */
+/* Model and depth live within reach of the box you type in. Right-aligned,
+   quiet until you go looking for them. */
+.logos-root .lg-tools {
+  display: flex; align-items: center; justify-content: flex-end; gap: 8px;
+  margin: 0 40px; padding: 0 2px 4px;
+}
+@media (max-width: 900px) { .logos-root .lg-tools { margin: 0 22px; } }
+
+.logos-root .lg-model { position: relative; }
+.logos-root .lg-model-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 11px 4px 8px;
+  border: 1px solid var(--lg-line); border-radius: 999px;
+  background: transparent;
+  font: inherit; font-size: 11.5px;
+  color: var(--lg-ink-40);
+  cursor: pointer; transition: color 0.2s, border-color 0.2s, background 0.2s;
+}
+.logos-root .lg-model-btn:hover {
+  color: var(--lg-primary);
+  border-color: rgba(53,70,32,0.35);
+  background: rgba(53,70,32,0.04);
+}
+/* the mark carries the green even while the label is resting grey */
+.logos-root .lg-model-btn .lg-mark { color: var(--lg-primary); opacity: 0.8; }
+.logos-root .lg-model-btn:hover .lg-mark { opacity: 1; }
+.logos-root .lg-model-name { white-space: nowrap; }
+.logos-root .lg-model-go { color: var(--lg-ink-40); }
+
 /* ── Answer Guard bar ────────────────────────────────────────────── */
 .logos-root .lg-guard {
   display: flex; align-items: center; gap: 10px;
