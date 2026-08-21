@@ -27,7 +27,11 @@ export function ModelGlyph({
   const uid = useId().replace(/:/g, '');
   const cls = className ? `socria-glyph ${className}` : 'socria-glyph';
 
-  if (model === 'logos') return <LogosMark size={size} className={className} />;
+  // The brain is open line-work and narrower than it is tall, so at the same
+  // nominal size it reads smaller than a solid ring. Give it a little back so
+  // the three marks sit at the same visual weight in a row.
+  if (model === 'logos')
+    return <LogosMark size={Math.round(size * 1.22)} className={className} />;
 
   if (model === 'core-2') {
     return (
