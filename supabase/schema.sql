@@ -65,3 +65,24 @@ create table if not exists logos_connections (
   created_at timestamptz not null default now(),
   primary key (user_id, provider)
 );
+
+-- Socria One subscriptions. One row per user; Stripe is the source of truth
+-- and this table is its local projection, written only by the webhook.
+-- `status` is Stripe's own subscription status verbatim ('active', 'trialing',
+-- 'past_due', 'canceled', …) so we never invent a vocabulary of our own.
+create table if not exists socria_subscriptions (
+  user_id text primary key,
+  stripe_customer_id text not null,
+  stripe_subscription_id text,
+  status text not null default 'incomplete',
+  price_id text,
+  -- when the paid period runs out; entitlement survives a cancellation until
+  -- this passes, because someone who cancels has already paid for the month
+  current_period_end bigint,
+  cancel_at_period_end boolean not null default false,
+  updated_at bigint not null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists socria_subscriptions_customer_idx
+  on socria_subscriptions (stripe_customer_id);

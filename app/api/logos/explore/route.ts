@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'label required' }, { status: 400 });
   }
 
-  const plan = resolvePlanForRequest(req, userId);
+  const plan = await resolvePlanForRequest(req, userId);
   // Research is the one mode a free reader meets a boundary in — they get to
   // run it and see what it does, and it's the SECOND reach for the evidence
   // that One opens. Explore, Challenge and Trace stay open: Trace especially,

@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
   // it must not populate the result. Depth also shapes how much it extracts.
   // Depth is one of the things One opens, so a free request is answered at
   // Balanced whatever it asked for — clamped here rather than trusted.
-  const plan = resolvePlanForRequest(req, userId);
+  const plan = await resolvePlanForRequest(req, userId);
   const depth = depthForPlan(resolveDepth(body?.depth), plan);
   const guidance = guidanceBlock(depth, resolveGuard(body?.guard), 'surface');
 

@@ -5610,3 +5610,20 @@ html.js-anim .scrolly-root .fade.d3 { transition-delay: .3s; }
 .logos-root .lg-depth-opt .lg-onelock { margin-left: 6px; vertical-align: -2px; }
 .logos-root .lg-draft-lock { margin-left: 6px; vertical-align: -3px; }
 .logos-root .lg-draft-open { display: inline-flex; align-items: center; }
+
+.logos-root .lg-one-err {
+  margin: 18px 0 0; padding: 9px 12px;
+  border: 1px solid rgba(156,91,60,0.3); border-radius: 9px;
+  background: rgba(156,91,60,0.06);
+  font-size: 12px; line-height: 1.5; color: #7d4a30;
+}
+.logos-root .lg-one-go:disabled { opacity: 0.6; cursor: default; transform: none; }
+/* A subscriber's quiet door to their own billing — never a badge that boasts. */
+.logos-root .lg-one-chip {
+  display: inline-flex; align-items: center;
+  padding: 4px 10px; border-radius: 999px;
+  border: 1px solid var(--lg-one-line); background: transparent;
+  font: inherit; font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase;
+  color: var(--lg-one); cursor: pointer; transition: background 0.18s;
+}
+.logos-root .lg-one-chip:hover { background: var(--lg-one-soft); }

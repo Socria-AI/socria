@@ -20,13 +20,23 @@ export function SocriaOneModal({
   onClose,
   onUnlock,
   reason,
+  busy,
+  error,
 }: {
   open: boolean;
   onClose: () => void;
-  /** returns true when the typed key is good */
-  onUnlock: (key: string) => boolean;
+  /**
+   * Called with a typed access code, or with '' for the subscribe button.
+   * Resolves true when it worked; the button case redirects to Stripe and
+   * never resolves in this page's lifetime.
+   */
+  onUnlock: (key: string) => boolean | Promise<boolean>;
   /** the boundary they walked into, so the page opens where they are */
   reason?: string;
+  /** checkout is being opened */
+  busy?: boolean;
+  /** checkout could not be reached */
+  error?: string | null;
 }) {
   const [key, setKey] = useState('');
   const [bad, setBad] = useState(false);
@@ -82,9 +92,16 @@ export function SocriaOneModal({
           lineage and your corrections remain open and editable, on any plan.
         </p>
 
+        {error && <p className="lg-one-err">{error}</p>}
+
         <div className="lg-one-actions">
-          <button type="button" className="lg-one-go" onClick={() => onUnlock('')}>
-            Continue to Socria One
+          <button
+            type="button"
+            className="lg-one-go"
+            onClick={() => void onUnlock('')}
+            disabled={busy}
+          >
+            {busy ? 'Opening checkout…' : 'Continue to Socria One'}
           </button>
           <button type="button" className="lg-one-not" onClick={onClose}>
             Not now
@@ -95,9 +112,11 @@ export function SocriaOneModal({
           className="lg-one-key"
           onSubmit={(e) => {
             e.preventDefault();
-            const ok = onUnlock(key);
-            setBad(!ok);
-            if (ok) setKey('');
+            void (async () => {
+              const ok = await onUnlock(key);
+              setBad(!ok);
+              if (ok) setKey('');
+            })();
           }}
         >
           <label htmlFor="lg-one-code" className="lg-one-key-label">

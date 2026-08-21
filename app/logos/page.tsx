@@ -111,10 +111,17 @@ export default function LogosPage() {
   const [oneReason, setOneReason] = useState<string | undefined>();
   // Research runs already spent, per session id.
   const [researchUsed, setResearchUsed] = useState<Record<string, number>>({});
+  // Checkout is a redirect, so the button needs to show it's gone somewhere.
+  const [oneBusy, setOneBusy] = useState(false);
+  const [oneError, setOneError] = useState<string | null>(null);
   // The boundary note is dismissible — said once, not nagged.
   const [limitNoteOff, setLimitNoteOff] = useState(false);
   // The extraction wanted to add something and the free map was full.
   const [mapCapped, setMapCapped] = useState(false);
+  // They have a Stripe customer behind them, so billing can be managed.
+  const [oneManageable, setOneManageable] = useState(false);
+  // Just came back from a completed checkout.
+  const [oneWelcome, setOneWelcome] = useState(false);
   const one = plan === 'one';
   const [revealedIds, setRevealedIds] = useState<Set<string>>(new Set());
 
@@ -289,6 +296,35 @@ export default function LogosPage() {
     return () => clearTimeout(t);
   }, []);
 
+  // Coming back from Stripe. The webhook may still be in flight when the
+  // browser lands, so ask the server a few times before believing 'free' —
+  // telling someone who has just paid that they haven't would be the worst
+  // possible first second of a subscription.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const flag = params.get('one');
+    if (!flag) {
+      void syncPlan();
+      return;
+    }
+    // Clean the query so a refresh doesn't replay this.
+    window.history.replaceState({}, '', '/logos');
+    if (flag !== 'welcome') return;
+
+    setOneWelcome(true);
+    let tries = 0;
+    let timer: ReturnType<typeof setTimeout>;
+    const poll = async () => {
+      await syncPlan();
+      tries += 1;
+      if (tries < 6) timer = setTimeout(poll, 1000 * tries);
+    };
+    void poll();
+    return () => clearTimeout(timer);
+    // syncPlan is stable enough for mount-only; re-running would restart polling
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     if (isLoaded) setAuthSettled(true);
   }, [isLoaded]);
@@ -359,19 +395,77 @@ export default function LogosPage() {
     setOneOpen(true);
   }, []);
 
-  /**
-   * Take up Socria One. With no billing wired yet, the button and a valid
-   * access code do the same thing — this is the single place a real checkout
-   * replaces.
-   */
-  function takeOne(typed: string): boolean {
-    if (typed && !isValidOneKey(typed)) return false;
-    setPlan('one');
-    setOneOpen(false);
+  /** What the server says we hold. Its answer replaces our local belief. */
+  const syncPlan = useCallback(async () => {
     try {
-      localStorage.setItem(ONE_KEY_STORAGE, '1');
+      const res = await fetch('/api/logos/plan', { headers: keyHeaders() });
+      if (!res.ok) return;
+      const json = await res.json();
+      if (json?.plan === 'one' || json?.plan === 'free') {
+        setPlan(json.plan);
+        try {
+          if (json.plan === 'one') localStorage.setItem(ONE_KEY_STORAGE, '1');
+          else localStorage.removeItem(ONE_KEY_STORAGE);
+        } catch {}
+      }
+      setOneManageable(!!json?.manageable);
+    } catch {
+      // Offline or unconfigured — keep whatever we believed.
+    }
+  }, [keyHeaders]);
+
+  /**
+   * Take up Socria One.
+   *
+   * A typed access code unlocks locally (the soft gate Core 3.1 established,
+   * for deployments with no billing). Everything else goes to Stripe Checkout,
+   * and the entitlement only becomes real when the webhook says so — this
+   * function never grants the plan to itself.
+   */
+  async function takeOne(typed: string): Promise<boolean> {
+    if (typed) {
+      if (!isValidOneKey(typed)) return false;
+      setPlan('one');
+      setOneOpen(false);
+      try {
+        localStorage.setItem(ONE_KEY_STORAGE, '1');
+      } catch {}
+      return true;
+    }
+
+    setOneBusy(true);
+    setOneError(null);
+    try {
+      const res = await fetch('/api/stripe/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...keyHeaders() },
+      });
+      const json = await res.json().catch(() => null);
+      if (res.ok && json?.url) {
+        window.location.href = json.url;
+        return true;
+      }
+      setOneError(
+        json?.error ??
+          'Could not start checkout. If this deployment has no billing configured, an access code still works.'
+      );
+    } catch {
+      setOneError('Could not reach checkout.');
+    }
+    setOneBusy(false);
+    return false;
+  }
+
+  /** Open Stripe's billing portal — cancelling is theirs, not a support ticket. */
+  async function manageOne() {
+    try {
+      const res = await fetch('/api/stripe/portal', {
+        method: 'POST',
+        headers: keyHeaders(),
+      });
+      const json = await res.json().catch(() => null);
+      if (res.ok && json?.url) window.location.href = json.url;
     } catch {}
-    return true;
   }
 
   // ── sessions ───────────────────────────────────────────────────────
@@ -1026,6 +1120,8 @@ export default function LogosPage() {
         onClose={() => setOneOpen(false)}
         onUnlock={takeOne}
         reason={oneReason}
+        busy={oneBusy}
+        error={oneError}
       />
 
       <ConnectionsModal
@@ -1187,6 +1283,34 @@ export default function LogosPage() {
             </div>
           )}
 
+          {/* Just back from checkout. Says the one thing worth saying and
+              then goes away — nobody needs a receipt read aloud. */}
+          {oneWelcome && (
+            <div className="lg-one-note" role="status">
+              <span className="lg-one-note-text">
+                {one ? (
+                  <>
+                    <b>Socria One is open.</b> Your maps grow as far as the thinking
+                    does, every lens and depth is yours, and Research runs the whole map.
+                  </>
+                ) : (
+                  <>
+                    <b>Thank you — setting up your subscription.</b> This takes a moment;
+                    the environment opens as soon as Stripe confirms.
+                  </>
+                )}
+              </span>
+              <button
+                type="button"
+                className="lg-one-note-x"
+                onClick={() => setOneWelcome(false)}
+                aria-label="Dismiss"
+              >
+                ×
+              </button>
+            </div>
+          )}
+
           {/* The free map has grown as far as it goes. Said plainly, once,
               and dismissible — the map itself stays exactly as it is. */}
           {!one && !limitNoteOff && atMapBoundary && (
@@ -1229,6 +1353,16 @@ export default function LogosPage() {
               the box you type in rather than parked up in the header. Both
               menus open upward; they sit at the bottom of the screen. */}
           <div className="lg-tools">
+            {one && oneManageable && (
+              <button
+                type="button"
+                className="lg-one-chip"
+                onClick={manageOne}
+                title="Manage your Socria One subscription"
+              >
+                Socria One
+              </button>
+            )}
             <div className="lg-depth">
               <button
                 type="button"
