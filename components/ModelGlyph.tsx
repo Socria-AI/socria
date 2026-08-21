@@ -4,8 +4,8 @@
 // of text repeating the word "Socria".
 //
 //   Core 2    a plain outlined circle — the quiet one
-//   Core 3.1  the same circle, filled and polished, with a slow sweep of
-//             light across it; it is the one that notices language
+//   Core 3.1  the same circle, polished: a gradient ring with a slow sweep
+//             of light across it; it is the one that notices language
 //   Logos     the brain, the same mark the Logos header carries
 //
 // Gradients need ids that are unique per instance — two of these render at
@@ -47,10 +47,12 @@ export function ModelGlyph({
     );
   }
 
-  // Core 3.1 — the shiny one.
-  const fill = `sg${uid}`;
+  // Core 3.1 — the same hollow circle, but polished: the ring itself is drawn
+  // in gradient, a sweep of light travels across it, and a short arc catches
+  // the highlight. Hollow like Core 2's, so they read as one family.
+  const ring = `sg${uid}`;
   const gloss = `sh${uid}`;
-  const clip = `sc${uid}`;
+  const hole = `sm${uid}`;
   return (
     <svg
       className={cls}
@@ -61,23 +63,30 @@ export function ModelGlyph({
       focusable="false"
     >
       <defs>
-        <linearGradient id={fill} x1="0" y1="0" x2="1" y2="1">
+        <linearGradient id={ring} x1="0" y1="0" x2="1" y2="1">
           <stop offset="0%" stopColor="#9CB874" />
-          <stop offset="52%" stopColor="#5e7633" />
+          <stop offset="50%" stopColor="#5e7633" />
           <stop offset="100%" stopColor="#B8A26B" />
         </linearGradient>
         <linearGradient id={gloss} x1="0" y1="0" x2="1" y2="0">
           <stop offset="0%" stopColor="#fff" stopOpacity="0" />
-          <stop offset="50%" stopColor="#fff" stopOpacity="0.75" />
+          <stop offset="50%" stopColor="#fff" stopOpacity="0.95" />
           <stop offset="100%" stopColor="#fff" stopOpacity="0" />
         </linearGradient>
-        <clipPath id={clip}>
-          <circle cx="12" cy="12" r="9" />
-        </clipPath>
+        {/* the sweep is confined to the ring, not the hole it encloses */}
+        <mask id={hole}>
+          <circle cx="12" cy="12" r="8.5" fill="none" stroke="#fff" strokeWidth="2.6" />
+        </mask>
       </defs>
-      <circle cx="12" cy="12" r="9" fill={`url(#${fill})`} />
-      <g clipPath={`url(#${clip})`}>
-        {/* the sweep of light, held still most of the cycle */}
+      <circle
+        cx="12"
+        cy="12"
+        r="8.5"
+        fill="none"
+        stroke={`url(#${ring})`}
+        strokeWidth="2.6"
+      />
+      <g mask={`url(#${hole})`}>
         <rect
           className="socria-shine"
           x="-10"
@@ -88,9 +97,15 @@ export function ModelGlyph({
           transform="rotate(18 12 12)"
         />
       </g>
-      {/* a specular catch, top-left, the way a bead of glass takes the room */}
-      <ellipse cx="9.1" cy="8.4" rx="3.1" ry="2" fill="#fff" opacity="0.3"
-        transform="rotate(-28 9.1 8.4)" />
+      {/* a standing highlight on the upper-left of the ring */}
+      <path
+        d="M5.9 8.1 A8.5 8.5 0 0 1 11.4 3.6"
+        fill="none"
+        stroke="#fff"
+        strokeOpacity="0.55"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
     </svg>
   );
 }
