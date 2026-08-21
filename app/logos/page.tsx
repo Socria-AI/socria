@@ -425,6 +425,14 @@ export default function LogosPage() {
   async function takeOne(typed: string): Promise<boolean> {
     if (typed) {
       if (!isValidOneKey(typed)) return false;
+      // Redeem through the server too: signed in, the grant is written to the
+      // account and follows them to their next device. Fire-and-forget — the
+      // local unlock works either way, and syncPlan reconciles later.
+      void fetch('/api/logos/redeem', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: typed }),
+      }).catch(() => {});
       setPlan('one');
       setOneOpen(false);
       try {

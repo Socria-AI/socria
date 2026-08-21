@@ -32,13 +32,18 @@ export const FREE_LIMITS = {
   research: 1,
 } as const;
 
-// A typed key that opens One without billing attached, mirroring the Core 3
-// access key already in the product. This is the seam a real subscription
-// check drops into later; everything else reads `plan`, not this.
+// Typed codes that open One without billing attached, mirroring the Core 3
+// access key already in the product. Soft gates, not secrets — like that key,
+// they ship in the client bundle. 'ONE' is the dev/test gate; the longer code
+// is for handing out. A signed-in redemption is ALSO written to the account
+// (see /api/logos/redeem) so it follows the person across devices.
 export const SOCRIA_ONE_KEY = 'ONE';
+export const SOCRIA_ONE_CODES = [SOCRIA_ONE_KEY, 'MAVERICKS26LONGHORNS27'];
 
 export function isValidOneKey(key: unknown): boolean {
-  return typeof key === 'string' && key.trim().toUpperCase() === SOCRIA_ONE_KEY;
+  return (
+    typeof key === 'string' && SOCRIA_ONE_CODES.includes(key.trim().toUpperCase())
+  );
 }
 
 export function resolvePlan(input: unknown): Plan {

@@ -27,8 +27,42 @@ export interface SubscriptionRow {
   cancelAtPeriodEnd: boolean;
 }
 
-/** Stripe statuses that mean "this person is on Socria One right now". */
-const LIVE = new Set(['active', 'trialing', 'past_due']);
+/** Stripe statuses that mean "this person is on Socria One right now" —
+ * plus 'comp', ours: a complimentary grant from a redeemed access code,
+ * which has no Stripe subscription behind it at all. */
+const LIVE = new Set(['active', 'trialing', 'past_due', 'comp']);
+
+/** The sentinel customer id a complimentary row carries. Never a real
+ * Stripe customer; checkout and the billing portal must not treat it as one. */
+export function isCompCustomer(customerId: string | null | undefined): boolean {
+  return !!customerId && customerId.startsWith('comp_');
+}
+
+/**
+ * Grant Socria One to an account from a redeemed access code. Overwrites
+ * nothing that matters: a real subscription row would already entitle them,
+ * and if they later subscribe for real, checkout replaces this row.
+ */
+export async function grantComplimentary(userId: string): Promise<void> {
+  const existing = await getSubscription(userId);
+  // Never downgrade a real Stripe relationship to a comp row.
+  if (existing && !isCompCustomer(existing.customerId)) {
+    if (entitles(existing)) return;
+    // A dead real subscription: keep the customer, mark them comp'd.
+    await upsertSubscription({
+      userId,
+      customerId: existing.customerId,
+      subscriptionId: existing.subscriptionId,
+      status: 'comp',
+    });
+    return;
+  }
+  await upsertSubscription({
+    userId,
+    customerId: `comp_${userId}`,
+    status: 'comp',
+  });
+}
 
 export function entitles(row: Pick<SubscriptionRow, 'status' | 'currentPeriodEnd'> | null): boolean {
   if (!row) return false;

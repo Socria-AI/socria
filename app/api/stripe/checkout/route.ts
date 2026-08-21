@@ -7,7 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth, currentUser } from '@clerk/nextjs/server';
 import { stripe, stripeConfigured, onePriceId, siteUrl } from '@/lib/stripe';
-import { getSubscription, upsertSubscription } from '@/lib/subscriptions';
+import { getSubscription, isCompCustomer, upsertSubscription } from '@/lib/subscriptions';
 import { enforceRateLimit } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
@@ -35,8 +35,11 @@ export async function POST(req: NextRequest) {
     const existing = await getSubscription(userId);
 
     // Reuse the customer if we've seen them, so a second subscription doesn't
-    // create a second customer record with the same person behind it.
-    let customerId = existing?.customerId;
+    // create a second customer record with the same person behind it. A comp
+    // row's sentinel id is NOT a Stripe customer — someone comp'd who chooses
+    // to pay gets a real customer created here, replacing the sentinel.
+    let customerId =
+      existing && !isCompCustomer(existing.customerId) ? existing.customerId : undefined;
     if (!customerId) {
       const user = await currentUser();
       const email = user?.emailAddresses?.[0]?.emailAddress;

@@ -8,7 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { stripe, stripeConfigured, siteUrl } from '@/lib/stripe';
-import { getSubscription } from '@/lib/subscriptions';
+import { getSubscription, isCompCustomer } from '@/lib/subscriptions';
 import { enforceRateLimit } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
   }
 
   const sub = await getSubscription(userId);
-  if (!sub?.customerId) {
+  if (!sub?.customerId || isCompCustomer(sub.customerId)) {
     return NextResponse.json({ error: 'No subscription to manage.' }, { status: 404 });
   }
 
