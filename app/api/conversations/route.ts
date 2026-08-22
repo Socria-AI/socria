@@ -47,6 +47,34 @@ function sanitizeMessages(raw: unknown): Msg[] {
 type Kind = 'chat' | 'logos';
 const asKind = (v: unknown): Kind => (v === 'logos' ? 'logos' : 'chat');
 
+// ── legacy-database fallback ────────────────────────────────────────
+// kind/map/draft/contexts arrived after the original conversations table, as
+// idempotent ALTERs in supabase/schema.sql. A deployment whose database never
+// ran them used to hard-fail the moment someone signed in ("column
+// conversations.kind does not exist"). The app cannot ALTER TABLE through
+// PostgREST, so instead: detect the missing column, retry with the columns
+// every database has, and keep chat working while saying — loudly, on the
+// server — exactly what to run.
+//
+// Postgres reports 42703 on select; PostgREST reports PGRST204 ("Could not
+// find the '…' column in the schema cache") on insert/upsert.
+function missingColumn(error: { code?: string; message?: string } | null): boolean {
+  if (!error) return false;
+  if (error.code === '42703' || error.code === 'PGRST204') return true;
+  return /column .* does not exist|could not find the '.*' column/i.test(error.message ?? '');
+}
+
+let warnedLegacy = false;
+function warnLegacy(op: string) {
+  if (warnedLegacy) return;
+  warnedLegacy = true;
+  console.error(
+    `conversations ${op}: this database is missing newer columns (kind/map/draft/contexts). ` +
+      'Running in degraded chat-only mode — Logos maps and drafts are NOT being saved. ' +
+      'Fix: run supabase/schema.sql against this project (SQL Editor or psql); it is idempotent.'
+  );
+}
+
 // The draft is the person's own writing, so it is stored verbatim — only
 // bounded, never reformatted or cleaned up on their behalf.
 const MAX_DRAFT_HTML = 200_000;
@@ -65,11 +93,27 @@ export async function GET() {
   }
 
   try {
-    const { data, error } = await supabaseAdmin()
+    // `any[]`: the two selects below return different row shapes on purpose
+    // (the fallback asks only for the columns every database has); the mapping
+    // after them defaults whatever is absent.
+    let data: any[] | null;
+    let error;
+    ({ data, error } = await supabaseAdmin()
       .from('conversations')
       .select('id, title, messages, memory, kind, map, draft, contexts, updated_at')
       .eq('user_id', userId)
-      .order('updated_at', { ascending: false });
+      .order('updated_at', { ascending: false }));
+
+    // An old database: list what it does have, defaulting the rest, so
+    // signing in still works while the migration is outstanding.
+    if (error && missingColumn(error)) {
+      warnLegacy('GET');
+      ({ data, error } = await supabaseAdmin()
+        .from('conversations')
+        .select('id, title, messages, memory, updated_at')
+        .eq('user_id', userId)
+        .order('updated_at', { ascending: false }));
+    }
 
     if (error) {
       console.error('GET conversations error:', error);
@@ -118,18 +162,28 @@ export async function PUT(req: NextRequest) {
   }
 
   try {
-    const { error } = await supabaseAdmin().from('conversations').upsert({
+    const legacyRow = {
       id: c.id,
       user_id: userId,
       title: c.title.slice(0, MAX_TITLE),
       messages: sanitizeMessages(c.messages),
       memory: sanitizeMemory(c.memory ?? EMPTY_MEMORY),
+      updated_at: Number(c.updatedAt) || Date.now(),
+    };
+    let { error } = await supabaseAdmin().from('conversations').upsert({
+      ...legacyRow,
       kind: asKind(c.kind),
       map: sanitizeMap(c.map ?? EMPTY_MAP),
       draft: sanitizeDraft(c.draft),
       contexts: sanitizeContexts(c.contexts),
-      updated_at: Number(c.updatedAt) || Date.now(),
     });
+
+    // An old database: save what it can hold. The conversation itself is
+    // never lost; the map/draft columns simply don't exist to write to yet.
+    if (error && missingColumn(error)) {
+      warnLegacy('PUT');
+      ({ error } = await supabaseAdmin().from('conversations').upsert(legacyRow));
+    }
 
     if (error) {
       console.error('PUT conversation error:', error);
@@ -163,7 +217,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const rows = list
+  const legacyRows = list
     .filter(
       (c: any) =>
         c && typeof c.id === 'string' && Array.isArray(c.messages)
@@ -178,9 +232,18 @@ export async function POST(req: NextRequest) {
       ),
       messages: sanitizeMessages(c.messages),
       memory: sanitizeMemory(c.memory ?? EMPTY_MEMORY),
+      updated_at: Number(c.updatedAt) || Date.now(),
+    }));
+  const rows = list
+    .filter(
+      (c: any) =>
+        c && typeof c.id === 'string' && Array.isArray(c.messages)
+    )
+    .slice(0, MAX_BULK_CONVOS)
+    .map((c: any, i: number) => ({
+      ...legacyRows[i],
       kind: asKind(c.kind),
       map: sanitizeMap(c.map ?? EMPTY_MAP),
-      updated_at: Number(c.updatedAt) || Date.now(),
     }));
 
   if (rows.length === 0) {
@@ -188,7 +251,11 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { error } = await supabaseAdmin().from('conversations').upsert(rows);
+    let { error } = await supabaseAdmin().from('conversations').upsert(rows);
+    if (error && missingColumn(error)) {
+      warnLegacy('POST');
+      ({ error } = await supabaseAdmin().from('conversations').upsert(legacyRows));
+    }
     if (error) {
       console.error('POST conversations error:', error);
       return NextResponse.json(
