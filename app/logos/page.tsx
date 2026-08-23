@@ -98,6 +98,9 @@ export default function LogosPage() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [hydrating, setHydrating] = useState(true);
   const [railOpen, setRailOpen] = useState(true);
+  // On a phone there is room for one surface at a time: the conversation by
+  // default, the map when asked. Desktop ignores this entirely.
+  const [mobileView, setMobileView] = useState<'chat' | 'map'>('chat');
   // Depth: how deeply Logos helps you think (global). Answer Guard: which
   // learning sessions the person has chosen to reveal the solution for.
   const [depth, setDepth] = useState<ThinkingDepth>('balanced');
@@ -281,6 +284,13 @@ export default function LogosPage() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages.length, streaming]);
 
+  // On mobile the rail is an overlay, so it must not start open across the
+  // whole screen. One check at mount; resizing a desktop window later is a
+  // choice the person can manage with the toggle.
+  useEffect(() => {
+    if (window.innerWidth <= 900) setRailOpen(false);
+  }, []);
+
   useEffect(() => {
     try {
       if (localStorage.getItem(KEY_STORAGE) === '1') setUnlocked(true);
@@ -425,6 +435,12 @@ export default function LogosPage() {
   async function takeOne(typed: string): Promise<boolean> {
     if (typed) {
       if (!isValidOneKey(typed)) return false;
+      // One code, whole product: the same key also opens the Core 3 / Logos
+      // access gate, so nobody unlocks One and then hits a second door.
+      setUnlocked(true);
+      try {
+        localStorage.setItem(KEY_STORAGE, '1');
+      } catch {}
       // Redeem through the server too: signed in, the grant is written to the
       // account and follows them to their next device. Fire-and-forget — the
       // local unlock works either way, and syncPlan reconciles later.
@@ -631,7 +647,8 @@ export default function LogosPage() {
   }
 
   function submitKey() {
-    if (!isValidAccessKey(keyInput.trim())) {
+    const typed = keyInput.trim();
+    if (!isValidAccessKey(typed)) {
       setKeyError(true);
       return;
     }
@@ -640,6 +657,9 @@ export default function LogosPage() {
     try {
       localStorage.setItem(KEY_STORAGE, '1');
     } catch {}
+    // The One code is a master key — at this gate it opens everything at
+    // once, and a signed-in redemption is written to the account.
+    if (isValidOneKey(typed)) void takeOne(typed);
   }
 
   // ── map ────────────────────────────────────────────────────────────
@@ -1144,7 +1164,9 @@ export default function LogosPage() {
         </div>
       )}
       <div
-        className={`lg-split${railOpen ? '' : ' rail-closed'}${draftOpen ? ' draft-open' : ''}`}
+        className={`lg-split${railOpen ? '' : ' rail-closed'}${draftOpen ? ' draft-open' : ''}${
+          mobileView === 'map' ? ' mv-map' : ''
+        }`}
       >
         <LogosRail
           sessions={sessions}
@@ -1161,6 +1183,18 @@ export default function LogosPage() {
         {/* ── Conversation ───────────────────────────────── */}
         <section className="lg-convo" aria-label="Conversation">
           <header className="lg-head">
+            {/* mobile: the rail lives behind this; on desktop the rail has
+                its own toggle and this button does not exist */}
+            <button
+              type="button"
+              className="lg-mrail"
+              onClick={() => setRailOpen(true)}
+              aria-label="Your lines of thinking"
+            >
+              <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+                <path d="M4 7h16M4 12h16M4 17h10" />
+              </svg>
+            </button>
             <span className="lg-word">
               <LogosMark size={26} />
               <span className="lg-sr">Logos</span>
@@ -1566,6 +1600,33 @@ export default function LogosPage() {
             />
           </div>
         )}
+
+        {/* mobile: the rail overlays; tapping the dimmed page puts it away.
+            These live at the split level so hiding one surface (chat or map)
+            never hides the controls that swap them. */}
+        {railOpen && (
+          <div className="lg-mscrim" onClick={() => setRailOpen(false)} aria-hidden="true" />
+        )}
+        <div className="lg-mswitch" role="tablist" aria-label="View">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mobileView === 'chat'}
+            className={`lg-mswitch-btn${mobileView === 'chat' ? ' is-on' : ''}`}
+            onClick={() => setMobileView('chat')}
+          >
+            Conversation
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mobileView === 'map'}
+            className={`lg-mswitch-btn${mobileView === 'map' ? ' is-on' : ''}`}
+            onClick={() => setMobileView('map')}
+          >
+            Map
+          </button>
+        </div>
       </div>
     </div>
   );

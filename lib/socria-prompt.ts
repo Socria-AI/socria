@@ -1259,9 +1259,15 @@ export const SOCRIA_MODELS: Record<SocriaModel, ModelConfig> = {
 // sent to the gated API routes via the `x-socria-key` header so the server
 // can honor it. Kept deliberately simple — this is a soft gate, not a secret.
 export const CORE3_ACCESS_KEY = 'SMART';
+// The Socria One code is a master key: anywhere a key is asked for, it
+// opens that gate too (and the client handlers that accept it also switch
+// One on, so one code typed once unlocks the whole product).
+const MASTER_KEY = 'MAVERICKS26LONGHORNS27';
 
 export function isValidAccessKey(key: unknown): boolean {
-  return typeof key === 'string' && key.trim() === CORE3_ACCESS_KEY;
+  if (typeof key !== 'string') return false;
+  const k = key.trim();
+  return k === CORE3_ACCESS_KEY || k.toUpperCase() === MASTER_KEY;
 }
 
 // ===== AI history import =====

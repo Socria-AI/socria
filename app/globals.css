@@ -2816,12 +2816,84 @@ html.js-anim .scrolly-root .fade.d3 { transition-delay: .3s; }
 @media (max-width: 1180px) {
   .logos-root .lg-split { grid-template-columns: 200px minmax(320px, 1fr) 1.05fr; }
 }
+/* ── mobile: one surface at a time ─────────────────────────────────
+   A phone can hold the conversation OR the map well, never both halved.
+   The conversation is the default; a fixed switcher swaps the map in; the
+   rail becomes a slide-over drawer behind a hamburger; the draft, when
+   open, takes the whole screen. Desktop reads none of this. */
 @media (max-width: 900px) {
   .logos-root .lg-split,
-  .logos-root .lg-split.rail-closed {
+  .logos-root .lg-split.rail-closed,
+  .logos-root .lg-split.draft-open,
+  .logos-root .lg-split.draft-open.rail-closed {
     grid-template-columns: 1fr;
-    grid-template-rows: auto 1fr 1fr;
+    grid-template-rows: 1fr;
   }
+
+  /* the rail: a drawer over the page, not a row above it */
+  .logos-root .lg-rail {
+    position: fixed; z-index: 70;
+    left: 0; top: 0; bottom: 0;
+    width: min(320px, 86vw);
+    border-right: 1px solid var(--lg-line);
+    background: var(--lg-panel);
+    box-shadow: 0 0 60px rgba(35,36,31,0.25);
+    transform: translateX(0);
+    transition: transform 0.28s cubic-bezier(0.16,1,0.3,1);
+  }
+  .logos-root .lg-split.rail-closed .lg-rail { transform: translateX(-105%); box-shadow: none; }
+  /* rail-closed on desktop shrinks the rail to a sliver; the drawer needs
+     its full contents whenever it slides in */
+  .logos-root .lg-mscrim {
+    position: fixed; inset: 0; z-index: 69;
+    background: rgba(35,36,31,0.32);
+    animation: lgFade 0.25s ease both;
+  }
+
+  /* one surface at a time */
+  .logos-root .lg-split .lg-panel { display: none; }
+  .logos-root .lg-split.mv-map .lg-panel { display: flex; min-height: 0; }
+  .logos-root .lg-split.mv-map .lg-convo { display: none; }
+  /* the draft, when open, IS the screen */
+  .logos-root .lg-split.draft-open .lg-convo,
+  .logos-root .lg-split.draft-open .lg-panel { display: none; }
+
+  /* the switcher: a floating pill where a thumb already is */
+  .logos-root .lg-mswitch {
+    position: fixed; z-index: 60;
+    left: 50%; transform: translateX(-50%);
+    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    display: inline-flex; gap: 2px; padding: 3px;
+    border: 1px solid var(--lg-line); border-radius: 999px;
+    background: rgba(250,248,242,0.94);
+    box-shadow: 0 10px 30px -12px rgba(35,36,31,0.35);
+    backdrop-filter: blur(6px);
+  }
+  .logos-root .lg-mswitch-btn {
+    padding: 7px 16px; border: none; border-radius: 999px;
+    background: transparent; font: inherit; font-size: 12.5px;
+    color: var(--lg-ink-60); cursor: pointer;
+  }
+  .logos-root .lg-mswitch-btn.is-on { background: var(--lg-primary); color: var(--lg-paper); }
+  /* the draft on top means the switcher steps aside */
+  .logos-root .lg-split.draft-open .lg-mswitch { display: none; }
+
+  /* head: the hamburger appears, the subtitle and back-link make room */
+  .logos-root .lg-mrail {
+    display: grid; place-items: center;
+    width: 32px; height: 32px; flex: 0 0 auto;
+    border: none; background: transparent; color: var(--lg-ink-60);
+    cursor: pointer; padding: 0;
+  }
+  .logos-root .lg-head-note, .logos-root .lg-back { display: none; }
+
+  /* breathing room follows the phone, and the composer clears the switcher */
+  .logos-root .lg-guard { margin: 0 14px; }
+  .logos-root .lg-tools { margin: 0 14px; padding-bottom: 56px; }
+  .logos-root .lg-one-note { margin: 0 14px 10px; }
+}
+@media (min-width: 901px) {
+  .logos-root .lg-mrail, .logos-root .lg-mswitch, .logos-root .lg-mscrim { display: none; }
 }
 
 /* ---------- rail: every line of thinking, with its map ---------- */

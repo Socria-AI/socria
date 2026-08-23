@@ -12,6 +12,7 @@ import {
 } from '@clerk/nextjs';
 import { Logo } from '@/components/Logo';
 import { ModelPicker } from '@/components/ModelPicker';
+import { isValidOneKey } from '@/lib/socria-one';
 import { DepthPicker } from '@/components/DepthPicker';
 import { TryCore3Pill } from '@/components/TryCore3Pill';
 import { Core3IntroModal } from '@/components/Core3IntroModal';
@@ -46,6 +47,7 @@ import {
   EMPTY_MEMORY,
   CORE3_ACCESS_KEY,
   isValidAccessKey,
+
   type SocriaModel,
   type ThinkingDepth,
   sanitizeUserUnderstanding,
@@ -459,11 +461,22 @@ export default function ChatPage() {
   }
 
   // Validate + persist a typed access key. Returns true when accepted.
+  // The Socria One code is a master key: typed here, it unlocks Core 3 AND
+  // switches One on (Logos reads the same storage), and a signed-in
+  // redemption is written to the account so it follows them.
   function handleUnlockKey(key: string): boolean {
     if (!isValidAccessKey(key)) return false;
     setSmartUnlocked(true);
     try {
       localStorage.setItem(SMART_KEY_STORAGE, '1');
+      if (isValidOneKey(key)) {
+        localStorage.setItem('socria.one.v1', '1');
+        void fetch('/api/logos/redeem', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: key }),
+        }).catch(() => {});
+      }
     } catch {}
     return true;
   }
