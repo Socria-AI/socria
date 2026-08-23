@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { isValidOneKey } from '@/lib/socria-one';
 import { grantComplimentary } from '@/lib/subscriptions';
+import { writeAccountGrant } from '@/lib/socria-one-grant';
 import { enforceRateLimit } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
@@ -30,13 +31,22 @@ export async function POST(req: NextRequest) {
 
   let account = false;
   if (userId) {
+    // Clerk is the store that always exists — if they could sign in to
+    // redeem, this write can land. It is what resolvePlanForRequest reads.
+    try {
+      await writeAccountGrant(userId);
+      account = true;
+    } catch (e) {
+      console.error('redeem: could not write Clerk grant', e);
+    }
+    // The subscriptions row is best-effort enrichment: when the database has
+    // been migrated it lets billing-side logic see the comp too. Its absence
+    // never fails a redemption.
     try {
       await grantComplimentary(userId);
       account = true;
-    } catch (e) {
-      // Supabase down or unconfigured: the code still works locally; say so
-      // honestly rather than failing the redemption outright.
-      console.error('redeem: could not persist grant', e);
+    } catch {
+      // Supabase down or unmigrated — the Clerk grant above already holds.
     }
   }
   return NextResponse.json({ ok: true, account });

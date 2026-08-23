@@ -14,12 +14,17 @@
 import type { NextRequest } from 'next/server';
 import { isValidOneKey, type Plan } from './socria-one';
 import { isSubscribed } from './subscriptions';
+import { hasAccountGrant } from './socria-one-grant';
 
 export async function resolvePlanForRequest(
   req: NextRequest,
   userId: string | null
 ): Promise<Plan> {
   if (await isSubscribed(userId)) return 'one';
+
+  // A redeemed access code, written to the Clerk account — works on every
+  // deployment login works on, migrated database or not.
+  if (userId && (await hasAccountGrant(userId))) return 'one';
 
   const allow = (process.env.SOCRIA_ONE_USER_IDS || '')
     .split(',')
