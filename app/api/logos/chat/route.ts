@@ -18,6 +18,7 @@ import {
 import { renderMessageForModel, sanitizeAttachments } from '@/lib/logos-attachments';
 import { renderContextsForNode, sanitizeNodeContextList } from '@/lib/logos-sources';
 import { guidanceBlock, resolveDepth, resolveGuard } from '@/lib/logos-guidance';
+import { styleBlock } from '@/lib/logos-style';
 import { isValidAccessKey } from '@/lib/socria-prompt';
 import { enforceRateLimit } from '@/lib/rate-limit';
 
@@ -112,7 +113,11 @@ export async function POST(req: NextRequest) {
     // Depth (how deeply to help them think) + the Answer Guard (learning math:
     // hints, not answers). The guard is the same one every surface honours.
     const guided =
-      system + guidanceBlock(resolveDepth(body?.depth), resolveGuard(body?.guard), 'chat');
+      system +
+      guidanceBlock(resolveDepth(body?.depth), resolveGuard(body?.guard), 'chat') +
+      // Their custom instructions, last: the protected blocks above read
+      // first, and the style block subordinates itself to them explicitly.
+      styleBlock(body?.style);
 
     const openai = new OpenAI({ apiKey });
     const configured = process.env.OPENAI_MODEL_LOGOS || LOGOS_MODEL;
@@ -122,7 +127,9 @@ export async function POST(req: NextRequest) {
         model,
         messages: [{ role: 'system', content: guided }, ...clean],
         temperature: 0.7,
-        max_tokens: 300,
+        // Short is the prompt's default; the ceiling leaves room for the
+        // people whose custom instructions ask for more than four sentences.
+        max_tokens: 640,
         stream: true,
       });
 

@@ -28,11 +28,15 @@ export function depthLabel(depth: ThinkingDepth): string {
 
 // Depth, in the Logos register. The load-bearing line is the last one: depth
 // changes how far the THINKING goes, never how readily an answer is revealed.
+// Depth sets how FAR the thinking goes — deliberately silent on the shape of
+// a reply (reflect, ask, notice, challenge…), which the chat prompt owns.
+// An earlier version of Balanced said "reflect, then ask the one question"
+// and quietly re-imposed the exact formula the conversation design bans.
 const DEPTH_CONTRACT: Record<ThinkingDepth, string> = {
   quick:
-    'DEPTH — Quick: minimal friction, highly targeted. Get to the single most useful thing and stop. One tight reflection or hint, not a tour. This is about brevity of help, not speed of answers.',
+    'DEPTH — Quick: minimal friction, highly targeted. Get to the single most useful thing and stop. One tight move, not a tour. This is about brevity of help, not speed of answers.',
   balanced:
-    'DEPTH — Balanced: the natural default. Reflect on what matters, ask the one question that opens the thinking, keep it conversational. Go deeper only where the thinking actually leads.',
+    'DEPTH — Balanced: the natural default. Engage with what matters most and keep it conversational. Go deeper only where the thinking actually leads.',
   deep:
     'DEPTH — Deep: work the reasoning thoroughly. Surface dependencies, assumptions, the structure underneath. Name distinctions precisely. More detail is welcome here — on the THINKING, still not on the answer.',
   abstract:
@@ -66,7 +70,7 @@ export const ANSWER_GUARD = `
 Behave like an excellent lab instructor or TA sitting beside them, NOT a solution engine. The goal is never to withhold artificially — it is to give exactly enough help to keep them moving, and no more.
 
 Use PROGRESSIVE ASSISTANCE. Start at the lowest rung that could unblock them and climb only if they're still stuck:
-  1. Observe — reflect back what they actually tried, so they feel seen.
+  1. Observe — name the specific step they actually tried, so they feel seen. (This is a deliberate move, not the reflexive paraphrase the conversation design bans.)
   2. Nudge — point their attention somewhere useful ("look at that second term again").
   3. Concept hint — recall the relevant idea or rule, without applying it for them.
   4. Specific hint — narrow the next move to one option.

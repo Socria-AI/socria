@@ -38,6 +38,7 @@ import {
   type ThinkingDepth,
 } from '@/lib/socria-prompt';
 import type { GuardSignal } from '@/lib/logos-guidance';
+import { MAX_STYLE } from '@/lib/logos-style';
 import { ContextPanel } from '@/components/ContextPanel';
 import { ConnectionsModal } from '@/components/ConnectionsModal';
 import type { Attachment, AttachmentOrigin } from '@/lib/logos-attachments';
@@ -71,6 +72,10 @@ const DEPTH_KEY = 'socria.depth.v1';
 // Same store the Core chat reads, so picking a model here lands there.
 const MODEL_KEY = 'socria.model.v1';
 const REVEALED_KEY = 'socria.logos.revealed.v1';
+// Custom instructions — how Socria should work with this person. The key is
+// product-wide by design so other surfaces can adopt it; today Logos is the
+// one that reads it.
+const STYLE_KEY = 'socria.style.v1';
 // Socria One, held client-side the way the Core 3 key already is. The routes
 // re-decide this for themselves; nothing here is the authority.
 const ONE_KEY_STORAGE = 'socria.one.v1';
@@ -101,6 +106,10 @@ export default function LogosPage() {
   // On a phone there is room for one surface at a time: the conversation by
   // default, the map when asked. Desktop ignores this entirely.
   const [mobileView, setMobileView] = useState<'chat' | 'map'>('chat');
+  // "How should Socria work with you?" — their standing instructions.
+  const [styleText, setStyleText] = useState('');
+  const [styleOpen, setStyleOpen] = useState(false);
+  const [styleDraftText, setStyleDraftText] = useState('');
   // Depth: how deeply Logos helps you think (global). Answer Guard: which
   // learning sessions the person has chosen to reveal the solution for.
   const [depth, setDepth] = useState<ThinkingDepth>('balanced');
@@ -233,8 +242,33 @@ export default function LogosPage() {
   depthRef.current = depth;
   const guardRef = useRef<GuardSignal>('');
   guardRef.current = guard;
-  /** the two fields every Logos generation request carries */
-  const guidance = () => ({ depth: depthRef.current, guard: guardRef.current });
+  const styleRef = useRef('');
+  styleRef.current = styleText;
+  /** the fields every Logos generation request carries */
+  const guidance = () => ({
+    depth: depthRef.current,
+    guard: guardRef.current,
+    style: styleRef.current,
+  });
+
+  useEffect(() => {
+    if (!styleOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setStyleOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [styleOpen]);
+
+  function saveStyle() {
+    const next = styleDraftText.trim();
+    setStyleText(next);
+    setStyleOpen(false);
+    try {
+      if (next) localStorage.setItem(STYLE_KEY, next);
+      else localStorage.removeItem(STYLE_KEY);
+    } catch {}
+  }
 
   function pickDepth(next: ThinkingDepth) {
     // Free thinking happens at Balanced; the other registers are One's. The
@@ -299,6 +333,8 @@ export default function LogosPage() {
       const rev = JSON.parse(localStorage.getItem(REVEALED_KEY) || '[]');
       if (Array.isArray(rev)) setRevealedIds(new Set(rev.filter((x) => typeof x === 'string')));
       if (localStorage.getItem(ONE_KEY_STORAGE) === '1') setPlan('one');
+      const st = localStorage.getItem(STYLE_KEY);
+      if (typeof st === 'string' && st.trim()) setStyleText(st);
       const spent = JSON.parse(localStorage.getItem(RESEARCH_KEY) || '{}');
       if (spent && typeof spent === 'object') setResearchUsed(spent);
     } catch {}
@@ -1143,6 +1179,56 @@ export default function LogosPage() {
   return (
     <div className="logos-root">
       <LogosGuide open={guideOpen} onClose={closeGuide} />
+      {styleOpen && (
+        <div className="lg-style-scrim" role="dialog" aria-modal="true" aria-label="How should Socria work with you?">
+          <div className="lg-style-back" onClick={() => setStyleOpen(false)} aria-hidden="true" />
+          <div className="lg-style-sheet">
+            <h2 className="lg-style-title">How should Socria work with you?</h2>
+            <p className="lg-style-sub">
+              In your own words. Tone, directness, how many questions, how hard to
+              challenge, how to explain — whatever makes it yours.
+            </p>
+            <textarea
+              className="lg-style-input"
+              value={styleDraftText}
+              onChange={(e) => setStyleDraftText(e.target.value)}
+              maxLength={MAX_STYLE}
+              rows={6}
+              placeholder={
+                'Talk casually with me. Keep responses concise.\nChallenge my assumptions more, and ask fewer questions.\nFor math, act like a lab instructor.'
+              }
+            />
+            <p className="lg-style-tip">
+              For one conversation, just ask in the chat — &ldquo;be more
+              casual&rdquo;, &ldquo;fewer questions&rdquo; — and Socria adapts on
+              the spot. What you write here is remembered.
+            </p>
+            <p className="lg-style-note">
+              This shapes Socria&rsquo;s personality, not its principles — your
+              thinking, your authorship and the learning guard stay yours on
+              every setting.
+            </p>
+            <div className="lg-style-row">
+              <button type="button" className="lg-style-save" onClick={saveStyle}>
+                Save
+              </button>
+              {styleDraftText.trim() && (
+                <button
+                  type="button"
+                  className="lg-style-clear"
+                  onClick={() => setStyleDraftText('')}
+                >
+                  Clear
+                </button>
+              )}
+              <button type="button" className="lg-style-cancel" onClick={() => setStyleOpen(false)}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <SocriaOneModal
         open={oneOpen}
         onClose={() => setOneOpen(false)}
@@ -1208,6 +1294,22 @@ export default function LogosPage() {
               title="What Logos does"
             >
               ?
+            </button>
+            <button
+              type="button"
+              className="lg-style-open"
+              onClick={() => {
+                setStyleDraftText(styleText);
+                setStyleOpen(true);
+              }}
+              aria-label="How should Socria work with you?"
+              title="How should Socria work with you?"
+            >
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true">
+                <path d="M4 7h9M17 7h3M4 17h3M11 17h9" />
+                <circle cx="15" cy="7" r="2.2" />
+                <circle cx="9" cy="17" r="2.2" />
+              </svg>
             </button>
             <button
               type="button"
