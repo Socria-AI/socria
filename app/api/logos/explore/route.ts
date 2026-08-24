@@ -19,6 +19,7 @@ import { renderMessageForModel, sanitizeAttachments } from '@/lib/logos-attachme
 import { renderContextsForNode, sanitizeNodeContextList } from '@/lib/logos-sources';
 import { guidanceBlock, resolveDepth, resolveGuard } from '@/lib/logos-guidance';
 import { styleBlock } from '@/lib/logos-style';
+import { personalityBlock } from '@/lib/logos-personality';
 import { isValidAccessKey } from '@/lib/socria-prompt';
 import { FREE_LIMITS, depthForPlan } from '@/lib/socria-one';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
@@ -195,6 +196,7 @@ export async function POST(req: NextRequest) {
         resolveGuard(body?.guard),
         'surface'
       ) +
+      personalityBlock(body?.persona) +
       styleBlock(body?.style);
     const composed = await complete(guided, 'Compose the panel.', 700);
     const parsed = JSON.parse(composed.choices?.[0]?.message?.content || '{}');

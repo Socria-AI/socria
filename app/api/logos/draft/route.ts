@@ -19,6 +19,7 @@ import {
 } from '@/lib/logos-draft';
 import { guidanceBlock, resolveDepth, resolveGuard } from '@/lib/logos-guidance';
 import { styleBlock } from '@/lib/logos-style';
+import { personalityBlock } from '@/lib/logos-personality';
 import { buildQueryPrompt, runSearch } from '@/lib/logos-explore';
 import { isValidAccessKey } from '@/lib/socria-prompt';
 import { enforceRateLimit } from '@/lib/rate-limit';
@@ -104,6 +105,7 @@ export async function POST(req: NextRequest) {
 
     const guide =
       guidanceBlock(resolveDepth(body?.depth), resolveGuard(body?.guard), 'surface') +
+      personalityBlock(body?.persona) +
       styleBlock(body?.style);
     const composed = await complete(
       buildDraftPrompt(action, selection, around, map, search.results) + guide,

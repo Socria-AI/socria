@@ -19,6 +19,7 @@ import { renderMessageForModel, sanitizeAttachments } from '@/lib/logos-attachme
 import { renderContextsForNode, sanitizeNodeContextList } from '@/lib/logos-sources';
 import { guidanceBlock, resolveDepth, resolveGuard } from '@/lib/logos-guidance';
 import { styleBlock } from '@/lib/logos-style';
+import { personalityBlock } from '@/lib/logos-personality';
 import { isValidAccessKey } from '@/lib/socria-prompt';
 import { enforceRateLimit } from '@/lib/rate-limit';
 
@@ -115,8 +116,10 @@ export async function POST(req: NextRequest) {
     const guided =
       system +
       guidanceBlock(resolveDepth(body?.depth), resolveGuard(body?.guard), 'chat') +
-      // Their custom instructions, last: the protected blocks above read
-      // first, and the style block subordinates itself to them explicitly.
+      // The hierarchy, in reading order: protected principles and depth
+      // (above), then their personality settings, then their free-text
+      // instructions — each block subordinating itself to what came before.
+      personalityBlock(body?.persona) +
       styleBlock(body?.style);
 
     const openai = new OpenAI({ apiKey });

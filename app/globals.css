@@ -5796,3 +5796,41 @@ html.js-anim .scrolly-root .fade.d3 { transition-delay: .3s; }
 }
 .logos-root .lg-style-clear:hover, .logos-root .lg-style-cancel:hover { color: var(--lg-ink); }
 .logos-root .lg-style-cancel { margin-left: auto; }
+
+/* ── Socria Personality controls ─────────────────────────────────── */
+.logos-root .lg-persona-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px;
+  margin-top: 16px;
+}
+@media (max-width: 560px) { .logos-root .lg-persona-grid { grid-template-columns: 1fr; } }
+.logos-root .lg-persona-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.logos-root .lg-persona-label {
+  font-size: 10.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--lg-ink-40);
+}
+.logos-root .lg-persona-select {
+  width: 100%; padding: 7px 10px;
+  border: 1px solid var(--lg-line); border-radius: 9px;
+  background: #fff; font: inherit; font-size: 13px; color: var(--lg-ink);
+  cursor: pointer;
+}
+.logos-root .lg-persona-select:focus { outline: none; border-color: rgba(53,70,32,0.4); }
+.logos-root .lg-persona-reset {
+  margin-top: 10px; padding: 0; border: none; background: transparent;
+  font: inherit; font-size: 12px; font-style: italic;
+  color: var(--lg-ink-40); cursor: pointer;
+}
+.logos-root .lg-persona-reset:hover { color: var(--lg-primary); }
+.logos-root .lg-style-title2 {
+  margin: 22px 0 0; padding-top: 18px; border-top: 1px solid var(--lg-line);
+  font-family: var(--font-serif), 'Instrument Serif', Georgia, serif;
+  font-size: 18px; font-weight: 400; color: var(--lg-ink);
+}
+/* the "chat updated your instructions" note borrows the boundary bar, in green */
+.logos-root .lg-style-note-bar { border-color: var(--lg-line); background: rgba(53,70,32,0.05); }
+.logos-root .lg-style-note-bar .lg-one-note-text { color: var(--lg-ink-60); }
+.logos-root .lg-style-note-bar .lg-one-note-x { color: var(--lg-ink-60); }
+.logos-root .lg-style-note-link {
+  padding: 0; border: none; background: transparent; font: inherit;
+  color: var(--lg-primary); text-decoration: underline; text-underline-offset: 2px; cursor: pointer;
+}

@@ -39,6 +39,13 @@ import {
 } from '@/lib/socria-prompt';
 import type { GuardSignal } from '@/lib/logos-guidance';
 import { MAX_STYLE } from '@/lib/logos-style';
+import {
+  DEFAULT_PERSONALITY,
+  PERSONALITY_DIMENSIONS,
+  isDefaultPersonality,
+  sanitizePersonality,
+  type Personality,
+} from '@/lib/logos-personality';
 import { ContextPanel } from '@/components/ContextPanel';
 import { ConnectionsModal } from '@/components/ConnectionsModal';
 import type { Attachment, AttachmentOrigin } from '@/lib/logos-attachments';
@@ -76,6 +83,11 @@ const REVEALED_KEY = 'socria.logos.revealed.v1';
 // product-wide by design so other surfaces can adopt it; today Logos is the
 // one that reads it.
 const STYLE_KEY = 'socria.style.v1';
+const PERSONALITY_KEY = 'socria.personality.v1';
+// The chat can update the standing instructions itself: when the person asks
+// Socria to REMEMBER a way of working, the model ends its reply with this
+// machine-read line, which the client strips and applies.
+const REMEMBER_MARK = '[[REMEMBER]]';
 // Socria One, held client-side the way the Core 3 key already is. The routes
 // re-decide this for themselves; nothing here is the authority.
 const ONE_KEY_STORAGE = 'socria.one.v1';
@@ -110,6 +122,11 @@ export default function LogosPage() {
   const [styleText, setStyleText] = useState('');
   const [styleOpen, setStyleOpen] = useState(false);
   const [styleDraftText, setStyleDraftText] = useState('');
+  // Socria Personality — the structured registers, above the free text.
+  const [persona, setPersona] = useState<Personality>(DEFAULT_PERSONALITY);
+  const [personaDraft, setPersonaDraft] = useState<Personality>(DEFAULT_PERSONALITY);
+  // A quiet line under the composer when the chat updated the instructions.
+  const [styleUpdatedNote, setStyleUpdatedNote] = useState(false);
   // Depth: how deeply Logos helps you think (global). Answer Guard: which
   // learning sessions the person has chosen to reveal the solution for.
   const [depth, setDepth] = useState<ThinkingDepth>('balanced');
@@ -244,12 +261,39 @@ export default function LogosPage() {
   guardRef.current = guard;
   const styleRef = useRef('');
   styleRef.current = styleText;
+  const personaRef = useRef<Personality>(DEFAULT_PERSONALITY);
+  personaRef.current = persona;
   /** the fields every Logos generation request carries */
   const guidance = () => ({
     depth: depthRef.current,
     guard: guardRef.current,
     style: styleRef.current,
+    persona: personaRef.current,
   });
+
+  /**
+   * A streamed reply may end with the REMEMBER line — the model updating the
+   * standing instructions because the person asked it to. Strip it from what
+   * they see and apply it, exactly as if they had typed it in the settings.
+   */
+  function absorbRemember(reply: string): string {
+    const at = reply.lastIndexOf(REMEMBER_MARK);
+    if (at === -1) return reply;
+    const next = reply.slice(at + REMEMBER_MARK.length).trim().slice(0, MAX_STYLE);
+    setStyleText(next);
+    try {
+      if (next) localStorage.setItem(STYLE_KEY, next);
+      else localStorage.removeItem(STYLE_KEY);
+    } catch {}
+    setStyleUpdatedNote(true);
+    return reply.slice(0, at).trimEnd();
+  }
+
+  /** What the person should see of a still-streaming reply. */
+  const visibleStream = (acc: string) => {
+    const at = acc.indexOf(REMEMBER_MARK);
+    return at === -1 ? acc : acc.slice(0, at).trimEnd();
+  };
 
   useEffect(() => {
     if (!styleOpen) return;
@@ -263,10 +307,14 @@ export default function LogosPage() {
   function saveStyle() {
     const next = styleDraftText.trim();
     setStyleText(next);
+    setPersona(personaDraft);
     setStyleOpen(false);
+    setStyleUpdatedNote(false);
     try {
       if (next) localStorage.setItem(STYLE_KEY, next);
       else localStorage.removeItem(STYLE_KEY);
+      if (isDefaultPersonality(personaDraft)) localStorage.removeItem(PERSONALITY_KEY);
+      else localStorage.setItem(PERSONALITY_KEY, JSON.stringify(personaDraft));
     } catch {}
   }
 
@@ -335,6 +383,8 @@ export default function LogosPage() {
       if (localStorage.getItem(ONE_KEY_STORAGE) === '1') setPlan('one');
       const st = localStorage.getItem(STYLE_KEY);
       if (typeof st === 'string' && st.trim()) setStyleText(st);
+      const pr = sanitizePersonality(JSON.parse(localStorage.getItem(PERSONALITY_KEY) || '{}'));
+      setPersona(pr);
       const spent = JSON.parse(localStorage.getItem(RESEARCH_KEY) || '{}');
       if (spent && typeof spent === 'object') setResearchUsed(spent);
     } catch {}
@@ -1009,9 +1059,10 @@ export default function LogosPage() {
           const { done, value } = await reader.read();
           if (done) break;
           acc += decoder.decode(value, { stream: true });
-          setFocusStream(acc);
+          setFocusStream(visibleStream(acc));
         }
       }
+      acc = absorbRemember(acc);
       setFocusStream('');
       setThreads((t) => ({ ...t, [key]: [...nextThread, { role: 'assistant', content: acc }] }));
       chronRef.current = [...chronRef.current, { role: 'assistant', content: acc }];
@@ -1094,9 +1145,10 @@ export default function LogosPage() {
           const { done, value } = await reader.read();
           if (done) break;
           acc += decoder.decode(value, { stream: true });
-          setStreaming(acc);
+          setStreaming(visibleStream(acc));
         }
       }
+      acc = absorbRemember(acc);
       setStreaming('');
       patchActive((s) => ({ ...s, messages: [...next, { role: 'assistant', content: acc }] }));
       chronRef.current = [...chronRef.current, { role: 'assistant', content: acc }];
@@ -1183,10 +1235,47 @@ export default function LogosPage() {
         <div className="lg-style-scrim" role="dialog" aria-modal="true" aria-label="How should Socria work with you?">
           <div className="lg-style-back" onClick={() => setStyleOpen(false)} aria-hidden="true" />
           <div className="lg-style-sheet">
-            <h2 className="lg-style-title">How should Socria work with you?</h2>
+            <h2 className="lg-style-title">Socria Personality</h2>
             <p className="lg-style-sub">
-              In your own words. Tone, directness, how many questions, how hard to
-              challenge, how to explain — whatever makes it yours.
+              How Socria communicates while it thinks with you. Depth stays
+              separate — it decides how far the thinking goes; this decides how
+              it sounds on the way.
+            </p>
+
+            <div className="lg-persona-grid">
+              {PERSONALITY_DIMENSIONS.map((d) => (
+                <label key={d.id} className="lg-persona-field">
+                  <span className="lg-persona-label">{d.label}</span>
+                  <select
+                    className="lg-persona-select"
+                    value={personaDraft[d.id] ?? d.options[0].id}
+                    onChange={(e) =>
+                      setPersonaDraft((prev) => ({ ...prev, [d.id]: e.target.value }))
+                    }
+                  >
+                    {d.options.map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ))}
+            </div>
+            {!isDefaultPersonality(personaDraft) && (
+              <button
+                type="button"
+                className="lg-persona-reset"
+                onClick={() => setPersonaDraft(DEFAULT_PERSONALITY)}
+              >
+                Reset to Socria defaults
+              </button>
+            )}
+
+            <h3 className="lg-style-title2">How should Socria work with you?</h3>
+            <p className="lg-style-sub">
+              In your own words, layered over the settings above — whatever they
+              don&rsquo;t say.
             </p>
             <textarea
               className="lg-style-input"
@@ -1201,7 +1290,8 @@ export default function LogosPage() {
             <p className="lg-style-tip">
               For one conversation, just ask in the chat — &ldquo;be more
               casual&rdquo;, &ldquo;fewer questions&rdquo; — and Socria adapts on
-              the spot. What you write here is remembered.
+              the spot. Say &ldquo;remember this&rdquo; and it updates these
+              instructions itself; what&rsquo;s written here is remembered.
             </p>
             <p className="lg-style-note">
               This shapes Socria&rsquo;s personality, not its principles — your
@@ -1300,6 +1390,7 @@ export default function LogosPage() {
               className="lg-style-open"
               onClick={() => {
                 setStyleDraftText(styleText);
+                setPersonaDraft(persona);
                 setStyleOpen(true);
               }}
               aria-label="How should Socria work with you?"
@@ -1448,6 +1539,37 @@ export default function LogosPage() {
                 type="button"
                 className="lg-one-note-x"
                 onClick={() => setOneWelcome(false)}
+                aria-label="Dismiss"
+              >
+                ×
+              </button>
+            </div>
+          )}
+
+          {/* The chat just updated the standing instructions on their ask. */}
+          {styleUpdatedNote && (
+            <div className="lg-one-note lg-style-note-bar" role="status">
+              <span className="lg-one-note-text">
+                <b>Noted.</b> Socria updated how it works with you — see it under
+                the{' '}
+                <button
+                  type="button"
+                  className="lg-style-note-link"
+                  onClick={() => {
+                    setStyleDraftText(styleText);
+                    setPersonaDraft(persona);
+                    setStyleOpen(true);
+                    setStyleUpdatedNote(false);
+                  }}
+                >
+                  personality settings
+                </button>
+                .
+              </span>
+              <button
+                type="button"
+                className="lg-one-note-x"
+                onClick={() => setStyleUpdatedNote(false)}
                 aria-label="Dismiss"
               >
                 ×
