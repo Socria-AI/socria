@@ -128,7 +128,37 @@ async function gGetText(url: string, auth: Auth): Promise<string> {
 
 // ── which sources exist right now ───────────────────────────────────
 
+/**
+ * Are the OAuth-backed sources (Drive, Sheets, Calendar, Gmail, Notion) offered?
+ *
+ * Off by default. Google puts `drive.readonly` and every Gmail read scope in
+ * its RESTRICTED tier, which cannot be published to the public without a paid
+ * third-party security assessment — so while these are on, only emails added
+ * to the Cloud Console test-user list can connect, and their tokens expire
+ * weekly. Rather than gate Socria behind that, the connectors are dormant and
+ * everyone gets the whole product.
+ *
+ * Nothing is deleted: the routes, token store and connectors all still exist.
+ * Set SOCRIA_CONNECTORS=on to bring them back — ideally alongside a move to
+ * `drive.file` (picker-only, needs no verification) and dropping Gmail, which
+ * is what makes public publishing free.
+ *
+ * The web / paste / upload sources are unaffected and always available.
+ */
+export function connectorsEnabled(): boolean {
+  return process.env.SOCRIA_CONNECTORS === 'on';
+}
+
 export async function listSources(auth: Auth): Promise<SourceStatus[]> {
+  // Dormant: offer only what needs no third-party authorization.
+  if (!connectorsEnabled()) {
+    return [
+      { kind: 'web', connected: true },
+      { kind: 'paste', connected: true },
+      { kind: 'upload', connected: true },
+    ];
+  }
+
   const { connectionStatus } = await import('./logos-connections');
   const { providerConfig } = await import('./logos-oauth');
   const status = await connectionStatus(auth.userId);

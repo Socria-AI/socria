@@ -6,7 +6,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { authorizeUrl } from '@/lib/logos-oauth';
 import { connectionsConfigured } from '@/lib/logos-connections';
-import { ConnectError } from '@/lib/logos-connect';
+import { ConnectError, connectorsEnabled } from '@/lib/logos-connect';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -25,6 +25,10 @@ export async function GET(
   const origin = new URL(req.url).origin;
   // Connections are per account, so this genuinely requires a signed-in user;
   // the access key alone has no stable identity to attach a grant to.
+  // Dormant: never send anyone to a consent screen they would be blocked at.
+  if (!connectorsEnabled()) {
+    return back(origin, { connect: 'error', msg: 'Connected sources are turned off for now.' });
+  }
   const { userId } = auth();
   if (!userId) return back(origin, { connect: 'signin' });
   if (provider !== 'google' && provider !== 'notion') {

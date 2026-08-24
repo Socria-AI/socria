@@ -92,6 +92,13 @@ const REMEMBER_MARK = '[[REMEMBER]]';
 // re-decide this for themselves; nothing here is the authority.
 const ONE_KEY_STORAGE = 'socria.one.v1';
 const RESEARCH_KEY = 'socria.logos.research.v1';
+// Connected sources (Drive/Docs/Calendar/Gmail/Notion) are dormant: Google's
+// restricted scopes can't be published publicly without a paid security
+// assessment, so rather than gate Socria behind a test-user list, the door is
+// hidden. The server decides for itself (lib/logos-connect.ts connectorsEnabled);
+// this only governs whether the UI offers it. Set NEXT_PUBLIC_SOCRIA_CONNECTORS=on
+// alongside SOCRIA_CONNECTORS=on to bring it back.
+const CONNECTORS_ON = process.env.NEXT_PUBLIC_SOCRIA_CONNECTORS === 'on';
 
 const STARTERS = [
   'I’m debating whether to build Logos now.',
@@ -459,10 +466,11 @@ export default function LogosPage() {
       setConnBanner('Connection cancelled — nothing was shared.');
     } else if (c === 'signin') {
       setConnBanner('Sign in first, then connect your accounts.');
-      setConnOpen(true);
+      if (CONNECTORS_ON) setConnOpen(true);
     } else if (c === 'error') {
       setConnBanner(params.get('msg') || 'That connection didn’t go through.');
-      setConnOpen(true);
+      // While connectors are dormant a stale link shouldn't open an empty room.
+      if (CONNECTORS_ON) setConnOpen(true);
     }
     // Clean the URL so a refresh doesn't replay the banner.
     try {
@@ -1402,22 +1410,26 @@ export default function LogosPage() {
                 <circle cx="9" cy="17" r="2.2" />
               </svg>
             </button>
-            <button
-              type="button"
-              className="lg-conn-open"
-              onClick={() =>
-                one
-                  ? setConnOpen(true)
-                  : askOne('Socria One reads your own material — Drive, Docs, Notion and pasted work — into the thinking rather than around it.')
-              }
-              aria-label="Connections"
-              title={one ? 'Connect Google, Notion, and more' : 'Connected sources are part of Socria One'}
-            >
-              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M9 11a4 4 0 0 1 0-5l1-1a4 4 0 0 1 6 6l-1 1" />
-                <path d="M15 13a4 4 0 0 1 0 5l-1 1a4 4 0 0 1-6-6l1-1" />
-              </svg>
-            </button>
+            {/* Connected sources are dormant (see connectorsEnabled) — no
+                door to a room that isn't open. */}
+            {CONNECTORS_ON && (
+              <button
+                type="button"
+                className="lg-conn-open"
+                onClick={() =>
+                  one
+                    ? setConnOpen(true)
+                    : askOne('Socria One reads your own material — Drive, Docs, Notion and pasted work — into the thinking rather than around it.')
+                }
+                aria-label="Connections"
+                title={one ? 'Connect Google, Notion, and more' : 'Connected sources are part of Socria One'}
+              >
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M9 11a4 4 0 0 1 0-5l1-1a4 4 0 0 1 6 6l-1 1" />
+                  <path d="M15 13a4 4 0 0 1 0 5l-1 1a4 4 0 0 1-6-6l1-1" />
+                </svg>
+              </button>
+            )}
             {/* Deep ceiling, quiet door. It nudges only once the thinking
                 has actually turned into something worth writing. */}
             <button
