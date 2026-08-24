@@ -64,14 +64,60 @@ function missingColumn(error: { code?: string; message?: string } | null): boole
   return /column .* does not exist|could not find the '.*' column/i.test(error.message ?? '');
 }
 
+// Where the Logos fields go when their columns don't exist yet.
+//
+// `memory` is jsonb and has existed since the first schema, so on an
+// un-migrated database we park kind/map/draft/contexts inside it under this
+// key rather than dropping them. Without this, a Logos session round-trips
+// with no `kind`, comes back as 'chat', and disappears from the Logos rail
+// while cluttering the Core chat list — which reads to the person as
+// "Logos chats aren't saving".
+//
+// Self-healing: once the migration runs, the real columns take precedence and
+// the sidecar is simply ignored (and rehydrated for rows written before it).
+const SIDECAR = '__logos';
+
+interface Sidecar {
+  kind?: unknown;
+  map?: unknown;
+  draft?: unknown;
+  contexts?: unknown;
+}
+
+/** One stored row → the shape the clients expect, whichever schema wrote it. */
+function shape(c: any) {
+  const memory = c.memory ?? EMPTY_MEMORY;
+  const side: Sidecar = (memory && typeof memory === 'object' && memory[SIDECAR]) || {};
+  // Never let the sidecar leak into the memory the Core chat reads.
+  let clean = memory;
+  if (memory && typeof memory === 'object' && SIDECAR in memory) {
+    clean = { ...memory };
+    delete clean[SIDECAR];
+  }
+  return {
+    id: c.id,
+    title: c.title,
+    messages: c.messages,
+    memory: clean ?? EMPTY_MEMORY,
+    // Real column first, sidecar second — so a migrated database wins and a
+    // row written while degraded still comes back whole.
+    kind: asKind(c.kind ?? side.kind),
+    map: c.map ?? side.map ?? EMPTY_MAP,
+    draft: c.draft ?? side.draft ?? null,
+    contexts: c.contexts ?? side.contexts ?? null,
+    updatedAt: Number(c.updated_at),
+  };
+}
+
 let warnedLegacy = false;
 function warnLegacy(op: string) {
   if (warnedLegacy) return;
   warnedLegacy = true;
   console.error(
     `conversations ${op}: this database is missing newer columns (kind/map/draft/contexts). ` +
-      'Running in degraded chat-only mode — Logos maps and drafts are NOT being saved. ' +
-      'Fix: run supabase/schema.sql against this project (SQL Editor or psql); it is idempotent.'
+      'Falling back to storing the Logos fields inside `memory` so nothing is lost — ' +
+      'run supabase/schema.sql against this project (SQL Editor or psql) to restore ' +
+      'proper columns; it is idempotent and the fallback rows rehydrate automatically.'
   );
 }
 
@@ -123,17 +169,7 @@ export async function GET() {
       );
     }
 
-    const conversations = (data || []).map((c: any) => ({
-      id: c.id,
-      title: c.title,
-      messages: c.messages,
-      memory: c.memory ?? EMPTY_MEMORY,
-      kind: asKind(c.kind),
-      map: c.map ?? EMPTY_MAP,
-      draft: c.draft ?? null,
-      contexts: c.contexts ?? null,
-      updatedAt: Number(c.updated_at),
-    }));
+    const conversations = (data || []).map(shape);
     return NextResponse.json({ conversations });
   } catch (e: any) {
     console.error('GET conversations threw:', e);
@@ -162,7 +198,13 @@ export async function PUT(req: NextRequest) {
   }
 
   try {
-    const legacyRow = {
+    const extras = {
+      kind: asKind(c.kind),
+      map: sanitizeMap(c.map ?? EMPTY_MAP),
+      draft: sanitizeDraft(c.draft),
+      contexts: sanitizeContexts(c.contexts),
+    };
+    const base = {
       id: c.id,
       user_id: userId,
       title: c.title.slice(0, MAX_TITLE),
@@ -170,19 +212,17 @@ export async function PUT(req: NextRequest) {
       memory: sanitizeMemory(c.memory ?? EMPTY_MEMORY),
       updated_at: Number(c.updatedAt) || Date.now(),
     };
-    let { error } = await supabaseAdmin().from('conversations').upsert({
-      ...legacyRow,
-      kind: asKind(c.kind),
-      map: sanitizeMap(c.map ?? EMPTY_MAP),
-      draft: sanitizeDraft(c.draft),
-      contexts: sanitizeContexts(c.contexts),
-    });
+    let { error } = await supabaseAdmin()
+      .from('conversations')
+      .upsert({ ...base, ...extras });
 
-    // An old database: save what it can hold. The conversation itself is
-    // never lost; the map/draft columns simply don't exist to write to yet.
+    // An old database: keep the Logos fields in `memory` rather than dropping
+    // them, so the session still comes back as a Logos session.
     if (error && missingColumn(error)) {
       warnLegacy('PUT');
-      ({ error } = await supabaseAdmin().from('conversations').upsert(legacyRow));
+      ({ error } = await supabaseAdmin()
+        .from('conversations')
+        .upsert({ ...base, memory: { ...base.memory, [SIDECAR]: extras } }));
     }
 
     if (error) {
@@ -217,13 +257,14 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const legacyRows = list
+  const usable = list
     .filter(
       (c: any) =>
         c && typeof c.id === 'string' && Array.isArray(c.messages)
     )
-    .slice(0, MAX_BULK_CONVOS)
-    .map((c: any) => ({
+    .slice(0, MAX_BULK_CONVOS);
+  const prepared = usable.map((c: any) => {
+    const base = {
       id: c.id,
       user_id: userId,
       title: (typeof c.title === 'string' ? c.title : 'Imported session').slice(
@@ -233,18 +274,20 @@ export async function POST(req: NextRequest) {
       messages: sanitizeMessages(c.messages),
       memory: sanitizeMemory(c.memory ?? EMPTY_MEMORY),
       updated_at: Number(c.updatedAt) || Date.now(),
-    }));
-  const rows = list
-    .filter(
-      (c: any) =>
-        c && typeof c.id === 'string' && Array.isArray(c.messages)
-    )
-    .slice(0, MAX_BULK_CONVOS)
-    .map((c: any, i: number) => ({
-      ...legacyRows[i],
+    };
+    const extras = {
       kind: asKind(c.kind),
       map: sanitizeMap(c.map ?? EMPTY_MAP),
-    }));
+      draft: sanitizeDraft(c.draft),
+      contexts: sanitizeContexts(c.contexts),
+    };
+    return { base, extras };
+  });
+  const rows = prepared.map(({ base, extras }) => ({ ...base, ...extras }));
+  const legacyRows = prepared.map(({ base, extras }) => ({
+    ...base,
+    memory: { ...base.memory, [SIDECAR]: extras },
+  }));
 
   if (rows.length === 0) {
     return NextResponse.json({ ok: true, imported: 0 });
