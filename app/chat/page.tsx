@@ -13,6 +13,7 @@ import {
 import { Logo } from '@/components/Logo';
 import { ModelPicker } from '@/components/ModelPicker';
 import { ModelGlyph } from '@/components/ModelGlyph';
+import { LogosApp } from '@/components/LogosApp';
 import { isValidOneKey } from '@/lib/socria-one';
 import { DepthPicker } from '@/components/DepthPicker';
 import { TryCore3Pill } from '@/components/TryCore3Pill';
@@ -92,7 +93,8 @@ function readModel(): SocriaModel {
   if (typeof window === 'undefined') return 'core-2';
   try {
     const raw = localStorage.getItem(MODEL_KEY);
-    return raw === 'core-3' ? 'core-3' : 'core-2';
+    if (raw === 'core-3' || raw === 'logos') return raw;
+    return 'core-2';
   } catch {
     return 'core-2';
   }
@@ -1131,8 +1133,30 @@ export default function ChatPage() {
     }
   }
 
+  // Any entry point can ask for a model by link — /chat?model=logos — which is
+  // how the explainer page, the Socria One page and the sidebar all open Logos
+  // without needing a route of its own.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const want = params.get('model');
+    if (want !== 'logos' && want !== 'core-3' && want !== 'core-2') return;
+    setModel(want);
+    try {
+      localStorage.setItem(MODEL_KEY, want);
+    } catch {}
+    const url = new URL(window.location.href);
+    url.searchParams.delete('model');
+    window.history.replaceState({}, '', url.pathname + url.search);
+  }, []);
+
   const messages = active?.messages || [];
   const hasMessages = messages.length > 0;
+
+  // Logos is a model, not a destination: selecting it swaps the whole
+  // experience in here rather than navigating away, so /chat stays the
+  // address of "talking to Socria" whichever mind is answering. Every hook
+  // above has already run, so this branch is safe.
+  if (model === 'logos') return <LogosApp />;
 
   return (
     <div className="flex h-dvh">
@@ -1261,7 +1285,7 @@ export default function ChatPage() {
               {logosSessions.map((s) => (
                 <a
                   key={s.id}
-                  href={`/logos?s=${encodeURIComponent(s.id)}`}
+                  href={`/chat?s=${encodeURIComponent(s.id)}`}
                   // These sessions belong to a different model, so opening one
                   // is a model switch as well as a navigation: record it before
                   // leaving, or coming back to /chat would land on whatever was

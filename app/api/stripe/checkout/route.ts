@@ -68,8 +68,8 @@ export async function POST(req: NextRequest) {
       metadata: { clerkUserId: userId },
       subscription_data: { metadata: { clerkUserId: userId } },
       allow_promotion_codes: true,
-      success_url: `${base}/logos?one=welcome&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${base}/logos?one=cancelled`,
+      success_url: `${base}/chat?one=welcome&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${base}/chat?one=cancelled`,
     });
 
     if (!session.url) {

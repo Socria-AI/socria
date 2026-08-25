@@ -111,7 +111,7 @@ export function OneStory() {
   /** Every "become a member" CTA lands here. */
   const subscribe = useCallback(async () => {
     if (member) {
-      window.location.href = '/logos';
+      window.location.href = '/chat?model=logos';
       return;
     }
     if (busy) return;
@@ -326,7 +326,7 @@ export function OneStory() {
         </div>
         <div className="mh-center label">The complete reasoning environment</div>
         <div className="mh-right">
-          <a href="/logos">Logos</a>
+          <a href="/chat?model=logos">Logos</a>
           <a href="#invitation" className="ask">Begin with One</a>
         </div>
       </header>
@@ -532,7 +532,7 @@ export function OneStory() {
                     <button type="button" className="lc-cta" onClick={subscribe} disabled={busy}>
                       {memberCta('Continue with One')} →
                     </button>
-                    <a className="lc-dismiss" href="/logos">keep working with what I have</a>
+                    <a className="lc-dismiss" href="/chat?model=logos">keep working with what I have</a>
                   </div>
                   <p className="lc-note">Your map is never deleted, hidden, or held back.</p>
                 </div>
@@ -586,12 +586,12 @@ export function OneStory() {
                     : 'Become a member — $15/month'}{' '}
                 <span className="ar">→</span>
               </button>
-              <a className="m-keep" href="/logos">continue with the free tier</a>
+              <a className="m-keep" href="/chat?model=logos">continue with the free tier</a>
             </div>
             <p className="m-note">Cancel anytime. Your maps and history remain yours at every tier.</p>
             <div className="colophon">
               <span>Socria · Human-first AI</span>
-              <span><a href="/logos">Logos</a></span>
+              <span><a href="/chat?model=logos">Logos</a></span>
               <span className="it">Think For Yourself.</span>
               <span>© {new Date().getFullYear()}</span>
             </div>

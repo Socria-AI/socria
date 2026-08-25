@@ -1250,7 +1250,6 @@ export const SOCRIA_MODELS: Record<SocriaModel, ModelConfig> = {
     defaultOpenAIModel: 'gpt-5.6-sol',
     supportsDepth: false,
     requiresAuth: true,
-    href: '/logos',
   },
 };
 
