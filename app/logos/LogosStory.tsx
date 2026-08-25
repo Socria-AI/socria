@@ -88,43 +88,6 @@ export function LogosStory() {
       }
     }
 
-    // demonstration: the map builds (~4s), then reorganizes
-    const panel = root.querySelector('#demo-panel');
-    const cap = root.querySelector('#demo-cap');
-    const reorg = () => {
-      panel?.classList.add('map-re');
-      cap?.classList.add('re');
-    };
-    if (panel) {
-      if (reduce) {
-        panel.classList.add('map-on');
-        reorg();
-      } else {
-        const mio = new IntersectionObserver(
-          (en) =>
-            en.forEach((e) => {
-              if (e.isIntersecting) {
-                panel.classList.add('map-on');
-                timers.push(setTimeout(reorg, 4600));
-                mio.disconnect();
-              }
-            }),
-          { threshold: 0.45 }
-        );
-        mio.observe(panel);
-        observers.push(mio);
-        timers.push(
-          setTimeout(() => {
-            const r = panel.getBoundingClientRect();
-            if (r.top < innerHeight && r.bottom > 0 && !panel.classList.contains('map-on')) {
-              panel.classList.add('map-on');
-              timers.push(setTimeout(reorg, 4600));
-            }
-          }, 2500)
-        );
-      }
-    }
-
     // four moves: the lit spoke cycles, and the definitions follow it
     const mvGroups = Array.from(root.querySelectorAll<SVGGElement>('.moves-viz g.mv'));
     const mvDefs = Array.from(root.querySelectorAll<HTMLElement>('#mv-defs .mv-def'));
@@ -292,10 +255,6 @@ export function LogosStory() {
             <div className="spread-head"><span className="num">·</span><span className="label">A Demonstration</span></div>
             <p className="intro-line fade">Someone asks a real question. Watch what Logos does with it —</p>
             <DemoSplit />
-            <div className="demo-cap" id="demo-cap">
-              <span className="c1">Nodes appear as you speak — read twice, mapped once</span>
-              <span className="c2">…and the map reorganizes as you think</span>
-            </div>
           </div>
         </section>
 

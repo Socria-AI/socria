@@ -52,7 +52,7 @@ function Frame({
 export function DemoSplit() {
   return (
     <Frame label="The conversation and its map, side by side — as it actually runs" height={470}>
-      <div className="lg-split rail-closed" style={{ height: '100%' }}>
+      <div className="lg-split lg-demo-split" style={{ height: '100%' }}>
         <section className="lg-convo">
           <header className="lg-head">
             <span className="lg-word">

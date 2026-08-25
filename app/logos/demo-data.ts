@@ -16,16 +16,11 @@ export const DEMO_MAP: ThinkingMap = {
   context: 'deciding',
   nodes: [
     { id: 'q', type: 'question', label: 'Should I take the job?' },
-    { id: 'pay', type: 'claim', label: 'It pays significantly more', status: 'open' },
-    { id: 'grow', type: 'claim', label: 'I have stopped growing here', status: 'open' },
-    {
-      id: 'assume',
-      type: 'assumption',
-      label: 'More money means progress',
-      note: 'unexamined — you have not said why these are the same thing',
-    },
-    { id: 'tension', type: 'tension', label: 'Security pulls against growth' },
-    { id: 'value', type: 'value', label: 'I want work that keeps teaching me' },
+    { id: 'pay', type: 'claim', label: 'It pays more', status: 'open' },
+    { id: 'grow', type: 'claim', label: 'I’ve stopped growing', status: 'open' },
+    { id: 'assume', type: 'assumption', label: 'More money means progress' },
+    { id: 'tension', type: 'tension', label: 'Security ↔ growth' },
+    { id: 'value', type: 'value', label: 'Work that keeps teaching me' },
     { id: 'eq', type: 'evidence', label: 'Three years, same problems', status: 'supported' },
   ],
   edges: [

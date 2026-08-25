@@ -675,3 +675,17 @@
 .lgx-root .ui-guarddemo { padding: 22px 30px; gap: 4px; }
 .lgx-root .ui-guarddemo .lg-msg { margin: 10px 0; }
 .lgx-root .ui-guarddemo .lg-guard { margin: 14px 0 0; }
+
+/* the demo split has no rail, so it gets its own two columns — without this
+   the app's rail-closed grid kept a 46px rail column, crushed the
+   conversation into it, and left the third track empty */
+.lgx-root .logos-root.lg-demo .lg-demo-split {
+  grid-template-columns: minmax(0, 1fr) 1.18fr;
+}
+@media (max-width: 900px) {
+  /* the app hides the map on phones behind a switcher this exhibit doesn't
+     have; here the map IS the exhibit, so it takes the frame alone */
+  .lgx-root .logos-root.lg-demo .lg-demo-split { grid-template-columns: 1fr; grid-template-rows: 1fr; }
+  .lgx-root .logos-root.lg-demo .lg-demo-split .lg-convo { display: none; }
+  .lgx-root .logos-root.lg-demo .lg-demo-split .lg-panel { display: flex; }
+}
