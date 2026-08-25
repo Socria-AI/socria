@@ -326,7 +326,7 @@ export function OneStory() {
         </div>
         <div className="mh-center label">The complete reasoning environment</div>
         <div className="mh-right">
-          <a href="/chat?model=logos">Logos</a>
+          <a href="/logos">Logos</a>
           <a href="#invitation" className="ask">Begin with One</a>
         </div>
       </header>
@@ -591,7 +591,7 @@ export function OneStory() {
             <p className="m-note">Cancel anytime. Your maps and history remain yours at every tier.</p>
             <div className="colophon">
               <span>Socria · Human-first AI</span>
-              <span><a href="/chat?model=logos">Logos</a></span>
+              <span><a href="/logos">Logos</a></span>
               <span className="it">Think For Yourself.</span>
               <span>© {new Date().getFullYear()}</span>
             </div>

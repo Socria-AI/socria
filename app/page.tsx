@@ -74,6 +74,8 @@ export default async function Home() {
         </div>
         <div className="mh-center label">A place for thinking for yourself</div>
         <div className="mh-right">
+          <Link href="/logos">Logos</Link>
+          <Link href="/one">Socria One</Link>
           {/* Sign-in must survive Clerk being slow or misconfigured in
               production: show a real /sign-in link during load and when
               signed out, and only swap to the avatar once Clerk confirms a
@@ -547,6 +549,8 @@ export default async function Home() {
                 </svg>
               </a>
             </div>
+            <span><Link href="/logos">Logos</Link></span>
+            <span><Link href="/one">Socria One</Link></span>
             <span className="it">Think For Yourself.</span>
             <span>© {year}</span>
           </div>
