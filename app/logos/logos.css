@@ -589,3 +589,66 @@
 .lgx-root .close-sec .cta-quiet{font-family:var(--serif);font-style:italic;font-size:1.15rem;color:var(--sage);border-bottom:1px solid var(--sage);padding-bottom:2px;}
 .lgx-root .close-sec .colophon{margin-top:clamp(60px,10vh,110px);border-color:rgba(240,234,216,.16);color:rgba(240,234,216,.55);margin-left:auto;margin-right:auto;}
 .lgx-root .close-sec .colophon .it{color:var(--sage);}
+
+/* ── live product demonstrations ─────────────────────────────────── */
+/* The real Logos UI, embedded. .logos-root is fixed/inset-0 in the app, so
+   .lg-demo returns it to normal flow inside a frame; everything nested keeps
+   its own styling untouched. */
+.lgx-root .logos-root.lg-demo {
+  position: relative; inset: auto; width: 100%; height: 100%;
+  overflow: hidden; background: var(--paper);
+}
+/* the app paints a grain over the whole viewport — not wanted in a frame */
+.lgx-root .logos-root.lg-demo::before { display: none; }
+
+.lgx-root .ui-frame { margin: clamp(24px,4vh,44px) 0 0; }
+.lgx-root .ui-chrome {
+  display: flex; align-items: center; gap: 7px;
+  padding: 10px 14px; border: 1px solid var(--border); border-bottom: none;
+  background: #efeadd; border-radius: 10px 10px 0 0;
+}
+.lgx-root .ui-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--ink-12); }
+.lgx-root .ui-addr {
+  margin-left: 10px; font-family: var(--sans); font-size: .72rem;
+  letter-spacing: .04em; color: var(--ink-45);
+}
+.lgx-root .ui-body {
+  border: 1px solid var(--border); border-radius: 0 0 10px 10px; overflow: hidden;
+  background: var(--paper); box-shadow: 0 40px 90px -60px rgba(32,32,27,.5);
+}
+.lgx-root .ui-cap {
+  margin-top: 12px; font-size: .74rem; letter-spacing: .2em; text-transform: uppercase;
+  color: var(--ink-45); font-weight: 600;
+}
+.lgx-root .ui-placeholder { color: var(--lg-ink-24); font-size: 14.5px; }
+
+/* lens switcher above its frame */
+.lgx-root .ui-lenstabs { display: flex; gap: 6px; flex-wrap: wrap; margin-top: clamp(20px,3vh,32px); }
+.lgx-root .ui-lensblurb {
+  margin-top: 10px; font-family: var(--serif); font-style: italic;
+  font-size: clamp(1.05rem,1.6vw,1.3rem); color: var(--moss-700);
+}
+.lgx-root .ui-lenstabs .lg-lens {
+  padding: 6px 14px; border: 1px solid var(--border); border-radius: 999px;
+  background: #fff; font-family: var(--sans); font-size: .88rem; color: var(--ink-70);
+  cursor: pointer; transition: background .2s, color .2s, border-color .2s;
+}
+.lgx-root .ui-lenstabs .lg-lens.is-on { background: var(--moss-700); color: var(--paper); border-color: var(--moss-700); }
+
+/* node + its menu, centred in the frame */
+.lgx-root .ui-menudemo {
+  height: 100%; display: flex; align-items: center; justify-content: center;
+  gap: clamp(20px,4vw,56px); flex-wrap: wrap; padding: 20px;
+}
+.lgx-root .ui-menudemo .lg-acts { width: 232px; }
+.lgx-root .ui-menudemo .lg-act { display: block; }
+
+/* guard + controls demos */
+.lgx-root .ui-guarddemo { padding: 20px 24px; display: flex; flex-direction: column; justify-content: center; height: 100%; }
+.lgx-root .ui-ctrldemo { padding: 18px 20px; height: 100%; display: flex; flex-direction: column; }
+.lgx-root .ui-depthmenu { position: static; margin: 14px 0 0 auto; width: 248px; animation: none; }
+/* the thread inside a demo frame needs the app's own gutters, or a user
+   bubble (right-aligned, 80% wide) runs off the edge of the frame */
+.lgx-root .ui-guarddemo { padding: 22px 30px; gap: 4px; }
+.lgx-root .ui-guarddemo .lg-msg { margin: 10px 0; }
+.lgx-root .ui-guarddemo .lg-guard { margin: 14px 0 0; }

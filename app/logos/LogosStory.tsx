@@ -13,6 +13,14 @@
 // stylesheet is scoped to.
 
 import { useEffect, useRef } from 'react';
+import {
+  DemoBoard,
+  DemoControls,
+  DemoGuard,
+  DemoLenses,
+  DemoMoves,
+  DemoSplit,
+} from './LogosDemo';
 
 const OPEN = '/chat?model=logos';
 
@@ -282,27 +290,7 @@ export function LogosStory() {
           <div className="wrap">
             <div className="spread-head"><span className="num">·</span><span className="label">A Demonstration</span></div>
             <p className="intro-line fade">Someone asks a real question. Watch what Logos does with it —</p>
-            <div className="demo-panel" id="demo-panel">
-              <svg className="lmap" viewBox="0 0 640 360" role="img" aria-label="A Thinking Map forming from the question 'Should I take the job?'">
-                <path className="ln l1" d="M132,180 C190,178 250,120 316,96" />
-                <path className="ln l2" d="M132,180 C190,182 250,240 316,262" />
-                <path className="ln l3" d="M340,96 C400,98 450,118 498,128" />
-                <path className="ln tn" d="M330,116 C340,160 340,200 330,244" />
-                <path className="ln gh" d="M342,266 C420,282 480,294 542,300" />
-                <g className="nd root"><circle cx="120" cy="180" r="10" /></g>
-                <g className="lb root"><text x="66" y="212">“Should I take the job?”</text><text className="sub" x="92" y="228">Your question</text></g>
-                <g className="nd g1 mv2"><circle cx="328" cy="96" r="7" /></g>
-                <g className="lb g1 mv2"><text x="344" y="92">It pays more</text><text className="sub" x="344" y="107">claim</text></g>
-                <g className="nd g2 mv1"><circle cx="328" cy="262" r="7" /></g>
-                <g className="lb g2 mv1"><text x="344" y="258">I've stopped growing</text><text className="sub" x="344" y="273">claim</text></g>
-                <g className="nd as g3"><circle cx="510" cy="130" r="7" /></g>
-                <g className="lb g3"><text x="494" y="110" textAnchor="end">money = progress?</text><text className="sub" x="494" y="125" textAnchor="end">assumption — unexamined</text></g>
-                <g className="nd tn g4"><circle cx="333" cy="180" r="7" /></g>
-                <g className="lb g4"><text className="tn-lbl" x="349" y="176">security ↔ growth</text><text className="sub" x="349" y="191">tension — unresolved</text></g>
-                <g className="nd gh g5"><circle cx="554" cy="300" r="7" /></g>
-                <g className="lb g5"><text x="570" y="304">…</text></g>
-              </svg>
-            </div>
+            <DemoSplit />
             <div className="demo-cap" id="demo-cap">
               <span className="c1">Nodes appear as you speak — read twice, mapped once</span>
               <span className="c2">…and the map reorganizes as you think</span>
@@ -339,12 +327,7 @@ export function LogosStory() {
           <div className="wrap">
             <div className="spread-head"><span className="num">II.</span><span className="label">Four Lenses</span></div>
             <h2 className="fade">One map, four ways of seeing it.</h2>
-            <div className="exh plates4 io fade d1">
-              <div className="pl"><span className="rn">i · Graph</span><h3>The whole shape</h3><p>Your thinking as a living network — what connects, what floats free.</p><svg viewBox="0 0 54 54"><path className="p" d="M10,44 L27,20 M27,20 L44,36 M27,20 L27,6" /><circle className="c" cx="10" cy="44" r="4" /><circle className="c" cx="27" cy="20" r="4" /><circle className="c" cx="44" cy="36" r="4" /><circle className="c" cx="27" cy="6" r="3" /></svg></div>
-              <div className="pl"><span className="rn">ii · Structure</span><h3>The argument</h3><p>The same thinking as an outline — premises above, conclusions below.</p><svg viewBox="0 0 54 54"><path className="p" d="M6,10 H48 M14,24 H48 M14,38 H40 M22,52 H48" /></svg></div>
-              <div className="pl"><span className="rn">iii · Tensions</span><h3>The friction</h3><p>Every place two things you want pull in opposite directions.</p><svg viewBox="0 0 54 54"><path className="p g" d="M8,27 H22 M18,21 L24,27 L18,33 M46,27 H32 M36,21 L30,27 L36,33" /></svg></div>
-              <div className="pl"><span className="rn">iv · Evidence</span><h3>The ground</h3><p>Which claims stand on something — and which are still standing on air.</p><svg viewBox="0 0 54 54"><circle className="c" cx="22" cy="22" r="12" /><path className="p" d="M31,31 L44,44 M16,22 L21,27 L29,17" /></svg></div>
-            </div>
+            <div className="fade d1"><DemoLenses /></div>
           </div>
         </section>
 
@@ -371,6 +354,7 @@ export function LogosStory() {
                 <div className="mv-def"><span className="w">Trace</span><p>Walk backward: what does this claim rest on, and does the chain hold?</p></div>
               </div>
             </div>
+            <DemoMoves />
           </div>
         </section>
 
@@ -409,6 +393,7 @@ export function LogosStory() {
               <p className="note">sign slip — the roots flip when you solve each factor</p>
             </div>
             <p className="board-cap fade">Struck, corrected, kept — the record of a mind at work</p>
+            <DemoBoard />
           </div>
         </section>
 
@@ -431,6 +416,7 @@ export function LogosStory() {
                 <p className="dl lg"><span className="who">Logos</span>Not yet. You're one step away — what does dividing both sides by three do here?</p>
               </div>
             </div>
+            <DemoGuard />
           </div>
         </section>
 
@@ -459,6 +445,7 @@ export function LogosStory() {
                 <div className="mv-def"><span className="w">Abstract</span><p>The furthest register — principles, structures, first causes.</p></div>
               </div>
             </div>
+            <DemoControls />
           </div>
         </section>
 
