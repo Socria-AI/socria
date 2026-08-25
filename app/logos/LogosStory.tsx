@@ -19,6 +19,7 @@ import {
   DemoGuard,
   DemoLenses,
   DemoMoves,
+  DemoPersonality,
   DemoSplit,
 } from './LogosDemo';
 
@@ -337,16 +338,7 @@ export function LogosStory() {
             <div className="spread-head"><span className="num">III.</span><span className="label">Four Moves</span></div>
             <h2 className="fade">Any node, four moves.</h2>
             <div className="exh moves">
-              <div className="moves-viz fade" id="moves-viz" aria-hidden="true">
-                <svg viewBox="0 0 380 300">
-                  <circle className="hub" cx="190" cy="150" r="38" />
-                  <text className="hubt" x="190" y="155" textAnchor="middle">a node</text>
-                  <g className="mv" data-mv="0"><path className="sp" d="M190,104 L190,52" /><text x="190" y="38" textAnchor="middle">Explore</text></g>
-                  <g className="mv" data-mv="1"><path className="sp" d="M234,138 L318,110" /><text x="326" y="108">Challenge</text></g>
-                  <g className="mv" data-mv="2"><path className="sp" d="M190,196 L190,248" /><text x="190" y="272" textAnchor="middle">Research</text></g>
-                  <g className="mv" data-mv="3"><path className="sp" d="M146,162 L62,190" /><text x="54" y="196" textAnchor="end">Trace</text></g>
-                </svg>
-              </div>
+              <div className="fade"><DemoMoves /></div>
               <div className="mv-defs fade d1" id="mv-defs">
                 <div className="mv-def"><span className="w">Explore</span><p>Open the thought further — what's inside it that you haven't said yet?</p></div>
                 <div className="mv-def"><span className="w">Challenge</span><p>Logos argues the other side, properly — the strongest version of it.</p></div>
@@ -354,7 +346,6 @@ export function LogosStory() {
                 <div className="mv-def"><span className="w">Trace</span><p>Walk backward: what does this claim rest on, and does the chain hold?</p></div>
               </div>
             </div>
-            <DemoMoves />
           </div>
         </section>
 
@@ -382,16 +373,6 @@ export function LogosStory() {
             <div className="spread-head"><span className="num">V.</span><span className="label">The Board</span></div>
             <h2 className="fade">A chalkboard, not a chatbox.</h2>
             <p className="body fade d1">The Board is scratch-space: serif equations, handwritten working, arrows where arrows help. Mistakes aren't erased — they're <em>struck through with the fix beside them</em>, the way real thinking looks.</p>
-            <div className="exh board io fade d2">
-              <span className="bd-t">The Board · working</span>
-              <div className="eq" style={{ marginTop: '14px' }}>
-                <span className="row">x² − 5x + 6 = 0</span>
-                <span className="row">(x − 2)(x − 3) = 0</span>
-                <span className="row">x = <span className="strike">−2, −3<svg viewBox="0 0 100 12" preserveAspectRatio="none"><path d="M2,7 C24,3 48,10 68,5 C82,2 94,7 98,5" /></svg></span><span className="fix">x = 2, 3</span></span>
-              </div>
-              <svg className="barrow" viewBox="0 0 120 44" aria-hidden="true"><path d="M8,8 C30,34 70,38 104,20 M104,20 L90,18 M104,20 L96,32" /></svg>
-              <p className="note">sign slip — the roots flip when you solve each factor</p>
-            </div>
             <p className="board-cap fade">Struck, corrected, kept — the record of a mind at work</p>
             <DemoBoard />
           </div>
@@ -403,19 +384,6 @@ export function LogosStory() {
             <div className="spread-head"><span className="num">VI.</span><span className="label">The Answer Guard</span></div>
             <h2 className="fade">While you're learning, it will not hand you the answer.</h2>
             <p className="body fade d1">Ask it to. It declines — kindly — and guides instead. And the guard holds across every surface at once: the chat, the map, the Board. <em>Nothing leaks the answer</em> from around the side.</p>
-            <div className="exh guard fade d2">
-              <div className="guard-viz" aria-hidden="true">
-                <svg viewBox="0 0 130 130">
-                  <circle className="r2" cx="65" cy="65" r="60" />
-                  <circle className="r1" cx="65" cy="65" r="42" />
-                  <text x="65" y="76" textAnchor="middle">?</text>
-                </svg>
-              </div>
-              <div className="gd-lines">
-                <p className="dl you"><span className="who">You</span>“Just tell me x.”</p>
-                <p className="dl lg"><span className="who">Logos</span>Not yet. You're one step away — what does dividing both sides by three do here?</p>
-              </div>
-            </div>
             <DemoGuard />
           </div>
         </section>
@@ -426,18 +394,7 @@ export function LogosStory() {
             <div className="spread-head"><span className="num">VII.</span><span className="label">Depth</span></div>
             <h2 className="fade">How far the thinking goes — never how fast the answer arrives.</h2>
             <div className="exh depthx io">
-              <div className="depth-viz fade" aria-hidden="true">
-                <svg viewBox="0 0 340 270">
-                  <circle className="dr1" cx="170" cy="135" r="30" />
-                  <circle className="dr2" cx="170" cy="135" r="62" />
-                  <circle className="dr3" cx="170" cy="135" r="94" />
-                  <circle className="dr4" cx="170" cy="135" r="126" />
-                  <text className="dt1" x="170" y="140" textAnchor="middle">Quick</text>
-                  <text className="dt2" x="170" y="82" textAnchor="middle">Balanced</text>
-                  <text className="dt3" x="170" y="50" textAnchor="middle">Deep</text>
-                  <text className="dt4" x="170" y="18" textAnchor="middle">Abstract</text>
-                </svg>
-              </div>
+              <div className="fade"><DemoControls /></div>
               <div className="mv-defs depth-defs fade d1">
                 <div className="mv-def"><span className="w">Quick</span><p>A gut-check in plain words, when that's all the moment needs.</p></div>
                 <div className="mv-def"><span className="w">Balanced</span><p>The everyday register — a thoughtful mentor, keeping your pace.</p></div>
@@ -445,7 +402,6 @@ export function LogosStory() {
                 <div className="mv-def"><span className="w">Abstract</span><p>The furthest register — principles, structures, first causes.</p></div>
               </div>
             </div>
-            <DemoControls />
           </div>
         </section>
 
@@ -453,18 +409,8 @@ export function LogosStory() {
         <section className="spread sec short" data-folio="VIII" data-screen-label="Personality">
           <div className="wrap">
             <div className="spread-head"><span className="num">VIII.</span><span className="label">Personality</span></div>
-            <h2 className="fade">Nine dials for how it talks. Zero for what it decides.</h2>
-            <div className="exh dials fade d1">
-              <div className="dial"><svg viewBox="0 0 58 58"><circle cx="29" cy="29" r="24" /><line x1="29" y1="29" x2="29" y2="9" style={{ transform: 'rotate(-52deg)' }} /></svg><span className="dl">Warmth</span></div>
-              <div className="dial"><svg viewBox="0 0 58 58"><circle cx="29" cy="29" r="24" /><line x1="29" y1="29" x2="29" y2="9" style={{ transform: 'rotate(34deg)' }} /></svg><span className="dl">Directness</span></div>
-              <div className="dial"><svg viewBox="0 0 58 58"><circle cx="29" cy="29" r="24" /><line x1="29" y1="29" x2="29" y2="9" style={{ transform: 'rotate(-18deg)' }} /></svg><span className="dl">Humor</span></div>
-              <div className="dial"><svg viewBox="0 0 58 58"><circle cx="29" cy="29" r="24" /><line x1="29" y1="29" x2="29" y2="9" style={{ transform: 'rotate(58deg)' }} /></svg><span className="dl">Rigor</span></div>
-              <div className="dial"><svg viewBox="0 0 58 58"><circle cx="29" cy="29" r="24" /><line x1="29" y1="29" x2="29" y2="9" style={{ transform: 'rotate(8deg)' }} /></svg><span className="dl">Patience</span></div>
-              <div className="dial"><svg viewBox="0 0 58 58"><circle cx="29" cy="29" r="24" /><line x1="29" y1="29" x2="29" y2="9" style={{ transform: 'rotate(44deg)' }} /></svg><span className="dl">Push</span></div>
-              <div className="dial"><svg viewBox="0 0 58 58"><circle cx="29" cy="29" r="24" /><line x1="29" y1="29" x2="29" y2="9" style={{ transform: 'rotate(-38deg)' }} /></svg><span className="dl">Formality</span></div>
-              <div className="dial"><svg viewBox="0 0 58 58"><circle cx="29" cy="29" r="24" /><line x1="29" y1="29" x2="29" y2="9" style={{ transform: 'rotate(26deg)' }} /></svg><span className="dl">Curiosity</span></div>
-              <div className="dial"><svg viewBox="0 0 58 58"><circle cx="29" cy="29" r="24" /><line x1="29" y1="29" x2="29" y2="9" style={{ transform: 'rotate(-8deg)' }} /></svg><span className="dl">Candor</span></div>
-            </div>
+            <h2 className="fade">Nine settings for how it talks. Zero for what it decides.</h2>
+            <DemoPersonality />
             <p className="own-words fade d2">…and instructions in your own words: <span className="q">“be blunt, skip the jargon, and never flatter me.”</span></p>
           </div>
         </section>

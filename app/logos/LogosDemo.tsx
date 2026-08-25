@@ -19,6 +19,7 @@ import { MathBoard } from '@/components/MathBoard';
 import { LogosMark } from '@/components/LogosMark';
 import { NodeGlyph } from '@/components/NodeGlyph';
 import { THINKING_DEPTHS } from '@/lib/socria-prompt';
+import { DEFAULT_PERSONALITY, PERSONALITY_DIMENSIONS } from '@/lib/logos-personality';
 import { DEMO_MAP, DEMO_MATH_MAP, DEMO_TURNS } from './demo-data';
 
 /** A framed slice of the product, captioned. */
@@ -33,11 +34,11 @@ function Frame({
 }) {
   return (
     <figure className="ui-frame">
+      {/* The design system has no browser-chrome vocabulary, so the frame
+          announces itself the way its other exhibits do: a small letterspaced
+          rule, not traffic lights. */}
       <div className="ui-chrome" aria-hidden="true">
-        <span className="ui-dot" />
-        <span className="ui-dot" />
-        <span className="ui-dot" />
-        <span className="ui-addr">socria.app/chat</span>
+        <span className="ui-addr">Socria Logos · live</span>
       </div>
       <div className="ui-body" style={{ height }}>
         <div className="logos-root lg-demo">{children}</div>
@@ -138,7 +139,7 @@ export function DemoMoves() {
     { id: 'trace', label: 'Trace', blurb: 'Where this came from' },
   ];
   return (
-    <Frame label="Click any node — the menu the app actually opens" height={330}>
+    <Frame label="Click any node — the menu the app actually opens" height={470}>
       <div className="ui-menudemo">
         <button type="button" className="lg-node lg-node-assumption lg-st-open is-focused" style={{ width: 200 }}>
           <span className="lg-node-head">
@@ -211,7 +212,7 @@ export function DemoGuard() {
 export function DemoControls() {
   const [depth, setDepth] = useState('balanced');
   return (
-    <Frame label="Depth and personality, where they live — beside the box you type in" height={300}>
+    <Frame label="Depth, where it lives — beside the box you type in" height={490}>
       <div className="ui-ctrldemo">
         <div className="lg-composer">
           <div className="lg-composer-box">
@@ -246,6 +247,45 @@ export function DemoControls() {
               <span className="lg-depth-opt-label">{d.label}</span>
               <span className="lg-depth-opt-desc">{d.description}</span>
             </button>
+          ))}
+        </div>
+      </div>
+    </Frame>
+  );
+}
+
+/** The personality settings, as the sheet actually presents them. */
+export function DemoPersonality() {
+  const [p, setP] = useState<Record<string, string>>({
+    ...DEFAULT_PERSONALITY,
+    base: 'casual',
+    directness: 'blunt',
+    challenge: 'rigorous',
+    questioning: 'fewer',
+  });
+  return (
+    <Frame label="The nine settings, as the app presents them — change one" height={430}>
+      <div className="ui-personademo">
+        <h3 className="lg-style-title">Socria Personality</h3>
+        <p className="lg-style-sub">
+          How Socria communicates while it thinks with you. Depth stays separate.
+        </p>
+        <div className="lg-persona-grid">
+          {PERSONALITY_DIMENSIONS.map((d) => (
+            <label key={d.id} className="lg-persona-field">
+              <span className="lg-persona-label">{d.label}</span>
+              <select
+                className="lg-persona-select"
+                value={p[d.id] ?? d.options[0].id}
+                onChange={(e) => setP((prev) => ({ ...prev, [d.id]: e.target.value }))}
+              >
+                {d.options.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </label>
           ))}
         </div>
       </div>

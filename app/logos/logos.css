@@ -647,6 +647,29 @@
 .lgx-root .ui-guarddemo { padding: 20px 24px; display: flex; flex-direction: column; justify-content: center; height: 100%; }
 .lgx-root .ui-ctrldemo { padding: 18px 20px; height: 100%; display: flex; flex-direction: column; }
 .lgx-root .ui-depthmenu { position: static; margin: 14px 0 0 auto; width: 248px; animation: none; }
+/* the frame reads as one of the page's exhibits, not a browser screenshot */
+.lgx-root .ui-chrome {
+  justify-content: flex-start; padding: 9px 16px; background: transparent;
+  border-bottom: 1px solid var(--border); border-radius: 0;
+}
+.lgx-root .ui-addr {
+  margin: 0; font-size: .68rem; letter-spacing: .24em; text-transform: uppercase;
+  color: var(--ink-45); font-weight: 600;
+}
+.lgx-root .ui-frame { border: none; background: transparent; }
+.lgx-root .ui-chrome { border: 1px solid var(--border); border-bottom: 1px solid var(--border); background: #fff; }
+.lgx-root .ui-body {
+  border: 1px solid var(--border); border-top: none; border-radius: 0;
+  box-shadow: 0 30px 70px -55px rgba(32,32,27,.45);
+}
+.lgx-root .ui-cap { padding: 0 0 0 2px; }
+/* in a narrow column the node and its menu stack, so give them the room */
+.lgx-root .ui-menudemo { flex-direction: column; gap: 18px; padding: 22px 16px; justify-content: flex-start; overflow: auto; }
+@media (min-width: 900px) { .lgx-root .ui-menudemo { flex-direction: row; align-items: flex-start; } }
+.lgx-root .ui-ctrldemo { overflow: auto; }
+/* personality sheet inside a frame */
+.lgx-root .ui-personademo { padding: 24px 26px; height: 100%; overflow: auto; }
+
 /* the thread inside a demo frame needs the app's own gutters, or a user
    bubble (right-aligned, 80% wide) runs off the edge of the frame */
 .lgx-root .ui-guarddemo { padding: 22px 30px; gap: 4px; }
