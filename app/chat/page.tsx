@@ -12,6 +12,7 @@ import {
 } from '@clerk/nextjs';
 import { Logo } from '@/components/Logo';
 import { ModelPicker } from '@/components/ModelPicker';
+import { ModelGlyph } from '@/components/ModelGlyph';
 import { isValidOneKey } from '@/lib/socria-one';
 import { DepthPicker } from '@/components/DepthPicker';
 import { TryCore3Pill } from '@/components/TryCore3Pill';
@@ -1261,8 +1262,18 @@ export default function ChatPage() {
                 <a
                   key={s.id}
                   href={`/logos?s=${encodeURIComponent(s.id)}`}
-                  className="group flex items-center justify-between gap-2 px-3 py-2 rounded-md text-[13px] text-ink/70 hover:bg-ink/5 hover:text-ink transition-colors"
+                  // These sessions belong to a different model, so opening one
+                  // is a model switch as well as a navigation: record it before
+                  // leaving, or coming back to /chat would land on whatever was
+                  // active before and contradict where they just were.
+                  onClick={() => {
+                    try {
+                      localStorage.setItem(MODEL_KEY, 'logos');
+                    } catch {}
+                  }}
+                  className="group flex items-center gap-2 px-3 py-2 rounded-md text-[13px] text-ink/70 hover:bg-ink/5 hover:text-ink transition-colors"
                 >
+                  <ModelGlyph model="logos" size={13} className="text-moss-700" />
                   <span className="truncate flex-1">{s.title}</span>
                   <span className="text-[10px] text-ink/35 shrink-0">
                     {s.nodes ? `${s.nodes} nodes` : 'no map'}
