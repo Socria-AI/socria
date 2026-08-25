@@ -1,32 +1,38 @@
 'use client';
 
-// The Logos explainer at /logos — what Logos is, for someone who has not used
-// it yet. The app itself lives at /chat (Logos is a model, not a destination),
-// so every call to action here opens /chat?model=logos.
+// The Socria Logos page at /logos — ported from the design project's
+// `Socria Logos.html` (the magazine.css system plus logos.css), markup and
+// choreography intact.
 //
-// Written to be read, not scanned for keywords: each feature says what it does
-// and why it exists, in the order someone actually meets them.
+// Logos itself is a MODEL, not a route: this page explains it, and the calls
+// to action open the real thing at /chat?model=logos.
+//
+// The design's inline script becomes the one effect below — the same
+// behaviours, with every observer, timer, listener and rAF loop torn down on
+// unmount, and the html/body class toggles moved onto the root element the
+// stylesheet is scoped to.
 
 import { useEffect, useRef } from 'react';
-import { LogosMark } from '@/components/LogosMark';
 
 const OPEN = '/chat?model=logos';
 
 export function LogosStory() {
   const rootRef = useRef<HTMLDivElement>(null);
 
-  // Reveals on scroll, and the demo map drawing itself once it comes into view.
   useEffect(() => {
     const root = rootRef.current;
     if (!root) return;
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const els = Array.from(root.querySelectorAll<HTMLElement>('.fade'));
-    const demo = root.querySelector('.demo');
-    const obs: IntersectionObserver[] = [];
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    const intervals: ReturnType<typeof setInterval>[] = [];
+    const observers: IntersectionObserver[] = [];
+    const bound: Array<[Element, string, EventListener]> = [];
+    let raf = 0;
 
+    // reveals on scroll
+    const els = Array.from(root.querySelectorAll<HTMLElement>('.fade, .ink-mark, .io'));
     if (reduce || !('IntersectionObserver' in window)) {
       els.forEach((e) => e.classList.add('in'));
-      demo?.classList.add('on');
     } else {
       root.classList.add('js-anim');
       const io = new IntersectionObserver(
@@ -37,390 +43,552 @@ export function LogosStory() {
               io.unobserve(e.target);
             }
           }),
-        { threshold: 0.14, rootMargin: '0px 0px -6% 0px' }
+        { threshold: 0.15, rootMargin: '0px 0px -6% 0px' }
       );
       els.forEach((e) => io.observe(e));
-      obs.push(io);
+      observers.push(io);
+      // the design's self-heal: if something visible never revealed, stop animating
+      timers.push(
+        setTimeout(() => {
+          const vh = innerHeight;
+          const broken = els.some((el) => {
+            const r = el.getBoundingClientRect();
+            if (!(r.top < vh * 0.9 && r.bottom > 0)) return false;
+            return !el.classList.contains('in') || getComputedStyle(el).opacity === '0';
+          });
+          if (broken) {
+            root.classList.remove('js-anim');
+            els.forEach((el) => {
+              el.classList.add('in');
+              el.style.transition = 'none';
+              el.style.opacity = '1';
+              el.style.transform = 'none';
+            });
+          }
+        }, 1500)
+      );
+    }
 
-      if (demo) {
-        const dio = new IntersectionObserver(
+    // cover: the brain draws stroke by stroke, then the type arrives in beats
+    const coverEl = root.querySelector('.cover');
+    if (coverEl) {
+      if (reduce) coverEl.classList.add('intro', 'settled');
+      else {
+        requestAnimationFrame(() => coverEl.classList.add('intro'));
+        timers.push(setTimeout(() => coverEl.classList.add('settled'), 3400));
+      }
+    }
+
+    // demonstration: the map builds (~4s), then reorganizes
+    const panel = root.querySelector('#demo-panel');
+    const cap = root.querySelector('#demo-cap');
+    const reorg = () => {
+      panel?.classList.add('map-re');
+      cap?.classList.add('re');
+    };
+    if (panel) {
+      if (reduce) {
+        panel.classList.add('map-on');
+        reorg();
+      } else {
+        const mio = new IntersectionObserver(
           (en) =>
             en.forEach((e) => {
               if (e.isIntersecting) {
-                demo.classList.add('on');
-                dio.disconnect();
+                panel.classList.add('map-on');
+                timers.push(setTimeout(reorg, 4600));
+                mio.disconnect();
               }
             }),
-          { threshold: 0.35 }
+          { threshold: 0.45 }
         );
-        dio.observe(demo);
-        obs.push(dio);
+        mio.observe(panel);
+        observers.push(mio);
+        timers.push(
+          setTimeout(() => {
+            const r = panel.getBoundingClientRect();
+            if (r.top < innerHeight && r.bottom > 0 && !panel.classList.contains('map-on')) {
+              panel.classList.add('map-on');
+              timers.push(setTimeout(reorg, 4600));
+            }
+          }, 2500)
+        );
       }
     }
-    return () => obs.forEach((o) => o.disconnect());
+
+    // four moves: the lit spoke cycles, and the definitions follow it
+    const mvGroups = Array.from(root.querySelectorAll<SVGGElement>('.moves-viz g.mv'));
+    const mvDefs = Array.from(root.querySelectorAll<HTMLElement>('#mv-defs .mv-def'));
+    let mvI = 0;
+    let mvHover = false;
+    const lightMv = (i: number) => {
+      mvGroups.forEach((g, k) => g.classList.toggle('lit', k === i));
+      mvDefs.forEach((d, k) => d.classList.toggle('dim', k !== i));
+    };
+    if (mvGroups.length && !reduce) {
+      lightMv(0);
+      intervals.push(
+        setInterval(() => {
+          if (!mvHover) {
+            mvI = (mvI + 1) % mvGroups.length;
+            lightMv(mvI);
+          }
+        }, 1900)
+      );
+      // Listeners are kept in `bound` so the exact same function references
+      // can be removed on unmount — re-creating them at cleanup would leak.
+      [...mvGroups, ...mvDefs].forEach((el, idx) => {
+        const k = idx % mvGroups.length;
+        const onEnter = () => {
+          mvHover = true;
+          mvI = k;
+          lightMv(k);
+        };
+        const onLeave = () => {
+          mvHover = false;
+        };
+        el.addEventListener('pointerenter', onEnter);
+        el.addEventListener('pointerleave', onLeave);
+        bound.push([el, 'pointerenter', onEnter], [el, 'pointerleave', onLeave]);
+      });
+    }
+
+    // spine + folio + masthead + dark contrast
+    let vh = innerHeight;
+    const doc = document.documentElement;
+    const spineInk = root.querySelector<HTMLElement>('.spine .ink');
+    const folio = root.querySelector<HTMLElement>('#folio');
+    const masthead = root.querySelector<HTMLElement>('#masthead');
+    const progress = root.querySelector<HTMLElement>('.progress');
+    const spreads = Array.from(root.querySelectorAll<HTMLElement>('.spread'));
+    const darkSec = root.querySelector<HTMLElement>('.close-sec');
+    let lastY = -1;
+    let lastNavY = 0;
+
+    const update = (y: number) => {
+      const docH = doc.scrollHeight - vh;
+      const p = docH > 0 ? y / docH : 0;
+      if (progress) progress.style.width = p * 100 + '%';
+      if (spineInk) spineInk.style.height = p * 100 + '%';
+      if (masthead) {
+        masthead.classList.toggle('hidden', y > lastNavY && y > 260);
+        lastNavY = y;
+      }
+      if (darkSec) {
+        const r = darkSec.getBoundingClientRect();
+        root.classList.toggle('on-dark', r.top <= 60 && r.bottom > 60);
+      }
+      let cur: HTMLElement | null = null;
+      spreads.forEach((s) => {
+        const sr = s.getBoundingClientRect();
+        if (sr.top <= vh * 0.4 && sr.bottom > vh * 0.4) cur = s;
+      });
+      if (cur && folio) {
+        const f = (cur as HTMLElement).getAttribute('data-folio');
+        if (f && folio.textContent !== f) folio.textContent = f;
+      }
+    };
+    const frame = () => {
+      const y = scrollY || doc.scrollTop;
+      if (y !== lastY) {
+        lastY = y;
+        update(y);
+      }
+      raf = requestAnimationFrame(frame);
+    };
+    raf = requestAnimationFrame(frame);
+    const onResize = () => {
+      vh = innerHeight;
+      lastY = -1;
+    };
+    addEventListener('resize', onResize, { passive: true });
+    update(scrollY || 0);
+
+    return () => {
+      cancelAnimationFrame(raf);
+      removeEventListener('resize', onResize);
+      timers.forEach(clearTimeout);
+      intervals.forEach(clearInterval);
+      observers.forEach((o) => o.disconnect());
+      bound.forEach(([el, type, fn]) => el.removeEventListener(type, fn));
+    };
   }, []);
 
   return (
     <div className="lgx-root" ref={rootRef}>
-      <header className="masthead">
+      <div className="progress" aria-hidden="true"></div>
+
+      <div className="spine" aria-hidden="true">
+        <span className="ink"></span>
+        <span className="folio" id="folio">Logos</span>
+      </div>
+
+      <header className="masthead" id="masthead">
         <div className="mh-left">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/socria-logo.png" alt="" />
+          <img src="/logos-mark.png" alt="" />
           <span className="name">Socria</span>
         </div>
-        <div className="mh-center label">A reasoning environment</div>
+        <div className="mh-center label">The reasoning environment</div>
         <div className="mh-right">
+          <a href="/">The journal</a>
           <a href="/one">Socria One</a>
           <a href={OPEN} className="ask">Open Logos</a>
         </div>
       </header>
 
-      <main>
-        {/* COVER */}
-        <section className="spread cover">
-          <span className="mark" aria-hidden="true">
-            <LogosMark size={54} />
-          </span>
-          <h1>
-            Think out loud. <span className="em">Watch it take shape.</span>
-          </h1>
-          <p className="standfirst">
-            Logos listens to how you reason and draws it — live, beside the
-            conversation — so you can see the thing you are actually thinking.
-          </p>
-          <div className="cover-cta">
-            <a className="cta-primary" href={OPEN}>
-              Open Logos <span className="ar">→</span>
-            </a>
-            <a className="cta-secondary" href="#how">or read what it does</a>
-          </div>
+      <main id="top">
 
-          {/* the map, drawing itself */}
-          <div className="demo" role="img" aria-label="A Thinking Map forming from a conversation">
-            <svg viewBox="0 0 700 260">
-              <path className="dl" d="M350,130 C286,112 232,96 178,74" />
-              <path className="dl" d="M350,130 C418,112 476,98 528,76" />
-              <path className="dl" d="M350,130 C292,158 240,182 190,204" />
-              <path className="dl" d="M350,130 C412,160 468,184 516,206" />
-              <g className="dn claim d1">
-                <circle cx="350" cy="130" r="9" />
-                <text x="350" y="156" textAnchor="middle">should I take the job</text>
-              </g>
-              <g className="dn d2">
-                <circle cx="178" cy="74" r="6" />
-                <text x="178" y="56" textAnchor="middle">I&rsquo;d be starting over</text>
-              </g>
-              <g className="dn d3">
-                <circle cx="528" cy="76" r="6" />
-                <text x="528" y="58" textAnchor="middle">the money is better</text>
-              </g>
-              <g className="dn d4">
-                <circle cx="190" cy="204" r="6" />
-                <text x="190" y="226" textAnchor="middle">assumes I&rsquo;d be bored</text>
-              </g>
-              <g className="dn d5">
-                <circle cx="516" cy="206" r="6" />
-                <text x="516" y="228" textAnchor="middle">tension: safety vs. pull</text>
-              </g>
+        {/* COVER */}
+        <section className="spread cover" data-folio="Logos" data-screen-label="Cover">
+          <div className="issue label moss seq s1">Socria · Logos · MMXXVI</div>
+          <div className="brainmark" aria-hidden="true">
+            <svg viewBox="0 0 120 130">
+              <path style={{ '--d': '.05s' } as React.CSSProperties} d="M36,24 C42,17 50,13 57,11" />
+              <path style={{ '--d': '.5s' } as React.CSSProperties} d="M63,11 C70,13 78,17 84,24" />
+              <path style={{ '--d': '.15s' } as React.CSSProperties} d="M24,44 C27,36 31,30 34,27" />
+              <path style={{ '--d': '.6s' } as React.CSSProperties} d="M86,27 C89,30 93,36 96,44" />
+              <path style={{ '--d': '.25s' } as React.CSSProperties} d="M20,64 C20,56 21,50 23,48" />
+              <path style={{ '--d': '.7s' } as React.CSSProperties} d="M97,48 C99,50 100,56 100,64" />
+              <path style={{ '--d': '.35s' } as React.CSSProperties} d="M24,84 C22,78 21,73 21,69" />
+              <path style={{ '--d': '.8s' } as React.CSSProperties} d="M99,69 C99,73 98,78 96,84" />
+              <path style={{ '--d': '.45s' } as React.CSSProperties} d="M34,100 C30,96 27,92 26,88" />
+              <path style={{ '--d': '.9s' } as React.CSSProperties} d="M94,88 C93,92 90,96 86,100" />
+              <path style={{ '--d': '.55s' } as React.CSSProperties} d="M46,110 C42,108 38,105 36,103" />
+              <path style={{ '--d': '1s' } as React.CSSProperties} d="M84,103 C82,105 78,108 74,110" />
+              <path style={{ '--d': '.65s' } as React.CSSProperties} d="M50,113 C53,114 55,115 57,115" />
+              <path style={{ '--d': '1.05s' } as React.CSSProperties} d="M63,115 C65,115 67,114 70,113" />
+              <path style={{ '--d': '.2s' } as React.CSSProperties} d="M60,16 L60,44" />
+              <path style={{ '--d': '.55s' } as React.CSSProperties} d="M60,52 L60,78" />
+              <path style={{ '--d': '.9s' } as React.CSSProperties} d="M60,86 L60,112" />
+              <path style={{ '--d': '.4s' } as React.CSSProperties} d="M44,34 L54,48" />
+              <path style={{ '--d': '.75s' } as React.CSSProperties} d="M76,34 L66,48" />
+              <path style={{ '--d': '.5s' } as React.CSSProperties} d="M36,52 L48,64 L48,74" />
+              <path style={{ '--d': '.85s' } as React.CSSProperties} d="M84,52 L72,64 L72,74" />
+              <path style={{ '--d': '.6s' } as React.CSSProperties} d="M38,86 L48,76" />
+              <path style={{ '--d': '.95s' } as React.CSSProperties} d="M82,86 L72,76" />
             </svg>
           </div>
-          <p className="demo-cap">Your thinking, as Logos reads it — not a summary of it.</p>
-        </section>
-
-        {/* WHAT IT IS */}
-        <section className="spread" id="how">
-          <div className="wrap narrow">
-            <div className="spread-head"><span className="num">·</span><span className="label">What it is</span></div>
-            <p className="feat-b fade" style={{ fontSize: 'clamp(1.3rem,2.6vw,1.9rem)', lineHeight: 1.4, color: 'var(--ink)', fontFamily: 'var(--serif)' }}>
-              Most AI hands you an answer. Logos hands you your own reasoning,
-              made visible — so the thinking stays yours and gets sharper.
-            </p>
-            <div className="feat-b fade d1" style={{ marginTop: '1.4em' }}>
-              <p>
-                You talk. Two things happen at once: Socria answers, and a
-                <em> Thinking Map</em> builds itself alongside — the claims you
-                are making, the assumptions underneath them, the tensions you
-                have not resolved, the questions still open.
-              </p>
-              <p>
-                The map is not a transcript. It <strong>reorganizes</strong> as
-                you think: pieces merge when you realise they were the same
-                thing, split when they were not, and move as your reasoning
-                moves. Watching it settle is often when you see the actual
-                shape of what you believe.
-              </p>
-            </div>
+          <h1 className="lg-name seq s2">Watch yourself <span className="em">think.</span></h1>
+          <p className="standfirst seq s3">Logos is Socria's reasoning environment. You talk — and beside the conversation, a map of your thinking draws itself: the claims you're making, the assumptions underneath, the tensions you haven't resolved. And it reorganizes as you think.</p>
+          <div className="cover-cta seq s4">
+            <a className="cta-primary" href="#demo">Watch it think <span className="ar">→</span></a>
+            <a className="cta-secondary" href="#s1">or read the ten movements</a>
           </div>
         </section>
 
-        {/* THE FEATURES */}
-        <section className="spread">
+        {/* DEMONSTRATION */}
+        <section className="spread demo short" id="demo" data-folio="·" data-screen-label="A Demonstration">
           <div className="wrap">
-            <div className="spread-head"><span className="num">I.</span><span className="label">Everything it does</span></div>
-
-            <div className="feat fade">
-              <div className="feat-t"><span className="rn">i</span>The Thinking Map</div>
-              <div className="feat-b">
-                <p>
-                  Every message is read twice — once to answer you, once to map
-                  you — so the map keeps growing while the reply is still
-                  arriving. Nodes carry their own type: a claim, a goal, an
-                  assumption, a tension, a question, a piece of evidence.
-                </p>
-                <p>
-                  Click any node and you can act on that one piece of thinking
-                  alone, in its own small thread, without dragging the whole
-                  conversation along.
-                </p>
-              </div>
+            <div className="spread-head"><span className="num">·</span><span className="label">A Demonstration</span></div>
+            <p className="intro-line fade">Someone asks a real question. Watch what Logos does with it —</p>
+            <div className="demo-panel" id="demo-panel">
+              <svg className="lmap" viewBox="0 0 640 360" role="img" aria-label="A Thinking Map forming from the question 'Should I take the job?'">
+                <path className="ln l1" d="M132,180 C190,178 250,120 316,96" />
+                <path className="ln l2" d="M132,180 C190,182 250,240 316,262" />
+                <path className="ln l3" d="M340,96 C400,98 450,118 498,128" />
+                <path className="ln tn" d="M330,116 C340,160 340,200 330,244" />
+                <path className="ln gh" d="M342,266 C420,282 480,294 542,300" />
+                <g className="nd root"><circle cx="120" cy="180" r="10" /></g>
+                <g className="lb root"><text x="66" y="212">“Should I take the job?”</text><text className="sub" x="92" y="228">Your question</text></g>
+                <g className="nd g1 mv2"><circle cx="328" cy="96" r="7" /></g>
+                <g className="lb g1 mv2"><text x="344" y="92">It pays more</text><text className="sub" x="344" y="107">claim</text></g>
+                <g className="nd g2 mv1"><circle cx="328" cy="262" r="7" /></g>
+                <g className="lb g2 mv1"><text x="344" y="258">I've stopped growing</text><text className="sub" x="344" y="273">claim</text></g>
+                <g className="nd as g3"><circle cx="510" cy="130" r="7" /></g>
+                <g className="lb g3"><text x="494" y="110" textAnchor="end">money = progress?</text><text className="sub" x="494" y="125" textAnchor="end">assumption — unexamined</text></g>
+                <g className="nd tn g4"><circle cx="333" cy="180" r="7" /></g>
+                <g className="lb g4"><text className="tn-lbl" x="349" y="176">security ↔ growth</text><text className="sub" x="349" y="191">tension — unresolved</text></g>
+                <g className="nd gh g5"><circle cx="554" cy="300" r="7" /></g>
+                <g className="lb g5"><text x="570" y="304">…</text></g>
+              </svg>
             </div>
-
-            <div className="feat fade">
-              <div className="feat-t"><span className="rn">ii</span>Four ways to read it</div>
-              <div className="feat-b">
-                <p>
-                  The same reasoning, seen differently. Switch lens and the map
-                  rearranges to answer a different question about your thinking.
-                </p>
-                <div className="chips">
-                  <span className="chip"><b>Graph</b> everything at once, alive and settling</span>
-                  <span className="chip"><b>Structure</b> what rests on what</span>
-                  <span className="chip"><b>Tensions</b> what pulls against what</span>
-                  <span className="chip"><b>Evidence</b> which claims are actually held up</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="feat fade">
-              <div className="feat-t"><span className="rn">iii</span>Four things to do to a thought</div>
-              <div className="feat-b">
-                <p>Pick a node, then choose what you want done with it.</p>
-                <div className="chips">
-                  <span className="chip"><b>Explore</b> what this idea is, and what it isn&rsquo;t</span>
-                  <span className="chip"><b>Challenge</b> where this would break</span>
-                  <span className="chip"><b>Research</b> what the evidence actually says</span>
-                  <span className="chip"><b>Trace</b> where this came from</span>
-                </div>
-                <p>
-                  <em>Trace</em> is the one people are surprised by: it finds the
-                  moment in your own conversation where an idea entered, quoting
-                  you rather than paraphrasing. It is never locked behind
-                  anything — seeing where your own thought came from is not a
-                  feature to sell.
-                </p>
-              </div>
-            </div>
-
-            <div className="feat fade">
-              <div className="feat-t"><span className="rn">iv</span>Mathematics</div>
-              <div className="feat-b">
-                <p>
-                  Logos notices when the thinking turns mathematical and changes
-                  what it is for. Notation renders properly. The map becomes a
-                  chain of steps rather than a web of claims.
-                </p>
-                <p>
-                  It reads <em>why</em> you brought the problem. Learning
-                  something? It guides. Checking work you already did? It finds
-                  the <strong>first</strong> step that went wrong and helps you
-                  repair that one — rather than quietly replacing your work with
-                  a clean solution. Just need a number? It gives you the number.
-                </p>
-              </div>
-            </div>
-
-            <div className="feat fade">
-              <div className="feat-t"><span className="rn">v</span>The Board</div>
-              <div className="feat-b">
-                <p>
-                  A third surface for maths: a scratch-space that looks like a
-                  professor&rsquo;s chalkboard. Equations set in a serif maths
-                  face, the working written by hand beside them, arrows down the
-                  derivation, mistakes struck through with the correction next
-                  to them.
-                </p>
-                <p>
-                  It only ever shows work that has actually been done. It will
-                  not fill in the ending for you.
-                </p>
-              </div>
-            </div>
-
-            <div className="feat fade">
-              <div className="feat-t"><span className="rn">vi</span>The Answer Guard</div>
-              <div className="feat-b">
-                <p>
-                  When you are learning something, Logos behaves like a good lab
-                  instructor rather than a solution engine. It climbs one rung
-                  at a time — notice what you tried, point somewhere useful,
-                  recall the idea, narrow the next move, show one step — and it
-                  stops before the ending.
-                </p>
-                <p>
-                  It holds across <em>every</em> surface at once, so the chat
-                  cannot withhold an answer while the map quietly reveals it.
-                  And it never traps you: one button shows the whole solution
-                  whenever you decide you want it.
-                </p>
-              </div>
-            </div>
-
-            <div className="feat fade">
-              <div className="feat-t"><span className="rn">vii</span>Depth</div>
-              <div className="feat-b">
-                <p>How far the thinking goes, set globally and honoured everywhere.</p>
-                <div className="chips">
-                  <span className="chip"><b>Quick</b> the single most useful thing</span>
-                  <span className="chip"><b>Balanced</b> the natural default</span>
-                  <span className="chip"><b>Deep</b> dependencies and assumptions, thoroughly</span>
-                  <span className="chip"><b>Abstract</b> the principle underneath</span>
-                </div>
-                <p>
-                  Depth changes how deeply Logos helps you <em>think</em> — never
-                  how quickly it gives an answer away. Quick does not mean
-                  &ldquo;just tell me&rdquo;.
-                </p>
-              </div>
-            </div>
-
-            <div className="feat fade">
-              <div className="feat-t"><span className="rn">viii</span>Personality</div>
-              <div className="feat-b">
-                <p>
-                  Nine settings for how Socria talks while it thinks with you —
-                  base style, warmth, directness, challenge, questioning,
-                  length, humour, formatting, and how readily it notices your
-                  wording. Underneath every combination it is still recognisably
-                  Socria.
-                </p>
-                <p>
-                  Below them, write instructions in your own words:
-                  <em> &ldquo;let me ramble before you interrupt&rdquo;</em>,
-                  <em> &ldquo;call me out when I&rsquo;m rationalising&rdquo;</em>.
-                  Or just say it mid-conversation — &ldquo;fewer questions&rdquo;,
-                  &ldquo;be blunt&rdquo; — and it adapts on the spot. Say
-                  &ldquo;remember this&rdquo; and it keeps it.
-                </p>
-              </div>
-            </div>
-
-            <div className="feat fade">
-              <div className="feat-t"><span className="rn">ix</span>Draft Space</div>
-              <div className="feat-b">
-                <p>
-                  When thinking turns into writing, a page opens beside the map.
-                  Select a passage and ask for what you need — clarify it,
-                  challenge it, check a claim, tighten it. Nothing is ever
-                  written into your draft behind your back: a suggestion only
-                  lands if you put it there.
-                </p>
-              </div>
-            </div>
-
-            <div className="feat fade">
-              <div className="feat-t"><span className="rn">x</span>Your own material</div>
-              <div className="feat-b">
-                <p>
-                  Attach real material to a specific node — paste a page of
-                  notes, upload a file or a photo of a whiteboard, pull in
-                  something from the web. Logos reads it as <em>context</em>,
-                  never as authority: it can supply facts and dates, but it does
-                  not get to settle your question, and whoever wrote it does not
-                  become you.
-                </p>
-              </div>
+            <div className="demo-cap" id="demo-cap">
+              <span className="c1">Nodes appear as you speak — read twice, mapped once</span>
+              <span className="c2">…and the map reorganizes as you think</span>
             </div>
           </div>
         </section>
 
-        {/* THE PHILOSOPHY */}
-        <section className="spread">
-          <div className="wrap narrow">
-            <div className="spread-head"><span className="num">II.</span><span className="label">The line it will not cross</span></div>
-            <p className="feat-b fade" style={{ fontFamily: 'var(--serif)', fontSize: 'clamp(1.3rem,2.6vw,1.9rem)', lineHeight: 1.4, color: 'var(--ink)' }}>
-              Logos contributes structure, questions, research, critique and
-              refinement. You keep intent, authorship, judgment and the
-              conclusion.
-            </p>
-            <div className="feat-b fade d1" style={{ marginTop: '1.4em' }}>
-              <p>
-                So &ldquo;write my essay&rdquo; gets you a conversation about
-                what you are actually arguing. &ldquo;Here is my paragraph, make
-                it clearer&rdquo; gets you help — your ideas, your voice,
-                sharper. It is a narrow line, and it is the whole point: the
-                thinking has to stay yours or none of this is worth anything.
-              </p>
-              <p>
-                Two things are never paid features and never withheld:
-                <strong> seeing where your own reasoning came from</strong>, and
-                <strong> telling Logos it read you wrong</strong>. Correct it and
-                the map re-forms around what you actually meant.
-              </p>
-            </div>
-          </div>
-        </section>
-
-        {/* TIERS */}
-        <section className="spread">
+        {/* I · THE THINKING MAP */}
+        <section className="spread sec short" id="s1" data-folio="I" data-screen-label="The Thinking Map">
           <div className="wrap">
-            <div className="spread-head"><span className="num">III.</span><span className="label">What it costs</span></div>
-            <h2 className="fade" style={{ fontFamily: 'var(--serif)', fontSize: 'clamp(1.9rem,4vw,3rem)', maxWidth: '20ch' }}>
-              Free is a real beginning, not a demo.
-            </h2>
-            <div className="tiers fade d1">
-              <div className="tier">
-                <h3>Free</h3>
-                <p className="price">no account cost</p>
-                <ul>
-                  <li>The whole loop: chat, live map, explore</li>
-                  <li>Two lines of thinking at a time</li>
-                  <li>A map that grows to four nodes</li>
-                  <li>Research, once per conversation</li>
-                  <li>Trace and correction, always</li>
-                </ul>
+            <div className="spread-head"><span className="num">I.</span><span className="label">The Thinking Map</span></div>
+            <h2 className="fade">Every message is read twice.</h2>
+            <p className="body fade d1">Once to answer you — and once to map you. Each thing you say is quietly parsed for the <em>claims</em> it makes, the <em>assumptions</em> it rests on, and the <em>tensions</em> it leaves open. The map is the second reading, made visible.</p>
+            <div className="exh twin fade d2">
+              <div className="half">
+                <span className="rd">Read once — to answer</span>
+                <p className="msg">“I think I should take the job. It pays more, and honestly I've stopped growing here.”</p>
+                <p className="res">Logos replies the way a thoughtful interlocutor would — <em>with the question that cuts deeper.</em></p>
               </div>
-              <div className="tier one">
-                <h3>Socria One</h3>
-                <p className="price">$15 / month</p>
-                <ul>
-                  <li>Maps with no ceiling</li>
-                  <li>Every lens, and the Board</li>
-                  <li>All four depths</li>
-                  <li>Research across the whole map</li>
-                  <li>Draft Space and your own material</li>
-                  <li>As many lines of thinking as you keep</li>
-                </ul>
+              <div className="half">
+                <span className="rd">Read twice — to map</span>
+                <svg viewBox="0 0 200 120" aria-hidden="true">
+                  <path className="p" d="M24,60 L88,26 M24,60 L88,94 M96,26 L164,44" />
+                  <circle className="c" cx="20" cy="60" r="6" /><circle className="c" cx="92" cy="26" r="5" /><circle className="c" cx="92" cy="94" r="5" /><circle className="c" cx="168" cy="45" r="5" />
+                </svg>
+                <p className="res">Two claims. One unexamined assumption. One live tension — <em>drawn, not buried in prose.</em></p>
               </div>
             </div>
-            <p className="feat-b fade d2" style={{ marginTop: '22px' }}>
-              When a free map reaches its edge it stops taking on new thinking —
-              it does not disappear. Everything you built stays visible and
-              editable. <a href="/one" style={{ color: '#4A6FA5', borderBottom: '1px solid rgba(74,111,165,.4)' }}>See everything One opens →</a>
-            </p>
+          </div>
+        </section>
+
+        {/* II · FOUR LENSES */}
+        <section className="spread sec short" data-folio="II" data-screen-label="Four Lenses">
+          <div className="wrap">
+            <div className="spread-head"><span className="num">II.</span><span className="label">Four Lenses</span></div>
+            <h2 className="fade">One map, four ways of seeing it.</h2>
+            <div className="exh plates4 io fade d1">
+              <div className="pl"><span className="rn">i · Graph</span><h3>The whole shape</h3><p>Your thinking as a living network — what connects, what floats free.</p><svg viewBox="0 0 54 54"><path className="p" d="M10,44 L27,20 M27,20 L44,36 M27,20 L27,6" /><circle className="c" cx="10" cy="44" r="4" /><circle className="c" cx="27" cy="20" r="4" /><circle className="c" cx="44" cy="36" r="4" /><circle className="c" cx="27" cy="6" r="3" /></svg></div>
+              <div className="pl"><span className="rn">ii · Structure</span><h3>The argument</h3><p>The same thinking as an outline — premises above, conclusions below.</p><svg viewBox="0 0 54 54"><path className="p" d="M6,10 H48 M14,24 H48 M14,38 H40 M22,52 H48" /></svg></div>
+              <div className="pl"><span className="rn">iii · Tensions</span><h3>The friction</h3><p>Every place two things you want pull in opposite directions.</p><svg viewBox="0 0 54 54"><path className="p g" d="M8,27 H22 M18,21 L24,27 L18,33 M46,27 H32 M36,21 L30,27 L36,33" /></svg></div>
+              <div className="pl"><span className="rn">iv · Evidence</span><h3>The ground</h3><p>Which claims stand on something — and which are still standing on air.</p><svg viewBox="0 0 54 54"><circle className="c" cx="22" cy="22" r="12" /><path className="p" d="M31,31 L44,44 M16,22 L21,27 L29,17" /></svg></div>
+            </div>
+          </div>
+        </section>
+
+        {/* III · FOUR MOVES */}
+        <section className="spread sec short" data-folio="III" data-screen-label="Four Moves">
+          <div className="wrap">
+            <div className="spread-head"><span className="num">III.</span><span className="label">Four Moves</span></div>
+            <h2 className="fade">Any node, four moves.</h2>
+            <div className="exh moves">
+              <div className="moves-viz fade" id="moves-viz" aria-hidden="true">
+                <svg viewBox="0 0 380 300">
+                  <circle className="hub" cx="190" cy="150" r="38" />
+                  <text className="hubt" x="190" y="155" textAnchor="middle">a node</text>
+                  <g className="mv" data-mv="0"><path className="sp" d="M190,104 L190,52" /><text x="190" y="38" textAnchor="middle">Explore</text></g>
+                  <g className="mv" data-mv="1"><path className="sp" d="M234,138 L318,110" /><text x="326" y="108">Challenge</text></g>
+                  <g className="mv" data-mv="2"><path className="sp" d="M190,196 L190,248" /><text x="190" y="272" textAnchor="middle">Research</text></g>
+                  <g className="mv" data-mv="3"><path className="sp" d="M146,162 L62,190" /><text x="54" y="196" textAnchor="end">Trace</text></g>
+                </svg>
+              </div>
+              <div className="mv-defs fade d1" id="mv-defs">
+                <div className="mv-def"><span className="w">Explore</span><p>Open the thought further — what's inside it that you haven't said yet?</p></div>
+                <div className="mv-def"><span className="w">Challenge</span><p>Logos argues the other side, properly — the strongest version of it.</p></div>
+                <div className="mv-def"><span className="w">Research</span><p>Send the node out into the world and bring real sources back to it.</p></div>
+                <div className="mv-def"><span className="w">Trace</span><p>Walk backward: what does this claim rest on, and does the chain hold?</p></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* IV · MATHEMATICS */}
+        <section className="spread sec short" data-folio="IV" data-screen-label="Mathematics">
+          <div className="wrap">
+            <div className="spread-head"><span className="num">IV.</span><span className="label">Mathematics</span></div>
+            <h2 className="fade">It finds the first wrong step.</h2>
+            <p className="body fade d1">Notation renders as you write it. And when you ask Logos to check your work, it doesn't replace your solution with a clean one — it walks your steps and points at <em>the exact place the reasoning broke.</em></p>
+            <div className="exh mathx io fade d2">
+              <div className="worked">
+                <span className="st"><span className="no">1</span>3(x + 4) = 27</span>
+                <span className="st"><span className="no">2</span>3x + 12 = 27</span>
+                <span className="st wrong"><span className="no">3</span>3x = 39<svg className="ring" viewBox="0 0 100 40" preserveAspectRatio="none"><path d="M8,20 C6,8 30,3 52,4 C79,5 96,10 95,21 C94,33 69,38 45,37 C23,36 7,31 9,22" /></svg></span>
+                <span className="st"><span className="no">4</span>x = 13</span>
+              </div>
+              <p className="math-note">“Step three — what is 27 − 12?”<span className="sm">Your working stays yours. The error is named; the repair is you.</span></p>
+            </div>
+          </div>
+        </section>
+
+        {/* V · THE BOARD */}
+        <section className="spread sec short" data-folio="V" data-screen-label="The Board">
+          <div className="wrap">
+            <div className="spread-head"><span className="num">V.</span><span className="label">The Board</span></div>
+            <h2 className="fade">A chalkboard, not a chatbox.</h2>
+            <p className="body fade d1">The Board is scratch-space: serif equations, handwritten working, arrows where arrows help. Mistakes aren't erased — they're <em>struck through with the fix beside them</em>, the way real thinking looks.</p>
+            <div className="exh board io fade d2">
+              <span className="bd-t">The Board · working</span>
+              <div className="eq" style={{ marginTop: '14px' }}>
+                <span className="row">x² − 5x + 6 = 0</span>
+                <span className="row">(x − 2)(x − 3) = 0</span>
+                <span className="row">x = <span className="strike">−2, −3<svg viewBox="0 0 100 12" preserveAspectRatio="none"><path d="M2,7 C24,3 48,10 68,5 C82,2 94,7 98,5" /></svg></span><span className="fix">x = 2, 3</span></span>
+              </div>
+              <svg className="barrow" viewBox="0 0 120 44" aria-hidden="true"><path d="M8,8 C30,34 70,38 104,20 M104,20 L90,18 M104,20 L96,32" /></svg>
+              <p className="note">sign slip — the roots flip when you solve each factor</p>
+            </div>
+            <p className="board-cap fade">Struck, corrected, kept — the record of a mind at work</p>
+          </div>
+        </section>
+
+        {/* VI · THE ANSWER GUARD */}
+        <section className="spread sec short" data-folio="VI" data-screen-label="The Answer Guard">
+          <div className="wrap">
+            <div className="spread-head"><span className="num">VI.</span><span className="label">The Answer Guard</span></div>
+            <h2 className="fade">While you're learning, it will not hand you the answer.</h2>
+            <p className="body fade d1">Ask it to. It declines — kindly — and guides instead. And the guard holds across every surface at once: the chat, the map, the Board. <em>Nothing leaks the answer</em> from around the side.</p>
+            <div className="exh guard fade d2">
+              <div className="guard-viz" aria-hidden="true">
+                <svg viewBox="0 0 130 130">
+                  <circle className="r2" cx="65" cy="65" r="60" />
+                  <circle className="r1" cx="65" cy="65" r="42" />
+                  <text x="65" y="76" textAnchor="middle">?</text>
+                </svg>
+              </div>
+              <div className="gd-lines">
+                <p className="dl you"><span className="who">You</span>“Just tell me x.”</p>
+                <p className="dl lg"><span className="who">Logos</span>Not yet. You're one step away — what does dividing both sides by three do here?</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* VII · DEPTH */}
+        <section className="spread sec short" data-folio="VII" data-screen-label="Depth">
+          <div className="wrap">
+            <div className="spread-head"><span className="num">VII.</span><span className="label">Depth</span></div>
+            <h2 className="fade">How far the thinking goes — never how fast the answer arrives.</h2>
+            <div className="exh depthx io">
+              <div className="depth-viz fade" aria-hidden="true">
+                <svg viewBox="0 0 340 270">
+                  <circle className="dr1" cx="170" cy="135" r="30" />
+                  <circle className="dr2" cx="170" cy="135" r="62" />
+                  <circle className="dr3" cx="170" cy="135" r="94" />
+                  <circle className="dr4" cx="170" cy="135" r="126" />
+                  <text className="dt1" x="170" y="140" textAnchor="middle">Quick</text>
+                  <text className="dt2" x="170" y="82" textAnchor="middle">Balanced</text>
+                  <text className="dt3" x="170" y="50" textAnchor="middle">Deep</text>
+                  <text className="dt4" x="170" y="18" textAnchor="middle">Abstract</text>
+                </svg>
+              </div>
+              <div className="mv-defs depth-defs fade d1">
+                <div className="mv-def"><span className="w">Quick</span><p>A gut-check in plain words, when that's all the moment needs.</p></div>
+                <div className="mv-def"><span className="w">Balanced</span><p>The everyday register — a thoughtful mentor, keeping your pace.</p></div>
+                <div className="mv-def"><span className="w">Deep</span><p>Slow, rigorous, pattern-spotting. For questions that have earned it.</p></div>
+                <div className="mv-def"><span className="w">Abstract</span><p>The furthest register — principles, structures, first causes.</p></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* VIII · PERSONALITY */}
+        <section className="spread sec short" data-folio="VIII" data-screen-label="Personality">
+          <div className="wrap">
+            <div className="spread-head"><span className="num">VIII.</span><span className="label">Personality</span></div>
+            <h2 className="fade">Nine dials for how it talks. Zero for what it decides.</h2>
+            <div className="exh dials fade d1">
+              <div className="dial"><svg viewBox="0 0 58 58"><circle cx="29" cy="29" r="24" /><line x1="29" y1="29" x2="29" y2="9" style={{ transform: 'rotate(-52deg)' }} /></svg><span className="dl">Warmth</span></div>
+              <div className="dial"><svg viewBox="0 0 58 58"><circle cx="29" cy="29" r="24" /><line x1="29" y1="29" x2="29" y2="9" style={{ transform: 'rotate(34deg)' }} /></svg><span className="dl">Directness</span></div>
+              <div className="dial"><svg viewBox="0 0 58 58"><circle cx="29" cy="29" r="24" /><line x1="29" y1="29" x2="29" y2="9" style={{ transform: 'rotate(-18deg)' }} /></svg><span className="dl">Humor</span></div>
+              <div className="dial"><svg viewBox="0 0 58 58"><circle cx="29" cy="29" r="24" /><line x1="29" y1="29" x2="29" y2="9" style={{ transform: 'rotate(58deg)' }} /></svg><span className="dl">Rigor</span></div>
+              <div className="dial"><svg viewBox="0 0 58 58"><circle cx="29" cy="29" r="24" /><line x1="29" y1="29" x2="29" y2="9" style={{ transform: 'rotate(8deg)' }} /></svg><span className="dl">Patience</span></div>
+              <div className="dial"><svg viewBox="0 0 58 58"><circle cx="29" cy="29" r="24" /><line x1="29" y1="29" x2="29" y2="9" style={{ transform: 'rotate(44deg)' }} /></svg><span className="dl">Push</span></div>
+              <div className="dial"><svg viewBox="0 0 58 58"><circle cx="29" cy="29" r="24" /><line x1="29" y1="29" x2="29" y2="9" style={{ transform: 'rotate(-38deg)' }} /></svg><span className="dl">Formality</span></div>
+              <div className="dial"><svg viewBox="0 0 58 58"><circle cx="29" cy="29" r="24" /><line x1="29" y1="29" x2="29" y2="9" style={{ transform: 'rotate(26deg)' }} /></svg><span className="dl">Curiosity</span></div>
+              <div className="dial"><svg viewBox="0 0 58 58"><circle cx="29" cy="29" r="24" /><line x1="29" y1="29" x2="29" y2="9" style={{ transform: 'rotate(-8deg)' }} /></svg><span className="dl">Candor</span></div>
+            </div>
+            <p className="own-words fade d2">…and instructions in your own words: <span className="q">“be blunt, skip the jargon, and never flatter me.”</span></p>
+          </div>
+        </section>
+
+        {/* IX · DRAFT SPACE */}
+        <section className="spread sec short" data-folio="IX" data-screen-label="Draft Space">
+          <div className="wrap">
+            <div className="spread-head"><span className="num">IX.</span><span className="label">Draft Space</span></div>
+            <h2 className="fade">Write beside your map.</h2>
+            <p className="body fade d1">When the thinking is ready to become an essay, a decision memo, a plan — Draft Space opens beside the map. Your argument on one side, its skeleton on the other. <em>Nothing is written for you.</em></p>
+            <div className="exh draftx fade d2">
+              <div className="side">
+                <span className="rd">Your draft</span>
+                <p className="draft-lines">The case for leaving isn't the salary — <span className="cw"></span><br /><span className="faint">it's the part of me that stopped</span><br /><span className="faint">asking questions at this desk.</span></p>
+              </div>
+              <div className="side">
+                <span className="rd">Your map, beside it</span>
+                <div className="mini-map" aria-hidden="true">
+                  <svg viewBox="0 0 220 130">
+                    <path className="p" d="M28,65 L96,28 M28,65 L96,100 M104,28 L178,50" />
+                    <circle className="c" cx="24" cy="65" r="6" /><circle className="c" cx="100" cy="28" r="5" /><circle className="c" cx="100" cy="100" r="5" /><circle className="c" cx="182" cy="51" r="5" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* X · YOUR OWN MATERIAL */}
+        <section className="spread sec short" data-folio="X" data-screen-label="Your Own Material">
+          <div className="wrap">
+            <div className="spread-head"><span className="num">X.</span><span className="label">Your Own Material</span></div>
+            <h2 className="fade">Bring what you're actually working with.</h2>
+            <div className="exh mat fade d1">
+              <div className="m"><svg viewBox="0 0 40 40"><path className="p" d="M13,6 H27 M11,10 H29 V34 H11 Z M16,18 H24 M16,24 H24" /></svg><h3>Paste it</h3><p>Long-form text, a contract, your own notes — dropped straight into the thinking.</p></div>
+              <div className="m"><svg viewBox="0 0 40 40"><path className="p" d="M20,26 V8 M13,15 L20,8 L27,15 M8,26 V32 H32 V26" /></svg><h3>Upload it</h3><p>Documents and images, read alongside the conversation — multimodal when available.</p></div>
+              <div className="m"><svg viewBox="0 0 40 40"><path className="p" d="M20,6 A14,14 0 1,0 20,34 A14,14 0 1,0 20,6 M6,20 H34 M20,6 C14,14 14,26 20,34 C26,26 26,14 20,6" /></svg><h3>Send it out</h3><p>Research reaches the live web and brings sources back to the node that asked.</p></div>
+            </div>
+            <p className="aside fade d2">All of it is read as context. None of it is treated as authority.</p>
+          </div>
+        </section>
+
+        {/* THE LINE */}
+        <section className="spread sec vowx short" data-folio="Line" data-screen-label="The Line">
+          <div className="wrap">
+            <div className="spread-head"><span className="num">·</span><span className="label">The Line It Won't Cross</span></div>
+            <h2 className="fade">A precise division of labor.</h2>
+            <div className="v-grid fade d1">
+              <p><span className="k">Logos contributes</span>Structure. Questions. Research. <span className="b">Critique.</span></p>
+              <p><span className="k">You keep</span>Intent. Authorship. Judgment. <span className="b">The conclusion.</span></p>
+            </div>
+          </div>
+        </section>
+
+        {/* THE TERMS */}
+        <section className="spread sec terms short" data-folio="Terms" data-screen-label="The Terms">
+          <div className="wrap">
+            <div className="spread-head"><span className="num">·</span><span className="label">The Terms</span></div>
+            <h2 className="fade">Free is a beginning, not a demo.</h2>
+            <div className="t-grid">
+              <div className="tier fade">
+                <h3>Logos, free</h3>
+                <p className="tp">Every day · no card</p>
+                <ul>
+                  <li>Real Thinking Maps — drawn live, fully yours.</li>
+                  <li>Every lens and every move, on every node.</li>
+                  <li>Research — experienced properly, once per map.</li>
+                  <li>The Board, the guard, the depths of Quick and Balanced.</li>
+                </ul>
+                <p className="stoprow"><span className="o"></span>Free pauses at four branches<span className="sep">·</span><span className="f"></span>One branches without end</p>
+                <p className="stoprow"><span className="o"></span>Free researches once<span className="sep">·</span><span className="f"></span>One researches without asking twice</p>
+              </div>
+              <div className="tier one fade d1">
+                <h3>Socria <span className="em">One</span></h3>
+                <p className="tp">$15 / month · cancel anytime</p>
+                <ul>
+                  <li>The full map — unbounded branching, every view.</li>
+                  <li>Research across the whole map, as often as it calls.</li>
+                  <li>All four depths — Quick, Balanced, Deep, Abstract.</li>
+                  <li>Draft Space in full, long-form, multimodal.</li>
+                  <li>Persistent reasoning, personalization, connected sources.</li>
+                </ul>
+                <a className="t-cta" href="/one">Continue with One <span className="ar">→</span></a>
+                <br /><a className="t-more" href="/one">Read the One issue →</a>
+              </div>
+            </div>
+            <p className="t-vow fade">And the vow holds at every tier: what you've made is yours. Nothing you build is ever taken back.</p>
           </div>
         </section>
 
         {/* CLOSE */}
-        <section className="spread close-l">
+        <section className="spread close-sec" id="begin" data-folio="Fin" data-screen-label="Close">
           <div className="wrap">
-            <h2 className="fade">
-              Think <span className="em">for yourself.</span>
-            </h2>
-            <p className="sub fade d1">
-              Bring something you are actually stuck on. That is when it is
-              worth anything.
-            </p>
-            <a className="cta-primary fade d2" href={OPEN}>
-              Open Logos <span className="ar">→</span>
-            </a>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img className="cl-mark fade" src="/logos-mark.png" alt="" />
+            <h2 className="fade d1">Think For <span className="em">Yourself.</span></h2>
+            <p className="invite fade d2">Bring a question you've been carrying. Watch your own thinking take shape.</p>
+            <div className="cta-row fade d3">
+              <a className="cta-go" href={OPEN}>Open Logos <span className="ar">→</span></a>
+              <a className="cta-quiet" href="/one">or continue with One</a>
+            </div>
             <div className="colophon">
               <span>Socria · Human-first AI</span>
-              <span><a href="/chat">Socria chat</a></span>
+              <span><a href="/">The journal</a></span>
               <span><a href="/one">Socria One</a></span>
-              <span>© {new Date().getFullYear()}</span>
+              <span className="it">Think For Yourself.</span>
+              <span>© <span>2026</span></span>
             </div>
           </div>
         </section>
+
       </main>
     </div>
   );
