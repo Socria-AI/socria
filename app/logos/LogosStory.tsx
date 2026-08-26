@@ -354,8 +354,11 @@ export function LogosStory() {
           <div className="wrap">
             <div className="spread-head"><span className="num">VII.</span><span className="label">Depth</span></div>
             <h2 className="fade">How far the thinking goes — never how fast the answer arrives.</h2>
-            <div className="exh depthx io">
-              <div className="fade"><DemoControls /></div>
+            {/* Same treatment as the moves: the control and its result are a
+                two-pane exhibit, so it takes the spread's full width and the
+                written registers sit underneath it. */}
+            <div className="fade"><DemoControls /></div>
+            <div className="exh moves-defs">
               <div className="mv-defs depth-defs fade d1">
                 <div className="mv-def"><span className="w">Quick</span><p>A gut-check in plain words, when that's all the moment needs.</p></div>
                 <div className="mv-def"><span className="w">Balanced</span><p>The everyday register — a thoughtful mentor, keeping your pace.</p></div>

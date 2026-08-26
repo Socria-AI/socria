@@ -205,6 +205,24 @@ export const PERSONALITY_DIMENSIONS: PersonalityDimension[] = [
   },
 ];
 
+/**
+ * The order a dial should lay a dimension out in.
+ *
+ * The arrays above are authored default-first, because the default is the one
+ * that contributes no prompt line and everything else is a departure from it.
+ * A dial is read as a spectrum, though, and default-first would put the two
+ * departures next to each other at one end — implying Low sits between
+ * Default and High, which is backwards.
+ *
+ * Every three-option dimension here is a genuine less/more axis, so the
+ * default moves to the middle. Base style is a set of six manners rather than
+ * an axis, and keeps its authored order.
+ */
+export function dialOrder(d: PersonalityDimension): PersonalityOption[] {
+  if (d.options.length !== 3) return d.options;
+  return [d.options[1], d.options[0], d.options[2]];
+}
+
 export type Personality = Record<string, string>;
 
 export const DEFAULT_PERSONALITY: Personality = Object.fromEntries(

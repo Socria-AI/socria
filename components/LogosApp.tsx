@@ -50,6 +50,8 @@ import {
   sanitizePersonality,
   type Personality,
 } from '@/lib/logos-personality';
+import { lastCoreModel, rememberModel } from '@/lib/socria-model-store';
+import { PersonalityDial } from '@/components/PersonalityDial';
 import { ContextPanel } from '@/components/ContextPanel';
 import { ConnectionsModal } from '@/components/ConnectionsModal';
 import type { Attachment, AttachmentOrigin } from '@/lib/logos-attachments';
@@ -81,7 +83,6 @@ const KEY_STORAGE = 'socria.core3AccessKey.v1';
 // Depth is shared with the Core chat, so switching there carries over.
 const DEPTH_KEY = 'socria.depth.v1';
 // Same store the Core chat reads, so picking a model here lands there.
-const MODEL_KEY = 'socria.model.v1';
 const REVEALED_KEY = 'socria.logos.revealed.v1';
 // Custom instructions — how Socria should work with this person. The key is
 // product-wide by design so other surfaces can adopt it; today Logos is the
@@ -113,7 +114,13 @@ const STARTERS = [
 // Long enough to notice the map settle, short enough not to nag.
 const CHANGE_FLASH_MS = 4200;
 
-export function LogosApp() {
+export function LogosApp({
+  // Set by /chat, which renders this component. Switching model there is a
+  // state change, not a navigation — see switchTo.
+  onSwitchModel,
+}: {
+  onSwitchModel?: (next: SocriaModel) => void;
+} = {}) {
   const { isLoaded, isSignedIn } = useUser();
   const [unlocked, setUnlocked] = useState(false);
   // Don't hang behind Clerk: if it never initializes (preview builds), fall
@@ -349,9 +356,27 @@ export function LogosApp() {
   function pickModel(next: SocriaModel) {
     setModelOpen(false);
     if (next === 'logos') return;
-    try {
-      localStorage.setItem(MODEL_KEY, next);
-    } catch {}
+    switchTo(next);
+  }
+
+  /** The way out of Logos: back to whichever Core model they came from. */
+  function leaveForChat() {
+    switchTo(lastCoreModel());
+  }
+
+  // Leaving Logos is a model switch. It USED to be `router.push('/chat')`,
+  // which does nothing visible: /chat is already the route — it renders this
+  // component whenever the model is Logos — so pushing it again re-renders
+  // the same surface with the same state. Remembering the new model doesn't
+  // help either, since /chat only reads storage on mount. So when /chat is
+  // our host, hand the switch back to it and let it re-render; the router is
+  // only for the case where this is mounted somewhere else.
+  function switchTo(next: SocriaModel) {
+    rememberModel(next);
+    if (onSwitchModel) {
+      onSwitchModel(next);
+      return;
+    }
     router.push(SOCRIA_MODELS[next].href ?? '/chat');
   }
 
@@ -1192,7 +1217,7 @@ export function LogosApp() {
             <div className="lg-gate-card">
               <span className="lg-word">
                 <LogosMark size={44} />
-                <span className="lg-sr">Logos</span>
+                <span className="lg-sr">Socria Logos</span>
               </span>
               <h1>A reasoning environment.</h1>
               <p>
@@ -1256,22 +1281,14 @@ export function LogosApp() {
 
             <div className="lg-persona-grid">
               {PERSONALITY_DIMENSIONS.map((d) => (
-                <label key={d.id} className="lg-persona-field">
-                  <span className="lg-persona-label">{d.label}</span>
-                  <select
-                    className="lg-persona-select"
-                    value={personaDraft[d.id] ?? d.options[0].id}
-                    onChange={(e) =>
-                      setPersonaDraft((prev) => ({ ...prev, [d.id]: e.target.value }))
-                    }
-                  >
-                    {d.options.map((o) => (
-                      <option key={o.id} value={o.id}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                <PersonalityDial
+                  key={d.id}
+                  dimension={d}
+                  value={personaDraft[d.id] ?? d.options[0].id}
+                  onChange={(next) =>
+                    setPersonaDraft((prev) => ({ ...prev, [d.id]: next }))
+                  }
+                />
               ))}
             </div>
             {!isDefaultPersonality(personaDraft) && (
@@ -1385,7 +1402,7 @@ export function LogosApp() {
             </button>
             <span className="lg-word">
               <LogosMark size={26} />
-              <span className="lg-sr">Logos</span>
+              <span className="lg-sr">Socria Logos</span>
             </span>
             <span className="lg-head-note">A reasoning environment</span>
             <button
@@ -1452,9 +1469,13 @@ export function LogosApp() {
               Draft
               {!one && <OneLock className="lg-draft-lock" />}
             </button>
-            <a href="/chat" className="lg-back">
+            {/* Leaving is a model switch, not just a link: /chat opens on
+                whichever model is remembered, and that is still Logos — so a
+                bare href back to it re-rendered this and looked like a dead
+                button. Hand back the Core model they came from. */}
+            <button type="button" className="lg-back" onClick={leaveForChat}>
               Socria chat <span aria-hidden="true">→</span>
-            </a>
+            </button>
           </header>
 
           <div className="lg-thread">
@@ -1477,7 +1498,7 @@ export function LogosApp() {
 
             {messages.map((m, i) => (
               <div key={i} className={`lg-msg lg-msg-${m.role}`}>
-                {m.role === 'assistant' && <span className="lg-msg-who">Logos</span>}
+                {m.role === 'assistant' && <span className="lg-msg-who">Socria Logos</span>}
                 <div className="lg-msg-stack">
                   {!!m.attachments?.length && <AttachmentList items={m.attachments} />}
                   {m.content && (
@@ -1491,7 +1512,7 @@ export function LogosApp() {
 
             {streaming && (
               <div className="lg-msg lg-msg-assistant">
-                <span className="lg-msg-who">Logos</span>
+                <span className="lg-msg-who">Socria Logos</span>
                 <div className="lg-msg-body">
                   <MathText>{streaming}</MathText>
                 </div>
@@ -1500,7 +1521,7 @@ export function LogosApp() {
 
             {busy && !streaming && (
               <div className="lg-msg lg-msg-assistant">
-                <span className="lg-msg-who">Logos</span>
+                <span className="lg-msg-who">Socria Logos</span>
                 <div className="lg-thinking" aria-label="Thinking">
                   <span /> <span /> <span />
                 </div>

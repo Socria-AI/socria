@@ -79,6 +79,51 @@ export const DEMO_MATH_MAP: ThinkingMap = {
 };
 
 /**
+ * The same opening sentence, answered at each of the four registers.
+ *
+ * Depth is the setting people most expect to mean "longer", so the point of
+ * showing it rather than describing it is that the four replies differ in
+ * ALTITUDE, not word count: Quick names the split, Deep reads the wording it
+ * came in, Abstract asks what the whole question is standing on. Balanced is
+ * verbatim the reply in DEMO_TURNS, so the page never contradicts itself.
+ *
+ * All four end on a question. Depth changes how far the thinking goes; it
+ * never buys a verdict.
+ */
+export const DEMO_DEPTH_ANSWERS: Record<string, { note: string; body: string }> = {
+  quick: {
+    note: 'a gut-check, in plain words',
+    body: "Two reasons in one sentence, and only one of them is about the work. Would you still want it if the pay were identical?",
+  },
+  balanced: {
+    note: 'the everyday register — a thoughtful mentor, at your pace',
+    body: "Three years of the same problems is a real reason to leave. The money is a separate one — and you've put them in the same sentence, as though the first were evidence for the second. What would the new role teach you that this one has stopped teaching you?",
+  },
+  deep: {
+    note: 'slow, rigorous, reading the reasoning itself',
+    body: "Look at the order you said it in. The money came first, plainly. The stagnation came second, behind an “honestly” — which is the word people put in front of the reason they actually believe. The one you trust is the one you hedged.\n\nAnd the two measure different things. A raise prices the skills you already have; growth is about the ones you don't. They track each other often enough to feel like one measure, and they come apart precisely in roles that pay well for learning you've already finished.\n\nWhich of the two would you defend to someone who thought you were making a mistake?",
+  },
+  abstract: {
+    note: 'the furthest register — principles, structures, first causes',
+    body: "Underneath this is a question about what a career is for, and you're holding two answers at once.\n\nIf it's a store of value, the raise settles it and the boredom is a cost you're choosing to pay. If it's a sequence of problems that keep changing you, the raise is close to irrelevant and the boredom is the entire finding. Most people carry both accounts and never have to choose, because the two usually recommend the same job. Yours have come apart, which is why the sentence needed a “so” to hold together.\n\nWhich account were you reasoning from when you wrote “stopped growing”?",
+  },
+};
+
+/**
+ * The Board, drawn in the order it is actually worked — each step with the
+ * line that names what just happened. The mistake is step four and the
+ * correction is step five, because that sequence is the whole argument for
+ * the Board: the wrong turn stays on the page.
+ */
+export const DEMO_BOARD_STEPS: { id: string; say: string }[] = [
+  { id: 'g1', say: 'the equation you were handed' },
+  { id: 'u1', say: '…and what you are after' },
+  { id: 's1', say: 'factored — the first real move' },
+  { id: 'e1', say: 'set each factor to zero, and slip a sign' },
+  { id: 'r1', say: 'struck through, the fix beside it — nothing erased' },
+];
+
+/**
  * What each of the four moves actually returns, for the assumption node
  * "More money means progress".
  *

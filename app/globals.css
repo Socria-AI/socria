@@ -3053,9 +3053,14 @@ html.js-anim .scrolly-root .fade.d3 { transition-delay: .3s; }
 }
 .logos-root .lg-back {
   margin-left: auto;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font: inherit;
   font-size: 12px;
   color: var(--lg-ink-40);
   text-decoration: none;
+  cursor: pointer;
   transition: color 0.2s;
 }
 .logos-root .lg-back:hover { color: var(--lg-primary); }
@@ -5798,23 +5803,55 @@ html.js-anim .scrolly-root .fade.d3 { transition-delay: .3s; }
 .logos-root .lg-style-cancel { margin-left: auto; }
 
 /* ── Socria Personality controls ─────────────────────────────────── */
+/* Nine dials rather than nine dropdowns: each dimension is a short ordered
+   range, and a dial shows the whole range and your place in it without being
+   opened. Three across so the labels have room to sit under the faces. */
 .logos-root .lg-persona-grid {
-  display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px;
-  margin-top: 16px;
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px 10px;
+  margin-top: 18px;
 }
-@media (max-width: 560px) { .logos-root .lg-persona-grid { grid-template-columns: 1fr; } }
-.logos-root .lg-persona-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.logos-root .lg-persona-label {
-  font-size: 10.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
-  color: var(--lg-ink-40);
+@media (max-width: 560px) { .logos-root .lg-persona-grid { grid-template-columns: repeat(2, 1fr); } }
+
+.logos-root .lg-dial {
+  display: flex; flex-direction: column; align-items: center; gap: 5px;
+  min-width: 0; text-align: center;
+  /* a drag across a dial must not select the labels under it */
+  user-select: none; -webkit-user-select: none;
 }
-.logos-root .lg-persona-select {
-  width: 100%; padding: 7px 10px;
-  border: 1px solid var(--lg-line); border-radius: 9px;
-  background: #fff; font: inherit; font-size: 13px; color: var(--lg-ink);
-  cursor: pointer;
+.logos-root .lg-dial-face {
+  width: 100%; max-width: 62px; height: auto; overflow: visible;
+  cursor: pointer; touch-action: none; border-radius: 50%;
 }
-.logos-root .lg-persona-select:focus { outline: none; border-color: rgba(53,70,32,0.4); }
+.logos-root .lg-dial-face:focus { outline: none; }
+.logos-root .lg-dial-face:focus-visible {
+  outline: 2px solid var(--lg-primary); outline-offset: 3px;
+}
+.logos-root .lg-dial-ring { fill: none; stroke: var(--lg-line); stroke-width: 1.3; }
+.logos-root .lg-dial-tick {
+  stroke: var(--lg-ink-40); stroke-width: 1.3; stroke-linecap: round; opacity: 0.4;
+  transition: opacity 0.2s ease, stroke 0.2s ease;
+}
+.logos-root .lg-dial-tick.is-on { stroke: var(--lg-primary); stroke-width: 2; opacity: 1; }
+.logos-root .lg-dial-home { fill: var(--lg-ink-40); opacity: 0.5; }
+.logos-root .lg-dial-hub { fill: var(--lg-primary); }
+.logos-root .lg-dial-needle {
+  stroke: var(--lg-primary); stroke-width: 2.6; stroke-linecap: round;
+  transition: all 0.32s cubic-bezier(0.34, 1.3, 0.5, 1);
+}
+/* while dragging the needle should track the pointer, not lag behind an ease */
+.logos-root .lg-dial.is-dragging .lg-dial-needle { transition: none; }
+.logos-root .lg-dial-face:hover .lg-dial-ring { stroke: rgba(53, 70, 32, 0.3); }
+.logos-root .lg-dial-name {
+  font-size: 9.5px; font-weight: 600; letter-spacing: 0.09em; text-transform: uppercase;
+  color: var(--lg-ink-40); line-height: 1.25;
+}
+.logos-root .lg-dial-value { font-size: 12.5px; color: var(--lg-ink-60); line-height: 1.2; }
+.logos-root .lg-dial.is-moved .lg-dial-value { color: var(--lg-primary); font-weight: 500; }
+
+@media (prefers-reduced-motion: reduce) {
+  .logos-root .lg-dial-needle { transition: none; }
+}
+
 .logos-root .lg-persona-reset {
   margin-top: 10px; padding: 0; border: none; background: transparent;
   font: inherit; font-size: 12px; font-style: italic;

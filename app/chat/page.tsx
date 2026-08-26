@@ -15,6 +15,8 @@ import { ModelPicker } from '@/components/ModelPicker';
 import { ModelGlyph } from '@/components/ModelGlyph';
 import { LogosApp } from '@/components/LogosApp';
 import { isValidOneKey } from '@/lib/socria-one';
+import { MODEL_KEY, rememberModel } from '@/lib/socria-model-store';
+import { loadLocal as loadLocalLogos } from '@/lib/logos-sessions';
 import { DepthPicker } from '@/components/DepthPicker';
 import { TryCore3Pill } from '@/components/TryCore3Pill';
 import { Core3IntroModal } from '@/components/Core3IntroModal';
@@ -86,7 +88,6 @@ const MIGRATED_KEY = 'socria.cloudMigrated.v1';
 // AI reply). From then on, starting a *second* anonymous session requires
 // sign-in — even if they delete the first one. Cleared on sign-in.
 const USED_FREE_KEY = 'socria.usedFreeConvo.v1';
-const MODEL_KEY = 'socria.model.v1';
 const DEPTH_KEY = 'socria.depth.v1';
 
 function readModel(): SocriaModel {
@@ -172,9 +173,11 @@ export default function ChatPage() {
   const router = useRouter();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   // Logos sessions live in the same store; listed here so one sidebar shows
-  // everything you've been thinking about, whichever surface produced it.
+  // everything you've been thinking about, whichever surface produced it —
+  // interleaved by when you last touched it, not filed under the model that
+  // produced it. Which one it was is a mark on the row, not a heading.
   const [logosSessions, setLogosSessions] = useState<
-    { id: string; title: string; nodes: number }[]
+    { id: string; title: string; nodes: number; updatedAt: number }[]
   >([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [input, setInput] = useState('');
@@ -259,8 +262,8 @@ export default function ChatPage() {
           const json = await res.json();
           if (cancelled) return;
           const all: Conversation[] = json.conversations || [];
-          // Logos sessions share this store but not this UI — they're listed
-          // separately and opened in Logos, where their map lives.
+          // Logos sessions share this store but not this UI: they're listed
+          // in the same sidebar and opened in Logos, where their map lives.
           const list = all.filter((c: any) => c.kind !== 'logos');
           setLogosSessions(
             all
@@ -269,6 +272,7 @@ export default function ChatPage() {
                 id: c.id,
                 title: c.title,
                 nodes: c.map?.nodes?.length ?? 0,
+                updatedAt: Number(c.updatedAt) || 0,
               }))
           );
           setConversations(list);
@@ -280,6 +284,14 @@ export default function ChatPage() {
         const stored = loadLocal();
         if (cancelled) return;
         setConversations(stored);
+        setLogosSessions(
+          loadLocalLogos().map((s) => ({
+            id: s.id,
+            title: s.title,
+            nodes: s.map?.nodes?.length ?? 0,
+            updatedAt: Number(s.updatedAt) || 0,
+          }))
+        );
         setUsedFree(readUsedFree());
         const lastActive =
           typeof window !== 'undefined'
@@ -439,9 +451,7 @@ export default function ChatPage() {
     if (!isLoaded) return;
     if (!canUseCore3 && SOCRIA_MODELS[model].requiresAuth) {
       setModel('core-2');
-      try {
-        localStorage.setItem(MODEL_KEY, 'core-2');
-      } catch {}
+      rememberModel('core-2');
     }
   }, [isLoaded, canUseCore3, model]);
   function pickModel(next: SocriaModel) {
@@ -458,9 +468,7 @@ export default function ChatPage() {
       return;
     }
     setModel(next);
-    try {
-      localStorage.setItem(MODEL_KEY, next);
-    } catch {}
+    rememberModel(next);
   }
 
   // Validate + persist a typed access key. Returns true when accepted.
@@ -527,9 +535,7 @@ export default function ChatPage() {
       setCore3Dismissed(true);
       setCore3ModalOpen(false);
       setModel('core-3');
-      try {
-        localStorage.setItem(MODEL_KEY, 'core-3');
-      } catch {}
+      rememberModel('core-3');
       return;
     }
     setCore3ModalOpen(false);
@@ -546,11 +552,24 @@ export default function ChatPage() {
     setCore3Dismissed(true);
     setCore3ModalOpen(false);
     setModel('core-3');
-    try {
-      localStorage.setItem(MODEL_KEY, 'core-3');
-    } catch {}
+    rememberModel('core-3');
     return true;
   }
+
+  // One sidebar, one order. Chat sessions and Logos sessions are the same
+  // thing to the person reading the list — something they were thinking about
+  // — so they interleave by when each was last touched. The Logos mark on the
+  // row says which surface opens it; no heading files them apart.
+  const sessionRail = [
+    ...conversations.map((c) => ({
+      kind: 'chat' as const,
+      id: c.id,
+      title: c.title,
+      updatedAt: c.updatedAt,
+      nodes: 0,
+    })),
+    ...logosSessions.map((s) => ({ kind: 'logos' as const, ...s })),
+  ].sort((a, b) => b.updatedAt - a.updatedAt);
 
   // Scroll to bottom when messages or stream changes
   const active = conversations.find((c) => c.id === activeId);
@@ -1141,9 +1160,7 @@ export default function ChatPage() {
     const want = params.get('model');
     if (want !== 'logos' && want !== 'core-3' && want !== 'core-2') return;
     setModel(want);
-    try {
-      localStorage.setItem(MODEL_KEY, want);
-    } catch {}
+    rememberModel(want);
     const url = new URL(window.location.href);
     url.searchParams.delete('model');
     window.history.replaceState({}, '', url.pathname + url.search);
@@ -1156,7 +1173,17 @@ export default function ChatPage() {
   // experience in here rather than navigating away, so /chat stays the
   // address of "talking to Socria" whichever mind is answering. Every hook
   // above has already run, so this branch is safe.
-  if (model === 'logos') return <LogosApp />;
+  // Switching back out of Logos is the same swap in reverse, so it has to be
+  // a state change here — Logos pushing /chat would only re-render itself.
+  if (model === 'logos')
+    return (
+      <LogosApp
+        onSwitchModel={(next) => {
+          setModel(next);
+          rememberModel(next);
+        }}
+      />
+    );
 
   return (
     <div className="flex h-dvh">
@@ -1241,31 +1268,52 @@ export default function ChatPage() {
             <p className="px-3 py-2 text-xs text-ink/40 font-serif italic">
               Loading sessions…
             </p>
-          ) : conversations.length === 0 ? (
+          ) : sessionRail.length === 0 ? (
             <p className="px-3 py-2 text-xs text-ink/40 font-serif italic">
               No sessions yet. Start one.
             </p>
           ) : (
-            conversations.map((c) => {
-              const isActive = c.id === activeId;
-              return (
+            sessionRail.map((item) =>
+              item.kind === 'logos' ? (
+                <a
+                  key={`logos-${item.id}`}
+                  href={`/chat?s=${encodeURIComponent(item.id)}`}
+                  // Opening one of these is a model switch as well as a
+                  // navigation: record it before leaving, or coming back to
+                  // /chat would land on whatever was active before and
+                  // contradict where they just were.
+                  onClick={() => rememberModel('logos')}
+                  className="group flex items-center gap-2 px-3 py-2 rounded-md text-[13px] text-ink/70 hover:bg-ink/5 hover:text-ink transition-colors"
+                  title={`${item.title} — opens in Logos`}
+                >
+                  <ModelGlyph
+                    model="logos"
+                    size={13}
+                    className="text-moss-700 shrink-0"
+                  />
+                  <span className="truncate flex-1">{item.title}</span>
+                  <span className="text-[10px] text-ink/35 shrink-0">
+                    {item.nodes ? `${item.nodes} nodes` : 'no map'}
+                  </span>
+                </a>
+              ) : (
                 <div
-                  key={c.id}
+                  key={`chat-${item.id}`}
                   className={`group flex items-center justify-between px-3 py-2 rounded-md text-[13px] transition-colors cursor-pointer ${
-                    isActive
+                    item.id === activeId
                       ? 'bg-moss-50 text-ink'
                       : 'text-ink/70 hover:bg-ink/5 hover:text-ink'
                   }`}
                   onClick={() => {
-                    setActiveId(c.id);
+                    setActiveId(item.id);
                     setSidebarOpen(false);
                   }}
                 >
-                  <span className="truncate flex-1">{c.title}</span>
+                  <span className="truncate flex-1">{item.title}</span>
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      deleteSession(c.id);
+                      deleteSession(item.id);
                     }}
                     className="opacity-0 group-hover:opacity-100 text-ink/40 hover:text-ink ml-2 px-1 transition-opacity"
                     aria-label="Delete"
@@ -1273,38 +1321,8 @@ export default function ChatPage() {
                     ×
                   </button>
                 </div>
-              );
-            })
-          )}
-
-          {logosSessions.length > 0 && (
-            <>
-              <div className="px-3 pt-4 pb-1 text-[10px] uppercase tracking-wider text-ink/40">
-                Logos
-              </div>
-              {logosSessions.map((s) => (
-                <a
-                  key={s.id}
-                  href={`/chat?s=${encodeURIComponent(s.id)}`}
-                  // These sessions belong to a different model, so opening one
-                  // is a model switch as well as a navigation: record it before
-                  // leaving, or coming back to /chat would land on whatever was
-                  // active before and contradict where they just were.
-                  onClick={() => {
-                    try {
-                      localStorage.setItem(MODEL_KEY, 'logos');
-                    } catch {}
-                  }}
-                  className="group flex items-center gap-2 px-3 py-2 rounded-md text-[13px] text-ink/70 hover:bg-ink/5 hover:text-ink transition-colors"
-                >
-                  <ModelGlyph model="logos" size={13} className="text-moss-700" />
-                  <span className="truncate flex-1">{s.title}</span>
-                  <span className="text-[10px] text-ink/35 shrink-0">
-                    {s.nodes ? `${s.nodes} nodes` : 'no map'}
-                  </span>
-                </a>
-              ))}
-            </>
+              )
+            )
           )}
         </div>
 

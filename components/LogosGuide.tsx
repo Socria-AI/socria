@@ -27,7 +27,7 @@ const Talk = (
       I can’t tell if I want this career or just the idea of it.
     </div>
     <div className="lgg-bubble lgg-bubble-logos">
-      <span className="lgg-who">Logos</span>
+      <span className="lgg-who">Socria Logos</span>
       You said “the idea of it,” which suggests you’ve already noticed a gap.
     </div>
   </div>

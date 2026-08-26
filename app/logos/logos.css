@@ -662,8 +662,97 @@
 
 /* guard + controls demos */
 .lgx-root .ui-guarddemo { padding: 20px 24px; display: flex; flex-direction: column; justify-content: center; height: 100%; }
-.lgx-root .ui-ctrldemo { padding: 18px 20px; height: 100%; display: flex; flex-direction: column; }
-.lgx-root .ui-depthmenu { position: static; margin: 14px 0 0 auto; width: 248px; animation: none; }
+
+/* Depth: the control on the left, what it returns on the right. Same two-pane
+   shape as the moves exhibit, for the same reason — the setting alone proves
+   only that the setting exists. */
+.lgx-root .ui-ctrldemo {
+  height: 100%; display: grid; grid-template-columns: minmax(0,336px) minmax(0,1fr);
+  gap: clamp(18px,3vw,32px); padding: 20px 22px; align-items: start; overflow: auto;
+}
+@media (max-width: 820px) { .lgx-root .ui-ctrldemo { grid-template-columns: 1fr; } }
+.lgx-root .ui-ctrlpane { display: flex; flex-direction: column; min-width: 0; }
+.lgx-root .logos-root.lg-demo .ui-ctrltools { margin: 10px 0 0; }
+/* the menu is a popover in the app; in the frame it sits under the control it
+   belongs to — and like .lg-acts it must lose its animation, whose end state
+   carries a translate meant for a floating layer */
+.lgx-root .logos-root.lg-demo .ui-depthmenu {
+  position: static; transform: none; animation: none;
+  margin: 14px 0 0; width: 100%; box-shadow: none;
+  border: 1px solid var(--lg-line); max-height: none;
+}
+
+.lgx-root .ui-answerpane { display: flex; flex-direction: column; min-width: 0; height: 100%; }
+.lgx-root .logos-root.lg-demo .ui-depththread {
+  flex: 1; min-height: 0; overflow: auto; padding: 0 4px;
+}
+/* the reply is paragraphed prose at the deeper registers — that IS the
+   difference the exhibit is showing, so give the paragraphs real spacing */
+.lgx-root .logos-root.lg-demo .ui-para { margin: 0 0 0.7em; }
+.lgx-root .logos-root.lg-demo .ui-para:last-child { margin-bottom: 0; }
+.lgx-root .ui-depthnote {
+  margin: 10px 4px 0; padding-top: 10px; border-top: 1px solid var(--lg-line);
+  font-size: .8rem; font-style: italic; color: var(--ink-45);
+}
+/* each register arrives rather than swapping, so the change is legible */
+.lgx-root .logos-root.lg-demo .ui-answerpane .lg-msg-assistant {
+  animation: lgx-riseIn .34s cubic-bezier(.3,.7,.2,1) both;
+}
+
+/* The Board draws itself: each line is a node arriving, so the ink-in belongs
+   on the item. Items keep their React key, so only new ones animate. */
+.lgx-root .ui-boarddemo { height: 100%; display: flex; flex-direction: column; }
+.lgx-root .ui-boardpane { flex: 1; min-height: 0; }
+.lgx-root .logos-root.lg-demo .ui-boardpane .lg-map-wrap { height: 100%; }
+.lgx-root .logos-root.lg-demo .lg-board-item { animation: lgx-inkIn .46s ease both; }
+.lgx-root .logos-root.lg-demo .lg-board-arrow { animation: lgx-inkIn .5s ease both; }
+.lgx-root .ui-boardbar {
+  display: flex; align-items: center; gap: 14px;
+  padding: 9px 16px; border-top: 1px solid var(--lg-line); background: #fff;
+}
+.lgx-root .ui-boardsay {
+  flex: 1; min-width: 0; font-size: .8rem; font-style: italic; color: var(--ink-45);
+}
+.lgx-root .ui-boardpips { display: flex; gap: 5px; }
+.lgx-root .ui-pip {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: var(--ink-25); transition: background .3s ease;
+}
+.lgx-root .ui-pip.is-on { background: var(--moss); }
+.lgx-root .ui-boardreplay {
+  border: 1px solid var(--lg-line); border-radius: 999px; background: transparent;
+  padding: 4px 12px; font: inherit; font-size: .7rem; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--ink-45); cursor: pointer;
+  transition: color .2s ease, border-color .2s ease, opacity .2s ease;
+}
+.lgx-root .ui-boardreplay:hover:not(:disabled) { color: var(--moss); border-color: var(--moss); }
+.lgx-root .ui-boardreplay:disabled { opacity: .35; cursor: default; }
+
+/* These animate the independent `translate` property, NOT `transform`. Board
+   items carry an inline transform:rotate() for their hand-made tilt, and a
+   transform keyframe would overwrite it — permanently, since the animation is
+   `both`. `translate` composes with it instead. */
+@keyframes lgx-inkIn {
+  from { opacity: 0; translate: 0 6px; }
+  to { opacity: 1; translate: 0 0; }
+}
+@keyframes lgx-riseIn {
+  from { opacity: 0; translate: 0 8px; }
+  to { opacity: 1; translate: 0 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lgx-root .logos-root.lg-demo .lg-board-item,
+  .lgx-root .logos-root.lg-demo .lg-board-arrow,
+  .lgx-root .logos-root.lg-demo .ui-answerpane .lg-msg-assistant { animation: none; }
+}
+
+/* nine dials read as a panel across the frame, rather than three tall rows */
+.lgx-root .logos-root.lg-demo .lg-persona-grid {
+  grid-template-columns: repeat(5, 1fr); gap: 18px 10px;
+}
+@media (max-width: 760px) {
+  .lgx-root .logos-root.lg-demo .lg-persona-grid { grid-template-columns: repeat(3, 1fr); }
+}
 /* the frame reads as one of the page's exhibits, not a browser screenshot */
 .lgx-root .ui-chrome {
   justify-content: flex-start; padding: 9px 16px; background: transparent;
