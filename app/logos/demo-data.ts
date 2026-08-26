@@ -77,3 +77,78 @@ export const DEMO_MATH_MAP: ThinkingMap = {
     { from: 'e1', to: 'r1', relation: 'revises', op: 'fix the sign' },
   ],
 };
+
+/**
+ * What each of the four moves actually returns, for the assumption node
+ * "More money means progress".
+ *
+ * Written to the same ExploreResult shape the routes produce, so the page can
+ * render them through the app's own result markup. They also demonstrate the
+ * boundary: each ends on a question rather than a verdict, and Trace quotes
+ * the person verbatim instead of paraphrasing them.
+ */
+export const DEMO_MOVE_RESULTS: Record<
+  'explore' | 'challenge' | 'research' | 'trace',
+  {
+    concept: string;
+    framing: string;
+    points?: string[];
+    origins?: { who: 'you' | 'logos'; quote: string }[];
+    lineage?: string[];
+    connection: string;
+    question: string;
+    sources?: { title: string; site: string; cited?: boolean }[];
+  }
+> = {
+  explore: {
+    concept: 'Compensation as a proxy',
+    framing:
+      'A raise measures what a market will pay for the work you can already do. Progress measures what you will be able to do next. They move together often enough to feel like one thing, and come apart exactly when a role pays well for skills you have finished learning.',
+    connection:
+      'You put the money and the stagnation in the same sentence, as though the first answered the second.',
+    question: 'If the offer paid the same as your current job, would you still want it?',
+  },
+  challenge: {
+    concept: 'Where this breaks',
+    framing: 'Three ways the assumption could be wrong in your case.',
+    points: [
+      'A higher salary can price the same work — the market rate moved, not your ceiling.',
+      'Senior titles often trade learning for scope: more people, fewer new problems.',
+      'The thing you called stagnation might be the team, not the role. That travels.',
+    ],
+    connection:
+      'You have evidence for the boredom — three years, same problems. You have none yet for the new role being different.',
+    question: 'What would you need to see in the first month to know it was not the same job with a bigger number?',
+  },
+  research: {
+    concept: 'Pay and skill growth',
+    framing:
+      'Studies of job switching find compensation jumps are driven largely by market timing and negotiation, and correlate weakly with reported skill development in the following year.',
+    points: [
+      'Salary gains from switching are typically largest in the first year, then flatten.',
+      'Self-reported learning tracks task novelty and autonomy far more closely than pay.',
+    ],
+    connection: 'Which suggests the raise and the growth are worth judging separately — as you were doing before you joined them.',
+    question: 'What in the new role is genuinely new work, not the same work at a higher grade?',
+    sources: [
+      { title: 'Job mobility and wage growth over a career', site: 'nber.org', cited: true },
+      { title: 'What actually predicts skill development at work', site: 'hbr.org' },
+    ],
+  },
+  trace: {
+    concept: '',
+    framing: '',
+    origins: [
+      {
+        who: 'you',
+        quote:
+          'I got an offer with a lot more money. I think I should take it — honestly I’ve stopped growing where I am.',
+      },
+      { who: 'you', quote: '…I guess I’m treating the raise as proof it’s a step up.' },
+    ],
+    lineage: ['Sits under: “It pays more”', 'Pulls against: “Security ↔ growth”'],
+    connection:
+      'It entered as a link between two separate reasons, then you named the link yourself a turn later.',
+    question: 'Does it still hold now that you have seen it written down?',
+  },
+};

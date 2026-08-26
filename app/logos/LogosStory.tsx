@@ -296,8 +296,10 @@ export function LogosStory() {
           <div className="wrap">
             <div className="spread-head"><span className="num">III.</span><span className="label">Four Moves</span></div>
             <h2 className="fade">Any node, four moves.</h2>
-            <div className="exh moves">
-              <div className="fade"><DemoMoves /></div>
+            {/* The demo is a two-pane exhibit — node and result — so it takes
+                the spread's full width rather than the old diagram column. */}
+            <div className="fade"><DemoMoves /></div>
+            <div className="exh moves-defs">
               <div className="mv-defs fade d1" id="mv-defs">
                 <div className="mv-def"><span className="w">Explore</span><p>Open the thought further — what's inside it that you haven't said yet?</p></div>
                 <div className="mv-def"><span className="w">Challenge</span><p>Logos argues the other side, properly — the strongest version of it.</p></div>

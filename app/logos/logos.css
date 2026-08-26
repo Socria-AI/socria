@@ -635,13 +635,30 @@
 }
 .lgx-root .ui-lenstabs .lg-lens.is-on { background: var(--moss-700); color: var(--paper); border-color: var(--moss-700); }
 
-/* node + its menu, centred in the frame */
-.lgx-root .ui-menudemo {
-  height: 100%; display: flex; align-items: center; justify-content: center;
-  gap: clamp(20px,4vw,56px); flex-wrap: wrap; padding: 20px;
+/* the node, its menu, and what the chosen move hands back */
+/* .lg-acts animates with lgPop, whose END state is translateX(-50%) — the app
+   anchors the menu at a node's centre. A CSS animation beats an inline style,
+   so the menu ignored transform:none and sat half its width off the frame.
+   Cancel the animation here and it lays out where it is put. */
+.lgx-root .logos-root.lg-demo .lg-acts.ui-acts {
+  position: static; transform: none; animation: none;
+  width: 100%; max-width: 250px; margin-top: 14px;
 }
-.lgx-root .ui-menudemo .lg-acts { width: 232px; }
-.lgx-root .ui-menudemo .lg-act { display: block; }
+.lgx-root .logos-root.lg-demo .lg-acts.ui-acts .lg-act { display: block; width: 100%; text-align: left; }
+.lgx-root .logos-root.lg-demo .lg-act.is-on { background: rgba(53,70,32,0.09); }
+
+.lgx-root .ui-movedemo {
+  height: 100%; display: grid; grid-template-columns: minmax(0,260px) minmax(0,1fr);
+  gap: clamp(18px,3vw,34px); padding: 20px 22px; align-items: start; overflow: auto;
+}
+@media (max-width: 820px) { .lgx-root .ui-movedemo { grid-template-columns: 1fr; } }
+.lgx-root .ui-movedemo-left { display: flex; flex-direction: column; align-items: flex-start; }
+/* the result panel is a drawer in the app; here it sits in the frame */
+.lgx-root .logos-root.lg-demo .lg-explore.ui-xp {
+  position: static; width: 100%; height: auto; max-height: 100%;
+  border: 1px solid var(--lg-line); border-radius: 12px;
+  box-shadow: none; transform: none; animation: none; overflow: auto;
+}
 
 /* guard + controls demos */
 .lgx-root .ui-guarddemo { padding: 20px 24px; display: flex; flex-direction: column; justify-content: center; height: 100%; }
@@ -689,3 +706,10 @@
   .lgx-root .logos-root.lg-demo .lg-demo-split .lg-convo { display: none; }
   .lgx-root .logos-root.lg-demo .lg-demo-split .lg-panel { display: flex; }
 }
+
+/* the four-move definitions now sit under the full-width demo, in two
+   columns so the list does not run the length of the page */
+.lgx-root .moves-defs .mv-defs {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 0 clamp(24px,4vw,56px);
+}
+@media (max-width: 760px) { .lgx-root .moves-defs .mv-defs { grid-template-columns: 1fr; } }

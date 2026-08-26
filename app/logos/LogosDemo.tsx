@@ -20,7 +20,7 @@ import { LogosMark } from '@/components/LogosMark';
 import { NodeGlyph } from '@/components/NodeGlyph';
 import { THINKING_DEPTHS } from '@/lib/socria-prompt';
 import { DEFAULT_PERSONALITY, PERSONALITY_DIMENSIONS } from '@/lib/logos-personality';
-import { DEMO_MAP, DEMO_MATH_MAP, DEMO_TURNS } from './demo-data';
+import { DEMO_MAP, DEMO_MATH_MAP, DEMO_MOVE_RESULTS, DEMO_TURNS } from './demo-data';
 
 /** A framed slice of the product, captioned. */
 function Frame({
@@ -130,36 +130,128 @@ export function DemoLenses() {
   );
 }
 
-/** A node, and the four things you can do to it. */
+/**
+ * A node, the menu it opens, and what each move actually gives back.
+ *
+ * Click a move and the result panel below changes — the same anatomy the app
+ * renders (concept, framing, points, the verbatim origins Trace quotes, the
+ * connection, and the question it always ends on).
+ */
 export function DemoMoves() {
   const MOVES = [
     { id: 'explore', label: 'Explore', blurb: 'What this idea is, and what it isn’t' },
     { id: 'challenge', label: 'Challenge', blurb: 'Where this would break' },
     { id: 'research', label: 'Research', blurb: 'What the evidence actually says' },
     { id: 'trace', label: 'Trace', blurb: 'Where this came from' },
-  ];
+  ] as const;
+  const POINTS_LABEL: Record<string, string> = {
+    challenge: 'Pressure points',
+    research: 'What the evidence says',
+  };
+  const [move, setMove] = useState<'explore' | 'challenge' | 'research' | 'trace'>('explore');
+  const r = DEMO_MOVE_RESULTS[move];
+
   return (
-    <Frame label="Click any node — the menu the app actually opens" height={470}>
-      <div className="ui-menudemo">
-        <button type="button" className="lg-node lg-node-assumption lg-st-open is-focused" style={{ width: 200 }}>
-          <span className="lg-node-head">
-            <NodeGlyph type="assumption" />
-            <span className="lg-node-type">assumption</span>
-          </span>
-          <span className="lg-node-label">More money means progress</span>
-          <span className="lg-node-note">unexamined — you have not said why these are the same thing</span>
-        </button>
-        <div className="lg-acts" role="menu" style={{ position: 'static', transform: 'none' }}>
-          {MOVES.map((m) => (
-            <span key={m.id} className={`lg-act lg-act-${m.id}`} role="menuitem">
-              <span className="lg-act-label">{m.label}</span>
-              <span className="lg-act-blurb">{m.blurb}</span>
+    <Frame label="Click a move — this is what it hands back" height={560}>
+      <div className="ui-movedemo">
+        <div className="ui-movedemo-left">
+          <button
+            type="button"
+            className="lg-node lg-node-assumption lg-st-open is-focused"
+            style={{ width: '100%', maxWidth: 230 }}
+          >
+            <span className="lg-node-head">
+              <NodeGlyph type="assumption" />
+              <span className="lg-node-type">assumption</span>
             </span>
-          ))}
-          <span className="lg-act lg-act-context" role="menuitem">
-            <span className="lg-act-label">Add context</span>
-            <span className="lg-act-blurb">Ground it in your material</span>
-          </span>
+            <span className="lg-node-label">More money means progress</span>
+          </button>
+          <div className="lg-acts ui-acts" role="menu">
+            {MOVES.map((m) => (
+              <button
+                key={m.id}
+                type="button"
+                role="menuitem"
+                className={`lg-act lg-act-${m.id}${move === m.id ? ' is-on' : ''}`}
+                onClick={() => setMove(m.id)}
+              >
+                <span className="lg-act-label">{m.label}</span>
+                <span className="lg-act-blurb">{m.blurb}</span>
+              </button>
+            ))}
+            <span className="lg-act lg-act-context" role="menuitem">
+              <span className="lg-act-label">Add context</span>
+              <span className="lg-act-blurb">Ground it in your material</span>
+            </span>
+          </div>
+        </div>
+
+        <div className="lg-explore ui-xp">
+          <header className="lg-x-head">
+            <div className="lg-x-title">
+              <span className="lg-x-chip lg-node-assumption">
+                <NodeGlyph type="assumption" />
+                assumption
+              </span>
+              <span className="lg-x-label">More money means progress</span>
+            </div>
+          </header>
+          <div className="lg-x-body">
+            {r.concept && <span className="lg-x-concept">{r.concept}</span>}
+            {r.framing && <p className="lg-x-framing">{r.framing}</p>}
+
+            {!!r.origins?.length && (
+              <div className="lg-x-origins">
+                <span className="lg-x-block-label">First said</span>
+                {r.origins.map((o, i) => (
+                  <blockquote key={i} className={`lg-x-origin lg-x-origin-${o.who}`}>
+                    <span className="lg-x-origin-who">{o.who === 'you' ? 'You' : 'Logos'}</span>
+                    {o.quote}
+                  </blockquote>
+                ))}
+              </div>
+            )}
+
+            {!!r.lineage?.length && (
+              <div className="lg-x-lineage">
+                <span className="lg-x-block-label">Where it sits now</span>
+                <ul>
+                  {r.lineage.map((l, i) => (
+                    <li key={i}>{l}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {!!r.points?.length && (
+              <div className={`lg-x-points lg-x-points-${move}`}>
+                <span className="lg-x-block-label">{POINTS_LABEL[move] ?? 'Points'}</span>
+                <ul>
+                  {r.points.map((p, i) => (
+                    <li key={i}>{p}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {r.connection && <p className="lg-x-connection">{r.connection}</p>}
+            {r.question && <p className="lg-x-question">{r.question}</p>}
+
+            {!!r.sources?.length && (
+              <div className="lg-x-sources">
+                <span className="lg-x-sources-label">Sources</span>
+                {r.sources.map((src) => (
+                  <span key={src.title}>
+                    <span className="lg-x-src-title">
+                      {src.title}
+                      {src.cited && <span className="lg-x-cited">cited</span>}
+                    </span>
+                    <span className="lg-x-src-site">{src.site}</span>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </Frame>
