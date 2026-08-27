@@ -64,10 +64,12 @@ export function DepthPersonality() {
         </table>
       </TableWrap>
       <p>
-        Depth changes altitude, not length — Quick is not a truncated Deep,
-        and Deep is not Quick with padding. On the free tier, depth is fixed
-        at Balanced; <Link href="/docs/socria-one">Socria One</Link> opens all
-        four.
+        Depth changes how far the thinking goes — length follows the
+        thinking, so Quick is not a truncated Deep and Deep is not Quick with
+        padding. And no depth changes how readily an answer is revealed. In
+        Core 3.1, all four registers come with sign-in; in Logos, the free
+        tier thinks at Balanced and{' '}
+        <Link href="/docs/socria-one">Socria One</Link> opens all four.
       </p>
 
       <H2 id="personality">Socria Personality</H2>
