@@ -16,7 +16,7 @@ export const revalidate = 60;
 export const metadata: Metadata = {
   title: 'Socria — a journal for thinking for yourself',
   description:
-    'Socria is a human-first AI that asks before it answers, so your thinking stays yours. Issue No. 3 — Core 3.1.',
+    'Socria is a human-first AI that asks before it answers, so your thinking stays yours. Issue No. 4 — Logos, the reasoning environment.',
 };
 
 function issueDate(iso: string) {
@@ -26,27 +26,28 @@ function issueDate(iso: string) {
   return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
 }
 
-// In This Issue — Core 3.1 dispatches (the "what's new" the request asked for).
+// In This Issue — the Logos dispatches. Each line is a shipped behavior of
+// the reasoning environment, phrased for the cover, not a promise.
 const DISPATCHES = [
   {
     rn: 'i.',
-    h: 'Set the depth',
-    p: 'Ask for a quick gut-check or a long, careful think. Socria meets you at your level and keeps pace — never talking down, never showing off.',
+    h: 'Watch your thinking take shape',
+    p: 'Talk, and a live Thinking Map draws the structure of what you say beside the conversation — your claims, assumptions, tensions and evidence, reorganizing as your mind does.',
   },
   {
     rn: 'ii.',
-    h: 'A conversation, not a script',
-    p: 'Core 3.1 sounds like a person thinking alongside you. Each reply builds on the last and answers what actually changed — instead of restarting on every message.',
+    h: 'Press on any thought',
+    p: 'Click a node and choose the move: Explore it, Challenge it, take it out to real research with sources, or Trace it back to the moment you said it — in your own words, verbatim.',
   },
   {
     rn: 'iii.',
-    h: 'Hear yourself think',
-    p: 'It picks up the words you lean on, and the moment a “maybe” hardens into a “definitely” — then points them out, gently.',
+    h: 'Mathematics, done honestly',
+    p: 'Work a problem and the map becomes the working — a hand-drawn Board where mistakes are struck through and repaired, never erased. While you’re learning, the answer stays yours to reach.',
   },
   {
     rn: 'iv.',
-    h: 'Clearer on the page',
-    p: 'When you’re weighing options or planning, it lays the thinking out in tidy titled lists and tables — a light visual map, never a wall of text.',
+    h: 'Write beside your reasoning',
+    p: 'Draft Space is a page of your own with the map alongside, lighting the thinking each paragraph rests on. Logos reads and responds — it never writes your words for you.',
   },
 ];
 
@@ -104,7 +105,7 @@ export default async function Home() {
       <main id="top">
         {/* COVER */}
         <section className="spread cover" data-folio="Cover" data-screen-label="Cover">
-          <div className="issue label moss">Issue No. 3 · Core 3.1 · MMXXVI</div>
+          <div className="issue label moss">Issue No. 4 · Logos · MMXXVI</div>
           <h1 className="q" data-text="When did you last change your mind?">
             When did you last{' '}
             <span className="ink-mark ink-circ em" id="cover-mark">
@@ -330,19 +331,19 @@ export default async function Home() {
           </div>
         </section>
 
-        {/* VI · IN THIS ISSUE / CORE 3.1 */}
-        <section className="spread issue" id="core3" data-folio="VI" data-screen-label="In This Issue">
+        {/* VI · IN THIS ISSUE / LOGOS */}
+        <section className="spread issue" id="logos" data-folio="VI" data-screen-label="In This Issue">
           <div className="wrap">
             <div className="spread-head">
               <span className="num">VI.</span>
               <span className="label">In This Issue</span>
             </div>
             <div className="well-head">
-              <span className="label moss">Issue No. 3 — Core 3.1</span>
-              <h2 data-split>More human. More useful. Less like a chatbot.</h2>
+              <span className="label moss">Issue No. 4 — Socria Logos</span>
+              <h2 data-split>The first AI that shows you your own reasoning.</h2>
               <p className="sf">
-                The latest Socria follows the way thinking actually unfolds — and
-                hands the thinking back to you.
+                Logos turns the conversation into an environment: your thinking,
+                drawn live beside you — and still entirely yours.
               </p>
             </div>
             <div className="dispatches">
@@ -354,6 +355,9 @@ export default async function Home() {
                 </div>
               ))}
             </div>
+            <p className="issue-more fade d2">
+              <Link href="/logos">Read the Logos issue <span className="ar">→</span></Link>
+            </p>
           </div>
         </section>
 

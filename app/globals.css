@@ -5876,3 +5876,12 @@ html.js-anim .scrolly-root .fade.d3 { transition-delay: .3s; }
   padding: 0; border: none; background: transparent; font: inherit;
   color: var(--lg-primary); text-decoration: underline; text-underline-offset: 2px; cursor: pointer;
 }
+
+/* the quiet way out of the issue well, under the dispatches */
+.mag-root .issue-more { margin-top: clamp(26px, 4vh, 44px); }
+.mag-root .issue-more a {
+  font-family: var(--font-serif), Georgia, serif; font-style: italic; font-size: 1.1rem;
+  color: #475a28; text-decoration: none;
+  border-bottom: 1px solid rgba(94, 118, 51, 0.4); padding-bottom: 2px;
+}
+.mag-root .issue-more a:hover { border-color: #475a28; }
