@@ -130,8 +130,10 @@ export function Mathematics() {
         mentions the reveal button; it does not lecture, and it does not
         cave. On the map and the Board, the result and any verification of it
         are masked as <code>= ?</code> — the working stays visible, because
-        the working is yours. The plot still draws your curve faithfully, but
-        annotates no roots, intercepts or extrema while the guard holds.
+        the working is yours. The plot still draws your curve faithfully — and it
+        never annotates roots, intercepts or extrema with their values, so it
+        can never become the surface that hands over what the chat is
+        withholding.
       </p>
       <p>
         The bar under the chat says what is happening —{' '}
