@@ -3,6 +3,7 @@
 
 import Link from 'next/link';
 import { Article, H2, Callout, Defs, Def, TableWrap } from '../Article';
+import { DemoLenses, DemoMoves } from '@/app/logos/LogosDemo';
 import { docPage } from '../registry';
 
 const page = docPage('thinking-map')!;
@@ -147,6 +148,8 @@ export function ThinkingMapDoc() {
         math work, Graph otherwise; the other readings are{' '}
         <Link href="/docs/socria-one">Socria One</Link>&rsquo;s.
       </p>
+      <DemoLenses />
+
 
       <H2 id="moves">The four moves</H2>
       <p>
@@ -186,6 +189,8 @@ export function ThinkingMapDoc() {
         new conversation — and anything you type there is folded back into the
         session so the map can use it.
       </p>
+      <DemoMoves />
+
       <Callout tag="If no sources appear">
         <p>
           Explore and Research search the live web only when the deployment

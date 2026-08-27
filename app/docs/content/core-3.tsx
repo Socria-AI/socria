@@ -3,6 +3,7 @@
 
 import Link from 'next/link';
 import { Article, H2, Callout, Defs, Def } from '../Article';
+import { DemoChips, DemoSynthesis } from '../DocsDemo';
 import { docPage } from '../registry';
 
 const page = docPage('core-3')!;
@@ -116,6 +117,9 @@ export function Core3() {
           your own.
         </Def>
       </Defs>
+      <DemoSynthesis />
+      <DemoChips />
+
 
       <H2 id="journey">The Thinking Journey</H2>
       <p>

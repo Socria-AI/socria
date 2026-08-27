@@ -3,6 +3,7 @@
 
 import Link from 'next/link';
 import { Article, H2, Callout } from '../Article';
+import { DemoSplit } from '@/app/logos/LogosDemo';
 import { docPage } from '../registry';
 
 const page = docPage('logos')!;
@@ -37,6 +38,8 @@ export function Logos() {
         says what changed — &ldquo;merged 1 · resolved 2&rdquo; — and the
         affected nodes flash briefly so you can see where.
       </p>
+      <DemoSplit />
+
 
       <H2 id="turn">What happens when you send a message</H2>
       <p>

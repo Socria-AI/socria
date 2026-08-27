@@ -4,6 +4,7 @@
 
 import Link from 'next/link';
 import { Article, H2, Callout, Defs, Def, TableWrap } from '../Article';
+import { DemoControls, DemoPersonality } from '@/app/logos/LogosDemo';
 import { docPage } from '../registry';
 
 const page = docPage('depth-personality')!;
@@ -69,8 +70,11 @@ export function DepthPersonality() {
         padding. And no depth changes how readily an answer is revealed. In
         Core 3.1, all four registers come with sign-in; in Logos, the free
         tier thinks at Balanced and{' '}
-        <Link href="/docs/socria-one">Socria One</Link> opens all four.
+        <Link href="/docs/socria-one">Socria One</Link> opens all four. Pick
+        a register below — the reply is the same question answered there:
       </p>
+      <DemoControls />
+
 
       <H2 id="personality">Socria Personality</H2>
       <p>
@@ -105,6 +109,8 @@ export function DepthPersonality() {
         <em>High warmth is never therapeutic</em>. Warmth shows in attention,
         not in reflexive reassurance.
       </p>
+      <DemoPersonality />
+
 
       <H2 id="instructions">Custom instructions</H2>
       <p>

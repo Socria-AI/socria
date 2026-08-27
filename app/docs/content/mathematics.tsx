@@ -4,6 +4,8 @@
 
 import Link from 'next/link';
 import { Article, H2, Callout, Defs, Def } from '../Article';
+import { DemoBoard, DemoGuard } from '@/app/logos/LogosDemo';
+import { DemoPlot } from '../DocsDemo';
 import { docPage } from '../registry';
 
 const page = docPage('mathematics')!;
@@ -91,8 +93,12 @@ export function Mathematics() {
       </p>
       <p>
         Every wobble and tilt is seeded from the node&rsquo;s own id, so the
-        board looks hand-made but never jitters between renders.
+        board looks hand-made but never jitters between renders. Watch it
+        work the demo problem — the sign slip goes down, stays down, and the
+        fix arrives beside it:
       </p>
+      <DemoBoard />
+
 
       <H2 id="plot">The function plot</H2>
       <p>
@@ -112,6 +118,8 @@ export function Mathematics() {
           run code. Asymptotes render as pen-up gaps rather than spikes.
         </p>
       </Callout>
+      <DemoPlot />
+
 
       <H2 id="guard">The Answer Guard</H2>
       <p>
@@ -144,6 +152,8 @@ export function Mathematics() {
         The reveal is per-conversation, remembered, and{' '}
         <Link href="/docs/socria-one">never priced</Link>.
       </p>
+      <DemoGuard />
+
     </Article>
   );
 }

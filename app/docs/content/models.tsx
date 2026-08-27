@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { Article, H2, Callout, TableWrap } from '../Article';
+import { DemoModelPicker } from '../DocsDemo';
 import { docPage } from '../registry';
 
 const page = docPage('models')!;
@@ -89,6 +90,8 @@ export function Models() {
         Logos. The way back is the <em>Socria chat</em> button in the Logos
         header, which returns you to whichever Core model you were on.
       </p>
+      <DemoModelPicker />
+
 
       <H2 id="choosing">Which one, when</H2>
       <ul>
