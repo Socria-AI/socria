@@ -136,9 +136,12 @@ export function SocriaOne() {
 
       <H2 id="billing">How billing behaves</H2>
       <p>
-        Stripe is the source of truth; Socria keeps only a projection of it,
-        written exclusively by Stripe&rsquo;s signed webhook events. The rules
-        that projection enforces:
+        Stripe is the source of truth for paid subscriptions, and its signed
+        webhook events are the only writer of Stripe lifecycle state. Socria
+        itself writes just two other kinds of row: a pre-checkout customer
+        stub (status <code>incomplete</code>, which never entitles anyone)
+        and complimentary grants from redeemed codes. The rules the
+        projection enforces:
       </p>
       <ul>
         <li>
