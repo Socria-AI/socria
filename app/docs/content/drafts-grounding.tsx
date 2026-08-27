@@ -51,7 +51,8 @@ export function DraftsGrounding() {
       <Callout tag="Only Refine produces prose — and it proposes">
         <p>
           Refine returns a proposal with notes on what changed, and it lands
-          on the page only when you click Apply. Its hard limits: no
+          on the page only when you click <em>Use this</em> —{' '}
+          <em>Keep mine</em> dismisses it untouched. Its hard limits: no
           strengthening, softening or extending your claims; no new ideas,
           examples or evidence; your voice preserved — and a passage that is
           already clear comes back unchanged.
@@ -89,21 +90,22 @@ export function DraftsGrounding() {
 
       <H2 id="research">Research and sources</H2>
       <p>
-        Wherever Logos searches — the Research move, Explore, the
-        draft&rsquo;s Research action — the same rules hold. Sources are
-        listed with the ones the reasoning actually cited marked as cited;
-        the rest are what the search genuinely returned, shown for you to
-        judge. If the deployment has no search provider configured, the
-        thinking still happens — with zero sources, rather than invented
-        ones. No fabricated studies, no imagined citations, and thin
-        evidence is called thin.
+        Wherever Logos searches, only what was genuinely fetched is ever
+        shown. In Explore and Research on a map node, the sources the
+        reasoning actually drew on are marked cited, ahead of the rest of
+        what the search returned; the draft&rsquo;s Research action lists
+        what the search returned, shown for you to judge. If the deployment
+        has no search provider configured, the thinking still happens — with
+        zero sources, rather than invented ones. No fabricated studies, no
+        imagined citations, and thin evidence is called thin.
       </p>
 
       <H2 id="connections">Connected accounts</H2>
       <p>
         Logos was built to read your own material through connected
-        accounts — Google Drive, Docs, Notion — through a per-user,
-        read-only OAuth flow with tokens encrypted at rest.{' '}
+        accounts — Google Drive (Docs and Sheets), Calendar, Gmail, and
+        Notion — through a per-user, read-only OAuth flow with tokens
+        encrypted at rest.{' '}
         <strong>These connectors currently ship dormant.</strong>{' '}
         Google&rsquo;s Drive and Gmail scopes are restricted APIs whose
         public approval requires a paid third-party security assessment;
