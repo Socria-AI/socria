@@ -122,6 +122,7 @@ export function BlogFooter() {
         <div className="foot-links">
           <Link href="/#core3">What&rsquo;s new in 3.1</Link>
           <Link href="/blog">Journal</Link>
+          <Link href="/docs">Docs</Link>
           <Link href="/chat">Try Socria</Link>
           <Link href="/studio">Studio</Link>
         </div>

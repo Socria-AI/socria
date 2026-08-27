@@ -204,6 +204,7 @@ export function LogosStory() {
         <div className="mh-center label">The reasoning environment</div>
         <div className="mh-right">
           <a href="/">The journal</a>
+          <a href="/docs">Docs</a>
           <a href="/one">Socria One</a>
           <a href={OPEN} className="ask">Open Logos</a>
         </div>
@@ -440,9 +441,9 @@ export function LogosStory() {
                 <p className="tp">Every day · no card</p>
                 <ul>
                   <li>Real Thinking Maps — drawn live, fully yours.</li>
-                  <li>Every lens and every move, on every node.</li>
+                  <li>Every move on every node — and Trace is free forever.</li>
                   <li>Research — experienced properly, once per map.</li>
-                  <li>The Board, the guard, the depths of Quick and Balanced.</li>
+                  <li>The Answer Guard, whole. It is never for sale.</li>
                 </ul>
                 <p className="stoprow"><span className="o"></span>Free pauses at four branches<span className="sep">·</span><span className="f"></span>One branches without end</p>
                 <p className="stoprow"><span className="o"></span>Free researches once<span className="sep">·</span><span className="f"></span>One researches without asking twice</p>
@@ -479,6 +480,7 @@ export function LogosStory() {
             <div className="colophon">
               <span>Socria · Human-first AI</span>
               <span><a href="/">The journal</a></span>
+              <span><a href="/docs">The docs</a></span>
               <span><a href="/one">Socria One</a></span>
               <span className="it">Think For Yourself.</span>
               <span>© <span>2026</span></span>
