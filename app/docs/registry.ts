@@ -26,7 +26,6 @@ export const DOC_GROUPS = [
   'The models',
   'The reasoning environment',
   'Plans & accounts',
-  'Technical',
 ] as const;
 
 export const DOC_PAGES: DocPage[] = [
@@ -101,12 +100,6 @@ export const DOC_PAGES: DocPage[] = [
     title: 'Accounts & your data',
     blurb: 'Signed out vs signed in, what is stored where, sync, and deletion.',
     group: 'Plans & accounts',
-  },
-  {
-    slug: 'technical',
-    title: 'Technical reference',
-    blurb: 'The stack, every API route, every environment variable, and how to run your own.',
-    group: 'Technical',
   },
 ];
 

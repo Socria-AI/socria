@@ -111,8 +111,8 @@ export function DraftsGrounding() {
         public approval requires a paid third-party security assessment;
         rather than gate the product on that, Socria ships with connections
         off, and Paste, Upload and Web cover the same ground with no setup.
-        Operators can re-enable the flow — see the{' '}
-        <Link href="/docs/technical">technical reference</Link>.
+        Operators can re-enable the flow through the environment
+        configuration documented in the repository.
       </p>
     </Article>
   );

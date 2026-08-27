@@ -163,9 +163,9 @@ export function SocriaOne() {
       </ul>
       <p>
         For operators: the pricing is configured server-side (the client can
-        never name its own price), webhook requests are signature-verified
-        with replay protection, and the exact setup lives in the{' '}
-        <Link href="/docs/technical">technical reference</Link>.
+        never name its own price), and webhook requests are
+        signature-verified with replay protection. The exact setup lives in
+        the repository&rsquo;s <code>.env.example</code>.
       </p>
     </Article>
   );

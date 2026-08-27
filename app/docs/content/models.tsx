@@ -115,11 +115,9 @@ export function Models() {
         <p>
           Each Socria model runs on its own underlying engine, configurable
           per deployment; Core 3.1 and Logos additionally retry on a
-          known-good fallback engine if their configured one is rejected —
-          details in the <Link href="/docs/technical">technical
-          reference</Link>. The models differ far more in their prompting,
-          per-turn control loops and surrounding machinery than in raw
-          engine.
+          known-good fallback engine if their configured one is rejected.
+          The models differ far more in their prompting, per-turn control
+          loops and surrounding machinery than in raw engine.
         </p>
       </Callout>
     </Article>

@@ -16,7 +16,6 @@ import { DepthPersonality } from './depth-personality';
 import { DraftsGrounding } from './drafts-grounding';
 import { SocriaOne } from './socria-one';
 import { AccountsData } from './accounts-data';
-import { Technical } from './technical';
 
 export const CONTENT: Record<string, ComponentType> = {
   overview: Overview,
@@ -31,5 +30,4 @@ export const CONTENT: Record<string, ComponentType> = {
   'drafts-grounding': DraftsGrounding,
   'socria-one': SocriaOne,
   'accounts-data': AccountsData,
-  technical: Technical,
 };
