@@ -29,7 +29,7 @@ export function Technical() {
         <Def term="Billing">Stripe subscriptions, pinned API version, webhook-driven.</Def>
         <Def term="Math">KaTeX, rendered with <code>trust: false</code> and bounded size/expansion so hostile TeX cannot break layout or inject markup.</Def>
         <Def term="Journal">Sanity (the blog and its Studio at <code>/studio</code>).</Def>
-        <Def term="Evals">An A/B conversational eval replays ~24 multi-turn scenarios against Core 3.1 with its controller on vs. off, judged by a model (<code>npm run eval:core3</code>).</Def>
+        <Def term="Evals">An A/B conversational eval replays 22 multi-turn scenarios (plus a depth-comparison case) against Core 3.1 with its controller on vs. off; deterministic checks always run, and a model judge joins when the eval is given an API key (<code>npm run eval:core3</code>).</Def>
       </Defs>
 
       <H2 id="engines">Model engines</H2>
@@ -79,19 +79,22 @@ export function Technical() {
             <tr><td><code>POST /api/logos/explore</code></td><td>account/key</td><td>The four node moves; free Research past the first returns 402</td></tr>
             <tr><td><code>POST /api/logos/draft</code></td><td>account/key</td><td>The five Draft Space actions on a selected passage</td></tr>
             <tr><td><code>POST /api/logos/read</code></td><td>account/key</td><td>Reads an attached image once into text</td></tr>
-            <tr><td><code>GET /api/logos/sources</code> + <code>/search</code> + <code>/fetch</code></td><td>account/key</td><td>Lists context sources; searches one; fetches one chosen item</td></tr>
-            <tr><td><code>GET·DELETE /api/logos/connections</code>, <code>GET /api/logos/connect/:provider(/callback)</code></td><td>account</td><td>Per-user OAuth connections (dormant unless enabled)</td></tr>
+            <tr><td><code>GET /api/logos/sources</code> · <code>POST …/search</code> · <code>POST …/fetch</code></td><td>account/key</td><td>Lists context sources; searches one; fetches one chosen item</td></tr>
+            <tr><td><code>GET·DELETE /api/logos/connections</code>, <code>GET /api/logos/connect/:provider(/callback)</code></td><td>account/key³</td><td>Per-user OAuth connections (dormant unless enabled)</td></tr>
             <tr><td><code>GET /api/logos/plan</code></td><td>open</td><td>The server&rsquo;s answer on your plan; anonymous resolves to free</td></tr>
             <tr><td><code>POST /api/logos/redeem</code></td><td>open²</td><td>Redeems an access code; signed-in redemptions follow the account</td></tr>
             <tr><td><code>POST /api/stripe/checkout</code> · <code>portal</code></td><td>account</td><td>Start a subscription; open the billing portal</td></tr>
-            <tr><td><code>POST /api/stripe/webhook</code></td><td>signature</td><td>The only writer of subscription state; verifies before parsing</td></tr>
+            <tr><td><code>POST /api/stripe/webhook</code></td><td>signature</td><td>The only writer of Stripe lifecycle state; verifies before parsing</td></tr>
           </tbody>
         </table>
       </TableWrap>
       <p>
         ¹ Core 2 is open to anonymous users; Core 3.1 requires the account or
-        key. ² Rate limited — it is the one surface a code could be guessed
-        against.
+        key. ² Rate limited; typed codes are also checked on every account/key
+        route, so this is the throttled front door rather than the only door —
+        and the codes are soft gates by design, not secrets. ³ Reading
+        connection status allows the key; connecting and disconnecting
+        require the account.
       </p>
       <Callout tag="Entitlement is decided server-side">
         <p>
@@ -134,7 +137,9 @@ export function Technical() {
           <code>CONNECTION_SECRET</code> — never plaintext.
         </Def>
         <Def term={<code>socria_subscriptions</code>}>
-          The local projection of Stripe, written by the webhook.
+          The local projection of Stripe — lifecycle state written by the
+          webhook, plus the pre-checkout customer stub and complimentary
+          rows from redeemed codes.
         </Def>
       </Defs>
 
@@ -158,7 +163,7 @@ export function Technical() {
             <tr><td><code>SOCRIA_CONNECTORS</code> + <code>NEXT_PUBLIC_SOCRIA_CONNECTORS</code></td><td>Waking the dormant connectors (both must be <code>on</code>)</td></tr>
             <tr><td><code>GOOGLE_OAUTH_CLIENT_ID/SECRET</code>, <code>NOTION_OAUTH_CLIENT_ID/SECRET</code></td><td>The per-user OAuth apps, if connectors are on</td></tr>
             <tr><td><code>OPENAI_MODEL*</code> family</td><td>Per-surface engine overrides (table above)</td></tr>
-            <tr><td><code>RATE_LIMIT_DISABLED</code>, <code>SOCRIA_DISABLE_STATE</code></td><td>Kill switches: limiting off (local only); Core 3.1&rsquo;s state pass off</td></tr>
+            <tr><td><code>RATE_LIMIT_DISABLED</code>, <code>SOCRIA_DISABLE_STATE</code></td><td>Kill switches: limiting off (effective in any environment — never set it in production) and Core 3.1&rsquo;s state pass off</td></tr>
           </tbody>
         </table>
       </TableWrap>
@@ -171,8 +176,10 @@ export function Technical() {
           cloud sync.</li>
         <li>Add a search provider key if you want Research to cite anything.</li>
         <li>For billing: create the $15/month price in Stripe, point a
-          webhook at <code>/api/stripe/webhook</code> with the four
-          subscription lifecycle events, and set the three Stripe variables.</li>
+          webhook at <code>/api/stripe/webhook</code> subscribed to{' '}
+          <code>checkout.session.completed</code> and{' '}
+          <code>customer.subscription.created&thinsp;/&thinsp;updated&thinsp;/&thinsp;deleted</code>,
+          and set the three Stripe variables.</li>
       </ol>
       <p>
         Everything degrades deliberately: no Supabase means local-only
