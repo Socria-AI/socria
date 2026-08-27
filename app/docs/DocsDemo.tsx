@@ -10,6 +10,7 @@
 // wiki figure.
 
 import { useState } from 'react';
+import { MathBoard } from '@/components/MathBoard';
 import { MathPlot } from '@/components/MathPlot';
 import { ModelPicker } from '@/components/ModelPicker';
 import { SynthesisCard } from '@/components/SynthesisCard';
@@ -69,6 +70,124 @@ export function DemoPlot() {
         <MathPlot map={PLOT_MAP} width={680} height={300} />
       </div>
     </DocsFrame>
+  );
+}
+
+/* ── the same vocabulary, at college level ────────────────────────── */
+// Two more worked Boards, because the quadratic undersells the range. The
+// point these make is that nothing math-specific was added for them: the
+// same eleven node types, the same chain edges with the operation written
+// on them, carry integration by parts and a hypothesis test unchanged.
+
+/** Integration by parts — with the classic dropped minus, kept and repaired. */
+const CALC_MAP: ThinkingMap = {
+  context: 'math',
+  intent: 'learning',
+  nodes: [
+    { id: 'cg', type: 'given', label: 'the integral', tex: '\\int x\\, e^x \\,dx' },
+    { id: 'cu', type: 'unknown', label: 'the antiderivative', tex: 'F(x)' },
+    {
+      id: 'ct',
+      type: 'theorem',
+      label: 'integration by parts',
+      tex: '\\int u\\,dv = uv - \\int v\\,du',
+    },
+    { id: 'cs', type: 'equation', label: 'choosing parts', tex: 'u = x,\\quad dv = e^x\\,dx' },
+    {
+      id: 'ce',
+      type: 'error',
+      label: 'sign slip',
+      tex: 'x e^x + \\int e^x \\,dx',
+      flag: 'error',
+      note: 'by parts subtracts $\\int v\\,du$ — minus, not plus',
+    },
+    { id: 'cr', type: 'result', label: 'the antiderivative', tex: 'x e^x - e^x + C' },
+    {
+      id: 'cv',
+      type: 'verification',
+      label: 'differentiate to check',
+      tex: "\\tfrac{d}{dx}\\left(x e^x - e^x\\right) = x\\,e^x",
+      flag: 'verified',
+    },
+  ],
+  edges: [
+    { from: 'cg', to: 'cs', relation: 'transforms_to', op: 'pick u and dv' },
+    { from: 'cs', to: 'ce', relation: 'transforms_to', op: 'apply the rule' },
+    { from: 'ce', to: 'cr', relation: 'revises', op: 'restore the minus' },
+    { from: 'cr', to: 'cv', relation: 'transforms_to', op: 'check' },
+    { from: 'ct', to: 'cs', relation: 'justifies' },
+  ],
+};
+
+/** A one-sample t-test — givens, the statistic as a theorem aside, a verdict. */
+const STATS_MAP: ThinkingMap = {
+  context: 'math',
+  intent: 'verification',
+  nodes: [
+    { id: 'sg', type: 'given', label: 'the sample', tex: 'n = 40,\\ \\bar{x} = 52.3,\\ s = 6.8' },
+    { id: 'sh', type: 'given', label: 'the claim to test', tex: 'H_0\\colon \\mu = 50' },
+    { id: 'su', type: 'unknown', label: 'is the shift real?', tex: 'H_a\\colon \\mu \\neq 50' },
+    {
+      id: 'st',
+      type: 'theorem',
+      label: 'the t-statistic',
+      tex: 't = \\dfrac{\\bar{x} - \\mu_0}{s/\\sqrt{n}}',
+    },
+    { id: 's1', type: 'step', label: 'standardize', tex: 't = \\dfrac{52.3 - 50}{6.8/\\sqrt{40}} \\approx 2.14' },
+    { id: 's2', type: 'step', label: 'the threshold', tex: 't_{0.025,\\,39} \\approx 2.02' },
+    {
+      id: 'sr',
+      type: 'result',
+      label: 'the verdict',
+      tex: '2.14 > 2.02 \\;\\Rightarrow\\; \\text{reject } H_0',
+      note: 'at the 5% level, the shift is unlikely to be chance',
+    },
+  ],
+  edges: [
+    { from: 'sg', to: 's1', relation: 'transforms_to', op: 'standardize' },
+    { from: 's1', to: 'sr', relation: 'implies' },
+    { from: 's2', to: 'sr', relation: 'implies', op: 'compare' },
+    { from: 'st', to: 's1', relation: 'justifies' },
+  ],
+};
+
+const COLLEGE = [
+  { id: 'calc', label: 'Calculus', map: CALC_MAP, height: 570,
+    blurb: 'integration by parts — the dropped minus stays on the board, repaired beside itself' },
+  { id: 'stats', label: 'Statistics', map: STATS_MAP, height: 470,
+    blurb: 'a one-sample t-test — the statistic sits in the margin as the rule that licenses the step' },
+] as const;
+
+export function DemoCollege() {
+  const [tab, setTab] = useState<'calc' | 'stats'>('calc');
+  const cur = COLLEGE.find((c) => c.id === tab)!;
+  return (
+    <div className="ui-lenses">
+      <div className="ui-lenstabs" role="tablist" aria-label="Subject">
+        {COLLEGE.map((c) => (
+          <button
+            key={c.id}
+            type="button"
+            role="tab"
+            aria-selected={tab === c.id}
+            className={`lg-lens${tab === c.id ? ' is-on' : ''}`}
+            onClick={() => setTab(c.id)}
+          >
+            {c.label}
+          </button>
+        ))}
+      </div>
+      <p className="ui-lensblurb">{cur.blurb}</p>
+      <DocsFrame label="The same Board, no new vocabulary — switch subject" height={cur.height}>
+        <div className="lg-panel" style={{ height: '100%' }}>
+          <div className="lg-map-wrap" style={{ height: '100%' }}>
+            <div className="lg-map">
+              <MathBoard key={cur.id} map={cur.map} width={680} height={cur.height - 40} />
+            </div>
+          </div>
+        </div>
+      </DocsFrame>
+    </div>
   );
 }
 

@@ -2776,7 +2776,12 @@ html.js-anim .scrolly-root .fade.d3 { transition-delay: .3s; }
   --lg-one-line: rgba(74, 111, 165, 0.32);
   --lg-sans: var(--font-sans), Inter, system-ui, sans-serif;
   --lg-hand: var(--font-hand), 'Comic Sans MS', cursive;
-  --lg-stix: var(--font-stix), 'STIX Two Math', 'Cambria Math', Georgia, serif;
+  /* KaTeX_Main sits in the stack because KaTeX draws negations (\neq, \not)
+     with a private-use glyph (U+E020) that exists only in its own fonts; the
+     STIX webfont is latin-subset, so without this the negation slash silently
+     vanishes and \neq reads as =. Fallback is per glyph, so only the slash
+     comes from KaTeX_Main. */
+  --lg-stix: var(--font-stix), 'STIX Two Math', 'Cambria Math', KaTeX_Main, Georgia, serif;
 
   position: fixed;
   inset: 0;

@@ -71,7 +71,10 @@ export function UseCases() {
         lays it out like a hand-written scratch page (mistakes struck through
         with the fix beside them, never erased); and a{' '}
         <strong>function plot</strong> when there is something to graph.
-        Details on the <Link href="/docs/mathematics">Mathematics</Link> page.
+        This carries from school algebra through college work — integration
+        by parts and hypothesis tests chain the same way. Details and live
+        examples on the <Link href="/docs/mathematics">Mathematics</Link>{' '}
+        page.
       </p>
 
       <H2 id="writing">Writing something that matters</H2>

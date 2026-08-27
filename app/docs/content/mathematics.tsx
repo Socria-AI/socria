@@ -5,7 +5,7 @@
 import Link from 'next/link';
 import { Article, H2, Callout, Defs, Def } from '../Article';
 import { DemoBoard, DemoGuard } from '@/app/logos/LogosDemo';
-import { DemoPlot } from '../DocsDemo';
+import { DemoCollege, DemoPlot } from '../DocsDemo';
 import { docPage } from '../registry';
 
 const page = docPage('mathematics')!;
@@ -14,6 +14,7 @@ const sections = [
   { id: 'intents', heading: 'Four kinds of math moment' },
   { id: 'board', heading: 'The Board' },
   { id: 'plot', heading: 'The function plot' },
+  { id: 'college', heading: 'Calculus, statistics, and beyond' },
   { id: 'guard', heading: 'The Answer Guard' },
 ];
 
@@ -120,6 +121,53 @@ export function Mathematics() {
       </Callout>
       <DemoPlot />
 
+      <H2 id="college">Calculus, statistics, and beyond</H2>
+      <p>
+        The quadratic above is deliberately small — but nothing about the
+        machinery is tied to school algebra. The map&rsquo;s mathematical
+        vocabulary is domain-agnostic: the same eleven node types and the
+        same chain edges carry college work unchanged.
+      </p>
+      <ul>
+        <li>
+          <strong>Calculus</strong> — a derivative or an integral is a chain
+          like any other, each state becoming the next with the move written
+          on the edge: <em>pick u and dv</em>, <em>apply the rule</em>,{' '}
+          <em>differentiate to check</em>. The rule you invoked — by parts,
+          the chain rule, a known limit — attaches to the step it licenses as
+          a theorem in the margin, and the Plot lens graphs whatever function
+          the work holds.
+        </li>
+        <li>
+          <strong>Statistics</strong> — a hypothesis test maps its sample and
+          its H&#8320; as givens, the question as the unknown, the
+          t-statistic as the theorem justifying the standardizing step, and
+          the verdict as the result. Confidence intervals and regressions
+          take the same shape.
+        </li>
+        <li>
+          <strong>Proofs and logic</strong> — proof steps chain on{' '}
+          <code>implies</code> rather than <code>transforms_to</code>, with
+          inference nodes for the deductions.
+        </li>
+        <li>
+          <strong>Linear algebra and the rest</strong> — row operations,
+          substitutions, unit conversions: anywhere the work is a sequence of
+          justified moves, the map is a map of the work.
+        </li>
+      </ul>
+      <p>
+        Two of those, on the real Board — including calculus&rsquo;s most
+        classic mistake, kept and repaired in place:
+      </p>
+      <DemoCollege />
+      <p>
+        Everything on this page applies at every level: the intents read the
+        same way (a problem set being checked is <em>verification</em>; a
+        concept being explored is <em>exploration</em>), and the{' '}
+        <Link href="#guard">Answer Guard</Link> arms for learning-intent work
+        whether the problem is a quadratic or an integral.
+      </p>
 
       <H2 id="guard">The Answer Guard</H2>
       <p>
