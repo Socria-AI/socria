@@ -35,7 +35,7 @@ export function Core2() {
 
       <H2 id="modes">The three modes</H2>
       <p>
-        Core 2 shifts stance with what you bring, without announcing it:
+        Core 2 shifts stance with what you bring:
       </p>
       <Defs>
         <Def term="Coach">
@@ -75,9 +75,10 @@ export function Core2() {
       <H2 id="access">Access</H2>
       <p>
         Core 2 is free and works without an account: anyone can have one full
-        session signed out. After that first session, keeping and syncing
-        conversations requires signing in — the model itself stays free
-        either way, and is never part of the{' '}
+        session signed out. After that first session, starting another
+        requires signing in — the first stays saved on your device and you
+        can keep talking in it, but syncing across devices needs an account.
+        The model itself stays free either way, and is never part of the{' '}
         <Link href="/docs/socria-one">Socria One</Link> paywall.
       </p>
     </Article>

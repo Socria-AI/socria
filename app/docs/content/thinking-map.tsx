@@ -74,9 +74,11 @@ export function ThinkingMapDoc() {
         Nodes carry status (<code>open</code> → <code>supported</code> /{' '}
         <code>resolved</code> / <code>revised</code>), optional LaTeX, an
         optional note, and a &ldquo;+N folded in&rdquo; badge listing wordings
-        that were merged into them. Ordinary maps hold up to 16 nodes and 22
-        edges; math maps stretch to 26 and 34, because a solution chain is
-        long by nature.
+        that were merged into them. Maps hold up to 16 nodes and 22 edges —
+        26 and 34 for math, because a solution chain is long by nature. On
+        the free tier the map stops taking on <em>new</em> nodes at four;{' '}
+        <Link href="/docs/socria-one">Socria One</Link> lets it keep growing,
+        and nothing already drawn is ever taken back.
       </p>
 
       <H2 id="edges">Relationships</H2>
@@ -130,7 +132,7 @@ export function ThinkingMapDoc() {
           <tbody>
             <tr><td><strong>Graph</strong></td><td>everything at once — a live force-directed layout that settles as you watch</td><td>the map has any node</td></tr>
             <tr><td><strong>Structure</strong></td><td>what rests on what, as a layered tree</td><td>more than one node</td></tr>
-            <tr><td><strong>Tensions</strong></td><td>each conflict as an opposing pair, facing each other</td><td>a conflict or tension exists</td></tr>
+            <tr><td><strong>Tensions</strong></td><td>each conflict as an opposing pair, facing each other</td><td>a conflict, tension or counterpoint exists</td></tr>
             <tr><td><strong>Evidence</strong></td><td>claims in columns with their actual support beneath</td><td>evidence or sources exist</td></tr>
             <tr><td><strong>Solution</strong></td><td>the worked chain, step by step, operations written beside the arrows</td><td>math, with a chain to follow</td></tr>
             <tr><td><strong>Plot</strong></td><td>the functions on the map, graphed</td><td>math, with something plottable</td></tr>
@@ -141,8 +143,9 @@ export function ThinkingMapDoc() {
       <p>
         Math work leads with the Solution lens automatically — until you pick
         a lens by hand, after which the choice is yours and stays yours. On
-        the free tier one lens is open at a time;{' '}
-        <Link href="/docs/socria-one">Socria One</Link> opens them all.
+        the free tier only the map&rsquo;s lead lens is open — Solution for
+        math work, Graph otherwise; the other readings are{' '}
+        <Link href="/docs/socria-one">Socria One</Link>&rsquo;s.
       </p>
 
       <H2 id="moves">The four moves</H2>

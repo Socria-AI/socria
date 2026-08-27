@@ -103,9 +103,9 @@ export function Logos() {
         Signed in, sessions sync to your account and appear in the same
         sidebar as your Core conversations, marked with the Logos glyph.
         Unlocked by key without an account, they stay in the browser. Deep
-        links work either way: <code>/chat?s=&lt;session&gt;</code> opens a
-        specific line of thinking, <code>/chat?model=logos</code> opens
-        Logos itself.
+        links work either way: <code>/chat?model=logos</code> opens Logos,
+        and <code>/chat?model=logos&amp;s=&lt;session&gt;</code> opens a
+        specific line of thinking.
       </p>
 
       <H2 id="material">Bringing your own material</H2>
@@ -113,11 +113,12 @@ export function Logos() {
         Paste something long and it becomes an attached note instead of
         flooding the box; attach images and Logos reads them once, at attach
         time, so the reply and the map work from the same reading. Every
-        attachment carries an origin you can correct —{' '}
+        pasted or uploaded note carries an origin you can correct —{' '}
         <strong>My thinking</strong>, <strong>Source material</strong> or{' '}
         <strong>Context</strong> — and the origin decides what the map may do
         with it: someone else&rsquo;s argument can become a claim or a source
-        on your map, but never one of <em>your</em> beliefs. Grounding a
+        on your map, but never one of <em>your</em> beliefs. Images enter as
+        context — described, never adopted as positions. Grounding a
         specific node in material is covered under{' '}
         <Link href="/docs/drafts-grounding">Draft Space &amp; grounding</Link>.
       </p>

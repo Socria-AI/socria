@@ -66,9 +66,9 @@ export function Models() {
             </tr>
             <tr>
               <td><strong>Writes prose for you</strong></td>
-              <td>Never</td>
               <td>Only refining material you brought</td>
-              <td>Only in Draft Space, seeded from your map</td>
+              <td>Only refining material you brought</td>
+              <td>Never — even Draft Space&rsquo;s Refine is a proposal that lands only when you apply it</td>
             </tr>
           </tbody>
         </table>
@@ -83,11 +83,11 @@ export function Models() {
         not to a default.
       </p>
       <p>
-        Your choice is remembered per browser, and every saved session in the
-        sidebar carries a mark for the model that made it — opening a Logos
-        session switches you into Logos, opening a Core session switches you
-        back. One list, ordered by when you last touched each, whichever
-        surface produced it.
+        Your choice is remembered per browser. In the sidebar, chat and Logos
+        sessions sit in one list ordered by when you last touched each; Logos
+        sessions carry the Logos mark, and opening one switches you into
+        Logos. The way back is the <em>Socria chat</em> button in the Logos
+        header, which returns you to whichever Core model you were on.
       </p>
 
       <H2 id="choosing">Which one, when</H2>
@@ -110,11 +110,13 @@ export function Models() {
       </ul>
       <Callout tag="Under the hood">
         <p>
-          Each Socria model runs on its own underlying engine with an
-          automatic fallback, all configurable per deployment — details in the{' '}
-          <Link href="/docs/technical">technical reference</Link>. The models
-          differ far more in their prompting, per-turn control loops and
-          surrounding machinery than in raw engine.
+          Each Socria model runs on its own underlying engine, configurable
+          per deployment; Core 3.1 and Logos additionally retry on a
+          known-good fallback engine if their configured one is rejected —
+          details in the <Link href="/docs/technical">technical
+          reference</Link>. The models differ far more in their prompting,
+          per-turn control loops and surrounding machinery than in raw
+          engine.
         </p>
       </Callout>
     </Article>

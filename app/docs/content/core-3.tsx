@@ -56,7 +56,7 @@ export function Core3() {
           stage (observe → clarify → challenge → connect → synthesize), your
           engagement, and readiness for synthesis; it varies the reply&rsquo;s
           move so two turns never repeat the same shape; and it scans the last
-          two replies against a list of twenty-three banned coaching patterns,
+          two replies against a list of twenty-two banned coaching patterns,
           forbidding any that just appeared. Two questions in a row? The third
           reply is not allowed to ask one.
         </Def>
@@ -91,8 +91,9 @@ export function Core3() {
       <p>
         Conversations also title themselves: once a thread has real substance,
         it gets a name that captures the underlying question
-        (&ldquo;Ambition vs Security&rdquo;), never a generic label — and a
-        manual rename is never overwritten.
+        (&ldquo;Ambition vs Security&rdquo;), never a generic label — and the
+        auto-titler only ever replaces its own suggestions or the default
+        name; a title it did not write is left alone.
       </p>
 
       <H2 id="cards">Syntheses, insights, chips</H2>
@@ -100,8 +101,8 @@ export function Core3() {
         <Def term="Synthesis cards">
           At a cadence paced by your depth setting, Core 3.1 gathers what you
           have worked out into a structured card — recurring themes, tensions,
-          hidden assumptions, areas of clarity, possible reframes — with a
-          short title. It waits if you still have one unread.
+          hidden assumptions, shifts in thinking, areas of clarity, possible
+          reframes — with a short title. It waits if you still have one unread.
         </Def>
         <Def term="Insight cards">
           Occasionally, one reflection in one to three sentences, grounded
@@ -111,7 +112,8 @@ export function Core3() {
         <Def term="Choice chips">
           When a reply ends on a question, it offers four to six tappable
           answers written in your first-person voice — including at least one
-          that questions the premise. Pick one or type your own.
+          that questions the premise or admits uncertainty. Pick one or type
+          your own.
         </Def>
       </Defs>
 
