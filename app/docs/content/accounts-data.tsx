@@ -56,10 +56,14 @@ export function AccountsData() {
       </Defs>
       <Callout tag="Older databases">
         <p>
-          Deployments whose database predates newer columns still work: the
-          newer fields ride along inside an existing column until the
-          operator migrates, and the app reads both shapes. Data is never
-          dropped for being newer than the schema.
+          Deployments whose database predates newer columns still work for
+          your sessions: the newer Logos fields — kind, map, draft, grounded
+          contexts — ride along inside an existing column of the
+          conversations table until the operator migrates, and the app reads
+          both shapes, so session data is never dropped for being newer than
+          the schema. The one exception is the cross-conversation Thinking
+          Journey, whose column has no ride-along — on an un-migrated
+          database it simply isn&rsquo;t stored until the schema is run.
         </p>
       </Callout>
 
