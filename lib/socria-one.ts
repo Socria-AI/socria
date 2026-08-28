@@ -34,11 +34,23 @@ export const FREE_LIMITS = {
 
 // Typed codes that open One without billing attached, mirroring the Core 3
 // access key already in the product. Soft gates, not secrets — like that key,
-// they ship in the client bundle. 'ONE' is the dev/test gate; the longer code
-// is for handing out. A signed-in redemption is ALSO written to the account
-// (see /api/logos/redeem) so it follows the person across devices.
-export const SOCRIA_ONE_KEY = 'ONE';
-export const SOCRIA_ONE_CODES = [SOCRIA_ONE_KEY, 'MAVERICKS26LONGHORNS27'];
+// they ship in the client bundle. A signed-in redemption is ALSO written to
+// the account (see /api/logos/redeem) so it follows the person across devices.
+//
+// There used to be a second, shorter code here — 'ONE' — as a dev/test gate.
+// It came out for the paid launch: three letters, and the first three anyone
+// would try against a product called Socria One, handing over a $15/month
+// subscription to whoever guessed. A soft gate is one a determined person can
+// step over, not one nobody has to.
+export const SOCRIA_ONE_CODES = ['MAVERICKS26LONGHORNS27'];
+
+/**
+ * The code the client echoes in `x-socria-one` to assert it already holds One.
+ * Any accepted code satisfies the server; this is simply the one the bundle
+ * carries. NOT a secret and not a security boundary — see resolvePlanForRequest,
+ * where it is the last fallback behind Stripe and the account grant.
+ */
+export const SOCRIA_ONE_KEY = SOCRIA_ONE_CODES[0];
 
 export function isValidOneKey(key: unknown): boolean {
   return (
