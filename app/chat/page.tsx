@@ -16,6 +16,7 @@ import { ModelGlyph } from '@/components/ModelGlyph';
 import { LogosApp } from '@/components/LogosApp';
 import { isValidOneKey } from '@/lib/socria-one';
 import { MODEL_KEY, rememberModel } from '@/lib/socria-model-store';
+import { buildStarters } from '@/lib/starters';
 import { loadLocal as loadLocalLogos } from '@/lib/logos-sessions';
 import { DepthPicker } from '@/components/DepthPicker';
 import { TryCore3Pill } from '@/components/TryCore3Pill';
@@ -121,6 +122,9 @@ function readSmartUnlocked(): boolean {
   }
 }
 
+// The openings offered to someone with no history — and the top-up for
+// everyone else. buildStarters puts what they have actually been thinking
+// about ahead of these.
 const STARTER_PROMPTS = [
   'I don’t know what decision to make',
   'Help me think through this idea',
@@ -555,6 +559,16 @@ export default function ChatPage() {
     rememberModel('core-3');
     return true;
   }
+
+  // The empty screen's chips. An open thread is an unfinished line of thought,
+  // so it outranks a finished conversation's title; both outrank the generic
+  // openings, which stay to top the list up and to keep one way in to
+  // something new.
+  const starters = buildStarters({
+    threads: journey?.openThreads,
+    recent: conversations.map((c) => ({ title: c.title, updatedAt: c.updatedAt })),
+    fallback: STARTER_PROMPTS,
+  });
 
   // One sidebar, one order. Chat sessions and Logos sessions are the same
   // thing to the person reading the list — something they were thinking about
@@ -1468,7 +1482,7 @@ export default function ChatPage() {
                 </p>
 
                 <div className="mt-10 grid sm:grid-cols-2 gap-3 text-left">
-                  {STARTER_PROMPTS.map((p) => (
+                  {starters.map((p) => (
                     <button
                       key={p}
                       onClick={() => send(p)}

@@ -51,6 +51,7 @@ import {
   type Personality,
 } from '@/lib/logos-personality';
 import { lastCoreModel, rememberModel } from '@/lib/socria-model-store';
+import { buildStarters } from '@/lib/starters';
 import { PersonalityDial } from '@/components/PersonalityDial';
 import { ContextPanel } from '@/components/ContextPanel';
 import { ConnectionsModal } from '@/components/ConnectionsModal';
@@ -105,6 +106,8 @@ const RESEARCH_KEY = 'socria.logos.research.v1';
 // alongside SOCRIA_CONNECTORS=on to bring it back.
 const CONNECTORS_ON = process.env.NEXT_PUBLIC_SOCRIA_CONNECTORS === 'on';
 
+// Shown to someone with no lines of thinking yet; afterwards they top up the
+// ones drawn from what they have actually been working through.
 const STARTERS = [
   'I’m debating whether to build Logos now.',
   'I can’t tell if I want this career or just the idea of it.',
@@ -379,6 +382,21 @@ export function LogosApp({
     }
     router.push(SOCRIA_MODELS[next].href ?? '/chat');
   }
+
+  // The chips on an empty line of thinking. Logos keeps no journey of its own,
+  // but a session is titled after the first thing said in it, which is enough
+  // to offer a way back into one; the written openings top the list up. The
+  // active (empty) session is skipped — offering a way back into the screen
+  // you are already looking at is no offer at all.
+  const logosStarters = buildStarters(
+    {
+      recent: sessions
+        .filter((s) => s.id !== activeId && s.messages.length > 0)
+        .map((s) => ({ title: s.title, updatedAt: s.updatedAt })),
+      fallback: STARTERS,
+    },
+    STARTERS.length
+  );
 
   function reveal() {
     const id = activeIdRef.current;
@@ -1487,7 +1505,7 @@ export function LogosApp({
                   the shape of your reasoning beside you as you talk.
                 </p>
                 <div className="lg-starters">
-                  {STARTERS.map((s) => (
+                  {logosStarters.map((s) => (
                     <button key={s} type="button" onClick={() => send(s)}>
                       {s}
                     </button>
