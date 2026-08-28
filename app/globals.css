@@ -3642,6 +3642,37 @@ html.js-anim .scrolly-root .fade.d3 { transition-delay: .3s; }
   font-size: 12px;
   color: var(--lg-ink-40);
 }
+/* Signing in is the way into a public product, so it carries the weight the
+   access-key row used to; the key sits behind a quiet disclosure under it. */
+.logos-root .lg-gate-go {
+  display: inline-block;
+  margin-top: 26px;
+  padding: 12px 24px;
+  border-radius: 11px;
+  background: var(--lg-primary);
+  color: var(--lg-paper);
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: transform 0.2s, opacity 0.2s;
+}
+.logos-root .lg-gate-go:hover { transform: translateY(-1px); opacity: 0.94; }
+.logos-root .lg-gate-toggle {
+  display: block;
+  margin: 14px 0 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--lg-ink-40);
+  text-decoration: underline;
+  text-decoration-color: rgba(53, 70, 32, 0.25);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.logos-root .lg-gate-toggle:hover { color: var(--lg-primary); }
+.logos-root .lg-gate-row[hidden] { display: none; }
 
 /* Logos — lens tabs, captions, structured connectors */
 .logos-root .lg-map-wrap {

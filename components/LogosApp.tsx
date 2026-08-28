@@ -130,6 +130,7 @@ export function LogosApp({
   // through to the key gate rather than showing nothing forever.
   const [authSettled, setAuthSettled] = useState(false);
   const [keyInput, setKeyInput] = useState('');
+  const [keyOpen, setKeyOpen] = useState(false);
   const [keyError, setKeyError] = useState(false);
 
   const [sessions, setSessions] = useState<LogosSession[]>([]);
@@ -1239,10 +1240,25 @@ export function LogosApp({
               </span>
               <h1>A reasoning environment.</h1>
               <p>
-                An early prototype: you think out loud, and the shape of your
-                reasoning is drawn beside you as you talk.
+                You think out loud, and the shape of your reasoning is drawn
+                beside you as you talk.
               </p>
-              <div className="lg-gate-row">
+              {/* Logos is open to anyone with an account, so signing in is the
+                  way in and leads. The access key stays for people without one
+                  — comped members, anyone handed a code — but it no longer
+                  fronts the screen as though this were invite-only. */}
+              <a className="lg-gate-go" href="/sign-in?redirect_url=%2Fchat%3Fmodel%3Dlogos">
+                Sign in to open Logos
+              </a>
+              <button
+                type="button"
+                className="lg-gate-toggle"
+                aria-expanded={keyOpen}
+                onClick={() => setKeyOpen((v) => !v)}
+              >
+                Have an access key?
+              </button>
+              <div className="lg-gate-row" hidden={!keyOpen}>
                 <input
                   type="text"
                   autoCapitalize="characters"
@@ -1274,7 +1290,7 @@ export function LogosApp({
                 </span>
               )}
               <p className="lg-gate-fine">
-                Signed-in Socria accounts have access automatically.
+                Free to start — two lines of thinking, and the whole loop.
               </p>
             </div>
           )}
