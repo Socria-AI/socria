@@ -74,7 +74,7 @@ export function DemoSplit() {
           <div className="lg-thread" style={{ overflow: 'hidden' }}>
             {DEMO_TURNS.map((m, i) => (
               <div key={i} className={`lg-msg lg-msg-${m.role}`}>
-                {m.role === 'assistant' && <span className="lg-msg-who">Socria Logos</span>}
+                {m.role === 'assistant' && <span className="lg-msg-who">Socria</span>}
                 <div className="lg-msg-stack">
                   <div className="lg-msg-body">{m.content}</div>
                 </div>
@@ -373,7 +373,7 @@ export function DemoGuard() {
           </div>
         </div>
         <div className="lg-msg lg-msg-assistant">
-          <span className="lg-msg-who">Socria Logos</span>
+          <span className="lg-msg-who">Socria</span>
           <div className="lg-msg-body">
             Not yet — you are one step away. What does setting each factor to zero give you?
           </div>
@@ -449,7 +449,7 @@ export function DemoControls() {
               </div>
             </div>
             <div className="lg-msg lg-msg-assistant" key={depth}>
-              <span className="lg-msg-who">Socria Logos</span>
+              <span className="lg-msg-who">Socria</span>
               <div className="lg-msg-stack">
                 <div className="lg-msg-body">
                   {answer.body.split('\n\n').map((para, i) => (

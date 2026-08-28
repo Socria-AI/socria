@@ -1498,7 +1498,7 @@ export function LogosApp({
 
             {messages.map((m, i) => (
               <div key={i} className={`lg-msg lg-msg-${m.role}`}>
-                {m.role === 'assistant' && <span className="lg-msg-who">Socria Logos</span>}
+                {m.role === 'assistant' && <span className="lg-msg-who">Socria</span>}
                 <div className="lg-msg-stack">
                   {!!m.attachments?.length && <AttachmentList items={m.attachments} />}
                   {m.content && (
@@ -1512,7 +1512,7 @@ export function LogosApp({
 
             {streaming && (
               <div className="lg-msg lg-msg-assistant">
-                <span className="lg-msg-who">Socria Logos</span>
+                <span className="lg-msg-who">Socria</span>
                 <div className="lg-msg-body">
                   <MathText>{streaming}</MathText>
                 </div>
@@ -1521,7 +1521,7 @@ export function LogosApp({
 
             {busy && !streaming && (
               <div className="lg-msg lg-msg-assistant">
-                <span className="lg-msg-who">Socria Logos</span>
+                <span className="lg-msg-who">Socria</span>
                 <div className="lg-thinking" aria-label="Thinking">
                   <span /> <span /> <span />
                 </div>
