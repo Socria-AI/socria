@@ -9,3 +9,8 @@ build/
 .DS_Store
 .vercel
 *.tsbuildinfo
+
+# Trailer build: the seeded canvas payload and the exported UI fragments are
+# derived — regenerate them with .trailer/export.mjs + .trailer/build.mjs.
+.trailer/socria-logos-trailer.html
+.trailer/frag/

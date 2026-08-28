@@ -1,0 +1,79 @@
+{
+  "artboards": [
+    {
+      "file": "Main.dc.html",
+      "x": 0,
+      "y": 0,
+      "w": 1600,
+      "h": 1000
+    },
+    {
+      "file": "Split.dc.html",
+      "x": 1820,
+      "y": 0,
+      "w": 1600,
+      "h": 1000
+    },
+    {
+      "file": "Lenses.dc.html",
+      "x": 3640,
+      "y": 0,
+      "w": 1600,
+      "h": 1000
+    },
+    {
+      "file": "Moves.dc.html",
+      "x": 0,
+      "y": 1260,
+      "w": 1600,
+      "h": 1000
+    },
+    {
+      "file": "Board.dc.html",
+      "x": 1820,
+      "y": 1260,
+      "w": 1600,
+      "h": 1000
+    },
+    {
+      "file": "Calculus.dc.html",
+      "x": 3640,
+      "y": 1260,
+      "w": 1600,
+      "h": 1000
+    },
+    {
+      "file": "Guard.dc.html",
+      "x": 0,
+      "y": 2520,
+      "w": 1600,
+      "h": 1000
+    },
+    {
+      "file": "Dials.dc.html",
+      "x": 1820,
+      "y": 2520,
+      "w": 1600,
+      "h": 1000
+    },
+    {
+      "file": "Close.dc.html",
+      "x": 3640,
+      "y": 2520,
+      "w": 1600,
+      "h": 1000
+    }
+  ],
+  "annotations": [
+    {
+      "id": "trailer-brief",
+      "x": 0,
+      "y": -190,
+      "w": 620,
+      "text": "Socria Logos — feature trailer, nine beats.\nEvery product frame is the real interface exported from the running app, not a mockup: real map layout, real Board ink, real dials."
+    }
+  ],
+  "launch": {
+    "view": "canvas"
+  }
+}

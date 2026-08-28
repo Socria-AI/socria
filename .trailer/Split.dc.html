@@ -1,0 +1,428 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&family=Kalam:wght@300;400;700&family=STIX+Two+Text:ital,wght@0,400..700;1,400..700&display=swap">
+  <style>
+    body { margin: 0; }
+    a { color: #465a26; } a:hover { color: #232f14; }
+
+    :root, .docs-root, .logos-root {
+      --font-serif: 'Instrument Serif'; --font-sans: 'Inter';
+      --font-hand: 'Kalam'; --font-stix: 'STIX Two Text';
+    }
+    :root { --paper: #F5F3EB; --paper-2: #ece8da; --ink: #1F1F1F; --ink-60: rgba(31, 31, 31, 0.6); --ink-40: rgba(31, 31, 31, 0.4); --moss: #5e7633; --moss-50: #f4f6ee; --moss-100: #e4eada; --moss-200: #cad5b6; --moss-600: #5e7633; --moss-700: #475a28; --moss-800: #38481f; --sage: #9CB874; --sage-bright: #aecb86; --forest: #2c3b18; --forest-2: #1d2710; --gold: #b8a26b; --blue: #9fbfd3; --border: #e7e2d3; --line-dark: rgba(245, 243, 235, 0.16); --accent: #5e7633; --accent-700: #475a28; --serif: var(--font-serif), "Instrument Serif", Georgia, serif; --sans: var(--font-sans), "Inter", system-ui, sans-serif; --edge: clamp(20px, 4vw, 64px); }
+    body{counter-reset: katexEqnNo 0 mmlEqnNo 0;}
+*{--tw-border-spacing-x: 0; --tw-border-spacing-y: 0; --tw-translate-x: 0; --tw-translate-y: 0; --tw-rotate: 0; --tw-skew-x: 0; --tw-skew-y: 0; --tw-scale-x: 1; --tw-scale-y: 1; --tw-pan-x: ; --tw-pan-y: ; --tw-pinch-zoom: ; --tw-scroll-snap-strictness: proximity; --tw-gradient-from-position: ; --tw-gradient-via-position: ; --tw-gradient-to-position: ; --tw-ordinal: ; --tw-slashed-zero: ; --tw-numeric-figure: ; --tw-numeric-spacing: ; --tw-numeric-fraction: ; --tw-ring-inset: ; --tw-ring-offset-width: 0px; --tw-ring-offset-color: #fff; --tw-ring-color: rgb(59 130 246 / 0.5); --tw-ring-offset-shadow: 0 0 #0000; --tw-ring-shadow: 0 0 #0000; --tw-shadow: 0 0 #0000; --tw-shadow-colored: 0 0 #0000; --tw-blur: ; --tw-brightness: ; --tw-contrast: ; --tw-grayscale: ; --tw-hue-rotate: ; --tw-invert: ; --tw-saturate: ; --tw-sepia: ; --tw-drop-shadow: ; --tw-backdrop-blur: ; --tw-backdrop-brightness: ; --tw-backdrop-contrast: ; --tw-backdrop-grayscale: ; --tw-backdrop-hue-rotate: ; --tw-backdrop-invert: ; --tw-backdrop-opacity: ; --tw-backdrop-saturate: ; --tw-backdrop-sepia: ; --tw-contain-size: ; --tw-contain-layout: ; --tw-contain-paint: ; --tw-contain-style: ;}
+*{box-sizing: border-box; border-width: 0px; border-style: solid; border-color: rgb(229, 231, 235);}
+html{line-height: 1.5; text-size-adjust: 100%; tab-size: 4; font-family: var(--font-sans), system-ui, sans-serif; font-feature-settings: normal; font-variation-settings: normal; -webkit-tap-highlight-color: transparent;}
+body{margin: 0px; line-height: inherit;}
+button{font-family: inherit; font-feature-settings: inherit; font-variation-settings: inherit; font-size: 100%; font-weight: inherit; line-height: inherit; letter-spacing: inherit; color: inherit; margin: 0px; padding: 0px;}
+button{text-transform: none;}
+button{appearance: button; background-color: transparent; background-image: none;}
+figure,p{margin: 0px;}
+button{cursor: pointer;}
+svg{display: block; vertical-align: middle;}
+@keyframes fadeUp { 
+  0% { opacity: 0; transform: translateY(12px); }
+  100% { opacity: 1; transform: translateY(0px); }
+}
+.antialiased{-webkit-font-smoothing: antialiased;}
+:root{--paper: #F5F3EB; --paper-2: #ece8da; --ink: #1F1F1F; --ink-60: rgba(31, 31, 31, 0.6); --ink-40: rgba(31, 31, 31, 0.4); --moss: #5e7633; --moss-50: #f4f6ee; --moss-100: #e4eada; --moss-200: #cad5b6; --moss-600: #5e7633; --moss-700: #475a28; --moss-800: #38481f; --sage: #9CB874; --sage-bright: #aecb86; --forest: #2c3b18; --forest-2: #1d2710; --gold: #b8a26b; --blue: #9fbfd3; --border: #e7e2d3; --line-dark: rgba(245, 243, 235, 0.16); --accent: #5e7633; --accent-700: #475a28; --serif: var(--font-serif), "Instrument Serif", Georgia, serif; --sans: var(--font-sans), "Inter", system-ui, sans-serif; --edge: clamp(20px, 4vw, 64px);}
+*{box-sizing: border-box;}
+html{overflow-x: hidden; scroll-behavior: smooth;}
+body{margin: 0px; background: var(--paper); color: var(--ink); font-family: var(--sans); line-height: 1.55; -webkit-font-smoothing: antialiased; text-rendering: optimizelegibility;}
+@keyframes scrollx { 
+  0% { transform: translateX(0px); }
+  100% { transform: translateX(-50%); }
+}
+@keyframes pulse { 
+  0%, 100% { box-shadow: rgba(156, 184, 116, 0.22) 0px 0px 0px 7px, rgba(156, 184, 116, 0.5) 0px 0px 36px 8px; }
+  50% { box-shadow: rgba(156, 184, 116, 0.1) 0px 0px 0px 12px, rgba(156, 184, 116, 0.72) 0px 0px 54px 13px; }
+}
+@keyframes breathe { 
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.14); }
+}
+@keyframes drip { 
+  0% { transform: translateY(-16px); }
+  100% { transform: translateY(36px); }
+}
+.paper-bg{background-color: var(--paper); background-image: radial-gradient(at 0% 0%, rgba(94, 118, 51, 0.05) 0px, transparent 50%), radial-gradient(at 100% 100%, rgba(156, 184, 116, 0.06) 0px, transparent 50%);}
+@keyframes tryCore3Breathe { 
+  0%, 100% { box-shadow: rgba(94, 118, 51, 0.28) 0px 1px 6px -2px; }
+  50% { box-shadow: rgba(94, 118, 51, 0.5) 0px 2px 14px -2px; }
+}
+@keyframes tryCore3Twinkle { 
+  0%, 100% { opacity: 0.65; transform: scale(0.9) rotate(0deg); }
+  50% { opacity: 1; transform: scale(1.12) rotate(45deg); }
+}
+@keyframes tryCore3Cycle { 
+  0%, 18% { color: var(--ink); font-style: normal; font-family: inherit; font-size: 1em; letter-spacing: 0px; }
+  36%, 62% { color: var(--moss-700); font-style: italic; font-family: var(--font-serif), "Instrument Serif", Georgia, serif; font-size: 1.2em; letter-spacing: 0.005em; }
+  82%, 100% { color: var(--ink); font-style: normal; font-family: inherit; font-size: 1em; letter-spacing: 0px; }
+}
+@keyframes depthPillCycle { 
+  0%, 5% { background: transparent; color: rgba(31, 31, 31, 0.5); border-color: rgba(31, 31, 31, 0.12); }
+  10%, 20% { background: var(--moss-600); color: var(--paper); border-color: var(--moss-600); }
+  25%, 100% { background: transparent; color: rgba(31, 31, 31, 0.5); border-color: rgba(31, 31, 31, 0.12); }
+}
+@keyframes core3ModalFadeIn { 
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+@keyframes core3ModalPop { 
+  0% { opacity: 0; transform: translateY(20px) scale(0.96); }
+  100% { opacity: 1; transform: translateY(0px) scale(1); }
+}
+@keyframes core3HeroSweep { 
+  0% { transform: translateX(-40%) skewX(-14deg); opacity: 0; }
+  30% { opacity: 1; }
+  70% { opacity: 1; }
+  100% { transform: translateX(120%) skewX(-14deg); opacity: 0; }
+}
+@keyframes core3GlyphBreathe { 
+  0%, 100% { transform-origin: 72px 50px; transform: scale(1); }
+  50% { transform-origin: 72px 50px; transform: scale(1.08); }
+}
+@keyframes core3GlyphSpin { 
+  0% { transform-origin: 172px 50px; transform: rotate(0deg); }
+  100% { transform-origin: 172px 50px; transform: rotate(360deg); }
+}
+@keyframes core3BeamPulse { 
+  0%, 100% { opacity: 0.25; stroke-dashoffset: 0; }
+  50% { opacity: 0.9; stroke-dashoffset: -16; }
+}
+@keyframes core3Sparkle { 
+  0%, 100% { opacity: 0; transform: scale(0.4); }
+  50% { opacity: 1; transform: scale(1.4); }
+}
+@keyframes core3RevealIn { 
+  0% { opacity: 0; transform: translateY(10px); }
+  100% { opacity: 1; transform: translateY(0px); }
+}
+@keyframes core3TitleShimmer { 
+  0% { background-position: -180% 0px; }
+  100% { background-position: 280% 0px; }
+}
+@keyframes bubbleGlow { 
+  0%, 100% { opacity: 0; }
+  30%, 70% { opacity: 1; }
+}
+@keyframes depthPillHighlight { 
+  0%, 5% { background: transparent; color: rgba(31, 31, 31, 0.55); border-color: rgba(31, 31, 31, 0.15); box-shadow: rgba(94, 118, 51, 0) 0px 0px 0px 0px; transform: translateY(0px); }
+  10%, 20% { background: var(--moss-600); color: var(--paper); border-color: var(--moss-600); box-shadow: rgba(94, 118, 51, 0.55) 0px 8px 22px -6px, rgba(94, 118, 51, 0.14) 0px 0px 0px 4px; transform: translateY(-2px); }
+  25%, 100% { background: transparent; color: rgba(31, 31, 31, 0.55); border-color: rgba(31, 31, 31, 0.15); box-shadow: rgba(94, 118, 51, 0) 0px 0px 0px 0px; transform: translateY(0px); }
+}
+@keyframes core3PrimaryGlow { 
+  0%, 100% { box-shadow: rgba(94, 118, 51, 0.55) 0px 10px 26px -10px, rgba(94, 118, 51, 0.35) 0px 0px 0px 0px; }
+  50% { box-shadow: rgba(94, 118, 51, 0.75) 0px 10px 26px -10px, rgba(94, 118, 51, 0) 0px 0px 0px 8px; }
+}
+@keyframes core3PrimaryShine { 
+  0% { transform: translateX(-160%) skewX(-24deg); }
+  100% { transform: translateX(360%) skewX(-24deg); }
+}
+@keyframes core3PrimaryArrow { 
+  0%, 60%, 100% { transform: translateX(0px); }
+  80% { transform: translateX(4px); }
+}
+@keyframes choiceChipIn { 
+  0% { opacity: 0; transform: translateY(6px); }
+  100% { opacity: 1; transform: translateY(0px); }
+}
+@keyframes synthesisCardIn { 
+  0% { opacity: 0; transform: translateY(12px); }
+  100% { opacity: 1; transform: translateY(0px); }
+}
+@keyframes synthesisItemIn { 
+  0% { opacity: 0; transform: translateY(6px); }
+  100% { opacity: 1; transform: translateY(0px); }
+}
+@keyframes synthesisShimmer { 
+  0% { background-position: -200% 0px; }
+  100% { background-position: 200% 0px; }
+}
+@keyframes insightCardIn { 
+  0% { opacity: 0; transform: translateY(14px) scale(0.98); }
+  100% { opacity: 1; transform: translateY(0px) scale(1); }
+}
+@keyframes insightCardShine { 
+  0% { transform: translateX(-140%) skewX(-24deg); }
+  100% { transform: translateX(320%) skewX(-24deg); }
+}
+@keyframes insightShareFadeIn { 
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+@keyframes insightSharePop { 
+  0% { opacity: 0; transform: translateY(20px) scale(0.96); }
+  100% { opacity: 1; transform: translateY(0px) scale(1); }
+}
+@keyframes bubbleIn { 
+  0% { opacity: 0; transform: translateY(6px) scale(0.96); filter: blur(2px); }
+  55% { opacity: 0.75; filter: blur(0.4px); }
+  100% { opacity: 1; transform: translateY(0px) scale(1); filter: blur(0px); }
+}
+@keyframes dotPulse { 
+  0%, 80%, 100% { opacity: 0.25; transform: translateY(0px); }
+  40% { opacity: 1; transform: translateY(-2px); }
+}
+@keyframes scrollyDrip { 
+  0% { transform: translateY(-17px); }
+  100% { transform: translateY(40px); }
+}
+@keyframes scrollyBlink { 
+  50% { opacity: 0; }
+}
+@keyframes drip { 
+  0% { transform: translateY(-18px); }
+  100% { transform: translateY(44px); }
+}
+@keyframes blink { 
+  50% { opacity: 0; }
+}
+@keyframes askpulse { 
+  0% { box-shadow: rgba(156, 184, 116, 0.55) 0px 0px 0px 0px; }
+  70% { box-shadow: rgba(156, 184, 116, 0) 0px 0px 0px 9px; }
+  100% { box-shadow: rgba(156, 184, 116, 0) 0px 0px 0px 0px; }
+}
+@keyframes cuebob { 
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(4px); }
+}
+.logos-root{--lg-paper: #F5F3EB; --lg-panel: #FAF8F2; --lg-primary: #354620; --lg-accent: #264653; --lg-secondary: #B8A26B; --lg-tension: #9C5B3C; --lg-ink: #23241F; --lg-ink-60: rgba(35, 36, 31, 0.6); --lg-ink-40: rgba(35, 36, 31, 0.4); --lg-ink-24: rgba(35, 36, 31, 0.24); --lg-line: rgba(53, 70, 32, 0.14); --lg-one: #4A6FA5; --lg-one-soft: rgba(74, 111, 165, 0.1); --lg-one-line: rgba(74, 111, 165, 0.32); --lg-sans: var(--font-sans), Inter, system-ui, sans-serif; --lg-hand: var(--font-hand), 'Comic Sans MS', cursive; --lg-stix: var(--font-stix), 'STIX Two Math', 'Cambria Math', KaTeX_Main, Georgia, serif; position: fixed; inset: 0px; background: var(--lg-paper); color: var(--lg-ink); font-family: var(--lg-sans); -webkit-font-smoothing: antialiased;}
+.logos-root *{box-sizing: border-box;}
+.logos-root .lg-split{display: grid; grid-template-columns: 232px minmax(360px, 1fr) 1.12fr; height: 100%;}
+@media (max-width: 1180px){.logos-root .lg-split{grid-template-columns: 200px minmax(320px, 1fr) 1.05fr;}}
+@media (max-width: 900px){.logos-root .lg-split{grid-template-columns: 1fr; grid-template-rows: 1fr;}.logos-root .lg-split .lg-panel{display: none;}.logos-root .lg-head-note{display: none;}}
+.logos-root .lg-convo{display: flex; flex-direction: column; min-width: 0px; min-height: 0px;}
+.logos-root .lg-head{display: flex; align-items: center; gap: 14px; padding: 22px 40px 18px;}
+.logos-root .lg-word{display: inline-flex; align-items: center; color: var(--lg-primary);}
+.logos-root .lg-mark{display: block; overflow: visible;}
+.logos-root .lg-head-note{font-size: 12px; letter-spacing: 0.04em; color: var(--lg-ink-40);}
+.logos-root .lg-thread{flex: 1 1 0%; min-height: 0px; overflow-y: auto; padding: 8px 40px 12px; scrollbar-width: thin;}
+@media (max-width: 900px){.logos-root .lg-head{padding: 18px 22px 12px;}.logos-root .lg-thread{padding: 8px 22px 12px;}}
+.logos-root .lg-msg{margin: 26px 0px; animation: 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0s 1 normal both running lgFade;}
+.logos-root .lg-msg-user{display: flex; justify-content: flex-end;}
+.logos-root .lg-msg-user .lg-msg-body{background: rgba(53, 70, 32, 0.07); border-radius: 16px 16px 4px; padding: 12px 16px; max-width: 80%; font-size: 15px; line-height: 1.6;}
+.logos-root .lg-msg-who{display: block; font-size: 10px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: var(--lg-primary); opacity: 0.7; margin-bottom: 8px;}
+.logos-root .lg-msg-assistant .lg-msg-body{font-size: 15.5px; line-height: 1.7; color: var(--lg-ink); max-width: 62ch; white-space: pre-wrap;}
+.logos-root .lg-composer{padding: 12px 40px 30px;}
+@media (max-width: 900px){.logos-root .lg-composer{padding: 10px 22px 20px;}}
+.logos-root .lg-composer-box{position: relative; display: flex; flex-direction: column; gap: 8px; background: rgb(255, 255, 255); border: 1px solid var(--lg-line); border-radius: 16px; padding: 10px 10px 10px 12px; transition: border-color 0.25s, box-shadow 0.25s;}
+.logos-root .lg-composer-row{display: flex; align-items: flex-end; gap: 8px;}
+.logos-root .lg-msg-stack{display: flex; flex-direction: column; gap: 8px;}
+.logos-root .lg-msg-user .lg-msg-stack{align-items: flex-end; max-width: 80%; margin-left: auto;}
+.logos-root .lg-panel{position: relative; min-width: 0px; min-height: 0px; display: flex; flex-direction: column; background: var(--lg-panel); border-left: 1px solid var(--lg-line);}
+@media (max-width: 900px){.logos-root .lg-panel{border-left: none; border-top: 1px solid var(--lg-line);}}
+.logos-root .lg-panel-head{display: flex; align-items: baseline; justify-content: space-between; padding: 26px 32px 10px;}
+.logos-root .lg-panel-title{font-size: 11px; font-weight: 600; letter-spacing: 0.2em; text-transform: uppercase; color: var(--lg-ink-40);}
+.logos-root .lg-panel-context{margin-left: 9px; padding-left: 9px; border-left: 1px solid var(--lg-line); font-style: normal; font-weight: 500; letter-spacing: 0.16em; color: var(--lg-accent); opacity: 0.8; animation: 0.5s ease 0s 1 normal both running lgFade;}
+.logos-root .lg-panel-state{font-size: 11px; letter-spacing: 0.1em; color: var(--lg-ink-24); transition: color 0.3s;}
+.logos-root .lg-map{position: relative; flex: 1 1 0%; min-height: 0px; overflow: auto; background-image: radial-gradient(circle, rgba(53, 70, 32, 0.09) 1px, transparent 1px); background-size: 26px 26px;}
+.logos-root .lg-edges{position: absolute; inset: 0px; width: 100%; height: 100%; overflow: visible;}
+.logos-root .lg-edge{stroke-width: 1.4; stroke-dasharray: 1; stroke-dashoffset: 1; animation: 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.12s 1 normal forwards running lgDraw; transition: opacity 0.35s, stroke-width 0.35s; opacity: 0.72;}
+.logos-root .lg-node-pos{position: absolute; top: 0px; left: 0px; z-index: 1; transition: opacity 0.35s;}
+.logos-root .lg-node{display: block; text-align: left; background: rgb(255, 255, 255); border: 1px solid var(--lg-line); border-radius: 9px; padding: 8px 12px 10px; cursor: pointer; font: inherit; box-shadow: rgba(35, 36, 31, 0.04) 0px 1px 2px; animation: 0.55s cubic-bezier(0.16, 1, 0.3, 1) 0s 1 normal both running lgNodeIn; transition: box-shadow 0.3s, transform 0.3s, border-color 0.3s;}
+.logos-root .lg-node-type{display: block; font-size: 8.5px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; margin-bottom: 5px;}
+.logos-root .lg-node-label{display: block; font-size: 13.5px; line-height: 1.4; color: var(--lg-ink); letter-spacing: -0.005em;}
+.logos-root .lg-node-value{background: rgb(237, 243, 232); border-color: rgb(207, 224, 192);}
+.logos-root .lg-node-value .lg-node-type{color: rgb(90, 114, 71);}
+.logos-root .lg-node-assumption{background: rgb(250, 243, 227); border-color: rgb(232, 217, 176);}
+.logos-root .lg-node-assumption .lg-node-type{color: rgb(138, 119, 66);}
+.logos-root .lg-node-evidence{background: rgb(255, 255, 255); border-color: rgb(221, 227, 232);}
+.logos-root .lg-node-evidence .lg-node-type{color: rgb(90, 114, 71);}
+.logos-root .lg-node-question{background: rgb(238, 242, 245); border-color: rgb(210, 220, 228);}
+.logos-root .lg-node-question .lg-node-type{color: rgb(62, 107, 122);}
+.logos-root .lg-node-tension{background: rgb(251, 238, 233); border-color: rgb(235, 200, 184);}
+.logos-root .lg-node-tension .lg-node-type{color: var(--lg-tension);}
+.logos-root .lg-node-claim{background: rgb(255, 253, 247); border-color: rgb(220, 211, 184);}
+.logos-root .lg-node-claim .lg-node-type{color: rgb(122, 106, 58);}
+@keyframes lgNodeIn { 
+  0% { opacity: 0; transform: scale(0.92); }
+  100% { opacity: 1; transform: scale(1); }
+}
+@keyframes lgDraw { 
+  100% { stroke-dashoffset: 0; }
+}
+@keyframes lgFade { 
+  0% { opacity: 0; transform: translateY(6px); }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes lgPulse { 
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 0.75; }
+}
+@keyframes lgBreathe { 
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.9; }
+}
+@media (prefers-reduced-motion: reduce){.logos-root .lg-node,.logos-root .lg-msg{animation: auto ease 0s 1 normal none running none;}.logos-root .lg-edge{animation: auto ease 0s 1 normal none running none; stroke-dashoffset: 0;}}
+.logos-root .lg-map-wrap{flex: 1 1 0%; min-height: 0px; display: flex; flex-direction: column;}
+.logos-root .lg-lenses{display: flex; gap: 4px; padding: 2px 32px 12px; flex-wrap: wrap;}
+.logos-root .lg-lens{border: 1px solid transparent; background: transparent; border-radius: 999px; padding: 5px 12px; font-style: inherit; font-variant: inherit; font-weight: inherit; font-stretch: inherit; line-height: inherit; font-family: inherit; font-optical-sizing: inherit; font-size-adjust: inherit; font-kerning: inherit; font-feature-settings: inherit; font-variation-settings: inherit; font-size: 12px; letter-spacing: 0.01em; color: var(--lg-ink-40); cursor: pointer; transition: color 0.2s, background 0.2s, border-color 0.2s;}
+.logos-root .lg-lens.is-on{color: var(--lg-primary); background: rgb(255, 255, 255); border-color: var(--lg-line); font-weight: 500;}
+.logos-root .lg-caption{padding: 12px 32px 22px; font-size: 12.5px; font-style: italic; color: var(--lg-ink-40); text-align: center;}
+.logos-root .lg-conn{color: var(--lg-ink-24); transition: opacity 0.35s;}
+.logos-root .lg-conn .lg-edge{stroke: currentcolor; opacity: 0.9;}
+.logos-root .lg-conn-supports{color: rgb(124, 148, 99);}
+.logos-root .lg-conn-depends{color: rgb(110, 147, 163);}
+.logos-root .lg-conn-conflicts{color: var(--lg-tension);}
+.logos-root .lg-conn-relates{color: rgba(35, 36, 31, 0.22);}
+.logos-root .lg-node-head{display: flex; align-items: center; gap: 5px; margin-bottom: 4px;}
+.logos-root .lg-node-glyph{width: 11px; height: 11px; flex: 0 0 auto; opacity: 0.85;}
+.logos-root .lg-node-type{margin-bottom: 0px;}
+.logos-root .lg-node-value{border-radius: 16px;}
+.logos-root .lg-node-assumption{border-radius: 10px; border-style: dashed;}
+.logos-root .lg-node-evidence{border-radius: 3px; border-left: 2px solid rgb(169, 188, 150);}
+.logos-root .lg-node-question{border-radius: 10px; border-bottom-style: dashed;}
+.logos-root .lg-node-tension{border-radius: 10px; background-image: repeating-linear-gradient(-45deg, rgba(156, 91, 60, 0.06) 0px, rgba(156, 91, 60, 0.06) 5px, transparent 5px, transparent 11px);}
+.logos-root .lg-node-claim{border-radius: 4px 10px 10px 4px; border-left: 2px solid rgb(196, 180, 130);}
+@keyframes lgSlideIn { 
+  0% { opacity: 0; transform: translateX(18px); }
+  100% { opacity: 1; transform: none; }
+}
+.logos-root .lg-status{display: inline-flex; align-items: center; gap: 3px; margin-left: auto; padding: 1px 5px 1px 4px; border-radius: 999px; font-size: 8.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;}
+.logos-root .lg-status svg{width: 9px; height: 9px; flex: 0 0 auto;}
+.logos-root .lg-status-supported{background: rgba(38, 70, 83, 0.12); color: var(--lg-accent);}
+.logos-root .lg-node.lg-st-supported{border-color: rgba(38, 70, 83, 0.38);}
+.logos-root .lg-conn.lg-str-strong .lg-edge{stroke-width: 2.1; opacity: 0.9;}
+@keyframes lgSettle { 
+  0% { box-shadow: rgba(53, 70, 32, 0.34) 0px 0px 0px 0px; }
+  22% { box-shadow: rgba(53, 70, 32, 0.11) 0px 0px 0px 5px; }
+  100% { box-shadow: rgba(53, 70, 32, 0) 0px 0px 0px 0px; }
+}
+@keyframes lgPop { 
+  0% { opacity: 0; transform: translateX(-50%) translateY(-4px); }
+  100% { opacity: 1; transform: translateX(-50%) translateY(0px); }
+}
+@keyframes lgRise { 
+  0% { opacity: 0; transform: translateY(-4px); }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes lgPopUp { 
+  0% { opacity: 0; transform: translate(-50%, calc(-100% + 4px)); }
+  100% { opacity: 1; transform: translate(-50%, -100%); }
+}
+.logos-root .lg-node{position: relative;}
+@keyframes lgMenuIn { 
+  0% { opacity: 0; transform: translate(-50%, calc(-100% + 5px)); }
+  100% { opacity: 1; transform: translate(-50%, -100%); }
+}
+@keyframes lgMenuInDown { 
+  0% { opacity: 0; transform: translate(-50%, -5px); }
+  100% { opacity: 1; transform: translate(-50%, 0px); }
+}
+@keyframes lgFadeIn { 
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+@keyframes lggIn { 
+  0% { opacity: 0; transform: translateY(14px) scale(0.985); }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes lggRise { 
+  0% { opacity: 0; transform: translateY(8px); }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes lggDraw { 
+  100% { stroke-dashoffset: 0; }
+}
+@keyframes lggPop { 
+  0% { opacity: 0; transform: scale(0.9) translateY(6px); }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes lggMergeA { 
+  0%, 30% { opacity: 1; transform: none; }
+  55%, 100% { opacity: 0; transform: translateY(24px) scale(0.96); }
+}
+@keyframes lggMergeB { 
+  0%, 30% { opacity: 1; transform: none; }
+  55%, 100% { opacity: 0; transform: translateY(-28px) scale(0.96); }
+}
+@keyframes lggMergeC { 
+  0%, 45% { opacity: 0; transform: scale(0.94); }
+  70%, 100% { opacity: 1; transform: none; }
+}
+@keyframes lggMark { 
+  0% { background: transparent; }
+  100% { background: rgba(53, 70, 32, 0.16); }
+}
+.logos-root .lg-node{position: relative;}
+.logos-root .lg-depth-btn{display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border: 1px solid var(--lg-line); border-radius: 999px; background: transparent; font-style: inherit; font-variant: inherit; font-stretch: inherit; line-height: inherit; font-family: inherit; font-optical-sizing: inherit; font-size-adjust: inherit; font-kerning: inherit; font-feature-settings: inherit; font-variation-settings: inherit; font-size: 11px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: var(--lg-ink-40); cursor: pointer; transition: color 0.2s, border-color 0.2s;}
+@keyframes socriaShine { 
+  0% { transform: rotate(18deg) translateX(0px); }
+  14% { transform: rotate(18deg) translateX(34px); }
+  100% { transform: rotate(18deg) translateX(34px); }
+}
+.logos-root .lg-lens{display: inline-flex; align-items: center; gap: 5px;}
+.__variable_1f5468{--font-serif: '__Instrument_Serif_1f5468', '__Instrument_Serif_Fallback_1f5468';}
+.__variable_f367f3{--font-sans: '__Inter_f367f3', '__Inter_Fallback_f367f3';}
+.__variable_2ad349{--font-hand: '__Kalam_2ad349', '__Kalam_Fallback_2ad349';}
+.__variable_d6b9b6{--font-stix: '__STIX_Two_Text_d6b9b6', '__STIX_Two_Text_Fallback_d6b9b6';}
+.docs-root{--d-paper: #f4f1e8; --d-paper-2: #ece8da; --d-card: #faf8f1; --d-ink: #20201b; --d-ink-70: rgba(32, 32, 27, 0.7); --d-ink-45: rgba(32, 32, 27, 0.45); --d-ink-25: rgba(32, 32, 27, 0.25); --d-line: rgba(53, 70, 32, 0.16); --d-moss: #5e7633; --d-moss-deep: #354620; --d-serif: var(--font-serif), 'Instrument Serif', Georgia, serif; --d-sans: var(--font-sans), Inter, system-ui, sans-serif; --d-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; min-height: 100svh; display: flex; flex-direction: column; background: var(--d-paper); color: var(--d-ink); font-family: var(--d-sans); font-size: 15.5px; line-height: 1.65;}
+.docs-root .d-body{flex: 1 1 0%; display: grid; grid-template-columns: 250px minmax(0px, 1fr); gap: 0px; width: 100%; max-width: 1240px; margin: 0px auto; padding: 0px clamp(16px, 4vw, 40px);}
+.docs-root .d-main{padding: 34px 0px 70px clamp(24px, 3.5vw, 48px); min-width: 0px;}
+.docs-root .d-article{max-width: 720px;}
+.docs-root .d-article p{margin: 0px 0px 14px;}
+@media (max-width: 860px){.docs-root .d-body{grid-template-columns: 1fr;}.docs-root .d-main{padding-left: 0px;}}
+.docs-root{--paper: var(--d-paper); --border: var(--d-line); --ink-12: rgba(32, 32, 27, 0.12); --ink-25: var(--d-ink-25); --ink-45: var(--d-ink-45); --ink-70: var(--d-ink-70); --moss: var(--d-moss); --moss-700: var(--d-moss-deep); --sans: var(--d-sans); --serif: var(--d-serif);}
+.docs-root .logos-root.lg-demo{position: relative; inset: auto; width: 100%; height: 100%; overflow: hidden; background: var(--paper);}
+.docs-root .ui-frame{margin: clamp(24px, 4vh, 44px) 0px 0px;}
+.docs-root .ui-body{border: 1px solid var(--border); border-radius: 0px 0px 10px 10px; overflow: hidden; background: var(--paper); box-shadow: rgba(32, 32, 27, 0.5) 0px 40px 90px -60px;}
+.docs-root .ui-placeholder{color: var(--lg-ink-24); font-size: 14.5px;}
+@keyframes d-inkIn { 
+  0% { opacity: 0; translate: 0px 6px; }
+  100% { opacity: 1; translate: 0px; }
+}
+@keyframes d-riseIn { 
+  0% { opacity: 0; translate: 0px 8px; }
+  100% { opacity: 1; translate: 0px; }
+}
+.docs-root .ui-frame{border: none; background: transparent;}
+.docs-root .ui-body{border-right-color: ; border-right-style: ; border-right-width: ; border-bottom-color: ; border-bottom-style: ; border-bottom-width: ; border-left-color: ; border-left-style: ; border-left-width: ; border-image-source: ; border-image-slice: ; border-image-width: ; border-image-outset: ; border-image-repeat: ; border-top: none; border-radius: 0px; box-shadow: rgba(32, 32, 27, 0.45) 0px 30px 70px -55px;}
+.docs-root .logos-root.lg-demo .lg-demo-split{grid-template-columns: minmax(0px, 1fr) 1.18fr;}
+@media (max-width: 900px){.docs-root .logos-root.lg-demo .lg-demo-split{grid-template-columns: 1fr; grid-template-rows: 1fr;}.docs-root .logos-root.lg-demo .lg-demo-split .lg-convo{display: none;}.docs-root .logos-root.lg-demo .lg-demo-split .lg-panel{display: flex;}}
+.docs-root .ui-frame{margin: 18px 0px 6px;}
+.docs-root .d-body{max-width: none !important; grid-template-columns: minmax(0px, 1fr) !important;}
+.docs-root .d-article{max-width: none !important;}
+.docs-root .d-main{padding-left: 0px !important;}
+    /* the stage carries the wiki scope so '.docs-root .logos-root' binds;
+       neutralise the shell layout it would otherwise impose */
+    .tr-stage.docs-root {
+      min-height: 0; display: flex; flex-direction: row; background: transparent; color: inherit;
+    }
+    /* the product surface is fixed/inset-0 in the app; seat it in the frame */
+    .tr-stage.docs-root .logos-root.lg-demo {
+      position: relative; inset: auto; width: 1338px; height: 469px;
+      overflow: hidden; background: #F4F1E8;
+      border: 1px solid #ded8c6; border-radius: 12px;
+      box-shadow: 0 50px 90px -60px rgba(32,32,27,.55);
+    }
+    .tr-stage.docs-root .logos-root.lg-demo::before { display: none; }
+  </style>
+</helmet>
+<div style="width: 1600px; height: 1000px; background: #F4F1E8; font-family: 'Inter', system-ui, sans-serif; display: flex; flex-direction: column; overflow: hidden; position: relative">
+  <div style="position: absolute; left: 0; top: 0; width: 100%; height: 4px; background: #5e7633"></div>
+  <div style="display: flex; align-items: baseline; gap: 20px; padding: 54px 80px 0">
+    <span style="font-family: 'Instrument Serif', Georgia, serif; font-style: italic; font-size: 30px; color: #9CB874">i.</span>
+    <span style="font-size: 11.5px; font-weight: 700; letter-spacing: .26em; text-transform: uppercase; color: #5e7633">The Thinking Map</span>
+  </div>
+  <h2 style="margin: 12px 80px 0; font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: 52px; line-height: 1.06; letter-spacing: -.015em; color: #20201b; max-width: 20ch">Your reasoning, drawn as you talk.</h2>
+  <p style="margin: 16px 80px 0; font-size: 17px; line-height: 1.5; color: rgba(32,32,27,.7); max-width: 64ch">The conversation runs on the left. On the right, a live map of what you actually said — claims, assumptions, tensions, evidence — reorganizing as your mind does.</p>
+  <div class="tr-stage docs-root" style="flex: 1; display: flex; align-items: flex-start; justify-content: center; padding: 28px 0 0; min-height: 0">
+    <div style="transform: scale(1.0000); transform-origin: top center">
+      <div class="logos-root lg-demo"><div class="lg-split lg-demo-split" style="height:100%"><section class="lg-convo"><header class="lg-head"><span class="lg-word"><svg class="lg-mark" width="19" height="22" viewBox="280 245 550 626" fill="none" stroke="currentColor" stroke-width="22" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M553 258 C 551 350 549 470 548 588"></path><path d="M551 601 C 550 690 548 764 547 838"></path><path d="M497 256 C 448 266 398 300 360 383"></path><path d="M352 415 C 336 465 310 520 303 578"></path><path d="M293 622 C 291 682 303 738 352 772"></path><path d="M392 782 C 414 818 458 846 528 860"></path><path d="M613 256 C 662 266 712 300 750 383"></path><path d="M758 415 C 774 465 800 520 807 578"></path><path d="M817 622 C 819 682 807 738 758 772"></path><path d="M718 782 C 696 818 652 846 582 860"></path><path d="M432 372 C 458 402 490 448 518 500"></path><path d="M352 497 C 400 520 452 550 485 578 C 492 612 494 650 495 690"></path><path d="M348 700 C 370 678 404 652 437 632"></path><path d="M678 372 C 652 402 620 448 592 500"></path><path d="M748 520 C 706 538 656 556 625 578 C 618 612 616 650 615 690"></path><path d="M762 700 C 740 678 706 652 673 632"></path></svg></span><span class="lg-head-note">A reasoning environment</span><span class="lg-depth-btn" style="margin-left:auto">Balanced</span></header><div class="lg-thread" style="overflow:hidden"><div class="lg-msg lg-msg-user"><div class="lg-msg-stack"><div class="lg-msg-body">I got an offer with a lot more money. I think I should take it — honestly I've stopped growing where I am.</div></div></div><div class="lg-msg lg-msg-assistant"><span class="lg-msg-who">Socria Logos</span><div class="lg-msg-stack"><div class="lg-msg-body">Three years of the same problems is a real reason to leave. The money is a separate one — and you've put them in the same sentence.</div></div></div><div class="lg-msg lg-msg-user"><div class="lg-msg-stack"><div class="lg-msg-body">…I guess I'm treating the raise as proof it's a step up.</div></div></div><div class="lg-msg lg-msg-assistant"><span class="lg-msg-who">Socria Logos</span><div class="lg-msg-stack"><div class="lg-msg-body">That is the assumption worth testing. What would the new role teach you?</div></div></div></div><div class="lg-composer"><div class="lg-composer-box"><div class="lg-composer-row"><span class="ui-placeholder">What are you thinking through?</span></div></div></div></section><section class="lg-panel"><header class="lg-panel-head"><span class="lg-panel-title">Thinking Map<em class="lg-panel-context">deciding</em></span><span class="lg-panel-state">7 nodes</span></header><div class="lg-map-wrap"><div class="lg-lenses" role="tablist" aria-label="Map lens"><button type="button" role="tab" aria-selected="true" class="lg-lens is-on">Graph</button><button type="button" role="tab" aria-selected="false" class="lg-lens">Structure</button><button type="button" role="tab" aria-selected="false" class="lg-lens">Tensions</button><button type="button" role="tab" aria-selected="false" class="lg-lens">Evidence</button></div><div class="lg-map"><svg class="lg-edges" aria-hidden="true"><defs><marker id="lg-arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,1 L7,4 L0,7" fill="none" stroke="currentColor" stroke-width="1.2"></path></marker></defs><g class="lg-conn lg-conn-depends lg-str-normal"><path class="lg-edge" pathLength="1" fill="none" d="M 420.317854366676 181.33045801898672 Q 369.6355214342197 174.7296787474354 332.60486159314416 209.95749999999998"></path></g><g class="lg-conn lg-conn-depends lg-str-normal"><path class="lg-edge" pathLength="1" fill="none" d="M 415.9816147239067 151.32690603315737 Q 401.92608553530124 130.812180174176 385.9831824978151 149.89714076041292"></path></g><g class="lg-conn lg-conn-depends lg-str-strong"><path class="lg-edge" pathLength="1" fill="none" d="M 269.6237766652202 209.95749999999998 Q 325.1023796191625 161.2214556766498 346.28548257310484 90.48"></path></g><g class="lg-conn lg-conn-relates lg-str-normal"><path class="lg-edge" pathLength="1" fill="none" d="M 344.98493352656243 171.89358877458358 Q 367.45575074432264 205.8213362611016 407.9393502071661 209.95749999999998"></path></g><g class="lg-conn lg-conn-conflicts lg-str-normal"><path class="lg-edge" pathLength="1" fill="none" d="M 336.94110123591344 235.95749999999998 Q 351.94110123591344 255.7575 366.94110123591344 235.95749999999998"></path></g><g class="lg-conn lg-conn-supports lg-str-normal"><path class="lg-edge" pathLength="1" fill="none" d="M 478.2594914951115 90.48 Q 424.8781346739609 84.19935708967485 384.6918490051153 119.89358877458358"></path></g><g class="lg-conn lg-conn-supports lg-str-strong"><path class="lg-edge" pathLength="1" fill="none" d="M 167.22731650112695 90.48 Q 194.8502323714492 124.98511263707331 238.75586599668816 119.89358877458358"></path></g></svg><div class="lg-node-pos" style="transform: translate(-50%, -50%) translate(499.982px, 155.33px);"><button type="button" style="width:168px" class="lg-node lg-node-question lg-st-open" aria-haspopup="menu" aria-expanded="false"><span class="lg-node-head"><svg class="lg-node-glyph" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5.9 6.1a2.1 2.1 0 1 1 2.9 1.95c-.6.28-.8.7-.8 1.25v.5"></path><path d="M8 12.4h.01"></path></svg><span class="lg-node-type">question</span></span><span class="lg-node-label">Should I take the job?</span></button></div><div class="lg-node-pos" style="transform: translate(-50%, -50%) translate(252.941px, 235.957px);"><button type="button" style="width:168px" class="lg-node lg-node-claim lg-st-open" aria-haspopup="menu" aria-expanded="false"><span class="lg-node-head"><svg class="lg-node-glyph" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.6 13.4V3"></path><path d="M4.6 3.4h7.2l-1.7 2.4 1.7 2.4H4.6"></path></svg><span class="lg-node-type">claim</span></span><span class="lg-node-label">It pays more</span></button></div><div class="lg-node-pos" style="transform: translate(-50%, -50%) translate(301.983px, 145.894px);"><button type="button" style="width:168px" class="lg-node lg-node-claim lg-st-open" aria-haspopup="menu" aria-expanded="false"><span class="lg-node-head"><svg class="lg-node-glyph" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.6 13.4V3"></path><path d="M4.6 3.4h7.2l-1.7 2.4 1.7 2.4H4.6"></path></svg><span class="lg-node-type">claim</span></span><span class="lg-node-label">I’ve stopped growing</span></button></div><div class="lg-node-pos" style="transform: translate(-50%, -50%) translate(362.968px, 64.48px);"><button type="button" style="width:168px" class="lg-node lg-node-assumption lg-st-open" aria-haspopup="menu" aria-expanded="false"><span class="lg-node-head"><svg class="lg-node-glyph" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="5.6" stroke-dasharray="2.6 2.4"></circle></svg><span class="lg-node-type">assumption</span></span><span class="lg-node-label">More money means progress</span></button></div><div class="lg-node-pos" style="transform: translate(-50%, -50%) translate(450.941px, 235.957px);"><button type="button" style="width:168px" class="lg-node lg-node-tension lg-st-open" aria-haspopup="menu" aria-expanded="false"><span class="lg-node-head"><svg class="lg-node-glyph" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.4 5.2 3.2 8l3.2 2.8M9.6 5.2 12.8 8l-3.2 2.8"></path><path d="M8 3.6v8.8" stroke-dasharray="1.6 1.8"></path></svg><span class="lg-node-type">tension</span></span><span class="lg-node-label">Security ↔ growth</span></button></div><div class="lg-node-pos" style="transform: translate(-50%, -50%) translate(560.968px, 64.48px);"><button type="button" style="width:168px" class="lg-node lg-node-value lg-st-open" aria-haspopup="menu" aria-expanded="false"><span class="lg-node-head"><svg class="lg-node-glyph" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2.4 13.6 8 8 13.6 2.4 8Z"></path></svg><span class="lg-node-type">value</span></span><span class="lg-node-label">Work that keeps teaching me</span></button></div><div class="lg-node-pos" style="transform: translate(-50%, -50%) translate(104px, 64.48px);"><button type="button" style="width:168px" class="lg-node lg-node-evidence lg-st-supported" aria-haspopup="menu" aria-expanded="false"><span class="lg-node-head"><svg class="lg-node-glyph" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 2.8h6l2.2 2.2v8.2H4Z"></path><path d="M6.2 8.4h4M6.2 10.8h2.6"></path></svg><span class="lg-node-type">evidence</span><span class="lg-status lg-status-supported" title="Backed by evidence you gave"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M2 9.5h8" stroke-linecap="round"></path><path d="M6 8.6V3.2M3.8 5.2 6 3l2.2 2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg><span class="lg-status-word">supported</span></span></span><span class="lg-node-label">Three years, same problems</span></button></div></div><p class="lg-caption">See how everything connects.</p></div></section></div></div>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>
