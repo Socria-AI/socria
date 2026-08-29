@@ -12,7 +12,14 @@
 // straight to the DOM each frame. The other lenses are computed layouts, so
 // they simply render at fixed coordinates and animate in.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import type { ThinkingMap as TMap, LogosRelation } from '@/lib/logos';
 import { MODE_META, NODE_MODES, type NodeMode } from '@/lib/logos-explore';
 import { NodeGlyph } from './NodeGlyph';
@@ -20,6 +27,18 @@ import { StatusMark } from './StatusMark';
 import { TeX, MathText } from './TeX';
 import { MathPlot } from './MathPlot';
 import { MathBoard } from './MathBoard';
+
+/** The zoom ladder. Discrete steps, so every zoom lands somewhere legible. */
+const ZOOMS = [0.55, 0.7, 0.85, 1, 1.2, 1.45];
+/** Wheel delta that makes one step — roughly one notch of a mouse wheel. */
+const WHEEL_STEP = 60;
+
+/** One rung up or down from wherever `from` sits, clamped at both ends. */
+function stepZoom(from: number, dir: -1 | 1): number {
+  const i = ZOOMS.indexOf(from);
+  const at = i === -1 ? ZOOMS.indexOf(1) : i;
+  return ZOOMS[Math.min(ZOOMS.length - 1, Math.max(0, at + dir))];
+}
 import { LogosMark } from './LogosMark';
 import { OneLock } from './OneLock';
 import {
@@ -134,6 +153,10 @@ export function ThinkingMap({
 
   const [zoom, setZoom] = useState(1);
   const zoomRef = useRef(1);
+  /** wheel delta banked toward the next step on the discrete ladder */
+  const wheelRef = useRef(0);
+  /** scroll offset to restore after a zoom, so the cursor stays anchored */
+  const anchorRef = useRef<{ left: number; top: number } | null>(null);
 
   // Zooming OUT gives the graph simulation more room rather than just shrinking
   // what is already there — a crowded map rendered smaller is still crowded.
@@ -154,12 +177,70 @@ export function ThinkingMap({
     setMenu(null);
   }, [zoom, world.w, world.h]);
 
-  const ZOOMS = [0.55, 0.7, 0.85, 1, 1.2, 1.45];
-  const zoomBy = (dir: -1 | 1) => {
-    const i = ZOOMS.indexOf(zoom);
-    const at = i === -1 ? ZOOMS.indexOf(1) : i;
-    setZoom(ZOOMS[Math.min(ZOOMS.length - 1, Math.max(0, at + dir))]);
-  };
+  const zoomBy = (dir: -1 | 1) => setZoom((z) => stepZoom(z, dir));
+
+  // Ctrl/Cmd + wheel zooms, the way every map on the web does. A trackpad
+  // pinch arrives as a wheel event with ctrlKey already set, so pinch-to-zoom
+  // comes along for free. A plain wheel is left alone: it still pans a map
+  // that has grown past the panel, which is the more common thing to want.
+  //
+  // Registered by hand rather than with onWheel because React attaches wheel
+  // listeners passively, and without preventDefault the browser zooms the
+  // whole page instead of the map.
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey && !e.metaKey) return;
+      // The plot and the Board draw themselves to fit, so they have no zoom
+      // control; changing it behind their backs would only grow the sizer and
+      // hang a scrollbar off nothing.
+      if (lens === 'plot' || lens === 'board') return;
+      e.preventDefault();
+
+      // One mouse notch (~100) is one step; a pinch sends many small deltas,
+      // so they accumulate instead of tearing through the whole ladder in a
+      // single gesture. Reversing direction discards what was banked.
+      const d = e.deltaY;
+      if (d === 0) return;
+      if (d > 0 !== wheelRef.current > 0) wheelRef.current = 0;
+      wheelRef.current += d;
+      if (Math.abs(wheelRef.current) < WHEEL_STEP) return;
+      const dir: -1 | 1 = wheelRef.current > 0 ? -1 : 1; // wheel down zooms out
+      wheelRef.current = 0;
+
+      const from = zoomRef.current;
+      const to = stepZoom(from, dir);
+      if (to === from) return;
+
+      // Keep whatever is under the cursor under the cursor. Only meaningful
+      // while zoomed past 1:1 — below that the sizer matches the panel and
+      // there is nothing to scroll — but harmless to compute either way.
+      const box = el.getBoundingClientRect();
+      const px = e.clientX - box.left;
+      const py = e.clientY - box.top;
+      const sx = (el.scrollLeft + px) / from;
+      const sy = (el.scrollTop + py) / from;
+      anchorRef.current = { left: sx * to - px, top: sy * to - py };
+
+      setZoom(to);
+    };
+
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, [lens]);
+
+  // Applied after the sizer has grown, or the scroll offset would be clamped
+  // against the old extent and the anchor would slide.
+  useLayoutEffect(() => {
+    const el = wrapRef.current;
+    const a = anchorRef.current;
+    anchorRef.current = null;
+    if (!el || !a) return;
+    el.scrollLeft = a.left;
+    el.scrollTop = a.top;
+  }, [zoom]);
 
   // Hold the graph still while a menu is open — a target that drifts out from
   // under the cursor is the fastest way to make this feel cheap.
@@ -776,7 +857,7 @@ export function ThinkingMap({
             onClick={() => setZoom(1)}
             disabled={zoom === 1}
             aria-label={`Zoom ${Math.round(zoom * 100)} percent — reset`}
-            title="Reset zoom"
+            title="Reset zoom — or hold Ctrl and scroll to zoom on the map"
           >
             {Math.round(zoom * 100)}%
           </button>
