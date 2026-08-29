@@ -119,7 +119,11 @@ export default function TermsPage() {
         and we will explain why unless we are legally prevented from doing so.
       </p>
 
-      <h2 id="legal">Changes</h2>
+      <h2 id="legal">Governing law and changes</h2>
+      <p>
+        These Terms are governed by the laws of the State of Texas, without
+        regard to its conflict-of-laws principles.
+      </p>
       <p>
         If we change these terms materially, we will give notice in the product
         rather than silently updating the page. Questions:{' '}
