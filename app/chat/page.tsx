@@ -19,8 +19,8 @@ import { MODEL_KEY, rememberModel } from '@/lib/socria-model-store';
 import { buildStarters } from '@/lib/starters';
 import { loadLocal as loadLocalLogos } from '@/lib/logos-sessions';
 import { DepthPicker } from '@/components/DepthPicker';
-import { TryCore3Pill } from '@/components/TryCore3Pill';
-import { Core3IntroModal } from '@/components/Core3IntroModal';
+import { TryLogosPill } from '@/components/TryLogosPill';
+import { TryLogosModal } from '@/components/TryLogosModal';
 import { InsightCard } from '@/components/InsightCard';
 import { InsightShareModal } from '@/components/InsightShareModal';
 import { ImportProfileModal } from '@/components/ImportProfileModal';
@@ -36,7 +36,9 @@ import { synthesisCadence, type Insight } from '@/lib/socria-prompt';
 const INSIGHT_MIN_USER_TURNS = 6;
 const INSIGHT_MIN_GAP = 3;
 
-const CORE3_INTRO_DISMISS_KEY = 'socria.core3IntroDontShowAgain.v1';
+// A key of its own: dismissing the old Core 3.1 note is not a decision about
+// Logos, so anyone who had seen that one is still shown this once.
+const LOGOS_INTRO_DISMISS_KEY = 'socria.logosIntroDontShowAgain.v1';
 // Set to '1' once the user unlocks auth-gated models with the typed access
 // key. Lets anonymous (not-signed-in) users reach Core 3.1.
 const SMART_KEY_STORAGE = 'socria.core3AccessKey.v1';
@@ -194,8 +196,8 @@ export default function ChatPage() {
   const [model, setModel] = useState<SocriaModel>('core-2');
   const [depth, setDepth] = useState<ThinkingDepth>('balanced');
   const [smartUnlocked, setSmartUnlocked] = useState(false);
-  const [core3ModalOpen, setCore3ModalOpen] = useState(false);
-  const [core3Dismissed, setCore3Dismissed] = useState(false);
+  const [logosModalOpen, setLogosModalOpen] = useState(false);
+  const [logosDismissed, setLogosDismissed] = useState(false);
   const [autoOpenChecked, setAutoOpenChecked] = useState(false);
   const [shareInsight, setShareInsight] = useState<Insight | null>(null);
   const [importedProfile, setImportedProfile] = useState('');
@@ -463,7 +465,7 @@ export default function ChatPage() {
     // Gated model, and the user hasn't signed in or unlocked with the key:
     // open the intro modal, which offers both the key entry and sign-in.
     if (config.requiresAuth && !canUseCore3) {
-      setCore3ModalOpen(true);
+      setLogosModalOpen(true);
       return;
     }
     // Logos lives on its own route — it needs the split screen for the map.
@@ -502,61 +504,58 @@ export default function ChatPage() {
     } catch {}
   }
 
-  // Auto-open the Core 3 intro modal once per mount, unless the user has
-  // permanently dismissed it or is already using Core 3.
+  // Show the Logos invitation once per mount, unless it has been permanently
+  // dismissed or they are already in Logos — where the pitch would be absurd.
   useEffect(() => {
     if (!isLoaded || autoOpenChecked) return;
     setAutoOpenChecked(true);
     try {
-      const dismissed =
-        localStorage.getItem(CORE3_INTRO_DISMISS_KEY) === '1';
-      setCore3Dismissed(dismissed);
-      const currentModel = localStorage.getItem(MODEL_KEY);
-      if (!dismissed && currentModel !== 'core-3') {
-        setCore3ModalOpen(true);
+      const dismissed = localStorage.getItem(LOGOS_INTRO_DISMISS_KEY) === '1';
+      setLogosDismissed(dismissed);
+      if (!dismissed && localStorage.getItem(MODEL_KEY) !== 'logos') {
+        setLogosModalOpen(true);
       }
     } catch {}
   }, [isLoaded, autoOpenChecked]);
 
-  function handleCore3ModalClose(dontShowAgain: boolean) {
+  function handleLogosModalClose(dontShowAgain: boolean) {
     if (dontShowAgain) {
       try {
-        localStorage.setItem(CORE3_INTRO_DISMISS_KEY, '1');
+        localStorage.setItem(LOGOS_INTRO_DISMISS_KEY, '1');
       } catch {}
-      setCore3Dismissed(true);
+      setLogosDismissed(true);
     }
-    setCore3ModalOpen(false);
+    setLogosModalOpen(false);
   }
 
-  function handleCore3ModalTry() {
-    // Signed-in or key-unlocked users who tap "Try" have access — switch to
-    // Core 3.1 and stop nudging them. Anon users without the key are sent to
-    // sign-in without a permanent dismiss so the modal returns later.
+  function handleLogosModalTry() {
+    // Anyone with access goes straight in and stops being nudged. Anyone else
+    // is sent to sign-in WITHOUT a permanent dismiss, so the invitation is
+    // still there when they come back with an account.
     if (canUseCore3) {
       try {
-        localStorage.setItem(CORE3_INTRO_DISMISS_KEY, '1');
+        localStorage.setItem(LOGOS_INTRO_DISMISS_KEY, '1');
       } catch {}
-      setCore3Dismissed(true);
-      setCore3ModalOpen(false);
-      setModel('core-3');
-      rememberModel('core-3');
+      setLogosDismissed(true);
+      setLogosModalOpen(false);
+      setModel('logos');
+      rememberModel('logos');
       return;
     }
-    setCore3ModalOpen(false);
-    router.push('/sign-in?redirect_url=/chat');
+    setLogosModalOpen(false);
+    router.push('/sign-in?redirect_url=%2Fchat%3Fmodel%3Dlogos');
   }
 
-  // Called by the intro modal when the user submits a valid access key.
-  // Unlock, switch straight to Core 3.1, and close.
-  function handleCore3ModalUnlock(key: string): boolean {
+  // A valid access key opens the whole product, so it goes straight to Logos.
+  function handleLogosModalUnlock(key: string): boolean {
     if (!handleUnlockKey(key)) return false;
     try {
-      localStorage.setItem(CORE3_INTRO_DISMISS_KEY, '1');
+      localStorage.setItem(LOGOS_INTRO_DISMISS_KEY, '1');
     } catch {}
-    setCore3Dismissed(true);
-    setCore3ModalOpen(false);
-    setModel('core-3');
-    rememberModel('core-3');
+    setLogosDismissed(true);
+    setLogosModalOpen(false);
+    setModel('logos');
+    rememberModel('logos');
     return true;
   }
 
@@ -1201,13 +1200,12 @@ export default function ChatPage() {
 
   return (
     <div className="flex h-dvh">
-      <Core3IntroModal
-        open={core3ModalOpen}
-        onClose={handleCore3ModalClose}
-        onTry={handleCore3ModalTry}
-        onUnlock={handleCore3ModalUnlock}
+      <TryLogosModal
+        open={logosModalOpen}
+        onClose={handleLogosModalClose}
+        onTry={handleLogosModalTry}
+        onUnlock={handleLogosModalUnlock}
         isSignedIn={!!isSignedIn}
-        canUseCore3={canUseCore3}
       />
       <InsightShareModal
         open={!!shareInsight}
@@ -1424,13 +1422,13 @@ export default function ChatPage() {
             </button>
           </div>
 
-          {/* Right: try-core-3 pill (desktop) + auth */}
+          {/* Right: the Logos invitation (desktop) + auth */}
           <div className="flex items-center gap-2 shrink-0">
             <div className="hidden sm:block">
-              <TryCore3Pill
+              <TryLogosPill
                 currentModel={model}
-                visible={!core3Dismissed}
-                onOpen={() => setCore3ModalOpen(true)}
+                visible={!logosDismissed}
+                onOpen={() => setLogosModalOpen(true)}
               />
             </div>
             <SignedOut>
@@ -1656,7 +1654,7 @@ export default function ChatPage() {
                   value={model}
                   onChange={pickModel}
                   isSignedIn={canUseCore3}
-                  onLockedAttempt={() => setCore3ModalOpen(true)}
+                  onLockedAttempt={() => setLogosModalOpen(true)}
                   dropUp
                   align="right"
                 />
