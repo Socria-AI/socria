@@ -2788,6 +2788,97 @@ html.js-anim .scrolly-root .fade.d3 { transition-delay: .3s; }
   .core3-modal-card .tl-stage .tl-node { width: 47%; }
 }
 
+/* ── the tour: four scenes on one clock ─────────────────────────── */
+.tl-scene { position: relative; }
+.tl-pane { position: absolute; inset: 0; animation: tl-fade 0.5s ease both; }
+@keyframes tl-fade { from { opacity: 0; } to { opacity: 1; } }
+
+/* ii · the node, its menu, and what Challenge writes back */
+.tl-moves { display: grid; grid-template-columns: 46% 1fr; gap: 14px; }
+.tl-moves-left { display: flex; flex-direction: column; gap: 8px; }
+.core3-modal-card .tl-stage .tl-moves-left .tl-node { position: relative; left: auto; top: auto; width: 100%; }
+.tl-menu {
+  display: flex; flex-direction: column;
+  border: 1px solid var(--border); border-radius: 10px;
+  background: #fff; overflow: hidden;
+  opacity: 0; transform: translateY(-4px);
+  transition: opacity 0.35s ease, transform 0.35s ease;
+}
+.tl-menu.is-in { opacity: 1; transform: none; }
+.tl-menu-item {
+  padding: 5px 10px; font-size: 11.5px; color: rgba(31, 31, 31, 0.66);
+  border-bottom: 1px solid rgba(53, 70, 32, 0.07);
+  transition: background 0.3s ease, color 0.3s ease;
+}
+.tl-menu-item:last-child { border-bottom: none; }
+.tl-menu-item.is-on { background: rgba(94, 118, 51, 0.11); color: var(--moss-700); font-weight: 600; }
+.tl-result {
+  border-left: 2px solid rgba(94, 118, 51, 0.35); padding-left: 12px;
+  opacity: 0; transform: translateX(6px);
+  transition: opacity 0.45s ease, transform 0.45s ease;
+}
+.tl-result.is-in { opacity: 1; transform: none; }
+.tl-result-head {
+  display: block; font-size: 9px; font-weight: 700; letter-spacing: 0.16em;
+  text-transform: uppercase; color: var(--moss-700); margin-bottom: 8px;
+}
+.tl-result ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 7px; }
+.tl-result li {
+  font-size: 11.5px; line-height: 1.35; color: rgba(31, 31, 31, 0.7);
+  opacity: 0; transform: translateY(4px);
+  transition: opacity 0.4s ease, transform 0.4s ease;
+}
+.tl-result li.is-in { opacity: 1; transform: none; }
+
+/* iii · the Board, at modal scale */
+.tl-boardpane { overflow: hidden; border-radius: 8px; }
+.tl-boardscale {
+  width: 810px; height: 400px;
+  transform: scale(0.58); transform-origin: top left;
+}
+.core3-modal-card .tl-stage .lg-board { height: 100%; }
+.core3-modal-card .tl-stage .lg-board-item { animation: tl-ink 0.5s ease both; }
+@keyframes tl-ink { from { opacity: 0; translate: 0 5px; } to { opacity: 1; translate: 0 0; } }
+
+/* iv · the guard */
+.tl-guardpane { display: flex; flex-direction: column; justify-content: center; gap: 2px; padding: 0 2px; }
+.core3-modal-card .tl-stage .tl-guardpane .lg-msg { margin: 5px 0; }
+.core3-modal-card .tl-stage .tl-guardpane .lg-msg-body { font-size: 12.5px; line-height: 1.4; }
+.core3-modal-card .tl-stage .tl-guardpane .lg-guard { margin: 10px 0 0; }
+.tl-out { opacity: 0; transform: translateY(5px); }
+.tl-in { opacity: 1; transform: none; }
+.core3-modal-card .tl-stage .tl-out,
+.core3-modal-card .tl-stage .tl-in { transition: opacity 0.45s ease, transform 0.45s ease; }
+
+/* the rail under the stage: what you are watching, and where you are */
+.tl-rail {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  margin-top: 10px;
+}
+.tl-rail-label { font-size: 11.5px; color: rgba(31, 31, 31, 0.55); }
+.tl-rail-label em { font-family: var(--serif); font-style: italic; color: var(--moss-700); }
+.tl-dots { display: flex; gap: 5px; }
+.tl-dot {
+  width: 22px; height: 3px; padding: 0; border: none; border-radius: 999px;
+  background: rgba(53, 70, 32, 0.16); cursor: pointer; overflow: hidden;
+  transition: background 0.3s ease;
+}
+.tl-dot:hover { background: rgba(53, 70, 32, 0.3); }
+.tl-dot-fill { display: block; width: 100%; height: 100%; transform-origin: left; transform: scaleX(0); }
+.tl-dot.is-on .tl-dot-fill {
+  background: var(--moss-700);
+  animation: tl-sweep linear forwards;
+}
+@keyframes tl-sweep { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .tl-pane, .core3-modal-card .tl-stage .lg-board-item { animation: none; }
+  .tl-menu, .tl-result, .tl-result li,
+  .core3-modal-card .tl-stage .tl-out,
+  .core3-modal-card .tl-stage .tl-in { transition: none; }
+  .tl-dot.is-on .tl-dot-fill { animation: none; transform: scaleX(1); background: var(--moss-700); }
+}
+
 .tl-free {
   margin-top: 16px;
   font-size: 12.5px;
