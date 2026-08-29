@@ -21,15 +21,16 @@ export default function TermsPage() {
         here needs a lawyer to decode, that is our failure, not yours.
       </p>
       <p className="lg-dates">
-        Effective <span className="fill">[DATE]</span> · Provided by{' '}
-        <span className="fill">[LEGAL ENTITY NAME, ADDRESS]</span>
+        Effective August 2026 · Provided by Socria —{' '}
+        <a href="mailto:hellosocria@gmail.com">hellosocria@gmail.com</a>
       </p>
 
       <h2 id="who">Who can use Socria</h2>
       <p>
-        You must be at least <span className="fill">[AGE]</span> years old. If
-        you are using Socria for an organisation, you confirm you may accept
-        these terms on its behalf. Keep your sign-in details to yourself; you
+        You must be at least <strong>13</strong> years old, and older where your
+        country sets a higher digital age of consent. If you are using Socria
+        for an organisation, you confirm you may accept these terms on its
+        behalf. Keep your sign-in details to yourself; you
         are responsible for what happens under your account.
       </p>
 
@@ -57,12 +58,11 @@ export default function TermsPage() {
         the product.
       </p>
       <p>
-        As far as the law allows, the service is provided &ldquo;as is&rdquo;,
-        without warranties.{' '}
-        <span className="fill">
-          [Insert your limitation of liability and warranty disclaimer here —
-          have a lawyer draft this clause specifically.]
-        </span>
+        As far as the law allows, the service is provided &ldquo;as is&rdquo;
+        and &ldquo;as available&rdquo;, without warranties of any kind, and our
+        total liability to you for any claim relating to Socria is limited to
+        what you paid us in the twelve months before it arose. Nothing here
+        limits liability that cannot lawfully be limited.
       </p>
 
       <h2 id="fair">Fair use</h2>
@@ -97,8 +97,10 @@ export default function TermsPage() {
       </ul>
       <p>
         Cancel any time from the billing portal inside the app — there is no
-        retention flow to argue with.{' '}
-        <span className="fill">[State your refund policy here.]</span>
+        retention flow to argue with. Because cancelling already leaves you the
+        rest of the month you paid for, we do not refund partial months by
+        default; if something went genuinely wrong, write to us and we will put
+        it right.
       </p>
 
       <h2 id="free">The free tier</h2>
@@ -117,16 +119,11 @@ export default function TermsPage() {
         and we will explain why unless we are legally prevented from doing so.
       </p>
 
-      <h2 id="legal">Governing law and changes</h2>
-      <p>
-        These terms are governed by the laws of{' '}
-        <span className="fill">[JURISDICTION]</span>, and disputes go to the
-        courts of <span className="fill">[VENUE]</span>.
-      </p>
+      <h2 id="legal">Changes</h2>
       <p>
         If we change these terms materially, we will give notice in the product
         rather than silently updating the page. Questions:{' '}
-        <span className="fill">[CONTACT EMAIL]</span>.
+        <a href="mailto:hellosocria@gmail.com">hellosocria@gmail.com</a>.
       </p>
     </article>
   );

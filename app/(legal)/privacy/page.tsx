@@ -23,9 +23,8 @@ export default function PrivacyPage() {
         deleted.
       </p>
       <p className="lg-dates">
-        Effective <span className="fill">[DATE]</span> · Last updated{' '}
-        <span className="fill">[DATE]</span> · Data controller:{' '}
-        <span className="fill">[LEGAL ENTITY NAME, ADDRESS]</span>
+        Effective August 2026 · Last updated August 2026 · Data controller:
+        Socria — <a href="mailto:hellosocria@gmail.com">hellosocria@gmail.com</a>
       </p>
 
       <h2 id="what">What we collect</h2>
@@ -101,12 +100,9 @@ export default function PrivacyPage() {
       </div>
       <p>
         We do <strong>not</strong> sell your data, and we do not use your
-        conversations to train models.{' '}
-        <span className="fill">
-          [CONFIRM with your AI provider&rsquo;s terms and state their retention
-          period here — an API provider may retain inputs briefly for abuse
-          monitoring.]
-        </span>
+        conversations to train models. OpenAI does not train on data submitted
+        through its API, and retains it only briefly for abuse monitoring; their
+        current terms govern that, not us.
       </p>
 
       <h2 id="who">Who it is shared with</h2>
@@ -117,23 +113,46 @@ export default function PrivacyPage() {
       <div className="lg-tablewrap">
         <table>
           <thead>
-            <tr><th>Provider</th><th>Receives</th></tr>
+            <tr><th>Sub-processor</th><th>Purpose</th><th>Receives</th></tr>
           </thead>
           <tbody>
-            <tr><td>AI model provider</td><td>Your messages and conversation history, to generate replies, maps, and summaries</td></tr>
-            <tr><td>Authentication provider</td><td>Email and sign-in credentials</td></tr>
-            <tr><td>Database host</td><td>Everything stored: conversations, maps, drafts, memory, the Journey</td></tr>
-            <tr><td>Payment processor</td><td>Billing details, for Socria One only</td></tr>
-            <tr><td>Analytics</td><td>Aggregate page views</td></tr>
-            <tr><td>Search provider</td><td>Only a generated search query when you run Research — never your private details, by design</td></tr>
-            <tr><td>Hosting and rate limiting</td><td>Request metadata; your account id or IP</td></tr>
+            <tr>
+              <td><strong>OpenAI, L.L.C.</strong></td>
+              <td>AI inference</td>
+              <td>Your messages and conversation history, to generate replies, maps and summaries</td>
+            </tr>
+            <tr>
+              <td><strong>Supabase, Inc.</strong></td>
+              <td>Database and storage</td>
+              <td>Everything stored: conversations, maps, drafts, memory, the Journey</td>
+            </tr>
+            <tr>
+              <td><strong>Clerk</strong></td>
+              <td>Authentication</td>
+              <td>Email and sign-in credentials</td>
+            </tr>
+            <tr>
+              <td><strong>Stripe, Inc.</strong></td>
+              <td>Subscription and payment processing</td>
+              <td>Billing details, for Socria One only</td>
+            </tr>
+            <tr>
+              <td><strong>Vercel, Inc.</strong></td>
+              <td>Application hosting</td>
+              <td>Request metadata; your account id, or your IP when signed out</td>
+            </tr>
+            <tr>
+              <td><strong>Vercel, Inc.</strong></td>
+              <td>Analytics</td>
+              <td>Aggregate page views</td>
+            </tr>
           </tbody>
         </table>
       </div>
-      <p className="fill">
-        [Name each provider explicitly here before publishing, and link their
-        privacy policies. Regulators expect named sub-processors, not
-        categories.]
+      <p>
+        If web Research is enabled on this deployment, a search provider also
+        receives the generated search query — never your private details, which
+        the code strips by design.
       </p>
 
       <h2 id="where">Where it lives</h2>
@@ -153,28 +172,43 @@ export default function PrivacyPage() {
       <ul>
         <li><strong>See it</strong> — everything you have written is visible in the app.</li>
         <li><strong>Delete a conversation</strong> — deleting one removes it, and its map, draft and memory, from our database.</li>
-        <li><strong>Delete everything</strong> — <span className="fill">[state how: account deletion in settings, or email an address you monitor]</span>.</li>
-        <li><strong>Export</strong> — <span className="fill">[state how, or say plainly that export is not yet available]</span>.</li>
+        <li>
+          <strong>Delete everything</strong> — email{' '}
+          <a href="mailto:hellosocria@gmail.com">hellosocria@gmail.com</a> from
+          your account address and we will erase your account and all of its
+          data. Self-service account deletion is not built yet; until it is,
+          that address is the route, and we will confirm when it is done.
+        </li>
+        <li>
+          <strong>Export</strong> — not yet available as a one-click download.
+          Ask at the same address and we will send you what we hold.
+        </li>
         <li><strong>Correct it</strong> — tell Socria in the conversation when it has read you wrong; correcting the record is never a paid feature.</li>
       </ul>
-      <p className="fill">
-        [If you serve the EU/UK or California, spell out the legal bases for
-        processing, the retention periods, and the right to complain to a
-        supervisory authority.]
+      <p>
+        We keep what you write for as long as your account exists, because it is
+        what the product is for; deleting a conversation removes it, and
+        deleting your account removes all of it. If you are in the EU, the UK or
+        California you have further rights over your data — access, correction,
+        erasure, portability and objection — and the right to complain to your
+        local supervisory authority. Write to us first and we will try to settle
+        it directly.
       </p>
 
       <h2 id="children">Children</h2>
       <p>
-        Socria is not intended for children under{' '}
-        <span className="fill">[AGE]</span>, and we do not knowingly collect
-        their data.
+        You must be at least <strong>13</strong> to use Socria, and older where
+        your country sets a higher digital age of consent — several EU member
+        states set it at 14, 15 or 16. We do not knowingly collect data from
+        anyone below that age; if you believe a child has given us data, write
+        to us and we will delete it.
       </p>
 
       <h2 id="changes">Changes and contact</h2>
       <p>
         If this policy changes in a way that matters, we will say so rather than
         quietly re-dating the page. Questions, or a request to delete your data:{' '}
-        <span className="fill">[CONTACT EMAIL]</span>.
+        <a href="mailto:hellosocria@gmail.com">hellosocria@gmail.com</a>.
       </p>
     </article>
   );

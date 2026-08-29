@@ -23,28 +23,29 @@ export default function SecurityPage() {
         done, this page says so.
       </p>
       <p className="lg-dates">
-        Last reviewed <span className="fill">[DATE]</span> · Report a
-        vulnerability: <span className="fill">[SECURITY EMAIL]</span>
+        Last reviewed August 2026 · Report a vulnerability:{' '}
+        <a href="mailto:hellosocria@gmail.com">hellosocria@gmail.com</a>
       </p>
 
       <h2 id="accounts">Your account</h2>
       <p>
-        Sign-in is handled by a dedicated authentication provider rather than by
-        us. <strong>We never see or store your password.</strong> Session
+        Sign-in is handled by <strong>Clerk</strong> rather than by us.{' '}
+        <strong>We never see or store your password.</strong> Session
         handling, multi-factor authentication where you enable it, and device
         management are theirs — a specialist doing one job well beats us
         reimplementing it.
       </p>
       <p>
-        Payments run through our payment processor&rsquo;s own hosted checkout.
-        Card numbers never touch our servers; we hold only a customer reference
-        and your subscription status.
+        Payments run through <strong>Stripe&rsquo;s</strong> own hosted
+        checkout. Card numbers never touch our servers; we hold only a customer
+        reference and your subscription status.
       </p>
 
       <h2 id="data">Where your data sits</h2>
       <p>
         Conversations, maps, drafts and memory live in a managed Postgres
-        database, encrypted at rest and in transit by the host.{' '}
+        database at <strong>Supabase</strong>, encrypted at rest and in transit
+        by the host.{' '}
         <strong>The browser never talks to that database directly.</strong>{' '}
         Every read and write goes through our server, which checks on every
         request that the row belongs to the account asking for it — deletes, for
@@ -131,16 +132,13 @@ export default function SecurityPage() {
           any of those before adopting a tool, we are not there yet — and would
           rather tell you than let you assume.
         </p>
-        <p className="fill">
-          [Update this section as each of those changes. Remove nothing that is
-          still true.]
-        </p>
       </div>
 
       <h2 id="report">Reporting a vulnerability</h2>
       <p>
         If you find something, please tell us at{' '}
-        <span className="fill">[SECURITY EMAIL]</span> before disclosing it
+        <a href="mailto:hellosocria@gmail.com">hellosocria@gmail.com</a> before
+        disclosing it
         publicly, and give us a reasonable window to fix it. We will confirm we
         received your report, keep you posted, and credit you if you would like
         that. We will not pursue legal action against anyone acting in good

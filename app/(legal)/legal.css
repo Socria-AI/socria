@@ -78,13 +78,6 @@
   border-radius: 5px; padding: 1px 5px;
 }
 
-/* a value the operator has to fill in before publishing */
-.legal-root .fill {
-  background: rgba(184, 162, 107, 0.22);
-  border-bottom: 1px dashed rgba(120, 100, 50, 0.55);
-  padding: 0 3px; font-style: normal;
-}
-
 .legal-root .lg-note {
   margin: 20px 0; padding: 15px 18px;
   background: var(--lg-card); border: 1px solid var(--lg-line);
