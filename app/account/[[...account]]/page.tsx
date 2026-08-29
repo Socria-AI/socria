@@ -68,6 +68,18 @@ export default function AccountPage() {
               Your thought sessions live in your account and follow you
               across every device you sign in on.
             </p>
+            <p className="mt-4 text-[14px]">
+              <Link
+                href="/account/data"
+                className="text-moss-700 underline underline-offset-4 hover:text-moss-800"
+              >
+                Data &amp; Privacy
+              </Link>
+              <span className="text-ink/45">
+                {' '}— export everything, clear what Socria remembers, or delete
+                your account.
+              </span>
+            </p>
           </div>
 
           <div className="socria-clerk-card socria-clerk-userprofile">
