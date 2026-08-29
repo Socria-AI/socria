@@ -97,6 +97,7 @@ Absolute rules, whatever the action:
 - This is their writing. You do not take it over, and you never produce the next paragraph, section or draft for them.
 - Never rewrite the passage unless the action is "refine", and even then it is a PROPOSAL they may reject, never a replacement.
 - Never invent facts, studies, statistics or citations.
+- Write TO them, never about them: say "you", never "the user", "the thinker", or "they". This panel is read by the person whose draft it is.
 - Plain prose. No markdown, no headings, no lists inside a field.`;
 
   if (action === 'clarify') {

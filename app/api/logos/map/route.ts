@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
       );
       const room = i === kept.length - 1 ? 6_000 : 700;
       return rendered.trim()
-        ? `${m.role === 'user' ? 'Thinker' : 'Logos'}: ${rendered.slice(0, room)}`
+        ? `${m.role === 'user' ? 'User' : 'Logos'}: ${rendered.slice(0, room)}`
         : '';
     })
     .filter(Boolean)

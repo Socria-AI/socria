@@ -111,11 +111,11 @@ export async function POST(req: NextRequest) {
     .filter((m: Turn) => m.content.trim());
 
   const conversation = turns
-    .map((m) => `${m.role === 'user' ? 'Thinker' : 'Logos'}: ${m.content}`)
+    .map((m) => `${m.role === 'user' ? 'User' : 'Logos'}: ${m.content}`)
     .join('\n');
   // Trace picks moments by number, so it needs the same numbering we hold.
   const indexed = turns
-    .map((m, i) => `[${i}] ${m.role === 'user' ? 'Thinker' : 'Logos'}: ${m.content}`)
+    .map((m, i) => `[${i}] ${m.role === 'user' ? 'User' : 'Logos'}: ${m.content}`)
     .join('\n');
 
   // Material the person attached to this node — context, not authority.

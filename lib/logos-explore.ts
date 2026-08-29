@@ -288,6 +288,7 @@ Return ONLY JSON:
 }
 
 Absolute rules:
+- Write TO them, never about them: say "you", never "the user", "the thinker", or "they". This panel is read by the person whose reasoning it is.
 - NEVER conclude, recommend, advise, or tell them what to do. "You should pursue entrepreneurship" is a total failure, no matter how well supported.
 - NEVER resolve the tension or answer the question they are working through. You are adding a lens, not a verdict.
 - Research informs the FRAME, never the DECISION. The conclusion is always theirs.
@@ -327,6 +328,7 @@ Return ONLY JSON:
 }
 
 Absolute rules:
+- Write TO them, never about them: say "you", never "the user", "the thinker", or "they". This panel is read by the person whose reasoning it is.
 - NEVER say they are wrong, mistaken, or should reconsider. Show the load, not the verdict.
 - NEVER resolve the tension you expose. Exposing it IS the work.
 - Steelman the opposite case rather than knocking down a weak version of it.
@@ -365,6 +367,7 @@ Return ONLY JSON:
 }
 
 Absolute rules:
+- Write TO them, never about them: say "you", never "the user", "the thinker", or "they". This panel is read by the person whose reasoning it is.
 - "originIndexes" are the numbers of the messages this piece actually grew out of — at most 3, most important first. Only real numbers from the list. Empty array if you genuinely cannot tell.
 - Never quote text yourself; only give indexes. The quotes are taken from the transcript, not from you.
 - NEVER conclude, recommend, or tell them what the trace means they should do.
@@ -405,6 +408,7 @@ Return ONLY JSON:
 }
 
 Absolute rules:
+- Write TO them, never about them: say "you", never "the user", "the thinker", or "they". This panel is read by the person whose reasoning it is.
 - NEVER conclude what they should do. Evidence about the world is not a decision about their life.
 - Report disagreement in the literature as disagreement. Do not average it into a false consensus.
 - Do not invent studies, names, statistics, or citations. Only what appears above. If it is empty, say the evidence was not retrievable and return no findings.
