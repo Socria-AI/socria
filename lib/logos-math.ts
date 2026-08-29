@@ -12,26 +12,39 @@
 
 type Tok =
   | { t: 'num'; v: number }
-  | { t: 'var' }
+  | { t: 'var'; v: string }
   | { t: 'op'; v: string }
   | { t: 'fn'; v: string }
   | { t: 'lp' }
   | { t: 'rp' };
 
-const FUNCS: Record<string, (x: number) => number> = {
+// Null-prototype, and this matters. With a plain object literal, `'constructor'
+// in FUNCS` is true, inherited from Object.prototype -- as are toString,
+// valueOf, hasOwnProperty and the rest. That made every one of those names
+// read as a known function or constant: `freeNames` counted them as bound,
+// the tokenizer emitted Object itself as a numeric literal, and
+// `FUNCS[name](x)` reached for a prototype method. compileFunction happened to
+// survive it, but only because its "does this ever produce a finite number"
+// check threw the results away afterwards. Removing the prototype fixes the
+// lookup, the membership test, and the name census in one move.
+const FUNCS: Record<string, (x: number) => number> = Object.assign(Object.create(null), {
   sin: Math.sin, cos: Math.cos, tan: Math.tan,
   asin: Math.asin, acos: Math.acos, atan: Math.atan,
   sinh: Math.sinh, cosh: Math.cosh, tanh: Math.tanh,
-  ln: Math.log, log: (x) => Math.log10(x), log2: Math.log2,
+  ln: Math.log, log: (x: number) => Math.log10(x), log2: Math.log2,
   sqrt: Math.sqrt, cbrt: Math.cbrt, abs: Math.abs,
   exp: Math.exp, sign: Math.sign, floor: Math.floor, ceil: Math.ceil, round: Math.round,
-};
-const CONSTS: Record<string, number> = { pi: Math.PI, e: Math.E, tau: Math.PI * 2 };
-const PREC: Record<string, number> = { '+': 1, '-': 1, '*': 2, '/': 2, '%': 2, '^': 4, 'u-': 3 };
+});
+const CONSTS: Record<string, number> = Object.assign(Object.create(null), {
+  pi: Math.PI, e: Math.E, tau: Math.PI * 2,
+});
+const PREC: Record<string, number> = Object.assign(Object.create(null), {
+  '+': 1, '-': 1, '*': 2, '/': 2, '%': 2, '^': 4, 'u-': 3,
+});
 const RIGHT = new Set(['^', 'u-']);
 
 /** Normalize common human notation into the grammar the tokenizer knows. */
-function normalizeExpr(raw: string, varName: string): string {
+function normalizeExpr(raw: string): string {
   let s = raw.trim();
   // strip a leading "y =" / "f(x) =" so we evaluate the right-hand side
   s = s.replace(/^\s*[a-zA-Z]\w*\s*(\([^)]*\))?\s*=\s*/, '');
@@ -43,10 +56,12 @@ function normalizeExpr(raw: string, varName: string): string {
   return s;
 }
 
-function tokenize(src: string, varName: string): Tok[] | null {
+// `vars` is the closed set of names that may appear free. Anything else is
+// still a hard failure — an unknown name means we did not understand the
+// expression, and guessing is worse than declining to draw it.
+function tokenize(src: string, vars: Set<string>): Tok[] | null {
   const toks: Tok[] = [];
   let i = 0;
-  const v = varName.toLowerCase();
   while (i < src.length) {
     const c = src[i];
     if (c === ' ') { i++; continue; }
@@ -67,7 +82,7 @@ function tokenize(src: string, varName: string): Tok[] | null {
       let j = i + 1;
       while (j < src.length && /[a-zA-Z0-9]/.test(src[j])) j++;
       const word = src.slice(i, j).toLowerCase();
-      if (word === v) toks.push({ t: 'var' });
+      if (vars.has(word)) toks.push({ t: 'var', v: word });
       else if (word in CONSTS) toks.push({ t: 'num', v: CONSTS[word] });
       else if (word in FUNCS) toks.push({ t: 'fn', v: word });
       else return null; // an unknown name → not plottable, bail
@@ -149,36 +164,62 @@ export interface CompiledFn {
   eval: (x: number) => number;
 }
 
-/** Compile "y = x^2 - 3" into a numeric function of one variable, or null. */
-export function compileFunction(raw: string): CompiledFn | null {
-  if (typeof raw !== 'string' || raw.length > 400) return null;
-  // detect the variable: x by default, else the single letter used
+/** A compiled expression over a named scope — the general form. */
+export interface CompiledExpr {
+  /** every free name the expression actually referenced */
+  vars: string[];
+  eval: (scope: Record<string, number>) => number;
+}
+
+/** The free single-letter names in an expression, minus functions/constants. */
+export function freeNames(raw: string): string[] {
   const rhs = raw.replace(/^\s*[a-zA-Z]\w*\s*(\([^)]*\))?\s*=\s*/, '');
-  const letters = new Set(
-    (rhs.toLowerCase().match(/[a-z]+/g) ?? []).filter(
-      (w) => !(w in FUNCS) && !(w in CONSTS)
-    )
+  const words = (rhs.toLowerCase().match(/[a-z][a-z0-9]*/g) ?? []).filter(
+    (w) => !(w in FUNCS) && !(w in CONSTS)
   );
-  if (letters.size > 1) return null; // more than one free variable → not a curve
-  const varName = letters.size === 1 ? [...letters][0] : 'x';
-  const toks0 = tokenize(normalizeExpr(raw, varName), varName);
+  return [...new Set(words)];
+}
+
+/**
+ * Compile an expression over a declared set of variables.
+ *
+ * This is the general form the single-variable `compileFunction` is built on.
+ * Parameterised visualisations need it: "a*x^2 + b" is one expression whose
+ * meaning depends on which of its names are being swept and which are held.
+ *
+ * Names outside `varNames` still fail rather than defaulting to zero — an
+ * expression we only half understand should not be drawn as if we understood
+ * it. Undefined names at eval time give NaN, which the renderers already treat
+ * as "no point here".
+ */
+export function compileExpr(raw: string, varNames: string[]): CompiledExpr | null {
+  if (typeof raw !== 'string' || raw.length > 400) return null;
+  const allowed = new Set(varNames.map((v) => v.toLowerCase()));
+  const toks0 = tokenize(normalizeExpr(raw), allowed);
   if (!toks0 || !toks0.length) return null;
   const toks = insertImplicitMult(toks0);
-  if (!toks.some((t) => t.t === 'var')) return null; // a constant, not a function
   const rpn = toRpn(toks);
   if (!rpn) return null;
+  const used = [...new Set(rpn.filter((t) => t.t === 'var').map((t) => (t as any).v as string))];
 
-  const fn = (x: number): number => {
+  const evaluate = (scope: Record<string, number>): number => {
     const st: number[] = [];
     for (const tk of rpn) {
       if (tk.t === 'num') st.push(tk.v);
-      else if (tk.t === 'var') st.push(x);
-      else if (tk.t === 'fn') {
+      else if (tk.t === 'var') {
+        const val = scope[tk.v];
+        st.push(typeof val === 'number' ? val : NaN);
+      } else if (tk.t === 'fn') {
         const a = st.pop();
         if (a === undefined) return NaN;
         st.push(FUNCS[tk.v](a));
       } else if (tk.t === 'op') {
-        if (tk.v === 'u-') { const a = st.pop(); if (a === undefined) return NaN; st.push(-a); continue; }
+        if (tk.v === 'u-') {
+          const a = st.pop();
+          if (a === undefined) return NaN;
+          st.push(-a);
+          continue;
+        }
         const b = st.pop(), a = st.pop();
         if (a === undefined || b === undefined) return NaN;
         st.push(
@@ -189,6 +230,19 @@ export function compileFunction(raw: string): CompiledFn | null {
     }
     return st.length === 1 ? st[0] : NaN;
   };
+  return { vars: used, eval: evaluate };
+}
+
+/** Compile "y = x^2 - 3" into a numeric function of one variable, or null. */
+export function compileFunction(raw: string): CompiledFn | null {
+  if (typeof raw !== 'string' || raw.length > 400) return null;
+  const letters = freeNames(raw);
+  if (letters.length > 1) return null; // more than one free variable -> not a curve
+  const varName = letters.length === 1 ? letters[0] : 'x';
+  const compiled = compileExpr(raw, [varName]);
+  if (!compiled) return null;
+  if (!compiled.vars.includes(varName)) return null; // a constant, not a function
+  const fn = (x: number) => compiled.eval({ [varName]: x });
   // sanity: it must produce a finite number somewhere in a normal window
   let ok = false;
   for (let x = -6; x <= 6 && !ok; x += 1.5) if (Number.isFinite(fn(x))) ok = true;
