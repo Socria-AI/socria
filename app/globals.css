@@ -3588,7 +3588,15 @@ html.js-anim .scrolly-root .fade.d3 { transition-delay: .3s; }
    the sizer carries the scrollable extent and the surface inside it scales;
    zoomed out the two cancel and the map fits the panel, zoomed in the sizer
    grows and the panel's own overflow does the panning. */
-.logos-root .lg-map-sizer { position: relative; }
+/* Absolute, not relative, and this is load-bearing. The sizer's width is
+   world * zoom, and the panel it lives in is measured by a ResizeObserver to
+   produce `world`. In flow, zooming past 1:1 made the sizer wider than the
+   panel, the panel grew to fit its own child, the observer reported the larger
+   width, and the next frame multiplied again — one click of "+" ran the map out
+   to 33 million pixels. Out of flow it still creates the scrollable extent
+   (.lg-map is the positioned ancestor) but can no longer drive the measurement
+   that produced it. */
+.logos-root .lg-map-sizer { position: absolute; top: 0; left: 0; }
 .logos-root .lg-map-surface {
   position: absolute; inset: 0;
   transform-origin: 0 0;
