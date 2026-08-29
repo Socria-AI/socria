@@ -109,7 +109,10 @@ export function availableLenses(map: ThinkingMap): LensId[] {
     const chainNodes = map.nodes.filter((n) => CHAIN_TYPES.has(n.type));
     const chainEdges = map.edges.filter((e) => CHAIN_REL.has(e.relation));
     if (chainNodes.length >= 2 || chainEdges.length >= 1) out.unshift('solve');
-    if (plottableNodes(map).length) out.push('plot');
+    // A dynamic scene earns the lens on its own: the interesting cases —
+    // a limit, a secant closing on a tangent, rectangles under a curve — are
+    // often stated in prose with no plottable node anywhere in the map.
+    if (map.viz || plottableNodes(map).length) out.push('plot');
     if (map.nodes.length) out.push('board');
   }
   return out;

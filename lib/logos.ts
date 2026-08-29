@@ -9,6 +9,8 @@
 // evidence) — the map is the data, the lens is how you look at it.
 // No editing, no persistence.
 
+import { sanitizeViz, type VizScene } from './logos-viz';
+
 export const LOGOS_MODEL = 'gpt-5.6-sol';
 // If the Sol id is ever rejected as unknown, the routes retry with this so a
 // demo never dies mid-sentence.
@@ -157,6 +159,11 @@ export interface ThinkingMap {
   context?: ThinkingContext;
   /** for math: how they're engaging — learning drives the Answer Guard */
   intent?: MathIntent;
+  /**
+   * math: an interactive picture of the idea, when motion would teach it
+   * better than prose. Drives the Plot lens; see lib/logos-viz.ts.
+   */
+  viz?: VizScene;
 }
 
 export const EMPTY_MAP: ThinkingMap = { nodes: [], edges: [] };
@@ -257,7 +264,17 @@ export function sanitizeMap(raw: any): ThinkingMap {
     })
     .slice(0, isMath ? MAX_EDGES_MATH : MAX_EDGES);
 
-  return { nodes, edges, ...(context ? { context } : {}), ...(intent ? { intent } : {}) };
+  // Only mathematical work gets a dynamic picture; everywhere else it would
+  // be a category error, and the sanitizer is the place to say so once.
+  const viz = isMath ? sanitizeViz(raw.viz) : null;
+
+  return {
+    nodes,
+    edges,
+    ...(context ? { context } : {}),
+    ...(intent ? { intent } : {}),
+    ...(viz ? { viz } : {}),
+  };
 }
 
 // ===== Conversation =====
@@ -331,6 +348,8 @@ When the work is mathematical, read what they are actually here for and match it
 - UTILITY (a quick calculation where teaching would be friction — "what's 18% of 340", "convert this"): just compute it, plainly. No Socratic detour.
 - EXPLORATION (they want to understand a concept or relationship): explain it, and where a function or relationship is involved, describe it so it can be seen.
 Write mathematics in LaTeX: inline as $…$ and displayed as $$…$$. Notation renders, so use it — $x^2$, $\\frac{a}{b}$, $\\int_0^1 f(x)\\,dx$ — rather than ascii. Keep prose spare around it.
+
+THE PICTURE BESIDE YOU. On mathematical work the Plot lens can become a live one: a secant sliding toward a tangent, both sides of a limit closing in, rectangles multiplying under a curve — with sliders they can drag and an animation they can play. You do not build it and you do not describe it in detail; it is built from the same reading of the conversation that your reply is. What you can do is point: "watch what the slope does as Q comes in", "push n higher and see where the total settles". Direct their attention to the thing that will show them the answer, rather than saying the answer. When the guard is up this is often the strongest move you have — the picture can show the mechanism honestly while the value stays theirs to find.
 
 Openings to avoid entirely: "That's a great question", "That's a significant decision", "I understand how difficult", "There are several factors to consider", "You're weighing", "It sounds like", "What I'm hearing is".
 
@@ -544,7 +563,8 @@ Return ONLY JSON, exactly this shape:
   "context": "deciding|writing|creating|researching|learning|planning|brainstorming|reflecting|analysing|math",
   "intent": "learning|verification|utility|exploration",  // ONLY for context=math
   "nodes": [{"id": "short_snake_case_id", "type": "<node type>", "label": "a short phrase in their own framing", "status": "open|supported|resolved|revised", "merged": ["label of a node folded into this one"], "tex": "LaTeX for this node, if mathematical", "flag": "error|verified", "note": "a short annotation or repair hint"}],
-  "edges": [{"from": "node_id", "to": "node_id", "relation": "supports|conflicts|depends|relates|leads_to|revises|precedes|part_of|transforms_to|implies|justifies", "strength": "weak|normal|strong", "op": "the operation on a transforms_to edge"}]
+  "edges": [{"from": "node_id", "to": "node_id", "relation": "supports|conflicts|depends|relates|leads_to|revises|precedes|part_of|transforms_to|implies|justifies", "strength": "weak|normal|strong", "op": "the operation on a transforms_to edge"}],
+  "viz": {"kind": "function|limit|derivative|riemann", "expr": "the function in plain notation", "varName": "x", "a": 0, "b": 1, "rule": "left|right|midpoint", "view": {"xMin": -6, "xMax": 6}, "params": [{"id": "a", "min": -3, "max": 3, "step": 0.1, "value": 1}], "title": "a short line naming what is being shown"}
 }
 
 READ THE CONTEXT FIRST.
@@ -578,6 +598,22 @@ MATHEMATICS. When the work is quantitative — solving, proving, calculating, or
 - ERRORS ARE THE POINT. If the person's work diverges, do NOT silently replace it with a correct chain. Keep their steps, and on the FIRST wrong one set flag:"error" and put the specific mistake + how to repair it in "note" ("subtracted 6 but the term is +6; add instead"). Everything after a genuine error is suspect — mark the error where it first occurs, not everywhere.
 - When a step is confirmed correct (verification), you may set flag:"verified" on it.
 - Only mark flag:"error" for a real mathematical mistake the person actually made, never for a step you would have done differently. Never fabricate an error.
+
+AN INTERACTIVE PICTURE ("viz"). ONLY for context=math, and only when SEEING the idea move would teach it better than describing it. Omit the field entirely otherwise — a static equation does not need an animation, and a picture nobody needed is clutter. Emit one when the thinking is about how a quantity CHANGES or what it APPROACHES, or when they ask to see, animate, explore, or vary something.
+
+  kind="derivative"  a secant closing on a tangent. Set "a" to the point of tangency. The h slider is added for you and animates h → 0.
+  kind="limit"       approach from both sides. Set "a" to the point being approached. The δ slider is added for you.
+  kind="riemann"     rectangles under a curve. Set "a" and "b" to the interval, optionally "rule". The n slider is added for you and animates n → ∞.
+  kind="function"    the curve itself, with sliders for its coefficients. Use "params" for the letters you want them to be able to move.
+
+RULES for viz, all of them load-bearing:
+- "expr" is PLAIN notation, not LaTeX: "x^2 - 3", "sin(x)/x", "a*x^2 + b". Available: + - * / ^, parentheses, and sin cos tan asin acos atan sinh cosh tanh ln log log2 sqrt cbrt abs exp sign floor ceil round, pi, e. NO \\frac, no \\int, no dx, no "=", no piecewise.
+- Every letter in "expr" must be either "varName" or the id of a parameter you list. An unbound letter means the picture cannot be drawn and the whole field is discarded.
+- Choose "view" so the interesting behaviour fills it. Around a point of interest, keep the window tight — xMin/xMax of about a ± 4 beats -10..10 for seeing a tangent form.
+- Give a parameter a slider whenever the person might reasonably ask "what if this were different" — a coefficient, an initial value, a bound. Two or three at most; a wall of sliders is not an instrument.
+- FOLLOW WHAT THEY ASKED. "animate as h approaches zero" → kind="derivative". "what happens as n increases" → kind="riemann". "let me change a" → put a in "params". "show me both approaches" → kind="limit". Change the scene when they ask for a different one; keep it when they are still working on this one.
+- The surface writes its own captions and asks its own questions. Do NOT put explanation, results, or values in "title" — it names the picture ("A secant approaching the tangent at x = 1"), nothing more.
+- The Answer Guard reaches this field. The picture shows the MECHANISM — the moving secant, the shrinking rectangles, both sides closing in — and the surface withholds the limiting value on its own. Never encode the answer in a title.
 
 Node types mean:
   goal = what they're trying to achieve, or the central idea of a piece

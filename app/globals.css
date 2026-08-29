@@ -5555,6 +5555,194 @@ html.js-anim .scrolly-root .fade.d3 { transition-delay: .3s; }
   opacity: 0.75;
 }
 
+/* ── the animated Graph ────────────────────────────────────────────
+   Same paper, same ink as the rest of Logos. The instrument is the drawing;
+   the controls sit under it and stay quiet until they are needed. */
+.logos-root .lg-viz {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 14px 16px 10px;
+}
+.logos-root .lg-viz-title {
+  flex: 0 0 auto;
+  margin: 0 0 4px;
+  text-align: center;
+  font-family: var(--lg-stix);
+  font-size: 14px;
+  letter-spacing: 0.01em;
+  color: var(--lg-ink);
+}
+.logos-root .lg-viz-svg { flex: 1; min-height: 0; width: 100%; }
+.logos-root .lg-viz-grid { stroke: rgba(53, 70, 32, 0.07); stroke-width: 1; }
+.logos-root .lg-viz-axis { stroke: rgba(35, 36, 31, 0.32); stroke-width: 1.2; }
+.logos-root .lg-viz-tick { fill: var(--lg-ink-40); font-size: 10px; }
+.logos-root .lg-viz-lab {
+  font-family: var(--lg-stix);
+  font-size: 11.5px;
+  font-style: italic;
+}
+.logos-root .lg-viz-curve { stroke-linecap: round; stroke-linejoin: round; }
+/* The moving parts ease between frames so a dragged slider glides rather than
+   snaps. The curve itself is excluded: it is resampled, not moved, and a
+   transition on its path only smears the redraw. */
+.logos-root .lg-viz-pt circle,
+.logos-root .lg-viz-line {
+  transition: all 0.09s linear;
+}
+.logos-root .lg-viz-bar { transition: none; }
+
+/* readouts: the numbers worth watching */
+.logos-root .lg-viz-readouts {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px 16px;
+  padding: 8px 2px 2px;
+}
+.logos-root .lg-viz-readout {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  font-size: 12.5px;
+  color: var(--lg-ink);
+}
+.logos-root .lg-viz-readout i { color: var(--lg-ink-40); font-style: normal; }
+.logos-root .lg-viz-readout b {
+  font-family: var(--lg-stix);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  min-width: 3.2ch;
+  color: var(--lg-primary);
+}
+.logos-root .lg-viz-readout.is-held b {
+  color: var(--lg-accent);
+  opacity: 0.55;
+  border-bottom: 1px dashed currentColor;
+  cursor: help;
+}
+
+/* controls */
+.logos-root .lg-viz-controls {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px 14px;
+  padding: 8px 0 4px;
+}
+.logos-root .lg-viz-transport {
+  display: inline-flex;
+  align-items: stretch;
+  gap: 2px;
+  border: 1px solid var(--lg-line);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 2px;
+}
+.logos-root .lg-viz-transport button {
+  border: 0;
+  background: transparent;
+  color: var(--lg-ink-60);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1;
+  padding: 5px 8px;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: background 0.14s ease, color 0.14s ease;
+}
+.logos-root .lg-viz-transport button:hover { background: rgba(53, 70, 32, 0.07); color: var(--lg-ink); }
+.logos-root .lg-viz-play {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--lg-primary) !important;
+  font-weight: 500;
+}
+.logos-root .lg-viz-play svg { display: block; }
+.logos-root .lg-viz-speeds {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  margin-left: 4px;
+  padding-left: 5px;
+  border-left: 1px solid var(--lg-line);
+}
+.logos-root .lg-viz-speeds button { padding: 5px 5px; font-size: 11px; opacity: 0.6; }
+.logos-root .lg-viz-speeds button.is-on { opacity: 1; color: var(--lg-primary); background: rgba(53, 70, 32, 0.08); }
+
+.logos-root .lg-viz-sliders {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 16px;
+}
+.logos-root .lg-viz-slider {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--lg-ink-60);
+}
+.logos-root .lg-viz-sym { min-width: 2.4em; }
+.logos-root .lg-viz-slider output {
+  font-family: var(--lg-stix);
+  font-variant-numeric: tabular-nums;
+  min-width: 3.4ch;
+  color: var(--lg-ink);
+}
+.logos-root .lg-viz-slider input[type='range'] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 118px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--lg-line);
+  outline: none;
+  cursor: pointer;
+}
+.logos-root .lg-viz-slider input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--lg-paper);
+  border: 1.5px solid var(--lg-primary);
+  cursor: grab;
+}
+.logos-root .lg-viz-slider input[type='range']::-moz-range-thumb {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--lg-paper);
+  border: 1.5px solid var(--lg-primary);
+  cursor: grab;
+}
+.logos-root .lg-viz-slider input[type='range']:focus-visible {
+  box-shadow: 0 0 0 3px rgba(53, 70, 32, 0.16);
+}
+
+.logos-root .lg-viz-caption {
+  flex: 0 0 auto;
+  margin: 0;
+  text-align: center;
+  padding: 2px 12px 2px;
+  font-family: var(--lg-hand);
+  font-size: 13px;
+  color: var(--lg-accent);
+  opacity: 0.8;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .logos-root .lg-viz-pt circle,
+  .logos-root .lg-viz-line { transition: none; }
+}
+
 /* solution-chain op labels ride a little chip on the spine */
 .logos-root .lg-conn-transforms_to .lg-edge { stroke: #7C9463; }
 .logos-root .lg-conn-implies .lg-edge { stroke: var(--lg-accent); }
