@@ -3584,6 +3584,42 @@ html.js-anim .scrolly-root .fade.d3 { transition-delay: .3s; }
 }
 .logos-root .lg-panel-state.is-working { color: var(--lg-accent); opacity: 0.75; animation: lgBreathe 1.8s ease-in-out infinite; }
 
+/* The zoom surface. A transform does not change an element's layout box, so
+   the sizer carries the scrollable extent and the surface inside it scales;
+   zoomed out the two cancel and the map fits the panel, zoomed in the sizer
+   grows and the panel's own overflow does the panning. */
+.logos-root .lg-map-sizer { position: relative; }
+.logos-root .lg-map-surface {
+  position: absolute; inset: 0;
+  transform-origin: 0 0;
+  transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .logos-root .lg-map-surface { transition: none; }
+}
+
+.logos-root .lg-zoom {
+  position: absolute; right: 12px; bottom: 12px; z-index: 4;
+  display: flex; align-items: stretch;
+  border: 1px solid var(--lg-line); border-radius: 9px;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(6px);
+  overflow: hidden;
+}
+.logos-root .lg-zoom button {
+  min-width: 27px; padding: 0 6px; border: none; background: transparent;
+  font: inherit; font-size: 14px; line-height: 1; color: var(--lg-ink-60);
+  cursor: pointer; transition: background 0.15s ease, color 0.15s ease;
+}
+.logos-root .lg-zoom button:hover:not(:disabled) { background: rgba(53, 70, 32, 0.07); color: var(--lg-primary); }
+.logos-root .lg-zoom button:disabled { opacity: 0.32; cursor: default; }
+.logos-root .lg-zoom .lg-zoom-level {
+  min-width: 48px; font-size: 11px; font-variant-numeric: tabular-nums;
+  border-left: 1px solid var(--lg-line); border-right: 1px solid var(--lg-line);
+  color: var(--lg-ink-40);
+}
+.logos-root .lg-zoom .lg-zoom-level:disabled { opacity: 0.55; }
+
 .logos-root .lg-map {
   position: relative;
   flex: 1;

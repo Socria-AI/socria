@@ -132,6 +132,35 @@ export function ThinkingMap({
   } | null>(null);
   const menuFor = menu?.id ?? null;
 
+  const [zoom, setZoom] = useState(1);
+  const zoomRef = useRef(1);
+
+  // Zooming OUT gives the graph simulation more room rather than just shrinking
+  // what is already there — a crowded map rendered smaller is still crowded.
+  // Zooming IN never shrinks the world: it magnifies, and the container's own
+  // overflow does the panning. The static lenses compute their own extents and
+  // already overflow, so for them the scale alone is the whole feature.
+  const world = useMemo(
+    () => ({ w: size.w / Math.min(zoom, 1), h: size.h / Math.min(zoom, 1) }),
+    [size.w, size.h, zoom]
+  );
+
+  // Widening the world means the graph has somewhere new to spread into, so
+  // wake the simulation; a pinned menu is measured against the old scale.
+  useEffect(() => {
+    zoomRef.current = zoom;
+    sizeRef.current = { w: world.w, h: world.h };
+    alphaRef.current = Math.max(alphaRef.current, 0.35);
+    setMenu(null);
+  }, [zoom, world.w, world.h]);
+
+  const ZOOMS = [0.55, 0.7, 0.85, 1, 1.2, 1.45];
+  const zoomBy = (dir: -1 | 1) => {
+    const i = ZOOMS.indexOf(zoom);
+    const at = i === -1 ? ZOOMS.indexOf(1) : i;
+    setZoom(ZOOMS[Math.min(ZOOMS.length - 1, Math.max(0, at + dir))]);
+  };
+
   // Hold the graph still while a menu is open — a target that drifts out from
   // under the cursor is the fastest way to make this feel cheap.
   const frozenRef = useRef(false);
@@ -355,7 +384,9 @@ export function ThinkingMap({
     if (!el) return;
     const apply = () => {
       const r = el.getBoundingClientRect();
-      sizeRef.current = { w: r.width, h: r.height };
+      // sizeRef is the simulation's world, which zoom can widen; `size` stays
+      // the container, because the Board and the plot draw to fit it.
+      sizeRef.current = { w: r.width / Math.min(zoomRef.current, 1), h: r.height / Math.min(zoomRef.current, 1) };
       setSize({ w: r.width, h: r.height });
       alphaRef.current = Math.max(alphaRef.current, 0.4);
       // The menu is pinned to coordinates that no longer mean anything.
@@ -456,6 +487,18 @@ export function ThinkingMap({
           <MathBoard map={map} width={size.w} height={size.h} guarded={guarded} />
         )}
 
+        {/* The sizer carries the scrollable extent, because a transform does
+            not change an element's layout box; the surface inside it is what
+            actually scales. Zoomed out the two cancel and the map fits the
+            panel exactly; zoomed in the sizer grows and the panel pans. */}
+        <div
+          className="lg-map-sizer"
+          style={{ width: world.w * zoom, height: world.h * zoom }}
+        >
+          <div
+            className="lg-map-surface"
+            style={{ width: world.w, height: world.h, transform: `scale(${zoom})` }}
+          >
         <svg className="lg-edges" aria-hidden="true">
           <defs>
             <marker
@@ -557,14 +600,20 @@ export function ThinkingMap({
                     return;
                   }
                   const card = ev.currentTarget.getBoundingClientRect();
-                  const box = wrapRef.current?.getBoundingClientRect();
-                  if (!box) return;
+                  const el = wrapRef.current;
+                  const box = el?.getBoundingClientRect();
+                  if (!el || !box) return;
                   // Flip above the card when there isn't room beneath it.
                   const above = card.bottom - box.top + MENU_H > box.height;
+                  // The menu sits inside the scrollable, scaled sizer, so it is
+                  // placed in scroll-content coordinates — client rects are
+                  // viewport-relative, hence the scroll offsets.
                   setMenu({
                     id: p.id,
-                    x: card.left - box.left + card.width / 2,
-                    y: above ? card.top - box.top - 8 : card.bottom - box.top + 8,
+                    x: card.left - box.left + el.scrollLeft + card.width / 2,
+                    y: above
+                      ? card.top - box.top + el.scrollTop - 8
+                      : card.bottom - box.top + el.scrollTop + 8,
                     above,
                   });
                 }}
@@ -616,6 +665,7 @@ export function ThinkingMap({
             </div>
           );
         })}
+          </div>
 
         {menu &&
           (() => {
@@ -681,6 +731,7 @@ export function ThinkingMap({
               </div>
             );
           })()}
+        </div>
 
         {related && active && lens === 'graph' && (
           <div className="lg-legend" aria-live="polite">
@@ -706,6 +757,40 @@ export function ThinkingMap({
           </div>
         )}
       </div>
+
+      {/* Zoom is meaningless on the plot and the Board, which draw to fit. */}
+      {map.nodes.length > 0 && lens !== 'plot' && lens !== 'board' && (
+        <div className="lg-zoom" role="group" aria-label="Zoom">
+          <button
+            type="button"
+            onClick={() => zoomBy(-1)}
+            disabled={zoom <= ZOOMS[0]}
+            aria-label="Zoom out"
+            title="Zoom out"
+          >
+            −
+          </button>
+          <button
+            type="button"
+            className="lg-zoom-level"
+            onClick={() => setZoom(1)}
+            disabled={zoom === 1}
+            aria-label={`Zoom ${Math.round(zoom * 100)} percent — reset`}
+            title="Reset zoom"
+          >
+            {Math.round(zoom * 100)}%
+          </button>
+          <button
+            type="button"
+            onClick={() => zoomBy(1)}
+            disabled={zoom >= ZOOMS[ZOOMS.length - 1]}
+            aria-label="Zoom in"
+            title="Zoom in"
+          >
+            +
+          </button>
+        </div>
+      )}
 
       {map.nodes.length > 0 && <p className="lg-caption">{caption}</p>}
     </div>
