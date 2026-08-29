@@ -212,17 +212,54 @@ export async function PUT(req: NextRequest) {
       memory: sanitizeMemory(c.memory ?? EMPTY_MEMORY),
       updated_at: Number(c.updatedAt) || Date.now(),
     };
-    let { error } = await supabaseAdmin()
+    // NOT an upsert. `conversations.id` is the primary key on its own, so an
+    // upsert conflicts on the id alone — and a caller who supplied someone
+    // else's conversation id would overwrite that row and take ownership of
+    // it. Reads and deletes were always scoped to the owner; this write was
+    // the one path that was not.
+    //
+    // Update-then-insert closes it without a check-then-act race: the update
+    // is scoped to (id, user_id) so it can only ever touch your own row, and
+    // if it matches nothing the insert either creates the row or fails on the
+    // primary key because the id belongs to somebody else.
+    let { error, count } = await supabaseAdmin()
       .from('conversations')
-      .upsert({ ...base, ...extras });
+      .update({ ...base, ...extras }, { count: 'exact' })
+      .eq('id', c.id)
+      .eq('user_id', userId);
 
-    // An old database: keep the Logos fields in `memory` rather than dropping
-    // them, so the session still comes back as a Logos session.
+    let legacy = false;
     if (error && missingColumn(error)) {
       warnLegacy('PUT');
-      ({ error } = await supabaseAdmin()
+      legacy = true;
+      ({ error, count } = await supabaseAdmin()
         .from('conversations')
-        .upsert({ ...base, memory: { ...base.memory, [SIDECAR]: extras } }));
+        .update({ ...base, memory: { ...base.memory, [SIDECAR]: extras } }, { count: 'exact' })
+        .eq('id', c.id)
+        .eq('user_id', userId));
+    }
+
+    if (!error && !count) {
+      // Annotated, or the ternary infers a union the client's generics reject.
+      const row: Record<string, unknown> = legacy
+        ? { ...base, memory: { ...base.memory, [SIDECAR]: extras } }
+        : { ...base, ...extras };
+      ({ error } = await supabaseAdmin().from('conversations').insert(row));
+
+      if (error && missingColumn(error)) {
+        warnLegacy('PUT');
+        ({ error } = await supabaseAdmin()
+          .from('conversations')
+          .insert({ ...base, memory: { ...base.memory, [SIDECAR]: extras } }));
+      }
+
+      // A primary-key collision here means the id exists and is not yours.
+      if (error && /duplicate key|23505/i.test(`${error.code} ${error.message}`)) {
+        return NextResponse.json(
+          { error: 'That conversation belongs to another account.' },
+          { status: 403 }
+        );
+      }
     }
 
     if (error) {
@@ -294,10 +331,33 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    let { error } = await supabaseAdmin().from('conversations').upsert(rows);
+    // Same hazard as PUT: an upsert conflicts on `id` alone, so a caller could
+    // hand us somebody else's conversation ids and overwrite their rows. This
+    // is the sign-in migration path, where every id SHOULD be new to us — so
+    // drop any id that already exists and does not belong to this account,
+    // rather than letting it through and taking the row.
+    const ids = rows.map((r) => r.id as string);
+    const { data: existing } = await supabaseAdmin()
+      .from('conversations')
+      .select('id, user_id')
+      .in('id', ids);
+    const foreign = new Set(
+      (existing ?? [])
+        .filter((r: { user_id: string }) => r.user_id !== userId)
+        .map((r: { id: string }) => r.id)
+    );
+    const mine = (list: { id: unknown }[]) =>
+      list.filter((r) => !foreign.has(r.id as string));
+
+    let { error } = await supabaseAdmin().from('conversations').upsert(mine(rows));
     if (error && missingColumn(error)) {
       warnLegacy('POST');
-      ({ error } = await supabaseAdmin().from('conversations').upsert(legacyRows));
+      ({ error } = await supabaseAdmin().from('conversations').upsert(mine(legacyRows)));
+    }
+    if (foreign.size) {
+      console.warn(
+        `POST conversations: skipped ${foreign.size} id(s) owned by another account`
+      );
     }
     if (error) {
       console.error('POST conversations error:', error);
@@ -306,7 +366,7 @@ export async function POST(req: NextRequest) {
         { status: 500 }
       );
     }
-    return NextResponse.json({ ok: true, imported: rows.length });
+    return NextResponse.json({ ok: true, imported: rows.length - foreign.size });
   } catch (e: any) {
     console.error('POST conversations threw:', e);
     return NextResponse.json(
