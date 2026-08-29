@@ -26,6 +26,7 @@ import { NodeGlyph } from './NodeGlyph';
 import { StatusMark } from './StatusMark';
 import { TeX, MathText } from './TeX';
 import { MathPlot } from './MathPlot';
+import { MathViz } from './MathViz';
 import { MathBoard } from './MathBoard';
 
 /** The zoom ladder. Discrete steps, so every zoom lands somewhere legible. */
@@ -559,10 +560,15 @@ export function ThinkingMap({
           </div>
         )}
 
-        {/* the plot lens draws the function itself, not cards */}
-        {lens === 'plot' && (
-          <MathPlot map={map} width={size.w} height={size.h} guarded={guarded} />
-        )}
+        {/* The plot lens draws the mathematics itself, not cards. A scene
+            makes it interactive — parameters, a clock, the idea in motion;
+            without one it stays the static drawing it has always been. */}
+        {lens === 'plot' &&
+          (map.viz ? (
+            <MathViz scene={map.viz} width={size.w} height={size.h} guarded={guarded} />
+          ) : (
+            <MathPlot map={map} width={size.w} height={size.h} guarded={guarded} />
+          ))}
         {/* the board is worked-by-hand notebook, not cards */}
         {lens === 'board' && (
           <MathBoard map={map} width={size.w} height={size.h} guarded={guarded} />
@@ -571,7 +577,14 @@ export function ThinkingMap({
         {/* The sizer carries the scrollable extent, because a transform does
             not change an element's layout box; the surface inside it is what
             actually scales. Zoomed out the two cancel and the map fits the
-            panel exactly; zoomed in the sizer grows and the panel pans. */}
+            panel exactly; zoomed in the sizer grows and the panel pans.
+
+            Skipped entirely on the lenses that draw themselves. It is a
+            full-bleed absolute layer painted after them, so leaving it up
+            over the plot or the Board put an invisible sheet across both —
+            harmless while neither had anything to click, and not harmless
+            now that the plot has controls. */}
+        {lens !== 'plot' && lens !== 'board' && (
         <div
           className="lg-map-sizer"
           style={{ width: world.w * zoom, height: world.h * zoom }}
@@ -813,6 +826,7 @@ export function ThinkingMap({
             );
           })()}
         </div>
+        )}
 
         {related && active && lens === 'graph' && (
           <div className="lg-legend" aria-live="polite">
