@@ -48,18 +48,43 @@ export default function SecurityPage() {
         by the host.{' '}
         <strong>The browser never talks to that database directly.</strong>{' '}
         Every read and write goes through our server, which checks on every
-        request that the row belongs to the account asking for it — deletes, for
-        example, are scoped to both the record and its owner, so no request can
-        reach across accounts.
+        request that the row belongs to the account asking for it. That is not a
+        rule applied to deletes and hoped for elsewhere: every query in the
+        codebase is filtered by account, updates included, and the routes that
+        call the AI hold no database state at all, so there is no record
+        identifier a request could substitute to reach someone else&rsquo;s
+        thinking.
       </p>
+      <p>
+        The database has row-level security switched on with no policies and the
+        public API roles revoked, which is a second wall rather than the first
+        one. If a key ever leaked, or the database&rsquo;s own REST interface
+        were exposed by mistake, the answer would be nothing rather than
+        everything.
+      </p>
+      <div className="lg-note">
+        <span className="t">What this is not</span>
+        <p>
+          Your messages are encrypted in transit and encrypted at rest by the
+          database host, and access to them is controlled per account.{' '}
+          <strong>They are not end-to-end encrypted.</strong> We could read them
+          if we chose to, and so could our AI provider in the course of
+          generating a reply. Anyone telling you otherwise about a product that
+          builds a Thinking Map from your words is selling something.
+        </p>
+      </div>
       <div className="lg-note">
         <span className="t">Connected accounts</span>
         <p>
           If you ever connect Google or Notion, those access tokens are
           encrypted before they are stored — AES-256-GCM, with a key derived
           from a server-side secret. Without that secret the system refuses to
-          store a connection at all rather than fall back to plaintext. These
-          connectors currently ship switched off.
+          store a connection at all rather than fall back to plaintext — a
+          database dump on its own does not yield anyone&rsquo;s Google or
+          Notion access. Finishing a connection also checks a signed, single-use
+          link against the session making the request, so a link cannot be
+          re-pointed at somebody else&rsquo;s account. Disconnecting deletes the
+          stored credential.
         </p>
       </div>
 
@@ -127,10 +152,13 @@ export default function SecurityPage() {
         <span className="t">Stated plainly</span>
         <p>
           Socria is a young product. We have not completed a third-party
-          security audit, we do not hold SOC&nbsp;2 or ISO&nbsp;27001, and we do
-          not yet run a formal bug-bounty programme. If your organisation needs
-          any of those before adopting a tool, we are not there yet — and would
-          rather tell you than let you assume.
+          security audit or a penetration test, we do not hold SOC&nbsp;2 or
+          ISO&nbsp;27001, we do not yet run a formal bug-bounty programme, and
+          we have not signed a data processing agreement with our AI provider or
+          moved to a zero-retention endpoint. Your messages are not end-to-end
+          encrypted. If your organisation needs any of those before adopting a
+          tool, we are not there yet — and would rather tell you than let you
+          assume.
         </p>
       </div>
 

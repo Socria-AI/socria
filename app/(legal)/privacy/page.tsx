@@ -61,9 +61,10 @@ export default function PrivacyPage() {
         <span className="t">Be clear-eyed about this</span>
         <p>
           The Journey is an evolving description of how you think, not a log of
-          what you typed. If you would rather Socria did not keep one, do not
-          use Core&nbsp;3.1 — or delete the conversations that feed it, and ask
-          us to erase it.
+          what you typed. If you would rather Socria did not keep one, there is
+          a control for exactly that: <a href="/account/data">Data &amp;
+          Privacy</a> clears the Journey and every thread&rsquo;s memory and
+          leaves your own words untouched.
         </p>
       </div>
 
@@ -99,10 +100,16 @@ export default function PrivacyPage() {
         </table>
       </div>
       <p>
-        We do <strong>not</strong> sell your data, and we do not use your
-        conversations to train models. OpenAI does not train on data submitted
-        through its API, and retains it only briefly for abuse monitoring; their
-        current terms govern that, not us.
+        We do <strong>not</strong> sell your data, we do not share it for
+        cross-context behavioural advertising, and we do not use your
+        conversations to train models &mdash; we do not have a model of our own
+        to train. Under OpenAI&rsquo;s published API policy, data sent through
+        their API is not used to train their models by default, and inputs and
+        outputs are retained for{' '}
+        <strong>up to 30 days for abuse monitoring</strong> before deletion.
+        That is their policy rather than a contract we hold, and we have not
+        signed a data processing agreement or enabled zero retention with them
+        &mdash; if you need either, ask us before you rely on it.
       </p>
 
       <h2 id="who">Who it is shared with</h2>
@@ -146,13 +153,27 @@ export default function PrivacyPage() {
               <td>Analytics</td>
               <td>Aggregate page views</td>
             </tr>
+            <tr>
+              <td><strong>Upstash, Inc.</strong></td>
+              <td>Rate limiting</td>
+              <td>A counter keyed to your account id, or your IP when signed out. No content.</td>
+            </tr>
+            <tr>
+              <td><strong>Serper / Tavily</strong></td>
+              <td>Web search</td>
+              <td>The search phrase only, when Research looks something up</td>
+            </tr>
           </tbody>
         </table>
       </div>
       <p>
-        If web Research is enabled on this deployment, a search provider also
-        receives the generated search query — never your private details, which
-        the code strips by design.
+        When Research looks something up, a search provider receives{' '}
+        <strong>the search phrase and nothing else</strong> &mdash; your
+        conversation is never sent to it. A rate-limiting service receives a
+        counter keyed to your account id, or your IP when you are signed out,
+        and no content at all. If you connect Google or Notion yourself, your
+        searches and the documents you choose reach those services too; both are
+        listed on the register.
       </p>
       <p>
         The full register, with each company&rsquo;s role, location and privacy
@@ -165,11 +186,14 @@ export default function PrivacyPage() {
         our database and follow you across devices.
       </p>
       <p>
-        <strong>Signed out</strong>, they stay in your browser&rsquo;s local
-        storage and never reach us. So do your personality settings, your custom
-        instructions, and which maths solutions you chose to reveal — those stay
-        on your device even when you are signed in. Clearing your browser data
-        clears them.
+        <strong>Signed out</strong>, they are{' '}
+        <strong>never written to our database</strong> &mdash; they live in your
+        browser&rsquo;s local storage, and clearing your browser data clears
+        them. Be precise about what that does and does not mean: to answer you
+        at all, each message still passes through our server and on to our AI
+        provider. It is not stored; it is not anonymous. Your personality
+        settings, your custom instructions, and which maths solutions you chose
+        to reveal stay on your device either way, signed in or out.
       </p>
 
       <h2 id="rights">Your choices</h2>
@@ -177,15 +201,26 @@ export default function PrivacyPage() {
         <li><strong>See it</strong> — everything you have written is visible in the app.</li>
         <li><strong>Delete a conversation</strong> — deleting one removes it, and its map, draft and memory, from our database.</li>
         <li>
-          <strong>Delete everything</strong> — email{' '}
-          <a href="mailto:hellosocria@gmail.com">hellosocria@gmail.com</a> from
-          your account address and we will erase your account and all of its
-          data. Self-service account deletion is not built yet; until it is,
-          that address is the route, and we will confirm when it is done.
+          <strong>Forget what Socria worked out</strong> &mdash;{' '}
+          <a href="/account/data">Data &amp; Privacy</a> has a control that
+          clears thread memory and the Thinking Journey from every conversation
+          while leaving your own words, maps and drafts exactly where they are.
+          Being forgotten and losing your notes are different requests.
         </li>
         <li>
-          <strong>Export</strong> — not yet available as a one-click download.
-          Ask at the same address and we will send you what we hold.
+          <strong>Export</strong> &mdash; one click in{' '}
+          <a href="/account/data">Data &amp; Privacy</a> downloads everything we
+          hold about you as a JSON file: conversations, maps, drafts, memory,
+          profile and subscription status. Connected accounts are listed as
+          connected; their access tokens are never included.
+        </li>
+        <li>
+          <strong>Delete everything</strong> &mdash; the same page deletes your
+          account outright. It cancels any subscription first, then removes
+          every row keyed to you, then the account itself. It is immediate and
+          it is not reversible. If you would rather a person did it, write to{' '}
+          <a href="mailto:hellosocria@gmail.com">hellosocria@gmail.com</a> from
+          your account address.
         </li>
         <li><strong>Correct it</strong> — tell Socria in the conversation when it has read you wrong; correcting the record is never a paid feature.</li>
       </ul>
@@ -197,6 +232,72 @@ export default function PrivacyPage() {
         erasure, portability and objection — and the right to complain to your
         local supervisory authority. Write to us first and we will try to settle
         it directly.
+      </p>
+
+      <h2 id="keep">How long we keep it</h2>
+      <p>
+        Nothing you write expires on a timer. A conversation stays until you
+        delete it, because a thinking record you lose track of is not a thinking
+        record. Deleting a conversation removes it immediately; deleting your
+        account removes all of it immediately. Neither is a soft delete &mdash;
+        we do not keep a copy in a bin.
+      </p>
+      <p>Three things survive that, and you should hear it from us:</p>
+      <ul>
+        <li>
+          <strong>Payment records.</strong> Stripe keeps invoice and transaction
+          records to meet its own tax and legal obligations after a subscription
+          ends. That retention is theirs, and not ours to override.
+        </li>
+        <li>
+          <strong>Abuse-monitoring logs at OpenAI</strong>, for up to the 30 days
+          described above.
+        </li>
+        <li>
+          <strong>Encrypted database backups</strong>, which contain a deleted
+          row until they age out of their retention window and are overwritten.
+        </li>
+      </ul>
+      <p>
+        Our own application logs record route names, error codes and counts.
+        They do not contain your messages, and they never contain an access
+        token.
+      </p>
+
+      <h2 id="legal">Legal bases, and rights by region</h2>
+      <p>
+        For people in the EEA, the UK and Switzerland, we rely on{' '}
+        <strong>contract</strong> to run the service you asked for &mdash;
+        holding your conversations, generating replies, maintaining memory and
+        managing your subscription &mdash; and on{' '}
+        <strong>legitimate interests</strong> for keeping the service up and
+        preventing abuse, which is the rate limiting described above. We do not
+        rely on consent for any of it, so there is no consent to withdraw; the
+        equivalent is to stop using Socria and delete your account, which you
+        can do in one click.
+      </p>
+      <p>
+        You have the right to access, correct, erase and port your data, to
+        object to or restrict processing, and to complain to your local
+        supervisory authority. The export and delete controls above are that
+        access, portability and erasure, available without asking us. All of our
+        sub-processors are United States companies, so your data is transferred
+        to and processed in the US; those transfers rely on the Standard
+        Contractual Clauses and each vendor&rsquo;s own transfer framework.
+      </p>
+      <p>
+        For people in California and other US states with comparable laws: we do
+        not sell personal information, and we do not share it for cross-context
+        behavioural advertising &mdash; there is nothing to opt out of, because
+        we do not do it. You have the right to know, delete and correct what we
+        hold, and to portability, and we will not treat you differently for
+        exercising any of it. If you use an authorised agent, we will ask for
+        proof they are acting for you.
+      </p>
+      <p>
+        We honour these rights for everyone, wherever you live, rather than
+        gating them by jurisdiction. We answer within 30 days, and tell you if
+        we need longer and why.
       </p>
 
       <h2 id="children">Children</h2>
@@ -211,8 +312,12 @@ export default function PrivacyPage() {
       <h2 id="changes">Changes and contact</h2>
       <p>
         If this policy changes in a way that matters, we will say so rather than
-        quietly re-dating the page. Questions, or a request to delete your data:{' '}
-        <a href="mailto:hellosocria@gmail.com">hellosocria@gmail.com</a>.
+        quietly re-dating the page. If a breach ever puts your data at real
+        risk, we will tell you and the relevant authority within the deadlines
+        the law sets, and we will say what happened rather than what sounds
+        best. How we protect the data in the first place is set out on the{' '}
+        <a href="/security">security page</a>. Questions, or a request about
+        your data: <a href="mailto:hellosocria@gmail.com">hellosocria@gmail.com</a>.
       </p>
     </article>
   );

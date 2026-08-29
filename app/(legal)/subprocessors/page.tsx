@@ -56,6 +56,37 @@ const ROWS = [
     where: 'United States',
     site: 'https://vercel.com/legal/privacy-policy',
   },
+  {
+    name: 'Upstash, Inc.',
+    role: 'Rate limiting',
+    gets: 'A counter keyed to your account id, or to your IP address when you are not signed in. No message content. Entries expire on their own within the hour.',
+    where: 'United States',
+    site: 'https://upstash.com/trust/privacy.pdf',
+  },
+  {
+    name: 'Serper / Tavily',
+    role: 'Web search, when a source is looked up',
+    gets: 'The search phrase only — not your conversation. Only when Logos looks something up for you.',
+    where: 'United States',
+    site: 'https://serper.dev/privacy-policy',
+  },
+];
+
+// Reached only because you connected the account yourself, and only while the
+// connection is live. Listed because data does move, not because we chose them.
+const CONNECTED = [
+  {
+    name: 'Google LLC',
+    role: 'Drive, Gmail and Calendar, if you connect them',
+    gets: 'The searches you run against your own account, and the documents you choose to pull in.',
+    site: 'https://policies.google.com/privacy',
+  },
+  {
+    name: 'Notion Labs, Inc.',
+    role: 'Notion, if you connect it',
+    gets: 'The searches you run against your own workspace, and the pages you choose to pull in.',
+    site: 'https://www.notion.com/privacy',
+  },
 ];
 
 export default function SubprocessorsPage() {
@@ -99,21 +130,57 @@ export default function SubprocessorsPage() {
         </table>
       </div>
 
+      <h2 id="connected">Only if you connect them</h2>
+      <p>
+        Nothing below is reached until you link the account yourself, and
+        disconnecting it in Logos deletes the stored credential.
+      </p>
+      <div className="lg-tablewrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Company</th>
+              <th>Role</th>
+              <th>Receives</th>
+            </tr>
+          </thead>
+          <tbody>
+            {CONNECTED.map((r) => (
+              <tr key={r.name}>
+                <td>
+                  <strong>{r.name}</strong>
+                  <br />
+                  <a href={r.site} target="_blank" rel="noopener noreferrer">
+                    privacy policy
+                  </a>
+                </td>
+                <td>{r.role}</td>
+                <td>{r.gets}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
       <h2 id="ai">A note on AI processing</h2>
       <p>
         Your conversations are sent to OpenAI to generate replies and to build
-        your map. Under OpenAI&rsquo;s API terms, data submitted through the API
-        is <strong>not used to train their models</strong>, and is retained only
-        briefly for abuse monitoring before deletion.
+        your map. Under OpenAI&rsquo;s API data-usage policy, data submitted
+        through the API is{' '}
+        <strong>not used to train their models by default</strong>, and inputs
+        and outputs are retained for{' '}
+        <strong>up to 30 days for abuse monitoring</strong> before deletion,
+        unless a longer period is required by law. Socria uses the standard API,
+        not a zero-retention endpoint, so that 30-day window applies to us.
       </p>
       <div className="lg-note">
         <span className="t">Verify this yourself</span>
         <p>
-          That statement reflects OpenAI&rsquo;s published API data-usage policy
-          rather than a private agreement, and their terms are theirs to change.
-          If your organisation needs it contractually guaranteed — a zero-
-          retention endpoint, or a signed DPA — that is a conversation to have
-          with us and with them before you rely on it. Ask us at{' '}
+          Those durations are OpenAI&rsquo;s published policy, not a private
+          agreement we hold, and their terms are theirs to change. We have not
+          signed a DPA with them or enabled Zero Data Retention. If your
+          organisation needs either one contractually guaranteed, that is a
+          conversation to have with us before you rely on it. Ask us at{' '}
           <a href="mailto:hellosocria@gmail.com">hellosocria@gmail.com</a>.
         </p>
       </div>

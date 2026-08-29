@@ -102,6 +102,20 @@ export default function TermsPage() {
         default; if something went genuinely wrong, write to us and we will put
         it right.
       </p>
+      <div className="lg-note">
+        <span className="t">If you are a consumer in the EU or the UK</span>
+        <p>
+          You have a statutory right to withdraw from this contract within{' '}
+          <strong>14 days</strong> of subscribing. By starting to use Socria One
+          straight away you ask us to begin the service inside that period; you
+          can still withdraw, and we will refund the part of the month you had
+          not used. Write to{' '}
+          <a href="mailto:hellosocria@gmail.com">hellosocria@gmail.com</a>{' '}
+          — no form, no reason required. Nothing in these terms takes away a
+          right your local consumer law gives you, and where the two conflict,
+          your law wins.
+        </p>
+      </div>
 
       <h2 id="free">The free tier</h2>
       <p>
@@ -114,15 +128,29 @@ export default function TermsPage() {
 
       <h2 id="ending">Ending it</h2>
       <p>
-        You can stop using Socria and delete your account whenever you like. We
-        may suspend an account that breaks these terms or endangers the service,
-        and we will explain why unless we are legally prevented from doing so.
+        You can stop using Socria whenever you like, and delete your account
+        yourself from <Link href="/account/data">Data &amp; Privacy</Link> — it
+        cancels your subscription, erases your data and closes the account in
+        one step, with no email to send and nobody to persuade. We may suspend
+        an account that breaks these terms or endangers the service, and we will
+        explain why unless we are legally prevented from doing so. If we
+        discontinue Socria One, we will give notice and refund the unused part
+        of anything you have paid.
       </p>
 
       <h2 id="legal">Governing law and changes</h2>
       <p>
         These Terms are governed by the laws of the State of Texas, without
-        regard to its conflict-of-laws principles.
+        regard to its conflict-of-laws principles, and the courts of Texas are
+        where a dispute would be heard. If you are a consumer outside the United
+        States, that clause does not deprive you of the protection of the
+        mandatory laws of the country you live in, or of your right to bring a
+        claim in your local courts where your law gives you one.
+      </p>
+      <p>
+        Before anyone files anything, write to us. Nearly everything is settled
+        faster by an email than by a filing, and we would rather fix the problem
+        than win the argument.
       </p>
       <p>
         If we change these terms materially, we will give notice in the product
