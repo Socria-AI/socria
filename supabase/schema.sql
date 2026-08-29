@@ -1,7 +1,10 @@
 -- Socria conversation storage.
 -- Run this once against your Supabase project (SQL Editor or psql).
--- All access goes through the Next.js API using the service role key,
--- so RLS isn't required. Enable it later if you ever expose direct client access.
+-- All access goes through the Next.js API using the service role key, which
+-- bypasses RLS; every query there is scoped with .eq('user_id', ...) and that
+-- is the control that keeps accounts apart. Run rls.sql alongside this file
+-- anyway: it turns RLS on with no policies, so a leaked anon key or an
+-- accidentally exposed REST endpoint returns nothing instead of everything.
 
 create table if not exists conversations (
   id text primary key,
