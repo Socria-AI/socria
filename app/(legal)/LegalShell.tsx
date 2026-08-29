@@ -9,6 +9,7 @@ const TABS = [
   { href: '/privacy', label: 'Privacy' },
   { href: '/terms', label: 'Terms' },
   { href: '/security', label: 'Security' },
+  { href: '/subprocessors', label: 'Sub-processors' },
 ];
 
 export function LegalShell({ children }: { children: React.ReactNode }) {

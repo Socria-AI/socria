@@ -154,6 +154,10 @@ export default function PrivacyPage() {
         receives the generated search query — never your private details, which
         the code strips by design.
       </p>
+      <p>
+        The full register, with each company&rsquo;s role, location and privacy
+        policy, is at <a href="/subprocessors">subprocessors</a>.
+      </p>
 
       <h2 id="where">Where it lives</h2>
       <p>
