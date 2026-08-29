@@ -68,7 +68,9 @@ export function DocsShell({ children }: { children: React.ReactNode }) {
         <span className="d-foot-links">
           <Link href="/logos">What Logos is</Link>
           <Link href="/one">Socria One</Link>
-          <Link href="/chat">Open Socria</Link>
+          <Link href="/privacy">Privacy</Link>
+          <Link href="/terms">Terms</Link>
+          <Link href="/security">Security</Link>
         </span>
       </footer>
     </div>

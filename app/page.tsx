@@ -533,7 +533,15 @@ export default async function Home() {
             </Link>
           </div>
           <div className="colophon">
-            <span>Socria · Human-first AI</span>
+            <span>
+              Socria · Human-first AI
+              {' · '}
+              <Link href="/privacy">Privacy</Link>
+              {' · '}
+              <Link href="/terms">Terms</Link>
+              {' · '}
+              <Link href="/security">Security</Link>
+            </span>
             <div className="colo-socials">
               <a href="https://www.linkedin.com/company/socria" target="_blank" rel="noopener noreferrer" aria-label="Socria on LinkedIn">
                 <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">

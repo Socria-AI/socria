@@ -1,0 +1,118 @@
+/* app/(legal)/legal.css — the policy pages.
+   Quieter than the docs wiki and much quieter than the magazine: these are
+   documents to be read once and referred back to, so the treatment is a plain
+   measure of text on paper with the site's palette and nothing else. */
+
+.legal-root {
+  --lg-paper: #F4F1E8;
+  --lg-card: #FAF8F1;
+  --lg-ink: #20201b;
+  --lg-ink-70: rgba(32, 32, 27, 0.7);
+  --lg-ink-45: rgba(32, 32, 27, 0.45);
+  --lg-line: rgba(53, 70, 32, 0.16);
+  --lg-moss: #5e7633;
+  --lg-moss-deep: #354620;
+  --lg-serif: var(--font-serif), 'Instrument Serif', Georgia, serif;
+  --lg-sans: var(--font-sans), Inter, system-ui, sans-serif;
+
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  background: var(--lg-paper);
+  color: var(--lg-ink);
+  font-family: var(--lg-sans);
+  font-size: 15.5px;
+  line-height: 1.68;
+}
+
+.legal-root .lg-top {
+  border-bottom: 1px solid var(--lg-line);
+  padding: 16px clamp(18px, 5vw, 44px);
+  display: flex; align-items: center; gap: 22px; flex-wrap: wrap;
+}
+.legal-root .lg-word {
+  font-family: var(--lg-serif); font-size: 1.35rem;
+  color: var(--lg-ink); text-decoration: none;
+}
+.legal-root .lg-tabs { display: flex; gap: 18px; margin-left: auto; }
+.legal-root .lg-tabs a {
+  font-size: 13px; color: var(--lg-ink-45); text-decoration: none;
+}
+.legal-root .lg-tabs a:hover { color: var(--lg-moss-deep); }
+.legal-root .lg-tabs a.is-on { color: var(--lg-moss-deep); font-weight: 600; }
+
+.legal-root main { flex: 1; width: 100%; max-width: 760px; margin: 0 auto; padding: clamp(34px, 6vh, 62px) clamp(18px, 5vw, 44px) 80px; }
+
+.legal-root .lg-kicker {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.18em;
+  text-transform: uppercase; color: var(--lg-moss);
+}
+.legal-root h1 {
+  margin: 10px 0 0;
+  font-family: var(--lg-serif); font-weight: 400;
+  font-size: clamp(2.1rem, 5vw, 3rem); line-height: 1.06;
+  letter-spacing: -0.015em; text-wrap: balance;
+}
+.legal-root .lg-lead {
+  margin: 16px 0 0; font-size: 17px; line-height: 1.6; color: var(--lg-ink-70);
+}
+.legal-root .lg-dates {
+  margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--lg-line);
+  font-size: 12.5px; color: var(--lg-ink-45);
+}
+.legal-root h2 {
+  margin: 42px 0 12px; padding-top: 20px;
+  border-top: 1px solid var(--lg-line);
+  font-family: var(--lg-serif); font-weight: 400; font-size: 1.5rem;
+  line-height: 1.2; scroll-margin-top: 20px;
+}
+.legal-root h3 { margin: 26px 0 8px; font-size: 15px; font-weight: 650; }
+.legal-root p { margin: 0 0 14px; }
+.legal-root ul { margin: 0 0 14px; padding-left: 22px; }
+.legal-root li { margin-bottom: 7px; }
+.legal-root strong { font-weight: 650; }
+.legal-root a { color: var(--lg-moss-deep); text-underline-offset: 2px; }
+.legal-root code {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 0.86em;
+  background: rgba(53, 70, 32, 0.07); border: 1px solid rgba(53, 70, 32, 0.1);
+  border-radius: 5px; padding: 1px 5px;
+}
+
+/* a value the operator has to fill in before publishing */
+.legal-root .fill {
+  background: rgba(184, 162, 107, 0.22);
+  border-bottom: 1px dashed rgba(120, 100, 50, 0.55);
+  padding: 0 3px; font-style: normal;
+}
+
+.legal-root .lg-note {
+  margin: 20px 0; padding: 15px 18px;
+  background: var(--lg-card); border: 1px solid var(--lg-line);
+  border-left: 3px solid var(--lg-moss); border-radius: 0 10px 10px 0;
+}
+.legal-root .lg-note p { margin: 0; }
+.legal-root .lg-note p + p { margin-top: 9px; }
+.legal-root .lg-note .t {
+  display: block; margin-bottom: 5px;
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--lg-moss);
+}
+
+.legal-root .lg-tablewrap { overflow-x: auto; margin: 0 0 16px; }
+.legal-root table { width: 100%; border-collapse: collapse; font-size: 13.5px; line-height: 1.5; }
+.legal-root th {
+  text-align: left; padding: 8px 14px 8px 0; white-space: nowrap;
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.11em;
+  text-transform: uppercase; color: var(--lg-ink-45);
+  border-bottom: 1px solid var(--lg-line);
+}
+.legal-root td { padding: 10px 14px 10px 0; border-bottom: 1px solid rgba(53,70,32,0.08); vertical-align: top; }
+
+.legal-root .lg-foot {
+  border-top: 1px solid var(--lg-line);
+  padding: 20px clamp(18px, 5vw, 44px);
+  display: flex; gap: 18px; flex-wrap: wrap;
+  font-size: 12.5px; color: var(--lg-ink-45);
+}
+.legal-root .lg-foot a { color: var(--lg-ink-70); text-decoration: none; }
+.legal-root .lg-foot a:hover { color: var(--lg-moss-deep); }

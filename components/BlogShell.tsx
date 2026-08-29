@@ -124,6 +124,9 @@ export function BlogFooter() {
           <Link href="/blog">Journal</Link>
           <Link href="/docs">Docs</Link>
           <Link href="/chat">Try Socria</Link>
+          <Link href="/privacy">Privacy</Link>
+          <Link href="/terms">Terms</Link>
+          <Link href="/security">Security</Link>
           <Link href="/studio">Studio</Link>
         </div>
       </div>

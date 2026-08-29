@@ -482,6 +482,8 @@ export function LogosStory() {
               <span><a href="/">The journal</a></span>
               <span><a href="/docs">The docs</a></span>
               <span><a href="/one">Socria One</a></span>
+              <span><a href="/privacy">Privacy</a></span>
+              <span><a href="/terms">Terms</a></span>
               <span className="it">Think For Yourself.</span>
               <span>© <span>2026</span></span>
             </div>
