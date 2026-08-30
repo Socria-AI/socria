@@ -72,18 +72,47 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid conversation' }, { status: 400 });
   }
 
-  const { error } = await supabaseAdmin().from('conversations').upsert({
-    id: c.id,
+  // conversations.id is the SOLE primary key, so an upsert conflicts on the id
+  // alone and will happily overwrite a row belonging to somebody else — taking
+  // ownership of it, since user_id is part of what gets written. A signed-in
+  // caller who knew another account's conversation id could replace its title
+  // and its messages.
+  //
+  // So: update only a row this account already owns, and fall back to an
+  // insert when no such row exists. A primary-key collision on that insert
+  // means the id belongs to someone else, which is a 403 rather than an error.
+  const row = {
     user_id: userId,
     title: c.title.slice(0, MAX_TITLE),
     messages: sanitizeMessages(c.messages),
     updated_at: Number(c.updatedAt) || Date.now(),
-  });
+  };
 
-  if (error) {
-    console.error('PUT conversation error:', error);
+  const { error: updateError, count } = await supabaseAdmin()
+    .from('conversations')
+    .update(row, { count: 'exact' })
+    .eq('id', c.id)
+    .eq('user_id', userId);
+
+  if (updateError) {
+    console.error('PUT conversation error:', updateError);
     return NextResponse.json({ error: 'Failed to save' }, { status: 500 });
   }
+
+  if (!count) {
+    const { error: insertError } = await supabaseAdmin()
+      .from('conversations')
+      .insert({ id: c.id, ...row });
+    if (insertError) {
+      // 23505 is unique_violation: the id exists and is not ours.
+      if (insertError.code === '23505') {
+        return NextResponse.json({ error: 'Not found' }, { status: 403 });
+      }
+      console.error('PUT conversation error:', insertError);
+      return NextResponse.json({ error: 'Failed to save' }, { status: 500 });
+    }
+  }
+
   return NextResponse.json({ ok: true });
 }
 
@@ -123,10 +152,37 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, imported: 0 });
   }
 
-  const { error } = await supabaseAdmin().from('conversations').upsert(rows);
+  // Same hazard as PUT: this upsert conflicts on id alone, so a caller could
+  // hand us somebody else's conversation ids and overwrite their rows. This is
+  // the sign-in migration path, where every id SHOULD be new to us — so drop
+  // any id that already exists and does not belong to this account, rather
+  // than letting it through and taking the row.
+  const { data: existing } = await supabaseAdmin()
+    .from('conversations')
+    .select('id, user_id')
+    .in(
+      'id',
+      rows.map((r) => r.id)
+    );
+  const foreign = new Set(
+    (existing ?? [])
+      .filter((r: { user_id: string }) => r.user_id !== userId)
+      .map((r: { id: string }) => r.id)
+  );
+  const mine = rows.filter((r) => !foreign.has(r.id));
+  if (foreign.size) {
+    console.warn(
+      `POST conversations: skipped ${foreign.size} id(s) owned by another account`
+    );
+  }
+  if (mine.length === 0) {
+    return NextResponse.json({ ok: true, imported: 0 });
+  }
+
+  const { error } = await supabaseAdmin().from('conversations').upsert(mine);
   if (error) {
     console.error('POST conversations error:', error);
     return NextResponse.json({ error: 'Failed to import' }, { status: 500 });
   }
-  return NextResponse.json({ ok: true, imported: rows.length });
+  return NextResponse.json({ ok: true, imported: mine.length });
 }
