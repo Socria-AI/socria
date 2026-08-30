@@ -1354,7 +1354,7 @@ function estimateSeries(fn: CompiledExpr, scope: Record<string, number>): number
 
 // --- 7. Vectors and linear combination ------------------------------
 
-const buildVectors: Builder = (scene, _fn, vals) => {
+const buildVectors: Builder = (scene, _fn, vals, _view, guarded) => {
   const vs = scene.vectors ?? [];
   if (!vs.length) return EMPTY_FRAME;
   const tones: Tone[] = ['primary', 'accent', 'muted', 'muted'];
@@ -1389,7 +1389,11 @@ const buildVectors: Builder = (scene, _fn, vals) => {
       {
         id: 'combo',
         tex: 's\\mathbf{u} + t\\mathbf{v}',
-        value: `(${fmt(cx)}, ${fmt(cy)})`,
+        // "Work out 3u − 2v" is a real exercise, and its answer is exactly
+        // this pair of numbers. The arrow itself stays drawn — reading a
+        // vector off the grid is the skill — but the coordinates are the
+        // thing being asked for, so they guard like every other answer.
+        value: guarded ? null : `(${fmt(cx)}, ${fmt(cy)})`,
         help: 'Where you land after walking s of the way along u and then t along v. Sweep both sliders and the set of places you can reach is the span.',
       }
     );
@@ -1525,6 +1529,9 @@ const buildMatrix: Builder = (scene, _fn, vals, view, guarded) => {
 
 // --- 9. Probability distributions -----------------------------------
 
+/** Most bars worth drawing; beyond this they are thinner than a pixel. */
+const MAX_BARS = 400;
+
 function lnFact(n: number): number {
   let acc = 0;
   for (let i = 2; i <= n; i++) acc += Math.log(i);
@@ -1617,22 +1624,35 @@ const buildDistribution: Builder = (scene, _fn, vals, view, guarded) => {
 
   let prob: number | null = null;
   if (spec.discrete) {
+    // Bounded, because the window is the READER's: zooming out to the
+    // renderer's 1e9 span would otherwise run this loop a billion times per
+    // frame and hang the tab. Past a few hundred bars they are sub-pixel
+    // anyway, so nothing visible is lost by stopping.
     const lo = Math.max(0, Math.floor(view.xMin));
-    const hi = Math.ceil(view.xMax);
+    const hi = Math.min(lo + MAX_BARS, Math.ceil(view.xMax));
     const bars: { x0: number; x1: number; y: number }[] = [];
     const hot: { x0: number; x1: number; y: number }[] = [];
-    let acc = 0;
     for (let k = lo; k <= hi; k++) {
       const y = spec.pdf(k);
       if (y < 1e-9) continue;
       const bar = { x0: k - 0.38, x1: k + 0.38, y };
       const inside = hasWindow && k >= scene.a! && k <= scene.b!;
       (inside ? hot : bars).push(bar);
-      if (inside) acc += y;
     }
     objects.push({ o: 'rects', id: 'pmf', bars, tone: 'primary' });
     if (hot.length) objects.push({ o: 'rects', id: 'hot', bars: hot, tone: 'tension' });
-    if (hasWindow) prob = acc;
+
+    // The probability is summed over the INTERVAL, not over whatever is on
+    // screen. Accumulating it inside the drawing loop tied the answer to the
+    // window, so scrolling the plot would have quietly changed it — and
+    // capping that loop, as it now is, would have truncated it outright.
+    if (hasWindow) {
+      const from = Math.max(Math.ceil(scene.a! - 1e-9), spec.domain[0]);
+      const to = Math.min(Math.floor(scene.b! + 1e-9), spec.domain[1]);
+      let acc = 0;
+      for (let k = from; k <= to; k++) acc += spec.pdf(k);
+      prob = Number.isFinite(acc) ? acc : null;
+    }
   } else {
     const pts: Pt[] = [];
     const N = 320;
@@ -1846,7 +1866,27 @@ export function buildFrame(
 ): VizFrame {
   const frame = KINDS[scene.kind](scene, fn, vals, view, guarded);
   const extra = overlayObjects(scene, vals, view);
-  return extra.length ? { ...frame, objects: [...frame.objects, ...extra] } : frame;
+  const objects = extra.length ? [...frame.objects, ...extra] : frame.objects;
+  // Ids become React keys, and a duplicate key silently drops a mark from the
+  // screen. Builders compose their ids from parameter names — an expression
+  // with a coefficient called `fa` collides with the `fa` readout — so rather
+  // than asking every builder to be careful, uniqueness is enforced once,
+  // here, on the one path every frame takes.
+  return { ...frame, objects: uniqueById(objects), readouts: uniqueById(frame.readouts) };
+}
+
+function uniqueById<T extends { id: string }>(items: T[]): T[] {
+  const seen = new Set<string>();
+  return items.map((it) => {
+    if (!seen.has(it.id)) {
+      seen.add(it.id);
+      return it;
+    }
+    let n = 2;
+    while (seen.has(`${it.id}_${n}`)) n++;
+    seen.add(`${it.id}_${n}`);
+    return { ...it, id: `${it.id}_${n}` };
+  });
 }
 
 /**
@@ -2158,7 +2198,16 @@ function sanitizeVectors(raw: any): { x: number; y: number; label?: string }[] |
   const out = raw
     .map((v: any) =>
       v && typeof v.x === 'number' && typeof v.y === 'number' && Number.isFinite(v.x) && Number.isFinite(v.y) && Math.hypot(v.x, v.y) > 1e-9 && Math.abs(v.x) <= 1e3 && Math.abs(v.y) <= 1e3
-        ? { x: v.x, y: v.y, ...(typeof v.label === 'string' && v.label.trim() ? { label: v.label.trim().slice(0, 12) } : {}) }
+        ? {
+            x: v.x,
+            y: v.y,
+            // A label is a NAME — u, v, e1 — and nothing else. Free text here
+            // would be the one channel by which model prose reaches a guarded
+            // frame, and "= 5" fits comfortably in twelve characters.
+            ...(typeof v.label === 'string' && /^[A-Za-z][A-Za-z0-9]{0,5}$/.test(v.label.trim())
+              ? { label: v.label.trim() }
+              : {}),
+          }
         : null
     )
     .filter(Boolean) as { x: number; y: number; label?: string }[];

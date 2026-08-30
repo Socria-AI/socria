@@ -31,7 +31,10 @@ function seed(s: string): () => number {
   };
 }
 
-const CHAIN_REL = new Set(['transforms_to', 'implies', 'precedes']);
+// Kept in step with CHAIN_REL in lib/logos-layout.ts — an equivalence is a
+// step in the work like any other, and leaving it out here disconnected the
+// chain the Board draws.
+const CHAIN_REL = new Set(['transforms_to', 'implies', 'precedes', 'equivalent_to']);
 const SETUP = new Set<LogosNode['type']>(['given', 'unknown', 'constraint']);
 const ASIDE = new Set<LogosNode['type']>(['theorem', 'definition']);
 

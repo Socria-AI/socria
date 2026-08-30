@@ -571,7 +571,7 @@ Return ONLY JSON, exactly this shape:
   "context": "deciding|writing|creating|researching|learning|planning|brainstorming|reflecting|analysing|math",
   "intent": "learning|verification|utility|exploration",  // ONLY for context=math
   "nodes": [{"id": "short_snake_case_id", "type": "<node type>", "label": "a short phrase in their own framing", "status": "open|supported|resolved|revised", "merged": ["label of a node folded into this one"], "tex": "LaTeX for this node, if mathematical", "flag": "error|verified", "note": "a short annotation or repair hint"}],
-  "edges": [{"from": "node_id", "to": "node_id", "relation": "supports|conflicts|depends|relates|leads_to|revises|precedes|part_of|transforms_to|implies|justifies", "strength": "weak|normal|strong", "op": "the operation on a transforms_to edge"}],
+  "edges": [{"from": "node_id", "to": "node_id", "relation": "supports|conflicts|depends|relates|leads_to|revises|precedes|part_of|transforms_to|implies|justifies|equivalent_to", "strength": "weak|normal|strong", "op": "the operation on a transforms_to edge"}],
   "viz": {"kind": "function|limit|derivative|riemann|taylor|sequence|vectors|matrix|distribution|ode", "expr": "the function in plain notation", "varName": "x", "a": 0, "b": 1, "rule": "left|right|midpoint", "matrix": [[1, 1], [0, 1]], "vectors": [{"x": 2, "y": 1, "label": "u"}], "dist": "normal|binomial|poisson|exponential", "partial": true, "ghost": true, "overlays": [{"id": "short_id", "expr": "x^2", "label": "optional", "visible": true, "source": "user"}], "view": {"xMin": -6, "xMax": 6}, "params": [{"id": "a", "min": -3, "max": 3, "step": 0.1, "value": 1}], "title": "a short line naming what is being shown"}
 }
 
@@ -683,7 +683,7 @@ Node types mean:
 Relations mean: supports (A is a reason for B), conflicts (A pulls against B), depends (B requires A, including a prerequisite), relates (loose association), leads_to (A produces B), revises (A is a later version of B), precedes (A comes before B in time or sequence), part_of (A sits inside B — a section within a piece, a scene within an act), transforms_to (expression A becomes expression B via an operation — the solution chain), implies (A logically implies B — proofs), justifies (a theorem/definition/property justifies a step).
 - Labels are short phrases (2–8 words) in THEIR language, not yours. Never full sentences.
 - Prefer typing precisely: a stated priority is a value, not an idea; "I've decided X" is a decision; a cost of a choice is a consequence.
-- Maximum 16 nodes. When it would grow past that, merge or drop the least load-bearing node instead. A small sharp map beats a big one.
+- Maximum 16 nodes — 26 for mathematics, where a solution chain or a proof is legitimately longer. When it would grow past that, merge or drop the least load-bearing node instead. A small sharp map beats a big one.
 - Only include what the conversation actually supports. Never invent reasoning they haven't expressed.
 - Connect nodes wherever a real relationship exists — an unconnected node is usually a sign the map is wrong.
 - A user message beginning with [on "…"] was said while they were looking closely at that specific node. Attach what it adds to that node — sharpen, extend or revise it — rather than creating a parallel node beside it.

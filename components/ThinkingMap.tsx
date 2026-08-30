@@ -658,8 +658,16 @@ export function ThinkingMap({
           // math lens): mask a concluding node — a stated result, or a
           // verification that restates it — so the map can't reveal an answer
           // Chat is withholding. The working nodes stay visible.
+          // A counterexample joins the concluding types: "find a case where
+          // this fails" is an exercise, and the case IS its answer. Lemma and
+          // conjecture deliberately do NOT — a conjecture is unproven by
+          // definition, and masking lemmas would blind the proof-tracing this
+          // ontology exists for.
           const hideVal =
-            !!guarded && (p.node.type === 'result' || p.node.type === 'verification');
+            !!guarded &&
+            (p.node.type === 'result' ||
+              p.node.type === 'verification' ||
+              p.node.type === 'counterexample');
           return (
             <div
               key={p.id}

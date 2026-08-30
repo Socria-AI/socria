@@ -177,11 +177,17 @@ const HIERARCHY: Partial<Record<LogosRelation, 'to-above' | 'from-above'>> = {
   leads_to: 'from-above',
   // a section hangs beneath the piece it belongs to
   part_of: 'to-above',
-  // proofs: what a statement implies or justifies sits above it, so a theorem
-  // rises to the top and its dependencies trace downward — the shape a
-  // dependency question ("what does this rest on?") is answered by reading.
-  implies: 'from-above',
-  justifies: 'from-above',
+  // Proofs: the CONCLUSION rises. "A implies B" puts B above A, and "A
+  // justifies B" puts the justified step above its justification — so a
+  // theorem sits on top of what it rests on, and "what does this depend on?"
+  // is answered by reading downward.
+  //
+  // These were 'from-above', which is the same direction as leads_to and put
+  // the axioms on top and the theorem at the bottom — the proof tree upside
+  // down. 'to-above' is the direction `supports` already uses, and for the
+  // same reason: evidence sits under the claim it holds up.
+  implies: 'to-above',
+  justifies: 'to-above',
 };
 
 export function layoutStructure(map: ThinkingMap, w: number, h: number): Layout {

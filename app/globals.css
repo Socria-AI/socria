@@ -5520,6 +5520,18 @@ html.js-anim .scrolly-root .fade.d3 { transition-delay: .3s; }
 .logos-root .lg-node-verification .lg-node-type { color: #4F6B3C; }
 .logos-root .lg-node-result     { background: #EDF3E8; border-color: #9FBE86; border-width: 1.5px; }
 .logos-root .lg-node-result .lg-node-type { color: var(--lg-primary); }
+/* Proof cards. An axiom is ground you stand on, so it reads solid; a lemma is
+   a definition that has been earned, so it borrows its shape; a conjecture is
+   dashed because it is not established yet; a counterexample is the one card
+   that exists to knock something down. */
+.logos-root .lg-node-axiom      { background: #F1F2EC; border-color: #C9CDBB; border-left: 2px solid var(--lg-primary); border-radius: 3px 9px 9px 3px; }
+.logos-root .lg-node-axiom .lg-node-type { color: var(--lg-primary); }
+.logos-root .lg-node-lemma      { background: #F4F1F6; border-color: #D8D0E0; border-left: 2px solid #6B5F7A; border-radius: 3px 9px 9px 3px; }
+.logos-root .lg-node-lemma .lg-node-type { color: #6B5F7A; }
+.logos-root .lg-node-conjecture { background: #FAF8F2; border-color: #C7BE9E; border-style: dashed; }
+.logos-root .lg-node-conjecture .lg-node-type { color: var(--lg-secondary); }
+.logos-root .lg-node-counterexample { background: #F9EFEA; border-color: #D9A98F; border-width: 1.5px; }
+.logos-root .lg-node-counterexample .lg-node-type { color: var(--lg-tension); }
 .logos-root .lg-node-result .lg-node-label { font-weight: 500; }
 .logos-root .lg-node-error      { background: #FBEEE9; border-color: #EBC8B8; }
 .logos-root .lg-node-error .lg-node-type { color: var(--lg-tension); }

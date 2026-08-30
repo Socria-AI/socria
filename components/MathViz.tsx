@@ -373,7 +373,13 @@ export function MathViz({
   const W = Math.max(300, width - 32 - (asideNarr ? NARR_W + 12 : 0));
   const H = Math.max(
     200,
-    height - 96 - (active.params.length ? 30 : 0) - (swept ? 26 : 0) - (draft ? 118 : 0)
+    height -
+      96 -
+      (active.params.length ? 30 : 0) -
+      (swept ? 26 : 0) -
+      // The editor is shorter without its equation row, which the kinds that
+      // carry their objects directly never show.
+      (draft ? (kindNeedsExpr(active.kind) ? 118 : 76) : 0)
   );
   const plotW = W - PAD.l - PAD.r;
   const plotH = H - PAD.t - PAD.b;
