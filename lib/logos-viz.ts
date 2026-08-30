@@ -50,6 +50,8 @@ export interface VizParam {
   toward?: string;
   /** LaTeX to show instead of the id, where the two differ (id 'd' → δ) */
   symbol?: string;
+  /** plain language: what moving this slider does. Shown on click. */
+  help?: string;
 }
 
 /** Where a sweeping parameter sits at progress p ∈ [0,1]. */
@@ -126,6 +128,12 @@ export interface VizReadout {
   id: string;
   /** LaTeX for the quantity itself, e.g. \frac{f(a+h)-f(a)}{h} */
   tex: string;
+  /**
+   * Plain language: what this quantity IS, for someone who does not yet read
+   * the notation. Shown on click. It must describe the quantity and never
+   * disclose its value, so it is safe to show while the guard is up.
+   */
+  help?: string;
   /**
    * The value, already formatted. `null` means the Answer Guard is holding it
    * back — the renderer draws a placeholder and the number never enters the
@@ -520,13 +528,19 @@ const buildFunction: Builder = (scene, fn, vals, view) => {
     id: p.id,
     tex: p.id,
     value: fmtParam(p, vals[p.id]),
+    help: p.help ?? `The current value of ${p.id}. Drag its slider and watch which part of the shape answers.`,
   }));
   // A marked point is only worth drawing when there is a reason to look there.
   if (typeof scene.a === 'number') {
     const y = at(fn, scene.varName, vals, scene.a);
     if (Number.isFinite(y)) {
       objects.push({ o: 'point', id: 'a', x: scene.a, y, tone: 'accent' });
-      readouts.push({ id: 'fa', tex: `f(${fmt(scene.a)})`, value: fmt(y) });
+      readouts.push({
+        id: 'fa',
+        tex: `f(${fmt(scene.a)})`,
+        value: fmt(y),
+        help: `The height of the curve at ${scene.varName} = ${fmt(scene.a)} — where the marked point sits.`,
+      });
     }
   }
   return {
@@ -539,6 +553,87 @@ const buildFunction: Builder = (scene, fn, vals, view) => {
 };
 
 // --- 2. a limit: approach from both sides ---------------------------
+
+/**
+ * A one-sided limit, honestly typed. "The function got big" and "the function
+ * never settled" are different answers, and a picture that renders both as
+ * "does not exist" teaches less than one that names them.
+ */
+type SideLimit =
+  | { kind: 'value'; v: number }
+  | { kind: 'infinite'; sign: 1 | -1 }
+  | { kind: 'none' };
+
+function sideText(s: SideLimit): string {
+  if (s.kind === 'value') return fmt(s.v, 5);
+  if (s.kind === 'infinite') return s.sign > 0 ? '+∞' : '−∞';
+  return 'does not exist';
+}
+
+/**
+ * What f approaches as x → a from one side.
+ *
+ * This is NOT the same quantity as f(a ± δ) for the δ currently on the
+ * slider, and conflating the two was a real bug here: at δ = 2 the reading
+ * f(3 − δ) = 7 for 2x + 5, while the left-hand limit is 11. One is a
+ * measurement off the graph; the other is where the measurements are going.
+ *
+ * Probes at shrinking offsets, then Richardson-extrapolates: for error linear
+ * in h — the common case, and exact for a linear function — L = (10·y(h/10) −
+ * y(h))/9 lands ON the limit rather than near it, so 2x + 5 at 3 reports 11
+ * and not 10.999994. The extrapolation is discarded if it disagrees wildly
+ * with the last probe, which is what float noise looks like.
+ */
+function oneSidedLimit(
+  fn: CompiledExpr,
+  varName: string,
+  vals: Record<string, number>,
+  a: number,
+  side: -1 | 1
+): SideLimit {
+  const scale = Math.max(1, Math.abs(a));
+  const hs = [1e-2, 1e-3, 1e-4, 1e-5, 1e-6].map((h) => h * scale);
+  const ys = hs.map((h) => at(fn, varName, vals, a + side * h));
+
+  // Undefined anywhere along the approach: nothing to say about this side.
+  if (ys.some((y) => Number.isNaN(y))) return { kind: 'none' };
+
+  const last = ys[ys.length - 1];
+  const prev = ys[ys.length - 2];
+
+  // Growing without bound in a consistent direction is a real answer, and a
+  // more useful one than "does not exist".
+  const sameSign = ys.every((y) => y === 0 || Math.sign(y) === Math.sign(last || prev));
+  const blowingUp =
+    sameSign && Math.abs(last) > 1e5 * scale && Math.abs(last) > Math.abs(prev) * 2;
+  if (blowingUp || !Number.isFinite(last)) {
+    const witness = Number.isFinite(last) ? last : prev;
+    if (!Number.isFinite(witness)) return { kind: 'none' };
+    if (!blowingUp && Number.isFinite(last)) return { kind: 'none' };
+    return { kind: 'infinite', sign: witness > 0 ? 1 : -1 };
+  }
+  if (!ys.every(Number.isFinite)) return { kind: 'none' };
+
+  // Settling: the last probes must agree AND the gaps must be closing.
+  // sin(1/x) passes neither test.
+  const mag = Math.max(1, Math.abs(last));
+  if (Math.abs(last - prev) > 1e-3 * mag) return { kind: 'none' };
+  if (Math.abs(ys[2] - ys[3]) < Math.abs(ys[3] - last) * 0.9) return { kind: 'none' };
+
+  const extrap = (10 * last - prev) / 9;
+  const v = Number.isFinite(extrap) && Math.abs(extrap - last) < 0.1 * mag ? extrap : last;
+  return { kind: 'value', v: Math.abs(v) < 1e-9 * mag ? 0 : Math.round(v * 1e9) / 1e9 };
+}
+
+/** The two-sided limit follows from the two sides, and only from them. */
+function twoSidedLimit(l: SideLimit, r: SideLimit): SideLimit {
+  if (l.kind === 'value' && r.kind === 'value') {
+    const tol = 1e-6 * Math.max(1, Math.abs(l.v), Math.abs(r.v));
+    return Math.abs(l.v - r.v) <= tol ? { kind: 'value', v: (l.v + r.v) / 2 } : { kind: 'none' };
+  }
+  if (l.kind === 'infinite' && r.kind === 'infinite' && l.sign === r.sign) return l;
+  return { kind: 'none' };
+}
 
 const buildLimit: Builder = (scene, fn, vals, view, guarded) => {
   if (!fn) return EMPTY_FRAME;
@@ -555,8 +650,8 @@ const buildLimit: Builder = (scene, fn, vals, view, guarded) => {
     { o: 'vrule', id: 'a', at: a, tone: 'muted', dashed: true, label: `${varName} = ${fmt(a)}` },
   ];
 
-  // The two approaching points, and the drop lines that make "the value at
-  // this x" a thing you can see rather than infer.
+  // The two sample points, and the drop lines that make "the value at this x"
+  // a thing you can see rather than infer.
   for (const [id, x, y] of [
     ['L', left, yl],
     ['R', right, yr],
@@ -569,84 +664,94 @@ const buildLimit: Builder = (scene, fn, vals, view, guarded) => {
 
   const fa = at(fn, varName, vals, a);
   const defined = Number.isFinite(fa);
-  // The distinction the whole picture exists to make: a hole is where the
-  // limit and the value disagree. Drawn as a hollow point either way, because
-  // whether f(a) exists is not the answer to "what is the limit".
   if (defined) {
     objects.push({ o: 'point', id: 'fa', x: a, y: fa, tone: 'muted', hollow: true });
   }
 
+  const Ln = oneSidedLimit(fn, varName, vals, a, -1);
+  const Rn = oneSidedLimit(fn, varName, vals, a, 1);
+  const Two = twoSidedLimit(Ln, Rn);
+
+  // FOUR distinct quantities, and the entire point of this lens is that they
+  // are not interchangeable: where you are sampling, what you read there,
+  // where each side is heading, and whether those two agree.
   const readouts: VizReadout[] = [
-    { id: 'd', tex: '\\delta', value: fmt(d, 4) },
-    { id: 'fl', tex: `f(${fmt(a)}^{-})`, value: Number.isFinite(yl) ? fmt(yl) : 'undefined' },
-    { id: 'fr', tex: `f(${fmt(a)}^{+})`, value: Number.isFinite(yr) ? fmt(yr) : 'undefined' },
+    {
+      id: 'd',
+      tex: '\\delta',
+      value: fmt(d, 4),
+      help: 'How far out from the point you are sampling. Drag it toward 0 to bring both readings in closer.',
+    },
+    {
+      id: 'fl',
+      tex: `f(${fmt(a)} - \\delta)`,
+      value: Number.isFinite(yl) ? fmt(yl, 5) : 'undefined',
+      help: `The height of the curve at ${varName} = ${fmt(a)} − δ, to the left. This is a reading off the graph at the δ you have right now — not the limit. Watch it move as δ shrinks.`,
+    },
+    {
+      id: 'fr',
+      tex: `f(${fmt(a)} + \\delta)`,
+      value: Number.isFinite(yr) ? fmt(yr, 5) : 'undefined',
+      help: 'The same reading from the right-hand side. As δ shrinks these two close in on each other — or they do not, which tells you just as much.',
+    },
   ];
 
-  // The limit itself is the answer. Estimated, not asserted: a numeric probe
-  // agrees with a limit only when one exists, so we only ever draw it when the
-  // two sides have already visibly met.
-  const L = estimateLimit(fn, varName, vals, a);
-  if (!guarded) {
-    readouts.push({
+  // The limits are the answer, so the guard holds all three.
+  readouts.push(
+    {
+      id: 'limL',
+      tex: `\\lim_{${varName} \\to ${fmt(a)}^{-}} f(${varName})`,
+      value: guarded ? null : sideText(Ln),
+      help: 'The single height the curve is heading for as you come in from the left. Not the reading at any particular δ — the value all those readings are closing in on.',
+    },
+    {
+      id: 'limR',
+      tex: `\\lim_{${varName} \\to ${fmt(a)}^{+}} f(${varName})`,
+      value: guarded ? null : sideText(Rn),
+      help: 'The same thing, coming in from the right.',
+    },
+    {
       id: 'L',
       tex: `\\lim_{${varName} \\to ${fmt(a)}} f(${varName})`,
-      value: L === null ? 'does not exist' : fmt(L),
-    });
-    if (L !== null) {
-      objects.push({ o: 'hrule', id: 'Lrule', at: L, tone: 'accent', dashed: true, label: `L = ${fmt(L)}` });
+      value: guarded ? null : sideText(Two),
+      help: 'The two-sided limit. It exists only when both sides head for the same place, so it is really the two lines above agreeing with each other.',
     }
-  } else {
-    readouts.push({ id: 'L', tex: `\\lim_{${varName} \\to ${fmt(a)}} f(${varName})`, value: null });
+  );
+
+  if (!guarded) {
+    if (Two.kind === 'value') {
+      objects.push({ o: 'hrule', id: 'Lrule', at: Two.v, tone: 'accent', dashed: true, label: `L = ${fmt(Two.v)}` });
+      // An open circle at (a, L) is the textbook picture of a removable
+      // discontinuity: the limit is there even though the function is not.
+      if (!defined) objects.push({ o: 'point', id: 'hole', x: a, y: Two.v, tone: 'accent', hollow: true });
+    } else if (Ln.kind === 'value' && Rn.kind === 'value') {
+      // A jump: two open circles, which is what makes it read as a jump
+      // rather than as a broken drawing.
+      objects.push({ o: 'point', id: 'jl', x: a, y: Ln.v, tone: 'accent', hollow: true });
+      objects.push({ o: 'point', id: 'jr', x: a, y: Rn.v, tone: 'tension', hollow: true });
+    }
   }
 
-  const hole = defined && L !== null && Math.abs(fa - L) > 1e-6;
+  const sidesDiffer = Ln.kind === 'value' && Rn.kind === 'value' && Two.kind === 'none';
+  const blowsUp = Ln.kind === 'infinite' || Rn.kind === 'infinite';
+  const removable = !defined && Two.kind === 'value';
+  const hole = defined && Two.kind === 'value' && Math.abs(fa - Two.v) > 1e-6;
+
   return {
     objects,
     readouts,
-    caption: hole
-      ? `Both sides agree — and f(${fmt(a)}) is somewhere else entirely.`
-      : defined
-        ? `Squeeze δ toward 0 and watch both sides.`
-        : `f(${fmt(a)}) is undefined. The limit need not be.`,
-    ask: 'Both sides are heading somewhere. What value?',
+    caption: sidesDiffer
+      ? 'The two sides are heading to different places. There is nothing for them to agree on.'
+      : blowsUp
+        ? `The curve runs away near ${varName} = ${fmt(a)}. No finite height to close on.`
+        : hole
+          ? `Both sides agree — and f(${fmt(a)}) is somewhere else entirely.`
+          : removable
+            ? `f(${fmt(a)}) is undefined, and the limit does not care.`
+            : 'Squeeze δ toward 0 and watch both readings.',
+    ask: 'The two readings are moving. What single number are they closing in on?',
   };
 };
-
-/**
- * A numeric estimate of the limit, or null if the sides disagree.
- *
- * Deliberately conservative: it probes closer and closer from both sides and
- * only reports a value when the two agree to a tight tolerance. It is a check
- * on what the picture already shows, never a substitute for it — and its
- * result is only ever shown once the guard is down.
- */
-function estimateLimit(
-  fn: CompiledExpr,
-  varName: string,
-  vals: Record<string, number>,
-  a: number
-): number | null {
-  const probe = (sign: number) => {
-    const out: number[] = [];
-    for (let k = 3; k <= 7; k++) {
-      const y = at(fn, varName, vals, a + sign * Math.pow(10, -k));
-      if (Number.isFinite(y)) out.push(y);
-    }
-    return out;
-  };
-  const l = probe(-1);
-  const r = probe(1);
-  if (l.length < 3 || r.length < 3) return null;
-  const lv = l[l.length - 1];
-  const rv = r[r.length - 1];
-  const scale = Math.max(1, Math.abs(lv), Math.abs(rv));
-  if (Math.abs(lv - rv) > 1e-4 * scale) return null; // sides disagree
-  // and it must be settling, not drifting
-  if (Math.abs(l[0] - lv) > 0.5 * scale && Math.abs(l[1] - lv) > 0.4 * scale) return null;
-  const mean = (lv + rv) / 2;
-  const near = Math.round(mean * 1e6) / 1e6;
-  return Number.isFinite(near) ? near : null;
-}
 
 // --- 3. the derivative: secant → tangent ----------------------------
 
@@ -687,13 +792,19 @@ const buildDerivative: Builder = (scene, fn, vals, view, guarded) => {
   if (Number.isFinite(yq)) objects.push({ o: 'point', id: 'Q', x: xq, y: yq, tone: 'tension', label: 'Q' });
 
   const readouts: VizReadout[] = [
-    { id: 'h', tex: 'h', value: fmt(h, 4) },
+    {
+      id: 'h',
+      tex: 'h',
+      value: fmt(h, 4),
+      help: 'The horizontal gap from P to Q. It is the only thing moving here.',
+    },
     {
       id: 'slope',
       // The secant slope is theirs — it is the arithmetic the picture is
       // teaching them to do, computed from two points they can both see.
       tex: `\\frac{f(${fmt(a)}+h)-f(${fmt(a)})}{h}`,
       value: Number.isFinite(slope) ? fmt(slope) : '—',
+      help: 'Rise over run between the two points: how steep the straight line through P and Q is. This is the average rate of change across the gap, not the rate at P.',
     },
   ];
   const d = derivativeAt(fn, varName, vals, a);
@@ -701,6 +812,7 @@ const buildDerivative: Builder = (scene, fn, vals, view, guarded) => {
     id: 'fprime',
     tex: `f'(${fmt(a)})`,
     value: guarded ? null : d === null ? '—' : fmt(d),
+    help: `The derivative at ${fmt(a)}: how steep the curve is at that exact point, with no gap at all. It is what the rise-over-run above is closing in on.`,
   });
 
   return {
@@ -758,9 +870,19 @@ const buildRiemann: Builder = (scene, fn, vals, view, guarded) => {
   ];
 
   const readouts: VizReadout[] = [
-    { id: 'n', tex: 'n', value: String(n) },
-    { id: 'w', tex: '\\Delta x', value: fmt(w, 4) },
-    { id: 'sum', tex: `S_{n}`, value: Number.isFinite(sum) ? fmt(sum, 4) : '—' },
+    { id: 'n', tex: 'n', value: String(n), help: 'How many rectangles the interval is cut into.' },
+    {
+      id: 'w',
+      tex: '\\Delta x',
+      value: fmt(w, 4),
+      help: 'The width of one rectangle — the interval divided by n.',
+    },
+    {
+      id: 'sum',
+      tex: `S_{n}`,
+      value: Number.isFinite(sum) ? fmt(sum, 4) : '—',
+      help: 'Add up every rectangle: height times width, n times over. An estimate of the area, and one you could do by hand.',
+    },
   ];
 
   // Simpson's rule on a fine grid: the exact value, and therefore the answer.
@@ -769,6 +891,7 @@ const buildRiemann: Builder = (scene, fn, vals, view, guarded) => {
     id: 'exact',
     tex: `\\int_{${fmt(a)}}^{${fmt(b)}} f(${varName})\\,d${varName}`,
     value: guarded ? null : exact === null ? '—' : fmt(exact, 4),
+    help: 'The exact area under the curve between the two ends — what the rectangle total is closing in on as n grows.',
   });
 
   return {
@@ -818,7 +941,9 @@ const buildTaylor: Builder = (scene, fn, vals, view, guarded) => {
   const objects: VizObject[] = [
     { o: 'curve', id: 'f', pts: sampleCurve(fn, varName, vals, view.xMin, view.xMax), tone: 'primary', width: 2 },
   ];
-  const readouts: VizReadout[] = [{ id: 'k', tex: 'k', value: String(k) }];
+  const readouts: VizReadout[] = [
+    { id: 'k', tex: 'k', value: String(k), help: 'The degree: the highest power the polynomial is allowed to use.' },
+  ];
 
   if (coeffs) {
     const P = (x: number) => {
@@ -845,11 +970,13 @@ const buildTaylor: Builder = (scene, fn, vals, view, guarded) => {
       id: 'err',
       tex: `\\max\\,|f - P_{${k}}|`,
       value: Number.isFinite(worst) ? fmt(worst, 4) : '—',
+      help: 'The widest gap between the real function and the polynomial anywhere in this window. Near the centre it is tiny; the gap is what opens up as you move away.',
     });
     readouts.push({
       id: 'ck',
       tex: `c_{${k}}`,
       value: guarded ? null : fmt(coeffs[k], 5),
+      help: 'The number multiplying the newest term. It comes from the k-th derivative at the centre, divided by k factorial.',
     });
   }
 
@@ -889,11 +1016,21 @@ const buildSequence: Builder = (scene, fn, vals, view, guarded) => {
   if (scene.partial) objects.push({ o: 'sequence', id: 'S', pts: sums, tone: 'accent' });
 
   const readouts: VizReadout[] = [
-    { id: 'm', tex: 'm', value: String(m) },
-    { id: 'am', tex: `a_{${m}}`, value: Number.isFinite(last) ? fmt(last, 5) : '—' },
+    { id: 'm', tex: 'm', value: String(m), help: 'How many terms are on screen.' },
+    {
+      id: 'am',
+      tex: `a_{${m}}`,
+      value: Number.isFinite(last) ? fmt(last, 5) : '—',
+      help: 'The last term shown — the height of the rightmost stem.',
+    },
   ];
   if (scene.partial) {
-    readouts.push({ id: 'Sm', tex: `S_{${m}}`, value: Number.isFinite(S) ? fmt(S, 5) : '—' });
+    readouts.push({
+      id: 'Sm',
+      tex: `S_{${m}}`,
+      value: Number.isFinite(S) ? fmt(S, 5) : '—',
+      help: 'Every term so far, added up — the height of the rightmost dot. Terms can shrink to nothing while this total still grows.',
+    });
     // Where the series is heading is the answer; estimated only when the
     // partial sums have already visibly settled, and withheld under guard.
     const est = estimateSeries(fn, scope);
@@ -901,6 +1038,7 @@ const buildSequence: Builder = (scene, fn, vals, view, guarded) => {
       id: 'lim',
       tex: '\\sum_{n=1}^{\\infty} a_n',
       value: guarded ? null : est === null ? 'not settling' : `≈ ${fmt(est, 4)}`,
+      help: 'What the running total heads toward if you never stop adding. "Not settling" means the dots keep moving instead of homing in.',
     });
   } else {
     const est = estimateSequenceLimit(fn, scope);
@@ -911,6 +1049,7 @@ const buildSequence: Builder = (scene, fn, vals, view, guarded) => {
       id: 'lim',
       tex: '\\lim_{n \\to \\infty} a_n',
       value: guarded ? null : est === null ? 'no limit' : `≈ ${fmt(est, 3)}`,
+      help: 'What the terms themselves settle down to far out. "No limit" means they never settle — they may oscillate or run away.',
     });
   }
 
@@ -1007,9 +1146,14 @@ const buildVectors: Builder = (scene, _fn, vals) => {
       { o: 'vector', id: 'combo', x1: 0, y1: 0, x2: cx, y2: cy, tone: 'tension', label: 'su+tv' }
     );
     readouts.push(
-      { id: 's', tex: 's', value: fmt(vals.s) },
-      { id: 't', tex: 't', value: fmt(vals.t) },
-      { id: 'combo', tex: 's\\mathbf{u} + t\\mathbf{v}', value: `(${fmt(cx)}, ${fmt(cy)})` }
+      { id: 's', tex: 's', value: fmt(vals.s), help: 'How many copies of u to lay down.' },
+      { id: 't', tex: 't', value: fmt(vals.t), help: 'How many copies of v to lay down.' },
+      {
+        id: 'combo',
+        tex: 's\\mathbf{u} + t\\mathbf{v}',
+        value: `(${fmt(cx)}, ${fmt(cy)})`,
+        help: 'Where you land after walking s of the way along u and then t along v. Sweep both sliders and the set of places you can reach is the span.',
+      }
     );
   }
 
@@ -1105,12 +1249,18 @@ const buildMatrix: Builder = (scene, _fn, vals, view, guarded) => {
 
   const det = A[0][0] * A[1][1] - A[0][1] * A[1][0];
   const readouts: VizReadout[] = [
-    { id: 't', tex: 't', value: fmt(t, 2) },
-    { id: 'det', tex: '\\det A', value: guarded ? null : fmt(det, 4) },
+    { id: 't', tex: 't', value: fmt(t, 2), help: 'How far through the transformation you are: 0 is before, 1 is after.' },
+    {
+      id: 'det',
+      tex: '\\det A',
+      value: guarded ? null : fmt(det, 4),
+      help: 'The area factor. A unit square becomes a shape this many times bigger; a negative value means the plane was flipped over, and zero means it was squashed flat onto a line.',
+    },
     {
       id: 'eig',
       tex: '\\lambda_{1,2}',
       value: guarded ? null : eig ? `${fmt(eig.values[0], 3)}, ${fmt(eig.values[1], 3)}` : 'complex',
+      help: 'The stretch factors along the special directions that stay on their own line through the transformation. "Complex" means no direction survives — the map rotates everything.',
     },
   ];
 
@@ -1208,6 +1358,7 @@ const buildDistribution: Builder = (scene, _fn, vals, view, guarded) => {
     id: p.id,
     tex: p.symbol || p.id,
     value: p.integer ? String(Math.round(vals[p.id] ?? p.value)) : fmt(vals[p.id] ?? p.value),
+    help: p.help,
   }));
 
   // The interval whose probability is being asked about, if the scene set one.
@@ -1279,16 +1430,27 @@ const buildDistribution: Builder = (scene, _fn, vals, view, guarded) => {
   // Withholding a number the person is holding in their hand is not a
   // guard, it is a tease.
   if (scene.dist !== 'normal' && scene.dist !== 'poisson') {
-    readouts.push({ id: 'mu', tex: '\\mathbb{E}[X]', value: guarded ? null : fmt(spec.mean, 4) });
+    readouts.push({
+      id: 'mu',
+      tex: '\\mathbb{E}[X]',
+      value: guarded ? null : fmt(spec.mean, 4),
+      help: 'The long-run average: repeat the experiment forever and this is what the outcomes average out to. It need not be an outcome you could actually get.',
+    });
   }
   if (scene.dist !== 'normal') {
-    readouts.push({ id: 'sd', tex: '\\sigma_X', value: guarded ? null : fmt(spec.sd, 4) });
+    readouts.push({
+      id: 'sd',
+      tex: '\\sigma_X',
+      value: guarded ? null : fmt(spec.sd, 4),
+      help: 'Typical distance from the average — a measure of how spread out the outcomes are.',
+    });
   }
   if (prob !== null) {
     readouts.push({
       id: 'prob',
       tex: `P(${fmt(scene.a!)} \\le X \\le ${fmt(scene.b!)})`,
       value: guarded ? null : fmt(prob, 4),
+      help: 'The chance the outcome lands between those two numbers. It is the shaded share of the total — and the whole area is 1, so it is a fraction of everything.',
     });
   }
 
@@ -1375,10 +1537,22 @@ const buildOde: Builder = (scene, fn, vals, view, guarded) => {
     { o: 'point', id: 'ic', x: x0, y: y0, tone: 'accent', label: `(${fmt(x0)}, ${fmt(y0)})` },
   ];
 
-  const readouts: VizReadout[] = [{ id: 'y0', tex: 'y_0', value: fmt(y0, 3) }];
+  const readouts: VizReadout[] = [
+    {
+      id: 'y0',
+      tex: 'y_0',
+      value: fmt(y0, 3),
+      help: 'The starting height. The equation only fixes the slope at each point; this picks which of the many curves through that field you actually follow.',
+    },
+  ];
   for (const p of scene.params) {
     if (p.id === 'y0') continue;
-    readouts.push({ id: p.id, tex: p.symbol || p.id, value: fmt(vals[p.id] ?? p.value, 3) });
+    readouts.push({
+      id: p.id,
+      tex: p.symbol || p.id,
+      value: fmt(vals[p.id] ?? p.value, 3),
+      help: p.help ?? `A constant in the equation. Change it and the whole field of slopes changes with it.`,
+    });
   }
 
   return {
@@ -1440,41 +1614,41 @@ const REQUIRED: Record<VizKind, (scene: VizScene) => VizParam[]> = {
   // the opening frame shows a line going nowhere.
   limit: (sc) => {
     const max = span(sc, 4, 2);
-    return [{ id: 'd', symbol: '\\delta', min: max / 1500, max, step: max / 2000, value: max, sweep: 'down', toward: '0' }];
+    return [{ id: 'd', symbol: '\\delta', min: max / 1500, max, step: max / 2000, value: max, sweep: 'down', toward: '0', help: 'How far either side of the point you are looking. Smaller δ means both sample points sit closer in.' }];
   },
   derivative: (sc) => {
     const max = span(sc, 5, 2.5);
-    return [{ id: 'h', min: max / 1200, max, step: max / 2000, value: max, sweep: 'down', toward: '0' }];
+    return [{ id: 'h', min: max / 1200, max, step: max / 2000, value: max, sweep: 'down', toward: '0', help: 'The gap between the two points on the curve. Shrink it and the line through them stops being a shortcut and starts being a tangent.' }];
   },
-  riemann: () => [{ id: 'n', min: 1, max: 80, step: 1, value: 4, integer: true, sweep: 'up', toward: '\\infty' }],
-  taylor: () => [{ id: 'k', min: 0, max: 10, step: 1, value: 1, integer: true, sweep: 'up', toward: '\\infty' }],
+  riemann: () => [{ id: 'n', min: 1, max: 80, step: 1, value: 4, integer: true, sweep: 'up', toward: '\\infty', help: 'How many rectangles the area is chopped into. More rectangles, thinner each, closer to the true area.' }],
+  taylor: () => [{ id: 'k', min: 0, max: 10, step: 1, value: 1, integer: true, sweep: 'up', toward: '\\infty', help: 'The degree of the polynomial: how many terms it is allowed. Each extra term buys accuracy further from the centre.' }],
   sequence: (sc) => [
-    { id: 'm', min: 1, max: 48, step: 1, value: sc.partial ? 4 : 8, integer: true, sweep: 'up', toward: '\\infty' },
+    { id: 'm', min: 1, max: 48, step: 1, value: sc.partial ? 4 : 8, integer: true, sweep: 'up', toward: '\\infty', help: 'How many terms of the sequence to show. Push it out to see what happens in the long run.' },
   ],
   vectors: (sc) =>
     (sc.vectors?.length ?? 0) === 2
       ? [
-          { id: 's', min: -2, max: 2, step: 0.05, value: 1 },
-          { id: 't', min: -2, max: 2, step: 0.05, value: 1 },
+          { id: 's', min: -2, max: 2, step: 0.05, value: 1, help: 'How much of the first vector to take. Negative flips it around.' },
+          { id: 't', min: -2, max: 2, step: 0.05, value: 1, help: 'How much of the second vector to take. Every point you can reach with s and t together is the span.' },
         ]
       : [],
-  matrix: () => [{ id: 't', min: 0, max: 1, step: 0.01, value: 0, sweep: 'up', toward: '1' }],
+  matrix: () => [{ id: 't', min: 0, max: 1, step: 0.01, value: 0, sweep: 'up', toward: '1', help: 'How far through the transformation you are. 0 is the untouched plane, 1 is the plane after A has acted on it.' }],
   distribution: (sc) => {
     switch (sc.dist) {
       case 'normal':
         return [
-          { id: 'u', symbol: '\\mu', min: -6, max: 6, step: 0.1, value: 0 },
-          { id: 's', symbol: '\\sigma', min: 0.3, max: 3, step: 0.05, value: 1 },
+          { id: 'u', symbol: '\\mu', min: -6, max: 6, step: 0.1, value: 0, help: 'The centre of the bell. Sliding it moves the whole shape left or right without changing it.' },
+          { id: 's', symbol: '\\sigma', min: 0.3, max: 3, step: 0.05, value: 1, help: 'How spread out the bell is. Bigger σ makes it wider and flatter — the total area stays 1 either way.' },
         ];
       case 'binomial':
         return [
-          { id: 'n', min: 1, max: 60, step: 1, value: 12, integer: true },
-          { id: 'p', min: 0.05, max: 0.95, step: 0.01, value: 0.5 },
+          { id: 'n', min: 1, max: 60, step: 1, value: 12, integer: true, help: 'How many independent tries there are.' },
+          { id: 'p', min: 0.05, max: 0.95, step: 0.01, value: 0.5, help: 'The chance of success on any single try.' },
         ];
       case 'exponential':
-        return [{ id: 'l', symbol: '\\lambda', min: 0.2, max: 4, step: 0.05, value: 1 }];
+        return [{ id: 'l', symbol: '\\lambda', min: 0.2, max: 4, step: 0.05, value: 1, help: 'The rate things happen at. Higher rate means shorter waits, so the curve piles up near zero.' }];
       default: // poisson
-        return [{ id: 'l', symbol: '\\lambda', min: 0.5, max: 20, step: 0.5, value: 4 }];
+        return [{ id: 'l', symbol: '\\lambda', min: 0.5, max: 20, step: 0.5, value: 4, help: 'The average count per interval. It is both the centre of the distribution and its name.' }];
     }
   },
   // y₀'s range tracks the window so the slider always reaches something the
@@ -1483,7 +1657,7 @@ const REQUIRED: Record<VizKind, (scene: VizScene) => VizParam[]> = {
     const lo = typeof sc.view.yMin === 'number' ? sc.view.yMin : -4;
     const hi = typeof sc.view.yMax === 'number' ? sc.view.yMax : 4;
     return [
-      { id: 'y0', symbol: 'y_0', min: lo, max: hi, step: (hi - lo) / 100, value: Math.min(hi, Math.max(lo, 1)) },
+      { id: 'y0', symbol: 'y_0', min: lo, max: hi, step: (hi - lo) / 100, value: Math.min(hi, Math.max(lo, 1)), help: 'Where the solution starts. The equation fixes the slope everywhere; this picks which single curve you are riding.' },
     ];
   },
 };
