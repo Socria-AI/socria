@@ -235,10 +235,18 @@ export function resolveView(scene: VizScene, fn: CompiledExpr): Viewport {
       ? scene.a
       : null;
   const halfSpan = (xMax - xMin) / 4;
-  const [sMin, sMax] =
+  let [sMin, sMax] =
     focus === null
       ? [xMin, xMax]
       : [Math.max(xMin, focus - halfSpan), Math.min(xMax, focus + halfSpan)];
+
+  // A secant needs both of its ends. Q starts at a + h, which for a steep
+  // function can sit well above a window drawn from the neighbourhood alone —
+  // and an opening frame with one end of the construction missing does not
+  // read as a construction at all.
+  if (scene.kind === 'derivative' && focus !== null) {
+    sMax = Math.max(sMax, Math.min(xMax, focus + span(scene, 5, 2.5)));
+  }
 
   const ys = sampleCurve(fn, scene.varName, scope, sMin, sMax, 200)
     .map((p) => p.y)
@@ -273,8 +281,34 @@ export function resolveView(scene: VizScene, fn: CompiledExpr): Viewport {
     }
   }
 
+  // Last word: the construction's own points must be inside the frame. The
+  // percentile clip and the recentring above are both heuristics over samples,
+  // and either can leave Q just outside the top — so this expands (never
+  // shrinks) to take in the points the picture is actually about.
+  if (focus !== null) {
+    const must: number[] = [fnAt(fn, scene.varName, scope, focus)];
+    if (scene.kind === 'derivative') {
+      must.push(fnAt(fn, scene.varName, scope, focus + span(scene, 5, 2.5)));
+    }
+    for (const y of must) {
+      if (!Number.isFinite(y)) continue;
+      const margin = (yMax - yMin) * 0.06;
+      if (y > yMax - margin) yMax = y + margin;
+      if (y < yMin + margin) yMin = y - margin;
+    }
+  }
+
   if (!Number.isFinite(yMin) || !Number.isFinite(yMax)) return { xMin, xMax, yMin: -5, yMax: 5 };
   return { xMin, xMax, yMin, yMax };
+}
+
+function fnAt(
+  fn: CompiledExpr,
+  varName: string,
+  scope: Record<string, number>,
+  x: number
+): number {
+  return fn.eval({ ...scope, [varName]: x });
 }
 
 export function defaults(scene: VizScene): Record<string, number> {
@@ -642,6 +676,69 @@ const REQUIRED: Record<VizKind, (scene: VizScene) => VizParam[]> = {
   },
   riemann: () => [{ id: 'n', min: 1, max: 80, step: 1, value: 4, integer: true, sweep: 'up', toward: '\\infty' }],
 };
+
+/**
+ * The parameter each kind owns and drives with the clock. Reserved: a
+ * coefficient slider must never be auto-created for one of these names, or it
+ * would take the animation's parameter away from it.
+ */
+/** The free letters in an expression — re-exported so the editor can reason
+ *  about what a person has typed without importing the evaluator directly. */
+export function freeNamesOf(expr: string): string[] {
+  return freeNames(expr);
+}
+
+export const RESERVED_PARAM: Record<VizKind, string | null> = {
+  function: null,
+  limit: 'd',
+  derivative: 'h',
+  riemann: 'n',
+};
+
+export const KIND_LABEL: Record<VizKind, string> = {
+  function: 'Function',
+  limit: 'Limit',
+  derivative: 'Derivative',
+  riemann: 'Integral',
+};
+
+/**
+ * The sliders an expression implies.
+ *
+ * Every letter that is not the variable, and not the kind's own animated
+ * parameter, becomes something you can move — type "a*x^2 + b" and you get an
+ * a and a b, which is the behaviour anyone who has used a graphing calculator
+ * expects. An existing slider for the same letter is kept as it is, so
+ * retyping the expression does not throw away a range you had set.
+ */
+export function autoParams(
+  expr: string,
+  varName: string,
+  kind: VizKind,
+  existing: VizParam[] = []
+): VizParam[] {
+  const reserved = RESERVED_PARAM[kind];
+  const by = new Map(existing.map((p) => [p.id, p]));
+  const out: VizParam[] = [];
+  for (const name of freeNames(expr)) {
+    if (name === varName || name === reserved) continue;
+    if (name.length > 2) continue; // not a coefficient; the sanitizer rejects it anyway
+    const had = by.get(name);
+    out.push(had ?? { id: name, min: -5, max: 5, step: 0.1, value: 1 });
+    if (out.length >= MAX_PARAMS) break;
+  }
+  return out;
+}
+
+/**
+ * A content signature. Scene objects arrive fresh from JSON on every
+ * extraction, so identity says nothing about whether the picture changed —
+ * and resetting a running animation because an unrelated message arrived would
+ * be maddening.
+ */
+export function sceneSignature(scene: VizScene | null | undefined): string {
+  return scene ? JSON.stringify(scene) : '';
+}
 
 /** A fraction of the x-window, capped, and never absurdly small. */
 function span(scene: VizScene, divisor: number, cap: number): number {

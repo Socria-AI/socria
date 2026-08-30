@@ -27,6 +27,7 @@ import { StatusMark } from './StatusMark';
 import { TeX, MathText } from './TeX';
 import { MathPlot } from './MathPlot';
 import { MathViz } from './MathViz';
+import type { VizScene } from '@/lib/logos-viz';
 import { MathBoard } from './MathBoard';
 
 /** The zoom ladder. Discrete steps, so every zoom lands somewhere legible. */
@@ -99,6 +100,7 @@ export function ThinkingMap({
   lensesLocked,
   onLocked,
   researchLocked,
+  onViz,
 }: {
   map: TMap;
   initialLens?: LensId;
@@ -124,6 +126,8 @@ export function ThinkingMap({
   onLocked?: () => void;
   /** free tier: Research has been spent in this conversation */
   researchLocked?: boolean;
+  /** the reader edited the interactive graph — keep it with the session */
+  onViz?: (scene: VizScene) => void;
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const posRef = useRef<Map<string, P>>(new Map());
@@ -565,7 +569,13 @@ export function ThinkingMap({
             without one it stays the static drawing it has always been. */}
         {lens === 'plot' &&
           (map.viz ? (
-            <MathViz scene={map.viz} width={size.w} height={size.h} guarded={guarded} />
+            <MathViz
+              scene={map.viz}
+              width={size.w}
+              height={size.h}
+              guarded={guarded}
+              onSceneChange={onViz}
+            />
           ) : (
             <MathPlot map={map} width={size.w} height={size.h} guarded={guarded} />
           ))}

@@ -841,7 +841,16 @@ export function LogosApp({
                 );
                 if (Object.keys(kept).length !== Object.keys(contexts).length) contexts = kept;
               }
-              return { ...s, map: json.map, contexts };
+              // A turn that produced no scene is not a request to remove the
+              // one already on screen — the extractor simply had nothing new
+              // to say about the picture. Carry it across, so a graph someone
+              // is in the middle of adjusting survives the next message. A
+              // scene the model DOES send replaces it, and if the thinking
+              // stops being mathematical the sanitizer drops it anyway.
+              const map = json.map.viz
+                ? json.map
+                : { ...json.map, ...(s.map?.viz ? { viz: s.map.viz } : {}) };
+              return { ...s, map, contexts };
             });
             setChanged(new Set(delta.changed));
             setDeltaNote(summarizeDelta(delta));
@@ -1826,6 +1835,9 @@ export function LogosApp({
             grounded={groundedCounts}
             onAddContext={openAddContext}
             guarded={guarded}
+            onViz={(viz) =>
+              patchActive((s) => ({ ...s, map: { ...(s.map ?? EMPTY_MAP), viz } }))
+            }
           />
           <ExplorePanel
             open={explore.open}

@@ -5574,7 +5574,47 @@ html.js-anim .scrolly-root .fade.d3 { transition-delay: .3s; }
   letter-spacing: 0.01em;
   color: var(--lg-ink);
 }
-.logos-root .lg-viz-svg { flex: 1; min-height: 0; width: 100%; }
+/* The stage is the positioning context for the zoom cluster; the svg fills it
+   and takes the pointer, because the whole plot is draggable. */
+.logos-root .lg-viz-stage { position: relative; flex: 1; min-height: 0; display: flex; }
+.logos-root .lg-viz-svg {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  cursor: grab;
+  touch-action: none;
+}
+.logos-root .lg-viz-svg:active { cursor: grabbing; }
+.logos-root .lg-viz-zoom {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 2px;
+  border: 1px solid var(--lg-line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.86);
+  opacity: 0;
+  transition: opacity 0.16s ease;
+}
+.logos-root .lg-viz-stage:hover .lg-viz-zoom,
+.logos-root .lg-viz-zoom:focus-within { opacity: 1; }
+.logos-root .lg-viz-zoom button {
+  width: 22px;
+  height: 20px;
+  border: 0;
+  background: transparent;
+  color: var(--lg-ink-60);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.logos-root .lg-viz-zoom button:hover:not(:disabled) { background: rgba(53, 70, 32, 0.09); color: var(--lg-ink); }
+.logos-root .lg-viz-zoom button:disabled { opacity: 0.28; cursor: default; }
 .logos-root .lg-viz-grid { stroke: rgba(53, 70, 32, 0.07); stroke-width: 1; }
 .logos-root .lg-viz-axis { stroke: rgba(35, 36, 31, 0.32); stroke-width: 1.2; }
 .logos-root .lg-viz-tick { fill: var(--lg-ink-40); font-size: 10px; }
@@ -5726,6 +5766,111 @@ html.js-anim .scrolly-root .fade.d3 { transition-delay: .3s; }
 .logos-root .lg-viz-slider input[type='range']:focus-visible {
   box-shadow: 0 0 0 3px rgba(53, 70, 32, 0.16);
 }
+
+/* the editor: an equation line, the concept, and whatever that concept needs */
+.logos-root .lg-viz-editbtn {
+  border: 1px solid var(--lg-line);
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--lg-ink-60);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1;
+  padding: 7px 11px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.14s ease, color 0.14s ease;
+}
+.logos-root .lg-viz-editbtn:hover { color: var(--lg-ink); background: rgba(53, 70, 32, 0.06); }
+.logos-root .lg-viz-editbtn.is-on { color: var(--lg-primary); border-color: rgba(53, 70, 32, 0.3); }
+
+.logos-root .lg-viz-editor {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin: 2px 0 0;
+  padding: 10px 12px;
+  border: 1px solid var(--lg-line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.66);
+}
+.logos-root .lg-viz-eqrow { display: flex; align-items: center; gap: 8px; }
+.logos-root .lg-viz-eqlab { flex: 0 0 auto; color: var(--lg-ink-60); }
+.logos-root .lg-viz-eq {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  border-bottom: 1px solid var(--lg-line);
+  background: transparent;
+  font-family: var(--lg-stix);
+  font-size: 16px;
+  color: var(--lg-ink);
+  padding: 3px 2px;
+  outline: none;
+}
+.logos-root .lg-viz-eq:focus { border-bottom-color: var(--lg-primary); }
+.logos-root .lg-viz-editrow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.logos-root .lg-viz-kinds,
+.logos-root .lg-viz-rules {
+  display: inline-flex;
+  gap: 1px;
+  padding: 2px;
+  border: 1px solid var(--lg-line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.8);
+}
+.logos-root .lg-viz-kinds button,
+.logos-root .lg-viz-rules button {
+  border: 0;
+  background: transparent;
+  color: var(--lg-ink-60);
+  font: inherit;
+  font-size: 11.5px;
+  line-height: 1;
+  padding: 5px 9px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.logos-root .lg-viz-kinds button:hover,
+.logos-root .lg-viz-rules button:hover { background: rgba(53, 70, 32, 0.07); color: var(--lg-ink); }
+.logos-root .lg-viz-kinds button.is-on,
+.logos-root .lg-viz-rules button.is-on {
+  background: rgba(53, 70, 32, 0.1);
+  color: var(--lg-primary);
+  font-weight: 500;
+}
+.logos-root .lg-viz-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--lg-ink-60);
+}
+.logos-root .lg-viz-field input {
+  width: 56px;
+  border: 0;
+  border-bottom: 1px solid var(--lg-line);
+  background: transparent;
+  font-family: var(--lg-stix);
+  font-size: 13px;
+  color: var(--lg-ink);
+  padding: 2px;
+  outline: none;
+}
+.logos-root .lg-viz-field input:focus { border-bottom-color: var(--lg-primary); }
+.logos-root .lg-viz-err,
+.logos-root .lg-viz-hint {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.4;
+}
+.logos-root .lg-viz-err { color: var(--lg-tension); }
+.logos-root .lg-viz-hint { color: var(--lg-ink-40); }
 
 .logos-root .lg-viz-caption {
   flex: 0 0 auto;
