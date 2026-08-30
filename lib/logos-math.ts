@@ -294,3 +294,269 @@ export function samplePlot(fn: CompiledFn, xMin = -10, xMax = 10, n = 240): Plot
 export function plottable(node: { tex?: string; label: string }): CompiledFn | null {
   return compileFunction(node.tex || node.label);
 }
+
+// ── Taylor-mode automatic differentiation ───────────────────────────
+//
+// Exact Taylor coefficients of an expression about a point, computed by
+// propagating truncated power series through the same RPN the evaluator runs.
+// This is the honest way to get high-order derivatives: finite differences
+// turn to noise past the third order, but series arithmetic is closed-form —
+// each operation has a classical recurrence, so the only error is float
+// rounding.
+//
+// A series here is number[] of length order+1: s[k] is the coefficient of
+// (x − a)^k. Operations that are not analytic (abs, floor, sign, …) have no
+// Taylor series and return null, which callers treat as "this function is not
+// one this lens can serve".
+
+type Series = number[];
+
+const sNew = (n: number): Series => new Array(n).fill(0);
+const sConst = (v: number, n: number): Series => {
+  const s = sNew(n);
+  s[0] = v;
+  return s;
+};
+
+function sAdd(a: Series, b: Series): Series {
+  return a.map((v, i) => v + b[i]);
+}
+function sSub(a: Series, b: Series): Series {
+  return a.map((v, i) => v - b[i]);
+}
+function sNeg(a: Series): Series {
+  return a.map((v) => -v);
+}
+/** Cauchy product, truncated. */
+function sMul(a: Series, b: Series): Series {
+  const n = a.length;
+  const out = sNew(n);
+  for (let i = 0; i < n; i++) {
+    if (a[i] === 0) continue;
+    for (let j = 0; i + j < n; j++) out[i + j] += a[i] * b[j];
+  }
+  return out;
+}
+/** q = a / b, needs b[0] ≠ 0. */
+function sDiv(a: Series, b: Series): Series | null {
+  if (b[0] === 0) return null;
+  const n = a.length;
+  const q = sNew(n);
+  for (let k = 0; k < n; k++) {
+    let acc = a[k];
+    for (let j = 0; j < k; j++) acc -= q[j] * b[k - j];
+    q[k] = acc / b[0];
+  }
+  return q;
+}
+/** e = exp(a): e' = a'·e gives e_k = (1/k) Σ_{j=1..k} j·a_j·e_{k−j}. */
+function sExp(a: Series): Series {
+  const n = a.length;
+  const e = sNew(n);
+  e[0] = Math.exp(a[0]);
+  for (let k = 1; k < n; k++) {
+    let acc = 0;
+    for (let j = 1; j <= k; j++) acc += j * a[j] * e[k - j];
+    e[k] = acc / k;
+  }
+  return e;
+}
+/** l = ln(a), needs a[0] > 0: a·l' = a' gives the recurrence below. */
+function sLn(a: Series): Series | null {
+  if (!(a[0] > 0)) return null;
+  const n = a.length;
+  const l = sNew(n);
+  l[0] = Math.log(a[0]);
+  for (let k = 1; k < n; k++) {
+    let acc = k * a[k];
+    for (let j = 1; j < k; j++) acc -= j * l[j] * a[k - j];
+    l[k] = acc / (k * a[0]);
+  }
+  return l;
+}
+/** sin and cos advance together: s' = a'·c, c' = −a'·s. */
+function sSinCos(a: Series): [Series, Series] {
+  const n = a.length;
+  const s = sNew(n);
+  const c = sNew(n);
+  s[0] = Math.sin(a[0]);
+  c[0] = Math.cos(a[0]);
+  for (let k = 1; k < n; k++) {
+    let sa = 0;
+    let ca = 0;
+    for (let j = 1; j <= k; j++) {
+      sa += j * a[j] * c[k - j];
+      ca += j * a[j] * s[k - j];
+    }
+    s[k] = sa / k;
+    c[k] = -ca / k;
+  }
+  return [s, c];
+}
+/**
+ * w = a^α for real α, needs a[0] > 0:
+ * w_k = (1/(k·a_0)) Σ_{j=1..k} (αj − (k−j)) a_j w_{k−j}.
+ */
+function sPowReal(a: Series, alpha: number): Series | null {
+  if (!(a[0] > 0)) return null;
+  const n = a.length;
+  const w = sNew(n);
+  w[0] = Math.pow(a[0], alpha);
+  for (let k = 1; k < n; k++) {
+    let acc = 0;
+    for (let j = 1; j <= k; j++) acc += (alpha * j - (k - j)) * a[j] * w[k - j];
+    w[k] = acc / (k * a[0]);
+  }
+  return w;
+}
+/** Integer powers by binary exponentiation — no positivity requirement. */
+function sPowInt(a: Series, p: number): Series | null {
+  if (p < 0) {
+    const inv = sDiv(sConst(1, a.length), a);
+    return inv ? sPowInt(inv, -p) : null;
+  }
+  let out = sConst(1, a.length);
+  let base = a;
+  let e = p;
+  while (e > 0) {
+    if (e & 1) out = sMul(out, base);
+    base = sMul(base, base);
+    e >>= 1;
+  }
+  return out;
+}
+
+/** Series for one whitelisted function applied to a series, or null. */
+function sFn(name: string, a: Series): Series | null {
+  switch (name) {
+    case 'sin': return sSinCos(a)[0];
+    case 'cos': return sSinCos(a)[1];
+    case 'tan': {
+      const [s, c] = sSinCos(a);
+      return sDiv(s, c);
+    }
+    case 'exp': return sExp(a);
+    case 'ln': return sLn(a);
+    case 'log': {
+      const l = sLn(a);
+      return l ? l.map((v) => v / Math.LN10) : null;
+    }
+    case 'log2': {
+      const l = sLn(a);
+      return l ? l.map((v) => v / Math.LN2) : null;
+    }
+    case 'sqrt': return sPowReal(a, 0.5);
+    case 'cbrt': return a[0] > 0 ? sPowReal(a, 1 / 3) : null;
+    case 'sinh': {
+      const e = sExp(a);
+      const em = sExp(sNeg(a));
+      return sSub(e, em).map((v) => v / 2);
+    }
+    case 'cosh': {
+      const e = sExp(a);
+      const em = sExp(sNeg(a));
+      return sAdd(e, em).map((v) => v / 2);
+    }
+    case 'tanh': {
+      const e = sExp(a);
+      const em = sExp(sNeg(a));
+      return sDiv(sSub(e, em), sAdd(e, em));
+    }
+    // atan: v = atan(a) has v' = a'/(1+a²) — integrate the derivative series.
+    case 'atan': {
+      const n = a.length;
+      const denom = sAdd(sConst(1, n), sMul(a, a));
+      const da = a.map((v, i) => (i + 1 < n ? (i + 1) * a[i + 1] : 0));
+      const dv = sDiv(da, denom);
+      if (!dv) return null;
+      const v = sNew(n);
+      v[0] = Math.atan(a[0]);
+      for (let k = 1; k < n; k++) v[k] = dv[k - 1] / k;
+      return v;
+    }
+    // abs, sign, floor, ceil, round, asin, acos: not analytic (or not worth
+    // the edge cases) — no series.
+    default:
+      return null;
+  }
+}
+
+/**
+ * The Taylor coefficients of `raw` about x = a, to the given order, with any
+ * other free names bound by `scope`. Returns null when the expression does not
+ * compile over the declared names, uses a non-analytic operation, or produces
+ * a non-finite coefficient (a pole at the centre, say).
+ */
+export function taylorCoeffs(
+  raw: string,
+  varName: string,
+  scope: Record<string, number>,
+  a: number,
+  order: number
+): number[] | null {
+  // Number.isInteger also rejects NaN — a NaN order would otherwise sail
+  // through both comparisons and hand new Array() an invalid length.
+  if (typeof raw !== 'string' || raw.length > 400) return null;
+  if (!Number.isInteger(order) || order < 0 || order > 24) return null;
+  const vars = new Set([varName.toLowerCase(), ...Object.keys(scope).map((k) => k.toLowerCase())]);
+  const toks0 = tokenize(normalizeExpr(raw), vars);
+  if (!toks0 || !toks0.length) return null;
+  const rpn = toRpn(insertImplicitMult(toks0));
+  if (!rpn) return null;
+
+  const n = order + 1;
+  const st: Series[] = [];
+  for (const tk of rpn) {
+    if (tk.t === 'num') st.push(sConst(tk.v, n));
+    else if (tk.t === 'var') {
+      if (tk.v === varName.toLowerCase()) {
+        const s = sConst(a, n);
+        if (n > 1) s[1] = 1; // the variable itself: a + 1·(x − a)
+        st.push(s);
+      } else {
+        const bound = scope[tk.v];
+        if (typeof bound !== 'number') return null;
+        st.push(sConst(bound, n));
+      }
+    } else if (tk.t === 'fn') {
+      const arg = st.pop();
+      if (!arg) return null;
+      const out = sFn(tk.v, arg);
+      if (!out) return null;
+      st.push(out);
+    } else if (tk.t === 'op') {
+      if (tk.v === 'u-') {
+        const x = st.pop();
+        if (!x) return null;
+        st.push(sNeg(x));
+        continue;
+      }
+      const b = st.pop();
+      const x = st.pop();
+      if (!x || !b) return null;
+      let out: Series | null = null;
+      if (tk.v === '+') out = sAdd(x, b);
+      else if (tk.v === '-') out = sSub(x, b);
+      else if (tk.v === '*') out = sMul(x, b);
+      else if (tk.v === '/') out = sDiv(x, b);
+      else if (tk.v === '%') return null; // not analytic
+      else if (tk.v === '^') {
+        // Only a CONSTANT exponent has a classical recurrence. x^x needs
+        // exp(b·ln x); handle it when the exponent series is genuinely
+        // varying, via exp/ln, which then imposes x > 0.
+        const constant = b.slice(1).every((v) => v === 0);
+        if (constant) {
+          out = Number.isInteger(b[0]) ? sPowInt(x, b[0]) : sPowReal(x, b[0]);
+        } else {
+          const l = sLn(x);
+          out = l ? sExp(sMul(b, l)) : null;
+        }
+      }
+      if (!out) return null;
+      st.push(out);
+    }
+  }
+  if (st.length !== 1) return null;
+  const coeffs = st[0];
+  return coeffs.every(Number.isFinite) ? coeffs : null;
+}
