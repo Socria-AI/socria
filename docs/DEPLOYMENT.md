@@ -2,6 +2,12 @@
 
 Read this before your first merge. It is short on purpose.
 
+> Some of what this describes is not switched on yet — branch protection, the
+> production-branch setting, and a database migration the live site is already
+> asking for all live in dashboards this repository cannot reach.
+> **`docs/MANUAL-SETUP.md` is the list of what only you can do**, in order of
+> consequence. Start there if nothing below seems to be enforced.
+
 The whole design exists to answer one question: **can we fix a production bug
 today while a major version is half-finished?** Yes — because unreleased work
 never sits between a fix and production. That is the only rule that really
@@ -162,6 +168,21 @@ the one that matters most — **a secret exposed to the browser through a
 into a client bundle is public in every build already deployed, so the only
 fix is to rotate the key.
 
+Vercel runs it too. `npm run vercel-build` is `check:env --soft` followed by
+the build, and Vercel prefers that script over `build` when it exists, so
+every deployment checks the environment it is actually being given — which is
+the only place the real variables exist.
+
+`--soft` is the difference between the two. Locally and in `npm run verify`
+the check is strict: any problem fails. On Vercel only a **leaked secret**
+fails the build; a missing or malformed variable is printed loudly and the
+deploy continues. That asymmetry is deliberate. Nothing in this codebase
+throws at runtime over a missing variable — the feature degrades and the app
+stays up — so a validator that could take production offline would be adding
+a risk larger than the one it removes. A leaked secret has no such symmetry:
+it cannot be undone by a redeploy, only by rotating the key, so it is stopped
+everywhere.
+
 ---
 
 ## Environments
@@ -190,7 +211,9 @@ return URLs. Setting it to the production domain on a preview sends people
 back to production mid-flow. Leave it unset there; the code falls back to the
 request origin, which is what a preview wants.
 
-Setup steps for all of this are in `docs/PRIVATE-DEV.md`.
+Setup steps for all of this are in `docs/PRIVATE-DEV.md`, and the
+dashboard-by-dashboard checklist — including which variables go in which
+Vercel scope — is in `docs/MANUAL-SETUP.md`.
 
 ---
 
@@ -202,8 +225,9 @@ Setup steps for all of this are in `docs/PRIVATE-DEV.md`.
 - **No end-to-end tests.** The browser checks in this project have been run by
   hand against a real build. Automating them is worthwhile and is not free;
   it is not a prerequisite for the rest of this.
-- **No environment check.** CI has no real environment. That gate belongs in
-  the Vercel build.
+- **No environment check.** CI has no real environment, so there is nothing
+  to validate. That gate lives in the Vercel build instead, via
+  `vercel-build`, where the actual variables are.
 
 Neither absence is pretended over. If a check is not here, it is not being
 done.
