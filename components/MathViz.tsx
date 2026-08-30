@@ -25,6 +25,7 @@ import {
   fmt,
   freeNamesOf,
   KIND_LABEL,
+  kindNarrates,
   kindNeedsExpr,
   resolveView,
   RESERVED_PARAM,
@@ -78,6 +79,10 @@ const MAX_SPAN = 1e9;
 const PERSIST_MS = 700;
 
 const PAD = { l: 44, r: 22, t: 20, b: 30 };
+/** The narration column, when there is room for one beside the plot. */
+const NARR_W = 196;
+/** Below this the column would squeeze the plot, so the words go underneath. */
+const NARR_MIN_W = 700;
 
 type Geom = { view: Viewport; plotW: number; plotH: number };
 
@@ -360,7 +365,12 @@ export function MathViz({
 
   useEffect(() => () => { if (persistRef.current) clearTimeout(persistRef.current); }, []);
 
-  const W = Math.max(300, width - 32);
+  // The column is reserved for the whole life of the scene, not just while
+  // the animation runs — a panel that appeared on play would resize the plot
+  // mid-sentence, which is exactly when you are trying to read it.
+  const narrating = usable && kindNarrates(active.kind);
+  const asideNarr = narrating && width >= NARR_MIN_W;
+  const W = Math.max(300, width - 32 - (asideNarr ? NARR_W + 12 : 0));
   const H = Math.max(
     200,
     height - 96 - (active.params.length ? 30 : 0) - (swept ? 26 : 0) - (draft ? 118 : 0)
@@ -416,6 +426,7 @@ export function MathViz({
     <div className="lg-viz">
       {active.title && !draft && <p className="lg-viz-title">{active.title}</p>}
 
+      <div className="lg-viz-body">
       <div className="lg-viz-stage">
         <svg
           ref={svgRef}
@@ -498,6 +509,15 @@ export function MathViz({
           </button>
         </div>
       </div>
+
+        {asideNarr && frame.narration && (
+          <Narration text={frame.narration} playing={playing} />
+        )}
+      </div>
+
+      {!asideNarr && frame.narration && (
+        <Narration text={frame.narration} playing={playing} below />
+      )}
 
       {frame.readouts.length > 0 && (
         <div className="lg-viz-readouts">
@@ -585,6 +605,38 @@ export function MathViz({
 
       <p className="lg-viz-caption">{guarded && frame.ask ? frame.ask : frame.caption}</p>
     </div>
+  );
+}
+
+/**
+ * Subtitles for the mathematics: what is happening, in plain words, changing
+ * as the picture does.
+ *
+ * `key` on the paragraph is load-bearing — it remounts the node when the words
+ * change, which is what replays the fade. Without it the text would swap in
+ * place and the eye would miss that anything had been said.
+ *
+ * aria-live is polite and only while playing: a screen reader should hear the
+ * commentary during an animation, and should not have it read out every time
+ * someone nudges a slider.
+ */
+function Narration({
+  text,
+  playing,
+  below,
+}: {
+  text: string;
+  playing: boolean;
+  below?: boolean;
+}) {
+  return (
+    <aside
+      className={`lg-viz-narr${below ? ' is-below' : ''}`}
+      aria-live={playing ? 'polite' : 'off'}
+    >
+      <span className="lg-viz-narr-mark" aria-hidden="true" />
+      <p key={text}>{text}</p>
+    </aside>
   );
 }
 

@@ -157,6 +157,18 @@ export interface VizReadout {
 export interface VizFrame {
   objects: VizObject[];
   readouts: VizReadout[];
+  /**
+   * Plain words for what is happening at this moment, shown beside the plot
+   * and changing as it animates — subtitles for the mathematics.
+   *
+   * Written by the builders, like every other piece of prose here, so it sits
+   * next to the thing it describes. It changes on STAGE, not on frame: a line
+   * rewritten sixty times a second is not readable, so the story advances a
+   * handful of times across a run and holds still in between. And it narrates
+   * the MOTION, never the destination — which is what lets it keep talking
+   * while the Answer Guard is up.
+   */
+  narration?: string;
   /** one line under the canvas, describing what is happening right now */
   caption: string;
   /** while the guard is up: the noticing the visual is asking them to do */
@@ -206,6 +218,20 @@ export function squareView(view: Viewport, plotW: number, plotH: number): Viewpo
 
 export const DISTS = ['normal', 'binomial', 'poisson', 'exponential'] as const;
 export type DistName = (typeof DISTS)[number];
+
+/**
+ * Whether this kind's builder narrates.
+ *
+ * The layout has to reserve the narration column BEFORE the frame that
+ * carries the words exists — the frame needs the viewport, which needs the
+ * plot width, which needs to know whether a column was reserved. So the
+ * answer comes from the kind rather than from the frame. Every builder
+ * narrates today; a future one that does not goes in this set.
+ */
+const SILENT_KINDS = new Set<VizKind>();
+export function kindNarrates(kind: VizKind): boolean {
+  return !SILENT_KINDS.has(kind);
+}
 
 /** Kinds that draw an expression; the others carry their objects directly. */
 export function kindNeedsExpr(kind: VizKind): boolean {
@@ -563,6 +589,21 @@ export function defaults(scene: VizScene): Record<string, number> {
   return out;
 }
 
+/**
+ * Which part of the story a swept parameter is in. Deliberately coarse: four
+ * stages over a whole run, so the words beside the plot change a few times
+ * rather than strobing.
+ *
+ * Measured in the animation's own pacing (sweepProgress), not linearly in the
+ * value, so "half way through" means half way through what you are watching —
+ * h → 0 moves geometrically and the stages follow it.
+ */
+export function sweepStage(p: VizParam | null, v: number): 0 | 1 | 2 | 3 {
+  if (!p) return 0;
+  const t = sweepProgress(p, v);
+  return t < 0.18 ? 0 : t < 0.55 ? 1 : t < 0.9 ? 2 : 3;
+}
+
 /** The parameter the clock drives, if any. */
 export function sweptParam(scene: VizScene): VizParam | null {
   return scene.params.find((p) => p.sweep) ?? null;
@@ -647,6 +688,9 @@ const buildFunction: Builder = (scene, fn, vals, view) => {
   return {
     objects,
     readouts,
+    narration: scene.params.length
+      ? 'Each slider is one letter in the expression. Move one and watch which part of the shape answers — and which parts do not.'
+      : 'The function, drawn over this window.',
     caption: scene.params.length
       ? 'Move a coefficient and watch the shape answer.'
       : 'The function, drawn.',
@@ -870,9 +914,24 @@ const buildLimit: Builder = (scene, fn, vals, view, guarded) => {
   const removable = !defined && Two.kind === 'value';
   const hole = defined && Two.kind === 'value' && Math.abs(fa - Two.v) > 1e-6;
 
+  const stage = sweepStage(scene.params.find((p) => p.id === 'd') ?? null, d);
+  const narration =
+    stage === 0
+      ? `δ is wide, so the two points sit a long way either side of ${varName} = ${fmt(a)}. Their heights are nowhere near each other.`
+      : stage === 1
+        ? `δ is shrinking. Both points are sliding in toward ${varName} = ${fmt(a)}, and the two heights are moving with them.`
+        : stage === 2
+          ? 'The gap between the two heights is closing. Keep an eye on it rather than on the points.'
+          : sidesDiffer
+            ? 'δ is almost nothing, and the two heights have still not met. They are heading for different places.'
+            : blowsUp
+              ? 'δ is almost nothing, and the curve is still running away. There is no height for it to settle on.'
+              : 'δ is almost nothing now, and both sides have arrived at the same place.';
+
   return {
     objects,
     readouts,
+    narration,
     caption: sidesDiffer
       ? 'The two sides are heading to different places. There is nothing for them to agree on.'
       : blowsUp
@@ -948,9 +1007,18 @@ const buildDerivative: Builder = (scene, fn, vals, view, guarded) => {
     help: `The derivative at ${fmt(a)}: how steep the curve is at that exact point, with no gap at all. It is what the rise-over-run above is closing in on.`,
   });
 
+  const dstage = sweepStage(scene.params.find((p) => p.id === 'h') ?? null, h);
   return {
     objects,
     readouts,
+    narration:
+      dstage === 0
+        ? 'Q is far from P, so the straight line through them cuts right across the curve. Its steepness is an average over that whole gap.'
+        : dstage === 1
+          ? 'h is shrinking, so Q is sliding down the curve toward P. The line is pivoting as it goes.'
+          : dstage === 2
+            ? 'The two points are close now, and the line barely cuts across the curve any more. Watch the number, not the line.'
+            : 'Q has all but landed on P. The line has stopped turning — whatever its steepness is now, that is what it was heading for.',
     caption: `Q slides toward P. The secant has to become something.`,
     ask: 'Watch the slope, not the line. What number is it settling on?',
   };
@@ -1027,9 +1095,21 @@ const buildRiemann: Builder = (scene, fn, vals, view, guarded) => {
     help: 'The exact area under the curve between the two ends — what the rectangle total is closing in on as n grows.',
   });
 
+  const rstage = sweepStage(scene.params.find((p) => p.id === 'n') ?? null, n);
   return {
     objects,
     readouts,
+    // No live counter in the words: interpolating n would rewrite the same
+    // sentence on every step of the sweep, which reads as a flicker rather
+    // than as a line of commentary. The count is in the readout below.
+    narration:
+      rstage === 0
+        ? 'Only a few rectangles, and each one is wide. Look along the top — every rectangle misses a good deal of the curve.'
+        : rstage === 1
+          ? 'More rectangles now, each thinner than the last. The staircase is following the curve more closely.'
+          : rstage === 2
+            ? 'The steps are small, and the gaps along the top are getting hard to see. The running total is barely moving.'
+            : 'The rectangles are so thin the staircase is hard to tell from the curve itself. The total has all but stopped changing.',
     caption: `${n} rectangle${n === 1 ? '' : 's'}, ${rule === 'midpoint' ? 'sampled at the middle' : `touching at the ${rule}`}.`,
     ask: 'Push n higher. What is the running total closing in on?',
   };
@@ -1113,9 +1193,19 @@ const buildTaylor: Builder = (scene, fn, vals, view, guarded) => {
     });
   }
 
+  const tstage = sweepStage(scene.params.find((p) => p.id === 'k') ?? null, k);
   return {
     objects,
     readouts,
+    narration: !coeffs
+      ? 'This function has no polynomial like this at that point, so there is nothing to build.'
+      : tstage === 0
+        ? `Low degree. It is exactly right at ${varName} = ${fmt(a)} and starts drifting away almost immediately.`
+        : tstage === 1
+          ? 'Each new term buys a little more of the curve on either side of the centre.'
+          : tstage === 2
+            ? 'The polynomial is tracking the function well across the middle now, and still peels off at the edges.'
+            : 'It follows the function a long way before it leaves — but it always leaves eventually. The centre is all it ever knew.',
     caption: coeffs
       ? `Degree ${k}. The polynomial only knows the function through the point ${varName} = ${fmt(a)}.`
       : 'This function has no Taylor series at that point.',
@@ -1186,9 +1276,24 @@ const buildSequence: Builder = (scene, fn, vals, view, guarded) => {
     });
   }
 
+  const mstage = sweepStage(scene.params.find((p) => p.id === 'm') ?? null, m);
   return {
     objects,
     readouts,
+    narration:
+      mstage === 0
+        ? 'Only the first few terms. Too early to tell what they are doing.'
+        : mstage === 1
+          ? scene.partial
+            ? 'More terms. The stems are getting shorter — but watch the dots, which are the running total.'
+            : 'More terms now. A pattern should be starting to show.'
+          : mstage === 2
+            ? scene.partial
+              ? 'The stems are nearly flat, so each new term adds very little. The dots are barely climbing.'
+              : 'The terms are settling into whatever they are going to do.'
+            : scene.partial
+              ? 'Far out now. The dots have almost stopped moving, even though terms are still being added.'
+              : 'Far out now. Whatever the terms were heading for, this is it.',
     caption: scene.partial
       ? `${m} term${m === 1 ? '' : 's'}: each stem is a term, each dot the running total.`
       : `The first ${m} term${m === 1 ? '' : 's'}.`,
@@ -1293,6 +1398,10 @@ const buildVectors: Builder = (scene, _fn, vals) => {
   return {
     objects,
     readouts,
+    narration:
+      vs.length === 2
+        ? 'Two arrows, and a third made by taking s of the first and t of the second. Sweep both sliders: every point that third arrow can reach is the span.'
+        : 'The vectors, drawn from the origin.',
     caption:
       vs.length === 2
         ? 'Slide s and t. Everything the combination can reach is the span.'
@@ -1397,9 +1506,18 @@ const buildMatrix: Builder = (scene, _fn, vals, view, guarded) => {
     },
   ];
 
+  const mxstage = sweepStage(scene.params.find((p) => p.id === 't') ?? null, t);
   return {
     objects,
     readouts,
+    narration:
+      mxstage === 0
+        ? 'The plane before A touches it. Every square is a square, and the two arrows are the ordinary axes.'
+        : mxstage === 1
+          ? 'A is being applied. The whole grid moves at once — notice that the lines stay straight and evenly spaced.'
+          : mxstage === 2
+            ? 'Most of the way through. Some directions have swung a long way round; others have barely turned at all.'
+            : 'The plane after A. The origin never moved, and every straight line is still straight — but almost every direction now points somewhere new.',
     caption: t === 0 ? 'The untouched plane. Press play to apply A.' : t === 1 ? 'The plane under A.' : `Part way: M(t) at t = ${fmt(t, 2)}.`,
     ask: 'Watch the grid go. Which directions never leave their own line?',
   };
@@ -1590,6 +1708,9 @@ const buildDistribution: Builder = (scene, _fn, vals, view, guarded) => {
   return {
     objects,
     readouts,
+    narration: spec.discrete
+      ? `Each bar is one outcome, and its height is how likely that outcome is. All the heights together come to 1.${hasWindow ? ' The darker bars are the ones being asked about.' : ''}`
+      : `The curve is not a probability by itself — area is. The whole area underneath comes to 1.${hasWindow ? ' The shaded piece is the part being asked about.' : ''}`,
     caption: spec.discrete ? 'Each bar is one outcome; heights sum to 1.' : 'The whole area under the curve is 1.',
     ask: hasWindow
       ? 'The shaded share of the total area is the probability. Roughly how much of it is shaded?'
@@ -1691,6 +1812,8 @@ const buildOde: Builder = (scene, fn, vals, view, guarded) => {
   return {
     objects,
     readouts,
+    narration:
+      'The little dashes are the equation itself: at every point it says which way to head. The curve is what you get by starting at the dot and always following them. Move y₀ and you pick a different starting point — and a different curve.',
     caption: 'One solution, threaded through the field its equation defines.',
     ask: 'Slide y₀. Which starting points end up together, and which never meet?',
   };

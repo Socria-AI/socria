@@ -5576,9 +5576,61 @@ html.js-anim .scrolly-root .fade.d3 { transition-delay: .3s; }
   letter-spacing: 0.01em;
   color: var(--lg-ink);
 }
-/* The stage is the positioning context for the zoom cluster; the svg fills it
-   and takes the pointer, because the whole plot is draggable. */
-.logos-root .lg-viz-stage { position: relative; flex: 1; min-height: 0; display: flex; }
+/* The plot and its commentary sit side by side; the stage is the positioning
+   context for the zoom cluster, and the svg fills it and takes the pointer,
+   because the whole plot is draggable. */
+.logos-root .lg-viz-body { flex: 1; min-height: 0; display: flex; gap: 12px; }
+.logos-root .lg-viz-stage { position: relative; flex: 1; min-width: 0; min-height: 0; display: flex; }
+
+/* Subtitles for the mathematics. Set in the reading voice, not the maths one,
+   and kept to a column narrow enough that a line is a glance. */
+.logos-root .lg-viz-narr {
+  flex: 0 0 196px;
+  align-self: center;
+  position: relative;
+  padding: 12px 12px 12px 15px;
+  border-left: 2px solid var(--lg-accent);
+  border-radius: 0 9px 9px 0;
+  background: rgba(255, 255, 255, 0.55);
+}
+.logos-root .lg-viz-narr p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.62;
+  color: var(--lg-ink);
+  animation: lgNarr 0.34s ease both;
+}
+/* A small mark that pulses once per line, so a change registers peripherally
+   while you are still looking at the plot. */
+.logos-root .lg-viz-narr-mark {
+  position: absolute;
+  top: 15px;
+  left: -4px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--lg-accent);
+  opacity: 0.55;
+}
+@keyframes lgNarr {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .logos-root .lg-viz-narr p { animation: none; }
+}
+
+/* No room for a column: the words go under the plot instead of squeezing it. */
+.logos-root .lg-viz-narr.is-below {
+  flex: 0 0 auto;
+  align-self: stretch;
+  margin: 6px 0 0;
+  padding: 9px 12px;
+  border-left: 2px solid var(--lg-accent);
+  border-radius: 0 8px 8px 0;
+}
+.logos-root .lg-viz-narr.is-below p { font-size: 12.5px; line-height: 1.5; }
+.logos-root .lg-viz-narr.is-below .lg-viz-narr-mark { top: 12px; }
 .logos-root .lg-viz-svg {
   flex: 1;
   min-height: 0;
