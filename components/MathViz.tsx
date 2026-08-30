@@ -40,6 +40,7 @@ import {
   type Tone,
   type Viewport,
   type VizKind,
+  type VizFrame,
   type VizObject,
   type VizParam,
   type VizScene,
@@ -142,6 +143,7 @@ export function MathViz({
     // one desyncs the toggle and edits a picture that is no longer there.
     setDraft(null);
     setError(null);
+    setAsked(null);
     const p = sweptParam(active);
     progRef.current = p ? sweepProgress(p, defaults(active)[p.id]) : 0;
   }, [activeKey]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -310,6 +312,8 @@ export function MathViz({
 
   const [draft, setDraft] = useState<Draft | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** which term the reader has asked about, by id. One at a time. */
+  const [asked, setAsked] = useState<string | null>(null);
   // The scene as it stood when the editor opened, and the ONLY thing a draft
   // is resolved against. Building each keystroke against the live scene lets
   // decisions compound: typing "a*sin(b*x)" passes through the moment where
@@ -485,24 +489,48 @@ export function MathViz({
 
       {frame.readouts.length > 0 && (
         <div className="lg-viz-readouts">
-          {frame.readouts.map((r) => (
-            <span key={r.id} className={`lg-viz-readout${r.value === null ? ' is-held' : ''}`}>
-              <TeX tex={r.tex} />
-              <i aria-hidden="true">=</i>
-              {/* A withheld value is not rendered at all — not hidden with CSS,
-                  not present in the DOM. The guard has to hold when someone
-                  opens the inspector, or it is theatre. */}
-              {r.value === null ? (
-                <b className="lg-viz-held" title="yours to find">
-                  ?
-                </b>
-              ) : (
-                <b>{r.value}</b>
-              )}
-            </span>
-          ))}
+          {frame.readouts.map((r) => {
+            const body = (
+              <>
+                <TeX tex={r.tex} />
+                <i aria-hidden="true">=</i>
+                {/* A withheld value is not rendered at all — not hidden with
+                    CSS, not present in the DOM. The guard has to hold when
+                    someone opens the inspector, or it is theatre. */}
+                {r.value === null ? (
+                  <b className="lg-viz-held" title="yours to find">
+                    ?
+                  </b>
+                ) : (
+                  <b>{r.value}</b>
+                )}
+              </>
+            );
+            const cls = `lg-viz-readout${r.value === null ? ' is-held' : ''}`;
+            // Notation is only obvious once you already know it. Anything with
+            // an explanation becomes a button; anything without stays inert,
+            // so the affordance never promises something it cannot deliver.
+            return r.help ? (
+              <button
+                key={r.id}
+                type="button"
+                className={`${cls} is-askable${asked === r.id ? ' is-asked' : ''}`}
+                aria-expanded={asked === r.id}
+                title="What is this?"
+                onClick={() => setAsked((cur) => (cur === r.id ? null : r.id))}
+              >
+                {body}
+              </button>
+            ) : (
+              <span key={r.id} className={cls}>
+                {body}
+              </span>
+            );
+          })}
         </div>
       )}
+
+      {asked && <Explain frame={frame} scene={active} id={asked} onClose={() => setAsked(null)} />}
 
       <Controls
         scene={active}
@@ -516,6 +544,8 @@ export function MathViz({
         onReset={reset}
         onStep={step}
         onSpeed={setSpeed}
+        asked={asked}
+        onAsk={(id) => setAsked((cur) => (cur === id ? null : id))}
         onEdit={() => (draft ? setDraft(null) : openEditor())}
         onParam={(id, v) => {
           setPlaying(false);
@@ -527,6 +557,43 @@ export function MathViz({
       {draft && <Editor draft={draft} error={error} varName={active.varName} onChange={applyDraft} />}
 
       <p className="lg-viz-caption">{guarded && frame.ask ? frame.ask : frame.caption}</p>
+    </div>
+  );
+}
+
+/**
+ * The plain-language answer to "what is this?".
+ *
+ * Deliberately reads from the FRAME's help text, not from anything computed
+ * here: the builders write it, so it stays with the mathematics it describes
+ * and cannot drift from it. Help describes what a quantity IS and never what
+ * it equals, which is what makes it safe to show while the guard is up — the
+ * point of asking is usually that you cannot read the notation yet, and that
+ * is not a moment to withhold anything.
+ */
+function Explain({
+  frame,
+  scene,
+  id,
+  onClose,
+}: {
+  frame: VizFrame;
+  scene: VizScene;
+  id: string;
+  onClose: () => void;
+}) {
+  const r = frame.readouts.find((x) => x.id === id);
+  const p = scene.params.find((x) => x.id === id);
+  const tex = r?.tex ?? p?.symbol ?? p?.id;
+  const help = r?.help ?? p?.help;
+  if (!help) return null;
+  return (
+    <div className="lg-viz-explain" role="note">
+      <span className="lg-viz-explain-term">{tex && <TeX tex={tex} />}</span>
+      <p>{help}</p>
+      <button type="button" onClick={onClose} aria-label="Close">
+        ×
+      </button>
     </div>
   );
 }
@@ -988,6 +1055,8 @@ function Controls({
   onReset,
   onStep,
   onSpeed,
+  asked,
+  onAsk,
   onEdit,
   onParam,
 }: {
@@ -997,6 +1066,8 @@ function Controls({
   playing: boolean;
   speed: number;
   editing: boolean;
+  asked: string | null;
+  onAsk: (id: string) => void;
   onPlay: () => void;
   onPause: () => void;
   onReset: () => void;
@@ -1058,14 +1129,36 @@ function Controls({
         <div className="lg-viz-sliders">
           {scene.params.map((p) => (
             <label key={p.id} className="lg-viz-slider">
-              <span className="lg-viz-sym">
-                <TeX
-                  tex={(() => {
-                    const sym = p.symbol || p.id;
-                    return p.toward ? `${sym} \\to ${p.toward}` : sym;
-                  })()}
-                />
-              </span>
+              {p.help ? (
+                <button
+                  type="button"
+                  className={`lg-viz-sym is-askable${asked === p.id ? ' is-asked' : ''}`}
+                  aria-expanded={asked === p.id}
+                  title="What does this do?"
+                  onClick={(e) => {
+                    // the symbol sits inside the slider's <label>, so a click
+                    // would otherwise fall through to the range input
+                    e.preventDefault();
+                    onAsk(p.id);
+                  }}
+                >
+                  <TeX
+                    tex={(() => {
+                      const sym = p.symbol || p.id;
+                      return p.toward ? `${sym} \\to ${p.toward}` : sym;
+                    })()}
+                  />
+                </button>
+              ) : (
+                <span className="lg-viz-sym">
+                  <TeX
+                    tex={(() => {
+                      const sym = p.symbol || p.id;
+                      return p.toward ? `${sym} \\to ${p.toward}` : sym;
+                    })()}
+                  />
+                </span>
+              )}
               <input
                 type="range"
                 min={p.min}

@@ -5659,6 +5659,91 @@ html.js-anim .scrolly-root .fade.d3 { transition-delay: .3s; }
   min-width: 3.2ch;
   color: var(--lg-primary);
 }
+/* A term you can ask about. The cue is a dotted underline that only appears
+   on hover — present when wanted, invisible when not. */
+.logos-root button.lg-viz-readout {
+  border: 0;
+  background: transparent;
+  font: inherit;
+  padding: 1px 3px;
+  margin: -1px -3px;
+  border-radius: 5px;
+  cursor: help;
+  transition: background 0.14s ease;
+}
+.logos-root .lg-viz-readout.is-askable .katex,
+.logos-root .lg-viz-sym.is-askable .katex {
+  border-bottom: 1px dotted transparent;
+  transition: border-color 0.14s ease;
+}
+.logos-root .lg-viz-readout.is-askable:hover .katex,
+.logos-root .lg-viz-sym.is-askable:hover .katex,
+.logos-root .lg-viz-readout.is-asked .katex,
+.logos-root .lg-viz-sym.is-asked .katex {
+  border-bottom-color: var(--lg-ink-40);
+}
+.logos-root .lg-viz-readout.is-askable:hover,
+.logos-root .lg-viz-readout.is-asked {
+  background: rgba(53, 70, 32, 0.06);
+}
+.logos-root button.lg-viz-sym {
+  border: 0;
+  background: transparent;
+  font: inherit;
+  padding: 1px 3px;
+  margin: -1px -3px;
+  border-radius: 5px;
+  cursor: help;
+  text-align: left;
+  min-width: 2.4em;
+}
+.logos-root .lg-viz-sym.is-asked { background: rgba(53, 70, 32, 0.06); }
+
+/* the answer: one calm line, in the reading voice rather than the maths one */
+.logos-root .lg-viz-explain {
+  flex: 0 0 auto;
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 6px 0 0;
+  padding: 9px 30px 9px 12px;
+  border: 1px solid var(--lg-line);
+  border-left: 2px solid var(--lg-accent);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.72);
+  animation: lgVizExplain 0.18s ease both;
+}
+@keyframes lgVizExplain {
+  from { opacity: 0; transform: translateY(-3px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .logos-root .lg-viz-explain { animation: none; }
+}
+.logos-root .lg-viz-explain-term { flex: 0 0 auto; color: var(--lg-primary); }
+.logos-root .lg-viz-explain p {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--lg-ink);
+}
+.logos-root .lg-viz-explain button {
+  position: absolute;
+  top: 5px;
+  right: 6px;
+  border: 0;
+  background: transparent;
+  color: var(--lg-ink-40);
+  font: inherit;
+  font-size: 15px;
+  line-height: 1;
+  padding: 3px 5px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.logos-root .lg-viz-explain button:hover { color: var(--lg-ink); background: rgba(53, 70, 32, 0.07); }
+
 .logos-root .lg-viz-readout.is-held b {
   color: var(--lg-accent);
   opacity: 0.55;
