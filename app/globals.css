@@ -5651,6 +5651,42 @@ html.js-anim .scrolly-root .fade.d3 { transition-delay: .3s; }
   touch-action: none;
 }
 .logos-root .lg-viz-svg:active { cursor: grabbing; }
+/* The plot takes focus now, so it has to show it. Inset rather than outset:
+   an outline on the outside would be clipped by the stage. */
+.logos-root .lg-viz-svg:focus { outline: none; }
+.logos-root .lg-viz-svg:focus-visible {
+  outline: 2px solid var(--lg-primary);
+  outline-offset: -2px;
+  border-radius: 4px;
+}
+/* What the keys do, said once, and only to the person who has just tabbed
+   into the plot — a permanent legend on an instrument this dense would be
+   clutter for the mouse users who are the majority. */
+.logos-root .lg-viz-keys {
+  position: absolute;
+  /* Top-left, inside the plot's own top padding. The drawing is clipped to a
+     rect that starts below that strip, so this is the one band of the stage
+     nothing is ever plotted in — and it is nowhere near the axis labels along
+     the bottom, which is where this sat before and was covering the numbers
+     it was meant to help someone read. */
+  left: 4px;
+  top: 3px;
+  padding: 4px 10px;
+  border: 1px solid var(--lg-line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  font-size: 10.5px;
+  letter-spacing: 0.01em;
+  color: var(--lg-ink-60);
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.16s ease;
+}
+.logos-root .lg-viz-svg:focus-visible ~ .lg-viz-keys { opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .logos-root .lg-viz-keys { transition: none; }
+}
 .logos-root .lg-viz-zoom {
   position: absolute;
   top: 4px;
@@ -5667,7 +5703,16 @@ html.js-anim .scrolly-root .fade.d3 { transition-delay: .3s; }
 }
 .logos-root .lg-viz-stage:hover .lg-viz-zoom,
 .logos-root .lg-viz-zoom:focus-within { opacity: 1; }
+/* A finger cannot hover. On a touch device these were the only way to zoom —
+   there is no wheel — and they were permanently invisible, which made the
+   graph unzoomable rather than merely awkward. Pinch now works too, but the
+   buttons still have to be visible: pinch is a gesture nobody is told about,
+   and a control you cannot see is a control you do not have. */
+@media (hover: none) {
+  .logos-root .lg-viz-zoom { opacity: 1; }
+}
 .logos-root .lg-viz-zoom button {
+  position: relative;
   width: 22px;
   height: 20px;
   border: 0;
@@ -5678,6 +5723,18 @@ html.js-anim .scrolly-root .fade.d3 { transition-delay: .3s; }
   line-height: 1;
   border-radius: 5px;
   cursor: pointer;
+}
+/* The instrument is dense on purpose, so rather than growing these to 44px
+   and pushing the plot around, the TARGET grows and the mark does not. */
+.logos-root .lg-viz-zoom button::after {
+  content: '';
+  position: absolute;
+  inset: -6px -8px;
+}
+@media (hover: none) {
+  /* Where the target is the only thing anyone has, make it a real one. */
+  .logos-root .lg-viz-zoom button { width: 38px; height: 36px; font-size: 16px; }
+  .logos-root .lg-viz-zoom button::after { inset: -4px; }
 }
 .logos-root .lg-viz-zoom button:hover:not(:disabled) { background: rgba(53, 70, 32, 0.09); color: var(--lg-ink); }
 .logos-root .lg-viz-zoom button:disabled { opacity: 0.28; cursor: default; }
@@ -5847,6 +5904,15 @@ html.js-anim .scrolly-root .fade.d3 { transition-delay: .3s; }
   transition: background 0.14s ease, color 0.14s ease;
 }
 .logos-root .lg-viz-transport button:hover { background: rgba(53, 70, 32, 0.07); color: var(--lg-ink); }
+/* Same trick as the zoom cluster: the target grows past the visible chip so a
+   thumb can land on it, without loosening a control bar that is meant to read
+   as one instrument rather than a row of separate buttons. */
+.logos-root .lg-viz-transport button { position: relative; }
+.logos-root .lg-viz-transport button::after {
+  content: '';
+  position: absolute;
+  inset: -9px -4px;
+}
 .logos-root .lg-viz-play {
   display: inline-flex;
   align-items: center;
@@ -5886,15 +5952,34 @@ html.js-anim .scrolly-root .fade.d3 { transition-delay: .3s; }
   min-width: 3.4ch;
   color: var(--lg-ink);
 }
+/* The slider is the instrument's main control — the thing you drag to watch
+   the mathematics move — so its hit area is the thing that matters most.
+
+   It used to be 3px tall: the element WAS the track, so the 13px thumb drew
+   outside a 3px box and only that 3px band accepted the pointer. It looked
+   grabbable and mostly was not. The element is now 24px of transparent hit
+   area with the 3px track painted by ::-*-track instead, so the picture is
+   unchanged and the target is eight times larger. */
 .logos-root .lg-viz-slider input[type='range'] {
   -webkit-appearance: none;
   appearance: none;
   width: 118px;
+  height: 24px;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  outline: none;
+  cursor: pointer;
+}
+.logos-root .lg-viz-slider input[type='range']::-webkit-slider-runnable-track {
   height: 3px;
   border-radius: 2px;
   background: var(--lg-line);
-  outline: none;
-  cursor: pointer;
+}
+.logos-root .lg-viz-slider input[type='range']::-moz-range-track {
+  height: 3px;
+  border-radius: 2px;
+  background: var(--lg-line);
 }
 .logos-root .lg-viz-slider input[type='range']::-webkit-slider-thumb {
   -webkit-appearance: none;
@@ -5905,6 +5990,9 @@ html.js-anim .scrolly-root .fade.d3 { transition-delay: .3s; }
   background: var(--lg-paper);
   border: 1.5px solid var(--lg-primary);
   cursor: grab;
+  /* centre the 13px thumb on the 3px track: (3 - 13) / 2 */
+  margin-top: -5px;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
 }
 .logos-root .lg-viz-slider input[type='range']::-moz-range-thumb {
   width: 13px;
@@ -5913,6 +6001,20 @@ html.js-anim .scrolly-root .fade.d3 { transition-delay: .3s; }
   background: var(--lg-paper);
   border: 1.5px solid var(--lg-primary);
   cursor: grab;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+/* A little feedback that it is grabbable, and that you have it. */
+.logos-root .lg-viz-slider input[type='range']:hover::-webkit-slider-thumb { transform: scale(1.15); }
+.logos-root .lg-viz-slider input[type='range']:hover::-moz-range-thumb { transform: scale(1.15); }
+.logos-root .lg-viz-slider input[type='range']:active::-webkit-slider-thumb {
+  transform: scale(1.15); box-shadow: 0 0 0 5px rgba(53, 70, 32, 0.12); cursor: grabbing;
+}
+.logos-root .lg-viz-slider input[type='range']:active::-moz-range-thumb {
+  transform: scale(1.15); box-shadow: 0 0 0 5px rgba(53, 70, 32, 0.12); cursor: grabbing;
+}
+@media (prefers-reduced-motion: reduce) {
+  .logos-root .lg-viz-slider input[type='range']::-webkit-slider-thumb,
+  .logos-root .lg-viz-slider input[type='range']::-moz-range-thumb { transition: none; }
 }
 .logos-root .lg-viz-slider input[type='range']:focus-visible {
   box-shadow: 0 0 0 3px rgba(53, 70, 32, 0.16);

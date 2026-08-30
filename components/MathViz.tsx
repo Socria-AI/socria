@@ -15,7 +15,7 @@
 // to zoom, drag to pan) and the scene itself (change the expression, change
 // the concept). Logos proposes the picture; you own it once it is on screen.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
   autoParams,
   CORE_KINDS,
@@ -28,6 +28,7 @@ import {
   kindNarrates,
   kindNeedsExpr,
   resolveView,
+  scaleView,
   RESERVED_PARAM,
   sanitizeViz,
   overlayId,
@@ -72,9 +73,6 @@ const RUN_MS = 7000;
 const SPEEDS = [0.5, 1, 2];
 /** How far one notch of the wheel zooms. */
 const ZOOM_STEP = 1.14;
-/** Beyond these the axis labels turn to float dust and the curve to a line. */
-const MIN_SPAN = 1e-7;
-const MAX_SPAN = 1e9;
 /** How long after the last keystroke the edited scene is written to the session. */
 const PERSIST_MS = 700;
 
@@ -109,6 +107,7 @@ export function MathViz({
   // JSON on every extraction and identity would say the picture changed when
   // nothing about it did — resetting the window and the animation each time a
   // message went past.
+  const uid = useId().replace(/:/g, '');
   const [edited, setEdited] = useState<VizScene | null>(null);
   const propKey = sceneSignature(scene);
   useEffect(() => {
@@ -153,6 +152,18 @@ export function MathViz({
   const geomRef = useRef<Geom | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
   const dragRef = useRef<{ x: number; y: number; view: Viewport } | null>(null);
+  /**
+   * Every pointer currently down on the plot, by id.
+   *
+   * One is a pan. Two is a pinch, and a pinch is the only way to zoom on a
+   * touch device: there is no wheel, and the buttons in the corner were
+   * hover-revealed, so before this the graph simply could not be zoomed with
+   * a finger. Tracked here rather than in dragRef because a pinch has to know
+   * about both pointers at once.
+   */
+  const ptrs = useRef<Map<number, { x: number; y: number }>>(new Map());
+  /** Span and midpoint of the pinch when the second finger landed. */
+  const pinchRef = useRef<{ dist: number; view: Viewport; cx: number; cy: number } | null>(null);
   const persistRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // A different scene is a different problem: back to its own defaults, its
@@ -240,20 +251,10 @@ export function MathViz({
   const zoomAbout = useCallback((cx: number, cy: number, factor: number) => {
     const g = geomRef.current;
     if (!g) return;
-    const v = g.view;
-    const next: Viewport = {
-      xMin: cx + (v.xMin - cx) * factor,
-      xMax: cx + (v.xMax - cx) * factor,
-      yMin: cy + (v.yMin - cy) * factor,
-      yMax: cy + (v.yMax - cy) * factor,
-    };
-    const w = next.xMax - next.xMin;
-    const h = next.yMax - next.yMin;
-    // Refuse the zoom rather than half-apply it: a window that has collapsed
-    // in one axis only is worse than one that would not move.
-    if (![next.xMin, next.xMax, next.yMin, next.yMax].every(Number.isFinite)) return;
-    if (w < MIN_SPAN || h < MIN_SPAN || w > MAX_SPAN || h > MAX_SPAN) return;
-    setPan(next);
+    // scaleView refuses a degenerate window rather than half-applying it, and
+    // is shared with the pinch below so both gestures obey the same limits.
+    const next = scaleView(g.view, cx, cy, factor);
+    if (next) setPan(next);
   }, []);
 
   /** Zoom on the centre — what the +/− buttons and the keyboard use. */
@@ -286,18 +287,71 @@ export function MathViz({
     return () => el.removeEventListener('wheel', onWheel);
   }, [dataAt, zoomAbout]);
 
+  /** Screen distance and midpoint between the two live pointers. */
+  const pinchGeom = () => {
+    const [a, b] = [...ptrs.current.values()];
+    if (!a || !b) return null;
+    return {
+      dist: Math.hypot(a.x - b.x, a.y - b.y),
+      mx: (a.x + b.x) / 2,
+      my: (a.y + b.y) / 2,
+    };
+  };
+
   const onPointerDown = (e: React.PointerEvent<SVGSVGElement>) => {
-    if (e.button !== 0) return;
+    // Touch and pen have no meaningful button; only filter real mouse clicks,
+    // or a finger (which reports button 0) would be fine but a pen barrel
+    // press would silently do nothing.
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
     const g = geomRef.current;
     if (!g) return;
-    dragRef.current = { x: e.clientX, y: e.clientY, view: g.view };
-    (e.currentTarget as SVGSVGElement).setPointerCapture(e.pointerId);
+    ptrs.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    try {
+      (e.currentTarget as SVGSVGElement).setPointerCapture(e.pointerId);
+    } catch {
+      // InvalidPointerId — the pointer can be gone by the time this runs.
+      // Capture is an improvement (the drag survives leaving the element),
+      // not a requirement, and letting it throw here would abort the handler
+      // before either the pan or the pinch had been set up.
+    }
+
+    if (ptrs.current.size === 2) {
+      // A pinch has begun. Drop the pan so the view does not get moved by one
+      // finger and scaled by both at the same time.
+      dragRef.current = null;
+      const pg = pinchGeom();
+      const at = pg && dataAt(pg.mx, pg.my);
+      if (pg && at) pinchRef.current = { dist: pg.dist, view: g.view, cx: at.x, cy: at.y };
+      return;
+    }
+    if (ptrs.current.size === 1) {
+      dragRef.current = { x: e.clientX, y: e.clientY, view: g.view };
+    }
   };
 
   const onPointerMove = (e: React.PointerEvent<SVGSVGElement>) => {
-    const d = dragRef.current;
     const g = geomRef.current;
-    if (!d || !g) return;
+    if (!g) return;
+    if (ptrs.current.has(e.pointerId)) {
+      ptrs.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    }
+
+    // ── two fingers: scale about the point they started around ──
+    const pinch = pinchRef.current;
+    if (pinch && ptrs.current.size >= 2) {
+      const pg = pinchGeom();
+      if (!pg || pg.dist < 1 || pinch.dist < 1) return;
+      // Spreading enlarges the picture, so the window shrinks — hence the
+      // ratio this way round. Measured against where the pinch STARTED, not
+      // the last frame, so the scale cannot drift as the fingers move.
+      const next = scaleView(pinch.view, pinch.cx, pinch.cy, pinch.dist / pg.dist);
+      if (next) setPan(next);
+      return;
+    }
+
+    // ── one pointer: pan ──
+    const d = dragRef.current;
+    if (!d) return;
     // Convert the pixel drag into data units through the same matrix the
     // drawing uses, so the graph tracks the cursor exactly rather than
     // approximately.
@@ -316,14 +370,58 @@ export function MathViz({
   };
 
   const endDrag = (e: React.PointerEvent<SVGSVGElement>) => {
-    if (!dragRef.current) return;
-    dragRef.current = null;
+    ptrs.current.delete(e.pointerId);
+    if (ptrs.current.size < 2) pinchRef.current = null;
+    if (ptrs.current.size === 1) {
+      // Lifting one finger of a pinch: hand the survivor a fresh pan origin,
+      // or the view would jump by however far the two had travelled together.
+      const g = geomRef.current;
+      const [only] = [...ptrs.current.values()];
+      if (g && only) dragRef.current = { x: only.x, y: only.y, view: g.view };
+    } else {
+      dragRef.current = null;
+    }
     try {
       (e.currentTarget as SVGSVGElement).releasePointerCapture(e.pointerId);
     } catch {
       /* the pointer may already be gone */
     }
   };
+
+  /**
+   * The plot from the keyboard.
+   *
+   * It was reachable by mouse and by finger and by nothing else: no tabindex,
+   * no key handling, and role="img" telling assistive technology it was a
+   * picture rather than an instrument. Arrows pan by a tenth of the window,
+   * +/- zoom about the centre, and 0 fits — the same three things the mouse
+   * can do, which is the bar this had to clear.
+   */
+  const onKeyDown = useCallback(
+    (e: React.KeyboardEvent<SVGSVGElement>) => {
+      const g = geomRef.current;
+      if (!g) return;
+      const v = g.view;
+      const stepX = (v.xMax - v.xMin) * 0.1;
+      const stepY = (v.yMax - v.yMin) * 0.1;
+      const move = (dx: number, dy: number) =>
+        setPan({ xMin: v.xMin + dx, xMax: v.xMax + dx, yMin: v.yMin + dy, yMax: v.yMax + dy });
+
+      switch (e.key) {
+        case 'ArrowLeft': move(-stepX, 0); break;
+        case 'ArrowRight': move(stepX, 0); break;
+        case 'ArrowUp': move(0, stepY); break;
+        case 'ArrowDown': move(0, -stepY); break;
+        // '=' is the unshifted key most people actually press for '+'.
+        case '+': case '=': zoomCentre(1 / ZOOM_STEP); break;
+        case '-': case '_': zoomCentre(ZOOM_STEP); break;
+        case '0': setPan(null); break;
+        default: return; // anything else belongs to the page
+      }
+      e.preventDefault();
+    },
+    [zoomCentre]
+  );
 
   // ── editing the scene ─────────────────────────────────────────────
 
@@ -426,7 +524,13 @@ export function MathViz({
 
   const xTicks = ticks(view.xMin, view.xMax);
   const yTicks = ticks(view.yMin, view.yMax);
-  const clipId = 'lgviz-clip';
+  // Unique per instance. These were fixed strings, so two plots on one page
+  // would define the same clipPath and marker ids twice and every reference
+  // would resolve to whichever mounted last — one plot silently drawing with
+  // another's clip. Only one renders today; this costs nothing and removes
+  // the trap.
+  const clipId = `${uid}-clip`;
+  const arrowId = `${uid}-arrow`;
 
   return (
     <div className="lg-viz">
@@ -438,19 +542,28 @@ export function MathViz({
           ref={svgRef}
           viewBox={`0 0 ${W} ${H}`}
           className="lg-viz-svg"
-          role="img"
-          aria-label={active.title || 'Mathematical visualisation'}
+          /* Not role="img": this is pannable, zoomable and now operable from
+             the keyboard, and announcing it as a picture told anyone using a
+             screen reader that there was nothing here to do. */
+          role="group"
+          tabIndex={0}
+          aria-label={`${active.title || 'Mathematical visualisation'} — arrow keys pan, plus and minus zoom, 0 fits`}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={endDrag}
           onPointerCancel={endDrag}
+          onKeyDown={onKeyDown}
+          /* A double click is the one gesture everyone already expects to
+             mean "put it back", and it is the only way to fit without going
+             to the corner. */
+          onDoubleClick={() => setPan(null)}
         >
           <defs>
             <clipPath id={clipId}>
               <rect x={PAD.l} y={PAD.t} width={plotW} height={plotH} />
             </clipPath>
             <marker
-              id="lgviz-arrow"
+              id={arrowId}
               viewBox="0 0 8 8"
               refX="7"
               refY="4"
@@ -492,10 +605,27 @@ export function MathViz({
 
           <g clipPath={`url(#${clipId})`}>
             {frame.objects.map((ob) => (
-              <Obj key={ob.id} ob={ob} sx={sx} sy={sy} view={view} pad={PAD} plotW={plotW} plotH={plotH} />
+              <Obj
+                key={ob.id}
+                ob={ob}
+                sx={sx}
+                sy={sy}
+                view={view}
+                pad={PAD}
+                plotW={plotW}
+                plotH={plotH}
+                arrowId={arrowId}
+              />
             ))}
           </g>
         </svg>
+
+        {/* Sibling of the svg, so the focus-visible rule above can reveal it
+            without JavaScript tracking focus. aria-hidden because the same
+            words are already in the svg's own label. */}
+        <p className="lg-viz-keys" aria-hidden="true">
+          ← → ↑ ↓ pan · + − zoom · 0 fit
+        </p>
 
         <div className="lg-viz-zoom" role="group" aria-label="Zoom">
           <button type="button" onClick={() => zoomCentre(1 / ZOOM_STEP)} aria-label="Zoom in" title="Zoom in">
@@ -1008,6 +1138,7 @@ function Obj({
   pad,
   plotW,
   plotH,
+  arrowId,
 }: {
   ob: VizObject;
   sx: (x: number) => number;
@@ -1016,6 +1147,8 @@ function Obj({
   pad: { l: number; r: number; t: number; b: number };
   plotW: number;
   plotH: number;
+  /** the arrow marker belonging to THIS plot — see the note on clipId */
+  arrowId: string;
 }) {
   const stroke = TONE[ob.tone ?? 'primary'];
   const dash = 'dashed' in ob && ob.dashed ? '4 4' : undefined;
@@ -1094,7 +1227,7 @@ function Obj({
             y2={sy(ob.y2)}
             stroke={stroke}
             strokeWidth={2}
-            markerEnd="url(#lgviz-arrow)"
+            markerEnd={`url(#${arrowId})`}
           />
           {ob.label && (
             <text x={sx(ob.x2) + 6} y={sy(ob.y2) - 6} className="lg-viz-lab" fill={stroke}>

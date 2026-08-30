@@ -1,4 +1,4 @@
-import { sanitizeViz, compileScene, resolveView, buildFrame, defaults, sweepValue, sweepProgress, sweptParam } from './.tmp/logos-viz.mjs';
+import { sanitizeViz, compileScene, resolveView, buildFrame, defaults, sweepValue, sweepProgress, sweptParam, scaleView, VIEW_MIN_SPAN, VIEW_MAX_SPAN } from './.tmp/logos-viz.mjs';
 let pass = 0, fail = 0;
 const ok = (n, c, extra = '') => c ? pass++ : (fail++, console.log(`FAIL ${n} ${extra}`));
 const near = (n, got, want, tol = 1e-3) => ok(n, Math.abs(got - want) < tol, `got ${got} want ${want}`);
@@ -93,6 +93,54 @@ for (const [nm, r] of [['deriv', D], ['limit', L], ['riemann', R], ['fn', F]]) {
 }
 const poly = frame({ kind: 'limit', expr: '1/x', a: 0 }, { d: 0.5 });
 ok('pole: still renders', !!poly && poly.frame.objects.length > 0);
+
+console.log('\n=== scaleView: every zoom goes through one function ===');
+{
+  const V = { xMin: -10, xMax: 10, yMin: -5, yMax: 5 };
+  const w = (v) => +(v.xMax - v.xMin).toFixed(6);
+  const h = (v) => +(v.yMax - v.yMin).toFixed(6);
+
+  const inn = scaleView(V, 0, 0, 0.5);
+  ok('factor < 1 narrows the window', w(inn) === 10 && h(inn) === 5, JSON.stringify(inn));
+  const out = scaleView(V, 0, 0, 2);
+  ok('factor > 1 widens it', w(out) === 40 && h(out) === 20, JSON.stringify(out));
+  ok('factor 1 is identity', JSON.stringify(scaleView(V, 3, 3, 1)) === JSON.stringify(V));
+
+  // The anchor is the whole point: the thing under the cursor stays put.
+  const at = scaleView(V, 6, 2, 0.5);
+  ok('anchor stays at the same fraction across x',
+     Math.abs((6 - at.xMin) / (at.xMax - at.xMin) - (6 - V.xMin) / (V.xMax - V.xMin)) < 1e-12);
+  ok('anchor stays at the same fraction across y',
+     Math.abs((2 - at.yMin) / (at.yMax - at.yMin) - (2 - V.yMin) / (V.yMax - V.yMin)) < 1e-12);
+
+  console.log('\n=== …and refuses rather than half-applying ===');
+  ok('rejects a collapse below the floor', scaleView(V, 0, 0, 1e-12) === null);
+  ok('rejects a blow-up past the ceiling', scaleView(V, 0, 0, 1e12) === null);
+  ok('rejects zero', scaleView(V, 0, 0, 0) === null);
+  ok('rejects a negative factor', scaleView(V, 0, 0, -2) === null);
+  ok('rejects NaN factor', scaleView(V, 0, 0, NaN) === null);
+  ok('rejects Infinity factor', scaleView(V, 0, 0, Infinity) === null);
+  ok('rejects a NaN anchor', scaleView(V, NaN, 0, 0.5) === null);
+  ok('rejects an Infinite anchor', scaleView(V, 0, Infinity, 0.5) === null);
+  ok('limits are exported for the caller', VIEW_MIN_SPAN > 0 && VIEW_MAX_SPAN > VIEW_MIN_SPAN);
+
+  // A refusal must leave nothing behind — the caller keeps its own view.
+  const before = JSON.stringify(V);
+  scaleView(V, 0, 0, 1e-12);
+  ok('does not mutate the window it was given', JSON.stringify(V) === before);
+
+  console.log('\n=== a pinch is the same operation ===');
+  // Spreading fingers 100px -> 300px is factor 100/300, i.e. zoom in 3x.
+  const pinched = scaleView(V, 0, 0, 100 / 300);
+  ok('spreading narrows the window', w(pinched) < w(V), String(w(pinched)));
+  const squeezed = scaleView(V, 0, 0, 300 / 100);
+  ok('squeezing widens it', w(squeezed) > w(V), String(w(squeezed)));
+  // Round trip: in then out by the reciprocal returns the start.
+  const round = scaleView(scaleView(V, 4, 1, 0.4), 4, 1, 1 / 0.4);
+  ok('a pinch and its reciprocal round-trip',
+     Math.abs(round.xMin - V.xMin) < 1e-9 && Math.abs(round.yMax - V.yMax) < 1e-9,
+     JSON.stringify(round));
+}
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -202,6 +202,50 @@ export const CORE_KINDS: VizKind[] = ['function', 'limit', 'derivative', 'rieman
 export const SQUARE_KINDS = new Set<VizKind>(['matrix', 'vectors']);
 
 /** Widen one axis of a viewport about its centre until units match pixels. */
+/**
+ * How far the window may be scaled before the picture stops meaning anything.
+ * Past the lower bound the tick labels are float dust; past the upper one the
+ * curve is a horizontal line.
+ */
+export const VIEW_MIN_SPAN = 1e-7;
+export const VIEW_MAX_SPAN = 1e9;
+
+/**
+ * Scale a window about a fixed point — the operation behind every zoom, from
+ * whichever direction it arrives: the wheel, the +/- buttons, the keyboard,
+ * and a two-finger pinch.
+ *
+ * `factor` is applied to the window, not to the picture, so it reads
+ * backwards from the gesture: spreading two fingers apart makes the window
+ * SMALLER, and the caller passes a factor below 1.
+ *
+ * Returns null rather than a repaired window when the result is unusable.
+ * Refusing is the right answer because the alternative is applying the part
+ * that worked: a window that has collapsed along one axis only is harder to
+ * recover from than one that simply did not move.
+ */
+export function scaleView(
+  v: Viewport,
+  cx: number,
+  cy: number,
+  factor: number
+): Viewport | null {
+  if (!Number.isFinite(factor) || factor <= 0) return null;
+  if (!Number.isFinite(cx) || !Number.isFinite(cy)) return null;
+  const next: Viewport = {
+    xMin: cx + (v.xMin - cx) * factor,
+    xMax: cx + (v.xMax - cx) * factor,
+    yMin: cy + (v.yMin - cy) * factor,
+    yMax: cy + (v.yMax - cy) * factor,
+  };
+  if (![next.xMin, next.xMax, next.yMin, next.yMax].every(Number.isFinite)) return null;
+  const w = next.xMax - next.xMin;
+  const h = next.yMax - next.yMin;
+  if (w < VIEW_MIN_SPAN || h < VIEW_MIN_SPAN) return null;
+  if (w > VIEW_MAX_SPAN || h > VIEW_MAX_SPAN) return null;
+  return next;
+}
+
 export function squareView(view: Viewport, plotW: number, plotH: number): Viewport {
   const ux = plotW / (view.xMax - view.xMin);
   const uy = plotH / (view.yMax - view.yMin);
