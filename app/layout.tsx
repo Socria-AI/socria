@@ -4,6 +4,14 @@ import { Instrument_Serif, Inter, Kalam, STIX_Two_Text } from 'next/font/google'
 import { ClerkProvider } from '@clerk/nextjs';
 import { Analytics } from '@vercel/analytics/react';
 import './globals.css';
+import {
+  clerkConfigured,
+  clerkKeyMismatch,
+  currentEnv,
+  isProduction,
+} from '@/lib/environment';
+import { EnvBadge } from '@/components/EnvBadge';
+import { SetupNotice } from '@/components/SetupNotice';
 
 const serif = Instrument_Serif({
   subsets: ['latin'],
@@ -40,6 +48,11 @@ const siteUrl =
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
+  // A preview build carries its own noindex, so it stays out of search even
+  // if something links to it. robots.txt asks; this tells.
+  ...(isProduction()
+    ? {}
+    : { robots: { index: false, follow: false, nocache: true } }),
   title: {
     default: 'Socria — AI that sharpens your thinking',
     template: '%s — Socria',
@@ -69,6 +82,21 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  // A build with no Clerk credentials cannot mount ClerkProvider, and until
+  // now that was a 500 with nothing to read. On a preview or a local build it
+  // is nearly always one missing pair of environment variables, so say which
+  // ones. Production keeps failing loudly: there, missing auth is not a
+  // configuration note, it is an outage.
+  if (!clerkConfigured() && !isProduction()) {
+    return (
+      <html lang="en" className={`${serif.variable} ${sans.variable} ${hand.variable} ${stix.variable}`}>
+        <body className="paper-bg antialiased">
+          <SetupNotice env={currentEnv()} />
+        </body>
+      </html>
+    );
+  }
+
   return (
     <ClerkProvider
       signInUrl="/sign-in"
@@ -136,6 +164,15 @@ export default function RootLayout({
       <html lang="en" className={`${serif.variable} ${sans.variable} ${hand.variable} ${stix.variable}`}>
         <body className="paper-bg antialiased">
           {children}
+          {/* Non-production only, so the real site never carries it. */}
+          {!isProduction() && (
+            <EnvBadge
+              env={currentEnv() === 'preview' ? 'preview' : 'development'}
+              clerk={
+                clerkKeyMismatch() ? 'mismatch' : clerkConfigured() ? 'ok' : 'missing'
+              }
+            />
+          )}
           <Analytics />
         </body>
       </html>

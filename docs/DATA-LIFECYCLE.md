@@ -221,6 +221,9 @@ with dashboard access:
 - MFA on the Supabase, Vercel, Clerk, Stripe, OpenAI and GitHub accounts.
 - Rotate any key that predates this document or has ever been pasted anywhere.
 - Separate dev / staging / production projects, so a mistake in development
-  cannot reach real conversations.
+  cannot reach real conversations. The steps are written up in
+  `docs/PRIVATE-DEV.md`; the repo side (previews refuse crawlers, carry a
+  badge, and warn on a Clerk key mismatch) is done, and what remains is
+  scoping the Supabase, Stripe and OpenAI credentials per environment.
 - Decide whether a DPA and Zero Data Retention with OpenAI are worth having
   before the first enterprise conversation, not during it.
