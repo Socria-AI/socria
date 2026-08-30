@@ -22,15 +22,14 @@ export const SOCRIA_ONE = {
 
 export type Plan = 'free' | 'one';
 
-/** What the free tier holds. Deliberately enough to become invested in. */
-export const FREE_LIMITS = {
-  /** lines of thinking you can keep at once */
-  conversations: 2,
-  /** nodes a free map will grow to before it stops taking on new ones */
-  mapNodes: 4,
-  /** Research runs per conversation — enough to feel what it does */
-  research: 1,
-} as const;
+// Imported for the map cap's default; entitlements imports only the TYPE
+// above, so this edge is one-directional at runtime.
+import { PLANS } from './entitlements';
+
+// The numbers that used to live here are in lib/entitlements.ts now — one
+// table, both plans, read by the UI and the routes alike. A limit written in
+// two places disagrees with itself the first time it changes, and these are
+// meant to change as we learn what they should be.
 
 // Typed codes that open One without billing attached, mirroring the Core 3
 // access key already in the product. Soft gates, not secrets — like that key,
@@ -144,7 +143,7 @@ export function meaningfulNodes(map: MapLike | null | undefined): number {
 export function capMapForFree<T extends MapLike>(
   next: T,
   current: MapLike | null | undefined,
-  limit: number = FREE_LIMITS.mapNodes
+  limit: number = PLANS.free.mapNodes ?? 8
 ): { map: T; capped: boolean } {
   const nodes = next?.nodes ?? [];
   if (nodes.length <= limit) return { map: next, capped: false };

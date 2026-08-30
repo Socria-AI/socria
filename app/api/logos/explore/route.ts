@@ -21,8 +21,10 @@ import { guidanceBlock, resolveDepth, resolveGuard } from '@/lib/logos-guidance'
 import { styleBlock } from '@/lib/logos-style';
 import { personalityBlock } from '@/lib/logos-personality';
 import { isValidAccessKey } from '@/lib/socria-prompt';
-import { FREE_LIMITS, depthForPlan } from '@/lib/socria-one';
+import { depthForPlan } from '@/lib/socria-one';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
+import { boundaryNote, type Counter } from '@/lib/entitlements';
+import { spend } from '@/lib/usage';
 import { enforceRateLimit } from '@/lib/rate-limit';
 import {
   MODE_META,
@@ -72,19 +74,26 @@ export async function POST(req: NextRequest) {
   }
 
   const plan = await resolvePlanForRequest(req, userId);
-  // Research is the one mode a free reader meets a boundary in — they get to
-  // run it and see what it does, and it's the SECOND reach for the evidence
-  // that One opens. Explore, Challenge and Trace stay open: Trace especially,
-  // since seeing where your own thought came from is never a paid feature.
-  // The count is the client's word (nothing here is persisted per user), so
-  // this is a boundary, not a lock — the honest shape for a soft gate.
-  if (plan === 'free' && mode === 'research') {
-    const used = Number.isFinite(body?.researchUsed) ? Number(body.researchUsed) : 0;
-    if (used >= FREE_LIMITS.research) {
+
+  // Every node action a free reader gets to TRY once, per line of thinking —
+  // Explore, Challenge and Research — and then meets a boundary. Trace is
+  // never metered at any tier: seeing where your own thought came from is not
+  // a paid feature, and neither is correcting it.
+  //
+  // The count comes from the usage store, not from the request. This route
+  // used to read `body.researchUsed`, which meant a client posting a zero
+  // bought itself unlimited Research.
+  if (mode !== 'trace') {
+    const counter = mode as Counter;
+    const chatId = typeof body?.sessionId === 'string' ? body.sessionId : null;
+    const allowance = await spend(userId, plan, counter, chatId);
+    if (!allowance.ok) {
       return NextResponse.json(
         {
-          error: 'Research beyond the first is part of Socria One.',
-          upgrade: 'research',
+          error: boundaryNote(counter),
+          upgrade: counter,
+          used: allowance.used,
+          limit: allowance.limit,
         },
         { status: 402 }
       );

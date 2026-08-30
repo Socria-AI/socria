@@ -22,6 +22,7 @@ alter table conversations        enable row level security;
 alter table user_profiles        enable row level security;
 alter table logos_connections    enable row level security;
 alter table socria_subscriptions enable row level security;
+alter table logos_usage           enable row level security;
 
 -- Force it for the table owner too, so a future superuser-ish role does not
 -- silently slip past the policies it thinks are protecting it. The service
@@ -31,6 +32,7 @@ alter table conversations        force row level security;
 alter table user_profiles        force row level security;
 alter table logos_connections    force row level security;
 alter table socria_subscriptions force row level security;
+alter table logos_usage           force row level security;
 
 -- Deliberately no policies. With RLS on and no policy granting access, anon
 -- and authenticated see nothing. If direct client access is ever added, add
@@ -43,3 +45,4 @@ revoke all on conversations        from anon, authenticated;
 revoke all on user_profiles        from anon, authenticated;
 revoke all on logos_connections    from anon, authenticated;
 revoke all on socria_subscriptions from anon, authenticated;
+revoke all on logos_usage           from anon, authenticated;

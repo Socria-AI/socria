@@ -27,7 +27,6 @@ import { ModelGlyph } from '@/components/ModelGlyph';
 import { SocriaOneModal } from '@/components/SocriaOneModal';
 import { OneLock } from '@/components/OneLock';
 import {
-  FREE_LIMITS,
   SOCRIA_ONE_KEY,
   isValidOneKey,
   meaningfulNodes,
@@ -58,6 +57,7 @@ import { ConnectionsModal } from '@/components/ConnectionsModal';
 import type { Attachment, AttachmentOrigin } from '@/lib/logos-attachments';
 import { MAX_CONTEXTS_PER_NODE, sanitizeContexts, type NodeContext } from '@/lib/logos-sources';
 import { relevantNodes, type DraftAction, type DraftResponse } from '@/lib/logos-draft';
+import { boundaryNote, limitsFor, type Counter } from '@/lib/entitlements';
 import { DRIFT_DISMISS_LIMIT, readDrift, type DriftVerdict } from '@/lib/topic-drift';
 import {
   MATH_FADE_MS,
@@ -106,7 +106,17 @@ const REMEMBER_MARK = '[[REMEMBER]]';
 // Socria One, held client-side the way the Core 3 key already is. The routes
 // re-decide this for themselves; nothing here is the authority.
 const ONE_KEY_STORAGE = 'socria.one.v1';
-const RESEARCH_KEY = 'socria.logos.research.v1';
+
+/** How each metered thing is named in the free-tier panel. */
+const LIMIT_NOUN: Partial<Record<Counter, string>> = {
+  explore: 'Explore',
+  research: 'Research',
+  images: 'image',
+  files: 'file',
+};
+// The research counter used to live in localStorage and be posted with each
+// request, which made the browser the authority on its own limit. It is on
+// the server now; see lib/usage.ts.
 // Connected sources (Drive/Docs/Calendar/Gmail/Notion) are dormant: Google's
 // restricted scopes can't be published publicly without a paid security
 // assessment, so rather than gate Socria behind a test-user list, the door is
@@ -170,7 +180,10 @@ export function LogosApp({
   const [oneOpen, setOneOpen] = useState(false);
   const [oneReason, setOneReason] = useState<string | undefined>();
   // Research runs already spent, per session id.
-  const [researchUsed, setResearchUsed] = useState<Record<string, number>>({});
+  // What has actually been spent, as the SERVER counts it. The client used
+  // to keep this itself and post it with each request, which meant the
+  // browser was the authority on its own limits; now it only draws them.
+  const [usage, setUsage] = useState<Record<string, { used: number; limit: number | null }>>({});
   // Checkout is a redirect, so the button needs to show it's gone somewhere.
   const [oneBusy, setOneBusy] = useState(false);
   const [oneError, setOneError] = useState<string | null>(null);
@@ -500,8 +513,6 @@ export function LogosApp({
       if (typeof st === 'string' && st.trim()) setStyleText(st);
       const pr = sanitizePersonality(JSON.parse(localStorage.getItem(PERSONALITY_KEY) || '{}'));
       setPersona(pr);
-      const spent = JSON.parse(localStorage.getItem(RESEARCH_KEY) || '{}');
-      if (spent && typeof spent === 'object') setResearchUsed(spent);
     } catch {}
     const t = setTimeout(() => setAuthSettled(true), 1200);
     return () => clearTimeout(t);
@@ -592,6 +603,21 @@ export function LogosApp({
 
   // Anonymous but key-unlocked callers identify with the header; signed-in
   // users are authorized by their session alone.
+  const refreshUsage = useCallback(
+    async (chatId?: string | null) => {
+      try {
+        const q = chatId ? `?chat=${encodeURIComponent(chatId)}` : '';
+        const res = await fetch(`/api/logos/usage${q}`);
+        if (!res.ok) return;
+        const json = await res.json();
+        if (json?.counters) setUsage(json.counters);
+      } catch {
+        /* the panel simply does not update; nothing depends on it */
+      }
+    },
+    []
+  );
+
   const keyHeaders = useCallback(
     (): Record<string, string> => ({
       ...(unlocked && !isSignedIn ? { 'x-socria-key': CORE3_ACCESS_KEY } : {}),
@@ -798,6 +824,12 @@ export function LogosApp({
     };
   }, [hasAccess, authSettled, isSignedIn]);
 
+  // The counts belong to a conversation as much as to a month, so they are
+  // re-read whenever the conversation on screen changes.
+  useEffect(() => {
+    void refreshUsage(activeId);
+  }, [activeId, plan, refreshUsage]);
+
   function switchSession(id: string) {
     if (id === activeIdRef.current) return;
     setActiveId(id);
@@ -820,15 +852,13 @@ export function LogosApp({
   }
 
   function newSession() {
-    // A free reader keeps two lines of thinking. Both stay entirely usable —
-    // it's starting a THIRD that One opens, and an empty unused session
-    // doesn't count against them.
-    if (!one) {
-      const used = sessionsRef.current.filter((x) => x.messages.length > 0).length;
-      if (used >= FREE_LIMITS.conversations) {
-        askOne('You have both of your free lines of thinking open. Socria One keeps as many as you have.');
-        return;
-      }
+    // The month's count is the server's, and it is spent when a line of
+    // thinking BEGINS rather than when an empty one is created — so opening
+    // Logos and closing it again costs nothing. Everything already open stays
+    // open and stays usable; what runs out is starting another.
+    if (!one && chatsSpent) {
+      askOne(boundaryNote('chats'));
+      return;
     }
     const fresh = emptySession();
     applySessions([fresh, ...sessionsRef.current]);
@@ -1094,12 +1124,16 @@ export function LogosApp({
 
   // ── acting on a node ───────────────────────────────────────────────
   /** The free map is full: new thinking will no longer be added to it. */
-  const atMapBoundary = !one && meaningfulNodes(map) >= FREE_LIMITS.mapNodes;
+  const atMapBoundary =
+    !one && meaningfulNodes(map) >= (limitsFor(plan).mapNodes ?? Infinity);
 
-  /** Research runs already spent in the conversation on screen. */
-  const researchSpent = researchUsed[activeId ?? ''] ?? 0;
-  /** Research is the only node action a free reader can run out of. */
-  const researchLocked = !one && researchSpent >= FREE_LIMITS.research;
+  /** Whether a metered action has run out, by the server's count. */
+  const spentOf = (c: Counter) => {
+    const u = usage[c];
+    return !!u && u.limit !== null && u.used >= u.limit;
+  };
+  const chatsSpent = spentOf('chats');
+  const researchLocked = spentOf('research');
 
   async function runAction(mode: NodeMode, node: MapNodeRef) {
     // Explore, Challenge and Trace stay open at every tier — Trace especially,
@@ -1128,18 +1162,9 @@ export function LogosApp({
     }
 
     const seq = ++exploreSeq.current;
-    // Spend the run only when we actually go and look — a cached result
-    // reopened costs nothing and shouldn't count against them.
-    if (mode === 'research' && !one) {
-      const sid = activeIdRef.current ?? '';
-      setResearchUsed((prev) => {
-        const next = { ...prev, [sid]: (prev[sid] ?? 0) + 1 };
-        try {
-          localStorage.setItem(RESEARCH_KEY, JSON.stringify(next));
-        } catch {}
-        return next;
-      });
-    }
+    // The spend happens on the server, at the moment it does the work — a
+    // cached result reopened never reaches the route, so it costs nothing.
+    // All the client does afterwards is re-read the count.
     setExplore({ key: cacheKey, mode, node, data: null, loading: true, error: null, open: true });
     try {
       const res = await fetch('/api/logos/explore', {
@@ -1153,12 +1178,20 @@ export function LogosApp({
           messages,
           map: mode === 'trace' ? map : undefined,
           contexts: contextsRef.current[node.id] ?? [],
-          researchUsed: researchSpent,
           ...guidance(),
         }),
       });
+      if (res.status === 402) {
+        // A boundary, not a failure: the server has the authoritative count.
+        const json = await res.json().catch(() => null);
+        void refreshUsage(activeIdRef.current);
+        setExplore((e) => ({ ...e, loading: false, open: false }));
+        askOne(json?.error || boundaryNote(mode as Counter));
+        return;
+      }
       if (!res.ok) throw new Error('Could not look that up right now.');
       const json = await res.json();
+      void refreshUsage(activeIdRef.current);
       // A newer click may have landed while this was in flight.
       if (seq !== exploreSeq.current) return;
       const result: ExploreResult | null = json?.explore ?? null;
@@ -1206,6 +1239,7 @@ export function LogosApp({
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...keyHeaders() },
         body: JSON.stringify({
+          sessionId: activeIdRef.current,
           messages: payload,
           focus: {
             label: node.label,
@@ -1252,7 +1286,7 @@ export function LogosApp({
       const res = await fetch('/api/logos/read', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...keyHeaders() },
-        body: JSON.stringify({ image: dataUrl }),
+        body: JSON.stringify({ image: dataUrl, sessionId: activeIdRef.current }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -1313,8 +1347,19 @@ export function LogosApp({
       const res = await fetch('/api/logos/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...keyHeaders() },
-        body: JSON.stringify({ messages: next, ...guidance() }),
+        body: JSON.stringify({ sessionId: activeIdRef.current, messages: next, ...guidance() }),
       });
+      if (res.status === 402) {
+        // A boundary rather than a failure: the turn is put back in the
+        // composer so nothing they wrote is lost to a limit.
+        const body = await res.json().catch(() => ({}));
+        void refreshUsage(activeIdRef.current);
+        patchActive((sn) => ({ ...sn, messages: sn.messages.slice(0, -1) }), false);
+        setInput(content);
+        setBusy(false);
+        askOne(body?.error || boundaryNote('chats'));
+        return;
+      }
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error || 'Something went wrong.');
@@ -1844,6 +1889,40 @@ export function LogosApp({
           {/* Which mind you're talking to, and how deep it goes — kept beside
               the box you type in rather than parked up in the header. Both
               menus open upward; they sit at the bottom of the screen. */}
+          {/* What the free tier holds, said plainly and once. Nobody should
+              discover a limit by hitting it. Reads the same counts the routes
+              enforce against, so it cannot claim room that is not there. */}
+          {!one && usage.chats && (
+            <div className="lg-allow" role="note">
+              <span className="lg-allow-tier">Free Logos</span>
+              <span className="lg-allow-items">
+                {(() => {
+                  const cap = usage.chats.limit ?? 0;
+                  const left = Math.max(0, cap - usage.chats.used);
+                  return (
+                    <span className={left === 0 ? 'is-out' : undefined}>
+                      {/* the plural agrees with the TOTAL, not the remainder:
+                          "1 of 2 chats left", never "1 of 2 chat left" */}
+                      {left} of {cap} {cap === 1 ? 'chat' : 'chats'} left this month
+                    </span>
+                  );
+                })()}
+                {(['explore', 'research', 'images', 'files'] as Counter[]).map((c) => {
+                  const u = usage[c];
+                  if (!u || u.limit === null) return null;
+                  return (
+                    <span key={c} className={u.used >= u.limit ? 'is-out' : undefined}>
+                      {u.limit} {LIMIT_NOUN[c]} per chat
+                    </span>
+                  );
+                })}
+              </span>
+              <button type="button" className="lg-allow-go" onClick={() => askOne()}>
+                Socria One
+              </button>
+            </div>
+          )}
+
           <div className="lg-tools">
             {one && oneManageable && (
               <button

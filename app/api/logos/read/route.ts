@@ -12,6 +12,9 @@ import { LOGOS_MODEL, LOGOS_FALLBACK_MODEL } from '@/lib/logos';
 import { IMAGE_READ_PROMPT, MAX_READING_CHARS } from '@/lib/logos-attachments';
 import { isValidAccessKey } from '@/lib/socria-prompt';
 import { enforceRateLimit } from '@/lib/rate-limit';
+import { resolvePlanForRequest } from '@/lib/socria-one-server';
+import { boundaryNote } from '@/lib/entitlements';
+import { spend } from '@/lib/usage';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -39,6 +42,24 @@ export async function POST(req: NextRequest) {
   const image = typeof body?.image === 'string' ? body.image.trim() : '';
   if (!image || image.length > MAX_DATA_URL || !DATA_URL.test(image)) {
     return NextResponse.json({ error: 'A base64 image data URL is required.' }, { status: 400 });
+  }
+
+  // Reading an image is where the cost is, so it is where the count is —
+  // attaching one is free and the boundary is met at the moment Logos would
+  // actually look. A free reader gets one per line of thinking, so they see
+  // what reading an image DOES before they meet the limit.
+  const plan = await resolvePlanForRequest(req, userId);
+  const allowance = await spend(
+    userId,
+    plan,
+    'images',
+    typeof body?.sessionId === 'string' ? body.sessionId : null
+  );
+  if (!allowance.ok) {
+    return NextResponse.json(
+      { error: boundaryNote('images'), upgrade: 'images', used: allowance.used, limit: allowance.limit },
+      { status: 402 }
+    );
   }
 
   const openai = new OpenAI({ apiKey });

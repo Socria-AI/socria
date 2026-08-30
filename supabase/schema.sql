@@ -89,3 +89,44 @@ create table if not exists socria_subscriptions (
 
 create index if not exists socria_subscriptions_customer_idx
   on socria_subscriptions (stripe_customer_id);
+
+-- Metered usage, for the free tier's boundaries.
+--
+-- One row per (person, scope, counter). `scope` is what the counter resets
+-- with: a calendar month for the monthly ones ('2026-08'), or a single
+-- conversation for the per-chat ones ('chat:lg_abc123'). Sharing one table
+-- between the two keeps a single place to read, write and expire — and makes
+-- adding a counter a config change rather than a migration.
+--
+-- Deliberately NOT in `conversations`: a per-chat counter must survive the
+-- conversation being deleted, or deleting a chat would refund what it spent.
+create table if not exists logos_usage (
+  user_id text not null,
+  scope text not null,
+  counter text not null,
+  n integer not null default 0,
+  updated_at bigint not null,
+  primary key (user_id, scope, counter)
+);
+
+create index if not exists logos_usage_user_scope_idx
+  on logos_usage (user_id, scope);
+
+-- Atomic increment. Read-then-write from the application would race two
+-- tabs against each other and lose counts; this cannot.
+create or replace function bump_logos_usage(
+  p_user text, p_scope text, p_counter text, p_by integer, p_at bigint
+) returns integer
+language plpgsql
+as $$
+declare
+  out_n integer;
+begin
+  insert into logos_usage (user_id, scope, counter, n, updated_at)
+  values (p_user, p_scope, p_counter, p_by, p_at)
+  on conflict (user_id, scope, counter)
+  do update set n = logos_usage.n + p_by, updated_at = p_at
+  returning n into out_n;
+  return out_n;
+end;
+$$;

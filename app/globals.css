@@ -5918,6 +5918,53 @@ html.js-anim .scrolly-root .fade.d3 { transition-delay: .3s; }
   box-shadow: 0 0 0 3px rgba(53, 70, 32, 0.16);
 }
 
+/* What the free tier holds. A line of quiet type above the composer — the
+   one place a limit should be met is before it is hit. */
+.logos-root .lg-allow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  margin: 0 0 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--lg-line);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.5);
+  font-size: 11.5px;
+  color: var(--lg-ink-40);
+}
+.logos-root .lg-allow-tier {
+  color: var(--lg-ink-60);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+.logos-root .lg-allow-items { display: flex; flex-wrap: wrap; gap: 3px 10px; }
+.logos-root .lg-allow-items > span::after {
+  content: '·';
+  margin-left: 10px;
+  opacity: 0.5;
+}
+.logos-root .lg-allow-items > span:last-child::after { content: ''; margin: 0; }
+/* Spent, not scolding: the same grey a shade darker, never red. */
+.logos-root .lg-allow-items > span.is-out { color: var(--lg-secondary); }
+.logos-root .lg-allow-go {
+  margin-left: auto;
+  border: 0;
+  background: transparent;
+  color: var(--lg-one);
+  font: inherit;
+  font-size: 11.5px;
+  padding: 2px 4px;
+  border-radius: 5px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.logos-root .lg-allow-go:hover { background: var(--lg-one-soft); }
+
+@media (max-width: 640px) {
+  .logos-root .lg-allow { font-size: 11px; padding: 5px 8px; }
+}
+
 /* the wrong-chat note: an aside, deliberately not a modal */
 .logos-root .lg-drift {
   position: relative;

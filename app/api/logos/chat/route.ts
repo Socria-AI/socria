@@ -16,6 +16,9 @@ import {
   buildFocusPrompt,
 } from '@/lib/logos';
 import { renderMessageForModel, sanitizeAttachments } from '@/lib/logos-attachments';
+import { resolvePlanForRequest } from '@/lib/socria-one-server';
+import { boundaryNote } from '@/lib/entitlements';
+import { bumpUsage, checkAllowance, spend } from '@/lib/usage';
 import { renderContextsForNode, sanitizeNodeContextList } from '@/lib/logos-sources';
 import { guidanceBlock, resolveDepth, resolveGuard } from '@/lib/logos-guidance';
 import { styleBlock } from '@/lib/logos-style';
@@ -97,6 +100,65 @@ export async function POST(req: NextRequest) {
     const f = body?.focus;
     const trim = (v: any, n: number) =>
       typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().slice(0, n) : '';
+    const plan = await resolvePlanForRequest(req, userId);
+
+    // ── the metered boundaries ────────────────────────────────────
+    //
+    // Two counts happen here because this is the only route that sees a turn
+    // arrive with its attachments and its history.
+    //
+    // A "chat" is counted when a line of thinking BEGINS — one user turn and
+    // nothing before it — not when an empty session is created. So opening
+    // Logos and closing it again costs nothing, and the count matches what
+    // the person would call a conversation. A node-focus request is never a
+    // beginning, whatever its history looks like.
+    const sessionId = typeof body?.sessionId === 'string' ? body.sessionId : null;
+    const userTurns = clean.filter((m: { role: string }) => m.role === 'user').length;
+    const isNewChat = !body?.focus && userTurns <= 1;
+
+    if (isNewChat) {
+      const allowance = await spend(userId, plan, 'chats');
+      if (!allowance.ok) {
+        return NextResponse.json(
+          {
+            error: boundaryNote('chats'),
+            upgrade: 'chats',
+            used: allowance.used,
+            limit: allowance.limit,
+          },
+          { status: 402 }
+        );
+      }
+    }
+
+    // Files are counted on the turn that carries them — only the newest one,
+    // since the history repeats every earlier attachment on every request and
+    // counting those again would charge the same file over and over.
+    const newest = clean[clean.length - 1] as { role?: string; attachments?: unknown[] } | undefined;
+    const freshFiles =
+      newest?.role === 'user'
+        ? (newest.attachments ?? []).filter(
+            (a) => (a as { kind?: string })?.kind === 'text'
+          ).length
+        : 0;
+    if (freshFiles > 0) {
+      const allowance = await checkAllowance(userId, plan, 'files', sessionId);
+      if (!allowance.ok) {
+        return NextResponse.json(
+          {
+            error: boundaryNote('files'),
+            upgrade: 'files',
+            used: allowance.used,
+            limit: allowance.limit,
+          },
+          { status: 402 }
+        );
+      }
+      if (userId && allowance.limit !== null) {
+        await bumpUsage(userId, 'files', sessionId, freshFiles);
+      }
+    }
+
     const focusLabel = trim(f?.label, 120);
     const focusContexts = sanitizeNodeContextList(f?.contexts);
     const system = focusLabel
