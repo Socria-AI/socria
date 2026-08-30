@@ -328,6 +328,10 @@ function fmtParam(p: VizParam, v: number): string {
 // ── sampling ────────────────────────────────────────────────────────
 
 const SAMPLES = 320;
+/** Ceiling on adaptive refinement, so a pathological curve cannot run away. */
+const MAX_SAMPLES = 3200;
+/** How many times one segment may be bisected. */
+const SUB_DEPTH = 9;
 
 /**
  * Sample f over [xMin,xMax] with the given scope. Non-finite values are kept
@@ -340,14 +344,84 @@ export function sampleCurve(
   scope: Record<string, number>,
   xMin: number,
   xMax: number,
-  n = SAMPLES
+  n = SAMPLES,
+  view?: Viewport
+): Pt[] {
+  return sampleAdaptive((x) => fn.eval({ ...scope, [varName]: x }), xMin, xMax, n, view);
+}
+
+/**
+ * Sample any x → y into a polyline, refining where it moves fastest.
+ *
+ * Split out from sampleCurve because the curves a builder computes itself —
+ * a Taylor polynomial, say — need exactly the same treatment, and having two
+ * samplers would mean fixing this twice.
+ */
+export function sampleAdaptive(
+  evalAt: (x: number) => number,
+  xMin: number,
+  xMax: number,
+  n = SAMPLES,
+  view?: Viewport
 ): Pt[] {
   const pts: Pt[] = [];
   for (let i = 0; i <= n; i++) {
     const x = xMin + ((xMax - xMin) * i) / n;
-    pts.push({ x, y: fn.eval({ ...scope, [varName]: x }) });
+    pts.push({ x, y: evalAt(x) });
   }
-  return pts;
+  if (!view) return pts;
+
+  // ── adaptive refinement ───────────────────────────────────────────
+  //
+  // A fixed number of evenly spaced samples is fine at rest and falls apart
+  // when zoomed out. Zoom x² out by sixty notches and the arms leave the top
+  // of the frame within a few units of the origin, so of 320 samples only
+  // FOUR land anywhere visible — and the parabola renders as a handful of
+  // 500-pixel straight segments, a jagged spike rather than a curve.
+  //
+  // So where a segment climbs more than a fraction of the window's height,
+  // bisect it and look again. That puts samples where the curve is actually
+  // moving, which is exactly where a polyline needs them, and leaves the flat
+  // stretches alone.
+  const span = view.yMax - view.yMin;
+  if (!(span > 0)) return pts;
+  const tol = span / 40; // ≈ 12px on a typical panel: below this the eye cannot tell
+  const far = span * 1.5; // beyond here the curve is off-frame and unseeable
+
+  let budget = MAX_SAMPLES - pts.length;
+  const out: Pt[] = [];
+
+  const refine = (a: Pt, b: Pt, depth: number) => {
+    if (depth <= 0 || budget <= 0) return;
+    const af = Number.isFinite(a.y);
+    const bf = Number.isFinite(b.y);
+    // One end defined and the other not: bisect toward the boundary so the
+    // curve actually meets the edge of a pole instead of stopping short.
+    const straddlesUndefined = af !== bf;
+    if (!straddlesUndefined) {
+      if (!af && !bf) return; // both undefined — nothing between them to draw
+      // Both far off the same side of the frame: no visible detail between
+      // them, so refining would only spend budget on invisible points.
+      const aOut = a.y > view.yMax + far ? 1 : a.y < view.yMin - far ? -1 : 0;
+      const bOut = b.y > view.yMax + far ? 1 : b.y < view.yMin - far ? -1 : 0;
+      if (aOut !== 0 && aOut === bOut) return;
+      if (Math.abs(b.y - a.y) <= tol) return; // already smooth enough
+    }
+    const mx = (a.x + b.x) / 2;
+    if (!(mx > a.x && mx < b.x)) return; // float floor: cannot subdivide further
+    const m: Pt = { x: mx, y: evalAt(mx) };
+    budget--;
+    refine(a, m, depth - 1);
+    out.push(m);
+    refine(m, b, depth - 1);
+  };
+
+  for (let i = 0; i < pts.length - 1; i++) {
+    out.push(pts[i]);
+    refine(pts[i], pts[i + 1], SUB_DEPTH);
+  }
+  out.push(pts[pts.length - 1]);
+  return out;
 }
 
 /**
@@ -652,7 +726,7 @@ const buildFunction: Builder = (scene, fn, vals, view) => {
       objects.push({
         o: 'curve',
         id: 'ghost',
-        pts: sampleCurve(fn, scene.varName, base, view.xMin, view.xMax),
+        pts: sampleCurve(fn, scene.varName, base, view.xMin, view.xMax, SAMPLES, view),
         tone: 'ghost',
         width: 1.4,
         dashed: true,
@@ -662,7 +736,7 @@ const buildFunction: Builder = (scene, fn, vals, view) => {
   objects.push({
     o: 'curve',
     id: 'f',
-    pts: sampleCurve(fn, scene.varName, vals, view.xMin, view.xMax),
+    pts: sampleCurve(fn, scene.varName, vals, view.xMin, view.xMax, SAMPLES, view),
     tone: 'primary',
     width: 2,
   });
@@ -791,7 +865,7 @@ const buildLimit: Builder = (scene, fn, vals, view, guarded) => {
   const yr = at(fn, varName, vals, right);
 
   const objects: VizObject[] = [
-    { o: 'curve', id: 'f', pts: sampleCurve(fn, varName, vals, view.xMin, view.xMax), tone: 'primary', width: 2 },
+    { o: 'curve', id: 'f', pts: sampleCurve(fn, varName, vals, view.xMin, view.xMax, SAMPLES, view), tone: 'primary', width: 2 },
     { o: 'vrule', id: 'a', at: a, tone: 'muted', dashed: true, label: `${varName} = ${fmt(a)}` },
   ];
 
@@ -958,7 +1032,7 @@ const buildDerivative: Builder = (scene, fn, vals, view, guarded) => {
   const slope = (yq - ya) / h;
 
   const objects: VizObject[] = [
-    { o: 'curve', id: 'f', pts: sampleCurve(fn, varName, vals, view.xMin, view.xMax), tone: 'primary', width: 2 },
+    { o: 'curve', id: 'f', pts: sampleCurve(fn, varName, vals, view.xMin, view.xMax, SAMPLES, view), tone: 'primary', width: 2 },
   ];
 
   // The rise and run, drawn as the two legs of the difference quotient. This
@@ -1065,7 +1139,7 @@ const buildRiemann: Builder = (scene, fn, vals, view, guarded) => {
 
   const objects: VizObject[] = [
     { o: 'rects', id: 'bars', bars, tone: 'accent' },
-    { o: 'curve', id: 'f', pts: sampleCurve(fn, varName, vals, view.xMin, view.xMax), tone: 'primary', width: 2 },
+    { o: 'curve', id: 'f', pts: sampleCurve(fn, varName, vals, view.xMin, view.xMax, SAMPLES, view), tone: 'primary', width: 2 },
     { o: 'vrule', id: 'a', at: a, tone: 'muted', dashed: true, label: `${varName} = ${fmt(a)}` },
     { o: 'vrule', id: 'b', at: b, tone: 'muted', dashed: true, label: `${varName} = ${fmt(b)}` },
   ];
@@ -1152,7 +1226,7 @@ const buildTaylor: Builder = (scene, fn, vals, view, guarded) => {
   // Exact coefficients via series AD — never finite differences.
   const coeffs = taylorCoeffs(scene.expr, varName, scope, a, k);
   const objects: VizObject[] = [
-    { o: 'curve', id: 'f', pts: sampleCurve(fn, varName, vals, view.xMin, view.xMax), tone: 'primary', width: 2 },
+    { o: 'curve', id: 'f', pts: sampleCurve(fn, varName, vals, view.xMin, view.xMax, SAMPLES, view), tone: 'primary', width: 2 },
   ];
   const readouts: VizReadout[] = [
     { id: 'k', tex: 'k', value: String(k), help: 'The degree: the highest power the polynomial is allowed to use.' },
@@ -1164,15 +1238,14 @@ const buildTaylor: Builder = (scene, fn, vals, view, guarded) => {
       for (let i = coeffs.length - 1; i >= 0; i--) acc = acc * (x - a) + coeffs[i];
       return acc;
     };
-    const pts: Pt[] = [];
-    const N = 320;
+    // Through the same adaptive sampler as every other curve: a high-degree
+    // polynomial leaves the frame even faster than the function it is chasing,
+    // and drawn on a uniform grid it comes out as the same jagged spike.
+    const pts = sampleAdaptive(P, view.xMin, view.xMax, SAMPLES, view);
     let worst = 0;
-    for (let i = 0; i <= N; i++) {
-      const x = view.xMin + ((view.xMax - view.xMin) * i) / N;
-      const y = P(x);
-      pts.push({ x, y });
-      const fy = at(fn, varName, vals, x);
-      if (Number.isFinite(fy) && Number.isFinite(y)) worst = Math.max(worst, Math.abs(fy - y));
+    for (const pt of pts) {
+      const fy = at(fn, varName, vals, pt.x);
+      if (Number.isFinite(fy) && Number.isFinite(pt.y)) worst = Math.max(worst, Math.abs(fy - pt.y));
     }
     objects.push({ o: 'curve', id: 'P', pts, tone: 'accent', width: 1.8 });
     const fa = at(fn, varName, vals, a);
@@ -1915,7 +1988,7 @@ function overlayObjects(
     out.push({
       o: 'curve',
       id: `ov_${ov.id}`,
-      pts: sampleCurve(fn, scene.varName, vals, view.xMin, view.xMax),
+      pts: sampleCurve(fn, scene.varName, vals, view.xMin, view.xMax, SAMPLES, view),
       tone: USER_TONES[slot % USER_TONES.length],
       width: 1.8,
     });
