@@ -29,6 +29,9 @@ import {
   resolveView,
   RESERVED_PARAM,
   sanitizeViz,
+  overlayId,
+  overlayLegend,
+  sceneDraws,
   sceneSignature,
   SQUARE_KINDS,
   squareView,
@@ -41,6 +44,7 @@ import {
   type Viewport,
   type VizKind,
   type VizFrame,
+  type PlotExpression,
   type VizObject,
   type VizParam,
   type VizScene,
@@ -54,6 +58,12 @@ const TONE: Record<Tone, string> = {
   tension: 'var(--lg-tension)',
   muted: 'var(--lg-ink-40)',
   ghost: 'var(--lg-ink-24)',
+  // The reader's own curves. Distinct from the teaching palette above so it
+  // stays obvious which marks are Socria's and which are yours.
+  u1: '#7C6A9C',
+  u2: '#3F7F6E',
+  u3: '#B07C3A',
+  u4: '#5A7BA6',
 };
 
 /** One full sweep, at 1×. Slow enough to watch, short enough to rewatch. */
@@ -101,6 +111,13 @@ export function MathViz({
     // persisted the incoming scene IS that edit, so clearing here is a no-op
     // rather than a fight over who owns the picture.
     setEdited(null);
+    // The editor was drafting the OLD scene, so it closes with it — but only
+    // for a scene arriving from OUTSIDE. Keying this on the active scene
+    // instead would slam the editor shut on every edit made THROUGH it: add
+    // an expression, and the box you typed it into vanishes.
+    setDraft(null);
+    setError(null);
+    setAsked(null);
   }, [propKey]);
 
   const active = edited ?? scene;
@@ -109,7 +126,7 @@ export function MathViz({
   const compiled = useMemo(() => compileScene(active), [activeKey]); // eslint-disable-line react-hooks/exhaustive-deps
   // vectors / matrix / distribution carry their objects directly; for them a
   // null compile is the normal state, not a failure.
-  const usable = !kindNeedsExpr(active.kind) || !!compiled;
+  const usable = sceneDraws(active);
   const autoView = useMemo(
     () => (usable ? resolveView(active, compiled) : null),
     [activeKey, compiled, usable] // eslint-disable-line react-hooks/exhaustive-deps
@@ -139,11 +156,6 @@ export function MathViz({
     setVals(defaults(active));
     setPlaying(false);
     setPan(null);
-    // The editor was drafting the OLD scene; leaving it open against a new
-    // one desyncs the toggle and edits a picture that is no longer there.
-    setDraft(null);
-    setError(null);
-    setAsked(null);
     const p = sweptParam(active);
     progRef.current = p ? sweepProgress(p, defaults(active)[p.id]) : 0;
   }, [activeKey]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -556,6 +568,21 @@ export function MathViz({
 
       {draft && <Editor draft={draft} error={error} varName={active.varName} onChange={applyDraft} />}
 
+      {(active.overlays?.length || draft) && (
+        <Expressions
+          scene={active}
+          open={!!draft}
+          onChange={(overlays) => {
+            const next: VizScene = { ...active, overlays };
+            // An overlay-only scene with nothing left on it is no scene at
+            // all; keep it rather than blanking the surface mid-edit.
+            setEdited(next);
+            if (persistRef.current) clearTimeout(persistRef.current);
+            persistRef.current = setTimeout(() => onSceneChange?.(next), PERSIST_MS);
+          }}
+        />
+      )}
+
       <p className="lg-viz-caption">{guarded && frame.ask ? frame.ask : frame.caption}</p>
     </div>
   );
@@ -596,6 +623,123 @@ function Explain({
       </button>
     </div>
   );
+}
+
+/**
+ * What is on the plot, and the smallest set of controls for changing it:
+ * show, hide, remove, add. Deliberately a list and not a panel — the plot is
+ * the instrument, and this is a margin note about it.
+ *
+ * Always visible when there are overlays, because a curve you cannot find the
+ * switch for is worse than one you never added. The add row appears only with
+ * the editor open, so the resting state stays a legend.
+ */
+function Expressions({
+  scene,
+  open,
+  onChange,
+}: {
+  scene: VizScene;
+  open: boolean;
+  onChange: (next: PlotExpression[]) => void;
+}) {
+  const [adding, setAdding] = useState('');
+  const [addErr, setAddErr] = useState(false);
+  const rows = overlayLegend(scene);
+
+  const set = (id: string, patch: Partial<PlotExpression>) =>
+    onChange((scene.overlays ?? []).map((o) => (o.id === id ? { ...o, ...patch } : o)));
+
+  const add = () => {
+    const expr = adding.trim();
+    if (!expr) return;
+    const taken = new Set((scene.overlays ?? []).map((o) => o.id));
+    const next: PlotExpression[] = [
+      ...(scene.overlays ?? []),
+      { id: overlayId(expr, taken), expr, visible: true, source: 'user' },
+    ];
+    // Validation is the sanitizer's, so a typed curve and a spoken one are
+    // held to exactly the same standard.
+    const ok = sanitizeViz({ ...scene, overlays: next });
+    if (!ok?.overlays?.length || ok.overlays.length !== next.length) {
+      setAddErr(true);
+      return;
+    }
+    setAddErr(false);
+    setAdding('');
+    onChange(ok.overlays);
+  };
+
+  if (!rows.length && !open) return null;
+
+  return (
+    <div className="lg-viz-exprs">
+      {rows.map(({ ov, tone, ok }) => (
+        <span key={ov.id} className={`lg-viz-expr${ov.visible ? '' : ' is-off'}`}>
+          <button
+            type="button"
+            className="lg-viz-expr-dot"
+            style={{ background: ov.visible && ok ? TONE[tone] : 'transparent', borderColor: TONE[tone] }}
+            onClick={() => set(ov.id, { visible: !ov.visible })}
+            aria-pressed={ov.visible}
+            title={ov.visible ? 'Hide' : 'Show'}
+          />
+          <span className="lg-viz-expr-tex" title={ov.expr}>
+            {ok ? <TeX tex={texify(ov.label || ov.expr)} /> : <em>{ov.expr}</em>}
+          </span>
+          {open && (
+            <button
+              type="button"
+              className="lg-viz-expr-x"
+              onClick={() => onChange((scene.overlays ?? []).filter((o) => o.id !== ov.id))}
+              aria-label={`Remove ${ov.expr}`}
+              title="Remove"
+            >
+              ×
+            </button>
+          )}
+        </span>
+      ))}
+      {open && (
+        <span className={`lg-viz-expr-add${addErr ? ' is-bad' : ''}`}>
+          <input
+            value={adding}
+            spellCheck={false}
+            placeholder="add an expression"
+            aria-label="Add an expression to the plot"
+            onChange={(e) => {
+              setAdding(e.target.value);
+              setAddErr(false);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                add();
+              }
+            }}
+          />
+          <button type="button" onClick={add} disabled={!adding.trim()} aria-label="Add">
+            +
+          </button>
+        </span>
+      )}
+      {open && rows.length > 0 && (
+        <button type="button" className="lg-viz-expr-clear" onClick={() => onChange([])}>
+          clear
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** Plain notation → LaTeX, well enough for a legend chip. */
+function texify(src: string): string {
+  return src
+    .replace(/\*/g, '\\cdot ')
+    .replace(/\bpi\b/g, '\\pi ')
+    .replace(/\b(sin|cos|tan|ln|log|exp|sqrt|abs)\b/g, '\\$1 ')
+    .replace(/\\sqrt\s*\(([^()]*)\)/g, '\\sqrt{$1}')
+    .replace(/\^\(([^()]*)\)/g, '^{$1}');
 }
 
 // ── the editor ──────────────────────────────────────────────────────

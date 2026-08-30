@@ -572,7 +572,7 @@ Return ONLY JSON, exactly this shape:
   "intent": "learning|verification|utility|exploration",  // ONLY for context=math
   "nodes": [{"id": "short_snake_case_id", "type": "<node type>", "label": "a short phrase in their own framing", "status": "open|supported|resolved|revised", "merged": ["label of a node folded into this one"], "tex": "LaTeX for this node, if mathematical", "flag": "error|verified", "note": "a short annotation or repair hint"}],
   "edges": [{"from": "node_id", "to": "node_id", "relation": "supports|conflicts|depends|relates|leads_to|revises|precedes|part_of|transforms_to|implies|justifies", "strength": "weak|normal|strong", "op": "the operation on a transforms_to edge"}],
-  "viz": {"kind": "function|limit|derivative|riemann|taylor|sequence|vectors|matrix|distribution|ode", "expr": "the function in plain notation", "varName": "x", "a": 0, "b": 1, "rule": "left|right|midpoint", "matrix": [[1, 1], [0, 1]], "vectors": [{"x": 2, "y": 1, "label": "u"}], "dist": "normal|binomial|poisson|exponential", "partial": true, "ghost": true, "view": {"xMin": -6, "xMax": 6}, "params": [{"id": "a", "min": -3, "max": 3, "step": 0.1, "value": 1}], "title": "a short line naming what is being shown"}
+  "viz": {"kind": "function|limit|derivative|riemann|taylor|sequence|vectors|matrix|distribution|ode", "expr": "the function in plain notation", "varName": "x", "a": 0, "b": 1, "rule": "left|right|midpoint", "matrix": [[1, 1], [0, 1]], "vectors": [{"x": 2, "y": 1, "label": "u"}], "dist": "normal|binomial|poisson|exponential", "partial": true, "ghost": true, "overlays": [{"id": "short_id", "expr": "x^2", "label": "optional", "visible": true, "source": "user"}], "view": {"xMin": -6, "xMax": 6}, "params": [{"id": "a", "min": -3, "max": 3, "step": 0.1, "value": 1}], "title": "a short line naming what is being shown"}
 }
 
 READ THE CONTEXT FIRST.
@@ -635,6 +635,13 @@ RULES for viz, all of them load-bearing:
 - FOLLOW WHAT THEY ASKED. "animate as h approaches zero" → kind="derivative". "what happens as n increases" → kind="riemann". "let me change a" → put a in "params". "show me both approaches" → kind="limit". Change the scene when they ask for a different one; keep it when they are still working on this one.
 - The surface writes its own captions and asks its own questions. Do NOT put explanation, results, or values in "title" — it names the picture ("A secant approaching the tangent at x = 1"), nothing more.
 - The Answer Guard reaches this field. The picture shows the MECHANISM — the moving secant, the shrinking rectangles, both sides closing in, the grid mid-transformation — and the surface withholds the limiting value, the eigenvalues, the probability on its own. Never encode the answer in a title.
+THE PLOT IS A WORKSPACE ("overlays"). Curves the person asked for by name live in "overlays", separate from the scene's own teaching drawing, and they PERSIST across turns:
+- "graph x^2", "add 2x + 5", "also show sin(x)" → append to overlays. "remove the quadratic", "hide sin(x)" → drop it, or set visible:false. "change 2x+5 to 3x+5" → edit that entry's expr, keeping its id. "clear the graph" → "overlays": [].
+- CARRY THE WHOLE LIST FORWARD every turn. Emitting overlays at all replaces the list, so a curve you leave out is a curve you removed. If this turn is not about the plot, OMIT the overlays field entirely and everything on it stays.
+- Pure graphing with nothing being taught: kind "function", NO "expr", and every curve in overlays. That way each one can be removed like any other. Only give the scene its own "expr" when it is the subject of a lesson (a limit, a derivative, an integral).
+- Overlays coexist with the lesson. Someone watching a limit at x = 3 who says "also graph x^2" gets both: keep the limit scene exactly as it is and add x^2 to overlays.
+- "zoom around x = 3", "focus near zero" → set "view" tightly around it. Same grammar as "expr"; each overlay must compile over the scene's variable and parameters.
+
 - Match the kind to the WORK: series and convergence → "sequence"; approximating a function near a point → "taylor"; span, basis, dependence → "vectors"; a linear map, eigen-anything → "matrix"; probability, sampling, distributions → "distribution"; growth, decay, populations, anything with dy/dx → "ode".
 
 Node types mean:

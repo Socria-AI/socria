@@ -58,6 +58,13 @@ import { ConnectionsModal } from '@/components/ConnectionsModal';
 import type { Attachment, AttachmentOrigin } from '@/lib/logos-attachments';
 import { MAX_CONTEXTS_PER_NODE, sanitizeContexts, type NodeContext } from '@/lib/logos-sources';
 import { relevantNodes, type DraftAction, type DraftResponse } from '@/lib/logos-draft';
+import { DRIFT_DISMISS_LIMIT, readDrift, type DriftVerdict } from '@/lib/topic-drift';
+import {
+  MATH_FADE_MS,
+  readMathSignal,
+  readMathTopic,
+  shouldShowMath,
+} from '@/lib/math-context';
 import {
   CONTEXT_LABEL,
   EMPTY_MAP,
@@ -85,6 +92,8 @@ const KEY_STORAGE = 'socria.core3AccessKey.v1';
 const DEPTH_KEY = 'socria.depth.v1';
 // Same store the Core chat reads, so picking a model here lands there.
 const REVEALED_KEY = 'socria.logos.revealed.v1';
+/** How often this person has told us a topic change was intentional. */
+const DRIFT_KEY = 'socria.logos.driftDismissals.v1';
 // Custom instructions — how Socria should work with this person. The key is
 // product-wide by design so other surfaces can adopt it; today Logos is the
 // one that reads it.
@@ -254,6 +263,57 @@ export function LogosApp({
   );
   const messages = active?.messages ?? [];
   const map = active?.map ?? EMPTY_MAP;
+
+  // ── is mathematics in play? ───────────────────────────────────────
+  // Local and deterministic, so it can run on every keystroke; sticky, so the
+  // control never blinks under a moving thumb. The map's own verdict outranks
+  // the regexes, and a scene on the plot settles it outright.
+  const mathInput = useMemo(
+    () => ({
+      context: map.context,
+      composer: input,
+      recent: (active?.messages ?? []).slice(-4).map((m) => m.content),
+      hasViz: !!map.viz,
+    }),
+    [map.context, map.viz, input, active?.messages]
+  );
+  const mathSignal = useMemo(() => readMathSignal(mathInput), [mathInput]);
+  const mathTopic = useMemo(() => readMathTopic(mathInput), [mathInput]);
+  const lastStrongRef = useRef(0);
+  const [mathAvailable, setMathAvailable] = useState(false);
+  useEffect(() => {
+    const now = Date.now();
+    if (mathSignal === 'strong') lastStrongRef.current = now;
+    const next = shouldShowMath(mathSignal, mathAvailable, lastStrongRef.current, now);
+    if (next !== mathAvailable) setMathAvailable(next);
+    // While it is fading, re-check once the window is up so it actually goes.
+    if (mathAvailable && mathSignal !== 'strong') {
+      const t = setTimeout(() => setMathAvailable(false), MATH_FADE_MS);
+      return () => clearTimeout(t);
+    }
+  }, [mathSignal, mathAvailable]);
+
+  // ── wrong-chat ────────────────────────────────────────────────────
+  // Held rather than acted on: the message is sent and answered either way,
+  // and the note is an offer beside it, never a gate in front of it.
+  const [drift, setDrift] = useState<(DriftVerdict & { text: string }) | null>(null);
+  const [driftDismissals, setDriftDismissals] = useState(0);
+  useEffect(() => {
+    try {
+      const n = Number(localStorage.getItem(DRIFT_KEY));
+      if (Number.isFinite(n) && n > 0) setDriftDismissals(n);
+    } catch {}
+  }, []);
+  const dismissDrift = useCallback(() => {
+    setDrift(null);
+    setDriftDismissals((n) => {
+      const next = n + 1;
+      try {
+        localStorage.setItem(DRIFT_KEY, String(next));
+      } catch {}
+      return next;
+    });
+  }, []);
   const draft = active?.draft ?? { title: '', html: '' };
   const contexts = active?.contexts ?? {};
   const contextsRef = useRef<Record<string, NodeContext[]>>({});
@@ -776,6 +836,38 @@ export function LogosApp({
     // A brand-new empty session isn't worth a round trip until it has content.
   }
 
+  /**
+   * Take the message that looked misfiled into a conversation of its own.
+   *
+   * It is a MOVE: the turn is removed from where it landed, so the line of
+   * thinking it interrupted reads as though it was never interrupted. What
+   * was said in reply goes with it, because an answer to a question that is
+   * no longer there is worse than nothing.
+   */
+  function moveDriftToNewChat() {
+    const d = drift;
+    if (!d) return;
+    const from = activeIdRef.current;
+    setDrift(null);
+    const fresh = emptySession();
+    applySessions([
+      fresh,
+      ...sessionsRef.current.map((x) => {
+        if (x.id !== from) return x;
+        let cut = x.messages.length;
+        for (let i = x.messages.length - 1; i >= 0; i--) {
+          if (x.messages[i].role === 'user' && x.messages[i].content === d.text) {
+            cut = i;
+            break;
+          }
+        }
+        return { ...x, messages: x.messages.slice(0, cut), updatedAt: Date.now() };
+      }),
+    ]);
+    switchSession(fresh.id);
+    void send(d.text);
+  }
+
   async function deleteSession(id: string) {
     const remaining = sessionsRef.current.filter((s) => s.id !== id);
     const next = remaining.length ? remaining : [emptySession()];
@@ -847,9 +939,22 @@ export function LogosApp({
               // is in the middle of adjusting survives the next message. A
               // scene the model DOES send replaces it, and if the thinking
               // stops being mathematical the sanitizer drops it anyway.
-              const map = json.map.viz
-                ? json.map
-                : { ...json.map, ...(s.map?.viz ? { viz: s.map.viz } : {}) };
+              // A turn that produced no scene is not a request to remove the
+              // one already on screen — the extractor simply had nothing new
+              // to say about the picture. Carry it across, so a graph someone
+              // is in the middle of adjusting survives the next message. A
+              // scene the model DOES send replaces it, and if the thinking
+              // stops being mathematical the sanitizer drops it anyway.
+              let viz = json.map.viz ?? s.map?.viz;
+              // The reader's curves outlive a distracted extraction. If a new
+              // scene arrives with no opinion about overlays, the ones already
+              // plotted stay; only an explicit empty list clears them. Someone
+              // who asked for x² five turns ago should not lose it because
+              // this turn was about something else.
+              if (json.map.viz && json.map.viz.overlays === undefined && s.map?.viz?.overlays?.length) {
+                viz = { ...json.map.viz, overlays: s.map.viz.overlays };
+              }
+              const map = { ...json.map, ...(viz ? { viz } : {}) };
               return { ...s, map, contexts };
             });
             setChanged(new Set(delta.changed));
@@ -1175,6 +1280,18 @@ export function LogosApp({
     if ((!content && !atts.length) || busy || !activeIdRef.current) return;
     setError(null);
     setInput('');
+
+    // Once, here, on the message as sent — never while typing. The reply
+    // proceeds regardless; this only decides whether a note appears beside it.
+    const s0 = sessionsRef.current.find((x) => x.id === activeIdRef.current);
+    const v = readDrift({
+      message: content,
+      title: s0?.title === UNTITLED ? undefined : s0?.title,
+      recent: (s0?.messages ?? []).map((m) => m.content),
+      context: s0?.map?.context,
+      dismissals: driftDismissals,
+    });
+    setDrift(v.flag ? { ...v, text: content } : null);
 
     const turn: Msg = {
       role: 'user',
@@ -1685,9 +1802,38 @@ export function LogosApp({
             </div>
           )}
 
+          {/* An offer, after the fact. The message was sent and answered;
+              this only asks whether it landed where it was meant to. */}
+          {drift && (
+            <div className="lg-drift" role="note">
+              <span className="lg-drift-text">
+                That reads like {drift.domain === 'code' ? 'a coding' : `a ${drift.domain}`} question,
+                and this line of thinking has been about something else. Did you mean it here?
+              </span>
+              <span className="lg-drift-acts">
+                <button type="button" className="lg-drift-stay" onClick={dismissDrift}>
+                  Keep it here
+                </button>
+                <button type="button" className="lg-drift-move" onClick={moveDriftToNewChat}>
+                  Move to a new chat
+                </button>
+              </span>
+              <button
+                type="button"
+                className="lg-drift-x"
+                onClick={dismissDrift}
+                aria-label="Dismiss"
+              >
+                ×
+              </button>
+            </div>
+          )}
+
           <LogosComposer
             value={input}
             onChange={setInput}
+            mathAvailable={mathAvailable}
+            mathTopic={mathTopic}
             drafts={drafts}
             setDrafts={setDrafts}
             onSend={sendFromComposer}

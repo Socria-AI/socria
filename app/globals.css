@@ -5854,6 +5854,230 @@ html.js-anim .scrolly-root .fade.d3 { transition-delay: .3s; }
   box-shadow: 0 0 0 3px rgba(53, 70, 32, 0.16);
 }
 
+/* the wrong-chat note: an aside, deliberately not a modal */
+.logos-root .lg-drift {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  margin: 0 0 8px;
+  padding: 9px 30px 9px 12px;
+  border: 1px solid var(--lg-line);
+  border-left: 2px solid var(--lg-secondary);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.7);
+  animation: lgDriftIn 0.22s ease both;
+}
+@keyframes lgDriftIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .logos-root .lg-drift { animation: none; }
+}
+.logos-root .lg-drift-text { flex: 1 1 15rem; font-size: 12.5px; line-height: 1.45; color: var(--lg-ink); }
+.logos-root .lg-drift-acts { display: inline-flex; gap: 6px; }
+.logos-root .lg-drift-stay,
+.logos-root .lg-drift-move {
+  border: 1px solid var(--lg-line);
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--lg-ink-60);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1;
+  padding: 6px 10px;
+  border-radius: 7px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.14s ease, color 0.14s ease;
+}
+.logos-root .lg-drift-stay:hover { color: var(--lg-ink); background: rgba(53, 70, 32, 0.06); }
+.logos-root .lg-drift-move { color: var(--lg-primary); border-color: rgba(53, 70, 32, 0.28); }
+.logos-root .lg-drift-move:hover { background: rgba(53, 70, 32, 0.09); }
+.logos-root .lg-drift-x {
+  position: absolute;
+  top: 5px;
+  right: 6px;
+  border: 0;
+  background: transparent;
+  color: var(--lg-ink-40);
+  font: inherit;
+  font-size: 15px;
+  line-height: 1;
+  padding: 3px 5px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.logos-root .lg-drift-x:hover { color: var(--lg-ink); }
+
+/* the maths keypad: only present when mathematics is, and collapsed until asked */
+.logos-root .lg-mathbtn {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--lg-line);
+  border-radius: 9px;
+  background: transparent;
+  color: var(--lg-ink-60);
+  font-family: var(--lg-stix);
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.14s ease, color 0.14s ease, border-color 0.14s ease;
+  animation: lgMathIn 0.2s ease both;
+}
+@keyframes lgMathIn {
+  from { opacity: 0; transform: scale(0.9); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .logos-root .lg-mathbtn { animation: none; }
+}
+.logos-root .lg-mathbtn:hover { color: var(--lg-ink); background: rgba(53, 70, 32, 0.06); }
+.logos-root .lg-mathbtn.is-on {
+  color: var(--lg-primary);
+  border-color: rgba(53, 70, 32, 0.34);
+  background: rgba(53, 70, 32, 0.08);
+}
+
+.logos-root .lg-keypad {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin: 0 0 8px;
+  padding: 9px 10px;
+  border: 1px solid var(--lg-line);
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.72);
+  max-height: 42vh;
+  overflow-y: auto;
+}
+.logos-root .lg-keypad-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+.logos-root .lg-keypad-row.is-promoted {
+  padding-bottom: 6px;
+  margin-bottom: 1px;
+  border-bottom: 1px solid var(--lg-line);
+}
+.logos-root .lg-keypad-label {
+  flex: 0 0 auto;
+  width: 60px;
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--lg-ink-40);
+}
+.logos-root .lg-key {
+  min-width: 34px;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--lg-line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--lg-ink);
+  font-family: var(--lg-stix);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+.logos-root .lg-key.is-wide { min-width: 46px; font-size: 13.5px; }
+.logos-root .lg-key:hover { background: rgba(53, 70, 32, 0.09); border-color: rgba(53, 70, 32, 0.26); }
+.logos-root .lg-key:active { background: rgba(53, 70, 32, 0.16); }
+.logos-root .lg-keypad-row.is-promoted .lg-key {
+  border-color: rgba(53, 70, 32, 0.28);
+  background: rgba(53, 70, 32, 0.05);
+}
+
+/* Mobile: the keypad is where it earns its place, so it gets more room and
+   bigger targets, and the group labels fold away to buy that room. */
+@media (max-width: 640px) {
+  .logos-root .lg-keypad { max-height: 38vh; padding: 8px; }
+  .logos-root .lg-keypad-label { display: none; }
+  .logos-root .lg-key { min-width: 40px; height: 38px; font-size: 16px; }
+  .logos-root .lg-key.is-wide { min-width: 54px; }
+  .logos-root .lg-mathbtn { width: 38px; height: 38px; }
+}
+
+/* what is on the plot — a legend that happens to be operable */
+.logos-root .lg-viz-exprs {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 5px 12px;
+  padding: 5px 2px 0;
+}
+.logos-root .lg-viz-expr {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--lg-ink);
+}
+.logos-root .lg-viz-expr.is-off { opacity: 0.42; }
+.logos-root .lg-viz-expr-dot {
+  width: 11px;
+  height: 11px;
+  flex: 0 0 auto;
+  padding: 0;
+  border: 1.5px solid;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: background 0.14s ease;
+}
+.logos-root .lg-viz-expr-tex { line-height: 1; }
+.logos-root .lg-viz-expr-tex em { font-style: italic; color: var(--lg-tension); }
+.logos-root .lg-viz-expr-x,
+.logos-root .lg-viz-expr-clear {
+  border: 0;
+  background: transparent;
+  color: var(--lg-ink-40);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.logos-root .lg-viz-expr-x:hover,
+.logos-root .lg-viz-expr-clear:hover { color: var(--lg-tension); background: rgba(156, 91, 60, 0.09); }
+.logos-root .lg-viz-expr-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  border-bottom: 1px solid var(--lg-line);
+}
+.logos-root .lg-viz-expr-add.is-bad { border-bottom-color: var(--lg-tension); }
+.logos-root .lg-viz-expr-add input {
+  width: 130px;
+  border: 0;
+  background: transparent;
+  font-family: var(--lg-stix);
+  font-size: 13px;
+  color: var(--lg-ink);
+  padding: 2px;
+  outline: none;
+}
+.logos-root .lg-viz-expr-add button {
+  border: 0;
+  background: transparent;
+  color: var(--lg-ink-40);
+  font: inherit;
+  font-size: 14px;
+  line-height: 1;
+  padding: 2px 5px;
+  cursor: pointer;
+}
+.logos-root .lg-viz-expr-add button:hover:not(:disabled) { color: var(--lg-primary); }
+.logos-root .lg-viz-expr-add button:disabled { opacity: 0.3; cursor: default; }
+
 /* the editor: an equation line, the concept, and whatever that concept needs */
 .logos-root .lg-viz-editbtn {
   border: 1px solid var(--lg-line);

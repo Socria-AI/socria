@@ -122,7 +122,19 @@ export type VizObject =
   | { o: 'label'; id: string; x: number; y: number; text: string; tone?: Tone; anchor?: 'start' | 'middle' | 'end'; dy?: number };
 
 /** Semantic colour roles, resolved to the Logos palette by the renderer. */
-export type Tone = 'primary' | 'accent' | 'tension' | 'muted' | 'ghost';
+export type Tone =
+  | 'primary'
+  | 'accent'
+  | 'tension'
+  | 'muted'
+  | 'ghost'
+  /** the reader's own curves, distinct from Socria's teaching objects */
+  | 'u1'
+  | 'u2'
+  | 'u3'
+  | 'u4';
+
+export const USER_TONES: Tone[] = ['u1', 'u2', 'u3', 'u4'];
 
 export interface VizReadout {
   id: string;
@@ -200,6 +212,43 @@ export function kindNeedsExpr(kind: VizKind): boolean {
   return kind !== 'vectors' && kind !== 'matrix' && kind !== 'distribution';
 }
 
+/**
+ * Whether this scene draws a curve of its OWN, as distinct from the reader's
+ * overlays. A plain graphing session — "graph x², now add 2x+5" — is a
+ * function scene with no expression of its own and everything in the overlay
+ * list, so that every curve on it can be removed like any other. Without this
+ * the first expression someone graphed would be the one they could never take
+ * off again.
+ */
+export function sceneHasOwnCurve(scene: VizScene): boolean {
+  return kindNeedsExpr(scene.kind) && !!scene.expr;
+}
+
+/** Is there anything at all to draw? */
+export function sceneDraws(scene: VizScene): boolean {
+  return sceneHasOwnCurve(scene) || !kindNeedsExpr(scene.kind) || !!scene.overlays?.length;
+}
+
+/**
+ * A curve the reader put on the plot, as opposed to one the lesson drew.
+ *
+ * Overlays ride ON TOP of whatever scene is active, which is what makes
+ * "also graph x²" additive rather than destructive: asking for a curve while
+ * a limit is being demonstrated adds the curve and leaves the demonstration
+ * standing. Because they live in the scene, they persist with the
+ * conversation for free — the same row, the same sanitizer, the same save.
+ */
+export interface PlotExpression {
+  id: string;
+  /** in the evaluator's grammar, over the scene's variable and parameters */
+  expr: string;
+  /** what to call it in the legend; defaults to the expression itself */
+  label?: string;
+  visible: boolean;
+  /** who put it there — the reader, or Socria while teaching */
+  source: 'user' | 'socria';
+}
+
 export interface VizScene {
   kind: VizKind;
   /** the function under study, in the evaluator's grammar */
@@ -224,6 +273,12 @@ export interface VizScene {
   partial?: boolean;
   /** function: ghost the curve at default parameter values for comparison */
   ghost?: boolean;
+  /**
+   * Curves the reader added. Additive to the scene's own drawing, never
+   * instead of it. Undefined and empty mean different things: undefined is
+   * "no opinion, keep what is there", empty is "cleared".
+   */
+  overlays?: PlotExpression[];
   /** a short title, in the person's own framing */
   title?: string;
 }
@@ -377,7 +432,25 @@ export function resolveView(scene: VizScene, fn: CompiledExpr | null): Viewport 
   const special = specialView(scene, fn, scope);
   if (special) return special;
 
-  if (!fn) return { xMin, xMax, yMin: -5, yMax: 5 };
+  if (!fn) {
+    // No curve of its own: the window comes from the reader's overlays alone.
+    const ys: number[] = [];
+    for (const ov of scene.overlays ?? []) {
+      if (!ov.visible) continue;
+      const ofn = compileExpr(ov.expr, [scene.varName, ...scene.params.map((p) => p.id)]);
+      if (!ofn) continue;
+      for (const p of sampleCurve(ofn, scene.varName, scope, xMin, xMax, 160)) {
+        if (Number.isFinite(p.y)) ys.push(p.y);
+      }
+    }
+    if (ys.length < 8) return { xMin, xMax, yMin: -5, yMax: 5 };
+    ys.sort((a, b) => a - b);
+    let lo = Math.min(ys[Math.floor(ys.length * 0.03)], 0);
+    let hi = Math.max(ys[Math.floor(ys.length * 0.97)], 0);
+    if (hi - lo < 1e-6) { lo -= 1; hi += 1; }
+    const pd = (hi - lo) * 0.12;
+    return { xMin, xMax, yMin: lo - pd, yMax: hi + pd };
+  }
 
   // A tangent forming, or two sides of a limit closing, is a LOCAL event. Ask
   // what the function does across the whole window and x^2 on [-1.5, 4] answers
@@ -408,6 +481,23 @@ export function resolveView(scene: VizScene, fn: CompiledExpr | null): Viewport 
     .map((p) => p.y)
     .filter((y) => Number.isFinite(y))
     .sort((a, b) => a - b);
+
+  // A reader's curve that leaves the frame the moment it is added is not much
+  // of an answer to "graph this", so visible overlays get a vote on the
+  // window — a modest one, via the same percentile clip.
+  for (const ov of scene.overlays ?? []) {
+    if (!ov.visible) continue;
+    const ofn = compileExpr(ov.expr, [scene.varName, ...scene.params.map((p) => p.id)]);
+    if (!ofn) continue;
+    const oy = sampleCurve(ofn, scene.varName, scope, sMin, sMax, 120)
+      .map((p) => p.y)
+      .filter((y) => Number.isFinite(y))
+      .sort((a, b) => a - b);
+    if (oy.length > 8) {
+      ys.push(oy[Math.floor(oy.length * 0.1)], oy[Math.floor(oy.length * 0.9)]);
+      ys.sort((a, b) => a - b);
+    }
+  }
   if (ys.length < 4) return { xMin, xMax, yMin: -5, yMax: 5 };
   // Clip the tails so one asymptote does not flatten everything else.
   const lo = ys[Math.floor(ys.length * 0.02)];
@@ -500,8 +590,19 @@ const at = (
 // --- 1. a function, with whatever coefficients are live -------------
 
 const buildFunction: Builder = (scene, fn, vals, view) => {
-  if (!fn) return EMPTY_FRAME;
   const objects: VizObject[] = [];
+  if (!fn) {
+    // Overlays only: the reader's plot. buildFrame appends their curves, so
+    // the frame is theirs entirely and this contributes just the caption.
+    const n = (scene.overlays ?? []).filter((o) => o.visible).length;
+    return {
+      objects,
+      readouts: [],
+      caption: n
+        ? `${n} expression${n === 1 ? '' : 's'} on the plot.`
+        : 'Nothing plotted yet.',
+    };
+  }
   // Transformations teach by comparison: when asked to, keep the curve at its
   // default parameters underneath, so "what did my change do" has a referent.
   if (scene.ghost && scene.params.length) {
@@ -1588,12 +1689,69 @@ export function buildFrame(
   view: Viewport,
   guarded: boolean
 ): VizFrame {
-  return KINDS[scene.kind](scene, fn, vals, view, guarded);
+  const frame = KINDS[scene.kind](scene, fn, vals, view, guarded);
+  const extra = overlayObjects(scene, vals, view);
+  return extra.length ? { ...frame, objects: [...frame.objects, ...extra] } : frame;
+}
+
+/**
+ * The reader's curves, drawn after the lesson's objects so they sit on top
+ * without displacing anything. Compiled per call rather than cached: an
+ * overlay is a handful of samples, and correctness under a changing parameter
+ * matters more here than saving a compile.
+ */
+function overlayObjects(
+  scene: VizScene,
+  vals: Record<string, number>,
+  view: Viewport
+): VizObject[] {
+  const out: VizObject[] = [];
+  let slot = 0;
+  for (const ov of scene.overlays ?? []) {
+    if (!ov.visible) {
+      slot++; // a hidden curve keeps its colour, so showing it again is the same curve
+      continue;
+    }
+    const fn = compileExpr(ov.expr, [scene.varName, ...scene.params.map((p) => p.id)]);
+    if (!fn) {
+      slot++;
+      continue;
+    }
+    out.push({
+      o: 'curve',
+      id: `ov_${ov.id}`,
+      pts: sampleCurve(fn, scene.varName, vals, view.xMin, view.xMax),
+      tone: USER_TONES[slot % USER_TONES.length],
+      width: 1.8,
+    });
+    slot++;
+  }
+  return out;
+}
+
+/** Every overlay that currently draws, with the colour it draws in. */
+export function overlayLegend(
+  scene: VizScene
+): { ov: PlotExpression; tone: Tone; ok: boolean }[] {
+  return (scene.overlays ?? []).map((ov, i) => ({
+    ov,
+    tone: USER_TONES[i % USER_TONES.length],
+    ok: !!compileExpr(ov.expr, [scene.varName, ...scene.params.map((p) => p.id)]),
+  }));
+}
+
+/** A stable id for a new overlay, derived from the expression rather than a clock. */
+export function overlayId(expr: string, taken: Set<string>): string {
+  const base = expr.toLowerCase().replace(/[^a-z0-9]+/g, '').slice(0, 10) || 'expr';
+  let id = base;
+  let n = 2;
+  while (taken.has(id)) id = `${base}${n++}`;
+  return id;
 }
 
 /** Compile a scene's expression over its variable and every parameter. */
 export function compileScene(scene: VizScene): CompiledExpr | null {
-  if (!kindNeedsExpr(scene.kind)) return null;
+  if (!sceneHasOwnCurve(scene)) return null;
   const names = [scene.varName, ...scene.params.map((p) => p.id)];
   if (scene.kind === 'ode') names.push('y'); // dy/dx = f(x, y)
   return compileExpr(scene.expr, names);
@@ -1780,6 +1938,52 @@ const num = (v: any, lo: number, hi: number, dflt: number): number => {
  * guard's question are generated by the builders, so the surface cannot be
  * talked into narrating an answer that Chat is withholding.
  */
+const MAX_OVERLAYS = 6;
+
+/**
+ * The reader's curves, validated. Each must compile over the scene's own
+ * variable and parameters, because an overlay that evaluates to NaN forever
+ * is an invisible entry in a legend that claims something is drawn.
+ */
+function sanitizeOverlays(
+  raw: any,
+  varName: string,
+  paramIds: string[]
+): PlotExpression[] | undefined {
+  // Undefined and empty are DIFFERENT: undefined means the extractor had no
+  // opinion this turn and whatever is on the plot should stay; empty means
+  // clear it. Collapsing them would let a distracted turn wipe the plot.
+  if (raw === undefined || raw === null) return undefined;
+  if (!Array.isArray(raw)) return undefined;
+  const known = [varName, ...paramIds];
+  const seen = new Set<string>();
+  const out: PlotExpression[] = [];
+  for (const o of raw) {
+    const expr = typeof o?.expr === 'string' ? o.expr.trim().slice(0, MAX_EXPR) : '';
+    if (!expr) continue;
+    if (freeNames(expr).some((nm) => !known.includes(nm))) continue;
+    const fn = compileExpr(expr, known);
+    if (!fn) continue;
+    const id =
+      typeof o?.id === 'string' && /^[a-z0-9_]{1,24}$/i.test(o.id)
+        ? o.id.toLowerCase()
+        : overlayId(expr, seen);
+    if (seen.has(id)) continue;
+    seen.add(id);
+    out.push({
+      id,
+      expr,
+      ...(typeof o?.label === 'string' && o.label.trim()
+        ? { label: o.label.replace(/\s+/g, ' ').trim().slice(0, 40) }
+        : {}),
+      visible: o?.visible !== false,
+      source: o?.source === 'socria' ? 'socria' : 'user',
+    });
+    if (out.length >= MAX_OVERLAYS) break;
+  }
+  return out;
+}
+
 function sanitizeMatrix(raw: any): [[number, number], [number, number]] | null {
   if (!Array.isArray(raw) || raw.length !== 2) return null;
   const row = (r: any): [number, number] | null =>
@@ -1813,7 +2017,10 @@ export function sanitizeViz(raw: any): VizScene | null {
 
   const needsExpr = kindNeedsExpr(kind);
   const expr = typeof raw.expr === 'string' ? raw.expr.trim().slice(0, MAX_EXPR) : '';
-  if (needsExpr && !expr) return null;
+  // A bare function scene may have no expression of its own, provided the
+  // reader has put something on it — that is the conversational graphing case.
+  const overlayCount = Array.isArray(raw.overlays) ? raw.overlays.length : 0;
+  if (needsExpr && !expr && !(kind === 'function' && overlayCount > 0)) return null;
 
   // A sequence is indexed by n, always; the ODE's second name is y, always.
   const varName =
@@ -1876,6 +2083,10 @@ export function sanitizeViz(raw: any): VizScene | null {
     ...(kind === 'distribution' && DISTS.includes(raw.dist) ? { dist: raw.dist as DistName } : {}),
     ...(kind === 'sequence' && raw.partial !== false ? { partial: true } : {}),
     ...(raw.ghost === true ? { ghost: true } : {}),
+    ...(() => {
+      const ov = sanitizeOverlays(raw.overlays, varName, params.map((p) => p.id));
+      return ov ? { overlays: ov } : {};
+    })(),
     ...(typeof raw.title === 'string' && raw.title.trim()
       ? { title: raw.title.replace(/\s+/g, ' ').trim().slice(0, MAX_TITLE) }
       : {}),
@@ -1890,7 +2101,7 @@ export function sanitizeViz(raw: any): VizScene | null {
   // bind. An expression mentioning a name with no slider would evaluate to NaN
   // forever and draw an empty canvas, so it is rejected here instead.
   let fn: CompiledExpr | null = null;
-  if (needsExpr) {
+  if (needsExpr && scene.expr) {
     const known = new Set([scene.varName, ...scene.params.map((p) => p.id)]);
     if (scene.kind === 'ode') known.add('y');
     if (freeNames(scene.expr).some((nm) => !known.has(nm))) return null;
@@ -1923,6 +2134,8 @@ export function sanitizeViz(raw: any): VizScene | null {
     for (const pm of scene.params) if (pm.id !== 'k') scope[pm.id] = pm.value;
     if (!taylorCoeffs(scene.expr, scene.varName, scope, scene.a ?? 0, 2)) return null;
   }
+
+  if (!sceneDraws(scene)) return null;
 
   // Finally: it has to actually draw. A scene whose viewport comes out
   // degenerate would render NaN coordinates.
