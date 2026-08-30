@@ -6,7 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "eval:core3": "node evals/core3-progression.mjs"
+    "typecheck": "tsc --noEmit",
+    "test": "node test/run.mjs",
+    "verify": "npm run check:env && npm run typecheck && npm test && npm run build",
+    "eval:core3": "node evals/core3-progression.mjs",
+    "check:env": "node scripts/check-env.mjs"
   },
   "dependencies": {
     "@clerk/nextjs": "^5.7.0",
@@ -32,6 +36,7 @@
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",
     "autoprefixer": "^10.4.20",
+    "esbuild": "^0.25.6",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.13",
     "typescript": "^5.6.0"
