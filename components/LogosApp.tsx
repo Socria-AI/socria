@@ -25,6 +25,10 @@ import { LogosGuide, GUIDE_SEEN_KEY } from '@/components/LogosGuide';
 import { LogosMark } from '@/components/LogosMark';
 import { ModelGlyph } from '@/components/ModelGlyph';
 import { SocriaOneModal } from '@/components/SocriaOneModal';
+import { OnePrompt } from '@/components/OnePrompt';
+import { useOnePrompt } from '@/components/useOnePrompt';
+import { reasonForCounter } from '@/lib/one-prompt';
+import { track } from '@/lib/analytics';
 import { OneLock } from '@/components/OneLock';
 import {
   SOCRIA_ONE_KEY,
@@ -57,7 +61,7 @@ import { ConnectionsModal } from '@/components/ConnectionsModal';
 import type { Attachment, AttachmentOrigin } from '@/lib/logos-attachments';
 import { MAX_CONTEXTS_PER_NODE, sanitizeContexts, type NodeContext } from '@/lib/logos-sources';
 import { relevantNodes, type DraftAction, type DraftResponse } from '@/lib/logos-draft';
-import { boundaryNote, limitsFor, type Counter } from '@/lib/entitlements';
+import { limitsFor, type Counter } from '@/lib/entitlements';
 import { DRIFT_DISMISS_LIMIT, readDrift, type DriftVerdict } from '@/lib/topic-drift';
 import {
   MATH_FADE_MS,
@@ -187,6 +191,8 @@ export function LogosApp({
   // Checkout is a redirect, so the button needs to show it's gone somewhere.
   const [oneBusy, setOneBusy] = useState(false);
   const [oneError, setOneError] = useState<string | null>(null);
+  /** Completed assistant turns this mount — the proactive prompt's only cue. */
+  const [landedTurns, setLandedTurns] = useState(0);
   // The boundary note is dismissible — said once, not nagged.
   const [limitNoteOff, setLimitNoteOff] = useState(false);
   // The extraction wanted to add something and the free map was full.
@@ -417,7 +423,7 @@ export function LogosApp({
     // Free thinking happens at Balanced; the other registers are One's. The
     // routes clamp this too, so the menu and the answer always agree.
     if (!one && next !== 'balanced') {
-      askOne('Quick, Deep and Abstract change how far Logos thinks with you. Socria One opens all four.');
+      ask('depth-locked');
       return;
     }
     setDepth(next);
@@ -627,11 +633,66 @@ export function LogosApp({
     [unlocked, isSignedIn, plan]
   );
 
-  /** Open the Socria One screen, saying which boundary they walked into. */
-  const askOne = useCallback((reason?: string) => {
-    setOneReason(reason);
-    setOneOpen(true);
-  }, []);
+  /**
+   * The prompt controller. Every mention of Socria One that Logos raises on
+   * its own goes through `ask` — it holds the plan check, the cooldowns, the
+   * once-per-session rule and the analytics in one place, so no component
+   * here can open an upgrade modal that nothing is able to rate-limit.
+   */
+  const { prompt: onePrompt, ask, dismiss: dismissPrompt, accept: acceptPrompt } =
+    useOnePrompt({
+      plan,
+      signedIn: !!isSignedIn,
+      context: map.context,
+      sessions,
+      mapNodes: meaningfulNodes(map),
+      surface: 'logos',
+    });
+
+  /**
+   * The one proactive prompt in the product.
+   *
+   * It has a single cue: a thought just finished. Not a timer, not a session
+   * count, not page load — the moment a reply lands is the only moment where
+   * mentioning more room is a continuation of what someone is doing rather
+   * than an interruption of it. Everything else — has this person come back
+   * across days, is the map substantial, have they dismissed one recently, is
+   * this a reflective conversation — is decided inside `ask`.
+   *
+   * The short wait is not a timed trigger. The trigger already fired; this
+   * only keeps the sheet from landing on top of a reply someone has not
+   * finished reading. Typing again cancels it, because someone still working
+   * is someone not to interrupt.
+   */
+  useEffect(() => {
+    if (landedTurns === 0 || one || busy || streaming) return;
+    const t = setTimeout(() => ask('returning-thinker'), 2600);
+    return () => clearTimeout(t);
+  }, [landedTurns, one, busy, streaming, ask]);
+
+  /**
+   * Open the full Socria One screen — the invitation plate with everything on
+   * it. This is the deliberate path: someone pressed a button that says
+   * Socria One, so they get the whole picture rather than a single sentence
+   * about whatever just stopped.
+   */
+  const askOne = useCallback(
+    (reason?: string) => {
+      if (plan === 'one') return; // a member is never sold to
+      setOneReason(reason);
+      setOneOpen(true);
+      track('one_prompt_shown', {
+        trigger: 'asked',
+        category: 'proactive',
+        intent: 'low',
+        surface: 'logos',
+        plan,
+        hard_limit: false,
+        signed_in: !!isSignedIn,
+      });
+    },
+    [plan, isSignedIn]
+  );
 
   /** What the server says we hold. Its answer replaces our local belief. */
   const syncPlan = useCallback(async () => {
@@ -687,6 +748,16 @@ export function LogosApp({
 
     setOneBusy(true);
     setOneError(null);
+    // Recorded before the redirect, because after it this page is gone. The
+    // trigger that led here is on the prompt, if a prompt is what led here.
+    track('one_checkout_started', {
+      trigger: onePrompt?.reason ?? (oneOpen ? 'asked' : undefined),
+      category: onePrompt?.category ?? (oneOpen ? 'proactive' : undefined),
+      intent: onePrompt?.intent,
+      surface: 'logos',
+      plan,
+      signed_in: !!isSignedIn,
+    });
     try {
       const res = await fetch('/api/stripe/checkout', {
         method: 'POST',
@@ -857,7 +928,7 @@ export function LogosApp({
     // Logos and closing it again costs nothing. Everything already open stays
     // open and stays usable; what runs out is starting another.
     if (!one && chatsSpent) {
-      askOne(boundaryNote('chats'));
+      ask('chats-spent');
       return;
     }
     const fresh = emptySession();
@@ -1140,7 +1211,7 @@ export function LogosApp({
     // since seeing where your own thinking came from is not a feature to sell.
     // Research is the one that has a free edge, and only on the second reach.
     if (mode === 'research' && researchLocked) {
-      askOne('You have seen what Research does. Socria One takes any node on the map out to the evidence, as often as the thinking needs.');
+      ask('research-spent');
       return;
     }
     // Generated once per node per mode, then reused — reopening is instant and
@@ -1186,7 +1257,7 @@ export function LogosApp({
         const json = await res.json().catch(() => null);
         void refreshUsage(activeIdRef.current);
         setExplore((e) => ({ ...e, loading: false, open: false }));
-        askOne(json?.error || boundaryNote(mode as Counter));
+        ask(reasonForCounter(mode as Counter));
         return;
       }
       if (!res.ok) throw new Error('Could not look that up right now.');
@@ -1357,7 +1428,7 @@ export function LogosApp({
         patchActive((sn) => ({ ...sn, messages: sn.messages.slice(0, -1) }), false);
         setInput(content);
         setBusy(false);
-        askOne(body?.error || boundaryNote('chats'));
+        ask('chats-spent');
         return;
       }
       if (!res.ok) {
@@ -1379,6 +1450,10 @@ export function LogosApp({
       setStreaming('');
       patchActive((s) => ({ ...s, messages: [...next, { role: 'assistant', content: acc }] }));
       chronRef.current = [...chronRef.current, { role: 'assistant', content: acc }];
+      // A thought completed. The proactive check runs from an effect rather
+      // than here, so it sees the map this turn produced instead of the one
+      // captured when this function was defined.
+      setLandedTurns((n) => n + 1);
     } catch (e: any) {
       setStreaming('');
       setError(e?.message || 'Something went wrong.');
@@ -1562,6 +1637,20 @@ export function LogosApp({
         error={oneError}
       />
 
+      {/* The contextual prompt. Says what stopped and how to keep going, and
+          nothing else — the full plate above is for when someone goes looking
+          for it. Both end at the same checkout. */}
+      <OnePrompt
+        view={onePrompt}
+        onDismiss={dismissPrompt}
+        onAccept={() => {
+          acceptPrompt();
+          void takeOne('');
+        }}
+        busy={oneBusy}
+        error={oneError}
+      />
+
       <ConnectionsModal
         open={connOpen}
         authHeaders={keyHeaders}
@@ -1645,7 +1734,7 @@ export function LogosApp({
                 onClick={() =>
                   one
                     ? setConnOpen(true)
-                    : askOne('Socria One reads your own material — Drive, Docs, Notion and pasted work — into the thinking rather than around it.')
+                    : ask('connections-locked')
                 }
                 aria-label="Connections"
                 title={one ? 'Connect Google, Notion, and more' : 'Connected sources are part of Socria One'}
@@ -1668,7 +1757,7 @@ export function LogosApp({
               onClick={() =>
                 one
                   ? setDraftOpen((v) => !v)
-                  : askOne('Draft Space lets you write beside your map with the reasoning still in view. It is part of Socria One.')
+                  : ask('draft-locked')
               }
             >
               Draft
@@ -1831,7 +1920,7 @@ export function LogosApp({
                 type="button"
                 className="lg-one-note-go"
                 onClick={() =>
-                  askOne('This line of thinking has more in it than a free map holds. Socria One lets the map keep growing.')
+                  ask('map-full')
                 }
               >
                 Socria One
@@ -2049,7 +2138,7 @@ export function LogosApp({
             onAction={runAction}
             lensesLocked={!one}
             onLocked={() =>
-              askOne('Structure, Board and the other lenses read the same reasoning different ways. Socria One opens them.')
+              ask('lenses-locked')
             }
             researchLocked={researchLocked}
             explored={exploredIds}

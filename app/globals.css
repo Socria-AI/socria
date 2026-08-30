@@ -7058,3 +7058,118 @@ html.js-anim .scrolly-root .fade.d3 { transition-delay: .3s; }
 .setup-notice code { font-size: 12.5px; }
 .setup-where { color: rgba(35, 36, 31, 0.62); }
 .setup-foot { font-size: 13px; color: rgba(35, 36, 31, 0.5); }
+
+/* ── The quiet Socria One prompt ────────────────────────────────────
+   Paper, not the blue invitation plate. That contrast is the point: the
+   full One screen is somewhere you went, this is something that happened
+   where you already were, so it reads as part of Logos rather than as a
+   page that has arrived on top of it.
+
+   On a phone it is a bottom sheet — thumb-reachable, and it covers the
+   least of what the person was reading. On a wider screen it centres. */
+.logos-root .lg-op-scrim {
+  position: fixed; inset: 0; z-index: 95;
+  display: flex; align-items: flex-end; justify-content: center;
+}
+.logos-root .lg-op-back {
+  position: absolute; inset: 0;
+  background: rgba(35, 36, 31, 0.34);
+  animation: lgOpFade 0.18s ease both;
+}
+.logos-root .lg-op-sheet {
+  position: relative; z-index: 1;
+  width: 100%; max-width: 100%;
+  max-height: 88vh; overflow-y: auto;
+  padding: 26px 22px calc(22px + env(safe-area-inset-bottom, 0px));
+  background: var(--lg-panel);
+  border-top: 2px solid var(--lg-one);
+  border-radius: 14px 14px 0 0;
+  box-shadow: 0 -20px 60px -24px rgba(35, 36, 31, 0.4);
+  text-align: left;
+  animation: lgOpUp 0.24s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@media (min-width: 640px) {
+  .logos-root .lg-op-scrim { align-items: center; padding: 24px; }
+  .logos-root .lg-op-sheet {
+    width: min(440px, 100%);
+    padding: 30px 30px 24px;
+    border: 1px solid var(--lg-one-line);
+    border-top: 2px solid var(--lg-one);
+    border-radius: 4px;
+    box-shadow: 0 40px 100px -40px rgba(35, 36, 31, 0.5);
+    animation: lgOpIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+}
+
+.logos-root .lg-op-eyebrow {
+  margin: 0 0 12px;
+  font-size: 10.5px; font-weight: 600;
+  letter-spacing: 0.2em; text-transform: uppercase;
+  color: var(--lg-one);
+}
+.logos-root .lg-op-title {
+  margin: 0;
+  font-family: var(--font-serif), 'Instrument Serif', Georgia, serif;
+  font-size: 25px; font-weight: 400; line-height: 1.16;
+  letter-spacing: -0.01em; color: var(--lg-ink);
+}
+.logos-root .lg-op-body {
+  margin: 11px 0 0; max-width: 42ch;
+  font-size: 14.5px; line-height: 1.55; color: var(--lg-ink-60);
+}
+.logos-root .lg-op-err {
+  margin: 14px 0 0; padding: 9px 11px;
+  border: 1px solid var(--lg-one-line); border-radius: 3px;
+  background: var(--lg-one-soft);
+  font-size: 12.5px; line-height: 1.5; color: var(--lg-ink);
+}
+
+.logos-root .lg-op-actions {
+  display: flex; flex-direction: column; gap: 8px; margin-top: 22px;
+}
+.logos-root .lg-op-go {
+  /* 14px of padding puts this at 45px tall. Deliberately over the 44px
+     minimum touch target rather than a pixel under it — this is the primary
+     action on a sheet that appears under someone's thumb. */
+  width: 100%; padding: 14px 18px;
+  border: none; border-radius: 3px;
+  background: var(--lg-one); color: #fbfaf6;
+  font-family: var(--lg-sans); font-size: 14.5px; font-weight: 550;
+  letter-spacing: 0.005em; cursor: pointer;
+  transition: background 0.16s ease, transform 0.16s ease;
+}
+.logos-root .lg-op-go:hover:not(:disabled) { background: #3f608f; transform: translateY(-1px); }
+.logos-root .lg-op-go:disabled { opacity: 0.62; cursor: default; }
+.logos-root .lg-op-go:focus-visible { outline: 2px solid var(--lg-one); outline-offset: 3px; }
+.logos-root .lg-op-not {
+  width: 100%; padding: 10px 18px;
+  border: none; background: transparent;
+  color: var(--lg-ink-60);
+  font-family: var(--lg-sans); font-size: 13.5px; cursor: pointer;
+  border-radius: 3px; transition: color 0.16s ease, background 0.16s ease;
+}
+.logos-root .lg-op-not:hover { color: var(--lg-ink); background: rgba(35, 36, 31, 0.045); }
+.logos-root .lg-op-not:focus-visible { outline: 2px solid var(--lg-ink-24); outline-offset: 2px; }
+
+.logos-root .lg-op-foot {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 7px;
+  margin: 16px 0 0; padding-top: 14px;
+  border-top: 1px solid var(--lg-line);
+  font-size: 12px; color: var(--lg-ink-40);
+}
+.logos-root .lg-op-price { color: var(--lg-ink-60); font-weight: 550; }
+.logos-root .lg-op-dot { opacity: 0.5; }
+.logos-root .lg-op-more { color: var(--lg-one); text-decoration: none; border-bottom: 1px solid transparent; }
+.logos-root .lg-op-more:hover { border-bottom-color: var(--lg-one-line); }
+
+@keyframes lgOpFade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes lgOpUp { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+@keyframes lgOpIn { from { opacity: 0; transform: translateY(10px) scale(0.99); } to { opacity: 1; transform: none; } }
+
+/* Someone who has asked for less motion gets none of the above. The sheet
+   still appears; it simply does not travel to get there. */
+@media (prefers-reduced-motion: reduce) {
+  .logos-root .lg-op-sheet,
+  .logos-root .lg-op-back { animation: none; }
+  .logos-root .lg-op-go:hover:not(:disabled) { transform: none; }
+}

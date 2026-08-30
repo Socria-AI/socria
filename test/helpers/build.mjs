@@ -25,6 +25,8 @@ const MODULES = [
   'lib/entitlements.ts',
   'lib/math-context.ts',
   'lib/topic-drift.ts',
+  'lib/one-prompt.ts',
+  'lib/analytics.ts',
 ];
 
 export async function buildAll() {

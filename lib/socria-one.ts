@@ -22,6 +22,23 @@ export const SOCRIA_ONE = {
 
 export type Plan = 'free' | 'one';
 
+/**
+ * The price as a string, from the one place the number lives.
+ *
+ * There are nine other places in this repository that write "$15" as a
+ * literal — the /one page, the Logos landing page, the terms, the docs. Each
+ * is a copy that will not change when this constant does. Use this wherever
+ * the price is rendered, and migrate those when they are next touched.
+ */
+export function priceLabel(): string {
+  return `${SOCRIA_ONE.currency}${SOCRIA_ONE.price}`;
+}
+
+/** The price with its period, e.g. "$15/month". */
+export function priceWithPeriod(): string {
+  return `${priceLabel()}/${SOCRIA_ONE.period}`;
+}
+
 // Imported for the map cap's default; entitlements imports only the TYPE
 // above, so this edge is one-directional at runtime.
 import { PLANS } from './entitlements';
