@@ -232,8 +232,14 @@ export function copyFor(reason: TriggerReason): PromptCopy {
     body: spec.counter ? boundaryNote(spec.counter) : fill(spec.body ?? ''),
     // One action. "Continue" rather than "Upgrade", because what they are
     // doing is continuing — the transaction is incidental to it.
-    primary: spec.category === 'entitlement' ? 'Continue with Socria One' : 'Explore Socria One',
-    secondary: spec.category === 'entitlement' ? 'Not now' : 'Maybe later',
+    primary:
+      spec.category === 'entitlement' ? 'Continue with Socria One' : 'Become a member',
+    // The way out is the /one cover's own phrasing, and it is set in the same
+    // quiet serif italic. It says what actually happens next rather than
+    // deferring the question — "not now" implies we will ask again, and for
+    // an entitlement prompt we will not.
+    secondary:
+      spec.category === 'entitlement' ? 'continue with the free tier' : 'maybe later',
   };
 }
 

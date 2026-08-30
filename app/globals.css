@@ -7059,111 +7059,205 @@ html.js-anim .scrolly-root .fade.d3 { transition-delay: .3s; }
 .setup-where { color: rgba(35, 36, 31, 0.62); }
 .setup-foot { font-size: 13px; color: rgba(35, 36, 31, 0.5); }
 
-/* ── The quiet Socria One prompt ────────────────────────────────────
-   Paper, not the blue invitation plate. That contrast is the point: the
-   full One screen is somewhere you went, this is something that happened
-   where you already were, so it reads as part of Logos rather than as a
-   page that has arrived on top of it.
+/* ── The Socria One prompt ──────────────────────────────────────────
+   The invitation plate from /one, at the scale of an interruption.
 
-   On a phone it is a bottom sheet — thumb-reachable, and it covers the
-   least of what the person was reading. On a wider screen it centres. */
+   Same plate, same palette, same beats: the tracked eyebrow, the italic
+   monogram in its ring, the serif name with One set italic, the price with
+   its tracked period, the standfirst, the rule, the cream pill. What it drops
+   is the six-capability ledger — someone who pressed Explore and found it had
+   stopped has one question, and a feature list is not an answer to it. The
+   link at the foot goes to the page that does answer it.
+
+   Tokens are copied from app/one/one.css rather than imported: that file is
+   scoped to .one-root and loaded only on that route, and Logos must not pull
+   a whole page's stylesheet to draw one sheet. They are named here so the
+   next person can see they are meant to match, and where to look.
+
+   On a phone it is a bottom sheet — thumb-reachable, covering the least of
+   what someone was reading. On a wider screen it centres. */
 .logos-root .lg-op-scrim {
+  --op-blue-0: #0f2430;
+  --op-blue-1: #16303d;
+  --op-blue-2: #1d3a4a;
+  --op-pblue: #26485a;
+  --op-pale: #b8cdd9;
+  --op-pale-70: rgba(184, 205, 217, 0.7);
+  --op-cream: #f0ead8;
+  --op-serif: var(--font-serif), 'Instrument Serif', Georgia, serif;
   position: fixed; inset: 0; z-index: 95;
   display: flex; align-items: flex-end; justify-content: center;
 }
 .logos-root .lg-op-back {
   position: absolute; inset: 0;
-  background: rgba(35, 36, 31, 0.34);
-  animation: lgOpFade 0.18s ease both;
+  background: rgba(15, 36, 48, 0.5);
+  backdrop-filter: blur(3px);
+  animation: lgOpFade 0.2s ease both;
 }
 .logos-root .lg-op-sheet {
   position: relative; z-index: 1;
   width: 100%; max-width: 100%;
   max-height: 88vh; overflow-y: auto;
-  padding: 26px 22px calc(22px + env(safe-area-inset-bottom, 0px));
-  background: var(--lg-panel);
-  border-top: 2px solid var(--lg-one);
+  padding: 30px 24px calc(24px + env(safe-area-inset-bottom, 0px));
+  /* the plate, exactly as the cover draws it */
+  background: radial-gradient(120% 90% at 70% 8%,
+    var(--op-pblue) 0%, var(--op-blue-2) 34%, var(--op-blue-1) 62%, var(--op-blue-0) 100%);
+  color: var(--op-cream);
   border-radius: 14px 14px 0 0;
-  box-shadow: 0 -20px 60px -24px rgba(35, 36, 31, 0.4);
-  text-align: left;
-  animation: lgOpUp 0.24s cubic-bezier(0.16, 1, 0.3, 1) both;
+  box-shadow: 0 -30px 80px -30px rgba(0, 0, 0, 0.7);
+  text-align: center;
+  animation: lgOpUp 0.26s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+/* the inner rule, drawn just inside the plate */
+.logos-root .lg-op-sheet::before {
+  content: ""; position: absolute; inset: 9px;
+  border: 1px solid rgba(240, 234, 216, 0.14);
+  border-radius: 8px 8px 0 0;
+  pointer-events: none;
+}
+/* the same faint grain the magazine pages carry */
+.logos-root .lg-op-sheet::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  border-radius: inherit; opacity: 0.5; mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
 }
 @media (min-width: 640px) {
   .logos-root .lg-op-scrim { align-items: center; padding: 24px; }
   .logos-root .lg-op-sheet {
-    width: min(440px, 100%);
-    padding: 30px 30px 24px;
-    border: 1px solid var(--lg-one-line);
-    border-top: 2px solid var(--lg-one);
-    border-radius: 4px;
-    box-shadow: 0 40px 100px -40px rgba(35, 36, 31, 0.5);
-    animation: lgOpIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
+    width: min(452px, 100%);
+    padding: 38px 40px 30px;
+    border: 1px solid rgba(240, 234, 216, 0.22);
+    border-radius: 3px;
+    box-shadow: 0 60px 140px -60px rgba(0, 0, 0, 0.85);
+    animation: lgOpIn 0.24s cubic-bezier(0.16, 1, 0.3, 1) both;
   }
+  .logos-root .lg-op-sheet::before { inset: 10px; border-radius: 0; }
 }
 
+/* eyebrow — the cover's tracked micro-label */
 .logos-root .lg-op-eyebrow {
-  margin: 0 0 12px;
-  font-size: 10.5px; font-weight: 600;
-  letter-spacing: 0.2em; text-transform: uppercase;
-  color: var(--lg-one);
+  position: relative; z-index: 1;
+  margin: 0 0 18px;
+  font-size: 9.5px; font-weight: 600;
+  letter-spacing: 0.28em; text-transform: uppercase;
+  color: var(--op-pale-70);
 }
+/* At 0.28em tracking this line is ~296px wide, which fits a 360px phone with
+   room to spare and wraps on a 320px one. Tightening rather than shortening
+   keeps the same words on every device. */
+@media (max-width: 379px) {
+  .logos-root .lg-op-eyebrow { font-size: 8.5px; letter-spacing: 0.2em; }
+}
+
+/* the monogram in its ring */
+.logos-root .lg-op-mono {
+  position: relative; z-index: 1;
+  width: 46px; height: 46px; border-radius: 50%;
+  border: 1px solid rgba(240, 234, 216, 0.3);
+  display: grid; place-items: center; margin: 0 auto 18px;
+}
+.logos-root .lg-op-mono span {
+  font-family: var(--op-serif); font-style: italic;
+  font-size: 21px; line-height: 1; color: var(--op-pale);
+  transform: translateY(-1px);
+}
+
 .logos-root .lg-op-title {
+  position: relative; z-index: 1;
   margin: 0;
-  font-family: var(--font-serif), 'Instrument Serif', Georgia, serif;
-  font-size: 25px; font-weight: 400; line-height: 1.16;
-  letter-spacing: -0.01em; color: var(--lg-ink);
+  font-family: var(--op-serif);
+  font-size: clamp(26px, 3.4vw, 31px); font-weight: 400;
+  letter-spacing: -0.015em; line-height: 1.08;
+  color: var(--op-cream);
 }
+
+/* price, set as the cover sets it: serif amount, tracked period */
+.logos-root .lg-op-price {
+  position: relative; z-index: 1;
+  margin: 11px 0 0;
+  display: flex; align-items: baseline; gap: 9px; justify-content: center;
+}
+.logos-root .lg-op-amt { font-family: var(--op-serif); font-size: 21px; }
+.logos-root .lg-op-per {
+  font-size: 9.5px; letter-spacing: 0.24em; text-transform: uppercase;
+  color: rgba(240, 234, 216, 0.5); font-weight: 600;
+}
+
+/* the standfirst voice — serif italic, held to a narrow measure */
 .logos-root .lg-op-body {
-  margin: 11px 0 0; max-width: 42ch;
-  font-size: 14.5px; line-height: 1.55; color: var(--lg-ink-60);
+  position: relative; z-index: 1;
+  /* 38ch keeps the longest body in the table to four lines. The cover's
+     standfirst runs to two; five ragged centred lines stops reading as a
+     standfirst and starts reading as a paragraph that wandered in. */
+  margin: 18px auto 0; max-width: 38ch;
+  font-family: var(--op-serif); font-style: italic;
+  font-size: 17px; line-height: 1.42;
+  color: var(--op-pale);
 }
+
 .logos-root .lg-op-err {
-  margin: 14px 0 0; padding: 9px 11px;
-  border: 1px solid var(--lg-one-line); border-radius: 3px;
-  background: var(--lg-one-soft);
-  font-size: 12.5px; line-height: 1.5; color: var(--lg-ink);
+  position: relative; z-index: 1;
+  margin: 16px auto 0; max-width: 36ch; padding: 9px 12px;
+  border: 1px solid rgba(184, 205, 217, 0.35); border-radius: 2px;
+  background: rgba(184, 205, 217, 0.08);
+  font-size: 12.5px; line-height: 1.5; color: var(--op-pale);
 }
 
 .logos-root .lg-op-actions {
-  display: flex; flex-direction: column; gap: 8px; margin-top: 22px;
+  position: relative; z-index: 1;
+  margin-top: 24px; padding-top: 22px;
+  border-top: 1px solid rgba(240, 234, 216, 0.16);
+  display: flex; flex-direction: column; align-items: center; gap: 14px;
 }
+/* the cream pill */
 .logos-root .lg-op-go {
-  /* 14px of padding puts this at 45px tall. Deliberately over the 44px
-     minimum touch target rather than a pixel under it — this is the primary
-     action on a sheet that appears under someone's thumb. */
-  width: 100%; padding: 14px 18px;
-  border: none; border-radius: 3px;
-  background: var(--lg-one); color: #fbfaf6;
-  font-family: var(--lg-sans); font-size: 14.5px; font-weight: 550;
-  letter-spacing: 0.005em; cursor: pointer;
-  transition: background 0.16s ease, transform 0.16s ease;
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.55em;
+  min-height: 48px; padding: 0 30px; max-width: 100%;
+  border: none; border-radius: 999px;
+  background: var(--op-cream); color: var(--op-blue-0);
+  font-family: var(--lg-sans); font-size: 15px; font-weight: 500;
+  cursor: pointer;
+  transition: background 0.25s, transform 0.25s;
 }
-.logos-root .lg-op-go:hover:not(:disabled) { background: #3f608f; transform: translateY(-1px); }
-.logos-root .lg-op-go:disabled { opacity: 0.62; cursor: default; }
-.logos-root .lg-op-go:focus-visible { outline: 2px solid var(--lg-one); outline-offset: 3px; }
+.logos-root .lg-op-go:hover:not(:disabled) { background: #fff; transform: translateY(-2px); }
+.logos-root .lg-op-go:disabled { opacity: 0.6; cursor: default; }
+.logos-root .lg-op-go:focus-visible { outline: 2px solid var(--op-pale); outline-offset: 3px; }
+.logos-root .lg-op-go .ar { transition: transform 0.2s; }
+.logos-root .lg-op-go:hover:not(:disabled) .ar { transform: translateX(3px); }
+/* the quiet way out, in the cover's secondary voice */
 .logos-root .lg-op-not {
-  width: 100%; padding: 10px 18px;
-  border: none; background: transparent;
-  color: var(--lg-ink-60);
-  font-family: var(--lg-sans); font-size: 13.5px; cursor: pointer;
-  border-radius: 3px; transition: color 0.16s ease, background 0.16s ease;
+  border: none; background: transparent; cursor: pointer; padding: 2px 0;
+  font-family: var(--op-serif); font-style: italic; font-size: 16px;
+  color: var(--op-pale);
+  border-bottom: 1px solid rgba(184, 205, 217, 0.4);
+  transition: color 0.2s, border-color 0.2s;
 }
-.logos-root .lg-op-not:hover { color: var(--lg-ink); background: rgba(35, 36, 31, 0.045); }
-.logos-root .lg-op-not:focus-visible { outline: 2px solid var(--lg-ink-24); outline-offset: 2px; }
+.logos-root .lg-op-not:hover { color: var(--op-cream); border-bottom-color: var(--op-cream); }
+.logos-root .lg-op-not:focus-visible { outline: 2px solid var(--op-pale); outline-offset: 3px; }
 
 .logos-root .lg-op-foot {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 7px;
-  margin: 16px 0 0; padding-top: 14px;
-  border-top: 1px solid var(--lg-line);
-  font-size: 12px; color: var(--lg-ink-40);
+  position: relative; z-index: 1;
+  /* Stacked by default. On a narrow sheet these two never fit on one line,
+     and wrapping a row leaves the separator orphaned at the end of the first
+     line, which looks like a typo. The dot only exists when they share a
+     line, so it is hidden here rather than allowed to dangle. */
+  display: flex; flex-direction: column; align-items: center; gap: 5px;
+  margin: 22px 0 0;
+  font-size: 11.5px; line-height: 1.5; color: rgba(240, 234, 216, 0.42);
 }
-.logos-root .lg-op-price { color: var(--lg-ink-60); font-weight: 550; }
-.logos-root .lg-op-dot { opacity: 0.5; }
-.logos-root .lg-op-more { color: var(--lg-one); text-decoration: none; border-bottom: 1px solid transparent; }
-.logos-root .lg-op-more:hover { border-bottom-color: var(--lg-one-line); }
+.logos-root .lg-op-dot { display: none; }
+@media (min-width: 640px) {
+  .logos-root .lg-op-foot { flex-direction: row; flex-wrap: wrap; gap: 7px; }
+  .logos-root .lg-op-dot { display: inline; opacity: 0.55; }
+}
+.logos-root .lg-op-more {
+  color: var(--op-pale); text-decoration: none;
+  border-bottom: 1px solid transparent; transition: border-color 0.2s;
+}
+.logos-root .lg-op-more:hover { border-bottom-color: rgba(184, 205, 217, 0.55); }
 
 @keyframes lgOpFade { from { opacity: 0; } to { opacity: 1; } }
-@keyframes lgOpUp { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+@keyframes lgOpUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: none; } }
 @keyframes lgOpIn { from { opacity: 0; transform: translateY(10px) scale(0.99); } to { opacity: 1; transform: none; } }
 
 /* Someone who has asked for less motion gets none of the above. The sheet
@@ -7172,4 +7266,5 @@ html.js-anim .scrolly-root .fade.d3 { transition-delay: .3s; }
   .logos-root .lg-op-sheet,
   .logos-root .lg-op-back { animation: none; }
   .logos-root .lg-op-go:hover:not(:disabled) { transform: none; }
+  .logos-root .lg-op-go .ar { transition: none; }
 }

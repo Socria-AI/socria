@@ -2,27 +2,30 @@
 
 // components/OnePrompt.tsx
 //
-// The quiet version of the Socria One screen.
+// The Socria One invitation plate, at the scale of an interruption.
 //
-// SocriaOneModal is the full invitation plate — the monogram, six
-// capabilities, the access-code field. It is the right thing when someone has
-// chosen to go and look at One. It is the wrong thing to put in front of
-// someone who just pressed Explore and found it had stopped: at that moment
-// they have one question, "why did that stop and how do I keep going", and a
-// feature list is not an answer to it.
+// It is the /one cover, not a lookalike: the same Prussian-blue plate and
+// inner rule, the same tracked eyebrow, the same italic monogram in its ring,
+// the same serif name with One set italic, the same price with its tracked
+// period, the same standfirst voice, and the same cream pill. Someone who
+// walks into a boundary here and later opens the Socria One page should
+// recognise the second from the first.
 //
-// So this says the answer and nothing else. A title in their situation, two
-// sentences, one action, a quiet way out, and the price stated plainly
-// because hiding it until checkout is its own kind of dark pattern. Anyone
-// who wants the full picture has the link at the bottom.
+// What it drops is the ledger of six capabilities. SocriaOneModal keeps that,
+// and it is the right thing when someone has chosen to go and look at One.
+// It is the wrong thing in front of someone who just pressed Explore and
+// found it had stopped: at that moment they have one question — why did that
+// stop, and how do I keep going — and a feature list is not an answer to it.
+// So this says the answer, in the product's best voice, and the foot links to
+// the page that does carry the ledger.
 //
 // What is deliberately absent: any countdown, any "limited time", any
-// styling that pulls the eye harder than the thing behind it, any animation
-// beyond the one that gets it on screen without a jump. The dismissal is a
-// real button with a real word on it, not a grey ✕ hidden in a corner.
+// animation beyond the one that gets it on screen without a jump. The price
+// is on the face of it, because hiding it until checkout is its own kind of
+// dark pattern. The dismissal is a real phrase, not a grey ✕ in a corner.
 
 import { useEffect, useRef } from 'react';
-import { priceWithPeriod } from '@/lib/socria-one';
+import { SOCRIA_ONE } from '@/lib/socria-one';
 import type { OnePromptView } from './useOnePrompt';
 
 export function OnePrompt({
@@ -67,11 +70,24 @@ export function OnePrompt({
     >
       <div className="lg-op-back" onClick={onDismiss} aria-hidden="true" />
       <div className={`lg-op-sheet is-${view.category}`}>
-        <p className="lg-op-eyebrow">Socria One</p>
+        <p className="lg-op-eyebrow">The complete reasoning environment</p>
+
+        <span className="lg-op-mono" aria-hidden="true">
+          <span>I</span>
+        </span>
 
         <h2 id="lg-op-title" className="lg-op-title">
           {view.title}
         </h2>
+
+        {/* The price sits on the face, where the cover puts it. */}
+        <p className="lg-op-price">
+          <span className="lg-op-amt">
+            {SOCRIA_ONE.currency}
+            {SOCRIA_ONE.price}
+          </span>
+          <span className="lg-op-per">/ {SOCRIA_ONE.period}</span>
+        </p>
 
         <p id="lg-op-body" className="lg-op-body">
           {view.body}
@@ -92,6 +108,11 @@ export function OnePrompt({
             disabled={busy}
           >
             {busy ? 'Opening checkout…' : view.primary}
+            {!busy && (
+              <span className="ar" aria-hidden="true">
+                →
+              </span>
+            )}
           </button>
           <button type="button" className="lg-op-not" onClick={onDismiss}>
             {view.secondary}
@@ -99,11 +120,7 @@ export function OnePrompt({
         </div>
 
         <p className="lg-op-foot">
-          <span className="lg-op-price">{priceWithPeriod()}</span>
-          <span className="lg-op-dot" aria-hidden="true">
-            ·
-          </span>
-          <span>cancel anytime</span>
+          <span>Cancel anytime. Your maps stay yours.</span>
           <span className="lg-op-dot" aria-hidden="true">
             ·
           </span>

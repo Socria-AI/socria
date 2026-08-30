@@ -11,6 +11,30 @@ cannot also be a place that interrupts you to sell.
 
 ---
 
+## How it looks
+
+The prompt is the **/one invitation plate at the scale of an interruption** —
+the same Prussian-blue plate and inner rule, the tracked eyebrow, the italic
+monogram in its ring, the serif title, the price with its tracked period, the
+standfirst voice, the cream pill, and "continue with the free tier" in the
+cover's quiet italic. Someone who meets a boundary in Logos and later opens
+the Socria One page should recognise the second from the first.
+
+What it drops is the ledger of six capabilities. `SocriaOneModal` keeps that
+and is right when someone chose to go and look at One; it is wrong in front of
+someone who pressed Explore and found it had stopped. The foot links to the
+page that does carry the ledger.
+
+The One page's tokens are **copied** into the `.lg-op-scrim` block in
+`app/globals.css`, not imported — `app/one/one.css` is scoped to `.one-root`
+and loaded only on that route, and Logos should not pull a whole page's
+stylesheet to draw one sheet. If the One palette changes, change both.
+
+Verified in Chromium at 320, 360, 390, 640 and 1280px: bottom sheet flush to
+the bottom edge below 640px, centred 452px plate above it, eyebrow on one line
+at every width, and with the longest copy in the table it reaches 82% of a
+320×640 viewport with the primary action still fully visible.
+
 ## The rule
 
 A prompt is shown because of something the **person did**. Never because time
