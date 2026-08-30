@@ -21,7 +21,7 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [main, staging]
+    branches: [main, staging, dev]
 
 # A new push supersedes the run before it — no point finishing a build for a
 # commit that has already been replaced.

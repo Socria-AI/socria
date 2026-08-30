@@ -13,50 +13,75 @@ matters here; everything below serves it.
 
 ```
 main                  what is live. Only released code.
-staging               a release being assembled. Optional for small changes.
-feature/<name>        unreleased work. Can live for weeks.
-fix/<name>            a small production fix. Branched from main.
+staging               a release being assembled and tested.
+dev                   where day-to-day work lands and integrates.
+feature/<name>        a piece of work, branched from dev. Can live for weeks.
+fix/<name>            a production fix, branched from MAIN. Not from dev.
+```
+
+Work flows one way:
+
+```
+feature/*  →  dev  →  staging  →  main  →  production
+```
+
+with exactly one exception, and it is the important one:
+
+```
+fix/*  →  main                     (then main → staging → dev)
 ```
 
 `main` is the production branch. Nothing reaches it except through a pull
 request that CI has passed.
 
-A long-lived `feature/` branch is **never** in the path from a fix to
-production. That is what makes a hotfix possible mid-project: the fix branches
-from `main`, and merges back to `main`, and the feature branch is not involved
-at any point.
+**A fix branches from `main`, never from `dev`.** That single rule is what
+makes it possible to ship a production fix while a major version is
+half-finished: unreleased work is never in the path between the fix and
+production, so it cannot ride along. If you branch a fix from `dev` you drag
+everything unreleased with it — which is the exact failure this model exists
+to prevent.
+
+After a fix ships, carry it forward so it is not lost at the next release:
+
+```
+git switch staging && git merge origin/main && git push
+git switch dev     && git merge origin/main && git push
+```
 
 ---
 
 ## A. A normal feature
 
 ```
-git switch main && git pull
+git switch dev && git pull
 git switch -c feature/logos-improvement
 # … work …
 git push -u origin feature/logos-improvement
 ```
 
-Pushing opens a private preview deployment. Open a pull request into `main`
-(or into `staging` if it is part of a coordinated release). CI runs
-typecheck, tests and a production build. Review, merge, done — merging to
-`main` deploys production.
+Pushing opens a private preview deployment. Open a pull request into `dev`.
+CI runs typecheck, tests and a production build. Review and merge.
+
+Nothing has shipped yet — `dev` is not deployed to anyone. When a set of work
+is ready to go out, open `dev → staging`, test it on the staging URL, then
+open `staging → main`. Merging to `main` deploys production.
 
 ## B. Major long-running development
 
 Same start, but the branch lives for weeks:
 
 ```
+git switch dev && git pull
 git switch -c feature/v2
 ```
 
 It gets its own preview URL, which updates on every push, and it stays out of
-production until you deliberately merge it. Meanwhile `main` keeps receiving
-fixes (C below). Pull those into your branch regularly — weekly is plenty:
+production until it goes `dev → staging → main`. Meanwhile `main` keeps
+receiving fixes (C below). Pull those forward regularly — weekly is plenty:
 
 ```
 git switch feature/v2
-git merge origin/main          # NOT rebase — see below
+git merge origin/dev           # NOT rebase — see below
 ```
 
 **Merge, not rebase, for shared long-lived branches.** Rebase rewrites
@@ -78,16 +103,18 @@ git push -u origin fix/logos-node-bug
 ```
 
 Open a PR into `main`, check the preview, let CI pass, merge. Production
-deploys. **`feature/v2` is untouched and unreleased** — it was never in the
-path.
+deploys. **`dev` and `feature/v2` are untouched and unreleased** — neither was
+ever in the path.
 
-Then give the fix to the long-lived branch so it is not lost at merge time:
+Then carry the fix forward, or the next release will revert it:
 
 ```
-git switch feature/v2
-git merge origin/main
-git push
+git switch staging && git merge origin/main && git push
+git switch dev     && git merge origin/main && git push
 ```
+
+This is not optional. A fix that lives only on `main` is a fix that
+disappears the next time `staging` merges in.
 
 ## D. Emergency hotfix
 
