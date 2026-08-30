@@ -900,14 +900,17 @@ const buildSequence: Builder = (scene, fn, vals, view, guarded) => {
     readouts.push({
       id: 'lim',
       tex: '\\sum_{n=1}^{\\infty} a_n',
-      value: guarded ? null : est === null ? 'not settling' : `\\approx ${fmt(est, 5)}`.replace('\\approx ', '≈ '),
+      value: guarded ? null : est === null ? 'not settling' : `≈ ${fmt(est, 4)}`,
     });
   } else {
     const est = estimateSequenceLimit(fn, scope);
+    // A tail probe is an estimate: n^(1/n) at n = 8000 still reads 1.00112,
+    // and printing that to five unqualified decimals asserts digits the
+    // method does not have. Three decimals behind an ≈ is what it knows.
     readouts.push({
       id: 'lim',
       tex: '\\lim_{n \\to \\infty} a_n',
-      value: guarded ? null : est === null ? 'no limit' : fmt(est, 5),
+      value: guarded ? null : est === null ? 'no limit' : `≈ ${fmt(est, 3)}`,
     });
   }
 
@@ -924,33 +927,51 @@ const buildSequence: Builder = (scene, fn, vals, view, guarded) => {
 };
 
 /**
- * Conservative tail probe: a value only when late terms agree. The probe
- * points deliberately mix parities — (−1)^n agrees with itself perfectly on
- * any all-even sample, and an estimator that can be fooled by the first
- * oscillating sequence anyone tries is worse than none.
+ * Conservative tail probe: a value only when late terms agree.
+ *
+ * Two ways an estimator like this gets fooled, both guarded against:
+ * parity — (−1)^n agrees with itself perfectly on any all-even sample — and
+ * grid aliasing: a verifier caught cos(πn/1000) reporting limit 1, because
+ * every probe on a round-numbered grid sat within one index of a peak of the
+ * period-2000 wave. The probes are primes scattered across [2k, 8k], which no
+ * period expressible in this grammar's round constants lines up with, and the
+ * tail must also be locally flat — consecutive terms agreeing — not merely
+ * flat at the probe points.
  */
 function estimateSequenceLimit(fn: CompiledExpr, scope: Record<string, number>): number | null {
-  const probes = [1999, 2000, 3999, 4000, 7999, 8000].map((n) => fn.eval({ ...scope, n }));
+  const probes = [1999, 2477, 3163, 4001, 5711, 7919, 7920, 8000].map((n) =>
+    fn.eval({ ...scope, n })
+  );
   if (!probes.every(Number.isFinite)) return null;
   const scale = Math.max(1, ...probes.map(Math.abs));
   const last = probes[probes.length - 1];
   if (probes.some((v) => Math.abs(v - last) > 5e-3 * scale)) return null;
-  if (Math.abs(probes[5] - probes[3]) > 1e-3 * scale) return null;
+  if (Math.abs(probes[7] - probes[3]) > 1e-3 * scale) return null;
   return Math.round(last * 1e6) / 1e6;
 }
 
-/** Partial sums to two depths; a value only when they already agree. */
+/**
+ * Partial sums to two depths; a value only when they already agree. The
+ * depths are primes for the same anti-aliasing reason as above (2000 and
+ * 4000 are whole periods of cos(πn/1000), so its wildly swinging partial
+ * sums agreed at exactly those two points), and the terms themselves must be
+ * vanishing at the tail — the necessary condition for convergence, checked
+ * directly rather than inferred.
+ */
 function estimateSeries(fn: CompiledExpr, scope: Record<string, number>): number | null {
   let s1 = 0;
   let s2 = 0;
-  for (let i = 1; i <= 4000; i++) {
+  let tail = 0;
+  for (let i = 1; i <= 4001; i++) {
     const a = fn.eval({ ...scope, n: i });
     if (!Number.isFinite(a)) return null;
-    if (i <= 2000) s1 += a;
+    if (i <= 1733) s1 += a;
     s2 += a;
+    if (i > 3990) tail = Math.max(tail, Math.abs(a));
   }
   const scale = Math.max(1, Math.abs(s2));
-  if (Math.abs(s2 - s1) > 1e-3 * scale) return null;
+  if (tail > 1e-3 * scale) return null; // terms not going to zero
+  if (Math.abs(s2 - s1) > 2e-3 * scale) return null;
   return Math.round(s2 * 1e6) / 1e6;
 }
 
@@ -1245,13 +1266,22 @@ const buildDistribution: Builder = (scene, _fn, vals, view, guarded) => {
     }
   }
 
-  objects.push({ o: 'vrule', id: 'mean', at: spec.mean, tone: 'muted', dashed: true, label: 'mean' });
+  // The marker IS the mean — a labelled position is as legible as a printed
+  // number, so under guard it must go wherever the readout goes. The normal
+  // keeps it (its mean is the μ slider, already in the person's hand).
+  if (!guarded || scene.dist === 'normal') {
+    objects.push({ o: 'vrule', id: 'mean', at: spec.mean, tone: 'muted', dashed: true, label: 'mean' });
+  }
 
   // Mean and sd are what a problem set asks FOR; inputs stay, answers guard.
-  // Except the normal, whose mean and sd ARE the sliders — withholding a
-  // number the person is holding in their hand is not a guard, it is a tease.
-  if (scene.dist !== 'normal') {
+  // Except where the "answer" restates a slider digit for digit — the
+  // normal's mean and sd ARE μ and σ, and the poisson's mean IS λ.
+  // Withholding a number the person is holding in their hand is not a
+  // guard, it is a tease.
+  if (scene.dist !== 'normal' && scene.dist !== 'poisson') {
     readouts.push({ id: 'mu', tex: '\\mathbb{E}[X]', value: guarded ? null : fmt(spec.mean, 4) });
+  }
+  if (scene.dist !== 'normal') {
     readouts.push({ id: 'sd', tex: '\\sigma_X', value: guarded ? null : fmt(spec.sd, 4) });
   }
   if (prob !== null) {
