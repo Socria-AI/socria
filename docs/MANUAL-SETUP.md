@@ -94,10 +94,19 @@ All four branches (`main`, `staging`, `dev`, and the old claude branch) are at
 the identical commit right now, so this switch changes nothing about what code
 exists anywhere. It is purely a pointer.
 
-Afterwards you can delete `claude/beautiful-lovelace-xdkqcx` and
-`fix/conversations-cross-user-write` — both are fully merged into `main`,
-verified with `git rev-list --count origin/main..<branch>` = 0. Nothing is
-lost. Keep them if you would rather; they cost nothing.
+Afterwards you can delete two branches, for different reasons:
+
+- `claude/beautiful-lovelace-xdkqcx` — fully merged, and
+  `git rev-list --count origin/main..claude/beautiful-lovelace-xdkqcx`
+  returns 0, so nothing on it is missing from `main`.
+- `fix/conversations-cross-user-write` — the *content* is in `main`, but the
+  same count returns 1, because PR #4 was **squash**-merged and a squash
+  produces a new commit rather than making the branch tip an ancestor. The
+  check that matters is the code: `main` carries all four
+  `.eq('user_id', userId)` guards from that fix. Confirmed directly, not
+  inferred from the merge.
+
+Both are safe to delete. Keeping them costs nothing either.
 
 ### 2b. Branch protection on `main` and `staging`
 
