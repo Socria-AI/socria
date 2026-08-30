@@ -44,6 +44,10 @@ const TONE: Record<LogosNodeType, string> = {
   verification: 'var(--lg-primary)',
   result: 'var(--lg-primary)',
   error: 'var(--lg-tension)',
+  axiom: 'var(--lg-primary)',
+  lemma: 'var(--lg-accent)',
+  conjecture: 'var(--lg-secondary)',
+  counterexample: 'var(--lg-tension)',
 };
 
 function hash(s: string): number {

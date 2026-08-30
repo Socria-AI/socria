@@ -200,6 +200,35 @@ const PATHS: Record<LogosNodeType, JSX.Element> = {
       <path d="M8 6.4v3M8 11h.01" />
     </>
   ),
+  // cornerstone — the block everything rests on
+  axiom: (
+    <>
+      <path d="M3 12.6h10" />
+      <path d="M4.6 12.6V8h6.8v4.6" />
+      <path d="M8 8V4.6" />
+    </>
+  ),
+  // a small brick set into a larger course
+  lemma: (
+    <>
+      <rect x="2.6" y="6" width="10.8" height="4.4" rx="0.8" />
+      <path d="M8 6v4.4" />
+    </>
+  ),
+  // a dashed target — aimed at, not yet hit
+  conjecture: (
+    <>
+      <circle cx="8" cy="8" r="5.6" strokeDasharray="2.6 2.4" />
+      <path d="M8 5.4v2.8l2 1.4" />
+    </>
+  ),
+  // one strike through a claim
+  counterexample: (
+    <>
+      <circle cx="8" cy="8" r="5.4" />
+      <path d="M4.4 11.6 11.6 4.4" />
+    </>
+  ),
 };
 
 export function NodeGlyph({ type }: { type: LogosNodeType }) {

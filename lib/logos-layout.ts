@@ -77,6 +77,7 @@ export const RELATION_LABEL: Record<LogosRelation, string> = {
   transforms_to: 'becomes',
   implies: 'implies',
   justifies: 'justifies',
+  equivalent_to: 'equivalent to',
 };
 
 const CARD_W = 150;
@@ -119,6 +120,10 @@ export function availableLenses(map: ThinkingMap): LensId[] {
 }
 
 const CHAIN_TYPES = new Set<LogosNode['type']>([
+  'axiom',
+  'lemma',
+  'conjecture',
+  'counterexample',
   'given',
   'unknown',
   'equation',
@@ -131,7 +136,7 @@ const CHAIN_TYPES = new Set<LogosNode['type']>([
   'result',
   'error',
 ]);
-const CHAIN_REL = new Set<LogosRelation>(['transforms_to', 'implies', 'precedes']);
+const CHAIN_REL = new Set<LogosRelation>(['transforms_to', 'implies', 'precedes', 'equivalent_to']);
 
 /** Nodes whose label/tex is a plottable single-variable function. */
 export function plottableNodes(map: ThinkingMap): { id: string; node: LogosNode; fn: CompiledFn }[] {
@@ -172,6 +177,11 @@ const HIERARCHY: Partial<Record<LogosRelation, 'to-above' | 'from-above'>> = {
   leads_to: 'from-above',
   // a section hangs beneath the piece it belongs to
   part_of: 'to-above',
+  // proofs: what a statement implies or justifies sits above it, so a theorem
+  // rises to the top and its dependencies trace downward — the shape a
+  // dependency question ("what does this rest on?") is answered by reading.
+  implies: 'from-above',
+  justifies: 'from-above',
 };
 
 export function layoutStructure(map: ThinkingMap, w: number, h: number): Layout {

@@ -53,6 +53,11 @@ export const NODE_TYPES = [
   'verification', // a check of the work
   'result', // the final answer
   'error', // a mistake, or where the reasoning diverged
+  // proofs and formal reasoning
+  'axiom', // taken as ground truth within the system being worked in
+  'lemma', // a proven stepping-stone another statement leans on
+  'conjecture', // believed but not yet established
+  'counterexample', // a case that defeats a claim or conjecture
 ] as const;
 export type LogosNodeType = (typeof NODE_TYPES)[number];
 
@@ -73,6 +78,8 @@ export const RELATIONS = [
   'implies',
   /** a theorem, definition or property justifies a step */
   'justifies',
+  /** logic: A and B are logically equivalent (iff) */
+  'equivalent_to',
 ] as const;
 export type LogosRelation = (typeof RELATIONS)[number];
 
@@ -349,7 +356,7 @@ When the work is mathematical, read what they are actually here for and match it
 - EXPLORATION (they want to understand a concept or relationship): explain it, and where a function or relationship is involved, describe it so it can be seen.
 Write mathematics in LaTeX: inline as $…$ and displayed as $$…$$. Notation renders, so use it — $x^2$, $\\frac{a}{b}$, $\\int_0^1 f(x)\\,dx$ — rather than ascii. Keep prose spare around it.
 
-THE PICTURE BESIDE YOU. On mathematical work the Plot lens can become a live one: a secant sliding toward a tangent, both sides of a limit closing in, rectangles multiplying under a curve — with sliders they can drag and an animation they can play. You do not build it and you do not describe it in detail; it is built from the same reading of the conversation that your reply is. What you can do is point: "watch what the slope does as Q comes in", "push n higher and see where the total settles". Direct their attention to the thing that will show them the answer, rather than saying the answer. When the guard is up this is often the strongest move you have — the picture can show the mechanism honestly while the value stays theirs to find.
+THE PICTURE BESIDE YOU. On mathematical work the Plot lens can become a live one: a secant sliding toward a tangent, both sides of a limit closing in, rectangles multiplying under a curve, a Taylor polynomial hugging its function, partial sums piling up, a plane deforming under a matrix, a distribution shifting with its parameters, a solution threading a direction field — with sliders they can drag and an animation they can play. You do not build it and you do not describe it in detail; it is built from the same reading of the conversation that your reply is. What you can do is point: "watch what the slope does as Q comes in", "push n higher and see where the total settles". Direct their attention to the thing that will show them the answer, rather than saying the answer. When the guard is up this is often the strongest move you have — the picture can show the mechanism honestly while the value stays theirs to find.
 
 Openings to avoid entirely: "That's a great question", "That's a significant decision", "I understand how difficult", "There are several factors to consider", "You're weighing", "It sounds like", "What I'm hearing is".
 
@@ -483,6 +490,7 @@ const LINEAGE_PHRASE: Record<LogosRelation, [string, string]> = {
   part_of: ['sits inside', 'contains'],
   transforms_to: ['becomes', 'came from'],
   implies: ['implies', 'follows from'],
+  equivalent_to: ['is equivalent to', 'is equivalent to'],
   justifies: ['justifies', 'is justified by'],
 };
 
@@ -564,7 +572,7 @@ Return ONLY JSON, exactly this shape:
   "intent": "learning|verification|utility|exploration",  // ONLY for context=math
   "nodes": [{"id": "short_snake_case_id", "type": "<node type>", "label": "a short phrase in their own framing", "status": "open|supported|resolved|revised", "merged": ["label of a node folded into this one"], "tex": "LaTeX for this node, if mathematical", "flag": "error|verified", "note": "a short annotation or repair hint"}],
   "edges": [{"from": "node_id", "to": "node_id", "relation": "supports|conflicts|depends|relates|leads_to|revises|precedes|part_of|transforms_to|implies|justifies", "strength": "weak|normal|strong", "op": "the operation on a transforms_to edge"}],
-  "viz": {"kind": "function|limit|derivative|riemann", "expr": "the function in plain notation", "varName": "x", "a": 0, "b": 1, "rule": "left|right|midpoint", "view": {"xMin": -6, "xMax": 6}, "params": [{"id": "a", "min": -3, "max": 3, "step": 0.1, "value": 1}], "title": "a short line naming what is being shown"}
+  "viz": {"kind": "function|limit|derivative|riemann|taylor|sequence|vectors|matrix|distribution|ode", "expr": "the function in plain notation", "varName": "x", "a": 0, "b": 1, "rule": "left|right|midpoint", "matrix": [[1, 1], [0, 1]], "vectors": [{"x": 2, "y": 1, "label": "u"}], "dist": "normal|binomial|poisson|exponential", "partial": true, "ghost": true, "view": {"xMin": -6, "xMax": 6}, "params": [{"id": "a", "min": -3, "max": 3, "step": 0.1, "value": 1}], "title": "a short line naming what is being shown"}
 }
 
 READ THE CONTEXT FIRST.
@@ -599,12 +607,25 @@ MATHEMATICS. When the work is quantitative — solving, proving, calculating, or
 - When a step is confirmed correct (verification), you may set flag:"verified" on it.
 - Only mark flag:"error" for a real mathematical mistake the person actually made, never for a step you would have done differently. Never fabricate an error.
 
+PROOFS. When the person is proving something — or reading, checking or attacking a proof — the map is the DEPENDENCY STRUCTURE of the argument, and its whole value is that a theorem can be traced backward to what it stands on:
+- definitions and axioms at the base; assumptions next; lemmas built on them ("implies" / "justifies" edges); the target theorem at the top. Use "goal" for the statement being chased before it is proven, "theorem" once it is.
+- "implies" is for logical entailment, "equivalent_to" for iff, "depends" for a statement resting on another without a worked entailment, "conflicts" for contradiction.
+- AN UNSUPPORTED STEP IS A FINDING, NOT A FAILURE. When the person asserts an implication that has not been established, keep the edge, leave the target's status "open", and put "not yet established" (plus what would establish it, named not worked) in its "note". Do NOT supply the missing proof — under the Answer Guard that is exactly the moment being protected.
+- A "conjecture" stays a conjecture until it is proven (status resolved, or type theorem) or defeated — a "counterexample" node with a "conflicts" edge to what it kills. Everything downstream of a defeated statement is suspect; leave those statuses "open" rather than deleting the person's structure.
+- When they ask what an assumption carries — "what breaks without this?" — the map already answers it: everything reachable from that assumption through "implies"/"depends"/"justifies" edges is what breaks. Keep those chains honest and connected, because that trace is the feature.
+
 AN INTERACTIVE PICTURE ("viz"). ONLY for context=math, and only when SEEING the idea move would teach it better than describing it. Omit the field entirely otherwise — a static equation does not need an animation, and a picture nobody needed is clutter. Emit one when the thinking is about how a quantity CHANGES or what it APPROACHES, or when they ask to see, animate, explore, or vary something.
 
   kind="derivative"  a secant closing on a tangent. Set "a" to the point of tangency. The h slider is added for you and animates h → 0.
   kind="limit"       approach from both sides. Set "a" to the point being approached. The δ slider is added for you.
   kind="riemann"     rectangles under a curve. Set "a" and "b" to the interval, optionally "rule". The n slider is added for you and animates n → ∞.
-  kind="function"    the curve itself, with sliders for its coefficients. Use "params" for the letters you want them to be able to move.
+  kind="function"    the curve itself, with sliders for its coefficients. Use "params" for the letters you want them to be able to move. Set "ghost": true when they are studying a TRANSFORMATION of a base function (a·sin(b(x−c))+d and the like) — the curve at default parameters stays underneath for comparison.
+  kind="taylor"      the Taylor polynomial closing on the function. Set "a" to the centre. The degree slider k is added for you and animates upward. Only for functions analytic at a — no abs, no pole at the centre.
+  kind="sequence"    terms of a_n against n, with partial sums when "partial": true (default). "expr" is in n: "1/n^2", "(-1)^n/n". The count slider m is added for you.
+  kind="vectors"     arrows from the origin. Give 1–4 in "vectors"; with exactly two, sliders s and t appear and the combination s·u + t·v is drawn — span, dependence and basis in one picture. No "expr".
+  kind="matrix"      the plane under a 2×2 map. Give "matrix": [[a,b],[c,d]]. The t slider is added for you and animates identity → A, grid and basis vectors moving; eigen-directions appear when the guard is down. No "expr".
+  kind="distribution" a probability distribution. Give "dist" and, to shade P(a ≤ X ≤ b), set "a" and "b". Parameter sliders (μ σ / n p / λ) are added for you. No "expr".
+  kind="ode"         a first-order differential equation dy/dx = f(x, y): direction field plus one solution threaded through it. "expr" may use x AND y ("y", "x - y", "-k*y" with k in params). Set "a" for the trajectory's starting x. The y₀ slider is added for you.
 
 RULES for viz, all of them load-bearing:
 - "expr" is PLAIN notation, not LaTeX: "x^2 - 3", "sin(x)/x", "a*x^2 + b". Available: + - * / ^, parentheses, and sin cos tan asin acos atan sinh cosh tanh ln log log2 sqrt cbrt abs exp sign floor ceil round, pi, e. NO \\frac, no \\int, no dx, no "=", no piecewise.
@@ -613,7 +634,8 @@ RULES for viz, all of them load-bearing:
 - Give a parameter a slider whenever the person might reasonably ask "what if this were different" — a coefficient, an initial value, a bound. Two or three at most; a wall of sliders is not an instrument.
 - FOLLOW WHAT THEY ASKED. "animate as h approaches zero" → kind="derivative". "what happens as n increases" → kind="riemann". "let me change a" → put a in "params". "show me both approaches" → kind="limit". Change the scene when they ask for a different one; keep it when they are still working on this one.
 - The surface writes its own captions and asks its own questions. Do NOT put explanation, results, or values in "title" — it names the picture ("A secant approaching the tangent at x = 1"), nothing more.
-- The Answer Guard reaches this field. The picture shows the MECHANISM — the moving secant, the shrinking rectangles, both sides closing in — and the surface withholds the limiting value on its own. Never encode the answer in a title.
+- The Answer Guard reaches this field. The picture shows the MECHANISM — the moving secant, the shrinking rectangles, both sides closing in, the grid mid-transformation — and the surface withholds the limiting value, the eigenvalues, the probability on its own. Never encode the answer in a title.
+- Match the kind to the WORK: series and convergence → "sequence"; approximating a function near a point → "taylor"; span, basis, dependence → "vectors"; a linear map, eigen-anything → "matrix"; probability, sampling, distributions → "distribution"; growth, decay, populations, anything with dy/dx → "ode".
 
 Node types mean:
   goal = what they're trying to achieve, or the central idea of a piece
@@ -634,6 +656,10 @@ Node types mean:
   theme = what a piece of work keeps returning to
   character = a person or figure in a creative work
   constraint = a fixed limit on what is possible: time, money, scope, capability
+  axiom = ground truth of the system being worked in
+  lemma = a proven stepping-stone that other statements lean on
+  conjecture = believed true, not yet established
+  counterexample = a case that defeats a claim or conjecture
   milestone = a point that marks progress toward a goal
   given = a quantity or fact the problem hands you
   unknown = what they are solving for
