@@ -5,13 +5,80 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
-import { SOCRIA_SYSTEM_PROMPT } from '@/lib/socria-prompt';
+import { auth } from '@clerk/nextjs/server';
+import {
+  buildSystemPrompt,
+  resolveOpenAIModel,
+  SOCRIA_MODELS,
+  SOCRIA_PROMPT_VERSION,
+  CORE_3_FALLBACK_MODEL,
+  isValidAccessKey,
+  sanitizeUserUnderstanding,
+  hasJourneyContent,
+  renderJourneyBrief,
+  buildConversationStatePrompt,
+  sanitizeConversationState,
+  renderTranscriptForState,
+  type ConversationState,
+} from '@/lib/socria-prompt';
+import {
+  computeGuidance,
+  renderTurnDirective,
+  renderStateDirective,
+} from '@/lib/conversation-controller';
+import { enforceRateLimit } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const MAX_INPUT_LEN = 8000;
 const MAX_HISTORY = 30;
+// Cap how long we wait for the semantic state pass before falling back to the
+// deterministic directive, so a slow mini-call never stalls the reply.
+const STATE_TIMEOUT_MS = 4500;
+
+// Semantic living-understanding pass. Reads the thread with a cheap model and
+// returns how the latest message updated the assistant's understanding. Any
+// failure/timeout resolves null so the caller falls back gracefully.
+async function computeConversationState(
+  openai: OpenAI,
+  messages: { role: string; content: string }[],
+  priorUnderstanding: string | null,
+  journeyBrief?: string | null
+): Promise<ConversationState | null> {
+  const model =
+    process.env.OPENAI_STATE_MODEL ||
+    process.env.OPENAI_MEMORY_MODEL ||
+    'gpt-4o-mini';
+  const run = openai.chat.completions
+    .create({
+      model,
+      temperature: 0,
+      max_tokens: 220,
+      response_format: { type: 'json_object' },
+      messages: [
+        {
+          role: 'system',
+          content: buildConversationStatePrompt(priorUnderstanding, journeyBrief),
+        },
+        { role: 'user', content: renderTranscriptForState(messages) },
+      ],
+    })
+    .then((c) => {
+      const raw = c.choices?.[0]?.message?.content;
+      if (!raw) return null;
+      try {
+        return sanitizeConversationState(JSON.parse(raw));
+      } catch {
+        return null;
+      }
+    })
+    .catch(() => null);
+  const timeout = new Promise<null>((resolve) =>
+    setTimeout(() => resolve(null), STATE_TIMEOUT_MS)
+  );
+  return Promise.race([run, timeout]);
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -25,6 +92,57 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json().catch(() => null);
     const messages = body?.messages;
+
+    // Server-side gate: models flagged requiresAuth need a Clerk session OR
+    // a valid access key (typed by the user, sent via the x-socria-key
+    // header). Even if the client UI is bypassed, anon users without either
+    // can't hit Core 3.
+    const { userId } = auth();
+    const keyUnlocked = isValidAccessKey(
+      req.headers.get('x-socria-key') ?? body?.accessKey
+    );
+    const requestedModelId = body?.model;
+    const requestedConfig =
+      requestedModelId === 'core-3'
+        ? SOCRIA_MODELS['core-3']
+        : SOCRIA_MODELS['core-2'];
+    if (requestedConfig.requiresAuth && !userId && !keyUnlocked) {
+      return NextResponse.json(
+        {
+          error: `Sign in to use ${requestedConfig.label}.`,
+          requiresAuth: true,
+        },
+        { status: 401 }
+      );
+    }
+
+    // Rate limit before any expensive work — the main defense against
+    // cost-abuse. Anonymous callers (open Core 2 / access key) get a stricter
+    // budget; the aux background routes have their own pool.
+    const limited = await enforceRateLimit(req, userId, 'chat');
+    if (limited) return limited;
+
+    // Cross-conversation journey: the client sends the user's evolving
+    // understanding; a fresh conversation (first user turn) may open with a
+    // natural check-in on an unfinished thread.
+    const understanding = body?.understanding
+      ? sanitizeUserUnderstanding(body.understanding)
+      : null;
+    const rawUserTurns = Array.isArray(messages)
+      ? messages.filter((m: any) => m?.role === 'user').length
+      : 0;
+    const journey =
+      understanding && hasJourneyContent(understanding)
+        ? { understanding, conversationStart: rawUserTurns <= 1 }
+        : null;
+
+    const { prompt: basePrompt, model, depth } = buildSystemPrompt(
+      body?.model,
+      body?.depth,
+      body?.memory,
+      typeof body?.profile === 'string' ? body.profile : null,
+      journey
+    );
 
     if (!Array.isArray(messages) || messages.length === 0) {
       return NextResponse.json(
@@ -59,19 +177,126 @@ export async function POST(req: NextRequest) {
       .slice(-MAX_HISTORY)
       .map((m: any) => ({ role: m.role, content: m.content }));
 
-    const openai = new OpenAI({ apiKey });
-    const model = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+    // Core 3.1 per-turn conversation controller: compute compact guidance from
+    // the thread (what changed this turn, anti-loop "do not" list) and append
+    // it to the END of the system prompt, where the model attends most. This
+    // is the forcing function that keeps 3.1 from falling into the generic
+    // reassure → paraphrase → broad-question loop. Deterministic — no extra
+    // model call. Core 2 is untouched.
+    // Dev-only A/B knob: the eval harness sends this to compare controller-on
+    // vs controller-off replies against the same server. Ignored in production.
+    const controllerDisabled =
+      process.env.NODE_ENV !== 'production' &&
+      req.headers.get('x-socria-no-controller') === '1';
 
-    const completion = await openai.chat.completions.create({
-      model,
-      messages: [
-        { role: 'system', content: SOCRIA_SYSTEM_PROMPT },
-        ...clean,
-      ],
-      temperature: 0.7,
-      max_tokens: 500,
-      stream: true,
-    });
+    const openai = new OpenAI({ apiKey });
+
+    let systemPrompt = basePrompt;
+    let guidance: ReturnType<typeof computeGuidance> | null = null;
+    let state: ConversationState | null = null;
+    if (model === 'core-3' && !controllerDisabled) {
+      guidance = computeGuidance(clean, body?.memory, depth);
+
+      // Living-understanding pass — the semantic layer. Runs from the 2nd
+      // user turn on (nothing to compare against on turn 1), unless disabled.
+      // Prior understanding seeds continuity from last turn's memory.
+      const userTurns = clean.filter((m) => m.role === 'user').length;
+      const stateEnabled =
+        process.env.SOCRIA_DISABLE_STATE !== '1' &&
+        !(
+          process.env.NODE_ENV !== 'production' &&
+          req.headers.get('x-socria-no-state') === '1'
+        );
+      if (stateEnabled && userTurns >= 2) {
+        const priorUnderstanding =
+          (Array.isArray(body?.memory?.emergingUnderstanding) &&
+            body.memory.emergingUnderstanding[0]) ||
+          null;
+        state = await computeConversationState(
+          openai,
+          clean,
+          priorUnderstanding,
+          journey ? renderJourneyBrief(journey.understanding) : null
+        );
+      }
+
+      const parts = [basePrompt];
+      if (state) parts.push(renderStateDirective(state));
+      parts.push(
+        renderTurnDirective(guidance, {
+          hasSemanticState: !!state,
+          journeyCheckIn:
+            !!journey &&
+            journey.conversationStart &&
+            journey.understanding.openThreads.length > 0,
+        })
+      );
+      systemPrompt = parts.join('\n\n');
+    }
+
+    if (process.env.NODE_ENV !== 'production') {
+      const userTurns = clean.filter((m) => m.role === 'user').length;
+      const assistantTurns = clean.filter((m) => m.role === 'assistant').length;
+      // Dev-only. Never logs conversation content — only routing + shape.
+      console.log('[socria/chat]', {
+        socriaModel: model,
+        openaiModel: resolveOpenAIModel(model),
+        depth,
+        promptVersion: model === 'core-3' ? SOCRIA_PROMPT_VERSION : 'core-2',
+        promptChars: systemPrompt.length,
+        approxPromptTokens: Math.round(systemPrompt.length / 4),
+        memoryInjected: model === 'core-3' && !!body?.memory,
+        profileInjected: model === 'core-3' && !!body?.profile,
+        journeyInjected: model === 'core-3' && !!journey,
+        userTurns,
+        assistantTurns,
+        stage: guidance?.stage ?? null,
+        previousMove: guidance?.previousMove ?? null,
+        avoidNext: guidance?.avoidNext ?? null,
+        stateDelta: state?.delta ?? null,
+        stateStakes: state?.stakes ?? null,
+        stateResolved: state?.resolved ?? null,
+        stateActive: !!state,
+      });
+    }
+
+    const openaiModel = resolveOpenAIModel(model);
+
+    const makeCompletion = (modelId: string) =>
+      openai.chat.completions.create({
+        model: modelId,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          ...clean,
+        ],
+        temperature: 0.7,
+        max_tokens: 500,
+        stream: true,
+      });
+
+    // If the configured Core 3.1 model id is unknown/unavailable, OpenAI
+    // rejects the request before streaming starts. Retry once with a known-
+    // good fallback so a mis-set model id never takes chat down.
+    let completion;
+    try {
+      completion = await makeCompletion(openaiModel);
+    } catch (e: any) {
+      const status = e?.status ?? e?.response?.status;
+      const isModelError =
+        status === 404 ||
+        /model/i.test(e?.code || '') ||
+        /model|not found|does not exist|unknown/i.test(e?.message || '');
+      if (model === 'core-3' && isModelError && openaiModel !== CORE_3_FALLBACK_MODEL) {
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn(
+            `[socria/chat] model "${openaiModel}" rejected (${e?.message || status}); falling back to ${CORE_3_FALLBACK_MODEL}`
+          );
+        }
+        completion = await makeCompletion(CORE_3_FALLBACK_MODEL);
+      } else {
+        throw e;
+      }
+    }
 
     const encoder = new TextEncoder();
     const stream = new ReadableStream({

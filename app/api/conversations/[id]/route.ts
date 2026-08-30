@@ -17,15 +17,26 @@ export async function DELETE(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const { error } = await supabaseAdmin()
-    .from('conversations')
-    .delete()
-    .eq('id', params.id)
-    .eq('user_id', userId);
+  try {
+    const { error } = await supabaseAdmin()
+      .from('conversations')
+      .delete()
+      .eq('id', params.id)
+      .eq('user_id', userId);
 
-  if (error) {
-    console.error('DELETE conversation error:', error);
-    return NextResponse.json({ error: 'Failed to delete' }, { status: 500 });
+    if (error) {
+      console.error('DELETE conversation error:', error);
+      return NextResponse.json(
+        { error: `Supabase: ${error.message}` },
+        { status: 500 }
+      );
+    }
+    return NextResponse.json({ ok: true });
+  } catch (e: any) {
+    console.error('DELETE conversation threw:', e);
+    return NextResponse.json(
+      { error: e?.message || 'Internal error' },
+      { status: 500 }
+    );
   }
-  return NextResponse.json({ ok: true });
 }

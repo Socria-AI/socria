@@ -1,0 +1,528 @@
+/* app/docs/docs.css — the Socria docs wiki, scoped under .docs-root.
+   Same house as the rest of the site: paper, ink, moss; serif display,
+   sans body. A wiki wants quieter type than the magazine pages — this is
+   reference material, so measure, contrast and anchors do the work. */
+
+.docs-root {
+  --d-paper: #f4f1e8;
+  --d-paper-2: #ece8da;
+  --d-card: #faf8f1;
+  --d-ink: #20201b;
+  --d-ink-70: rgba(32, 32, 27, 0.7);
+  --d-ink-45: rgba(32, 32, 27, 0.45);
+  --d-ink-25: rgba(32, 32, 27, 0.25);
+  --d-line: rgba(53, 70, 32, 0.16);
+  --d-moss: #5e7633;
+  --d-moss-deep: #354620;
+  --d-serif: var(--font-serif), 'Instrument Serif', Georgia, serif;
+  --d-sans: var(--font-sans), Inter, system-ui, sans-serif;
+  --d-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  background: var(--d-paper);
+  color: var(--d-ink);
+  font-family: var(--d-sans);
+  font-size: 15.5px;
+  line-height: 1.65;
+}
+
+/* ── header ─────────────────────────────────────────────────────── */
+.docs-root .d-top {
+  position: sticky; top: 0; z-index: 30;
+  display: flex; align-items: center; gap: 18px;
+  padding: 14px clamp(16px, 4vw, 40px);
+  background: rgba(244, 241, 232, 0.92);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--d-line);
+}
+.docs-root .d-word {
+  font-family: var(--d-serif); font-size: 1.35rem; letter-spacing: -0.01em;
+  color: var(--d-ink); text-decoration: none;
+}
+.docs-root .d-word em { font-style: italic; color: var(--d-moss); }
+.docs-root .d-top-links { margin-left: auto; display: flex; gap: 18px; align-items: center; }
+.docs-root .d-top-links a {
+  font-size: 13px; color: var(--d-ink-70); text-decoration: none;
+}
+.docs-root .d-top-links a:hover { color: var(--d-moss-deep); }
+.docs-root .d-top-links .d-open {
+  padding: 7px 14px; border: 1px solid var(--d-moss); border-radius: 999px;
+  color: var(--d-moss-deep); font-weight: 500;
+}
+.docs-root .d-top-links .d-open:hover { background: var(--d-moss); color: #fff; }
+.docs-root .d-nav-toggle { display: none; }
+
+/* ── body: sidebar + content ────────────────────────────────────── */
+.docs-root .d-body {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 250px minmax(0, 1fr);
+  gap: 0;
+  width: 100%;
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 0 clamp(16px, 4vw, 40px);
+}
+
+.docs-root .d-nav {
+  padding: 30px 22px 40px 0;
+  border-right: 1px solid var(--d-line);
+  position: sticky; top: 61px;
+  align-self: start;
+  max-height: calc(100svh - 61px);
+  overflow-y: auto;
+}
+.docs-root .d-group { margin-bottom: 22px; }
+.docs-root .d-group-name {
+  display: block; margin-bottom: 7px;
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--d-ink-45);
+}
+.docs-root .d-nav-link {
+  display: block; padding: 4.5px 10px; margin-left: -10px;
+  border-radius: 7px;
+  font-size: 13.5px; color: var(--d-ink-70); text-decoration: none;
+  line-height: 1.4;
+}
+.docs-root .d-nav-link:hover { color: var(--d-ink); background: rgba(53, 70, 32, 0.05); }
+.docs-root .d-nav-link.is-active {
+  color: var(--d-moss-deep); font-weight: 600; background: rgba(94, 118, 51, 0.1);
+}
+
+.docs-root .d-main {
+  padding: 34px 0 70px clamp(24px, 3.5vw, 48px);
+  min-width: 0;
+}
+
+/* ── article typography ─────────────────────────────────────────── */
+.docs-root .d-article { max-width: 720px; }
+.docs-root .d-kicker {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.16em;
+  text-transform: uppercase; color: var(--d-moss);
+}
+.docs-root .d-article h1 {
+  margin: 6px 0 10px;
+  font-family: var(--d-serif); font-weight: 400;
+  font-size: clamp(1.9rem, 3.4vw, 2.5rem); line-height: 1.12;
+  letter-spacing: -0.01em;
+}
+.docs-root .d-lead {
+  margin: 0 0 26px; font-size: 17px; line-height: 1.6; color: var(--d-ink-70);
+}
+.docs-root .d-article h2 {
+  margin: 40px 0 12px; padding-top: 18px;
+  border-top: 1px solid var(--d-line);
+  font-family: var(--d-serif); font-weight: 400;
+  font-size: 1.45rem; line-height: 1.25;
+  scroll-margin-top: 80px;
+}
+.docs-root .d-article h3 {
+  margin: 24px 0 8px; font-size: 15px; font-weight: 650; color: var(--d-ink);
+}
+.docs-root .d-article p { margin: 0 0 14px; }
+.docs-root .d-article ul, .docs-root .d-article ol { margin: 0 0 14px; padding-left: 22px; }
+.docs-root .d-article li { margin-bottom: 6px; }
+.docs-root .d-article a { color: var(--d-moss-deep); text-decoration: underline; text-decoration-color: rgba(94,118,51,.4); text-underline-offset: 2px; }
+.docs-root .d-article a:hover { text-decoration-color: var(--d-moss); }
+.docs-root .d-article strong { font-weight: 650; }
+.docs-root .d-article code {
+  font-family: var(--d-mono); font-size: 0.86em;
+  background: rgba(53, 70, 32, 0.07);
+  border: 1px solid rgba(53, 70, 32, 0.1);
+  border-radius: 5px; padding: 1px 5px;
+  white-space: nowrap;
+}
+.docs-root .d-article pre {
+  margin: 0 0 16px; padding: 14px 16px;
+  background: #23241f; color: #e9e6da;
+  border-radius: 10px; overflow-x: auto;
+  font-family: var(--d-mono); font-size: 12.8px; line-height: 1.6;
+}
+.docs-root .d-article pre code {
+  background: none; border: none; padding: 0; white-space: pre; color: inherit;
+}
+
+/* anchor affordance on section headings */
+.docs-root .d-article h2 .d-hash {
+  margin-left: 8px; color: var(--d-ink-25); text-decoration: none;
+  opacity: 0; font-size: 0.85em;
+}
+.docs-root .d-article h2:hover .d-hash { opacity: 1; }
+.docs-root .d-article h2 .d-hash:hover { color: var(--d-moss); }
+
+/* ── furniture the pages share ──────────────────────────────────── */
+/* callout: a held principle or a caution, visually distinct from prose */
+.docs-root .d-callout {
+  margin: 18px 0; padding: 14px 18px;
+  background: var(--d-card);
+  border: 1px solid var(--d-line);
+  border-left: 3px solid var(--d-moss);
+  border-radius: 0 10px 10px 0;
+}
+.docs-root .d-callout .d-callout-tag {
+  display: block; margin-bottom: 4px;
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--d-moss);
+}
+.docs-root .d-callout p { margin: 0; }
+.docs-root .d-callout p + p { margin-top: 8px; }
+.docs-root .d-callout.is-warn { border-left-color: #a5623a; }
+.docs-root .d-callout.is-warn .d-callout-tag { color: #a5623a; }
+
+/* tables: reference material's native form */
+.docs-root .d-tablewrap { margin: 0 0 16px; overflow-x: auto; }
+.docs-root .d-article table {
+  width: 100%; border-collapse: collapse; font-size: 13.5px; line-height: 1.5;
+}
+.docs-root .d-article th {
+  text-align: left; padding: 8px 12px 8px 0;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--d-ink-45); border-bottom: 1px solid var(--d-line);
+  white-space: nowrap;
+}
+.docs-root .d-article td {
+  padding: 9px 12px 9px 0; border-bottom: 1px solid rgba(53, 70, 32, 0.08);
+  vertical-align: top;
+}
+.docs-root .d-article td code { white-space: nowrap; }
+
+/* definition rows: term left, meaning right */
+.docs-root .d-defs { margin: 0 0 16px; }
+.docs-root .d-def {
+  display: grid; grid-template-columns: 168px minmax(0, 1fr); gap: 4px 18px;
+  padding: 9px 0; border-bottom: 1px solid rgba(53, 70, 32, 0.08);
+}
+.docs-root .d-def dt { font-weight: 650; font-size: 13.5px; }
+.docs-root .d-def dt code { font-weight: 500; }
+.docs-root .d-def dd { margin: 0; font-size: 13.5px; color: var(--d-ink-70); }
+@media (max-width: 620px) { .docs-root .d-def { grid-template-columns: 1fr; } }
+
+/* the index page's card grid */
+.docs-root .d-cards {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 18px 0 8px;
+}
+@media (max-width: 700px) { .docs-root .d-cards { grid-template-columns: 1fr; } }
+.docs-root .d-card {
+  display: block; padding: 16px 18px;
+  background: var(--d-card); border: 1px solid var(--d-line); border-radius: 12px;
+  text-decoration: none; color: var(--d-ink);
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+.docs-root .d-card:hover { border-color: var(--d-moss); transform: translateY(-1px); }
+.docs-root .d-card .t {
+  display: block; font-family: var(--d-serif); font-size: 1.12rem; margin-bottom: 4px;
+}
+.docs-root .d-card .b { display: block; font-size: 13px; color: var(--d-ink-70); line-height: 1.5; }
+
+/* prev / next */
+.docs-root .d-pn {
+  margin-top: 46px; padding-top: 18px; border-top: 1px solid var(--d-line);
+  display: flex; justify-content: space-between; gap: 14px;
+}
+.docs-root .d-pn a {
+  max-width: 46%; text-decoration: none; color: var(--d-ink);
+}
+.docs-root .d-pn .lbl {
+  display: block; font-size: 10.5px; font-weight: 700; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--d-ink-45); margin-bottom: 3px;
+}
+.docs-root .d-pn .ttl { font-family: var(--d-serif); font-size: 1.05rem; }
+.docs-root .d-pn a:hover .ttl { color: var(--d-moss-deep); }
+.docs-root .d-pn .next { margin-left: auto; text-align: right; }
+
+/* on-this-page strip under the lead */
+.docs-root .d-toc {
+  margin: 0 0 8px; display: flex; flex-wrap: wrap; gap: 6px 14px;
+  font-size: 12.5px;
+}
+.docs-root .d-toc a { color: var(--d-ink-45); text-decoration: none; }
+.docs-root .d-toc a:hover { color: var(--d-moss-deep); }
+.docs-root .d-toc a::before { content: '§ '; color: var(--d-ink-25); }
+
+/* ── footer ─────────────────────────────────────────────────────── */
+.docs-root .d-foot {
+  border-top: 1px solid var(--d-line);
+  padding: 20px clamp(16px, 4vw, 40px);
+  display: flex; justify-content: space-between; gap: 14px; flex-wrap: wrap;
+  font-size: 12.5px; color: var(--d-ink-45);
+}
+.docs-root .d-foot-links { display: flex; gap: 16px; }
+.docs-root .d-foot a { color: var(--d-ink-70); text-decoration: none; }
+.docs-root .d-foot a:hover { color: var(--d-moss-deep); }
+
+/* ── small screens ──────────────────────────────────────────────── */
+@media (max-width: 860px) {
+  .docs-root .d-body { grid-template-columns: 1fr; }
+  .docs-root .d-nav {
+    display: none;
+    position: static; max-height: none;
+    border-right: none; border-bottom: 1px solid var(--d-line);
+    padding: 18px 0;
+  }
+  .docs-root .d-nav.is-open { display: block; }
+  .docs-root .d-nav-toggle {
+    display: inline-flex; align-items: center; gap: 7px;
+    border: 1px solid var(--d-line); background: var(--d-card);
+    border-radius: 8px; padding: 6px 11px;
+    font: inherit; font-size: 12.5px; color: var(--d-ink-70); cursor: pointer;
+  }
+  .docs-root .d-main { padding-left: 0; }
+  .docs-root .d-top-links a:not(.d-open) { display: none; }
+}
+
+
+/* ═══ live product demonstrations ════════════════════════════════════
+   The wiki embeds the REAL components — ThinkingMap, MathBoard, the dials,
+   the cards — with canned reasoning, exactly as the /logos page does. The
+   markup comes from app/logos/LogosDemo.tsx unchanged; this block is that
+   page's demo-support CSS re-scoped to the docs root, because page-level
+   stylesheets only load with their own route. The demo chrome reads the
+   /logos design tokens, aliased here onto the wiki's palette. */
+.docs-root {
+  --paper: var(--d-paper);
+  --border: var(--d-line);
+  --ink-12: rgba(32, 32, 27, 0.12);
+  --ink-25: var(--d-ink-25);
+  --ink-45: var(--d-ink-45);
+  --ink-70: var(--d-ink-70);
+  --moss: var(--d-moss);
+  --moss-700: var(--d-moss-deep);
+  --sans: var(--d-sans);
+  --serif: var(--d-serif);
+}
+
+/* ── live product demonstrations ─────────────────────────────────── */
+/* The real Logos UI, embedded. .logos-root is fixed/inset-0 in the app, so
+   .lg-demo returns it to normal flow inside a frame; everything nested keeps
+   its own styling untouched. */
+.docs-root .logos-root.lg-demo {
+  position: relative; inset: auto; width: 100%; height: 100%;
+  overflow: hidden; background: var(--paper);
+}
+/* the app paints a grain over the whole viewport — not wanted in a frame */
+.docs-root .logos-root.lg-demo::before { display: none; }
+
+.docs-root .ui-frame { margin: clamp(24px,4vh,44px) 0 0; }
+.docs-root .ui-chrome {
+  display: flex; align-items: center; gap: 7px;
+  padding: 10px 14px; border: 1px solid var(--border); border-bottom: none;
+  background: #efeadd; border-radius: 10px 10px 0 0;
+}
+.docs-root .ui-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--ink-12); }
+.docs-root .ui-addr {
+  margin-left: 10px; font-family: var(--sans); font-size: .72rem;
+  letter-spacing: .04em; color: var(--ink-45);
+}
+.docs-root .ui-body {
+  border: 1px solid var(--border); border-radius: 0 0 10px 10px; overflow: hidden;
+  background: var(--paper); box-shadow: 0 40px 90px -60px rgba(32,32,27,.5);
+}
+.docs-root .ui-cap {
+  margin-top: 12px; font-size: .74rem; letter-spacing: .2em; text-transform: uppercase;
+  color: var(--ink-45); font-weight: 600;
+}
+.docs-root .ui-placeholder { color: var(--lg-ink-24); font-size: 14.5px; }
+
+/* lens switcher above its frame */
+.docs-root .ui-lenstabs { display: flex; gap: 6px; flex-wrap: wrap; margin-top: clamp(20px,3vh,32px); }
+.docs-root .ui-lensblurb {
+  margin-top: 10px; font-family: var(--serif); font-style: italic;
+  font-size: clamp(1.05rem,1.6vw,1.3rem); color: var(--moss-700);
+}
+.docs-root .ui-lenstabs .lg-lens {
+  padding: 6px 14px; border: 1px solid var(--border); border-radius: 999px;
+  background: #fff; font-family: var(--sans); font-size: .88rem; color: var(--ink-70);
+  cursor: pointer; transition: background .2s, color .2s, border-color .2s;
+}
+.docs-root .ui-lenstabs .lg-lens.is-on { background: var(--moss-700); color: var(--paper); border-color: var(--moss-700); }
+
+/* the node, its menu, and what the chosen move hands back */
+/* .lg-acts animates with lgPop, whose END state is translateX(-50%) — the app
+   anchors the menu at a node's centre. A CSS animation beats an inline style,
+   so the menu ignored transform:none and sat half its width off the frame.
+   Cancel the animation here and it lays out where it is put. */
+.docs-root .logos-root.lg-demo .lg-acts.ui-acts {
+  position: static; transform: none; animation: none;
+  width: 100%; max-width: 250px; margin-top: 14px;
+}
+.docs-root .logos-root.lg-demo .lg-acts.ui-acts .lg-act { display: block; width: 100%; text-align: left; }
+.docs-root .logos-root.lg-demo .lg-act.is-on { background: rgba(53,70,32,0.09); }
+
+.docs-root .ui-movedemo {
+  height: 100%; display: grid; grid-template-columns: minmax(0,260px) minmax(0,1fr);
+  gap: clamp(18px,3vw,34px); padding: 20px 22px; align-items: start; overflow: auto;
+}
+@media (max-width: 820px) { .docs-root .ui-movedemo { grid-template-columns: 1fr; } }
+.docs-root .ui-movedemo-left { display: flex; flex-direction: column; align-items: flex-start; }
+/* the result panel is a drawer in the app; here it sits in the frame */
+.docs-root .logos-root.lg-demo .lg-explore.ui-xp {
+  position: static; width: 100%; height: auto; max-height: 100%;
+  border: 1px solid var(--lg-line); border-radius: 12px;
+  box-shadow: none; transform: none; animation: none; overflow: auto;
+}
+
+/* guard + controls demos */
+.docs-root .ui-guarddemo { padding: 20px 24px; display: flex; flex-direction: column; justify-content: center; height: 100%; }
+
+/* Depth: the control on the left, what it returns on the right. Same two-pane
+   shape as the moves exhibit, for the same reason — the setting alone proves
+   only that the setting exists. */
+.docs-root .ui-ctrldemo {
+  height: 100%; display: grid; grid-template-columns: minmax(0,336px) minmax(0,1fr);
+  gap: clamp(18px,3vw,32px); padding: 20px 22px; align-items: start; overflow: auto;
+}
+@media (max-width: 820px) { .docs-root .ui-ctrldemo { grid-template-columns: 1fr; } }
+.docs-root .ui-ctrlpane { display: flex; flex-direction: column; min-width: 0; }
+.docs-root .logos-root.lg-demo .ui-ctrltools { margin: 10px 0 0; }
+/* the menu is a popover in the app; in the frame it sits under the control it
+   belongs to — and like .lg-acts it must lose its animation, whose end state
+   carries a translate meant for a floating layer */
+.docs-root .logos-root.lg-demo .ui-depthmenu {
+  position: static; transform: none; animation: none;
+  margin: 14px 0 0; width: 100%; box-shadow: none;
+  border: 1px solid var(--lg-line); max-height: none;
+}
+
+.docs-root .ui-answerpane { display: flex; flex-direction: column; min-width: 0; height: 100%; }
+.docs-root .logos-root.lg-demo .ui-depththread {
+  flex: 1; min-height: 0; overflow: auto; padding: 0 4px;
+}
+/* the reply is paragraphed prose at the deeper registers — that IS the
+   difference the exhibit is showing, so give the paragraphs real spacing */
+.docs-root .logos-root.lg-demo .ui-para { margin: 0 0 0.7em; }
+.docs-root .logos-root.lg-demo .ui-para:last-child { margin-bottom: 0; }
+.docs-root .ui-depthnote {
+  margin: 10px 4px 0; padding-top: 10px; border-top: 1px solid var(--lg-line);
+  font-size: .8rem; font-style: italic; color: var(--ink-45);
+}
+/* each register arrives rather than swapping, so the change is legible */
+.docs-root .logos-root.lg-demo .ui-answerpane .lg-msg-assistant {
+  animation: d-riseIn .34s cubic-bezier(.3,.7,.2,1) both;
+}
+
+/* The Board draws itself: each line is a node arriving, so the ink-in belongs
+   on the item. Items keep their React key, so only new ones animate. */
+.docs-root .ui-boarddemo { height: 100%; display: flex; flex-direction: column; }
+.docs-root .ui-boardpane { flex: 1; min-height: 0; }
+.docs-root .logos-root.lg-demo .ui-boardpane .lg-map-wrap { height: 100%; }
+.docs-root .logos-root.lg-demo .lg-board-item { animation: d-inkIn .46s ease both; }
+.docs-root .logos-root.lg-demo .lg-board-arrow { animation: d-inkIn .5s ease both; }
+.docs-root .ui-boardbar {
+  display: flex; align-items: center; gap: 14px;
+  padding: 9px 16px; border-top: 1px solid var(--lg-line); background: #fff;
+}
+.docs-root .ui-boardsay {
+  flex: 1; min-width: 0; font-size: .8rem; font-style: italic; color: var(--ink-45);
+}
+.docs-root .ui-boardpips { display: flex; gap: 5px; }
+.docs-root .ui-pip {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: var(--ink-25); transition: background .3s ease;
+}
+.docs-root .ui-pip.is-on { background: var(--moss); }
+.docs-root .ui-boardreplay {
+  border: 1px solid var(--lg-line); border-radius: 999px; background: transparent;
+  padding: 4px 12px; font: inherit; font-size: .7rem; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--ink-45); cursor: pointer;
+  transition: color .2s ease, border-color .2s ease, opacity .2s ease;
+}
+.docs-root .ui-boardreplay:hover:not(:disabled) { color: var(--moss); border-color: var(--moss); }
+.docs-root .ui-boardreplay:disabled { opacity: .35; cursor: default; }
+
+/* These animate the independent `translate` property, NOT `transform`. Board
+   items carry an inline transform:rotate() for their hand-made tilt, and a
+   transform keyframe would overwrite it — permanently, since the animation is
+   `both`. `translate` composes with it instead. */
+@keyframes d-inkIn {
+  from { opacity: 0; translate: 0 6px; }
+  to { opacity: 1; translate: 0 0; }
+}
+@keyframes d-riseIn {
+  from { opacity: 0; translate: 0 8px; }
+  to { opacity: 1; translate: 0 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .docs-root .logos-root.lg-demo .lg-board-item,
+  .docs-root .logos-root.lg-demo .lg-board-arrow,
+  .docs-root .logos-root.lg-demo .ui-answerpane .lg-msg-assistant { animation: none; }
+}
+
+/* nine dials read as a panel across the frame, rather than three tall rows */
+.docs-root .logos-root.lg-demo .lg-persona-grid {
+  grid-template-columns: repeat(5, 1fr); gap: 18px 10px;
+}
+@media (max-width: 760px) {
+  .docs-root .logos-root.lg-demo .lg-persona-grid { grid-template-columns: repeat(3, 1fr); }
+}
+/* the frame reads as one of the page's exhibits, not a browser screenshot */
+.docs-root .ui-chrome {
+  justify-content: flex-start; padding: 9px 16px; background: transparent;
+  border-bottom: 1px solid var(--border); border-radius: 0;
+}
+.docs-root .ui-addr {
+  margin: 0; font-size: .68rem; letter-spacing: .24em; text-transform: uppercase;
+  color: var(--ink-45); font-weight: 600;
+}
+.docs-root .ui-frame { border: none; background: transparent; }
+.docs-root .ui-chrome { border: 1px solid var(--border); border-bottom: 1px solid var(--border); background: #fff; }
+.docs-root .ui-body {
+  border: 1px solid var(--border); border-top: none; border-radius: 0;
+  box-shadow: 0 30px 70px -55px rgba(32,32,27,.45);
+}
+.docs-root .ui-cap { padding: 0 0 0 2px; }
+/* in a narrow column the node and its menu stack, so give them the room */
+.docs-root .ui-menudemo { flex-direction: column; gap: 18px; padding: 22px 16px; justify-content: flex-start; overflow: auto; }
+@media (min-width: 900px) { .docs-root .ui-menudemo { flex-direction: row; align-items: flex-start; } }
+.docs-root .ui-ctrldemo { overflow: auto; }
+/* personality sheet inside a frame */
+.docs-root .ui-personademo { padding: 24px 26px; height: 100%; overflow: auto; }
+
+/* the thread inside a demo frame needs the app's own gutters, or a user
+   bubble (right-aligned, 80% wide) runs off the edge of the frame */
+.docs-root .ui-guarddemo { padding: 22px 30px; gap: 4px; }
+.docs-root .ui-guarddemo .lg-msg { margin: 10px 0; }
+.docs-root .ui-guarddemo .lg-guard { margin: 14px 0 0; }
+
+/* the demo split has no rail, so it gets its own two columns — without this
+   the app's rail-closed grid kept a 46px rail column, crushed the
+   conversation into it, and left the third track empty */
+.docs-root .logos-root.lg-demo .lg-demo-split {
+  grid-template-columns: minmax(0, 1fr) 1.18fr;
+}
+@media (max-width: 900px) {
+  /* the app hides the map on phones behind a switcher this exhibit doesn't
+     have; here the map IS the exhibit, so it takes the frame alone */
+  .docs-root .logos-root.lg-demo .lg-demo-split { grid-template-columns: 1fr; grid-template-rows: 1fr; }
+  .docs-root .logos-root.lg-demo .lg-demo-split .lg-convo { display: none; }
+  .docs-root .logos-root.lg-demo .lg-demo-split .lg-panel { display: flex; }
+}
+
+/* the four-move definitions now sit under the full-width demo, in two
+   columns so the list does not run the length of the page */
+.docs-root .moves-defs .mv-defs {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 0 clamp(24px,4vw,56px);
+}
+@media (max-width: 760px) { .docs-root .moves-defs .mv-defs { grid-template-columns: 1fr; } }
+
+
+/* wiki-specific corrections to the copied chrome: the docs frame sits in an
+   article column, not a magazine spread */
+.docs-root .ui-frame { margin: 18px 0 6px; }
+.docs-root .ui-cap { letter-spacing: 0.08em; font-size: 11.5px; }
+.docs-root .ui-lenses { margin-top: 18px; }
+
+/* docs-only demo furniture: chat-side cards and the picker are not Logos
+   surfaces, so they render on plain paper rather than inside .logos-root */
+.docs-root .d-demo-bare {
+  padding: 22px 24px; background: var(--d-paper);
+}
+.docs-root .d-pickerdemo { position: relative; min-height: 420px; }
+.docs-root .d-pickernote {
+  margin: 14px 0 0; font-size: 12.5px; color: var(--d-ink-45); font-style: italic;
+}
+.docs-root .d-carddemo { max-width: 640px; }
+.docs-root .d-chipq {
+  margin: 0 0 12px; font-family: var(--d-serif); font-size: 1.15rem;
+}
