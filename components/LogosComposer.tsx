@@ -8,6 +8,8 @@
 // work from the same material.
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { MathKeypad } from './MathKeypad';
+import type { MathTopic } from '@/lib/math-context';
 import type { Attachment, AttachmentOrigin } from '@/lib/logos-attachments';
 import {
   NOTE_THRESHOLD,
@@ -137,9 +139,34 @@ export function AttachmentList({
   );
 }
 
+/** Insert at the caret and put the caret where the snippet says. */
+function insertAtCaret(
+  ta: HTMLTextAreaElement | null,
+  value: string,
+  text: string,
+  caret: number,
+  onChange: (v: string) => void
+) {
+  const start = ta?.selectionStart ?? value.length;
+  const end = ta?.selectionEnd ?? value.length;
+  const next = value.slice(0, start) + text + value.slice(end);
+  onChange(next);
+  // The caret lands inside the structure that was just inserted — √(here) —
+  // which is what makes a nested expression a sequence of presses rather than
+  // an exercise in counting brackets. After the state round-trip, hence rAF.
+  requestAnimationFrame(() => {
+    if (!ta) return;
+    const at = start + caret;
+    ta.focus();
+    ta.setSelectionRange(at, at);
+  });
+}
+
 export function LogosComposer({
   value,
   onChange,
+  mathAvailable,
+  mathTopic,
   drafts,
   setDrafts,
   onSend,
@@ -148,6 +175,9 @@ export function LogosComposer({
 }: {
   value: string;
   onChange: (v: string) => void;
+  /** show the maths control at all — decided by context, not by a setting */
+  mathAvailable?: boolean;
+  mathTopic?: MathTopic;
   drafts: Draft[];
   setDrafts: (fn: (prev: Draft[]) => Draft[]) => void;
   onSend: () => void;
@@ -157,8 +187,12 @@ export function LogosComposer({
 }) {
   const taRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [keypad, setKeypad] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  useEffect(() => {
+    if (!mathAvailable) setKeypad(false);
+  }, [mathAvailable]);
   const dragDepth = useRef(0);
 
   const readying = drafts.some((d) => d.status === 'reading');
@@ -302,6 +336,19 @@ export function LogosComposer({
           }
         />
 
+        {keypad && mathAvailable && (
+          <MathKeypad
+            topic={mathTopic ?? 'general'}
+            onClose={() => setKeypad(false)}
+            onInsert={(text, caret) =>
+              insertAtCaret(taRef.current, value, text, caret, (v) => {
+                onChange(v);
+                grow();
+              })
+            }
+          />
+        )}
+
         <div className="lg-composer-row">
           <button
             type="button"
@@ -348,6 +395,21 @@ export function LogosComposer({
               }
             }}
           />
+
+          {/* Appears only when mathematics is in play, and stays put once it
+              has — see lib/math-context.ts for why that hysteresis matters. */}
+          {mathAvailable && (
+            <button
+              type="button"
+              className={`lg-mathbtn${keypad ? ' is-on' : ''}`}
+              onClick={() => setKeypad((k) => !k)}
+              aria-pressed={keypad}
+              aria-label={keypad ? 'Hide mathematical symbols' : 'Mathematical symbols'}
+              title={keypad ? 'Hide symbols' : 'Mathematical symbols'}
+            >
+              ∑
+            </button>
+          )}
 
           <button
             type="button"
