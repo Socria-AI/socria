@@ -751,16 +751,48 @@ const buildLimit: Builder = (scene, fn, vals, view, guarded) => {
     { o: 'vrule', id: 'a', at: a, tone: 'muted', dashed: true, label: `${varName} = ${fmt(a)}` },
   ];
 
-  // The two sample points, and the drop lines that make "the value at this x"
-  // a thing you can see rather than infer.
-  for (const [id, x, y] of [
-    ['L', left, yl],
-    ['R', right, yr],
+  // The two sample points and their guides. The horizontal guide runs from the
+  // axis out to its own dot and carries the value at its left end, so each
+  // reading is legible against the y-axis and directly comparable with the
+  // limit line — which is what makes the squeeze visible as a squeeze. Running
+  // it only as far as x = a, as this did, left the two readings floating with
+  // nothing to measure them against.
+  // Formatted ONCE, and used by both the guide label on the plot and the
+  // readout below it. Two calls with two precisions is how "13.0007" ends up
+  // on the line while "13.00067" sits in the readout — the same number,
+  // disagreeing with itself.
+  const lTxt = Number.isFinite(yl) ? fmt(yl, 5) : 'undefined';
+  const rTxt = Number.isFinite(yr) ? fmt(yr, 5) : 'undefined';
+
+  const span = view.yMax - view.yMin;
+  // Once the two readings have all but met, their labels would sit on top of
+  // each other and on the limit line. At that point the picture has already
+  // made its point and the readouts carry the numbers, so the labels go.
+  const converged =
+    Number.isFinite(yl) && Number.isFinite(yr) && Math.abs(yl - yr) < span * 0.04;
+  const labelX = view.xMin + (view.xMax - view.xMin) * 0.012;
+
+  for (const [id, x, y, txt] of [
+    ['L', left, yl, lTxt],
+    ['R', right, yr, rTxt],
   ] as const) {
     if (!Number.isFinite(y)) continue;
+    const tone: Tone = id === 'L' ? 'accent' : 'tension';
     objects.push({ o: 'segment', id: `drop${id}`, x1: x, y1: 0, x2: x, y2: y, tone: 'ghost', dashed: true });
-    objects.push({ o: 'segment', id: `run${id}`, x1: x, y1: y, x2: a, y2: y, tone: 'ghost', dashed: true });
-    objects.push({ o: 'point', id: `p${id}`, x, y, tone: id === 'L' ? 'accent' : 'tension' });
+    objects.push({ o: 'segment', id: `run${id}`, x1: view.xMin, y1: y, x2: x, y2: y, tone: 'ghost', dashed: true });
+    if (!converged) {
+      objects.push({
+        o: 'label',
+        id: `val${id}`,
+        x: labelX,
+        y,
+        text: txt,
+        tone,
+        anchor: 'start',
+        dy: -5,
+      });
+    }
+    objects.push({ o: 'point', id: `p${id}`, x, y, tone });
   }
 
   const fa = at(fn, varName, vals, a);
@@ -786,13 +818,13 @@ const buildLimit: Builder = (scene, fn, vals, view, guarded) => {
     {
       id: 'fl',
       tex: `f(${fmt(a)} - \\delta)`,
-      value: Number.isFinite(yl) ? fmt(yl, 5) : 'undefined',
+      value: lTxt,
       help: `The height of the curve at ${varName} = ${fmt(a)} − δ, to the left. This is a reading off the graph at the δ you have right now — not the limit. Watch it move as δ shrinks.`,
     },
     {
       id: 'fr',
       tex: `f(${fmt(a)} + \\delta)`,
-      value: Number.isFinite(yr) ? fmt(yr, 5) : 'undefined',
+      value: rTxt,
       help: 'The same reading from the right-hand side. As δ shrinks these two close in on each other — or they do not, which tells you just as much.',
     },
   ];
