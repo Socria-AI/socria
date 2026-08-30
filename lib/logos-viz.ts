@@ -27,7 +27,7 @@
 // Nothing in this file touches React, the network, or time. Frames are
 // deterministic, which is what makes the whole surface testable.
 
-import { compileExpr, freeNames, type CompiledExpr } from './logos-math';
+import { compileExpr, freeNames, taylorCoeffs, type CompiledExpr } from './logos-math';
 
 // ── parameters ──────────────────────────────────────────────────────
 
@@ -113,6 +113,8 @@ export type VizObject =
   | { o: 'region'; id: string; pts: Pt[]; tone?: Tone }
   /** discrete terms: a sequence, a set of partial sums */
   | { o: 'sequence'; id: string; pts: Pt[]; tone?: Tone; stems?: boolean }
+  /** many polylines drawn as ONE path — grids, direction fields */
+  | { o: 'mesh'; id: string; lines: Pt[][]; tone?: Tone; width?: number }
   | { o: 'vrule'; id: string; at: number; tone?: Tone; dashed?: boolean; label?: string }
   | { o: 'hrule'; id: string; at: number; tone?: Tone; dashed?: boolean; label?: string }
   | { o: 'label'; id: string; x: number; y: number; text: string; tone?: Tone; anchor?: 'start' | 'middle' | 'end'; dy?: number };
@@ -143,8 +145,52 @@ export interface VizFrame {
 
 // ── the scene ───────────────────────────────────────────────────────
 
-export const VIZ_KINDS = ['function', 'limit', 'derivative', 'riemann'] as const;
+export const VIZ_KINDS = [
+  'function',
+  'limit',
+  'derivative',
+  'riemann',
+  'taylor',
+  'sequence',
+  'vectors',
+  'matrix',
+  'distribution',
+  'ode',
+] as const;
 export type VizKind = (typeof VIZ_KINDS)[number];
+
+/** The four everyone meets first; the editor leads with these. */
+export const CORE_KINDS: VizKind[] = ['function', 'limit', 'derivative', 'riemann'];
+
+/**
+ * Kinds where x and y are the SAME kind of quantity, so a unit must render the
+ * same length both ways. Under an unequal mapping a rotation looks like a
+ * shear and every angle lies — fatal for exactly these pictures.
+ */
+export const SQUARE_KINDS = new Set<VizKind>(['matrix', 'vectors']);
+
+/** Widen one axis of a viewport about its centre until units match pixels. */
+export function squareView(view: Viewport, plotW: number, plotH: number): Viewport {
+  const ux = plotW / (view.xMax - view.xMin);
+  const uy = plotH / (view.yMax - view.yMin);
+  if (!Number.isFinite(ux) || !Number.isFinite(uy) || Math.abs(ux - uy) < 1e-9) return view;
+  if (ux > uy) {
+    const span = plotW / uy;
+    const cx = (view.xMin + view.xMax) / 2;
+    return { ...view, xMin: cx - span / 2, xMax: cx + span / 2 };
+  }
+  const span = plotH / ux;
+  const cy = (view.yMin + view.yMax) / 2;
+  return { ...view, yMin: cy - span / 2, yMax: cy + span / 2 };
+}
+
+export const DISTS = ['normal', 'binomial', 'poisson', 'exponential'] as const;
+export type DistName = (typeof DISTS)[number];
+
+/** Kinds that draw an expression; the others carry their objects directly. */
+export function kindNeedsExpr(kind: VizKind): boolean {
+  return kind !== 'vectors' && kind !== 'matrix' && kind !== 'distribution';
+}
 
 export interface VizScene {
   kind: VizKind;
@@ -160,6 +206,16 @@ export interface VizScene {
   b?: number;
   /** which corner of each Riemann bar sits on the curve */
   rule?: 'left' | 'right' | 'midpoint';
+  /** matrix: the 2×2 transformation, rows first: [[a, b], [c, d]] */
+  matrix?: [[number, number], [number, number]];
+  /** vectors: the arrows themselves; with exactly two, s·u + t·v is offered */
+  vectors?: { x: number; y: number; label?: string }[];
+  /** distribution: which family */
+  dist?: DistName;
+  /** sequence: also plot the partial sums S_m */
+  partial?: boolean;
+  /** function: ghost the curve at default parameter values for comparison */
+  ghost?: boolean;
   /** a short title, in the person's own framing */
   title?: string;
 }
@@ -217,12 +273,103 @@ export interface Viewport {
   yMax: number;
 }
 
-export function resolveView(scene: VizScene, fn: CompiledExpr): Viewport {
+function specialView(
+  scene: VizScene,
+  fn: CompiledExpr | null,
+  scope: Record<string, number>
+): Viewport | null {
+  const pad = (lo: number, hi: number): [number, number] => {
+    if (hi - lo < 1e-6) return [lo - 1, hi + 1];
+    const p = (hi - lo) * 0.12;
+    return [lo - p, hi + p];
+  };
+
+  if (scene.kind === 'sequence') {
+    const mMax = scene.params.find((p) => p.id === 'm')?.max ?? 48;
+    if (!fn) return null;
+    let lo = 0;
+    let hi = 0;
+    let S = 0;
+    for (let i = 1; i <= mMax; i++) {
+      const a = fn.eval({ ...scope, n: i });
+      if (Number.isFinite(a)) {
+        lo = Math.min(lo, a);
+        hi = Math.max(hi, a);
+        S += a;
+        if (scene.partial) {
+          lo = Math.min(lo, S);
+          hi = Math.max(hi, S);
+        }
+      }
+    }
+    const [yMin, yMax] = pad(lo, hi);
+    return { xMin: 0, xMax: mMax + 1, yMin, yMax };
+  }
+
+  if (scene.kind === 'vectors') {
+    const vs = scene.vectors ?? [];
+    if (!vs.length) return null;
+    // Room for every vector, and for the combination at full slider throw.
+    const reach = vs.length === 2
+      ? 2 * (Math.hypot(vs[0].x, vs[0].y) + Math.hypot(vs[1].x, vs[1].y))
+      : Math.max(...vs.map((v) => Math.hypot(v.x, v.y)));
+    const r = Math.max(1, reach) * 1.15;
+    return { xMin: -r, xMax: r, yMin: -r, yMax: r };
+  }
+
+  if (scene.kind === 'matrix') {
+    const A = scene.matrix;
+    if (!A) return null;
+    // The 4×4 lattice under A: its corners bound everything drawn.
+    const R = 4;
+    const corners = [
+      { x: R, y: R },
+      { x: R, y: -R },
+      { x: -R, y: R },
+      { x: -R, y: -R },
+    ].map((p) => ({ x: A[0][0] * p.x + A[0][1] * p.y, y: A[1][0] * p.x + A[1][1] * p.y }));
+    const r = Math.min(14, Math.max(R + 0.5, ...corners.map((p) => Math.max(Math.abs(p.x), Math.abs(p.y)))));
+    return { xMin: -r, xMax: r, yMin: -r, yMax: r };
+  }
+
+  if (scene.kind === 'distribution') {
+    if (!scene.dist) return null;
+    const spec = distSpec(scene.dist, scope);
+    if (!spec) return null;
+    const [lo, hi] = spec.support;
+    let peak = 0;
+    const N = 160;
+    for (let i = 0; i <= N; i++) {
+      const x = spec.discrete ? Math.round(lo + ((hi - lo) * i) / N) : lo + ((hi - lo) * i) / N;
+      peak = Math.max(peak, spec.pdf(x));
+    }
+    const m = spec.discrete ? 0.8 : (hi - lo) * 0.04;
+    return { xMin: lo - m, xMax: hi + m, yMin: 0, yMax: Math.max(peak, 1e-6) * 1.15 };
+  }
+
+  if (scene.kind === 'ode') {
+    // A field needs a fixed frame in BOTH axes; sampling a trajectory to pick
+    // one would move the goalposts with y₀.
+    return { xMin: scene.view.xMin, xMax: scene.view.xMax, yMin: -4, yMax: 4 };
+  }
+
+  return null;
+}
+
+export function resolveView(scene: VizScene, fn: CompiledExpr | null): Viewport {
   const { xMin, xMax } = scene.view;
   if (typeof scene.view.yMin === 'number' && typeof scene.view.yMax === 'number') {
     return { xMin, xMax, yMin: scene.view.yMin, yMax: scene.view.yMax };
   }
   const scope = defaults(scene);
+
+  // Kinds whose window is a property of their OBJECTS, not of a sampled
+  // curve. Each is computed from the scene's defaults and then holds still,
+  // for the same reason as everywhere else: a breathing window hides motion.
+  const special = specialView(scene, fn, scope);
+  if (special) return special;
+
+  if (!fn) return { xMin, xMax, yMin: -5, yMax: 5 };
 
   // A tangent forming, or two sides of a limit closing, is a LOCAL event. Ask
   // what the function does across the whole window and x^2 on [-1.5, 4] answers
@@ -231,7 +378,8 @@ export function resolveView(scene: VizScene, fn: CompiledExpr): Viewport {
   // follows the neighbourhood of that point instead, and the curve is simply
   // allowed to leave the top of the frame — which is what graphs do.
   const focus =
-    (scene.kind === 'derivative' || scene.kind === 'limit') && typeof scene.a === 'number'
+    (scene.kind === 'derivative' || scene.kind === 'limit' || scene.kind === 'taylor') &&
+    typeof scene.a === 'number'
       ? scene.a
       : null;
   const halfSpan = (xMax - xMin) / 4;
@@ -326,11 +474,13 @@ export function sweptParam(scene: VizScene): VizParam | null {
 
 type Builder = (
   scene: VizScene,
-  fn: CompiledExpr,
+  fn: CompiledExpr | null,
   vals: Record<string, number>,
   view: Viewport,
   guarded: boolean
 ) => VizFrame;
+
+const EMPTY_FRAME: VizFrame = { objects: [], readouts: [], caption: '' };
 
 const at = (
   fn: CompiledExpr,
@@ -342,9 +492,30 @@ const at = (
 // --- 1. a function, with whatever coefficients are live -------------
 
 const buildFunction: Builder = (scene, fn, vals, view) => {
-  const objects: VizObject[] = [
-    { o: 'curve', id: 'f', pts: sampleCurve(fn, scene.varName, vals, view.xMin, view.xMax), tone: 'primary', width: 2 },
-  ];
+  if (!fn) return EMPTY_FRAME;
+  const objects: VizObject[] = [];
+  // Transformations teach by comparison: when asked to, keep the curve at its
+  // default parameters underneath, so "what did my change do" has a referent.
+  if (scene.ghost && scene.params.length) {
+    const base = defaults(scene);
+    if (scene.params.some((p) => base[p.id] !== vals[p.id])) {
+      objects.push({
+        o: 'curve',
+        id: 'ghost',
+        pts: sampleCurve(fn, scene.varName, base, view.xMin, view.xMax),
+        tone: 'ghost',
+        width: 1.4,
+        dashed: true,
+      });
+    }
+  }
+  objects.push({
+    o: 'curve',
+    id: 'f',
+    pts: sampleCurve(fn, scene.varName, vals, view.xMin, view.xMax),
+    tone: 'primary',
+    width: 2,
+  });
   const readouts: VizReadout[] = scene.params.map((p) => ({
     id: p.id,
     tex: p.id,
@@ -370,6 +541,7 @@ const buildFunction: Builder = (scene, fn, vals, view) => {
 // --- 2. a limit: approach from both sides ---------------------------
 
 const buildLimit: Builder = (scene, fn, vals, view, guarded) => {
+  if (!fn) return EMPTY_FRAME;
   const a = scene.a ?? 0;
   const d = Math.abs(vals.d ?? 1);
   const varName = scene.varName;
@@ -479,6 +651,7 @@ function estimateLimit(
 // --- 3. the derivative: secant → tangent ----------------------------
 
 const buildDerivative: Builder = (scene, fn, vals, view, guarded) => {
+  if (!fn) return EMPTY_FRAME;
   const varName = scene.varName;
   const a = scene.a ?? 0;
   const h = vals.h ?? 1;
@@ -557,6 +730,7 @@ function derivativeAt(
 // --- 4. Riemann sums → the definite integral ------------------------
 
 const buildRiemann: Builder = (scene, fn, vals, view, guarded) => {
+  if (!fn) return EMPTY_FRAME;
   const varName = scene.varName;
   const a = scene.a ?? view.xMin;
   const b = scene.b ?? view.xMax;
@@ -626,11 +800,576 @@ function integrate(
   return Number.isFinite(v) ? Math.round(v * 1e6) / 1e6 : null;
 }
 
+// --- 5. Taylor: the polynomial closing on the function ---------------
+
+const buildTaylor: Builder = (scene, fn, vals, view, guarded) => {
+  if (!fn) return EMPTY_FRAME;
+  const varName = scene.varName;
+  const a = scene.a ?? 0;
+  const rawK = vals.k;
+  // Math.round propagates NaN, and a NaN k must degrade to the empty picture,
+  // not crash the frame builder.
+  const k = Number.isFinite(rawK) ? Math.max(0, Math.round(rawK)) : 1;
+  const scope: Record<string, number> = {};
+  for (const p of scene.params) if (p.id !== 'k') scope[p.id] = vals[p.id];
+
+  // Exact coefficients via series AD — never finite differences.
+  const coeffs = taylorCoeffs(scene.expr, varName, scope, a, k);
+  const objects: VizObject[] = [
+    { o: 'curve', id: 'f', pts: sampleCurve(fn, varName, vals, view.xMin, view.xMax), tone: 'primary', width: 2 },
+  ];
+  const readouts: VizReadout[] = [{ id: 'k', tex: 'k', value: String(k) }];
+
+  if (coeffs) {
+    const P = (x: number) => {
+      let acc = 0;
+      for (let i = coeffs.length - 1; i >= 0; i--) acc = acc * (x - a) + coeffs[i];
+      return acc;
+    };
+    const pts: Pt[] = [];
+    const N = 320;
+    let worst = 0;
+    for (let i = 0; i <= N; i++) {
+      const x = view.xMin + ((view.xMax - view.xMin) * i) / N;
+      const y = P(x);
+      pts.push({ x, y });
+      const fy = at(fn, varName, vals, x);
+      if (Number.isFinite(fy) && Number.isFinite(y)) worst = Math.max(worst, Math.abs(fy - y));
+    }
+    objects.push({ o: 'curve', id: 'P', pts, tone: 'accent', width: 1.8 });
+    const fa = at(fn, varName, vals, a);
+    if (Number.isFinite(fa)) objects.push({ o: 'point', id: 'a', x: a, y: fa, tone: 'muted' });
+
+    // The error is the convergence story; the coefficient is the answer.
+    readouts.push({
+      id: 'err',
+      tex: `\\max\\,|f - P_{${k}}|`,
+      value: Number.isFinite(worst) ? fmt(worst, 4) : '—',
+    });
+    readouts.push({
+      id: 'ck',
+      tex: `c_{${k}}`,
+      value: guarded ? null : fmt(coeffs[k], 5),
+    });
+  }
+
+  return {
+    objects,
+    readouts,
+    caption: coeffs
+      ? `Degree ${k}. The polynomial only knows the function through the point ${varName} = ${fmt(a)}.`
+      : 'This function has no Taylor series at that point.',
+    ask: 'Raise the degree. Where does the polynomial stop lying?',
+  };
+};
+
+// --- 6. Sequences and series ----------------------------------------
+
+const buildSequence: Builder = (scene, fn, vals, view, guarded) => {
+  if (!fn) return EMPTY_FRAME;
+  const m = Math.max(1, Math.round(vals.m ?? 6));
+  const scope: Record<string, number> = {};
+  for (const p of scene.params) if (p.id !== 'm') scope[p.id] = vals[p.id];
+
+  const terms: Pt[] = [];
+  const sums: Pt[] = [];
+  let S = 0;
+  for (let i = 1; i <= m; i++) {
+    const a = fn.eval({ ...scope, n: i });
+    terms.push({ x: i, y: a });
+    if (Number.isFinite(a)) S += a;
+    sums.push({ x: i, y: S });
+  }
+  const last = terms[m - 1]?.y;
+
+  const objects: VizObject[] = [
+    { o: 'hrule', id: 'zero', at: 0, tone: 'ghost' },
+    { o: 'sequence', id: 'a', pts: terms, tone: 'primary', stems: true },
+  ];
+  if (scene.partial) objects.push({ o: 'sequence', id: 'S', pts: sums, tone: 'accent' });
+
+  const readouts: VizReadout[] = [
+    { id: 'm', tex: 'm', value: String(m) },
+    { id: 'am', tex: `a_{${m}}`, value: Number.isFinite(last) ? fmt(last, 5) : '—' },
+  ];
+  if (scene.partial) {
+    readouts.push({ id: 'Sm', tex: `S_{${m}}`, value: Number.isFinite(S) ? fmt(S, 5) : '—' });
+    // Where the series is heading is the answer; estimated only when the
+    // partial sums have already visibly settled, and withheld under guard.
+    const est = estimateSeries(fn, scope);
+    readouts.push({
+      id: 'lim',
+      tex: '\\sum_{n=1}^{\\infty} a_n',
+      value: guarded ? null : est === null ? 'not settling' : `\\approx ${fmt(est, 5)}`.replace('\\approx ', '≈ '),
+    });
+  } else {
+    const est = estimateSequenceLimit(fn, scope);
+    readouts.push({
+      id: 'lim',
+      tex: '\\lim_{n \\to \\infty} a_n',
+      value: guarded ? null : est === null ? 'no limit' : fmt(est, 5),
+    });
+  }
+
+  return {
+    objects,
+    readouts,
+    caption: scene.partial
+      ? `${m} term${m === 1 ? '' : 's'}: each stem is a term, each dot the running total.`
+      : `The first ${m} term${m === 1 ? '' : 's'}.`,
+    ask: scene.partial
+      ? 'Follow the dots, not the stems. Where are they piling up?'
+      : 'Push m out. What are the terms doing?',
+  };
+};
+
+/**
+ * Conservative tail probe: a value only when late terms agree. The probe
+ * points deliberately mix parities — (−1)^n agrees with itself perfectly on
+ * any all-even sample, and an estimator that can be fooled by the first
+ * oscillating sequence anyone tries is worse than none.
+ */
+function estimateSequenceLimit(fn: CompiledExpr, scope: Record<string, number>): number | null {
+  const probes = [1999, 2000, 3999, 4000, 7999, 8000].map((n) => fn.eval({ ...scope, n }));
+  if (!probes.every(Number.isFinite)) return null;
+  const scale = Math.max(1, ...probes.map(Math.abs));
+  const last = probes[probes.length - 1];
+  if (probes.some((v) => Math.abs(v - last) > 5e-3 * scale)) return null;
+  if (Math.abs(probes[5] - probes[3]) > 1e-3 * scale) return null;
+  return Math.round(last * 1e6) / 1e6;
+}
+
+/** Partial sums to two depths; a value only when they already agree. */
+function estimateSeries(fn: CompiledExpr, scope: Record<string, number>): number | null {
+  let s1 = 0;
+  let s2 = 0;
+  for (let i = 1; i <= 4000; i++) {
+    const a = fn.eval({ ...scope, n: i });
+    if (!Number.isFinite(a)) return null;
+    if (i <= 2000) s1 += a;
+    s2 += a;
+  }
+  const scale = Math.max(1, Math.abs(s2));
+  if (Math.abs(s2 - s1) > 1e-3 * scale) return null;
+  return Math.round(s2 * 1e6) / 1e6;
+}
+
+// --- 7. Vectors and linear combination ------------------------------
+
+const buildVectors: Builder = (scene, _fn, vals) => {
+  const vs = scene.vectors ?? [];
+  if (!vs.length) return EMPTY_FRAME;
+  const tones: Tone[] = ['primary', 'accent', 'muted', 'muted'];
+  const objects: VizObject[] = vs.map((v, i) => ({
+    o: 'vector',
+    id: `v${i}`,
+    x1: 0,
+    y1: 0,
+    x2: v.x,
+    y2: v.y,
+    tone: tones[i] ?? 'muted',
+    label: v.label ?? (i === 0 ? 'u' : i === 1 ? 'v' : undefined),
+  }));
+  const readouts: VizReadout[] = [];
+
+  // With exactly two vectors, the picture is the linear combination — the
+  // heart of span, basis and dependence, all in one draggable object.
+  if (vs.length === 2 && typeof vals.s === 'number' && typeof vals.t === 'number') {
+    const [u, v] = vs;
+    const cx = vals.s * u.x + vals.t * v.x;
+    const cy = vals.s * u.y + vals.t * v.y;
+    objects.push(
+      { o: 'segment', id: 'p1', x1: vals.s * u.x, y1: vals.s * u.y, x2: cx, y2: cy, tone: 'ghost', dashed: true },
+      { o: 'segment', id: 'p2', x1: vals.t * v.x, y1: vals.t * v.y, x2: cx, y2: cy, tone: 'ghost', dashed: true },
+      { o: 'vector', id: 'su', x1: 0, y1: 0, x2: vals.s * u.x, y2: vals.s * u.y, tone: 'ghost' },
+      { o: 'vector', id: 'tv', x1: 0, y1: 0, x2: vals.t * v.x, y2: vals.t * v.y, tone: 'ghost' },
+      { o: 'vector', id: 'combo', x1: 0, y1: 0, x2: cx, y2: cy, tone: 'tension', label: 'su+tv' }
+    );
+    readouts.push(
+      { id: 's', tex: 's', value: fmt(vals.s) },
+      { id: 't', tex: 't', value: fmt(vals.t) },
+      { id: 'combo', tex: 's\\mathbf{u} + t\\mathbf{v}', value: `(${fmt(cx)}, ${fmt(cy)})` }
+    );
+  }
+
+  return {
+    objects,
+    readouts,
+    caption:
+      vs.length === 2
+        ? 'Slide s and t. Everything the combination can reach is the span.'
+        : 'The vectors, from the origin.',
+  };
+};
+
+// --- 8. Matrix transformation ---------------------------------------
+
+/** Real eigen-decomposition of a 2×2, closed form; null when complex. */
+export function eigen2x2(
+  M: [[number, number], [number, number]]
+): { values: [number, number]; vectors: [Pt, Pt] } | null {
+  const [[a, b], [c, d]] = M;
+  const tr = a + d;
+  const det = a * d - b * c;
+  const disc = tr * tr - 4 * det;
+  if (disc < 0) return null;
+  const r = Math.sqrt(disc);
+  const l1 = (tr + r) / 2;
+  const l2 = (tr - r) / 2;
+  const vecFor = (l: number): Pt => {
+    // (A − λI)v = 0: take the larger row for numerical stability.
+    if (Math.abs(b) > 1e-12) return norm({ x: b, y: l - a });
+    if (Math.abs(c) > 1e-12) return norm({ x: l - d, y: c });
+    // diagonal matrix: axis directions
+    return Math.abs(a - l) < Math.abs(d - l) ? { x: 1, y: 0 } : { x: 0, y: 1 };
+  };
+  return { values: [l1, l2], vectors: [vecFor(l1), vecFor(l2)] };
+}
+function norm(p: Pt): Pt {
+  const m = Math.hypot(p.x, p.y) || 1;
+  return { x: p.x / m, y: p.y / m };
+}
+
+const buildMatrix: Builder = (scene, _fn, vals, view, guarded) => {
+  const M0 = scene.matrix;
+  if (!M0) return EMPTY_FRAME;
+  // Entries become live when sliders named a, b, c, d exist.
+  const A: [[number, number], [number, number]] = [
+    [vals.a ?? M0[0][0], vals.b ?? M0[0][1]],
+    [vals.c ?? M0[1][0], vals.d ?? M0[1][1]],
+  ];
+  const t = Math.min(1, Math.max(0, vals.t ?? 0));
+  // M(t) walks the identity to A, so the space is seen MOVING, not swapped.
+  const M: [[number, number], [number, number]] = [
+    [1 + (A[0][0] - 1) * t, A[0][1] * t],
+    [A[1][0] * t, 1 + (A[1][1] - 1) * t],
+  ];
+  const apply = (p: Pt): Pt => ({ x: M[0][0] * p.x + M[0][1] * p.y, y: M[1][0] * p.x + M[1][1] * p.y });
+
+  // The transformed lattice, as one mesh. A linear map keeps lines straight,
+  // so two points per line are enough.
+  const R = 4;
+  const lines: Pt[][] = [];
+  for (let i = -R; i <= R; i++) {
+    lines.push([apply({ x: -R, y: i }), apply({ x: R, y: i })]);
+    lines.push([apply({ x: i, y: -R }), apply({ x: i, y: R })]);
+  }
+  const e1 = apply({ x: 1, y: 0 });
+  const e2 = apply({ x: 0, y: 1 });
+
+  const objects: VizObject[] = [
+    { o: 'mesh', id: 'grid', lines, tone: 'accent', width: 0.8 },
+    { o: 'vector', id: 'e1', x1: 0, y1: 0, x2: e1.x, y2: e1.y, tone: 'primary', label: 'e₁' },
+    { o: 'vector', id: 'e2', x1: 0, y1: 0, x2: e2.x, y2: e2.y, tone: 'tension', label: 'e₂' },
+  ];
+
+  const eig = eigen2x2(A);
+  // Eigen-directions are the ANSWER a student is usually after, so under the
+  // guard they are not drawn — the invariant lines are there to be noticed in
+  // the motion, not printed over it.
+  if (!guarded && eig) {
+    for (const [i, v] of eig.vectors.entries()) {
+      objects.push({
+        o: 'segment',
+        id: `eig${i}`,
+        x1: -v.x * R * 2,
+        y1: -v.y * R * 2,
+        x2: v.x * R * 2,
+        y2: v.y * R * 2,
+        tone: 'muted',
+        dashed: true,
+      });
+    }
+  }
+
+  const det = A[0][0] * A[1][1] - A[0][1] * A[1][0];
+  const readouts: VizReadout[] = [
+    { id: 't', tex: 't', value: fmt(t, 2) },
+    { id: 'det', tex: '\\det A', value: guarded ? null : fmt(det, 4) },
+    {
+      id: 'eig',
+      tex: '\\lambda_{1,2}',
+      value: guarded ? null : eig ? `${fmt(eig.values[0], 3)}, ${fmt(eig.values[1], 3)}` : 'complex',
+    },
+  ];
+
+  return {
+    objects,
+    readouts,
+    caption: t === 0 ? 'The untouched plane. Press play to apply A.' : t === 1 ? 'The plane under A.' : `Part way: M(t) at t = ${fmt(t, 2)}.`,
+    ask: 'Watch the grid go. Which directions never leave their own line?',
+  };
+};
+
+// --- 9. Probability distributions -----------------------------------
+
+function lnFact(n: number): number {
+  let acc = 0;
+  for (let i = 2; i <= n; i++) acc += Math.log(i);
+  return acc;
+}
+
+/** pdf/pmf, mean, sd, and discreteness for the supported families. */
+export function distSpec(
+  dist: DistName,
+  vals: Record<string, number>
+): {
+  pdf: (x: number) => number;
+  mean: number;
+  sd: number;
+  discrete: boolean;
+  support: [number, number];
+  /** where the pdf is actually defined and smooth — quadrature must not cross its edge */
+  domain: [number, number];
+} | null {
+  if (dist === 'normal') {
+    const mu = vals.u ?? 0;
+    const sig = Math.abs(vals.s ?? 1) || 1e-9;
+    return {
+      pdf: (x) => Math.exp(-((x - mu) ** 2) / (2 * sig * sig)) / (sig * Math.sqrt(2 * Math.PI)),
+      mean: mu,
+      sd: sig,
+      discrete: false,
+      support: [mu - 4 * sig, mu + 4 * sig],
+      domain: [-Infinity, Infinity],
+    };
+  }
+  if (dist === 'exponential') {
+    const l = Math.abs(vals.l ?? 1) || 1e-9;
+    return {
+      pdf: (x) => (x < 0 ? 0 : l * Math.exp(-l * x)),
+      mean: 1 / l,
+      sd: 1 / l,
+      discrete: false,
+      support: [0, 5 / l],
+      domain: [0, Infinity],
+    };
+  }
+  if (dist === 'binomial') {
+    const n = Math.max(1, Math.round(vals.n ?? 10));
+    const p = Math.min(0.99, Math.max(0.01, vals.p ?? 0.5));
+    const lnC = (k: number) => lnFact(n) - lnFact(k) - lnFact(n - k);
+    return {
+      pdf: (x) => {
+        const k = Math.round(x);
+        if (k < 0 || k > n || Math.abs(x - k) > 1e-9) return 0;
+        return Math.exp(lnC(k) + k * Math.log(p) + (n - k) * Math.log(1 - p));
+      },
+      mean: n * p,
+      sd: Math.sqrt(n * p * (1 - p)),
+      discrete: true,
+      support: [0, n],
+      domain: [0, n],
+    };
+  }
+  // poisson
+  const l = Math.max(0.05, vals.l ?? 4);
+  return {
+    pdf: (x) => {
+      const k = Math.round(x);
+      if (k < 0 || Math.abs(x - k) > 1e-9) return 0;
+      return Math.exp(k * Math.log(l) - l - lnFact(k));
+    },
+    mean: l,
+    sd: Math.sqrt(l),
+    discrete: true,
+    support: [0, Math.ceil(l + 4 * Math.sqrt(l) + 4)],
+    domain: [0, Infinity],
+  };
+}
+
+const buildDistribution: Builder = (scene, _fn, vals, view, guarded) => {
+  if (!scene.dist) return EMPTY_FRAME;
+  const spec = distSpec(scene.dist, vals);
+  if (!spec) return EMPTY_FRAME;
+  const objects: VizObject[] = [];
+  const readouts: VizReadout[] = scene.params.map((p) => ({
+    id: p.id,
+    tex: p.symbol || p.id,
+    value: p.integer ? String(Math.round(vals[p.id] ?? p.value)) : fmt(vals[p.id] ?? p.value),
+  }));
+
+  // The interval whose probability is being asked about, if the scene set one.
+  const hasWindow = typeof scene.a === 'number' && typeof scene.b === 'number' && scene.b >= scene.a;
+
+  let prob: number | null = null;
+  if (spec.discrete) {
+    const lo = Math.max(0, Math.floor(view.xMin));
+    const hi = Math.ceil(view.xMax);
+    const bars: { x0: number; x1: number; y: number }[] = [];
+    const hot: { x0: number; x1: number; y: number }[] = [];
+    let acc = 0;
+    for (let k = lo; k <= hi; k++) {
+      const y = spec.pdf(k);
+      if (y < 1e-9) continue;
+      const bar = { x0: k - 0.38, x1: k + 0.38, y };
+      const inside = hasWindow && k >= scene.a! && k <= scene.b!;
+      (inside ? hot : bars).push(bar);
+      if (inside) acc += y;
+    }
+    objects.push({ o: 'rects', id: 'pmf', bars, tone: 'primary' });
+    if (hot.length) objects.push({ o: 'rects', id: 'hot', bars: hot, tone: 'tension' });
+    if (hasWindow) prob = acc;
+  } else {
+    const pts: Pt[] = [];
+    const N = 320;
+    for (let i = 0; i <= N; i++) {
+      const x = view.xMin + ((view.xMax - view.xMin) * i) / N;
+      pts.push({ x, y: spec.pdf(x) });
+    }
+    objects.push({ o: 'curve', id: 'pdf', pts, tone: 'primary', width: 2 });
+    if (hasWindow) {
+      // Clamp to where the pdf is defined and smooth. Simpson's rule assumes
+      // smoothness; run it across the exponential's jump at 0 and the panels
+      // straddling the edge average the cliff — P(−1 ≤ X ≤ 1) comes out
+      // visibly wrong. Outside the domain the probability is exactly zero, so
+      // clipping the interval IS the correct integral, not an approximation.
+      const a = Math.max(scene.a!, spec.domain[0]);
+      const b = Math.min(scene.b!, spec.domain[1]);
+      if (b > a) {
+        const region: Pt[] = [{ x: a, y: 0 }];
+        const M = 120;
+        let acc = 0;
+        for (let i = 0; i <= M; i++) {
+          const x = a + ((b - a) * i) / M;
+          region.push({ x, y: spec.pdf(x) });
+          // Simpson weights over the same samples
+          acc += spec.pdf(x) * (i === 0 || i === M ? 1 : i % 2 ? 4 : 2);
+        }
+        region.push({ x: b, y: 0 });
+        objects.push({ o: 'region', id: 'P', pts: region, tone: 'tension' });
+        prob = (acc * ((b - a) / M)) / 3;
+      } else {
+        prob = 0;
+      }
+    }
+  }
+
+  objects.push({ o: 'vrule', id: 'mean', at: spec.mean, tone: 'muted', dashed: true, label: 'mean' });
+
+  // Mean and sd are what a problem set asks FOR; inputs stay, answers guard.
+  // Except the normal, whose mean and sd ARE the sliders — withholding a
+  // number the person is holding in their hand is not a guard, it is a tease.
+  if (scene.dist !== 'normal') {
+    readouts.push({ id: 'mu', tex: '\\mathbb{E}[X]', value: guarded ? null : fmt(spec.mean, 4) });
+    readouts.push({ id: 'sd', tex: '\\sigma_X', value: guarded ? null : fmt(spec.sd, 4) });
+  }
+  if (prob !== null) {
+    readouts.push({
+      id: 'prob',
+      tex: `P(${fmt(scene.a!)} \\le X \\le ${fmt(scene.b!)})`,
+      value: guarded ? null : fmt(prob, 4),
+    });
+  }
+
+  return {
+    objects,
+    readouts,
+    caption: spec.discrete ? 'Each bar is one outcome; heights sum to 1.' : 'The whole area under the curve is 1.',
+    ask: hasWindow
+      ? 'The shaded share of the total area is the probability. Roughly how much of it is shaded?'
+      : 'Move a parameter and watch where the mass goes.',
+  };
+};
+
+// --- 10. First-order ODE: direction field + trajectory ---------------
+
+/** RK4 both ways from (x0, y0), stopping when the solution leaves the world. */
+export function rk4Trajectory(
+  f: (x: number, y: number) => number,
+  x0: number,
+  y0: number,
+  view: Viewport,
+  steps = 400
+): Pt[] {
+  const run = (dir: 1 | -1): Pt[] => {
+    const h = ((view.xMax - view.xMin) / steps) * dir;
+    const out: Pt[] = [];
+    let x = x0;
+    let y = y0;
+    const ySpan = view.yMax - view.yMin;
+    for (let i = 0; i < steps; i++) {
+      const k1 = f(x, y);
+      const k2 = f(x + h / 2, y + (h / 2) * k1);
+      const k3 = f(x + h / 2, y + (h / 2) * k2);
+      const k4 = f(x + h, y + h * k3);
+      if (![k1, k2, k3, k4].every(Number.isFinite)) break;
+      y += (h / 6) * (k1 + 2 * k2 + 2 * k3 + k4);
+      x += h;
+      if (!Number.isFinite(y) || x < view.xMin - 1e-9 || x > view.xMax + 1e-9) break;
+      if (y < view.yMin - ySpan || y > view.yMax + ySpan) break; // ran away
+      out.push({ x, y });
+    }
+    return out;
+  };
+  const fwd = run(1);
+  const back = run(-1).reverse();
+  return [...back, { x: x0, y: y0 }, ...fwd];
+}
+
+const buildOde: Builder = (scene, fn, vals, view, guarded) => {
+  if (!fn) return EMPTY_FRAME;
+  const scope: Record<string, number> = {};
+  for (const p of scene.params) if (p.id !== 'y0') scope[p.id] = vals[p.id];
+  const f = (x: number, y: number) => fn.eval({ ...scope, [scene.varName]: x, y });
+
+  // The direction field: a short unit-length dash of slope f(x, y) at each
+  // lattice point, all drawn as one mesh.
+  const NX = 20;
+  const NY = 14;
+  const dx = (view.xMax - view.xMin) / NX;
+  const dy = (view.yMax - view.yMin) / NY;
+  const len = Math.min(dx, dy) * 0.42;
+  const aspect = dy / dx; // slopes live in data space; normalise the dash there
+  const lines: Pt[][] = [];
+  for (let i = 0; i <= NX; i++) {
+    for (let j = 0; j <= NY; j++) {
+      const x = view.xMin + i * dx;
+      const y = view.yMin + j * dy;
+      const m = f(x, y);
+      if (!Number.isFinite(m)) continue;
+      const norm = Math.hypot(1, m / aspect) || 1;
+      const ux = (len / norm) * 1;
+      const uy = (len / norm) * (m / aspect) * aspect;
+      lines.push([{ x: x - ux / 2, y: y - uy / 2 }, { x: x + ux / 2, y: y + uy / 2 }]);
+    }
+  }
+
+  const x0 = scene.a ?? (view.xMin + view.xMax) / 2;
+  const y0 = vals.y0 ?? 1;
+  const traj = rk4Trajectory(f, x0, y0, view);
+
+  const objects: VizObject[] = [
+    { o: 'mesh', id: 'field', lines, tone: 'ghost', width: 1 },
+    { o: 'curve', id: 'traj', pts: traj, tone: 'primary', width: 2.2 },
+    { o: 'point', id: 'ic', x: x0, y: y0, tone: 'accent', label: `(${fmt(x0)}, ${fmt(y0)})` },
+  ];
+
+  const readouts: VizReadout[] = [{ id: 'y0', tex: 'y_0', value: fmt(y0, 3) }];
+  for (const p of scene.params) {
+    if (p.id === 'y0') continue;
+    readouts.push({ id: p.id, tex: p.symbol || p.id, value: fmt(vals[p.id] ?? p.value, 3) });
+  }
+
+  return {
+    objects,
+    readouts,
+    caption: 'One solution, threaded through the field its equation defines.',
+    ask: 'Slide y₀. Which starting points end up together, and which never meet?',
+  };
+};
+
 const KINDS: Record<VizKind, Builder> = {
   function: buildFunction,
   limit: buildLimit,
   derivative: buildDerivative,
   riemann: buildRiemann,
+  taylor: buildTaylor,
+  sequence: buildSequence,
+  vectors: buildVectors,
+  matrix: buildMatrix,
+  distribution: buildDistribution,
+  ode: buildOde,
 };
 
 /**
@@ -640,7 +1379,7 @@ const KINDS: Record<VizKind, Builder> = {
  */
 export function buildFrame(
   scene: VizScene,
-  fn: CompiledExpr,
+  fn: CompiledExpr | null,
   vals: Record<string, number>,
   view: Viewport,
   guarded: boolean
@@ -650,7 +1389,10 @@ export function buildFrame(
 
 /** Compile a scene's expression over its variable and every parameter. */
 export function compileScene(scene: VizScene): CompiledExpr | null {
-  return compileExpr(scene.expr, [scene.varName, ...scene.params.map((p) => p.id)]);
+  if (!kindNeedsExpr(scene.kind)) return null;
+  const names = [scene.varName, ...scene.params.map((p) => p.id)];
+  if (scene.kind === 'ode') names.push('y'); // dy/dx = f(x, y)
+  return compileExpr(scene.expr, names);
 }
 
 // ── defaults ────────────────────────────────────────────────────────
@@ -675,6 +1417,45 @@ const REQUIRED: Record<VizKind, (scene: VizScene) => VizParam[]> = {
     return [{ id: 'h', min: max / 1200, max, step: max / 2000, value: max, sweep: 'down', toward: '0' }];
   },
   riemann: () => [{ id: 'n', min: 1, max: 80, step: 1, value: 4, integer: true, sweep: 'up', toward: '\\infty' }],
+  taylor: () => [{ id: 'k', min: 0, max: 10, step: 1, value: 1, integer: true, sweep: 'up', toward: '\\infty' }],
+  sequence: (sc) => [
+    { id: 'm', min: 1, max: 48, step: 1, value: sc.partial ? 4 : 8, integer: true, sweep: 'up', toward: '\\infty' },
+  ],
+  vectors: (sc) =>
+    (sc.vectors?.length ?? 0) === 2
+      ? [
+          { id: 's', min: -2, max: 2, step: 0.05, value: 1 },
+          { id: 't', min: -2, max: 2, step: 0.05, value: 1 },
+        ]
+      : [],
+  matrix: () => [{ id: 't', min: 0, max: 1, step: 0.01, value: 0, sweep: 'up', toward: '1' }],
+  distribution: (sc) => {
+    switch (sc.dist) {
+      case 'normal':
+        return [
+          { id: 'u', symbol: '\\mu', min: -6, max: 6, step: 0.1, value: 0 },
+          { id: 's', symbol: '\\sigma', min: 0.3, max: 3, step: 0.05, value: 1 },
+        ];
+      case 'binomial':
+        return [
+          { id: 'n', min: 1, max: 60, step: 1, value: 12, integer: true },
+          { id: 'p', min: 0.05, max: 0.95, step: 0.01, value: 0.5 },
+        ];
+      case 'exponential':
+        return [{ id: 'l', symbol: '\\lambda', min: 0.2, max: 4, step: 0.05, value: 1 }];
+      default: // poisson
+        return [{ id: 'l', symbol: '\\lambda', min: 0.5, max: 20, step: 0.5, value: 4 }];
+    }
+  },
+  // y₀'s range tracks the window so the slider always reaches something the
+  // person can see.
+  ode: (sc) => {
+    const lo = typeof sc.view.yMin === 'number' ? sc.view.yMin : -4;
+    const hi = typeof sc.view.yMax === 'number' ? sc.view.yMax : 4;
+    return [
+      { id: 'y0', symbol: 'y_0', min: lo, max: hi, step: (hi - lo) / 100, value: Math.min(hi, Math.max(lo, 1)) },
+    ];
+  },
 };
 
 /**
@@ -693,6 +1474,12 @@ export const RESERVED_PARAM: Record<VizKind, string | null> = {
   limit: 'd',
   derivative: 'h',
   riemann: 'n',
+  taylor: 'k',
+  sequence: 'm',
+  vectors: null,
+  matrix: 't',
+  distribution: null,
+  ode: 'y0',
 };
 
 export const KIND_LABEL: Record<VizKind, string> = {
@@ -700,6 +1487,12 @@ export const KIND_LABEL: Record<VizKind, string> = {
   limit: 'Limit',
   derivative: 'Derivative',
   riemann: 'Integral',
+  taylor: 'Taylor',
+  sequence: 'Series',
+  vectors: 'Vectors',
+  matrix: 'Matrix',
+  distribution: 'Distribution',
+  ode: 'Field',
 };
 
 /**
@@ -722,6 +1515,7 @@ export function autoParams(
   const out: VizParam[] = [];
   for (const name of freeNames(expr)) {
     if (name === varName || name === reserved) continue;
+    if (kind === 'ode' && name === 'y') continue; // the solution, not a knob
     if (name.length > 2) continue; // not a coefficient; the sanitizer rejects it anyway
     const had = by.get(name);
     out.push(had ?? { id: name, min: -5, max: 5, step: 0.1, value: 1 });
@@ -782,23 +1576,55 @@ const num = (v: any, lo: number, hi: number, dflt: number): number => {
  * guard's question are generated by the builders, so the surface cannot be
  * talked into narrating an answer that Chat is withholding.
  */
+function sanitizeMatrix(raw: any): [[number, number], [number, number]] | null {
+  if (!Array.isArray(raw) || raw.length !== 2) return null;
+  const row = (r: any): [number, number] | null =>
+    Array.isArray(r) && r.length === 2 && r.every((v) => typeof v === 'number' && Number.isFinite(v) && Math.abs(v) <= 100)
+      ? [r[0], r[1]]
+      : null;
+  const r0 = row(raw[0]);
+  const r1 = row(raw[1]);
+  if (!r0 || !r1) return null;
+  // The zero matrix flattens the lattice to a point — true, but nothing to see.
+  if (r0[0] === 0 && r0[1] === 0 && r1[0] === 0 && r1[1] === 0) return null;
+  return [r0, r1];
+}
+
+function sanitizeVectors(raw: any): { x: number; y: number; label?: string }[] | null {
+  if (!Array.isArray(raw)) return null;
+  const out = raw
+    .map((v: any) =>
+      v && typeof v.x === 'number' && typeof v.y === 'number' && Number.isFinite(v.x) && Number.isFinite(v.y) && Math.hypot(v.x, v.y) > 1e-9 && Math.abs(v.x) <= 1e3 && Math.abs(v.y) <= 1e3
+        ? { x: v.x, y: v.y, ...(typeof v.label === 'string' && v.label.trim() ? { label: v.label.trim().slice(0, 12) } : {}) }
+        : null
+    )
+    .filter(Boolean) as { x: number; y: number; label?: string }[];
+  return out.length ? out.slice(0, 4) : null;
+}
+
 export function sanitizeViz(raw: any): VizScene | null {
   if (!raw || typeof raw !== 'object') return null;
   const kind: VizKind | null = VIZ_KINDS.includes(raw.kind) ? raw.kind : null;
   if (!kind) return null;
 
+  const needsExpr = kindNeedsExpr(kind);
   const expr = typeof raw.expr === 'string' ? raw.expr.trim().slice(0, MAX_EXPR) : '';
-  if (!expr) return null;
+  if (needsExpr && !expr) return null;
 
+  // A sequence is indexed by n, always; the ODE's second name is y, always.
   const varName =
-    typeof raw.varName === 'string' && /^[a-z]$/i.test(raw.varName.trim())
-      ? raw.varName.trim().toLowerCase()
-      : 'x';
+    kind === 'sequence'
+      ? 'n'
+      : typeof raw.varName === 'string' && /^[a-z]$/i.test(raw.varName.trim())
+        ? raw.varName.trim().toLowerCase()
+        : 'x';
+  if (kind === 'ode' && varName === 'y') return null;
 
   const rawParams: VizParam[] = (Array.isArray(raw.params) ? raw.params : [])
     .map((p: any): VizParam | null => {
       const id = typeof p?.id === 'string' ? p.id.trim().toLowerCase() : '';
       if (!/^[a-z][a-z0-9]?$/.test(id) || id === varName) return null;
+      if (kind === 'ode' && id === 'y') return null; // y is the solution, not a slider
       const min = num(p?.min, -1e4, 1e4, 0);
       const max = num(p?.max, -1e4, 1e4, 1);
       if (!(max > min)) return null;
@@ -841,19 +1667,35 @@ export function sanitizeViz(raw: any): VizScene | null {
     ...(typeof raw.a === 'number' && Number.isFinite(raw.a) ? { a: num(raw.a, -1e4, 1e4, 0) } : {}),
     ...(typeof raw.b === 'number' && Number.isFinite(raw.b) ? { b: num(raw.b, -1e4, 1e4, 1) } : {}),
     ...(raw.rule === 'left' || raw.rule === 'right' || raw.rule === 'midpoint' ? { rule: raw.rule } : {}),
+    ...(kind === 'matrix' ? { matrix: sanitizeMatrix(raw.matrix) ?? undefined } : {}),
+    ...(kind === 'vectors' ? { vectors: sanitizeVectors(raw.vectors) ?? undefined } : {}),
+    ...(kind === 'distribution' && DISTS.includes(raw.dist) ? { dist: raw.dist as DistName } : {}),
+    ...(kind === 'sequence' && raw.partial !== false ? { partial: true } : {}),
+    ...(raw.ghost === true ? { ghost: true } : {}),
     ...(typeof raw.title === 'string' && raw.title.trim()
       ? { title: raw.title.replace(/\s+/g, ' ').trim().slice(0, MAX_TITLE) }
       : {}),
   });
 
+  // Kinds that carry their objects directly stand or fall on those objects.
+  if (scene.kind === 'matrix' && !scene.matrix) return null;
+  if (scene.kind === 'vectors' && !scene.vectors?.length) return null;
+  if (scene.kind === 'distribution' && !scene.dist) return null;
+
   // The expression must compile over exactly the names we are prepared to
   // bind. An expression mentioning a name with no slider would evaluate to NaN
   // forever and draw an empty canvas, so it is rejected here instead.
-  const known = new Set([scene.varName, ...scene.params.map((p) => p.id)]);
-  if (freeNames(scene.expr).some((nm) => !known.has(nm))) return null;
-  const fn = compileScene(scene);
-  if (!fn) return null;
-  if (!fn.vars.includes(scene.varName)) return null; // a constant is not a curve
+  let fn: CompiledExpr | null = null;
+  if (needsExpr) {
+    const known = new Set([scene.varName, ...scene.params.map((p) => p.id)]);
+    if (scene.kind === 'ode') known.add('y');
+    if (freeNames(scene.expr).some((nm) => !known.has(nm))) return null;
+    fn = compileScene(scene);
+    if (!fn) return null;
+    // A constant is not a curve — except in an ODE, where dy/dx = k is a
+    // perfectly good field, and y may appear with or without x.
+    if (scene.kind !== 'ode' && !fn.vars.includes(scene.varName)) return null;
+  }
 
   // An interval kind needs a real interval.
   if (scene.kind === 'riemann') {
@@ -863,8 +1705,19 @@ export function sanitizeViz(raw: any): VizScene | null {
     scene.a = a;
     scene.b = b;
   }
-  if ((scene.kind === 'limit' || scene.kind === 'derivative') && typeof scene.a !== 'number') {
+  if (
+    (scene.kind === 'limit' || scene.kind === 'derivative' || scene.kind === 'taylor') &&
+    typeof scene.a !== 'number'
+  ) {
     scene.a = 0;
+  }
+
+  // A Taylor scene must actually HAVE a series at its centre — abs(x), a pole,
+  // a log of a negative — otherwise the lens would open onto an apology.
+  if (scene.kind === 'taylor') {
+    const scope: Record<string, number> = {};
+    for (const pm of scene.params) if (pm.id !== 'k') scope[pm.id] = pm.value;
+    if (!taylorCoeffs(scene.expr, scene.varName, scope, scene.a ?? 0, 2)) return null;
   }
 
   // Finally: it has to actually draw. A scene whose viewport comes out

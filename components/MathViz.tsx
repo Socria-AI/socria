@@ -18,16 +18,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   autoParams,
+  CORE_KINDS,
   buildFrame,
   compileScene,
   defaults,
   fmt,
   freeNamesOf,
   KIND_LABEL,
+  kindNeedsExpr,
   resolveView,
   RESERVED_PARAM,
   sanitizeViz,
   sceneSignature,
+  SQUARE_KINDS,
+  squareView,
   sweepProgress,
   sweepValue,
   sweptParam,
@@ -102,9 +106,12 @@ export function MathViz({
   const activeKey = sceneSignature(active);
 
   const compiled = useMemo(() => compileScene(active), [activeKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  // vectors / matrix / distribution carry their objects directly; for them a
+  // null compile is the normal state, not a failure.
+  const usable = !kindNeedsExpr(active.kind) || !!compiled;
   const autoView = useMemo(
-    () => (compiled ? resolveView(active, compiled) : null),
-    [activeKey, compiled] // eslint-disable-line react-hooks/exhaustive-deps
+    () => (usable ? resolveView(active, compiled) : null),
+    [activeKey, compiled, usable] // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   const swept = useMemo(() => sweptParam(active), [activeKey]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -117,7 +124,7 @@ export function MathViz({
   // change to the mathematics, and writing it into the scene on every wheel
   // tick would also resize h and δ, which are derived from the x-window.
   const [pan, setPan] = useState<Viewport | null>(null);
-  const view = pan ?? autoView;
+  const rawView = pan ?? autoView;
 
   const progRef = useRef(0);
   const geomRef = useRef<Geom | null>(null);
@@ -131,6 +138,10 @@ export function MathViz({
     setVals(defaults(active));
     setPlaying(false);
     setPan(null);
+    // The editor was drafting the OLD scene; leaving it open against a new
+    // one desyncs the toggle and edits a picture that is no longer there.
+    setDraft(null);
+    setError(null);
     const p = sweptParam(active);
     progRef.current = p ? sweepProgress(p, defaults(active)[p.id]) : 0;
   }, [activeKey]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -333,13 +344,6 @@ export function MathViz({
 
   useEffect(() => () => { if (persistRef.current) clearTimeout(persistRef.current); }, []);
 
-  // ── frame ─────────────────────────────────────────────────────────
-
-  const frame = useMemo(
-    () => (compiled && view ? buildFrame(active, compiled, vals, view, !!guarded) : null),
-    [activeKey, compiled, vals, view, guarded] // eslint-disable-line react-hooks/exhaustive-deps
-  );
-
   const W = Math.max(300, width - 32);
   const H = Math.max(
     200,
@@ -348,13 +352,32 @@ export function MathViz({
   const plotW = W - PAD.l - PAD.r;
   const plotH = H - PAD.t - PAD.b;
 
+  // Where x and y are the same kind of quantity, force a unit to the same
+  // number of pixels both ways — otherwise a rotation renders as a shear.
+  // Zooming scales both axes together and panning shifts them, so once square
+  // the window stays square; re-applying is a no-op.
+  const view = useMemo(
+    () =>
+      rawView && SQUARE_KINDS.has(active.kind)
+        ? squareView(rawView, plotW, plotH)
+        : rawView,
+    [rawView, active.kind, plotW, plotH]
+  );
+
+  // ── frame ─────────────────────────────────────────────────────────
+
+  const frame = useMemo(
+    () => (usable && view ? buildFrame(active, compiled, vals, view, !!guarded) : null),
+    [activeKey, compiled, usable, vals, view, guarded] // eslint-disable-line react-hooks/exhaustive-deps
+  );
+
   // Geometry the imperative handlers read. Updated after every render so the
   // wheel listener, which is registered once, never works from a stale window.
   useEffect(() => {
     geomRef.current = view ? { view, plotW, plotH } : null;
   });
 
-  if (!compiled || !view || !frame) {
+  if (!usable || !view || !frame) {
     return (
       <div className="lg-map-empty">
         <span className="lg-map-empty-mark" aria-hidden="true">
@@ -546,6 +569,13 @@ function buildScene(d: Draft, base: VizScene, liveParams: VizParam[] = []): VizS
     ...(a !== undefined ? { a } : {}),
     ...(b !== undefined ? { b } : {}),
     ...(kind === 'riemann' ? { rule: d.rule } : {}),
+    // The kinds that carry data rather than an expression keep it across an
+    // edit — retyping nothing should not cost someone their matrix.
+    ...(kind === base.kind && base.matrix ? { matrix: base.matrix } : {}),
+    ...(kind === base.kind && base.vectors ? { vectors: base.vectors } : {}),
+    ...(kind === base.kind && base.dist ? { dist: base.dist } : {}),
+    ...(kind === base.kind && base.partial ? { partial: base.partial } : {}),
+    ...(base.ghost ? { ghost: base.ghost } : {}),
     // The model's title described the model's picture. Once the reader has
     // changed the expression or the concept it is no longer true, and we are
     // in no position to write a new one, so it goes.
@@ -583,6 +613,12 @@ function forKind(d: Draft, kind: VizKind): Draft {
   return { ...d, kind, a: String(a), b: b !== null && b > a ? String(b) : String(a + 2) };
 }
 
+function eqLabel(kind: VizKind, varName: string): string {
+  if (kind === 'ode') return `\\frac{dy}{d${varName}} =`;
+  if (kind === 'sequence') return 'a_n =';
+  return `f(${varName}) =`;
+}
+
 function Editor({
   draft,
   error,
@@ -594,13 +630,24 @@ function Editor({
   varName: string;
   onChange: (d: Draft) => void;
 }) {
-  const needsA = draft.kind !== 'function';
+  const needsA =
+    kindNeedsExpr(draft.kind) &&
+    draft.kind !== 'function' &&
+    draft.kind !== 'sequence' &&
+    draft.kind !== 'ode';
   const needsB = draft.kind === 'riemann';
+  const hasExpr = kindNeedsExpr(draft.kind);
+  // The four everyone meets first, plus the one on screen when it is not
+  // among them — never a wall of ten chips.
+  const chips: VizKind[] = CORE_KINDS.includes(draft.kind)
+    ? CORE_KINDS
+    : [...CORE_KINDS, draft.kind];
   return (
     <div className="lg-viz-editor">
+      {hasExpr && (
       <div className="lg-viz-eqrow">
         <span className="lg-viz-eqlab">
-          <TeX tex={`f(${varName}) =`} />
+          <TeX tex={eqLabel(draft.kind, varName)} />
         </span>
         <input
           className="lg-viz-eq"
@@ -613,10 +660,11 @@ function Editor({
           onChange={(e) => onChange({ ...draft, expr: e.target.value })}
         />
       </div>
+      )}
 
       <div className="lg-viz-editrow">
         <span className="lg-viz-kinds" role="group" aria-label="What to show">
-          {VIZ_KINDS.map((k) => (
+          {chips.map((k) => (
             <button
               key={k}
               type="button"
@@ -715,6 +763,21 @@ function Obj({
           className="lg-viz-curve"
         />
       );
+
+    case 'mesh': {
+      // Many polylines, one DOM node — a 40-line grid or a 300-dash field
+      // would otherwise be hundreds of elements React reconciles per frame.
+      let d = '';
+      for (const line of ob.lines) {
+        for (let i = 0; i < line.length; i++) {
+          const X = sx(line[i].x);
+          const Y = sy(line[i].y);
+          if (!Number.isFinite(X) || !Number.isFinite(Y)) break;
+          d += `${i === 0 ? 'M' : 'L'} ${X.toFixed(1)} ${Y.toFixed(1)} `;
+        }
+      }
+      return <path d={d} fill="none" stroke={stroke} strokeWidth={ob.width ?? 1} className="lg-viz-mesh" />;
+    }
 
     case 'region':
       return <path d={`${path(ob.pts, sx, sy, view)} Z`} fill={stroke} opacity={0.12} stroke="none" />;

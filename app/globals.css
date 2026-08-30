@@ -3954,6 +3954,8 @@ html.js-anim .scrolly-root .fade.d3 { transition-delay: .3s; }
 .logos-root .lg-conn-relates   { color: rgba(35, 36, 31, 0.22); }
 .logos-root .lg-conn-precedes  { color: #8A9BA6; }
 .logos-root .lg-conn-part_of   { color: rgba(53, 70, 32, 0.3); }
+.logos-root .lg-conn-equivalent_to { color: #6E7FA3; }
+.logos-root .lg-conn-equivalent_to .lg-edge { stroke-dasharray: 8 3 2 3; }
 /* chronology reads as a sequence, not a claim of cause */
 .logos-root .lg-conn-precedes .lg-edge { stroke-dasharray: 5 3; }
 .logos-root .lg-conn.is-dim { opacity: 0.12; }
