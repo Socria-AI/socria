@@ -1,11 +1,24 @@
-// Mathematics: math maps, the Board, the plot, the evaluator, the guard.
-// Checkable against lib/logos-math.ts, lib/logos-guidance.ts,
-// components/MathBoard.tsx and components/MathPlot.tsx.
+// Mathematics: math maps, the Board, the interactive graph, the evaluator,
+// the guard. Checkable against lib/logos-math.ts, lib/logos-viz.ts,
+// lib/logos-guidance.ts, components/MathBoard.tsx, components/MathPlot.tsx
+// and components/MathViz.tsx.
+//
+// Every figure below is a LIVE component, not a screenshot. If the product
+// changes, these change with it — and if one breaks, the page breaks
+// visibly rather than quietly describing something that no longer exists.
 
 import Link from 'next/link';
 import { Article, H2, Callout, Defs, Def } from '../Article';
 import { DemoBoard, DemoGuard } from '@/app/logos/LogosDemo';
-import { DemoCollege, DemoPlot } from '../DocsDemo';
+import {
+  DemoCollege,
+  DemoPlot,
+  DemoVizDerivative,
+  DemoVizLimit,
+  DemoVizOthers,
+  DemoVizRiemann,
+  DemoVizTaylor,
+} from '../DocsDemo';
 import { docPage } from '../registry';
 
 const page = docPage('mathematics')!;
@@ -14,6 +27,9 @@ const sections = [
   { id: 'intents', heading: 'Four kinds of math moment' },
   { id: 'board', heading: 'The Board' },
   { id: 'plot', heading: 'The function plot' },
+  { id: 'graph', heading: 'The interactive graph' },
+  { id: 'kinds', heading: 'Ten kinds of scene' },
+  { id: 'yours', heading: 'The window is yours' },
   { id: 'college', heading: 'Calculus, statistics, and beyond' },
   { id: 'guard', heading: 'The Answer Guard' },
 ];
@@ -120,6 +136,124 @@ export function Mathematics() {
         </p>
       </Callout>
       <DemoPlot />
+
+      <H2 id="graph">The interactive graph</H2>
+      <p>
+        A drawn curve tells you what a function looks like. It does not tell
+        you what a derivative <em>is</em>. So when the work is about an idea
+        rather than a picture, the Plot lens builds a <strong>scene</strong>:
+        the same plot, plus one parameter you can move and watch the
+        mathematics respond.
+      </p>
+      <p>
+        Below is the definition of the derivative, live in this page. Drag{' '}
+        <code>h</code> toward zero, or press play. Two points on a curve,
+        the straight line through them, and the moment that line stops being
+        an average and becomes the slope at a point:
+      </p>
+      <DemoVizDerivative />
+      <p>
+        Nothing about that is a video. The readings under the plot are
+        computed from the expression as you move the handle, the words to the
+        right change as the picture does, and the whole thing is drawn with
+        the same sandboxed evaluator described above — no plotting library,
+        no <code>eval()</code>.
+      </p>
+      <Callout tag="Why a slider and not a slideshow">
+        <p>
+          The gap between &ldquo;the secant approaches the tangent&rdquo; as a
+          sentence and as a thing you did with your own hand is most of what
+          makes the idea stick. You are meant to overshoot, come back, and
+          watch the number settle — which is why the parameter is a control
+          and not a play button with a fixed path.
+        </p>
+      </Callout>
+
+      <H2 id="kinds">Ten kinds of scene</H2>
+      <p>
+        The renderer knows nothing about mathematics. It draws objects and
+        runs a clock over one swept parameter; each <em>kind</em> decides what
+        those objects are. That split is why the list grows without the
+        drawing code changing.
+      </p>
+      <Defs>
+        <Def term="function">
+          A curve, with as many expressions on it as you care to add.
+        </Def>
+        <Def term="limit">
+          Two readings closing in from either side, and whether they meet.
+        </Def>
+        <Def term="derivative">
+          A secant becoming a tangent as the gap closes.
+        </Def>
+        <Def term="riemann">
+          Rectangles narrowing under a curve toward the integral.
+        </Def>
+        <Def term="taylor">
+          A polynomial gaining a degree at a time until it hugs the function.
+        </Def>
+        <Def term="sequence">
+          Terms as stems, with the running total beside them.
+        </Def>
+        <Def term="vectors">
+          Arrows, and everything a combination of them can reach.
+        </Def>
+        <Def term="matrix">
+          A plane being transformed, with its eigenvectors held still.
+        </Def>
+        <Def term="distribution">
+          A density, and the area under whatever interval you choose.
+        </Def>
+        <Def term="ode">
+          A slope field, with a solution threaded through it.
+        </Def>
+      </Defs>
+      <p>Three more, live — a limit, a Taylor series, and an area:</p>
+      <DemoVizLimit />
+      <DemoVizTaylor />
+      <DemoVizRiemann />
+      <p>
+        Notice what the limit scene does <em>not</em> show. When both sides
+        arrive at the same value, the one-sided limits are left out: three
+        lines reading &ldquo;2&rdquo;, &ldquo;2&rdquo; and &ldquo;2&rdquo;
+        make one point, and the two sample readings closing on each other are
+        the visible evidence for it. Give it a jump discontinuity and the
+        one-sided limits come back, because there they are the whole reason
+        the two-sided limit does not exist.
+      </p>
+      <p>And the same instrument, well outside calculus:</p>
+      <DemoVizOthers />
+
+      <H2 id="yours">The window is yours</H2>
+      <p>
+        Logos proposes the picture. What you do with it afterwards is not the
+        model&rsquo;s business, so the window and the scene are both yours to
+        change:
+      </p>
+      <ul>
+        <li>
+          <strong>Scroll to zoom, drag to move.</strong> On a touch screen,
+          pinch. The window is never written back into the scene — panning is
+          a way of looking, not a change to the mathematics.
+        </li>
+        <li>
+          <strong>From the keyboard.</strong> Tab to the plot and the arrow
+          keys pan, <code>+</code> and <code>−</code> zoom, <code>0</code>{' '}
+          fits. Double-click fits too.
+        </li>
+        <li>
+          <strong>Edit what is shown.</strong> Change the expression, change
+          the kind of scene, or add your own curves alongside Socria&rsquo;s —
+          they are drawn in their own colours so it stays obvious which marks
+          are yours.
+        </li>
+        <li>
+          <strong>Ask what a symbol means.</strong> Any reading with an
+          explanation behind it is a button; pressing it says what the
+          quantity <em>is</em>, never what it equals. That distinction is what
+          makes it safe to answer while the guard is up.
+        </li>
+      </ul>
 
       <H2 id="college">Calculus, statistics, and beyond</H2>
       <p>

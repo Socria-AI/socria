@@ -74,7 +74,7 @@ export const DOC_PAGES: DocPage[] = [
   {
     slug: 'mathematics',
     title: 'Mathematics',
-    blurb: 'Math-aware maps, the Board, function plots, and the Answer Guard.',
+    blurb: 'Math-aware maps, the Board, an interactive graph you can drive, and the Answer Guard.',
     group: 'The reasoning environment',
   },
   {
@@ -92,7 +92,7 @@ export const DOC_PAGES: DocPage[] = [
   {
     slug: 'socria-one',
     title: 'Socria One',
-    blurb: 'The free tier, the $15/month subscription, access codes, and how billing behaves.',
+    blurb: 'The free tier, the subscription, when Socria asks, access codes, and how billing behaves.',
     group: 'Plans & accounts',
   },
   {

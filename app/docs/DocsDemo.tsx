@@ -9,9 +9,13 @@
 // docs.css carries the re-scoped demo chrome that makes both sets sit in a
 // wiki figure.
 
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { MathBoard } from '@/components/MathBoard';
 import { MathPlot } from '@/components/MathPlot';
+import { MathViz } from '@/components/MathViz';
+import { sanitizeViz, type VizScene } from '@/lib/logos-viz';
+import { COUNTER_SCOPE, PLANS, type Counter } from '@/lib/entitlements';
+import { SOCRIA_ONE } from '@/lib/socria-one';
 import { ModelPicker } from '@/components/ModelPicker';
 import { SynthesisCard } from '@/components/SynthesisCard';
 import { ChoiceChips } from '@/components/ChoiceChips';
@@ -70,6 +74,224 @@ export function DemoPlot() {
         <MathPlot map={PLOT_MAP} width={680} height={300} />
       </div>
     </DocsFrame>
+  );
+}
+
+/* ── what each plan holds ──────────────────────────────────────────── */
+// Read from lib/entitlements at render time rather than typed out.
+//
+// The table this replaces said a free map holds 4 nodes when it holds 8, and
+// listed six of the seven counters not at all. That is the ordinary fate of
+// a number written down twice: the code moved and the docs did not. Now the
+// page cannot disagree with the product, because it is reading the product.
+
+/** How each counter is described to a reader, and what its period is. */
+const COUNTER_LABEL: Record<Counter, string> = {
+  chats: 'Lines of thinking begun',
+  explore: 'Explore, on a node',
+  research: 'Research runs',
+  challenge: 'Challenge — Logos pushing back',
+  context: 'Nodes grounded in your own material',
+  images: 'Images read',
+  files: 'Files read',
+};
+
+const PERIOD: Record<'month' | 'chat', string> = {
+  month: 'per month',
+  chat: 'per conversation',
+};
+
+/** The free tier's numbers are boundaries someone will actually meet. */
+function cap(n: number | null): string {
+  return n === null ? 'Uncapped' : String(n);
+}
+
+/**
+ * One's numbers are not the same kind of thing.
+ *
+ * Where a cap exists at all it is a fair-use ceiling set where nobody working
+ * seriously will meet it — so printing a bare "400" next to the free tier's
+ * "2" invites the reader to compare two figures that mean different things,
+ * and makes a plan sold as "without the limits" look metered. The number is
+ * still shown, because hiding it would be the other kind of dishonest.
+ */
+function oneCap(n: number | null): ReactNode {
+  if (n === null) return 'Uncapped';
+  return (
+    <>
+      {n} <span className="d-dim">fair use</span>
+    </>
+  );
+}
+
+export function DemoLimitsTable() {
+  const free = PLANS.free;
+  const one = PLANS.one;
+  const counters = Object.keys(COUNTER_LABEL) as Counter[];
+  return (
+    <div className="d-tablewrap">
+      <table>
+        <thead>
+          <tr>
+            <th>What</th>
+            <th>Free</th>
+            <th>
+              Socria One · {SOCRIA_ONE.currency}
+              {SOCRIA_ONE.price}/{SOCRIA_ONE.period}
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {counters.map((c) => (
+            <tr key={c}>
+              <td>
+                {COUNTER_LABEL[c]}{' '}
+                <span className="d-dim">{PERIOD[COUNTER_SCOPE[c]]}</span>
+              </td>
+              <td>{cap(free.counters[c])}</td>
+              <td>{oneCap(one.counters[c])}</td>
+            </tr>
+          ))}
+          <tr>
+            <td>Nodes a map grows to</td>
+            <td>{cap(free.mapNodes)}</td>
+            <td>{oneCap(one.mapNodes)}</td>
+          </tr>
+          <tr>
+            <td>Lenses onto the map</td>
+            <td>{cap(free.lenses)}</td>
+            <td>All of them</td>
+          </tr>
+          <tr>
+            <td>Thinking depth</td>
+            <td>{free.allDepths ? 'All four' : 'Balanced only'}</td>
+            <td>{one.allDepths ? 'All four' : 'Balanced only'}</td>
+          </tr>
+          <tr>
+            <td>The map re-organising as you talk</td>
+            <td>{free.liveMap ? 'Yes' : '—'}</td>
+            <td>{one.liveMap ? 'Yes' : '—'}</td>
+          </tr>
+          <tr>
+            <td>Turns the memory carries</td>
+            <td>{cap(free.memoryTurns)}</td>
+            <td>{oneCap(one.memoryTurns)}</td>
+          </tr>
+          <tr>
+            <td>Attachments on one message</td>
+            <td>{free.attachmentsPerMessage}</td>
+            <td>{one.attachmentsPerMessage}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/* ── the interactive graph ─────────────────────────────────────────── */
+// These are live MathViz instances, not pictures of one. Every control below
+// works in the page: drag the slider, press play, scroll to zoom, drag to
+// pan. That is the point of showing them here rather than screenshotting —
+// a screenshot of an instrument tells you it exists; the instrument tells you
+// what it does.
+//
+// sanitizeViz is the same gate the model's output passes through, so a scene
+// that would be rejected in the product is rejected here too. If one of these
+// ever stops rendering, the docs are telling the truth about a real break.
+
+function viz(raw: unknown): VizScene | null {
+  return sanitizeViz(raw);
+}
+
+const SECANT = viz({ kind: 'derivative', expr: 'sin(x)', varName: 'x', a: 1 });
+const RIEMANN = viz({ kind: 'riemann', expr: 'x^2', varName: 'x', a: 0, b: 2 });
+const LIMIT = viz({ kind: 'limit', expr: '(x^2 - 9)/(x - 3)', varName: 'x', a: 3 });
+const TAYLOR = viz({ kind: 'taylor', expr: 'exp(x)', varName: 'x', a: 0, order: 6 });
+const VECTORS = viz({
+  kind: 'vectors',
+  vectors: [{ x: 2, y: 1, label: 'u' }, { x: -1, y: 2, label: 'v' }],
+});
+const DIST = viz({ kind: 'distribution', dist: 'normal', mu: 0, sigma: 1 });
+
+/** One live scene in a wiki figure. Renders nothing if the scene is invalid. */
+function VizFigure({
+  scene,
+  label,
+  height = 560,
+}: {
+  scene: VizScene | null;
+  label: string;
+  height?: number;
+}) {
+  if (!scene) return null;
+  // MathViz stacks a narration column, a row of readings, the transport and
+  // a full-width slider around the plot. Give the figure too little and all
+  // of that keeps its size while the drawing — the only part anyone came to
+  // look at — is what shrinks.
+  return (
+    <DocsFrame label={label} height={height}>
+      <div className="lg-panel" style={{ height: '100%', position: 'relative' }}>
+        <MathViz scene={scene} width={680} height={height - 24} />
+      </div>
+    </DocsFrame>
+  );
+}
+
+/** The secant becoming a tangent — the moment the derivative is defined. */
+export function DemoVizDerivative() {
+  return (
+    <VizFigure
+      scene={SECANT}
+      label="Drag h toward 0, or press play — the secant becomes the tangent"
+    />
+  );
+}
+
+/** Rectangles narrowing under a curve. */
+export function DemoVizRiemann() {
+  return (
+    <VizFigure
+      scene={RIEMANN}
+      label="More rectangles, each thinner — the staircase closing on the area"
+    />
+  );
+}
+
+/** Two readings closing in on a value the function never takes. */
+export function DemoVizLimit() {
+  return (
+    <VizFigure
+      scene={LIMIT}
+      label="Squeeze δ toward 0 — both sides arrive where the function has a hole"
+    />
+  );
+}
+
+/** A polynomial growing degree by degree until it hugs the curve. */
+export function DemoVizTaylor() {
+  return (
+    <VizFigure
+      scene={TAYLOR}
+      label="Each degree of the Taylor polynomial, added one at a time"
+    />
+  );
+}
+
+/** Linear algebra and probability, in the same instrument. */
+export function DemoVizOthers() {
+  return (
+    <>
+      <VizFigure
+        scene={VECTORS}
+        label="Slide s and t — everything the combination s·u + t·v can reach"
+        height={500}
+      />
+      <VizFigure
+        scene={DIST}
+        label="A normal distribution, with the area under the interval you choose"
+        height={500}
+      />
+    </>
   );
 }
 

@@ -1,15 +1,22 @@
 // The money page. Everything here is a statement about the shipped
 // entitlement code, so it can be checked against lib/socria-one.ts,
-// lib/subscriptions.ts and the stripe routes.
+// lib/entitlements.ts, lib/subscriptions.ts and the stripe routes.
+//
+// The plan table is GENERATED from lib/entitlements rather than typed out.
+// The hand-written one it replaced claimed a free map holds 4 nodes when it
+// holds 8, and listed one of the seven counters. A number written down twice
+// goes stale; this one cannot.
 
 import Link from 'next/link';
-import { Article, H2, Callout, Defs, Def, TableWrap } from '../Article';
+import { Article, H2, Callout, Defs, Def } from '../Article';
+import { DemoLimitsTable } from '../DocsDemo';
 import { docPage } from '../registry';
 
 const page = docPage('socria-one')!;
 const sections = [
   { id: 'plans', heading: 'The two plans' },
   { id: 'free', heading: 'What the free tier holds' },
+  { id: 'asking', heading: 'When Socria asks' },
   { id: 'never', heading: 'What is never gated' },
   { id: 'codes', heading: 'Access codes' },
   { id: 'billing', heading: 'How billing behaves' },
@@ -24,8 +31,8 @@ export function SocriaOne() {
         opens the complete reasoning environment — all four{' '}
         <Link href="/docs/depth-personality">depth modes</Link>, Thinking Maps
         with unbounded branching and every lens, Research across the whole map
-        as often as it&rsquo;s needed, Draft Space, and unlimited lines of
-        thinking with full history. Core 2 is not part of the paywall at all —
+        as often as it&rsquo;s needed, Draft Space, and as many lines of thinking as you
+        keep, with their full history. Core 2 is not part of the paywall at all —
         it stays free, account or no account.
       </p>
       <p>
@@ -41,45 +48,14 @@ export function SocriaOne() {
         The free tier is a working trial of the whole loop, not a demo. Its
         exact shape:
       </p>
-      <TableWrap>
-        <table>
-          <thead>
-            <tr><th>Limit</th><th>Free</th><th>Socria One</th></tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>Lines of thinking kept at once</td>
-              <td>2</td>
-              <td>Unlimited</td>
-            </tr>
-            <tr>
-              <td>Nodes a map grows to</td>
-              <td>4</td>
-              <td>Unbounded</td>
-            </tr>
-            <tr>
-              <td>Research runs per conversation</td>
-              <td>1</td>
-              <td>As often as needed</td>
-            </tr>
-            <tr>
-              <td>Thinking depth</td>
-              <td>Balanced</td>
-              <td>All four modes</td>
-            </tr>
-            <tr>
-              <td>Map lenses</td>
-              <td>The map&rsquo;s lead lens</td>
-              <td>All seven</td>
-            </tr>
-            <tr>
-              <td>Draft Space</td>
-              <td>—</td>
-              <td>Included</td>
-            </tr>
-          </tbody>
-        </table>
-      </TableWrap>
+      <DemoLimitsTable />
+      <p className="d-after-table">
+        Those numbers are read from the entitlement table the product itself
+        enforces, so this page cannot drift from what actually happens. Where
+        Socria One carries a figure at all it is a fair-use ceiling — set
+        where serious work will not meet it — rather than an allowance you are
+        meant to ration.
+      </p>
       <Callout tag="Boundary, not wall">
         <p>
           Hitting a limit stops <em>new</em> growth — the map stops taking on
@@ -88,6 +64,61 @@ export function SocriaOne() {
           screen, stays interactive, and stays yours.
         </p>
       </Callout>
+
+      <H2 id="asking">When Socria asks</H2>
+      <p>
+        A place to think cannot also be a place that interrupts you to sell,
+        so there are rules about when Socria One is allowed to come up at
+        all — and most of them are rules about staying quiet.
+      </p>
+      <p>
+        A prompt appears because <strong>you did something</strong>. Never
+        because time passed, never because you are new, never because a
+        session started. There are two kinds, and they are treated very
+        differently:
+      </p>
+      <Defs>
+        <Def term="You reached a boundary">
+          You pressed Explore, or began a third line of thinking, and it
+          stopped. The prompt names the thing that stopped and how to carry
+          on. These appear immediately and are never rationed — a button that
+          silently does nothing is worse than an explanation.
+        </Def>
+        <Def term="Nobody asked">
+          At most one of these per browser session, ever. It needs you to have
+          come back across at least two different days with a map of real
+          size, and it only appears just after a reply lands — the one moment
+          where mentioning more room continues what you were doing rather
+          than interrupting it.
+        </Def>
+      </Defs>
+      <p>
+        Closing the second kind starts a cooldown: a week the first time, a
+        fortnight the second, then two months, then six. Saying no is taken as
+        an answer. Closing the first kind costs nothing — it is a
+        &ldquo;not now&rdquo; to what you were doing, not a verdict on the
+        subscription — so ordinary use of the free tier never silences an
+        explanation you might want later.
+      </p>
+      <Callout tag="Where it stays quiet regardless">
+        <p>
+          When the map reads the conversation as <em>reflecting</em> —
+          someone working through something personal — the unprompted kind is
+          suppressed outright, whatever else is true. Boundary explanations
+          still appear there, because in the middle of that conversation
+          silence from a button you pressed is worse than a sentence saying
+          why.
+        </p>
+        <p>
+          Members never see any of it. That is the first thing checked, before
+          anything else can override it.
+        </p>
+      </Callout>
+      <p>
+        There are no countdowns, no expiring offers and no manufactured
+        scarcity anywhere in this. The price is on the face of every prompt
+        rather than behind a checkout.
+      </p>
 
       <H2 id="never">What is never gated</H2>
       <p>

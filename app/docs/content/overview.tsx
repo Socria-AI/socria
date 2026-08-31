@@ -3,6 +3,7 @@
 
 import Link from 'next/link';
 import { Article, H2, Callout } from '../Article';
+import { DemoSplit } from '@/app/logos/LogosDemo';
 import { DOC_PAGES, docPage } from '../registry';
 
 const page = docPage('overview')!;
@@ -39,8 +40,12 @@ export function Overview() {
       <H2 id="shape">The shape of the product</H2>
       <p>
         Everything lives at one address — <code>socria.app/chat</code> — behind
-        one model switcher. Three models share it:
+        one model switcher. This is what the fullest of the three looks like:
+        the conversation on the left, a map of the thinking it produced on the
+        right, kept in step with each other.
       </p>
+      <DemoSplit />
+      <p>Three models share that address:</p>
       <ul>
         <li>
           <strong><Link href="/docs/core-2">Core 2</Link></strong> — calm,
