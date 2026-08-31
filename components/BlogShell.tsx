@@ -55,7 +55,10 @@ export function BlogNav() {
             </SignedIn>
           </ClerkLoaded>
           <Link href="/chat" className="btn btn-nav">
-            Start a thought session <span className="arrow">→</span>
+            {/* The tail is hidden on a narrow header, where the full label is
+                what pushes this row past the screen. "Start →" still says it. */}
+            Start<span className="btn-tail"> a thought session</span>{' '}
+            <span className="arrow">→</span>
           </Link>
         </div>
       </div>

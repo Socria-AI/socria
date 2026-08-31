@@ -146,6 +146,21 @@ body {
 .brand .name { font-family: var(--serif); font-size: 1.8rem; line-height: 1; letter-spacing: -0.01em; }
 .nav-right { display: flex; align-items: center; gap: 30px; }
 .nav-links { display: flex; gap: 26px; }
+
+/* The header on a phone.
+   Brand, two links, sign-in and a call to action do not fit across 320px, and
+   with nothing telling them otherwise they simply ran off the side and took
+   the whole page with them. Wrapping keeps every one of them reachable —
+   dropping the links would have been easier and would have cost the reader
+   the navigation. */
+@media (max-width: 640px) {
+  .nav-inner { flex-wrap: wrap; gap: 8px 14px; }
+  .nav-right { gap: 16px; flex-wrap: wrap; row-gap: 8px; }
+  .nav-links { gap: 16px; }
+  .brand .name { font-size: 1.5rem; }
+  .brand img { height: 24px; }
+  .btn-nav .btn-tail { display: none; }
+}
 .nav-links a { font-size: 0.88rem; font-weight: 500; color: var(--paper); opacity: 0.85; transition: opacity 0.2s; }
 .nav-links a:hover { opacity: 1; }
 .nav-signin {
@@ -1847,14 +1862,24 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
 /* subscribe band */
 .blog-page .subscribe { padding: clamp(56px, 8vw, 120px) var(--edge); }
 .blog-page .subscribe .inner { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: clamp(30px, 5vw, 72px); align-items: center; max-width: 1320px; margin: 0 auto; }
-@media (max-width: 820px) { .blog-page .subscribe .inner { grid-template-columns: 1fr; } }
+@media (max-width: 820px) {
+  /* minmax(0, 1fr), never a bare 1fr: a bare one cannot go below the widest
+     thing inside it, which is how a single unshrinkable control takes the
+     whole page sideways. */
+  .blog-page .subscribe .inner { grid-template-columns: minmax(0, 1fr); }
+}
 .blog-page .subscribe h2 { font-size: clamp(2.4rem, 5.6vw, 4.6rem); line-height: 0.98; letter-spacing: -0.02em; }
 .blog-page .subscribe h2 .b { font-style: italic; color: var(--sage); }
 .blog-page .subscribe .sub { margin-top: 22px; font-size: clamp(1.02rem, 1.4vw, 1.2rem); line-height: 1.5; opacity: 0.82; max-width: 42ch; }
-.blog-page .sub-form { display: flex; gap: 10px; background: rgba(245, 243, 235, 0.1); border: 1px solid rgba(245, 243, 235, 0.28); padding: 8px; margin-top: 26px; }
-.blog-page .sub-form input { flex: 1; background: transparent; border: 0; outline: none; color: var(--paper); font-family: var(--sans); font-size: 1rem; padding: 0 14px; }
+.blog-page .sub-form { display: flex; flex-wrap: wrap; gap: 10px; background: rgba(245, 243, 235, 0.1); border: 1px solid rgba(245, 243, 235, 0.28); padding: 8px; margin-top: 26px; }
+/* min-width:0 is what stops this page scrolling sideways on a phone.
+   A flex item defaults to min-width:auto, so the input refused to shrink
+   below its intrinsic width; the grid track above it is `1fr`, which is
+   minmax(AUTO, 1fr), so it inherited that refusal and held the whole column
+   at 437px inside a 379px screen. */
+.blog-page .sub-form input { flex: 1 1 12ch; min-width: 0; background: transparent; border: 0; outline: none; color: var(--paper); font-family: var(--sans); font-size: 16px; padding: 0 14px; height: 52px; }
 .blog-page .sub-form input::placeholder { color: rgba(245, 243, 235, 0.5); }
-.blog-page .sub-form button { flex: 0 0 auto; height: 52px; padding: 0 26px; border: 0; background: var(--paper); color: var(--forest-2); font-family: var(--sans); font-weight: 600; font-size: 0.95rem; cursor: pointer; display: inline-flex; align-items: center; gap: 0.5em; transition: background 0.2s, transform 0.2s; }
+.blog-page .sub-form button { flex: 1 1 auto; height: 52px; justify-content: center; padding: 0 26px; border: 0; background: var(--paper); color: var(--forest-2); font-family: var(--sans); font-weight: 600; font-size: 0.95rem; cursor: pointer; display: inline-flex; align-items: center; gap: 0.5em; transition: background 0.2s, transform 0.2s; }
 .blog-page .sub-form button:hover { background: #fff; transform: translateY(-1px); }
 .blog-page .subscribe .fine { margin-top: 14px; font-size: 0.8rem; opacity: 0.6; }
 .blog-page .subscribe .aside { border-left: 1px solid var(--line-dark); padding-left: clamp(26px, 3vw, 44px); }
@@ -7435,4 +7460,71 @@ html.js-anim .scrolly-root .fade.d3 { transition-delay: .3s; }
   .logos-root .lg-op-back { animation: none; }
   .logos-root .lg-op-go:hover:not(:disabled) { transform: none; }
   .logos-root .lg-op-go .ar { transition: none; }
+}
+
+/* ── Phones and touch ───────────────────────────────────────────────
+   Everything below is one of two problems found by measuring the site at
+   320 and 390px on a touch emulator, not by looking at it.
+
+   1. Type set for a desktop label — 7.5px to 10px, tracked and uppercase —
+      is legible on a monitor at arm's length and simply is not on a phone.
+      The floor here is 11px. Sizes are raised only at this width, so the
+      desktop typography the labels were designed for is untouched.
+
+   2. Navigation and controls whose hit area is 14–23px tall. The TEXT is
+      fine; there is just nothing around it to land a thumb on. So the
+      padding grows and the type does not, which leaves the design intact
+      and the target usable.
+
+   The query fires on a narrow screen OR a device with no hover, because
+   both are cases where a finger is doing the pointing. */
+@media (max-width: 640px), (hover: none) {
+  /* — legibility — */
+  .logos-root .lg-node-type { font-size: 10.5px; }
+  .logos-root .lg-status-word { font-size: 11px; }
+  .logos-root .lg-dial-name { font-size: 11px; }
+  .logos-root .lg-msg-who,
+  .logos-root .lg-x-concept { font-size: 11.5px; }
+  .logos-root .lg-act-blurb { font-size: 11.5px; }
+  .core3-modal-card .tl-stage .tl-node .lg-node-type { font-size: 10px; }
+
+  /* — targets — */
+  .legal-root .lg-tabs a,
+  .legal-root .lg-foot a,
+  .foot-links a,
+  .colophon a,
+  .mh-right a,
+  .mh-right button {
+    display: inline-block;
+    padding-block: 10px;
+  }
+  /* The map's zoom cluster was 27x14 — the smallest control in the product,
+     and on a phone the only way to change the map's scale. */
+  .logos-root .lg-zoom button { min-width: 40px; min-height: 38px; font-size: 15px; }
+  .logos-root .lg-zoom .lg-zoom-level { min-width: 56px; }
+  /* Lens tabs sit at 31px; a little padding is all they need. */
+  .logos-root .lg-lens { min-height: 38px; }
+
+  /* The header's own links, which the wrapping rules above move but do not
+     make any easier to hit. */
+  .nav-links a,
+  .nav-signin { display: inline-block; padding-block: 9px; }
+
+  /* The landing page's starter prompts. These are the first thing anyone
+     taps on the site and they were 26px tall. */
+  .suggest button,
+  .ask-row button { min-height: 40px; }
+  .suggest button { padding-block: 8px; }
+
+  /* The blog's brand link and the sign-in page's way back — both are the
+     only navigation on their screen and both were under 25px. */
+  .blog-page .brand { padding-block: 8px; }
+  .paper-bg a.text-\[13px\] { display: inline-block; padding-block: 10px; }
+
+  /* Tailwind's text-[10px] is used across chat and sign-in for section
+     labels, timestamps and footnotes, mostly at 35–40% opacity. Ten pixels
+     of tracked uppercase at that contrast is not readable on a handset, and
+     it is the same judgement as the hand-written labels above — so the
+     utility itself gets the floor rather than a dozen call sites. */
+  .text-\[10px\] { font-size: 11.5px; }
 }

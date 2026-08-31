@@ -109,3 +109,17 @@
 }
 .legal-root .lg-foot a { color: var(--lg-ink-70); text-decoration: none; }
 .legal-root .lg-foot a:hover { color: var(--lg-moss-deep); }
+
+/* On a phone.
+   These labels are set at 10.5px because they are tracked uppercase captions
+   sitting beside 13.5px body copy on a monitor. At arm's length on a handset
+   the tracking makes them harder to read, not easier, so they come up to a
+   floor of 11.5px here and stay as designed everywhere else.
+
+   This override lives in THIS file rather than globals.css: this stylesheet
+   is route-scoped and loads after it, so a rule there loses the cascade no
+   matter how specific it is. */
+@media (max-width: 640px), (hover: none) {
+  .legal-root th { font-size: 11.5px; letter-spacing: 0.08em; }
+  .legal-root .lg-note .t { font-size: 11.5px; letter-spacing: 0.1em; }
+}
