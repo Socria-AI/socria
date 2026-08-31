@@ -5762,35 +5762,41 @@ html.js-anim .scrolly-root .fade.d3 { transition-delay: .3s; }
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 6px 16px;
-  padding: 8px 2px 2px;
+  gap: 7px;
+  padding: 10px 2px 4px;
 }
+/* Each reading is a card, not a run of text.
+   Loose inline readouts blurred into one another as the row filled up, and
+   at a glance you could not tell where "f(a) = -1.45" ended and the next
+   began. A quiet border and a panel ground make each quantity a thing you
+   can point at, which is what these are for. */
 .logos-root .lg-viz-readout {
   display: inline-flex;
   align-items: baseline;
-  gap: 5px;
+  gap: 6px;
+  padding: 6px 11px;
+  border: 1px solid var(--lg-line);
+  border-radius: 9px;
+  background: var(--lg-panel);
   font-size: 12.5px;
-  color: var(--lg-ink);
+  color: var(--lg-ink-60);
 }
-.logos-root .lg-viz-readout i { color: var(--lg-ink-40); font-style: normal; }
+.logos-root .lg-viz-readout i { color: var(--lg-ink-24); font-style: normal; }
 .logos-root .lg-viz-readout b {
   font-family: var(--lg-stix);
-  font-weight: 500;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
   min-width: 3.2ch;
+  font-size: 13.5px;
   color: var(--lg-primary);
 }
 /* A term you can ask about. The cue is a dotted underline that only appears
    on hover — present when wanted, invisible when not. */
 .logos-root button.lg-viz-readout {
-  border: 0;
-  background: transparent;
   font: inherit;
-  padding: 1px 3px;
-  margin: -1px -3px;
-  border-radius: 5px;
+  font-size: 12.5px;
   cursor: help;
-  transition: background 0.14s ease;
+  transition: background 0.14s ease, border-color 0.14s ease;
 }
 .logos-root .lg-viz-readout.is-askable .katex,
 .logos-root .lg-viz-sym.is-askable .katex {
@@ -5806,6 +5812,7 @@ html.js-anim .scrolly-root .fade.d3 { transition-delay: .3s; }
 .logos-root .lg-viz-readout.is-askable:hover,
 .logos-root .lg-viz-readout.is-asked {
   background: rgba(53, 70, 32, 0.06);
+  border-color: var(--lg-ink-24);
 }
 .logos-root button.lg-viz-sym {
   border: 0;
@@ -5873,15 +5880,33 @@ html.js-anim .scrolly-root .fade.d3 { transition-delay: .3s; }
 }
 
 /* controls */
+/* The transport on its own line, the swept parameter's track spanning the
+   full width below it. Both used to share one wrapping row, which left the
+   slider a 118px stub squeezed between the speed buttons and the Edit
+   button — the smallest control on screen for the thing you spend the most
+   time holding. */
 .logos-root .lg-viz-controls {
   flex: 0 0 auto;
-  display: flex;
-  flex-wrap: wrap;
+  /* Two rows: the transport and Edit share the first, the swept parameter's
+     track spans the second. A plain column would have put Edit on a line of
+     its own and taken another 30px from the plot, which is the thing anyone
+     is actually here to look at. */
+  display: grid;
+  /* The 1fr spacers centre the transport and Edit between them; the slider
+     spans all four so it reaches the full width rather than only as far as
+     those two buttons happen to be wide. */
+  grid-template-columns: 1fr auto auto 1fr;
   align-items: center;
-  justify-content: center;
-  gap: 8px 14px;
-  padding: 8px 0 4px;
+  gap: 8px 12px;
+  width: 100%;
+  padding: 8px 0 2px;
 }
+/* Rows are explicit because the slider comes BEFORE Edit in the DOM and
+   spans every column: auto-placement could not fit Edit beside it and pushed
+   it onto a third row of its own. */
+.logos-root .lg-viz-controls > .lg-viz-transport { grid-row: 1; grid-column: 2; justify-self: end; }
+.logos-root .lg-viz-controls > .lg-viz-editbtn { grid-row: 1; grid-column: 3; justify-self: start; }
+.logos-root .lg-viz-controls > .lg-viz-sliders { grid-row: 2; grid-column: 1 / -1; }
 .logos-root .lg-viz-transport {
   display: inline-flex;
   align-items: stretch;
@@ -5913,14 +5938,36 @@ html.js-anim .scrolly-root .fade.d3 { transition-delay: .3s; }
   position: absolute;
   inset: -9px -4px;
 }
+/* One filled control, quiet circles around it. Play is what anyone reaches
+   for, so it is the only thing in the bar carrying any weight. */
 .logos-root .lg-viz-play {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  color: var(--lg-primary) !important;
-  font-weight: 500;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0 !important;
+  border-radius: 10px !important;
+  background: var(--lg-primary) !important;
+  color: var(--lg-paper) !important;
+  transition: background 0.14s ease, transform 0.14s ease;
 }
+.logos-root .lg-viz-play:hover { background: #465c2a !important; transform: translateY(-1px); }
 .logos-root .lg-viz-play svg { display: block; }
+/* reset and the two shuttle steps */
+.logos-root .lg-viz-transport > button:not(.lg-viz-play) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 50%;
+  font-size: 14px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .logos-root .lg-viz-play:hover { transform: none; }
+}
 .logos-root .lg-viz-speeds {
   display: inline-flex;
   align-items: center;
@@ -5929,29 +5976,48 @@ html.js-anim .scrolly-root .fade.d3 { transition-delay: .3s; }
   padding-left: 5px;
   border-left: 1px solid var(--lg-line);
 }
-.logos-root .lg-viz-speeds button { padding: 5px 5px; font-size: 11px; opacity: 0.6; }
+.logos-root .lg-viz-speeds button { padding: 5px 7px; font-size: 11px; opacity: 0.6; border-radius: 6px; }
 .logos-root .lg-viz-speeds button.is-on { opacity: 1; color: var(--lg-primary); background: rgba(53, 70, 32, 0.08); }
 
+/* A swept parameter gets its own full-width row rather than a 118px stub
+   wedged into the transport bar.
+   It is the control people actually spend time in — the whole lens is "move
+   this and watch" — and a wider track means finer control over the same
+   range, which matters most for a δ closing on zero. Two rows: the symbol
+   and its value on the first, the track spanning the second. */
 .logos-root .lg-viz-sliders {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px 16px;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  /* Inset to match the plot above it. Flush to the panel edge the track read
+     as part of the frame rather than as a control. */
+  padding: 0 10px;
 }
 .logos-root .lg-viz-slider {
-  display: inline-flex;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas: 'sym value' 'track track';
   align-items: center;
-  gap: 8px;
+  column-gap: 10px;
+  row-gap: 3px;
+  width: 100%;
   font-size: 12px;
   color: var(--lg-ink-60);
 }
-.logos-root .lg-viz-sym { min-width: 2.4em; }
+.logos-root .lg-viz-sym { grid-area: sym; min-width: 2.4em; }
+.logos-root button.lg-viz-sym { justify-self: start; }
 .logos-root .lg-viz-slider output {
+  grid-area: value;
+  justify-self: end;
   font-family: var(--lg-stix);
   font-variant-numeric: tabular-nums;
+  font-size: 13px;
   min-width: 3.4ch;
+  text-align: right;
   color: var(--lg-ink);
 }
+.logos-root .lg-viz-slider input[type='range'] { grid-area: track; }
 /* The slider is the instrument's main control — the thing you drag to watch
    the mathematics move — so its hit area is the thing that matters most.
 
@@ -5963,7 +6029,7 @@ html.js-anim .scrolly-root .fade.d3 { transition-delay: .3s; }
 .logos-root .lg-viz-slider input[type='range'] {
   -webkit-appearance: none;
   appearance: none;
-  width: 118px;
+  width: 100%;
   height: 24px;
   margin: 0;
   padding: 0;

@@ -1416,6 +1416,15 @@ function Controls({
     <div className="lg-viz-controls">
       {swept && (
         <div className="lg-viz-transport">
+          {/* Reset, step back, PLAY, step forward — the shuttle order every
+              transport uses, with the one control you actually reach for in
+              the middle and filled so the eye lands on it first. */}
+          <button type="button" onClick={onReset} aria-label="Reset" title="Reset">
+            ↺
+          </button>
+          <button type="button" onClick={() => onStep(-1)} aria-label="Step back" title="Step back">
+            ‹
+          </button>
           <button
             type="button"
             className="lg-viz-play"
@@ -1433,16 +1442,9 @@ function Controls({
                 <path d="M0 0 L11 6 L0 12 Z" fill="currentColor" />
               </svg>
             )}
-            <span>{playing ? 'Pause' : 'Animate'}</span>
-          </button>
-          <button type="button" onClick={() => onStep(-1)} aria-label="Step back" title="Step back">
-            ‹
           </button>
           <button type="button" onClick={() => onStep(1)} aria-label="Step forward" title="Step forward">
             ›
-          </button>
-          <button type="button" onClick={onReset} aria-label="Reset" title="Reset">
-            ↺
           </button>
           <span className="lg-viz-speeds" role="group" aria-label="Speed">
             {SPEEDS.map((s) => (
@@ -1495,15 +1497,9 @@ function Controls({
                   />
                 </span>
               )}
-              <input
-                type="range"
-                min={p.min}
-                max={p.max}
-                step={p.integer ? 1 : p.step}
-                value={vals[p.id] ?? p.value}
-                onChange={(e) => onParam(p.id, Number(e.target.value))}
-                aria-label={p.id}
-              />
+              {/* Value above the track, right-aligned over its own end, so
+                  the number sits where the handle is heading rather than
+                  crowding the symbol. */}
               <output>
                 {/* Precision from the STEP, not a fixed 3. δ steps in
                     thousandths, so three decimals printed 0.001 next to a
@@ -1513,6 +1509,15 @@ function Controls({
                   ? Math.round(vals[p.id] ?? p.value)
                   : fmt(vals[p.id] ?? p.value, precisionFor(p.step))}
               </output>
+              <input
+                type="range"
+                min={p.min}
+                max={p.max}
+                step={p.integer ? 1 : p.step}
+                value={vals[p.id] ?? p.value}
+                onChange={(e) => onParam(p.id, Number(e.target.value))}
+                aria-label={p.id}
+              />
             </label>
           ))}
         </div>
