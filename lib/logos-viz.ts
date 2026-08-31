@@ -28,6 +28,17 @@
 // deterministic, which is what makes the whole surface testable.
 
 import { compileExpr, freeNames, taylorCoeffs, type CompiledExpr } from './logos-math';
+import {
+  binds as econBinds,
+  equilibrium as econEquilibrium,
+  frontierAt as econFrontierAt,
+  marketAt as econMarketAt,
+  opportunityCost as econOpportunityCost,
+  outputGap as econOutputGap,
+  priceAt as econPriceAt,
+  shift as econShift,
+  welfare as econWelfare,
+} from './logos-econ';
 
 // ── parameters ──────────────────────────────────────────────────────
 
@@ -188,6 +199,12 @@ export const VIZ_KINDS = [
   'matrix',
   'distribution',
   'ode',
+  // Introductory economics. Three diagrams carry most of a first course, and
+  // all three are drawings you are meant to MOVE — which is exactly what this
+  // renderer already does and what a textbook cannot.
+  'supply-demand',
+  'ppc',
+  'ad-as',
 ] as const;
 export type VizKind = (typeof VIZ_KINDS)[number];
 
@@ -291,8 +308,19 @@ export function kindNarrates(kind: VizKind): boolean {
 }
 
 /** Kinds that draw an expression; the others carry their objects directly. */
+const OBJECT_KINDS = new Set<VizKind>([
+  'vectors',
+  'matrix',
+  'distribution',
+  // The economics scenes are parameterised by their curves, not by an
+  // expression someone typed: a demand curve is an intercept and a slope.
+  'supply-demand',
+  'ppc',
+  'ad-as',
+]);
+
 export function kindNeedsExpr(kind: VizKind): boolean {
-  return kind !== 'vectors' && kind !== 'matrix' && kind !== 'distribution';
+  return !OBJECT_KINDS.has(kind);
 }
 
 /**
@@ -352,6 +380,26 @@ export interface VizScene {
   vectors?: { x: number; y: number; label?: string }[];
   /** distribution: which family */
   dist?: DistName;
+
+  // ── economics ──
+  // Written the way a textbook draws them: price on the vertical axis, so a
+  // "curve" here is P as a function of Q. See lib/logos-econ.ts.
+  /** supply-demand: the two curves, as P = intercept + slope·Q */
+  demand?: { intercept: number; slope: number };
+  supply?: { intercept: number; slope: number };
+  /** supply-demand: an imposed price, when there is one */
+  control?: { kind: 'ceiling' | 'floor'; at: number };
+  /** supply-demand: shade consumer and producer surplus */
+  surplus?: boolean;
+  /** ppc: the frontier, and whether opportunity cost increases along it */
+  frontier?: { xMax: number; yMax: number; bowed: boolean };
+  /** what the axes are counting — "Guns", "Butter", "Real GDP" */
+  axes?: { x: string; y: string };
+  /** ad-as: aggregate demand and short-run aggregate supply */
+  ad?: { intercept: number; slope: number };
+  sras?: { intercept: number; slope: number };
+  /** ad-as: potential output — where LRAS stands */
+  potential?: number;
   /** sequence: also plot the partial sums S_m */
   partial?: boolean;
   /** function: ghost the curve at default parameter values for comparison */
@@ -503,6 +551,37 @@ function specialView(
     const p = (hi - lo) * 0.12;
     return [lo - p, hi + p];
   };
+
+  // ── economics ──
+  // These diagrams live in the first quadrant and nowhere else. Quantity and
+  // price are not negative, and a window centred on the origin the way a
+  // function's is would spend three quarters of itself on regions the model
+  // does not describe. The frame is the curves' own extent, with a margin so
+  // the intercepts are not sitting on the axes.
+  if (scene.kind === 'supply-demand') {
+    const D = scene.demand ?? { intercept: 100, slope: -1 };
+    const S = scene.supply ?? { intercept: 20, slope: 1 };
+    // Out to where demand hits the axis: past that the model has stopped.
+    const qCap = D.slope < 0 ? -D.intercept / D.slope : 100;
+    const pCap = Math.max(D.intercept, S.intercept + Math.abs(S.slope) * qCap);
+    return { xMin: 0, xMax: qCap * 1.08, yMin: 0, yMax: pCap * 1.1 };
+  }
+
+  if (scene.kind === 'ppc') {
+    const f = scene.frontier ?? { xMax: 100, yMax: 100, bowed: true };
+    // Room for growth to push the frontier outward without it leaving.
+    const gMax = scene.params.find((p) => p.id === 'g')?.max ?? 1.25;
+    return { xMin: 0, xMax: f.xMax * gMax * 1.04, yMin: 0, yMax: f.yMax * gMax * 1.04 };
+  }
+
+  if (scene.kind === 'ad-as') {
+    const AD = scene.ad ?? { intercept: 140, slope: -1 };
+    const SR = scene.sras ?? { intercept: 20, slope: 1 };
+    const yp = scene.potential ?? 60;
+    const yCap = Math.max(AD.slope < 0 ? -AD.intercept / AD.slope : 100, yp * 1.6);
+    const pCap = Math.max(AD.intercept, SR.intercept + Math.abs(SR.slope) * yCap);
+    return { xMin: 0, xMax: yCap * 1.05, yMin: 0, yMax: pCap * 1.1 };
+  }
 
   if (scene.kind === 'sequence') {
     const mMax = scene.params.find((p) => p.id === 'm')?.max ?? 48;
@@ -1980,6 +2059,379 @@ const buildOde: Builder = (scene, fn, vals, view, guarded) => {
   };
 };
 
+/**
+ * A person's own words, made safe to sit inside \text{...}.
+ *
+ * Axis names come from the model — "Guns", "Consumer goods", "Real GDP" — and
+ * go straight into a LaTeX readout. A stray backslash or brace there does not
+ * produce a wrong label, it produces a KaTeX parse error where a quantity
+ * should be, so the characters that could do that are dropped rather than
+ * escaped: none of them belongs in the name of an axis.
+ */
+function texEscape(s: string): string {
+  return s.replace(/[\\{}$&#^_~%]/g, '').slice(0, 40);
+}
+
+// --- economics: supply and demand -----------------------------------
+//
+// The diagram a first course spends the most time in. What it has to make
+// visible, in order: where the market lands on its own, what moves when a
+// curve shifts, and what a price someone imposed does to the quantity that
+// actually changes hands.
+
+const buildSupplyDemand: Builder = (scene, _fn, vals, view, guarded) => {
+  const d0 = scene.demand ?? { intercept: 100, slope: -1 };
+  const s0 = scene.supply ?? { intercept: 20, slope: 1 };
+  const dsh = vals.dsh ?? 0;
+  // An INCREASE in supply moves the curve down and to the right, so the
+  // intercept falls. Left as-is, dragging the slider marked "more supply" to
+  // the right would have reduced supply — technically the truth about an
+  // intercept, and the opposite of what the label promises. The sign is
+  // flipped here so the control means what it says.
+  const ssh = -(vals.ssh ?? 0);
+  const D = econShift(d0, dsh);
+  const S = econShift(s0, ssh);
+
+  const objects: VizObject[] = [];
+  const readouts: VizReadout[] = [];
+  const qHi = view.xMax;
+
+  // The curves, drawn across the window rather than sampled: they are lines.
+  const seg = (line: { intercept: number; slope: number }, id: string, tone: Tone, label: string) => {
+    objects.push({
+      o: 'segment',
+      id,
+      x1: 0,
+      y1: econPriceAt(line, 0),
+      x2: qHi,
+      y2: econPriceAt(line, qHi),
+      tone,
+      width: 2,
+    });
+    objects.push({
+      o: 'label',
+      id: `${id}lab`,
+      x: qHi * 0.94,
+      y: econPriceAt(line, qHi * 0.94),
+      text: label,
+      tone,
+      anchor: 'end',
+      dy: -6,
+    });
+  };
+
+  // The original positions stay as ghosts once something has moved, so a
+  // shift reads as a shift rather than as a different diagram.
+  if (dsh !== 0) {
+    objects.push({ o: 'segment', id: 'd0', x1: 0, y1: econPriceAt(d0, 0), x2: qHi, y2: econPriceAt(d0, qHi), tone: 'ghost', dashed: true, width: 1.3 });
+  }
+  if (ssh !== 0) {
+    objects.push({ o: 'segment', id: 's0', x1: 0, y1: econPriceAt(s0, 0), x2: qHi, y2: econPriceAt(s0, qHi), tone: 'ghost', dashed: true, width: 1.3 });
+  }
+  seg(D, 'D', 'accent', 'D');
+  seg(S, 'S', 'tension', 'S');
+
+  const eq = econEquilibrium(D, S);
+  const control = scene.control;
+  const pc = control ? (vals.pc ?? control.at) : null;
+  const bind = eq && control && pc !== null ? econBinds(control.kind, pc, eq.p) : false;
+
+  if (eq) {
+    // Surplus areas first, so the curves and guides draw over them.
+    if (scene.surplus && !guarded) {
+      const price = bind && pc !== null ? pc : eq.p;
+      const m = econMarketAt(D, S, price);
+      const q = bind ? m.traded : eq.q;
+      objects.push({
+        o: 'region',
+        id: 'cs',
+        pts: [
+          { x: 0, y: D.intercept },
+          { x: 0, y: price },
+          { x: q, y: price },
+          { x: q, y: econPriceAt(D, q) },
+        ],
+        tone: 'accent',
+      });
+      objects.push({
+        o: 'region',
+        id: 'ps',
+        pts: [
+          { x: 0, y: S.intercept },
+          { x: 0, y: price },
+          { x: q, y: price },
+          { x: q, y: econPriceAt(S, q) },
+        ],
+        tone: 'tension',
+      });
+      // The loss, drawn where it is: the wedge between what the next buyer
+      // would have paid and what the next seller would have accepted, over
+      // the trades that a binding control has made illegal. Naming it in a
+      // readout without shading it leaves the most important number on the
+      // diagram pointing at nothing.
+      if (bind && eq && q < eq.q - 1e-9) {
+        objects.push({
+          o: 'region',
+          id: 'dwl',
+          pts: [
+            { x: q, y: econPriceAt(D, q) },
+            { x: eq.q, y: eq.p },
+            { x: q, y: econPriceAt(S, q) },
+          ],
+          tone: 'muted',
+        });
+      }
+
+      const w = econWelfare(D, S, q, price);
+      readouts.push(
+        { id: 'cs', tex: '\\text{CS}', value: fmt(w.consumer, 4), help: 'Consumer surplus: what buyers were willing to pay, less what they did pay, added up over everyone who bought.' },
+        { id: 'ps', tex: '\\text{PS}', value: fmt(w.producer, 4), help: 'Producer surplus: what sellers received, less the least they would have accepted.' }
+      );
+      if (w.deadweight > 1e-6) {
+        readouts.push({ id: 'dwl', tex: '\\text{DWL}', value: fmt(w.deadweight, 4), help: 'Deadweight loss: surplus that simply is not created, because trades both sides would have agreed to are no longer allowed to happen.' });
+      }
+    }
+
+    objects.push({ o: 'point', id: 'eq', x: eq.q, y: eq.p, tone: 'primary' });
+    objects.push({ o: 'segment', id: 'eqv', x1: eq.q, y1: 0, x2: eq.q, y2: eq.p, tone: 'ghost', dashed: true });
+    objects.push({ o: 'segment', id: 'eqh', x1: 0, y1: eq.p, x2: eq.q, y2: eq.p, tone: 'ghost', dashed: true });
+    readouts.push(
+      { id: 'pe', tex: 'P^{*}', value: guarded ? null : fmt(eq.p, 4), help: 'The price where the amount wanted and the amount offered are the same number. Nothing pushes it from there.' },
+      { id: 'qe', tex: 'Q^{*}', value: guarded ? null : fmt(eq.q, 4), help: 'The quantity that changes hands at the equilibrium price.' }
+    );
+  }
+
+  // The control, and what it does.
+  let imbalance = 0;
+  if (control && pc !== null) {
+    objects.push({
+      o: 'hrule',
+      id: 'pc',
+      at: pc,
+      tone: bind ? 'primary' : 'muted',
+      dashed: !bind,
+      label: control.kind === 'ceiling' ? 'ceiling' : 'floor',
+    });
+    const m = econMarketAt(D, S, pc);
+    imbalance = m.imbalance;
+    if (bind) {
+      // The gap between the two sides, drawn AT the control price where the
+      // shortage or surplus actually is.
+      objects.push({ o: 'segment', id: 'gap', x1: Math.min(m.qd, m.qs), y1: pc, x2: Math.max(m.qd, m.qs), y2: pc, tone: 'tension', width: 3 });
+      objects.push({ o: 'point', id: 'qd', x: m.qd, y: pc, tone: 'accent', hollow: true });
+      objects.push({ o: 'point', id: 'qs', x: m.qs, y: pc, tone: 'tension', hollow: true });
+      readouts.push(
+        { id: 'qd', tex: 'Q_d', value: guarded ? null : fmt(m.qd, 4), help: 'How much buyers want at the imposed price.' },
+        { id: 'qs', tex: 'Q_s', value: guarded ? null : fmt(m.qs, 4), help: 'How much sellers offer at that price.' },
+        {
+          id: 'gap',
+          tex: imbalance > 0 ? '\\text{shortage}' : '\\text{surplus}',
+          value: guarded ? null : fmt(Math.abs(imbalance), 4),
+          help: 'The difference between the two. Only the smaller of them actually trades — nobody can be made to buy or sell.',
+        }
+      );
+    }
+  }
+
+  // Which curve moved decides what is said. Keying this on the demand slider
+  // alone meant that shifting SUPPLY produced a story about demand — the
+  // numbers were right and the sentence beside them described a different
+  // experiment, which is worse than saying nothing.
+  const movedD = dsh !== 0;
+  const movedS = ssh !== 0;
+  const narration = !eq
+    ? 'These two curves do not cross anywhere a market could exist. Shift one until they do.'
+    : bind && imbalance > 0
+      ? 'The ceiling holds the price below where the market would settle. Buyers want more than sellers will offer, and only the smaller amount trades — that gap is the shortage.'
+      : bind && imbalance < 0
+        ? 'The floor holds the price above the market price. Sellers offer more than buyers will take, and the unsold difference is the surplus.'
+        : !movedD && !movedS
+          ? 'The market at rest. Where the two curves cross is the only price at which the amount wanted and the amount offered are the same.'
+          : movedD && movedS
+            ? 'Both curves have moved. When that happens one of the two — price or quantity — is settled by the shifts and the other depends on which shift was larger; that is the whole difficulty of a double shift.'
+            : movedD
+              ? dsh > 0
+                ? 'More is wanted at every price, so the crossing rides up the supply curve: price and quantity both end higher.'
+                : 'Less is wanted at every price. The crossing slides down the supply curve — price and quantity both fall.'
+              : ssh < 0
+                ? 'Supply has increased: more is offered at every price. The crossing slides down the demand curve, so the price falls while the quantity rises — the two move opposite ways, which is how you tell a supply shift from a demand one.'
+                : 'Supply has fallen: less is offered at every price. The crossing rides up the demand curve, so the price rises and the quantity falls.';
+
+  return {
+    objects,
+    readouts,
+    narration,
+    caption: control
+      ? 'Move the control price through the market price and watch the gap open.'
+      : 'Shift demand or supply and watch where the market settles.',
+    ask: 'Before you move anything — if demand rises, which way does the price go, and why?',
+  };
+};
+
+// --- economics: the production possibilities curve -------------------
+//
+// Opportunity cost made into a picture. The frontier is what you can have;
+// its SLOPE is what the next unit costs, and on a bowed frontier that cost
+// climbs as you specialise — which is the whole reason the curve is bowed.
+
+const buildPpc: Builder = (scene, _fn, vals, view, guarded) => {
+  const base = scene.frontier ?? { xMax: 100, yMax: 100, bowed: true };
+  const g = vals.g ?? 1;
+  const f = { xMax: base.xMax * g, yMax: base.yMax * g, bowed: base.bowed };
+  const names = scene.axes ?? { x: 'good X', y: 'good Y' };
+
+  const objects: VizObject[] = [];
+  const readouts: VizReadout[] = [];
+
+  // The frontier itself, sampled because the bowed one is a curve.
+  const pts: Pt[] = [];
+  const N = 160;
+  for (let i = 0; i <= N; i++) {
+    const x = (f.xMax * i) / N;
+    const y = econFrontierAt(f, x);
+    if (Number.isFinite(y)) pts.push({ x, y });
+  }
+  objects.push({ o: 'curve', id: 'ppc', pts, tone: 'primary', width: 2.2 });
+
+  // Where it started, once growth has moved it.
+  if (Math.abs(g - 1) > 1e-9) {
+    const was: Pt[] = [];
+    for (let i = 0; i <= N; i++) {
+      const x = (base.xMax * i) / N;
+      const y = econFrontierAt(base, x);
+      if (Number.isFinite(y)) was.push({ x, y });
+    }
+    objects.push({ o: 'curve', id: 'ppc0', pts: was, tone: 'ghost', width: 1.4, dashed: true });
+  }
+
+  const q = Math.min(f.xMax, Math.max(0, vals.q ?? 0));
+  const y = econFrontierAt(f, q);
+  if (Number.isFinite(y)) {
+    objects.push({ o: 'point', id: 'on', x: q, y, tone: 'primary' });
+    objects.push({ o: 'segment', id: 'gx', x1: q, y1: 0, x2: q, y2: y, tone: 'ghost', dashed: true });
+    objects.push({ o: 'segment', id: 'gy', x1: 0, y1: y, x2: q, y2: y, tone: 'ghost', dashed: true });
+  }
+
+  // One point inside and one outside, because the frontier only means
+  // something against what it rules in and out.
+  const inX = f.xMax * 0.35;
+  const inY = econFrontierAt(f, inX) * 0.55;
+  objects.push({ o: 'point', id: 'ineff', x: inX, y: inY, tone: 'muted', hollow: true, label: 'unused capacity' });
+  const outX = f.xMax * 0.62;
+  const outY = econFrontierAt(f, outX) * 1.35;
+  objects.push({ o: 'point', id: 'unatt', x: outX, y: outY, tone: 'ghost', hollow: true, label: 'out of reach' });
+
+  const oc = econOpportunityCost(f, q);
+  readouts.push(
+    { id: 'x', tex: `\\text{${texEscape(names.x)}}`, value: guarded ? null : fmt(q, 4), help: `How much of ${names.x} is being produced.` },
+    { id: 'y', tex: `\\text{${texEscape(names.y)}}`, value: guarded ? null : fmt(y, 4), help: `What is left over for ${names.y} once that choice is made. The frontier, not preference, is what fixes this.` },
+    {
+      id: 'oc',
+      tex: '\\text{opportunity cost}',
+      value: guarded ? null : Number.isFinite(oc) ? fmt(oc, 3) : '\\infty',
+      help: `Units of ${names.y} given up for one more unit of ${names.x}. It is the steepness of the frontier where you are standing — which is why a bowed curve makes each extra unit cost more than the last.`,
+    }
+  );
+
+  const stage = sweepStage(scene.params.find((p) => p.id === 'q') ?? null, q);
+  const narration = !base.bowed
+    ? 'A straight frontier: every unit of the first good costs the same amount of the second, wherever you stand on it. Resources are equally good at both jobs.'
+    : stage === 0
+      ? 'Everything is going to the second good. The first unit of the other one is nearly free — the resources moved across are the ones worst suited to what they were doing.'
+      : stage === 1
+        ? 'Moving along the frontier. Each extra unit costs a little more than the last, because the resources being moved are better and better at the job they are leaving.'
+        : stage === 2
+          ? 'The curve is steepening. This is increasing opportunity cost, and it is the only thing the bow in the frontier means.'
+          : 'Almost everything is going to the first good now, and the last few units are costing enormous amounts of the second. That is why specialising completely is rarely the choice anyone makes.';
+
+  return {
+    objects,
+    readouts,
+    narration,
+    caption:
+      'Slide along the frontier. Inside it, resources are idle; outside is unattainable — until the frontier itself moves.',
+    ask: 'Which costs more: the first unit of X, or the last one? Move the handle and see whether you were right.',
+  };
+};
+
+// --- economics: aggregate demand and supply --------------------------
+//
+// The macro picture. Same crossing as a market, with one addition that
+// changes what the diagram is FOR: a vertical line at potential output, so
+// every equilibrium is read as a distance from it rather than on its own.
+
+const buildAdAs: Builder = (scene, _fn, vals, view, guarded) => {
+  const ad0 = scene.ad ?? { intercept: 140, slope: -1 };
+  const sr0 = scene.sras ?? { intercept: 20, slope: 1 };
+  const AD = econShift(ad0, vals.adsh ?? 0);
+  const SR = econShift(sr0, vals.srsh ?? 0);
+  const yp = scene.potential ?? 60;
+
+  const objects: VizObject[] = [];
+  const readouts: VizReadout[] = [];
+  const hi = view.xMax;
+
+  const line = (l: { intercept: number; slope: number }, id: string, tone: Tone, label: string) => {
+    objects.push({ o: 'segment', id, x1: 0, y1: econPriceAt(l, 0), x2: hi, y2: econPriceAt(l, hi), tone, width: 2 });
+    objects.push({ o: 'label', id: `${id}l`, x: hi * 0.95, y: econPriceAt(l, hi * 0.95), text: label, tone, anchor: 'end', dy: -6 });
+  };
+
+  if ((vals.adsh ?? 0) !== 0) {
+    objects.push({ o: 'segment', id: 'ad0', x1: 0, y1: econPriceAt(ad0, 0), x2: hi, y2: econPriceAt(ad0, hi), tone: 'ghost', dashed: true, width: 1.3 });
+  }
+  if ((vals.srsh ?? 0) !== 0) {
+    objects.push({ o: 'segment', id: 'sr0', x1: 0, y1: econPriceAt(sr0, 0), x2: hi, y2: econPriceAt(sr0, hi), tone: 'ghost', dashed: true, width: 1.3 });
+  }
+  line(AD, 'AD', 'accent', 'AD');
+  line(SR, 'SRAS', 'tension', 'SRAS');
+  objects.push({ o: 'vrule', id: 'lras', at: yp, tone: 'primary', label: 'LRAS' });
+
+  const eq = econEquilibrium(AD, SR);
+  let gapKind = 'at potential';
+  if (eq) {
+    objects.push({ o: 'point', id: 'eq', x: eq.q, y: eq.p, tone: 'primary' });
+    objects.push({ o: 'segment', id: 'gh', x1: 0, y1: eq.p, x2: eq.q, y2: eq.p, tone: 'ghost', dashed: true });
+    const gap = econOutputGap(eq.q, yp);
+    gapKind = gap.kind;
+    if (gap.kind !== 'at potential') {
+      // The gap itself, drawn along the output axis where it is measured.
+      objects.push({ o: 'segment', id: 'gap', x1: Math.min(eq.q, yp), y1: eq.p, x2: Math.max(eq.q, yp), y2: eq.p, tone: 'tension', width: 3 });
+    }
+    readouts.push(
+      { id: 'pl', tex: '\\text{price level}', value: guarded ? null : fmt(eq.p, 4), help: 'The average level of prices, not the price of any one thing. Its rate of change is inflation.' },
+      { id: 'y', tex: 'Y', value: guarded ? null : fmt(eq.q, 4), help: 'Real output — what the economy actually produces, corrected for prices.' },
+      {
+        id: 'gap',
+        tex: '\\text{output gap}',
+        value: guarded ? null : `${fmt(gap.gap, 3)} (${gap.kind})`,
+        help: 'Actual output less potential. Below potential is a recessionary gap and unemployment above its natural rate; above it is an inflationary gap that cannot last.',
+      }
+    );
+  }
+
+  // A shift parameter that opens at 0 in the MIDDLE of its range reads as
+  // half-swept, so the stage cannot be used to detect "nothing has happened
+  // yet" the way it can for a sweep that starts at one end. Ask the values.
+  const moved = (vals.adsh ?? 0) !== 0 || (vals.srsh ?? 0) !== 0;
+  const narration = !eq
+    ? 'AD and SRAS do not cross in a region that describes an economy. Shift one of them.'
+    : gapKind === 'recessionary'
+      ? 'Output has settled below potential. LRAS has not moved — the economy is capable of more than it is producing, which is what a recessionary gap is.'
+      : gapKind === 'inflationary'
+        ? 'Output is above potential. That is not a better economy; it is one running hotter than it can sustain, and the price level is where the pressure shows.'
+        : !moved
+          ? 'The economy at potential: the crossing sits on LRAS, so what is produced is what can be produced.'
+          : 'The curves have moved but output is still at potential. Watch the distance between the crossing and LRAS — that distance is the whole diagnosis.';
+
+  return {
+    objects,
+    readouts,
+    narration,
+    caption: 'Shift AD or SRAS. LRAS does not move — it is what the economy can do, not what it is doing.',
+    ask: 'If aggregate demand rises with the economy already at potential, what happens to output, and what happens to prices?',
+  };
+};
+
 const KINDS: Record<VizKind, Builder> = {
   function: buildFunction,
   limit: buildLimit,
@@ -1991,6 +2443,9 @@ const KINDS: Record<VizKind, Builder> = {
   matrix: buildMatrix,
   distribution: buildDistribution,
   ode: buildOde,
+  'supply-demand': buildSupplyDemand,
+  ppc: buildPpc,
+  'ad-as': buildAdAs,
 };
 
 /**
@@ -2145,6 +2600,94 @@ const REQUIRED: Record<VizKind, (scene: VizScene) => VizParam[]> = {
         return [{ id: 'l', symbol: '\\lambda', min: 0.5, max: 20, step: 0.5, value: 4, help: 'The average count per interval. It is both the centre of the distribution and its name.' }];
     }
   },
+  // ── economics ──
+  // Each of these opens at 0 — the undisturbed diagram — and sweeps UP, so
+  // pressing play performs a shift rather than undoing one. A student is
+  // being shown "what happens when demand rises", and the first frame has to
+  // be the market before it did.
+  'supply-demand': (sc) => {
+    const p: VizParam[] = [
+      {
+        id: 'dsh',
+        symbol: '\\Delta D',
+        min: -30,
+        max: 30,
+        step: 0.5,
+        value: 0,
+        sweep: 'up',
+        help: 'Shifts the whole demand curve. Right and up is an increase — more wanted at every price — from income, tastes, or the price of a substitute.',
+      },
+      {
+        id: 'ssh',
+        symbol: '\\Delta S',
+        min: -30,
+        max: 30,
+        step: 0.5,
+        value: 0,
+        help: 'Shifts supply. Down and right is an increase — more offered at every price — from cheaper inputs or better technology.',
+      },
+    ];
+    if (sc.control) {
+      p.push({
+        id: 'pc',
+        symbol: 'P_c',
+        min: 0,
+        max: Math.max(10, (sc.demand?.intercept ?? 100) * 1.05),
+        step: 0.5,
+        value: sc.control.at,
+        help:
+          sc.control.kind === 'ceiling'
+            ? 'The legal maximum price. Above the market price it does nothing at all; below it, buyers want more than sellers will offer.'
+            : 'The legal minimum price. Below the market price it does nothing; above it, sellers offer more than buyers will take.',
+      });
+    }
+    return p;
+  },
+  ppc: (sc) => [
+    {
+      id: 'q',
+      min: 0,
+      max: sc.frontier?.xMax ?? 100,
+      step: (sc.frontier?.xMax ?? 100) / 200,
+      value: 0,
+      sweep: 'up',
+      help: 'How much of the first good you choose to make. Everything else follows: the frontier fixes how much of the other good you can still have.',
+    },
+    {
+      // The range is deliberately narrow. The window has to hold the frontier
+      // at its LARGEST — it is fixed once, because a window that resizes as
+      // you drag hides the very motion you are dragging to see — so every bit
+      // of headroom reserved for growth is width taken from the diagram at
+      // rest. 1.25 is enough for growth to read as growth.
+      id: 'g',
+      min: 0.75,
+      max: 1.25,
+      step: 0.01,
+      value: 1,
+      help: 'Growth. Scales the whole frontier outward — more resources or better technology — which is the only way to reach a point that was unattainable.',
+    },
+  ],
+  'ad-as': () => [
+    {
+      id: 'adsh',
+      symbol: '\\Delta AD',
+      min: -40,
+      max: 40,
+      step: 0.5,
+      value: 0,
+      sweep: 'up',
+      help: 'Shifts aggregate demand — spending, investment, government purchases, net exports. Right is an increase.',
+    },
+    {
+      id: 'srsh',
+      symbol: '\\Delta SRAS',
+      min: -40,
+      max: 40,
+      step: 0.5,
+      value: 0,
+      help: 'Shifts short-run aggregate supply. Left is a negative supply shock: input costs up, output down and prices up together.',
+    },
+  ],
   // y₀'s range tracks the window so the slider always reaches something the
   // person can see.
   ode: (sc) => {
@@ -2178,6 +2721,9 @@ export const RESERVED_PARAM: Record<VizKind, string | null> = {
   matrix: 't',
   distribution: null,
   ode: 'y0',
+  'supply-demand': 'dsh',
+  ppc: 'q',
+  'ad-as': 'adsh',
 };
 
 export const KIND_LABEL: Record<VizKind, string> = {
@@ -2190,6 +2736,9 @@ export const KIND_LABEL: Record<VizKind, string> = {
   vectors: 'Vectors',
   matrix: 'Matrix',
   distribution: 'Distribution',
+  'supply-demand': 'Supply & demand',
+  ppc: 'Production frontier',
+  'ad-as': 'AD–AS',
   ode: 'Field',
 };
 
@@ -2355,6 +2904,61 @@ function sanitizeVectors(raw: any): { x: number; y: number; label?: string }[] |
   return out.length ? out.slice(0, 4) : null;
 }
 
+/**
+ * The economics half of a scene, read out of untrusted JSON.
+ *
+ * Signs are IMPOSED rather than validated. A demand curve must slope down and
+ * a supply curve up — that is not a convention, it is what makes the picture
+ * mean what it is drawn to mean — so a model that hands over a positive
+ * demand slope has its magnitude kept and its sign corrected. Rejecting the
+ * scene would leave the reader with nothing over a mistake that has an
+ * obvious right answer.
+ */
+function econFields(kind: VizKind, raw: any): Partial<VizScene> {
+  const priceLine = (r: any, fallbackInt: number, sign: -1 | 1) => ({
+    intercept: num(r?.intercept, 0, 1e5, fallbackInt),
+    slope: sign * (Math.abs(num(r?.slope, -1e4, 1e4, 1)) || 1),
+  });
+
+  const out: Partial<VizScene> = {};
+
+  if (kind === 'supply-demand') {
+    out.demand = priceLine(raw?.demand, 100, -1);
+    out.supply = priceLine(raw?.supply, 20, 1);
+    if (raw?.control && (raw.control.kind === 'ceiling' || raw.control.kind === 'floor')) {
+      out.control = {
+        kind: raw.control.kind,
+        at: num(raw.control.at, 0, 1e5, out.demand.intercept / 2),
+      };
+    }
+    if (raw?.surplus === true) out.surplus = true;
+  }
+
+  if (kind === 'ppc') {
+    out.frontier = {
+      xMax: num(raw?.frontier?.xMax, 1e-3, 1e5, 100),
+      yMax: num(raw?.frontier?.yMax, 1e-3, 1e5, 100),
+      // Bowed unless told otherwise: increasing opportunity cost is what the
+      // curve exists to show, and a straight frontier is the special case.
+      bowed: raw?.frontier?.bowed !== false,
+    };
+  }
+
+  if (kind === 'ad-as') {
+    out.ad = priceLine(raw?.ad, 140, -1);
+    out.sras = priceLine(raw?.sras, 20, 1);
+    out.potential = num(raw?.potential, 1e-3, 1e5, 60);
+  }
+
+  if (raw?.axes && typeof raw.axes === 'object') {
+    const nm = (v: any, d: string) =>
+      typeof v === 'string' && v.trim() ? v.trim().slice(0, 40) : d;
+    out.axes = { x: nm(raw.axes.x, 'good X'), y: nm(raw.axes.y, 'good Y') };
+  }
+
+  return out;
+}
+
 export function sanitizeViz(raw: any): VizScene | null {
   if (!raw || typeof raw !== 'object') return null;
   const kind: VizKind | null = VIZ_KINDS.includes(raw.kind) ? raw.kind : null;
@@ -2426,6 +3030,13 @@ export function sanitizeViz(raw: any): VizScene | null {
     ...(kind === 'matrix' ? { matrix: sanitizeMatrix(raw.matrix) ?? undefined } : {}),
     ...(kind === 'vectors' ? { vectors: sanitizeVectors(raw.vectors) ?? undefined } : {}),
     ...(kind === 'distribution' && DISTS.includes(raw.dist) ? { dist: raw.dist as DistName } : {}),
+    // The economics fields have to be INSIDE this literal, not assigned to
+    // the scene afterwards: withRequired() reads them to build the sliders —
+    // the control price for a price ceiling, the frontier's width for the
+    // production slider's range — and it runs on the object as constructed.
+    // Setting them later left a ceiling with no handle to move it, under a
+    // caption inviting the reader to move it.
+    ...econFields(kind, raw),
     ...(kind === 'sequence' && raw.partial !== false ? { partial: true } : {}),
     ...(raw.ghost === true ? { ghost: true } : {}),
     ...(() => {
@@ -2441,6 +3052,7 @@ export function sanitizeViz(raw: any): VizScene | null {
   if (scene.kind === 'matrix' && !scene.matrix) return null;
   if (scene.kind === 'vectors' && !scene.vectors?.length) return null;
   if (scene.kind === 'distribution' && !scene.dist) return null;
+
 
   // The expression must compile over exactly the names we are prepared to
   // bind. An expression mentioning a name with no slider would evaluate to NaN

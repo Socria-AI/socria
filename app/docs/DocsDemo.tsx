@@ -77,6 +77,77 @@ export function DemoPlot() {
   );
 }
 
+/* ── economics ─────────────────────────────────────────────────────── */
+// Live, like the calculus scenes: drag the shift sliders and the equilibrium
+// moves, because the crossing is computed rather than drawn.
+
+const MARKET = viz({
+  kind: 'supply-demand',
+  demand: { intercept: 100, slope: -1 },
+  supply: { intercept: 20, slope: 1 },
+});
+const CEILING = viz({
+  kind: 'supply-demand',
+  demand: { intercept: 100, slope: -1 },
+  supply: { intercept: 20, slope: 1 },
+  control: { kind: 'ceiling', at: 45 },
+  surplus: true,
+});
+const PPC = viz({
+  kind: 'ppc',
+  frontier: { xMax: 100, yMax: 80, bowed: true },
+  axes: { x: 'Guns', y: 'Butter' },
+});
+const ADAS = viz({
+  kind: 'ad-as',
+  ad: { intercept: 140, slope: -1 },
+  sras: { intercept: 20, slope: 1 },
+  potential: 60,
+});
+
+export function DemoMarket() {
+  return (
+    <VizFigure
+      scene={MARKET}
+      label="Shift demand or supply — the crossing moves, and so do P* and Q*"
+      height={560}
+    />
+  );
+}
+
+export function DemoCeiling() {
+  return (
+    <VizFigure
+      scene={CEILING}
+      label="A price ceiling: the shortage, what actually trades, and the surplus destroyed"
+      /* Eight readings, a third slider and a two-line narration all keep
+         their size when the figure is short — the plot is the only thing
+         that gives, and it is the only thing worth looking at. */
+      height={720}
+    />
+  );
+}
+
+export function DemoPpc() {
+  return (
+    <VizFigure
+      scene={PPC}
+      label="Slide along the frontier — each extra unit of one good costs more of the other"
+      height={600}
+    />
+  );
+}
+
+export function DemoAdAs() {
+  return (
+    <VizFigure
+      scene={ADAS}
+      label="AD, SRAS and LRAS — the output gap is the distance from potential"
+      height={600}
+    />
+  );
+}
+
 /* ── what each plan holds ──────────────────────────────────────────── */
 // Read from lib/entitlements at render time rather than typed out.
 //

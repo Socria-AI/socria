@@ -28,6 +28,7 @@ const MODULES = [
   'lib/one-prompt.ts',
   'lib/analytics.ts',
   'lib/tex-split.ts',
+  'lib/logos-econ.ts',
 ];
 
 export async function buildAll() {

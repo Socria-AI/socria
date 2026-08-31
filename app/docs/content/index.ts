@@ -11,6 +11,7 @@ import { Core2 } from './core-2';
 import { Core3 } from './core-3';
 import { Logos } from './logos';
 import { ThinkingMapDoc } from './thinking-map';
+import { Economics } from './economics';
 import { Mathematics } from './mathematics';
 import { DepthPersonality } from './depth-personality';
 import { DraftsGrounding } from './drafts-grounding';
@@ -26,6 +27,7 @@ export const CONTENT: Record<string, ComponentType> = {
   logos: Logos,
   'thinking-map': ThinkingMapDoc,
   mathematics: Mathematics,
+  economics: Economics,
   'depth-personality': DepthPersonality,
   'drafts-grounding': DraftsGrounding,
   'socria-one': SocriaOne,

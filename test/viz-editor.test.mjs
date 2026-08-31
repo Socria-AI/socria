@@ -1,4 +1,4 @@
-import { sanitizeViz, autoParams, freeNamesOf, sceneSignature, RESERVED_PARAM, KIND_LABEL } from './.tmp/logos-viz.mjs';
+import { sanitizeViz, autoParams, freeNamesOf, sceneSignature, RESERVED_PARAM, KIND_LABEL, VIZ_KINDS } from './.tmp/logos-viz.mjs';
 let pass=0, fail=0;
 const ok=(n,c,x='')=>c?pass++:(fail++,console.log('FAIL',n,x));
 
@@ -46,6 +46,13 @@ const a1 = {kind:'function',expr:'x^2',varName:'x',view:{xMin:-6,xMax:6},params:
 ok('same content same key', sceneSignature(sanitizeViz(a1))===sceneSignature(sanitizeViz({...a1})));
 ok('different content different key', sceneSignature(sanitizeViz(a1))!==sceneSignature(sanitizeViz({...a1,expr:'x^3'})));
 ok('null safe', sceneSignature(null)==='');
-ok('labels cover every kind', Object.keys(KIND_LABEL).length===10);
+// Against VIZ_KINDS, not against a number. The count was hardcoded to 10 and
+// broke the moment a legitimate kind was added — a test that fails for being
+// right is worse than no test.
+ok('labels cover every kind', VIZ_KINDS.every(k => typeof KIND_LABEL[k] === 'string' && KIND_LABEL[k].length > 0),
+   VIZ_KINDS.filter(k => !KIND_LABEL[k]).join());
+ok('no labels for kinds that do not exist',
+   Object.keys(KIND_LABEL).every(k => VIZ_KINDS.includes(k)),
+   Object.keys(KIND_LABEL).filter(k => !VIZ_KINDS.includes(k)).join());
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail?1:0);

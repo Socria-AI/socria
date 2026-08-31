@@ -105,15 +105,26 @@ export function availableLenses(map: ThinkingMap): LensId[] {
   // evidence under a claim in an essay.
   if (map.nodes.some((n) => n.type === 'evidence' || n.type === 'source')) out.push('evidence');
 
-  // Mathematics gets its own two lenses, offered only for math work.
+  // A scene earns the Plot lens on its own, whatever the work is called.
+  //
+  // This used to sit inside the math-only branch, which was fine while every
+  // scene was a curve. It is not fine now: a supply-and-demand diagram
+  // belongs to a conversation about markets, which the extractor labels
+  // "learning" or "analysing" rather than "math" — and withholding the lens
+  // that draws the picture, because of the name on the conversation, would
+  // have made the economics scenes unreachable in exactly the conversations
+  // they exist for.
+  if (map.viz) out.push('plot');
+
+  // The other two mathematical lenses stay math-only. A solution chain and a
+  // worked Board are about algebra being done step by step; neither has
+  // anything to show for a diagram that is not a calculation.
   if (map.context === 'math') {
     const chainNodes = map.nodes.filter((n) => CHAIN_TYPES.has(n.type));
     const chainEdges = map.edges.filter((e) => CHAIN_REL.has(e.relation));
     if (chainNodes.length >= 2 || chainEdges.length >= 1) out.unshift('solve');
-    // A dynamic scene earns the lens on its own: the interesting cases —
-    // a limit, a secant closing on a tangent, rectangles under a curve — are
-    // often stated in prose with no plottable node anywhere in the map.
-    if (map.viz || plottableNodes(map).length) out.push('plot');
+    // Without a scene, a plottable node still earns the lens.
+    if (!map.viz && plottableNodes(map).length) out.push('plot');
     if (map.nodes.length) out.push('board');
   }
   return out;

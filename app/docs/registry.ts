@@ -78,6 +78,12 @@ export const DOC_PAGES: DocPage[] = [
     group: 'The reasoning environment',
   },
   {
+    slug: 'economics',
+    title: 'Economics',
+    blurb: 'Supply and demand, opportunity cost, the production frontier and AD–AS — drawn so you can move them.',
+    group: 'The reasoning environment',
+  },
+  {
     slug: 'depth-personality',
     title: 'Depth, Personality & instructions',
     blurb: 'How far the thinking goes, how it sounds on the way, and what always stays fixed.',
