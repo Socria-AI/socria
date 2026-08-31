@@ -10,6 +10,7 @@
 // than crashing the surface it's on.
 
 import katex from 'katex';
+import { splitMath, hasMath } from '@/lib/tex-split';
 
 const MAX_TEX = 2000; // a single expression; longer is certainly not one
 
@@ -47,73 +48,11 @@ export function TeX({ tex, display = false }: { tex: string; display?: boolean }
 }
 
 // ── mixed prose + math ──────────────────────────────────────────────
-// Chat replies and notes are prose with math sprinkled in: $…$ / \(…\) for
-// inline, $$…$$ / \[…\] for display. Split on those and render each piece.
+// The splitting itself lives in lib/tex-split.ts: it is pure, it is the part
+// that can mangle a sentence without anyone noticing, and there it can be
+// tested. Re-exported here because every caller already imports from './TeX'.
 
-interface Seg {
-  kind: 'text' | 'inline' | 'block';
-  body: string;
-}
-
-// Ordered so the longer delimiters ($$, \[, \() are tried before the shorter
-// ones and never mis-split a $$ as two $.
-const PATTERNS: { re: RegExp; kind: 'inline' | 'block' }[] = [
-  { re: /\$\$([\s\S]+?)\$\$/, kind: 'block' },
-  { re: /\\\[([\s\S]+?)\\\]/, kind: 'block' },
-  { re: /\\\(([\s\S]+?)\\\)/, kind: 'inline' },
-  // single-$ inline: not a currency amount ("$5") — require a non-space start
-  // and a non-digit-only body so "it cost $5 and $10" stays prose.
-  { re: /\$(?!\s)([^$\n]*?[^\s$])\$/, kind: 'inline' },
-];
-
-export function splitMath(input: string): Seg[] {
-  const segs: Seg[] = [];
-  let rest = input;
-  let guard = 0;
-  while (rest && guard++ < 400) {
-    let best: { index: number; len: number; body: string; kind: 'inline' | 'block' } | null =
-      null;
-    for (const { re, kind } of PATTERNS) {
-      const m = re.exec(rest);
-      if (m && (best === null || m.index < best.index)) {
-        best = { index: m.index, len: m[0].length, body: m[1], kind };
-      }
-    }
-    if (!best) {
-      segs.push({ kind: 'text', body: rest });
-      break;
-    }
-    if (best.index > 0) segs.push({ kind: 'text', body: rest.slice(0, best.index) });
-    // a single-$ span is math only if its body actually looks mathematical.
-    // "$5-$10" and "$100$" are money; "$x=3$", "$\pi$", "$14 - 6 = 8$" are math.
-    if (best.kind === 'inline' && !looksMath(best.body)) {
-      segs.push({ kind: 'text', body: rest.slice(0, best.index + best.len) });
-    } else {
-      segs.push({ kind: best.kind, body: best.body });
-    }
-    rest = rest.slice(best.index + best.len);
-  }
-  return segs;
-}
-
-// A single-$ body is math when it carries a real signal: a letter, a LaTeX
-// command, a super/subscript or brace, an equals, or a spaced arithmetic
-// operator between numbers ("14 - 6"). Bare amounts ("5", "5-", "100") are money.
-function looksMath(body: string): boolean {
-  return /[a-zA-Z\\^_{}=]/.test(body) || /\d\s*[-+*/×÷^]\s*\d/.test(body);
-}
-
-export function hasMath(input: string): boolean {
-  if (/\$\$[\s\S]+?\$\$|\\\[[\s\S]+?\\\]|\\\([\s\S]+?\\\)/.test(input)) return true;
-  // Scan EVERY single-$ span, not just the first: "$5$ then $x+2=0$" is math
-  // because of the second span, even though the first reads as money. Matches
-  // splitMath's per-span judgement so the gate and the splitter never disagree.
-  const re = /\$(?!\s)([^$\n]*?[^\s$])\$/g;
-  for (let m = re.exec(input); m; m = re.exec(input)) {
-    if (looksMath(m[1])) return true;
-  }
-  return false;
-}
+export { splitMath, hasMath, looksMath, type Seg } from '@/lib/tex-split';
 
 /** Render a string that mixes prose and LaTeX. */
 export function MathText({ children, className }: { children: string; className?: string }) {

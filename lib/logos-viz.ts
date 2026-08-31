@@ -203,6 +203,19 @@ export const SQUARE_KINDS = new Set<VizKind>(['matrix', 'vectors']);
 
 /** Widen one axis of a viewport about its centre until units match pixels. */
 /**
+ * How many decimals a slider needs before one step of it is visible.
+ *
+ * A slider whose step is 0.0006 printed at three decimals reads 0.001, then
+ * 0.001, then 0.002 — it looks stuck, and worse, it disagrees with anything
+ * else on screen showing the same quantity to more places. Deriving the
+ * precision from the step means the number always moves when the handle does.
+ */
+export function precisionFor(step: number, cap = 6): number {
+  if (!Number.isFinite(step) || step <= 0) return 3;
+  return Math.min(cap, Math.max(0, Math.ceil(-Math.log10(step))));
+}
+
+/**
  * How far the window may be scaled before the picture stops meaning anything.
  * Past the lower bound the tick labels are float dust; past the upper one the
  * curve is a horizontal line.
@@ -967,16 +980,13 @@ const buildLimit: Builder = (scene, fn, vals, view, guarded) => {
   const Rn = oneSidedLimit(fn, varName, vals, a, 1);
   const Two = twoSidedLimit(Ln, Rn);
 
-  // FOUR distinct quantities, and the entire point of this lens is that they
-  // are not interchangeable: where you are sampling, what you read there,
-  // where each side is heading, and whether those two agree.
+  // What you read at the δ you have, and where those readings are heading.
+  //
+  // δ itself is deliberately NOT here: the slider a few pixels away is
+  // labelled "δ → 0", shows the value, and carries the same explanation. A
+  // second copy of it was one more number to read and — because the two were
+  // formatted to different precisions — one that could disagree with itself.
   const readouts: VizReadout[] = [
-    {
-      id: 'd',
-      tex: '\\delta',
-      value: fmt(d, 4),
-      help: 'How far out from the point you are sampling. Drag it toward 0 to bring both readings in closer.',
-    },
     {
       id: 'fl',
       tex: `f(${fmt(a)} - \\delta)`,
@@ -991,20 +1001,34 @@ const buildLimit: Builder = (scene, fn, vals, view, guarded) => {
     },
   ];
 
-  // The limits are the answer, so the guard holds all three.
+  // The two one-sided limits are shown only when they have something to say.
+  //
+  // When both sides arrive at the same place — the ordinary case, and every
+  // removable hole — they read "4", "4" above a two-sided limit that also
+  // reads "4", which is three lines to make one point. When they DISAGREE
+  // they are the whole story, because they are the reason the two-sided limit
+  // does not exist. So they appear exactly then, and the row stays short the
+  // rest of the time.
+  const sidesInformative = !(Ln.kind === 'value' && Rn.kind === 'value' && Two.kind === 'value');
+  if (sidesInformative) {
+    readouts.push(
+      {
+        id: 'limL',
+        tex: `\\lim_{${varName} \\to ${fmt(a)}^{-}} f(${varName})`,
+        value: guarded ? null : sideText(Ln),
+        help: 'The single height the curve is heading for as you come in from the left. Not the reading at any particular δ — the value all those readings are closing in on.',
+      },
+      {
+        id: 'limR',
+        tex: `\\lim_{${varName} \\to ${fmt(a)}^{+}} f(${varName})`,
+        value: guarded ? null : sideText(Rn),
+        help: 'The same thing, coming in from the right.',
+      }
+    );
+  }
+
+  // The limit itself is always the answer, so the guard holds it.
   readouts.push(
-    {
-      id: 'limL',
-      tex: `\\lim_{${varName} \\to ${fmt(a)}^{-}} f(${varName})`,
-      value: guarded ? null : sideText(Ln),
-      help: 'The single height the curve is heading for as you come in from the left. Not the reading at any particular δ — the value all those readings are closing in on.',
-    },
-    {
-      id: 'limR',
-      tex: `\\lim_{${varName} \\to ${fmt(a)}^{+}} f(${varName})`,
-      value: guarded ? null : sideText(Rn),
-      help: 'The same thing, coming in from the right.',
-    },
     {
       id: 'L',
       tex: `\\lim_{${varName} \\to ${fmt(a)}} f(${varName})`,

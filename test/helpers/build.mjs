@@ -27,6 +27,7 @@ const MODULES = [
   'lib/topic-drift.ts',
   'lib/one-prompt.ts',
   'lib/analytics.ts',
+  'lib/tex-split.ts',
 ];
 
 export async function buildAll() {

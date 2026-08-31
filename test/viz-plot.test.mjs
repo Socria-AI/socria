@@ -30,7 +30,12 @@ ok('colour slot held while hidden', overlayLegend(H2.s)[1].tone === overlayLegen
 
 console.log('\n=== 7: coexistence with a teaching scene ===');
 const Co = F({kind:'limit', expr:'2x + 5', a:3, view:{xMin:-1,xMax:7}, overlays:[{expr:'x^2', source:'user'}]});
-ok('limit scene intact', Co.f.readouts.some(r=>r.id==='limL') && Co.f.objects.some(o=>o.id==='a'));
+// Witnesses that are always present: the two-sided limit and the left-hand
+// sample. limL is NOT one — 2x+5 is continuous, so the one-sided rows are
+// deliberately not drawn there. See viz-limits.
+ok('limit scene intact',
+   Co.f.readouts.some(r=>r.id==='L') && Co.f.readouts.some(r=>r.id==='fl')
+   && Co.f.objects.some(o=>o.id==='a'));
 ok('limit curve + overlay both drawn', curves(Co).includes('f') && curves(Co).some(c=>c.startsWith('ov_')), JSON.stringify(curves(Co)));
 ok('limit maths untouched', Co.f.readouts.find(r=>r.id==='L').value==='11');
 const CoG = F({kind:'limit', expr:'2x + 5', a:3, view:{xMin:-1,xMax:7}, overlays:[{expr:'x^2'}]}, true);

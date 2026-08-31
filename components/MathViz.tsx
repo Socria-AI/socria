@@ -27,6 +27,7 @@ import {
   KIND_LABEL,
   kindNarrates,
   kindNeedsExpr,
+  precisionFor,
   resolveView,
   scaleView,
   RESERVED_PARAM,
@@ -1504,7 +1505,13 @@ function Controls({
                 aria-label={p.id}
               />
               <output>
-                {p.integer ? Math.round(vals[p.id] ?? p.value) : fmt(vals[p.id] ?? p.value, 3)}
+                {/* Precision from the STEP, not a fixed 3. δ steps in
+                    thousandths, so three decimals printed 0.001 next to a
+                    readout saying 0.0008 — the same number contradicting
+                    itself an inch apart — and made the handle look stuck. */}
+                {p.integer
+                  ? Math.round(vals[p.id] ?? p.value)
+                  : fmt(vals[p.id] ?? p.value, precisionFor(p.step))}
               </output>
             </label>
           ))}
