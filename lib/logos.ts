@@ -9,7 +9,7 @@
 // evidence) — the map is the data, the lens is how you look at it.
 // No editing, no persistence.
 
-import { sanitizeViz, type VizScene } from './logos-viz';
+import { ECON_KINDS, sanitizeViz, type VizScene } from './logos-viz';
 
 export const LOGOS_MODEL = 'gpt-5.6-sol';
 // If the Sol id is ever rejected as unknown, the routes retry with this so a
@@ -273,7 +273,14 @@ export function sanitizeMap(raw: any): ThinkingMap {
 
   // Only mathematical work gets a dynamic picture; everywhere else it would
   // be a category error, and the sanitizer is the place to say so once.
-  const viz = isMath ? sanitizeViz(raw.viz) : null;
+  // A scene survives if the work is mathematical, OR if the scene is one of
+  // the economics diagrams — those belong to conversations the extractor
+  // calls learning or analysing, never math. Gating the whole field on
+  // context threw away every supply-and-demand and PPC scene the model
+  // produced, silently, after the prompt had asked for them and the lens was
+  // ready to draw them.
+  const scene = sanitizeViz(raw.viz);
+  const viz = scene && (isMath || ECON_KINDS.has(scene.kind)) ? scene : null;
 
   return {
     nodes,

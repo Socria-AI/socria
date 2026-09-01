@@ -13,6 +13,7 @@ import {
   sanitizeViz, compileScene, resolveView, buildFrame, defaults,
 } from './.tmp/logos-viz.mjs';
 import { availableLenses, leadLens } from './.tmp/logos-layout.mjs';
+import { sanitizeMap } from './.tmp/logos.mjs';
 
 let pass = 0, fail = 0;
 const ok = (n, c, x = '') => (c ? pass++ : (fail++, console.log('FAIL', n, x)));
@@ -340,6 +341,48 @@ console.log('\n=== degenerate cases ===');
   ok('a scene but no plot lens falls back', leadLens(['graph'], true) === 'graph');
   ok('the lead is always one of the lenses offered',
      ['graph', 'plot', 'solve'].includes(leadLens(['graph', 'plot'], true)));
+}
+
+console.log('\n=== a scene survives the map sanitiser ===');
+{
+  // The bug this catches reached a real conversation: the map sanitiser kept
+  // `viz` only when context was "math", so every economics scene the model
+  // produced was discarded on the server — after the prompt had asked for it
+  // and the lens was ready to draw it. The lens showed Graph and Structure
+  // and nothing else, with no error anywhere.
+  const econRaw = {
+    context: 'learning',
+    nodes: [{ id: 'a', type: 'concept', label: 'PPC is bowed' }],
+    edges: [],
+    viz: { kind: 'ppc', frontier: { xMax: 100, yMax: 80, bowed: true } },
+  };
+  const m = sanitizeMap(econRaw);
+  ok('an economics scene survives a learning conversation', !!m.viz, JSON.stringify(m.viz));
+  ok('and it is the right kind', m.viz?.kind === 'ppc', String(m.viz?.kind));
+  ok('so the plot lens appears', availableLenses(m).includes('plot'), availableLenses(m).join());
+
+  const sd = sanitizeMap({ ...econRaw, context: 'analysing',
+    viz: { kind: 'supply-demand', demand: { intercept: 100, slope: -1 }, supply: { intercept: 20, slope: 1 } } });
+  ok('supply-demand survives too', sd.viz?.kind === 'supply-demand', String(sd.viz?.kind));
+
+  // The gate still holds for the mathematics kinds: a derivative scene in a
+  // conversation about a house move is not something anyone asked for.
+  const stray = sanitizeMap({
+    context: 'deciding',
+    nodes: [{ id: 'a', type: 'goal', label: 'should we move' }],
+    edges: [],
+    viz: { kind: 'derivative', expr: 'x^2', varName: 'x', a: 1 },
+  });
+  ok('a maths scene outside maths is still dropped', !stray.viz, JSON.stringify(stray.viz));
+
+  // …and is kept where it belongs.
+  const mathMap = sanitizeMap({
+    context: 'math',
+    nodes: [{ id: 'a', type: 'given', label: 'f(x) = x^2' }],
+    edges: [],
+    viz: { kind: 'derivative', expr: 'x^2', varName: 'x', a: 1 },
+  });
+  ok('a maths scene in maths is kept', mathMap.viz?.kind === 'derivative', String(mathMap.viz?.kind));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

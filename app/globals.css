@@ -4082,7 +4082,12 @@ html.js-anim .scrolly-root .fade.d3 { transition-delay: .3s; }
   border-left: 3px double var(--lg-accent);
 }
 /* concept — held, not argued */
-.logos-root .lg-node-concept { border-radius: 999px; padding-left: 15px; padding-right: 15px; }
+/* A concept reads as a pill — but 999px only reads as a pill while the label
+   fits on one line. Let it wrap to three and the same rule renders a large
+   oval, which is not a softer card, it is a different shape. 18px is half the
+   height of a single-line node, so a short label is still a pill and a
+   wrapped one becomes the rounded card the rest of the map uses. */
+.logos-root .lg-node-concept { border-radius: 18px; padding-left: 15px; padding-right: 15px; }
 /* misconception — understood wrongly, and marked as such */
 .logos-root .lg-node-misconception {
   border-radius: 10px;

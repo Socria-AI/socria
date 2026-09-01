@@ -208,6 +208,16 @@ export const VIZ_KINDS = [
 ] as const;
 export type VizKind = (typeof VIZ_KINDS)[number];
 
+/**
+ * The economics diagrams, which are NOT mathematics-context work.
+ *
+ * A supply-and-demand conversation is about markets, and the extractor
+ * labels it learning or analysing. Anything deciding whether a scene may
+ * exist has to ask which KIND it is rather than what the conversation was
+ * called, or these are thrown away in exactly the conversations they are for.
+ */
+export const ECON_KINDS = new Set<VizKind>(['supply-demand', 'ppc', 'ad-as']);
+
 /** The four everyone meets first; the editor leads with these. */
 export const CORE_KINDS: VizKind[] = ['function', 'limit', 'derivative', 'riemann'];
 
