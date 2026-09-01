@@ -90,6 +90,33 @@ function cardH(label: string, w = CARD_W) {
   return label.length * 7.1 > w - 26 ? CARD_H2 : CARD_H;
 }
 
+/**
+ * The lens a map should OPEN on, and — for a free reader, who gets one — the
+ * lens that is theirs.
+ *
+ * Both questions have the same answer, which is why they are one function:
+ * whichever view is the point of this particular map. Landing someone on a
+ * lens they cannot open, or unlocking one they were never shown, are the two
+ * ways of getting that wrong.
+ *
+ * A SCENE WINS when there is no solution chain. The extractor only emits one
+ * when watching the idea move would teach it better than describing it, so a
+ * map carrying a scene is a map whose whole answer is a picture — and until
+ * this existed, an economics conversation built a supply-and-demand diagram
+ * and then opened on a concept map of the words around it, with the diagram
+ * one unlabelled tab away and, on the free tier, locked.
+ *
+ * A solution chain still leads where there is one. Worked algebra is read
+ * step by step, and the animation beside it is a second look at the same
+ * work rather than a replacement for it.
+ */
+export function leadLens(lenses: LensId[], hasViz: boolean): LensId | null {
+  if (!lenses.length) return null;
+  if (lenses.includes('solve')) return 'solve';
+  if (hasViz && lenses.includes('plot')) return 'plot';
+  return lenses[0];
+}
+
 // ── which lenses have anything to show ──────────────────────────────
 export function availableLenses(map: ThinkingMap): LensId[] {
   const out: LensId[] = [];

@@ -12,6 +12,7 @@ import {
 import {
   sanitizeViz, compileScene, resolveView, buildFrame, defaults,
 } from './.tmp/logos-viz.mjs';
+import { availableLenses, leadLens } from './.tmp/logos-layout.mjs';
 
 let pass = 0, fail = 0;
 const ok = (n, c, x = '') => (c ? pass++ : (fail++, console.log('FAIL', n, x)));
@@ -275,6 +276,70 @@ console.log('\n=== the guard reaches economics too ===');
   ok('the equilibrium price is withheld', pe && pe.value === null);
   ok('but the curves are still drawn', g.objects.some((o) => o.id === 'D'));
   ok('and there is a question to answer', typeof g.ask === 'string' && g.ask.length > 10);
+}
+
+// ── the diagram has to be the thing you see ────────────────────────
+//
+// Building a scene and then opening on something else is the same as not
+// building it. This decides BOTH what a map opens on and, for a free reader
+// who gets one lens, which lens is theirs — so getting it wrong either
+// buries the answer or unlocks a view nobody was shown.
+
+console.log('\n=== an economics map opens on the diagram ===');
+{
+  const scene = sanitizeViz({
+    kind: 'supply-demand',
+    demand: { intercept: 100, slope: -1 },
+    supply: { intercept: 20, slope: 1 },
+  });
+  // An economics conversation: the extractor calls this "learning", not
+  // "math", so there is no solution chain anywhere in it.
+  const map = {
+    context: 'learning',
+    nodes: [
+      { id: 'a', type: 'goal', label: 'why did the price rise' },
+      { id: 'b', type: 'idea', label: 'demand shifted' },
+    ],
+    edges: [],
+    viz: scene,
+  };
+  const lenses = availableLenses(map);
+  ok('the plot lens is offered without math context', lenses.includes('plot'), lenses.join());
+  ok('and it is what the map opens on', leadLens(lenses, true) === 'plot', String(leadLens(lenses, true)));
+  ok('which is also the lens a free reader gets',
+     leadLens(lenses, true) === 'plot');
+
+  // Without a scene the concept graph still leads, as it always did.
+  const plain = { ...map, viz: undefined };
+  const pl = availableLenses(plain);
+  ok('no scene, no plot lens', !pl.includes('plot'), pl.join());
+  ok('and the graph leads', leadLens(pl, false) === 'graph', String(leadLens(pl, false)));
+}
+
+console.log('\n=== a solution chain still leads where there is one ===');
+{
+  // Worked algebra is read step by step; the animation beside it is a second
+  // look at the same work, not a replacement for it.
+  const mathMap = {
+    context: 'math',
+    nodes: [
+      { id: 'g', type: 'given', label: '2x + 5 = 11' },
+      { id: 's', type: 'step', label: '2x = 6' },
+    ],
+    edges: [{ from: 'g', to: 's', relation: 'transforms_to' }],
+    viz: sanitizeViz({ kind: 'derivative', expr: 'x^2', varName: 'x', a: 1 }),
+  };
+  const lenses = availableLenses(mathMap);
+  ok('solve is available', lenses.includes('solve'), lenses.join());
+  ok('and solve leads even with a scene', leadLens(lenses, true) === 'solve');
+}
+
+console.log('\n=== degenerate cases ===');
+{
+  ok('no lenses, no lead', leadLens([], true) === null);
+  ok('a scene but no plot lens falls back', leadLens(['graph'], true) === 'graph');
+  ok('the lead is always one of the lenses offered',
+     ['graph', 'plot', 'solve'].includes(leadLens(['graph', 'plot'], true)));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

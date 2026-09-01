@@ -54,6 +54,7 @@ import {
   cardH,
   GRAPH_W,
   type Connector,
+  leadLens,
   type LensId,
   type Placed,
 } from '@/lib/logos-layout';
@@ -266,20 +267,19 @@ export function ThinkingMap({
   // A free reader keeps the lens this map leads with — the signature view,
   // never a stub. The other readings of the same reasoning are One's. The
   // auto-switch below lands on exactly this lens, so nobody is ever dropped
-  // onto something they can't open.
-  const freeLens: LensId | null = lenses.length
-    ? lenses.includes('solve')
-      ? 'solve'
-      : lenses[0]
-    : null;
-  const lensLocked = (id: LensId) => !!lensesLocked && id !== freeLens;
+  // onto something they can't open, and nobody is given a free lens they
+  // were never shown.
+  const lead = leadLens(lenses, !!map.viz);
+  const lensLocked = (id: LensId) => !!lensesLocked && id !== lead;
 
-  // If the active lens loses its content, fall back to the graph.
+  // Open on the lens that IS the answer, unless the reader has since chosen
+  // otherwise. A map carrying a scene used to open on the concept graph with
+  // the diagram an unlabelled tab away — the picture had been built and
+  // nothing showed it.
   useEffect(() => {
     if (lenses.length && !lenses.includes(lens)) setLens(lenses[0]);
-    // Math work leads with the Solution chain unless they've chosen otherwise.
-    else if (!lensManual.current && lenses.includes('solve') && lens !== 'solve') setLens('solve');
-  }, [lenses, lens]);
+    else if (!lensManual.current && lead && lens !== lead) setLens(lead);
+  }, [lenses, lens, lead]);
 
   const edgeKey = (e: { from: string; to: string; relation: string }) =>
     `${e.from}~${e.to}~${e.relation}`;
