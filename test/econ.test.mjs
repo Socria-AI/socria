@@ -13,7 +13,7 @@ import {
   sanitizeViz, compileScene, resolveView, buildFrame, defaults,
 } from './.tmp/logos-viz.mjs';
 import { availableLenses, leadLens } from './.tmp/logos-layout.mjs';
-import { sanitizeMap } from './.tmp/logos.mjs';
+import { buildMapPrompt, sanitizeMap } from './.tmp/logos.mjs';
 
 let pass = 0, fail = 0;
 const ok = (n, c, x = '') => (c ? pass++ : (fail++, console.log('FAIL', n, x)));
@@ -424,6 +424,71 @@ console.log('\n=== growth in one good pivots the frontier ===');
   const after = frame({ ...spec, frontier: { ...spec.frontier, grows: 'x' } }, { g: 1.25, q: 50 });
   ok('and every opportunity cost along it changes',
      val(before, 'oc') !== val(after, 'oc'), `${val(before,'oc')} vs ${val(after,'oc')}`);
+}
+
+console.log('\n=== the extractor can see the picture it maintains ===');
+{
+  // The bug: buildMapPrompt showed the model the nodes and edges but never
+  // the scene, so it was asked to keep a picture in step with the
+  // conversation while unable to see the picture. Its only honest moves were
+  // to invent a new scene from scratch — which reproduced the default and
+  // looked like nothing had happened — or to omit the field, which the client
+  // reads as "no opinion" and carries the old scene forward. Either way the
+  // graph never moved, however plainly someone asked it to.
+  const withScene = sanitizeMap({
+    context: 'learning',
+    nodes: [{ id: 'a', type: 'concept', label: 'PPC is bowed' }],
+    edges: [],
+    viz: {
+      kind: 'ppc',
+      frontier: { xMax: 100, yMax: 80, bowed: true },
+      axes: { x: 'Guns', y: 'Butter' },
+    },
+  });
+  const p = buildMapPrompt(withScene);
+  ok('the scene is in the prompt', p.includes('"kind":"ppc"'), 'kind missing');
+  ok('with its frontier', p.includes('"xMax":100'), 'frontier missing');
+  ok('and the axis names it was given', p.includes('"Guns"'), 'axes missing');
+  ok('and where each handle currently sits', /"id":"q".*"value":0/.test(p), 'param values missing');
+  ok('told to edit rather than replace', /EDIT IT rather than replacing/.test(p));
+  ok('told that a value moves the picture', /Change a parameter's "value"/.test(p));
+
+  // Slider help is UI copy written for the reader. Showing it is a third of
+  // the scene by length and invites the model to rewrite prose nobody asked
+  // it to touch.
+  ok('slider help text is not sent', !/How much of the first good/.test(p), 'help leaked');
+
+  // The reader's own curves persist on their own; listing them invites the
+  // model to rewrite them.
+  const withOverlays = sanitizeMap({
+    context: 'math',
+    nodes: [{ id: 'a', type: 'given', label: 'f' }],
+    edges: [],
+    viz: { kind: 'function', expr: 'x^2', varName: 'x',
+           overlays: [{ id: 'u1', expr: 'sin(x)', visible: true, source: 'user' }] },
+  });
+  // Scoped to the scene block. The prompt's own RULES section cites
+  // "sin(x)/x" as an example of plain notation, so searching the WHOLE
+  // prompt for an expression finds the documentation rather than a leak —
+  // the first version of this assertion did exactly that and failed on
+  // correct code.
+  const sceneBlock = (m) => {
+    const t = buildMapPrompt(m);
+    const i = t.indexOf('The picture currently on screen');
+    if (i < 0) return '';
+    const j = t.indexOf('{', i);
+    return t.slice(j, t.indexOf('\n', j));
+  };
+  ok("the reader's overlays are not sent", !sceneBlock(withOverlays).includes('overlays'),
+     sceneBlock(withOverlays).slice(0, 140));
+
+  // A map with no scene must not gain an empty instruction block.
+  const noScene = sanitizeMap({
+    context: 'deciding',
+    nodes: [{ id: 'a', type: 'goal', label: 'should we move' }],
+    edges: [],
+  });
+  ok('no scene, no block', !buildMapPrompt(noScene).includes('picture currently on screen'));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

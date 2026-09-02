@@ -559,11 +559,55 @@ ${
     ? `Last read as: ${current.context}. Keep it there unless the conversation has genuinely moved.`
     : 'Not yet established — read it from the conversation.';
 
+  /**
+   * The scene already on screen, shown so it can be EDITED.
+   *
+   * Without this the extractor was being asked to keep a picture in step with
+   * the conversation while unable to see the picture. Its only honest moves
+   * were to invent a whole new scene — which usually reproduced the default
+   * and looked like nothing had happened — or to omit the field, which the
+   * client reads as "no opinion" and carries the old scene forward. Either
+   * way the graph never moved, however plainly someone asked it to.
+   *
+   * Serialised as the JSON it will be handed back, minus the reader's own
+   * overlays: those are theirs, they persist on their own, and listing them
+   * invites the model to rewrite them.
+   */
+  const vizBlock = (() => {
+    if (!current.viz) return '';
+    const { overlays, ...scene } = current.viz;
+    // Sliders are shown as id/range/value only. Their help text is UI copy
+    // written for the reader, it is a third of the scene by length, and
+    // showing it invites the model to rewrite prose it was never asked to
+    // touch. What it needs from a parameter is where the handle is and how
+    // far it may move.
+    const lean = {
+      ...scene,
+      params: (scene.params ?? []).map(({ id, min, max, step, value, symbol, integer, sweep, toward }) => ({
+        id,
+        min,
+        max,
+        step,
+        value,
+        ...(symbol ? { symbol } : {}),
+        ...(integer ? { integer } : {}),
+        ...(sweep ? { sweep } : {}),
+        ...(toward ? { toward } : {}),
+      })),
+    };
+    return `
+The picture currently on screen, as JSON. EDIT IT rather than replacing it — return the same object with only what this turn changed:
+${JSON.stringify(lean)}
+Change a parameter's "value" to move the picture to where the conversation now is: someone who says "more guns" wants the position along the frontier moved, not a lecture about it. Change a curve when a curve moved. Keep the axis names, the numbers and the kind unless the subject genuinely changed. Omit "viz" entirely only when this turn said nothing about the picture at all — the one on screen then stays exactly as it is.
+`;
+  })();
+
   return `You extract the STRUCTURE of a person's thinking from a conversation and maintain it as a small graph. You never talk to the user.
 
 ${currentBlock}
 
 Thinking context: ${contextLine}
+${vizBlock}
 ${
   grounded
     ? `
