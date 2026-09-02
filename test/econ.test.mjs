@@ -385,5 +385,46 @@ console.log('\n=== a scene survives the map sanitiser ===');
   ok('a maths scene in maths is kept', mathMap.viz?.kind === 'derivative', String(mathMap.viz?.kind));
 }
 
+console.log('\n=== growth in one good pivots the frontier ===');
+{
+  const at = (r, x) => {
+    // frontier height at x, read off the drawn curve
+    const c = r.f.objects.find((o) => o.id === 'ppc');
+    let best = null;
+    for (const pt of c.pts) if (!best || Math.abs(pt.x - x) < Math.abs(best.x - x)) best = pt;
+    return best;
+  };
+  const spec = { kind: 'ppc', frontier: { xMax: 100, yMax: 80, bowed: true }, axes: { x: 'Guns', y: 'Butter' } };
+
+  const both = frame({ ...spec, frontier: { ...spec.frontier, grows: 'both' } }, { g: 1.25 });
+  const gunsOnly = frame({ ...spec, frontier: { ...spec.frontier, grows: 'x' } }, { g: 1.25 });
+  const rest = frame(spec, { g: 1 });
+
+  const reach = (r) => Math.max(...r.f.objects.find((o) => o.id === 'ppc').pts.map((p) => p.x));
+  const top = (r) => Math.max(...r.f.objects.find((o) => o.id === 'ppc').pts.map((p) => p.y));
+
+  ok('uniform growth moves both ends out', reach(both) > reach(rest) && top(both) > top(rest),
+     `${reach(both)}/${top(both)} vs ${reach(rest)}/${top(rest)}`);
+  ok('growth in guns moves the guns end out', reach(gunsOnly) > reach(rest), String(reach(gunsOnly)));
+  ok('and leaves the butter end exactly where it was',
+     Math.abs(top(gunsOnly) - top(rest)) < 1e-6, `${top(gunsOnly)} vs ${top(rest)}`);
+  ok('which is a pivot, not a slide', reach(gunsOnly) > reach(rest) && top(gunsOnly) <= top(rest) + 1e-6);
+
+  ok('grows defaults to both', frame(spec).sc.frontier.grows === 'both');
+  ok('a nonsense value falls back to both',
+     frame({ ...spec, frontier: { ...spec.frontier, grows: 'sideways' } }).sc.frontier.grows === 'both');
+
+  // The window must not reserve headroom on an axis growth cannot move.
+  const v = resolveView(frame({ ...spec, frontier: { ...spec.frontier, grows: 'x' } }).sc, null);
+  ok('no wasted headroom above a pivot in x', v.yMax < 80 * 1.25, String(v.yMax));
+  ok('but room for the pivot itself', v.xMax > 100 * 1.2, String(v.xMax));
+
+  // The one that matters pedagogically: opportunity cost changes everywhere.
+  const before = frame(spec, { g: 1, q: 50 });
+  const after = frame({ ...spec, frontier: { ...spec.frontier, grows: 'x' } }, { g: 1.25, q: 50 });
+  ok('and every opportunity cost along it changes',
+     val(before, 'oc') !== val(after, 'oc'), `${val(before,'oc')} vs ${val(after,'oc')}`);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

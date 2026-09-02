@@ -6016,13 +6016,27 @@ html.js-anim .scrolly-root .fade.d3 { transition-delay: .3s; }
    range, which matters most for a δ closing on zero. Two rows: the symbol
    and its value on the first, the track spanning the second. */
 .logos-root .lg-viz-sliders {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  /* One column on a narrow panel, two where there is room.
+     A supply-and-demand scene with a price control carries three sliders, and
+     stacked at full width they took a third of the panel from the plot —
+     which is the thing they exist to move. Two columns costs nothing in
+     legibility: each still gets its symbol, its value and a track wide enough
+     to be worth dragging. */
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px 22px;
   width: 100%;
   /* Inset to match the plot above it. Flush to the panel edge the track read
      as part of the frame rather than as a control. */
   padding: 0 10px;
+}
+@media (min-width: 720px) {
+  .logos-root .lg-viz-sliders { grid-template-columns: 1fr 1fr; }
+  /* An odd one out spans, rather than sitting in a half-width column with
+     empty space beside it. */
+  .logos-root .lg-viz-sliders > .lg-viz-slider:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
 }
 .logos-root .lg-viz-slider {
   display: grid;

@@ -152,6 +152,9 @@ export function MathViz({
   const progRef = useRef(0);
   const geomRef = useRef<Geom | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
+  const stageRef = useRef<HTMLDivElement | null>(null);
+  /** The stage's real pixel box. See the note where W and H are set. */
+  const [stage, setStage] = useState<{ w: number; h: number } | null>(null);
   const dragRef = useRef<{ x: number; y: number; view: Viewport } | null>(null);
   /**
    * Every pointer currently down on the plot, by id.
@@ -424,6 +427,39 @@ export function MathViz({
     [zoomCentre]
   );
 
+  /**
+   * Measure the stage rather than predicting it.
+   *
+   * W and H set the viewBox, and the SVG letterboxes when that shape does not
+   * match its container — so getting them wrong does not clip the plot, it
+   * shrinks it and centres it in a field of empty space. They used to be the
+   * panel's size minus a hardcoded 96px for "the chrome below", plus a few
+   * more constants for the sliders and the editor. Every readout, every
+   * narration line and every slider added since then made that guess more
+   * wrong, and an economics scene with eight readings and three sliders made
+   * it wrong by three hundred pixels: the graph you saw was a quarter of the
+   * room it had.
+   *
+   * The observer watches the stage and sets the viewBox to what is actually
+   * there. It cannot feed back: the SVG is flex:1/width:100% inside the
+   * stage, so its size comes FROM the stage, and changing a viewBox changes
+   * no layout.
+   */
+  useEffect(() => {
+    const el = stageRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(([entry]) => {
+      const r = entry.contentRect;
+      setStage((prev) =>
+        prev && Math.abs(prev.w - r.width) < 1 && Math.abs(prev.h - r.height) < 1
+          ? prev
+          : { w: r.width, h: r.height }
+      );
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   // ── editing the scene ─────────────────────────────────────────────
 
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -469,17 +505,10 @@ export function MathViz({
   // mid-sentence, which is exactly when you are trying to read it.
   const narrating = usable && kindNarrates(active.kind);
   const asideNarr = narrating && width >= NARR_MIN_W;
-  const W = Math.max(300, width - 32 - (asideNarr ? NARR_W + 12 : 0));
-  const H = Math.max(
-    200,
-    height -
-      96 -
-      (active.params.length ? 30 : 0) -
-      (swept ? 26 : 0) -
-      // The editor is shorter without its equation row, which the kinds that
-      // carry their objects directly never show.
-      (draft ? (kindNeedsExpr(active.kind) ? 118 : 76) : 0)
-  );
+  // The stage's own box once it has been measured; the old arithmetic only as
+  // the first-paint fallback, before the observer has said anything.
+  const W = Math.max(300, stage ? stage.w : width - 32 - (asideNarr ? NARR_W + 12 : 0));
+  const H = Math.max(200, stage ? stage.h : height - 260);
   const plotW = W - PAD.l - PAD.r;
   const plotH = H - PAD.t - PAD.b;
 
@@ -538,7 +567,7 @@ export function MathViz({
       {active.title && !draft && <p className="lg-viz-title">{active.title}</p>}
 
       <div className="lg-viz-body">
-      <div className="lg-viz-stage">
+      <div className="lg-viz-stage" ref={stageRef}>
         <svg
           ref={svgRef}
           viewBox={`0 0 ${W} ${H}`}

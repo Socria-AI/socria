@@ -401,8 +401,17 @@ export interface VizScene {
   control?: { kind: 'ceiling' | 'floor'; at: number };
   /** supply-demand: shade consumer and producer surplus */
   surplus?: boolean;
-  /** ppc: the frontier, and whether opportunity cost increases along it */
-  frontier?: { xMax: number; yMax: number; bowed: boolean };
+  /**
+   * ppc: the frontier, whether opportunity cost increases along it, and which
+   * good the growth control acts on.
+   *
+   * `grows` is the difference between an economy getting richer and an
+   * economy getting better at ONE thing. Uniform growth slides the whole
+   * frontier out; growth in a single good pivots it, and the pivot is the
+   * more interesting picture — you can now have more guns without giving up
+   * any butter, and the opportunity cost of every gun has changed.
+   */
+  frontier?: { xMax: number; yMax: number; bowed: boolean; grows?: 'both' | 'x' | 'y' };
   /** what the axes are counting — "Guns", "Butter", "Real GDP" */
   axes?: { x: string; y: string };
   /** ad-as: aggregate demand and short-run aggregate supply */
@@ -581,7 +590,12 @@ function specialView(
     const f = scene.frontier ?? { xMax: 100, yMax: 100, bowed: true };
     // Room for growth to push the frontier outward without it leaving.
     const gMax = scene.params.find((p) => p.id === 'g')?.max ?? 1.25;
-    return { xMin: 0, xMax: f.xMax * gMax * 1.04, yMin: 0, yMax: f.yMax * gMax * 1.04 };
+    const grows = f.grows ?? 'both';
+    // Reserve headroom only on the axis growth can actually move. A pivot in
+    // x has no business shrinking the y half of the picture.
+    const gx = grows === 'y' ? 1 : gMax;
+    const gy = grows === 'x' ? 1 : gMax;
+    return { xMin: 0, xMax: f.xMax * gx * 1.04, yMin: 0, yMax: f.yMax * gy * 1.04 };
   }
 
   if (scene.kind === 'ad-as') {
@@ -2104,6 +2118,8 @@ const buildSupplyDemand: Builder = (scene, _fn, vals, view, guarded) => {
 
   const objects: VizObject[] = [];
   const readouts: VizReadout[] = [];
+  /** Welfare figures, appended after the equilibrium — see the note below. */
+  const welfare: VizReadout[] = [];
   const qHi = view.xMax;
 
   // The curves, drawn across the window rather than sampled: they are lines.
@@ -2192,13 +2208,17 @@ const buildSupplyDemand: Builder = (scene, _fn, vals, view, guarded) => {
         });
       }
 
+      // Held back, not pushed. The shading has to be drawn before the curves,
+      // but the NUMBERS belong last: the row is read left to right, and
+      // welfare arithmetic arriving before "what is the price" buries the
+      // answer behind three figures that only make sense once you have it.
       const w = econWelfare(D, S, q, price);
-      readouts.push(
+      welfare.push(
         { id: 'cs', tex: '\\text{CS}', value: fmt(w.consumer, 4), help: 'Consumer surplus: what buyers were willing to pay, less what they did pay, added up over everyone who bought.' },
         { id: 'ps', tex: '\\text{PS}', value: fmt(w.producer, 4), help: 'Producer surplus: what sellers received, less the least they would have accepted.' }
       );
       if (w.deadweight > 1e-6) {
-        readouts.push({ id: 'dwl', tex: '\\text{DWL}', value: fmt(w.deadweight, 4), help: 'Deadweight loss: surplus that simply is not created, because trades both sides would have agreed to are no longer allowed to happen.' });
+        welfare.push({ id: 'dwl', tex: '\\text{DWL}', value: fmt(w.deadweight, 4), help: 'Deadweight loss: surplus that simply is not created, because trades both sides would have agreed to are no longer allowed to happen.' });
       }
     }
 
@@ -2269,7 +2289,7 @@ const buildSupplyDemand: Builder = (scene, _fn, vals, view, guarded) => {
 
   return {
     objects,
-    readouts,
+    readouts: [...readouts, ...welfare],
     narration,
     caption: control
       ? 'Move the control price through the market price and watch the gap open.'
@@ -2285,9 +2305,15 @@ const buildSupplyDemand: Builder = (scene, _fn, vals, view, guarded) => {
 // climbs as you specialise — which is the whole reason the curve is bowed.
 
 const buildPpc: Builder = (scene, _fn, vals, view, guarded) => {
-  const base = scene.frontier ?? { xMax: 100, yMax: 100, bowed: true };
+  const base = scene.frontier ?? { xMax: 100, yMax: 100, bowed: true, grows: 'both' as const };
   const g = vals.g ?? 1;
-  const f = { xMax: base.xMax * g, yMax: base.yMax * g, bowed: base.bowed };
+  const grows = base.grows ?? 'both';
+  // Growth in one good PIVOTS the frontier; growth in both slides it out.
+  const f = {
+    xMax: base.xMax * (grows === 'y' ? 1 : g),
+    yMax: base.yMax * (grows === 'x' ? 1 : g),
+    bowed: base.bowed,
+  };
   const names = scene.axes ?? { x: 'good X', y: 'good Y' };
 
   const objects: VizObject[] = [];
@@ -2674,7 +2700,10 @@ const REQUIRED: Record<VizKind, (scene: VizScene) => VizParam[]> = {
       max: 1.25,
       step: 0.01,
       value: 1,
-      help: 'Growth. Scales the whole frontier outward — more resources or better technology — which is the only way to reach a point that was unattainable.',
+      help:
+        (sc.frontier?.grows ?? 'both') === 'both'
+          ? 'Growth. Slides the whole frontier outward — more resources, or better technology across the board — which is the only way to reach a point that was unattainable.'
+          : `Growth in ${(sc.frontier?.grows === 'x' ? sc.axes?.x : sc.axes?.y) ?? 'one good'} only. The frontier pivots rather than sliding: you can have more of that good without giving up any of the other, and every opportunity cost along the curve changes with it.`,
     },
   ],
   'ad-as': () => [
@@ -2945,12 +2974,14 @@ function econFields(kind: VizKind, raw: any): Partial<VizScene> {
   }
 
   if (kind === 'ppc') {
+    const grows = raw?.frontier?.grows;
     out.frontier = {
       xMax: num(raw?.frontier?.xMax, 1e-3, 1e5, 100),
       yMax: num(raw?.frontier?.yMax, 1e-3, 1e5, 100),
       // Bowed unless told otherwise: increasing opportunity cost is what the
       // curve exists to show, and a straight frontier is the special case.
       bowed: raw?.frontier?.bowed !== false,
+      grows: grows === 'x' || grows === 'y' ? grows : 'both',
     };
   }
 
