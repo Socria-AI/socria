@@ -491,5 +491,103 @@ console.log('\n=== the extractor can see the picture it maintains ===');
   ok('no scene, no block', !buildMapPrompt(noScene).includes('picture currently on screen'));
 }
 
+console.log('\n=== each tab appears for the work it is for ===');
+{
+  const lens = (m) => availableLenses(m);
+  const node = (id, type, label, extra = {}) => ({ id, type, label, ...extra });
+
+  // A calculation. The concept views read the SHAPE of an argument, which is
+  // the wrong question here — the shape IS the chain of steps, and solve and
+  // the Board draw that properly.
+  const worked = {
+    context: 'math',
+    nodes: [
+      node('g', 'given', '2x + 5 = 11'),
+      node('s1', 'step', '2x = 6', { flag: 'verified' }),
+      node('s2', 'step', 'x = 2', { flag: 'error', note: 'divided by 2 but wrote 2' }),
+    ],
+    edges: [{ from: 'g', to: 's1', relation: 'transforms_to' }],
+  };
+  const wl = lens(worked);
+  ok('a worked problem offers the chain', wl.includes('solve'), wl.join());
+  ok('and the Board', wl.includes('board'), wl.join());
+  ok('but not the concept graph', !wl.includes('graph'), wl.join());
+  ok('nor the structure view', !wl.includes('structure'), wl.join());
+  ok('and it opens on the chain', leadLens(wl, false) === 'solve', String(leadLens(wl, false)));
+
+  // Maths with nothing worked yet: no chain, no scene. The Board is still the
+  // right reading — a notebook rather than a mind map of the words.
+  const asked = {
+    context: 'math',
+    nodes: [node('q', 'unknown', 'the antiderivative')],
+    edges: [],
+  };
+  const al = lens(asked);
+  ok('an unworked maths question offers the Board', al.includes('board'), al.join());
+  ok('and still not the concept graph', !al.includes('graph'), al.join());
+
+  // Economics with a diagram: the diagram is the answer.
+  const econ = {
+    context: 'learning',
+    nodes: [node('a', 'concept', 'PPC is bowed'), node('b', 'concept', 'opportunity cost rises')],
+    edges: [],
+    viz: sanitizeViz({ kind: 'ppc', frontier: { xMax: 100, yMax: 80, bowed: true } }),
+  };
+  const el = lens(econ);
+  ok('an economics scene offers the plot', el.includes('plot'), el.join());
+  ok('and drops the concept views', !el.includes('graph') && !el.includes('structure'), el.join());
+  ok('opening on the diagram', leadLens(el, true) === 'plot', String(leadLens(el, true)));
+
+  // Contradiction is worth surfacing whatever the work is.
+  const clash = {
+    ...worked,
+    nodes: [...worked.nodes, node('t', 'tension', 'two results disagree')],
+  };
+  ok('a contradiction surfaces even in maths', lens(clash).includes('tensions'), lens(clash).join());
+
+  // Ordinary reasoning is untouched.
+  const deciding = {
+    context: 'deciding',
+    nodes: [node('g', 'goal', 'should we move'), node('v', 'value', 'time with family')],
+    edges: [],
+  };
+  const dl = lens(deciding);
+  ok('a decision still gets the concept graph', dl.includes('graph'), dl.join());
+  ok('and the structure view', dl.includes('structure'), dl.join());
+
+  console.log('\n=== …and there is never an empty panel ===');
+  // Quantitative work that has produced nothing yet must still show
+  // something rather than a blank tab row.
+  const bare = { context: 'learning', nodes: [node('a', 'concept', 'supply and demand')], edges: [] };
+  ok('a bare economics conversation falls back', lens(bare).length > 0, lens(bare).join());
+  ok('to the concept view', lens(bare).includes('graph'), lens(bare).join());
+  ok('an empty map offers nothing at all', lens({ context: 'math', nodes: [], edges: [] }).length === 0);
+  // Whatever the work, the lens it opens on is one it actually offers.
+  for (const m of [worked, asked, econ, deciding, bare]) {
+    const ls = lens(m);
+    const lead = leadLens(ls, !!m.viz);
+    ok(`lead is offered: ${m.context}/${ls.join('+')}`, lead === null || ls.includes(lead), String(lead));
+  }
+}
+
+console.log('\n=== right and wrong are marked on the steps ===');
+{
+  const m = sanitizeMap({
+    context: 'math',
+    nodes: [
+      { id: 's1', type: 'step', label: '2x = 6', flag: 'verified' },
+      { id: 's2', type: 'step', label: 'x = 4', flag: 'error', note: 'divided by 2 but wrote 4' },
+    ],
+    edges: [{ from: 's1', to: 's2', relation: 'transforms_to' }],
+  });
+  ok('a confirmed step keeps its mark', m.nodes.find((n) => n.id === 's1')?.flag === 'verified');
+  ok('a wrong step keeps its mark', m.nodes.find((n) => n.id === 's2')?.flag === 'error');
+  ok('and the repair note survives with it',
+     /divided by 2/.test(m.nodes.find((n) => n.id === 's2')?.note ?? ''),
+     m.nodes.find((n) => n.id === 's2')?.note);
+  ok('these are on the chain the map opens to',
+     availableLenses(m).includes('solve'), availableLenses(m).join());
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

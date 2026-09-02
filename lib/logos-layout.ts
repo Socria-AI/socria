@@ -117,11 +117,39 @@ export function leadLens(lenses: LensId[], hasViz: boolean): LensId | null {
   return lenses[0];
 }
 
+/**
+ * Is this piece of work quantitative?
+ *
+ * The extractor's own label when it can tell, plus the presence of a scene —
+ * economics conversations come back as "learning" or "analysing" and are
+ * quantitative all the same.
+ */
+function isQuantitative(map: ThinkingMap): boolean {
+  return map.context === 'math' || !!map.viz;
+}
+
 // ── which lenses have anything to show ──────────────────────────────
+//
+// A tab appears when it has something to say about THIS work, not whenever it
+// could technically render. Every lens on screen is a claim that there is a
+// worthwhile reading of the reasoning behind it, and five tabs over a
+// quadratic — two of them concept maps of the words around the algebra — is
+// four claims that are not true.
 export function availableLenses(map: ThinkingMap): LensId[] {
   const out: LensId[] = [];
-  if (map.nodes.length) out.push('graph');
-  if (map.nodes.length > 1) out.push('structure');
+  const quant = isQuantitative(map);
+
+  // The concept views. They read the SHAPE of an argument — what supports
+  // what, what sits under what — which is the right question for a decision
+  // or an essay and the wrong one for a calculation, where the shape is the
+  // chain of steps and the lenses below draw it properly.
+  if (!quant) {
+    if (map.nodes.length) out.push('graph');
+    if (map.nodes.length > 1) out.push('structure');
+  }
+
+  // Contradiction is worth surfacing in any kind of work. Two results that
+  // disagree is exactly as important in algebra as in an argument.
   if (
     map.edges.some((e) => e.relation === 'conflicts') ||
     map.nodes.some((n) => n.type === 'tension' || n.type === 'counterpoint')
@@ -132,20 +160,18 @@ export function availableLenses(map: ThinkingMap): LensId[] {
   // evidence under a claim in an essay.
   if (map.nodes.some((n) => n.type === 'evidence' || n.type === 'source')) out.push('evidence');
 
-  // A scene earns the Plot lens on its own, whatever the work is called.
-  //
-  // This used to sit inside the math-only branch, which was fine while every
-  // scene was a curve. It is not fine now: a supply-and-demand diagram
-  // belongs to a conversation about markets, which the extractor labels
-  // "learning" or "analysing" rather than "math" — and withholding the lens
-  // that draws the picture, because of the name on the conversation, would
-  // have made the economics scenes unreachable in exactly the conversations
-  // they exist for.
+  // A scene earns the Plot lens on its own, whatever the work is called: a
+  // supply-and-demand diagram belongs to a conversation about markets, and
+  // withholding the lens that draws it because of the name on the
+  // conversation made the economics scenes unreachable in exactly the
+  // conversations they exist for.
   if (map.viz) out.push('plot');
 
-  // The other two mathematical lenses stay math-only. A solution chain and a
-  // worked Board are about algebra being done step by step; neither has
-  // anything to show for a diagram that is not a calculation.
+  // The step-by-step readings. A solution chain and a worked Board are about
+  // work being DONE — each state of the expression, the move that produced
+  // it, and which steps have been checked. That is the map someone doing
+  // mathematics actually wants, and it is where a verified tick or a flagged
+  // error is legible.
   if (map.context === 'math') {
     const chainNodes = map.nodes.filter((n) => CHAIN_TYPES.has(n.type));
     const chainEdges = map.edges.filter((e) => CHAIN_REL.has(e.relation));
@@ -153,6 +179,14 @@ export function availableLenses(map: ThinkingMap): LensId[] {
     // Without a scene, a plottable node still earns the lens.
     if (!map.viz && plottableNodes(map).length) out.push('plot');
     if (map.nodes.length) out.push('board');
+  }
+
+  // Never nothing. Quantitative work that has produced no chain, no scene and
+  // no board — a question just asked, an economics conversation still in
+  // prose — falls back to the concept view rather than an empty panel.
+  if (!out.length && map.nodes.length) {
+    out.push('graph');
+    if (map.nodes.length > 1) out.push('structure');
   }
   return out;
 }

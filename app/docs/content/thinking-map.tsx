@@ -131,22 +131,46 @@ export function ThinkingMapDoc() {
             <tr><th>Lens</th><th>Reads</th><th>Appears when</th></tr>
           </thead>
           <tbody>
-            <tr><td><strong>Graph</strong></td><td>everything at once — a live force-directed layout that settles as you watch</td><td>the map has any node</td></tr>
-            <tr><td><strong>Structure</strong></td><td>what rests on what, as a layered tree</td><td>more than one node</td></tr>
+            <tr><td><strong>Graph</strong></td><td>everything at once — a live force-directed layout that settles as you watch</td><td>reasoning work, with any node</td></tr>
+            <tr><td><strong>Structure</strong></td><td>what rests on what, as a layered tree</td><td>reasoning work, more than one node</td></tr>
             <tr><td><strong>Tensions</strong></td><td>each conflict as an opposing pair, facing each other</td><td>a conflict, tension or counterpoint exists</td></tr>
             <tr><td><strong>Evidence</strong></td><td>claims in columns with their actual support beneath</td><td>evidence or sources exist</td></tr>
             <tr><td><strong>Solution</strong></td><td>the worked chain, step by step, operations written beside the arrows</td><td>math, with a chain to follow</td></tr>
-            <tr><td><strong>Plot</strong></td><td>the functions on the map, graphed</td><td>math, with something plottable</td></tr>
+            <tr><td><strong>Plot</strong></td><td>the functions and diagrams on the map, drawn and driveable</td><td>a scene exists, or math with something plottable</td></tr>
             <tr><td><strong>Board</strong></td><td>the work laid out by hand — see <Link href="/docs/mathematics">Mathematics</Link></td><td>math, with any node</td></tr>
           </tbody>
         </table>
       </TableWrap>
+      <Callout tag="Quantitative work gets different tabs">
+        <p>
+          Graph and Structure read the <em>shape</em> of an argument — what
+          supports what, what rests on what. That is the right question for a
+          decision or an essay and the wrong one for a calculation, where the
+          shape <em>is</em> the chain of steps. So mathematical and economic
+          work does not offer them: it offers the Solution chain, the Board
+          and the Plot, which draw the work being done rather than the words
+          around it. Contradiction still surfaces, because two results that
+          disagree matter as much in algebra as in an argument.
+        </p>
+        <p>
+          Work that has produced nothing yet — a question just asked — falls
+          back to Graph rather than an empty panel.
+        </p>
+      </Callout>
       <p>
-        Math work leads with the Solution lens automatically — until you pick
-        a lens by hand, after which the choice is yours and stays yours. On
-        the free tier only the map&rsquo;s lead lens is open — Solution for
-        math work, Graph otherwise; the other readings are{' '}
+        A map opens on the reading that <em>is</em> its answer: the Solution
+        chain where there is one, the diagram where a scene exists, otherwise
+        the Graph — until you pick a lens by hand, after which the choice is
+        yours and stays yours. On the free tier that lead lens is the one
+        that is open; the other readings are{' '}
         <Link href="/docs/socria-one">Socria One</Link>&rsquo;s.
+      </p>
+      <p>
+        On the Solution chain and the Board, a step that has been checked
+        carries a mark, and the <strong>first</strong> step that went wrong
+        carries a different one with the specific mistake beside it. Your
+        steps are never replaced by a correct chain — see{' '}
+        <Link href="/docs/mathematics#maps">Mathematics</Link>.
       </p>
       <DemoLenses />
 
