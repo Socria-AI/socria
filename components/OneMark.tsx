@@ -23,6 +23,7 @@
 
 import { useCallback, useState } from 'react';
 import { priceLabel, SOCRIA_ONE } from '@/lib/socria-one';
+import { billingError, billingLine } from '@/lib/billing-message';
 import type { PlanState } from './usePlan';
 
 function Monogram() {
@@ -109,7 +110,7 @@ export function OneCard({ state }: { state: PlanState }) {
         window.location.href = json.url;
         return;
       }
-      setErr(json?.error ?? 'Checkout could not be reached just now.');
+      setErr(billingLine(billingError(json)));
     } catch {
       setErr('Checkout could not be reached just now.');
     }
@@ -127,7 +128,7 @@ export function OneCard({ state }: { state: PlanState }) {
         window.location.href = json.url;
         return;
       }
-      setErr(json?.error ?? 'Billing could not be opened just now.');
+      setErr(billingLine(billingError(json, 'Billing could not be opened just now.')));
     } catch {
       setErr('Billing could not be opened just now.');
     }

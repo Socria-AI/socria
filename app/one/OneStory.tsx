@@ -15,6 +15,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { priceLabel, priceWithPeriod, SOCRIA_ONE } from '@/lib/socria-one';
+import { billingError, billingLine } from '@/lib/billing-message';
 
 // Dust motes on the cover — positions and drift straight from the design.
 const DUST: Array<[string, string, string, string, string, string]> = [
@@ -130,7 +131,7 @@ export function OneStory() {
         window.location.href = json.url;
         return;
       }
-      setErr(json?.error ?? 'Checkout could not be reached just now.');
+      setErr(billingLine(billingError(json)));
     } catch {
       setErr('Checkout could not be reached just now.');
     }

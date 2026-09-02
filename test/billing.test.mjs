@@ -13,6 +13,8 @@
 
 import { entitles, isCompCustomer } from './.tmp/subscriptions.mjs';
 import { entitledBy, LIVE_STATUSES } from './.tmp/entitlement-rule.mjs';
+import { billingError, billingLine } from './.tmp/billing-message.mjs';
+import { stripeFailure, priceIdProblem } from './.tmp/stripe-diagnosis.mjs';
 
 // The account mirror's own check, which is `entitledBy` applied to the shape
 // Clerk holds. Reproduced here rather than imported, because the module it
@@ -117,6 +119,96 @@ console.log('\n=== the rule is written once ===');
   ok('the match is exact', entitledBy('ACTIVE', null) === false);
   ok('and past_due is deliberately live', LIVE_STATUSES.includes('past_due'));
   ok('as is our own comp', LIVE_STATUSES.includes('comp'));
+}
+
+console.log('\n=== a failure says what it was ===');
+{
+  // Nothing key-shaped leaves the process, whatever produced the string.
+  const leak = stripeFailure({
+    type: 'StripeInvalidRequestError',
+    code: 'resource_missing',
+    message: "No such price: 'price_1Abc' with key sk_live_51HxyzABCDEF",
+  });
+  ok('the code comes through', leak.code === 'resource_missing');
+  ok('the price id comes through', /price_1Abc/.test(leak.detail));
+  ok('the secret key does not', !/sk_live_51HxyzABCDEF/.test(leak.detail));
+  ok('and is visibly redacted rather than dropped', /sk_\*\*\*/.test(leak.detail), leak.detail);
+  for (const p of ['sk_live_x1', 'rk_test_y2', 'whsec_z3', 'pk_live_w4']) {
+    const r = stripeFailure({ type: 'StripeInvalidRequestError', message: `saw ${p} here` });
+    ok(`${p.slice(0, 6)} is redacted`, !r.detail.includes(p), r.detail);
+  }
+
+  // Only the classes whose text a person can act on are repeated back.
+  ok('a network failure says nothing quotable',
+    stripeFailure({ type: 'StripeConnectionError', message: 'socket hang up' }).detail === null);
+  ok('but still carries a code',
+    stripeFailure({ type: 'StripeConnectionError', message: 'x' }).code === 'StripeConnectionError');
+  ok('an auth error IS quotable',
+    stripeFailure({ type: 'StripeAuthenticationError', message: 'Invalid API Key' }).detail !== null);
+  ok('something that is not an error at all', stripeFailure(null).code === 'unknown');
+  ok('and does not invent a detail', stripeFailure(null).detail === null);
+  ok('a bare string', stripeFailure('boom').code === 'unknown');
+  ok('the detail is capped', (stripeFailure({
+    type: 'StripeInvalidRequestError',
+    message: 'x'.repeat(5000),
+  }).detail ?? '').length <= 200);
+}
+
+console.log('\n=== the two price-id mistakes are named before Stripe is called ===');
+{
+  const withEnv = (env, fn) => {
+    const before = { ...process.env };
+    Object.assign(process.env, env);
+    try { return fn(); } finally {
+      for (const k of Object.keys(env)) delete process.env[k];
+      Object.assign(process.env, before);
+    }
+  };
+
+  ok('unset is named', /not set/i.test(
+    withEnv({ STRIPE_PRICE_SOCRIA_ONE: '' }, priceIdProblem) ?? ''));
+  // The commonest setup mistake: copying the product id off the dashboard.
+  const prod = withEnv({ STRIPE_PRICE_SOCRIA_ONE: 'prod_ABC' }, priceIdProblem);
+  ok('a product id is named as one', /product id/i.test(prod ?? ''), prod);
+  ok('and says where to find the price', /price_/.test(prod ?? ''));
+  ok('something else entirely is named', /does not look like/i.test(
+    withEnv({ STRIPE_PRICE_SOCRIA_ONE: 'sub_123' }, priceIdProblem) ?? ''));
+  ok('a real price id passes',
+    withEnv({ STRIPE_PRICE_SOCRIA_ONE: 'price_1AbcDEF', STRIPE_SECRET_KEY: 'sk_live_1' }, priceIdProblem) === null);
+
+  // The other one: it worked in testing and fails in production.
+  const mixed = withEnv(
+    { STRIPE_PRICE_SOCRIA_ONE: 'price_1AbcDEF', STRIPE_SECRET_KEY: 'sk_test_1', VERCEL_ENV: 'production' },
+    priceIdProblem
+  );
+  ok('a test key on production is named', /TEST key/.test(mixed ?? ''), mixed);
+  ok('but a test key on preview is fine', withEnv(
+    { STRIPE_PRICE_SOCRIA_ONE: 'price_1AbcDEF', STRIPE_SECRET_KEY: 'sk_test_1', VERCEL_ENV: 'preview' },
+    priceIdProblem
+  ) === null);
+}
+
+console.log('\n=== the reason reaches the person, not just the log ===');
+{
+  const full = billingError({ error: 'Could not start checkout.', code: 'resource_missing', detail: 'No such price.' });
+  ok('the sentence is the server’s', full.message === 'Could not start checkout.');
+  ok('the detail survives', full.detail === 'No such price.');
+  ok('and the line carries it', billingLine(full).includes('No such price.'));
+
+  // A code with no detail is still worth showing: it is searchable, and
+  // "could not start checkout" on its own is not.
+  const coded = billingError({ error: 'Could not start checkout.', code: 'api_key_expired' });
+  ok('a bare code is shown in brackets', billingLine(coded) === 'Could not start checkout. (api_key_expired)');
+
+  const bare = billingError({ error: 'Could not start checkout.' });
+  ok('and nothing is invented when there is nothing', billingLine(bare) === 'Could not start checkout.');
+
+  // The surfaces each keep their own fallback for a response that never came.
+  ok('a dead response falls back', billingError(null).message === 'Checkout could not be reached just now.');
+  ok('a caller’s own fallback wins', billingError(null, 'Billing could not be opened just now.').message
+    === 'Billing could not be opened just now.');
+  ok('junk does not become a message', billingError({ error: 42 }).message === 'Checkout could not be reached just now.');
+  ok('whitespace is not a message', billingError({ error: '   ' }).message === 'Checkout could not be reached just now.');
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

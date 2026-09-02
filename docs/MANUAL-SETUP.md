@@ -271,6 +271,23 @@ Worth doing while you are in the Clerk dashboard:
 
 ## 5. Stripe — two dashboards, and the webhook that is easy to forget
 
+**If checkout is failing, ask before guessing.** Sign in and open
+`/api/stripe/diagnose`. It checks the key, the price (exists, active,
+recurring, and in the same mode as the key), the return URL, the webhook
+secret and the subscriptions table — without creating a customer, opening a
+session, or charging anybody — and names whatever is wrong. The checkout route
+itself also returns a `code` and, for configuration errors, a `detail`, both
+of which are now shown in the UI rather than only written to a log.
+
+The two mistakes that account for most of it, and which Stripe reports
+identically as a missing price:
+
+- `STRIPE_PRICE_SOCRIA_ONE` set to the **product** id (`prod_…`) instead of
+  the **price** id (`price_…`) found inside that product.
+- A **test** key with a **live** price, or the reverse. Test and live are
+  separate worlds: neither key can see the other's prices.
+
+
 Stripe's test and live modes are separate worlds with separate everything.
 Whatever exists in one does not exist in the other.
 

@@ -55,6 +55,7 @@ import {
 } from '@/lib/logos-personality';
 import { lastCoreModel, rememberModel } from '@/lib/socria-model-store';
 import { buildStarters, PENDING_TYPES } from '@/lib/starters';
+import { billingError, billingLine } from '@/lib/billing-message';
 import { PersonalityDial } from '@/components/PersonalityDial';
 import { ContextPanel } from '@/components/ContextPanel';
 import { ConnectionsModal } from '@/components/ConnectionsModal';
@@ -783,8 +784,12 @@ export function LogosApp({
         return true;
       }
       setOneError(
-        json?.error ??
-          'Could not start checkout. If this deployment has no billing configured, an access code still works.'
+        billingLine(
+          billingError(
+            json,
+            'Could not start checkout. If this deployment has no billing configured, an access code still works.'
+          )
+        )
       );
     } catch {
       setOneError('Could not reach checkout.');

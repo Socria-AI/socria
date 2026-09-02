@@ -33,6 +33,8 @@ const MODULES = [
   'lib/starters.ts',
   'lib/subscriptions.ts',
   'lib/entitlement-rule.ts',
+  'lib/billing-message.ts',
+  'lib/stripe-diagnosis.ts',
 ];
 
 export async function buildAll() {

@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth, currentUser } from '@clerk/nextjs/server';
 import { stripe, stripeConfigured, onePriceId, siteUrl } from '@/lib/stripe';
+import { priceIdProblem, stripeFailure } from '@/lib/stripe-diagnosis';
 import { getSubscription, isCompCustomer, tryUpsertSubscription } from '@/lib/subscriptions';
 import { enforceRateLimit } from '@/lib/rate-limit';
 
@@ -26,6 +27,18 @@ export async function POST(req: NextRequest) {
   if (!stripeConfigured()) {
     return NextResponse.json(
       { error: 'Billing is not configured on this deployment.' },
+      { status: 503 }
+    );
+  }
+
+  // Named before Stripe is called, because Stripe reports both of these as a
+  // missing price, which reads as though the price were deleted rather than
+  // as the setup mistake it is.
+  const misconfigured = priceIdProblem();
+  if (misconfigured) {
+    console.error('stripe checkout: misconfigured —', misconfigured);
+    return NextResponse.json(
+      { error: 'Billing is not configured correctly.', code: 'price_config', detail: misconfigured },
       { status: 503 }
     );
   }
@@ -60,8 +73,14 @@ export async function POST(req: NextRequest) {
     }
 
     if (!customerId) {
-      const user = await currentUser();
-      const email = user?.emailAddresses?.[0]?.emailAddress;
+      // The email is a convenience on the Stripe customer, not a requirement.
+      // Clerk being slow or unreachable is not a reason nobody can subscribe.
+      let email: string | undefined;
+      try {
+        email = (await currentUser())?.emailAddresses?.[0]?.emailAddress;
+      } catch (e) {
+        console.warn('stripe checkout: could not read the email', e);
+      }
       const customer = await s.customers.create({
         email,
         metadata: { clerkUserId: userId },
@@ -99,11 +118,23 @@ export async function POST(req: NextRequest) {
     });
 
     if (!session.url) {
-      return NextResponse.json({ error: 'Could not start checkout.' }, { status: 502 });
+      return NextResponse.json(
+        { error: 'Could not start checkout.', code: 'no_session_url' },
+        { status: 502 }
+      );
     }
     return NextResponse.json({ url: session.url });
   } catch (e) {
-    console.error('stripe checkout error:', e);
-    return NextResponse.json({ error: 'Could not start checkout.' }, { status: 500 });
+    // Say what happened. Every failure in here used to report the same eleven
+    // words, which meant the only way to find out why checkout was refusing
+    // people was to read server logs the person seeing the error cannot
+    // reach — so the same message covered a missing price, a test key on a
+    // live deployment, and Stripe being down.
+    const { code, detail } = stripeFailure(e);
+    console.error('stripe checkout error:', code, detail, e);
+    return NextResponse.json(
+      { error: 'Could not start checkout.', code, ...(detail ? { detail } : {}) },
+      { status: 500 }
+    );
   }
 }
