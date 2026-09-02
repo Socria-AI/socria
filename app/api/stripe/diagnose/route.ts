@@ -16,7 +16,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { stripe, stripeConfigured, siteUrl } from '@/lib/stripe';
+import { stripe, stripeConfigured, siteUrl, usableCustomer } from '@/lib/stripe';
 import { priceIdProblem, stripeFailure } from '@/lib/stripe-diagnosis';
 import { getSubscription } from '@/lib/subscriptions';
 import { enforceRateLimit } from '@/lib/rate-limit';
@@ -103,6 +103,29 @@ export async function GET(req: NextRequest) {
       false,
       `${code}${detail ? ` — ${detail}` : ''}. A price that exists in the other mode reads exactly like this: test keys cannot see live prices, and live keys cannot see test ones.`
     );
+  }
+
+  // ── the customer we have on file for whoever is asking ───────────
+  // The failure that reads as "No such customer" at checkout. An id written
+  // by a test key is invisible to a live one, and the row keeps naming it.
+  try {
+    const mine = await getSubscription(userId);
+    if (!mine?.customerId) {
+      add('Your stored customer', true, 'None on file — one will be created at checkout.');
+    } else if (mine.customerId.startsWith('comp_')) {
+      add('Your stored customer', true, 'A complimentary grant, with no Stripe customer behind it.');
+    } else {
+      const live = await usableCustomer(mine.customerId);
+      add(
+        'Your stored customer',
+        !!live,
+        live
+          ? `${mine.customerId} — visible to this key.`
+          : `${mine.customerId} is NOT visible to this key. It was created in the other mode (test vs live) or has been deleted. Checkout replaces it automatically now; before that it produced "No such customer".`
+      );
+    }
+  } catch {
+    add('Your stored customer', true, 'Could not be read — the table is unreachable, which is reported below.');
   }
 
   // ── our own record ───────────────────────────────────────────────

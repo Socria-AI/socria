@@ -7,7 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { stripe, stripeConfigured, siteUrl } from '@/lib/stripe';
+import { stripe, stripeConfigured, siteUrl, usableCustomer } from '@/lib/stripe';
 import { getSubscription, isCompCustomer } from '@/lib/subscriptions';
 import { enforceRateLimit } from '@/lib/rate-limit';
 
@@ -25,8 +25,12 @@ export async function POST(req: NextRequest) {
   }
 
   const sub = await getSubscription(userId);
+  // Checked, not trusted — same reason as checkout: an id from the other mode
+  // or a deleted customer would send somebody trying to CANCEL into an error.
   let customerId =
-    sub?.customerId && !isCompCustomer(sub.customerId) ? sub.customerId : null;
+    sub?.customerId && !isCompCustomer(sub.customerId)
+      ? await usableCustomer(sub.customerId)
+      : null;
 
   // Our table had nothing to go on. Ask Stripe directly before telling
   // somebody there is nothing to manage: if the subscriptions table is

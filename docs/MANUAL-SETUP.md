@@ -287,6 +287,15 @@ identically as a missing price:
 - A **test** key with a **live** price, or the reverse. Test and live are
   separate worlds: neither key can see the other's prices.
 
+The same split bites a second time, and it is the one that actually happened:
+**`No such customer: 'cus_…'`**. A customer created under a test key is
+invisible to a live one, and the `socria_subscriptions` row goes on naming it
+after the deployment goes live. A customer deleted in the dashboard reads
+identically. Nothing needs doing about it now — checkout and the billing
+portal both check a stored id before using it and replace a dead one, and
+checkout retries once if the customer dies mid-flight — but if you see it
+anywhere else, that is what it means.
+
 
 Stripe's test and live modes are separate worlds with separate everything.
 Whatever exists in one does not exist in the other.

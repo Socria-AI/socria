@@ -14,7 +14,9 @@
 import { entitles, isCompCustomer } from './.tmp/subscriptions.mjs';
 import { entitledBy, LIVE_STATUSES } from './.tmp/entitlement-rule.mjs';
 import { billingError, billingLine } from './.tmp/billing-message.mjs';
-import { stripeFailure, priceIdProblem } from './.tmp/stripe-diagnosis.mjs';
+import {
+  stripeFailure, priceIdProblem, isMissingResource, isMissingCustomer,
+} from './.tmp/stripe-diagnosis.mjs';
 
 // The account mirror's own check, which is `entitledBy` applied to the shape
 // Clerk holds. Reproduced here rather than imported, because the module it
@@ -209,6 +211,48 @@ console.log('\n=== the reason reaches the person, not just the log ===');
     === 'Billing could not be opened just now.');
   ok('junk does not become a message', billingError({ error: 42 }).message === 'Checkout could not be reached just now.');
   ok('whitespace is not a message', billingError({ error: '   ' }).message === 'Checkout could not be reached just now.');
+}
+
+console.log('\n=== a dead customer id is recognised, not passed on ===');
+{
+  // The real one, as Stripe sent it: a customer created under a test key,
+  // handed to a live one. Same shape as a customer deleted in the dashboard.
+  const real = {
+    type: 'StripeInvalidRequestError',
+    code: 'resource_missing',
+    param: 'customer',
+    raw: { code: 'resource_missing', message: "No such customer: 'cus_V9R2dCzyrn4TZr'", param: 'customer' },
+    message: "No such customer: 'cus_V9R2dCzyrn4TZr'",
+  };
+  ok('it is a missing resource', isMissingResource(real) === true);
+  ok('and specifically a missing customer', isMissingCustomer(real) === true);
+
+  // Recognised by the message alone, for a client that does not set `code`.
+  ok('by message alone', isMissingResource({ message: "No such customer: 'cus_x'" }) === true);
+  ok('case does not matter', isMissingResource({ message: 'no such customer: cus_x' }) === true);
+  ok('leading space does not matter', isMissingResource({ message: '  No such price: p' }) === true);
+
+  // A MISSING PRICE is a missing resource but not a missing customer — the
+  // retry path must not fire for it, or a misconfigured price would quietly
+  // create a spare customer on every attempt.
+  const price = {
+    code: 'resource_missing',
+    param: 'line_items[0][price]',
+    raw: { code: 'resource_missing', message: "No such price: 'price_x'", param: 'line_items[0][price]' },
+  };
+  ok('a missing price is a missing resource', isMissingResource(price) === true);
+  ok('but is NOT treated as a missing customer', isMissingCustomer(price) === false);
+
+  // Everything else must not look like one.
+  ok('a card decline is not', isMissingResource({ code: 'card_declined', message: 'Your card was declined.' }) === false);
+  ok('a rate limit is not', isMissingResource({ code: 'rate_limit', message: 'Too many requests' }) === false);
+  ok('a network error is not', isMissingResource({ type: 'StripeConnectionError', message: 'socket hang up' }) === false);
+  ok('nothing is not', isMissingResource(null) === false);
+  ok('a bare string is not', isMissingResource('No such customer') === false);
+  ok('prose that merely mentions one is not',
+    isMissingResource({ message: 'We found no such customer problems today' }) === false);
+  ok('and a missing customer needs a missing resource first',
+    isMissingCustomer({ code: 'card_declined', message: 'customer declined' }) === false);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

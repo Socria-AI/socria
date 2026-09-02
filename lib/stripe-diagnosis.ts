@@ -72,3 +72,28 @@ export function priceIdProblem(): string | null {
   }
   return null;
 }
+
+/**
+ * Is this Stripe saying "that object is not here"?
+ *
+ * The case it exists for: a customer id we have on file that the current key
+ * cannot see. Test and live are separate worlds with separate customers, so a
+ * `cus_…` created while testing is invisible to a live key and vice versa —
+ * and a customer deleted in the dashboard reads exactly the same way. Either
+ * way the id is dead, and the only sane response is to stop using it rather
+ * than to refuse the sale.
+ */
+export function isMissingResource(e: unknown): boolean {
+  const err = e as { code?: string; statusCode?: number; raw?: { code?: string; message?: string }; message?: string };
+  if (err?.code === 'resource_missing' || err?.raw?.code === 'resource_missing') return true;
+  const msg = err?.raw?.message ?? err?.message ?? '';
+  return typeof msg === 'string' && /^no such /i.test(msg.trim());
+}
+
+/** Specifically a customer we can no longer use. */
+export function isMissingCustomer(e: unknown): boolean {
+  if (!isMissingResource(e)) return false;
+  const err = e as { raw?: { message?: string; param?: string }; message?: string; param?: string };
+  const where = `${err?.param ?? err?.raw?.param ?? ''} ${err?.raw?.message ?? err?.message ?? ''}`;
+  return /customer/i.test(where);
+}

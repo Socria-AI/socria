@@ -6,8 +6,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { auth, currentUser } from '@clerk/nextjs/server';
-import { stripe, stripeConfigured, onePriceId, siteUrl } from '@/lib/stripe';
-import { priceIdProblem, stripeFailure } from '@/lib/stripe-diagnosis';
+import { stripe, stripeConfigured, onePriceId, siteUrl, usableCustomer } from '@/lib/stripe';
+import { isMissingCustomer, priceIdProblem, stripeFailure } from '@/lib/stripe-diagnosis';
 import { getSubscription, isCompCustomer, tryUpsertSubscription } from '@/lib/subscriptions';
 import { enforceRateLimit } from '@/lib/rate-limit';
 
@@ -51,8 +51,17 @@ export async function POST(req: NextRequest) {
     // create a second customer record with the same person behind it. A comp
     // row's sentinel id is NOT a Stripe customer — someone comp'd who chooses
     // to pay gets a real customer created here, replacing the sentinel.
-    let customerId =
-      existing && !isCompCustomer(existing.customerId) ? existing.customerId : undefined;
+    //
+    // And check it still exists. A stored id can outlive the customer it
+    // names: test and live keys cannot see each other's customers, so an id
+    // written while testing is dead the moment the deployment goes live, and
+    // one deleted in the dashboard is dead immediately. Both surface as "No
+    // such customer" from Checkout — after the sale has already failed, over
+    // a row that was only ever a shortcut.
+    let customerId: string | undefined =
+      existing && !isCompCustomer(existing.customerId)
+        ? (await usableCustomer(existing.customerId)) ?? undefined
+        : undefined;
 
     // Our own table had nothing. Ask Stripe before making a new customer:
     // when the table is unreachable this is the ONLY thing standing between a
@@ -103,19 +112,38 @@ export async function POST(req: NextRequest) {
     await tryUpsertSubscription({ userId, customerId, status: 'incomplete' });
 
     const base = siteUrl(req);
-    const session = await s.checkout.sessions.create({
-      mode: 'subscription',
-      customer: customerId,
-      line_items: [{ price: onePriceId(), quantity: 1 }],
-      // Both sides carry the user id: the session for checkout.session.completed,
-      // the subscription for every later lifecycle event.
-      client_reference_id: userId,
-      metadata: { clerkUserId: userId },
-      subscription_data: { metadata: { clerkUserId: userId } },
-      allow_promotion_codes: true,
-      success_url: `${base}/chat?one=welcome&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${base}/chat?one=cancelled`,
-    });
+    const open = (customer: string) =>
+      s.checkout.sessions.create({
+        mode: 'subscription',
+        customer,
+        line_items: [{ price: onePriceId(), quantity: 1 }],
+        // Both sides carry the user id: the session for
+        // checkout.session.completed, the subscription for every later
+        // lifecycle event.
+        client_reference_id: userId,
+        metadata: { clerkUserId: userId },
+        subscription_data: { metadata: { clerkUserId: userId } },
+        allow_promotion_codes: true,
+        success_url: `${base}/chat?one=welcome&session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${base}/chat?one=cancelled`,
+      });
+
+    let session;
+    try {
+      session = await open(customerId);
+    } catch (e) {
+      // Last line of defence for a customer that died between being checked
+      // and being used — or that came back from a search index still holding
+      // one that has since gone. One retry with a customer we have just
+      // created ourselves, and no further: a second failure is not about the
+      // customer.
+      if (!isMissingCustomer(e)) throw e;
+      console.warn('stripe checkout: customer vanished mid-flight, making another');
+      const fresh = await s.customers.create({ metadata: { clerkUserId: userId } });
+      customerId = fresh.id;
+      await tryUpsertSubscription({ userId, customerId, status: 'incomplete' });
+      session = await open(customerId);
+    }
 
     if (!session.url) {
       return NextResponse.json(
