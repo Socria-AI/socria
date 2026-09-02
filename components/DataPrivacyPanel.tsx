@@ -51,7 +51,7 @@ export function DataPrivacyPanel() {
       if (!res.ok) throw new Error(json?.error || 'failed');
       setNote('Memory cleared. Socria starts fresh from here; your conversations are untouched.');
     } catch {
-      setErr('Could not clear memory just now.');
+      setErr('Could not clear memory. Try again.');
     }
     setBusy(null);
   }
@@ -82,7 +82,7 @@ export function DataPrivacyPanel() {
       <section className="dp-explain">
         <h2>What Socria remembers</h2>
         <p>
-          Two different things, and it is worth knowing which is which.
+          Two different things, kept separately and deleted separately.
         </p>
         <dl>
           <div>

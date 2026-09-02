@@ -1679,25 +1679,29 @@ export const THINKING_DEPTHS: Array<{
   label: string;
   description: string;
 }> = [
+  // These are options in a menu, and a menu says what each one does. They
+  // used to be four clipped noun-phrase pairs — "Rigorous, pattern-spotting.
+  // Precise distinctions." — which is a nice line and does not tell anyone
+  // when to pick it over the one above.
   {
     id: 'quick',
     label: 'Quick',
-    description: 'Plain, conversational. Immediate clarity.',
+    description: 'Short, plain answers. Good when you already know what you want.',
   },
   {
     id: 'balanced',
     label: 'Balanced',
-    description: 'Thoughtful, considered. Mentor voice. Default.',
+    description: 'The default. Asks a question or two before it gets anywhere.',
   },
   {
     id: 'deep',
     label: 'Deep',
-    description: 'Rigorous, pattern-spotting. Precise distinctions.',
+    description: 'Slower. Presses on assumptions and points out where things conflict.',
   },
   {
     id: 'abstract',
     label: 'Abstract',
-    description: 'Philosophically literate. Values and meaning.',
+    description: 'Steps back to values, definitions and first principles.',
   },
 ];
 

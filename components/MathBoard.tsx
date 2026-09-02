@@ -67,7 +67,7 @@ export function MathBoard({
         <span className="lg-map-empty-mark" aria-hidden="true">
           <LogosMark size={46} />
         </span>
-        <p className="lg-board-empty">The board is clear. Start working.</p>
+        <p className="lg-board-empty">Nothing on the board yet.</p>
       </div>
     );
   }

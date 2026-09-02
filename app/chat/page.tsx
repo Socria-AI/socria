@@ -1493,8 +1493,8 @@ export default function ChatPage() {
                   What would you like to think through?
                 </h2>
                 <p className="mt-3 text-ink/60 font-serif italic">
-                  Bring a question, a draft, or a decision. Socria will ask,
-                  not answer for you.
+                  A question, a draft, or a decision — whatever you&rsquo;re
+                  working through.
                 </p>
 
                 <div className="mt-10 grid sm:grid-cols-2 gap-3 text-left">
@@ -1663,7 +1663,7 @@ export default function ChatPage() {
                 header. Both menus open upward; they sit at the screen's edge. */}
             <div className="mt-2 flex items-center justify-between gap-3">
               <p className="hidden sm:block text-[11px] text-ink/40 font-serif italic min-w-0 truncate">
-                Socria asks. You think. Enter to send, Shift+Enter for a new line.
+                Enter to send, Shift+Enter for a new line.
               </p>
               <div className="flex items-center gap-2 shrink-0 ml-auto">
                 {SOCRIA_MODELS[model].supportsDepth && (

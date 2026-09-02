@@ -14,7 +14,10 @@
 //
 // Three sizes, one voice:
 //
-//   foot   the sidebar's last item: monogram, name, price.
+//   foot   the sidebar's last item: monogram, name, what it opens, price.
+//          The subtitle says what you get rather than what it is like —
+//          "the whole instrument" was a line, and a line in a sidebar row is
+//          a line nobody asked for.
 //   strip  the line under the model menu: "Logos in full is Socria One".
 //   card   the account page's plan block, with the action on it.
 //
@@ -65,7 +68,7 @@ export function OneFoot({ state }: { state: PlanState }) {
         <span className="one-mark-name">
           Socria <em>One</em>
         </span>
-        <span className="one-mark-sub">the whole instrument</span>
+        <span className="one-mark-sub">Unlimited maps, research and depth</span>
       </span>
       <Price />
     </a>
@@ -112,7 +115,7 @@ export function OneCard({ state }: { state: PlanState }) {
       }
       setErr(billingLine(billingError(json)));
     } catch {
-      setErr('Checkout could not be reached just now.');
+      setErr('Could not reach checkout. Try again.');
     }
     setBusy(null);
   }, [busy]);
@@ -128,9 +131,9 @@ export function OneCard({ state }: { state: PlanState }) {
         window.location.href = json.url;
         return;
       }
-      setErr(billingLine(billingError(json, 'Billing could not be opened just now.')));
+      setErr(billingLine(billingError(json, 'Could not open billing. Try again.')));
     } catch {
-      setErr('Billing could not be opened just now.');
+      setErr('Could not open billing. Try again.');
     }
     setBusy(null);
   }, [busy]);

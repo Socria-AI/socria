@@ -32,7 +32,7 @@ export default function DataPrivacyPage() {
         </nav>
         <h1>Data &amp; Privacy</h1>
         <p className="dp-lead">
-          What Socria holds for you, and everything you can do about it.
+          Export or delete your data, and see what Socria keeps.
         </p>
         <DataPrivacyPanel />
       </div>

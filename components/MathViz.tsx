@@ -543,7 +543,7 @@ export function MathViz({
         <span className="lg-map-empty-mark" aria-hidden="true">
           <LogosMark size={46} />
         </span>
-        <p>Nothing to draw here yet.</p>
+        <p>No diagram for this yet.</p>
       </div>
     );
   }

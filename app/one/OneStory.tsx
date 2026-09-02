@@ -133,7 +133,7 @@ export function OneStory() {
       }
       setErr(billingLine(billingError(json)));
     } catch {
-      setErr('Checkout could not be reached just now.');
+      setErr('Could not reach checkout. Try again.');
     }
     setBusy(false);
   }, [busy, member]);

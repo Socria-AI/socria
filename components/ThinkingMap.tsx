@@ -554,7 +554,7 @@ export function ThinkingMap({
             <span className="lg-map-empty-mark" aria-hidden="true">
               <LogosMark size={46} />
             </span>
-            <p>Your reasoning will take shape here.</p>
+            <p>The map builds as you talk.</p>
           </div>
         )}
 

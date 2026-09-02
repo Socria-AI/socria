@@ -22,7 +22,7 @@ export interface BillingError {
   detail?: string;
 }
 
-const FALLBACK = 'Checkout could not be reached just now.';
+const FALLBACK = 'Could not reach checkout. Try again.';
 
 /** Read a failed billing response into something sayable. */
 export function billingError(body: unknown, fallback = FALLBACK): BillingError {

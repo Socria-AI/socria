@@ -132,9 +132,15 @@ const CONNECTORS_ON = process.env.NEXT_PUBLIC_SOCRIA_CONNECTORS === 'on';
 
 // Shown to someone with no lines of thinking yet; afterwards they top up the
 // ones drawn from what they have actually been working through.
+// Written to look like something a person would actually type into an empty
+// box: direct, a bit under-specified, no shape to them. The set they replace
+// was three well-made sentences — one of which invited you to deliberate
+// about whether to build the product you were sitting inside — and a
+// placeholder that reads better than real input is a placeholder nobody
+// believes.
 const STARTERS = [
-  'I’m debating whether to build Logos now.',
-  'I can’t tell if I want this career or just the idea of it.',
+  'I have two job offers and I keep going back and forth.',
+  'Help me work out if this idea is any good.',
   'We keep shipping features but retention is flat.',
 ];
 
@@ -1566,8 +1572,8 @@ export function LogosApp({
               </span>
               <h1>A reasoning environment.</h1>
               <p>
-                You think out loud, and the shape of your reasoning is drawn
-                beside you as you talk.
+                A split screen: you talk on the left, and a map of your
+                reasoning is drawn on the right. Sign in to open it.
               </p>
               {/* Logos is open to anyone with an account, so signing in is the
                   way in and leads. The access key stays for people without one
@@ -1857,8 +1863,8 @@ export function LogosApp({
               <div className="lg-intro">
                 <h1>Think out loud.</h1>
                 <p>
-                  Logos won’t hand you an answer. It listens, asks, and draws
-                  the shape of your reasoning beside you as you talk.
+                  Type what you’re working through. Logos asks questions back,
+                  and draws the shape of your reasoning on the right as you go.
                 </p>
                 <div className="lg-starters">
                   {logosStarters.map((s) => (

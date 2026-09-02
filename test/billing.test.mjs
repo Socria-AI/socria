@@ -206,11 +206,12 @@ console.log('\n=== the reason reaches the person, not just the log ===');
   ok('and nothing is invented when there is nothing', billingLine(bare) === 'Could not start checkout.');
 
   // The surfaces each keep their own fallback for a response that never came.
-  ok('a dead response falls back', billingError(null).message === 'Checkout could not be reached just now.');
-  ok('a caller’s own fallback wins', billingError(null, 'Billing could not be opened just now.').message
-    === 'Billing could not be opened just now.');
-  ok('junk does not become a message', billingError({ error: 42 }).message === 'Checkout could not be reached just now.');
-  ok('whitespace is not a message', billingError({ error: '   ' }).message === 'Checkout could not be reached just now.');
+  const FALLBACK = 'Could not reach checkout. Try again.';
+  ok('a dead response falls back', billingError(null).message === FALLBACK);
+  ok('a caller’s own fallback wins', billingError(null, 'Could not open billing. Try again.').message
+    === 'Could not open billing. Try again.');
+  ok('junk does not become a message', billingError({ error: 42 }).message === FALLBACK);
+  ok('whitespace is not a message', billingError({ error: '   ' }).message === FALLBACK);
 }
 
 console.log('\n=== a dead customer id is recognised, not passed on ===');
