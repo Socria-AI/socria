@@ -118,6 +118,11 @@ export async function POST(req: NextRequest) {
     const draft = sanitizeUserUnderstanding({
       narrative: parsed.narrative,
       openThreads: parsed?.openThreads,
+      // A full replacement, deliberately: these are proposals about what is
+      // pending NOW, and a stale one is worse than none. If this pass has
+      // nothing to suggest, the chips fall back to the written openings
+      // rather than offering a question the person has already answered.
+      nextQuestions: parsed?.nextQuestions,
       timeline: current.timeline,
       updatedAt: now,
     });

@@ -444,12 +444,12 @@ export default async function Home() {
         </section>
 
         {/* IX · FURTHER READING — real Sanity posts */}
-        <section className="spread reading short" id="journal" data-folio="IX" data-screen-label="Further Reading">
+        <section className="spread reading short" id="reading" data-folio="IX" data-screen-label="Further Reading">
           <div className="wrap">
             <div className="rd-head">
               <div>
                 <span className="label">IX · Further Reading</span>
-                <h2>From the Socria journal.</h2>
+                <h2>From the blog.</h2>
               </div>
               <Link href="/blog">All writing →</Link>
             </div>
@@ -477,13 +477,13 @@ export default async function Home() {
                   <img src="/socria-logo.png" alt="" />
                 </div>
                 <div>
-                  <span className="tag">The Socria Journal</span>
+                  <span className="tag">Socria Blog</span>
                   <h3>Notes on thinking, coming soon.</h3>
                   <p>
                     Essays on reasoning, metacognition, and building an AI that
                     strengthens human judgment instead of replacing it.
                   </p>
-                  <span className="more">Visit the journal →</span>
+                  <span className="more">Visit the blog →</span>
                 </div>
               </Link>
             )}

@@ -16,7 +16,7 @@ export default function NotFound() {
           <div className="nav-right">
             <nav className="nav-links">
               <Link href="/#core3">What&rsquo;s new</Link>
-              <Link href="/blog">Journal</Link>
+              <Link href="/blog">Blog</Link>
               <Link href="/chat">Try Socria</Link>
             </nav>
             <SignedOut>
@@ -95,7 +95,7 @@ export default function NotFound() {
             </Link>
             <Link className="nf-path" href="/blog">
               <span className="pn">02</span>
-              <span className="pt">The Journal</span>
+              <span className="pt">The blog</span>
               <span className="pa" aria-hidden="true">
                 →
               </span>

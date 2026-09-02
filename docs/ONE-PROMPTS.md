@@ -232,9 +232,18 @@ cannot.
 | Logos free-tier meter | the counts, then a cream-on-blue *Socria One* | free only |
 | /account | the plan block: what you hold, checkout or billing | everyone signed in |
 
-All of it is `components/OneMark.tsx`, drawn in the /one cover's own palette
+All of it is `components/OneMark.tsx`, drawn from the /one cover's own palette
 (`--one-*` tokens on `:root` in `app/globals.css`, which the prompt sheet
-now reads too). Each waits for `usePlan().known` before rendering.
+reads too).
+
+**How much of the cover each size keeps.** The card is page-sized and keeps the
+whole plate — gradient, inner rule, paper grain. The foot and the strip live
+inside a cream sidebar and a white menu, and drawing the full plate there put a
+dark slab in a light room: it read as an advert rather than as furniture. Those
+two are now built like every other row on those surfaces — paper, a hairline,
+the product's type — and what carries Socria One at that size is the monogram,
+the roman numeral in its gradient disc. It is the piece of the cover that
+survives being made small, and it is on every size without exception. Each waits for `usePlan().known` before rendering.
 
 What `known` takes depends on who is asking. A **signed-in** visitor waits for
 the server, because an account can hold One through Stripe, a grant or a

@@ -23,7 +23,7 @@ export function BlogNav() {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  const onJournal = pathname?.startsWith('/blog');
+  const onBlog = pathname?.startsWith('/blog');
 
   return (
     <header className={`nav blognav${scrolled ? ' scrolled' : ''}`}>
@@ -35,8 +35,8 @@ export function BlogNav() {
         <div className="nav-right">
           <nav className="nav-links">
             <Link href="/#logos">What&rsquo;s new</Link>
-            <Link href="/blog" className={onJournal ? 'cur' : undefined}>
-              Journal
+            <Link href="/blog" className={onBlog ? 'cur' : undefined}>
+              Blog
             </Link>
           </nav>
           <ClerkLoading>
@@ -124,7 +124,7 @@ export function BlogFooter() {
         </div>
         <div className="foot-links">
           <Link href="/#logos">What&rsquo;s new: Logos</Link>
-          <Link href="/blog">Journal</Link>
+          <Link href="/blog">Blog</Link>
           <Link href="/docs">Docs</Link>
           <Link href="/chat">Try Socria</Link>
           <Link href="/privacy">Privacy</Link>

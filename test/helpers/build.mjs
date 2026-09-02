@@ -30,6 +30,7 @@ const MODULES = [
   'lib/analytics.ts',
   'lib/tex-split.ts',
   'lib/logos-econ.ts',
+  'lib/starters.ts',
 ];
 
 export async function buildAll() {

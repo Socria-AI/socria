@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 
 // Ports blog.js (word-rise + intersection reveals + progress bar) to a
-// client component scoped to the journal pages. Cleans up listeners and
+// client component scoped to the blog pages. Cleans up listeners and
 // IntersectionObserver on unmount.
 export function BlogMotion() {
   useEffect(() => {

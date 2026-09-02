@@ -54,7 +54,7 @@ export default function AccountPage() {
             Chat
           </Link>
           <Link href="/blog" className="hover:text-ink transition-colors">
-            Journal
+            Blog
           </Link>
         </div>
       </header>

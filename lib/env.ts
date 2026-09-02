@@ -113,7 +113,7 @@ export const ENV_SPEC: Spec[] = [
   {
     name: 'NEXT_PUBLIC_SANITY_PROJECT_ID',
     scope: 'public',
-    needed: 'the journal',
+    needed: 'the blog',
     required: 'optional',
   },
   {

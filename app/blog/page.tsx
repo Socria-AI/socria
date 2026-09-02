@@ -17,7 +17,7 @@ import {
 export const revalidate = 60;
 
 export const metadata: Metadata = {
-  title: 'The Socria Journal — Notes on thinking clearly',
+  title: 'Blog — Notes on thinking clearly',
   description:
     'Essays on reasoning, metacognition, and human-first AI. Think for yourself.',
 };
@@ -58,7 +58,7 @@ export default async function BlogIndex() {
             <div className="kicker">
               <span className="eyebrow reveal">
                 <span className="tick" />
-                The Socria Journal
+                Blog
               </span>
               <span
                 className="dim reveal"

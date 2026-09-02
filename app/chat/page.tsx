@@ -569,6 +569,11 @@ export default function ChatPage() {
   // openings, which stay to top the list up and to keep one way in to
   // something new.
   const starters = buildStarters({
+    // What the journey extractor thinks this person would want to ask next,
+    // from what they have actually been working through. Everything below is
+    // a fallback for when it has nothing — a new account, an everyday chat,
+    // or a model call that has not happened yet.
+    suggestions: journey?.nextQuestions,
     threads: journey?.openThreads,
     recent: conversations.map((c) => ({ title: c.title, updatedAt: c.updatedAt })),
     fallback: STARTER_PROMPTS,
@@ -1495,12 +1500,13 @@ export default function ChatPage() {
                 <div className="mt-10 grid sm:grid-cols-2 gap-3 text-left">
                   {starters.map((p) => (
                     <button
-                      key={p}
-                      onClick={() => send(p)}
+                      key={p.prompt}
+                      onClick={() => send(p.prompt)}
+                      title={p.prompt !== p.label ? p.prompt : undefined}
                       disabled={sending}
                       className="p-4 rounded-xl border border-border bg-paper hover:border-moss-600 hover:bg-moss-50/40 transition-all text-[14px] text-ink/80 text-left"
                     >
-                      {p}
+                      {p.label}
                     </button>
                   ))}
                 </div>

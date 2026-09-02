@@ -54,7 +54,7 @@ import {
   type Personality,
 } from '@/lib/logos-personality';
 import { lastCoreModel, rememberModel } from '@/lib/socria-model-store';
-import { buildStarters } from '@/lib/starters';
+import { buildStarters, PENDING_TYPES } from '@/lib/starters';
 import { PersonalityDial } from '@/components/PersonalityDial';
 import { ContextPanel } from '@/components/ContextPanel';
 import { ConnectionsModal } from '@/components/ConnectionsModal';
@@ -468,8 +468,22 @@ export function LogosApp({
   // to offer a way back into one; the written openings top the list up. The
   // active (empty) session is skipped — offering a way back into the screen
   // you are already looking at is no offer at all.
+  // A map's own unfinished business is the best thing this surface knows: an
+  // open question, a tension nobody resolved, an assumption never tested. It
+  // is exact, it costs nothing, and it exists the moment a map does — which
+  // is the whole reason a Logos screen should not be offering "More on" a
+  // conversation's first sentence instead.
+  const pendingFromMaps = sessions
+    .filter((s) => s.id !== activeId)
+    .flatMap((s) =>
+      (s.map?.nodes ?? [])
+        .filter((n) => PENDING_TYPES.includes(n.type))
+        .map((n) => ({ label: n.label, type: n.type, updatedAt: s.updatedAt }))
+    );
+
   const logosStarters = buildStarters(
     {
+      pending: pendingFromMaps,
       recent: sessions
         .filter((s) => s.id !== activeId && s.messages.length > 0)
         .map((s) => ({ title: s.title, updatedAt: s.updatedAt })),
@@ -1843,8 +1857,13 @@ export function LogosApp({
                 </p>
                 <div className="lg-starters">
                   {logosStarters.map((s) => (
-                    <button key={s} type="button" onClick={() => send(s)}>
-                      {s}
+                    <button
+                      key={s.prompt}
+                      type="button"
+                      onClick={() => send(s.prompt)}
+                      title={s.prompt !== s.label ? s.prompt : undefined}
+                    >
+                      {s.label}
                     </button>
                   ))}
                 </div>

@@ -1449,6 +1449,18 @@ export interface UserUnderstanding {
   narrative: string[]; // evolving understanding, max ~5 lines
   openThreads: JourneyThread[]; // max 4
   timeline: JourneyEvent[]; // meaningful moments only, oldest first
+  /**
+   * What this person would plausibly want to ask NEXT, in their own voice,
+   * ready to send as written. Max 3.
+   *
+   * The empty screen's chips used to be built from titles alone, which meant
+   * they could only ever point backward at what had already been asked. This
+   * is the one part of the journey that looks forward, and it is the only
+   * thing here that exists for the interface rather than for the model —
+   * renderJourneyBrief deliberately leaves it out, because a suggestion fed
+   * back into the conversation would be Socria taking its own advice.
+   */
+  nextQuestions: string[];
   updatedAt: number;
 }
 
@@ -1456,12 +1468,14 @@ export const EMPTY_UNDERSTANDING: UserUnderstanding = {
   narrative: [],
   openThreads: [],
   timeline: [],
+  nextQuestions: [],
   updatedAt: 0,
 };
 
 const MAX_NARRATIVE = 5;
 const MAX_THREADS = 4;
 const MAX_TIMELINE = 14;
+const MAX_NEXT = 3;
 
 export function sanitizeUserUnderstanding(raw: any): UserUnderstanding {
   if (!raw || typeof raw !== 'object') return { ...EMPTY_UNDERSTANDING };
@@ -1480,6 +1494,10 @@ export function sanitizeUserUnderstanding(raw: any): UserUnderstanding {
     }))
     .filter((t: JourneyThread) => t.topic)
     .slice(0, MAX_THREADS);
+  const nextQuestions = (Array.isArray(raw.nextQuestions) ? raw.nextQuestions : [])
+    .map((s: any) => line(s, 140))
+    .filter(Boolean)
+    .slice(0, MAX_NEXT);
   const timeline = (Array.isArray(raw.timeline) ? raw.timeline : [])
     .map((e: any) => ({
       at: typeof e?.at === 'number' && e.at > 0 ? e.at : 0,
@@ -1491,6 +1509,7 @@ export function sanitizeUserUnderstanding(raw: any): UserUnderstanding {
   return {
     narrative,
     openThreads,
+    nextQuestions,
     timeline,
     updatedAt:
       typeof raw.updatedAt === 'number' && raw.updatedAt > 0 ? raw.updatedAt : 0,
@@ -1535,11 +1554,20 @@ Return ONLY JSON, exactly:
 {
   "narrative": ["up to 5 short lines — the evolving understanding of this person's thinking. Full replacement: rewrite, merge, and drop stale lines. Capture HOW they think and what they're genuinely working through, confidence shifts included."],
   "openThreads": [{"topic": "unfinished thinking worth returning to, as a short noun phrase", "status": "where their thinking stood, plainly worded", "touched": true}],
-  "newTimelineEvent": "ONE meaningful development from THIS conversation worth recording (a decision made, a real shift in perspective, a milestone, a goal completed) — or null. Most conversations add nothing; trivial or everyday topics NEVER produce an event."
+  "newTimelineEvent": "ONE meaningful development from THIS conversation worth recording (a decision made, a real shift in perspective, a milestone, a goal completed) — or null. Most conversations add nothing; trivial or everyday topics NEVER produce an event.",
+  "nextQuestions": ["up to 3 things this person would plausibly want to work on NEXT — written as THEY would type them, first person, ready to send exactly as written"]
 }
 
+nextQuestions is the only part of this that faces the person rather than the model. It fills the chips on their empty screen, and pressing one sends it verbatim, so each has to stand alone as a message.
+
+- FORWARD, never backward. The next step in the thinking — not a restatement of a question already answered, and never "more on X".
+- In their voice, as they would type it: "Work out what a per-unit tax does to that market", "Am I solving the right problem here?". First person or imperative. Never "you" or "your", never a title, never a heading.
+- Grounded in what they were actually working through. If someone has been doing supply and demand, the next thing is a real next thing in that subject — a tax wedge, a price floor, why the short side decides the quantity — not "tell me more about economics".
+- Under about 12 words each. It goes on a chip.
+- Return [] when nothing is genuinely pending. An everyday or practical chat produces none, and three weak suggestions are worse than zero — the screen has its own openings to fall back on.
+
 Rules:
-- Max 5 narrative lines, max 4 open threads. Full replacement each time; resolved threads must be REMOVED.
+- Max 5 narrative lines, max 4 open threads, max 3 next questions. Full replacement each time; resolved threads must be REMOVED.
 - "touched" is true ONLY if THIS conversation actually engaged that thread. Threads carried over untouched must have "touched": false and keep their existing topic and status wording EXACTLY as given above.
 - Plain wording, no hedge padding. Provisional in content, not in phrasing.
 - Ground everything in what the user actually said. Never invent, never speculate.

@@ -22,7 +22,7 @@ export async function generateMetadata({
   const post = await getPostBySlug(params.slug);
   if (!post) return { title: 'Not found — Socria' };
   return {
-    title: `${post.title} — The Socria Journal`,
+    title: `${post.title} — Socria Blog`,
     description: post.excerpt,
   };
 }
