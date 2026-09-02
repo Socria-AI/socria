@@ -13,9 +13,55 @@
 // resolved plan.
 
 import { clerkClient } from '@clerk/nextjs/server';
+import { entitledBy } from './entitlement-rule';
 
 const GRANT_KEY = 'socriaOne';
 const GRANT_VALUE = 'comp';
+
+/**
+ * Where a PAID subscription is mirrored, beside the comp grant.
+ *
+ * The subscriptions table is the projection of Stripe we read on every
+ * request, and it lives in a migration. If that migration has not been run —
+ * or the database is simply unreachable — then someone can complete checkout,
+ * be charged, and get nothing, because the only record of what they bought
+ * failed to write. Taking money and delivering nothing is the worst failure
+ * this codebase has available to it, so the fact is written in two places.
+ *
+ * Clerk is the right second place for the same reason the comp grant lives
+ * here: it needs no schema and no new environment variable, and if login
+ * works, this works. The webhook writes it on every lifecycle event, so a
+ * cancellation revokes it exactly as it revokes the table row — this is a
+ * mirror of the subscription's state, NOT a permanent grant.
+ */
+const STRIPE_KEY = 'socriaOneStripe';
+
+export interface StripeMirror {
+  status: string;
+  /** Stripe's period end, in SECONDS, as Stripe reports it */
+  periodEnd: number | null;
+}
+
+/**
+ * Does a mirrored subscription entitle its holder right now?
+ *
+ * The same rule the table uses, from the same function — see
+ * lib/entitlement-rule.ts for why that matters.
+ */
+export function mirrorEntitles(m: StripeMirror | null | undefined): boolean {
+  if (!m) return false;
+  return entitledBy(m.status, m.periodEnd);
+}
+
+function readMirror(meta: Record<string, unknown> | null | undefined): StripeMirror | null {
+  const raw = meta?.[STRIPE_KEY];
+  if (!raw || typeof raw !== 'object') return null;
+  const m = raw as Record<string, unknown>;
+  return {
+    status: typeof m.status === 'string' ? m.status : '',
+    periodEnd: typeof m.periodEnd === 'number' ? m.periodEnd : null,
+  };
+}
 
 // Accounts that hold Socria One unconditionally — no code to type, no
 // environment to configure, nothing to redeem. Checked against EVERY email
@@ -38,12 +84,16 @@ export async function hasAccountGrant(userId: string): Promise<boolean> {
   if (hit && Date.now() - hit.at < TTL) return hit.v;
   try {
     const user = await clerkClient().users.getUser(userId);
-    const granted =
-      (user?.privateMetadata as Record<string, unknown> | null)?.[GRANT_KEY] === GRANT_VALUE;
+    const meta = user?.privateMetadata as Record<string, unknown> | null;
+    const granted = meta?.[GRANT_KEY] === GRANT_VALUE;
     const comped = (user?.emailAddresses ?? []).some((e) =>
       COMPED_EMAILS.has(e.emailAddress?.toLowerCase?.() ?? '')
     );
-    const v = granted || comped;
+    // A paid subscription, as the webhook last saw it. Checked here so that
+    // somebody who has actually paid is entitled even when the subscriptions
+    // table cannot be read.
+    const paid = mirrorEntitles(readMirror(meta));
+    const v = granted || comped || paid;
     cache.set(userId, { v, at: Date.now() });
     // Make a list match permanent on the account itself.
     if (comped && !granted) void writeAccountGrant(userId).catch(() => {});
@@ -60,4 +110,50 @@ export async function writeAccountGrant(userId: string): Promise<void> {
     privateMetadata: { [GRANT_KEY]: GRANT_VALUE },
   });
   cache.set(userId, { v: true, at: Date.now() });
+}
+
+/**
+ * The mirrored subscription state, or null.
+ *
+ * Read by the surfaces that need to know whether a real Stripe relationship
+ * stands behind an entitlement — a comp grant has nothing to manage, a paid
+ * subscription has a portal to open.
+ */
+export async function readStripeMirror(userId: string): Promise<StripeMirror | null> {
+  try {
+    const user = await clerkClient().users.getUser(userId);
+    return readMirror(user?.privateMetadata as Record<string, unknown> | null);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Mirror a subscription's current state onto the account.
+ *
+ * Called by the webhook on every lifecycle event, so the mirror tracks the
+ * subscription rather than outliving it. Never throws: this is the backup
+ * path, and a backup that can take down the thing it is backing up is not one.
+ */
+export async function writeStripeMirror(
+  userId: string,
+  mirror: StripeMirror
+): Promise<boolean> {
+  try {
+    await clerkClient().users.updateUserMetadata(userId, {
+      privateMetadata: { [STRIPE_KEY]: mirror },
+    });
+    // Entitlement is the OR of three sources, so only a true may be primed:
+    // priming false from this one would drop a comp holder whose card happens
+    // to have lapsed. A false invalidates instead, and the next read asks all
+    // three. Priming true still matters — for the person coming back from
+    // checkout it is the difference between arriving to Socria One and
+    // arriving to the free tier for another minute.
+    if (mirrorEntitles(mirror)) cache.set(userId, { v: true, at: Date.now() });
+    else cache.delete(userId);
+    return true;
+  } catch (e) {
+    console.error('writeStripeMirror failed:', e);
+    return false;
+  }
 }

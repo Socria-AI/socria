@@ -29,6 +29,15 @@ product. So the failure is silent and generous.
 The consequence: **free-tier limits are not being enforced.** Free accounts
 currently get unlimited Logos chats, Explore, images and files.
 
+It also broke checkout, until it was made not to. `socria_subscriptions` is
+in this file, so recording a customer before checkout threw, and every attempt
+to subscribe answered *"Could not start checkout"* — after creating a Stripe
+customer, so each try left an orphan behind in Stripe. That write is now
+best-effort and cannot fail a sale, and a paid subscription is mirrored onto
+the Clerk account so that somebody who pays is entitled whether or not this
+table exists. **Run it anyway.** The mirror is a backstop for an outage, not
+a substitute for the projection every request reads.
+
 Fix it:
 
 1. Supabase dashboard → your **production** project → **SQL Editor**

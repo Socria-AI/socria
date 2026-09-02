@@ -7,7 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth, currentUser } from '@clerk/nextjs/server';
 import { stripe, stripeConfigured, onePriceId, siteUrl } from '@/lib/stripe';
-import { getSubscription, isCompCustomer, upsertSubscription } from '@/lib/subscriptions';
+import { getSubscription, isCompCustomer, tryUpsertSubscription } from '@/lib/subscriptions';
 import { enforceRateLimit } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
@@ -40,6 +40,25 @@ export async function POST(req: NextRequest) {
     // to pay gets a real customer created here, replacing the sentinel.
     let customerId =
       existing && !isCompCustomer(existing.customerId) ? existing.customerId : undefined;
+
+    // Our own table had nothing. Ask Stripe before making a new customer:
+    // when the table is unreachable this is the ONLY thing standing between a
+    // person who retries three times and three customer records with their
+    // name on them. Search is eventually consistent, so it can miss one made
+    // seconds ago — a duplicate is a mess to tidy, not a broken checkout, and
+    // a failure here must not stop the sale either.
+    if (!customerId) {
+      try {
+        const found = await s.customers.search({
+          query: `metadata['clerkUserId']:'${userId}'`,
+          limit: 1,
+        });
+        customerId = found.data[0]?.id;
+      } catch (e) {
+        console.warn('stripe checkout: customer search failed', e);
+      }
+    }
+
     if (!customerId) {
       const user = await currentUser();
       const email = user?.emailAddresses?.[0]?.emailAddress;
@@ -48,14 +67,21 @@ export async function POST(req: NextRequest) {
         metadata: { clerkUserId: userId },
       });
       customerId = customer.id;
-      // Record the customer now, before checkout — otherwise a webhook that
-      // arrives before the browser returns has no user to attribute it to.
-      await upsertSubscription({
-        userId,
-        customerId,
-        status: 'incomplete',
-      });
     }
+
+    // Record the customer before checkout, so a webhook arriving before the
+    // browser returns has someone to attribute it to.
+    //
+    // BEST EFFORT, and that is the whole point of this line. This used to
+    // throw, which meant an unrun migration or an unreachable database turned
+    // every attempt to subscribe into "Could not start checkout" — after
+    // creating a Stripe customer, so each try also left one behind. It is
+    // bookkeeping, and bookkeeping is not a reason to refuse somebody's
+    // money. Nothing depends on it: the session below carries the user id in
+    // client_reference_id and in both metadata bags, which is where the
+    // webhook looks first. This row is its last-resort fallback, not its
+    // source.
+    await tryUpsertSubscription({ userId, customerId, status: 'incomplete' });
 
     const base = siteUrl(req);
     const session = await s.checkout.sessions.create({

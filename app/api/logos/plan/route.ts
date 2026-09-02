@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { getSubscription, isCompCustomer } from '@/lib/subscriptions';
+import { mirrorEntitles, readStripeMirror } from '@/lib/socria-one-grant';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -19,10 +20,19 @@ export async function GET(req: NextRequest) {
   // Only a real Stripe customer has anything to manage — an access-code or
   // complimentary unlock has no billing behind it and shouldn't be offered
   // a portal it can't open.
+  //
+  // The account mirror is consulted when the table gives nothing, for the
+  // same reason the portal route searches Stripe: without it, an unreachable
+  // subscriptions table hides the Manage billing button from every paying
+  // customer, and somebody who cannot find how to cancel is somebody we are
+  // quietly making it hard to leave.
   const sub = userId ? await getSubscription(userId) : null;
+  const fromTable = !!sub?.customerId && !isCompCustomer(sub.customerId);
+  const manageable =
+    fromTable || (!sub && !!userId && mirrorEntitles(await readStripeMirror(userId)));
   return NextResponse.json({
     plan,
-    manageable: !!sub?.customerId && !isCompCustomer(sub.customerId),
+    manageable,
     cancelAtPeriodEnd: !!sub?.cancelAtPeriodEnd,
   });
 }

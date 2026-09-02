@@ -15,11 +15,21 @@
 //   3. ALWAYS 200 ON A HANDLED EVENT. Returning an error makes Stripe retry;
 //      retries are only useful for failures we might recover from, not for
 //      events we have decided are not ours.
+//
+//   4. WRITE THE ENTITLEMENT TWICE, AND WRITE IT TO THE ACCOUNT FIRST. The
+//      subscriptions table is a projection of Stripe that lives in a
+//      migration; the Clerk mirror needs no schema at all. If only one of
+//      them can be written, it has to be the one that decides whether the
+//      person who just paid gets what they paid for. The table write still
+//      happens, and still returns 500 so Stripe retries it — but somebody
+//      being charged and handed nothing is not a failure worth being tidy
+//      about.
 
 import { NextRequest, NextResponse } from 'next/server';
 import type Stripe from 'stripe';
 import { stripe } from '@/lib/stripe';
 import { upsertSubscription, userForCustomer } from '@/lib/subscriptions';
+import { writeStripeMirror } from '@/lib/socria-one-grant';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -60,6 +70,15 @@ async function applySubscription(sub: Stripe.Subscription): Promise<void> {
     console.warn('stripe webhook: no user for subscription', sub.id);
     return;
   }
+
+  // The account first — see rule 4. This is a mirror of the subscription's
+  // CURRENT state, so a cancellation revokes through it exactly as it revokes
+  // through the table.
+  await writeStripeMirror(userId, {
+    status: sub.status,
+    periodEnd: periodEndOf(sub),
+  });
+
   await upsertSubscription({
     userId,
     customerId,
@@ -115,6 +134,9 @@ export async function POST(req: NextRequest) {
           const sub = await stripe().subscriptions.retrieve(subId);
           await applySubscription({ ...sub, metadata: { ...sub.metadata, clerkUserId: userId } });
         } else {
+          // No subscription on the session — rare, but the payment happened,
+          // so the entitlement is written the same way round.
+          await writeStripeMirror(userId, { status: 'active', periodEnd: null });
           await upsertSubscription({ userId, customerId, status: 'active' });
         }
       } else {

@@ -31,6 +31,8 @@ const MODULES = [
   'lib/tex-split.ts',
   'lib/logos-econ.ts',
   'lib/starters.ts',
+  'lib/subscriptions.ts',
+  'lib/entitlement-rule.ts',
 ];
 
 export async function buildAll() {

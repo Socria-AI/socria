@@ -25,13 +25,33 @@ export async function POST(req: NextRequest) {
   }
 
   const sub = await getSubscription(userId);
-  if (!sub?.customerId || isCompCustomer(sub.customerId)) {
+  let customerId =
+    sub?.customerId && !isCompCustomer(sub.customerId) ? sub.customerId : null;
+
+  // Our table had nothing to go on. Ask Stripe directly before telling
+  // somebody there is nothing to manage: if the subscriptions table is
+  // unreachable, the row is missing for everyone, and a paying customer being
+  // told they have no subscription — with no way to cancel it — is far worse
+  // than an extra API call on the rare path.
+  if (!customerId) {
+    try {
+      const found = await stripe().customers.search({
+        query: `metadata['clerkUserId']:'${userId}'`,
+        limit: 1,
+      });
+      customerId = found.data[0]?.id ?? null;
+    } catch (e) {
+      console.warn('stripe portal: customer search failed', e);
+    }
+  }
+
+  if (!customerId) {
     return NextResponse.json({ error: 'No subscription to manage.' }, { status: 404 });
   }
 
   try {
     const session = await stripe().billingPortal.sessions.create({
-      customer: sub.customerId,
+      customer: customerId,
       return_url: `${siteUrl(req)}/logos`,
     });
     return NextResponse.json({ url: session.url });

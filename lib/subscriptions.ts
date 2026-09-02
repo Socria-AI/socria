@@ -17,6 +17,7 @@
 //     thinking they are in the middle of.
 
 import { supabaseAdmin } from './supabase';
+import { entitledBy } from './entitlement-rule';
 
 export interface SubscriptionRow {
   userId: string;
@@ -26,11 +27,6 @@ export interface SubscriptionRow {
   currentPeriodEnd: number | null;
   cancelAtPeriodEnd: boolean;
 }
-
-/** Stripe statuses that mean "this person is on Socria One right now" —
- * plus 'comp', ours: a complimentary grant from a redeemed access code,
- * which has no Stripe subscription behind it at all. */
-const LIVE = new Set(['active', 'trialing', 'past_due', 'comp']);
 
 /** The sentinel customer id a complimentary row carries. Never a real
  * Stripe customer; checkout and the billing portal must not treat it as one. */
@@ -64,12 +60,11 @@ export async function grantComplimentary(userId: string): Promise<void> {
   });
 }
 
-export function entitles(row: Pick<SubscriptionRow, 'status' | 'currentPeriodEnd'> | null): boolean {
+export function entitles(
+  row: Pick<SubscriptionRow, 'status' | 'currentPeriodEnd'> | null | undefined
+): boolean {
   if (!row) return false;
-  if (LIVE.has(row.status)) return true;
-  // Cancelled or otherwise finished, but the paid period hasn't run out yet.
-  if (row.currentPeriodEnd && row.currentPeriodEnd * 1000 > Date.now()) return true;
-  return false;
+  return entitledBy(row.status, row.currentPeriodEnd);
 }
 
 export async function getSubscription(userId: string): Promise<SubscriptionRow | null> {
@@ -99,6 +94,28 @@ export async function getSubscription(userId: string): Promise<SubscriptionRow |
 export async function isSubscribed(userId: string | null): Promise<boolean> {
   if (!userId) return false;
   return entitles(await getSubscription(userId));
+}
+
+/**
+ * The same write, for the places where failing must not stop the person.
+ *
+ * The distinction is not stylistic. Recording a customer before checkout is
+ * BOOKKEEPING: useful, and no reason to refuse somebody's money if the store
+ * is unreachable. Recording what they now hold, in the webhook, is the
+ * PRODUCT: that one has to be retried until it lands.
+ *
+ * Returns whether it worked, so a caller that has a second place to put the
+ * fact can go and use it.
+ */
+export async function tryUpsertSubscription(
+  row: Parameters<typeof upsertSubscription>[0]
+): Promise<boolean> {
+  try {
+    await upsertSubscription(row);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export async function upsertSubscription(row: {
