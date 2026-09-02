@@ -2,10 +2,11 @@
 import type { Metadata } from 'next';
 import './one.css';
 import { OneStory } from './OneStory';
+import { priceWithPeriod } from '@/lib/socria-one';
 
 export const metadata: Metadata = {
   title: 'Socria One — the complete reasoning environment',
-  description: 'Socria One. Everything Socria does, without the ceiling. $15/month.',
+  description: `Socria One. Everything Socria does, without the ceiling. ${priceWithPeriod()}.`,
 };
 
 export default function OnePage() {

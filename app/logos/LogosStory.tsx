@@ -13,6 +13,7 @@
 // stylesheet is scoped to.
 
 import { useEffect, useRef } from 'react';
+import { priceLabel, SOCRIA_ONE } from '@/lib/socria-one';
 import {
   DemoBoard,
   DemoControls,
@@ -450,7 +451,7 @@ export function LogosStory() {
               </div>
               <div className="tier one fade d1">
                 <h3>Socria <span className="em">One</span></h3>
-                <p className="tp">$15 / month · cancel anytime</p>
+                <p className="tp">{priceLabel()} / {SOCRIA_ONE.period} · cancel anytime</p>
                 <ul>
                   <li>The full map — unbounded branching, every view.</li>
                   <li>Research across the whole map, as often as it calls.</li>

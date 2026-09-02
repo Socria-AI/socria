@@ -6,10 +6,15 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { UserProfile, useUser } from '@clerk/nextjs';
+import { usePlan } from '@/components/usePlan';
+import { OneCard } from '@/components/OneMark';
 
 export default function AccountPage() {
   const { isLoaded, isSignedIn } = useUser();
   const router = useRouter();
+  // "What am I on?" is the question people bring to this page, and until
+  // now the answer was not on it. Rendered only once the server has said.
+  const planState = usePlan();
 
   useEffect(() => {
     if (isLoaded && !isSignedIn) {
@@ -81,6 +86,12 @@ export default function AccountPage() {
               </span>
             </p>
           </div>
+
+          {planState.known && (
+            <div className="mb-10 md:mb-14 max-w-[452px]">
+              <OneCard state={planState} />
+            </div>
+          )}
 
           <div className="socria-clerk-card socria-clerk-userprofile">
             <UserProfile routing="path" path="/account" />

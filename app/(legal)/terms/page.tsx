@@ -4,6 +4,7 @@
 
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { priceLabel, SOCRIA_ONE } from '@/lib/socria-one';
 
 export const metadata: Metadata = {
   title: 'Terms — Socria',
@@ -79,7 +80,7 @@ export default function TermsPage() {
 
       <h2 id="billing">Socria One</h2>
       <p>
-        Socria One costs <strong>$15 per month</strong>, billed through our
+        Socria One costs <strong>{priceLabel()} per {SOCRIA_ONE.period}</strong>, billed through our
         payment processor and renewing automatically until cancelled. Prices may
         change; if they do, we will tell you before it affects you.
       </p>

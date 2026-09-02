@@ -2,7 +2,9 @@
 
 import { useState } from 'react';
 import { SOCRIA_MODELS, type SocriaModel } from '@/lib/socria-prompt';
+import type { Plan } from '@/lib/socria-one';
 import { ModelGlyph } from './ModelGlyph';
+import { OneStrip } from './OneMark';
 
 export function ModelPicker({
   value,
@@ -11,11 +13,22 @@ export function ModelPicker({
   onLockedAttempt,
   dropUp = false,
   align = 'left',
+  plan,
 }: {
   value: SocriaModel;
   onChange: (next: SocriaModel) => void;
   isSignedIn?: boolean;
   onLockedAttempt?: (locked: SocriaModel) => void;
+  /**
+   * What the person holds, when the caller knows. Logos is listed here as a
+   * model, and Socria One is the plan that opens it in full — so this menu is
+   * the one place a mention of One is information about the menu rather
+   * than a pitch. Undefined means "not known yet", and nothing is shown:
+   * a member flashed a price for the half-second before the server answers
+   * is exactly the kind of thing that makes a product feel like it is
+   * selling.
+   */
+  plan?: Plan;
   /** open the menu above the button — it sits at the bottom of the screen */
   dropUp?: boolean;
   align?: 'left' | 'right';
@@ -65,6 +78,8 @@ export function ModelPicker({
               const m = SOCRIA_MODELS[id];
               const active = id === value;
               const locked = m.requiresAuth && !isSignedIn;
+              // Logos in full is One's; the tag says so, once, on the row.
+              const oneTag = id === 'logos' && plan === 'free' && !locked;
               return (
                 <button
                   key={id}
@@ -87,6 +102,7 @@ export function ModelPicker({
                     <span className="font-serif text-[15px] text-ink flex items-center gap-2">
                       <ModelGlyph model={id} size={15} className="text-moss-700" />
                       {m.short}
+                      {oneTag && <span className="one-tag">One</span>}
                       {locked && (
                         <svg
                           width="11"
@@ -124,6 +140,7 @@ export function ModelPicker({
                 </button>
               );
             })}
+            {plan === 'free' && <OneStrip />}
           </div>
         </>
       )}

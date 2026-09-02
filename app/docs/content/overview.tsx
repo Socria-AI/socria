@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Article, H2, Callout } from '../Article';
 import { DemoSplit } from '@/app/logos/LogosDemo';
 import { DOC_PAGES, docPage } from '../registry';
+import { priceWithPeriod } from '@/lib/socria-one';
 
 const page = docPage('overview')!;
 const sections = [
@@ -71,7 +72,7 @@ export function Overview() {
         Core 2 and Core 3.1 are chat models with different depths of attention.
         Logos is a different kind of thing — an environment — and it is the
         centerpiece of <Link href="/docs/socria-one">Socria One</Link>, the
-        $15/month plan. Its free tier is a real trial: the whole loop, with
+        {priceWithPeriod()} plan. Its free tier is a real trial: the whole loop, with
         boundaries rather than walls.
       </p>
 

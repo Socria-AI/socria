@@ -25,10 +25,13 @@ export type Plan = 'free' | 'one';
 /**
  * The price as a string, from the one place the number lives.
  *
- * There are nine other places in this repository that write "$15" as a
- * literal — the /one page, the Logos landing page, the terms, the docs. Each
- * is a copy that will not change when this constant does. Use this wherever
- * the price is rendered, and migrate those when they are next touched.
+ * Every rendering of the price — the /one page, the Logos landing page, the
+ * terms, the docs, the marks in the chrome — goes through this or
+ * priceWithPeriod(). There used to be nine literal "$15"s beside it; they
+ * were migrated when the in-chrome mentions were added, so that adding
+ * four more places to say the price did not mean writing it thirteen times.
+ * Keep it that way: a price written twice disagrees with itself the first
+ * time it changes.
  */
 export function priceLabel(): string {
   return `${SOCRIA_ONE.currency}${SOCRIA_ONE.price}`;

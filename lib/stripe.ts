@@ -22,7 +22,7 @@ export function stripeConfigured(): boolean {
   return !!process.env.STRIPE_SECRET_KEY && !!process.env.STRIPE_PRICE_SOCRIA_ONE;
 }
 
-/** The $15/month Socria One price. Never taken from the client. */
+/** The Socria One price (see SOCRIA_ONE in lib/socria-one.ts). Never taken from the client. */
 export function onePriceId(): string {
   const id = process.env.STRIPE_PRICE_SOCRIA_ONE;
   if (!id) throw new Error('Set STRIPE_PRICE_SOCRIA_ONE to the Socria One price id.');

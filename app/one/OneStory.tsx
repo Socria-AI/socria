@@ -14,6 +14,7 @@
 // Logos). If checkout says sign in first, we go to sign-in and come back.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { priceLabel, priceWithPeriod, SOCRIA_ONE } from '@/lib/socria-one';
 
 // Dust motes on the cover — positions and drift straight from the design.
 const DUST: Array<[string, string, string, string, string, string]> = [
@@ -356,8 +357,8 @@ export function OneStory() {
             <span className="one seq s-one">One</span>
           </h1>
           <div className="price seq s-price">
-            <span className="amt">$15</span>
-            <span className="per">/ month</span>
+            <span className="amt">{priceLabel()}</span>
+            <span className="per">/ {SOCRIA_ONE.period}</span>
           </div>
           <p className="standfirst seq s-stand">Everything Socria does, without the ceiling.</p>
           <div className="cover-cta seq s-cta">
@@ -485,7 +486,7 @@ export function OneStory() {
         {/* JOIN BAND */}
         <section className="join">
           <div className="wrap">
-            <p className="j-line fade">The whole instrument — <span className="j-price">$15 a month.</span></p>
+            <p className="j-line fade">The whole instrument — <span className="j-price">{priceLabel()} a {SOCRIA_ONE.period}.</span></p>
             <div className="j-row fade d1">
               <button type="button" className="j-cta" onClick={subscribe} disabled={busy}>
                 {busy ? 'Opening checkout…' : memberCta('Become a member of One')} <span className="ar">→</span>
@@ -568,7 +569,7 @@ export function OneStory() {
             <div className="modal fade">
               <div className="m-mono"><span>I</span></div>
               <h3>Socria <span className="one">One</span></h3>
-              <div className="m-price"><span className="amt">$15</span><span className="per">/ month</span></div>
+              <div className="m-price"><span className="amt">{priceLabel()}</span><span className="per">/ {SOCRIA_ONE.period}</span></div>
               <p className="m-line">Membership in the complete reasoning environment.</p>
               <ul>
                 <li><GlCircle /><em>Deeper thinking</em> — all four depth modes, at your pace.</li>
@@ -583,7 +584,7 @@ export function OneStory() {
                   ? 'Opening checkout…'
                   : member
                     ? 'You are a member — open Logos'
-                    : 'Become a member — $15/month'}{' '}
+                    : `Become a member — ${priceWithPeriod()}`}{' '}
                 <span className="ar">→</span>
               </button>
               <a className="m-keep" href="/chat?model=logos">continue with the free tier</a>

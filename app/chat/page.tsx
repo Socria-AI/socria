@@ -12,6 +12,8 @@ import {
 } from '@clerk/nextjs';
 import { Logo } from '@/components/Logo';
 import { ModelPicker } from '@/components/ModelPicker';
+import { usePlan } from '@/components/usePlan';
+import { OneFoot } from '@/components/OneMark';
 import { ModelGlyph } from '@/components/ModelGlyph';
 import { LogosApp } from '@/components/LogosApp';
 import { isValidOneKey } from '@/lib/socria-one';
@@ -214,6 +216,9 @@ export default function ChatPage() {
 
   // Signed in OR unlocked with the typed access key → may use Core 3.1.
   const canUseCore3 = !!isSignedIn || smartUnlocked;
+  // What they hold, for the two quiet mentions of One on this page: the
+  // sidebar foot and the model menu. Both wait for `known` — see usePlan.
+  const planState = usePlan();
 
   // Anonymous users get one free thought session. They're "locked out" of
   // starting a new one once that flag is set OR they're already mid-session.
@@ -1339,6 +1344,14 @@ export default function ChatPage() {
         </div>
 
         <div className="border-t border-border/60 p-4">
+          {/* Socria One, said once and left alone. The same plate as the
+              /one cover, at the size of a sidebar row; it never moves and
+              never changes what it says. A member sees what they hold. */}
+          {planState.known && (
+            <div className="mb-3">
+              <OneFoot state={planState} />
+            </div>
+          )}
           <button
             type="button"
             onClick={() => {
@@ -1657,6 +1670,7 @@ export default function ChatPage() {
                   onLockedAttempt={() => setLogosModalOpen(true)}
                   dropUp
                   align="right"
+                  plan={planState.known ? planState.plan : undefined}
                 />
               </div>
             </div>

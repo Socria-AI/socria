@@ -10,6 +10,7 @@
 import Link from 'next/link';
 import { Article, H2, Callout, Defs, Def } from '../Article';
 import { DemoLimitsTable } from '../DocsDemo';
+import { priceWithPeriod } from '@/lib/socria-one';
 import { docPage } from '../registry';
 
 const page = docPage('socria-one')!;
@@ -27,7 +28,7 @@ export function SocriaOne() {
     <Article page={page} sections={sections}>
       <H2 id="plans">The two plans</H2>
       <p>
-        Socria has one paid plan: <strong>Socria One, $15/month</strong>. It
+        Socria has one paid plan: <strong>Socria One, {priceWithPeriod()}</strong>. It
         opens the complete reasoning environment — all four{' '}
         <Link href="/docs/depth-personality">depth modes</Link>, Thinking Maps
         with unbounded branching and every lens, Research across the whole map

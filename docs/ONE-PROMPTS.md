@@ -191,22 +191,30 @@ from `lib/entitlements`, and every metered boundary is worded once by
 
 ---
 
-## Known issue: the price is written ten times
+## Where One is mentioned without being asked for
+
+Besides the prompts, four pieces of chrome say "Socria One" on their own.
+None of them is a prompt: each sits still, says the same thing on every visit,
+and never animates in. That is the difference between visibility and
+interruption, and it is why these can be on every page and the prompts
+cannot.
+
+| where | what | who sees it |
+|---|---|---|
+| model menu, Logos row | a small `One` tag, and a strip under the list: *Logos in full is Socria One* | free only |
+| sidebar foot (chat and Logos share it) | the plate: monogram, name, price | free: the price · member: "member" |
+| Logos free-tier meter | the counts, then a cream-on-blue *Socria One* | free only |
+| /account | the plan block: what you hold, checkout or billing | everyone signed in |
+
+All of it is `components/OneMark.tsx`, drawn in the /one cover's own palette
+(`--one-*` tokens on `:root` in `app/globals.css`, which the prompt sheet
+now reads too). Each waits for `usePlan().known` before rendering, so a
+member is never shown a price for the half-second before the server answers.
+
+## The price is written once
 
 `SOCRIA_ONE.price` in `lib/socria-one.ts` is the source of truth, and
-`priceLabel()` / `priceWithPeriod()` render it. New code uses them.
-
-Nine older places still hard-code `$15`:
-
-```
-app/one/page.tsx:8            app/one/OneStory.tsx:359,488,571,586
-app/logos/LogosStory.tsx:453  app/(legal)/terms/page.tsx:82
-app/docs/content/overview.tsx:69
-app/docs/content/socria-one.tsx:23
-app/docs/registry.ts:95
-```
-
-They were left alone deliberately: migrating marketing and legal copy is a
-change to those pages, not to this feature, and it does not belong in the same
-diff. **Changing the price means editing all ten.** Migrate each as it is next
-touched.
+`priceLabel()` / `priceWithPeriod()` render it. Every place that shows the
+price — the /one page and its metadata, the Logos landing page, the terms,
+the docs, the marks above — goes through one of the two. Change the constant
+and everything follows. Do not write the number anywhere else.
