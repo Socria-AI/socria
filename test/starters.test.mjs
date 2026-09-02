@@ -78,11 +78,13 @@ console.log('\n=== an unresolved node becomes a thing worth saying ===');
 {
   const cases = [
     ['question', 'Does the short side really decide?', 'Does the short side really decide?'],
-    ['tension', 'Two answers disagree', 'Work through the tension: Two answers disagree'],
-    ['assumption', 'The market clears', 'Test the assumption that the market clears'],
+    ['tension', 'Two answers disagree', 'Work through this tension: Two answers disagree'],
+    ['assumption', 'Producers respond instantly to price', 'Test this assumption: Producers respond instantly to price'],
     ['unknown', 'The equilibrium price', 'Solve for the equilibrium price'],
-    ['misconception', 'That supply shifts with price', 'Clear up that supply shifts with price'],
-    ['conjecture', 'Every bounded sequence converges', 'Try to prove Every bounded sequence converges'],
+    ['misconception', 'Demand curves can slope up', 'Clear this up: Demand curves can slope up'],
+    ['conjecture', 'Every bounded sequence converges', 'Try to prove this: Every bounded sequence converges'],
+    ['counterpoint', 'Fixed costs are ignored here', 'Take this objection seriously: Fixed costs are ignored here'],
+    ['error', 'The sign flipped at step three', 'Go back to where it went wrong: The sign flipped at step three'],
   ];
   for (const [type, label, want] of cases) {
     const [c] = build({ pending: [{ label, type }] });
@@ -98,6 +100,27 @@ console.log('\n=== an unresolved node becomes a thing worth saying ===');
     const [c] = build({ pending: [{ label: 'Some open thing', type: t }] });
     ok(`${t} is offered`, c.prompt.includes('Some open thing'));
   }
+
+  // A node label is capitalised because it is a label. Splicing one into the
+  // middle of a clause put a capital there too ("…the assumption that
+  // Producers respond…"), and lowering it is not available — nothing about
+  // the shape of "Producers" tells it apart from "Berlin". Every opener that
+  // takes a whole clause now introduces it with a colon instead.
+  for (const t of PENDING_TYPES) {
+    if (t === 'question' || t === 'unknown') continue;
+    const [c] = build({ pending: [{ label: 'Producers respond instantly', type: t }] });
+    const body = c.prompt.slice(c.prompt.indexOf('Producers'));
+    ok(`${t}: the label keeps its own capital`, body.startsWith('Producers'), c.prompt);
+    ok(
+      `${t}: and never lands mid-clause`,
+      /: Producers/.test(c.prompt),
+      c.prompt
+    );
+  }
+
+  // A proper noun is never lowered, whichever opener takes it.
+  const berlin = build({ pending: [{ label: 'Berlin is the wrong move', type: 'assumption' }] });
+  ok('a proper noun survives intact', berlin[0].prompt.includes('Berlin is the wrong move'));
 }
 
 console.log('\n=== always a way to start something new ===');

@@ -168,16 +168,26 @@ function usable(s: unknown): s is string {
  * not unfinished business and never becomes a chip at all. Anything missing
  * from this table is simply not offered, which is the right default — a chip
  * that does not quite parse is worse than one fewer chip.
+ *
+ * The openers introduce the label with a colon rather than splicing it into a
+ * clause, and that is the whole reason. A node label is capitalised because it
+ * is a label, not because it names anything — so "Test the assumption that
+ * Producers respond instantly to price" came out with a capital in the middle
+ * of a sentence, and lowering it is not available: nothing about the SHAPE of
+ * "Producers" distinguishes it from "Berlin". A colon takes a capital happily.
  */
 const PENDING_OPENER: Record<string, (label: string) => string> = {
   question: (l) => l,
-  tension: (l) => `Work through the tension: ${l}`,
-  counterpoint: (l) => `Take seriously the objection that ${lowerFirst(l)}`,
-  assumption: (l) => `Test the assumption that ${lowerFirst(l)}`,
-  misconception: (l) => `Clear up ${lowerFirst(l)}`,
-  conjecture: (l) => `Try to prove ${lowerFirst(l)}`,
-  unknown: (l) => `Solve for ${lowerFirst(l)}`,
+  tension: (l) => `Work through this tension: ${l}`,
+  counterpoint: (l) => `Take this objection seriously: ${l}`,
+  assumption: (l) => `Test this assumption: ${l}`,
+  misconception: (l) => `Clear this up: ${l}`,
+  conjecture: (l) => `Try to prove this: ${l}`,
   error: (l) => `Go back to where it went wrong: ${l}`,
+  // The one label that is reliably a noun phrase ("the equilibrium
+  // quantity"), so it can be spliced into a sentence — and its determiner is
+  // one lowerFirst knows how to lower.
+  unknown: (l) => `Solve for ${lowerFirst(l)}`,
 };
 
 /** The node types worth reopening, for callers that filter before passing. */
