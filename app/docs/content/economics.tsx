@@ -12,6 +12,7 @@ const sections = [
   { id: 'why', heading: 'Why economics is drawings' },
   { id: 'market', heading: 'Supply and demand' },
   { id: 'controls', heading: 'Price controls and surplus' },
+  { id: 'tax', heading: 'Who actually pays a tax' },
   { id: 'ppc', heading: 'Opportunity cost and the frontier' },
   { id: 'macro', heading: 'AD, SRAS and potential output' },
   { id: 'limits', heading: 'What these models do not say' },
@@ -101,6 +102,48 @@ export function Economics() {
           it is, between the two curves and out to the quantity that was lost.
         </Def>
       </Defs>
+
+      <H2 id="tax">Who actually pays a tax</H2>
+      <p>
+        Ask for a per-unit tax — <em>&ldquo;put a $9 tax on every unit and show
+        me who pays it&rdquo;</em> — and the diagram gains a second supply
+        curve sitting exactly the tax above the first, because that is what a
+        tax is: sellers now need the old price plus the tax at every quantity.
+      </p>
+      <p>
+        What opens up is a <strong>wedge</strong>. One price becomes two:
+        buyers hand over <em>P<sub>b</sub></em>, sellers keep{' '}
+        <em>P<sub>s</sub></em>, and the distance between them is the tax. Open
+        the slider from zero and watch them come apart.
+      </p>
+      <Defs>
+        <Def term="Incidence">
+          How the tax splits between the two sides. Almost never evenly — and,
+          the point of the whole exercise, <em>not decided by who the law
+          collects it from</em>. Levying it on buyers instead shifts demand
+          down by the same amount and produces the same two prices, the same
+          quantity, and the same split. The side that can least easily walk
+          away carries more of it, which on this diagram is the steeper curve.
+        </Def>
+        <Def term="Revenue">
+          The rectangle between the two prices, over every unit still traded.
+          It is shaded because it is not destroyed — it moves. A diagram that
+          shades the loss and not the revenue makes a tax look like pure
+          waste, which is a different claim from the one the model makes.
+        </Def>
+        <Def term="The loss">
+          Only the trades that stopped happening. Fewer units change hands
+          than before, and the surplus those trades would have created goes to
+          nobody — not the buyers, not the sellers, not the government. That
+          triangle is the deadweight loss, and it is the honest cost of the
+          tax.
+        </Def>
+      </Defs>
+      <Callout tag="A tax can close a market">
+        Push it far enough and the market closes rather than shrinks:
+        there is no price left at which anyone still trades. The diagram says
+        so instead of drawing a crossing that is not there.
+      </Callout>
 
       <H2 id="ppc">Opportunity cost and the frontier</H2>
       <p>

@@ -37,6 +37,8 @@ import {
   outputGap as econOutputGap,
   priceAt as econPriceAt,
   shift as econShift,
+  taxedSupply as econTaxedSupply,
+  taxIncidence as econTaxIncidence,
   welfare as econWelfare,
 } from './logos-econ';
 
@@ -399,6 +401,15 @@ export interface VizScene {
   supply?: { intercept: number; slope: number };
   /** supply-demand: an imposed price, when there is one */
   control?: { kind: 'ceiling' | 'floor'; at: number };
+  /**
+   * supply-demand: a per-unit tax, in the same money as the prices.
+   *
+   * Present at all means the diagram is about incidence, and the `t` slider
+   * appears. A control and a tax are two different lessons and are not drawn
+   * together — a market can have both, but a first course never asks it to,
+   * and the diagram would have four prices on it.
+   */
+  tax?: number;
   /** supply-demand: shade consumer and producer surplus */
   surplus?: boolean;
   /**
@@ -2122,6 +2133,20 @@ const buildSupplyDemand: Builder = (scene, _fn, vals, view, guarded) => {
   const welfare: VizReadout[] = [];
   const qHi = view.xMax;
 
+  const eq = econEquilibrium(D, S);
+  const control = scene.control;
+  const pc = control ? (vals.pc ?? control.at) : null;
+  const bind = eq && control && pc !== null ? econBinds(control.kind, pc, eq.p) : false;
+
+  // A per-unit tax. Drawn as a shift of supply, because that is what it is:
+  // sellers need the old price plus the tax for every quantity. The taxed
+  // curve is what the market now clears against, and the two prices it
+  // produces — one for buyers, one for sellers — are the whole lesson.
+  const t = scene.tax != null ? Math.max(0, vals.t ?? scene.tax) : 0;
+  const taxOn = t > 1e-9 && !!eq;
+  const St = taxOn ? econTaxedSupply(S, t) : S;
+  const inc = taxOn ? econTaxIncidence(D, S, t) : null;
+
   // The curves, drawn across the window rather than sampled: they are lines.
   const seg = (line: { intercept: number; slope: number }, id: string, tone: Tone, label: string) => {
     objects.push({
@@ -2156,18 +2181,42 @@ const buildSupplyDemand: Builder = (scene, _fn, vals, view, guarded) => {
   }
   seg(D, 'D', 'accent', 'D');
   seg(S, 'S', 'tension', 'S');
-
-  const eq = econEquilibrium(D, S);
-  const control = scene.control;
-  const pc = control ? (vals.pc ?? control.at) : null;
-  const bind = eq && control && pc !== null ? econBinds(control.kind, pc, eq.p) : false;
+  // The taxed curve sits above the untaxed one by exactly the tax, and both
+  // stay on screen: the distance between them IS the tax, and hiding the
+  // original would turn the clearest measurement on the diagram into a
+  // number in a list.
+  if (taxOn) {
+    objects.push({
+      o: 'segment',
+      id: 'St',
+      x1: 0,
+      y1: econPriceAt(St, 0),
+      x2: qHi,
+      y2: econPriceAt(St, qHi),
+      tone: 'primary',
+      width: 2,
+    });
+    objects.push({
+      o: 'label',
+      id: 'Stlab',
+      x: qHi * 0.94,
+      y: econPriceAt(St, qHi * 0.94),
+      text: 'S + t',
+      tone: 'primary',
+      anchor: 'end',
+      dy: -6,
+    });
+  }
 
   if (eq) {
     // Surplus areas first, so the curves and guides draw over them.
     if (scene.surplus && !guarded) {
-      const price = bind && pc !== null ? pc : eq.p;
+      // Three cases, and only the tax has two prices: buyers measure their
+      // surplus against what they paid, sellers against what they kept.
+      const price = inc ? inc.pricePaid : bind && pc !== null ? pc : eq.p;
+      const priceGot = inc ? inc.priceReceived : price;
       const m = econMarketAt(D, S, price);
-      const q = bind ? m.traded : eq.q;
+      const q = inc ? inc.quantity : bind ? m.traded : eq.q;
       objects.push({
         o: 'region',
         id: 'cs',
@@ -2184,18 +2233,36 @@ const buildSupplyDemand: Builder = (scene, _fn, vals, view, guarded) => {
         id: 'ps',
         pts: [
           { x: 0, y: S.intercept },
-          { x: 0, y: price },
-          { x: q, y: price },
+          { x: 0, y: priceGot },
+          { x: q, y: priceGot },
           { x: q, y: econPriceAt(S, q) },
         ],
         tone: 'tension',
       });
+      // What the tax collects: the rectangle between the two prices, over
+      // every unit still traded. It is drawn because it is not lost — it is
+      // the part of the wedge that goes somewhere, and a diagram that shades
+      // the loss without shading the revenue makes a tax look like pure
+      // destruction.
+      if (inc) {
+        objects.push({
+          o: 'region',
+          id: 'rev',
+          pts: [
+            { x: 0, y: priceGot },
+            { x: 0, y: price },
+            { x: q, y: price },
+            { x: q, y: priceGot },
+          ],
+          tone: 'primary',
+        });
+      }
       // The loss, drawn where it is: the wedge between what the next buyer
       // would have paid and what the next seller would have accepted, over
       // the trades that a binding control has made illegal. Naming it in a
       // readout without shading it leaves the most important number on the
       // diagram pointing at nothing.
-      if (bind && eq && q < eq.q - 1e-9) {
+      if ((bind || inc) && eq && q < eq.q - 1e-9) {
         objects.push({
           o: 'region',
           id: 'dwl',
@@ -2212,23 +2279,67 @@ const buildSupplyDemand: Builder = (scene, _fn, vals, view, guarded) => {
       // but the NUMBERS belong last: the row is read left to right, and
       // welfare arithmetic arriving before "what is the price" buries the
       // answer behind three figures that only make sense once you have it.
-      const w = econWelfare(D, S, q, price);
+      const w = econWelfare(D, S, q, price, priceGot, inc ? inc.revenue : 0);
       welfare.push(
         { id: 'cs', tex: '\\text{CS}', value: fmt(w.consumer, 4), help: 'Consumer surplus: what buyers were willing to pay, less what they did pay, added up over everyone who bought.' },
         { id: 'ps', tex: '\\text{PS}', value: fmt(w.producer, 4), help: 'Producer surplus: what sellers received, less the least they would have accepted.' }
       );
+      if (inc) {
+        welfare.push({
+          id: 'rev',
+          tex: '\\text{revenue}',
+          value: fmt(inc.revenue, 4),
+          help: 'What the tax collects: the tax on every unit still traded. Not lost — moved.',
+        });
+      }
       if (w.deadweight > 1e-6) {
-        welfare.push({ id: 'dwl', tex: '\\text{DWL}', value: fmt(w.deadweight, 4), help: 'Deadweight loss: surplus that simply is not created, because trades both sides would have agreed to are no longer allowed to happen.' });
+        welfare.push({
+          id: 'dwl',
+          tex: '\\text{DWL}',
+          value: fmt(w.deadweight, 4),
+          help: inc
+            ? 'Deadweight loss: the surplus from trades that no longer happen. Nobody gets this — not the buyers, not the sellers, not the government.'
+            : 'Deadweight loss: surplus that simply is not created, because trades both sides would have agreed to are no longer allowed to happen.',
+        });
       }
     }
 
-    objects.push({ o: 'point', id: 'eq', x: eq.q, y: eq.p, tone: 'primary' });
+    objects.push({ o: 'point', id: 'eq', x: eq.q, y: eq.p, tone: taxOn ? 'ghost' : 'primary' });
     objects.push({ o: 'segment', id: 'eqv', x1: eq.q, y1: 0, x2: eq.q, y2: eq.p, tone: 'ghost', dashed: true });
     objects.push({ o: 'segment', id: 'eqh', x1: 0, y1: eq.p, x2: eq.q, y2: eq.p, tone: 'ghost', dashed: true });
     readouts.push(
       { id: 'pe', tex: 'P^{*}', value: guarded ? null : fmt(eq.p, 4), help: 'The price where the amount wanted and the amount offered are the same number. Nothing pushes it from there.' },
       { id: 'qe', tex: 'Q^{*}', value: guarded ? null : fmt(eq.q, 4), help: 'The quantity that changes hands at the equilibrium price.' }
     );
+
+    // The wedge. Two points on one vertical line, the tax apart, with the
+    // traded quantity dropped to the axis — the picture a course draws.
+    if (inc) {
+      objects.push({ o: 'point', id: 'pb', x: inc.quantity, y: inc.pricePaid, tone: 'accent' });
+      objects.push({ o: 'point', id: 'ps', x: inc.quantity, y: inc.priceReceived, tone: 'tension' });
+      objects.push({
+        o: 'segment',
+        id: 'wedge',
+        x1: inc.quantity,
+        y1: inc.priceReceived,
+        x2: inc.quantity,
+        y2: inc.pricePaid,
+        tone: 'primary',
+        width: 3,
+      });
+      objects.push({ o: 'segment', id: 'qtv', x1: inc.quantity, y1: 0, x2: inc.quantity, y2: inc.priceReceived, tone: 'ghost', dashed: true });
+      readouts.push(
+        { id: 'pb', tex: 'P_b', value: guarded ? null : fmt(inc.pricePaid, 4), help: 'What buyers hand over, once the tax is on. Higher than the old price — but by less than the tax.' },
+        { id: 'ps', tex: 'P_s', value: guarded ? null : fmt(inc.priceReceived, 4), help: 'What sellers keep. The gap between this and what buyers paid is exactly the tax.' },
+        { id: 'qt', tex: 'Q_t', value: guarded ? null : fmt(inc.quantity, 4), help: 'How much still trades. Fewer units than before — that shrinkage is where the loss comes from.' },
+        {
+          id: 'inc',
+          tex: '\\text{buyers}',
+          value: guarded ? null : `${fmt((inc.buyerShare / (t || 1)) * 100, 3)}\\%`,
+          help: 'The share of the tax buyers carry, as a rise in what they pay. Decided by the slopes, never by who is made to send the money in.',
+        }
+      );
+    }
   }
 
   // The control, and what it does.
@@ -2271,7 +2382,11 @@ const buildSupplyDemand: Builder = (scene, _fn, vals, view, guarded) => {
   const movedS = ssh !== 0;
   const narration = !eq
     ? 'These two curves do not cross anywhere a market could exist. Shift one until they do.'
-    : bind && imbalance > 0
+    : inc
+      ? `The tax opens a gap between two prices that used to be one. Buyers pay ${fmt(inc.pricePaid, 4)} and sellers keep ${fmt(inc.priceReceived, 4)}; the ${fmt(t, 3)} between them is the tax. Buyers carry ${fmt((inc.buyerShare / (t || 1)) * 100, 3)}% of it — and notice that this was decided by the slopes of the two curves, not by which side the law collects from. Fewer units trade than before, and the surplus from those lost trades goes to nobody at all.`
+      : taxOn
+        ? 'A tax this large closes the market rather than shrinking it: there is no price left at which anyone still trades. Bring it down until the curves cross again.'
+        : bind && imbalance > 0
       ? 'The ceiling holds the price below where the market would settle. Buyers want more than sellers will offer, and only the smaller amount trades — that gap is the shortage.'
       : bind && imbalance < 0
         ? 'The floor holds the price above the market price. Sellers offer more than buyers will take, and the unsold difference is the surplus.'
@@ -2291,10 +2406,16 @@ const buildSupplyDemand: Builder = (scene, _fn, vals, view, guarded) => {
     objects,
     readouts: [...readouts, ...welfare],
     narration,
-    caption: control
-      ? 'Move the control price through the market price and watch the gap open.'
-      : 'Shift demand or supply and watch where the market settles.',
-    ask: 'Before you move anything — if demand rises, which way does the price go, and why?',
+    caption:
+      scene.tax != null
+        ? 'Open the tax from zero and watch one price become two.'
+        : control
+          ? 'Move the control price through the market price and watch the gap open.'
+          : 'Shift demand or supply and watch where the market settles.',
+    ask:
+      scene.tax != null
+        ? 'Before you move it — the tax is collected from sellers. Does that mean sellers are the ones who pay it?'
+        : 'Before you move anything — if demand rises, which way does the price go, and why?',
   };
 };
 
@@ -2650,7 +2771,12 @@ const REQUIRED: Record<VizKind, (scene: VizScene) => VizParam[]> = {
         max: 30,
         step: 0.5,
         value: 0,
-        sweep: 'up',
+        // Only one parameter may be swept, and on a tax scene the tax is the
+        // subject: pressing play should open the wedge, not shift demand
+        // while the wedge sits still. Said here rather than left to the
+        // tie-break in withRequired, which keeps whichever comes first and
+        // would silently drop the tax's own sweep.
+        ...(sc.tax != null ? {} : { sweep: 'up' as const }),
         help: 'Shifts the whole demand curve. Right and up is an increase — more wanted at every price — from income, tastes, or the price of a substitute.',
       },
       {
@@ -2663,6 +2789,18 @@ const REQUIRED: Record<VizKind, (scene: VizScene) => VizParam[]> = {
         help: 'Shifts supply. Down and right is an increase — more offered at every price — from cheaper inputs or better technology.',
       },
     ];
+    if (sc.tax != null) {
+      p.push({
+        id: 't',
+        symbol: 't',
+        min: 0,
+        max: Math.max(5, Math.abs((sc.demand?.intercept ?? 100) - (sc.supply?.intercept ?? 20)) * 0.9),
+        step: 0.5,
+        value: sc.tax,
+        sweep: 'up',
+        help: 'A tax of this much on every unit sold. Open it from zero and watch the two prices come apart — buyers pay more, sellers keep less, and the gap between them is the tax.',
+      });
+    }
     if (sc.control) {
       p.push({
         id: 'pc',
@@ -2971,6 +3109,12 @@ function econFields(kind: VizKind, raw: any): Partial<VizScene> {
       };
     }
     if (raw?.surplus === true) out.surplus = true;
+    // A tax and a price control are two different lessons; the control wins
+    // when a scene asks for both, because it is the one that was drawn first
+    // and a diagram carrying four prices teaches neither.
+    if (!out.control && raw?.tax != null) {
+      out.tax = num(raw.tax, 0, 1e5, out.demand.intercept / 10);
+    }
   }
 
   if (kind === 'ppc') {

@@ -130,6 +130,7 @@ export function binds(kind: ControlKind, at: number, eqPrice: number): boolean {
 export interface Welfare {
   consumer: number;
   producer: number;
+  /** consumer + producer + whatever the government collected or paid */
   total: number;
   /** surplus destroyed relative to the free-market outcome */
   deadweight: number;
@@ -150,7 +151,19 @@ export function welfare(
   supply: PriceLine,
   traded: number,
   pricePaid: number,
-  priceReceived = pricePaid
+  priceReceived = pricePaid,
+  /**
+   * What the government takes or gives on those trades: tax revenue as a
+   * positive number, the cost of a subsidy as a negative one.
+   *
+   * It belongs in this sum because it is not destroyed — a tax moves surplus
+   * from the two sides to everyone, and total surplus counts it. Leave it at
+   * zero for a price control, where nobody collects the wedge and the whole
+   * of it really is lost. Getting this wrong makes a subsidy look free: CS
+   * and PS both RISE under one, and it is only once its cost is subtracted
+   * that the overproduction shows up as a loss at all.
+   */
+  transfer = 0
 ): Welfare {
   const q = Math.max(0, traded);
   // Consumer surplus: area under demand, above what was paid, out to q.
@@ -165,11 +178,12 @@ export function welfare(
 
   const eq = equilibrium(demand, supply);
   let deadweight = 0;
+  const total = consumer + producer + transfer;
   if (eq) {
     const free = welfareFree(demand, supply, eq);
-    deadweight = Math.max(0, free - (consumer + producer));
+    deadweight = Math.max(0, free - total);
   }
-  return { consumer, producer, total: consumer + producer, deadweight };
+  return { consumer, producer, total, deadweight };
 }
 
 /** Total surplus when the market is left alone — the benchmark for DWL. */
@@ -265,4 +279,75 @@ export function outputGap(y: number, potential: number, tolFrac = 0.005): Output
   const tol = Math.abs(potential) * tolFrac;
   if (Math.abs(gap) <= tol) return { gap, kind: 'at potential' };
   return { gap, kind: gap < 0 ? 'recessionary' : 'inflationary' };
+}
+
+// ── a per-unit tax ──────────────────────────────────────────────────
+
+/**
+ * The taxed supply curve.
+ *
+ * A per-unit tax raises the price sellers need for every quantity by exactly
+ * the tax, so the curve moves straight up by `t`. Drawn on sellers here, but
+ * the choice does not matter and that is the point of teaching it: levying it
+ * on buyers shifts demand down by `t` instead and produces the same two
+ * prices, the same quantity and the same split. Who hands over the money is
+ * not who bears the cost.
+ *
+ * A negative `t` is a subsidy, and everything below reads correctly for one —
+ * as long as its cost is passed to welfare() as a negative transfer.
+ */
+export function taxedSupply(supply: PriceLine, t: number): PriceLine {
+  return { intercept: supply.intercept + t, slope: supply.slope };
+}
+
+export interface TaxIncidence {
+  /** how much changes hands once the tax is on */
+  quantity: number;
+  /** the price buyers hand over */
+  pricePaid: number;
+  /** what sellers keep, once the tax is taken out of it */
+  priceReceived: number;
+  /** collected on every unit traded */
+  revenue: number;
+  /** how much of the tax buyers absorb, as a price rise */
+  buyerShare: number;
+  /** how much sellers absorb, as a fall in what they keep */
+  sellerShare: number;
+  /** trades the tax prevented */
+  quantityLost: number;
+}
+
+/**
+ * Who actually pays a tax.
+ *
+ * The two prices are the whole lesson. Buyers pay more than before and
+ * sellers keep less than before, and the two gaps add up to the tax — but
+ * they are almost never equal, and which one is bigger is decided by the
+ * slopes rather than by the law. The side that can least easily walk away
+ * carries more of it.
+ *
+ * Returns null when the taxed market has no equilibrium: a tax larger than
+ * the whole gap between the curves closes the market rather than shrinking
+ * it, and there is no honest price to report for a market that is not there.
+ */
+export function taxIncidence(
+  demand: PriceLine,
+  supply: PriceLine,
+  t: number
+): TaxIncidence | null {
+  const free = equilibrium(demand, supply);
+  const taxed = equilibrium(demand, taxedSupply(supply, t));
+  if (!free || !taxed) return null;
+
+  const pricePaid = taxed.p;
+  const priceReceived = pricePaid - t;
+  return {
+    quantity: taxed.q,
+    pricePaid,
+    priceReceived,
+    revenue: t * taxed.q,
+    buyerShare: pricePaid - free.p,
+    sellerShare: free.p - priceReceived,
+    quantityLost: free.q - taxed.q,
+  };
 }

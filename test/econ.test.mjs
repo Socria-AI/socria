@@ -8,6 +8,7 @@
 import {
   priceAt, quantityAt, equilibrium, shift, marketAt, binds, welfare,
   frontierAt, opportunityCost, standing, outputGap,
+  taxedSupply, taxIncidence,
 } from './.tmp/logos-econ.mjs';
 import {
   sanitizeViz, compileScene, resolveView, buildFrame, defaults,
@@ -19,6 +20,9 @@ let pass = 0, fail = 0;
 const ok = (n, c, x = '') => (c ? pass++ : (fail++, console.log('FAIL', n, x)));
 const near = (n, got, want, tol = 1e-9) =>
   ok(n, Math.abs(got - want) < tol, `got ${got}, want ${want}`);
+/** The same comparison as a plain boolean, for assertions that read better
+ *  with the claim in the name rather than the two numbers. */
+const close = (got, want, tol = 1e-9) => Math.abs(got - want) < tol;
 
 // The market used throughout: D: P = 100 − Q, S: P = 20 + Q.
 // 100 − Q = 20 + Q  →  Q* = 40, P* = 60.
@@ -587,6 +591,177 @@ console.log('\n=== right and wrong are marked on the steps ===');
      m.nodes.find((n) => n.id === 's2')?.note);
   ok('these are on the chain the map opens to',
      availableLenses(m).includes('solve'), availableLenses(m).join());
+}
+
+console.log('\n=== a per-unit tax: two prices where there was one ===');
+{
+  // P = 120 - 2Q and P = 30 + Q cross at Q = 30, P = 60.
+  const D = { intercept: 120, slope: -2 };
+  const S = { intercept: 30, slope: 1 };
+  const free = equilibrium(D, S);
+  ok('the untaxed market clears at 30 units', close(free.q, 30));
+  ok('at a price of 60', close(free.p, 60));
+
+  const t = 9;
+  const inc = taxIncidence(D, S, t);
+  // Taxed supply is P = 39 + Q; 120 - 2Q = 39 + Q gives Q = 27, Pb = 66.
+  ok('fewer units trade', close(inc.quantity, 27));
+  ok('buyers pay 66', close(inc.pricePaid, 66));
+  ok('sellers keep 57', close(inc.priceReceived, 57));
+  ok('and the gap between them IS the tax', close(inc.pricePaid - inc.priceReceived, t));
+  ok('revenue is the tax on every unit still traded', close(inc.revenue, t * 27));
+  ok('three trades were prevented', close(inc.quantityLost, 3));
+
+  // The split is decided by the slopes: the share landing on buyers is
+  // |slope D| / (|slope D| + slope S). Demand is the steeper curve here (2
+  // against 1), which means buyers are the side that can least easily walk
+  // away — so they carry two thirds of it, and sellers one third.
+  ok('buyers carry two thirds', close(inc.buyerShare, 6));
+  ok('sellers carry one third', close(inc.sellerShare, 3));
+  ok('and the two shares are the whole tax', close(inc.buyerShare + inc.sellerShare, t));
+
+  // The lesson: which side the law collects from changes nothing. Levying it
+  // on buyers shifts DEMAND down by t instead.
+  const onBuyers = equilibrium({ intercept: D.intercept - t, slope: D.slope }, S);
+  ok('taxing buyers trades the same quantity', close(onBuyers.q, inc.quantity));
+  ok('and sellers keep the same price', close(onBuyers.p, inc.priceReceived));
+
+  // And that is the rule, not this market: make demand steeper still and
+  // buyers — now even less able to walk away — carry more of it; make it
+  // flatter and they carry less. Neither line of the law changed.
+  const steeper = taxIncidence({ intercept: 120, slope: -4 }, S, t);
+  const flatter = taxIncidence({ intercept: 120, slope: -0.5 }, S, t);
+  ok('steeper demand carries more of the tax', steeper.buyerShare > inc.buyerShare);
+  ok('flatter demand carries less', flatter.buyerShare < inc.buyerShare);
+  ok('the split is 4/5 when demand is four times as steep', close(steeper.buyerShare, t * 0.8));
+
+  // A tax bigger than the gap between the curves closes the market.
+  ok('a tax that closes the market has no prices', taxIncidence(D, S, 200) === null);
+  ok('zero tax leaves the market where it was', close(taxIncidence(D, S, 0).quantity, free.q));
+}
+
+console.log('\n=== the tax wedge is not all destroyed ===');
+{
+  const D = { intercept: 120, slope: -2 };
+  const S = { intercept: 30, slope: 1 };
+  const t = 9;
+  const inc = taxIncidence(D, S, t);
+  const w = welfare(D, S, inc.quantity, inc.pricePaid, inc.priceReceived, inc.revenue);
+
+  // Free total: CS = (120-60)/2*30 = 900, PS = (60-30)/2*30 = 450 → 1350.
+  // Taxed: CS = (120-66)/2*27 = 729, PS = (57-30)/2*27 = 364.5, rev = 243.
+  ok('consumer surplus shrinks', close(w.consumer, 729));
+  ok('producer surplus shrinks', close(w.producer, 364.5));
+  ok('total counts the revenue as well', close(w.total, 729 + 364.5 + 243));
+  // DWL = 1350 - 1336.5 = 13.5, which is the triangle ½·9·3.
+  ok('the loss is only the lost trades', close(w.deadweight, 13.5));
+  ok('and that is the wedge times the units lost, halved', close(w.deadweight, 0.5 * t * inc.quantityLost));
+
+  // Counting the revenue as destroyed would say the whole wedge was lost.
+  const ignoringRevenue = welfare(D, S, inc.quantity, inc.pricePaid, inc.priceReceived);
+  ok('ignoring the transfer overstates the loss', ignoringRevenue.deadweight > w.deadweight);
+  ok('by exactly the revenue', close(ignoringRevenue.deadweight - w.deadweight, inc.revenue));
+
+  // A price control has no transfer, so its old behaviour must be untouched.
+  const ceilingQ = marketAt(D, S, 45).traded;
+  const noTransfer = welfare(D, S, ceilingQ, 45);
+  ok('a control still loses the whole wedge', noTransfer.deadweight > 0);
+  ok('and passing transfer 0 is the same thing', close(welfare(D, S, ceilingQ, 45, 45, 0).deadweight, noTransfer.deadweight));
+}
+
+console.log('\n=== the taxed curve is the old one, moved up by the tax ===');
+{
+  const S = { intercept: 30, slope: 1 };
+  const St = taxedSupply(S, 9);
+  ok('same slope', St.slope === S.slope);
+  ok('intercept up by the tax', close(St.intercept, 39));
+  for (const q of [0, 5, 20, 100]) {
+    ok(`at Q=${q} it sits exactly the tax above`, close(priceAt(St, q) - priceAt(S, q), 9));
+  }
+}
+
+console.log('\n=== the tax reaches the picture ===');
+{
+  const sc = sanitizeViz({
+    kind: 'supply-demand',
+    demand: { intercept: 120, slope: -2 },
+    supply: { intercept: 30, slope: 1 },
+    tax: 9,
+    surplus: true,
+    title: 'Who pays the tax?',
+  });
+  ok('the scene survives', !!sc);
+  ok('and carries the tax', sc.tax === 9);
+  const t = (sc.params ?? []).find((p) => p.id === 't');
+  ok('a t slider is offered', !!t, JSON.stringify(sc.params));
+  ok('it opens at the tax the scene asked for', t.value === 9);
+  ok('it can be closed back to nothing', t.min === 0);
+  ok('and it sweeps up, so play performs the tax', t.sweep === 'up');
+  // Only one parameter may sweep, and on a tax scene it must be the tax —
+  // pressing play should open the wedge, not shift demand beside a still one.
+  ok('nothing else sweeps', (sc.params ?? []).filter((p) => p.sweep).length === 1);
+  ok('and on a plain market ΔD still does',
+    (sanitizeViz({ kind: 'supply-demand', demand: { intercept: 120, slope: -2 }, supply: { intercept: 30, slope: 1 } }).params ?? [])
+      .find((p) => p.id === 'dsh')?.sweep === 'up');
+
+  const view = resolveView(sc);
+  const on = buildFrame(sc, null, { ...defaults(sc), t: 9 }, view, false);
+  const ids = on.objects.map((o) => o.id);
+  ok('the taxed curve is drawn', ids.includes('St'));
+  ok('beside the original', ids.includes('S'));
+  ok('with the wedge between the two prices', ids.includes('wedge'));
+  ok('the revenue is shaded', ids.includes('rev'));
+  ok('and so is the loss', ids.includes('dwl'));
+  const r = Object.fromEntries(on.readouts.map((x) => [x.id, x.value]));
+  ok('buyers’ price is reported', r.pb === '66');
+  ok('sellers’ price is reported', r.ps === '57');
+  ok('the traded quantity too', r.qt === '27');
+  ok('and the share buyers carry', /66\.7|66\.6/.test(r.inc ?? ''), r.inc);
+  ok('the narration names both prices', /66/.test(on.narration) && /57/.test(on.narration));
+  ok('and says the law does not decide it', /slopes/.test(on.narration));
+
+  // At zero the diagram is an ordinary market again — no wedge, no ghosts.
+  const off = buildFrame(sc, null, { ...defaults(sc), t: 0 }, view, false);
+  const offIds = off.objects.map((o) => o.id);
+  ok('no wedge at zero', !offIds.includes('wedge'));
+  ok('no second curve at zero', !offIds.includes('St'));
+  ok('no revenue at zero', !offIds.includes('rev'));
+  ok('and the equilibrium is the live one again', off.narration.includes('market at rest'));
+
+  // A tax that closes the market says so instead of drawing a fiction.
+  const shut = buildFrame(sc, null, { ...defaults(sc), t: 500 }, view, false);
+  ok('an impossible tax is named', /closes the market/.test(shut.narration), shut.narration);
+  ok('and nothing is drawn at a made-up price', !shut.objects.map((o) => o.id).includes('wedge'));
+
+  // The Answer Guard still withholds the numbers.
+  const guarded = buildFrame(sc, null, { ...defaults(sc), t: 9 }, view, true);
+  const gr = Object.fromEntries(guarded.readouts.map((x) => [x.id, x.value]));
+  ok('guarded: the prices are withheld', gr.pb === null && gr.ps === null);
+  ok('guarded: but the picture is still drawn', guarded.objects.map((o) => o.id).includes('St'));
+}
+
+console.log('\n=== a tax and a control are alternatives ===');
+{
+  const both = sanitizeViz({
+    kind: 'supply-demand',
+    demand: { intercept: 120, slope: -2 },
+    supply: { intercept: 30, slope: 1 },
+    control: { kind: 'ceiling', at: 45 },
+    tax: 9,
+  });
+  ok('the control wins', !!both.control && both.tax === undefined);
+  const ids = (both.params ?? []).map((p) => p.id);
+  ok('and only its slider is offered', ids.includes('pc') && !ids.includes('t'));
+
+  // A negative tax is not a subsidy here — welfare() would need the cost
+  // passing as a negative transfer, and the diagram does not do that yet.
+  const neg = sanitizeViz({
+    kind: 'supply-demand',
+    demand: { intercept: 120, slope: -2 },
+    supply: { intercept: 30, slope: 1 },
+    tax: -9,
+  });
+  ok('a negative tax is clamped away', !neg.tax || neg.tax >= 0);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
