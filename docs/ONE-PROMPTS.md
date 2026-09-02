@@ -69,9 +69,22 @@ deleted, not one limit would change.
 ## Two categories
 
 **Entitlement** prompts answer a question the person asked by acting: *why did
-that stop?* They appear immediately and are **never rationed** — no cooldown,
-no session cap, no engagement bar. Rationing them would leave someone staring
-at a button that silently did nothing, which is worse than the prompt.
+that stop?* They appear immediately, and none of the proactive rationing
+touches them — no cooldown, no session cap, no engagement bar.
+
+They are shown **once per boundary per tab**, though. The first press of an
+exhausted control deserves an answer; the fourth is the same person doing the
+same thing, and answering it again with a sheet across the screen is the
+nagging the rest of this system exists to prevent. Each trigger is counted
+separately: being told the month's chats are gone says nothing about why
+Research stopped.
+
+The reason rationing them was once forbidden is real and still holds — silence
+would leave someone staring at a button that did nothing. So the surfaces keep
+that promise instead. When `ask()` returns `false`, the caller says the same
+sentence **in place**: the composer shows it under the box, the node panel
+opens on the node that was pressed and says it there, and the allowance meter
+carries it for as long as it is true. A press never produces nothing.
 
 **Proactive** prompts answer no question. Nobody asked. Everything that looks
 like paranoia below is aimed at these.
@@ -122,6 +135,19 @@ There is also a ~2.6s settle after the reply lands. That is not a timed
 trigger — the trigger already fired — it just keeps the sheet from landing on
 top of a reply someone has not finished reading. Typing again cancels it.
 
+### Nothing is generated past a boundary
+
+A refused turn is not extracted from. The map rebuild used to be fired
+alongside the reply so the two ran in parallel; that was free when the turn was
+accepted and wrong when it was not, because a spent account watched new nodes
+appear on every attempt. The extraction now waits for the reply's response
+**headers** — not its body — so it still overlaps the whole stream, and a turn
+the server refuses never reaches the extractor.
+
+The composer also checks the boundary before sending at all, so a turn that
+would begin a chat there is no room for costs no round trip. Continuing an open
+line of thinking is never stopped: a chat is counted once, when it starts.
+
 ### Dismissal counting
 
 Closing an **entitlement** prompt does not count toward the cooldown. It is a
@@ -135,7 +161,7 @@ ever rejected.
 
 | | holds | why |
 |---|---|---|
-| `sessionStorage` | prompts shown this tab | clears itself on tab close, which is what "per session" means |
+| `sessionStorage` | prompts shown this tab, and which boundaries were explained | clears itself on tab close, which is what "per session" means |
 | `localStorage` | dismissals + when | survives reload, works signed out |
 | `logos_usage` (server) | the same, per account | survives a different device |
 
@@ -208,8 +234,18 @@ cannot.
 
 All of it is `components/OneMark.tsx`, drawn in the /one cover's own palette
 (`--one-*` tokens on `:root` in `app/globals.css`, which the prompt sheet
-now reads too). Each waits for `usePlan().known` before rendering, so a
-member is never shown a price for the half-second before the server answers.
+now reads too). Each waits for `usePlan().known` before rendering.
+
+What `known` takes depends on who is asking. A **signed-in** visitor waits for
+the server, because an account can hold One through Stripe, a grant or a
+redeemed code and none of that is visible from the browser — pricing a member
+for half a second is a small insult that repeats on every page load. A
+**signed-out** visitor waits for nothing: they cannot hold a subscription, and
+the one way they hold One is the typed code in `localStorage`, read
+synchronously. Making them wait meant that when the round trip did not
+arrive — a first visit that meets an auth handshake, a blocked request, a cold
+start — they saw no mention of Socria One anywhere on the site, which is the
+one audience the caution was not protecting.
 
 ## The price is written once
 

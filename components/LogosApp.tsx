@@ -61,7 +61,7 @@ import { ConnectionsModal } from '@/components/ConnectionsModal';
 import type { Attachment, AttachmentOrigin } from '@/lib/logos-attachments';
 import { MAX_CONTEXTS_PER_NODE, sanitizeContexts, type NodeContext } from '@/lib/logos-sources';
 import { relevantNodes, type DraftAction, type DraftResponse } from '@/lib/logos-draft';
-import { limitsFor, type Counter } from '@/lib/entitlements';
+import { boundaryNote, limitsFor, type Counter } from '@/lib/entitlements';
 import { DRIFT_DISMISS_LIMIT, readDrift, type DriftVerdict } from '@/lib/topic-drift';
 import {
   MATH_FADE_MS,
@@ -1211,7 +1211,21 @@ export function LogosApp({
     // since seeing where your own thinking came from is not a feature to sell.
     // Research is the one that has a free edge, and only on the second reach.
     if (mode === 'research' && researchLocked) {
-      ask('research-spent');
+      // When the sheet stays shut — this boundary was already explained in
+      // this tab — the panel opens on the node they pressed and says it
+      // there. A press that produces nothing at all is the one outcome this
+      // is not allowed to have.
+      if (!ask('research-spent')) {
+        setExplore({
+          key: `spent::${node.id}::${mode}`,
+          mode,
+          node,
+          data: null,
+          loading: false,
+          error: boundaryNote('research'),
+          open: true,
+        });
+      }
       return;
     }
     // Generated once per node per mode, then reused — reopening is instant and
@@ -1256,8 +1270,18 @@ export function LogosApp({
         // A boundary, not a failure: the server has the authoritative count.
         const json = await res.json().catch(() => null);
         void refreshUsage(activeIdRef.current);
-        setExplore((e) => ({ ...e, loading: false, open: false }));
-        ask(reasonForCounter(mode as Counter));
+        const said = ask(reasonForCounter(mode as Counter));
+        // When the sheet stays shut because this boundary was already
+        // explained, the panel says it rather than closing on nothing.
+        setExplore((e) =>
+          said
+            ? { ...e, loading: false, open: false }
+            : {
+                ...e,
+                loading: false,
+                error: json?.error || boundaryNote(mode as Counter),
+              }
+        );
         return;
       }
       if (!res.ok) throw new Error('Could not look that up right now.');
@@ -1301,7 +1325,6 @@ export function LogosApp({
     // so the extractor knows which node the person was looking at.
     const marked: Msg = { role: 'user', content: `[on “${node.label}”] ${content}` };
     chronRef.current = [...chronRef.current, marked];
-    refreshMap();
 
     const payload = [...messages.slice(-8), ...nextThread];
 
@@ -1326,6 +1349,11 @@ export function LogosApp({
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error || 'Something went wrong.');
       }
+
+      // Accepted — the reasoning done in this node belongs on the map. Same
+      // rule as the main composer: a refused turn is not extracted from.
+      refreshMap();
+
       const reader = res.body?.getReader();
       const decoder = new TextDecoder();
       let acc = '';
@@ -1383,6 +1411,28 @@ export function LogosApp({
   async function send(text: string, atts: Attachment[] = []) {
     const content = text.trim();
     if ((!content && !atts.length) || busy || !activeIdRef.current) return;
+
+    // The month's chats are spent and this turn would BEGIN one.
+    //
+    // The server would refuse it anyway — that is where the boundary really
+    // lives — but sending it first meant the refusal arrived after the map
+    // extraction had already run beside it, so a spent account watched new
+    // nodes appear on every attempt and got a sheet each time. Stopping here
+    // costs a round trip that was never going to produce anything, and the
+    // sentence stays in the composer where they can still send it once they
+    // have room. Continuing an OPEN line of thinking is not a beginning and
+    // is not stopped: a chat is counted once, when it starts.
+    //
+    // If the sheet has already explained this boundary in this tab, it stays
+    // shut and the sentence is said in place instead. Something must answer
+    // a press that does nothing — that was the whole reason entitlement
+    // prompts were never rationed, and the once-per-tab rule only holds
+    // because this line keeps the promise the sheet used to.
+    if (!one && chatsSpent && !messages.some((m) => m.role === 'user')) {
+      if (!ask('chats-spent')) setError(boundaryNote('chats'));
+      return;
+    }
+
     setError(null);
     setInput('');
 
@@ -1410,10 +1460,16 @@ export function LogosApp({
     setBusy(true);
     setStreaming('');
 
-    // Independent pass: rebuild the map from everything said so far.
-    refreshMap();
-
     // Conversational reply.
+    //
+    // The map extraction USED to be fired here, in parallel, so it could run
+    // while the answer streamed. It cost nothing when the turn was accepted
+    // and was wrong when it was not: a refused turn still had its map rebuilt
+    // beside it, which is how a spent account kept watching nodes appear
+    // after the boundary. It now waits for the response HEADERS — not the
+    // body — so the extraction still overlaps the whole of the stream, which
+    // is where the time actually goes, and a turn the server refuses is not
+    // extracted from at all.
     try {
       const res = await fetch('/api/logos/chat', {
         method: 'POST',
@@ -1428,13 +1484,18 @@ export function LogosApp({
         patchActive((sn) => ({ ...sn, messages: sn.messages.slice(0, -1) }), false);
         setInput(content);
         setBusy(false);
-        ask('chats-spent');
+        // Same rule as the pre-flight above: the sheet once, then in place.
+        if (!ask('chats-spent')) setError(body?.error || boundaryNote('chats'));
         return;
       }
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error || 'Something went wrong.');
       }
+
+      // The turn was accepted. Now the map may be rebuilt from it.
+      refreshMap();
+
       const reader = res.body?.getReader();
       const decoder = new TextDecoder();
       let acc = '';

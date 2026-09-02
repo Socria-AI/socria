@@ -112,7 +112,7 @@ console.log('\n=== free user hits the Explore limit ===');
   ok('explore-spent title is the user\'s sentence', d.show && d.copy.title === 'Keep exploring', d.show && d.copy.title);
 }
 
-console.log('\n=== entitlement prompts are never rationed ===');
+console.log('\n=== entitlement prompts are not rationed by the proactive guards ===');
 // They are the answer to an action the person just took. Cooldowns, session
 // caps and engagement bars must not silence them.
 {
@@ -122,6 +122,7 @@ console.log('\n=== entitlement prompts are never rationed ===');
       lastDismissedAt: NOW - 1000,
       lastShownAt: NOW - 1000,
       shownThisSession: 7,
+      shownTriggers: [],
     },
     engagement: { sessions: 0, activeDays: 0, mapNodes: 0 },
     context: 'reflecting',
@@ -130,6 +131,57 @@ console.log('\n=== entitlement prompts are never rationed ===');
     const d = show({ reason: r, ...hostile });
     ok(`${r}: survives every proactive guard`, d.show === true, JSON.stringify(d));
   }
+}
+
+console.log('\n=== but each boundary is explained once per tab, not once per press ===');
+// The first press of an exhausted control deserves an answer. The fourth is
+// the same person doing the same thing, and answering it again with a sheet
+// across the screen is the nagging this whole file exists to prevent.
+{
+  for (const r of TRIGGER_REASONS.filter((x) => TRIGGERS[x].category === 'entitlement')) {
+    const first = show({ reason: r });
+    ok(`${r}: the first press is answered`, first.show === true);
+    const again = show({
+      reason: r,
+      state: { ...EMPTY_PROMPT_STATE, shownTriggers: [r] },
+    });
+    ok(
+      `${r}: the second press is not`,
+      again.show === false && again.why === 'said-already',
+      JSON.stringify(again)
+    );
+  }
+
+  // Each boundary is its own explanation. Being told the month's chats are
+  // spent says nothing about why Research stopped, so it must not silence it.
+  const other = show({
+    reason: 'research-spent',
+    state: { ...EMPTY_PROMPT_STATE, shownTriggers: ['chats-spent'] },
+  });
+  ok('a different boundary is still explained', other.show === true);
+
+  // The Socria One button is a request, and a request is answered every time.
+  const asked = show({
+    reason: 'asked',
+    state: { ...EMPTY_PROMPT_STATE, shownTriggers: ['asked', 'chats-spent'] },
+  });
+  ok('pressing the Socria One button always opens it', asked.show === true);
+
+  // A member is refused before any of this is consulted.
+  const member = show({
+    reason: 'chats-spent',
+    plan: 'one',
+    state: { ...EMPTY_PROMPT_STATE, shownTriggers: [] },
+  });
+  ok('a member is still refused first', member.show === false && member.why === 'has-one');
+
+  // And the once-per-tab rule never outranks "something is already open".
+  const stacked = show({
+    reason: 'chats-spent',
+    open: true,
+    state: { ...EMPTY_PROMPT_STATE, shownTriggers: ['chats-spent'] },
+  });
+  ok('already-open still wins', stacked.show === false && stacked.why === 'already-open');
 }
 
 console.log('\n=== proactive prompts need real engagement ===');
@@ -161,6 +213,7 @@ console.log('\n=== never immediately after signup ===');
 console.log('\n=== max one proactive prompt per session ===');
 {
   const after = { ...EMPTY_PROMPT_STATE, shownThisSession: 1 };
+  // (shownTriggers is empty here — this is about the proactive session cap.)
   const d = show({ reason: 'returning-thinker', state: after });
   ok('second one in a session is suppressed', d.show === false && d.why === 'session-cap');
   // …but an entitlement prompt still gets through, because they asked for it.
@@ -270,7 +323,9 @@ console.log('\n=== the decision is pure ===');
   const before = JSON.stringify(state);
   show({ reason: 'returning-thinker', state });
   show({ reason: 'chats-spent', state });
+  show({ reason: 'chats-spent', state: { ...state, shownTriggers: ['chats-spent'] } });
   ok('decide() does not mutate the state it is given', JSON.stringify(state) === before);
+  ok('and it did not grow a shownTriggers list of its own', state.shownTriggers.length === 0);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

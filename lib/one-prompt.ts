@@ -313,6 +313,16 @@ export interface PromptState {
   lastShownAt: number;
   /** proactive prompts shown in this browser session */
   shownThisSession: number;
+  /**
+   * Which triggers have already been explained in this browser session.
+   *
+   * An entitlement prompt is the answer to "why did that stop?", and the
+   * answer only has to be given once. Repeating it on every further press of
+   * the same exhausted control is not an explanation any more, it is a
+   * nag — and the surfaces all carry the same sentence inline, so nothing is
+   * hidden by staying quiet the second time.
+   */
+  shownTriggers: readonly TriggerReason[];
 }
 
 export const EMPTY_PROMPT_STATE: PromptState = {
@@ -320,6 +330,7 @@ export const EMPTY_PROMPT_STATE: PromptState = {
   lastDismissedAt: 0,
   lastShownAt: 0,
   shownThisSession: 0,
+  shownTriggers: [],
 };
 
 export type SuppressReason =
@@ -328,7 +339,9 @@ export type SuppressReason =
   | 'cooldown'
   | 'sensitive-context'
   | 'not-engaged'
-  | 'already-open';
+  | 'already-open'
+  /** this exact boundary has already been explained in this browser session */
+  | 'said-already';
 
 export interface DecideInput {
   reason: TriggerReason;
@@ -375,13 +388,26 @@ export function decide(input: DecideInput): Decision {
 
   if (spec.category === 'entitlement') {
     // They pressed something and it stopped. Explaining that is not
-    // promotion, and it is not rationed — the frequency IS their action.
+    // promotion, and it is not rationed by the cooldown, the session cap or
+    // the engagement bar — the frequency IS their action.
+    //
+    // Once per boundary per tab, though. The original rule was "never
+    // rationed", on the reasoning that silence would leave someone staring
+    // at a control that did nothing; that reasoning is about the FIRST
+    // press and does not survive the fourth. Someone who has been told the
+    // month's chats are spent and types again has not asked a new question,
+    // and answering it again with a sheet across the screen is the exact
+    // behaviour the rest of this file exists to prevent. The allowance
+    // panel and the boundary note say the same sentence, in place, for as
+    // long as it is true.
+    if (state.shownTriggers.includes(reason)) return no('said-already');
     return yes();
   }
 
   // 'asked' is proactive by category but is a button press: it bypasses the
-  // rationing for the same reason entitlement prompts do. It is here rather
-  // than as its own category because it must still never show to a member.
+  // rationing for the same reason entitlement prompts do, and it is not
+  // subject to the once-per-tab rule either — pressing a button labelled
+  // Socria One is a request, and a request is answered every time.
   if (reason === 'asked') return yes();
 
   // ── from here down: nobody asked ──────────────────────────────────

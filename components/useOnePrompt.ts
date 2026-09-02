@@ -12,8 +12,9 @@
 //
 // Where state lives, and why it is split:
 //
-//   sessionStorage  how many proactive prompts this TAB has shown. Clears by
-//                   itself when the tab closes, which is exactly the lifetime
+//   sessionStorage  how many proactive prompts this TAB has shown, and which
+//                   boundaries it has already explained. Clears by itself
+//                   when the tab closes, which is exactly the lifetime
 //                   "once per session" means.
 //   localStorage    dismissals and when, so a cooldown survives a reload even
 //                   signed out.
@@ -52,7 +53,9 @@ function readLocal(): PromptState {
       dismissals: Number(j.dismissals) || 0,
       lastDismissedAt: Number(j.lastDismissedAt) || 0,
       lastShownAt: Number(j.lastShownAt) || 0,
-      shownThisSession: 0, // never persisted here; sessionStorage owns it
+      // Neither of these is persisted here; sessionStorage owns both.
+      shownThisSession: 0,
+      shownTriggers: [],
     };
   } catch {
     return { ...EMPTY_PROMPT_STATE };
@@ -74,19 +77,38 @@ function writeLocal(s: PromptState) {
   }
 }
 
-function readSessionCount(): number {
+interface SessionMemory {
+  /** proactive prompts shown in this tab */
+  n: number;
+  /** boundaries already explained in this tab */
+  triggers: TriggerReason[];
+}
+
+function readSessionMemory(): SessionMemory {
   try {
-    return Number(sessionStorage.getItem(SESSION_KEY)) || 0;
+    const raw = sessionStorage.getItem(SESSION_KEY);
+    if (!raw) return { n: 0, triggers: [] };
+    // This key used to hold a bare count. A tab open across the deploy that
+    // added the trigger list would otherwise throw here and be told it had
+    // already asked about everything.
+    if (/^\d+$/.test(raw)) return { n: Number(raw), triggers: [] };
+    const j = JSON.parse(raw) as Partial<SessionMemory>;
+    return {
+      n: Number(j.n) || 0,
+      triggers: Array.isArray(j.triggers)
+        ? j.triggers.filter((t): t is TriggerReason => typeof t === 'string' && t in TRIGGERS)
+        : [],
+    };
   } catch {
     // No sessionStorage means we cannot prove we have not already asked, so
     // count it as asked. Erring toward silence is the correct direction.
-    return 1;
+    return { n: 1, triggers: [] };
   }
 }
 
-function writeSessionCount(n: number) {
+function writeSessionMemory(m: SessionMemory) {
   try {
-    sessionStorage.setItem(SESSION_KEY, String(n));
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify(m));
   } catch {}
 }
 
@@ -150,7 +172,9 @@ export function useOnePrompt({
     if (loaded.current) return;
     loaded.current = true;
     const local = readLocal();
-    local.shownThisSession = readSessionCount();
+    const mem = readSessionMemory();
+    local.shownThisSession = mem.n;
+    local.shownTriggers = mem.triggers;
     state.current = local;
 
     if (!signedIn) return;
@@ -220,8 +244,17 @@ export function useOnePrompt({
       ...state.current,
       lastShownAt: Date.now(),
       shownThisSession: state.current.shownThisSession + (proactive ? 1 : 0),
+      // 'asked' is the Socria One button, which is answered every time and
+      // so is never remembered as having been said.
+      shownTriggers:
+        reason === 'asked' || state.current.shownTriggers.includes(reason)
+          ? state.current.shownTriggers
+          : [...state.current.shownTriggers, reason],
     };
-    if (proactive) writeSessionCount(state.current.shownThisSession);
+    writeSessionMemory({
+      n: state.current.shownThisSession,
+      triggers: [...state.current.shownTriggers],
+    });
     writeLocal(state.current);
 
     setView({
