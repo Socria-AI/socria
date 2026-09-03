@@ -5,7 +5,7 @@ let seed = 0x5eed;
 const rnd = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 2 ** 32;
 const pick = (a) => a[Math.floor(rnd() * a.length)];
 
-const KINDS = ['function','limit','derivative','riemann','taylor','sequence','vectors','matrix','distribution','ode', 'wat', 42, null, {}, 'FUNCTION'];
+const KINDS = ['function','limit','derivative','riemann','taylor','sequence','vectors','matrix','distribution','ode','diagram','supply-demand','ppc','ad-as', 'wat', 42, null, {}, 'FUNCTION'];
 const EXPRS = ['x^2','sin(x)','1/x','a*x+b','x % 2','abs(x)','','(((','x^x','y - x','ln(x)','q*z*w','constructor(x)','__proto__','x'.repeat(5000),'2+2','sqrt(-1-x^2)', 'x^(1/2)', 'exp(x^2)^2', 42, null, ['x'], {e:'x'}];
 const NUMS = [0,1,-1,0.5,3,NaN,Infinity,-Infinity,1e9,-1e9,1e-9,'3','x',null,[],{},true,-100,100,1e4+1];
 const rnum = () => pick(NUMS);
@@ -23,8 +23,43 @@ const rvectors = () => pick([
   [{x:0,y:0}], 'vecs', [null, {x:1}], [], [{x:1,y:2},{y:3,x:-1}],
 ]);
 
+// The open kind is the one place a model authors DRAWING instructions rather
+// than parameters to a builder, so it is the one that most needs proving
+// against nonsense: a bad coordinate must become a missing part, never a
+// broken picture or a NaN in the SVG.
+const COORD = () => pick([
+  0, 1, -1, 3.5, 1e7, -1e7, NaN, Infinity, 'a', 'k', 'z', 'a*2', 'x', '1/0',
+  '(((', '', 'x'.repeat(500), 'constructor', '__proto__', null, undefined, [], {}, true, '2+2',
+]);
+const rpart = () => pick([
+  { o: 'curve', expr: pick(EXPRS), from: COORD(), to: COORD(), tone: pick(['accent','nope',42,null]), label: pick(['c', 'x'.repeat(200), 42]) },
+  { o: 'point', x: COORD(), y: COORD(), hollow: pick([true,'yes',1]), label: pick(['p',null,42]) },
+  { o: 'segment', x1: COORD(), y1: COORD(), x2: COORD(), y2: COORD(), width: pick([1,0,-5,99,'wide',null]) },
+  { o: 'line', x: COORD(), y: COORD(), slope: COORD() },
+  { o: 'vector', x1: COORD(), y1: COORD(), x2: COORD(), y2: COORD() },
+  { o: 'region', pts: pick([[{x:COORD(),y:COORD()},{x:COORD(),y:COORD()},{x:COORD(),y:COORD()}], [], 'pts', null, Array.from({length:300},()=>({x:COORD(),y:COORD()}))]) },
+  { o: 'rects', bars: pick([[{x0:COORD(),x1:COORD(),y:COORD()}], [], null, 'bars']) },
+  { o: 'sequence', pts: pick([[{x:COORD(),y:COORD()}], [], null]), stems: pick([true,1,'y']) },
+  { o: 'vrule', at: COORD() }, { o: 'hrule', at: COORD() },
+  { o: 'label', x: COORD(), y: COORD(), text: pick(['t', '', 'x'.repeat(900), 42, null]), anchor: pick(['start','end','middle','over',null]), dy: pick([0,-6,900,'up',null]) },
+  { o: 'nonsense' }, { o: 42 }, {}, null, 'part', 7, [],
+]);
+
 const scene = () => ({
   kind: pick(KINDS),
+  parts: pick([
+    [rpart()], [rpart(), rpart(), rpart()], Array.from({length: 80}, rpart),
+    [], null, 'parts', 42, [null, undefined, {}],
+  ]),
+  quantities: pick([
+    [{ tex: 'k', expr: pick(EXPRS), help: pick(['h', 'x'.repeat(900), 42]) }],
+    [{ tex: 42, expr: null }], [], null, 'q', Array.from({length: 20}, () => ({ tex: 'a', expr: 'a' })),
+  ]),
+  says: pick([
+    { caption: pick(['c', 'x'.repeat(900), 42]), narration: pick(['n', null]), ask: pick(['a?', 42]) },
+    {}, null, 'says', 42,
+  ]),
+  axes: pick([{ x: 'A', y: 'B' }, { x: 42 }, {}, null, 'axes']),
   expr: pick(EXPRS),
   varName: pick(['x','t','n','y','xx','1','',42,null,'__proto__']),
   view: pick([{xMin:rnum(),xMax:rnum(),yMin:rnum(),yMax:rnum()}, {xMin:rnum(),xMax:rnum()}, {}, null, 'view', []]),

@@ -188,6 +188,36 @@ export interface VizFrame {
   ask?: string;
 }
 
+// ── the open kind's parts ───────────────────────────────────────────
+//
+// A mirror of VizObject, with two differences: every coordinate may be an
+// expression over the scene's parameters, and there is no `id` — ids are
+// assigned on the way out, so the extractor cannot collide them or leave one
+// out. Curves carry their own `expr` rather than the scene's, which is why
+// `diagram` sits in OBJECT_KINDS: the scene as a whole has no single formula.
+
+/** A number, or an expression over the parameters that evaluates to one. */
+export type NumOrExpr = number | string;
+
+export type DiagramPart =
+  | { o: 'curve'; expr: string; from?: NumOrExpr; to?: NumOrExpr; tone?: Tone; dashed?: boolean; width?: number; label?: string }
+  | { o: 'point'; x: NumOrExpr; y: NumOrExpr; tone?: Tone; hollow?: boolean; label?: string }
+  | { o: 'segment'; x1: NumOrExpr; y1: NumOrExpr; x2: NumOrExpr; y2: NumOrExpr; tone?: Tone; dashed?: boolean; width?: number }
+  | { o: 'line'; x: NumOrExpr; y: NumOrExpr; slope: NumOrExpr; tone?: Tone; dashed?: boolean; width?: number }
+  | { o: 'vector'; x1: NumOrExpr; y1: NumOrExpr; x2: NumOrExpr; y2: NumOrExpr; tone?: Tone; label?: string }
+  | { o: 'region'; pts: { x: NumOrExpr; y: NumOrExpr }[]; tone?: Tone }
+  | { o: 'rects'; bars: { x0: NumOrExpr; x1: NumOrExpr; y: NumOrExpr }[]; tone?: Tone }
+  | { o: 'sequence'; pts: { x: NumOrExpr; y: NumOrExpr }[]; tone?: Tone; stems?: boolean }
+  | { o: 'vrule'; at: NumOrExpr; tone?: Tone; dashed?: boolean; label?: string }
+  | { o: 'hrule'; at: NumOrExpr; tone?: Tone; dashed?: boolean; label?: string }
+  | { o: 'label'; x: NumOrExpr; y: NumOrExpr; text: string; tone?: Tone; anchor?: 'start' | 'middle' | 'end'; dy?: number };
+
+export interface DiagramQuantity {
+  tex: string;
+  expr: string;
+  help?: string;
+}
+
 // ── the scene ───────────────────────────────────────────────────────
 
 export const VIZ_KINDS = [
@@ -207,6 +237,14 @@ export const VIZ_KINDS = [
   'supply-demand',
   'ppc',
   'ad-as',
+  // The open one. Every kind above is a named picture with a builder that
+  // knows its mathematics; this is the picture nobody wrote a builder for —
+  // a titration curve, a free-body diagram, a phase change, a timeline, a
+  // budget line, a food web, whatever the conversation is actually about.
+  // The extractor authors the parts itself out of the same primitives the
+  // other builders emit, so it is live, zoomable and slider-driven like the
+  // rest rather than a picture of a picture.
+  'diagram',
 ] as const;
 export type VizKind = (typeof VIZ_KINDS)[number];
 
@@ -329,6 +367,9 @@ const OBJECT_KINDS = new Set<VizKind>([
   'supply-demand',
   'ppc',
   'ad-as',
+  // A diagram's curves each carry their own expression; the scene has no
+  // single one, so requiring scene.expr would reject every one of them.
+  'diagram',
 ]);
 
 export function kindNeedsExpr(kind: VizKind): boolean {
@@ -423,6 +464,25 @@ export interface VizScene {
    * any butter, and the opportunity cost of every gun has changed.
    */
   frontier?: { xMax: number; yMax: number; bowed: boolean; grows?: 'both' | 'x' | 'y' };
+  // ── the open kind ──
+  /**
+   * diagram: the parts the extractor drew, in the scene's own coordinates.
+   *
+   * Every slot that takes a number also takes an EXPRESSION over the scene's
+   * parameters, which is what keeps an authored picture live: a point at
+   * `{x: 'c', y: 'k*c'}` moves when the c slider moves, so the model can draw
+   * a concentration, a force balance or a break-even point and hand the
+   * reader the control that makes it mean something.
+   */
+  parts?: DiagramPart[];
+  /**
+   * diagram: quantities computed from the parameters and shown beside the
+   * picture, the way every other kind's readouts are. `tex` names it, `expr`
+   * computes it, `help` says what it is without giving the number away.
+   */
+  quantities?: DiagramQuantity[];
+  /** diagram: the words under and beside it, authored rather than derived */
+  says?: { caption?: string; narration?: string; ask?: string };
   /** what the axes are counting — "Guns", "Butter", "Real GDP" */
   axes?: { x: string; y: string };
   /** ad-as: aggregate demand and short-run aggregate supply */
@@ -571,6 +631,9 @@ export interface Viewport {
   yMax: number;
 }
 
+const xMinOf = (sc: VizScene) => sc.view.xMin;
+const xMaxOf = (sc: VizScene) => sc.view.xMax;
+
 function specialView(
   scene: VizScene,
   fn: CompiledExpr | null,
@@ -581,6 +644,79 @@ function specialView(
     const p = (hi - lo) * 0.12;
     return [lo - p, hi + p];
   };
+
+  // ── the open kind ──
+  // A diagram's window is its own contents and nothing else: the parts were
+  // authored in whatever units the subject uses, and pH against millilitres
+  // or a decade of years would be invisible in the default window a function
+  // gets. Computed at the DEFAULT parameters, like every branch here, so
+  // moving a slider moves the picture rather than the frame around it.
+  if (scene.kind === 'diagram') {
+    const names = scene.params.map((q) => q.id);
+    const xs: number[] = [];
+    const ys: number[] = [];
+    const take = (x: number, y: number) => {
+      if (Number.isFinite(x)) xs.push(x);
+      if (Number.isFinite(y)) ys.push(y);
+    };
+    const at = (v: NumOrExpr | undefined): number => coord(v, scope, names);
+    for (const part of scene.parts ?? []) {
+      switch (part.o) {
+        case 'point':
+        case 'label':
+          take(at(part.x), at(part.y));
+          break;
+        case 'segment':
+        case 'vector':
+          take(at(part.x1), at(part.y1));
+          take(at(part.x2), at(part.y2));
+          break;
+        case 'region':
+        case 'sequence':
+          for (const q of part.pts) take(at(q.x), at(q.y));
+          break;
+        case 'rects':
+          for (const b of part.bars) { take(at(b.x0), at(b.y)); take(at(b.x1), 0); }
+          break;
+        case 'vrule': {
+          const a = at(part.at);
+          if (Number.isFinite(a)) xs.push(a);
+          break;
+        }
+        case 'hrule': {
+          const a = at(part.at);
+          if (Number.isFinite(a)) ys.push(a);
+          break;
+        }
+        case 'curve': {
+          // Sampled coarsely — this only has to find the extent, and the
+          // window must not depend on how finely the curve is later drawn.
+          const cf = diagramExpr(part.expr, [scene.varName, ...names]);
+          if (!cf) break;
+          const from = part.from === undefined ? xMinOf(scene) : at(part.from);
+          const to = part.to === undefined ? xMaxOf(scene) : at(part.to);
+          if (!Number.isFinite(from) || !Number.isFinite(to) || to === from) break;
+          for (let i = 0; i <= 48; i++) {
+            const x = from + ((to - from) * i) / 48;
+            take(x, cf.eval({ ...scope, [scene.varName]: x }));
+          }
+          break;
+        }
+        case 'line':
+          take(at(part.x), at(part.y));
+          break;
+      }
+    }
+    if (xs.length && ys.length) {
+      const [xlo, xhi] = pad(Math.min(...xs), Math.max(...xs));
+      const [ylo, yhi] = pad(Math.min(...ys), Math.max(...ys));
+      return { xMin: xlo, xMax: xhi, yMin: ylo, yMax: yhi };
+    }
+    // Nothing measurable: fall through to the generic window rather than
+    // returning one built from an empty list, which would be NaN on all four
+    // sides and take the whole panel down.
+    return null;
+  }
 
   // ── economics ──
   // These diagrams live in the first quadrant and nowhere else. Quantity and
@@ -2589,6 +2725,167 @@ const buildAdAs: Builder = (scene, _fn, vals, view, guarded) => {
   };
 };
 
+
+// --- the open kind: whatever this conversation is actually about ----
+//
+// Every builder above knows a subject. This one knows none, and that is the
+// point: the extractor authors the parts and this draws them. A titration
+// curve, a free-body diagram, a budget line, a cooling curve, a timeline —
+// none of them will ever have a builder of their own, and all of them are
+// made of the same segments, points, regions and labels the named kinds emit.
+//
+// What makes it more than a picture is that every coordinate may be an
+// EXPRESSION over the scene's parameters. Author a point at (c, k*c) and give
+// the reader a c slider, and the diagram moves the way the named kinds move.
+
+/**
+ * Compiled expressions, kept between frames.
+ *
+ * A diagram is rebuilt on every animation tick and its parts do not change
+ * between them, so compiling each coordinate sixty times a second is work
+ * nobody asked for. Keyed on the source text and the parameter names, because
+ * the same text means something different once a slider is renamed.
+ */
+const diagramExprCache = new Map<string, CompiledExpr | null>();
+const DIAGRAM_CACHE_MAX = 512;
+
+function diagramExpr(src: string, names: string[]): CompiledExpr | null {
+  const key = `${names.join(',')}|${src}`;
+  const hit = diagramExprCache.get(key);
+  if (hit !== undefined) return hit;
+  const compiled = compileExpr(src, names);
+  // Bounded: a long session that keeps rewording its diagram must not grow
+  // this without limit. Oldest out, which for a Map is insertion order.
+  if (diagramExprCache.size >= DIAGRAM_CACHE_MAX) {
+    const oldest = diagramExprCache.keys().next().value;
+    if (oldest !== undefined) diagramExprCache.delete(oldest);
+  }
+  diagramExprCache.set(key, compiled);
+  return compiled;
+}
+
+/** A coordinate: a number as written, or an expression over the sliders. */
+function coord(v: NumOrExpr | undefined, scope: Record<string, number>, names: string[]): number {
+  if (typeof v === 'number') return v;
+  if (typeof v !== 'string') return NaN;
+  const fn = diagramExpr(v, names);
+  return fn ? fn.eval(scope) : NaN;
+}
+
+const buildDiagram: Builder = (scene, _fn, vals, view, guarded) => {
+  const names = scene.params.map((p) => p.id);
+  const scope: Record<string, number> = {};
+  for (const p of scene.params) scope[p.id] = vals[p.id] ?? p.value;
+  const at = (v: NumOrExpr | undefined) => coord(v, scope, names);
+  const ok = (...ns: number[]) => ns.every((n) => Number.isFinite(n));
+
+  const objects: VizObject[] = [];
+  const parts = scene.parts ?? [];
+
+  parts.forEach((part, i) => {
+    const id = `d${i}`;
+    const tone = part.tone;
+    switch (part.o) {
+      case 'curve': {
+        // The curve's own variable is the scene's, and it may lean on the
+        // sliders like any other expression here.
+        const fn = diagramExpr(part.expr, [scene.varName, ...names]);
+        if (!fn) return;
+        const from = part.from === undefined ? view.xMin : at(part.from);
+        const to = part.to === undefined ? view.xMax : at(part.to);
+        const lo = Math.max(view.xMin, Math.min(from, to));
+        const hi = Math.min(view.xMax, Math.max(from, to));
+        if (!ok(lo, hi) || !(hi > lo)) return;
+        const pts = sampleAdaptive((x) => fn.eval({ ...scope, [scene.varName]: x }), lo, hi, SAMPLES, view);
+        if (pts.length) {
+          objects.push({ o: 'curve', id, pts, tone, dashed: part.dashed, width: part.width });
+          if (part.label) {
+            // On the curve, at the right-hand end of what is actually drawn.
+            const last = [...pts].reverse().find((q) => Number.isFinite(q.y));
+            if (last) objects.push({ o: 'label', id: `${id}l`, x: last.x, y: last.y, text: part.label, tone, anchor: 'end', dy: -6 });
+          }
+        }
+        return;
+      }
+      case 'point': {
+        const x = at(part.x), y = at(part.y);
+        if (ok(x, y)) objects.push({ o: 'point', id, x, y, tone, hollow: part.hollow, label: part.label });
+        return;
+      }
+      case 'segment': {
+        const x1 = at(part.x1), y1 = at(part.y1), x2 = at(part.x2), y2 = at(part.y2);
+        if (ok(x1, y1, x2, y2)) objects.push({ o: 'segment', id, x1, y1, x2, y2, tone, dashed: part.dashed, width: part.width });
+        return;
+      }
+      case 'line': {
+        const x = at(part.x), y = at(part.y), slope = at(part.slope);
+        if (ok(x, y, slope)) objects.push({ o: 'line', id, x, y, slope, tone, dashed: part.dashed, width: part.width });
+        return;
+      }
+      case 'vector': {
+        const x1 = at(part.x1), y1 = at(part.y1), x2 = at(part.x2), y2 = at(part.y2);
+        if (ok(x1, y1, x2, y2)) objects.push({ o: 'vector', id, x1, y1, x2, y2, tone, label: part.label });
+        return;
+      }
+      case 'region': {
+        const pts = (part.pts ?? []).map((q) => ({ x: at(q.x), y: at(q.y) })).filter((q) => ok(q.x, q.y));
+        // Two points enclose nothing; drawing it would be a line pretending
+        // to be an area.
+        if (pts.length >= 3) objects.push({ o: 'region', id, pts, tone });
+        return;
+      }
+      case 'rects': {
+        const bars = (part.bars ?? [])
+          .map((b) => ({ x0: at(b.x0), x1: at(b.x1), y: at(b.y) }))
+          .filter((b) => ok(b.x0, b.x1, b.y));
+        if (bars.length) objects.push({ o: 'rects', id, bars, tone });
+        return;
+      }
+      case 'sequence': {
+        const pts = (part.pts ?? []).map((q) => ({ x: at(q.x), y: at(q.y) })).filter((q) => ok(q.x, q.y));
+        if (pts.length) objects.push({ o: 'sequence', id, pts, tone, stems: part.stems });
+        return;
+      }
+      case 'vrule': {
+        const a = at(part.at);
+        if (ok(a)) objects.push({ o: 'vrule', id, at: a, tone, dashed: part.dashed, label: part.label });
+        return;
+      }
+      case 'hrule': {
+        const a = at(part.at);
+        if (ok(a)) objects.push({ o: 'hrule', id, at: a, tone, dashed: part.dashed, label: part.label });
+        return;
+      }
+      case 'label': {
+        const x = at(part.x), y = at(part.y);
+        if (ok(x, y)) objects.push({ o: 'label', id, x, y, text: part.text, tone, anchor: part.anchor, dy: part.dy });
+        return;
+      }
+    }
+  });
+
+  // Authored quantities, computed live. Withheld by the guard like every
+  // other number on a Logos diagram — the name and the help still show, so
+  // the reader knows what is being asked of them.
+  const readouts: VizReadout[] = [];
+  for (const [i, q] of (scene.quantities ?? []).entries()) {
+    const fn = diagramExpr(q.expr, names);
+    if (!fn) continue;
+    const v = fn.eval(scope);
+    if (!Number.isFinite(v)) continue;
+    readouts.push({ id: `q${i}`, tex: q.tex, value: guarded ? null : fmt(v, 4), help: q.help });
+  }
+
+  const says = scene.says ?? {};
+  return {
+    objects,
+    readouts,
+    narration: says.narration,
+    caption: says.caption ?? (scene.params.length ? 'Move a control and watch what depends on it.' : 'A diagram of what you are working through.'),
+    ask: says.ask,
+  };
+};
+
 const KINDS: Record<VizKind, Builder> = {
   function: buildFunction,
   limit: buildLimit,
@@ -2603,6 +2900,7 @@ const KINDS: Record<VizKind, Builder> = {
   'supply-demand': buildSupplyDemand,
   ppc: buildPpc,
   'ad-as': buildAdAs,
+  diagram: buildDiagram,
 };
 
 /**
@@ -2714,6 +3012,10 @@ export function compileScene(scene: VizScene): CompiledExpr | null {
 
 const REQUIRED: Record<VizKind, (scene: VizScene) => VizParam[]> = {
   function: () => [],
+  // Nothing is implied for a diagram: its controls are the ones the picture
+  // is about, and inventing one would put a slider under a drawing that has
+  // nothing to move.
+  diagram: () => [],
   // δ and h open at a fraction of the window rather than a fixed 2. The second
   // point has to be ON SCREEN in the first frame: with a tight window around
   // the point of interest, a fixed starting h puts Q above the top edge and
@@ -2901,6 +3203,9 @@ export const RESERVED_PARAM: Record<VizKind, string | null> = {
   'supply-demand': 'dsh',
   ppc: 'q',
   'ad-as': 'adsh',
+  // A diagram's parameters are whatever the picture is about, so none of them
+  // is reserved and the editor may offer every name.
+  diagram: null,
 };
 
 export const KIND_LABEL: Record<VizKind, string> = {
@@ -2917,6 +3222,7 @@ export const KIND_LABEL: Record<VizKind, string> = {
   ppc: 'Production frontier',
   'ad-as': 'AD–AS',
   ode: 'Field',
+  diagram: 'Diagram',
 };
 
 /**
@@ -3091,6 +3397,157 @@ function sanitizeVectors(raw: any): { x: number; y: number; label?: string }[] |
  * scene would leave the reader with nothing over a mistake that has an
  * obvious right answer.
  */
+
+// --- the open kind, sanitized ---------------------------------------
+//
+// Everything here arrives from a language model, so every field is checked
+// and anything unrecognised is dropped rather than repaired. The parts are
+// the one place a model authors DRAWING instructions rather than parameters
+// to a builder, which is exactly why the checking is strictest here: a bad
+// coordinate must become a missing part, never a broken picture.
+
+const DIAGRAM_TONES = new Set<Tone>(['primary', 'accent', 'tension', 'muted', 'ghost', 'u1', 'u2', 'u3', 'u4']);
+const MAX_PARTS = 40;
+const MAX_PART_PTS = 64;
+const MAX_QUANTITIES = 4;
+
+/** A coordinate slot: a finite number, or an expression short enough to trust. */
+function numOrExpr(v: any): NumOrExpr | null {
+  if (typeof v === 'number' && Number.isFinite(v)) return Math.min(1e6, Math.max(-1e6, v));
+  if (typeof v === 'string') {
+    const t = v.trim();
+    // Compiled against no names here — this only proves it PARSES. Whether
+    // its free names are actual sliders is decided at draw time, where an
+    // unknown name evaluates to NaN and the part is simply not drawn.
+    if (t && t.length <= 120 && compileExpr(t, ALPHABET)) return t;
+  }
+  return null;
+}
+
+/** Every single letter, so a coordinate expression may name any slider. */
+const ALPHABET = 'abcdefghijklmnopqrstuvwxyz'.split('');
+
+const tone = (v: any): Tone | undefined =>
+  typeof v === 'string' && DIAGRAM_TONES.has(v as Tone) ? (v as Tone) : undefined;
+
+const text = (v: any, n: number): string | undefined =>
+  typeof v === 'string' && v.trim() ? v.trim().replace(/\s+/g, ' ').slice(0, n) : undefined;
+
+function pointList(v: any): { x: NumOrExpr; y: NumOrExpr }[] {
+  if (!Array.isArray(v)) return [];
+  const out: { x: NumOrExpr; y: NumOrExpr }[] = [];
+  for (const q of v.slice(0, MAX_PART_PTS)) {
+    const x = numOrExpr(q?.x);
+    const y = numOrExpr(q?.y);
+    if (x !== null && y !== null) out.push({ x, y });
+  }
+  return out;
+}
+
+function diagramPart(raw: any): DiagramPart | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const t = tone(raw.tone);
+  const dashed = raw.dashed === true;
+  const width = typeof raw.width === 'number' && Number.isFinite(raw.width)
+    ? Math.min(4, Math.max(0.5, raw.width))
+    : undefined;
+  const n = (k: string) => numOrExpr(raw[k]);
+
+  switch (raw.o) {
+    case 'curve': {
+      const expr = text(raw.expr, 400);
+      if (!expr || !compileExpr(expr, ALPHABET)) return null;
+      const from = raw.from === undefined ? undefined : numOrExpr(raw.from);
+      const to = raw.to === undefined ? undefined : numOrExpr(raw.to);
+      return { o: 'curve', expr, ...(from !== null && from !== undefined ? { from } : {}), ...(to !== null && to !== undefined ? { to } : {}), tone: t, dashed, width, label: text(raw.label, 24) };
+    }
+    case 'point': {
+      const x = n('x'), y = n('y');
+      if (x === null || y === null) return null;
+      return { o: 'point', x, y, tone: t, hollow: raw.hollow === true, label: text(raw.label, 24) };
+    }
+    case 'segment': {
+      const x1 = n('x1'), y1 = n('y1'), x2 = n('x2'), y2 = n('y2');
+      if (x1 === null || y1 === null || x2 === null || y2 === null) return null;
+      return { o: 'segment', x1, y1, x2, y2, tone: t, dashed, width };
+    }
+    case 'line': {
+      const x = n('x'), y = n('y'), slope = n('slope');
+      if (x === null || y === null || slope === null) return null;
+      return { o: 'line', x, y, slope, tone: t, dashed, width };
+    }
+    case 'vector': {
+      const x1 = n('x1'), y1 = n('y1'), x2 = n('x2'), y2 = n('y2');
+      if (x1 === null || y1 === null || x2 === null || y2 === null) return null;
+      return { o: 'vector', x1, y1, x2, y2, tone: t, label: text(raw.label, 24) };
+    }
+    case 'region': {
+      const pts = pointList(raw.pts);
+      return pts.length >= 3 ? { o: 'region', pts, tone: t } : null;
+    }
+    case 'sequence': {
+      const pts = pointList(raw.pts);
+      return pts.length ? { o: 'sequence', pts, tone: t, stems: raw.stems === true } : null;
+    }
+    case 'rects': {
+      if (!Array.isArray(raw.bars)) return null;
+      const bars: { x0: NumOrExpr; x1: NumOrExpr; y: NumOrExpr }[] = [];
+      for (const b of raw.bars.slice(0, MAX_PART_PTS)) {
+        const x0 = numOrExpr(b?.x0), x1 = numOrExpr(b?.x1), y = numOrExpr(b?.y);
+        if (x0 !== null && x1 !== null && y !== null) bars.push({ x0, x1, y });
+      }
+      return bars.length ? { o: 'rects', bars, tone: t } : null;
+    }
+    case 'vrule':
+    case 'hrule': {
+      const a = numOrExpr(raw.at);
+      if (a === null) return null;
+      return { o: raw.o, at: a, tone: t, dashed, label: text(raw.label, 24) };
+    }
+    case 'label': {
+      const x = n('x'), y = n('y');
+      const body = text(raw.text, 48);
+      if (x === null || y === null || !body) return null;
+      const anchor = raw.anchor === 'start' || raw.anchor === 'end' || raw.anchor === 'middle' ? raw.anchor : undefined;
+      const dy = typeof raw.dy === 'number' && Number.isFinite(raw.dy) ? Math.min(40, Math.max(-40, raw.dy)) : undefined;
+      return { o: 'label', x, y, text: body, tone: t, anchor, dy };
+    }
+    default:
+      return null;
+  }
+}
+
+function diagramFields(raw: any): Partial<VizScene> {
+  const parts = (Array.isArray(raw?.parts) ? raw.parts : [])
+    .slice(0, MAX_PARTS)
+    .map(diagramPart)
+    .filter(Boolean) as DiagramPart[];
+
+  const quantities = (Array.isArray(raw?.quantities) ? raw.quantities : [])
+    .slice(0, MAX_QUANTITIES)
+    .map((q: any) => {
+      const tex = text(q?.tex, 40);
+      const expr = text(q?.expr, 200);
+      if (!tex || !expr || !compileExpr(expr, ALPHABET)) return null;
+      return { tex, expr, ...(text(q?.help, 300) ? { help: text(q?.help, 300) } : {}) };
+    })
+    .filter(Boolean) as DiagramQuantity[];
+
+  const says = raw?.says && typeof raw.says === 'object'
+    ? {
+        ...(text(raw.says.caption, 120) ? { caption: text(raw.says.caption, 120) } : {}),
+        ...(text(raw.says.narration, 400) ? { narration: text(raw.says.narration, 400) } : {}),
+        ...(text(raw.says.ask, 200) ? { ask: text(raw.says.ask, 200) } : {}),
+      }
+    : undefined;
+
+  return {
+    parts,
+    ...(quantities.length ? { quantities } : {}),
+    ...(says && Object.keys(says).length ? { says } : {}),
+  };
+}
+
 function econFields(kind: VizKind, raw: any): Partial<VizScene> {
   const priceLine = (r: any, fallbackInt: number, sign: -1 | 1) => ({
     intercept: num(r?.intercept, 0, 1e5, fallbackInt),
@@ -3222,6 +3679,7 @@ export function sanitizeViz(raw: any): VizScene | null {
     // Setting them later left a ceiling with no handle to move it, under a
     // caption inviting the reader to move it.
     ...econFields(kind, raw),
+    ...(kind === 'diagram' ? diagramFields(raw) : {}),
     ...(kind === 'sequence' && raw.partial !== false ? { partial: true } : {}),
     ...(raw.ghost === true ? { ghost: true } : {}),
     ...(() => {
@@ -3237,6 +3695,10 @@ export function sanitizeViz(raw: any): VizScene | null {
   if (scene.kind === 'matrix' && !scene.matrix) return null;
   if (scene.kind === 'vectors' && !scene.vectors?.length) return null;
   if (scene.kind === 'distribution' && !scene.dist) return null;
+  // A diagram IS its parts. One that arrived with none — or whose every part
+  // failed its checks — is an empty frame with a title, which is worse than
+  // no picture at all: it takes the panel and says nothing.
+  if (scene.kind === 'diagram' && !scene.parts?.length) return null;
 
 
   // The expression must compile over exactly the names we are prepared to

@@ -271,16 +271,24 @@ export function sanitizeMap(raw: any): ThinkingMap {
     })
     .slice(0, isMath ? MAX_EDGES_MATH : MAX_EDGES);
 
-  // Only mathematical work gets a dynamic picture; everywhere else it would
-  // be a category error, and the sanitizer is the place to say so once.
-  // A scene survives if the work is mathematical, OR if the scene is one of
-  // the economics diagrams — those belong to conversations the extractor
-  // calls learning or analysing, never math. Gating the whole field on
-  // context threw away every supply-and-demand and PPC scene the model
-  // produced, silently, after the prompt had asked for them and the lens was
-  // ready to draw them.
+  // Which scenes survive, and why the test is on the KIND rather than on the
+  // conversation's label.
+  //
+  // It used to be mathematics only, on the reasoning that a picture anywhere
+  // else is a category error. That was wrong twice over. The economics
+  // diagrams belong to conversations the extractor calls learning or
+  // analysing, and gating on context threw every one of them away silently —
+  // after the prompt had asked for it and the lens was ready to draw it. And
+  // the open 'diagram' kind exists precisely to draw the subjects nobody
+  // wrote a builder for: a titration curve, a phase change, a food web, a
+  // budget line. Those conversations are never labelled math either, and
+  // asking the context whether a picture is allowed would discard them for
+  // the same bad reason a second time.
+  //
+  // So: a scene survives if the work is mathematical, or if its kind is one
+  // that carries its own subject with it.
   const scene = sanitizeViz(raw.viz);
-  const viz = scene && (isMath || ECON_KINDS.has(scene.kind)) ? scene : null;
+  const viz = scene && (isMath || ECON_KINDS.has(scene.kind) || scene.kind === 'diagram') ? scene : null;
 
   return {
     nodes,
@@ -598,7 +606,13 @@ ${
     return `
 The picture currently on screen, as JSON. EDIT IT rather than replacing it — return the same object with only what this turn changed:
 ${JSON.stringify(lean)}
-Change a parameter's "value" to move the picture to where the conversation now is: someone who says "more guns" wants the position along the frontier moved, not a lecture about it. Change a curve when a curve moved. Keep the axis names, the numbers and the kind unless the subject genuinely changed. Omit "viz" entirely only when this turn said nothing about the picture at all — the one on screen then stays exactly as it is.
+DO WHAT THEY ASKED, TO THE PICTURE. A request to change the drawing is an instruction, not a topic of conversation:
+- "make a bigger", "raise the tax to 20", "set n to 8", "double the intercept" → change that "value" (or that field) to the number they named, or a clearly bigger/smaller one when they did not name one. Widen the parameter's "min"/"max" if the number they want is outside the current range.
+- "zoom out", "show me from 0 to 100", "I can't see the intercept" → change "view".
+- "make it steeper", "shift demand up", "make the curve flatter" → change the slope/intercept/coefficient that does that.
+- "now suppose a frost hits the crop", "what if we get better at making guns" → move the curve or the frontier the fact moves.
+- "add x^2 to it" → add an overlay; do not replace what is there.
+Someone who says "more guns" wants the position along the frontier MOVED, not a lecture about it. Keep the axis names, the numbers and the kind unless the subject genuinely changed. Omit "viz" entirely only when this turn said nothing about the picture at all — the one on screen then stays exactly as it is.
 `;
   })();
 
@@ -623,7 +637,7 @@ Return ONLY JSON, exactly this shape:
   "intent": "learning|verification|utility|exploration",  // ONLY for context=math
   "nodes": [{"id": "short_snake_case_id", "type": "<node type>", "label": "a short phrase in their own framing", "status": "open|supported|resolved|revised", "merged": ["label of a node folded into this one"], "tex": "LaTeX for this node, if mathematical", "flag": "error|verified", "note": "a short annotation or repair hint"}],
   "edges": [{"from": "node_id", "to": "node_id", "relation": "supports|conflicts|depends|relates|leads_to|revises|precedes|part_of|transforms_to|implies|justifies|equivalent_to", "strength": "weak|normal|strong", "op": "the operation on a transforms_to edge"}],
-  "viz": {"kind": "function|limit|derivative|riemann|taylor|sequence|vectors|matrix|distribution|ode|supply-demand|ppc|ad-as", "expr": "the function in plain notation", "varName": "x", "a": 0, "b": 1, "rule": "left|right|midpoint", "matrix": [[1, 1], [0, 1]], "vectors": [{"x": 2, "y": 1, "label": "u"}], "dist": "normal|binomial|poisson|exponential", "demand": {"intercept": 100, "slope": -1}, "supply": {"intercept": 20, "slope": 1}, "control": {"kind": "ceiling|floor", "at": 45}, "tax": 12, "surplus": true, "frontier": {"xMax": 100, "yMax": 80, "bowed": true, "grows": "both|x|y"}, "ad": {"intercept": 140, "slope": -1}, "sras": {"intercept": 20, "slope": 1}, "potential": 60, "axes": {"x": "Guns", "y": "Butter"}, "partial": true, "ghost": true, "overlays": [{"id": "short_id", "expr": "x^2", "label": "optional", "visible": true, "source": "user"}], "view": {"xMin": -6, "xMax": 6}, "params": [{"id": "a", "min": -3, "max": 3, "step": 0.1, "value": 1}], "title": "a short line naming what is being shown"}
+  "viz": {"kind": "function|limit|derivative|riemann|taylor|sequence|vectors|matrix|distribution|ode|supply-demand|ppc|ad-as|diagram", "parts": [{"o": "curve|point|segment|line|vector|region|rects|sequence|vrule|hrule|label", "expr": "for a curve, y in terms of x", "x": 0, "y": 0, "x1": 0, "y1": 0, "x2": 0, "y2": 0, "at": 0, "slope": 1, "pts": [{"x": 0, "y": 0}], "bars": [{"x0": 0, "x1": 1, "y": 2}], "text": "for a label", "tone": "primary|accent|tension|muted|ghost", "dashed": false, "label": "short"}], "quantities": [{"tex": "K_a", "expr": "10^(-p)", "help": "what it is, without the number"}], "says": {"caption": "one line under the picture", "narration": "what is happening now", "ask": "a question to sit with while the guard is up"}, "expr": "the function in plain notation", "varName": "x", "a": 0, "b": 1, "rule": "left|right|midpoint", "matrix": [[1, 1], [0, 1]], "vectors": [{"x": 2, "y": 1, "label": "u"}], "dist": "normal|binomial|poisson|exponential", "demand": {"intercept": 100, "slope": -1}, "supply": {"intercept": 20, "slope": 1}, "control": {"kind": "ceiling|floor", "at": 45}, "tax": 12, "surplus": true, "frontier": {"xMax": 100, "yMax": 80, "bowed": true, "grows": "both|x|y"}, "ad": {"intercept": 140, "slope": -1}, "sras": {"intercept": 20, "slope": 1}, "potential": 60, "axes": {"x": "Guns", "y": "Butter"}, "partial": true, "ghost": true, "overlays": [{"id": "short_id", "expr": "x^2", "label": "optional", "visible": true, "source": "user"}], "view": {"xMin": -6, "xMax": 6}, "params": [{"id": "a", "min": -3, "max": 3, "step": 0.1, "value": 1}], "title": "a short line naming what is being shown"}
 }
 
 READ THE CONTEXT FIRST.
@@ -700,7 +714,10 @@ THE PLOT IS A WORKSPACE ("overlays"). Curves the person asked for by name live i
 
 - Match the kind to the WORK: series and convergence → "sequence"; approximating a function near a point → "taylor"; span, basis, dependence → "vectors"; a linear map, eigen-anything → "matrix"; probability, sampling, distributions → "distribution"; growth, decay, populations, anything with dy/dx → "ode".
 - THE PICTURE FOLLOWS THE CONVERSATION. The scene is re-read every turn, so change it when the situation changes and leave it alone when it has not. "now a frost hits the crop" → same supply-demand scene with the supply curve moved. "suppose we get better at making guns" → the same PPC with "grows": "x". "what if the government spends more" → the same AD-AS scene, AD shifted. Keep the numbers and the axis names the person has been working with; change only what the new fact changed. Emitting a fresh unrelated scene throws away the comparison, which is the thing they are looking at.
-- ECONOMICS, same rule: a market, a price, a shortage, a ceiling or floor, elasticity, consumer or producer surplus → "supply-demand"; a per-unit tax, tax incidence, "who really pays", a subsidy or excise duty → the same kind with "tax" set. Opportunity cost, trade-offs, scarcity, efficiency, "what do we give up", comparative advantage, economic growth → "ppc". Recession, inflation, GDP, unemployment, fiscal or monetary policy, a supply shock, an output gap → "ad-as". Use the numbers the person is working with when they give them, and plain round ones when they do not — the diagram is for the shape of the argument, not for their arithmetic.
+- ECONOMICS, same rule: a market, a price, a shortage, a ceiling or floor, elasticity, consumer or producer surplus → "supply-demand"; a per-unit tax, tax incidence, "who really pays", a subsidy or excise duty → the same kind with "tax" set.
+- ANY OTHER SUBJECT THAT WANTS A PICTURE → "diagram". This is the open kind and it is not a fallback for maths: use it when the thing being worked through is genuinely drawable and none of the kinds above is it. A titration curve, a free-body diagram, a phase change, a cooling curve, a food web, a budget line, a project timeline, a pressure-volume cycle, a dose-response curve, a circuit laid out as segments and labels, a population over time, a stress-strain curve, a Punnett square drawn as rects.
+  You author it yourself out of "parts", in whatever units the subject uses — set "axes" and a "view" that fits them. Every coordinate may be a NUMBER or an EXPRESSION over the sliders in "params", and that is what makes it worth drawing: put a point at {"x": "c", "y": "k*c"}, give them a "c" slider, and the picture moves the way the named kinds move. Add "quantities" for numbers worth reporting beside it, and "says" for the caption and the line of narration.
+  Draw only what you actually know. A diagram with three honest parts beats one with twelve invented ones, and a subject you cannot place on two axes should not be forced onto them — leave "viz" out and let the map carry the thinking instead. Opportunity cost, trade-offs, scarcity, efficiency, "what do we give up", comparative advantage, economic growth → "ppc". Recession, inflation, GDP, unemployment, fiscal or monetary policy, a supply shock, an output gap → "ad-as". Use the numbers the person is working with when they give them, and plain round ones when they do not — the diagram is for the shape of the argument, not for their arithmetic.
 
 Node types mean:
   goal = what they're trying to achieve, or the central idea of a piece

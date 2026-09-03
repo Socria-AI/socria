@@ -455,7 +455,13 @@ console.log('\n=== the extractor can see the picture it maintains ===');
   ok('and the axis names it was given', p.includes('"Guns"'), 'axes missing');
   ok('and where each handle currently sits', /"id":"q".*"value":0/.test(p), 'param values missing');
   ok('told to edit rather than replace', /EDIT IT rather than replacing/.test(p));
-  ok('told that a value moves the picture', /Change a parameter's "value"/.test(p));
+  // The instruction is about DOING what was asked, not about describing it:
+  // a request to change a number is an edit to the picture.
+  ok('told to act on the picture, not talk about it', /DO WHAT THEY ASKED, TO THE PICTURE/.test(p));
+  ok('names moving a value', /"value"/.test(p) && /make a bigger/.test(p));
+  ok('names widening a range when the number is outside it', /"min"\/"max"/.test(p));
+  ok('names changing the window', /"view"/.test(p) && /zoom out/.test(p));
+  ok('and still says a silent turn leaves the picture alone', /Omit "viz" entirely only when/.test(p));
 
   // Slider help is UI copy written for the reader. Showing it is a third of
   // the scene by length and invites the model to rewrite prose nobody asked

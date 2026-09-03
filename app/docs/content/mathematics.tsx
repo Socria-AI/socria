@@ -28,7 +28,8 @@ const sections = [
   { id: 'board', heading: 'The Board' },
   { id: 'plot', heading: 'The function plot' },
   { id: 'graph', heading: 'The interactive graph' },
-  { id: 'kinds', heading: 'Ten kinds of scene' },
+  { id: 'kinds', heading: 'The kinds of scene' },
+  { id: 'anything', heading: 'Anything else you can draw' },
   { id: 'yours', heading: 'The window is yours' },
   { id: 'college', heading: 'Calculus, statistics, and beyond' },
   { id: 'guard', heading: 'The Answer Guard' },
@@ -169,7 +170,7 @@ export function Mathematics() {
         </p>
       </Callout>
 
-      <H2 id="kinds">Ten kinds of scene</H2>
+      <H2 id="kinds">The kinds of scene</H2>
       <p>
         The renderer knows nothing about mathematics. It draws objects and
         runs a clock over one swept parameter; each <em>kind</em> decides what
@@ -223,6 +224,33 @@ export function Mathematics() {
       </p>
       <p>And the same instrument, well outside calculus:</p>
       <DemoVizOthers />
+
+      <H2 id="anything">Anything else you can draw</H2>
+      <p>
+        Every kind above is a named picture with code behind it that knows its
+        subject. Most of what people want to see is not on that list and never
+        will be — a titration curve, a free-body diagram, a cooling curve, a
+        budget line, a project timeline, a dose–response curve.
+      </p>
+      <p>
+        So there is one more kind, and it is open. Ask for a picture of
+        something drawable and Logos composes it out of the same pieces every
+        other scene is made of: curves, points, segments, arrows, shaded
+        regions, rules and labels, in whatever units the subject uses.
+      </p>
+      <Callout tag="It is a diagram, not a picture of one">
+        The coordinates can be <em>expressions</em>. A point placed at{' '}
+        <em>(c, k·c)</em> moves when you move the <em>k</em> slider, so an
+        authored diagram is live the way the named ones are — you get the
+        control, and the numbers beside it recompute as you drag.
+      </Callout>
+      <p>
+        It is deliberately not a fallback for mathematics: if what you are
+        doing is a limit, you get the limit scene. And Logos will decline to
+        draw rather than force something onto two axes that does not belong
+        there — a subject with no shape gets a map of the thinking instead,
+        which is the honest answer.
+      </p>
 
       <H2 id="yours">The window is yours</H2>
       <p>
