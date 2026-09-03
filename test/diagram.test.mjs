@@ -9,7 +9,7 @@ import {
   sanitizeViz, buildFrame, resolveView, defaults, compileScene,
   VIZ_KINDS, ECON_KINDS, KIND_LABEL, sceneDraws, kindNeedsExpr,
 } from './.tmp/logos-viz.mjs';
-import { sanitizeMap, buildMapPrompt } from './.tmp/logos.mjs';
+import { sanitizeMap, buildMapPrompt, LOGOS_CHAT_PROMPT } from './.tmp/logos.mjs';
 import { availableLenses, leadLens } from './.tmp/logos-layout.mjs';
 
 let pass = 0, fail = 0;
@@ -134,15 +134,21 @@ console.log('\n=== a part that cannot be evaluated is dropped, not drawn wrong =
     view: { xMin: 0, xMax: 10, yMin: 0, yMax: 10 },
     parts: [
       { o: 'point', x: 1, y: 1 },
-      // `z` is not a slider on this scene, so it evaluates to NaN.
+      // `z` is not a slider on this scene, so it could only ever be NaN. That
+      // is now caught while sanitizing rather than left to vanish at draw
+      // time — see the reachability section below.
       { o: 'point', x: 'z', y: 'z' },
+      // This one is reachable on paper and still not drawable: nothing is
+      // free in it, so only evaluating tells you. It has to survive the
+      // static check and be dropped by the builder.
       { o: 'segment', x1: 0, y1: 0, x2: '1/0', y2: 1 },
     ],
   });
-  ok('all three parse', sc.parts.length === 3);
+  ok('the unreachable part is refused up front', sc.parts.length === 2, JSON.stringify(sc.parts));
+  ok('and it is the z one that went', !JSON.stringify(sc.parts).includes('"z"'));
   const f = frameOf(sc);
   const pts = f.objects.filter((o) => o.o === 'point');
-  ok('only the real point is drawn', pts.length === 1 && pts[0].x === 1);
+  ok('the real point is drawn', pts.length === 1 && pts[0].x === 1);
   ok('and the infinite segment is not', !f.objects.some((o) => o.o === 'segment'));
   ok('nothing non-finite reaches the frame', JSON.stringify(f.objects).includes('null') === false);
   for (const o of f.objects) {
@@ -297,6 +303,115 @@ console.log('\n=== the extractor is told the kind exists ===');
   ok('the primitives are listed', p.includes('curve|point|segment'));
   ok('and it is told what it is for', /titration|free-body|food web/.test(p));
   ok('and told not to force it', /should not be forced onto them|leave "viz" out/.test(p));
+}
+
+console.log('\n=== a curve finds its own variable ===');
+{
+  // The bug this pins, exactly as it shipped: asked for a predator-prey cycle
+  // with a birth-rate slider, the model wrote the curves against t — because
+  // the subject is time — while the scene's varName defaulted to x. Every
+  // sample came back NaN and both curves silently did not appear, leaving a
+  // titled picture with a working slider over blank space.
+  const pp = sanitizeViz({
+    kind: 'diagram',
+    axes: { x: 'time', y: 'population' },
+    view: { xMin: 0, xMax: 20, yMin: 0, yMax: 12 },
+    params: [{ id: 'b', min: 0.5, max: 2, step: 0.1, value: 1.1 }],
+    parts: [
+      { o: 'curve', expr: '5 + 3*sin(b*t)', tone: 'accent', label: 'prey' },
+      { o: 'curve', expr: '5 + 3*sin(b*t - 1.6)', tone: 'tension', label: 'predator' },
+    ],
+    title: 'Predator–Prey Cycle',
+  });
+  ok('the scene survives', !!pp);
+  ok('both curves survive', pp.parts.length === 2);
+  const f = frameOf(pp);
+  const curves = f.objects.filter((o) => o.o === 'curve');
+  ok('and BOTH are drawn', curves.length === 2, `${f.objects.length} objects: ${f.objects.map(o=>o.o).join(',')}`);
+  ok('with real points on them', curves[0].pts.some((q) => Number.isFinite(q.y)));
+  ok('and the caption is not the empty one', !/could not be drawn/.test(f.caption));
+
+  // The slider still drives it, which is the whole reason to draw it.
+  const slow = frameOf(pp, { b: 0.5 });
+  const fast = frameOf(pp, { b: 2 });
+  const sig = (fr) => JSON.stringify(fr.objects.filter((o) => o.o === 'curve')[0].pts.slice(0, 30).map((q) => Math.round(q.y * 100)));
+  ok('the birth rate changes the cycle', sig(slow) !== sig(fast));
+
+  // Any letter, not just t — the subject picks the letter.
+  for (const v of ['t', 'v', 'q', 'p', 'z']) {
+    const sc = sanitizeViz({
+      kind: 'diagram', view: { xMin: 0, xMax: 10, yMin: 0, yMax: 10 },
+      parts: [{ o: 'curve', expr: `2*${v}` }],
+    });
+    ok(`a curve in ${v} draws`, frameOf(sc).objects.some((o) => o.o === 'curve'), v);
+  }
+
+  // A declared varName still wins when the expression uses it.
+  const declared = sanitizeViz({
+    kind: 'diagram', varName: 't', view: { xMin: 0, xMax: 10, yMin: 0, yMax: 20 },
+    parts: [{ o: 'curve', expr: '2*t' }],
+  });
+  ok('a declared variable is honoured', declared.varName === 't' && frameOf(declared).objects.length >= 1);
+}
+
+console.log('\n=== a part that could never draw is refused, not silently dropped ===');
+{
+  // A coordinate naming a letter that is not a slider can only ever be NaN.
+  const sc = sanitizeViz({
+    kind: 'diagram', view: { xMin: 0, xMax: 10, yMin: 0, yMax: 10 },
+    params: [{ id: 'k', min: 0, max: 5, step: 1, value: 2 }],
+    parts: [
+      { o: 'point', x: 'k', y: 1 },       // k is a slider — fine
+      { o: 'point', x: 'w', y: 1 },       // w is nothing — refused
+      { o: 'segment', x1: 0, y1: 0, x2: 'q', y2: 1 },
+    ],
+  });
+  ok('only the drawable part is kept', sc.parts.length === 1, JSON.stringify(sc.parts));
+  ok('and it is the right one', sc.parts[0].x === 'k');
+
+  // A curve gets exactly one unknown — its variable — and no more.
+  const twoFree = sanitizeViz({
+    kind: 'diagram', view: { xMin: 0, xMax: 10, yMin: 0, yMax: 10 },
+    parts: [{ o: 'curve', expr: 'a*t' }],
+  });
+  ok('two unknowns in a curve is refused', twoFree === null, JSON.stringify(twoFree && twoFree.parts));
+
+  const oneFree = sanitizeViz({
+    kind: 'diagram', view: { xMin: 0, xMax: 10, yMin: 0, yMax: 10 },
+    params: [{ id: 'a', min: 1, max: 3, step: 1, value: 2 }],
+    parts: [{ o: 'curve', expr: 'a*t' }],
+  });
+  ok('but one is fine once the other is a slider', !!oneFree && oneFree.parts.length === 1);
+
+  // Nothing drawable at all is no scene — not a title over blank space.
+  ok('a scene of unreachable parts is refused', sanitizeViz({
+    kind: 'diagram', view: { xMin: 0, xMax: 10 },
+    parts: [{ o: 'point', x: 'w', y: 'z' }, { o: 'hrule', at: 'q' }],
+  }) === null);
+}
+
+console.log('\n=== an empty frame says so rather than inviting a press ===');
+{
+  // Everything passes its static check and still produces nothing.
+  const sc = sanitizeViz({
+    kind: 'diagram', view: { xMin: 0, xMax: 10, yMin: 0, yMax: 10 },
+    params: [{ id: 'k', min: 1, max: 5, step: 1, value: 2 }],
+    parts: [{ o: 'point', x: 'k/0', y: 1 }],
+  });
+  if (sc) {
+    const f = frameOf(sc);
+    if (!f.objects.length) {
+      ok('the caption is honest', /could not be drawn/.test(f.caption), f.caption);
+      ok('and does not invite a control', !/Move a control/.test(f.caption));
+    } else ok('drew something after all, which is also fine', true);
+  } else ok('refused outright, which is also fine', true);
+}
+
+console.log('\n=== Socria never claims it cannot draw ===');
+{
+  ok('the chat prompt forbids it', /NEVER SAY YOU CANNOT DRAW/.test(LOGOS_CHAT_PROMPT));
+  ok('and says a second pass does it', /second pass draws the picture/.test(LOGOS_CHAT_PROMPT));
+  ok('and forbids describing it instead', /do not list what the curves do|Do not describe the axes/.test(LOGOS_CHAT_PROMPT));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

@@ -691,14 +691,16 @@ function specialView(
         case 'curve': {
           // Sampled coarsely — this only has to find the extent, and the
           // window must not depend on how finely the curve is later drawn.
-          const cf = diagramExpr(part.expr, [scene.varName, ...names]);
+          const cf = diagramExpr(part.expr, [scene.varName, ...names, ...ALPHABET]);
           if (!cf) break;
+          const cfree = cf.vars.filter((v) => !(v in scope));
+          const cvar = cfree.includes(scene.varName) ? scene.varName : (cfree[0] ?? scene.varName);
           const from = part.from === undefined ? xMinOf(scene) : at(part.from);
           const to = part.to === undefined ? xMaxOf(scene) : at(part.to);
           if (!Number.isFinite(from) || !Number.isFinite(to) || to === from) break;
           for (let i = 0; i <= 48; i++) {
             const x = from + ((to - from) * i) / 48;
-            take(x, cf.eval({ ...scope, [scene.varName]: x }));
+            take(x, cf.eval({ ...scope, [cvar]: x }));
           }
           break;
         }
@@ -2787,22 +2789,44 @@ const buildDiagram: Builder = (scene, _fn, vals, view, guarded) => {
     const tone = part.tone;
     switch (part.o) {
       case 'curve': {
-        // The curve's own variable is the scene's, and it may lean on the
-        // sliders like any other expression here.
-        const fn = diagramExpr(part.expr, [scene.varName, ...names]);
+        // The curve's variable is whichever free name is NOT a slider.
+        //
+        // It cannot simply be scene.varName. A diagram authored for a subject
+        // uses the subject's letter — population against t, pressure against
+        // v, pH against the volume added — and a scene that did not declare
+        // varName defaults to x. Compiling `5 + 3*sin(b*t)` against x and b
+        // leaves t free, every sample comes back NaN, and the curve silently
+        // does not appear: a titled picture with a working slider over blank
+        // space, which is exactly how this was found.
+        const fn = diagramExpr(part.expr, [scene.varName, ...names, ...ALPHABET]);
         if (!fn) return;
+        const free = fn.vars.filter((v) => !(v in scope));
+        const xVar = free.includes(scene.varName) ? scene.varName : (free[0] ?? scene.varName);
         const from = part.from === undefined ? view.xMin : at(part.from);
         const to = part.to === undefined ? view.xMax : at(part.to);
         const lo = Math.max(view.xMin, Math.min(from, to));
         const hi = Math.min(view.xMax, Math.max(from, to));
         if (!ok(lo, hi) || !(hi > lo)) return;
-        const pts = sampleAdaptive((x) => fn.eval({ ...scope, [scene.varName]: x }), lo, hi, SAMPLES, view);
+        const pts = sampleAdaptive((x) => fn.eval({ ...scope, [xVar]: x }), lo, hi, SAMPLES, view);
         if (pts.length) {
           objects.push({ o: 'curve', id, pts, tone, dashed: part.dashed, width: part.width });
           if (part.label) {
-            // On the curve, at the right-hand end of what is actually drawn.
-            const last = [...pts].reverse().find((q) => Number.isFinite(q.y));
-            if (last) objects.push({ o: 'label', id: `${id}l`, x: last.x, y: last.y, text: part.label, tone, anchor: 'end', dy: -6 });
+            // At the curve's high point rather than its right-hand end.
+            //
+            // The end is where every OTHER label already is — an hrule's name,
+            // the next curve's, the axis itself — and on anything periodic it
+            // is also an arbitrary place to point at. Two population cycles
+            // and a mean line came out as "mprey" stacked on the right margin.
+            // The maximum is on the curve, is usually in clear air, and is
+            // where a curve is easiest to tell apart from its neighbour.
+            let best = null as Pt | null;
+            for (const q of pts) {
+              if (!Number.isFinite(q.y)) continue;
+              if (q.y > view.yMax || q.y < view.yMin) continue;
+              if (!best || q.y > best.y) best = q;
+            }
+            const anchor = best && best.x > (view.xMin + view.xMax) / 2 ? 'end' : 'start';
+            if (best) objects.push({ o: 'label', id: `${id}l`, x: best.x, y: best.y, text: part.label, tone, anchor, dy: -8 });
           }
         }
         return;
@@ -2877,6 +2901,17 @@ const buildDiagram: Builder = (scene, _fn, vals, view, guarded) => {
   }
 
   const says = scene.says ?? {};
+  // Nothing came out despite every part passing its checks — a coordinate
+  // that divided by zero, a curve entirely outside the window. Say so. An
+  // inviting caption over blank space is worse than no picture, because it
+  // reads as a control that is not working.
+  if (!objects.length) {
+    return {
+      objects,
+      readouts,
+      caption: 'This one could not be drawn. Say what should be on the axes and it will be redrawn.',
+    };
+  }
   return {
     objects,
     readouts,
@@ -3517,11 +3552,52 @@ function diagramPart(raw: any): DiagramPart | null {
   }
 }
 
+/**
+ * Could this part ever draw, given the names that will have values?
+ *
+ * A coordinate naming a letter that is not a slider evaluates to NaN, and the
+ * part is dropped at draw time — silently, which is how a titled picture with
+ * a working slider over blank space happened. A curve is allowed exactly one
+ * such name, because that one is its variable; everything else must be known.
+ */
+function partIsDrawable(part: DiagramPart, known: Set<string>): boolean {
+  const exprs: string[] = [];
+  const add = (v: unknown) => { if (typeof v === 'string') exprs.push(v); };
+  switch (part.o) {
+    case 'curve': {
+      const free = freeNames(part.expr).filter((n) => !known.has(n));
+      // At most the variable may be unknown.
+      if (free.length > 1) return false;
+      add(part.from); add(part.to);
+      break;
+    }
+    case 'point': case 'label': add(part.x); add(part.y); break;
+    case 'segment': case 'vector': add(part.x1); add(part.y1); add(part.x2); add(part.y2); break;
+    case 'line': add(part.x); add(part.y); add(part.slope); break;
+    case 'region': case 'sequence': for (const q of part.pts) { add(q.x); add(q.y); } break;
+    case 'rects': for (const b of part.bars) { add(b.x0); add(b.x1); add(b.y); } break;
+    case 'vrule': case 'hrule': add(part.at); break;
+  }
+  return exprs.every((e) => freeNames(e).every((n) => known.has(n)));
+}
+
 function diagramFields(raw: any): Partial<VizScene> {
-  const parts = (Array.isArray(raw?.parts) ? raw.parts : [])
+  const parsed = (Array.isArray(raw?.parts) ? raw.parts : [])
     .slice(0, MAX_PARTS)
     .map(diagramPart)
     .filter(Boolean) as DiagramPart[];
+
+  // What will have a value when this is drawn: the sliders, plus whatever the
+  // scene calls its variable. Checked here rather than at draw time so a part
+  // that can never appear is refused while there is still something to say
+  // about it, instead of vanishing from the picture.
+  const known = new Set<string>([
+    ...(Array.isArray(raw?.params) ? raw.params : [])
+      .map((q: any) => (typeof q?.id === 'string' ? q.id.trim().toLowerCase() : ''))
+      .filter(Boolean),
+    typeof raw?.varName === 'string' ? raw.varName.trim().toLowerCase() : 'x',
+  ]);
+  const parts = parsed.filter((part) => partIsDrawable(part, known));
 
   const quantities = (Array.isArray(raw?.quantities) ? raw.quantities : [])
     .slice(0, MAX_QUANTITIES)
