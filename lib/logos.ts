@@ -189,6 +189,68 @@ const MAX_TEX = 240;
 const MAX_NOTE = 220;
 const MAX_OP = 60;
 
+/**
+ * The near misses worth naming, mapped to the type they actually are.
+ *
+ * Deliberately short. It exists so a common word draws as the right SHAPE —
+ * an observation as evidence, an effect as a consequence — not to enumerate
+ * every noun a model might reach for. Everything not here still survives as
+ * an idea; this list only improves how it looks, never whether it lives.
+ */
+const NODE_TYPE_ALIASES: Record<string, LogosNodeType> = {
+  hypothesis: 'conjecture',
+  prediction: 'conjecture',
+  observation: 'evidence',
+  measurement: 'evidence',
+  data: 'evidence',
+  fact: 'evidence',
+  example: 'evidence',
+  finding: 'evidence',
+  effect: 'consequence',
+  outcome: 'consequence',
+  result_of: 'consequence',
+  risk: 'consequence',
+  cause: 'concept',
+  mechanism: 'concept',
+  process: 'concept',
+  principle: 'concept',
+  law: 'theorem',
+  rule: 'theorem',
+  formula: 'equation',
+  variable: 'unknown',
+  quantity: 'given',
+  parameter: 'given',
+  condition: 'constraint',
+  requirement: 'constraint',
+  limitation: 'constraint',
+  problem: 'question',
+  issue: 'question',
+  option: 'decision',
+  alternative: 'decision',
+  choice: 'decision',
+  tradeoff: 'tension',
+  'trade-off': 'tension',
+  objection: 'counterpoint',
+  concern: 'counterpoint',
+  reason: 'claim',
+  justification: 'claim',
+  argument: 'claim',
+  action: 'step',
+  task: 'step',
+  stage: 'step',
+  phase: 'step',
+};
+
+/** The node type to draw this as. Never null — see the note at the call site. */
+function resolveNodeType(raw: unknown): LogosNodeType {
+  if (typeof raw !== 'string') return 'idea';
+  const t = raw.trim().toLowerCase().replace(/\s+/g, '_');
+  if (NODE_TYPES.includes(t as LogosNodeType)) return t as LogosNodeType;
+  const alias = NODE_TYPE_ALIASES[t];
+  if (alias && NODE_TYPES.includes(alias)) return alias;
+  return 'idea';
+}
+
 export function sanitizeMap(raw: any): ThinkingMap {
   if (!raw || typeof raw !== 'object') return { ...EMPTY_MAP };
 
@@ -205,9 +267,20 @@ export function sanitizeMap(raw: any): ThinkingMap {
   const nodes: LogosNode[] = (Array.isArray(raw.nodes) ? raw.nodes : [])
     .map((n: any) => {
       const id = typeof n?.id === 'string' ? n.id.trim().slice(0, 40) : '';
-      const type = NODE_TYPES.includes(n?.type) ? (n.type as LogosNodeType) : null;
       const label = str(n?.label, MAX_LABEL);
-      if (!id || !type || !label) return null;
+      // A thought is never thrown away for having an unfamiliar type.
+      //
+      // This used to drop the whole node when the type was not one of the
+      // thirty-four, and that is the wrong trade every time: the LABEL is the
+      // person's thinking and the type is a hint about how to draw it. Ask
+      // about a titration and the extractor reasonably says "hypothesis",
+      // "observation", "mechanism", "effect" — none of them on the list —
+      // and every node went, leaving a map that looked like Logos had simply
+      // stopped working. Near misses are mapped to their nearest kin and
+      // anything else becomes an idea, which draws correctly and says the
+      // true thing: we know what they thought, not what to call it.
+      const type = resolveNodeType(n?.type);
+      if (!id || !label) return null;
       const status: LogosNodeStatus = NODE_STATUSES.includes(n?.status)
         ? (n.status as LogosNodeStatus)
         : 'open';
@@ -245,10 +318,16 @@ export function sanitizeMap(raw: any): ThinkingMap {
     .map((e: any) => {
       const from = typeof e?.from === 'string' ? e.from.trim() : '';
       const to = typeof e?.to === 'string' ? e.to.trim() : '';
-      const relation = RELATIONS.includes(e?.relation)
-        ? (e.relation as LogosRelation)
-        : null;
-      if (!from || !to || !relation) return null;
+      // Same rule as the nodes above, for the same reason: a connection the
+      // person drew is thinking too, and an unfamiliar word for it is not a
+      // reason to delete the line. 'relates' is the neutral one and says
+      // exactly what is known — these two belong together, we are not sure
+      // how. An edge still needs both ends to exist; that check is below.
+      const named = typeof e?.relation === 'string' ? e.relation.trim().toLowerCase().replace(/\s+/g, '_') : '';
+      const relation: LogosRelation = RELATIONS.includes(named as LogosRelation)
+        ? (named as LogosRelation)
+        : 'relates';
+      if (!from || !to) return null;
       const strength: LogosEdgeStrength = EDGE_STRENGTHS.includes(e?.strength)
         ? (e.strength as LogosEdgeStrength)
         : 'normal';

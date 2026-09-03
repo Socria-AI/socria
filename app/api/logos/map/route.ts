@@ -27,6 +27,11 @@ export const dynamic = 'force-dynamic';
 
 const MAX_HISTORY = 16;
 
+/** Appended to the retry after a truncated response: map only, no picture. */
+const NO_PICTURE = `
+
+THIS TURN ONLY: omit "viz" entirely. The previous attempt ran out of room. Return the nodes and edges and nothing else — the picture already on screen stays as it is.`;
+
 export async function POST(req: NextRequest) {
   const { userId } = auth();
   const keyUnlocked = isValidAccessKey(req.headers.get('x-socria-key'));
@@ -90,14 +95,28 @@ export async function POST(req: NextRequest) {
     const configured =
       process.env.OPENAI_MODEL_LOGOS_MAP || process.env.OPENAI_MODEL_LOGOS || LOGOS_MODEL;
 
-    const make = (model: string) =>
+    // The ceiling has to fit the JSON the prompt asks for, which is now a map
+    // AND, when the conversation wants one, a picture the model authors part
+    // by part. At 900 a busy turn ran out mid-object; the JSON then failed to
+    // parse and the route quietly returned the map it was given — which on a
+    // first turn is empty. Nothing drew, nothing errored, and nothing said
+    // why.
+    const CEILING = 3200;
+
+    const make = (model: string, cap = CEILING, withPicture = true) =>
       openai.chat.completions.create({
         model,
         temperature: 0,
-        max_tokens: 900,
+        max_tokens: cap,
         response_format: { type: 'json_object' },
         messages: [
-          { role: 'system', content: buildMapPrompt(current, grounded) + guidance },
+          {
+            role: 'system',
+            content:
+              buildMapPrompt(current, grounded) +
+              guidance +
+              (withPicture ? '' : NO_PICTURE),
+          },
           { role: 'user', content: transcript },
         ],
       });
@@ -118,13 +137,36 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Ran out of room even at the ceiling. The map is the product and the
+    // picture is the extra, so drop the picture and ask again rather than
+    // returning nothing: from the outside, a turn that produces no map at all
+    // is indistinguishable from Logos having stopped working.
+    if (completion.choices?.[0]?.finish_reason === 'length') {
+      console.warn('logos map: truncated at the ceiling — retrying without the picture');
+      try {
+        completion = await make(configured, CEILING, false);
+      } catch {
+        /* keep the truncated one; the parse below will decide */
+      }
+    }
+
     const raw = completion.choices?.[0]?.message?.content;
-    if (!raw) return NextResponse.json({ map: current });
+    if (!raw) {
+      console.warn('logos map: empty completion');
+      return NextResponse.json({ map: current });
+    }
 
     let parsed: any;
     try {
       parsed = JSON.parse(raw);
     } catch {
+      // Said out loud, because the silent version of this looks exactly like
+      // a map that has decided to stop building.
+      console.error(
+        'logos map: model returned unparseable JSON',
+        completion.choices?.[0]?.finish_reason,
+        raw.slice(0, 200)
+      );
       return NextResponse.json({ map: current });
     }
 
