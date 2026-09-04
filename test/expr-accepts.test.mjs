@@ -188,6 +188,21 @@ console.log('\n=== two arguments, because most real shapes are piecewise ===');
   ok('max is not a free name', !freeNames('max(0, x)').includes('max'));
   ok('min is not either', !freeNames('min(0, x)').includes('min'));
 
+  // A minus directly after a comma opens the second argument; it does not
+  // subtract from the first. Every negative literal in an argument list was
+  // NaN until this was fixed, and no unit test had one — a heating curve
+  // found it.
+  ok('a negative literal as the second argument', near(val('min(0, -20 + x)', ['x'], { x: 10 }), -10));
+  ok('and at the other end of its range', near(val('min(0, -20 + x)', ['x'], { x: 50 }), 0));
+  ok('a bare negative second argument', near(val('max(-5, x)', ['x'], { x: -9 }), -5));
+  ok('a negative first argument', near(val('max(-5, x)', ['x'], { x: -1 }), -1));
+  ok('negatives on both sides', near(val('min(-2, -8)', ['x'], { x: 0 }), -8));
+  ok('a unary plus after a comma', near(val('max(0, +x)', ['x'], { x: 4 }), 4));
+  ok('nested with a negative', near(val('max(0, min(100, -x))', ['x'], { x: -30 }), 30));
+  // The whole heating curve, which is three of them summed.
+  ok('a heating curve with plateaus',
+    near(val('min(0, -20 + x) + max(0, min(100, (x-30)*2.5)) + max(0, (x-80)*1.5)', ['x'], { x: 50 }), 50));
+
   // Malformed calls must never yield a confident number.
   for (const src of ['max(0, )', 'max(,x)', 'max(0 x)', ',x', 'max(0,x', 'x,', 'max()']) {
     const fn = compileExpr(src, NAMES);

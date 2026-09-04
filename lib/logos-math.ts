@@ -208,7 +208,12 @@ function toRpn(toks: Tok[]): Tok[] | null {
     let tk = toks[k];
     // unary minus / plus: an operator with nothing usable before it
     if (tk.t === 'op' && (tk.v === '-' || tk.v === '+')) {
-      const unary = !prev || prev.t === 'op' || prev.t === 'lp';
+      // Also unary directly after a comma: in min(0, -20 + x) the minus opens
+      // the second argument, it does not subtract from the first. Missing this
+      // made every negative literal in an argument list evaluate to NaN, so
+      // the curve vanished — found by a heating curve whose plateau below zero
+      // is written exactly that way.
+      const unary = !prev || prev.t === 'op' || prev.t === 'lp' || prev.t === 'comma';
       if (unary) {
         if (tk.v === '+') { prev = tk; continue; }
         tk = { t: 'op', v: 'u-' };
