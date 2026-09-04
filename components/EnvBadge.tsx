@@ -25,10 +25,16 @@ export function EnvBadge({
 
   const note =
     clerk === 'mismatch'
-      ? 'Sign-in will not work here: this build has production Clerk keys, which are bound to the production domain. Set the development keys (pk_test_… / sk_test_…) on Vercel’s Preview environment.'
+      ? 'Sign-in is off here. This build has PRODUCTION Clerk keys, and a production instance is bound to its own domain, so the handshake can never complete on a preview URL. Everything else works and conversations stay in this browser.'
       : clerk === 'missing'
         ? 'Sign-in is off on this build — no Clerk keys are set. Everything else works; conversations stay in this browser.'
         : 'Sign-in is using a Clerk development instance, which is what previews want.';
+
+  /** The fix, where there is one — named precisely enough to act on. */
+  const fix =
+    clerk === 'mismatch' || clerk === 'missing'
+      ? 'Fix: Clerk dashboard → the DEVELOPMENT instance → API keys. Put that pair on Vercel → Settings → Environment Variables, scoped to Preview, then redeploy.'
+      : null;
 
   return (
     <div className={`env-badge is-${env}`}>
@@ -44,6 +50,13 @@ export function EnvBadge({
       {open && (
         <div className="env-note" role="note">
           <p>{note}</p>
+          {fix && (
+            <p className="env-note-fix">
+              <code>NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_…</code>
+              <code>CLERK_SECRET_KEY=sk_test_…</code>
+              {fix}
+            </p>
+          )}
           <p className="env-note-sub">Not production — nothing here is indexed.</p>
         </div>
       )}
