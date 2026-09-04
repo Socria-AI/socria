@@ -16,7 +16,9 @@ type Tok =
   | { t: 'op'; v: string }
   | { t: 'fn'; v: string }
   | { t: 'lp' }
-  | { t: 'rp' };
+  | { t: 'rp' }
+  /** an argument separator inside a call: max(0, x) */
+  | { t: 'comma' };
 
 // Null-prototype, and this matters. With a plain object literal, `'constructor'
 // in FUNCS` is true, inherited from Object.prototype -- as are toString,
@@ -55,6 +57,24 @@ const FUNCS: Record<string, (x: number) => number> = Object.assign(Object.create
   step: (x: number) => (x >= 0 ? 1 : 0),
   heaviside: (x: number) => (x >= 0 ? 1 : 0),
 });
+/**
+ * Functions of two arguments.
+ *
+ * Kept apart from FUNCS so the evaluator knows how many values to pop without
+ * carrying arity through the token stream. They exist because a great many
+ * real shapes are piecewise and this grammar has no conditional: a budget
+ * line with a kink, a tax bracket, a supply curve that hits capacity, a
+ * payoff floored at zero. `max(0, x)` is how all of those are written.
+ */
+const FUNCS2: Record<string, (a: number, b: number) => number> = Object.assign(Object.create(null), {
+  max: Math.max,
+  min: Math.min,
+  atan2: Math.atan2,
+  mod: (a: number, b: number) => (b === 0 ? NaN : ((a % b) + b) % b),
+  // A logarithm to any base, which is the other thing people write log_2 for.
+  logbase: (a: number, b: number) => Math.log(b) / Math.log(a),
+});
+
 const CONSTS: Record<string, number> = Object.assign(Object.create(null), {
   pi: Math.PI, e: Math.E, tau: Math.PI * 2,
 });
@@ -113,6 +133,10 @@ function normalizeExpr(raw: string): string {
       : (ch === '⁻' ? '-' : ''));
     return body ? `^(${body})` : '';
   });
+  // log_2(x) and log2(x) mean the same thing, and neither is log base ten.
+  // The '(' the pattern consumes is the one logbase( provides; adding another
+  // would leave the expression unbalanced.
+  s = s.replace(/\blog_\s*\{?\s*([0-9.]+)\s*\}?\s*\(/g, 'logbase($1,');
   // |x| → abs(x). Pairs, left to right; nothing nested, which is how anyone
   // actually writes it.
   s = s.replace(/\|([^|]+)\|/g, 'abs($1)');
@@ -128,6 +152,7 @@ function tokenize(src: string, vars: Set<string>): Tok[] | null {
   while (i < src.length) {
     const c = src[i];
     if (c === ' ') { i++; continue; }
+    if (c === ',') { toks.push({ t: 'comma' }); i++; continue; }
     if (/[0-9.]/.test(c)) {
       let j = i + 1;
       while (j < src.length && /[0-9.eE]/.test(src[j])) {
@@ -147,7 +172,7 @@ function tokenize(src: string, vars: Set<string>): Tok[] | null {
       const word = src.slice(i, j).toLowerCase();
       if (vars.has(word)) toks.push({ t: 'var', v: word });
       else if (word in CONSTS) toks.push({ t: 'num', v: CONSTS[word] });
-      else if (word in FUNCS) toks.push({ t: 'fn', v: word });
+      else if (word in FUNCS || word in FUNCS2) toks.push({ t: 'fn', v: word });
       else return null; // an unknown name → not plottable, bail
       i = j;
       continue;
@@ -155,7 +180,7 @@ function tokenize(src: string, vars: Set<string>): Tok[] | null {
     if ('+-*/%^'.includes(c)) { toks.push({ t: 'op', v: c }); i++; continue; }
     if (c === '(') { toks.push({ t: 'lp' }); i++; continue; }
     if (c === ')') { toks.push({ t: 'rp' }); i++; continue; }
-    return null; // anything else (=, <, commas…) → not a single function
+    return null; // anything else (=, <, …) → not a single function
   }
   return toks;
 }
@@ -205,6 +230,10 @@ function toRpn(toks: Tok[]): Tok[] | null {
         out.push(ops.pop()!);
       }
       ops.push(tk);
+    } else if (tk.t === 'comma') {
+      // Everything since the last '(' is one complete argument.
+      while (ops.length && ops[ops.length - 1].t !== 'lp') out.push(ops.pop()!);
+      if (!ops.length) return null; // a comma outside any call
     } else if (tk.t === 'lp') ops.push(tk);
     else if (tk.t === 'rp') {
       while (ops.length && ops[ops.length - 1].t !== 'lp') out.push(ops.pop()!);
@@ -238,7 +267,7 @@ export interface CompiledExpr {
 export function freeNames(raw: string): string[] {
   const rhs = raw.replace(/^\s*[a-zA-Z]\w*\s*(\([^)]*\))?\s*=\s*/, '');
   const words = (rhs.toLowerCase().match(/[a-z][a-z0-9]*/g) ?? []).filter(
-    (w) => !(w in FUNCS) && !(w in CONSTS)
+    (w) => !(w in FUNCS) && !(w in FUNCS2) && !(w in CONSTS)
   );
   return [...new Set(words)];
 }
@@ -273,9 +302,18 @@ export function compileExpr(raw: string, varNames: string[]): CompiledExpr | nul
         const val = scope[tk.v];
         st.push(typeof val === 'number' ? val : NaN);
       } else if (tk.t === 'fn') {
-        const a = st.pop();
-        if (a === undefined) return NaN;
-        st.push(FUNCS[tk.v](a));
+        const two = FUNCS2[tk.v];
+        if (two) {
+          // Popped in reverse: the second argument was pushed last.
+          const b = st.pop();
+          const a = st.pop();
+          if (a === undefined || b === undefined) return NaN;
+          st.push(two(a, b));
+        } else {
+          const a = st.pop();
+          if (a === undefined) return NaN;
+          st.push(FUNCS[tk.v](a));
+        }
       } else if (tk.t === 'op') {
         if (tk.v === 'u-') {
           const a = st.pop();

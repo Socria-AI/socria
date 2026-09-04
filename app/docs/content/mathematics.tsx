@@ -238,6 +238,16 @@ export function Mathematics() {
         other scene is made of: curves, points, segments, arrows, shaded
         regions, rules and labels, in whatever units the subject uses.
       </p>
+      <p>
+        Two things make that cover most of a syllabus rather than a corner of
+        one. A <strong>path</strong> is traced by a parameter rather than
+        being a height above <em>x</em>, so a shape may close or double back —
+        a Carnot cycle on a PV diagram, a hysteresis loop, a phase portrait,
+        an ellipse. And <strong>max</strong> and <strong>min</strong> give you
+        piecewise shapes without a conditional: a payoff floored at zero is{' '}
+        <em>max(0, x)</em>, a line that hits capacity is <em>min(2x, 6)</em>,
+        and a phase plateau is a sum of them.
+      </p>
       <Callout tag="It is a diagram, not a picture of one">
         The coordinates can be <em>expressions</em>. A point placed at{' '}
         <em>(c, k·c)</em> moves when you move the <em>k</em> slider, so an

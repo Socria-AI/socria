@@ -157,13 +157,41 @@ console.log('\n=== still refused, and deliberately ===');
   // does not have (comma arguments, postfix, ternary), and inventing one
   // quietly is worse than declining. Listed so the boundary is explicit.
   for (const [name, src] of [
-    ['two-argument max', 'max(0, x)'],
-    ['two-argument min', 'min(x, 5)'],
     ['a ternary', 'x > 0 ? x : 0'],
     ['a factorial', 'x!'],
-    ['a subscripted log', 'log_2(x)'],
+    ['an equality', 'x == 2'],
+    ['an inequality', 'x < 2'],
   ]) {
     ok(`${name} is refused`, compileExpr(src, NAMES) === null, src);
+  }
+}
+
+console.log('\n=== two arguments, because most real shapes are piecewise ===');
+{
+  // A payoff floored at zero, a budget line with a kink, a supply curve that
+  // hits capacity, a tax bracket. The grammar has no conditional, so max and
+  // min ARE the conditional.
+  ok('max floors', near(val('max(0, x)', ['x'], { x: -5 }), 0));
+  ok('and passes through', near(val('max(0, x)', ['x'], { x: 5 }), 5));
+  ok('min caps', near(val('min(2*x, 6)', ['x'], { x: 9 }), 6));
+  ok('and passes through', near(val('min(2*x, 6)', ['x'], { x: 1 }), 2));
+  ok('they nest', near(val('min(max(0, x), 2)', ['x'], { x: 5 }), 2));
+  ok('and compose with operators', near(val('3*max(0, x - 1) + 1', ['x'], { x: 4 }), 10));
+  ok('a power of one', near(val('max(0, x)^2', ['x'], { x: 3 }), 9));
+  ok('mod wraps', near(val('mod(x, 3)', ['x'], { x: 7 }), 1));
+  ok('and is never negative', near(val('mod(x, 3)', ['x'], { x: -1 }), 2));
+  ok('atan2 knows its quadrant', near(val('atan2(x, 1)', ['x'], { x: 1 }), Math.atan2(1, 1)));
+  ok('a log to any base', near(val('logbase(2, 8)', ['x'], { x: 0 }), 3));
+  ok('written the way people write it', near(val('log_2(8)', ['x'], { x: 0 }), 3));
+  ok('and log_10 too', near(val('log_10(1000)', ['x'], { x: 0 }), 3));
+  // Not sliders.
+  ok('max is not a free name', !freeNames('max(0, x)').includes('max'));
+  ok('min is not either', !freeNames('min(0, x)').includes('min'));
+
+  // Malformed calls must never yield a confident number.
+  for (const src of ['max(0, )', 'max(,x)', 'max(0 x)', ',x', 'max(0,x', 'x,', 'max()']) {
+    const fn = compileExpr(src, NAMES);
+    ok(`"${src}" yields no number`, fn === null || !Number.isFinite(fn.eval(SCOPE)), String(fn && fn.eval(SCOPE)));
   }
   // Genuinely meaningless input stays refused.
   for (const src of ['(((', '', '   ', 'constructor(x)', '__proto__', 'x)', '(x']) {

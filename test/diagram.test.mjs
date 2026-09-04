@@ -300,7 +300,7 @@ console.log('\n=== the extractor is told the kind exists ===');
   ok('the kind is in the schema', p.includes('|diagram'));
   ok('parts are described', p.includes('"parts"'));
   ok('so are quantities', p.includes('"quantities"'));
-  ok('the primitives are listed', p.includes('curve|point|segment'));
+  ok('the primitives are listed', p.includes('curve|path|point|segment'));
   ok('and it is told what it is for', /titration|free-body|food web/.test(p));
   ok('and told not to force it', /should not be forced onto them|leave "viz" out/.test(p));
 }
@@ -450,8 +450,101 @@ console.log('\n=== the example the prompt teaches must be one we accept ===');
   ok('the economics rules come BEFORE the diagram bullet', ppcIdx > 0 && ppcIdx < dIdx, `${ppcIdx} vs ${dIdx}`);
   ok('the diagram bullet names its own subjects', /titration curve|free-body diagram/.test(p.slice(dIdx, dIdx + 700)));
   ok('and says it is not a fallback for maths', /NOT a fallback for mathematics/.test(p));
-  ok('it names the operators that work', /Use ASCII operators/.test(p));
-  ok('and the ones that do not', /do not use max, min or a ternary/.test(p));
+  ok('it names the operators that work', /Operators and functions: ASCII/.test(p));
+  // max and min are no longer excluded — they are how piecewise shapes are
+  // written now that the parser takes two arguments.
+  ok('and offers the two-argument ones', /two-argument max, min/.test(p));
+}
+
+console.log('\n=== a path, for the shapes y = f(x) cannot express ===');
+{
+  // A closed loop is not a function of x, and a great many of the pictures
+  // worth drawing are loops: a Carnot cycle, hysteresis, a phase portrait.
+  // "Draw the PV cycle for a Carnot engine" was advertised and could not be
+  // drawn at all.
+  const circle = sanitizeViz({
+    kind: 'diagram', view: { xMin: -2, xMax: 2 },
+    parts: [{ o: 'path', x: 'cos(t)', y: 'sin(t)', from: 0, to: 6.2832, closed: true }],
+  });
+  ok('a circle survives', !!circle);
+  const f = frameOf(circle);
+  const c = f.objects.find((o) => o.o === 'curve');
+  ok('and draws as one path', !!c && c.pts.length > 100, String(c && c.pts.length));
+  const xs = c.pts.map((q) => q.x), ys = c.pts.map((q) => q.y);
+  ok('spanning x in [-1, 1]', Math.abs(Math.min(...xs) + 1) < 0.01 && Math.abs(Math.max(...xs) - 1) < 0.01);
+  ok('and y in [-1, 1]', Math.abs(Math.min(...ys) + 1) < 0.01 && Math.abs(Math.max(...ys) - 1) < 0.01);
+  ok('it closes', Math.abs(c.pts[0].x - c.pts[c.pts.length - 1].x) < 1e-9);
+  // The window has to see it too, or the fit and the frame disagree.
+  const v = resolveView(circle, compileScene(circle));
+  ok('the window contains it', v.xMin < -0.99 && v.xMax > 0.99 && v.yMin < -0.99 && v.yMax > 0.99, JSON.stringify(v));
+
+  // A slider drives the shape, which is what makes it worth drawing.
+  const ell = sanitizeViz({
+    kind: 'diagram', view: { xMin: -3, xMax: 3 },
+    params: [{ id: 'a', min: 0.2, max: 2, step: 0.1, value: 1 }],
+    parts: [{ o: 'path', x: '2*cos(t)', y: 'a*sin(t)', from: 0, to: 6.2832, closed: true }],
+  });
+  const tall = frameOf(ell, { a: 2 }).objects.find((o) => o.o === 'curve');
+  const flat = frameOf(ell, { a: 0.2 }).objects.find((o) => o.o === 'curve');
+  ok('the slider changes the shape', Math.max(...tall.pts.map((q) => q.y)) > Math.max(...flat.pts.map((q) => q.y)) + 1);
+
+  // The parameter: declared, or inferred, or t.
+  const declared = sanitizeViz({ kind: 'diagram', view: { xMin: 0, xMax: 4 },
+    parts: [{ o: 'path', x: '1 + u', y: '10/(1 + u)', param: 'u', from: 0, to: 2 }] });
+  ok('a declared parameter works', frameOf(declared).objects.some((o) => o.o === 'curve'));
+  const inferred = sanitizeViz({ kind: 'diagram', view: { xMin: -2, xMax: 2 },
+    parts: [{ o: 'path', x: 'cos(w)', y: 'sin(w)', from: 0, to: 6.2832 }] });
+  ok('an undeclared one is inferred', frameOf(inferred).objects.some((o) => o.o === 'curve'));
+  // A path's parameter shadows a slider of the same name INSIDE the path —
+  // within cos(t) the t is the thing being traced.
+  const shadow = sanitizeViz({ kind: 'diagram', view: { xMin: -2, xMax: 2 },
+    params: [{ id: 't', min: 0, max: 5, step: 1, value: 3 }],
+    parts: [{ o: 'path', x: 'cos(t)', y: 'sin(t)', from: 0, to: 6.2832, param: 't' }] });
+  const sc2 = frameOf(shadow).objects.find((o) => o.o === 'curve');
+  ok('the parameter wins inside the path', !!sc2 && new Set(sc2.pts.map((q) => Math.round(q.x * 100))).size > 20);
+
+  // Refused where it could not draw, rather than kept and silently absent.
+  const bad = (part) => sanitizeViz({ kind: 'diagram', view: { xMin: -2, xMax: 2 }, parts: [part, { o: 'point', x: 0, y: 0 }] });
+  ok('a path with no y is refused', !bad({ o: 'path', x: 'cos(t)' }).parts.some((q) => q.o === 'path'));
+  ok('an unparseable coordinate is refused', !bad({ o: 'path', x: '(((', y: 'sin(t)' }).parts.some((q) => q.o === 'path'));
+  ok('two different free letters are refused', !bad({ o: 'path', x: 'cos(t)', y: 'sin(q)' }).parts.some((q) => q.o === 'path'));
+  ok('nothing non-finite is drawn', frameOf(circle).objects.every((o) =>
+    o.o !== 'curve' || o.pts.every((q) => Number.isFinite(q.x) && Number.isFinite(q.y))));
+}
+
+console.log('\n=== piecewise shapes, via max and min ===');
+{
+  // A payoff floored at zero, a kinked budget line, a capacity limit — all of
+  // them piecewise, and this grammar has no conditional.
+  const sc = sanitizeViz({
+    kind: 'diagram', axes: { x: 'units', y: 'payoff' }, view: { xMin: -5, xMax: 10, yMin: -2, yMax: 10 },
+    parts: [
+      { o: 'curve', expr: 'max(0, x)', tone: 'accent', label: 'payoff' },
+      { o: 'curve', expr: 'min(2*x, 6)', tone: 'tension', label: 'capacity' },
+    ],
+  });
+  ok('both survive', !!sc && sc.parts.length === 2);
+  const f = frameOf(sc);
+  const curves = f.objects.filter((o) => o.o === 'curve');
+  ok('and both draw', curves.length === 2);
+  const yAt = (c, x) => c.pts.reduce((b, q) => Math.abs(q.x - x) < Math.abs(b.x - x) ? q : b).y;
+  ok('the floor holds below zero', Math.abs(yAt(curves[0], -3)) < 0.1, String(yAt(curves[0], -3)));
+  ok('and rises above it', Math.abs(yAt(curves[0], 5) - 5) < 0.2, String(yAt(curves[0], 5)));
+  ok('the cap holds', Math.abs(yAt(curves[1], 8) - 6) < 0.2, String(yAt(curves[1], 8)));
+  ok('and rises below it', Math.abs(yAt(curves[1], 1) - 2) < 0.2, String(yAt(curves[1], 1)));
+}
+
+console.log('\n=== the prompt teaches both ===');
+{
+  const p = buildMapPrompt({ context: null, nodes: [], edges: [], viz: null });
+  ok('path is in the primitive list', /curve\|path\|point/.test(p));
+  ok('and explained as the loop case', /cannot express a loop/.test(p));
+  ok('with a worked circle', /"o": "path", "x": "cos\(t\)"/.test(p));
+  ok('the loop subjects are named', /PV cycle|hysteresis|phase portrait/.test(p));
+  ok('max and min are offered', /two-argument max, min/.test(p));
+  ok('with the piecewise idiom spelled out', /max\(0, x\)/.test(p));
+  ok('and the function list is current', /arcsin.*sec.*step/.test(p) || /sec csc cot/.test(p));
+  ok('the old "do not use max" line is gone', !/do not use max, min or a ternary/.test(p));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

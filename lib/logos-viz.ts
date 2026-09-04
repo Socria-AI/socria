@@ -201,6 +201,16 @@ export type NumOrExpr = number | string;
 
 export type DiagramPart =
   | { o: 'curve'; expr: string; from?: NumOrExpr; to?: NumOrExpr; tone?: Tone; dashed?: boolean; width?: number; label?: string }
+  /**
+   * A path traced by a parameter, rather than a height above x.
+   *
+   * y = f(x) cannot express a closed loop, and a great many of the pictures
+   * worth drawing ARE loops or double back: a Carnot cycle on a PV diagram, a
+   * hysteresis curve, a phase portrait, an ellipse, a demand path that
+   * returns. Both coordinates are expressions in `param` (default 't'), which
+   * runs from `from` to `to`.
+   */
+  | { o: 'path'; x: string; y: string; param?: string; from?: NumOrExpr; to?: NumOrExpr; steps?: number; tone?: Tone; dashed?: boolean; width?: number; label?: string; closed?: boolean }
   | { o: 'point'; x: NumOrExpr; y: NumOrExpr; tone?: Tone; hollow?: boolean; label?: string }
   | { o: 'segment'; x1: NumOrExpr; y1: NumOrExpr; x2: NumOrExpr; y2: NumOrExpr; tone?: Tone; dashed?: boolean; width?: number }
   | { o: 'line'; x: NumOrExpr; y: NumOrExpr; slope: NumOrExpr; tone?: Tone; dashed?: boolean; width?: number }
@@ -707,6 +717,21 @@ function specialView(
         case 'line':
           take(at(part.x), at(part.y));
           break;
+        case 'path': {
+          const pv = pathParam(part, scope);
+          const fx = diagramExpr(part.x, [pv, ...names]);
+          const fy = diagramExpr(part.y, [pv, ...names]);
+          if (!fx || !fy) break;
+          const from = part.from === undefined ? 0 : at(part.from);
+          const to = part.to === undefined ? 2 * Math.PI : at(part.to);
+          if (!Number.isFinite(from) || !Number.isFinite(to) || from === to) break;
+          for (let s = 0; s <= 48; s++) {
+            const u = from + ((to - from) * s) / 48;
+            const sc2 = { ...scope, [pv]: u };
+            take(fx.eval(sc2), fy.eval(sc2));
+          }
+          break;
+        }
       }
     }
     if (xs.length && ys.length) {
@@ -2766,6 +2791,21 @@ function diagramExpr(src: string, names: string[]): CompiledExpr | null {
   return compiled;
 }
 
+/**
+ * What a path's parameter is called.
+ *
+ * Declared if the author said so; otherwise the one free name the two
+ * coordinates share, which is how anyone writes a parametric curve without
+ * thinking about it; otherwise t. Inside the path it SHADOWS a slider of the
+ * same name, because within `x: cos(t)` the t is the thing being traced —
+ * a slider called t is a different quantity that happens to share a letter.
+ */
+function pathParam(part: { x: string; y: string; param?: string }, scope: Record<string, number>): string {
+  if (part.param) return part.param;
+  const free = [...new Set([...freeNames(part.x), ...freeNames(part.y)])].filter((n) => !(n in scope));
+  return free[0] ?? 't';
+}
+
 /** A coordinate: a number as written, or an expression over the sliders. */
 function coord(v: NumOrExpr | undefined, scope: Record<string, number>, names: string[]): number {
   if (typeof v === 'number') return v;
@@ -2828,6 +2868,34 @@ const buildDiagram: Builder = (scene, _fn, vals, view, guarded) => {
             const anchor = best && best.x > (view.xMin + view.xMax) / 2 ? 'end' : 'start';
             if (best) objects.push({ o: 'label', id: `${id}l`, x: best.x, y: best.y, text: part.label, tone, anchor, dy: -8 });
           }
+        }
+        return;
+      }
+      case 'path': {
+        // Both coordinates in one parameter. The parameter is a name of its
+        // own, so it may not collide with a slider: a path in t beside a t
+        // slider would have the handle dragging the tracing point instead of
+        // the shape.
+        const pv = pathParam(part, scope);
+        const fx = diagramExpr(part.x, [pv, ...names]);
+        const fy = diagramExpr(part.y, [pv, ...names]);
+        if (!fx || !fy) return;
+        const from = part.from === undefined ? 0 : at(part.from);
+        const to = part.to === undefined ? 2 * Math.PI : at(part.to);
+        if (!ok(from, to) || from === to) return;
+        const steps = Math.min(720, Math.max(24, Math.round(part.steps ?? 240)));
+        const pts: Pt[] = [];
+        for (let s = 0; s <= steps; s++) {
+          const u = from + ((to - from) * s) / steps;
+          const sc2 = { ...scope, [pv]: u };
+          pts.push({ x: fx.eval(sc2), y: fy.eval(sc2) });
+        }
+        if (part.closed && pts.length) pts.push({ ...pts[0] });
+        if (!pts.some((q) => ok(q.x, q.y))) return;
+        objects.push({ o: 'curve', id, pts, tone, dashed: part.dashed, width: part.width });
+        if (part.label) {
+          const first = pts.find((q) => ok(q.x, q.y));
+          if (first) objects.push({ o: 'label', id: `${id}l`, x: first.x, y: first.y, text: part.label, tone, anchor: 'start', dy: -8 });
         }
         return;
       }
@@ -3496,6 +3564,27 @@ function diagramPart(raw: any): DiagramPart | null {
       const to = raw.to === undefined ? undefined : numOrExpr(raw.to);
       return { o: 'curve', expr, ...(from !== null && from !== undefined ? { from } : {}), ...(to !== null && to !== undefined ? { to } : {}), tone: t, dashed, width, label: text(raw.label, 24) };
     }
+    case 'path': {
+      const xs = text(raw.x, 400), ys = text(raw.y, 400);
+      if (!xs || !ys || !compileExpr(xs, ALPHABET) || !compileExpr(ys, ALPHABET)) return null;
+      const param = typeof raw.param === 'string' && /^[a-z]$/i.test(raw.param.trim())
+        ? raw.param.trim().toLowerCase()
+        : undefined;
+      const from = raw.from === undefined ? undefined : numOrExpr(raw.from);
+      const to = raw.to === undefined ? undefined : numOrExpr(raw.to);
+      const steps = typeof raw.steps === 'number' && Number.isFinite(raw.steps)
+        ? Math.min(720, Math.max(24, Math.round(raw.steps)))
+        : undefined;
+      return {
+        o: 'path', x: xs, y: ys,
+        ...(param ? { param } : {}),
+        ...(from !== null && from !== undefined ? { from } : {}),
+        ...(to !== null && to !== undefined ? { to } : {}),
+        ...(steps ? { steps } : {}),
+        tone: t, dashed, width, label: text(raw.label, 24),
+        ...(raw.closed === true ? { closed: true } : {}),
+      };
+    }
     case 'point': {
       const x = n('x'), y = n('y');
       if (x === null || y === null) return null;
@@ -3568,6 +3657,18 @@ function partIsDrawable(part: DiagramPart, known: Set<string>): boolean {
       const free = freeNames(part.expr).filter((n) => !known.has(n));
       // At most the variable may be unknown.
       if (free.length > 1) return false;
+      add(part.from); add(part.to);
+      break;
+    }
+    case 'path': {
+      // Resolved exactly as the builder resolves it, or this would keep a
+      // part the builder then refuses to draw — the silent outcome this
+      // whole check exists to prevent.
+      const free = [...new Set([...freeNames(part.x), ...freeNames(part.y)])].filter((n) => !known.has(n));
+      const pv = part.param ?? free[0] ?? 't';
+      const inner = new Set([...known, pv]);
+      // With the parameter settled, every other name must be a slider.
+      if ([...freeNames(part.x), ...freeNames(part.y)].some((n) => !inner.has(n))) return false;
       add(part.from); add(part.to);
       break;
     }
