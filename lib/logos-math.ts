@@ -34,6 +34,26 @@ const FUNCS: Record<string, (x: number) => number> = Object.assign(Object.create
   ln: Math.log, log: (x: number) => Math.log10(x), log2: Math.log2,
   sqrt: Math.sqrt, cbrt: Math.cbrt, abs: Math.abs,
   exp: Math.exp, sign: Math.sign, floor: Math.floor, ceil: Math.ceil, round: Math.round,
+
+  // The other names for the same functions.
+  //
+  // An unknown name is a HARD failure — the expression does not compile and
+  // the curve simply is not drawn — so every spelling a model might
+  // reasonably reach for is a curve that silently vanishes. arcsin is as
+  // common as asin in written mathematics, log10 is what a chemist types,
+  // and the reciprocal trig functions have no other spelling at all.
+  arcsin: Math.asin, arccos: Math.acos, arctan: Math.atan,
+  arcsinh: Math.asinh, arccosh: Math.acosh, arctanh: Math.atanh,
+  asinh: Math.asinh, acosh: Math.acosh, atanh: Math.atanh,
+  sec: (x: number) => 1 / Math.cos(x),
+  csc: (x: number) => 1 / Math.sin(x),
+  cot: (x: number) => 1 / Math.tan(x),
+  log10: (x: number) => Math.log10(x),
+  lg: (x: number) => Math.log10(x),
+  // A step, for anything that switches on: a phase change, a threshold, a
+  // piecewise definition the grammar has no other way to express.
+  step: (x: number) => (x >= 0 ? 1 : 0),
+  heaviside: (x: number) => (x >= 0 ? 1 : 0),
 });
 const CONSTS: Record<string, number> = Object.assign(Object.create(null), {
   pi: Math.PI, e: Math.E, tau: Math.PI * 2,
@@ -43,16 +63,41 @@ const PREC: Record<string, number> = Object.assign(Object.create(null), {
 });
 const RIGHT = new Set(['^', 'u-']);
 
-/** Normalize common human notation into the grammar the tokenizer knows. */
+/**
+ * Normalize common human notation into the grammar the tokenizer knows.
+ *
+ * Everything here exists because the alternative is silence. An expression
+ * this does not understand does not compile, and a curve that does not
+ * compile is simply absent from the picture — no error, no gap, just a
+ * diagram missing the line it was drawn for. So the rule is to accept what a
+ * person or a model would actually write, and only then be strict.
+ *
+ * The typographic minus is the one that matters most. Models emit U+2212 and
+ * en dashes constantly, because that is what a minus sign looks like in
+ * prose, and "20 − 5*x" was rejected outright while "20 - 5*x" drew fine.
+ */
 function normalizeExpr(raw: string): string {
   let s = raw.trim();
   // strip a leading "y =" / "f(x) =" so we evaluate the right-hand side
   s = s.replace(/^\s*[a-zA-Z]\w*\s*(\([^)]*\))?\s*=\s*/, '');
-  s = s.replace(/[×·]/g, '*').replace(/÷/g, '/');
+  // every dash that is meant as a minus
+  s = s.replace(/[\u2212\u2013\u2014\u2010\u2011]/g, '-');
+  s = s.replace(/[×·⋅]/g, '*').replace(/[÷∕]/g, '/');
+  s = s.replace(/\*\*/g, '^'); // Python's power operator
   s = s.replace(/\\cdot|\\times/g, '*').replace(/\\div/g, '/');
   s = s.replace(/\\left|\\right/g, '');
   s = s.replace(/\\pi/g, 'pi').replace(/\\/g, '');
   s = s.replace(/\bpi\b/gi, 'pi');
+  // superscript digits: x² → x^2, and ⁻¹ → ^-1
+  s = s.replace(/([⁰¹²³⁴⁵⁶⁷⁸⁹⁻]+)/g, (run) => {
+    const body = run.replace(/./g, (ch) => '⁰¹²³⁴⁵⁶⁷⁸⁹'.indexOf(ch) >= 0
+      ? String('⁰¹²³⁴⁵⁶⁷⁸⁹'.indexOf(ch))
+      : (ch === '⁻' ? '-' : ''));
+    return body ? `^(${body})` : '';
+  });
+  // |x| → abs(x). Pairs, left to right; nothing nested, which is how anyone
+  // actually writes it.
+  s = s.replace(/\|([^|]+)\|/g, 'abs($1)');
   return s;
 }
 

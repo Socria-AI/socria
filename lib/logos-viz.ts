@@ -3702,6 +3702,12 @@ export function sanitizeViz(raw: any): VizScene | null {
     .map((p: any): VizParam | null => {
       const id = typeof p?.id === 'string' ? p.id.trim().toLowerCase() : '';
       if (!/^[a-z][a-z0-9]?$/.test(id) || id === varName) return null;
+      // Not a constant. A slider called e or pi shadows the number in every
+      // expression in the same scene, so "e^x" quietly becomes NaN and the
+      // curve is not drawn — and the model has every reason to reach for e
+      // as a name (EC50, an elasticity, an efficiency) without knowing it
+      // has just redefined Euler's number underneath itself.
+      if (id === 'e' || id === 'pi' || id === 'tau') return null;
       if (kind === 'ode' && id === 'y') return null; // y is the solution, not a slider
       const min = num(p?.min, -1e4, 1e4, 0);
       const max = num(p?.max, -1e4, 1e4, 1);
