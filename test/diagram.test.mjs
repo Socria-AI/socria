@@ -414,5 +414,45 @@ console.log('\n=== Socria never claims it cannot draw ===');
   ok('and forbids describing it instead', /do not list what the curves do|Do not describe the axes/.test(LOGOS_CHAT_PROMPT));
 }
 
+console.log('\n=== the example the prompt teaches must be one we accept ===');
+{
+  // A worked example is the strongest instruction a prompt has. If the one we
+  // show the model does not survive our own sanitizer, we are training it to
+  // produce something we then reject — and the failure is silent, which is
+  // the worst combination available here.
+  const p = buildMapPrompt({ context: null, nodes: [], edges: [], viz: null });
+  const i = p.indexOf('{"kind": "diagram"');
+  ok('the prompt carries a worked example', i > 0);
+  let d = 0, end = -1;
+  for (let k = i; k < p.length; k++) { if (p[k] === '{') d++; else if (p[k] === '}') { d--; if (!d) { end = k; break; } } }
+  const src = p.slice(i, end + 1);
+  let raw = null;
+  try { raw = JSON.parse(src); } catch (e) { ok('the example is valid JSON', false, e.message); }
+  if (raw) {
+    ok('the example is valid JSON', true);
+    const sc = sanitizeViz(raw);
+    ok('and survives the sanitizer', !!sc);
+    ok('with every part kept', sc && sc.parts.length === raw.parts.length, sc && `${sc.parts.length}/${raw.parts.length}`);
+    ok('and its slider', sc && sc.params.some((q) => q.id === 'v'));
+    ok('and its quantity', sc && (sc.quantities || []).length === 1);
+    const f = frameOf(sc);
+    ok('it draws', f.objects.length >= 4, String(f.objects.length));
+    ok('the readout is right at the default', f.readouts[0] && f.readouts[0].value === '3.8003', f.readouts[0] && f.readouts[0].value);
+    ok('and moves with the slider', frameOf(sc, { v: 40 }).readouts[0].value === '10.1997');
+    ok('nothing non-finite is drawn', f.objects.every((o) => Object.values(o).every((v) => typeof v !== 'number' || Number.isFinite(v))));
+  }
+
+  // And the guidance must not have collapsed into the economics bullet: the
+  // PPC and AD-AS rules belong to economics, and a model reading them under
+  // the diagram heading would draw opportunity cost by hand.
+  const dIdx = p.indexOf('ANY OTHER SUBJECT THAT WANTS A PICTURE');
+  const ppcIdx = p.indexOf('Opportunity cost, trade-offs');
+  ok('the economics rules come BEFORE the diagram bullet', ppcIdx > 0 && ppcIdx < dIdx, `${ppcIdx} vs ${dIdx}`);
+  ok('the diagram bullet names its own subjects', /titration curve|free-body diagram/.test(p.slice(dIdx, dIdx + 700)));
+  ok('and says it is not a fallback for maths', /NOT a fallback for mathematics/.test(p));
+  ok('it names the operators that work', /Use ASCII operators/.test(p));
+  ok('and the ones that do not', /do not use max, min or a ternary/.test(p));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

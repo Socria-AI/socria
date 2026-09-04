@@ -770,5 +770,45 @@ console.log('\n=== a tax and a control are alternatives ===');
   ok('a negative tax is clamped away', !neg.tax || neg.tax >= 0);
 }
 
+console.log('\n=== a request to change a value reaches the picture ===');
+{
+  // The whole adjustment path, minus the model: a scene on screen, the
+  // prompt that shows it, the edited scene coming back, and the numbers
+  // recomputing. "Raise the tax to 20" has to end in a different picture.
+  const on = {
+    context: 'learning',
+    nodes: [{ id: 'm', type: 'concept', label: 'The market' }],
+    edges: [],
+    viz: { kind: 'supply-demand', demand: { intercept: 120, slope: -2 }, supply: { intercept: 30, slope: 1 }, tax: 9, surplus: true },
+  };
+  const current = sanitizeMap(on);
+  const p = buildMapPrompt(current);
+  ok('the scene on screen is in the prompt', p.includes('"tax":9'));
+  ok('with the handle where it sits', /"id":"t"[^}]*"value":9/.test(p), 'param value missing');
+  ok('and the instruction to act on a request', p.includes('DO WHAT THEY ASKED'));
+  // Slider help is UI copy for the reader; showing it invites the model to
+  // rewrite prose it was never asked to touch.
+  ok('slider help is not leaked', !p.includes('Open it from zero'));
+
+  const after = sanitizeMap({ ...on, viz: { ...on.viz, tax: 20 } });
+  ok('the new value survives the sanitizer', after.viz.tax === 20);
+  const t = (after.viz.params || []).find((q) => q.id === 't');
+  ok('and the slider opens at it', t && t.value === 20, JSON.stringify(t));
+
+  const view = resolveView(after.viz, compileScene(after.viz));
+  const f = buildFrame(after.viz, compileScene(after.viz), defaults(after.viz), view, false);
+  const r = Object.fromEntries(f.readouts.map((x) => [x.id, x.value]));
+  // 120 - 2Q = 50 + Q  ->  Q = 23.333, Pb = 73.333, Ps = 53.333
+  ok('the traded quantity recomputes', r.qt === '23.3333', r.qt);
+  ok("buyers' price recomputes", r.pb === '73.3333', r.pb);
+  ok("sellers' price recomputes", r.ps === '53.3333', r.ps);
+  ok('and the two are the tax apart', Math.abs(Number(r.pb) - Number(r.ps) - 20) < 1e-3);
+
+  // The picture genuinely differs from the one before it.
+  const before = sanitizeMap(on);
+  const bf = buildFrame(before.viz, compileScene(before.viz), defaults(before.viz), resolveView(before.viz, compileScene(before.viz)), false);
+  ok('the picture actually changed', JSON.stringify(bf.objects) !== JSON.stringify(f.objects));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
