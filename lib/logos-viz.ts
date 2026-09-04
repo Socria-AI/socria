@@ -220,7 +220,30 @@ export type DiagramPart =
   | { o: 'sequence'; pts: { x: NumOrExpr; y: NumOrExpr }[]; tone?: Tone; stems?: boolean }
   | { o: 'vrule'; at: NumOrExpr; tone?: Tone; dashed?: boolean; label?: string }
   | { o: 'hrule'; at: NumOrExpr; tone?: Tone; dashed?: boolean; label?: string }
-  | { o: 'label'; x: NumOrExpr; y: NumOrExpr; text: string; tone?: Tone; anchor?: 'start' | 'middle' | 'end'; dy?: number };
+  | { o: 'label'; x: NumOrExpr; y: NumOrExpr; text: string; tone?: Tone; anchor?: 'start' | 'middle' | 'end'; dy?: number }
+  /**
+   * The area between two curves.
+   *
+   * Uncertainty is most of science, and until now saying so meant listing the
+   * corners of a polygon by hand — which nobody does, so nobody drew a
+   * confidence interval, a tolerance range, an error envelope, a min-max
+   * band or a surplus region. Two expressions and an interval instead.
+   */
+  | { o: 'band'; lower: string; upper: string; from?: NumOrExpr; to?: NumOrExpr; tone?: Tone; label?: string }
+  /**
+   * A measurement with its uncertainty, drawn the way a lab draws it: the
+   * point, a bar through it, and caps on the ends. `dy` is the half-height;
+   * `dx` adds horizontal error where the x is measured too.
+   */
+  | { o: 'errorbar'; x: NumOrExpr; y: NumOrExpr; dy?: NumOrExpr; dx?: NumOrExpr; tone?: Tone; label?: string }
+  /**
+   * A label that points AT something rather than floating near it.
+   *
+   * Text placed on a busy diagram lands on top of a curve as often as beside
+   * it. A callout puts the words where there is room and draws a line from
+   * them to the thing they are about.
+   */
+  | { o: 'callout'; x: NumOrExpr; y: NumOrExpr; toX: NumOrExpr; toY: NumOrExpr; text: string; tone?: Tone };
 
 export interface DiagramQuantity {
   tex: string;
@@ -717,6 +740,36 @@ function specialView(
         case 'line':
           take(at(part.x), at(part.y));
           break;
+        case 'callout':
+          take(at(part.x), at(part.y));
+          take(at(part.toX), at(part.toY));
+          break;
+        case 'errorbar': {
+          const ex = at(part.x), ey = at(part.y);
+          const edy = part.dy === undefined ? 0 : Math.abs(at(part.dy));
+          const edx = part.dx === undefined ? 0 : Math.abs(at(part.dx));
+          take(ex, ey);
+          if (Number.isFinite(edy)) { take(ex, ey - edy); take(ex, ey + edy); }
+          if (Number.isFinite(edx)) { take(ex - edx, ey); take(ex + edx, ey); }
+          break;
+        }
+        case 'band': {
+          const lo = diagramExpr(part.lower, [scene.varName, ...names, ...ALPHABET]);
+          const hi = diagramExpr(part.upper, [scene.varName, ...names, ...ALPHABET]);
+          if (!lo || !hi) break;
+          const bfree = [...lo.vars, ...hi.vars].filter((v) => !(v in scope));
+          const bv = bfree[0] ?? scene.varName;
+          const a0 = part.from === undefined ? xMinOf(scene) : at(part.from);
+          const b0 = part.to === undefined ? xMaxOf(scene) : at(part.to);
+          if (!Number.isFinite(a0) || !Number.isFinite(b0) || a0 === b0) break;
+          for (let k = 0; k <= 32; k++) {
+            const xx = a0 + ((b0 - a0) * k) / 32;
+            const sc2 = { ...scope, [bv]: xx };
+            take(xx, hi.eval(sc2));
+            take(xx, lo.eval(sc2));
+          }
+          break;
+        }
         case 'path': {
           const pv = pathParam(part, scope);
           const fx = diagramExpr(part.x, [pv, ...names]);
@@ -2899,6 +2952,67 @@ const buildDiagram: Builder = (scene, _fn, vals, view, guarded) => {
         }
         return;
       }
+      case 'band': {
+        // Sampled along the top and back along the bottom, which is one
+        // closed polygon and exactly what a region wants.
+        const lo = diagramExpr(part.lower, [scene.varName, ...names, ...ALPHABET]);
+        const hi = diagramExpr(part.upper, [scene.varName, ...names, ...ALPHABET]);
+        if (!lo || !hi) return;
+        const freeOf = (f: CompiledExpr) => f.vars.filter((v) => !(v in scope));
+        const bv = [...freeOf(lo), ...freeOf(hi)].find((v) => v !== undefined) ?? scene.varName;
+        const a = part.from === undefined ? view.xMin : at(part.from);
+        const b = part.to === undefined ? view.xMax : at(part.to);
+        const from = Math.max(view.xMin, Math.min(a, b));
+        const to = Math.min(view.xMax, Math.max(a, b));
+        if (!ok(from, to) || !(to > from)) return;
+        const N = 96;
+        const top: Pt[] = [];
+        const bot: Pt[] = [];
+        for (let k = 0; k <= N; k++) {
+          const xx = from + ((to - from) * k) / N;
+          const sc2 = { ...scope, [bv]: xx };
+          const yh = hi.eval(sc2);
+          const yl = lo.eval(sc2);
+          if (ok(yh, yl)) { top.push({ x: xx, y: yh }); bot.push({ x: xx, y: yl }); }
+        }
+        if (top.length < 2) return;
+        objects.push({ o: 'region', id, pts: [...top, ...bot.reverse()], tone });
+        if (part.label) {
+          const mid = top[Math.floor(top.length / 2)];
+          objects.push({ o: 'label', id: `${id}l`, x: mid.x, y: mid.y, text: part.label, tone, anchor: 'middle', dy: -8 });
+        }
+        return;
+      }
+      case 'errorbar': {
+        const x = at(part.x), y = at(part.y);
+        if (!ok(x, y)) return;
+        const dy = part.dy === undefined ? 0 : Math.abs(at(part.dy));
+        const dx = part.dx === undefined ? 0 : Math.abs(at(part.dx));
+        // The measurement itself, then its uncertainty around it.
+        objects.push({ o: 'point', id, x, y, tone, label: part.label });
+        const cap = (view.xMax - view.xMin) / 90;
+        if (ok(dy) && dy > 0) {
+          objects.push({ o: 'segment', id: `${id}v`, x1: x, y1: y - dy, x2: x, y2: y + dy, tone, width: 1.4 });
+          objects.push({ o: 'segment', id: `${id}vt`, x1: x - cap, y1: y + dy, x2: x + cap, y2: y + dy, tone, width: 1.4 });
+          objects.push({ o: 'segment', id: `${id}vb`, x1: x - cap, y1: y - dy, x2: x + cap, y2: y - dy, tone, width: 1.4 });
+        }
+        if (ok(dx) && dx > 0) {
+          const capY = (view.yMax - view.yMin) / 90;
+          objects.push({ o: 'segment', id: `${id}h`, x1: x - dx, y1: y, x2: x + dx, y2: y, tone, width: 1.4 });
+          objects.push({ o: 'segment', id: `${id}hl`, x1: x - dx, y1: y - capY, x2: x - dx, y2: y + capY, tone, width: 1.4 });
+          objects.push({ o: 'segment', id: `${id}hr`, x1: x + dx, y1: y - capY, x2: x + dx, y2: y + capY, tone, width: 1.4 });
+        }
+        return;
+      }
+      case 'callout': {
+        const x = at(part.x), y = at(part.y);
+        const tx = at(part.toX), ty = at(part.toY);
+        if (!ok(x, y, tx, ty)) return;
+        objects.push({ o: 'segment', id: `${id}s`, x1: x, y1: y, x2: tx, y2: ty, tone: tone ?? 'ghost', width: 1 });
+        // Anchored away from what it points at, so the words never sit on it.
+        objects.push({ o: 'label', id, x, y, text: part.text, tone, anchor: x <= tx ? 'end' : 'start', dy: -4 });
+        return;
+      }
       case 'point': {
         const x = at(part.x), y = at(part.y);
         if (ok(x, y)) objects.push({ o: 'point', id, x, y, tone, hollow: part.hollow, label: part.label });
@@ -3585,6 +3699,36 @@ function diagramPart(raw: any): DiagramPart | null {
         ...(raw.closed === true ? { closed: true } : {}),
       };
     }
+    case 'band': {
+      const lower = text(raw.lower, 400), upper = text(raw.upper, 400);
+      if (!lower || !upper || !compileExpr(lower, ALPHABET) || !compileExpr(upper, ALPHABET)) return null;
+      const from = raw.from === undefined ? undefined : numOrExpr(raw.from);
+      const to = raw.to === undefined ? undefined : numOrExpr(raw.to);
+      return {
+        o: 'band', lower, upper,
+        ...(from !== null && from !== undefined ? { from } : {}),
+        ...(to !== null && to !== undefined ? { to } : {}),
+        tone: t, label: text(raw.label, 24),
+      };
+    }
+    case 'errorbar': {
+      const x = n('x'), y = n('y');
+      if (x === null || y === null) return null;
+      const dy = raw.dy === undefined ? undefined : numOrExpr(raw.dy);
+      const dx = raw.dx === undefined ? undefined : numOrExpr(raw.dx);
+      return {
+        o: 'errorbar', x, y,
+        ...(dy !== null && dy !== undefined ? { dy } : {}),
+        ...(dx !== null && dx !== undefined ? { dx } : {}),
+        tone: t, label: text(raw.label, 24),
+      };
+    }
+    case 'callout': {
+      const x = n('x'), y = n('y'), toX = n('toX'), toY = n('toY');
+      const body = text(raw.text, 48);
+      if (x === null || y === null || toX === null || toY === null || !body) return null;
+      return { o: 'callout', x, y, toX, toY, text: body, tone: t };
+    }
     case 'point': {
       const x = n('x'), y = n('y');
       if (x === null || y === null) return null;
@@ -3673,6 +3817,16 @@ function partIsDrawable(part: DiagramPart, known: Set<string>): boolean {
       break;
     }
     case 'point': case 'label': add(part.x); add(part.y); break;
+    case 'band': {
+      // Both edges are curves in the same variable, so one unknown between
+      // them is that variable and anything else is a mistake.
+      const free = [...new Set([...freeNames(part.lower), ...freeNames(part.upper)])].filter((n) => !known.has(n));
+      if (free.length > 1) return false;
+      add(part.from); add(part.to);
+      break;
+    }
+    case 'errorbar': add(part.x); add(part.y); add(part.dy); add(part.dx); break;
+    case 'callout': add(part.x); add(part.y); add(part.toX); add(part.toY); break;
     case 'segment': case 'vector': add(part.x1); add(part.y1); add(part.x2); add(part.y2); break;
     case 'line': add(part.x); add(part.y); add(part.slope); break;
     case 'region': case 'sequence': for (const q of part.pts) { add(q.x); add(q.y); } break;

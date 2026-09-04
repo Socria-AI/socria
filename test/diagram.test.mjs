@@ -300,7 +300,9 @@ console.log('\n=== the extractor is told the kind exists ===');
   ok('the kind is in the schema', p.includes('|diagram'));
   ok('parts are described', p.includes('"parts"'));
   ok('so are quantities', p.includes('"quantities"'));
-  ok('the primitives are listed', p.includes('curve|path|point|segment'));
+  for (const prim of ['curve', 'path', 'band', 'errorbar', 'callout', 'point', 'segment', 'line', 'vector', 'region', 'rects', 'sequence', 'vrule', 'hrule', 'label']) {
+    ok(`${prim} is offered to the extractor`, new RegExp(`\\b${prim}\\b`).test(p), prim);
+  }
   ok('and it is told what it is for', /titration|free-body|food web/.test(p));
   ok('and told not to force it', /should not be forced onto them|leave "viz" out/.test(p));
 }
@@ -537,7 +539,7 @@ console.log('\n=== piecewise shapes, via max and min ===');
 console.log('\n=== the prompt teaches both ===');
 {
   const p = buildMapPrompt({ context: null, nodes: [], edges: [], viz: null });
-  ok('path is in the primitive list', /curve\|path\|point/.test(p));
+  ok('path is in the primitive list', /"o": "curve\|path\|/.test(p));
   ok('and explained as the loop case', /cannot express a loop/.test(p));
   ok('with a worked circle', /"o": "path", "x": "cos\(t\)"/.test(p));
   ok('the loop subjects are named', /PV cycle|hysteresis|phase portrait/.test(p));
@@ -583,6 +585,65 @@ console.log('\n=== and the reply must not narrate what is being drawn ===');
   ok('the exact sentence that shipped is quoted back', /this is the top horizontal line/.test(LOGOS_CHAT_PROMPT));
   ok('and one sentence plus a question is the shape', /at most one sentence about what the picture shows/.test(LOGOS_CHAT_PROMPT));
   ok('claiming it cannot draw is still forbidden', /NEVER SAY YOU CANNOT DRAW/.test(LOGOS_CHAT_PROMPT));
+}
+
+console.log('\n=== uncertainty, measurements and pointing ===');
+{
+  // Science is mostly these three, and nothing expressed them: a band needed
+  // its corners listed by hand, an error bar had no part at all, and a label
+  // could only float near a thing rather than point at it.
+  const sc = sanitizeViz({
+    kind: 'diagram', axes: { x: 'dose', y: 'response' }, view: { xMin: 0, xMax: 10, yMin: 0, yMax: 20 },
+    params: [{ id: 'w', min: 0.5, max: 4, step: 0.5, value: 1.5 }],
+    parts: [
+      { o: 'band', lower: '1.5*x - w', upper: '1.5*x + w', tone: 'muted', label: '95% CI' },
+      { o: 'curve', expr: '1.5*x', tone: 'accent', label: 'fit' },
+      { o: 'errorbar', x: 2, y: 3.4, dy: 0.9 },
+      { o: 'errorbar', x: 8, y: 13.5, dy: 1.4, dx: 0.3 },
+      { o: 'callout', x: 8.6, y: 4, toX: 8, toY: 13.5, text: 'above the band' },
+    ],
+  });
+  ok('all five survive', !!sc && sc.parts.length === 5, sc && String(sc.parts.length));
+  const f = frameOf(sc);
+  ok('the band becomes a region', f.objects.some((o) => o.o === 'region'));
+  ok('with a closed outline', f.objects.find((o) => o.o === 'region').pts.length > 20);
+  ok('the fit is drawn', f.objects.some((o) => o.o === 'curve'));
+  ok('each measurement is a point', f.objects.filter((o) => o.o === 'point').length === 2);
+  // A bar and two caps for dy; the second also has dx, so three more.
+  ok('with bars and caps around them', f.objects.filter((o) => o.o === 'segment').length >= 7,
+    String(f.objects.filter((o) => o.o === 'segment').length));
+  ok('the callout draws a leader line', f.objects.some((o) => o.o === 'segment'));
+  ok('and its words', f.objects.some((o) => o.o === 'label' && o.text === 'above the band'));
+  ok('nothing non-finite', f.objects.every((o) => Object.values(o).every((v) => typeof v !== 'number' || Number.isFinite(v))));
+
+  // The band follows its slider, which is what makes it worth shading.
+  const narrow = frameOf(sc, { w: 0.5 }).objects.find((o) => o.o === 'region');
+  const wide = frameOf(sc, { w: 4 }).objects.find((o) => o.o === 'region');
+  const height = (r) => Math.max(...r.pts.map((q) => q.y)) - Math.min(...r.pts.map((q) => q.y));
+  ok('a wider interval is a taller band', height(wide) > height(narrow) + 3);
+
+  // The window must contain the uncertainty, not just the points.
+  const tall = sanitizeViz({ kind: 'diagram', view: { xMin: 0, xMax: 4 },
+    parts: [{ o: 'errorbar', x: 2, y: 5, dy: 40 }] });
+  const v = resolveView(tall, compileScene(tall));
+  ok('the window contains the error bar', v.yMin < -30 && v.yMax > 40, JSON.stringify(v));
+
+  // Refused rather than kept-and-blank.
+  const bad = (part) => sanitizeViz({ kind: 'diagram', view: { xMin: 0, xMax: 5 }, parts: [part, { o: 'point', x: 1, y: 1 }] });
+  ok('a band with one edge is refused', !bad({ o: 'band', lower: 'x' }).parts.some((q) => q.o === 'band'));
+  ok('an unparseable edge is refused', !bad({ o: 'band', lower: '(((', upper: 'x' }).parts.some((q) => q.o === 'band'));
+  ok('an error bar with no y is refused', !bad({ o: 'errorbar', x: 1 }).parts.some((q) => q.o === 'errorbar'));
+  ok('a callout with no target is refused', !bad({ o: 'callout', x: 1, y: 1, text: 'hi' }).parts.some((q) => q.o === 'callout'));
+  ok('a band naming two unknowns is refused',
+    !bad({ o: 'band', lower: 'a*x', upper: 'b*x' }).parts.some((q) => q.o === 'band'));
+
+  // And the extractor is told they exist.
+  const p = buildMapPrompt({ context: null, nodes: [], edges: [], viz: null });
+  ok('band is in the primitive list', /curve\|path\|band\|errorbar\|callout/.test(p));
+  ok('the band is explained', /shades between two curves/.test(p));
+  ok('so is the error bar', /a measurement with its uncertainty/.test(p));
+  ok('and why it matters', /a claim, not a measurement/.test(p));
+  ok('the callout is explained', /a label that POINTS at something/.test(p));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
