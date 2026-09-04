@@ -243,7 +243,22 @@ export type DiagramPart =
    * it. A callout puts the words where there is room and draws a line from
    * them to the thing they are about.
    */
-  | { o: 'callout'; x: NumOrExpr; y: NumOrExpr; toX: NumOrExpr; toY: NumOrExpr; text: string; tone?: Tone };
+  | { o: 'callout'; x: NumOrExpr; y: NumOrExpr; toX: NumOrExpr; toY: NumOrExpr; text: string; tone?: Tone }
+  /**
+   * Measured numbers, as they were measured.
+   *
+   * Everything else here is an expression — a shape derived from a formula.
+   * Real work starts from readings: twelve rows of a titration, a quarter of
+   * sales, a survey, an experiment. Those cannot be written as a function of
+   * x, and until this existed there was no way to put them on a picture at
+   * all.
+   *
+   * `fit` draws the least-squares line through them as well, because the
+   * first question anyone asks of a scatter is whether there is a trend, and
+   * computing it here means the answer is the data's rather than a model's
+   * guess at it.
+   */
+  | { o: 'data'; points: { x: number; y: number }[]; tone?: Tone; label?: string; connect?: boolean; fit?: boolean };
 
 export interface DiagramQuantity {
   tex: string;
@@ -743,6 +758,9 @@ function specialView(
         case 'callout':
           take(at(part.x), at(part.y));
           take(at(part.toX), at(part.toY));
+          break;
+        case 'data':
+          for (const q of part.points) take(q.x, q.y);
           break;
         case 'errorbar': {
           const ex = at(part.x), ey = at(part.y);
@@ -2875,6 +2893,10 @@ const buildDiagram: Builder = (scene, _fn, vals, view, guarded) => {
   const ok = (...ns: number[]) => ns.every((n) => Number.isFinite(n));
 
   const objects: VizObject[] = [];
+  // Declared before the loop because a `data` part contributes a slope and an
+  // R² alongside its points, and reading this after the loop that fills it
+  // would be a temporal-dead-zone error rather than a compile one.
+  const readouts: VizReadout[] = [];
   const parts = scene.parts ?? [];
 
   parts.forEach((part, i) => {
@@ -3013,6 +3035,54 @@ const buildDiagram: Builder = (scene, _fn, vals, view, guarded) => {
         objects.push({ o: 'label', id, x, y, text: part.text, tone, anchor: x <= tx ? 'end' : 'start', dy: -4 });
         return;
       }
+      case 'data': {
+        const pts = part.points.filter((q) => ok(q.x, q.y));
+        if (!pts.length) return;
+        if (part.connect) {
+          objects.push({ o: 'curve', id: `${id}c`, pts: [...pts], tone, width: 1.6 });
+        }
+        objects.push({ o: 'sequence', id, pts: [...pts], tone });
+        if (part.fit && pts.length >= 2) {
+          // Least squares, computed from the readings rather than guessed at.
+          const n = pts.length;
+          const mx = pts.reduce((a, q) => a + q.x, 0) / n;
+          const my = pts.reduce((a, q) => a + q.y, 0) / n;
+          let sxy = 0, sxx = 0;
+          for (const q of pts) { sxy += (q.x - mx) * (q.y - my); sxx += (q.x - mx) ** 2; }
+          if (sxx > 1e-12) {
+            const m = sxy / sxx;
+            const c = my - m * mx;
+            objects.push({ o: 'line', id: `${id}f`, x: mx, y: my, slope: m, tone: 'ghost', dashed: true });
+            // R², so the line is not mistaken for a claim that one fits.
+            let ssRes = 0, ssTot = 0;
+            for (const q of pts) { ssRes += (q.y - (m * q.x + c)) ** 2; ssTot += (q.y - my) ** 2; }
+
+            readouts.push({
+              id: `${id}fit`,
+              tex: '\\text{slope}',
+              value: guarded ? null : fmt(m, 4),
+              help: 'The least-squares slope through these readings.',
+            });
+            // R² is undefined when the readings do not vary, and reporting 1
+            // there would say the line accounts for all of the variation when
+            // there is none to account for. A confident number that means
+            // nothing is worse than no number.
+            if (ssTot > 1e-12) {
+              readouts.push({
+                id: `${id}r2`,
+                tex: 'R^2',
+                value: guarded ? null : fmt(1 - ssRes / ssTot, 3),
+                help: 'How much of the variation the straight line accounts for. Near 1 is a close fit; near 0 means the line is telling you very little.',
+              });
+            }
+          }
+        }
+        if (part.label) {
+          const last = pts[pts.length - 1];
+          objects.push({ o: 'label', id: `${id}l`, x: last.x, y: last.y, text: part.label, tone, anchor: 'end', dy: -8 });
+        }
+        return;
+      }
       case 'point': {
         const x = at(part.x), y = at(part.y);
         if (ok(x, y)) objects.push({ o: 'point', id, x, y, tone, hollow: part.hollow, label: part.label });
@@ -3073,7 +3143,6 @@ const buildDiagram: Builder = (scene, _fn, vals, view, guarded) => {
   // Authored quantities, computed live. Withheld by the guard like every
   // other number on a Logos diagram — the name and the help still show, so
   // the reader knows what is being asked of them.
-  const readouts: VizReadout[] = [];
   for (const [i, q] of (scene.quantities ?? []).entries()) {
     const fn = diagramExpr(q.expr, names);
     if (!fn) continue;
@@ -3625,6 +3694,8 @@ function sanitizeVectors(raw: any): { x: number; y: number; label?: string }[] |
 
 const DIAGRAM_TONES = new Set<Tone>(['primary', 'accent', 'tension', 'muted', 'ghost', 'u1', 'u2', 'u3', 'u4']);
 const MAX_PARTS = 40;
+/** Readings in one series. Enough for a term's data, bounded for the SVG. */
+const MAX_DATA = 400;
 const MAX_PART_PTS = 64;
 const MAX_QUANTITIES = 4;
 
@@ -3729,6 +3800,33 @@ function diagramPart(raw: any): DiagramPart | null {
       if (x === null || y === null || toX === null || toY === null || !body) return null;
       return { o: 'callout', x, y, toX, toY, text: body, tone: t };
     }
+    case 'data': {
+      // Numbers only. These are readings, not formulas — an expression here
+      // would mean somebody derived the data, which is a different claim.
+      if (!Array.isArray(raw.points)) return null;
+      const points: { x: number; y: number }[] = [];
+      // A reading is a number, or a string of one. null, undefined, '' and
+      // true all coerce to a number in JavaScript, and every one of them
+      // would silently become a measurement at the origin that nobody took.
+      const reading = (v: unknown): number => {
+        if (typeof v === 'number') return v;
+        if (typeof v === 'string' && v.trim()) return Number(v);
+        return NaN;
+      };
+      for (const q of raw.points.slice(0, MAX_DATA)) {
+        const x = reading(q?.x);
+        const y = reading(q?.y);
+        if (Number.isFinite(x) && Number.isFinite(y)) {
+          points.push({ x: Math.min(1e9, Math.max(-1e9, x)), y: Math.min(1e9, Math.max(-1e9, y)) });
+        }
+      }
+      if (!points.length) return null;
+      return {
+        o: 'data', points, tone: t, label: text(raw.label, 24),
+        ...(raw.connect === true ? { connect: true } : {}),
+        ...(raw.fit === true ? { fit: true } : {}),
+      };
+    }
     case 'point': {
       const x = n('x'), y = n('y');
       if (x === null || y === null) return null;
@@ -3826,6 +3924,9 @@ function partIsDrawable(part: DiagramPart, known: Set<string>): boolean {
       break;
     }
     case 'errorbar': add(part.x); add(part.y); add(part.dy); add(part.dx); break;
+    // Readings are already numbers; there is nothing to resolve and nothing
+    // that can fail to.
+    case 'data': break;
     case 'callout': add(part.x); add(part.y); add(part.toX); add(part.toY); break;
     case 'segment': case 'vector': add(part.x1); add(part.y1); add(part.x2); add(part.y2); break;
     case 'line': add(part.x); add(part.y); add(part.slope); break;

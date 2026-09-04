@@ -639,11 +639,81 @@ console.log('\n=== uncertainty, measurements and pointing ===');
 
   // And the extractor is told they exist.
   const p = buildMapPrompt({ context: null, nodes: [], edges: [], viz: null });
-  ok('band is in the primitive list', /curve\|path\|band\|errorbar\|callout/.test(p));
+  ok('band is in the primitive list', /curve\|path\|data\|band\|errorbar\|callout/.test(p));
   ok('the band is explained', /shades between two curves/.test(p));
   ok('so is the error bar', /a measurement with its uncertainty/.test(p));
   ok('and why it matters', /a claim, not a measurement/.test(p));
   ok('the callout is explained', /a label that POINTS at something/.test(p));
+}
+
+console.log('\n=== readings, as they were taken ===');
+{
+  // Everything else here is an expression — a shape derived from a formula.
+  // Real work starts from numbers, and there was no way to put a table of
+  // them on a picture at all.
+  const exact = sanitizeViz({
+    kind: 'diagram', view: { xMin: 0, xMax: 6 },
+    parts: [{ o: 'data', points: [{ x: 1, y: 3 }, { x: 2, y: 5 }, { x: 3, y: 7 }, { x: 4, y: 9 }], fit: true, label: 'runs' }],
+  });
+  ok('the readings survive', !!exact && exact.parts[0].points.length === 4);
+  const f = frameOf(exact);
+  ok('they are drawn as points', f.objects.some((o) => o.o === 'sequence'));
+  ok('with the fitted line', f.objects.some((o) => o.o === 'line'));
+  const r = Object.fromEntries(f.readouts.map((x) => [x.tex, x.value]));
+  // y = 2x + 1 exactly.
+  ok('the slope is the data’s', r['\\text{slope}'] === '2', JSON.stringify(r));
+  ok('and R² is 1 for an exact line', r['R^2'] === '1');
+
+  // A real scatter, and the fit must be computed rather than asserted.
+  const noisy = sanitizeViz({ kind: 'diagram', view: { xMin: 0, xMax: 6 },
+    parts: [{ o: 'data', points: [{ x: 1, y: 3.2 }, { x: 2, y: 4.6 }, { x: 3, y: 7.4 }, { x: 4, y: 8.7 }], fit: true }] });
+  const nr = Object.fromEntries(frameOf(noisy).readouts.map((x) => [x.tex, x.value]));
+  ok('a noisy slope is near but not exactly 2', Math.abs(Number(nr['\\text{slope}']) - 2) < 0.2 && nr['\\text{slope}'] !== '2');
+  ok('and R² is below 1', Number(nr['R^2']) < 1 && Number(nr['R^2']) > 0.9);
+
+  // Flat readings: a slope of zero is true, an R² of 1 is not. There is no
+  // variation for the line to account for, so no number is the honest answer.
+  const flat = sanitizeViz({ kind: 'diagram', view: { xMin: 0, xMax: 6 },
+    parts: [{ o: 'data', points: [{ x: 1, y: 5 }, { x: 2, y: 5 }, { x: 3, y: 5 }, { x: 4, y: 5 }], fit: true }] });
+  const fr = frameOf(flat).readouts.map((x) => x.tex);
+  ok('a flat fit still reports its slope', fr.includes('\\text{slope}'));
+  ok('and reports NO R² rather than a false 1', !fr.includes('R^2'), JSON.stringify(fr));
+
+  // Joined in order, for a series over time.
+  const series = sanitizeViz({ kind: 'diagram', view: { xMin: 0, xMax: 6 },
+    parts: [{ o: 'data', points: [{ x: 1, y: 3 }, { x: 2, y: 8 }, { x: 3, y: 4 }], connect: true }] });
+  ok('connect joins them', frameOf(series).objects.some((o) => o.o === 'curve'));
+  ok('and the points are still there', frameOf(series).objects.some((o) => o.o === 'sequence'));
+
+  // The window is the data's.
+  const wide = sanitizeViz({ kind: 'diagram', view: { xMin: 0, xMax: 6 },
+    parts: [{ o: 'data', points: [{ x: 100, y: 4000 }, { x: 200, y: 9000 }] }] });
+  const v = resolveView(wide, compileScene(wide));
+  ok('the window contains the readings', v.xMax >= 200 && v.yMax >= 9000, JSON.stringify(v));
+
+  // Junk must not become a measurement nobody took.
+  const junk = sanitizeViz({ kind: 'diagram', view: { xMin: 0, xMax: 5 },
+    parts: [{ o: 'data', points: [{ x: 'a', y: 1 }, { x: null, y: null }, { x: undefined, y: 2 }, { x: true, y: 1 }, { x: '', y: 3 }] },
+            { o: 'point', x: 1, y: 1 }] });
+  ok('nothing coerces to a reading at the origin', !junk.parts.some((q) => q.o === 'data'), JSON.stringify(junk.parts));
+  const strs = sanitizeViz({ kind: 'diagram', view: { xMin: 0, xMax: 5 },
+    parts: [{ o: 'data', points: [{ x: '1', y: '2' }, { x: '3', y: '4' }] }] });
+  ok('but numeric strings are read', strs.parts[0].points.length === 2);
+  ok('an empty series is refused', sanitizeViz({ kind: 'diagram', view: { xMin: 0, xMax: 5 }, parts: [{ o: 'data', points: [] }] }) === null);
+  const many = sanitizeViz({ kind: 'diagram', view: { xMin: 0, xMax: 5 },
+    parts: [{ o: 'data', points: Array.from({ length: 5000 }, (_, i) => ({ x: i, y: i })) }] });
+  ok('a runaway series is capped', many.parts[0].points.length <= 400, String(many.parts[0].points.length));
+
+  // Under the guard the picture stands and the numbers do not.
+  const g = buildFrame(exact, compileScene(exact), defaults(exact), resolveView(exact, compileScene(exact)), true);
+  ok('guarded: the readings are still drawn', g.objects.some((o) => o.o === 'sequence'));
+  ok('guarded: the slope is withheld', g.readouts.every((x) => x.value === null));
+
+  // And the extractor is told not to fake it.
+  const p = buildMapPrompt({ context: null, nodes: [], edges: [], viz: null });
+  ok('data is offered', /\bdata\b/.test(p));
+  ok('with the rule that their numbers go in as given', /put them on the picture exactly as given/.test(p));
+  ok('and never approximated by a formula', /a quiet lie about what was measured/.test(p));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
