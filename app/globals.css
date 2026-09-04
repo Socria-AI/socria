@@ -7571,6 +7571,89 @@ html.js-anim .scrolly-root .fade.d3 { transition-delay: .3s; }
   .text-\[10px\] { font-size: 11.5px; }
 }
 
+/* ── the comparison lens ─────────────────────────────────────────── */
+/* Options down the side, what matters across the top. A real table, so the
+   columns line up without arithmetic and a screen reader reads it as one.
+   The empty cells are drawn, not left bare: a blank reads as "nothing to say
+   here" when the truth is "nobody has looked". */
+.logos-root .lg-mx {
+  position: absolute; top: 0; left: 0;
+  display: flex; flex-direction: column;
+  padding: 18px 20px 12px;
+  overflow: hidden;
+}
+.logos-root .lg-mx-scroll { flex: 1; overflow: auto; min-height: 0; }
+.logos-root .lg-mx-table {
+  border-collapse: separate; border-spacing: 0;
+  width: 100%; font-family: var(--lg-sans); font-size: 13px;
+}
+.logos-root .lg-mx-table th,
+.logos-root .lg-mx-table td {
+  border-bottom: 1px solid var(--lg-line);
+  padding: 9px 10px; vertical-align: middle; text-align: left;
+}
+.logos-root .lg-mx-corner { border-bottom-color: transparent; width: 1%; }
+/* The header row stays put: a long comparison is scrolled, and a criterion
+   you cannot see is a column you cannot read. */
+.logos-root .lg-mx-crit {
+  position: sticky; top: 0; z-index: 2;
+  background: var(--lg-paper, #F5F3EB);
+  font-weight: 500; color: var(--lg-ink-60);
+  font-size: 11.5px; letter-spacing: 0.02em;
+  min-width: 92px; max-width: 150px;
+}
+.logos-root .lg-mx-opt {
+  position: sticky; left: 0; z-index: 1;
+  background: var(--lg-paper, #F5F3EB);
+  font-family: var(--lg-serif, var(--lg-sans)); font-size: 14px;
+  color: var(--lg-ink); font-weight: 400;
+  max-width: 190px;
+}
+.logos-root .lg-mx-crit button,
+.logos-root .lg-mx-opt button {
+  font: inherit; color: inherit; background: none; border: 0; padding: 0;
+  text-align: left; cursor: pointer; border-radius: 3px;
+}
+.logos-root .lg-mx-crit button:hover,
+.logos-root .lg-mx-opt button:hover { color: var(--lg-primary); text-decoration: underline; text-underline-offset: 3px; }
+.logos-root .lg-mx-crit button:focus-visible,
+.logos-root .lg-mx-opt button:focus-visible { outline: 2px solid var(--lg-primary); outline-offset: 2px; }
+
+.logos-root .lg-mx-cell { text-align: center; }
+.logos-root .lg-mx-mark {
+  display: inline-grid; place-items: center;
+  width: 22px; height: 22px; border-radius: 50%;
+  font-size: 13px; line-height: 1; font-weight: 600;
+}
+.logos-root .lg-mx-cell.is-good .lg-mx-mark { background: rgba(94,118,51,0.14); color: #465a26; }
+.logos-root .lg-mx-cell.is-bad  .lg-mx-mark { background: rgba(156,91,60,0.14); color: #8A4F33; }
+.logos-root .lg-mx-cell.is-noted .lg-mx-mark { background: rgba(35,36,31,0.07); color: var(--lg-ink-40); }
+/* A question, not a zero — outlined rather than filled, so it reads as open
+   rather than as a score of nothing. */
+.logos-root .lg-mx-cell.is-unknown .lg-mx-mark {
+  background: transparent; color: var(--lg-ink-24);
+  box-shadow: inset 0 0 0 1px var(--lg-line);
+}
+/* A weak claim is not a firm one, and a strong claim should look it. */
+.logos-root .lg-mx-cell.s-weak .lg-mx-mark { opacity: 0.55; }
+.logos-root .lg-mx-cell.s-strong .lg-mx-mark { box-shadow: 0 0 0 2px rgba(94,118,51,0.16); }
+.logos-root .lg-mx-cell.is-bad.s-strong .lg-mx-mark { box-shadow: 0 0 0 2px rgba(156,91,60,0.16); }
+.logos-root .lg-mx-note {
+  display: block; margin-top: 3px;
+  font-size: 10.5px; line-height: 1.35; color: var(--lg-ink-40);
+}
+.logos-root .lg-mx-open {
+  flex: 0 0 auto; margin: 12px 0 0;
+  font-family: var(--lg-serif, var(--lg-sans)); font-style: italic;
+  font-size: 13px; line-height: 1.5; color: var(--lg-ink-60);
+}
+@media (max-width: 640px) {
+  .logos-root .lg-mx { padding: 12px 12px 10px; }
+  .logos-root .lg-mx-table { font-size: 12px; }
+  .logos-root .lg-mx-opt { max-width: 120px; }
+  .logos-root .lg-mx-crit { min-width: 74px; }
+}
+
 /* ===== Socria One, mentioned in passing ===== */
 /* See components/OneMark.tsx for what each size is for.
 

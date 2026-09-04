@@ -21,7 +21,7 @@ import type {
 } from './logos';
 import { compileFunction, type CompiledFn } from './logos-math';
 
-export type LensId = 'graph' | 'structure' | 'tensions' | 'evidence' | 'solve' | 'plot' | 'board';
+export type LensId = 'graph' | 'structure' | 'tensions' | 'evidence' | 'solve' | 'plot' | 'board' | 'matrix';
 
 export interface Placed {
   id: string;
@@ -63,6 +63,7 @@ export const LENSES: { id: LensId; label: string; caption: string }[] = [
   { id: 'solve', label: 'Solution', caption: 'Follow the work, step by step.' },
   { id: 'plot', label: 'Plot', caption: 'See the function.' },
   { id: 'board', label: 'Board', caption: 'Work it out by hand.' },
+  { id: 'matrix', label: 'Compare', caption: 'How does each one do, on what matters?' },
 ];
 
 export const RELATION_LABEL: Record<LogosRelation, string> = {
@@ -114,6 +115,11 @@ export function leadLens(lenses: LensId[], hasViz: boolean): LensId | null {
   if (!lenses.length) return null;
   if (lenses.includes('solve')) return 'solve';
   if (hasViz && lenses.includes('plot')) return 'plot';
+  // A map that is making a comparison opens on the comparison. Same reasoning
+  // as the two above: when the work has a shape of its own, the lens that
+  // draws that shape is the one they came for, and a graph of the same thing
+  // is the general view they can always step back to.
+  if (lenses.includes('matrix')) return 'matrix';
   return lenses[0];
 }
 
@@ -147,6 +153,12 @@ export function availableLenses(map: ThinkingMap): LensId[] {
     if (map.nodes.length) out.push('graph');
     if (map.nodes.length > 1) out.push('structure');
   }
+
+  // A comparison is a table, not a graph, and it is offered whenever the map
+  // is already making one — options judged against criteria. Placed ahead of
+  // Tensions because when someone IS comparing, the table is the thing they
+  // came for.
+  if (buildMatrix(map)) out.push('matrix');
 
   // Contradiction is worth surfacing in any kind of work. Two results that
   // disagree is exactly as important in algebra as in an argument.
@@ -696,3 +708,123 @@ function emptyLayout(id: LensId, empty: string): Layout {
 }
 
 export { CARD_W, GRAPH_W, cardH };
+
+// ── the comparison matrix ───────────────────────────────────────────
+//
+// Every other lens draws a graph. Comparing options against criteria is not a
+// graph — it is a table — and almost every field does it: which solvent,
+// which algorithm, which treatment, which policy, which reading of a poem,
+// which supplier. There was no way to see one.
+//
+// It invents nothing. The matrix is a PROJECTION of the map that already
+// exists: the criteria are the nodes that say what matters, the options are
+// the nodes judged against them, and each cell is the edge between the two.
+// That means it needs no new node types, no new relations, and no second
+// extraction — a map built by talking is already a comparison if the thinking
+// was comparative.
+//
+// The empty cells are the point. A blank is not missing data, it is a
+// question nobody has asked yet, and it is the most useful thing on the
+// table.
+
+/** Nodes that say what MATTERS — the things options are judged against. */
+const CRITERION_TYPES = new Set<LogosNode['type']>(['value', 'constraint', 'goal']);
+
+/** Nodes that are never options: they are the material of an argument, not a
+ *  candidate in one. */
+const NOT_AN_OPTION = new Set<LogosNode['type']>([
+  'value', 'constraint', 'goal', 'evidence', 'source', 'question', 'tension',
+]);
+
+export type CellVerdict = 'good' | 'bad' | 'noted' | 'unknown';
+
+export interface MatrixCell {
+  verdict: CellVerdict;
+  strength?: LogosEdgeStrength;
+  /** what was actually said about this pairing, when anything was */
+  note?: string;
+}
+
+export interface ComparisonMatrix {
+  options: LogosNode[];
+  criteria: LogosNode[];
+  /** cells[option][criterion] */
+  cells: MatrixCell[][];
+  /** pairings nobody has said anything about — the questions still open */
+  unknowns: number;
+}
+
+/** Which way an edge reads as a judgement of an option against a criterion. */
+const VERDICT: Partial<Record<LogosRelation, CellVerdict>> = {
+  supports: 'good',
+  justifies: 'good',
+  implies: 'good',
+  conflicts: 'bad',
+  depends: 'noted',
+  relates: 'noted',
+  leads_to: 'noted',
+  part_of: 'noted',
+  equivalent_to: 'noted',
+};
+
+const MAX_OPTIONS = 8;
+const MAX_CRITERIA = 8;
+
+/**
+ * The comparison this map is already making, or null if it is not making one.
+ *
+ * Null rather than an empty table: a lens with nothing in it is worse than a
+ * lens that is not offered, and a single option or a single criterion is not
+ * a comparison — it is a description.
+ */
+export function buildMatrix(map: ThinkingMap): ComparisonMatrix | null {
+  const criteria = map.nodes.filter((n) => CRITERION_TYPES.has(n.type)).slice(0, MAX_CRITERIA);
+  if (criteria.length < 2) return null;
+  const criterionIds = new Set(criteria.map((c) => c.id));
+
+  // An option is anything judged against at least one criterion. Deriving it
+  // from the EDGES rather than from a type keeps the table to what is actually
+  // being compared, instead of every node that happens to be lying around.
+  const judged = new Map<string, Map<string, MatrixCell>>();
+  for (const e of map.edges) {
+    const verdict = VERDICT[e.relation];
+    if (!verdict) continue;
+    const [optId, critId] = criterionIds.has(e.to) ? [e.from, e.to] : criterionIds.has(e.from) ? [e.to, e.from] : [null, null];
+    if (!optId || !critId || criterionIds.has(optId)) continue;
+    const node = map.nodes.find((n) => n.id === optId);
+    if (!node || NOT_AN_OPTION.has(node.type)) continue;
+    if (!judged.has(optId)) judged.set(optId, new Map());
+    const row = judged.get(optId)!;
+    const had = row.get(critId);
+    // Two edges about the same pairing that disagree is a real state, and
+    // "mixed" would hide it — the stronger claim wins, and a tie keeps the
+    // first, which is the one the conversation reached first.
+    if (!had || rank(verdict, e.strength) > rank(had.verdict, had.strength)) {
+      row.set(critId, { verdict, strength: e.strength, ...(e.op ? { note: e.op } : {}) });
+    }
+  }
+
+  const options = map.nodes
+    .filter((n) => judged.has(n.id))
+    .slice(0, MAX_OPTIONS);
+  if (options.length < 2) return null;
+
+  let unknowns = 0;
+  const cells = options.map((o) => {
+    const row = judged.get(o.id)!;
+    return criteria.map((c) => {
+      const cell = row.get(c.id);
+      if (!cell) { unknowns++; return { verdict: 'unknown' as CellVerdict }; }
+      return cell;
+    });
+  });
+
+  return { options, criteria, cells, unknowns };
+}
+
+/** How much weight a cell carries, for resolving two claims about one pairing. */
+function rank(v: CellVerdict, s?: LogosEdgeStrength): number {
+  const base = v === 'unknown' ? 0 : v === 'noted' ? 1 : 2;
+  const w = s === 'strong' ? 2 : s === 'weak' ? 0 : 1;
+  return base * 3 + w;
+}

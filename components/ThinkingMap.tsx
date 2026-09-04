@@ -27,6 +27,7 @@ import { StatusMark } from './StatusMark';
 import { TeX, MathText } from './TeX';
 import { MathPlot } from './MathPlot';
 import { MathViz } from './MathViz';
+import { MatrixLens } from './MatrixLens';
 import type { VizScene } from '@/lib/logos-viz';
 import { MathBoard } from './MathBoard';
 
@@ -57,6 +58,7 @@ import {
   leadLens,
   type LensId,
   type Placed,
+  buildMatrix,
 } from '@/lib/logos-layout';
 
 type P = { x: number; y: number; vx: number; vy: number };
@@ -202,7 +204,7 @@ export function ThinkingMap({
       // The plot and the Board draw themselves to fit, so they have no zoom
       // control; changing it behind their backs would only grow the sizer and
       // hang a scrollbar off nothing.
-      if (lens === 'plot' || lens === 'board') return;
+      if (lens === 'plot' || lens === 'board' || lens === 'matrix') return;
       e.preventDefault();
 
       // One mouse notch (~100) is one step; a pinch sends many small deltas,
@@ -301,7 +303,7 @@ export function ThinkingMap({
 
   // ── static lenses ────────────────────────────────────────────────
   const staticLayout = useMemo(() => {
-    if (lens === 'graph' || lens === 'plot' || lens === 'board') return null;
+    if (lens === 'graph' || lens === 'plot' || lens === 'board' || lens === 'matrix') return null;
     const { w, h } = size;
     if (lens === 'structure') return layoutStructure(map, w, h);
     if (lens === 'tensions') return layoutTensions(map, w, h);
@@ -583,6 +585,26 @@ export function ThinkingMap({
         {lens === 'board' && (
           <MathBoard map={map} width={size.w} height={size.h} guarded={guarded} />
         )}
+
+        {/* A comparison is a table, so it is a table — not cards, and not an
+            SVG pretending to be one. Rebuilt from the map on every render for
+            the same reason the other lenses are: the map is the state. */}
+        {lens === 'matrix' &&
+          (() => {
+            const mx = buildMatrix(map);
+            return mx ? (
+              <MatrixLens
+                matrix={mx}
+                width={size.w}
+                height={size.h}
+                guarded={guarded}
+                onPick={(id) => {
+                  const n = map.nodes.find((q) => q.id === id);
+                  if (n) onFocus?.({ id: n.id, label: n.label, type: n.type });
+                }}
+              />
+            ) : null;
+          })()}
 
         {/* The sizer carries the scrollable extent, because a transform does
             not change an element's layout box; the surface inside it is what
