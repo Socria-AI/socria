@@ -35,6 +35,7 @@ const MODULES = [
   'lib/entitlement-rule.ts',
   'lib/billing-message.ts',
   'lib/stripe-diagnosis.ts',
+  'lib/socria-edu.ts',
 ];
 
 export async function buildAll() {

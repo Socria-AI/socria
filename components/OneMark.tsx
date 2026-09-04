@@ -139,6 +139,9 @@ export function OneCard({ state }: { state: PlanState }) {
   }, [busy]);
 
   const member = state.plan === 'one';
+  const student = state.student;
+  // Access that came from a verified university address rather than a card.
+  const byStudy = member && !!student?.email;
 
   return (
     <section className={`one-mark is-card${member ? ' is-member' : ''}`} id="plan" aria-labelledby="one-card-title">
@@ -149,9 +152,11 @@ export function OneCard({ state }: { state: PlanState }) {
       </h2>
       {member ? (
         <p className="one-mark-line">
-          {state.manageable
-            ? 'You are a member. Everything Socria does, without the ceiling.'
-            : 'You hold a complimentary membership. Everything Socria does, without the ceiling.'}
+          {byStudy
+            ? 'Student access. Everything Socria does, without the ceiling, free while that address stays verified.'
+            : state.manageable
+              ? 'You are a member. Everything Socria does, without the ceiling.'
+              : 'You hold a complimentary membership. Everything Socria does, without the ceiling.'}
         </p>
       ) : (
         <>
@@ -193,7 +198,26 @@ export function OneCard({ state }: { state: PlanState }) {
           </>
         )}
       </div>
-      {!member && <p className="one-mark-foot">Cancel anytime. Your maps stay yours.</p>}
+      {/* Say WHICH address qualified. "You have student access" is something
+          they have to take on trust; naming the address is a fact they can
+          check, and it is also the thing to look at when it stops working. */}
+      {byStudy && (
+        <p className="one-mark-foot">Verified as {student!.email}.</p>
+      )}
+
+      {/* The offer, to somebody who has not taken it up. Shown only where the
+          programme actually runs — a deployment that has not switched it on
+          says nothing about it. */}
+      {!member && student?.on && (
+        <p className="one-mark-foot">
+          Studying somewhere with a {student.domains} address? Add and verify it in
+          your account and Socria One is free.
+        </p>
+      )}
+
+      {!member && !student?.on && (
+        <p className="one-mark-foot">Cancel anytime. Your maps stay yours.</p>
+      )}
     </section>
   );
 }

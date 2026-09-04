@@ -14,6 +14,7 @@
 
 import { clerkClient } from '@clerk/nextjs/server';
 import { entitledBy } from './entitlement-rule';
+import { hasEduAccess, verifiedEduEmail } from './socria-edu';
 
 const GRANT_KEY = 'socriaOne';
 const GRANT_VALUE = 'comp';
@@ -86,16 +87,31 @@ export async function hasAccountGrant(userId: string): Promise<boolean> {
     const user = await clerkClient().users.getUser(userId);
     const meta = user?.privateMetadata as Record<string, unknown> | null;
     const granted = meta?.[GRANT_KEY] === GRANT_VALUE;
-    const comped = (user?.emailAddresses ?? []).some((e) =>
-      COMPED_EMAILS.has(e.emailAddress?.toLowerCase?.() ?? '')
+    // VERIFIED, not merely present. An address can be added to an account
+    // before it is confirmed, so matching on the string alone would hand
+    // Socria One to anyone willing to type a comped person's email into their
+    // own settings. What cannot be faked is receiving the code sent to it.
+    const comped = (user?.emailAddresses ?? []).some(
+      (e) =>
+        e?.verification?.status === 'verified' &&
+        COMPED_EMAILS.has(e.emailAddress?.toLowerCase?.() ?? '')
     );
+    // A student at an approved university, by verified address. Inert unless
+    // SOCRIA_EDU_DOMAINS names a domain — see lib/socria-edu.ts.
+    const student = hasEduAccess(user?.emailAddresses ?? []);
     // A paid subscription, as the webhook last saw it. Checked here so that
     // somebody who has actually paid is entitled even when the subscriptions
     // table cannot be read.
     const paid = mirrorEntitles(readMirror(meta));
-    const v = granted || comped || paid;
+    const v = granted || comped || paid || student;
     cache.set(userId, { v, at: Date.now() });
     // Make a list match permanent on the account itself.
+    //
+    // Deliberately NOT done for a student: that grant is a mirror of a
+    // verified address, and writing it into metadata would outlive the
+    // address it came from. Somebody who removes the university email, or
+    // whose access is meant to end when the programme does, would keep One
+    // for ever because of a row nothing updates.
     if (comped && !granted) void writeAccountGrant(userId).catch(() => {});
     return v;
   } catch {
@@ -155,5 +171,20 @@ export async function writeStripeMirror(
   } catch (e) {
     console.error('writeStripeMirror failed:', e);
     return false;
+  }
+}
+
+/**
+ * The verified university address behind a student's access, if any.
+ *
+ * Read by the surfaces that want to SAY which address qualified. Uncached,
+ * because it is asked once on a settings page rather than on every request.
+ */
+export async function studentEmail(userId: string): Promise<string | null> {
+  try {
+    const user = await clerkClient().users.getUser(userId);
+    return verifiedEduEmail(user?.emailAddresses ?? []);
+  } catch {
+    return null;
   }
 }
