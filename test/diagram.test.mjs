@@ -410,7 +410,7 @@ console.log('\n=== an empty frame says so rather than inviting a press ===');
 console.log('\n=== Socria never claims it cannot draw ===');
 {
   ok('the chat prompt forbids it', /NEVER SAY YOU CANNOT DRAW/.test(LOGOS_CHAT_PROMPT));
-  ok('and says a second pass does it', /second pass draws the picture/.test(LOGOS_CHAT_PROMPT));
+  ok('and says a second pass does it', /A second pass draws it beside this conversation/.test(LOGOS_CHAT_PROMPT));
   ok('and forbids describing it instead', /do not list what the curves do|Do not describe the axes/.test(LOGOS_CHAT_PROMPT));
 }
 
@@ -545,6 +545,44 @@ console.log('\n=== the prompt teaches both ===');
   ok('with the piecewise idiom spelled out', /max\(0, x\)/.test(p));
   ok('and the function list is current', /arcsin.*sec.*step/.test(p) || /sec csc cot/.test(p));
   ok('the old "do not use max" line is gone', !/do not use max, min or a ternary/.test(p));
+}
+
+console.log('\n=== the permission to draw is not maths-only ===');
+{
+  // The line that decides whether a picture is allowed at all still said
+  // "for context=math, and for ECONOMICS work in any context". The open kind
+  // exists for chemistry, physics, biology and the rest — and the very
+  // sentence that grants permission excluded every one of them, so the model
+  // read a request to draw a PV cycle and answered it in prose.
+  const p = buildMapPrompt({ context: null, nodes: [], edges: [], viz: null });
+  ok('the maths-only gate is gone', !/For context=math, and for ECONOMICS work in any context/.test(p));
+  ok('any subject is permitted', /Any subject at all, in any context/.test(p));
+  ok('and refusing for not being maths is forbidden', /Never refuse on the grounds that the subject is not mathematics/.test(p));
+
+  // An explicit request is an instruction, not a hint.
+  ok('an explicit ask makes a picture mandatory', /WHEN THEY ASK, YOU DRAW/.test(p));
+  ok('it says required, not optional', /is REQUIRED\. Not optional/.test(p));
+  for (const w of ['draw', 'show me', 'plot', 'graph', 'diagram', 'sketch', 'visualise']) {
+    ok(`"${w}" is named as a trigger`, p.includes(`"${w}"`), w);
+  }
+  ok('and describing instead is named as the worst outcome', /worst thing you can do here/.test(p));
+
+  // The subjects that were failing are named where the decision is made.
+  for (const subject of ['titration curve', 'PV cycle', 'free-body diagram', 'cooling curve', 'dose-response curve', 'phase portrait']) {
+    ok(`${subject} is named as drawable`, p.includes(subject), subject);
+  }
+}
+
+console.log('\n=== and the reply must not narrate what is being drawn ===');
+{
+  // The other half of the same screenshot: four paragraphs enumerating a
+  // diagram the person was looking at while they read them.
+  ok('narrating instead of drawing is forbidden', /NEVER DESCRIBE THE PICTURE INSTEAD/.test(LOGOS_CHAT_PROMPT));
+  ok('numbering its parts is named', /never number the parts of it/.test(LOGOS_CHAT_PROMPT));
+  ok('so is naming which line is which', /never say which line is which/.test(LOGOS_CHAT_PROMPT));
+  ok('the exact sentence that shipped is quoted back', /this is the top horizontal line/.test(LOGOS_CHAT_PROMPT));
+  ok('and one sentence plus a question is the shape', /at most one sentence about what the picture shows/.test(LOGOS_CHAT_PROMPT));
+  ok('claiming it cannot draw is still forbidden', /NEVER SAY YOU CANNOT DRAW/.test(LOGOS_CHAT_PROMPT));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

@@ -543,7 +543,11 @@ export function MathViz({
         <span className="lg-map-empty-mark" aria-hidden="true">
           <LogosMark size={46} />
         </span>
-        <p>No diagram for this yet.</p>
+        {/* A dead end is the wrong thing here. If the scene we were handed
+            cannot be drawn, the way out is to ask for one — and saying so is
+            the difference between a panel that looks broken and one that
+            tells you what it wants. */}
+        <p>No diagram for this yet. Ask for one — &ldquo;draw the PV cycle&rdquo;, &ldquo;plot pH against volume&rdquo;.</p>
       </div>
     );
   }
