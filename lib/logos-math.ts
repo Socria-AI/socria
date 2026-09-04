@@ -86,7 +86,25 @@ function normalizeExpr(raw: string): string {
   s = s.replace(/\*\*/g, '^'); // Python's power operator
   s = s.replace(/\\cdot|\\times/g, '*').replace(/\\div/g, '/');
   s = s.replace(/\\left|\\right/g, '');
+  // LaTeX structure, resolved innermost-first and before the backslashes go.
+  //
+  // The braced forms have to be unwrapped from the inside out, because each
+  // pattern matches only brace-FREE arguments — one pass turns \frac{x}{2}
+  // into a division and leaves \frac{x^{2}}{2} untouched, which is the more
+  // common way to write it. A handful of passes settles anything a model
+  // would realistically produce; the bound is there so a pathological string
+  // cannot spin.
+  for (let i = 0; i < 6; i++) {
+    const before = s;
+    s = s.replace(/\^\s*\{([^{}]*)\}/g, '^($1)');
+    s = s.replace(/\\d?frac\s*\{([^{}]*)\}\s*\{([^{}]*)\}/g, '(($1)/($2))');
+    s = s.replace(/\\sqrt\s*\[([^\]]*)\]\s*\{([^{}]*)\}/g, '(($2)^(1/($1)))');
+    s = s.replace(/\\sqrt\s*\{([^{}]*)\}/g, 'sqrt($1)');
+    if (s === before) break;
+  }
   s = s.replace(/\\pi/g, 'pi').replace(/\\/g, '');
+  // Anything still braced was a group, and a group is a parenthesis.
+  s = s.replace(/\{/g, '(').replace(/\}/g, ')');
   s = s.replace(/\bpi\b/gi, 'pi');
   // superscript digits: x² → x^2, and ⁻¹ → ^-1
   s = s.replace(/([⁰¹²³⁴⁵⁶⁷⁸⁹⁻]+)/g, (run) => {

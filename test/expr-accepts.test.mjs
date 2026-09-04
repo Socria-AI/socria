@@ -94,6 +94,36 @@ console.log('\n=== notation people actually type ===');
   ok('unary minus with a power', near(val('-x^2 + 3', ['x'], { x: 2 }), -1));
 }
 
+console.log('\n=== LaTeX, because a maths model writes LaTeX ===');
+{
+  // The extractor is asked for `tex` on every mathematical node, so LaTeX is
+  // the notation it is already thinking in. `\\frac{x}{2}` used to lose its
+  // backslash and arrive as `frac{x}{2}`, which is not an expression.
+  ok('a fraction', near(val('\\frac{1}{x}', ['x'], { x: 4 }), 0.25));
+  ok('a display fraction', near(val('\\dfrac{1}{x}', ['x'], { x: 4 }), 0.25));
+  ok('a square root', near(val('\\sqrt{x}', ['x'], { x: 9 }), 3));
+  ok('an nth root', near(val('\\sqrt[3]{x}', ['x'], { x: 8 }), 2));
+  ok('a braced power', near(val('x^{2}', ['x'], { x: 5 }), 25));
+  ok('e to a braced power', near(val('e^{x}', ['x'], { x: 1 }), Math.E, 1e-12));
+  ok('cdot is multiplication', near(val('2\\cdot x', ['x'], { x: 3 }), 6));
+  ok('left and right are dropped', near(val('\\left(x+1\\right)', ['x'], { x: 3 }), 4));
+  ok('pi survives', near(val('\\pi', ['x'], { x: 0 }), Math.PI));
+
+  // Nesting is the common case, not the exotic one: each pattern matches only
+  // brace-free arguments, so one pass would leave this untouched.
+  ok('a power inside a fraction', near(val('\\frac{x^{2}}{2}', ['x'], { x: 3 }), 4.5));
+  ok('a fraction inside a root', near(val('\\sqrt{\\frac{x}{4}}', ['x'], { x: 16 }), 2));
+  ok('a fraction of two powers', near(val('\\frac{x^{2}}{x^{1}}', ['x'], { x: 5 }), 5));
+
+  // And nothing pathological may hang the normalizer.
+  for (const src of ['\\frac{'.repeat(40), '{'.repeat(200), '\\sqrt{'.repeat(50) + 'x']) {
+    const t0 = process.hrtime.bigint();
+    compileExpr(src, ['x']);
+    const ms = Number(process.hrtime.bigint() - t0) / 1e6;
+    ok(`pathological input returns fast (${ms.toFixed(1)}ms)`, ms < 250);
+  }
+}
+
 console.log('\n=== e and pi are numbers, and stay numbers ===');
 {
   ok("e^x is Euler's", near(val('e^x', ['x'], { x: 1 }), Math.E));
