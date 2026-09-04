@@ -46,7 +46,12 @@ export function MatrixLens({
   height: number;
   /** while the guard is up, the marks stay and the wording softens */
   guarded?: boolean;
-  /** open a node the way the other lenses do */
+  /**
+   * Hold a row or column beside the draft — the same action the cards offer,
+   * and only when there is a draft to hold it beside. Absent means the labels
+   * are text, not buttons: a control that looks pressable and does nothing is
+   * worse than no control.
+   */
   onPick?: (id: string) => void;
 }) {
   const { options, criteria, cells, unknowns } = matrix;
@@ -65,9 +70,13 @@ export function MatrixLens({
               </th>
               {criteria.map((c) => (
                 <th key={c.id} scope="col" className="lg-mx-crit">
-                  <button type="button" onClick={() => onPick?.(c.id)} title={c.note || undefined}>
-                    {c.label}
-                  </button>
+                  {onPick ? (
+                    <button type="button" onClick={() => onPick(c.id)} title={c.note || undefined}>
+                      {c.label}
+                    </button>
+                  ) : (
+                    <span title={c.note || undefined}>{c.label}</span>
+                  )}
                 </th>
               ))}
             </tr>
@@ -76,9 +85,13 @@ export function MatrixLens({
             {options.map((o, i) => (
               <tr key={o.id}>
                 <th scope="row" className="lg-mx-opt">
-                  <button type="button" onClick={() => onPick?.(o.id)} title={o.note || undefined}>
-                    {o.label}
-                  </button>
+                  {onPick ? (
+                    <button type="button" onClick={() => onPick(o.id)} title={o.note || undefined}>
+                      {o.label}
+                    </button>
+                  ) : (
+                    <span title={o.note || undefined}>{o.label}</span>
+                  )}
                 </th>
                 {cells[i].map((cell, j) => (
                   <td

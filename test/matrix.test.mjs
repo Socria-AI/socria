@@ -181,5 +181,36 @@ console.log('\n=== bounded, and it reads either direction ===');
   ok('and the grid stays rectangular', many.cells.every((r) => r.length === many.criteria.length));
 }
 
+console.log('\n=== the lead is the free tier\'s one lens, so it must always exist ===');
+{
+  // On the free tier exactly one lens is unlocked — the lead — and everything
+  // else shows a lock. Two paths could put a LOCKED lens in the active slot,
+  // where its content then rendered, because the panel checks which lens is
+  // selected and never whether it is allowed: an initialLens that is not the
+  // lead, and the fallback that reached for lenses[0] when the active lens
+  // disappeared. A comparison map is exactly where those differ.
+  const maps = [
+    ['a comparison', DECISION],
+    ['maths with a scene', { context: 'math', nodes: [{ id: 'a', type: 'equation', label: 'x^2 + 1' }, { id: 'b', type: 'step', label: 'differentiate' }], edges: [], viz: { kind: 'function', expr: 'x^2', view: { xMin: -5, xMax: 5 } } }],
+    ['an ordinary map', { context: 'deciding', nodes: [{ id: 'a', type: 'idea', label: 'A' }, { id: 'b', type: 'idea', label: 'B' }], edges: [{ from: 'a', to: 'b', relation: 'conflicts' }] }],
+    ['a single node', { context: 'deciding', nodes: [{ id: 'a', type: 'idea', label: 'A' }], edges: [] }],
+  ];
+  for (const [name, raw] of maps) {
+    const m = sanitizeMap(raw);
+    const lenses = availableLenses(m);
+    const lead = leadLens(lenses, !!m.viz);
+    ok(`${name}: some lens is offered`, lenses.length > 0);
+    ok(`${name}: a lead is chosen`, lead !== null);
+    // The property the free tier depends on: the one unlocked lens is real.
+    ok(`${name}: the lead is one of them`, lenses.includes(lead), `${lead} not in ${lenses.join(',')}`);
+  }
+
+  // And the case that made this reachable: the lead is not the first lens.
+  const m = sanitizeMap(DECISION);
+  const lenses = availableLenses(m);
+  ok('a comparison leads with a lens that is NOT first', leadLens(lenses, false) !== lenses[0],
+    `${leadLens(lenses, false)} vs ${lenses[0]}`);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -2987,20 +2987,44 @@ const buildDiagram: Builder = (scene, _fn, vals, view, guarded) => {
         const from = Math.max(view.xMin, Math.min(a, b));
         const to = Math.min(view.xMax, Math.max(a, b));
         if (!ok(from, to) || !(to > from)) return;
+        // Sampled in RUNS of consecutive finite samples, one region each.
+        //
+        // A curve breaks its pen where the value is not a number, which is how
+        // an asymptote draws correctly. A polygon cannot break: dropping the
+        // bad samples and closing what is left joins the branch on one side of
+        // a pole to the branch on the other, filling a stripe across territory
+        // the band does not cover. Two regions instead of one lie about
+        // nothing.
         const N = 96;
-        const top: Pt[] = [];
-        const bot: Pt[] = [];
+        const runs: { top: Pt[]; bot: Pt[] }[] = [];
+        let run: { top: Pt[]; bot: Pt[] } | null = null;
         for (let k = 0; k <= N; k++) {
           const xx = from + ((to - from) * k) / N;
           const sc2 = { ...scope, [bv]: xx };
           const yh = hi.eval(sc2);
           const yl = lo.eval(sc2);
-          if (ok(yh, yl)) { top.push({ x: xx, y: yh }); bot.push({ x: xx, y: yl }); }
+          if (ok(yh, yl)) {
+            if (!run) { run = { top: [], bot: [] }; runs.push(run); }
+            run.top.push({ x: xx, y: yh });
+            run.bot.push({ x: xx, y: yl });
+          } else {
+            run = null;
+          }
         }
-        if (top.length < 2) return;
-        objects.push({ o: 'region', id, pts: [...top, ...bot.reverse()], tone });
+        const drawn = runs.filter((r) => r.top.length >= 2);
+        if (!drawn.length) return;
+        drawn.forEach((r, k) => {
+          objects.push({
+            o: 'region',
+            id: drawn.length > 1 ? `${id}_${k}` : id,
+            pts: [...r.top, ...[...r.bot].reverse()],
+            tone,
+          });
+        });
         if (part.label) {
-          const mid = top[Math.floor(top.length / 2)];
+          // On the widest piece, which is the one the eye reads as the band.
+          const biggest = drawn.reduce((a, b) => (b.top.length > a.top.length ? b : a));
+          const mid = biggest.top[Math.floor(biggest.top.length / 2)];
           objects.push({ o: 'label', id: `${id}l`, x: mid.x, y: mid.y, text: part.label, tone, anchor: 'middle', dy: -8 });
         }
         return;

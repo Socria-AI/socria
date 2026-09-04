@@ -716,5 +716,66 @@ console.log('\n=== readings, as they were taken ===');
   ok('and never approximated by a formula', /a quiet lie about what was measured/.test(p));
 }
 
+console.log('\n=== a band does not join two branches across a gap ===');
+{
+  // A curve breaks its pen where the value is not a number, which is how an
+  // asymptote draws correctly. A polygon cannot break, so dropping the bad
+  // samples and closing what is left joined the branch on one side of a pole
+  // to the branch on the other — a filled stripe across territory the band
+  // does not cover.
+  const cont = sanitizeViz({ kind: 'diagram', view: { xMin: 0, xMax: 10 },
+    parts: [{ o: 'band', lower: 'x - 1', upper: 'x + 1' }] });
+  const contRegions = frameOf(cont).objects.filter((o) => o.o === 'region');
+  ok('a continuous band is one region', contRegions.length === 1);
+
+  const pole = sanitizeViz({ kind: 'diagram', view: { xMin: -5, xMax: 5 },
+    parts: [{ o: 'band', lower: '1/x - 1', upper: '1/x + 1' }] });
+  const regions = frameOf(pole).objects.filter((o) => o.o === 'region');
+  ok('a band across a pole is two', regions.length === 2, String(regions.length));
+  const spans = regions.map((r) => [Math.min(...r.pts.map((q) => q.x)), Math.max(...r.pts.map((q) => q.x))]);
+  ok('one on each side of it', spans[0][1] < 0 && spans[1][0] > 0, JSON.stringify(spans));
+  ok('and neither crosses it', spans.every(([a, b]) => a * b > 0));
+  ok('every point is finite', regions.every((r) => r.pts.every((q) => Number.isFinite(q.x) && Number.isFinite(q.y))));
+  ok('and each id is distinct', new Set(regions.map((r) => r.id)).size === regions.length);
+
+  // A band that only exists on part of the window is one region, not padded.
+  const half = sanitizeViz({ kind: 'diagram', view: { xMin: -5, xMax: 5 },
+    parts: [{ o: 'band', lower: 'sqrt(x) - 1', upper: 'sqrt(x) + 1' }] });
+  const hr = frameOf(half).objects.filter((o) => o.o === 'region');
+  ok('a half-defined band is one region', hr.length === 1);
+  ok('starting where it becomes real', Math.min(...hr[0].pts.map((q) => q.x)) >= -0.01, String(Math.min(...hr[0].pts.map((q) => q.x))));
+
+  // Nothing finite anywhere is nothing drawn, not an empty polygon.
+  const none = sanitizeViz({ kind: 'diagram', view: { xMin: -5, xMax: -1 },
+    parts: [{ o: 'band', lower: 'sqrt(x)', upper: 'sqrt(x) + 1' }, { o: 'point', x: -3, y: 0 }] });
+  ok('an entirely undefined band draws nothing', !frameOf(none).objects.some((o) => o.o === 'region'));
+}
+
+console.log('\n=== readings at scale ===');
+{
+  // The cap is 400, and the whole frame has to survive it.
+  const big = sanitizeViz({ kind: 'diagram', view: { xMin: 0, xMax: 400 },
+    parts: [{ o: 'data', points: Array.from({ length: 400 }, (_, i) => ({ x: i, y: Math.sin(i / 20) * 50 + i * 0.3 })), fit: true, connect: true }] });
+  const t0 = process.hrtime.bigint();
+  const f = frameOf(big);
+  const ms = Number(process.hrtime.bigint() - t0) / 1e6;
+  ok('a full series builds quickly', ms < 200, `${ms.toFixed(1)}ms`);
+  const seq = f.objects.find((o) => o.o === 'sequence');
+  ok('every reading is kept', seq.pts.length === 400);
+  ok('and every one is finite', seq.pts.every((q) => Number.isFinite(q.x) && Number.isFinite(q.y)));
+  ok('joined as well', f.objects.some((o) => o.o === 'curve'));
+  ok('with a fit through them', f.objects.some((o) => o.o === 'line'));
+  const v = resolveView(big, compileScene(big));
+  ok('the window holds all of it', v.xMax >= 399 && [v.xMin, v.xMax, v.yMin, v.yMax].every(Number.isFinite));
+
+  // And a path's sample count cannot be driven to something absurd.
+  const path = sanitizeViz({ kind: 'diagram', view: { xMin: -2, xMax: 2 },
+    parts: [{ o: 'path', x: 'cos(t)', y: 'sin(t)', from: 0, to: 6.2832, steps: 99999 }] });
+  ok('path steps are clamped', path.parts[0].steps <= 720, String(path.parts[0].steps));
+  const low = sanitizeViz({ kind: 'diagram', view: { xMin: -2, xMax: 2 },
+    parts: [{ o: 'path', x: 'cos(t)', y: 'sin(t)', from: 0, to: 6.2832, steps: 1 }] });
+  ok('and floored', low.parts[0].steps >= 24, String(low.parts[0].steps));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

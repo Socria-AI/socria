@@ -279,9 +279,26 @@ export function ThinkingMap({
   // the diagram an unlabelled tab away — the picture had been built and
   // nothing showed it.
   useEffect(() => {
-    if (lenses.length && !lenses.includes(lens)) setLens(lenses[0]);
-    else if (!lensManual.current && lead && lens !== lead) setLens(lead);
-  }, [lenses, lens, lead]);
+    if (!lenses.length) return;
+    // On the free tier exactly one lens is theirs — the lead — and nothing
+    // may leave them anywhere else. The click handler already refuses a
+    // locked tab, but two paths went around it: an initialLens that is not
+    // the lead, and the fallback below, which reached for lenses[0] rather
+    // than for the one they can actually use. Either put a locked lens in the
+    // active slot, where its content then rendered: the panel checks which
+    // lens is selected, never whether it is allowed.
+    if (lensesLocked && lead && lens !== lead) {
+      setLens(lead);
+      return;
+    }
+    // The lens they were on no longer exists. Fall back to the one that IS
+    // the answer for this map rather than to whatever sorts first.
+    if (!lenses.includes(lens)) {
+      setLens(lead ?? lenses[0]);
+      return;
+    }
+    if (!lensManual.current && lead && lens !== lead) setLens(lead);
+  }, [lenses, lens, lead, lensesLocked]);
 
   const edgeKey = (e: { from: string; to: string; relation: string }) =>
     `${e.from}~${e.to}~${e.relation}`;
@@ -598,10 +615,14 @@ export function ThinkingMap({
                 width={size.w}
                 height={size.h}
                 guarded={guarded}
-                onPick={(id) => {
-                  const n = map.nodes.find((q) => q.id === id);
-                  if (n) onFocus?.({ id: n.id, label: n.label, type: n.type });
-                }}
+                onPick={
+                  canFocus && onFocus
+                    ? (id) => {
+                        const n = map.nodes.find((q) => q.id === id);
+                        if (n) onFocus({ id: n.id, label: n.label, type: n.type });
+                      }
+                    : undefined
+                }
               />
             ) : null;
           })()}
