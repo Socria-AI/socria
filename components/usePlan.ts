@@ -35,12 +35,24 @@ import type { Plan } from '@/lib/socria-one';
 
 const ONE_KEY_STORAGE = 'socria.one.v1';
 
+/** Student access, when the deployment runs the programme at all. */
+export interface StudentState {
+  /** the programme is switched on here */
+  on: boolean;
+  /** how to describe the qualifying domains, e.g. "@mavs.uta.edu" */
+  domains: string;
+  /** the verified address that qualified, or null if none does yet */
+  email: string | null;
+}
+
 export interface PlanState {
   plan: Plan;
   /** `plan` can be trusted — see the note above on what that takes */
   known: boolean;
   /** a Stripe customer stands behind it, so billing can be managed */
   manageable: boolean;
+  /** absent where the deployment does not run a student programme */
+  student?: StudentState;
 }
 
 /** The typed code, if one was redeemed in this browser. */
@@ -76,7 +88,15 @@ export function usePlan(): PlanState {
       .then((j) => {
         if (!live || !j) return;
         const plan: Plan = j.plan === 'one' ? 'one' : 'free';
-        setState({ plan, known: true, manageable: !!j.manageable });
+        const student =
+          j.student && typeof j.student === 'object'
+            ? {
+                on: !!j.student.on,
+                domains: typeof j.student.domains === 'string' ? j.student.domains : '',
+                email: typeof j.student.email === 'string' ? j.student.email : null,
+              }
+            : undefined;
+        setState({ plan, known: true, manageable: !!j.manageable, ...(student ? { student } : {}) });
         try {
           if (plan === 'one') localStorage.setItem(ONE_KEY_STORAGE, '1');
         } catch {}

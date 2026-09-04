@@ -269,6 +269,31 @@ Worth doing while you are in the Clerk dashboard:
 
 ---
 
+## 4b. Socria One for students (optional, off by default)
+
+Set `SOCRIA_EDU_DOMAINS` to a comma-separated list of university domains and
+anyone holding a **verified** email address at one of them has Socria One,
+free, for as long as they hold it.
+
+```
+SOCRIA_EDU_DOMAINS=mavs.uta.edu
+```
+
+**Unset is off.** With no value the programme does not exist — every check
+answers no, and no surface mentions it. Set it on the one deployment you are
+trying it on and nowhere else; there is no branch logic in the code, because
+an environment variable is the honest way to say "here and not there".
+
+How it works for a student: they keep their ordinary Socria account and sign
+in as they always do. In **Account**, they add their university address as a
+second email, and Clerk sends a code to it. Once that address is verified, the
+plan card says so and Socria One is on. Removing the address, or losing
+verification, removes the access — the grant is a mirror of the address, never
+written into the account as something permanent.
+
+The check is on `verification.status`, never on the string. Typing an address
+proves nothing; receiving the code sent to it is the evidence.
+
 ## 5. Stripe — two dashboards, and the webhook that is easy to forget
 
 **If checkout is failing, ask before guessing.** Sign in and open

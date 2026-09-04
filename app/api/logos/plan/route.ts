@@ -9,7 +9,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { getSubscription, isCompCustomer } from '@/lib/subscriptions';
-import { mirrorEntitles, readStripeMirror } from '@/lib/socria-one-grant';
+import { mirrorEntitles, readStripeMirror, studentEmail } from '@/lib/socria-one-grant';
+import { eduDomainLabel, eduProgrammeOn } from '@/lib/socria-edu';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -30,9 +31,19 @@ export async function GET(req: NextRequest) {
   const fromTable = !!sub?.customerId && !isCompCustomer(sub.customerId);
   const manageable =
     fromTable || (!sub && !!userId && mirrorEntitles(await readStripeMirror(userId)));
+  // Student access, when the programme is switched on here. `on` lets the
+  // surfaces mention it at all; `email` is the verified address that
+  // qualified, so they can be told WHICH one rather than asked to take it on
+  // trust. Absent entirely where SOCRIA_EDU_DOMAINS is unset, so a deployment
+  // that has not opted in says nothing about a programme it does not run.
+  const student = eduProgrammeOn()
+    ? { on: true, domains: eduDomainLabel(), email: userId ? await studentEmail(userId) : null }
+    : undefined;
+
   return NextResponse.json({
     plan,
     manageable,
     cancelAtPeriodEnd: !!sub?.cancelAtPeriodEnd,
+    ...(student ? { student } : {}),
   });
 }

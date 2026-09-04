@@ -50,6 +50,7 @@ const MODULES = [
   'lib/email.ts',
   'lib/socria-prompt.ts',
   'app/explore/scenarios.ts',
+  'lib/socria-edu.ts',
 ];
 
 export async function buildAll() {
