@@ -3730,7 +3730,26 @@ export function sanitizeViz(raw: any): VizScene | null {
 
   // Dedupe by id — two sliders for the same name is a broken control surface.
   const seen = new Set<string>();
-  const params = rawParams.filter((p) => !seen.has(p.id) && (seen.add(p.id), true));
+  const declared = rawParams.filter((p) => !seen.has(p.id) && (seen.add(p.id), true));
+
+  // A coefficient the expression names becomes a slider, even when the model
+  // did not think to declare one.
+  //
+  // autoParams has always described this — "type a*x^2 + b and you get an a
+  // and a b, which is the behaviour anyone who has used a graphing calculator
+  // expects" — but it was only ever wired into the EDITOR. A scene arriving
+  // from the extractor as {kind:'function', expr:'a*x^2 + b'} therefore had
+  // two names nothing could give a value to, failed to compile, and was
+  // rejected outright: no picture at all, for the most ordinary thing a model
+  // can write. Declared sliders keep their own ranges; these only fill gaps.
+  let params = declared;
+  if (expr && kindNeedsExpr(kind)) {
+    const implied = autoParams(expr, varName, kind, declared);
+    const have = new Set(implied.map((q) => q.id));
+    // The union, not a replacement: a declared slider the expression happens
+    // not to name may still be driving an overlay.
+    params = implied.concat(declared.filter((d) => !have.has(d.id))).slice(0, MAX_PARAMS);
+  }
 
   const xMin = num(raw?.view?.xMin, -1e4, 1e4, -6);
   const xMax = num(raw?.view?.xMax, -1e4, 1e4, 6);

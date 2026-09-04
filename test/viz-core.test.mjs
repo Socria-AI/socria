@@ -16,7 +16,26 @@ const ro = (f, id) => f.frame.readouts.find(r => r.id === id);
 ok('rejects junk', sanitizeViz(null) === null);
 ok('rejects bad kind', sanitizeViz({ kind: 'wat', expr: 'x' }) === null);
 ok('rejects constant', sanitizeViz({ kind: 'function', expr: '5' }) === null);
-ok('rejects unbound name', sanitizeViz({ kind: 'function', expr: 'q*x' }) === null);
+// A single unbound letter is a COEFFICIENT, and gets a slider — the
+// graphing-calculator contract autoParams has always described. It used to be
+// rejected, so {kind:'function', expr:'a*x^2 + b'} from the extractor drew
+// nothing at all, which is the most ordinary thing a model can write.
+{
+  const q = sanitizeViz({ kind: 'function', expr: 'q*x' });
+  ok('an unbound letter becomes a slider', !!q && q.params.some((p) => p.id === 'q'));
+  const ab = sanitizeViz({ kind: 'function', expr: 'a*x^2 + b' });
+  ok('two of them become two sliders', !!ab && ab.params.length === 2, JSON.stringify(ab && ab.params));
+  ok('and the scene compiles', !!ab && compileScene(ab) !== null);
+  // A declared range is not overwritten by the implied one.
+  const kept = sanitizeViz({
+    kind: 'function', expr: 'a*x', view: { xMin: -5, xMax: 5 },
+    params: [{ id: 'a', min: -50, max: 50, step: 1, value: 7 }],
+  });
+  ok('a declared slider keeps its own range', kept.params.find((p) => p.id === 'a').max === 50);
+  ok('and its value', kept.params.find((p) => p.id === 'a').value === 7);
+  // But a name that is not a coefficient is still refused.
+  ok('a long unknown name is still rejected', sanitizeViz({ kind: 'function', expr: 'zz9*x' }) === null);
+}
 ok('accepts bound param', !!sanitizeViz({ kind: 'function', expr: 'q*x', params: [{ id: 'q', min: 0, max: 3, value: 1 }] }));
 ok('rejects bad interval', sanitizeViz({ kind: 'riemann', expr: 'x^2', a: 3, b: 1 }) === null);
 ok('rejects code-ish', sanitizeViz({ kind: 'function', expr: 'constructor(x)' }) === null);
