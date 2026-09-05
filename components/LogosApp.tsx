@@ -529,18 +529,37 @@ export function LogosApp({
   }, []);
 
   useEffect(() => {
-    try {
+    // Each setting restores in its own try, and that is the point rather than
+    // fussiness. These all shared one, so a single unparseable key — a
+    // half-written REVEALED_KEY, anything — threw and silently skipped every
+    // line after it. Personality was the last line, which made "my settings
+    // keep resetting" the symptom of a corrupt value three settings earlier.
+    const load = (fn: () => void) => {
+      try {
+        fn();
+      } catch {}
+    };
+    load(() => {
       if (localStorage.getItem(KEY_STORAGE) === '1') setUnlocked(true);
+    });
+    load(() => {
       const d = localStorage.getItem(DEPTH_KEY);
       if (d === 'quick' || d === 'balanced' || d === 'deep' || d === 'abstract') setDepth(d);
+    });
+    load(() => {
       const rev = JSON.parse(localStorage.getItem(REVEALED_KEY) || '[]');
       if (Array.isArray(rev)) setRevealedIds(new Set(rev.filter((x) => typeof x === 'string')));
+    });
+    load(() => {
       if (localStorage.getItem(ONE_KEY_STORAGE) === '1') setPlan('one');
+    });
+    load(() => {
       const st = localStorage.getItem(STYLE_KEY);
       if (typeof st === 'string' && st.trim()) setStyleText(st);
-      const pr = sanitizePersonality(JSON.parse(localStorage.getItem(PERSONALITY_KEY) || '{}'));
-      setPersona(pr);
-    } catch {}
+    });
+    load(() => {
+      setPersona(sanitizePersonality(JSON.parse(localStorage.getItem(PERSONALITY_KEY) || '{}')));
+    });
     const t = setTimeout(() => setAuthSettled(true), 1200);
     return () => clearTimeout(t);
   }, []);

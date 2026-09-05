@@ -35,6 +35,7 @@ const MODULES = [
   'lib/entitlement-rule.ts',
   'lib/billing-message.ts',
   'lib/stripe-diagnosis.ts',
+  'lib/logos-personality.ts',
 ];
 
 export async function buildAll() {
