@@ -39,6 +39,7 @@ const MODULES = [
   'lib/clerk-errors.ts',
   'lib/qr.ts',
   'lib/account-guards.ts',
+  'lib/logos-personality.ts',
 ];
 
 export async function buildAll() {

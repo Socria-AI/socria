@@ -249,7 +249,36 @@ export function sanitizePersonality(raw: unknown): Personality {
  * default Socria voice lives in the chat prompt itself and needs no addendum.
  * Sits AFTER the depth/guard guidance (protected principles and depth read
  * first) and BEFORE the person's free-text instructions.
+ *
+ * WHY IT CLAIMS PRECEDENCE OVER THE VOICE, AND ONLY OVER THE VOICE.
+ *
+ * Two of these dials contradicted the chat prompt outright and lost. That
+ * prompt says "Short. Two to four sentences" and "No lists, no headings" as
+ * flat rules, several hundred words before this block appears; Detailed asks
+ * for "a paragraph or three" and Structured asks for lists. Nothing told the
+ * model which to believe, and an unqualified imperative that arrives first
+ * beats a preference that arrives later — so the two dials most likely to be
+ * moved were the two least likely to do anything.
+ *
+ * The block now says which wins, and the chat prompt marks those two bullets
+ * as defaults rather than rules. That is the whole fix, and it is deliberately
+ * narrow: the settings outrank the VOICE and nothing else. They do not touch
+ * the protected principles or Depth, because a person choosing a manner is
+ * not choosing to be handed answers.
  */
+/**
+ * The reply ceiling this personality needs.
+ *
+ * Telling the model it may write three paragraphs and then cutting it off at
+ * two is worse than never allowing them: the reply dies mid-sentence. So the
+ * dial that asks for length raises the ceiling, and only that one — the
+ * default stays where it was, and Concise does not need less room than it
+ * already fails to use.
+ */
+export function personalityMaxTokens(raw: unknown, base: number): number {
+  return sanitizePersonality(raw).verbosity === 'detailed' ? Math.max(base, 1200) : base;
+}
+
 export function personalityBlock(raw: unknown): string {
   const p = sanitizePersonality(raw);
   const lines = PERSONALITY_DIMENSIONS.map(
@@ -261,5 +290,6 @@ export function personalityBlock(raw: unknown): string {
 === SOCRIA PERSONALITY — how they've tuned your manner ===
 ${lines.join('\n')}
 These settings shape how you COMMUNICATE. They sit under the protected principles and under Depth — depth decides how far the thinking goes; these decide how it sounds on the way. Underneath every setting you are still Socria: perceptive, intellectually confident, comfortable disagreeing, never therapeutic.
+THEY OUTRANK THE DEFAULT VOICE. The voice described earlier — its usual two-to-four sentences, its avoidance of lists and headings — is the default for somebody who has set nothing. A setting here is somebody who has, so where the two disagree the setting wins: a LENGTH of Detailed really does mean longer than that default, and a FORMATTING of Structured really does mean lay it out. What they never outrank is the protected principles or Depth.
 === END PERSONALITY ===`;
 }
