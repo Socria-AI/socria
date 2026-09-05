@@ -37,6 +37,8 @@ const MODULES = [
   'lib/stripe-diagnosis.ts',
   'lib/socria-edu.ts',
   'lib/clerk-errors.ts',
+  'lib/qr.ts',
+  'lib/account-guards.ts',
 ];
 
 export async function buildAll() {

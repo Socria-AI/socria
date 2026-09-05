@@ -1667,9 +1667,11 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
   .insight-share-actions { flex-direction: column; align-items: stretch; }
 }
 
-/* Clerk auth pages — make the Clerk-rendered card feel at home in
-   Socria's shell. The layout-level appearance prop styles Clerk's own
-   internal elements; this handles the container padding and shadow. */
+/* Clerk's sign-in and sign-up cards — make them feel at home in Socria's
+   shell. Only those two now: the account page manages the account itself, so
+   the rules that shaped <UserProfile> here went with it. The layout-level
+   appearance prop styles Clerk's internal elements; this handles the
+   container padding and shadow. */
 .socria-clerk-card {
   width: 100%;
 }
@@ -1679,13 +1681,6 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
 }
 .socria-clerk-card .cl-card {
   padding: 32px 28px;
-}
-.socria-clerk-userprofile .cl-rootBox,
-.socria-clerk-userprofile .cl-card {
-  max-width: none;
-}
-.socria-clerk-userprofile .cl-card {
-  padding: 0;
 }
 
 /* Word-by-word pop reveal for streaming assistant replies. Each word span
@@ -7945,4 +7940,137 @@ a.one-mark.is-strip:hover { background: rgba(38, 72, 90, 0.075); }
 @media (max-width: 480px) {
   .edu-panel { padding: 18px 16px 16px; }
   .edu-go { width: 100%; }
+}
+
+/* ── Socria's own account management ────────────────────────────────────────
+   Seven panels where Clerk's card used to be. The visual job is that they
+   read as one page rather than seven boxes, so the panel is a rule and a
+   heading rather than a card, and only the rows inside carry a surface. */
+.acct-stack { display: flex; flex-direction: column; gap: 34px; }
+.acct-panel { position: relative; }
+.acct-panel-head { margin-bottom: 14px; }
+.acct-panel-title {
+  margin: 0; padding-bottom: 8px;
+  border-bottom: 1px solid rgba(31, 31, 31, 0.1);
+  font-family: var(--serif); font-size: 19px; letter-spacing: -0.01em; color: var(--ink);
+}
+.acct-panel-lede {
+  margin: 10px 0 0; max-width: 56ch;
+  font-size: 13.5px; line-height: 1.55; color: rgba(31, 31, 31, 0.58);
+}
+
+.acct-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px 18px; flex-wrap: wrap;
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(31, 31, 31, 0.07);
+}
+.acct-row:last-of-type { border-bottom: none; }
+.acct-row-main { min-width: 0; flex: 1 1 240px; }
+.acct-row-label {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  font-size: 14.5px; color: var(--ink); word-break: break-word;
+}
+.acct-row-meta { margin-top: 3px; font-size: 12.5px; color: rgba(31, 31, 31, 0.5); }
+.acct-row-actions { display: flex; align-items: center; gap: 6px 12px; flex-wrap: wrap; }
+
+.acct-tag {
+  display: inline-block; padding: 2px 8px; border-radius: 999px;
+  font-size: 10.5px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase;
+  border: 1px solid transparent; white-space: nowrap;
+}
+.acct-tag.is-good { background: rgba(94, 118, 51, 0.1); color: var(--moss-700); border-color: rgba(94, 118, 51, 0.25); }
+.acct-tag.is-warn { background: rgba(150, 60, 40, 0.08); color: #7c3a26; border-color: rgba(150, 60, 40, 0.25); }
+.acct-tag.is-flat { background: rgba(31, 31, 31, 0.05); color: rgba(31, 31, 31, 0.55); border-color: rgba(31, 31, 31, 0.1); }
+
+.acct-btn {
+  border: none; background: transparent; padding: 6px 2px; cursor: pointer;
+  font-size: 13.5px; font-weight: 500; letter-spacing: -0.01em;
+  transition: color 0.15s, background 0.15s, opacity 0.15s;
+}
+.acct-btn:disabled { opacity: 0.45; cursor: default; }
+.acct-btn.is-quiet { color: rgba(31, 31, 31, 0.6); }
+.acct-btn.is-quiet:hover:not(:disabled) { color: var(--ink); }
+.acct-btn.is-danger { color: #8a4030; }
+.acct-btn.is-danger:hover:not(:disabled) { color: #6d2f21; }
+.acct-btn.is-go {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: 40px; padding: 0 20px; border-radius: 999px;
+  background: var(--moss-600); color: var(--paper);
+}
+.acct-btn.is-go:hover:not(:disabled) { background: var(--moss-700); }
+
+.acct-confirm { display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.acct-confirm-q {
+  font-family: var(--serif); font-style: italic;
+  font-size: 13.5px; color: rgba(31, 31, 31, 0.62);
+}
+
+.acct-field { margin-bottom: 14px; }
+.acct-label {
+  display: block; margin-bottom: 6px;
+  font-size: 12.5px; font-weight: 500; color: rgba(31, 31, 31, 0.7);
+}
+.acct-input {
+  width: 100%; height: 42px; padding: 0 12px;
+  border: 1px solid rgba(31, 31, 31, 0.15); border-radius: 10px;
+  background: #fff; color: var(--ink); font-size: 14.5px;
+  transition: border-color 0.2s;
+}
+.acct-input:focus { outline: none; border-color: var(--moss-600); }
+.acct-input:disabled { opacity: 0.6; }
+.acct-hint { margin: 5px 0 0; font-size: 12px; color: rgba(31, 31, 31, 0.5); }
+
+.acct-err,
+.acct-note {
+  margin: 12px 0; padding: 9px 12px;
+  border-radius: 2px; font-size: 12.5px; line-height: 1.5;
+}
+.acct-err { border: 1px solid rgba(150, 60, 40, 0.28); background: rgba(150, 60, 40, 0.06); color: #7c3a26; }
+.acct-note { border: 1px solid rgba(94, 118, 51, 0.3); background: rgba(94, 118, 51, 0.07); color: var(--moss-700); }
+
+/* an inline form that opens under a row — add an address, change a password */
+.acct-form {
+  margin-top: 14px; padding: 16px;
+  border: 1px solid rgba(31, 31, 31, 0.12); border-radius: 3px;
+  background: rgba(255, 255, 255, 0.6);
+}
+.acct-form-actions { display: flex; align-items: center; gap: 8px 16px; flex-wrap: wrap; }
+.acct-empty {
+  padding: 12px 0; font-family: var(--serif); font-style: italic;
+  font-size: 14px; color: rgba(31, 31, 31, 0.5);
+}
+
+/* avatar */
+.acct-avatar-row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.acct-avatar {
+  width: 56px; height: 56px; border-radius: 999px; object-fit: cover;
+  border: 1px solid rgba(31, 31, 31, 0.12); background: rgba(31, 31, 31, 0.04);
+}
+
+/* two-factor: the QR and the codes */
+.acct-qr {
+  display: block; width: 176px; height: 176px; padding: 10px;
+  background: #fff; border: 1px solid rgba(31, 31, 31, 0.12); border-radius: 3px;
+}
+.acct-secret {
+  display: inline-block; margin-top: 8px; padding: 6px 10px;
+  border: 1px dashed rgba(31, 31, 31, 0.2); border-radius: 3px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12.5px; letter-spacing: 0.06em; color: var(--ink); word-break: break-all;
+}
+.acct-codes {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
+  gap: 6px; margin: 12px 0;
+  padding: 14px; border: 1px solid rgba(31, 31, 31, 0.14); border-radius: 3px;
+  background: #fff;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px;
+}
+.acct-2fa-steps { display: flex; gap: 22px; flex-wrap: wrap; align-items: flex-start; }
+.acct-2fa-steps > div { flex: 1 1 220px; min-width: 0; }
+
+@media (max-width: 560px) {
+  .acct-row { align-items: flex-start; }
+  .acct-btn.is-go { width: 100%; }
+  .acct-2fa-steps { gap: 16px; }
 }
