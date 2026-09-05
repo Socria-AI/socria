@@ -172,7 +172,7 @@ export function OneCard({ state }: { state: PlanState }) {
       {member ? (
         <p className="one-mark-line">
           {byStudy
-            ? 'Student access. Everything Socria does, without the ceiling, free while that address stays verified.'
+            ? `${student?.school ? `${student.school.short} student` : 'Student'} access. Everything Socria does, without the ceiling, free while that address stays verified.`
             : state.manageable
               ? 'You are a member. Everything Socria does, without the ceiling.'
               : 'You hold a complimentary membership. Everything Socria does, without the ceiling.'}
