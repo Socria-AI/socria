@@ -10,7 +10,7 @@ import { auth } from '@clerk/nextjs/server';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { getSubscription, isCompCustomer } from '@/lib/subscriptions';
 import { mirrorEntitles, readStripeMirror, studentEmail } from '@/lib/socria-one-grant';
-import { eduDomainLabel, eduDomains, eduProgrammeOn } from '@/lib/socria-edu';
+import { eduDomainLabel, eduDomains, eduProgrammeOn, eduSchool } from '@/lib/socria-edu';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -46,6 +46,9 @@ export async function GET(req: NextRequest) {
         on: true,
         domains: eduDomainLabel(),
         hosts: eduDomains(),
+        // Null where the domains do not name one institution, and the copy
+        // falls back to the general wording rather than guessing.
+        school: eduSchool(),
         email: userId ? await studentEmail(userId) : null,
       }
     : undefined;
