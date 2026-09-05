@@ -22,7 +22,7 @@ import { bumpUsage, checkAllowance, spend } from '@/lib/usage';
 import { renderContextsForNode, sanitizeNodeContextList } from '@/lib/logos-sources';
 import { guidanceBlock, resolveDepth, resolveGuard } from '@/lib/logos-guidance';
 import { styleBlock } from '@/lib/logos-style';
-import { personalityBlock } from '@/lib/logos-personality';
+import { personalityBlock, personalityMaxTokens } from '@/lib/logos-personality';
 import { isValidAccessKey } from '@/lib/socria-prompt';
 import { enforceRateLimit } from '@/lib/rate-limit';
 
@@ -193,8 +193,11 @@ export async function POST(req: NextRequest) {
         messages: [{ role: 'system', content: guided }, ...clean],
         temperature: 0.7,
         // Short is the prompt's default; the ceiling leaves room for the
-        // people whose custom instructions ask for more than four sentences.
-        max_tokens: 640,
+        // people whose custom instructions ask for more than four sentences —
+        // and rises again for somebody who has actually set Length: Detailed,
+        // since promising three paragraphs and truncating at two is worse
+        // than never offering them.
+        max_tokens: personalityMaxTokens(body?.persona, 640),
         stream: true,
       });
 
