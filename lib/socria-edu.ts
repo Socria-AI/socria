@@ -50,12 +50,29 @@ export function eduProgrammeOn(): boolean {
  * registrable by anyone.
  */
 export function isEduEmail(email: unknown): boolean {
-  if (typeof email !== 'string') return false;
+  return emailMatchesHosts(email, eduDomains());
+}
+
+/**
+ * The same rule, against a list handed in rather than read from the
+ * environment.
+ *
+ * The browser cannot read SOCRIA_EDU_DOMAINS — the form that checks an
+ * address before sending a code is a client component, and it receives the
+ * domains from /api/logos/plan. Without this it would need its own copy of the
+ * matching rule, and the copy would be the one that eventually disagrees:
+ * accepting a suffix, or a domain in the local part, in exactly the way the
+ * comment above says not to. So the rule lives here once and both callers use
+ * it. The client's answer is a courtesy either way — the server checks again,
+ * and the address still has to be verified before it counts.
+ */
+export function emailMatchesHosts(email: unknown, hosts: readonly string[]): boolean {
+  if (typeof email !== 'string' || !hosts.length) return false;
   const at = email.lastIndexOf('@');
   if (at < 1) return false;
   const domain = email.slice(at + 1).trim().toLowerCase();
   if (!domain) return false;
-  return eduDomains().includes(domain);
+  return hosts.includes(domain);
 }
 
 /** The shape this needs from a Clerk user — kept narrow so it can be tested. */

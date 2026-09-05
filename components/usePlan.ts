@@ -29,7 +29,7 @@
 //   the audience the marks exist for, and they were the one audience the
 //   caution was not protecting.
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@clerk/nextjs';
 import type { Plan } from '@/lib/socria-one';
 
@@ -41,6 +41,8 @@ export interface StudentState {
   on: boolean;
   /** how to describe the qualifying domains, e.g. "@mavs.uta.edu" */
   domains: string;
+  /** the same domains as bare hosts, for checking what somebody typed */
+  hosts: string[];
   /** the verified address that qualified, or null if none does yet */
   email: string | null;
 }
@@ -53,7 +55,19 @@ export interface PlanState {
   manageable: boolean;
   /** absent where the deployment does not run a student programme */
   student?: StudentState;
+  /**
+   * Ask the server again.
+   *
+   * Something the person just did can change the answer — verifying a
+   * university address is the case this exists for — and without it the page
+   * would have to tell them to reload to see what it had just told them
+   * happened.
+   */
+  refresh: () => void;
 }
+
+/** What the server actually answers — PlanState minus the function. */
+type Answer = Omit<PlanState, 'refresh'>;
 
 /** The typed code, if one was redeemed in this browser. */
 function localBelief(): Plan {
@@ -66,7 +80,13 @@ function localBelief(): Plan {
 
 export function usePlan(): PlanState {
   const { isLoaded, isSignedIn } = useAuth();
-  const [state, setState] = useState<PlanState>(() => ({
+  // Bumping this re-runs the effect below, which is how refresh() works.
+  const [asked, setAsked] = useState(0);
+  const refresh = useCallback(() => setAsked((n) => n + 1), []);
+  // refresh is not kept in state: it never changes, and holding it there
+  // meant a load that failed left the caller with the no-op placeholder — the
+  // one case where being able to ask again matters most.
+  const [state, setState] = useState<Answer>(() => ({
     plan: 'free',
     known: false,
     manageable: false,
@@ -93,6 +113,9 @@ export function usePlan(): PlanState {
             ? {
                 on: !!j.student.on,
                 domains: typeof j.student.domains === 'string' ? j.student.domains : '',
+                hosts: Array.isArray(j.student.hosts)
+                  ? j.student.hosts.filter((h: unknown) => typeof h === 'string')
+                  : [],
                 email: typeof j.student.email === 'string' ? j.student.email : null,
               }
             : undefined;
@@ -108,7 +131,7 @@ export function usePlan(): PlanState {
     return () => {
       live = false;
     };
-  }, [isLoaded, isSignedIn]);
+  }, [isLoaded, isSignedIn, asked]);
 
-  return state;
+  return useMemo(() => ({ ...state, refresh }), [state, refresh]);
 }

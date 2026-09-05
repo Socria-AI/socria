@@ -8020,3 +8020,94 @@ a.one-mark.is-strip:hover { background: rgba(38, 72, 90, 0.075); }
 .jrn-foot-yes { color: #9a3b2c; font-weight: 600; }
 .jrn-foot-no { color: rgba(31, 31, 31, 0.55); }
 .jrn-foot-note { margin-left: auto; font-style: italic; }
+
+/* Student access — the panel that adds and verifies a university address.
+   Deliberately paper rather than the One plate: it sits directly under that
+   card, and two dark blue blocks stacked read as one confused object. This is
+   the quieter companion piece, so it takes the page's own materials and lets
+   the plate above stay the thing your eye goes to. */
+.edu-panel {
+  position: relative;
+  padding: 22px 22px 20px;
+  border: 1px solid rgba(31, 31, 31, 0.12);
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.6);
+}
+.edu-panel.is-done {
+  border-color: rgba(94, 118, 51, 0.32);
+  background: rgba(94, 118, 51, 0.06);
+}
+.edu-eyebrow {
+  margin: 0 0 10px;
+  font-size: 10.5px; font-weight: 500;
+  text-transform: uppercase; letter-spacing: 0.22em;
+  color: var(--moss-700);
+}
+.edu-title {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 20px; line-height: 1.25; letter-spacing: -0.01em;
+  color: var(--ink);
+}
+.edu-title em { font-style: italic; }
+.edu-addr {
+  font-family: var(--sans); font-size: 0.82em;
+  color: var(--moss-700); word-break: break-all;
+}
+.edu-line {
+  margin: 10px 0 0; max-width: 42ch;
+  font-size: 13.5px; line-height: 1.55; color: rgba(31, 31, 31, 0.62);
+}
+.edu-form { margin-top: 18px; }
+.edu-label {
+  display: block; margin-bottom: 6px;
+  font-size: 12.5px; font-weight: 500; color: rgba(31, 31, 31, 0.7);
+}
+.edu-input {
+  width: 100%; height: 42px; padding: 0 12px;
+  border: 1px solid rgba(31, 31, 31, 0.15); border-radius: 10px;
+  background: #fff; color: var(--ink); font-size: 14.5px;
+  transition: border-color 0.2s;
+}
+.edu-input:focus { outline: none; border-color: var(--moss-600); }
+.edu-input:disabled { opacity: 0.6; }
+.edu-actions {
+  margin-top: 14px;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px;
+}
+.edu-go {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: 42px; padding: 0 22px;
+  border: none; border-radius: 999px;
+  background: var(--moss-600); color: var(--paper);
+  font-size: 14px; font-weight: 500; letter-spacing: -0.01em;
+  cursor: pointer; transition: background 0.2s;
+}
+.edu-go:hover:not(:disabled) { background: var(--moss-700); }
+.edu-go:disabled { opacity: 0.5; cursor: default; }
+.edu-not {
+  border: none; background: transparent; padding: 2px 4px;
+  font-family: var(--serif); font-style: italic; font-size: 14px;
+  color: rgba(31, 31, 31, 0.55); cursor: pointer;
+}
+.edu-not:hover:not(:disabled) { color: var(--ink); }
+.edu-not:disabled { opacity: 0.5; cursor: default; }
+.edu-err,
+.edu-note {
+  margin: 14px 0 0; padding: 9px 12px;
+  border-radius: 2px; font-size: 12.5px; line-height: 1.5;
+}
+.edu-err {
+  border: 1px solid rgba(150, 60, 40, 0.28);
+  background: rgba(150, 60, 40, 0.06);
+  color: #7c3a26;
+}
+.edu-note {
+  border: 1px solid rgba(94, 118, 51, 0.3);
+  background: rgba(94, 118, 51, 0.07);
+  color: var(--moss-700);
+}
+@media (max-width: 480px) {
+  .edu-panel { padding: 18px 16px 16px; }
+  .edu-go { width: 100%; }
+}
