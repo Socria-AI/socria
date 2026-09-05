@@ -5,10 +5,11 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { UserProfile, useUser } from '@clerk/nextjs';
+import { useUser } from '@clerk/nextjs';
 import { usePlan } from '@/components/usePlan';
 import { OneCard } from '@/components/OneMark';
 import { StudentAccess } from '@/components/StudentAccess';
+import { AccountSettings } from '@/components/account/AccountSettings';
 
 export default function AccountPage() {
   const { isLoaded, isSignedIn } = useUser();
@@ -70,9 +71,9 @@ export default function AccountPage() {
               Manage your Socria account.
             </h1>
             <p className="mt-4 text-[15px] text-ink/60 max-w-xl leading-relaxed">
-              Update your profile, security settings, and connected devices.
-              Your thought sessions live in your account and follow you
-              across every device you sign in on.
+              Your profile, the addresses that reach you, how you sign in, and
+              what is guarding it. Your thought sessions live in your account
+              and follow you across every device you sign in on.
             </p>
             <p className="mt-4 text-[14px]">
               <Link
@@ -97,9 +98,7 @@ export default function AccountPage() {
             </div>
           )}
 
-          <div className="socria-clerk-card socria-clerk-userprofile">
-            <UserProfile routing="path" path="/account" />
-          </div>
+          <AccountSettings />
         </div>
       </main>
 
