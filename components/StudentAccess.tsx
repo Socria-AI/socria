@@ -26,27 +26,18 @@
 // up with an unverified address, which is worth nothing.
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useUser } from '@clerk/nextjs';
+import { useClerk, useUser } from '@clerk/nextjs';
 import type { EmailAddressResource } from '@clerk/types';
+import { clerkMessage, needsReverification } from '@/lib/clerk-errors';
 import { emailMatchesHosts } from '@/lib/socria-edu';
 import type { PlanState } from './usePlan';
 
-/**
- * Clerk's reason, in Clerk's words.
- *
- * Deliberately not replaced with something friendlier. The failures here are
- * mostly configuration ("you cannot add email addresses to this account") or
- * plain fact ("that email address is taken"), and a person who is stuck needs
- * the actual reason far more than they need a soft one.
- */
-function clerkMessage(err: unknown, fallback: string): string {
-  const e = err as { errors?: Array<{ longMessage?: string; message?: string }> };
-  const first = Array.isArray(e?.errors) ? e.errors[0] : null;
-  return first?.longMessage || first?.message || fallback;
-}
+/** The person closed the reverification modal rather than completing it. */
+class ReverifyCancelled extends Error {}
 
 export function StudentAccess({ state }: { state: PlanState }) {
   const { isLoaded, user } = useUser();
+  const clerk = useClerk();
   const student = state.student;
 
   const [email, setEmail] = useState('');
@@ -79,6 +70,61 @@ export function StudentAccess({ state }: { state: PlanState }) {
     if (unverified && !pending) setEmail(unverified.emailAddress);
   }, [unverified, pending]);
 
+  /**
+   * Run an operation, and if Clerk asks the person to prove themselves first,
+   * let them, then run it again.
+   *
+   * This mirrors what clerk-js does inside its own components — open the
+   * verification modal with no level (Clerk decides what it needs from the
+   * account: password, code, passkey, second factor), wait, retry once. Once,
+   * not in a loop: if a freshly verified session is still refused, that is a
+   * real refusal and the person should see it rather than watch a modal
+   * reopen for ever.
+   */
+  const withReverification = useCallback(
+    async <T,>(op: () => Promise<T>): Promise<T> => {
+      try {
+        return await op();
+      } catch (e) {
+        if (!needsReverification(e)) throw e;
+        const open = (
+          clerk as unknown as {
+            __experimental_openUserVerification?: (p: {
+              afterVerification?: () => void;
+              afterVerificationCancelled?: () => void;
+            }) => void;
+          }
+        ).__experimental_openUserVerification;
+        // Still flagged experimental in the SDK, and absent from older
+        // clerk-js builds. Where it is missing the original refusal is the
+        // honest thing to show — with the way out named, below.
+        if (typeof open !== 'function') throw e;
+        await new Promise<void>((resolve, reject) => {
+          open({
+            afterVerification: () => resolve(),
+            afterVerificationCancelled: () =>
+              reject(new ReverifyCancelled('verification cancelled')),
+          });
+        });
+        return await op();
+      }
+    },
+    [clerk],
+  );
+
+  /** What to say when something failed, including the two cases of our own. */
+  const failure = useCallback((e: unknown, fallback: string): string => {
+    if (e instanceof ReverifyCancelled) {
+      return 'Confirming it was you was cancelled, so nothing was sent. Try again when you are ready.';
+    }
+    if (needsReverification(e)) {
+      // The modal was unavailable. A fresh sign-in satisfies the same
+      // requirement, so say that rather than leaving them at a dead end.
+      return `${clerkMessage(e, fallback)} Signing out and back in, then trying again, will also clear this.`;
+    }
+    return clerkMessage(e, fallback);
+  }, []);
+
   const send = useCallback(async () => {
     if (busy || !user) return;
     const address = email.trim().toLowerCase();
@@ -96,18 +142,19 @@ export function StudentAccess({ state }: { state: PlanState }) {
     try {
       // Reuse the one already on the account when there is one; Clerk refuses
       // a duplicate, and this is the same address either way.
-      const resource =
+      const resource = await withReverification(async () =>
         unverified && unverified.emailAddress.toLowerCase() === address
           ? unverified
-          : await user.createEmailAddress({ email: address });
-      await resource.prepareVerification({ strategy: 'email_code' });
+          : user.createEmailAddress({ email: address }),
+      );
+      await withReverification(() => resource.prepareVerification({ strategy: 'email_code' }));
       setPending(resource);
       setNote(`Six-digit code sent to ${address}.`);
     } catch (e) {
-      setErr(clerkMessage(e, 'Could not send the code. Try again.'));
+      setErr(failure(e, 'Could not send the code. Try again.'));
     }
     setBusy(null);
-  }, [busy, user, email, hosts, student, unverified]);
+  }, [busy, user, email, hosts, student, unverified, withReverification, failure]);
 
   const check = useCallback(async () => {
     if (busy || !pending) return;
@@ -116,7 +163,7 @@ export function StudentAccess({ state }: { state: PlanState }) {
     setBusy('check');
     setErr(null);
     try {
-      await pending.attemptVerification({ code: entered });
+      await withReverification(() => pending.attemptVerification({ code: entered }));
       // Clerk's local copy of the user still says unverified until it is
       // reloaded, and the server is the one that decides anyway — so reload,
       // then ask.
@@ -126,10 +173,10 @@ export function StudentAccess({ state }: { state: PlanState }) {
       setNote(null);
       state.refresh();
     } catch (e) {
-      setErr(clerkMessage(e, 'That code was not accepted. Check it and try again.'));
+      setErr(failure(e, 'That code was not accepted. Check it and try again.'));
     }
     setBusy(null);
-  }, [busy, pending, code, user, state]);
+  }, [busy, pending, code, user, state, withReverification, failure]);
 
   const start = useCallback(() => {
     setPending(null);

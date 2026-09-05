@@ -51,6 +51,7 @@ const MODULES = [
   'lib/socria-prompt.ts',
   'app/explore/scenarios.ts',
   'lib/socria-edu.ts',
+  'lib/clerk-errors.ts',
 ];
 
 export async function buildAll() {
