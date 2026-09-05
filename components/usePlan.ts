@@ -43,6 +43,11 @@ export interface StudentState {
   domains: string;
   /** the same domains as bare hosts, for checking what somebody typed */
   hosts: string[];
+  /**
+   * The institution to name in the copy, when the domains are all one place.
+   * Null where they are not, and the wording stays general.
+   */
+  school: { name: string; short: string } | null;
   /** the verified address that qualified, or null if none does yet */
   email: string | null;
 }
@@ -116,6 +121,12 @@ export function usePlan(): PlanState {
                 hosts: Array.isArray(j.student.hosts)
                   ? j.student.hosts.filter((h: unknown) => typeof h === 'string')
                   : [],
+                school:
+                  j.student.school &&
+                  typeof j.student.school.name === 'string' &&
+                  typeof j.student.school.short === 'string'
+                    ? { name: j.student.school.name, short: j.student.school.short }
+                    : null,
                 email: typeof j.student.email === 'string' ? j.student.email : null,
               }
             : undefined;

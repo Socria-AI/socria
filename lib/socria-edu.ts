@@ -107,6 +107,53 @@ export function hasEduAccess(emails: readonly EmailLike[] | null | undefined): b
 }
 
 /**
+ * The institutions we can name, by domain.
+ *
+ * "A university address" is what the copy said before this, and it was
+ * needlessly vague to the only people who can use it: a UT Arlington student
+ * reading "verify an address at @mavs.uta.edu" has to work out that this
+ * means them. Naming the place is the whole improvement.
+ *
+ * A table rather than another environment variable. The domains are already
+ * configured; what a domain is CALLED is not deployment configuration, it is
+ * a fact about the domain, and it belongs next to it. Adding a school is one
+ * line here, and a domain that is not in the table still works — it just gets
+ * the general wording back, which is why this can never be the thing that
+ * breaks the programme.
+ *
+ * `short` is the form that reads well inline ("your UTA email"); `name` is the
+ * form that reads well as a subject ("UT Arlington students").
+ */
+const SCHOOLS: Record<string, { name: string; short: string }> = {
+  'mavs.uta.edu': { name: 'UT Arlington', short: 'UTA' },
+  'uta.edu': { name: 'UT Arlington', short: 'UTA' },
+};
+
+/** How to name the institution, when every configured domain is the same one. */
+export interface EduSchool {
+  /** as a subject, e.g. "UT Arlington" */
+  name: string;
+  /** inline, e.g. "UTA" */
+  short: string;
+}
+
+/**
+ * The school this deployment's programme is for, if it is for exactly one.
+ *
+ * Deliberately silent when the domains span more than one institution, or
+ * include one that is not in the table. Copy that names a school is only
+ * better than copy that does not while it is TRUE, and "UT Arlington
+ * students" on a deployment that also admits another school is worse than
+ * saying nothing — it tells the other school's students they do not qualify.
+ */
+export function eduSchool(): EduSchool | null {
+  const known = eduDomains().map((d) => SCHOOLS[d]);
+  if (!known.length || known.some((k) => !k)) return null;
+  const first = known[0];
+  return known.every((k) => k.name === first.name) ? first : null;
+}
+
+/**
  * How to describe the programme on screen, from the domains themselves.
  *
  * Derived rather than written down, so switching the domain switches the copy

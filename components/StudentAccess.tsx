@@ -4,6 +4,11 @@
 //
 // Add and verify a university email address, in Socria's own UI.
 //
+// The copy names the institution when the configured domains are all one
+// place — "your UTA email", not "a university address" — and falls back to
+// the general wording when they are not. See eduSchool() for why that
+// fallback matters more than the naming does.
+//
 // WHY THIS EXISTS RATHER THAN LEANING ON CLERK'S PROFILE CARD. The account
 // page already embeds <UserProfile>, which has an "add email address" flow of
 // its own — and that flow is not always there. Whether it appears depends on
@@ -51,6 +56,11 @@ export function StudentAccess({ state }: { state: PlanState }) {
   const [note, setNote] = useState<string | null>(null);
 
   const hosts = useMemo(() => student?.hosts ?? [], [student]);
+  // How to name the place. When the domains are all one institution the copy
+  // says so — "your UTA email" rather than "a university address", which the
+  // only people who can use this had to decode. When they are not, every
+  // phrase below falls back to the general wording rather than guessing.
+  const school = student?.school ?? null;
 
   // An address at a qualifying domain that is already on the account but has
   // not been verified — someone who started this and did not finish, or who
@@ -133,7 +143,11 @@ export function StudentAccess({ state }: { state: PlanState }) {
     // email, and so the reason arrives instantly instead of after a round
     // trip and a code that would have been useless.
     if (hosts.length && !emailMatchesHosts(address, hosts)) {
-      setErr(`Student access needs an address at ${student?.domains}.`);
+      setErr(
+        school
+          ? `Student access needs your ${school.short} email, at ${student?.domains}.`
+          : `Student access needs an address at ${student?.domains}.`,
+      );
       return;
     }
     setBusy('send');
@@ -194,7 +208,9 @@ export function StudentAccess({ state }: { state: PlanState }) {
   if (student.email) {
     return (
       <section className="edu-panel is-done" aria-labelledby="edu-title">
-        <p className="edu-eyebrow">Student access</p>
+        <p className="edu-eyebrow">
+          {school ? `${school.short} student access` : 'Student access'}
+        </p>
         <h2 id="edu-title" className="edu-title">
           Verified as <span className="edu-addr">{student.email}</span>
         </h2>
@@ -208,14 +224,18 @@ export function StudentAccess({ state }: { state: PlanState }) {
 
   return (
     <section className="edu-panel" aria-labelledby="edu-title">
-      <p className="edu-eyebrow">Student access</p>
+      <p className="edu-eyebrow">
+        {school ? `${school.short} student access` : 'Student access'}
+      </p>
       <h2 id="edu-title" className="edu-title">
-        Socria <em>One</em>, free, with a university address
+        Socria <em>One</em>, free, for{' '}
+        {school ? `${school.name} students` : 'students'}
       </h2>
       <p className="edu-line">
-        Verify an address at {student.domains} on this account and Socria One
-        turns on. You keep the account and the sign-in you already have — the
-        university address is added alongside it.
+        Verify your {school ? school.short : 'university'} email ({student.domains})
+        on this account and Socria One turns on. You keep the account and the
+        sign-in you already have — the {school ? school.short : 'university'}{' '}
+        address is added alongside it.
       </p>
 
       {err && (
@@ -264,7 +284,7 @@ export function StudentAccess({ state }: { state: PlanState }) {
       ) : (
         <div className="edu-form">
           <label className="edu-label" htmlFor="edu-email">
-            Your university email
+            Your {school ? school.short : 'university'} email
           </label>
           <input
             id="edu-email"

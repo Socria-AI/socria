@@ -13,7 +13,7 @@
 
 import {
   eduDomains, eduProgrammeOn, isEduEmail, verifiedEduEmail, hasEduAccess, eduDomainLabel,
-  emailMatchesHosts,
+  emailMatchesHosts, eduSchool,
 } from './.tmp/socria-edu.mjs';
 
 let pass = 0, fail = 0;
@@ -161,6 +161,45 @@ console.log('\n=== the browser gets the same rule, not a second one ===');
       ok(`server and client agree on ${address}`,
         isEduEmail(address) === emailMatchesHosts(address, list), address);
     }
+  });
+}
+
+console.log('\n=== naming the school, and knowing when not to ===');
+{
+  // Naming the place is better copy than "a university address" — but only
+  // while it is true. Every case below where it stays quiet is a case where
+  // naming one school would tell another school's students they do not
+  // qualify, which is worse than the vague wording it replaced.
+  withDomains('mavs.uta.edu', () => {
+    ok('the student domain names UT Arlington', eduSchool()?.name === 'UT Arlington');
+    ok('and shortens to UTA', eduSchool()?.short === 'UTA');
+  });
+  withDomains('uta.edu', () => {
+    ok('so does the staff domain', eduSchool()?.name === 'UT Arlington');
+  });
+  withDomains(' @MAVS.UTA.EDU , uta.edu ', () => {
+    ok('two domains at one school still name it', eduSchool()?.name === 'UT Arlington');
+  });
+
+  withDomains('mavs.uta.edu, example.edu', () => {
+    ok('an unknown domain alongside silences it', eduSchool() === null);
+  });
+  withDomains('example.edu', () => {
+    ok('an unknown domain alone silences it', eduSchool() === null);
+  });
+  withDomains('', () => {
+    ok('the programme being off silences it', eduSchool() === null);
+  });
+  withDomains(undefined, () => {
+    ok('and so does it being unset', eduSchool() === null);
+  });
+
+  // The naming must never be what decides access.
+  withDomains('example.edu', () => {
+    ok('an unnamed school still qualifies', isEduEmail('a@example.edu') === true);
+    ok('and still grants access', hasEduAccess([
+      { emailAddress: 'a@example.edu', verification: { status: 'verified' } },
+    ]) === true);
   });
 }
 
