@@ -10,7 +10,7 @@ import { auth } from '@clerk/nextjs/server';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { getSubscription, isCompCustomer } from '@/lib/subscriptions';
 import { mirrorEntitles, readStripeMirror, studentEmail } from '@/lib/socria-one-grant';
-import { eduDomainLabel, eduProgrammeOn } from '@/lib/socria-edu';
+import { eduDomainLabel, eduDomains, eduProgrammeOn } from '@/lib/socria-edu';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -36,8 +36,18 @@ export async function GET(req: NextRequest) {
   // qualified, so they can be told WHICH one rather than asked to take it on
   // trust. Absent entirely where SOCRIA_EDU_DOMAINS is unset, so a deployment
   // that has not opted in says nothing about a programme it does not run.
+  //
+  // `hosts` is the same list as a machine-readable array. The label is prose
+  // and reads as prose ("@mavs.uta.edu or @uta.edu"); the form that checks
+  // what somebody typed needs the domains themselves, and parsing them back
+  // out of the sentence would be a second, worse copy of eduDomains().
   const student = eduProgrammeOn()
-    ? { on: true, domains: eduDomainLabel(), email: userId ? await studentEmail(userId) : null }
+    ? {
+        on: true,
+        domains: eduDomainLabel(),
+        hosts: eduDomains(),
+        email: userId ? await studentEmail(userId) : null,
+      }
     : undefined;
 
   return NextResponse.json({
