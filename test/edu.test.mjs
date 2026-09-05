@@ -13,6 +13,7 @@
 
 import {
   eduDomains, eduProgrammeOn, isEduEmail, verifiedEduEmail, hasEduAccess, eduDomainLabel,
+  emailMatchesHosts,
 } from './.tmp/socria-edu.mjs';
 
 let pass = 0, fail = 0;
@@ -120,6 +121,46 @@ console.log('\n=== nothing else is an input ===');
     ok('an empty list is not access', hasEduAccess([]) === false);
     ok('a list of junk is not access',
       hasEduAccess([null, undefined, 'a@mavs.uta.edu', 42, {}]) === false);
+  });
+}
+
+console.log('\n=== the browser gets the same rule, not a second one ===');
+{
+  // The verification form runs in the browser, which cannot read
+  // SOCRIA_EDU_DOMAINS, so it checks against the host list the plan endpoint
+  // hands it. That check must not be a looser copy of the one above — this is
+  // where a suffix match or a local-part match would quietly reappear.
+  const hosts = ['mavs.uta.edu'];
+  ok('the qualifying domain matches', emailMatchesHosts('ella@mavs.uta.edu', hosts) === true);
+  ok('case does not matter', emailMatchesHosts('ELLA@MAVS.UTA.EDU', hosts) === true);
+  ok('a different domain does not', emailMatchesHosts('ella@gmail.com', hosts) === false);
+  ok('a longer label is not a match',
+    emailMatchesHosts('a@notmavs.uta.edu', hosts) === false);
+  ok('and neither is a subdomain of it',
+    emailMatchesHosts('a@mavs.uta.edu.example.com', hosts) === false);
+  ok('the domain in the local part does not count',
+    emailMatchesHosts('mavs.uta.edu@gmail.com', hosts) === false);
+  ok('the LAST @ decides', emailMatchesHosts('a@gmail.com@mavs.uta.edu', hosts) === true);
+  ok('so this one does not qualify',
+    emailMatchesHosts('a@mavs.uta.edu@gmail.com', hosts) === false);
+
+  ok('an empty host list matches nothing',
+    emailMatchesHosts('ella@mavs.uta.edu', []) === false);
+  for (const junk of ['', '   ', 'nope', '@', 'a@', '@mavs.uta.edu', null, undefined, 42, {}, []]) {
+    ok(`${JSON.stringify(junk)} is not an address`, emailMatchesHosts(junk, hosts) === false);
+  }
+
+  // The two must agree wherever both can answer, because they are the same
+  // decision made in two places.
+  withDomains('mavs.uta.edu, example.edu', () => {
+    const list = eduDomains();
+    for (const address of [
+      'ella@mavs.uta.edu', 'ELLA@Example.edu', 'a@gmail.com', 'a@notmavs.uta.edu',
+      'a@mavs.uta.edu.example.com', 'mavs.uta.edu@gmail.com', 'a@', '@x.edu', 'nope',
+    ]) {
+      ok(`server and client agree on ${address}`,
+        isEduEmail(address) === emailMatchesHosts(address, list), address);
+    }
   });
 }
 
