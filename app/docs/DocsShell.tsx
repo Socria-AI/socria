@@ -34,6 +34,7 @@ export function DocsShell({ children }: { children: React.ReactNode }) {
         </Link>
         <nav className="d-top-links" aria-label="Site">
           <Link href="/">The journal</Link>
+          <Link href="/explore">Explore</Link>
           <Link href="/logos">Logos</Link>
           <Link href="/one">Socria One</Link>
           <Link href="/chat" className="d-open">Open Socria</Link>
