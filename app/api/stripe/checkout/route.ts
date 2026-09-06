@@ -10,6 +10,7 @@ import { stripe, stripeConfigured, onePriceId, siteUrl, usableCustomer } from '@
 import { isMissingCustomer, priceIdProblem, stripeFailure } from '@/lib/stripe-diagnosis';
 import { getSubscription, isCompCustomer, tryUpsertSubscription } from '@/lib/subscriptions';
 import { enforceRateLimit } from '@/lib/rate-limit';
+import { resolvePlanForRequest } from '@/lib/socria-one-server';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -40,6 +41,26 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       { error: 'Billing is not configured correctly.', code: 'price_config', detail: misconfigured },
       { status: 503 }
+    );
+  }
+
+  // Somebody who already holds Socria One must not be sold it again.
+  //
+  // This has always been true and was always the client's job: the /one page
+  // asks for the plan on mount and turns its buttons into doors back into
+  // Logos. That was adequate while every checkout needed a deliberate click.
+  // It is not adequate now that checkout can RESUME BY ITSELF after sign-in —
+  // an automatic POST fired before the plan had loaded would be a second
+  // subscription bought by a page load. So the refusal moves to the server,
+  // where it does not depend on what the browser knew yet.
+  //
+  // A comp or a code is deliberately included: they already have it, and the
+  // honest response is to say so rather than to take money for a thing they
+  // are not missing.
+  if ((await resolvePlanForRequest(req, userId)) === 'one') {
+    return NextResponse.json(
+      { error: 'You already have Socria One.', already: true },
+      { status: 409 }
     );
   }
 

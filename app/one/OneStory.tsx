@@ -110,7 +110,19 @@ export function OneStory() {
       .catch(() => {});
   }, []);
 
-  /** Every "become a member" CTA lands here. */
+  /**
+   * Every "become a member" CTA lands here — and it is one press, even for
+   * somebody who has no account yet.
+   *
+   * It used to take two. A signed-out visitor pressed the button, got a 401,
+   * was sent to sign in, and came back to the TOP of a long page with nothing
+   * to say what they had been doing — so they had to find the button again
+   * and decide a second time. The most motivated moment a visitor has is the
+   * moment they press it, and that flow spent it on navigation.
+   *
+   * Now the intent travels with them: they return to /one?checkout=1, and the
+   * effect below picks it up and opens Stripe without being asked twice.
+   */
   const subscribe = useCallback(async () => {
     if (member) {
       window.location.href = '/chat?model=logos';
@@ -122,8 +134,17 @@ export function OneStory() {
     try {
       const res = await fetch('/api/stripe/checkout', { method: 'POST' });
       if (res.status === 401) {
-        // Sign in, then come straight back to this page.
-        window.location.href = '/sign-in?redirect_url=' + encodeURIComponent('/one');
+        // Sign in, then come straight back and finish the thing they started.
+        window.location.href =
+          '/sign-in?redirect_url=' + encodeURIComponent('/one?checkout=1');
+        return;
+      }
+      if (res.status === 409) {
+        // They already have it — bought in another tab, comped, or a code
+        // redeemed. Not an error to apologise for: send them to the thing
+        // they have paid for.
+        setMember(true);
+        window.location.href = '/chat?model=logos';
         return;
       }
       const json = await res.json().catch(() => null);
@@ -137,6 +158,29 @@ export function OneStory() {
     }
     setBusy(false);
   }, [busy, member]);
+
+  /**
+   * Coming back from sign-in with checkout still pending.
+   *
+   * Fired once and only for the marker this page itself put in the URL, which
+   * is then cleaned away so a refresh — or the back button after Stripe —
+   * cannot replay it. The server refuses a second subscription regardless
+   * (see the checkout route), so the worst case here is a wasted round trip
+   * rather than a wasted charge; the query is cleaned because a URL that
+   * re-opens checkout every time it is loaded is a nasty thing to leave in
+   * somebody's history.
+   */
+  const resumed = useRef(false);
+  useEffect(() => {
+    if (resumed.current) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('checkout') !== '1') return;
+    resumed.current = true;
+    window.history.replaceState({}, '', '/one');
+    // subscribe() owns `busy`; setting it here first only made its own
+    // `if (busy) return` guard look like it might refuse the call.
+    void subscribe();
+  }, [subscribe]);
 
   // ── the design's choreography, verbatim but on the root element ────
   useEffect(() => {

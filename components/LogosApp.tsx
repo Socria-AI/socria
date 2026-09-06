@@ -803,6 +803,18 @@ export function LogosApp({
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...keyHeaders() },
       });
+      if (res.status === 401) {
+        window.location.href =
+          '/sign-in?redirect_url=' + encodeURIComponent('/chat?model=logos');
+        return true;
+      }
+      if (res.status === 409) {
+        // Already a member. The server will not sell it twice, and the right
+        // response is to let them get on with it.
+        setPlan('one');
+        setOneOpen(false);
+        return true;
+      }
       const json = await res.json().catch(() => null);
       if (res.ok && json?.url) {
         window.location.href = json.url;
