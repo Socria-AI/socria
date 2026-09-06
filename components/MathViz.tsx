@@ -54,6 +54,7 @@ import {
 } from '@/lib/logos-viz';
 import { TeX } from './TeX';
 import { LogosMark } from './LogosMark';
+import { MathField } from './MathField';
 
 const TONE: Record<Tone, string> = {
   primary: 'var(--lg-primary)',
@@ -179,6 +180,47 @@ export function MathViz({
     const p = sweptParam(active);
     progRef.current = p ? sweepProgress(p, defaults(active)[p.id]) : 0;
   }, [activeKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /**
+   * A picture that moves says so by moving, once, when it first arrives.
+   *
+   * The sweep was reachable only through the play button, which meant the one
+   * thing that makes this a model rather than a diagram — the parameter
+   * running — was invisible until somebody guessed there was something to
+   * press. So a scene that HAS a swept parameter runs it through once the
+   * first time it appears.
+   *
+   * Once, and only for a scene arriving from outside. `propKey` rather than
+   * `activeKey` is the whole distinction: editing the expression produces a
+   * new active scene several times a second, and replaying the animation on
+   * each keystroke would be a strobe attached to a text box. Anything the
+   * reader has already touched — played, scrubbed, edited — is left alone,
+   * and prefers-reduced-motion opts out entirely.
+   */
+  const introduced = useRef<string | null>(null);
+  useEffect(() => {
+    if (introduced.current === propKey) return;
+    // `swept` rather than sweptParam(scene): that memo is what the play
+    // button and the clock both read, and a scene whose parameters have been
+    // filled in on the way through would otherwise look unsweepable here
+    // while animating perfectly well everywhere else.
+    if (!swept) return;
+    if (typeof window === 'undefined') return;
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+    // A beat after it lands, so the curve is drawn and settled before the
+    // parameter starts moving and there is something to watch it against.
+    // Marked when it FIRES, not when it is scheduled. React runs effects
+    // twice in development and throws the first one away; a flag set before
+    // the timer meant the surviving run saw "already introduced" and the
+    // animation never played at all — in development only, which is the
+    // worst place for it to hide.
+    const t = setTimeout(() => {
+      introduced.current = propKey;
+      progRef.current = 0;
+      setPlaying(true);
+    }, 450);
+    return () => clearTimeout(t);
+  }, [propKey, swept]);
 
   const setProgress = useCallback(
     (p: number) => {
@@ -1082,15 +1124,13 @@ function Editor({
         <span className="lg-viz-eqlab">
           <TeX tex={eqLabel(draft.kind, varName)} />
         </span>
-        <input
+        <MathField
           className="lg-viz-eq"
           value={draft.expr}
-          spellCheck={false}
-          autoComplete="off"
           autoFocus
-          aria-label="Expression"
-          placeholder="x^2 - 3"
-          onChange={(e) => onChange({ ...draft, expr: e.target.value })}
+          ariaLabel="Expression"
+          placeholder="x²-3"
+          onChange={(expr) => onChange({ ...draft, expr })}
         />
       </div>
       )}

@@ -7855,3 +7855,26 @@ a.one-mark.is-strip:hover { background: rgba(38, 72, 90, 0.075); }
 @media (max-width: 480px) {
   .one-mark.is-card { padding: 28px 18px 22px; }
 }
+
+/* The expression box is a real math field now, not a text input.
+   <math-field> is a custom element with its own shadow parts, so the shared
+   .lg-viz-eq rules above give it the line and the type, and these give it the
+   things an <input> did not need: a height that does not collapse before the
+   element upgrades, and Socria's colours inside the shadow tree. */
+.logos-root math-field.lg-viz-eq {
+  display: block;
+  min-height: 34px;
+  --caret-color: var(--lg-primary);
+  --selection-background-color: rgba(94, 118, 51, 0.18);
+  --selection-color: var(--lg-ink);
+  --contains-highlight-background-color: transparent;
+  /* MathLive draws its own focus ring; the row already has the underline. */
+  --focus-outline: none;
+  --smart-fence-color: var(--lg-ink-60);
+}
+.logos-root math-field.lg-viz-eq::part(virtual-keyboard-toggle) {
+  color: var(--lg-ink-45);
+}
+/* Before the element upgrades it is an unknown tag with no box; without this
+   the row jumps when MathLive finishes loading. */
+.logos-root math-field:not(:defined) { display: block; min-height: 34px; }
