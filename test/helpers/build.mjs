@@ -37,6 +37,8 @@ const MODULES = [
   'lib/stripe-diagnosis.ts',
   'lib/logos-personality.ts',
   'lib/logos-viz3d.ts',
+  'lib/why-not-answer.ts',
+  'lib/socria-prompt.ts',
   'app/explore/scenarios.ts',
 ];
 
