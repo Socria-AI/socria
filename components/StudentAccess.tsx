@@ -33,7 +33,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useClerk, useUser } from '@clerk/nextjs';
 import type { EmailAddressResource } from '@clerk/types';
-import { clerkMessage, needsReverification } from '@/lib/clerk-errors';
+import { clerkMessage, looksUnreachable, needsReverification } from '@/lib/clerk-errors';
 import { emailMatchesHosts } from '@/lib/socria-edu';
 import type { PlanState } from './usePlan';
 
@@ -126,6 +126,12 @@ export function StudentAccess({ state }: { state: PlanState }) {
   const failure = useCallback((e: unknown, fallback: string): string => {
     if (e instanceof ReverifyCancelled) {
       return 'Confirming it was you was cancelled, so nothing was sent. Try again when you are ready.';
+    }
+    if (looksUnreachable(e)) {
+      // The request never left the page. On a preview domain that is almost
+      // always a production Clerk key, which is bound to the production
+      // domain and refuses everything else.
+      return 'Could not reach Clerk, so nothing was sent. On a preview or dev domain this is usually a production Clerk key, which only works on the production domain.';
     }
     if (needsReverification(e)) {
       // The modal was unavailable. A fresh sign-in satisfies the same

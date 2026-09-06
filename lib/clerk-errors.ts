@@ -39,9 +39,39 @@ export function needsReverification(err: unknown): boolean {
  * the actual reason far more than they need a soft one.
  */
 export function clerkMessage(err: unknown, fallback: string): string {
-  const e = err as { errors?: Array<{ longMessage?: unknown; message?: unknown }> };
+  const e = err as { errors?: Array<{ longMessage?: unknown; message?: unknown }>; message?: unknown };
+  const str = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
   const first = Array.isArray(e?.errors) ? e.errors[0] : null;
-  const long = typeof first?.longMessage === 'string' ? first.longMessage.trim() : '';
-  const short = typeof first?.message === 'string' ? first.message.trim() : '';
-  return long || short || fallback;
+  const coded = str(first?.longMessage) || str(first?.message);
+  if (coded) return coded;
+
+  // Not every Clerk failure is a coded API refusal, and assuming they all
+  // were is how "Could not send the code. Try again." ended up on screen in
+  // place of the actual reason. clerk-js throws ClerkRuntimeError for its own
+  // problems, and the browser throws a bare TypeError when the request never
+  // left the page — neither carries an `errors` array, so both fell through
+  // to the caller's fallback and the one useful sentence was discarded.
+  const own = str(e?.message);
+  return own || fallback;
+}
+
+/**
+ * Did the request fail to reach Clerk at all?
+ *
+ * Worth separating because the fix is completely different. A coded refusal
+ * is Clerk saying no and the message explains it; an unreachable Frontend API
+ * is configuration — most often a PRODUCTION publishable key on a domain that
+ * is not the production domain, which is exactly what a preview deployment
+ * has — and the message the browser gives for it ("Failed to fetch") tells
+ * somebody nothing about that.
+ */
+export function looksUnreachable(err: unknown): boolean {
+  const e = err as { errors?: unknown; message?: unknown; name?: unknown };
+  if (Array.isArray(e?.errors) && e.errors.length) return false;
+  const m = typeof e?.message === 'string' ? e.message.toLowerCase() : '';
+  if (!m) return false;
+  return (
+    e?.name === 'TypeError' ||
+    /failed to fetch|networkerror|load failed|network request failed|err_/.test(m)
+  );
 }
