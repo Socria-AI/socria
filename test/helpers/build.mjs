@@ -40,6 +40,7 @@ const MODULES = [
   'lib/qr.ts',
   'lib/account-guards.ts',
   'lib/logos-personality.ts',
+  'app/explore/scenarios.ts',
 ];
 
 export async function buildAll() {
