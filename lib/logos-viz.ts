@@ -29,6 +29,17 @@
 
 import { compileExpr, freeNames, taylorCoeffs, type CompiledExpr } from './logos-math';
 import {
+  boxLines,
+  place,
+  sampleSurface,
+  sliceLines,
+  slicePlane,
+  surfaceLines,
+  zRange,
+  type Camera,
+  type Frame3,
+} from './logos-viz3d';
+import {
   binds as econBinds,
   equilibrium as econEquilibrium,
   frontierAt as econFrontierAt,
@@ -293,6 +304,11 @@ export const VIZ_KINDS = [
   // other builders emit, so it is live, zoomable and slider-driven like the
   // rest rather than a picture of a picture.
   'diagram',
+  // Three dimensions, projected. z = f(x, y) as a wireframe you can turn,
+  // with the cross-section at one y drawn on the sheet that cuts it — which
+  // is the picture behind partial derivatives and behind most of what people
+  // find hard about a function of two variables.
+  'surface',
 ] as const;
 export type VizKind = (typeof VIZ_KINDS)[number];
 
@@ -475,6 +491,14 @@ export interface VizScene {
   b?: number;
   /** which corner of each Riemann bar sits on the curve */
   rule?: 'left' | 'right' | 'midpoint';
+  /**
+   * surface: the range of the SECOND domain variable.
+   *
+   * x comes from the viewport, which the reader can already pan and zoom;
+   * y has no equivalent because the viewport is the page, not the domain. So
+   * it is carried here, and the cut slider inherits its bounds from it.
+   */
+  yRange?: { min: number; max: number };
   /** matrix: the 2×2 transformation, rows first: [[a, b], [c, d]] */
   matrix?: [[number, number], [number, number]];
   /** vectors: the arrows themselves; with exactly two, s·u + t·v is offered */
@@ -692,6 +716,18 @@ function specialView(
     const p = (hi - lo) * 0.12;
     return [lo - p, hi + p];
   };
+
+  // ── three dimensions ──
+  // A surface is drawn inside a normalised unit cube, so its window is a
+  // property of the PROJECTION and not of the function: whatever z does, the
+  // box is the same size. Fixed, and deliberately not fitted to the frame —
+  // a window that re-fitted itself as the model turned would make the object
+  // appear to breathe, and the one thing a rotation must show is a rigid
+  // shape. The bound is the furthest a unit cube's corner can project, plus
+  // room for the axis labels.
+  if (scene.kind === 'surface') {
+    return { xMin: -1.85, xMax: 1.85, yMin: -1.95, yMax: 1.95 };
+  }
 
   // ── the open kind ──
   // A diagram's window is its own contents and nothing else: the parts were
@@ -3240,6 +3276,126 @@ const buildDiagram: Builder = (scene, _fn, vals, view, guarded) => {
   };
 };
 
+/**
+ * z = f(x, y), turned into lines on the page.
+ *
+ * Everything here is projection plus the renderer's existing vocabulary: the
+ * wireframe and the bounding box are `mesh` objects (many polylines, one path
+ * node each — a 20×20 grid is two nodes, not four hundred), the cutting plane
+ * is a `region`, and the cross-section is a `mesh` drawn over both. There is
+ * no 3D renderer and nothing new for the drawing layer to learn.
+ *
+ * WHAT IT DELIBERATELY DOES NOT DO. There is no hidden-line removal and no
+ * shading. A wireframe you can see through is how mathematical surfaces have
+ * been drawn since long before anyone could shade one, it suits a product
+ * that draws in ink, and — the practical reason — sorting several hundred
+ * quads on every frame of an animation is a cost paid on every drag.
+ */
+const buildSurface: Builder = (scene, fn, vals, view, guarded) => {
+  if (!fn) return EMPTY_FRAME;
+  const yr = scene.yRange ?? { min: -3, max: 3 };
+  // The DOMAIN, from the scene — not from `view`, which for a surface is the
+  // fixed window the projected cube is drawn into and has nothing to do with
+  // x. Reading the domain off the viewport silently shrank it to the
+  // projection bounds: x² − y² over [−3, 3]² topped out at 3.42 instead of 9,
+  // and the surface was a correct drawing of the wrong function.
+  const xr = { min: scene.view.xMin, max: scene.view.xMax };
+  const cam: Camera = {
+    yaw: ((vals.yaw ?? 38) * Math.PI) / 180,
+    pitch: ((vals.turn ?? 26) * Math.PI) / 180,
+  };
+  const at3 = (x: number, y: number) =>
+    fn.eval({ ...vals, [scene.varName]: x, y });
+
+  // Coarse enough to stay readable and to redraw instantly while dragging.
+  const rows = sampleSurface(at3, xr, yr, 18);
+  const zr = zRange(rows);
+  if (!zr) {
+    return {
+      objects: [],
+      readouts: [],
+      caption: 'Nothing finite to draw over this domain. Try a smaller window.',
+    };
+  }
+  const frame: Frame3 = { x: xr, y: yr, z: zr };
+
+  const objects: VizObject[] = [
+    { o: 'mesh', id: 'box', lines: boxLines(frame, cam), tone: 'ghost', width: 1 },
+  ];
+
+  const cut = Math.min(yr.max, Math.max(yr.min, vals.cut ?? (yr.min + yr.max) / 2));
+  // The sheet first, so the wireframe and the cross-section sit on top of it.
+  objects.push({ o: 'region', id: 'sheet', pts: slicePlane(cut, frame, cam), tone: 'ghost' });
+  objects.push({
+    o: 'mesh',
+    id: 'surf',
+    lines: surfaceLines(rows, frame, cam),
+    tone: 'primary',
+    width: 1.15,
+  });
+  objects.push({
+    o: 'mesh',
+    id: 'cutline',
+    lines: sliceLines(at3, cut, xr, frame, cam),
+    tone: 'accent',
+    width: 2.4,
+  });
+
+  // Which way is up, and how far the domain runs. Three labels rather than
+  // full tick marks: the numbers that matter are in the readouts, and a
+  // projected axis with ticks on it reads as clutter at this size.
+  const corner = place({ x: xr.max, y: yr.min, z: zr.min }, frame, cam);
+  const yEnd = place({ x: xr.min, y: yr.max, z: zr.min }, frame, cam);
+  const zTop = place({ x: xr.min, y: yr.min, z: zr.max }, frame, cam);
+  objects.push({ o: 'label', id: 'ax', x: corner.x, y: corner.y, text: scene.varName, tone: 'muted', dy: 14 });
+  objects.push({ o: 'label', id: 'ay', x: yEnd.x, y: yEnd.y, text: 'y', tone: 'muted', dy: 14 });
+  objects.push({ o: 'label', id: 'az', x: zTop.x, y: zTop.y, text: 'z', tone: 'muted', dy: -8 });
+
+  const readouts: VizReadout[] = [
+    {
+      id: 'cutAt',
+      tex: 'y',
+      value: fmt(cut),
+      help: 'Where the sheet is. The bright curve is the surface cut there — a plain 2D graph in x, with y held still.',
+    },
+    {
+      id: 'zspan',
+      tex: 'z',
+      value: `${fmt(zr.min)} … ${fmt(zr.max)}`,
+      help: 'How high and how low the surface goes over this window. The box is drawn to exactly this range, so a tall thin surface and a flat one both fill it — the numbers here are the scale, not the picture.',
+    },
+  ];
+
+  // The height directly under the knife at the middle of the window: one
+  // concrete number tying the drawing to arithmetic they can check.
+  const midX = (xr.min + xr.max) / 2;
+  const zMid = at3(midX, cut);
+  if (Number.isFinite(zMid)) {
+    readouts.push({
+      id: 'sample',
+      tex: `f(${fmt(midX)}, ${fmt(cut)})`,
+      value: guarded ? null : fmt(zMid, 4),
+      help: 'The height of the surface at one point — the middle of the window, on the sheet.',
+    });
+  }
+
+  const stage = sweepStage(scene.params.find((p) => p.id === 'cut') ?? null, cut);
+  const narration =
+    stage === 0
+      ? 'The sheet is at one edge of the domain. The bright curve on it is the surface cut there.'
+      : stage < 3
+        ? 'The sheet is moving, and the curve on it changes shape as it goes. Each position is a different ordinary graph.'
+        : 'The sheet has crossed the whole domain. The surface is every one of those curves, stacked.';
+
+  return {
+    objects,
+    readouts,
+    narration,
+    caption: scene.says?.caption ?? 'Drag to turn it. The sheet slices it.',
+    ask: scene.says?.ask,
+  };
+};
+
 const KINDS: Record<VizKind, Builder> = {
   function: buildFunction,
   limit: buildLimit,
@@ -3255,6 +3411,7 @@ const KINDS: Record<VizKind, Builder> = {
   ppc: buildPpc,
   'ad-as': buildAdAs,
   diagram: buildDiagram,
+  surface: buildSurface,
 };
 
 /**
@@ -3354,6 +3511,7 @@ export function compileScene(scene: VizScene): CompiledExpr | null {
   if (!sceneHasOwnCurve(scene)) return null;
   const names = [scene.varName, ...scene.params.map((p) => p.id)];
   if (scene.kind === 'ode') names.push('y'); // dy/dx = f(x, y)
+  if (scene.kind === 'surface') names.push('y'); // z = f(x, y)
   return compileExpr(scene.expr, names);
 }
 
@@ -3370,6 +3528,33 @@ const REQUIRED: Record<VizKind, (scene: VizScene) => VizParam[]> = {
   // is about, and inventing one would put a slider under a drawing that has
   // nothing to move.
   diagram: () => [],
+  /**
+   * A surface needs three controls, and they are all camera or knife.
+   *
+   * `cut` is reserved (see RESERVED_PARAM) and sweeps, so pressing play walks
+   * the cutting plane across the whole domain — a family of cross-sections,
+   * which is the most useful single thing to see about a function of two
+   * variables. yaw and turn are the camera; they are ordinary sliders as well
+   * as being what dragging the picture moves, so the view is reachable
+   * without a pointer at all.
+   */
+  surface: (sc) => {
+    const yr = sc.yRange ?? { min: -3, max: 3 };
+    return [
+      {
+        id: 'cut',
+        min: yr.min,
+        max: yr.max,
+        step: (yr.max - yr.min) / 200,
+        value: (yr.min + yr.max) / 2,
+        sweep: 'up',
+        toward: fmt(yr.max),
+        help: 'Where the knife is. The curve drawn on the pale sheet is the surface cut at this value — hold y still and a function of two variables becomes an ordinary graph.',
+      },
+      { id: 'yaw', min: -180, max: 180, step: 1, value: 38, help: 'Spin the model on its turntable. Dragging the picture does the same thing.' },
+      { id: 'turn', min: 2, max: 88, step: 1, value: 26, help: 'How high the camera sits. Near zero you are looking along the surface edge-on; near ninety you are looking straight down at it.' },
+    ];
+  },
   // δ and h open at a fraction of the window rather than a fixed 2. The second
   // point has to be ON SCREEN in the first frame: with a tight window around
   // the point of interest, a fixed starting h puts Q above the top edge and
@@ -3560,6 +3745,10 @@ export const RESERVED_PARAM: Record<VizKind, string | null> = {
   // A diagram's parameters are whatever the picture is about, so none of them
   // is reserved and the editor may offer every name.
   diagram: null,
+  // The slice position. Sweeping it walks the cutting plane across the
+  // surface, which is the animation that shows a family of cross-sections is
+  // what a surface IS.
+  surface: 'cut',
 };
 
 export const KIND_LABEL: Record<VizKind, string> = {
@@ -3577,6 +3766,7 @@ export const KIND_LABEL: Record<VizKind, string> = {
   'ad-as': 'AD–AS',
   ode: 'Field',
   diagram: 'Diagram',
+  surface: 'Surface (3D)',
 };
 
 /**
@@ -3600,6 +3790,7 @@ export function autoParams(
   for (const name of freeNames(expr)) {
     if (name === varName || name === reserved) continue;
     if (kind === 'ode' && name === 'y') continue; // the solution, not a knob
+    if (kind === 'surface' && name === 'y') continue; // the second axis, not a knob
     if (name.length > 2) continue; // not a coefficient; the sanitizer rejects it anyway
     const had = by.get(name);
     out.push(had ?? { id: name, min: -5, max: 5, step: 0.1, value: 1 });
@@ -4133,6 +4324,7 @@ export function sanitizeViz(raw: any): VizScene | null {
       // has just redefined Euler's number underneath itself.
       if (id === 'e' || id === 'pi' || id === 'tau') return null;
       if (kind === 'ode' && id === 'y') return null; // y is the solution, not a slider
+      if (kind === 'surface' && id === 'y') return null; // y is an axis, not a slider
       const min = num(p?.min, -1e4, 1e4, 0);
       const max = num(p?.max, -1e4, 1e4, 1);
       if (!(max > min)) return null;
@@ -4194,6 +4386,23 @@ export function sanitizeViz(raw: any): VizScene | null {
     ...(typeof raw.a === 'number' && Number.isFinite(raw.a) ? { a: num(raw.a, -1e4, 1e4, 0) } : {}),
     ...(typeof raw.b === 'number' && Number.isFinite(raw.b) ? { b: num(raw.b, -1e4, 1e4, 1) } : {}),
     ...(raw.rule === 'left' || raw.rule === 'right' || raw.rule === 'midpoint' ? { rule: raw.rule } : {}),
+    // A surface always has a y range: whatever was given if it is a real
+    // interval, and a symmetric default otherwise. Defaulting rather than
+    // rejecting means a model that names only the expression still gets a
+    // drawable scene, which is how every other kind behaves.
+    ...(kind === 'surface'
+      ? {
+          yRange: (() => {
+            const fin = (v: unknown) =>
+              typeof v === 'number' && Number.isFinite(v) ? v : undefined;
+            const lo = fin(raw.yRange?.min);
+            const hi = fin(raw.yRange?.max);
+            return lo !== undefined && hi !== undefined && hi > lo
+              ? { min: lo, max: hi }
+              : { min: -3, max: 3 };
+          })(),
+        }
+      : {}),
     ...(kind === 'matrix' ? { matrix: sanitizeMatrix(raw.matrix) ?? undefined } : {}),
     ...(kind === 'vectors' ? { vectors: sanitizeVectors(raw.vectors) ?? undefined } : {}),
     ...(kind === 'distribution' && DISTS.includes(raw.dist) ? { dist: raw.dist as DistName } : {}),
@@ -4233,6 +4442,9 @@ export function sanitizeViz(raw: any): VizScene | null {
   if (needsExpr && scene.expr) {
     const known = new Set([scene.varName, ...scene.params.map((p) => p.id)]);
     if (scene.kind === 'ode') known.add('y');
+    // z = f(x, y): the second axis is bound by the sampler, not by a slider,
+    // so it is a name we ARE prepared to give a value to.
+    if (scene.kind === 'surface') known.add('y');
     if (freeNames(scene.expr).some((nm) => !known.has(nm))) return null;
     fn = compileScene(scene);
     if (!fn) return null;

@@ -169,6 +169,8 @@ export function MathViz({
   const ptrs = useRef<Map<number, { x: number; y: number }>>(new Map());
   /** Span and midpoint of the pinch when the second finger landed. */
   const pinchRef = useRef<{ dist: number; view: Viewport; cx: number; cy: number } | null>(null);
+  /** Where the camera was when a drag on a 3D scene began. */
+  const camRef = useRef<{ yaw: number; turn: number } | null>(null);
   const persistRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // A different scene is a different problem: back to its own defaults, its
@@ -372,6 +374,11 @@ export function MathViz({
     }
     if (ptrs.current.size === 1) {
       dragRef.current = { x: e.clientX, y: e.clientY, view: g.view };
+      // A surface turns instead of panning, so the drag has to remember where
+      // the camera started as well as where the window did. Measured from the
+      // START of the drag rather than accumulated frame by frame, for the same
+      // reason the pinch is: accumulation drifts.
+      camRef.current = { yaw: vals.yaw ?? 38, turn: vals.turn ?? 26 };
     }
   };
 
@@ -395,9 +402,27 @@ export function MathViz({
       return;
     }
 
-    // ── one pointer: pan ──
+    // ── one pointer: pan, or turn the model ──
     const d = dragRef.current;
     if (!d) return;
+
+    // Dragging a surface rotates it. Panning a projection is meaningless —
+    // the window is the fixed box the cube is drawn into, not a region of the
+    // domain — so the same gesture is given the job it obviously has here.
+    if (active.kind === 'surface') {
+      const start = camRef.current;
+      if (!start) return;
+      const box = svgRef.current?.getBoundingClientRect();
+      const w = box?.width || 400;
+      const h = box?.height || 300;
+      // A full drag across the picture is most of a turn; vertically it is
+      // the whole tilt. Clamped short of the poles, where the projection
+      // degenerates into a flat line and the model appears to vanish.
+      const yaw = start.yaw + ((e.clientX - d.x) / w) * 260;
+      const turn = Math.min(88, Math.max(2, start.turn - ((e.clientY - d.y) / h) * 150));
+      setVals((v) => ({ ...v, yaw: ((yaw + 180) % 360 + 360) % 360 - 180, turn }));
+      return;
+    }
     // Convert the pixel drag into data units through the same matrix the
     // drawing uses, so the graph tracks the cursor exactly rather than
     // approximately.
