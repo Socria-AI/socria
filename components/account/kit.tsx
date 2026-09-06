@@ -19,7 +19,7 @@ import {
   type ReactNode,
 } from 'react';
 import { useClerk, useUser } from '@clerk/nextjs';
-import { clerkMessage, needsReverification } from '@/lib/clerk-errors';
+import { clerkMessage, looksUnreachable, needsReverification } from '@/lib/clerk-errors';
 
 /** The person closed the reverification modal rather than completing it. */
 export class ReverifyCancelled extends Error {}
@@ -81,6 +81,12 @@ export function useReverification() {
 export function describeFailure(e: unknown, fallback: string): string {
   if (e instanceof ReverifyCancelled) {
     return 'Confirming it was you was cancelled, so nothing changed. Try again when you are ready.';
+  }
+  if (looksUnreachable(e)) {
+    // The request never left the page. On a preview domain that is almost
+    // always a production Clerk key, which is bound to the production domain
+    // and refuses everything else.
+    return 'Could not reach Clerk, so nothing changed. On a preview or dev domain this is usually a production Clerk key, which only works on the production domain.';
   }
   if (needsReverification(e)) {
     // The modal was unavailable. A fresh sign-in satisfies the same
