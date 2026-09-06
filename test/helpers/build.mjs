@@ -36,6 +36,8 @@ const MODULES = [
   'lib/billing-message.ts',
   'lib/stripe-diagnosis.ts',
   'lib/logos-personality.ts',
+  'lib/why-not-answer.ts',
+  'lib/socria-prompt.ts',
 ];
 
 export async function buildAll() {
