@@ -40,6 +40,7 @@ const MODULES = [
   'lib/qr.ts',
   'lib/account-guards.ts',
   'lib/logos-personality.ts',
+  'lib/logos-viz3d.ts',
   'app/explore/scenarios.ts',
 ];
 
