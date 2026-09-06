@@ -1269,9 +1269,27 @@ const buildLimit: Builder = (scene, fn, vals, view, guarded) => {
   const yl = at(fn, varName, vals, left);
   const yr = at(fn, varName, vals, right);
 
+  // The one-sided limits are needed before the objects are built, not after:
+  // whether this point is a POLE — a division by something on its way to zero
+  // — changes how the line at x = a should be drawn. A muted dashed marker
+  // says "the point of interest"; an asymptote is a wall the curve never
+  // reaches, and drawing the two the same way was the picture failing to
+  // distinguish the case somebody asking about 1/0 has come to see.
+  const Ln = oneSidedLimit(fn, varName, vals, a, -1);
+  const Rn = oneSidedLimit(fn, varName, vals, a, 1);
+  const Two = twoSidedLimit(Ln, Rn);
+  const blowsUp = Ln.kind === 'infinite' || Rn.kind === 'infinite';
+
   const objects: VizObject[] = [
     { o: 'curve', id: 'f', pts: sampleCurve(fn, varName, vals, view.xMin, view.xMax, SAMPLES, view), tone: 'primary', width: 2 },
-    { o: 'vrule', id: 'a', at: a, tone: 'muted', dashed: true, label: `${varName} = ${fmt(a)}` },
+    {
+      o: 'vrule',
+      id: 'a',
+      at: a,
+      tone: blowsUp ? 'tension' : 'muted',
+      dashed: true,
+      label: `${varName} = ${fmt(a)}`,
+    },
   ];
 
   // The two sample points and their guides. The horizontal guide runs from the
@@ -1324,10 +1342,6 @@ const buildLimit: Builder = (scene, fn, vals, view, guarded) => {
     objects.push({ o: 'point', id: 'fa', x: a, y: fa, tone: 'muted', hollow: true });
   }
 
-  const Ln = oneSidedLimit(fn, varName, vals, a, -1);
-  const Rn = oneSidedLimit(fn, varName, vals, a, 1);
-  const Two = twoSidedLimit(Ln, Rn);
-
   // What you read at the δ you have, and where those readings are heading.
   //
   // δ itself is deliberately NOT here: the slider a few pixels away is
@@ -1348,6 +1362,25 @@ const buildLimit: Builder = (scene, fn, vals, view, guarded) => {
       help: 'The same reading from the right-hand side. As δ shrinks these two close in on each other — or they do not, which tells you just as much.',
     },
   ];
+
+  // What the function actually is AT the point.
+  //
+  // This is the question somebody arrives with — "what happens if you divide
+  // by zero" — and until now the panel never answered it. It showed the
+  // approach from both sides and the limit, and left the one value they asked
+  // about off the board entirely. It is not the guarded answer either: that a
+  // function is undefined at a point is the PREMISE of asking what happens
+  // near it, and hiding the premise leaves the picture unmotivated.
+  if (!defined) {
+    readouts.push({
+      id: 'fa',
+      tex: `f(${fmt(a)})`,
+      value: 'undefined',
+      help: blowsUp
+        ? `There is no such number. Dividing by something smaller always gives something bigger, and nothing is smaller than zero is — so there is no height here for the curve to have. That is what the gap in the curve at ${varName} = ${fmt(a)} is.`
+        : `The function has no value at ${varName} = ${fmt(a)}. The limit asks a different question: not what it IS there, but what it is heading towards.`,
+    });
+  }
 
   // The two one-sided limits are shown only when they have something to say.
   //
@@ -1400,7 +1433,11 @@ const buildLimit: Builder = (scene, fn, vals, view, guarded) => {
   }
 
   const sidesDiffer = Ln.kind === 'value' && Rn.kind === 'value' && Two.kind === 'none';
-  const blowsUp = Ln.kind === 'infinite' || Rn.kind === 'infinite';
+  // Both run away, in opposite directions — 1/x at 0. This is the reason
+  // "1 ÷ 0 = ∞" is wrong rather than merely sloppy, and it is worth its own
+  // sentence: the two halves of the curve disagree about WHICH infinity.
+  const sidesOppose =
+    Ln.kind === 'infinite' && Rn.kind === 'infinite' && Ln.sign !== Rn.sign;
   const removable = !defined && Two.kind === 'value';
   const hole = defined && Two.kind === 'value' && Math.abs(fa - Two.v) > 1e-6;
 
@@ -1415,7 +1452,14 @@ const buildLimit: Builder = (scene, fn, vals, view, guarded) => {
           : sidesDiffer
             ? 'δ is almost nothing, and the two heights have still not met. They are heading for different places.'
             : blowsUp
-              ? 'δ is almost nothing, and the curve is still running away. There is no height for it to settle on.'
+              ? // Named with the numbers actually on screen, because "grows
+                // without bound" is the thing being explained, not an
+                // explanation of it. Halving δ doubling the height is the
+                // whole mechanism, and it is visible in the two readouts
+                // above the moment somebody moves the slider.
+                sidesOppose
+                ? `δ is almost nothing and the height is still climbing — and the two sides are climbing in OPPOSITE directions. So there is no single answer waiting at ${varName} = ${fmt(a)}, not even infinity: the left and the right cannot agree on which one.`
+                : `δ is almost nothing, and the curve is still running away. Halve δ again and the height roughly doubles again. Dividing by something smaller always gives something bigger, so there is nothing here for it to settle on.`
               : 'δ is almost nothing now, and both sides have arrived at the same place.';
 
   return {
