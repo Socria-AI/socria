@@ -36,6 +36,7 @@ const MODULES = [
   'lib/billing-message.ts',
   'lib/stripe-diagnosis.ts',
   'lib/logos-personality.ts',
+  'lib/logos-viz3d.ts',
   'app/explore/scenarios.ts',
 ];
 
