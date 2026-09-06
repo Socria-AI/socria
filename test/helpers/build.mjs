@@ -41,6 +41,8 @@ const MODULES = [
   'lib/account-guards.ts',
   'lib/logos-personality.ts',
   'lib/logos-viz3d.ts',
+  'lib/why-not-answer.ts',
+  'lib/socria-prompt.ts',
   'app/explore/scenarios.ts',
 ];
 
