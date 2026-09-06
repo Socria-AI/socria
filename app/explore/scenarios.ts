@@ -148,7 +148,10 @@ export const SCENARIOS: Scenario[] = [
         varName: 'x',
         view: { xMin: -1, xMax: 4, yMin: -1, yMax: 9 },
         a: 1.5,
-        params: [{ id: 'h', min: 0.05, max: 2, step: 0.05, value: 1.2 }],
+        // `sweep: 'down'` is what makes h the animated parameter rather than
+        // just a draggable one — and h running down to zero IS the idea being
+        // shown. Without it the scene had no play control at all.
+        params: [{ id: 'h', min: 0.05, max: 2, step: 0.05, value: 1.2, sweep: 'down' }],
         says: {
           caption: 'the secant through a and a+h',
           ask: 'what does the line do as h shrinks — and what does it never quite reach?',
