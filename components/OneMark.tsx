@@ -108,6 +108,19 @@ export function OneCard({ state }: { state: PlanState }) {
     setErr(null);
     try {
       const res = await fetch('/api/stripe/checkout', { method: 'POST' });
+      // Signed out: take them to sign in and bring them back to finish,
+      // rather than showing "Sign in to subscribe" as though it were a fault.
+      if (res.status === 401) {
+        const back = window.location.pathname + window.location.search;
+        window.location.href = '/sign-in?redirect_url=' + encodeURIComponent(back);
+        return;
+      }
+      // They already hold it — the server refuses to sell it twice. Not an
+      // error: open the thing they have.
+      if (res.status === 409) {
+        window.location.href = '/chat?model=logos';
+        return;
+      }
       const json = await res.json().catch(() => null);
       if (res.ok && json?.url) {
         window.location.href = json.url;
