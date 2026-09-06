@@ -285,3 +285,9 @@
   overscroll-behavior: contain;
   padding-bottom: 8px;
 }
+
+/* A live surface must never paint or take clicks outside its own frame.
+   Nothing currently does — the map SVGs measure well inside — but these are
+   real components with their own absolutely-positioned children, and an
+   exhibit that leaks over the case below it would steal its buttons. */
+.exp-root .ui-body { overflow: hidden; }
