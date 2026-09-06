@@ -75,6 +75,7 @@ export default async function Home() {
         </div>
         <div className="mh-center label">A place for thinking for yourself</div>
         <div className="mh-right">
+          <Link href="/explore">Explore</Link>
           <Link href="/logos">Logos</Link>
           <Link href="/one">Socria One</Link>
           {/* Sign-in must survive Clerk being slow or misconfigured in
@@ -561,6 +562,7 @@ export default async function Home() {
                 </svg>
               </a>
             </div>
+            <span><Link href="/explore">Explore</Link></span>
             <span><Link href="/logos">Logos</Link></span>
             <span><Link href="/one">Socria One</Link></span>
             <span className="it">Think For Yourself.</span>

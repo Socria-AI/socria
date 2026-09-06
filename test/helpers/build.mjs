@@ -36,6 +36,7 @@ const MODULES = [
   'lib/billing-message.ts',
   'lib/stripe-diagnosis.ts',
   'lib/logos-personality.ts',
+  'app/explore/scenarios.ts',
 ];
 
 export async function buildAll() {
