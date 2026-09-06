@@ -154,5 +154,68 @@ console.log('\n=== the two dials that were losing to the base prompt ===');
     /never outrank[^.]*protected principles or Depth/.test(block), block.slice(-300));
 }
 
+console.log('\n=== a moved dial has to be audible ===');
+{
+  // The dials were wired, unhedged by precedence, and still barely
+  // perceptible. The cause was in the lines themselves: nearly every option
+  // spent its second clause taking back its first. "Openly warm — still
+  // sharp, friendliness is the surface." "Noticeably warm — never
+  // therapeutic, no reassurance." "Gentle: the SAME observations." Told to
+  // move and then told the ways not to, the model landed back at the middle.
+  //
+  // The hedges now live once in the footer instead of inside every register.
+  // These assertions keep them there — a guardrail copied back into an
+  // option line is the exact regression that made this invisible.
+  const HEDGES = [
+    'Never therapeutic', 'never therapeutic',
+    'not a substitute for substance',
+    'never an intake form',
+    'never pomposity', 'never pompous',
+    'the same observations',
+  ];
+  for (const d of PERSONALITY_DIMENSIONS) {
+    for (const o of d.options.slice(1)) {
+      for (const h of HEDGES) {
+        ok(`${d.id}/${o.id} does not walk itself back with "${h}"`,
+          !o.line.includes(h), o.line);
+      }
+    }
+  }
+
+  // But nothing was dropped on the way out: the limits still bind, once,
+  // wherever any dial is moved.
+  const moved = personalityBlock({ ...DEFAULT_PERSONALITY, warmth: 'high' });
+  ok('warmth is still never therapeutic', /warmth is never therapeutic/.test(moved));
+  ok('and reassurance is still named', /no reflexive reassurance/.test(moved));
+  ok('academic is still never pompous', /academic is never pompous/.test(moved));
+  ok('humour is still not at their expense', /humour is never at their expense/.test(moved));
+  ok('questioning is still not an intake form', /never an intake form/.test(moved));
+  ok('and flattery is refused', /never flattery|ever flattery/.test(moved));
+
+  // Stated once, in the footer — not per-option, which is what diluted them.
+  ok('the limits appear exactly once',
+    (moved.match(/warmth is never therapeutic/g) || []).length === 1);
+
+  // And the block says plainly that a moved dial must change the reply.
+  ok('the block refuses an identical reply',
+    /would read identically at the default has ignored them/.test(moved));
+  ok('and calls them instructions',
+    /INSTRUCTIONS, NOT ASPIRATIONS/.test(moved));
+
+  // Every line should name something observable rather than an adjective.
+  // A crude but real proxy: each carries a concrete directive, not one word.
+  for (const d of PERSONALITY_DIMENSIONS) {
+    for (const o of d.options.slice(1)) {
+      // Long enough to carry a directive rather than an adjective. "Humor:
+      // None" is the shortest that legitimately needs to be, so the floor
+      // sits just under it.
+      ok(`${d.id}/${o.id} says enough to act on`, o.line.length >= 80, o.line);
+      ok(`${d.id}/${o.id} is prefixed with its dial`,
+        o.line.startsWith(`${d.label.toUpperCase()} —`) ||
+        /^[A-Z][A-Z ]+ —/.test(o.line), o.line);
+    }
+  }
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
