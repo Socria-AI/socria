@@ -407,8 +407,16 @@ export function OneStory() {
           </div>
           <p className="standfirst seq s-stand">Everything Socria does, without the ceiling.</p>
           <div className="cover-cta seq s-cta">
+            {/* The first screen's button says what pressing it DOES.
+                "Continue with One" said nothing — not that it subscribes, not
+                what it costs — on the one screen where a visitor decides, and
+                directly under a price it never referred to. A member sees
+                the door back into Logos instead, because selling somebody a
+                thing they already own is the one label that is worse than a
+                vague one. */}
             <button type="button" className="cta-primary" onClick={subscribe} disabled={busy}>
-              {busy ? 'Opening checkout…' : memberCta('Continue with One')} <span className="ar">→</span>
+              {busy ? 'Opening checkout…' : member ? 'Open Logos' : 'Become a member'}{' '}
+              <span className="ar">→</span>
             </button>
             <a className="cta-secondary" href="#opens">or see what opens</a>
           </div>
@@ -576,7 +584,7 @@ export function OneStory() {
                   </p>
                   <div className="lc-row">
                     <button type="button" className="lc-cta" onClick={subscribe} disabled={busy}>
-                      {memberCta('Continue with One')} →
+                      {member ? 'Open Logos' : 'Become a member'} →
                     </button>
                     <a className="lc-dismiss" href="/chat?model=logos">keep working with what I have</a>
                   </div>
