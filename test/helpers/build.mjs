@@ -37,6 +37,7 @@ const MODULES = [
   'lib/stripe-diagnosis.ts',
   'lib/logos-personality.ts',
   'lib/why-not-answer.ts',
+  'lib/wrong-chat.ts',
   'lib/auth-links.ts',
   'lib/session-rail.ts',
   'lib/socria-prompt.ts',
