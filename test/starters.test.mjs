@@ -24,17 +24,24 @@ const build = (input, count) => buildStarters({ fallback: FALLBACK, ...input }, 
 
 console.log('=== a starter is a pair, and the prompt is never the clipped text ===');
 {
-  const long =
-    'Why did concert ticket prices go up when the production cost of putting on the show stayed completely flat this year?';
+  // A long TITLE rather than a long sentence: sentences are now reduced to a
+  // subject before they are offered (see the block below), so the label/prompt
+  // split is demonstrated on the input that still reaches the chip whole.
+  const long = 'Concert ticket pricing and production cost recovery economics';
   const [first] = build({ recent: [{ title: long, updatedAt: 3 }] });
   ok('the label is clipped to one line', first.label.length <= 58);
   ok('the label says so', first.label.endsWith('…'));
-  ok('the prompt is the whole question', first.prompt === long);
+  ok('the prompt is the whole thing', first.prompt === `More on ${long}`);
   ok('the prompt is never truncated', !first.prompt.includes('…'));
 }
 
-console.log('\n=== nothing is ever prefixed onto a sentence ===');
+console.log('\n=== a sentence is never offered as itself ===');
 {
+  // The original rule here was that nothing may be PREFIXED onto a sentence,
+  // because "More on Why did ticket prices go up when the…" is nonsense. That
+  // is still true, and it is no longer the whole rule: offering the sentence
+  // unprefixed turned the chip into a replay button for the person's own old
+  // message. A sentence is now reduced to its subject, or declined.
   const sentences = [
     'Why did concert ticket prices go up when the production cost stayed flat?',
     "I don't understand why the production function is concave",
@@ -45,7 +52,9 @@ console.log('\n=== nothing is ever prefixed onto a sentence ===');
   for (const t of sentences) {
     ok(`"${t.slice(0, 34)}…" reads as a sentence`, isSentence(t) === true);
     const [c] = build({ recent: [{ title: t }] });
-    ok(`  and is offered as itself`, c.prompt === t && !c.prompt.startsWith('More on'));
+    ok(`  is never replayed verbatim`, c.prompt !== t, c.prompt);
+    ok(`  and is never the raw sentence prefixed`,
+      !c.prompt.startsWith(`More on ${t}`), c.prompt);
   }
 }
 
