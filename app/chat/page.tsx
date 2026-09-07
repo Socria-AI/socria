@@ -19,7 +19,18 @@ import { LogosApp } from '@/components/LogosApp';
 import { isValidOneKey } from '@/lib/socria-one';
 import { MODEL_KEY, rememberModel } from '@/lib/socria-model-store';
 import { buildStarters } from '@/lib/starters';
-import { loadLocal as loadLocalLogos } from '@/lib/logos-sessions';
+import {
+  loadLocal as loadLocalLogos,
+  saveLocal as saveLocalLogos,
+} from '@/lib/logos-sessions';
+import {
+  SESSION_TABS,
+  cleanTitle,
+  filterByTab,
+  shouldShowTabs,
+  tabCounts,
+  type SessionTab,
+} from '@/lib/session-rail';
 import { DepthPicker } from '@/components/DepthPicker';
 import { TryLogosPill } from '@/components/TryLogosPill';
 import { TryLogosModal } from '@/components/TryLogosModal';
@@ -193,6 +204,11 @@ export default function ChatPage() {
   const [streamed, setStreamed] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [railTab, setRailTab] = useState<SessionTab>('all');
+  // Which row is being renamed, and what is in the box. Rows from both
+  // surfaces share it, so the id is prefixed the way the keys are.
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const [renameDraft, setRenameDraft] = useState('');
   const [hydrating, setHydrating] = useState(true);
   const [usedFree, setUsedFree] = useState(false);
   const [model, setModel] = useState<SocriaModel>('core-2');
@@ -593,6 +609,53 @@ export default function ChatPage() {
     })),
     ...logosSessions.map((s) => ({ kind: 'logos' as const, ...s })),
   ].sort((a, b) => b.updatedAt - a.updatedAt);
+
+  // ...but once the list is long, "which of these has the map I drew" is a
+  // question the ordering cannot answer. The split is by whether there IS a
+  // map, not by which surface made it — see lib/session-rail.ts.
+  const railTabbed = shouldShowTabs(sessionRail);
+  const railCounts = tabCounts(sessionRail);
+  const activeTab: SessionTab = railTabbed && railCounts[railTab] > 0 ? railTab : 'all';
+  const shownRail = railTabbed ? filterByTab(sessionRail, activeTab) : sessionRail;
+
+  /**
+   * Rename a row, whichever surface it belongs to.
+   *
+   * Both kinds live in the same table, so both rename through the same PATCH.
+   * A chat's `autoTitledAs` is left as it was on purpose: the extractor only
+   * replaces a title that still matches that string, so a name set here stops
+   * being overwritten from the moment it is typed, with no extra flag.
+   */
+  function renameRow(kind: 'chat' | 'logos', id: string, title: string) {
+    if (kind === 'chat') {
+      const next = conversations.map((c) => (c.id === id ? { ...c, title } : c));
+      setConversations(next);
+      if (mode === 'local') saveLocal(next);
+    } else {
+      setLogosSessions((list) => list.map((s) => (s.id === id ? { ...s, title } : s)));
+      if (mode === 'local') {
+        // The rail holds a summary of each Logos session, not the session —
+        // so the rename is applied to the stored one, which has the map and
+        // the messages in it.
+        const stored = loadLocalLogos();
+        saveLocalLogos(stored.map((s) => (s.id === id ? { ...s, title } : s)));
+      }
+    }
+    if (mode === 'cloud') {
+      void fetch('/api/conversations', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, title }),
+      }).catch(() => {});
+    }
+  }
+
+  /** Take what was typed, or leave the name alone if it was emptied. */
+  function commitRename(kind: 'chat' | 'logos', id: string) {
+    const next = cleanTitle(renameDraft);
+    if (next) renameRow(kind, id, next);
+    setRenaming(null);
+  }
 
   // Scroll to bottom when messages or stream changes
   const active = conversations.find((c) => c.id === activeId);
@@ -1285,6 +1348,36 @@ export default function ChatPage() {
           Saved sessions
         </div>
 
+        {/* Only when it divides something. A switcher whose every option but
+            one leads to "nothing here" teaches people not to press it. */}
+        {railTabbed && (
+          <div
+            className="mx-3 mb-2 flex gap-0.5 rounded-lg bg-ink/[0.05] p-0.5"
+            role="tablist"
+            aria-label="Filter sessions"
+          >
+            {SESSION_TABS.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                role="tab"
+                aria-selected={activeTab === t.id}
+                onClick={() => setRailTab(t.id)}
+                className={`flex-1 flex items-center justify-center gap-1.5 rounded-md px-2 py-1 text-[11.5px] transition-colors ${
+                  activeTab === t.id
+                    ? 'bg-white text-ink shadow-sm'
+                    : 'text-ink/45 hover:text-ink/70'
+                }`}
+              >
+                {t.label}
+                <span className="text-[10px] tabular-nums text-ink/30">
+                  {railCounts[t.id]}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+
         <div className="flex-1 overflow-y-auto px-2 pb-2">
           {hydrating ? (
             <p className="px-3 py-2 text-xs text-ink/40 font-serif italic">
@@ -1295,56 +1388,142 @@ export default function ChatPage() {
               No sessions yet. Start one.
             </p>
           ) : (
-            sessionRail.map((item) =>
-              item.kind === 'logos' ? (
-                <a
-                  key={`logos-${item.id}`}
-                  href={`/chat?s=${encodeURIComponent(item.id)}`}
-                  // Opening one of these is a model switch as well as a
-                  // navigation: record it before leaving, or coming back to
-                  // /chat would land on whatever was active before and
-                  // contradict where they just were.
-                  onClick={() => rememberModel('logos')}
-                  className="group flex items-center gap-2 px-3 py-2 rounded-md text-[13px] text-ink/70 hover:bg-ink/5 hover:text-ink transition-colors"
-                  title={`${item.title} — opens in Logos`}
-                >
-                  <ModelGlyph
-                    model="logos"
-                    size={13}
-                    className="text-moss-700 shrink-0"
-                  />
-                  <span className="truncate flex-1">{item.title}</span>
-                  <span className="text-[10px] text-ink/35 shrink-0">
-                    {item.nodes ? `${item.nodes} nodes` : 'no map'}
-                  </span>
-                </a>
-              ) : (
-                <div
-                  key={`chat-${item.id}`}
-                  className={`group flex items-center justify-between px-3 py-2 rounded-md text-[13px] transition-colors cursor-pointer ${
-                    item.id === activeId
-                      ? 'bg-moss-50 text-ink'
-                      : 'text-ink/70 hover:bg-ink/5 hover:text-ink'
-                  }`}
-                  onClick={() => {
-                    setActiveId(item.id);
-                    setSidebarOpen(false);
-                  }}
-                >
-                  <span className="truncate flex-1">{item.title}</span>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      deleteSession(item.id);
-                    }}
-                    className="opacity-0 group-hover:opacity-100 text-ink/40 hover:text-ink ml-2 px-1 transition-opacity"
-                    aria-label="Delete"
+            <>
+              {railTabbed && shownRail.length === 0 && (
+                <p className="px-3 py-2 text-xs text-ink/40 font-serif italic">
+                  Nothing here yet.
+                </p>
+              )}
+              {shownRail.map((item) => {
+                const rowKey = `${item.kind}-${item.id}`;
+                const startRename = () => {
+                  setRenameDraft(item.title);
+                  setRenaming(rowKey);
+                };
+                // The box replaces the row rather than sitting inside it: a
+                // Logos row is a link, and a text field inside a link is a
+                // fight between typing and navigating that typing loses.
+                if (renaming === rowKey) {
+                  return (
+                    <div
+                      key={rowKey}
+                      className="flex items-center gap-2 px-3 py-1.5"
+                    >
+                      {item.kind === 'logos' && (
+                        <ModelGlyph
+                          model="logos"
+                          size={13}
+                          className="text-moss-700 shrink-0"
+                        />
+                      )}
+                      <input
+                        autoFocus
+                        value={renameDraft}
+                        aria-label="Rename this session"
+                        onChange={(e) => setRenameDraft(e.target.value)}
+                        onFocus={(e) => e.currentTarget.select()}
+                        // Blur commits as well as Enter: clicking away from a
+                        // box you have typed in should keep what you typed.
+                        onBlur={() => commitRename(item.kind, item.id)}
+                        onKeyDown={(e) => {
+                          e.stopPropagation();
+                          if (e.key === 'Enter') commitRename(item.kind, item.id);
+                          if (e.key === 'Escape') setRenaming(null);
+                        }}
+                        className="min-w-0 flex-1 rounded-md border border-moss-600 bg-white px-2 py-1 text-[13px] text-ink outline-none"
+                      />
+                    </div>
+                  );
+                }
+                return (
+                  <div
+                    key={rowKey}
+                    className={`group flex items-center rounded-md pr-1 transition-colors ${
+                      item.kind === 'chat' && item.id === activeId
+                        ? 'bg-moss-50 text-ink'
+                        : 'text-ink/70 hover:bg-ink/5 hover:text-ink'
+                    }`}
                   >
-                    ×
-                  </button>
-                </div>
-              )
-            )
+                    {item.kind === 'logos' ? (
+                      <a
+                        href={`/chat?s=${encodeURIComponent(item.id)}`}
+                        // Opening one of these is a model switch as well as a
+                        // navigation: record it before leaving, or coming back
+                        // to /chat would land on whatever was active before and
+                        // contradict where they just were.
+                        onClick={() => rememberModel('logos')}
+                        onDoubleClick={(e) => {
+                          e.preventDefault();
+                          startRename();
+                        }}
+                        className="flex min-w-0 flex-1 items-center gap-2 px-3 py-2 text-[13px]"
+                        title={`${item.title} — opens in Logos`}
+                      >
+                        <ModelGlyph
+                          model="logos"
+                          size={13}
+                          className="text-moss-700 shrink-0"
+                        />
+                        <span className="truncate flex-1">{item.title}</span>
+                        <span className="text-[10px] text-ink/35 shrink-0">
+                          {item.nodes ? `${item.nodes} nodes` : 'no map'}
+                        </span>
+                      </a>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveId(item.id);
+                          setSidebarOpen(false);
+                        }}
+                        onDoubleClick={startRename}
+                        className="min-w-0 flex-1 truncate px-3 py-2 text-left text-[13px]"
+                        title={item.title}
+                      >
+                        {item.title}
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        startRename();
+                      }}
+                      className="shrink-0 px-1 text-ink/35 opacity-0 transition-opacity hover:text-ink group-hover:opacity-100"
+                      aria-label={`Rename ${item.title}`}
+                      title="Rename"
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        width="13"
+                        height="13"
+                      >
+                        <path d="M12 20h9" />
+                        <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                      </svg>
+                    </button>
+                    {item.kind === 'chat' && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteSession(item.id);
+                        }}
+                        className="shrink-0 px-1 text-ink/40 opacity-0 transition-opacity hover:text-ink group-hover:opacity-100"
+                        aria-label="Delete"
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </>
           )}
         </div>
 

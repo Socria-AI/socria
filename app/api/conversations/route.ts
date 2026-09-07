@@ -1,6 +1,7 @@
 // app/api/conversations/route.ts
-// GET  /api/conversations          → list current user's conversations
-// PUT  /api/conversations          → upsert a single conversation
+// GET   /api/conversations         → list current user's conversations
+// PUT   /api/conversations         → upsert a single conversation
+// PATCH /api/conversations         → rename one (title only)
 // POST /api/conversations          → bulk-upsert (used for localStorage → cloud migration)
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -177,6 +178,64 @@ export async function GET() {
       { error: e?.message || 'Internal error' },
       { status: 500 }
     );
+  }
+}
+
+/**
+ * Rename one conversation, and touch nothing else.
+ *
+ * PUT writes the whole row, which is right when the caller holds the whole
+ * conversation and wrong for a rename: the sidebar knows a session's id and
+ * title and nothing more, so renaming through PUT would send an empty
+ * `messages` and an empty map and quietly erase the thing being renamed. It
+ * would also race — a rename typed while a reply is streaming would land on
+ * top of a row the chat is mid-way through saving.
+ *
+ * So this writes one column. `updated_at` is deliberately left alone: the
+ * sidebar is ordered by it, and renaming is not thinking — a rename that
+ * reordered the list would move the row out from under the cursor that just
+ * finished using it.
+ */
+export async function PATCH(req: NextRequest) {
+  const { userId } = auth();
+  if (!userId) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const body = await req.json().catch(() => null);
+  const id = body?.id;
+  const raw = body?.title;
+  if (typeof id !== 'string' || !id || typeof raw !== 'string') {
+    return NextResponse.json({ error: 'Invalid rename' }, { status: 400 });
+  }
+  // Same shape the client settles on, applied again here because a client is
+  // not a place to enforce anything.
+  const title = raw.replace(/\s+/g, ' ').trim().slice(0, MAX_TITLE);
+  if (!title) {
+    return NextResponse.json({ error: 'A name is required' }, { status: 400 });
+  }
+
+  try {
+    // Scoped to (id, user_id), so it can only ever touch your own row; an id
+    // belonging to somebody else matches nothing and 404s rather than
+    // reporting a success that did not happen.
+    const { error, count } = await supabaseAdmin()
+      .from('conversations')
+      .update({ title }, { count: 'exact' })
+      .eq('id', id)
+      .eq('user_id', userId);
+
+    if (error) {
+      console.error('PATCH conversation error:', error);
+      return NextResponse.json({ error: `Supabase: ${error.message}` }, { status: 500 });
+    }
+    if (!count) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    }
+    return NextResponse.json({ ok: true, title });
+  } catch (e: any) {
+    console.error('PATCH conversation threw:', e);
+    return NextResponse.json({ error: e?.message || 'Internal error' }, { status: 500 });
   }
 }
 

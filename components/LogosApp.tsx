@@ -1025,6 +1025,31 @@ export function LogosApp({
     void send(d.text);
   }
 
+  /**
+   * Give a session the name its owner wants.
+   *
+   * `patchActive` only auto-titles a session still called UNTITLED, so a name
+   * set here survives every later turn without needing a flag to say it was
+   * deliberate — the presence of a real title IS the flag.
+   */
+  function renameSession(id: string, title: string) {
+    const next = sessionsRef.current.map((s) => (s.id === id ? { ...s, title } : s));
+    // The list is ordered by when a session was last touched, and renaming is
+    // not thinking — leaving `updatedAt` alone keeps a rename from shuffling
+    // the row out from under the cursor that just used it.
+    applySessions(next);
+    // PATCH rather than `persist`: a rename knows the id and the name and
+    // nothing else, and sending a whole-row PUT from here would race whatever
+    // the conversation is mid-way through saving.
+    if (cloud) {
+      void fetch('/api/conversations', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, title }),
+      }).catch(() => {});
+    }
+  }
+
   async function deleteSession(id: string) {
     const remaining = sessionsRef.current.filter((s) => s.id !== id);
     const next = remaining.length ? remaining : [emptySession()];
@@ -1793,6 +1818,7 @@ export function LogosApp({
           onSelect={switchSession}
           onNew={newSession}
           onDelete={deleteSession}
+          onRename={renameSession}
           onToggle={() => setRailOpen((v) => !v)}
         />
 
