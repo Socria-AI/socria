@@ -20,11 +20,14 @@ export default function NotFound() {
               <Link href="/chat">Try Socria</Link>
             </nav>
             <SignedOut>
-              <SignInButton >
+              <SignInButton>
                 <button type="button" className="nav-signin">
                   Sign in
                 </button>
               </SignInButton>
+              <Link href="/sign-up" className="nav-signin">
+                Create account
+              </Link>
             </SignedOut>
             <SignedIn>
               <UserButton afterSignOutUrl="/" userProfileMode="navigation" userProfileUrl="/account" />

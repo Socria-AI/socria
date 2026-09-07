@@ -5,20 +5,29 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
+import { AUTH_CROSSLINK, authUrl, otherAuth, type AuthKind } from '@/lib/auth-links';
 
 export function AuthShell({
   eyebrow,
   title,
   subtitle,
   quote,
+  kind,
+  redirectTo,
   children,
 }: {
   eyebrow?: string;
   title: string;
   subtitle?: string;
   quote?: { text: string; source?: string };
+  /** which door this is — drives the link to the other one */
+  kind?: AuthKind;
+  /** where they were going, carried through to whichever door they use */
+  redirectTo?: string;
   children: React.ReactNode;
 }) {
+  const other = kind ? otherAuth(kind) : null;
+  const cross = kind ? AUTH_CROSSLINK[kind] : null;
   return (
     <div className="min-h-dvh flex flex-col bg-paper text-ink">
       <header className="px-6 md:px-10 py-6 flex items-center justify-between">
@@ -91,6 +100,24 @@ export function AuthShell({
               )}
             </div>
             <div className="socria-clerk-card">{children}</div>
+
+            {/* The other door, stated plainly and outside Clerk's card.
+                Clerk renders its own footer link, and it was not enough: the
+                page around it says "Welcome back" and "pick up where you left
+                off", so somebody arriving without an account reads the whole
+                screen as not-for-them and writes in to ask how to join. This
+                is that answer, in the place they are already looking. */}
+            {other && cross && (
+              <p className="mt-6 text-center text-[14px] text-ink/60">
+                {cross.lead}{' '}
+                <Link
+                  href={authUrl(other, redirectTo)}
+                  className="text-moss-700 hover:text-moss-800 font-medium underline underline-offset-4 decoration-1"
+                >
+                  {cross.action}
+                </Link>
+              </p>
+            )}
           </div>
         </div>
       </main>
