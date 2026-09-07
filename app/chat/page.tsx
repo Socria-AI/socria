@@ -23,6 +23,7 @@ import {
   loadLocal as loadLocalLogos,
   saveLocal as saveLocalLogos,
 } from '@/lib/logos-sessions';
+import { DRIFT_DISMISS_LIMIT, readDrift, type DriftVerdict } from '@/lib/topic-drift';
 import {
   SESSION_TABS,
   cleanTitle,
@@ -105,6 +106,8 @@ const MIGRATED_KEY = 'socria.cloudMigrated.v1';
 // sign-in — even if they delete the first one. Cleared on sign-in.
 const USED_FREE_KEY = 'socria.usedFreeConvo.v1';
 const DEPTH_KEY = 'socria.depth.v1';
+/** How often this person has told us a topic change was intentional. */
+const DRIFT_KEY = 'socria.chat.driftDismissals.v1';
 
 function readModel(): SocriaModel {
   if (typeof window === 'undefined') return 'core-2';
@@ -209,6 +212,9 @@ export default function ChatPage() {
   // surfaces share it, so the id is prefixed the way the keys are.
   const [renaming, setRenaming] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState('');
+  // A misfiled message, and how many times this person has said they meant it.
+  const [drift, setDrift] = useState<(DriftVerdict & { text: string; from: string }) | null>(null);
+  const [driftDismissals, setDriftDismissals] = useState(0);
   const [hydrating, setHydrating] = useState(true);
   const [usedFree, setUsedFree] = useState(false);
   const [model, setModel] = useState<SocriaModel>('core-2');
@@ -650,6 +656,64 @@ export default function ChatPage() {
     }
   }
 
+  // ── a message in the wrong conversation ────────────────────────────
+  useEffect(() => {
+    try {
+      const n = Number(localStorage.getItem(DRIFT_KEY) || '0');
+      if (Number.isFinite(n) && n > 0) setDriftDismissals(n);
+    } catch {}
+  }, []);
+
+  /**
+   * "I meant it here."
+   *
+   * Counted and remembered, because somebody whose work genuinely ranges
+   * across subjects should not be asked about it forever. After
+   * DRIFT_DISMISS_LIMIT the detector stops firing for them entirely.
+   */
+  function dismissDrift() {
+    setDrift(null);
+    setDriftDismissals((n) => {
+      const next = n + 1;
+      try {
+        localStorage.setItem(DRIFT_KEY, String(next));
+      } catch {}
+      return next;
+    });
+  }
+
+  /**
+   * Move the misfiled message into a session of its own.
+   *
+   * The message leaves the old conversation along with whatever was said in
+   * reply — an answer to a question that is no longer there is worse than
+   * nothing — and is sent again in a fresh one, so the thread it interrupted
+   * reads as though it was never interrupted.
+   */
+  function moveDriftToNewSession() {
+    const d = drift;
+    if (!d) return;
+    setDrift(null);
+    const trimmed = conversations.map((c) => {
+      if (c.id !== d.from) return c;
+      let cut = c.messages.length;
+      for (let i = c.messages.length - 1; i >= 0; i--) {
+        if (c.messages[i].role === 'user' && c.messages[i].content === d.text) {
+          cut = i;
+          break;
+        }
+      }
+      return { ...c, messages: c.messages.slice(0, cut) };
+    });
+    setConversations(trimmed);
+    if (mode === 'local') saveLocal(trimmed);
+    setActiveId(null);
+    setSidebarOpen(false);
+    // `send` would otherwise read the list it was rendered with, and put the
+    // message back into the conversation it was just taken out of.
+    void send(d.text, { convos: trimmed, id: null });
+  }
+
   /** Take what was typed, or leave the name alone if it was emptied. */
   function commitRename(kind: 'chat' | 'logos', id: string) {
     const next = cleanTitle(renameDraft);
@@ -1021,7 +1085,15 @@ export default function ChatPage() {
     }
   }
 
-  async function send(content: string) {
+  /**
+   * `start` is for the one caller that has already rewritten the list and
+   * cannot wait a render for state to catch up: moving a misfiled message to
+   * a session of its own.
+   */
+  async function send(
+    content: string,
+    start?: { convos: Conversation[]; id: string | null }
+  ) {
     const text = content.trim();
     if (!text || sending) return;
     setError(null);
@@ -1040,8 +1112,8 @@ export default function ChatPage() {
     }
 
     // Ensure we have an active conversation
-    let workingId = activeId;
-    let working = conversations;
+    let workingId = start ? start.id : activeId;
+    let working = start ? start.convos : conversations;
     if (!workingId) {
       const id = uid();
       const fresh: Conversation = {
@@ -1050,7 +1122,9 @@ export default function ChatPage() {
         messages: [],
         updatedAt: Date.now(),
       };
-      working = [fresh, ...conversations];
+      // `working`, not `conversations` — a caller that handed us a rewritten
+      // list means it, and reaching past it here would undo the rewrite.
+      working = [fresh, ...working];
       workingId = id;
       setActiveId(id);
     }
@@ -1073,6 +1147,18 @@ export default function ChatPage() {
     if (mode === 'local') saveLocal(withUser);
 
     setInput('');
+    // Once, here, on the message as sent — never while typing, and judged
+    // against the conversation as it was a moment ago. The reply proceeds
+    // either way; this only decides whether a note appears beside it.
+    const before = working.find((c) => c.id === workingId);
+    const v = readDrift({
+      message: text,
+      title: before?.title === 'New thought session' ? undefined : before?.title,
+      recent: (before?.messages ?? []).map((m) => m.content),
+      dismissals: driftDismissals,
+    });
+    setDrift(v.flag && workingId ? { ...v, text, from: workingId } : null);
+
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
     setSending(true);
     setStreamed('');
@@ -1803,6 +1889,51 @@ export default function ChatPage() {
 
         <div className="border-t border-border/60 bg-paper/80 backdrop-blur-sm">
           <div className="max-w-2xl mx-auto px-6 py-4">
+            {/* An offer, after the fact. The message was sent and is being
+                answered; this only asks whether it landed where it was meant
+                to, and it is never in the way of the reply. It belongs to the
+                session it was sent in, so switching away takes it with you. */}
+            {drift && drift.from === activeId && (
+              <div
+                className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-ink/12 bg-white/70 px-3 py-2 text-[12.5px] text-ink/70"
+                role="note"
+              >
+                <span className="min-w-0 flex-1 font-serif italic">
+                  That reads like {drift.domain === 'code' ? 'a coding' : `a ${drift.domain}`} question,
+                  and this session has been about something else. Did you mean it here?
+                </span>
+                <span className="flex shrink-0 items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={dismissDrift}
+                    className="rounded-md px-2 py-1 text-ink/60 hover:bg-ink/5 hover:text-ink transition-colors"
+                  >
+                    Keep it here
+                  </button>
+                  {/* Only when they can actually have another session —
+                      offering a door that leads to a sign-in wall is worse
+                      than not offering it. */}
+                  {!lockedOut && (
+                    <button
+                      type="button"
+                      onClick={moveDriftToNewSession}
+                      className="rounded-md px-2 py-1 font-medium text-moss-700 hover:bg-moss-50 hover:text-moss-800 transition-colors"
+                    >
+                      Move to a new session
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={dismissDrift}
+                    className="px-1 text-ink/35 hover:text-ink transition-colors"
+                    aria-label="Dismiss"
+                  >
+                    ×
+                  </button>
+                </span>
+              </div>
+            )}
+
             {!isSignedIn && !smartUnlocked && hasMessages && (
               <div className="mb-3 flex items-center justify-between gap-3 px-1 text-[12px] text-ink/55">
                 <span className="font-serif italic">
