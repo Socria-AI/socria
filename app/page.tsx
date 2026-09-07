@@ -81,15 +81,24 @@ export default async function Home() {
               production: show a real /sign-in link during load and when
               signed out, and only swap to the avatar once Clerk confirms a
               session. If Clerk never initializes, the link still shows. */}
+          {/* Both doors, always. Only "Sign in" was ever offered — here and
+              everywhere else — so somebody without an account had nothing to
+              press, and wrote in to ask how to make one. */}
           <ClerkLoading>
             <Link href="/sign-in" className="signin">
               Sign in
+            </Link>
+            <Link href="/sign-up" className="signin">
+              Create account
             </Link>
           </ClerkLoading>
           <ClerkLoaded>
             <SignedOut>
               <Link href="/sign-in" className="signin">
                 Sign in
+              </Link>
+              <Link href="/sign-up" className="signin">
+                Create account
               </Link>
             </SignedOut>
             <SignedIn>
