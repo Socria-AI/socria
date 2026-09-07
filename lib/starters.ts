@@ -156,6 +156,80 @@ function lowerFirst(s: string): string {
   return s[0].toLowerCase() + s.slice(1);
 }
 
+/**
+ * The subject inside a sentence, or null when there is not one worth offering.
+ *
+ * Source 4 is a conversation's TITLE, and a title is the person's own first
+ * message until something renames it. Offering a sentence as itself made the
+ * chip a replay button: pressing "I have two job offers and I keep going back
+ * and forth." re-sent their opening message to a fresh conversation. That is
+ * not a suggestion, and it is the thing that looked most obviously wrong on
+ * the empty screen — three chips, all of them yesterday's questions.
+ *
+ * So the sentence is reduced to what it is ABOUT. Strip the frame somebody
+ * wraps a request in — "solve for", "I have", "help me with" — stop at the
+ * first clause boundary, and what remains is the subject:
+ *
+ *   "Solve for slope of tangent line"                  → slope of tangent line
+ *   "I have two job offers and I keep going back…"     → two job offers
+ *   "Why won't you just give me answers"               → null
+ *
+ * The last one is the point of returning null. What is left there is
+ * "answers", which is not a subject anybody wants to go further into, and a
+ * chip that does not quite parse is worse than one fewer chip.
+ */
+const FRAME = new Set([
+  'i', "i'm", 'im', "i've", 'ive', "i'd", 'id', "i'll", 'ill', 'we', "we're", 'my', 'our',
+  'am', 'is', 'are', 'was', 'were', 'be', 'been', 'have', 'has', 'had', 'do', 'does', 'did',
+  'can', 'could', 'should', 'would', 'will', 'want', 'wanted', 'need', 'needed', 'keep',
+  'trying', 'try', 'thinking', 'wondering', 'stuck', 'confused', 'struggling',
+  'help', 'explain', 'tell', 'show', 'give', 'find', 'solve', 'prove', 'work', 'figure',
+  // the imperative openers a request starts with — "graph me the limit…" is
+  // about the limit, not about graphing
+  'graph', 'plot', 'draw', 'sketch', 'calculate', 'compute', 'derive', 'simplify',
+  'understand', 'know', 'learn', 'study', 'go', 'going', 'get', 'getting', 'talk', 'ask',
+  'how', 'what', 'why', 'when', 'where', 'which', 'who', 'whose', 'if', 'about',
+  'me', 'you', 'us', 'it', 'this', 'that', 'the', 'a', 'an', 'to', 'for', 'with', 'on',
+  'out', 'more', 'just', 'really', 'still', 'again', "won't", 'wont', "don't", 'dont',
+  // openings that carry no subject at all
+  'hey', 'hi', 'hello', 'yo', 'thanks', 'please', 'ok', 'okay',
+  "doesn't", 'doesnt', "can't", 'cant', 'not', 'no', 'some', 'any', 'so', 'and', 'but',
+]);
+
+/**
+ * Where a title stops being about one thing.
+ *
+ * "and" is deliberately not in here. It joins clauses ("two job offers AND I
+ * keep going back and forth") and it joins nouns ("supply AND demand"), and
+ * treating it as a break turned the second kind into "supply" — half a
+ * subject, and then dropped for being one word. So a coordinator only breaks
+ * the line when what follows actually starts a clause, which is handled
+ * separately below.
+ */
+const CLAUSE_BREAK = /\s+(?:but|because|so|while|which|though|although|since|then)\s+|[,;:—–]/i;
+
+/** A coordinator followed by something that opens a clause of its own. */
+const CLAUSE_AFTER_AND = /\s+and\s+(?=(?:i|we|it|they|he|she|that|this|there)\b)/i;
+
+export function topicOf(sentence: string): string | null {
+  const first = (sentence.split(CLAUSE_AFTER_AND)[0] ?? '').split(CLAUSE_BREAK)[0] ?? '';
+  const words = first.trim().replace(/[?!.]+$/, '').split(/\s+/).filter(Boolean);
+
+  // Drop the framing from the front, one word at a time, until something
+  // substantive appears. Only from the FRONT: "the slope of the tangent line"
+  // must keep its inner "of the", or it stops being a phrase.
+  let i = 0;
+  while (i < words.length && FRAME.has(words[i].toLowerCase().replace(/[^a-z']/g, ''))) i++;
+  const rest = words.slice(i);
+
+  // Two words is the bar. One is either a bare noun that reads oddly after
+  // "More on", or — far more often — the tail of a question that was never
+  // about a subject at all.
+  if (rest.length < 2 || rest.length > 9) return null;
+  const topic = rest.join(' ').replace(/[^a-zA-Z0-9)\]]+$/, '').trim();
+  return topic.length >= 6 ? topic : null;
+}
+
 function usable(s: unknown): s is string {
   return typeof s === 'string' && s.trim().length > 2 && !UNNAMED.test(s.trim());
 }
@@ -235,7 +309,16 @@ export function buildStarters(input: StarterInput, count = STARTER_COUNT): Start
     .sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
   for (const r of recent) {
     const title = r.title.trim();
-    add(isSentence(title) ? title : `More on ${title}`, key(title));
+    if (!isSentence(title)) {
+      add(`More on ${title}`, key(title));
+      continue;
+    }
+    // A sentence is reduced to its subject, and dropped when it has none.
+    // "More on X" is deliberately plain here: this is the deterministic
+    // fallback, not the extractor, whose forward-looking questions are
+    // explicitly forbidden that phrasing because it can do better.
+    const topic = topicOf(title);
+    if (topic) add(`More on ${topic}`, key(topic));
   }
 
   // top up with the generic openings, skipping any already offered
