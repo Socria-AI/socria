@@ -2,6 +2,7 @@
 import type { Metadata } from 'next';
 import { SignUp } from '@clerk/nextjs';
 import { AuthShell } from '@/components/AuthShell';
+import { authUrl, isSafeRedirect } from '@/lib/auth-links';
 
 export const metadata: Metadata = {
   title: 'Create your account — Socria',
@@ -9,9 +10,18 @@ export const metadata: Metadata = {
     'Create a free Socria account to save your thought sessions and unlock Core 3.',
 };
 
-export default function SignUpPage() {
+export default function SignUpPage({
+  searchParams,
+}: {
+  searchParams?: { redirect_url?: string };
+}) {
+  const back = isSafeRedirect(searchParams?.redirect_url)
+    ? searchParams!.redirect_url!
+    : undefined;
   return (
     <AuthShell
+      kind="sign-up"
+      redirectTo={back}
       eyebrow="Create your account"
       title="Think with Socria across every device."
       subtitle="Free account. Unlimited thought sessions. Access to Socria Core 3 with adjustable thinking depth."
@@ -22,8 +32,9 @@ export default function SignUpPage() {
       <SignUp
         routing="path"
         path="/sign-up"
-        signInUrl="/sign-in"
-        fallbackRedirectUrl="/chat"
+        signInUrl={authUrl('sign-in', back)}
+        fallbackRedirectUrl={back ?? '/chat'}
+        signInFallbackRedirectUrl={back ?? '/chat'}
       />
     </AuthShell>
   );
