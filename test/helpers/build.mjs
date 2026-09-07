@@ -38,6 +38,7 @@ const MODULES = [
   'lib/logos-personality.ts',
   'lib/why-not-answer.ts',
   'lib/auth-links.ts',
+  'lib/session-rail.ts',
   'lib/socria-prompt.ts',
 ];
 
