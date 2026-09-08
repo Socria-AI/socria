@@ -28,6 +28,11 @@ const OWNED_TABLES = [
   'lifecycle_emails',
 ] as const;
 
+function tableMissing(error: { code?: string; message?: string }): boolean {
+  const m = `${error.code ?? ''} ${error.message ?? ''}`.toLowerCase();
+  return m.includes('42p01') || m.includes('does not exist') || m.includes('could not find') || m.includes('schema cache');
+}
+
 export async function DELETE(req: NextRequest) {
   const { userId } = auth();
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -71,6 +76,13 @@ export async function DELETE(req: NextRequest) {
 
   for (const table of OWNED_TABLES) {
     const { error } = await db.from(table).delete().eq('user_id', userId);
+    // The lifecycle ledger arrived in a later migration than the rest. On a
+    // database that has not run it there is nothing of the person's in it,
+    // and refusing to finish a deletion — after the subscription is already
+    // cancelled — over a table that does not exist would be the wrong way
+    // round. Only a genuinely missing table is forgiven; any other error
+    // stops the deletion as before.
+    if (error && table === 'lifecycle_emails' && tableMissing(error)) continue;
     if (error) {
       console.error(`account delete: ${table} failed`, error);
       return NextResponse.json(

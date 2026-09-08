@@ -30,6 +30,8 @@ import { useOnePrompt } from '@/components/useOnePrompt';
 import { reasonForCounter } from '@/lib/one-prompt';
 import { track } from '@/lib/analytics';
 import { authUrl } from '@/lib/auth-links';
+import { isSource } from '@/lib/checkout-attribution';
+import { nthBucket } from '@/lib/analytics';
 import {
   FIRST_MAP_KEY,
   FIRST_MAP_NOTE,
@@ -252,6 +254,8 @@ export function LogosApp({
    * cleared; never set by hydrating a saved session.
    */
   const shapedRef = useRef(false);
+  /** whether a reply is in flight right now, readable from the extraction handler */
+  const inFlightRef = useRef(false);
   /** sessions that have had at least one extraction in this tab */
   const extractedRef = useRef<Set<string>>(new Set());
   /** the person's first map just took a shape: the share moment owns the screen */
@@ -666,7 +670,7 @@ export function LogosApp({
       const via = new URLSearchParams(window.location.search).get('via');
       if (via) {
         try {
-          sessionStorage.setItem(VIA_KEY, via);
+          if (isSource(via)) sessionStorage.setItem(VIA_KEY, via);
         } catch {}
         const url = new URL(window.location.href);
         url.searchParams.delete('via');
@@ -889,6 +893,9 @@ export function LogosApp({
   useEffect(() => {
     if (input || busy) cancelPending();
   }, [input, busy, cancelPending]);
+  useEffect(() => {
+    inFlightRef.current = busy || !!streaming;
+  }, [busy, streaming]);
 
   // What Socria knows about this person, for accounts. Anonymous, key-unlocked
   // Logos has no person to remember — and must not read Core's local journey
@@ -1206,6 +1213,9 @@ export function LogosApp({
 
   function switchSession(id: string) {
     if (id === activeIdRef.current) return;
+    // The share note belongs to the map it was shown on.
+    setFirstMapNote(false);
+    shareNoteRef.current = false;
     setActiveId(id);
     activeIdRef.current = id;
     chronRef.current = [...(sessionsRef.current.find((s) => s.id === id)?.messages ?? [])];
@@ -1359,7 +1369,14 @@ export function LogosApp({
             const seenBefore = extractedRef.current.has(sessionKey) || prevN === 0;
             extractedRef.current.add(sessionKey);
             if (seenBefore && firstMapCrossed(prevN, nextN)) {
-              shapedRef.current = true;
+              // The extraction usually lands AFTER the reply, by which time
+              // the landed-turn effect has already queued the generic nudge.
+              // Asking here too puts the shaped map into the same settle, so
+              // it is decided alongside and outranks it. While a reply is
+              // still in flight the flag waits for the landed effect instead,
+              // so nothing is decided mid-stream.
+              if (inFlightRef.current) shapedRef.current = true;
+              else if (!shareNoteRef.current) ask('map-shaped');
               let firstEver = false;
               try {
                 firstEver = !localStorage.getItem(FIRST_MAP_KEY);
@@ -1823,7 +1840,7 @@ export function LogosApp({
       const prior = sessionsRef.current.filter(
         (x) => x.id !== activeIdRef.current && x.messages.some((m) => m.role === 'user')
       ).length;
-      track('logos_session_started', { nth: prior === 0 ? '1' : prior === 1 ? '2' : '3+', surface: 'logos', signed_in: !!isSignedIn });
+      track('logos_session_started', { nth: nthBucket(prior + 1), surface: 'logos', signed_in: !!isSignedIn });
     }
     const sid = activeIdRef.current ?? '';
     const u = isSignedIn ? understandingRef.current : null;
@@ -2287,7 +2304,7 @@ export function LogosApp({
                   Type what you’re working through. Logos asks questions back,
                   and draws the shape of your reasoning on the right as you go.
                 </p>
-                {noSessions ? (
+                {noSessions && !input ? (
                   // Nothing has ever been said here. The chips would send a
                   // line too thin to draw; these are four complete first
                   // messages, put into the composer and NEVER sent — the
@@ -2680,6 +2697,7 @@ export function LogosApp({
             <button
               type="button"
               className="lg-panel-save"
+              hidden={firstMapNote}
               disabled={!map.nodes.length || mapping}
               onClick={() => void exportMapPng(map, active?.title && active.title !== UNTITLED ? active.title : 'A line of thinking')}
             >

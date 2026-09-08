@@ -57,6 +57,7 @@ import {
   candidates,
   claimLifecycle,
   dueLimitChats,
+  strandedWelcomes,
   isUnsubscribed,
   latestLogosSession,
   markSent,
@@ -240,6 +241,53 @@ export async function GET(req: NextRequest) {
         }
         const sessionId = await latestLogosSession(c.userId);
         await claimAndSend({ userId: c.userId, kind, to, sessionId }, ctx, counts);
+      }
+    }
+
+    // ── welcomes that were claimed and never sent ───────────────────
+    {
+      const kind = 'welcome-one' as const;
+      const counts: Counts = {};
+      report[kind] = counts;
+      const stranded = await strandedWelcomes(now, PER_KIND);
+      const addresses = await addressesFor(stranded.map((r) => r.userId));
+      for (const row of stranded) {
+        const [plan, unsubscribed] = await Promise.all([
+          resolvePlanForRequest(req, row.userId),
+          isUnsubscribed(row.userId),
+        ]);
+        const decision = decideLifecycle({
+          kind,
+          plan,
+          unsubscribed,
+          alreadySent: row.sentAt !== null,
+          now,
+        });
+        if (!decision.send) {
+          bump(counts, decision.reason);
+          // They are no longer a member, or have said stop: the welcome is
+          // never going. Leaving the row claimed would have it read and
+          // refused every day from now on.
+          if (decision.reason === 'not-member' || decision.reason === 'unsubscribed') {
+            await releaseClaim(row.userId, kind);
+          }
+          continue;
+        }
+        if (!permitted(row.userId)) {
+          bump(counts, 'not-in-allowlist');
+          continue;
+        }
+        if (dry) {
+          bump(counts, 'would-send');
+          continue;
+        }
+        const to = addresses.get(row.userId);
+        if (!to) {
+          bump(counts, 'no-address');
+          await releaseClaim(row.userId, kind);
+          continue;
+        }
+        await sendClaimed({ userId: row.userId, kind, to }, ctx, counts);
       }
     }
 

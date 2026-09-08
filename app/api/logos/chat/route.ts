@@ -32,7 +32,7 @@ import {
 import { enforceRateLimit } from '@/lib/rate-limit';
 import { claimLifecycle } from '@/lib/lifecycle-store';
 import { LIMIT_DELAY_MS } from '@/lib/lifecycle';
-import { withTimeout } from '@/lib/email';
+import { lifecycleEmailsOn, withTimeout } from '@/lib/email';
 import {
   memoryCaps,
   renderPersonMemory,
@@ -138,7 +138,10 @@ export async function POST(req: NextRequest) {
         // is the claim: a ledger row with a due date, which the daily run
         // reads. Bounded and wrapped: the 402 is the answer to this request
         // and nothing about email may delay or change it.
-        if (userId) {
+        // Only where email is actually switched on: a claim recorded on a
+        // deployment that never sends is a row that silently blocks the note
+        // for good, since the ledger promises once-ever.
+        if (userId && lifecycleEmailsOn()) {
           const now = Date.now();
           await withTimeout(
             claimLifecycle(userId, 'limit-chats', { now, dueAt: now + LIMIT_DELAY_MS }).catch(() => 'unavailable' as const),

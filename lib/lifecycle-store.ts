@@ -206,14 +206,40 @@ export interface DueRow {
  * first, so a backlog drains in the order it formed.
  */
 export async function dueLimitChats(now: number, limit: number): Promise<DueRow[]> {
+  return dueRows('limit-chats', now, limit);
+}
+
+/** How long a claimed-but-unsent row waits before the cron picks it up. */
+export const STRANDED_MS = 60 * 60 * 1000;
+
+/**
+ * Welcomes that were claimed and never sent.
+ *
+ * The webhook claims the row, then sends inside a short race so Stripe is not
+ * kept waiting; if the instance is frozen before the provider answers, the
+ * row is left claimed with nothing delivered, and every later attempt sees
+ * 'already'. Nothing else would ever look at it — Stripe does not redeliver a
+ * 200, and the subscription events do not send welcomes. So the daily run
+ * sweeps rows claimed more than an hour ago and still unsent.
+ */
+export async function strandedWelcomes(now: number, limit: number): Promise<DueRow[]> {
+  return dueRows('welcome-one', now - STRANDED_MS, limit, 'created_at');
+}
+
+async function dueRows(
+  kind: LifecycleKind,
+  before: number,
+  limit: number,
+  column: 'due_at' | 'created_at' = 'due_at'
+): Promise<DueRow[]> {
   try {
     const { data, error } = await supabaseAdmin()
       .from(TABLE)
       .select('user_id, created_at, due_at, sent_at')
-      .eq('kind', 'limit-chats')
+      .eq('kind', kind)
       .is('sent_at', null)
-      .lte('due_at', now)
-      .order('due_at', { ascending: true })
+      .lte(column, before)
+      .order(column, { ascending: true })
       .limit(limit);
     if (error) {
       if (unavailable(error)) warnOnce('due', error);

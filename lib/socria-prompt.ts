@@ -1621,6 +1621,7 @@ Return ONLY JSON, exactly:
   "openThreads": [{"topic": "unfinished thinking worth returning to, as a short noun phrase", "status": "where their thinking stood, plainly worded", "touched": true, "returnCue": "the message that picks this thread back up, in THEIR voice, first person, ready to send exactly as written — under 12 words"}],
   "newTimelineEvent": "ONE meaningful development from THIS conversation worth recording (a decision made, a real shift in perspective, a milestone, a goal completed) — or null. Most conversations add nothing; trivial or everyday topics NEVER produce an event.",
   "nextQuestions": ["up to 3 things this person would plausibly want to work on NEXT — written as THEY would type them, first person, ready to send exactly as written"],
+  "context": "what THIS exchange is, one word from: deciding, writing, creating, researching, learning, planning, brainstorming, reflecting, analysing, math. Use 'reflecting' whenever the person is working through something personal, emotional, or about themselves — grief, a relationship, a fear, their own worth — even in part.",
   "newEntries": [{"kind": "fact | value | constraint | preference | pattern | decision | insight", "text": "one specific thing about this person, under 15 words, in plain third person — 'Cannot move cities before the lease ends in June'", "confidence": "stated | inferred"}],
   "reinforce": ["handles (m1, m2, …) of known things this conversation confirmed again"],
   "retire": ["handles of known things this conversation shows are no longer true — the person changed their mind, resolved it, or corrected you. At most 3."]
@@ -1632,6 +1633,8 @@ newEntries, reinforce and retire are the durable memory — what Socria will kno
 - Do not re-add something already in the list above: use reinforce for that. Use retire ONLY for a genuine reversal, resolution or correction, never because a topic went quiet.
 - Max 4 newEntries per pass. A conversation that revealed nothing durable produces [].
 - Everyday and practical chats produce no entries at all.
+
+"context" is read before anything else is used. A pass that reports "reflecting" is discarded whole — nothing is learned from it and nothing about it is written down — so answer it about the exchange in front of you and not about the conversation's title or its earlier turns.
 
 nextQuestions is the only part of this that faces the person rather than the model. It fills the chips on their empty screen, and pressing one sends it verbatim, so each has to stand alone as a message.
 
