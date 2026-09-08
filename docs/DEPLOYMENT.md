@@ -240,7 +240,7 @@ and stay silent, which is the point: a branch must never mail real people.
 |---|---|---|---|
 | `LIFECYCLE_EMAILS` | `on` | **unset** | **unset** |
 | `EMAIL_SECRET`, `RESEND_API_KEY`, `EMAIL_FROM` | set | unset | unset |
-| `CRON_SECRET` | set | set or unset (the route no-ops) | unset |
+| `CRON_SECRET` | set | set (the route answers 503 without it) | unset |
 
 The run reports counts by kind and outcome, nothing else — no ids, no
 addresses — and the analytics event it emits (`lifecycle_email_sent`) is

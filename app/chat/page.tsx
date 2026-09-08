@@ -25,6 +25,7 @@ import {
 } from '@/lib/logos-sessions';
 import { DRIFT_DISMISS_LIMIT, readDrift, type DriftVerdict } from '@/lib/topic-drift';
 import { readStart, startMessage } from '@/lib/first-session';
+import { isSource } from '@/lib/checkout-attribution';
 import { track } from '@/lib/analytics';
 import { hasJourneyContent as journeyHasContent } from '@/lib/socria-prompt';
 import {
@@ -768,6 +769,12 @@ export default function ChatPage() {
       if (json?.frozen === true && !(convo.memory?.frozenAt ?? 0)) {
         const userTurns = convo.messages.filter((m) => m.role === 'user').length;
         if (userTurns > 15) nextMemory.frozenAt = userTurns;
+      } else if (convo.memory?.frozenAt && json?.frozen !== true) {
+        // The thread is being carried again — they subscribed, or the plan
+        // resolver had a bad moment. Either way the note is about a boundary
+        // that is not there, and a stale flag would put a free-tier line
+        // about Socria One in front of a member on every reload.
+        delete nextMemory.frozenAt;
       } else if (convo.memory?.frozenAt) {
         nextMemory.frozenAt = convo.memory.frozenAt;
       }
@@ -1382,7 +1389,7 @@ export default function ChatPage() {
     const via = params.get('via');
     if (via) {
       try {
-        sessionStorage.setItem('socria.via.v1', via);
+        if (isSource(via)) sessionStorage.setItem('socria.via.v1', via);
       } catch {}
       const u = new URL(window.location.href);
       u.searchParams.delete('via');
@@ -1393,7 +1400,7 @@ export default function ChatPage() {
     // is said in the thread and the plan is re-read until Stripe's webhook
     // has landed. Counted from the browser too (once per checkout session):
     // the webhook's event arrives as a visit by Stripe.
-    if (params.get('one') === 'welcome' && want !== 'logos') {
+    if (params.get('one') === 'welcome' && want !== 'logos' && readModel() !== 'logos') {
       const sessionId = params.get('session_id');
       const u = new URL(window.location.href);
       u.searchParams.delete('one');
@@ -1416,13 +1423,18 @@ export default function ChatPage() {
           });
         }
       } catch {}
-      let tries = 0;
-      const poll = () => {
-        planState.refresh();
-        tries += 1;
-        if (tries < 6) setTimeout(poll, 1000 * tries);
-      };
-      setTimeout(poll, 800);
+      // Not every branch's usePlan exposes refresh(); where it does not, the
+      // plan is re-read on the next mount and the line says "setting up".
+      const refresh = (planState as { refresh?: () => void }).refresh;
+      if (refresh) {
+        let tries = 0;
+        const poll = () => {
+          refresh();
+          tries += 1;
+          if (tries < 6) setTimeout(poll, 1000 * tries);
+        };
+        setTimeout(poll, 800);
+      }
     }
 
     if (want !== 'logos' && want !== 'core-3' && want !== 'core-2') return;
@@ -1905,7 +1917,12 @@ export default function ChatPage() {
                     {returnChips.map((t) => (
                       <button
                         key={t.topic}
-                        onClick={() => send(t.returnCue!)}
+                        // Into the composer, never sent: the cue is written in
+                        // their voice but they have not seen it yet.
+                        onClick={() => {
+                          setInput(t.returnCue!);
+                          requestAnimationFrame(() => textareaRef.current?.focus());
+                        }}
                         disabled={sending}
                         className="p-4 rounded-xl border border-moss-300/70 bg-moss-50/40 hover:border-moss-600 transition-all text-[14px] text-ink/80 text-left"
                       >
@@ -2053,7 +2070,7 @@ export default function ChatPage() {
             {/* The free tier's thread memory has stopped here. One line, once
                 per conversation, with a ×; no sheet, no trigger — it says
                 what happened and what One does, in the boundary's own voice. */}
-            {active?.memory?.frozenAt && !frozenNoteClosed.has(active.id) && !sending && (
+            {active?.memory?.frozenAt && planState.plan !== 'one' && !frozenNoteClosed.has(active.id) && !sending && (
               <div className="my-4 flex items-center gap-3 px-1 text-[12.5px] text-ink/60" role="note">
                 <span className="font-serif italic flex-1">
                   This is as far as a free thread’s memory reaches. Everything said here stays; Socria One carries a thread as far as it goes.

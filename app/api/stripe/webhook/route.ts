@@ -32,10 +32,14 @@ import { recordAttribution, upsertSubscription, userForCustomer } from '@/lib/su
 import { writeStripeMirror } from '@/lib/socria-one-grant';
 import { attributionFromMetadata, type Attribution } from '@/lib/checkout-attribution';
 import { trackServer } from '@/lib/analytics-server';
+import { tenureBucket } from '@/lib/analytics';
 import { clerkClient } from '@clerk/nextjs/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { forgetPlanMemo } from '@/lib/socria-one-server';
-import { RACE_MS, emailBaseUrl, emailSecret, sendEmail, withTimeout } from '@/lib/email';
+import { emailBaseUrl, emailSecret, sendEmail, withTimeout } from '@/lib/email';
+
+/** How long the welcome may take inside the webhook. Stripe allows far more. */
+const WELCOME_MS = 6000;
 import { lifecycleCopy, lifecycleLink, unsubscribeToken, unsubscribeUrl } from '@/lib/lifecycle';
 import { claimLifecycle, isUnsubscribed, markSent, releaseClaim } from '@/lib/lifecycle-store';
 
@@ -58,12 +62,7 @@ async function tenureFor(userId: string, now: number): Promise<string> {
     const raw = (data as { created_at?: unknown } | null)?.created_at;
     const first = raw ? new Date(String(raw)).getTime() : NaN;
     if (!Number.isFinite(first)) return 'unknown';
-    const days = Math.floor((now - first) / 86_400_000);
-    if (days <= 0) return 'd0';
-    if (days <= 3) return 'd1-3';
-    if (days <= 7) return 'd4-7';
-    if (days <= 30) return 'd8-30';
-    return '30+';
+    return tenureBucket(Math.floor((now - first) / 86_400_000));
   } catch {
     return 'unknown';
   }
@@ -77,13 +76,13 @@ async function tenureFor(userId: string, now: number): Promise<string> {
  * waiting for a 200 and an email is the least important thing happening
  * here; and wrapped so that nothing in it can change the response.
  */
-async function sendWelcome(userId: string, attribution: Attribution, req: NextRequest): Promise<void> {
+async function sendWelcome(userId: string, attribution: Attribution, req: NextRequest): Promise<'done'> {
   try {
     const secret = emailSecret();
-    if (!secret) return;
-    if (await isUnsubscribed(userId)) return;
+    if (!secret) return 'done';
+    if (await isUnsubscribed(userId)) return 'done';
     const claim = await claimLifecycle(userId, 'welcome-one');
-    if (claim !== 'claimed') return;
+    if (claim !== 'claimed') return 'done';
 
     let to = '';
     try {
@@ -92,7 +91,7 @@ async function sendWelcome(userId: string, attribution: Attribution, req: NextRe
     } catch {}
     if (!to) {
       await releaseClaim(userId, 'welcome-one');
-      return;
+      return 'done';
     }
 
     const base = emailBaseUrl();
@@ -104,13 +103,14 @@ async function sendWelcome(userId: string, attribution: Attribution, req: NextRe
     const result = await sendEmail({ to, subject: copy.subject, text: copy.text, html: copy.html, unsubscribeUrl: unsub });
     if (!result.ok) {
       await releaseClaim(userId, 'welcome-one');
-      return;
+      return 'done';
     }
     await markSent(userId, 'welcome-one');
     await trackServer('lifecycle_email_sent', { kind: 'welcome-one', source: 'webhook' }, req);
   } catch (e) {
     console.warn('stripe webhook: welcome email failed', e instanceof Error ? e.message : '');
   }
+  return 'done';
 }
 
 export const runtime = 'nodejs';
@@ -249,9 +249,14 @@ export async function POST(req: NextRequest) {
           },
           req
         );
-        // Last, and bounded: Stripe is waiting, and a welcome that takes
-        // longer than a moment simply goes without being waited for.
-        await withTimeout(sendWelcome(userId, attribution, req), RACE_MS, undefined);
+        // Last, and bounded. Stripe waits a good while for a 200, so the
+        // welcome gets a few seconds rather than the chat route's moment —
+        // a Clerk read and a provider POST fit comfortably. If it still runs
+        // out, the claim is handed back: the function may be frozen the
+        // instant this returns, and a claim left standing with nothing sent
+        // would be a welcome that never goes.
+        const sent = await withTimeout(sendWelcome(userId, attribution, req), WELCOME_MS, 'timeout' as const);
+        if (sent === 'timeout') await releaseClaim(userId, 'welcome-one').catch(() => false);
       } else {
         console.warn('stripe webhook: completed session with no user', session.id);
       }
