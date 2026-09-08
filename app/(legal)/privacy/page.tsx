@@ -23,7 +23,7 @@ export default function PrivacyPage() {
         deleted.
       </p>
       <p className="lg-dates">
-        Effective August 2026 · Last updated August 2026 · Data controller:
+        Effective August 2026 · Last updated September 2026 · Data controller:
         Socria — <a href="mailto:hellosocria@gmail.com">hellosocria@gmail.com</a>
       </p>
 
@@ -94,6 +94,7 @@ export default function PrivacyPage() {
             <tr><td>Running the conversation</td><td>Your messages, sent to our AI provider to generate a reply and to build your map</td></tr>
             <tr><td>Continuity</td><td>Thread memory and the Journey, so a conversation picks up where it left off</td></tr>
             <tr><td>Your account and plan</td><td>Email, sign-in, subscription status</td></tr>
+            <tr><td>Student access</td><td>A verified university email address, to check that it is at a school we have approved &mdash; and for nothing else</td></tr>
             <tr><td>Keeping the service up</td><td>Rate limiting and abuse prevention</td></tr>
             <tr><td>Understanding usage</td><td>Aggregate, privacy-preserving page analytics</td></tr>
           </tbody>
@@ -233,7 +234,9 @@ export default function PrivacyPage() {
           occasional note about your thinking here, such as that a map is where
           you left it; none of them contains anything you wrote, and every one
           carries a link that stops them, as does the switch under{' '}
-          <a href="/account/data">Data &amp; Privacy</a>.
+          <a href="/account/data">Data &amp; Privacy</a>. None is ever
+          addressed to a university address added for{' '}
+          <a href="#students">student access</a>.
         </li>
       </ul>
       <p>
@@ -310,6 +313,61 @@ export default function PrivacyPage() {
         We honour these rights for everyone, wherever you live, rather than
         gating them by jurisdiction. We answer within 30 days, and tell you if
         we need longer and why.
+      </p>
+
+      <h2 id="students">Students</h2>
+      <p>
+        Socria One is free for students at universities we have approved, and
+        the way we check is a <strong>verified</strong> email address at that
+        university &mdash; added to your ordinary account the way anyone adds a
+        second address, and verified by a code sent to it, because anyone can
+        type a domain. The programme runs only where we have switched it on;
+        where it is not running, adding a university address does nothing
+        beyond adding an email address.
+      </p>
+      <p>
+        That address is on your account for <strong>one purpose</strong>: to
+        confirm you are eligible. Specifically, we do not:
+      </p>
+      <ul>
+        <li>
+          <strong>Market to it.</strong> No note Socria sends is ever addressed
+          to a university address. If it is the only address we hold, we send
+          you nothing rather than send it there &mdash; this is enforced in the
+          sending code, not just promised here.
+        </li>
+        <li>
+          <strong>Advertise to you.</strong> We run no advertising, here or
+          anywhere else, and we do not share anything for advertising.
+        </li>
+        <li>
+          <strong>Sell it, or your data, to anyone.</strong> Not to a data
+          broker, not to a list, not to your school.
+        </li>
+        <li>
+          <strong>Tell your university anything.</strong> Not that you have an
+          account, not that you use Socria, and certainly not what you write.
+          There is no report, no dashboard and no channel back to any
+          institution.
+        </li>
+        <li>
+          <strong>Receive anything from them.</strong> We hold no enrolment
+          record, no student record and no education record; nothing about you
+          reaches us from a school.
+        </li>
+        <li>
+          <strong>Treat you differently for it.</strong> Being a student
+          changes the price and nothing else &mdash; not what we collect, not
+          how long we keep it, not what Socria does or how it answers.
+        </li>
+      </ul>
+      <p>
+        Socria is not affiliated with, endorsed by, or acting on behalf of any
+        university. Remove the address from{' '}
+        <a href="/account">your account</a> and the free access ends with it;
+        nothing else about your account changes, and everything you have
+        written stays yours. The age rule below applies to students in exactly
+        the same way as to everyone else.
       </p>
 
       <h2 id="children">Children</h2>
