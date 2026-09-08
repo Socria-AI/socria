@@ -78,6 +78,67 @@ export function dayWindow(kind: 'day-3' | 'day-7', now: number): { from: number;
   return { from: now - (n + 1) * DAY_MS, to: now - n * DAY_MS };
 }
 
+// ── who a note may go to ────────────────────────────────────────────
+//
+// Socria One for students is verified by a university email address. That
+// address is on the account for one purpose — proving eligibility — and a
+// promise not to market to it is worth nothing unless the sender honours it,
+// so the rule lives here rather than only in the privacy policy: no lifecycle
+// note is ever addressed to a university address under the programme. If that
+// is the only address we hold, nothing is sent at all. A person who gave us a
+// student address to get a discount did not give us a mailing list.
+//
+// The domain rule is repeated from lib/socria-edu.ts rather than imported.
+// That file carries the programme's UI and settings and lives only where the
+// programme does; this one ships everywhere the sender does, and a sender that
+// cannot see the rule would quietly ignore it. Where both exist the suite
+// checks they agree.
+
+/** The approved university domains, or none where the programme is off. */
+export function studentDomains(): string[] {
+  return (process.env.SOCRIA_EDU_DOMAINS || '')
+    .split(',')
+    .map((d) => d.trim().toLowerCase().replace(/^[@.]+/, ''))
+    .filter(Boolean);
+}
+
+/**
+ * Is this an address at an approved university?
+ *
+ * Matched on the domain after the LAST "@", as a whole label, so
+ * "mavs.uta.edu.example.com" is not a match and neither is "notmavs.uta.edu" —
+ * a suffix test would accept both, and both are registrable by anyone.
+ */
+export function isStudentAddress(email: unknown, domains = studentDomains()): boolean {
+  if (typeof email !== 'string' || !domains.length) return false;
+  const at = email.lastIndexOf('@');
+  if (at < 0) return false;
+  const host = email.slice(at + 1).trim().toLowerCase().replace(/\.+$/, '');
+  return domains.some((d) => host === d || host.endsWith(`.${d}`));
+}
+
+export interface AddressLike {
+  address: string;
+  primary?: boolean;
+}
+
+/**
+ * The address a lifecycle note may be sent to, or null for "do not send".
+ *
+ * The primary address ordinarily, another one when the primary is a student
+ * address, and nothing at all when every address we hold is one.
+ */
+export function lifecycleAddress(
+  emails: readonly AddressLike[] | null | undefined,
+  domains = studentDomains()
+): string | null {
+  const usable = (emails ?? []).filter(
+    (e) => typeof e?.address === 'string' && e.address.includes('@') && !isStudentAddress(e.address, domains)
+  );
+  if (!usable.length) return null;
+  return (usable.find((e) => e.primary) ?? usable[0]).address;
+}
+
 // ── the decision ────────────────────────────────────────────────────
 
 export interface LifecycleInput {

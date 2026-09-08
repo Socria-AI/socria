@@ -51,6 +51,7 @@ import {
   resetDateFor,
   unsubscribeToken,
   unsubscribeUrl,
+  lifecycleAddress,
   type LifecycleKind,
 } from '@/lib/lifecycle';
 import {
@@ -91,10 +92,14 @@ function authorised(req: NextRequest, secret: string): boolean {
 }
 
 /**
- * Primary email per user id, in batches of a hundred. A user Clerk does
- * not return — deleted since, or the lookup failed — simply has no address
- * and is skipped; the ledger row for them is released so nothing is
- * recorded as sent that was not.
+ * Where a note may go, per user id, in batches of a hundred.
+ *
+ * Not simply the primary address: a university address added for the student
+ * programme is on the account to prove eligibility and for nothing else, so
+ * `lifecycleAddress` skips past it, and answers null when every address we
+ * hold is one. A user Clerk does not return — deleted since, or the lookup
+ * failed — has no address either; both are skipped, and the ledger row is
+ * released so nothing is recorded as sent that was not.
  */
 async function addressesFor(userIds: string[]): Promise<Map<string, string>> {
   const out = new Map<string, string>();
@@ -103,9 +108,13 @@ async function addressesFor(userIds: string[]): Promise<Map<string, string>> {
     try {
       const { data } = await clerkClient().users.getUserList({ userId: batch, limit: CLERK_BATCH });
       for (const u of data) {
-        const primary =
-          u.emailAddresses.find((e) => e.id === u.primaryEmailAddressId) ?? u.emailAddresses[0];
-        if (primary?.emailAddress) out.set(u.id, primary.emailAddress);
+        const to = lifecycleAddress(
+          u.emailAddresses.map((e) => ({
+            address: e.emailAddress,
+            primary: e.id === u.primaryEmailAddressId,
+          }))
+        );
+        if (to) out.set(u.id, to);
       }
     } catch (e) {
       console.warn('lifecycle cron: clerk lookup failed for a batch', e instanceof Error ? e.message : '');
