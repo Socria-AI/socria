@@ -148,6 +148,42 @@ export async function upsertSubscription(row: {
   }
 }
 
+/**
+ * Which moment led to this subscription, kept beside it.
+ *
+ * Analytics answers "how many"; this answers "which of THESE people came from
+ * the map filling up" in a query, months later, without the analytics
+ * provider. Best effort, and tolerant of a database that has not run the
+ * migration adding the columns: attribution is bookkeeping, and bookkeeping
+ * never gets to make a webhook fail — the entitlement write that matters
+ * happens before this is called and is retried on its own terms.
+ */
+let warnedAttribution = false;
+export async function recordAttribution(
+  userId: string,
+  a: { trigger?: string; surface?: string }
+): Promise<void> {
+  if (!a.trigger && !a.surface) return;
+  try {
+    const { error } = await supabaseAdmin()
+      .from('socria_subscriptions')
+      .update({
+        attributed_trigger: a.trigger ?? null,
+        attributed_surface: a.surface ?? null,
+      })
+      .eq('user_id', userId);
+    if (error && !warnedAttribution) {
+      warnedAttribution = true;
+      console.warn(
+        'recordAttribution: could not write (run supabase/schema.sql for the attributed_* columns):',
+        error.message
+      );
+    }
+  } catch {
+    // Supabase not configured. Nothing to record into.
+  }
+}
+
 /** Find the user a Stripe customer belongs to, for webhook events. */
 export async function userForCustomer(customerId: string): Promise<string | null> {
   try {

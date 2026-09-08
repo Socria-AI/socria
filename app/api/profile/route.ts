@@ -78,7 +78,26 @@ export async function PUT(req: NextRequest) {
       row.profile = sanitizeImportedProfile(b.profile);
     }
     if ('understanding' in b) {
-      row.understanding = sanitizeUserUnderstanding(b.understanding);
+      // The journey fields are the client's to sync. The ENTRIES and the
+      // tombstones are not: the server merges those in
+      // /api/update-understanding and forgets them in /api/profile/forget,
+      // and a client posting its own copy — a stale tab, an older bundle —
+      // would wipe or resurrect them. So the row's entries are kept, whatever
+      // the body says. If the row cannot be read, nothing is written rather
+      // than risk writing a journey with the entries missing; the client
+      // syncs again on its next turn.
+      const incoming = sanitizeUserUnderstanding(b.understanding);
+      const { data: cur, error: readError } = await supabaseAdmin()
+        .from('user_profiles')
+        .select('understanding')
+        .eq('user_id', userId)
+        .maybeSingle();
+      if (readError) {
+        console.error('PUT profile: could not read the current understanding', readError);
+        return NextResponse.json({ error: readError.message }, { status: 500 });
+      }
+      const held = sanitizeUserUnderstanding((cur as { understanding?: unknown } | null)?.understanding);
+      row.understanding = { ...incoming, entries: held.entries, forgotten: held.forgotten };
     }
     const { error } = await supabaseAdmin()
       .from('user_profiles')

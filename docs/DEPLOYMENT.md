@@ -215,6 +215,58 @@ Setup steps for all of this are in `docs/PRIVATE-DEV.md`, and the
 dashboard-by-dashboard checklist — including which variables go in which
 Vercel scope — is in `docs/MANUAL-SETUP.md`.
 
+## Lifecycle email
+
+Socria sends a handful of notes on its own — a welcome when someone joins
+One, the boundary's own words a day after a free line of thinking was
+refused, and "your maps are where you left them" three and seven days after
+a first session. The rules are in `lib/lifecycle.ts`; the ledger that makes
+each one once-ever is `lifecycle_emails` in `supabase/schema.sql`, which
+also defines the `lifecycle_candidates` function the daily run reads. Both
+are in the same file as every other migration; run it as usual.
+
+`vercel.json` schedules `GET /api/cron/lifecycle` once a day (15:00 UTC).
+Vercel presents `CRON_SECRET` as a bearer token on that request; the route
+answers 503 without the variable and 401 without the token, and never sends
+from a request it cannot verify.
+
+**Off by default, everywhere.** Nothing is sent unless `LIFECYCLE_EMAILS`
+reads exactly `on`, and then only when `EMAIL_SECRET` (signs the unsubscribe
+links) and `RESEND_API_KEY` are also set. Set all three on **Production
+only**. A preview with production's keys copied into it will run the cron
+and stay silent, which is the point: a branch must never mail real people.
+
+| | Production | Preview / staging | Local |
+|---|---|---|---|
+| `LIFECYCLE_EMAILS` | `on` | **unset** | **unset** |
+| `EMAIL_SECRET`, `RESEND_API_KEY`, `EMAIL_FROM` | set | unset | unset |
+| `CRON_SECRET` | set | set or unset (the route no-ops) | unset |
+
+The run reports counts by kind and outcome, nothing else — no ids, no
+addresses — and the analytics event it emits (`lifecycle_email_sent`) is
+the kind and the word `cron`. Every note carries a signed unsubscribe link
+and the `List-Unsubscribe` headers; the switch a person sees under Data &
+Privacy writes the same row the link does.
+
+**Rehearse before the switch goes on.** Vercel cron runs on production
+only, so the candidate query's first real execution would otherwise be the
+one that emails people. Two aids, both in the route:
+
+```
+curl -H "Authorization: Bearer $CRON_SECRET" "https://<deployment>/api/cron/lifecycle?dry=1"
+```
+
+runs the whole selection and every decision and sends nothing — the answer
+is counts per kind (`would-send`, `too-early`, `not-quiet`, …). It works
+with `LIFECYCLE_EMAILS` unset. Then `LIFECYCLE_TEST_USER_IDS=<your id>`
+restricts real sends to the listed accounts, so the first live run on a
+preview reaches one person on the team. Only when both have been seen to
+behave does the switch go on in production, with the allow-list removed.
+
+Whether the day-3 and day-7 notes should be opt-in rather than opt-out for
+people in the EU and UK has not been decided; that is why the switch ships
+off. Turn it on when it has.
+
 ---
 
 ## What CI does not do, and why

@@ -12,6 +12,7 @@ import { auth } from '@clerk/nextjs/server';
 import { isValidOneKey } from '@/lib/socria-one';
 import { grantComplimentary } from '@/lib/subscriptions';
 import { writeAccountGrant } from '@/lib/socria-one-grant';
+import { forgetPlanMemo } from '@/lib/socria-one-server';
 import { enforceRateLimit } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
@@ -35,6 +36,9 @@ export async function POST(req: NextRequest) {
     // redeem, this write can land. It is what resolvePlanForRequest reads.
     try {
       await writeAccountGrant(userId);
+      // The instance that redeemed the code must not keep answering 'free'
+      // from its memo for the next half minute.
+      forgetPlanMemo(userId);
       account = true;
     } catch (e) {
       console.error('redeem: could not write Clerk grant', e);

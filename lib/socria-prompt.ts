@@ -3,6 +3,15 @@
 
 import { WHY_NOT_ANSWER } from './why-not-answer';
 import { WRONG_CHAT } from './wrong-chat';
+import type { ThinkingContext } from './logos';
+import { THINKING_CONTEXTS } from './logos';
+import {
+  renderEntriesForExtractor,
+  renderPersonMemory,
+  sanitizeEntries,
+  sanitizeForgotten,
+  type MemoryEntry,
+} from './person-memory';
 
 import type { SynthesisData } from './synthesis';
 
@@ -1445,6 +1454,13 @@ export interface JourneyThread {
   topic: string; // "whether to launch the private beta"
   status: string; // "was leaning toward launching after fixing onboarding"
   lastTouched: number; // ms timestamp
+  /**
+   * The message that picks this thread back up, in the person's own voice,
+   * ready to send exactly as written. `status` is written for the model, in
+   * the third person; read aloud on the empty screen it sounded like notes
+   * about the person being recited. This is the half that faces them.
+   */
+  returnCue?: string;
 }
 
 export interface JourneyEvent {
@@ -1468,6 +1484,15 @@ export interface UserUnderstanding {
    * back into the conversation would be Socria taking its own advice.
    */
   nextQuestions: string[];
+  /**
+   * The durable, typed things Socria knows about this person — the layer
+   * between a thread's memory and the narrative. Owned by the server: the
+   * client never writes these, only asks for one to be forgotten. See
+   * lib/person-memory.ts.
+   */
+  entries: MemoryEntry[];
+  /** fingerprints of entries the person asked us to forget; only ever grows */
+  forgotten: string[];
   updatedAt: number;
 }
 
@@ -1476,12 +1501,18 @@ export const EMPTY_UNDERSTANDING: UserUnderstanding = {
   openThreads: [],
   timeline: [],
   nextQuestions: [],
+  entries: [],
+  forgotten: [],
   updatedAt: 0,
 };
 
-const MAX_NARRATIVE = 5;
-const MAX_THREADS = 4;
-const MAX_TIMELINE = 14;
+// STORAGE caps, and they are the larger plan's. What a plan carries into a
+// conversation is decided at read time (lib/person-memory.ts memoryCaps);
+// storing at the smaller cap would destroy a lapsed member's journey on the
+// first sync after their card failed.
+const MAX_NARRATIVE = 8;
+const MAX_THREADS = 6;
+const MAX_TIMELINE = 40;
 const MAX_NEXT = 3;
 
 export function sanitizeUserUnderstanding(raw: any): UserUnderstanding {
@@ -1493,12 +1524,16 @@ export function sanitizeUserUnderstanding(raw: any): UserUnderstanding {
     .filter(Boolean)
     .slice(0, MAX_NARRATIVE);
   const openThreads = (Array.isArray(raw.openThreads) ? raw.openThreads : [])
-    .map((t: any) => ({
-      topic: line(t?.topic, 140),
-      status: line(t?.status, 200),
-      lastTouched:
-        typeof t?.lastTouched === 'number' && t.lastTouched > 0 ? t.lastTouched : 0,
-    }))
+    .map((t: any) => {
+      const returnCue = line(t?.returnCue, 140);
+      return {
+        topic: line(t?.topic, 140),
+        status: line(t?.status, 200),
+        lastTouched:
+          typeof t?.lastTouched === 'number' && t.lastTouched > 0 ? t.lastTouched : 0,
+        ...(returnCue ? { returnCue } : {}),
+      };
+    })
     .filter((t: JourneyThread) => t.topic)
     .slice(0, MAX_THREADS);
   const nextQuestions = (Array.isArray(raw.nextQuestions) ? raw.nextQuestions : [])
@@ -1518,6 +1553,8 @@ export function sanitizeUserUnderstanding(raw: any): UserUnderstanding {
     openThreads,
     nextQuestions,
     timeline,
+    entries: sanitizeEntries(raw.entries),
+    forgotten: sanitizeForgotten(raw.forgotten),
     updatedAt:
       typeof raw.updatedAt === 'number' && raw.updatedAt > 0 ? raw.updatedAt : 0,
   };
@@ -1525,8 +1562,23 @@ export function sanitizeUserUnderstanding(raw: any): UserUnderstanding {
 
 export function hasJourneyContent(u: UserUnderstanding | null | undefined): boolean {
   if (!u) return false;
-  return u.narrative.length > 0 || u.openThreads.length > 0 || u.timeline.length > 0;
+  return (
+    u.narrative.length > 0 ||
+    u.openThreads.length > 0 ||
+    u.timeline.length > 0 ||
+    (u.entries?.length ?? 0) > 0
+  );
 }
+
+/** What a plan injects of the journey. Storage keeps the larger caps. */
+export interface JourneyLimits {
+  narrative: number;
+  threads: number;
+  timeline: number;
+}
+
+/** The free tier's view, and the default when nobody says otherwise. */
+export const FREE_JOURNEY_LIMITS: JourneyLimits = { narrative: 5, threads: 4, timeline: 14 };
 
 // Extractor system prompt for /api/update-understanding. Returns narrative +
 // openThreads as full replacements and at most ONE new timeline event; the
@@ -1535,8 +1587,11 @@ export function buildJourneyExtractorPrompt(
   current: UserUnderstanding,
   conversationTitle: string | null,
   memoryBlock: string,
-  recentExchange: string
+  recentExchange: string,
+  /** the surface this pass runs from, for the entries' provenance wording */
+  surface: 'core' | 'logos' = 'core'
 ): string {
+  const entriesBlock = renderEntriesForExtractor(current.entries ?? []);
   const currentBlock = hasJourneyContent(current)
     ? `Current understanding (evolve it — replace stale lines, don't accumulate):
 Narrative:
@@ -1551,19 +1606,32 @@ ${current.timeline.map((e) => `- ${e.event}`).join('\n') || '- (none)'}`
 
 ${currentBlock}
 
+Things already known about this person (each has a handle you can refer to):
+${entriesBlock}
+
 ${conversationTitle ? `Current conversation: "${conversationTitle}"` : ''}
 Conversation memory so far:
 ${memoryBlock || '(none)'}
-Recent exchange:
+Recent exchange (${surface === 'logos' ? 'in Logos, the reasoning environment' : 'in Socria chat'}):
 ${recentExchange}
 
 Return ONLY JSON, exactly:
 {
   "narrative": ["up to 5 short lines — the evolving understanding of this person's thinking. Full replacement: rewrite, merge, and drop stale lines. Capture HOW they think and what they're genuinely working through, confidence shifts included."],
-  "openThreads": [{"topic": "unfinished thinking worth returning to, as a short noun phrase", "status": "where their thinking stood, plainly worded", "touched": true}],
+  "openThreads": [{"topic": "unfinished thinking worth returning to, as a short noun phrase", "status": "where their thinking stood, plainly worded", "touched": true, "returnCue": "the message that picks this thread back up, in THEIR voice, first person, ready to send exactly as written — under 12 words"}],
   "newTimelineEvent": "ONE meaningful development from THIS conversation worth recording (a decision made, a real shift in perspective, a milestone, a goal completed) — or null. Most conversations add nothing; trivial or everyday topics NEVER produce an event.",
-  "nextQuestions": ["up to 3 things this person would plausibly want to work on NEXT — written as THEY would type them, first person, ready to send exactly as written"]
+  "nextQuestions": ["up to 3 things this person would plausibly want to work on NEXT — written as THEY would type them, first person, ready to send exactly as written"],
+  "newEntries": [{"kind": "fact | value | constraint | preference | pattern | decision | insight", "text": "one specific thing about this person, under 15 words, in plain third person — 'Cannot move cities before the lease ends in June'", "confidence": "stated | inferred"}],
+  "reinforce": ["handles (m1, m2, …) of known things this conversation confirmed again"],
+  "retire": ["handles of known things this conversation shows are no longer true — the person changed their mind, resolved it, or corrected you. At most 3."]
 }
+
+newEntries, reinforce and retire are the durable memory — what Socria will know about this person in every future conversation, on every surface, until they ask for it to be forgotten.
+- SPECIFIC and DURABLE. "Has two children under five" is an entry; "is busy today" is not. "Compares several options before deciding" is a pattern; "asked a question" is not.
+- STATED means they said it in so many words. INFERRED means it is a fair reading of what they said. Never invent, never speculate; when unsure, leave it out.
+- Do not re-add something already in the list above: use reinforce for that. Use retire ONLY for a genuine reversal, resolution or correction, never because a topic went quiet.
+- Max 4 newEntries per pass. A conversation that revealed nothing durable produces [].
+- Everyday and practical chats produce no entries at all.
 
 nextQuestions is the only part of this that faces the person rather than the model. It fills the chips on their empty screen, and pressing one sends it verbatim, so each has to stand alone as a message.
 
@@ -1596,9 +1664,14 @@ export function renderJourneyBrief(u: UserUnderstanding): string {
 // Rendered injection for Core 3.1's system prompt.
 export function renderJourneyForPrompt(
   u: UserUnderstanding,
-  conversationStart: boolean
+  conversationStart: boolean,
+  limits: JourneyLimits = FREE_JOURNEY_LIMITS
 ): string {
   const now = Date.now();
+  const narrative = u.narrative.slice(0, limits.narrative);
+  const threads = u.openThreads.slice(0, limits.threads);
+  // The most recent developments are the ones worth the prompt space.
+  const timeline = u.timeline.slice(-limits.timeline);
   const ago = (ts: number) => {
     if (!ts) return '';
     const d = Math.max(0, Math.round((now - ts) / 86400000));
@@ -1636,26 +1709,26 @@ export function renderJourneyForPrompt(
     '- Never mention a journey, timeline, profile, or any stored system. No "according to my notes". It should simply feel like you remember.'
   );
   lines.push('- Never guilt them for time away or pressure them to continue anything.');
-  if (u.narrative.length) {
+  if (narrative.length) {
     lines.push('');
     lines.push('Understanding so far:');
-    u.narrative.forEach((n) => lines.push(`- ${n}`));
+    narrative.forEach((n) => lines.push(`- ${n}`));
   }
-  if (u.openThreads.length) {
+  if (threads.length) {
     lines.push('');
     lines.push('Open threads (unfinished thinking they may want to pick back up):');
-    u.openThreads.forEach((t) =>
+    threads.forEach((t) =>
       lines.push(
         `- ${t.topic} — ${t.status}${t.lastTouched ? ` (${ago(t.lastTouched)})` : ''}`
       )
     );
   }
-  if (u.timeline.length) {
+  if (timeline.length) {
     lines.push('');
     lines.push('Their journey so far (meaningful developments, oldest first):');
-    u.timeline.forEach((e) => lines.push(`- ${month(e.at)}: ${e.event}`));
+    timeline.forEach((e) => lines.push(`- ${month(e.at)}: ${e.event}`));
   }
-  if (conversationStart && u.openThreads.length) {
+  if (conversationStart && threads.length) {
     lines.push('');
     lines.push(
       'This is the START of a new conversation. If their opener relates to an open thread — or is open-ended ("hey", "I\'m back") — a natural check-in is a strong first move: "Last time we talked, you were deciding whether to launch the private beta. Did you end up moving forward?" A check-in like this COUNTS as establishing the actual question and satisfies the one-question budget. If they arrive with something new, follow them; never drag them back.'
@@ -1749,6 +1822,21 @@ export interface ConversationMemory {
   // cooldown so it re-synthesizes as the conversation grows.
   latestSynthesis?: SynthesisData | null;
   lastSynthesisAtTurn?: number;
+  /**
+   * The kind of thinking this conversation is, read by the thread extractor
+   * on the same vocabulary the Logos map uses. Core had no such signal, which
+   * meant nothing on this surface could tell a reflective conversation from a
+   * practical one — and a reflective one is where a prompt about Socria One
+   * must never appear, and where what is learned about the person stays
+   * private. See lib/one-prompt.ts SENSITIVE_CONTEXTS.
+   */
+  context?: ThinkingContext;
+  /**
+   * The person's turn at which the free tier's thread memory stopped and the
+   * one quiet note about it was shown. Set by the client, preserved by the
+   * extractor, so the note is shown once per conversation and never again.
+   */
+  frozenAt?: number;
 }
 
 export interface Insight {
@@ -1865,7 +1953,15 @@ export function buildSystemPrompt(
   journey?: {
     understanding: UserUnderstanding | null;
     conversationStart: boolean;
-  } | null
+    /** what this plan carries of the journey; the free view by default */
+    limits?: JourneyLimits;
+  } | null,
+  /**
+   * The person-memory entries chosen for THIS conversation — already
+   * selected and capped by the caller against the plan (see
+   * lib/person-memory.ts selectRelevant). Rendered beside the journey.
+   */
+  personMemory?: readonly MemoryEntry[] | null
 ): { prompt: string; model: SocriaModel; depth: ThinkingDepth } {
   const model = resolveModel(modelInput);
   const depth = resolveDepth(depthInput);
@@ -1899,8 +1995,13 @@ export function buildSystemPrompt(
   if (journey?.understanding && hasJourneyContent(journey.understanding)) {
     prompt += renderJourneyForPrompt(
       journey.understanding,
-      journey.conversationStart
+      journey.conversationStart,
+      journey.limits ?? FREE_JOURNEY_LIMITS
     );
+  }
+
+  if (personMemory && personMemory.length) {
+    prompt += renderPersonMemory(personMemory, 'core');
   }
 
   return { prompt, model, depth };
@@ -2058,6 +2159,7 @@ Memory categories:
 - insights: realizations the user has reached during this conversation.
 - emergingUnderstanding: SOCRIA'S own evolving read of how they are thinking. Two or three short observations — provisional in content, plain in wording (no "appears/seems" padding; these are working notes, not claims). Drop stale entries when new information contradicts them. Max 3 items.
 - thinkingStyle: recurring REASONING patterns the user shows — how they think, not what they think. Examples: "prefers first-principles reasoning", "compares multiple possibilities before deciding", "seeks certainty before acting", "often reframes problems", "weighs long-term consequences". Only include patterns that have appeared REPEATEDLY. Never guess from a single turn. Max 6 items.
+- context: the KIND of thinking this conversation is, as one word from: ${THINKING_CONTEXTS.join(', ')}. "reflecting" means the person is working through something personal, emotional, or about themselves — grief, a relationship, a fear, their own worth. Choose it whenever that is true even in part; it is used only to keep such conversations quieter and more private. "math" only for actual mathematics. If nothing fits, use "analysing".
 
 ${titleRule}
 
@@ -2080,6 +2182,7 @@ Rules:
   "insights": string[],
   "emergingUnderstanding": string[],
   "thinkingStyle": string[],
+  "context": string,
   "suggestedTitle": string | null
 }
 
@@ -2140,8 +2243,8 @@ export function sanitizeSynthesisData(input: any): SynthesisData | null {
   return { title, sections };
 }
 
-export function sanitizeMemory(input: any): ConversationMemory {
-  const arr = (v: any, max = 10): string[] => {
+export function sanitizeMemory(input: any, itemsPerCategory = 10): ConversationMemory {
+  const arr = (v: any, max = itemsPerCategory): string[] => {
     if (!Array.isArray(v)) return [];
     return v
       .filter((x) => typeof x === 'string')
@@ -2173,6 +2276,10 @@ export function sanitizeMemory(input: any): ConversationMemory {
       typeof input?.lastSynthesisAtTurn === 'number'
         ? Math.max(0, Math.floor(input.lastSynthesisAtTurn))
         : 0,
+    ...(THINKING_CONTEXTS.includes(input?.context) ? { context: input.context as ThinkingContext } : {}),
+    ...(typeof input?.frozenAt === 'number' && input.frozenAt > 0
+      ? { frozenAt: Math.floor(input.frozenAt) }
+      : {}),
   };
 }
 

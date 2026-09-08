@@ -73,6 +73,10 @@ export const TRIGGER_REASONS = [
   'lenses-locked',
   'draft-locked',
   'connections-locked',
+  // high — a success, not a boundary: the map on screen just took a shape.
+  // Nobody asked, so it clears the same engagement bar as returning-thinker,
+  // and it is one boundary with map-full (see FAMILY below).
+  'map-shaped',
   // medium — nobody asked; must clear the engagement bar as well
   'returning-thinker',
   // low — they pressed the button that says Socria One
@@ -198,6 +202,21 @@ export const TRIGGERS: Record<TriggerReason, TriggerSpec> = {
       'into the thinking rather than around it.',
   },
 
+  'map-shaped': {
+    category: 'proactive',
+    intent: 'high',
+    title: 'This map has a shape now',
+    // It promises MEMORY, deliberately. Growth is map-full's promise, three
+    // nodes later, and one map must not be sold the same thing twice. What a
+    // shaped map makes true is that there is now an assumption on it worth
+    // recognising the next time it appears — which is the thing Socria One
+    // carries into Logos.
+    body:
+      'The assumption this line of thinking leans on is the kind of thing Logos can ' +
+      'recognise the next time it appears. Socria One remembers how you reason ' +
+      'between lines of thinking, and carries it into Logos.',
+  },
+
   'returning-thinker': {
     category: 'proactive',
     intent: 'medium',
@@ -302,6 +321,26 @@ export interface Engagement {
  */
 export const SENSITIVE_CONTEXTS: readonly ThinkingContext[] = ['reflecting'];
 
+/**
+ * Triggers that are one boundary wearing two names.
+ *
+ * map-shaped (node 5) and map-full (node 8) are three nodes apart on the same
+ * map. Whichever is said first has said it; the other is then 'said-already'
+ * in that tab, exactly as pressing the same exhausted control twice is.
+ */
+export const FAMILY: Partial<Record<TriggerReason, readonly TriggerReason[]>> = {
+  'map-shaped': ['map-full'],
+  'map-full': ['map-shaped'],
+};
+
+function saidAlready(state: PromptState, reason: TriggerReason): boolean {
+  if (state.shownTriggers.includes(reason)) return true;
+  return (FAMILY[reason] ?? []).some((r) => state.shownTriggers.includes(r));
+}
+
+/** No proactive prompt within this of the last one, whatever tab showed it. */
+export const PROACTIVE_FLOOR_MS = DAY_MS;
+
 // ── the decision ────────────────────────────────────────────────────
 
 export interface PromptState {
@@ -311,6 +350,14 @@ export interface PromptState {
   lastDismissedAt: number;
   /** when any prompt was last shown */
   lastShownAt: number;
+  /**
+   * When a PROACTIVE prompt was last shown, in any tab.
+   *
+   * The session cap is per tab by construction (sessionStorage), which meant
+   * two tabs were two prompts. This is the floor under it: however many tabs
+   * are open, nobody who was not asking is asked twice in a day.
+   */
+  lastProactiveAt: number;
   /** proactive prompts shown in this browser session */
   shownThisSession: number;
   /**
@@ -329,6 +376,7 @@ export const EMPTY_PROMPT_STATE: PromptState = {
   dismissals: 0,
   lastDismissedAt: 0,
   lastShownAt: 0,
+  lastProactiveAt: 0,
   shownThisSession: 0,
   shownTriggers: [],
 };
@@ -336,6 +384,8 @@ export const EMPTY_PROMPT_STATE: PromptState = {
 export type SuppressReason =
   | 'has-one'
   | 'session-cap'
+  /** a proactive prompt was shown in the last day, in some tab */
+  | 'daily-floor'
   | 'cooldown'
   | 'sensitive-context'
   | 'not-engaged'
@@ -400,7 +450,7 @@ export function decide(input: DecideInput): Decision {
     // behaviour the rest of this file exists to prevent. The allowance
     // panel and the boundary note say the same sentence, in place, for as
     // long as it is true.
-    if (state.shownTriggers.includes(reason)) return no('said-already');
+    if (saidAlready(state, reason)) return no('said-already');
     return yes();
   }
 
@@ -412,7 +462,14 @@ export function decide(input: DecideInput): Decision {
 
   // ── from here down: nobody asked ──────────────────────────────────
 
+  // A family member already spoke in this tab: map-shaped after map-full is
+  // the same map being sold twice.
+  if (saidAlready(state, reason)) return no('said-already');
+
   if (state.shownThisSession >= 1) return no('session-cap');
+  if (state.lastProactiveAt > 0 && now - state.lastProactiveAt < PROACTIVE_FLOOR_MS) {
+    return no('daily-floor');
+  }
 
   if (state.dismissals > 0) {
     const until = state.lastDismissedAt + cooldownMs(state.dismissals);

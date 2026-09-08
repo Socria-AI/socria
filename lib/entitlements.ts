@@ -64,8 +64,13 @@ export interface Limits {
   readonly allDepths: boolean;
   /** the map keeps re-organising itself as the conversation moves */
   readonly liveMap: boolean;
-  /** how many turns of the conversation memory carries */
+  /** how many turns of a conversation its thread memory carries */
   readonly memoryTurns: number | null;
+  /**
+   * how many things Socria keeps about the person across conversations —
+   * the entries in lib/person-memory.ts. Evicted by score past this.
+   */
+  readonly memoryEntries: number | null;
   /** attachments a single message may carry */
   readonly attachmentsPerMessage: number;
 }
@@ -92,6 +97,7 @@ export const PLANS: Record<Plan, Limits> = {
     allDepths: false,
     liveMap: false,
     memoryTurns: 12,
+    memoryEntries: 12,
     attachmentsPerMessage: 2,
   },
   one: {
@@ -109,6 +115,7 @@ export const PLANS: Record<Plan, Limits> = {
     allDepths: true,
     liveMap: true,
     memoryTurns: null,
+    memoryEntries: 160,
     attachmentsPerMessage: 6,
   },
 };

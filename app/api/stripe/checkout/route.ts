@@ -11,6 +11,7 @@ import { isMissingCustomer, priceIdProblem, stripeFailure } from '@/lib/stripe-d
 import { getSubscription, isCompCustomer, tryUpsertSubscription } from '@/lib/subscriptions';
 import { enforceRateLimit } from '@/lib/rate-limit';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
+import { attributionMetadata, readAttribution } from '@/lib/checkout-attribution';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -24,6 +25,15 @@ export async function POST(req: NextRequest) {
   }
   const limited = await enforceRateLimit(req, userId, 'aux');
   if (limited) return limited;
+
+  // Which moment led here — the prompt's trigger and the screen it was on.
+  // Validated against a fixed allow-list, so what reaches Stripe is a short
+  // token and never anything the person typed. It rides in the session's
+  // metadata and comes back on the webhook, where the payment is counted
+  // against the trigger that earned it. The body is optional: the One page
+  // and the account card send only a surface, and a bare POST still works.
+  const attribution = readAttribution(await req.json().catch(() => null));
+  const attributionMeta = attributionMetadata(attribution);
 
   if (!stripeConfigured()) {
     return NextResponse.json(
@@ -142,8 +152,8 @@ export async function POST(req: NextRequest) {
         // checkout.session.completed, the subscription for every later
         // lifecycle event.
         client_reference_id: userId,
-        metadata: { clerkUserId: userId },
-        subscription_data: { metadata: { clerkUserId: userId } },
+        metadata: { clerkUserId: userId, ...attributionMeta },
+        subscription_data: { metadata: { clerkUserId: userId, ...attributionMeta } },
         allow_promotion_codes: true,
         success_url: `${base}/chat?one=welcome&session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${base}/chat?one=cancelled`,
