@@ -244,9 +244,19 @@ export function DemoLimitsTable() {
             <td>{one.liveMap ? 'Yes' : '—'}</td>
           </tr>
           <tr>
-            <td>Turns the memory carries</td>
+            <td>Turns a thread&rsquo;s memory carries</td>
             <td>{cap(free.memoryTurns)}</td>
             <td>{oneCap(one.memoryTurns)}</td>
+          </tr>
+          <tr>
+            <td>Things Socria carries about you into a conversation</td>
+            <td>{cap(free.memoryEntries)}</td>
+            <td>All of them</td>
+          </tr>
+          <tr>
+            <td>Logos remembers how you reason between lines of thinking</td>
+            <td>Your two strongest patterns</td>
+            <td>Everything, with the journey</td>
           </tr>
           <tr>
             <td>Attachments on one message</td>

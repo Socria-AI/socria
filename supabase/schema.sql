@@ -87,6 +87,15 @@ create table if not exists socria_subscriptions (
   created_at timestamptz not null default now()
 );
 
+-- Which moment led to the subscription — the prompt trigger ('map-full',
+-- 'explore-spent') and the surface it was on ('logos', 'one-page'). Short
+-- tokens from a fixed allow-list (lib/checkout-attribution.ts), never free
+-- text. Written best-effort by the webhook; the entitlement never waits on it.
+alter table socria_subscriptions
+  add column if not exists attributed_trigger text;
+alter table socria_subscriptions
+  add column if not exists attributed_surface text;
+
 create index if not exists socria_subscriptions_customer_idx
   on socria_subscriptions (stripe_customer_id);
 
@@ -130,3 +139,72 @@ begin
   return out_n;
 end;
 $$;
+
+-- Lifecycle email: the ledger of who has had which note, and who has said
+-- stop.
+--
+-- One row per (person, kind), and the primary key is the idempotency: a
+-- sender INSERTS first and sends only if the insert went in, so two crons
+-- overlapping or a webhook retried by Stripe collide on the key and only one
+-- of them sends. `due_at` is for the deferred kinds (limit-chats is claimed
+-- at the refusal and sent a day later); `sent_at` is set once the provider
+-- accepted it, and an unsent row is deleted when the provider refused.
+--
+-- The opt-out is a row too, with kind = 'unsubscribed'. Same table, so a
+-- database that can send can record a refusal without a second migration.
+-- Holds ids and timestamps only — never an address, never content.
+create table if not exists lifecycle_emails (
+  user_id text not null,
+  kind text not null,
+  created_at bigint not null,
+  due_at bigint,
+  sent_at bigint,
+  primary key (user_id, kind)
+);
+
+-- The cron reads "due and unsent" by kind; without this it scans the table.
+create index if not exists lifecycle_emails_due_idx
+  on lifecycle_emails (kind, due_at)
+  where sent_at is null;
+
+-- Who the day-N notes may go to, decided in the database rather than by
+-- reading every conversation into the application to find two hundred people.
+--
+-- A candidate's FIRST conversation was made in [p_from, p_to) — the window
+-- for "between N and N+1 days in" — and nothing of theirs has changed for a
+-- day (max(updated_at) < p_now - 24h): a note that lands while the person is
+-- still working is noise. The anti-join drops anyone who has had this kind
+-- already, or who has said stop. The kind is a parameter so day-3 and day-7
+-- share one function and one set of rules.
+--
+-- Times are epoch milliseconds (bigint) throughout, matching updated_at and
+-- the rest of the ledger; created_at is a timestamptz and is converted.
+create or replace function lifecycle_candidates(
+  p_kind text, p_from bigint, p_to bigint, p_now bigint, p_limit integer
+) returns table (user_id text, first_at bigint, last_at bigint)
+language plpgsql
+stable
+as $$
+begin
+  return query
+    select c.user_id,
+           (extract(epoch from min(c.created_at)) * 1000)::bigint as first_at,
+           max(c.updated_at)::bigint as last_at
+      from conversations c
+     where not exists (
+             select 1 from lifecycle_emails l
+              where l.user_id = c.user_id
+                and l.kind in (p_kind, 'unsubscribed')
+           )
+     group by c.user_id
+    having (extract(epoch from min(c.created_at)) * 1000)::bigint >= p_from
+       and (extract(epoch from min(c.created_at)) * 1000)::bigint <  p_to
+       and max(c.updated_at) < p_now - 86400000
+     order by first_at
+     limit p_limit;
+end;
+$$;
+
+-- The grouping above walks conversations by person and first date.
+create index if not exists conversations_user_created_idx
+  on conversations (user_id, created_at);

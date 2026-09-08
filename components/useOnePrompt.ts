@@ -29,6 +29,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  bestTrigger,
   decide,
   engagementFrom,
   EMPTY_PROMPT_STATE,
@@ -53,6 +54,9 @@ function readLocal(): PromptState {
       dismissals: Number(j.dismissals) || 0,
       lastDismissedAt: Number(j.lastDismissedAt) || 0,
       lastShownAt: Number(j.lastShownAt) || 0,
+      // Local, not per tab: the floor under the session cap. Two tabs used to
+      // be two prompts.
+      lastProactiveAt: Number(j.lastProactiveAt) || 0,
       // Neither of these is persisted here; sessionStorage owns both.
       shownThisSession: 0,
       shownTriggers: [],
@@ -70,6 +74,7 @@ function writeLocal(s: PromptState) {
         dismissals: s.dismissals,
         lastDismissedAt: s.lastDismissedAt,
         lastShownAt: s.lastShownAt,
+        lastProactiveAt: s.lastProactiveAt,
       })
     );
   } catch {
@@ -205,11 +210,29 @@ export function useOnePrompt({
   }, [signedIn]);
 
   /**
-   * Ask to show a prompt. Returns whether one opened, so a caller that needs
-   * to do something else when it did not — say, show an inline note instead —
-   * can tell.
+   * Proactive asks that have arrived and not yet been decided.
+   *
+   * A reply lands and two things say "now": the generic returning-thinker
+   * timer and, a moment later once the extraction comes back, the map having
+   * taken a shape. Decided at their own instants, the first one through took
+   * the tab's single proactive slot and the better one was suppressed as
+   * 'session-cap' — `bestTrigger` existed and had no caller. So proactive
+   * asks are collected here for a short settle and decided ONCE, as a set.
+   * The wait is also the courtesy the old timer provided: nothing lands on
+   * top of a reply somebody has not finished reading, and typing cancels it.
    */
-  const ask = useCallback((reason: TriggerReason): boolean => {
+  const pending = useRef<Set<TriggerReason>>(new Set());
+  const settle = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const SETTLE_MS = 2600;
+
+  useEffect(() => {
+    return () => {
+      if (settle.current) clearTimeout(settle.current);
+    };
+  }, []);
+
+  /** Decide one reason, now. The only path that opens a sheet. */
+  const decideNow = useCallback((reason: TriggerReason): boolean => {
     const cur = live.current;
     const spec = TRIGGERS[reason];
     const proactive = spec.category === 'proactive' && reason !== 'asked';
@@ -243,6 +266,7 @@ export function useOnePrompt({
     state.current = {
       ...state.current,
       lastShownAt: Date.now(),
+      lastProactiveAt: proactive ? Date.now() : state.current.lastProactiveAt,
       shownThisSession: state.current.shownThisSession + (proactive ? 1 : 0),
       // 'asked' is the Socria One button, which is answered every time and
       // so is never remembered as having been said.
@@ -281,6 +305,44 @@ export function useOnePrompt({
     });
     return true;
   }, []);
+
+  /** Drop whatever is waiting to be decided — they started typing, or asked for something. */
+  const cancelPending = useCallback(() => {
+    pending.current.clear();
+    if (settle.current) {
+      clearTimeout(settle.current);
+      settle.current = null;
+    }
+  }, []);
+
+  /**
+   * Ask to show a prompt.
+   *
+   * Entitlement prompts and the Socria One button are decided immediately
+   * and the return value says whether one opened, so a caller can show an
+   * inline note instead when it did not. Proactive asks are queued for the
+   * settle and this returns false — nothing has opened yet, and nothing may
+   * be assumed about whether it will.
+   */
+  const ask = useCallback(
+    (reason: TriggerReason): boolean => {
+      const spec = TRIGGERS[reason];
+      const proactive = spec.category === 'proactive' && reason !== 'asked';
+      if (!proactive) return decideNow(reason);
+
+      pending.current.add(reason);
+      if (settle.current) clearTimeout(settle.current);
+      settle.current = setTimeout(() => {
+        settle.current = null;
+        const queued = [...pending.current];
+        pending.current.clear();
+        const best = bestTrigger(queued);
+        if (best) decideNow(best);
+      }, SETTLE_MS);
+      return false;
+    },
+    [decideNow]
+  );
 
   /** They closed it. Only a proactive close counts toward the cooldown. */
   const dismiss = useCallback(() => {
@@ -336,5 +398,5 @@ export function useOnePrompt({
     });
   }, []);
 
-  return { prompt: view, ask, dismiss, accept };
+  return { prompt: view, ask, cancelPending, dismiss, accept };
 }

@@ -28,6 +28,24 @@ export const EVENTS = [
   'one_prompt_clicked',
   'one_checkout_started',
   'one_prompt_suppressed',
+  // The two that used to be missing. Everything above is a prompt being
+  // shown or pressed; these are the payment landing and the subscription
+  // ending, reported from the Stripe webhook (lib/analytics-server.ts) with
+  // the trigger that led there carried through Stripe's metadata. Without
+  // them the funnel stopped at "checkout opened" and every trigger looked
+  // equally good.
+  'one_subscribed',
+  'one_cancelled',
+  // A lifecycle email went out — its kind, never its recipient.
+  'lifecycle_email_sent',
+  // The moment a cancellation is scheduled through the billing portal — the
+  // one moment a save is possible — with Stripe's fixed-enum reason.
+  'one_cancel_scheduled',
+  // Activation, shape only: which line of thinking this is for the person
+  // (first, second, later), and whether the first map to take a shape came
+  // from an opening, the Explore page, or their own words.
+  'logos_session_started',
+  'first_map_shaped',
 ] as const;
 export type AnalyticsEvent = (typeof EVENTS)[number];
 
@@ -63,6 +81,18 @@ export interface EventProps {
   dismissals?: number;
   /** whether the person is signed in — not who they are */
   signed_in?: boolean;
+  /** which lifecycle email, for the sent event — a kind, never an address */
+  kind?: string;
+  /** where a server event came from: 'webhook' | 'cron' | 'route' — or, on checkout, the email kind that led there */
+  source?: string;
+  /** which line of thinking this is for the person: '1' | '2' | '3+' */
+  nth?: string;
+  /** an opening id, 'explore', or 'none' — the door, never the words */
+  opening?: string;
+  /** days between first activity and paying, bucketed: 'd0' | 'd1-3' | 'd4-7' | 'd8-30' | '30+' | 'unknown' */
+  tenure?: string;
+  /** Stripe's cancellation_details.feedback enum, never the free-text comment */
+  feedback?: string;
 }
 
 const ALLOWED_KEYS = new Set<keyof EventProps>([
@@ -76,6 +106,12 @@ const ALLOWED_KEYS = new Set<keyof EventProps>([
   'suppressed',
   'dismissals',
   'signed_in',
+  'kind',
+  'source',
+  'nth',
+  'opening',
+  'tenure',
+  'feedback',
 ]);
 
 /**

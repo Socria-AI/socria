@@ -20,6 +20,15 @@ console.log('=== the events we claim to emit ===');
     'one_prompt_dismissed',
     'one_prompt_clicked',
     'one_checkout_started',
+    // The funnel used to stop at "checkout opened". These two come back from
+    // the Stripe webhook, so a trigger can finally be judged by what it
+    // earned rather than by how often it was pressed.
+    'one_subscribed',
+    'one_cancelled',
+    'lifecycle_email_sent',
+    'one_cancel_scheduled',
+    'logos_session_started',
+    'first_map_shaped',
   ];
   for (const e of expected) ok(`${e} is declared`, EVENTS.includes(e));
   ok('every event name is snake_case', EVENTS.every((e) => /^[a-z][a-z0-9_]*$/.test(e)), EVENTS.join());
@@ -49,6 +58,22 @@ console.log('\n=== the allow-list keeps what it should ===');
   ok('dismissals kept as a number', out.dismissals === 2);
   ok('signed_in kept', out.signed_in === true);
   ok('nothing extra invented', Object.keys(out).length === 9, Object.keys(out).join());
+
+  // The two keys the server events carry: a lifecycle email's KIND, and where
+  // a server event came from. Both are short tokens by construction.
+  const srv = scrub({ kind: 'day-3', source: 'cron' });
+  ok('kind kept', srv.kind === 'day-3');
+  ok('source kept', srv.source === 'cron');
+  // And an address is not a key that exists, so it cannot ride along.
+  const leak = scrub({ kind: 'day-3', to: 'someone@example.com', email: 'x@y.z' });
+  ok('a recipient address cannot get through', !('to' in leak) && !('email' in leak));
+  // The activation and cancellation keys: all short tokens, all bounded.
+  const act = scrub({ nth: '3+', opening: 'limit', tenure: 'd1-3', feedback: 'too_expensive', comment: 'free text a person typed' });
+  ok('nth kept', act.nth === '3+');
+  ok('opening kept', act.opening === 'limit');
+  ok('tenure kept', act.tenure === 'd1-3');
+  ok('feedback kept', act.feedback === 'too_expensive');
+  ok('a cancellation comment is not a key and cannot get through', !('comment' in act));
 }
 
 console.log('\n=== conversation content cannot get through ===');

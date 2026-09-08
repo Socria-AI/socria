@@ -10,7 +10,7 @@
 // memory Socria keeps is the thing people are most surprised by; a delete
 // button for something you did not know existed is not really a choice.
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 type Busy = null | 'export' | 'memory' | 'account';
 
@@ -20,6 +20,43 @@ export function DataPrivacyPanel() {
   const [err, setErr] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [typed, setTyped] = useState('');
+  // The occasional note by email: a map still where it was left, a
+  // membership opening. One switch, backed by the same row the unsubscribe
+  // link writes, so the two never disagree. null until the answer arrives;
+  // shown as off when the store cannot say.
+  const [notes, setNotes] = useState<boolean | null>(null);
+  const [notesBusy, setNotesBusy] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch('/api/email/preferences', { cache: 'no-store' });
+        if (!res.ok) return;
+        const json = await res.json();
+        if (!cancelled) setNotes(json?.lifecycle === true);
+      } catch {}
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  async function setNotesOn(on: boolean) {
+    setNotesBusy(true); setErr(null);
+    try {
+      const res = await fetch('/api/email/preferences', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lifecycle: on }),
+      });
+      if (!res.ok) throw new Error('failed');
+      setNotes(on);
+    } catch {
+      setErr('Could not save that just now. Try again in a moment.');
+    }
+    setNotesBusy(false);
+  }
 
   async function exportData() {
     setBusy('export'); setErr(null); setNote(null);
@@ -49,6 +86,12 @@ export function DataPrivacyPanel() {
       const res = await fetch('/api/account/memory', { method: 'DELETE' });
       const json = await res.json().catch(() => null);
       if (!res.ok) throw new Error(json?.error || 'failed');
+      // The browser's own copy of the journey goes too. Left in place it
+      // would be pushed back up on the next page load as the newest copy,
+      // and the clearing would have lasted exactly one reload.
+      try {
+        localStorage.removeItem('socria.journey.v1');
+      } catch {}
       setNote('Memory cleared. Socria starts fresh from here; your conversations are untouched.');
     } catch {
       setErr('Could not clear memory. Try again.');
@@ -116,6 +159,25 @@ export function DataPrivacyPanel() {
         </div>
         <button type="button" onClick={exportData} disabled={busy !== null}>
           {busy === 'export' ? 'Preparing…' : 'Export my data'}
+        </button>
+      </section>
+
+      <section className="dp-act">
+        <div>
+          <h3>Notes by email</h3>
+          <p>
+            The occasional note from Socria about your thinking here — that a
+            map is where you left it, or when something opens. Never what you
+            wrote, and never more than a few a month.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => void setNotesOn(!(notes ?? false))}
+          disabled={notesBusy || notes === null}
+          aria-pressed={notes === true}
+        >
+          {notes === null ? '…' : notesBusy ? 'Saving…' : notes ? 'On — turn off' : 'Off — turn on'}
         </button>
       </section>
 

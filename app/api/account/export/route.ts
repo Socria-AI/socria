@@ -75,6 +75,14 @@ export async function GET(req: NextRequest) {
     .eq('user_id', userId);
   out.connections = conns ?? [];
 
+  // Lifecycle email: which notes have gone, and whether they said stop. Ids
+  // and timestamps only — the ledger never held an address or a subject.
+  const { data: lifecycle } = await db
+    .from('lifecycle_emails')
+    .select('kind, created_at, due_at, sent_at')
+    .eq('user_id', userId);
+  out.lifecycleEmails = lifecycle ?? [];
+
   const stamp = new Date().toISOString().slice(0, 10);
   return new NextResponse(JSON.stringify(out, null, 2), {
     status: 200,

@@ -132,7 +132,13 @@ export function OneStory() {
     setBusy(true);
     setErr(null);
     try {
-      const res = await fetch('/api/stripe/checkout', { method: 'POST' });
+      const res = await fetch('/api/stripe/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        // No prompt led here — only which screen it was. The webhook counts
+        // the payment against it.
+        body: JSON.stringify({ surface: 'one-page' }),
+      });
       if (res.status === 401) {
         // Sign in, then come straight back and finish the thing they started.
         window.location.href =

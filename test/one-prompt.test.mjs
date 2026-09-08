@@ -22,6 +22,8 @@ import {
   bestTrigger,
   engagementFrom,
   reasonForCounter,
+  FAMILY,
+  PROACTIVE_FLOOR_MS,
 } from './.tmp/one-prompt.mjs';
 import { COUNTERS } from './.tmp/entitlements.mjs';
 
@@ -326,6 +328,59 @@ console.log('\n=== the decision is pure ===');
   show({ reason: 'chats-spent', state: { ...state, shownTriggers: ['chats-spent'] } });
   ok('decide() does not mutate the state it is given', JSON.stringify(state) === before);
   ok('and it did not grow a shownTriggers list of its own', state.shownTriggers.length === 0);
+}
+
+console.log('\n=== map-shaped: a success that promises memory, not growth ===');
+{
+  const spec = TRIGGERS['map-shaped'];
+  ok('it exists and is proactive', spec && spec.category === 'proactive');
+  ok('it ranks above the generic nudge', INTENT_RANK[spec.intent] > INTENT_RANK[TRIGGERS['returning-thinker'].intent]);
+  // map-full sells growth at node 8; this one must not sell the same thing.
+  ok('the copy promises memory', /remembers how you reason/.test(spec.body));
+  ok('...and does not count moves', !/\bfive\b|\b5\b|nodes/i.test(spec.body), spec.body);
+  ok('...and does not sell growth', !/keep growing|grows as far/i.test(spec.body), spec.body);
+  ok('its title has no number', !/\d/.test(spec.title));
+
+  // Same bar as every other proactive prompt: it is never the first session.
+  ok('not engaged → suppressed', decide({ ...base, reason: 'map-shaped', engagement: { sessions: 1, activeDays: 1, mapNodes: 6 } }).why === 'not-engaged');
+  ok('engaged → shown', decide({ ...base, reason: 'map-shaped' }).show === true);
+  ok('a member is never sold to', decide({ ...base, reason: 'map-shaped', plan: 'one' }).why === 'has-one');
+  ok('reflecting suppresses it', decide({ ...base, reason: 'map-shaped', context: 'reflecting' }).why === 'sensitive-context');
+
+  // The family rule: one map, one promise. Either said makes the other said.
+  ok('family is symmetric', FAMILY['map-shaped'].includes('map-full') && FAMILY['map-full'].includes('map-shaped'));
+  const saidFull = { ...base, state: { ...EMPTY_PROMPT_STATE, shownTriggers: ['map-full'] } };
+  ok('after map-full, map-shaped is said-already', decide({ ...saidFull, reason: 'map-shaped' }).why === 'said-already');
+  const saidShaped = { ...base, state: { ...EMPTY_PROMPT_STATE, shownTriggers: ['map-shaped'] } };
+  ok('after map-shaped, map-full is said-already', decide({ ...saidShaped, reason: 'map-full' }).why === 'said-already');
+  ok('but returning-thinker is not in the family', decide({ ...saidShaped, reason: 'returning-thinker' }).show === true);
+  ok('bestTrigger prefers the shaped map to the generic nudge', bestTrigger(['returning-thinker', 'map-shaped']) === 'map-shaped');
+}
+
+console.log('\n=== the daily floor: two tabs are not two prompts ===');
+{
+  ok('the floor is a day', PROACTIVE_FLOOR_MS === DAY_MS);
+  // Shown in another tab an hour ago: this tab's session count is zero, and
+  // it must still stay quiet.
+  const other = { ...base, state: { ...EMPTY_PROMPT_STATE, lastProactiveAt: NOW - 3_600_000 } };
+  ok('an hour after a proactive prompt elsewhere → daily-floor', decide({ ...other, reason: 'returning-thinker' }).why === 'daily-floor');
+  ok('a day later it may ask again', decide({ ...base, state: { ...EMPTY_PROMPT_STATE, lastProactiveAt: NOW - DAY_MS - 1 }, reason: 'returning-thinker' }).show === true);
+  // Entitlement prompts are answers, not asks: the floor does not touch them.
+  ok('the floor does not silence an entitlement prompt', decide({ ...other, reason: 'explore-spent' }).show === true);
+  ok('nor the Socria One button', decide({ ...other, reason: 'asked' }).show === true);
+  ok('the empty state has no floor', EMPTY_PROMPT_STATE.lastProactiveAt === 0);
+}
+
+console.log('\n=== engagement counts thinking, not placeholders ===');
+{
+  // The store always holds one empty session, and newSession() makes more;
+  // each is stamped with the current time. Two of them on two days must not
+  // read as "this person came back" — the caller filters them out, and the
+  // bar is asserted here against what it would otherwise see.
+  const two = engagementFrom([{ updatedAt: NOW }, { updatedAt: NOW - DAY_MS }], 6);
+  ok('two dated sessions clear the bar (so the caller MUST filter empties)', two.sessions === 2 && two.activeDays === 2);
+  const filtered = engagementFrom([], 6);
+  ok('no sessions with messages → not engaged', decide({ ...base, reason: 'map-shaped', engagement: filtered }).why === 'not-engaged');
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

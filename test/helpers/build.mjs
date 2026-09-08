@@ -41,6 +41,11 @@ const MODULES = [
   'lib/wrong-chat.ts',
   'lib/auth-links.ts',
   'lib/session-rail.ts',
+  'lib/checkout-attribution.ts',
+  'lib/person-memory.ts',
+  'lib/first-session.ts',
+  'components/MapPoster.tsx',
+  'lib/lifecycle.ts',
   'lib/socria-prompt.ts',
   'app/explore/scenarios.ts',
 ];
@@ -56,7 +61,10 @@ export async function buildAll() {
         bundle: true,
         format: 'esm',
         platform: 'node',
-        outfile: join(OUT, m.split('/').pop().replace(/\.ts$/, '.mjs')),
+        outfile: join(OUT, m.split('/').pop().replace(/\.tsx?$/, '.mjs')),
+        // tsconfig says jsx: preserve, which Node cannot load; the one .tsx
+        // module under test (the poster) is bundled with the automatic runtime.
+        jsx: 'automatic',
         logLevel: 'error',
       })
     )
