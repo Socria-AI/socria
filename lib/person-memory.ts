@@ -341,9 +341,11 @@ const KIND_WEIGHT: Record<EntryKind, number> = {
   value: 2.5,
   constraint: 2.5,
   decision: 2,
+  // A realisation the person reached ranks with a decision they made: both
+  // are theirs, and a stale fact should not outlive either in the window.
+  insight: 2,
   fact: 1.5,
   preference: 1,
-  insight: 1,
 };
 
 export const DAY_MS = 86_400_000;
