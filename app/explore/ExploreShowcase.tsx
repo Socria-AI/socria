@@ -158,9 +158,15 @@ function Exhibit({ scenario }: { scenario: Scenario }) {
       )}
 
       <p className="exp-case-point">{scenario.point}</p>
+      {/* The conversation they just read, put into the composer — never sent.
+          Both surfaces read `start`; Core's own scenario stays on Core. */}
       <Link
         className="exp-case-go"
-        href={scenario.model === 'logos' ? OPEN_LOGOS : OPEN_CORE}
+        href={
+          scenario.model === 'logos'
+            ? `${OPEN_LOGOS}&start=${encodeURIComponent(scenario.id)}`
+            : `${OPEN_CORE}?start=${encodeURIComponent(scenario.id)}`
+        }
       >
         Try this one <span aria-hidden="true">→</span>
       </Link>

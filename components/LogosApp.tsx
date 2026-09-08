@@ -29,6 +29,20 @@ import { OnePrompt } from '@/components/OnePrompt';
 import { useOnePrompt } from '@/components/useOnePrompt';
 import { reasonForCounter } from '@/lib/one-prompt';
 import { track } from '@/lib/analytics';
+import { authUrl } from '@/lib/auth-links';
+import {
+  FIRST_MAP_KEY,
+  FIRST_MAP_NOTE,
+  OPENINGS,
+  OPENING_LEAD,
+  firstMapCrossed,
+  openingValue,
+  readStart,
+  startMessage,
+} from '@/lib/first-session';
+import { exportMapPng } from '@/components/MapPoster';
+import { JourneyDebugModal } from '@/components/JourneyDebugModal';
+import { sanitizeUserUnderstanding, type UserUnderstanding } from '@/lib/socria-prompt';
 import { OneLock } from '@/components/OneLock';
 import {
   SOCRIA_ONE_KEY,
@@ -99,6 +113,38 @@ const DEPTH_KEY = 'socria.depth.v1';
 const REVEALED_KEY = 'socria.logos.revealed.v1';
 /** How often this person has told us a topic change was intentional. */
 const DRIFT_KEY = 'socria.logos.driftDismissals.v1';
+/** a checkout interrupted by sign-in, with the trigger that led to it */
+const CHECKOUT_RESUME_KEY = 'socria.checkout.resume.v1';
+/** the attribution of the last checkout opened from this browser */
+const CHECKOUT_LAST_KEY = 'socria.checkout.last.v1';
+/** which email link brought them here, if one did — its kind only */
+const VIA_KEY = 'socria.via.v1';
+/** the checkout session already counted as a subscription from this tab */
+const WELCOMED_KEY = 'socria.one.welcomed.v1';
+/** journey passes happen this often, in the person's turns — the same cadence as Core */
+const JOURNEY_EVERY_TURNS = 4;
+
+/**
+ * A first message chosen elsewhere, waiting for the composer.
+ *
+ * Module-level on purpose. The mount effect that reads `?start=` also strips
+ * it from the URL, and React can throw that first tree away and mount a
+ * fresh one (a hydration mismatch does it; StrictMode does it in
+ * development) — a second instance would then read a URL with nothing in
+ * it. Held here, the message survives the remount and is applied once the
+ * session list has hydrated, which is also the only point at which "open a
+ * fresh session for it" can be decided.
+ */
+let pendingStart: { id: string; message: string } | null = null;
+
+/** The email kind that brought them here, if one did. */
+function readVia(): string | undefined {
+  try {
+    return sessionStorage.getItem(VIA_KEY) ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
 // Custom instructions — how Socria should work with this person. The key is
 // product-wide by design so other surfaces can adopt it; today Logos is the
 // one that reads it.
@@ -200,6 +246,30 @@ export function LogosApp({
   const [oneError, setOneError] = useState<string | null>(null);
   /** Completed assistant turns this mount — the proactive prompt's only cue. */
   const [landedTurns, setLandedTurns] = useState(0);
+  /**
+   * The map on screen just took a shape — crossed the first-map threshold in
+   * a fresh extraction in THIS tab. Read once by the landed-turn effect and
+   * cleared; never set by hydrating a saved session.
+   */
+  const shapedRef = useRef(false);
+  /** sessions that have had at least one extraction in this tab */
+  const extractedRef = useRef<Set<string>>(new Set());
+  /** the person's first map just took a shape: the share moment owns the screen */
+  const [firstMapNote, setFirstMapNote] = useState(false);
+  const shareNoteRef = useRef(false);
+  /** which opening or scenario this tab began from, for the activation event */
+  const startIdRef = useRef<string | null>(null);
+  /** where the sign-in gate should bring them back to — set on mount, so the query survives */
+  const [gateHref, setGateHref] = useState('/sign-in?redirect_url=%2Fchat%3Fmodel%3Dlogos');
+  /** what Socria knows about this person, for the prompt and the viewer (accounts only) */
+  const [understanding, setUnderstanding] = useState<UserUnderstanding | null>(null);
+  const understandingRef = useRef<UserUnderstanding | null>(null);
+  understandingRef.current = understanding;
+  /** sessions in which the recurrence line has already been injected once */
+  const recurrenceSaidRef = useRef<Set<string>>(new Set());
+  /** attribution stashed across a sign-in, so a resumed checkout keeps its trigger */
+  const resumeRef = useRef<{ trigger?: string; surface?: string; source?: string } | null>(null);
+  const [memoryOpen, setMemoryOpen] = useState(false);
   // The boundary note is dismissible — said once, not nagged.
   const [limitNoteOff, setLimitNoteOff] = useState(false);
   // The extraction wanted to add something and the free map was full.
@@ -488,6 +558,12 @@ export function LogosApp({
         .map((n) => ({ label: n.label, type: n.type, updatedAt: s.updatedAt }))
     );
 
+  // First-ever: nothing has been said or drawn in any session. The store
+  // always holds one empty placeholder, so "no sessions" cannot mean an
+  // empty list.
+  const noSessions =
+    !hydrating && sessions.every((x) => x.messages.length === 0 && !(x.map?.nodes?.length));
+
   const logosStarters = buildStarters(
     {
       pending: pendingFromMaps,
@@ -569,15 +645,86 @@ export function LogosApp({
   // telling someone who has just paid that they haven't would be the worst
   // possible first second of a subscription.
   useEffect(() => {
+    // Where the sign-in gate brings them back to: this page, query and all,
+    // so a ?start= from /explore survives the trip (lib/auth-links validates).
+    setGateHref(authUrl('sign-in', window.location.pathname + window.location.search));
+
+    // A first message chosen elsewhere — an opening, or an exhibit on
+    // /explore. Into the composer, never sent: the person edits it into
+    // their own situation before it costs them a line of thinking.
+    {
+      const { id, search } = readStart(window.location.search);
+      if (id) {
+        const msg = startMessage(id);
+        if (msg) pendingStart = { id, message: msg };
+        window.history.replaceState({}, '', window.location.pathname + search);
+      }
+    }
+
+    // A link from an email says which one it was; remembered for checkout.
+    {
+      const via = new URLSearchParams(window.location.search).get('via');
+      if (via) {
+        try {
+          sessionStorage.setItem(VIA_KEY, via);
+        } catch {}
+        const url = new URL(window.location.href);
+        url.searchParams.delete('via');
+        window.history.replaceState({}, '', url.pathname + url.search);
+      }
+    }
+
     const params = new URLSearchParams(window.location.search);
+
+    // Back from sign-in with a checkout to finish. Consumed exactly once.
+    if (params.get('checkout') === '1') {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('checkout');
+      window.history.replaceState({}, '', url.pathname + url.search);
+      try {
+        const raw = sessionStorage.getItem(CHECKOUT_RESUME_KEY);
+        sessionStorage.removeItem(CHECKOUT_RESUME_KEY);
+        const stash = raw ? (JSON.parse(raw) as { trigger?: string; source?: string; at?: number }) : null;
+        if (stash && Date.now() - (stash.at ?? 0) < 15 * 60_000) {
+          resumeRef.current = { trigger: stash.trigger, surface: 'logos', source: stash.source };
+        }
+      } catch {}
+      setResumeCheckout(true);
+    }
+
     const flag = params.get('one');
     if (!flag) {
       void syncPlan();
       return;
     }
     // Clean the query so a refresh doesn't replay this.
+    const sessionId = params.get('session_id');
     window.history.replaceState({}, '', '/chat');
     if (flag !== 'welcome') return;
+
+    // The payment, counted from the browser as well as the webhook: the
+    // webhook's event arrives as a visit by Stripe and may be bot-filtered,
+    // and this one belongs to the person's own session. Once per checkout.
+    if (sessionId) {
+      try {
+        const seen = sessionStorage.getItem(WELCOMED_KEY);
+        if (seen !== sessionId) {
+          sessionStorage.setItem(WELCOMED_KEY, sessionId);
+          const last = JSON.parse(localStorage.getItem(CHECKOUT_LAST_KEY) || 'null') as {
+            trigger?: string;
+            surface?: string;
+            source?: string;
+          } | null;
+          track('one_subscribed', {
+            trigger: last?.trigger,
+            surface: last?.surface ?? 'logos',
+            source: last?.source ?? 'client',
+            plan: 'one',
+            signed_in: !!isSignedIn,
+          });
+        }
+      } catch {}
+    }
 
     setOneWelcome(true);
     let tries = 0;
@@ -596,6 +743,19 @@ export function LogosApp({
   useEffect(() => {
     if (isLoaded) setAuthSettled(true);
   }, [isLoaded]);
+
+  // The checkout they started before signing in, finished without a second
+  // press. Waits for the account to be settled so the POST carries it, and
+  // runs once; the server refuses to sell One twice, so a person who bought
+  // it elsewhere in the meantime lands on a 409 and simply gets on with it.
+  const [resumeCheckout, setResumeCheckout] = useState(false);
+  useEffect(() => {
+    if (!resumeCheckout || !isLoaded || !isSignedIn) return;
+    setResumeCheckout(false);
+    void takeOne('');
+    // takeOne is redefined each render; this intentionally runs once per resume.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resumeCheckout, isLoaded, isSignedIn]);
 
   const hasAccess = unlocked || !!isSignedIn;
 
@@ -679,12 +839,17 @@ export function LogosApp({
    * once-per-session rule and the analytics in one place, so no component
    * here can open an upgrade modal that nothing is able to rate-limit.
    */
-  const { prompt: onePrompt, ask, dismiss: dismissPrompt, accept: acceptPrompt } =
+  // Only sessions with something in them count as engagement. The store
+  // always holds one empty placeholder, and newSession() makes more, each
+  // stamped with the current time — two of those on two days would read as
+  // "this person came back" when nobody has said a word.
+  const thoughtSessions = useMemo(() => sessions.filter((x) => x.messages.length > 0), [sessions]);
+  const { prompt: onePrompt, ask, cancelPending, dismiss: dismissPrompt, accept: acceptPrompt } =
     useOnePrompt({
       plan,
       signedIn: !!isSignedIn,
       context: map.context,
-      sessions,
+      sessions: thoughtSessions,
       mapNodes: meaningfulNodes(map),
       surface: 'logos',
     });
@@ -706,9 +871,48 @@ export function LogosApp({
    */
   useEffect(() => {
     if (landedTurns === 0 || one || busy || streaming) return;
-    const t = setTimeout(() => ask('returning-thinker'), 2600);
-    return () => clearTimeout(t);
+    // The first map belongs to the share moment. One note slot per screen.
+    if (shareNoteRef.current) return;
+    // The delay lives in the controller now: proactive asks settle for a
+    // moment and are decided together, so the shaped map — which arrives a
+    // beat after the reply, once the extraction lands — can outrank the
+    // generic nudge instead of losing the tab's one slot to it.
+    if (shapedRef.current) {
+      shapedRef.current = false;
+      ask('map-shaped');
+    }
+    ask('returning-thinker');
   }, [landedTurns, one, busy, streaming, ask]);
+
+  // Someone still working is someone not to interrupt: typing, or a request
+  // in flight, drops whatever was waiting to be decided.
+  useEffect(() => {
+    if (input || busy) cancelPending();
+  }, [input, busy, cancelPending]);
+
+  // What Socria knows about this person, for accounts. Anonymous, key-unlocked
+  // Logos has no person to remember — and must not read Core's local journey
+  // either, which would push one browser's memory into whichever account
+  // signs in next.
+  useEffect(() => {
+    if (!isSignedIn) {
+      setUnderstanding(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch('/api/profile', { cache: 'no-store' });
+        if (!res.ok) return;
+        const json = await res.json();
+        if (cancelled || !json?.understanding) return;
+        setUnderstanding(sanitizeUserUnderstanding(json.understanding));
+      } catch {}
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isSignedIn]);
 
   /**
    * Open the full Socria One screen — the invitation plate with everything on
@@ -790,22 +994,43 @@ export function LogosApp({
     setOneError(null);
     // Recorded before the redirect, because after it this page is gone. The
     // trigger that led here is on the prompt, if a prompt is what led here.
+    // A checkout resumed after sign-in carries the trigger it started with;
+    // a first-touch source (an email, the Explore page) rides along from the
+    // stash the mount effect wrote.
+    const attribution = {
+      trigger: resumeRef.current?.trigger ?? onePrompt?.reason ?? (oneOpen ? 'asked' : undefined),
+      surface: 'logos' as const,
+      source: resumeRef.current?.source ?? readVia(),
+    };
+    resumeRef.current = null;
     track('one_checkout_started', {
-      trigger: onePrompt?.reason ?? (oneOpen ? 'asked' : undefined),
+      trigger: attribution.trigger,
       category: onePrompt?.category ?? (oneOpen ? 'proactive' : undefined),
       intent: onePrompt?.intent,
       surface: 'logos',
+      source: attribution.source,
       plan,
       signed_in: !!isSignedIn,
     });
     try {
+      localStorage.setItem(CHECKOUT_LAST_KEY, JSON.stringify(attribution));
+    } catch {}
+    try {
       const res = await fetch('/api/stripe/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...keyHeaders() },
+        // The same trigger the event above carries, so the payment — which
+        // arrives later, on a webhook with no browser attached — can be
+        // counted against the moment that earned it.
+        body: JSON.stringify(attribution),
       });
       if (res.status === 401) {
-        window.location.href =
-          '/sign-in?redirect_url=' + encodeURIComponent('/chat?model=logos');
+        // Sign in, then come straight back and finish — with the trigger
+        // that led here, which would otherwise be lost with the page.
+        try {
+          sessionStorage.setItem(CHECKOUT_RESUME_KEY, JSON.stringify({ ...attribution, at: Date.now() }));
+        } catch {}
+        window.location.href = authUrl('sign-in', '/chat?model=logos&checkout=1');
         return true;
       }
       if (res.status === 409) {
@@ -936,7 +1161,13 @@ export function LogosApp({
       } catch {}
 
       if (list.length === 0) list = [emptySession()];
-      const sorted = sortSessions(list);
+      let sorted = sortSessions(list);
+      // A first message chosen elsewhere goes into a line of thinking of its
+      // own, not on top of the one they were last in — without going through
+      // newSession(), which asks and spends; nothing is spent until they send.
+      if (pendingStart && !wanted && sorted[0].messages.length > 0) {
+        sorted = [emptySession(), ...sorted];
+      }
       sessionsRef.current = sorted;
       setSessions(sorted);
       const target = (wanted && sorted.find((s) => s.id === wanted)?.id) || sorted[0].id;
@@ -944,6 +1175,22 @@ export function LogosApp({
       activeIdRef.current = target;
       chronRef.current = [...(sorted.find((s) => s.id === target)?.messages ?? [])];
       setHydrating(false);
+      // Applied, not consumed: the tree this runs in may be thrown away and
+      // mounted again (see pendingStart), and the message has to survive
+      // that. It is cleared when the person sends it — the one event that
+      // means it has left the composer.
+      if (pendingStart) {
+        const { id, message } = pendingStart;
+        setInput(message);
+        startIdRef.current = id;
+        requestAnimationFrame(() => {
+          const ta = document.querySelector<HTMLTextAreaElement>('.lg-composer textarea');
+          if (ta) {
+            ta.focus();
+            ta.setSelectionRange(ta.value.length, ta.value.length);
+          }
+        });
+      }
     })();
 
     return () => {
@@ -1102,6 +1349,33 @@ export function LogosApp({
           // A map that arrives after the reader has moved on belongs to a
           // different line of thinking — drop it rather than cross the wires.
           if (json?.map && activeIdRef.current === forSession) {
+            // A crossing observed in this tab — never a level. Hydrating a
+            // saved session with nine nodes is not a map taking shape, so the
+            // first extraction of an existing session does not count; a map
+            // that was empty a moment ago and is not now does.
+            const prevN = mapRef.current.nodes.length;
+            const nextN = (json.map.nodes as unknown[]).length;
+            const sessionKey = forSession ?? '';
+            const seenBefore = extractedRef.current.has(sessionKey) || prevN === 0;
+            extractedRef.current.add(sessionKey);
+            if (seenBefore && firstMapCrossed(prevN, nextN)) {
+              shapedRef.current = true;
+              let firstEver = false;
+              try {
+                firstEver = !localStorage.getItem(FIRST_MAP_KEY);
+                if (firstEver) localStorage.setItem(FIRST_MAP_KEY, String(Date.now()));
+              } catch {}
+              if (firstEver) {
+                // The person's first map. It belongs to the share moment, not
+                // to a prompt about One: the note takes the slot and the
+                // proactive triggers stand down for this tab.
+                track('first_map_shaped', { opening: openingValue(startIdRef.current), surface: 'logos' });
+                setFirstMapNote(true);
+                shareNoteRef.current = true;
+                shapedRef.current = false;
+                cancelPending();
+              }
+            }
             const delta = diffMaps(mapRef.current, json.map);
             const liveIds = new Set(json.map.nodes.map((n: any) => n.id));
             patchActive((s) => {
@@ -1516,6 +1790,7 @@ export function LogosApp({
 
     setError(null);
     setInput('');
+    pendingStart = null;
 
     // Once, here, on the message as sent — never while typing. The reply
     // proceeds regardless; this only decides whether a note appears beside it.
@@ -1541,6 +1816,18 @@ export function LogosApp({
     setBusy(true);
     setStreaming('');
 
+    // A line of thinking begins: which one is this for the person? Shape
+    // only — first, second, or later — so activation can be read without a
+    // word of what was said.
+    if (!before.some((m) => m.role === 'user')) {
+      const prior = sessionsRef.current.filter(
+        (x) => x.id !== activeIdRef.current && x.messages.some((m) => m.role === 'user')
+      ).length;
+      track('logos_session_started', { nth: prior === 0 ? '1' : prior === 1 ? '2' : '3+', surface: 'logos', signed_in: !!isSignedIn });
+    }
+    const sid = activeIdRef.current ?? '';
+    const u = isSignedIn ? understandingRef.current : null;
+
     // Conversational reply.
     //
     // The map extraction USED to be fired here, in parallel, so it could run
@@ -1555,7 +1842,15 @@ export function LogosApp({
       const res = await fetch('/api/logos/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...keyHeaders() },
-        body: JSON.stringify({ sessionId: activeIdRef.current, messages: next, ...guidance() }),
+        body: JSON.stringify({
+          sessionId: activeIdRef.current,
+          messages: next,
+          ...guidance(),
+          // What Logos knows about this person, for accounts; the server
+          // decides what the plan carries of it. The recurrence line is
+          // owed until it has been injected once in this session.
+          ...(u ? { understanding: u, recurrence: !recurrenceSaidRef.current.has(sid) } : {}),
+        }),
       });
       if (res.status === 402) {
         // A boundary rather than a failure: the turn is put back in the
@@ -1590,12 +1885,47 @@ export function LogosApp({
       }
       acc = absorbRemember(acc);
       setStreaming('');
-      patchActive((s) => ({ ...s, messages: [...next, { role: 'assistant', content: acc }] }));
+      const landed: Msg[] = [...next, { role: 'assistant', content: acc }];
+      patchActive((s) => ({ ...s, messages: landed }));
       chronRef.current = [...chronRef.current, { role: 'assistant', content: acc }];
+      if (u && u.entries.length) recurrenceSaidRef.current.add(sid);
       // A thought completed. The proactive check runs from an effect rather
       // than here, so it sees the map this turn produced instead of the one
       // captured when this function was defined.
       setLandedTurns((n) => n + 1);
+      // What Logos learned about the person, folded into the memory it
+      // shares with Core — every few turns, for accounts only, and never
+      // from a line of thinking the map read as reflecting: that memory is
+      // private, and Logos is the surface whose map can be shown to someone.
+      const userTurns = landed.filter((m) => m.role === 'user').length;
+      if (
+        isSignedIn &&
+        userTurns >= JOURNEY_EVERY_TURNS &&
+        userTurns % JOURNEY_EVERY_TURNS === 0 &&
+        mapRef.current.context !== 'reflecting'
+      ) {
+        void (async () => {
+          try {
+            const s0 = sessionsRef.current.find((x) => x.id === sid);
+            const jr = await fetch('/api/update-understanding', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                understanding: understandingRef.current ?? undefined,
+                title: s0 && s0.title !== UNTITLED ? s0.title : null,
+                messages: landed.map((m) => ({ role: m.role, content: m.content })),
+                surface: 'logos',
+                conversationId: sid,
+                mapContext: mapRef.current.context ?? null,
+              }),
+            });
+            if (jr.ok) {
+              const jj = await jr.json();
+              if (jj?.understanding) setUnderstanding(sanitizeUserUnderstanding(jj.understanding));
+            }
+          } catch {}
+        })();
+      }
     } catch (e: any) {
       setStreaming('');
       setError(e?.message || 'Something went wrong.');
@@ -1635,7 +1965,7 @@ export function LogosApp({
                   way in and leads. The access key stays for people without one
                   — comped members, anyone handed a code — but it no longer
                   fronts the screen as though this were invite-only. */}
-              <a className="lg-gate-go" href="/sign-in?redirect_url=%2Fchat%3Fmodel%3Dlogos">
+              <a className="lg-gate-go" href={gateHref}>
                 Sign in to open Logos
               </a>
               <button
@@ -1782,6 +2112,33 @@ export function LogosApp({
       {/* The contextual prompt. Says what stopped and how to keep going, and
           nothing else — the full plate above is for when someone goes looking
           for it. Both end at the same checkout. */}
+      <JourneyDebugModal
+        open={memoryOpen}
+        onClose={() => setMemoryOpen(false)}
+        journey={understanding}
+        plan={plan}
+        signedIn={!!isSignedIn}
+        onForget={async (id) => {
+          try {
+            const res = await fetch('/api/profile/forget', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ id }),
+            });
+            if (res.ok) {
+              const j = await res.json();
+              if (j?.understanding) setUnderstanding(sanitizeUserUnderstanding(j.understanding));
+            }
+          } catch {}
+        }}
+        onForgetAll={async () => {
+          try {
+            const res = await fetch('/api/account/memory', { method: 'DELETE' });
+            if (res.ok) setUnderstanding(null);
+          } catch {}
+        }}
+      />
+
       <OnePrompt
         view={onePrompt}
         onDismiss={dismissPrompt}
@@ -1842,6 +2199,13 @@ export function LogosApp({
               <span className="lg-sr">Socria Logos</span>
             </span>
             <span className="lg-head-note">A reasoning environment</span>
+            {/* Logos hears "you've leaned on this before"; this is where it
+                came from, and where it can be forgotten — on every plan. */}
+            {isSignedIn && (
+              <button type="button" className="lg-memory-btn" onClick={() => setMemoryOpen(true)}>
+                What Socria remembers
+              </button>
+            )}
             <button
               type="button"
               className="lg-guide-open"
@@ -1923,18 +2287,49 @@ export function LogosApp({
                   Type what you’re working through. Logos asks questions back,
                   and draws the shape of your reasoning on the right as you go.
                 </p>
-                <div className="lg-starters">
-                  {logosStarters.map((s) => (
-                    <button
-                      key={s.prompt}
-                      type="button"
-                      onClick={() => send(s.prompt)}
-                      title={s.prompt !== s.label ? s.prompt : undefined}
-                    >
-                      {s.label}
-                    </button>
-                  ))}
-                </div>
+                {noSessions ? (
+                  // Nothing has ever been said here. The chips would send a
+                  // line too thin to draw; these are four complete first
+                  // messages, put into the composer and NEVER sent — the
+                  // person edits them into their own situation first.
+                  <div className="lg-openings">
+                    <p className="lg-openings-lead">{OPENING_LEAD}</p>
+                    {OPENINGS.map((o) => (
+                      <button
+                        key={o.id}
+                        type="button"
+                        className="lg-opening"
+                        onClick={() => {
+                          setInput(o.message);
+                          startIdRef.current = o.id;
+                          requestAnimationFrame(() => {
+                            const ta = document.querySelector<HTMLTextAreaElement>('.lg-composer textarea');
+                            if (ta) {
+                              ta.focus();
+                              ta.setSelectionRange(ta.value.length, ta.value.length);
+                            }
+                          });
+                        }}
+                      >
+                        <strong>{o.label}</strong>
+                        <small>{o.shows}</small>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="lg-starters">
+                    {logosStarters.map((s) => (
+                      <button
+                        key={s.prompt}
+                        type="button"
+                        onClick={() => send(s.prompt)}
+                        title={s.prompt !== s.label ? s.prompt : undefined}
+                      >
+                        {s.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
@@ -2280,7 +2675,36 @@ export function LogosApp({
                     : 'empty'}
               </span>
             )}
+            {/* Every plan. A picture of your own thinking is not a thing to
+                sell; the title goes into the file and nowhere else. */}
+            <button
+              type="button"
+              className="lg-panel-save"
+              disabled={!map.nodes.length || mapping}
+              onClick={() => void exportMapPng(map, active?.title && active.title !== UNTITLED ? active.title : 'A line of thinking')}
+            >
+              Save as image
+            </button>
           </header>
+          {firstMapNote && (
+            <div className="lg-guard lg-share-note" role="note">
+              <span className="lg-guard-dot" aria-hidden="true" />
+              <span className="lg-guard-text">{FIRST_MAP_NOTE}</span>
+              <button
+                type="button"
+                className="lg-share-save"
+                onClick={() => {
+                  void exportMapPng(map, active?.title && active.title !== UNTITLED ? active.title : 'A line of thinking');
+                  setFirstMapNote(false);
+                }}
+              >
+                Save as image
+              </button>
+              <button type="button" className="lg-guard-x" aria-label="Dismiss" onClick={() => setFirstMapNote(false)}>
+                ×
+              </button>
+            </div>
+          )}
           <ThinkingMap
             map={map}
             onAction={runAction}

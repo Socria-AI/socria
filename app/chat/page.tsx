@@ -24,6 +24,9 @@ import {
   saveLocal as saveLocalLogos,
 } from '@/lib/logos-sessions';
 import { DRIFT_DISMISS_LIMIT, readDrift, type DriftVerdict } from '@/lib/topic-drift';
+import { readStart, startMessage } from '@/lib/first-session';
+import { track } from '@/lib/analytics';
+import { hasJourneyContent as journeyHasContent } from '@/lib/socria-prompt';
 import {
   SESSION_TABS,
   cleanTitle,
@@ -212,6 +215,10 @@ export default function ChatPage() {
   // surfaces share it, so the id is prefixed the way the keys are.
   const [renaming, setRenaming] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState('');
+  /** conversations whose one note about the free thread memory has been closed (this tab) */
+  const [frozenNoteClosed, setFrozenNoteClosed] = useState<Set<string>>(new Set());
+  /** just back from checkout: the one line worth saying, then gone */
+  const [oneWelcome, setOneWelcome] = useState(false);
   // A misfiled message, and how many times this person has said they meant it.
   const [drift, setDrift] = useState<(DriftVerdict & { text: string; from: string }) | null>(null);
   const [driftDismissals, setDriftDismissals] = useState(0);
@@ -590,6 +597,11 @@ export default function ChatPage() {
   // so it outranks a finished conversation's title; both outrank the generic
   // openings, which stay to top the list up and to keep one way in to
   // something new.
+  const returnChips = (journey?.openThreads ?? [])
+    .filter((t) => t.returnCue)
+    .sort((a, b) => b.lastTouched - a.lastTouched)
+    .slice(0, planState.plan === 'one' ? 3 : 1);
+
   const starters = buildStarters({
     // What the journey extractor thinks this person would want to ask next,
     // from what they have actually been working through. Everything below is
@@ -748,6 +760,18 @@ export default function ChatPage() {
       const suggestedTitle: string | null = json?.suggestedTitle ?? null;
       if (!nextMemory) return;
 
+      // The free tier's thread memory has stopped updating. Nothing on
+      // screen changed and the reply was the same; the note is shown once,
+      // and only from the turn where the stop could actually be felt — past
+      // the point where the raw history window (MAX_HISTORY/2 of the
+      // person's turns) has itself begun to slide.
+      if (json?.frozen === true && !(convo.memory?.frozenAt ?? 0)) {
+        const userTurns = convo.messages.filter((m) => m.role === 'user').length;
+        if (userTurns > 15) nextMemory.frozenAt = userTurns;
+      } else if (convo.memory?.frozenAt) {
+        nextMemory.frozenAt = convo.memory.frozenAt;
+      }
+
       let latestPatched: Conversation | undefined;
       setConversations((prev) => {
         const next = prev.map((c) => {
@@ -832,6 +856,8 @@ export default function ChatPage() {
               memory: latestPatched?.memory ?? nextMemory,
               title: latestPatched?.title ?? convo.title,
               messages: convo.messages,
+              surface: 'core',
+              conversationId: convoId,
             }),
           });
           if (jr.ok) {
@@ -1330,12 +1356,83 @@ export default function ChatPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const want = params.get('model');
+
+    // A first message chosen on /explore, for Core. Into the composer and
+    // never sent. When Logos is being routed — by the link, or by the model
+    // this page remembered — the parameter is left for it: Logos mounts a
+    // beat later and reads it itself, and this effect can run twice in
+    // development, the second time with `model` already gone from the URL.
+    // `model` state still holds its initial value here — the remembered model
+    // is applied by a later effect — so the store is asked directly.
+    if (want !== 'logos' && readModel() !== 'logos') {
+      const { id } = readStart(window.location.search);
+      if (id) {
+        const msg = startMessage(id);
+        if (msg) {
+          setInput(msg);
+          requestAnimationFrame(() => textareaRef.current?.focus());
+        }
+        const u = new URL(window.location.href);
+        u.searchParams.delete('start');
+        window.history.replaceState({}, '', u.pathname + u.search);
+      }
+    }
+
+    // A link from an email says which one it was; remembered for checkout.
+    const via = params.get('via');
+    if (via) {
+      try {
+        sessionStorage.setItem('socria.via.v1', via);
+      } catch {}
+      const u = new URL(window.location.href);
+      u.searchParams.delete('via');
+      window.history.replaceState({}, '', u.pathname + u.search);
+    }
+
+    // Back from checkout on Core. Logos handles its own; here the one line
+    // is said in the thread and the plan is re-read until Stripe's webhook
+    // has landed. Counted from the browser too (once per checkout session):
+    // the webhook's event arrives as a visit by Stripe.
+    if (params.get('one') === 'welcome' && want !== 'logos') {
+      const sessionId = params.get('session_id');
+      const u = new URL(window.location.href);
+      u.searchParams.delete('one');
+      u.searchParams.delete('session_id');
+      window.history.replaceState({}, '', u.pathname + u.search);
+      setOneWelcome(true);
+      try {
+        if (sessionId && sessionStorage.getItem('socria.one.welcomed.v1') !== sessionId) {
+          sessionStorage.setItem('socria.one.welcomed.v1', sessionId);
+          const last = JSON.parse(localStorage.getItem('socria.checkout.last.v1') || 'null') as {
+            trigger?: string;
+            surface?: string;
+            source?: string;
+          } | null;
+          track('one_subscribed', {
+            trigger: last?.trigger,
+            surface: last?.surface ?? 'core',
+            source: last?.source ?? 'client',
+            plan: 'one',
+          });
+        }
+      } catch {}
+      let tries = 0;
+      const poll = () => {
+        planState.refresh();
+        tries += 1;
+        if (tries < 6) setTimeout(poll, 1000 * tries);
+      };
+      setTimeout(poll, 800);
+    }
+
     if (want !== 'logos' && want !== 'core-3' && want !== 'core-2') return;
     setModel(want);
     rememberModel(want);
     const url = new URL(window.location.href);
     url.searchParams.delete('model');
     window.history.replaceState({}, '', url.pathname + url.search);
+    // planState.refresh is stable; this is a mount-only read of the URL.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const messages = active?.messages || [];
@@ -1381,6 +1478,43 @@ export default function ChatPage() {
         open={journeyDebugOpen}
         onClose={() => setJourneyDebugOpen(false)}
         journey={journey}
+        plan={planState.plan}
+        signedIn={!!isSignedIn}
+        onForget={async (id) => {
+          if (isSignedIn) {
+            try {
+              const res = await fetch('/api/profile/forget', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id }),
+              });
+              if (res.ok) {
+                const j = await res.json();
+                if (j?.understanding) saveJourney(j.understanding);
+              }
+            } catch {}
+            return;
+          }
+          // Signed out: the journey lives in this browser, so the tombstone
+          // does too. lib/person-memory's forgetEntry, applied locally.
+          const cur = journeyRef.current;
+          if (!cur) return;
+          const { forgetEntry } = await import('@/lib/person-memory');
+          const { entries, forgotten } = forgetEntry(cur.entries, cur.forgotten, id);
+          saveJourney({ ...cur, entries, forgotten, updatedAt: Date.now() });
+        }}
+        onForgetAll={async () => {
+          if (isSignedIn) {
+            try {
+              await fetch('/api/account/memory', { method: 'DELETE' });
+            } catch {}
+          }
+          setJourney(null);
+          journeyRef.current = null;
+          try {
+            localStorage.removeItem(JOURNEY_KEY);
+          } catch {}
+        }}
       />
       {/* Mobile backdrop when sidebar is open */}
       {sidebarOpen && (
@@ -1657,11 +1791,11 @@ export default function ChatPage() {
               <path d="M12 8v4l2.5 2.5" strokeLinecap="round" />
             </svg>
             <span>
-              Thinking journey{' '}
-              {journey ? (
+              What Socria remembers{' '}
+              {journeyHasContent(journey) ? (
                 <span className="text-moss-700 font-medium">· view</span>
               ) : (
-                <span className="text-ink/40">· empty so far</span>
+                <span className="text-ink/40">· nothing yet</span>
               )}
             </span>
           </button>
@@ -1762,7 +1896,27 @@ export default function ChatPage() {
                   working through.
                 </p>
 
-                <div className="mt-10 grid sm:grid-cols-2 gap-3 text-left">
+                {/* Where they left off — the open threads whose return cue
+                    is ready to send, as the first chips. The free tier shows
+                    the most recent one; One shows up to three. Topic and cue
+                    are on screen only; never in analytics. */}
+                {returnChips.length > 0 && (
+                  <div className="mt-10 grid sm:grid-cols-2 gap-3 text-left">
+                    {returnChips.map((t) => (
+                      <button
+                        key={t.topic}
+                        onClick={() => send(t.returnCue!)}
+                        disabled={sending}
+                        className="p-4 rounded-xl border border-moss-300/70 bg-moss-50/40 hover:border-moss-600 transition-all text-[14px] text-ink/80 text-left"
+                      >
+                        <span className="block text-[10px] uppercase tracking-wider text-moss-700 mb-1">still open</span>
+                        {t.topic}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                <div className={`${returnChips.length ? 'mt-3' : 'mt-10'} grid sm:grid-cols-2 gap-3 text-left`}>
                   {starters.map((p) => (
                     <button
                       key={p.prompt}
@@ -1794,6 +1948,25 @@ export default function ChatPage() {
                 </SignedOut>
               </div>
             ) : null}
+
+            {oneWelcome && (
+              <div className="my-4 flex items-start gap-3 rounded-xl border border-moss-200/70 bg-moss-50/40 p-3 text-[13px] text-ink/80" role="status">
+                <span className="flex-1">
+                  {planState.plan === 'one' ? (
+                    <>
+                      <b>Socria One is open.</b> Every line of thinking stays open as far as it goes, and Socria carries what it learns about how you think into Logos.
+                    </>
+                  ) : (
+                    <>
+                      <b>Thank you — setting up your subscription.</b> This takes a moment; it opens as soon as Stripe confirms.
+                    </>
+                  )}
+                </span>
+                <button type="button" className="px-1 text-ink/40 hover:text-ink" aria-label="Dismiss" onClick={() => setOneWelcome(false)}>
+                  ×
+                </button>
+              </div>
+            )}
 
             {messages.map((m, i) => {
               const isAssistant = m.role === 'assistant';
@@ -1874,6 +2047,25 @@ export default function ChatPage() {
                 <span className="thinking-dot" />
                 <span className="thinking-dot" />
                 <span className="ml-2 font-serif italic text-sm">thinking</span>
+              </div>
+            )}
+
+            {/* The free tier's thread memory has stopped here. One line, once
+                per conversation, with a ×; no sheet, no trigger — it says
+                what happened and what One does, in the boundary's own voice. */}
+            {active?.memory?.frozenAt && !frozenNoteClosed.has(active.id) && !sending && (
+              <div className="my-4 flex items-center gap-3 px-1 text-[12.5px] text-ink/60" role="note">
+                <span className="font-serif italic flex-1">
+                  This is as far as a free thread’s memory reaches. Everything said here stays; Socria One carries a thread as far as it goes.
+                </span>
+                <button
+                  type="button"
+                  className="px-1 text-ink/35 hover:text-ink"
+                  aria-label="Dismiss"
+                  onClick={() => setFrozenNoteClosed((prev) => new Set(prev).add(active.id))}
+                >
+                  ×
+                </button>
               </div>
             )}
 
