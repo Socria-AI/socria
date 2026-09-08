@@ -46,7 +46,7 @@ export interface Attribution {
   intent?: 'low' | 'medium' | 'high' | 'urgent';
 }
 
-function isSource(v: unknown): v is Source {
+export function isSource(v: unknown): v is Source {
   return typeof v === 'string' && (SOURCES as readonly string[]).includes(v);
 }
 

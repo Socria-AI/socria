@@ -7,7 +7,7 @@
 // up in an analytics payload is never a deliberate decision, it is a key
 // somebody added in a hurry.
 
-import { scrub, EVENTS } from './.tmp/analytics.mjs';
+import { scrub, EVENTS, nthBucket, tenureBucket } from './.tmp/analytics.mjs';
 
 let pass = 0,
   fail = 0;
@@ -159,6 +159,20 @@ console.log('\n=== the output is always flat scalars ===');
   );
   ok('every value is a scalar', flat, JSON.stringify(out));
   ok('prototype is not walked', !('constructor' in out) || out.constructor === Object);
+}
+
+console.log('\n=== the buckets say a shape, never a number ===');
+{
+  ok('first', nthBucket(1) === '1' && nthBucket(0) === '1' && nthBucket(NaN) === '1');
+  ok('second', nthBucket(2) === '2');
+  ok('everything after is one bucket', nthBucket(3) === '3+' && nthBucket(40) === '3+');
+  ok('same day', tenureBucket(0) === 'd0' && tenureBucket(-1) === 'd0');
+  ok('first days', tenureBucket(1) === 'd1-3' && tenureBucket(3) === 'd1-3');
+  ok('first week', tenureBucket(4) === 'd4-7' && tenureBucket(7) === 'd4-7');
+  ok('first month', tenureBucket(8) === 'd8-30' && tenureBucket(30) === 'd8-30');
+  ok('longer', tenureBucket(31) === '30+' && tenureBucket(400) === '30+');
+  ok('unknown when there is no first activity', tenureBucket(null) === 'unknown' && tenureBucket(undefined) === 'unknown' && tenureBucket(NaN) === 'unknown');
+  ok('every value is one of six words', ['d0', 'd1-3', 'd4-7', 'd8-30', '30+', 'unknown'].includes(tenureBucket(12)));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
