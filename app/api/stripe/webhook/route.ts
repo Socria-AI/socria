@@ -40,7 +40,13 @@ import { emailBaseUrl, emailSecret, sendEmail, withTimeout } from '@/lib/email';
 
 /** How long the welcome may take inside the webhook. Stripe allows far more. */
 const WELCOME_MS = 6000;
-import { lifecycleCopy, lifecycleLink, unsubscribeToken, unsubscribeUrl } from '@/lib/lifecycle';
+import {
+  lifecycleAddress,
+  lifecycleCopy,
+  lifecycleLink,
+  unsubscribeToken,
+  unsubscribeUrl,
+} from '@/lib/lifecycle';
 import { claimLifecycle, isUnsubscribed, markSent, releaseClaim } from '@/lib/lifecycle-store';
 
 /**
@@ -84,10 +90,18 @@ async function sendWelcome(userId: string, attribution: Attribution, req: NextRe
     const claim = await claimLifecycle(userId, 'welcome-one');
     if (claim !== 'claimed') return 'done';
 
+    // Never a university address: it is on the account to prove eligibility
+    // for the student programme, and nothing Socria sends is addressed to it.
     let to = '';
     try {
       const u = await clerkClient().users.getUser(userId);
-      to = (u.emailAddresses.find((e) => e.id === u.primaryEmailAddressId) ?? u.emailAddresses[0])?.emailAddress ?? '';
+      to =
+        lifecycleAddress(
+          u.emailAddresses.map((e) => ({
+            address: e.emailAddress,
+            primary: e.id === u.primaryEmailAddressId,
+          }))
+        ) ?? '';
     } catch {}
     if (!to) {
       await releaseClaim(userId, 'welcome-one');

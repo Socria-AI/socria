@@ -12,6 +12,7 @@ import { getSubscription, isCompCustomer, tryUpsertSubscription } from '@/lib/su
 import { enforceRateLimit } from '@/lib/rate-limit';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { attributionMetadata, readAttribution } from '@/lib/checkout-attribution';
+import { lifecycleAddress } from '@/lib/lifecycle';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -115,9 +116,19 @@ export async function POST(req: NextRequest) {
     if (!customerId) {
       // The email is a convenience on the Stripe customer, not a requirement.
       // Clerk being slow or unreachable is not a reason nobody can subscribe.
+      // Prefer an address that is not the university one: it was added to
+      // prove eligibility for the student programme, and it should not become
+      // the billing contact on a Stripe customer record. Falls back to
+      // whatever we have — a customer with no email is worse for the person
+      // than a receipt at their university address.
       let email: string | undefined;
       try {
-        email = (await currentUser())?.emailAddresses?.[0]?.emailAddress;
+        const u = await currentUser();
+        const all = (u?.emailAddresses ?? []).map((e) => ({
+          address: e.emailAddress,
+          primary: e.id === u?.primaryEmailAddressId,
+        }));
+        email = lifecycleAddress(all) ?? all[0]?.address;
       } catch (e) {
         console.warn('stripe checkout: could not read the email', e);
       }
