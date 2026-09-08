@@ -51,7 +51,17 @@ export async function GET() {
       : null;
     return NextResponse.json({
       profile: data?.profile ?? null,
-      understanding: hasJourneyContent(understanding) ? understanding : null,
+      // A CLEARED row is not the same as no row. "Forget everything" leaves a
+      // stamped but empty understanding; answering null for it told the
+      // browser the account had nothing, and the browser — which still had
+      // the old journey in localStorage — helpfully pushed it back up. So an
+      // understanding that has been written at all comes back, empty or not,
+      // and the client's newest-wins sync sees a clear that is newer than
+      // what it holds.
+      understanding:
+        understanding && (hasJourneyContent(understanding) || understanding.updatedAt > 0)
+          ? understanding
+          : null,
     });
   } catch (e: any) {
     console.error('GET profile error:', e);

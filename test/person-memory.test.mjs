@@ -317,5 +317,64 @@ console.log('\n=== the extractor’s proposals are cleaned before they count ===
   ok('retire on junk is empty', sanitizeRetire('x', store).length === 0);
 }
 
+console.log('\n=== the assertions that fail if the feature is deleted ===');
+{
+  // Relevance must actually discriminate. Two entries of the SAME kind and
+  // the same standing: only the words decide, so an assertion that passes
+  // with the relevance term removed is no assertion at all.
+  const a = entry('fact', 'Has a sister in Athens');
+  const b = entry('fact', 'Keeps a workshop in the garage');
+  const pick = (ctx) => selectRelevant([a, b], ctx, { now: NOW, n: 1 })[0].text;
+  ok('the Athens context picks the Athens fact', /Athens/.test(pick('should I take the job in Athens')));
+  ok('the workshop context picks the workshop fact', /workshop/.test(pick('the garage workshop is full of tools')));
+
+  // A realisation outranks a bare fact of the same age — the weight this
+  // commit changed. Reverting it makes this fail.
+  const ins = entry('insight', 'Realised the fear arrives before the goal', { lastSeen: day(2) });
+  const fct = entry('fact', 'Works nights at the city hospital', { lastSeen: day(2) });
+  ok('a realisation outranks a bare fact', scoreEntry(ins, NOW) > scoreEntry(fct, NOW));
+  ok('...and ranks with a decision', Math.abs(scoreEntry(ins, NOW) - scoreEntry(entry('decision', 'Turned down the Berlin offer', { lastSeen: day(2) }), NOW)) < 1e-9);
+
+  // `private` is what keeps a reflective conversation out of Logos. If it
+  // did not survive the round trip through the database it would be lost
+  // the first time the row was read back.
+  const priv = { ...entry('value', 'Wants to feel less afraid of being wrong'), private: true };
+  const back = sanitizeEntries([priv, entry('fact', 'Lives in Dallas now')]);
+  ok('private survives sanitising', back.find((e) => e.private === true) !== undefined);
+  ok('...and is not invented for the others', back.filter((e) => e.private).length === 1);
+  ok('a private entry is never selected for Logos',
+    selectRelevant(back, 'afraid of being wrong', { now: NOW, n: 5, excludePrivate: true }).every((e) => !e.private));
+  ok('...and never rendered into a Logos prompt',
+    !renderPersonMemory(selectRelevant(back, 'afraid of being wrong', { now: NOW, n: 5, excludePrivate: true }), 'logos').includes('afraid of being wrong'));
+
+  // The composition the route uses for free Logos: window → stated only →
+  // patterns and decisions → at most two → never private.
+  const store = [
+    entry('pattern', 'Compares several options before deciding', { seen: 5 }),
+    entry('pattern', 'Seeks certainty before acting', { seen: 3 }),
+    entry('pattern', 'Guesses first and checks after', { confidence: 'inferred', seen: 9 }),
+    entry('decision', 'Turned down the Berlin offer'),
+    { ...entry('value', 'Wants work that teaches them'), private: true },
+    entry('fact', 'Works nights at the city hospital'),
+  ];
+  const freeLogos = selectRelevant(
+    visibleEntries(store, 'free', NOW).filter((e) => e.confidence === 'stated'),
+    'anything at all',
+    { now: NOW, n: memoryCaps('free').injectLogos, kinds: ['pattern', 'decision'], excludePrivate: true }
+  );
+  ok('free Logos carries at most two', freeLogos.length <= 2 && freeLogos.length > 0);
+  ok('...only patterns or decisions', freeLogos.every((e) => e.kind === 'pattern' || e.kind === 'decision'));
+  ok('...only things they said outright', freeLogos.every((e) => e.confidence === 'stated'));
+  ok('...never the private one', freeLogos.every((e) => !e.private));
+  ok('...and One carries more', selectRelevant(visibleEntries(store, 'one', NOW), 'anything at all', { now: NOW, n: memoryCaps('one').injectLogos, excludePrivate: true }).length > freeLogos.length);
+
+  // The route resolves at most MAX_RETIRE_PER_PASS handles, as composed.
+  const many = Array.from({ length: 10 }, (_, i) => entry('fact', `Remembered thing number ${i} here`));
+  const al = entryAliases(many);
+  const asked = many.map((_, i) => `m${i + 1}`);
+  ok('a pass cannot retire more than the cap',
+    resolveAliases(asked, al, MAX_RETIRE_PER_PASS).length === MAX_RETIRE_PER_PASS);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

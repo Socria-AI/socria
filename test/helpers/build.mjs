@@ -45,6 +45,7 @@ const MODULES = [
   'lib/first-session.ts',
   'components/MapPoster.tsx',
   'lib/lifecycle.ts',
+  'lib/email.ts',
   'lib/socria-prompt.ts',
 ];
 

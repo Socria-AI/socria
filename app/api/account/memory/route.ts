@@ -61,7 +61,10 @@ export async function DELETE(req: NextRequest) {
     // The cross-conversation journey and the imported background profile.
     await db
       .from('user_profiles')
-      .update({ profile: '', understanding: {}, updated_at: Date.now() })
+      // Stamped, not empty: the clients sync newest-wins by `updatedAt`, and
+      // an unstamped clear reads as older than any browser's copy — which
+      // would then be pushed straight back up, undoing the clearing.
+      .update({ profile: '', understanding: { updatedAt: Date.now() }, updated_at: Date.now() })
       .eq('user_id', userId);
 
     return NextResponse.json({ ok: true, clearedThreads });

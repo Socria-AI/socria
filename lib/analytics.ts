@@ -115,6 +115,29 @@ const ALLOWED_KEYS = new Set<keyof EventProps>([
 ]);
 
 /**
+ * Which line of thinking this is for the person, as a bucket. Shape only —
+ * three values, so nobody can be picked out by their count.
+ */
+export function nthBucket(n: number): '1' | '2' | '3+' {
+  if (!Number.isFinite(n) || n <= 1) return '1';
+  return n === 2 ? '2' : '3+';
+}
+
+/**
+ * How long someone had been thinking here before they paid, from days to a
+ * word. Answers "do people pay on day one or after a month", which decides
+ * where every other effort should go — and nothing finer than that.
+ */
+export function tenureBucket(days: number | null | undefined): string {
+  if (days === null || days === undefined || !Number.isFinite(days)) return 'unknown';
+  if (days <= 0) return 'd0';
+  if (days <= 3) return 'd1-3';
+  if (days <= 7) return 'd4-7';
+  if (days <= 30) return 'd8-30';
+  return '30+';
+}
+
+/**
  * Keep only allowed keys, only scalar values, and cap strings.
  *
  * The length cap is the part that matters. Every allowed key is meant to hold

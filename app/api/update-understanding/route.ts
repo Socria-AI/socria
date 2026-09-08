@@ -52,17 +52,27 @@ const EXTRACTOR_ENTRIES = 60;
  * resurrect what another pass had just learned or forgotten. So the merge
  * happens into the ROW, and the row is what comes back.
  */
-async function readServerUnderstanding(userId: string): Promise<UserUnderstanding | null> {
+type ServerRead =
+  | { ok: true; understanding: UserUnderstanding }
+  /** the store could not answer — NOT the same thing as "no row" */
+  | { ok: false };
+
+async function readServerUnderstanding(userId: string): Promise<ServerRead> {
   try {
     const { data, error } = await supabaseAdmin()
       .from('user_profiles')
       .select('understanding')
       .eq('user_id', userId)
       .maybeSingle();
-    if (error || !data) return null;
-    return sanitizeUserUnderstanding((data as { understanding?: unknown }).understanding);
+    if (error) return { ok: false };
+    return {
+      ok: true,
+      understanding: sanitizeUserUnderstanding(
+        (data as { understanding?: unknown } | null)?.understanding
+      ),
+    };
   } catch {
-    return null;
+    return { ok: false };
   }
 }
 
@@ -98,17 +108,28 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json().catch(() => null);
   // The row when there is one; the client's copy only when there is not.
+  //
+  // A read that FAILED is not an empty row. Treating it as one would take the
+  // client's entries and tombstones — possibly a stale device that has not
+  // heard about something forgotten elsewhere — and write them back as the
+  // truth, resurrecting the forgotten entry and erasing its tombstone. So a
+  // failed read ends the pass; the next turn tries again.
   const fromClient = sanitizeUserUnderstanding(body?.understanding);
-  const fromServer = userId ? await readServerUnderstanding(userId) : null;
-  const current: UserUnderstanding = fromServer
-    ? {
-        // Journey fields: whichever is newer — the client may be a turn ahead.
-        ...(fromClient.updatedAt > fromServer.updatedAt ? fromClient : fromServer),
-        // Entries and tombstones: always the server's.
-        entries: fromServer.entries,
-        forgotten: fromServer.forgotten,
-      }
-    : fromClient;
+  let current: UserUnderstanding = fromClient;
+  if (userId) {
+    const read = await readServerUnderstanding(userId);
+    if (!read.ok) {
+      return NextResponse.json({ understanding: fromClient });
+    }
+    const held = read.understanding;
+    current = {
+      // Journey fields: whichever is newer — the client may be a turn ahead.
+      ...(fromClient.updatedAt > held.updatedAt ? fromClient : held),
+      // Entries and tombstones: always the server's.
+      entries: held.entries,
+      forgotten: held.forgotten,
+    };
+  }
   const memory = sanitizeMemory(body?.memory);
   const title =
     typeof body?.title === 'string' ? body.title.slice(0, 120) : null;
@@ -137,6 +158,15 @@ export async function POST(req: NextRequest) {
 
   if (!recent) {
     return NextResponse.json({ understanding: current });
+  }
+
+  // A conversation the person is working something personal through teaches
+  // this memory nothing it may carry. The entries were already kept out of
+  // Logos by their `private` flag — but the NARRATIVE and the open threads
+  // are rewritten from the same words and go into Logos whole, so marking the
+  // entries was only half the boundary. The whole pass stands down.
+  if (privateSource) {
+    return NextResponse.json({ understanding: current, skipped: 'private' });
   }
 
   try {
@@ -191,6 +221,17 @@ export async function POST(req: NextRequest) {
     // to every device via newest-wins sync.
     if (!Array.isArray(parsed?.narrative)) {
       return NextResponse.json({ understanding: current });
+    }
+
+    // The pass's own reading of what it just read. The thread memory's
+    // context is the signal above, and on the free tier it goes stale: a
+    // thread stops being extracted from at twelve turns, so a conversation
+    // that turns personal at turn sixteen still reports whatever it was
+    // before. This one cannot be stale — it is about the exchange in the
+    // prompt — and a "reflecting" answer discards the pass entirely, exactly
+    // as the prior signal does.
+    if (typeof parsed?.context === 'string' && parsed.context.trim().toLowerCase() === 'reflecting') {
+      return NextResponse.json({ understanding: current, skipped: 'private' });
     }
 
     const now = Date.now();
@@ -262,7 +303,6 @@ export async function POST(req: NextRequest) {
           now,
           reinforceIds: resolveAliases(parsed.reinforce, aliases, 20),
           source: conversationId ? { surface, conversationId } : undefined,
-          privateSource,
           forgotten: current.forgotten,
         }
       );

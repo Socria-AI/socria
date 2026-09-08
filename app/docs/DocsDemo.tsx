@@ -249,7 +249,7 @@ export function DemoLimitsTable() {
             <td>{oneCap(one.memoryTurns)}</td>
           </tr>
           <tr>
-            <td>Things Socria carries about you into a conversation</td>
+            <td>Things Socria keeps about how you think</td>
             <td>{cap(free.memoryEntries)}</td>
             <td>All of them</td>
           </tr>
