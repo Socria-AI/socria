@@ -27,6 +27,8 @@ import {
   renderStateDirective,
 } from '@/lib/conversation-controller';
 import { enforceRateLimit } from '@/lib/rate-limit';
+import { resolvePlanForRequest } from '@/lib/socria-one-server';
+import { memoryCaps, selectRelevant, visibleEntries } from '@/lib/person-memory';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -131,9 +133,33 @@ export async function POST(req: NextRequest) {
     const rawUserTurns = Array.isArray(messages)
       ? messages.filter((m: any) => m?.role === 'user').length
       : 0;
+    // What this plan carries of the person into the conversation. The plan
+    // is resolved here rather than trusted from the body: a modified free
+    // client could otherwise hand itself a member's memory. The store is one
+    // store for every plan; the plan is a window onto it (lib/person-memory.ts).
+    const plan = userId ? await resolvePlanForRequest(req, userId) : 'free';
+    const caps = memoryCaps(plan);
+    const now = Date.now();
+    const contextText = Array.isArray(messages)
+      ? messages
+          .slice(-4)
+          .map((m: any) => (typeof m?.content === 'string' ? m.content : ''))
+          .join('\n')
+          .slice(0, 2_000)
+      : '';
+    const personMemory = understanding
+      ? selectRelevant(visibleEntries(understanding.entries, plan, now), contextText, {
+          now,
+          n: caps.injectCore,
+        })
+      : null;
     const journey =
       understanding && hasJourneyContent(understanding)
-        ? { understanding, conversationStart: rawUserTurns <= 1 }
+        ? {
+            understanding,
+            conversationStart: rawUserTurns <= 1,
+            limits: { narrative: caps.narrative, threads: caps.threads, timeline: Math.min(caps.timeline, 14) },
+          }
         : null;
 
     const { prompt: basePrompt, model, depth } = buildSystemPrompt(
@@ -141,7 +167,8 @@ export async function POST(req: NextRequest) {
       body?.depth,
       body?.memory,
       typeof body?.profile === 'string' ? body.profile : null,
-      journey
+      journey,
+      personMemory
     );
 
     if (!Array.isArray(messages) || messages.length === 0) {

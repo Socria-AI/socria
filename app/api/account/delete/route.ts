@@ -25,6 +25,7 @@ const OWNED_TABLES = [
   'user_profiles',
   'logos_connections',
   'socria_subscriptions',
+  'lifecycle_emails',
 ] as const;
 
 export async function DELETE(req: NextRequest) {

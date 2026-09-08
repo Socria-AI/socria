@@ -107,7 +107,13 @@ export function OneCard({ state }: { state: PlanState }) {
     setBusy('checkout');
     setErr(null);
     try {
-      const res = await fetch('/api/stripe/checkout', { method: 'POST' });
+      const res = await fetch('/api/stripe/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        // No prompt led here — only which screen it was. The webhook counts
+        // the payment against it.
+        body: JSON.stringify({ surface: 'account' }),
+      });
       // Signed out: take them to sign in and bring them back to finish,
       // rather than showing "Sign in to subscribe" as though it were a fault.
       if (res.status === 401) {

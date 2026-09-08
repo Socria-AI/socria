@@ -19,11 +19,12 @@ import {
   isValidAccessKey,
 } from '@/lib/socria-prompt';
 import { enforceRateLimit } from '@/lib/rate-limit';
+import { resolvePlanForRequest } from '@/lib/socria-one-server';
+import { memoryCaps, memoryFrozen } from '@/lib/person-memory';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const MAX_MESSAGES_CONSIDERED = 8;
 
 export async function POST(req: NextRequest) {
   const { userId } = auth();
@@ -61,9 +62,25 @@ export async function POST(req: NextRequest) {
     (m: any) => m.role === 'user'
   ).length;
 
+  // What this plan carries. The free tier's thread memory stops updating
+  // past a fixed number of the person's turns — the one boundary in the
+  // product that is quiet by design: nothing on screen changes, the
+  // extractor simply stops, and the client shows a single note once the
+  // stop could be felt. A member's thread is carried as far as it goes.
+  const plan = userId ? await resolvePlanForRequest(req, userId) : 'free';
+  const caps = memoryCaps(plan);
+  if (memoryFrozen(plan, userTurnCount)) {
+    return NextResponse.json({
+      memory: currentMemory,
+      suggestedTitle: null,
+      frozen: true,
+      limit: caps.threadTurns,
+    });
+  }
+
   // Format the most recent turns for the extractor.
   const recent = validMessages
-    .slice(-MAX_MESSAGES_CONSIDERED)
+    .slice(-caps.extractorMessages)
     .map(
       (m: any) =>
         `${m.role === 'user' ? 'User' : 'Socria'}: ${m.content}`
@@ -94,7 +111,7 @@ export async function POST(req: NextRequest) {
     } catch {
       parsed = currentMemory;
     }
-    const extracted = sanitizeMemory(parsed);
+    const extracted = sanitizeMemory(parsed, caps.items);
     // Preserve insight + synthesis state — the extractor never touches them.
     const memory: typeof extracted = {
       ...extracted,
@@ -102,6 +119,8 @@ export async function POST(req: NextRequest) {
       lastInsightAtTurn: currentMemory.lastInsightAtTurn ?? 0,
       latestSynthesis: currentMemory.latestSynthesis ?? null,
       lastSynthesisAtTurn: currentMemory.lastSynthesisAtTurn ?? 0,
+      // The client's note about the freeze, if it has already been shown.
+      ...(currentMemory.frozenAt ? { frozenAt: currentMemory.frozenAt } : {}),
     };
     const suggestedTitle = sanitizeSuggestedTitle(parsed?.suggestedTitle);
 

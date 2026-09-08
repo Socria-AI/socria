@@ -28,8 +28,90 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type Stripe from 'stripe';
 import { stripe } from '@/lib/stripe';
-import { upsertSubscription, userForCustomer } from '@/lib/subscriptions';
+import { recordAttribution, upsertSubscription, userForCustomer } from '@/lib/subscriptions';
 import { writeStripeMirror } from '@/lib/socria-one-grant';
+import { attributionFromMetadata, type Attribution } from '@/lib/checkout-attribution';
+import { trackServer } from '@/lib/analytics-server';
+import { clerkClient } from '@clerk/nextjs/server';
+import { supabaseAdmin } from '@/lib/supabase';
+import { forgetPlanMemo } from '@/lib/socria-one-server';
+import { RACE_MS, emailBaseUrl, emailSecret, sendEmail, withTimeout } from '@/lib/email';
+import { lifecycleCopy, lifecycleLink, unsubscribeToken, unsubscribeUrl } from '@/lib/lifecycle';
+import { claimLifecycle, isUnsubscribed, markSent, releaseClaim } from '@/lib/lifecycle-store';
+
+/**
+ * How long this person had been thinking here before they paid, bucketed.
+ *
+ * Best effort and shape only: a query for the earliest conversation, turned
+ * into one of five words. It answers "do people pay on day one or after a
+ * month", which decides where every other effort in this file should go.
+ */
+async function tenureFor(userId: string, now: number): Promise<string> {
+  try {
+    const { data } = await supabaseAdmin()
+      .from('conversations')
+      .select('created_at')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    const raw = (data as { created_at?: unknown } | null)?.created_at;
+    const first = raw ? new Date(String(raw)).getTime() : NaN;
+    if (!Number.isFinite(first)) return 'unknown';
+    const days = Math.floor((now - first) / 86_400_000);
+    if (days <= 0) return 'd0';
+    if (days <= 3) return 'd1-3';
+    if (days <= 7) return 'd4-7';
+    if (days <= 30) return 'd8-30';
+    return '30+';
+  } catch {
+    return 'unknown';
+  }
+}
+
+/**
+ * The welcome, after the entitlement is written and never in its way.
+ *
+ * Claimed in the ledger before it is sent, so Stripe redelivering this event
+ * sends one welcome and not two; bounded by RACE_MS, because Stripe is
+ * waiting for a 200 and an email is the least important thing happening
+ * here; and wrapped so that nothing in it can change the response.
+ */
+async function sendWelcome(userId: string, attribution: Attribution, req: NextRequest): Promise<void> {
+  try {
+    const secret = emailSecret();
+    if (!secret) return;
+    if (await isUnsubscribed(userId)) return;
+    const claim = await claimLifecycle(userId, 'welcome-one');
+    if (claim !== 'claimed') return;
+
+    let to = '';
+    try {
+      const u = await clerkClient().users.getUser(userId);
+      to = (u.emailAddresses.find((e) => e.id === u.primaryEmailAddressId) ?? u.emailAddresses[0])?.emailAddress ?? '';
+    } catch {}
+    if (!to) {
+      await releaseClaim(userId, 'welcome-one');
+      return;
+    }
+
+    const base = emailBaseUrl();
+    const unsub = unsubscribeUrl(base, userId, unsubscribeToken(userId, secret));
+    const copy = lifecycleCopy('welcome-one', {
+      link: lifecycleLink('welcome-one', { base, surface: attribution.surface ?? null }),
+      unsubscribeUrl: unsub,
+    });
+    const result = await sendEmail({ to, subject: copy.subject, text: copy.text, html: copy.html, unsubscribeUrl: unsub });
+    if (!result.ok) {
+      await releaseClaim(userId, 'welcome-one');
+      return;
+    }
+    await markSent(userId, 'welcome-one');
+    await trackServer('lifecycle_email_sent', { kind: 'welcome-one', source: 'webhook' }, req);
+  } catch (e) {
+    console.warn('stripe webhook: welcome email failed', e instanceof Error ? e.message : '');
+  }
+}
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -70,6 +152,9 @@ async function applySubscription(sub: Stripe.Subscription): Promise<void> {
     console.warn('stripe webhook: no user for subscription', sub.id);
     return;
   }
+  // The instance that took the payment must not keep saying 'free' for
+  // half a minute from its memo.
+  forgetPlanMemo(userId);
 
   // The account first — see rule 4. This is a mirror of the subscription's
   // CURRENT state, so a cancellation revokes through it exactly as it revokes
@@ -139,11 +224,82 @@ export async function POST(req: NextRequest) {
           await writeStripeMirror(userId, { status: 'active', periodEnd: null });
           await upsertSubscription({ userId, customerId, status: 'active' });
         }
+
+        // The event the funnel was missing. Everything up to here was a
+        // prompt being shown or pressed; this is the payment landing, counted
+        // against the trigger that led to it — carried through the session's
+        // metadata from the checkout route and re-validated on the way back,
+        // because metadata is editable in the dashboard. Bookkeeping, after
+        // the entitlement: neither of these may make the webhook fail.
+        const attribution = attributionFromMetadata(session.metadata as Record<string, unknown>);
+        forgetPlanMemo(userId);
+        await recordAttribution(userId, attribution);
+        await trackServer(
+          'one_subscribed',
+          {
+            trigger: attribution.trigger,
+            surface: attribution.surface,
+            category: attribution.category,
+            intent: attribution.intent,
+            // First touch when there was one (an email, the Explore page);
+            // otherwise where the event was counted from.
+            source: attribution.source ?? 'webhook',
+            tenure: await tenureFor(userId, Date.now()),
+            plan: 'one',
+          },
+          req
+        );
+        // Last, and bounded: Stripe is waiting, and a welcome that takes
+        // longer than a moment simply goes without being waited for.
+        await withTimeout(sendWelcome(userId, attribution, req), RACE_MS, undefined);
       } else {
         console.warn('stripe webhook: completed session with no user', session.id);
       }
     } else {
-      await applySubscription(event.data.object as Stripe.Subscription);
+      const sub = event.data.object as Stripe.Subscription;
+      await applySubscription(sub);
+      // The other end of the funnel. Attribution rides on the subscription's
+      // own metadata (set at checkout), so a cancellation is counted against
+      // the same trigger that earned the subscription — which is how a
+      // trigger that converts well but churns fast becomes visible.
+      //
+      // Scheduling a cancellation in the portal is the one moment a save is
+      // possible, and the portal asks why. Stripe's `feedback` is a fixed
+      // enum ('too_expensive', 'unused', …); the free-text `comment` beside
+      // it is a person's words and never leaves Stripe.
+      if (event.type === 'customer.subscription.updated') {
+        const prev = (event.data as { previous_attributes?: { cancel_at_period_end?: boolean } })
+          .previous_attributes;
+        if (sub.cancel_at_period_end && prev && prev.cancel_at_period_end === false) {
+          const attribution = attributionFromMetadata(sub.metadata as Record<string, unknown>);
+          const feedback = (sub as { cancellation_details?: { feedback?: unknown } }).cancellation_details
+            ?.feedback;
+          await trackServer(
+            'one_cancel_scheduled',
+            {
+              trigger: attribution.trigger,
+              surface: attribution.surface,
+              feedback: typeof feedback === 'string' ? feedback : undefined,
+              plan: 'one',
+              source: 'webhook',
+            },
+            req
+          );
+        }
+      }
+      if (event.type === 'customer.subscription.deleted') {
+        const attribution = attributionFromMetadata(sub.metadata as Record<string, unknown>);
+        await trackServer(
+          'one_cancelled',
+          {
+            trigger: attribution.trigger,
+            surface: attribution.surface,
+            plan: 'free',
+            source: 'webhook',
+          },
+          req
+        );
+      }
     }
   } catch (e) {
     // A failure here IS worth a retry — the event was real and we couldn't

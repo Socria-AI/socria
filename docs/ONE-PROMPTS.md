@@ -263,3 +263,73 @@ one audience the caution was not protecting.
 price — the /one page and its metadata, the Logos landing page, the terms,
 the docs, the marks above — goes through one of the two. Change the constant
 and everything follows. Do not write the number anywhere else.
+
+---
+
+## Success moments (added with the memory work)
+
+There is now one proactive trigger besides `returning-thinker`:
+
+**`map-shaped`** — the map on screen just crossed five nodes, in a fresh
+extraction, in this tab. Never on hydration: opening a saved session with
+nine nodes is not a map taking shape, so the crossing has to be observed
+(previous count below five, new count at or above it) and the session has
+to have been extracted in this tab before, or been empty a moment ago.
+
+Two rules came out of the review that added it, and they hold for anything
+added later:
+
+- **A success trigger is never attached to a metered counter whose free
+  allowance is one.** The first Explore lands, and a prompt that fires on
+  it would be selling something the person just received free — seconds
+  before the `explore-spent` entitlement prompt says the same thing on the
+  next press. The next press IS the intent peak, and it already speaks.
+- **`map-shaped` and `map-full` are one boundary** (`FAMILY` in
+  `lib/one-prompt.ts`). Three nodes apart on the same map, they must not
+  sell the same thing twice: whichever is said first makes the other
+  `said-already` in that tab. That is also why `map-shaped` promises memory
+  — what Socria One carries about how the person reasons into Logos — and
+  not growth, which is `map-full`'s promise.
+
+`map-shaped` clears the same engagement bar as `returning-thinker`. A first
+map is never sold to; it belongs to the share moment (the one-time "That's
+your thinking, drawn" note), and while that note is up the proactive
+triggers stand down for the tab.
+
+### The settle
+
+Proactive asks are no longer decided at their own instant. A reply lands
+and two things say "now": the generic nudge, and — a beat later, once the
+extraction returns — the shaped map. Decided separately, the first through
+took the tab's one slot and the better one was suppressed as `session-cap`;
+`bestTrigger` existed and had no caller. The controller now collects
+proactive asks for a short settle (`SETTLE_MS`) and decides them once, as a
+set; typing or a request in flight cancels the lot (`cancelPending`).
+Entitlement prompts and the Socria One button are still immediate.
+
+### The daily floor
+
+The session cap is per tab by construction (sessionStorage), so two tabs
+were two prompts. `lastProactiveAt` is now kept locally and `decide()`
+refuses any proactive prompt within a day of the last one shown, whichever
+tab showed it (`daily-floor`).
+
+### Core
+
+Core mounts no proactive prompt. The map-node bar cannot be met on a
+surface with no map, the sheet's styles are scoped to Logos, and — the real
+reason — Core had no way to tell a reflective conversation from a practical
+one. That signal now exists: the thread extractor returns a `context` on
+the same vocabulary as the Logos map (`ConversationMemory.context`), and it
+is what marks memory entries from such conversations private. A Core
+trigger, if one is ever added, must pass that context to `decide()` and
+clear a bar written for Core in this file first.
+
+### Email is not a prompt
+
+Lifecycle email (`lib/lifecycle.ts`) is governed separately and is not a
+One prompt: the day-3 and day-7 notes arrive because time passed, which is
+exactly what the rule above forbids, so they do not mention One at all.
+Only the welcome and the deferred limit note do — the latter in the
+boundary's own two sentences, a day after the person met it on screen.
+

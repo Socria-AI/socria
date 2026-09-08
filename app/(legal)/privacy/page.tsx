@@ -163,6 +163,11 @@ export default function PrivacyPage() {
               <td>Web search</td>
               <td>The search phrase only, when Research looks something up</td>
             </tr>
+            <tr>
+              <td><strong>Resend, Inc.</strong></td>
+              <td>Email delivery</td>
+              <td>Your email address and the note itself, on the few occasions we send one. No content.</td>
+            </tr>
           </tbody>
         </table>
       </div>
@@ -223,6 +228,13 @@ export default function PrivacyPage() {
           your account address.
         </li>
         <li><strong>Correct it</strong> — tell Socria in the conversation when it has read you wrong; correcting the record is never a paid feature.</li>
+        <li>
+          <strong>Notes by email</strong> &mdash; Socria may send you an
+          occasional note about your thinking here, such as that a map is where
+          you left it; none of them contains anything you wrote, and every one
+          carries a link that stops them, as does the switch under{' '}
+          <a href="/account/data">Data &amp; Privacy</a>.
+        </li>
       </ul>
       <p>
         We keep what you write for as long as your account exists, because it is

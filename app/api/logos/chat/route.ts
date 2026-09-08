@@ -23,8 +23,22 @@ import { renderContextsForNode, sanitizeNodeContextList } from '@/lib/logos-sour
 import { guidanceBlock, resolveDepth, resolveGuard } from '@/lib/logos-guidance';
 import { styleBlock } from '@/lib/logos-style';
 import { personalityBlock, personalityMaxTokens } from '@/lib/logos-personality';
-import { isValidAccessKey } from '@/lib/socria-prompt';
+import {
+  isValidAccessKey,
+  hasJourneyContent,
+  renderJourneyBrief,
+  sanitizeUserUnderstanding,
+} from '@/lib/socria-prompt';
 import { enforceRateLimit } from '@/lib/rate-limit';
+import { claimLifecycle } from '@/lib/lifecycle-store';
+import { LIMIT_DELAY_MS } from '@/lib/lifecycle';
+import { withTimeout } from '@/lib/email';
+import {
+  memoryCaps,
+  renderPersonMemory,
+  selectRelevant,
+  visibleEntries,
+} from '@/lib/person-memory';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -119,6 +133,19 @@ export async function POST(req: NextRequest) {
     if (isNewChat) {
       const allowance = await spend(userId, plan, 'chats');
       if (!allowance.ok) {
+        // A note about this boundary may go by email — a day from now, not
+        // now, and only if they are still free then. All that happens here
+        // is the claim: a ledger row with a due date, which the daily run
+        // reads. Bounded and wrapped: the 402 is the answer to this request
+        // and nothing about email may delay or change it.
+        if (userId) {
+          const now = Date.now();
+          await withTimeout(
+            claimLifecycle(userId, 'limit-chats', { now, dueAt: now + LIMIT_DELAY_MS }).catch(() => 'unavailable' as const),
+            300,
+            'unavailable' as const
+          );
+        }
         return NextResponse.json(
           {
             error: boundaryNote('chats'),
@@ -175,6 +202,41 @@ export async function POST(req: NextRequest) {
 
     // Depth (how deeply to help them think) + the Answer Guard (learning math:
     // hints, not answers). The guard is the same one every surface honours.
+    // What Logos knows about this person between lines of thinking.
+    //
+    // Only for an account — anonymous, key-unlocked Logos has no person to
+    // remember — and only what the plan carries: a member gets the relevant
+    // entries and the journey brief; the free tier gets its two strongest
+    // reasoning patterns, so that "you've leaned on this before" can happen
+    // once and be missed afterwards. Nothing marked private ever reaches
+    // this surface, whose map can be saved as a picture. The recurrence line
+    // is included only while the client says it is still owed.
+    let memoryBlock = '';
+    if (userId && body?.understanding && !focusLabel) {
+      const u = sanitizeUserUnderstanding(body.understanding);
+      const caps = memoryCaps(plan);
+      const now = Date.now();
+      const contextText = clean
+        .slice(-4)
+        .map((m: { content?: unknown }) => (typeof m.content === 'string' ? m.content : ''))
+        .join('\n')
+        .slice(0, 2_000);
+      const pool = visibleEntries(u.entries, plan, now).filter(
+        (e) => plan === 'one' || e.confidence === 'stated'
+      );
+      const chosen = selectRelevant(pool, contextText, {
+        now,
+        n: caps.injectLogos,
+        excludePrivate: true,
+        ...(plan === 'one' ? {} : { kinds: ['pattern', 'decision'] as const }),
+      });
+      memoryBlock = renderPersonMemory(chosen, 'logos', { recurrence: body?.recurrence !== false });
+      if (plan === 'one' && hasJourneyContent(u)) {
+        const brief = renderJourneyBrief(u);
+        if (brief) memoryBlock += `\nWhere their thinking has been lately, across conversations (a snapshot, not a truth): ${brief}\n`;
+      }
+    }
+
     const guided =
       system +
       guidanceBlock(resolveDepth(body?.depth), resolveGuard(body?.guard), 'chat') +
@@ -182,7 +244,8 @@ export async function POST(req: NextRequest) {
       // (above), then their personality settings, then their free-text
       // instructions — each block subordinating itself to what came before.
       personalityBlock(body?.persona) +
-      styleBlock(body?.style);
+      styleBlock(body?.style) +
+      memoryBlock;
 
     const openai = new OpenAI({ apiKey });
     const configured = process.env.OPENAI_MODEL_LOGOS || LOGOS_MODEL;

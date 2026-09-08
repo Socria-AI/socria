@@ -7928,3 +7928,72 @@ a.one-mark.is-strip:hover { background: rgba(38, 72, 90, 0.075); }
 @media (max-width: 480px) {
   .one-mark.is-card { padding: 28px 18px 22px; }
 }
+
+/* ── First session: the openings, the poster, the share note, the memory door ── */
+.logos-root .lg-openings { display: grid; gap: 8px; margin-top: 18px; }
+.logos-root .lg-openings-lead {
+  font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--lg-ink-40); margin: 0 0 2px;
+}
+.logos-root .lg-opening {
+  display: grid; gap: 3px; text-align: left;
+  padding: 11px 13px;
+  border: 1px solid var(--lg-line); border-radius: 12px;
+  background: #fff; color: var(--lg-ink);
+  font: inherit; cursor: pointer;
+  transition: border-color 0.18s, background 0.18s;
+}
+.logos-root .lg-opening:hover { border-color: var(--lg-primary); background: rgba(53, 70, 32, 0.03); }
+.logos-root .lg-opening strong { font-weight: 600; font-size: 13.5px; }
+.logos-root .lg-opening small { font-size: 12px; line-height: 1.4; color: var(--lg-ink-60); }
+.logos-root .lg-panel-save {
+  margin-left: 12px;
+  font: inherit; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--lg-ink-40); background: none; border: 0; cursor: pointer;
+  transition: color 0.18s;
+}
+.logos-root .lg-panel-save:hover { color: var(--lg-primary); }
+.logos-root .lg-panel-save:disabled { opacity: 0.4; cursor: default; }
+.logos-root .lg-share-note { margin: 8px 12px 0; }
+.logos-root .lg-share-save {
+  margin-left: auto;
+  font: inherit; font-size: 12px; font-weight: 600;
+  color: var(--lg-primary); background: none; border: 0; cursor: pointer;
+}
+.logos-root .lg-memory-btn {
+  margin-left: 10px;
+  font: inherit; font-size: 11.5px; color: var(--lg-ink-40);
+  background: none; border: 0; cursor: pointer; white-space: nowrap;
+}
+.logos-root .lg-memory-btn:hover { color: var(--lg-primary); }
+
+/* ── The memory viewer: entries, forgetting, the free line ── */
+.jrn-plan-line { font-style: italic; }
+.jrn-entries li { display: flex; align-items: baseline; gap: 10px; }
+.jrn-entry-text { flex: 1; min-width: 0; }
+.jrn-entry-when { font-size: 11px; color: rgba(31, 31, 31, 0.45); white-space: nowrap; }
+.jrn-forget {
+  flex: 0 0 auto;
+  border: 0; background: none; cursor: pointer;
+  color: rgba(31, 31, 31, 0.3); font-size: 15px; line-height: 1; padding: 0 4px;
+  opacity: 0; transition: opacity 0.18s, color 0.18s;
+}
+.jrn-entry:hover .jrn-forget, .jrn-forget:focus-visible { opacity: 1; }
+.jrn-forget:hover { color: #9a3b2c; }
+.jrn-entry.is-busy { opacity: 0.5; }
+@media (hover: none) { .jrn-forget { opacity: 1; } }
+.jrn-foot {
+  margin-top: 22px; padding-top: 14px;
+  border-top: 1px solid rgba(31, 31, 31, 0.08);
+  display: flex; flex-wrap: wrap; align-items: center; gap: 12px;
+  font-size: 12.5px; color: rgba(31, 31, 31, 0.55);
+}
+.jrn-foot-link, .jrn-foot-yes, .jrn-foot-no {
+  font: inherit; font-size: 12.5px; background: none; border: 0; cursor: pointer; padding: 0;
+}
+.jrn-foot-link { color: rgba(31, 31, 31, 0.55); text-decoration: underline; text-underline-offset: 3px; }
+.jrn-foot-link:hover { color: #1f1f1f; }
+.jrn-foot-confirm { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.jrn-foot-yes { color: #9a3b2c; font-weight: 600; }
+.jrn-foot-no { color: rgba(31, 31, 31, 0.55); }
+.jrn-foot-note { margin-left: auto; font-style: italic; }

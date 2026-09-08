@@ -64,6 +64,13 @@ const ROWS = [
     site: 'https://upstash.com/trust/privacy.pdf',
   },
   {
+    name: 'Resend, Inc.',
+    role: 'Email delivery',
+    gets: 'Your email address and the note itself, on the few occasions Socria sends one — a welcome to Socria One, or a reminder that a map is where you left it. Never your conversations, and never a title. You can stop them from any note or under Data & Privacy.',
+    where: 'United States',
+    site: 'https://resend.com/legal/privacy-policy',
+  },
+  {
     name: 'Serper / Tavily',
     role: 'Web search, when a source is looked up',
     gets: 'The search phrase only — not your conversation. Only when Logos looks something up for you.',
