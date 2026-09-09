@@ -25,13 +25,31 @@ import {
   FAMILY,
   PROACTIVE_FLOOR_MS,
 } from './.tmp/one-prompt.mjs';
-import { COUNTERS } from './.tmp/entitlements.mjs';
+import { COUNTERS, TIERED_COUNTERS } from './.tmp/entitlements.mjs';
 
 let pass = 0,
   fail = 0;
 const ok = (n, c, x = '') => (c ? pass++ : (fail++, console.log('FAIL', n, x)));
 
 const NOW = 1_800_000_000_000;
+
+/**
+ * The entitlement triggers that can still open a sheet.
+ *
+ * A trigger whose counter is a fair-use ceiling BOTH plans share has nothing
+ * to offer — Socria One stops in the same place — so decide() refuses it with
+ * 'shared-ceiling' and the surface says what happened inline instead. Only
+ * `chats` is a boundary the product sells past, so the rules about how an
+ * entitlement prompt behaves are exercised against these.
+ */
+const sellable = (r) => {
+  const c = TRIGGERS[r].counter;
+  return TRIGGERS[r].category === 'entitlement' && (!c || TIERED_COUNTERS.includes(c));
+};
+const SELLABLE = TRIGGER_REASONS.filter(sellable);
+const SHARED = TRIGGER_REASONS.filter(
+  (r) => TRIGGERS[r].category === 'entitlement' && !sellable(r)
+);
 
 /** A free user who has cleared every proactive bar. Tests vary one thing. */
 const engaged = {
@@ -80,10 +98,14 @@ for (const r of TRIGGER_REASONS) {
 }
 
 console.log('\n=== limits are never written twice ===');
-// The map-full copy must interpolate the real free limit, not restate it.
-const mapBody = copyFor('map-full').body;
-ok('map-full names the real free node cap', /\b8\b/.test(mapBody), mapBody);
-ok('map-full left no placeholder behind', !mapBody.includes('{'), mapBody);
+// No trigger's copy names a quantity any more: the only number the free tier
+// has is the month's lines of thinking, and that sentence is written once in
+// lib/entitlements and reached through boundaryNote(). What is still asserted
+// is that nothing left a placeholder behind on the way out.
+for (const r of TRIGGER_REASONS) {
+  const b = copyFor(r).body;
+  ok(`${r}: no placeholder left behind`, !/\{[a-zA-Z]+\}/.test(b), b);
+}
 
 console.log('\n=== a Socria One member is never sold to ===');
 for (const r of TRIGGER_REASONS) {
@@ -106,12 +128,29 @@ console.log('\n=== free user hits the Logos chat limit ===');
   );
 }
 
-console.log('\n=== free user hits the Explore limit ===');
+console.log('\n=== a ceiling Socria One also has never opens a sheet ===');
+// The most expensive sentence available to this product is an offer of a
+// thing the person already holds, delivered at the moment they are annoyed.
+// Research, images and files are fair-use guards identical on both plans, so
+// there is nothing to say beyond what happened — and the surfaces say that
+// inline, from boundaryNote(), whether or not a sheet opens.
 {
-  const d = show({ reason: 'explore-spent' });
-  ok('explore-spent shows', d.show === true);
-  ok('explore-spent names Explore, not "a limit"', d.show && /Explore/i.test(d.copy.body), d.show && d.copy.body);
-  ok('explore-spent title is the user\'s sentence', d.show && d.copy.title === 'Keep exploring', d.show && d.copy.title);
+  ok('there is at least one such ceiling', SHARED.length > 0);
+  for (const r of SHARED) {
+    const d = show({ reason: r });
+    ok(`${r}: refused`, d.show === false && d.why === 'shared-ceiling', JSON.stringify(d));
+  }
+  // ...and it is refused for the reason above, not by accident of rationing:
+  // no state, no cooldown and no engagement changes the answer.
+  for (const r of SHARED) {
+    const d = show({
+      reason: r,
+      state: { ...EMPTY_PROMPT_STATE },
+      engagement: engaged,
+    });
+    ok(`${r}: refused however engaged they are`, d.show === false && d.why === 'shared-ceiling');
+  }
+  ok('the month is not one of them', !SHARED.includes('chats-spent'));
 }
 
 console.log('\n=== entitlement prompts are not rationed by the proactive guards ===');
@@ -129,7 +168,7 @@ console.log('\n=== entitlement prompts are not rationed by the proactive guards 
     engagement: { sessions: 0, activeDays: 0, mapNodes: 0 },
     context: 'reflecting',
   };
-  for (const r of TRIGGER_REASONS.filter((x) => TRIGGERS[x].category === 'entitlement')) {
+  for (const r of SELLABLE) {
     const d = show({ reason: r, ...hostile });
     ok(`${r}: survives every proactive guard`, d.show === true, JSON.stringify(d));
   }
@@ -140,7 +179,7 @@ console.log('\n=== but each boundary is explained once per tab, not once per pre
 // the same person doing the same thing, and answering it again with a sheet
 // across the screen is the nagging this whole file exists to prevent.
 {
-  for (const r of TRIGGER_REASONS.filter((x) => TRIGGERS[x].category === 'entitlement')) {
+  for (const r of SELLABLE) {
     const first = show({ reason: r });
     ok(`${r}: the first press is answered`, first.show === true);
     const again = show({
@@ -157,7 +196,7 @@ console.log('\n=== but each boundary is explained once per tab, not once per pre
   // Each boundary is its own explanation. Being told the month's chats are
   // spent says nothing about why Research stopped, so it must not silence it.
   const other = show({
-    reason: 'research-spent',
+    reason: 'map-full',
     state: { ...EMPTY_PROMPT_STATE, shownTriggers: ['chats-spent'] },
   });
   ok('a different boundary is still explained', other.show === true);
@@ -219,7 +258,7 @@ console.log('\n=== max one proactive prompt per session ===');
   const d = show({ reason: 'returning-thinker', state: after });
   ok('second one in a session is suppressed', d.show === false && d.why === 'session-cap');
   // …but an entitlement prompt still gets through, because they asked for it.
-  const e = show({ reason: 'explore-spent', state: after });
+  const e = show({ reason: 'chats-spent', state: after });
   ok('an entitlement prompt is unaffected', e.show === true);
 }
 
@@ -271,7 +310,7 @@ console.log('\n=== sensitive moments are left alone ===');
   const d = show({ reason: 'returning-thinker', context: 'reflecting' });
   ok('no proactive prompt while reflecting', d.show === false && d.why === 'sensitive-context');
   // But a boundary they walked into is still explained — silence would be worse.
-  const e = show({ reason: 'explore-spent', context: 'reflecting' });
+  const e = show({ reason: 'chats-spent', context: 'reflecting' });
   ok('an entitlement prompt still explains itself', e.show === true);
   // Ordinary work is unaffected.
   ok('planning is not sensitive', show({ reason: 'returning-thinker', context: 'planning' }).show === true);
@@ -366,7 +405,7 @@ console.log('\n=== the daily floor: two tabs are not two prompts ===');
   ok('an hour after a proactive prompt elsewhere → daily-floor', decide({ ...other, reason: 'returning-thinker' }).why === 'daily-floor');
   ok('a day later it may ask again', decide({ ...base, state: { ...EMPTY_PROMPT_STATE, lastProactiveAt: NOW - DAY_MS - 1 }, reason: 'returning-thinker' }).show === true);
   // Entitlement prompts are answers, not asks: the floor does not touch them.
-  ok('the floor does not silence an entitlement prompt', decide({ ...other, reason: 'explore-spent' }).show === true);
+  ok('the floor does not silence an entitlement prompt', decide({ ...other, reason: 'chats-spent' }).show === true);
   ok('nor the Socria One button', decide({ ...other, reason: 'asked' }).show === true);
   ok('the empty state has no floor', EMPTY_PROMPT_STATE.lastProactiveAt === 0);
 }

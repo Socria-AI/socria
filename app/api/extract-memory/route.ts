@@ -62,11 +62,11 @@ export async function POST(req: NextRequest) {
     (m: any) => m.role === 'user'
   ).length;
 
-  // What this plan carries. The free tier's thread memory stops updating
-  // past a fixed number of the person's turns — the one boundary in the
-  // product that is quiet by design: nothing on screen changes, the
-  // extractor simply stops, and the client shows a single note once the
-  // stop could be felt. A member's thread is carried as far as it goes.
+  // What this plan carries. No plan freezes a thread's memory any more —
+  // `memoryTurns` is null on both, so this never returns early. It stays
+  // because the answer belongs in one place: a conversation that quietly
+  // stopped remembering itself halfway through read as a broken product
+  // rather than as a boundary, which is exactly why the cap came out.
   const plan = userId ? await resolvePlanForRequest(req, userId) : 'free';
   const caps = memoryCaps(plan);
   if (memoryFrozen(plan, userTurnCount)) {

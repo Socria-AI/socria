@@ -1,6 +1,5 @@
 // The comparison page. Checkable against SOCRIA_MODELS in lib/socria-prompt.ts.
 
-import Link from 'next/link';
 import { Article, H2, Callout, TableWrap } from '../Article';
 import { DemoModelPicker } from '../DocsDemo';
 import { docPage } from '../registry';
@@ -51,7 +50,7 @@ export function Models() {
               <td><strong>Thinking Depth control</strong></td>
               <td>—</td>
               <td>All four modes</td>
-              <td>Its own depth control; all four with <Link href="/docs/socria-one">One</Link></td>
+              <td>Its own depth control; all four modes</td>
             </tr>
             <tr>
               <td><strong>Memory</strong></td>

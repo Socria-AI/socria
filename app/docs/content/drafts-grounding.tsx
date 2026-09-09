@@ -2,7 +2,6 @@
 // material enters the thinking. Checkable against lib/logos-draft.ts,
 // lib/logos-attachments.ts, lib/logos-sources.ts.
 
-import Link from 'next/link';
 import { Article, H2, Callout, Defs, Def } from '../Article';
 import { docPage } from '../registry';
 
@@ -30,8 +29,8 @@ export function DraftsGrounding() {
       <p>
         A draft belongs to its line of thinking: it is saved with the
         session (autosaving as you type), reopens with it, and sits beside
-        the same map that produced the thinking it argues. Draft Space is a{' '}
-        <Link href="/docs/socria-one">Socria One</Link> surface.
+        the same map that produced the thinking it argues. It is open on every
+        tier.
       </p>
 
       <H2 id="actions">The five selection actions</H2>

@@ -1,6 +1,13 @@
 // lib/usage.ts
 //
-// The counters behind the free tier's boundaries, read and written server-side.
+// The counters behind the product's boundaries, read and written server-side.
+//
+// Two different things live here now. `chats` is the one real plan boundary —
+// two lines of thinking a month on the free tier, effectively uncounted on
+// Socria One. Everything else is a fair-use ceiling identical on both plans,
+// set where serious work does not reach it, and lib/entitlements.ts says
+// which is which (TIERED_COUNTERS). Nothing in this file needs to know the
+// difference; the copy and the prompts do.
 //
 // The thing this replaces is a number the browser sent us. The Research limit
 // used to be enforced from `body.researchUsed`, which meant posting a zero
