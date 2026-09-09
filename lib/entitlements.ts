@@ -8,11 +8,29 @@
 // will disagree with itself the first time it changes, and these numbers are
 // meant to change as we learn what they should be.
 //
-// The shape of the free tier matters more than its size. It is a real trial,
-// not a demo: you get the whole Chat → Map → Explore loop, you see your
-// thinking become a map, you get to research something. What you run into is
-// a BOUNDARY, not a wall — the map you built stays on screen, stays
-// interactive, and stays yours. Nothing you have thought is ever taken back.
+// THE SHAPE OF THE FREE TIER, AND WHY IT CHANGED.
+//
+// It used to clip every dimension at once: eight nodes, one lens, one depth,
+// one Explore, one Research, twelve turns of memory — AND two lines of
+// thinking a month. The intention was a real trial. The effect was that
+// nobody on the free tier ever saw Socria be good. They saw a truncated
+// version of everything, which reads as "this product is thin" rather than
+// "I want more of this" — and people pay for more of a thing they have
+// watched be excellent, never to upgrade something they have only seen be
+// mediocre.
+//
+// So the axis moved. INSIDE a line of thinking, the free tier now gets
+// exactly what a member gets: the map grows as far as the thinking does,
+// every lens, every depth, Draft Space, Explore and Challenge and grounding
+// whenever they help, and a thread whose memory is carried the whole way.
+// What Socria One sells is no longer a better version of one conversation. It
+// is MORE of them — two a month against as many as you have — and what runs
+// BETWEEN them: the durable things Socria comes to know about how you reason,
+// carried into every later conversation and into Logos.
+//
+// That is the whole difference, and it is meant to be sayable in a sentence.
+// If a number below ever makes the free tier feel small inside a single
+// conversation again, it is the wrong number.
 //
 // Two things are never gated at any tier: TRACE (where a thought came from)
 // and CORRECTION (telling Logos it read you wrong). Charging to see your own
@@ -54,51 +72,66 @@ export const COUNTER_SCOPE: Record<Counter, 'month' | 'chat'> = {
 };
 
 export interface Limits {
-  /** null means no limit — One is bounded by fair use, not by a counter */
+  /** null means no limit — both plans are bounded by fair use, not by a counter */
   readonly counters: Readonly<Record<Counter, number | null>>;
-  /** nodes a map will grow to before it stops taking on new ones */
+  /** nodes a map will grow to before it stops taking on new ones; null is no ceiling */
   readonly mapNodes: number | null;
   /** how many lenses onto the map are offered; null is all of them */
   readonly lenses: number | null;
   /** thinking depths other than Balanced */
   readonly allDepths: boolean;
-  /** the map keeps re-organising itself as the conversation moves */
-  readonly liveMap: boolean;
-  /** how many turns of a conversation its thread memory carries */
+  /**
+   * Draft Space — the writing surface a map feeds into.
+   *
+   * Open on both plans. It was the largest thing the free tier could not see,
+   * and it is the clearest demonstration that a Thinking Map is for something:
+   * a person who has watched their own map become a draft knows what another
+   * line of thinking is worth. Charging for it bought a locked button.
+   */
+  readonly draftSpace: boolean;
+  /** how many turns of a conversation its thread memory carries; null is all of them */
   readonly memoryTurns: number | null;
   /**
    * how many things Socria keeps about the person across conversations —
-   * the entries in lib/person-memory.ts. Evicted by score past this.
+   * the entries in lib/person-memory.ts. The one thing besides volume that
+   * separates the plans, because it is the one thing that only exists once
+   * there have been several conversations to carry between.
    */
   readonly memoryEntries: number | null;
-  /** attachments a single message may carry */
-  readonly attachmentsPerMessage: number;
 }
 
 /**
- * Fair use rather than infinity. One is "Logos without the free tier's
- * limits", not "unmetered" — but the ceiling is set where nobody working
- * seriously will ever meet it, so it functions as a guard against abuse and
- * never as a boundary a person notices.
+ * Fair use rather than infinity, on BOTH plans.
+ *
+ * Every per-conversation ceiling below is identical for the two tiers and is
+ * set where nobody working seriously will ever meet it: they are a guard
+ * against a runaway loop, not a boundary a person notices, and the rate
+ * limiter is the real defence against abuse. Only two rows differ, and they
+ * are the two the product is sold on — `chats`, which is how many lines of
+ * thinking a month, and `memoryEntries`, which is how much of you is carried
+ * between them.
  */
 export const PLANS: Record<Plan, Limits> = {
   free: {
     counters: {
+      // The one limit anybody meets. Everything else here matches One.
       chats: 2,
-      explore: 1,
-      research: 1,
-      challenge: 1,
-      context: 1,
-      images: 1,
-      files: 1,
+      explore: null,
+      research: 120,
+      challenge: null,
+      context: null,
+      images: 60,
+      files: 60,
     },
-    mapNodes: 8,
-    lenses: 2,
-    allDepths: false,
-    liveMap: false,
-    memoryTurns: 12,
+    mapNodes: null,
+    lenses: null,
+    allDepths: true,
+    draftSpace: true,
+    memoryTurns: null,
+    // The other half of what One is: twelve things carried about you rather
+    // than everything. See lib/person-memory.ts — this is a WINDOW onto one
+    // store, not a smaller store, so nothing is lost by being on this plan.
     memoryEntries: 12,
-    attachmentsPerMessage: 2,
   },
   one: {
     counters: {
@@ -113,12 +146,20 @@ export const PLANS: Record<Plan, Limits> = {
     mapNodes: null,
     lenses: null,
     allDepths: true,
-    liveMap: true,
+    draftSpace: true,
     memoryTurns: null,
     memoryEntries: 160,
-    attachmentsPerMessage: 6,
   },
 };
+
+/**
+ * The counters that actually differ between the plans.
+ *
+ * Everything else is fair use held in common, and a prompt about a shared
+ * ceiling would be selling somebody something they already have. The suite
+ * asserts this list is the truth rather than a comment.
+ */
+export const TIERED_COUNTERS: readonly Counter[] = ['chats'];
 
 export function limitsFor(plan: Plan): Limits {
   return PLANS[plan];
@@ -143,32 +184,47 @@ export function remaining(plan: Plan, counter: Counter, used: number): number | 
 
 // ── how a boundary is said ──────────────────────────────────────────
 //
-// One sentence for what has been used, one for what One offers. Calm, and
-// never a countdown: nobody should feel a meter running while they think.
+// One sentence for what has been reached, one for what follows from it. Calm,
+// and never a countdown: nobody should feel a meter running while they think.
 // These live here rather than at each call site so the voice stays one voice.
+//
+// Only `chats` is a boundary the product sells past. The rest are the fair-use
+// ceilings above, identical on both plans, and their note says so — offering
+// somebody Socria One at a ceiling Socria One also has is a lie, and a small
+// lie at a moment of friction is the most expensive kind.
+
+/**
+ * "both", for two — the free month's count read from the table rather than
+ * written down a second time in prose that would then go stale.
+ */
+function freeChats(): string {
+  const n = PLANS.free.counters.chats;
+  if (n === null) return 'all';
+  return n === 2 ? 'both' : `all ${n}`;
+}
 
 const REACHED: Record<Counter, string> = {
   chats:
-    'That is both of your free lines of thinking for this month. The ones you have stay open, and stay yours.',
-  explore: 'You have used your free Explore on this map.',
-  research: 'You have used your free Research on this line of thinking.',
-  challenge: 'You have used your free Challenge on this line of thinking.',
-  context: 'You have grounded one node in outside material here.',
-  images: 'Logos has read one image in this conversation.',
-  files: 'Logos has read one file in this conversation.',
+    `That is ${freeChats()} of your free lines of thinking for this month. ` +
+    'The ones you have stay open, and stay yours.',
+  explore: 'Explore has run as far as it goes on this map.',
+  research: 'Research has run as far as it goes in this line of thinking.',
+  challenge: 'Challenge has run as far as it goes in this line of thinking.',
+  context: 'This line of thinking is holding as much outside material as it can.',
+  images: 'Logos has read as many images as it can hold in this conversation.',
+  files: 'Logos has read as many files as it can hold in this conversation.',
 };
 
-const OFFERS: Record<Counter, string> = {
+/** Only where the plans differ. Keys here must be exactly TIERED_COUNTERS. */
+const OFFERS: Partial<Record<Counter, string>> = {
   chats: 'Socria One keeps as many lines of thinking as you have.',
-  explore: 'Socria One gives you more room to keep exploring your thinking.',
-  research: 'Socria One opens Research whenever a question needs it.',
-  challenge: 'Socria One lets Logos push back as often as it is useful.',
-  context: 'Socria One grounds as much of your thinking as you want to bring.',
-  images: 'Socria One reads as many images as your thinking involves.',
-  files: 'Socria One reads as many files as your thinking involves.',
 };
 
-/** The two-sentence note shown when a free counter runs out. */
+/** Said where they do not: the truth, which is that there is nothing to buy. */
+const FAIR_USE =
+  'Socria One stops in the same place — this is a guard against a runaway loop, not a thing to buy.';
+
+/** The two-sentence note shown when a counter runs out. */
 export function boundaryNote(counter: Counter): string {
-  return `${REACHED[counter]} ${OFFERS[counter]}`;
+  return `${REACHED[counter]} ${OFFERS[counter] ?? FAIR_USE}`;
 }

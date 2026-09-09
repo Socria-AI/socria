@@ -145,10 +145,19 @@ console.log('\n=== the copy: what each says, and what none may say ===');
   ok('...and the reset date', all['limit-chats'].text.includes('1 October 2026'));
   ok('limit-chats subject', all['limit-chats'].subject === 'Your free lines of thinking for this month');
 
-  // welcome says what One does, and that nothing moved.
-  ok('welcome says what opens', /Research runs whenever a question needs it/.test(all['welcome-one'].text));
+  // welcome says what One does, and that nothing moved. What it says had to
+  // change when the free tier stopped being clipped: it used to promise a map
+  // that grows past where free held it, every lens, and Research on demand,
+  // and a new member now had all three the day before they paid.
+  ok('welcome opens with the volume', /as many lines of thinking as you have/.test(all['welcome-one'].text));
+  ok('welcome promises the continuity', /carries what it learns about how you reason/.test(all['welcome-one'].text));
+  ok('...on both surfaces', /into Core and into Logos/.test(all['welcome-one'].text));
   ok('welcome reassures', /Nothing you have already made changes/.test(all['welcome-one'].text));
-  ok('welcome carries memory into Logos', /carries it into Logos/.test(all['welcome-one'].text));
+
+  // And it must not sell back anything the free tier already holds.
+  for (const claim of [/every lens/i, /all four depth/i, /Draft Space/i, /keeps? developing past/i]) {
+    ok(`welcome does not re-sell ${claim}`, !claim.test(all['welcome-one'].text));
+  }
 
   // Every email: the link, the sign-off, the footer with a way out.
   for (const k of LIFECYCLE_KINDS) {

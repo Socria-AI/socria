@@ -75,10 +75,13 @@ export async function POST(req: NextRequest) {
 
   const plan = await resolvePlanForRequest(req, userId);
 
-  // Every node action a free reader gets to TRY once, per line of thinking —
-  // Explore, Challenge and Research — and then meets a boundary. Trace is
-  // never metered at any tier: seeing where your own thought came from is not
-  // a paid feature, and neither is correcting it.
+  // Explore and Challenge are uncapped on both plans; Research carries a
+  // fair-use ceiling, also on both, set where serious work does not reach it.
+  // None of the three is a plan boundary any more — inside a line of thinking
+  // the free tier is the whole product — so a 402 here explains what happened
+  // and never offers a subscription as the remedy. Trace is never metered at
+  // any tier: seeing where your own thought came from is not a paid feature,
+  // and neither is correcting it.
   //
   // The count comes from the usage store, not from the request. This route
   // used to read `body.researchUsed`, which meant a client posting a zero

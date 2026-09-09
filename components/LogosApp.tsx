@@ -47,6 +47,7 @@ import { JourneyDebugModal } from '@/components/JourneyDebugModal';
 import { sanitizeUserUnderstanding, type UserUnderstanding } from '@/lib/socria-prompt';
 import { OneLock } from '@/components/OneLock';
 import {
+  FREE_DEPTH,
   SOCRIA_ONE_KEY,
   isValidOneKey,
   meaningfulNodes,
@@ -160,13 +161,6 @@ const REMEMBER_MARK = '[[REMEMBER]]';
 // re-decide this for themselves; nothing here is the authority.
 const ONE_KEY_STORAGE = 'socria.one.v1';
 
-/** How each metered thing is named in the free-tier panel. */
-const LIMIT_NOUN: Partial<Record<Counter, string>> = {
-  explore: 'Explore',
-  research: 'Research',
-  images: 'image',
-  files: 'file',
-};
 // The research counter used to live in localStorage and be posted with each
 // request, which made the browser the authority on its own limit. It is on
 // the server now; see lib/usage.ts.
@@ -283,6 +277,15 @@ export function LogosApp({
   // Just came back from a completed checkout.
   const [oneWelcome, setOneWelcome] = useState(false);
   const one = plan === 'one';
+  // What this plan opens, read from the table rather than from `one`.
+  //
+  // These are all true on both plans now — inside a line of thinking the free
+  // tier is the whole product — but the UI asks lib/entitlements.ts rather
+  // than assuming, so that a change to the table is a change to the product
+  // instead of a change the interface quietly disagrees with. `one` still
+  // decides the things that really are the subscription: how many lines of
+  // thinking, and connected sources.
+  const limits = limitsFor(plan);
   const [revealedIds, setRevealedIds] = useState<Set<string>>(new Set());
 
   const [input, setInput] = useState('');
@@ -501,9 +504,10 @@ export function LogosApp({
   }
 
   function pickDepth(next: ThinkingDepth) {
-    // Free thinking happens at Balanced; the other registers are One's. The
-    // routes clamp this too, so the menu and the answer always agree.
-    if (!one && next !== 'balanced') {
+    // Every depth is open on every plan. The routes clamp through
+    // depthForPlan() against the same table, so the menu and the answer
+    // always agree — including if a plan ever closes them again.
+    if (!limits.allDepths && next !== FREE_DEPTH) {
       ask('depth-locked');
       return;
     }
@@ -1566,9 +1570,14 @@ export function LogosApp({
   }
 
   // ── acting on a node ───────────────────────────────────────────────
-  /** The free map is full: new thinking will no longer be added to it. */
-  const atMapBoundary =
-    !one && meaningfulNodes(map) >= (limitsFor(plan).mapNodes ?? Infinity);
+  /**
+   * The map is full: new thinking will no longer be added to it.
+   *
+   * Never, now — `mapNodes` is null on both plans and a map grows as far as
+   * the thinking does. The check reads the table rather than being deleted so
+   * the note below is one table entry away from coming back.
+   */
+  const atMapBoundary = meaningfulNodes(map) >= (limits.mapNodes ?? Infinity);
 
   /** Whether a metered action has run out, by the server's count. */
   const spentOf = (c: Counter) => {
@@ -1579,12 +1588,12 @@ export function LogosApp({
   const researchLocked = spentOf('research');
 
   async function runAction(mode: NodeMode, node: MapNodeRef) {
-    // Explore, Challenge and Trace stay open at every tier — Trace especially,
-    // since seeing where your own thinking came from is not a feature to sell.
-    // Research is the one that has a free edge, and only on the second reach.
+    // Every move on every node is open at every tier. Research still has a
+    // ceiling, but it is fair use — the same one a member has, set where
+    // serious work does not reach it — so ask() will decline to open a sheet
+    // ('shared-ceiling'), and the inline path below is the one that runs.
     if (mode === 'research' && researchLocked) {
-      // When the sheet stays shut — this boundary was already explained in
-      // this tab — the panel opens on the node they pressed and says it
+      // The panel opens on the node they pressed and says what happened
       // there. A press that produces nothing at all is the one outcome this
       // is not allowed to have.
       if (!ask('research-spent')) {
@@ -1643,8 +1652,10 @@ export function LogosApp({
         const json = await res.json().catch(() => null);
         void refreshUsage(activeIdRef.current);
         const said = ask(reasonForCounter(mode as Counter));
-        // When the sheet stays shut because this boundary was already
-        // explained, the panel says it rather than closing on nothing.
+        // The sheet stays shut for two reasons now: this boundary was already
+        // explained in this tab, or it is a fair-use ceiling Socria One shares
+        // and there is nothing to offer. Either way the panel says what
+        // happened rather than closing on nothing.
         setExplore((e) =>
           said
             ? { ...e, loading: false, open: false }
@@ -2279,13 +2290,13 @@ export function LogosApp({
                   : ''
               }${draftOpen ? ' is-on' : ''}`}
               onClick={() =>
-                one
+                limits.draftSpace
                   ? setDraftOpen((v) => !v)
                   : ask('draft-locked')
               }
             >
               Draft
-              {!one && <OneLock className="lg-draft-lock" />}
+              {!limits.draftSpace && <OneLock className="lg-draft-lock" />}
             </button>
             {/* Leaving is a model switch, not just a link: /chat opens on
                 whichever model is remembered, and that is still Logos — so a
@@ -2416,8 +2427,9 @@ export function LogosApp({
               <span className="lg-one-note-text">
                 {one ? (
                   <>
-                    <b>Socria One is open.</b> Your maps grow as far as the thinking
-                    does, every lens and depth is yours, and Research runs the whole map.
+                    <b>Socria One is open.</b> Begin as many lines of thinking as you
+                    have, and Socria carries what it learns about how you reason from
+                    each one into the next.
                   </>
                 ) : (
                   <>
@@ -2470,7 +2482,7 @@ export function LogosApp({
 
           {/* The free map has grown as far as it goes. Said plainly, once,
               and dismissible — the map itself stays exactly as it is. */}
-          {!one && !limitNoteOff && atMapBoundary && (
+          {!limitNoteOff && atMapBoundary && (
             <div className="lg-one-note" role="note">
               <span className="lg-one-note-text">
                 <b>Your free Thinking Map has reached its limit.</b> Everything here
@@ -2539,8 +2551,14 @@ export function LogosApp({
               the box you type in rather than parked up in the header. Both
               menus open upward; they sit at the bottom of the screen. */}
           {/* What the free tier holds, said plainly and once. Nobody should
-              discover a limit by hitting it. Reads the same counts the routes
-              enforce against, so it cannot claim room that is not there. */}
+              discover a limit by hitting it. Reads the same count the routes
+              enforce against, so it cannot claim room that is not there.
+              It used to list the per-conversation ceilings beside the month —
+              "1 Explore per chat", "1 Research per chat" — which read as a
+              product measured out by the spoonful. Those ceilings are fair use
+              now, identical on both plans and far out of reach, so the panel
+              says the one number that is actually a boundary and then says
+              what is NOT bounded, because that is the more useful sentence. */}
           {!one && usage.chats && (
             <div className="lg-allow" role="note">
               <span className="lg-allow-tier">Free Logos</span>
@@ -2556,15 +2574,7 @@ export function LogosApp({
                     </span>
                   );
                 })()}
-                {(['explore', 'research', 'images', 'files'] as Counter[]).map((c) => {
-                  const u = usage[c];
-                  if (!u || u.limit === null) return null;
-                  return (
-                    <span key={c} className={u.used >= u.limit ? 'is-out' : undefined}>
-                      {u.limit} {LIMIT_NOUN[c]} per chat
-                    </span>
-                  );
-                })}
+                <span>everything inside them, in full</span>
               </span>
               <button type="button" className="lg-allow-go" onClick={() => askOne()}>
                 Socria One
@@ -2612,7 +2622,7 @@ export function LogosApp({
                       >
                         <span className="lg-depth-opt-label">
                           {d.label}
-                          {!one && d.id !== 'balanced' && <OneLock />}
+                          {!limits.allDepths && d.id !== FREE_DEPTH && <OneLock />}
                         </span>
                         <span className="lg-depth-opt-desc">{d.description}</span>
                       </button>
@@ -2726,7 +2736,7 @@ export function LogosApp({
           <ThinkingMap
             map={map}
             onAction={runAction}
-            lensesLocked={!one}
+            lensLimit={limits.lenses}
             onLocked={() =>
               ask('lenses-locked')
             }

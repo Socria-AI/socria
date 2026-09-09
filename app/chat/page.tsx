@@ -1971,7 +1971,7 @@ export default function ChatPage() {
                 <span className="flex-1">
                   {planState.plan === 'one' ? (
                     <>
-                      <b>Socria One is open.</b> Every line of thinking stays open as far as it goes, and Socria carries what it learns about how you think into Logos.
+                      <b>Socria One is open.</b> Begin as many lines of thinking as you have, and Socria carries what it learns about how you reason from each one into the next — here and in Logos.
                     </>
                   ) : (
                     <>
@@ -2067,13 +2067,14 @@ export default function ChatPage() {
               </div>
             )}
 
-            {/* The free tier's thread memory has stopped here. One line, once
-                per conversation, with a ×; no sheet, no trigger — it says
-                what happened and what One does, in the boundary's own voice. */}
+            {/* Unreachable: no plan freezes a thread's memory now, so
+                `frozenAt` is never set. Kept with its dismissal state because
+                a conversation already carrying the flag from before the caps
+                changed must still render something sensible. */}
             {active?.memory?.frozenAt && planState.plan !== 'one' && !frozenNoteClosed.has(active.id) && !sending && (
               <div className="my-4 flex items-center gap-3 px-1 text-[12.5px] text-ink/60" role="note">
                 <span className="font-serif italic flex-1">
-                  This is as far as a free thread’s memory reaches. Everything said here stays; Socria One carries a thread as far as it goes.
+                  Earlier turns in this conversation are held as a summary rather than in full. Everything said here stays, and stays yours.
                 </span>
                 <button
                   type="button"

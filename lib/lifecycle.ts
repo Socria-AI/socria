@@ -381,7 +381,7 @@ function paragraphs(kind: LifecycleKind, ctx: CopyContext): { subject: string; b
         subject: 'Socria One is open',
         body: [
           'Socria One is open.',
-          'Every line of thinking you begin now stays open as far as it goes. The map keeps developing past where the free tier held it, with every lens onto it. Research runs whenever a question needs it. And Socria remembers how you reason between lines of thinking, and carries it into Logos.',
+          'Begin as many lines of thinking as you have — there is no longer a count. And Socria now carries what it learns about how you reason from each one into the next, into Core and into Logos alike, so a conversation begins where the last one ended rather than from nothing.',
           'Nothing you have already made changes. It is all still yours, and still where you left it.',
         ],
       };

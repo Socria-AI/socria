@@ -18,7 +18,7 @@
 //          The subtitle says what you get rather than what it is like —
 //          "the whole instrument" was a line, and a line in a sidebar row is
 //          a line nobody asked for.
-//   strip  the line under the model menu: "Logos in full is Socria One".
+//   strip  the line under the model menu: what One adds, in one line.
 //   card   the account page's plan block, with the action on it.
 //
 // A member sees the mark turn into a statement of what they hold, never a
@@ -68,7 +68,7 @@ export function OneFoot({ state }: { state: PlanState }) {
         <span className="one-mark-name">
           Socria <em>One</em>
         </span>
-        <span className="one-mark-sub">Unlimited maps, research and depth</span>
+        <span className="one-mark-sub">Every line of thinking, and what carries between</span>
       </span>
       <Price />
     </a>
@@ -82,7 +82,7 @@ export function OneStrip() {
       <Monogram />
       <span className="one-mark-text">
         <span className="one-mark-name">
-          Logos in full is Socria <em>One</em>
+          Keep every line of thinking — Socria <em>One</em>
         </span>
       </span>
       <Price />
@@ -181,8 +181,8 @@ export function OneCard({ state }: { state: PlanState }) {
         <>
           <Price />
           <p className="one-mark-line">
-            Full Thinking Maps, all four depth modes, Research as often as it is needed, Draft
-            Space, and your reasoning kept.
+            As many lines of thinking as you have, and a Socria that carries how
+            you reason from each one into the next.
           </p>
         </>
       )}

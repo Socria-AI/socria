@@ -435,29 +435,29 @@ export function LogosStory() {
         <section className="spread sec terms short" data-folio="Terms" data-screen-label="The Terms">
           <div className="wrap">
             <div className="spread-head"><span className="num">·</span><span className="label">The Terms</span></div>
-            <h2 className="fade">Free is a beginning, not a demo.</h2>
+            <h2 className="fade">Free is the whole thing, twice a month.</h2>
             <div className="t-grid">
               <div className="tier fade">
                 <h3>Logos, free</h3>
-                <p className="tp">Every day · no card</p>
+                <p className="tp">Two lines of thinking a month · no card</p>
                 <ul>
-                  <li>Real Thinking Maps — drawn live, fully yours.</li>
-                  <li>Every move on every node — and Trace is free forever.</li>
-                  <li>Research — experienced properly, once per map.</li>
+                  <li>The whole of Logos, not a sample of it.</li>
+                  <li>Maps that grow as far as the thinking does, every view.</li>
+                  <li>All four depths, Research, Draft Space, Trace.</li>
                   <li>The Answer Guard, whole. It is never for sale.</li>
                 </ul>
-                <p className="stoprow"><span className="o"></span>Free pauses at four branches<span className="sep">·</span><span className="f"></span>One branches without end</p>
-                <p className="stoprow"><span className="o"></span>Free researches once<span className="sep">·</span><span className="f"></span>One researches without asking twice</p>
+                <p className="stoprow"><span className="o"></span>Free stops at two a month<span className="sep">·</span><span className="f"></span>One does not count them</p>
+                <p className="stoprow"><span className="o"></span>Free starts each one fresh<span className="sep">·</span><span className="f"></span>One carries you between them</p>
               </div>
               <div className="tier one fade d1">
                 <h3>Socria <span className="em">One</span></h3>
                 <p className="tp">{priceLabel()} / {SOCRIA_ONE.period} · cancel anytime</p>
                 <ul>
-                  <li>The full map — unbounded branching, every view.</li>
-                  <li>Research across the whole map, as often as it calls.</li>
-                  <li>All four depths — Quick, Balanced, Deep, Abstract.</li>
-                  <li>Draft Space in full, long-form, multimodal.</li>
-                  <li>Persistent reasoning, personalization, connected sources.</li>
+                  <li>Every line of thinking — as many in a month as you have.</li>
+                  <li>It remembers how you reason, and carries it into the next.</li>
+                  <li>The thread of what you are working through, held across all of them.</li>
+                  <li>Your whole history — every map, every conversation, kept.</li>
+                  <li>Connected sources: Drive, Docs, and Notion, when available.</li>
                 </ul>
                 <a className="t-cta" href="/one">Continue with One <span className="ar">→</span></a>
                 <br /><a className="t-more" href="/one">Read the One issue →</a>
