@@ -100,7 +100,7 @@ export function ThinkingMap({
   grounded,
   onAddContext,
   guarded,
-  lensesLocked,
+  lensLimit,
   onLocked,
   researchLocked,
   onViz,
@@ -124,10 +124,23 @@ export function ThinkingMap({
   onAddContext?: (node: MapNodeRef) => void;
   /** Answer Guard is on — the board must not reveal a withheld result */
   guarded?: boolean;
-  /** free tier: the alternate lenses are Socria One's, the default stays open */
-  lensesLocked?: boolean;
+  /**
+   * How many lenses this plan offers; null or absent is all of them.
+   *
+   * Both plans offer all of them now: a map read only one way is a map that
+   * looks like a diagram rather than like thinking, and that is not a thing
+   * anyone upgrades to fix. Kept as a number rather than a boolean so a plan
+   * can open two of four without this needing a second shape.
+   */
+  lensLimit?: number | null;
   onLocked?: () => void;
-  /** free tier: Research has been spent in this conversation */
+  /**
+   * Research's fair-use ceiling has been reached in this conversation.
+   *
+   * Not a plan boundary — Socria One stops in the same place — so this only
+   * dims the row and routes the press to the explanation, and never to a
+   * subscription.
+   */
   researchLocked?: boolean;
   /** the reader edited the interactive graph — keep it with the session */
   onViz?: (scene: VizScene) => void;
@@ -266,13 +279,21 @@ export function ThinkingMap({
 
   const lenses = useMemo(() => availableLenses(map), [map]);
 
-  // A free reader keeps the lens this map leads with — the signature view,
-  // never a stub. The other readings of the same reasoning are One's. The
-  // auto-switch below lands on exactly this lens, so nobody is ever dropped
-  // onto something they can't open, and nobody is given a free lens they
-  // were never shown.
+  // The lens this map leads with — the signature view for what it holds,
+  // never a stub. Every plan opens all of them, so `open` below is null and
+  // nothing is locked; where a plan does clip them, it keeps the lead first
+  // and then the rest in order, so the reading that IS the answer is never
+  // the one withheld and nobody is dropped onto a tab they cannot open.
   const lead = leadLens(lenses, !!map.viz);
-  const lensLocked = (id: LensId) => !!lensesLocked && id !== lead;
+  const open = useMemo(() => {
+    if (lensLimit === null || lensLimit === undefined) return null;
+    const ordered = [
+      ...(lead ? [lead] : []),
+      ...lenses.filter((l) => l !== lead),
+    ];
+    return new Set(ordered.slice(0, Math.max(1, lensLimit)));
+  }, [lensLimit, lead, lenses]);
+  const lensLocked = (id: LensId) => !!open && !open.has(id);
 
   // Open on the lens that IS the answer, unless the reader has since chosen
   // otherwise. A map carrying a scene used to open on the concept graph with
@@ -280,15 +301,15 @@ export function ThinkingMap({
   // nothing showed it.
   useEffect(() => {
     if (!lenses.length) return;
-    // On the free tier exactly one lens is theirs — the lead — and nothing
-    // may leave them anywhere else. The click handler already refuses a
-    // locked tab, but two paths went around it: an initialLens that is not
-    // the lead, and the fallback below, which reached for lenses[0] rather
-    // than for the one they can actually use. Either put a locked lens in the
-    // active slot, where its content then rendered: the panel checks which
-    // lens is selected, never whether it is allowed.
-    if (lensesLocked && lead && lens !== lead) {
-      setLens(lead);
+    // Where a plan does clip the lenses, nothing may leave the reader on one
+    // they cannot open. The click handler already refuses a locked tab, but
+    // two paths went around it: an initialLens outside the open set, and the
+    // fallback below, which reached for lenses[0] rather than for one they
+    // can actually use. Either put a locked lens in the active slot, where
+    // its content then rendered: the panel checks which lens is selected,
+    // never whether it is allowed.
+    if (open && !open.has(lens)) {
+      setLens(lead ?? lenses[0]);
       return;
     }
     // The lens they were on no longer exists. Fall back to the one that IS
@@ -298,7 +319,7 @@ export function ThinkingMap({
       return;
     }
     if (!lensManual.current && lead && lens !== lead) setLens(lead);
-  }, [lenses, lens, lead, lensesLocked]);
+  }, [lenses, lens, lead, open]);
 
   const edgeKey = (e: { from: string; to: string; relation: string }) =>
     `${e.from}~${e.to}~${e.relation}`;
@@ -846,10 +867,11 @@ export function ThinkingMap({
                       onAction?.(m, { id: node.id, label: node.label, type: node.type });
                     }}
                   >
-                    <span className="lg-act-label">
-                      {MODE_META[m].label}
-                      {m === 'research' && researchLocked && <OneLock />}
-                    </span>
+                    {/* No padlock here. It said "Socria One opens this",
+                        and One does not: Research's ceiling is fair use, the
+                        same on both plans. The row still dims, and pressing
+                        it opens the panel with the explanation in it. */}
+                    <span className="lg-act-label">{MODE_META[m].label}</span>
                     <span className="lg-act-blurb">{MODE_META[m].blurb}</span>
                   </button>
                 ))}

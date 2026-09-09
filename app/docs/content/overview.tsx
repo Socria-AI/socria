@@ -72,8 +72,10 @@ export function Overview() {
         Core 2 and Core 3.1 are chat models with different depths of attention.
         Logos is a different kind of thing — an environment — and it is the
         centerpiece of <Link href="/docs/socria-one">Socria One</Link>, the
-        {priceWithPeriod()} plan. Its free tier is a real trial: the whole loop, with
-        boundaries rather than walls.
+        {priceWithPeriod()} plan. Its free tier is not a trial of Logos but Logos
+        itself, twice a month: what Socria One sells is how many lines of
+        thinking you get and what is carried between them, never a better
+        version of any one of them.
       </p>
 
       <H2 id="principles">What never changes</H2>
@@ -104,9 +106,10 @@ export function Overview() {
           tell Socria it read you wrong. Neither is ever gated.
         </li>
         <li>
-          <strong>Nothing held hostage.</strong> Hitting a free-tier limit stops
-          new growth; it never hides, deletes, or locks what you have already
-          thought. Your existing maps stay visible and interactive.
+          <strong>Nothing held hostage.</strong> Spending the month&rsquo;s free
+          lines of thinking stops new ones; it never hides, deletes, or locks
+          what you have already thought. Your existing maps stay visible and
+          interactive, and the conversations you have begun keep going.
         </li>
       </ul>
 

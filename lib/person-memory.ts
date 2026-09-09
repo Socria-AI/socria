@@ -32,6 +32,12 @@
 //      only past the ceiling nobody reaches, and "forget" is the only
 //      destructive path.
 //
+//      That window is also the ONLY thing a plan touches here. Everything
+//      about how memory behaves inside a single conversation — how far back
+//      the extractor reads, how many items a thread keeps, whether a thread's
+//      memory keeps updating at all — is the same on both, and memoryCaps()
+//      below says so in one place. See lib/entitlements.ts for why.
+//
 //   3. PRIVATE STAYS PRIVATE. An entry extracted from a weighty Core
 //      conversation, or from a Logos session the map read as reflecting, is
 //      marked private and is never carried into Logos — whose replies feed a
@@ -118,31 +124,51 @@ export interface MemoryCaps {
 /** Every account stores up to this; only past it does anything get evicted. */
 export const STORE_CEILING = PLANS.one.memoryEntries ?? 160;
 
+/**
+ * Everything that governs how well memory works INSIDE one conversation.
+ *
+ * Identical on both plans, and that is the whole design: a free line of
+ * thinking is not a thinner Socria, it is Socria. The extractor reads the
+ * same depth of history, keeps the same number of items, and a thread's own
+ * memory never stops updating on either plan. What Socria One sells is how
+ * much is carried BETWEEN conversations — `window` and the journey caps below
+ * — because that is the thing that genuinely does not exist until there have
+ * been several, and the only thing worth charging for.
+ */
+const WITHIN_A_CONVERSATION = {
+  threadTurns: null,
+  items: 16,
+  extractorMessages: 14,
+} as const;
+
 export function memoryCaps(plan: Plan): MemoryCaps {
   const p = PLANS[plan];
+  // The plan's window onto one store. Nothing outside it is lost — see
+  // visibleEntries: it is a view, and it widens the moment One is held.
+  const window = p.memoryEntries ?? STORE_CEILING;
+  const shared = { ...WITHIN_A_CONVERSATION, threadTurns: p.memoryTurns };
+
   if (plan === 'one') {
     return {
-      window: p.memoryEntries ?? STORE_CEILING,
+      ...shared,
+      window,
       injectCore: 18,
       injectLogos: 18,
-      threadTurns: p.memoryTurns,
-      items: 16,
-      extractorMessages: 14,
       narrative: 8,
       threads: 6,
       timeline: 40,
     };
   }
   return {
-    window: p.memoryEntries ?? 12,
-    injectCore: 5,
-    // A taste, not the meal: the two strongest reasoning patterns, so Logos
-    // can say "you assumed this last time too" once — a thing seen is a thing
-    // that can be missed, and nothing was ever missed that was never shown.
-    injectLogos: 2,
-    threadTurns: p.memoryTurns,
-    items: 10,
-    extractorMessages: 8,
+    ...shared,
+    window,
+    // The whole window, not a taste of it. Holding back nine of twelve
+    // entries did not make One look better; it made memory look broken, and
+    // a person who has never watched it work has no reason to buy more of it.
+    injectCore: window,
+    injectLogos: window,
+    // The journey is the cross-conversation read, so this is where the plans
+    // legitimately part: a shorter narrative and a shorter timeline.
     narrative: 5,
     threads: 4,
     timeline: 14,
@@ -152,8 +178,14 @@ export function memoryCaps(plan: Plan): MemoryCaps {
 /**
  * Has a thread's own memory stopped updating on this plan?
  *
- * Counted in the person's turns, and "past" rather than "at": the twelfth
- * turn is still carried; the thirteenth is the first one that is not.
+ * No longer on either — `memoryTurns` is null for both, so a conversation
+ * carries its own memory the whole way. Freezing it partway through was the
+ * clipping that hurt most: it made Socria appear to lose the thread mid-
+ * thought, which reads as a broken product rather than a boundary.
+ *
+ * Kept, with its suite, so that the answer stays in one place. Counted in the
+ * person's turns and "past" rather than "at": were the cap twelve, the twelfth
+ * turn is still carried and the thirteenth is the first one that is not.
  */
 export function memoryFrozen(plan: Plan, userTurns: number): boolean {
   const cap = memoryCaps(plan).threadTurns;

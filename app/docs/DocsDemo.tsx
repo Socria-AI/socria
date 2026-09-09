@@ -14,7 +14,7 @@ import { MathBoard } from '@/components/MathBoard';
 import { MathPlot } from '@/components/MathPlot';
 import { MathViz } from '@/components/MathViz';
 import { sanitizeViz, type VizScene } from '@/lib/logos-viz';
-import { COUNTER_SCOPE, PLANS, type Counter } from '@/lib/entitlements';
+import { COUNTER_SCOPE, PLANS, TIERED_COUNTERS, type Counter } from '@/lib/entitlements';
 import { SOCRIA_ONE } from '@/lib/socria-one';
 import { ModelPicker } from '@/components/ModelPicker';
 import { SynthesisCard } from '@/components/SynthesisCard';
@@ -151,10 +151,13 @@ export function DemoAdAs() {
 /* ── what each plan holds ──────────────────────────────────────────── */
 // Read from lib/entitlements at render time rather than typed out.
 //
-// The table this replaces said a free map holds 4 nodes when it holds 8, and
+// The table this replaces said a free map holds 4 nodes when it held 8, and
 // listed six of the seven counters not at all. That is the ordinary fate of
 // a number written down twice: the code moved and the docs did not. Now the
-// page cannot disagree with the product, because it is reading the product.
+// page cannot disagree with the product, because it is reading the product —
+// which is also why most of its rows now read the same on both sides. The
+// free tier stopped being a clipped Socria, and the table says so without
+// anyone having to remember to come here and edit it.
 
 /** How each counter is described to a reader, and what its period is. */
 const COUNTER_LABEL: Record<Counter, string> = {
@@ -172,7 +175,7 @@ const PERIOD: Record<'month' | 'chat', string> = {
   chat: 'per conversation',
 };
 
-/** The free tier's numbers are boundaries someone will actually meet. */
+/** A number a person will actually meet, printed plainly. */
 function cap(n: number | null): string {
   return n === null ? 'Uncapped' : String(n);
 }
@@ -199,6 +202,7 @@ export function DemoLimitsTable() {
   const free = PLANS.free;
   const one = PLANS.one;
   const counters = Object.keys(COUNTER_LABEL) as Counter[];
+  const tiered = (c: Counter) => (TIERED_COUNTERS as readonly Counter[]).includes(c);
   return (
     <div className="d-tablewrap">
       <table>
@@ -213,25 +217,29 @@ export function DemoLimitsTable() {
           </tr>
         </thead>
         <tbody>
+          {/* Almost every row below is the same on both sides, and that is
+              the table telling the truth rather than the table being lazy:
+              inside one line of thinking the free tier is the whole product.
+              Only the rows that differ are the ones Socria One is sold on. */}
           {counters.map((c) => (
             <tr key={c}>
               <td>
                 {COUNTER_LABEL[c]}{' '}
                 <span className="d-dim">{PERIOD[COUNTER_SCOPE[c]]}</span>
               </td>
-              <td>{cap(free.counters[c])}</td>
+              <td>{tiered(c) ? cap(free.counters[c]) : oneCap(free.counters[c])}</td>
               <td>{oneCap(one.counters[c])}</td>
             </tr>
           ))}
           <tr>
             <td>Nodes a map grows to</td>
             <td>{cap(free.mapNodes)}</td>
-            <td>{oneCap(one.mapNodes)}</td>
+            <td>{cap(one.mapNodes)}</td>
           </tr>
           <tr>
             <td>Lenses onto the map</td>
-            <td>{cap(free.lenses)}</td>
-            <td>All of them</td>
+            <td>{free.lenses === null ? 'All of them' : cap(free.lenses)}</td>
+            <td>{one.lenses === null ? 'All of them' : cap(one.lenses)}</td>
           </tr>
           <tr>
             <td>Thinking depth</td>
@@ -239,29 +247,24 @@ export function DemoLimitsTable() {
             <td>{one.allDepths ? 'All four' : 'Balanced only'}</td>
           </tr>
           <tr>
-            <td>The map re-organising as you talk</td>
-            <td>{free.liveMap ? 'Yes' : '—'}</td>
-            <td>{one.liveMap ? 'Yes' : '—'}</td>
+            <td>Draft Space</td>
+            <td>{free.draftSpace ? 'Yes' : '—'}</td>
+            <td>{one.draftSpace ? 'Yes' : '—'}</td>
           </tr>
           <tr>
             <td>Turns a thread&rsquo;s memory carries</td>
             <td>{cap(free.memoryTurns)}</td>
-            <td>{oneCap(one.memoryTurns)}</td>
+            <td>{cap(one.memoryTurns)}</td>
           </tr>
           <tr>
             <td>Things Socria keeps about how you think</td>
             <td>{cap(free.memoryEntries)}</td>
-            <td>All of them</td>
+            <td>{cap(one.memoryEntries)}</td>
           </tr>
           <tr>
-            <td>Logos remembers how you reason between lines of thinking</td>
-            <td>Your two strongest patterns</td>
-            <td>Everything, with the journey</td>
-          </tr>
-          <tr>
-            <td>Attachments on one message</td>
-            <td>{free.attachmentsPerMessage}</td>
-            <td>{one.attachmentsPerMessage}</td>
+            <td>Carried between lines of thinking</td>
+            <td>Your strongest {cap(free.memoryEntries)}</td>
+            <td>All of them, with the journey</td>
           </tr>
         </tbody>
       </table>

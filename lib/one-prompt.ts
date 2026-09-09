@@ -22,7 +22,7 @@
 // Enforcement lives on the server and is unaffected by any of this. A prompt
 // is UX. If this file were deleted, every limit would still hold.
 
-import { boundaryNote, PLANS, type Counter } from './entitlements';
+import { boundaryNote, TIERED_COUNTERS, type Counter } from './entitlements';
 import type { Plan } from './socria-one';
 import type { ThinkingContext } from './logos';
 
@@ -57,6 +57,16 @@ export const INTENT_RANK: Record<Intent, number> = {
 /**
  * Every moment that may mention One. Adding a member here is the only way to
  * add a prompt to the product — there is no free-form call.
+ *
+ * NOTHING IS EVER REMOVED FROM THIS LIST. Several members below can no longer
+ * fire: the free tier stopped being a clipped Socria, so there is no locked
+ * depth, no locked lens, no locked Draft and no map that fills up. They stay
+ * for two reasons. The small one is that a plan table can clip again, and the
+ * vocabulary should not have to be reinvented. The large one is that these
+ * strings are attribution: a subscription bought at 'map-full' in March has
+ * that word in its Stripe metadata, and lib/checkout-attribution.ts
+ * re-validates against this list on the way back. Delete a member and last
+ * quarter's answer to "which moment sells" quietly becomes "unknown".
  */
 export const TRIGGER_REASONS = [
   // urgent — a free counter ran out with work in progress
@@ -67,7 +77,8 @@ export const TRIGGER_REASONS = [
   'context-spent',
   'images-spent',
   'files-spent',
-  // high — reached for something One holds
+  // high — reached for something One holds. The first four are retired:
+  // nothing can raise them any more (see the note above on why they stay).
   'map-full',
   'depth-locked',
   'lenses-locked',
@@ -157,17 +168,20 @@ export const TRIGGERS: Record<TriggerReason, TriggerSpec> = {
     title: 'Keep reading what you bring',
   },
 
+  // ── retired, and kept ──────────────────────────────────────────
+  // The four below are unreachable: maps do not fill, every depth and every
+  // lens is open on both plans, and Draft Space is not sold. Their copy is
+  // kept ACCURATE rather than frozen, because a plan table that clipped again
+  // would put these on screen the same day, and stale copy is how a product
+  // ends up offering somebody a thing they already have.
+
   'map-full': {
     category: 'entitlement',
     intent: 'high',
     title: 'This map has more in it',
-    // {mapNodes} is filled from lib/entitlements at read time. Writing the
-    // number here would be a second copy of the limit, and it would go stale
-    // the first time the free map size is tuned.
     body:
-      'A free map holds {mapNodes} nodes, and this line of thinking has outgrown ' +
-      'that. Everything here stays — Socria One simply lets the map keep growing ' +
-      'with you.',
+      'This line of thinking has grown past what the map will hold. Everything ' +
+      'here stays — Socria One simply lets it keep growing with you.',
   },
   'depth-locked': {
     category: 'entitlement',
@@ -191,7 +205,7 @@ export const TRIGGERS: Record<TriggerReason, TriggerSpec> = {
     title: 'Write beside your thinking',
     body:
       'Draft Space lets you write with the map still in view, so the reasoning ' +
-      'stays next to the words. It is part of Socria One.',
+      'stays next to the words. Socria One opens it.',
   },
   'connections-locked': {
     category: 'entitlement',
@@ -221,9 +235,15 @@ export const TRIGGERS: Record<TriggerReason, TriggerSpec> = {
     category: 'proactive',
     intent: 'medium',
     title: 'Go further with Socria One',
+    // What it used to promise — lifted limits, maps that keep growing — is
+    // what the free tier already does. What is actually still on the other
+    // side of the price is the count and the continuity, so that is what it
+    // says now. Selling somebody a feature they are using is how a product
+    // teaches people to ignore it.
     body:
-      'You have been coming back to think here. Socria One lifts the free ' +
-      'limits, keeps your maps growing, and remembers more of how you think.',
+      'You have been coming back to think here. Socria One keeps as many lines ' +
+      'of thinking as you have, and carries what it learns about how you reason ' +
+      'from each one into the next.',
   },
 
   'asked': {
@@ -235,12 +255,17 @@ export const TRIGGERS: Record<TriggerReason, TriggerSpec> = {
 };
 
 /**
- * The one place a trigger's numbers are filled in. Anything a plan decides —
- * how big a free map is, and nothing else so far — is read from
- * lib/entitlements here rather than written into the copy above.
+ * The one place a trigger's numbers are filled in.
+ *
+ * There is nothing left to fill: the copy above no longer names a quantity,
+ * because the only quantity the free tier now has is the month's lines of
+ * thinking, and that sentence is written once in lib/entitlements and reached
+ * through boundaryNote(). Kept as the seam it always was, so the next piece
+ * of copy that does need a number has somewhere to get it from rather than
+ * writing it down a second time.
  */
 function fill(text: string): string {
-  return text.replace('{mapNodes}', String(PLANS.free.mapNodes ?? 0));
+  return text;
 }
 
 /** Title and body for a trigger, with the boundary worded in only one place. */
@@ -324,9 +349,14 @@ export const SENSITIVE_CONTEXTS: readonly ThinkingContext[] = ['reflecting'];
 /**
  * Triggers that are one boundary wearing two names.
  *
- * map-shaped (node 5) and map-full (node 8) are three nodes apart on the same
+ * map-shaped (node 5) and map-full (node 8) were three nodes apart on the same
  * map. Whichever is said first has said it; the other is then 'said-already'
  * in that tab, exactly as pressing the same exhausted control twice is.
+ *
+ * map-full cannot fire now — maps have no ceiling — so in practice this pair
+ * only ever protects map-shaped from a map-full raised before the caps
+ * changed. The rule is kept because "one map, one promise" is the principle,
+ * not the pair.
  */
 export const FAMILY: Partial<Record<TriggerReason, readonly TriggerReason[]>> = {
   'map-shaped': ['map-full'],
@@ -390,6 +420,8 @@ export type SuppressReason =
   | 'sensitive-context'
   | 'not-engaged'
   | 'already-open'
+  /** the counter that ran out is a fair-use ceiling One shares — nothing to sell */
+  | 'shared-ceiling'
   /** this exact boundary has already been explained in this browser session */
   | 'said-already';
 
@@ -437,6 +469,16 @@ export function decide(input: DecideInput): Decision {
   if (input.open) return no('already-open');
 
   if (spec.category === 'entitlement') {
+    // Some ceilings are the same on both plans — Research, images and files
+    // are fair-use guards against a runaway loop, not a boundary anybody is
+    // meant to meet, and Socria One does not lift them. Opening a sales sheet
+    // there would be offering somebody a thing they already have at the exact
+    // moment they are annoyed, which is the most expensive lie available.
+    // The surfaces still say what happened, inline, from boundaryNote().
+    if (spec.counter && !(TIERED_COUNTERS as readonly Counter[]).includes(spec.counter)) {
+      return no('shared-ceiling');
+    }
+
     // They pressed something and it stopped. Explaining that is not
     // promotion, and it is not rationed by the cooldown, the session cap or
     // the engagement bar — the frequency IS their action.

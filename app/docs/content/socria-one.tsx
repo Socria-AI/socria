@@ -28,13 +28,23 @@ export function SocriaOne() {
     <Article page={page} sections={sections}>
       <H2 id="plans">The two plans</H2>
       <p>
-        Socria has one paid plan: <strong>Socria One, {priceWithPeriod()}</strong>. It
-        opens the complete reasoning environment — all four{' '}
+        Socria has one paid plan: <strong>Socria One, {priceWithPeriod()}</strong>.
+        What it opens is <em>volume and continuity</em>: as many lines of thinking
+        in a month as you have, kept with their full history, and a Socria that
+        carries what it learns about how you reason from each one into the next —
+        into Logos as well as Core. Core 2 is not part of the paywall at all — it
+        stays free, account or no account.
+      </p>
+      <p>
+        What it deliberately does <em>not</em> open is anything inside a single
+        line of thinking. All four{' '}
         <Link href="/docs/depth-personality">depth modes</Link>, Thinking Maps
-        with unbounded branching and every lens, Research across the whole map
-        as often as it&rsquo;s needed, Draft Space, and as many lines of thinking as you
-        keep, with their full history. Core 2 is not part of the paywall at all —
-        it stays free, account or no account.
+        with unbounded branching and every lens, Research, Draft Space and
+        grounding in your own material are on the free tier too, at full
+        strength. That was a change, and the reasoning is in the table below:
+        a free tier that clips every dimension at once does not read as a trial,
+        it reads as a thin product, and nobody subscribes to more of something
+        they have only watched be mediocre.
       </p>
       <p>
         You subscribe from the <Link href="/one">Socria One page</Link> or
@@ -46,23 +56,26 @@ export function SocriaOne() {
 
       <H2 id="free">What the free tier holds</H2>
       <p>
-        The free tier is a working trial of the whole loop, not a demo. Its
-        exact shape:
+        Inside one line of thinking, the free tier is not a trial of Socria —
+        it <em>is</em> Socria. What it holds two of is lines of thinking, per
+        calendar month. Its exact shape:
       </p>
       <DemoLimitsTable />
       <p className="d-after-table">
         Those numbers are read from the entitlement table the product itself
-        enforces, so this page cannot drift from what actually happens. Where
-        Socria One carries a figure at all it is a fair-use ceiling — set
-        where serious work will not meet it — rather than an allowance you are
-        meant to ration.
+        enforces, so this page cannot drift from what actually happens. Most
+        rows are identical on both sides, and that is the point rather than an
+        oversight. Where a figure appears on both it is a fair-use ceiling —
+        a guard against a runaway loop, set where serious work will not meet
+        it — rather than an allowance you are meant to ration; Socria One does
+        not lift those, because there is nothing there to lift.
       </p>
       <Callout tag="Boundary, not wall">
         <p>
-          Hitting a limit stops <em>new</em> growth — the map stops taking on
-          nodes, the rail stops taking new sessions. It never hides, deletes,
-          or locks anything you already thought: the map you built stays on
-          screen, stays interactive, and stays yours.
+          Hitting the month&rsquo;s limit stops <em>new</em> lines of thinking.
+          It never hides, deletes, or locks anything you already thought: every
+          map you built stays on screen, stays interactive, and stays yours, and
+          the conversations you have already begun keep going.
         </p>
       </Callout>
 
@@ -80,10 +93,13 @@ export function SocriaOne() {
       </p>
       <Defs>
         <Def term="You reached a boundary">
-          You pressed Explore, or began a third line of thinking, and it
-          stopped. The prompt names the thing that stopped and how to carry
-          on. These appear immediately and are never rationed — a button that
-          silently does nothing is worse than an explanation.
+          You began a third line of thinking this month and it stopped. The
+          prompt names what stopped and how to carry on. These appear
+          immediately and are not rationed by the rules below — a button that
+          silently does nothing is worse than an explanation — though the same
+          boundary is only explained once per browser session. A fair-use
+          ceiling never opens one of these at all: Socria One shares it, so
+          there would be nothing to offer.
         </Def>
         <Def term="Nobody asked">
           At most one of these per browser session, ever. It needs you to have

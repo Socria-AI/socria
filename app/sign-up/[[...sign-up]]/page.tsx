@@ -24,7 +24,7 @@ export default function SignUpPage({
       redirectTo={back}
       eyebrow="Create your account"
       title="Think with Socria across every device."
-      subtitle="Free account. Unlimited thought sessions. Access to Socria Core 3 with adjustable thinking depth."
+      subtitle="Free account. Socria Core 3 with adjustable thinking depth, and two full lines of thinking in Logos every month."
       quote={{
         text: 'AI should multiply human thinking, not automate it.',
       }}
