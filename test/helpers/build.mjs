@@ -24,6 +24,7 @@ const MODULES = [
   'lib/logos-layout.ts',
   'lib/logos.ts',
   'lib/entitlements.ts',
+  'lib/socria-one.ts',
   'lib/math-context.ts',
   'lib/topic-drift.ts',
   'lib/one-prompt.ts',

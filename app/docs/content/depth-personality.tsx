@@ -68,10 +68,12 @@ export function DepthPersonality() {
         Depth changes how far the thinking goes — length follows the
         thinking, so Quick is not a truncated Deep and Deep is not Quick with
         padding. And no depth changes how readily an answer is revealed. In
-        Core 3.1, all four registers come with sign-in; in Logos, the free
-        tier thinks at Balanced and{' '}
-        <Link href="/docs/socria-one">Socria One</Link> opens all four. Pick
-        a register below — the reply is the same question answered there:
+        Core 3.1 and in Logos alike, all four registers come with sign-in, on
+        every plan — Logos used to think at Balanced unless you held{' '}
+        <Link href="/docs/socria-one">Socria One</Link>, and that clip came out:
+        depth is what makes Socria worth returning to, so charging to see it was
+        charging people not to. Pick a register below — the reply is the same
+        question answered there:
       </p>
       <DemoControls />
 

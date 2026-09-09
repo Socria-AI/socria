@@ -21,9 +21,9 @@ export function ModelPicker({
   onLockedAttempt?: (locked: SocriaModel) => void;
   /**
    * What the person holds, when the caller knows. Logos is listed here as a
-   * model, and Socria One is the plan that opens it in full — so this menu is
-   * the one place a mention of One is information about the menu rather
-   * than a pitch. Undefined means "not known yet", and nothing is shown:
+   * model, and Socria One is the plan that keeps as many lines of thinking in
+   * it as you have — so this menu is the one place a mention of One is
+   * information about the menu rather than a pitch. Undefined means "not known yet", and nothing is shown:
    * a member flashed a price for the half-second before the server answers
    * is exactly the kind of thing that makes a product feel like it is
    * selling.
@@ -78,8 +78,11 @@ export function ModelPicker({
               const m = SOCRIA_MODELS[id];
               const active = id === value;
               const locked = m.requiresAuth && !isSignedIn;
-              // Logos in full is One's; the tag says so, once, on the row.
-              const oneTag = id === 'logos' && plan === 'free' && !locked;
+              // No tag on the Logos row any more. It said "One", which read
+              // as "this model is the paid one" — and Logos is not: the free
+              // tier gets all of it, twice a month. The strip below the list
+              // says what One actually adds, which is more of them.
+              const oneTag = false;
               return (
                 <button
                   key={id}

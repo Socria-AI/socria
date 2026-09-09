@@ -67,14 +67,22 @@ console.log('=== the caps say what each plan carries ===');
   ok('free window is the plan table', free.window === PLANS.free.memoryEntries);
   ok('one window is the plan table', one.window === PLANS.one.memoryEntries);
   ok('one carries more than free', one.window > free.window && one.injectCore > free.injectCore);
-  ok('free Logos gets a taste, not nothing', free.injectLogos > 0 && free.injectLogos < one.injectLogos);
   ok('the store ceiling is the One window', STORE_CEILING === one.window);
-  ok('free thread memory has a ceiling', free.threadTurns === PLANS.free.memoryTurns);
+
+  // The axis. Everything about how memory behaves INSIDE a conversation is
+  // the same on both plans — the free tier is not a thinner Socria, it is
+  // Socria, twice a month. Only the window between conversations differs.
+  ok('the extractor reads the same history on both', free.extractorMessages === one.extractorMessages);
+  ok('a thread keeps the same number of items on both', free.items === one.items);
+  ok('free renders its whole window into Core, not a slice', free.injectCore >= free.window);
+  ok('...and into Logos too', free.injectLogos >= free.window);
+  ok('free thread memory follows the plan table', free.threadTurns === PLANS.free.memoryTurns);
   ok('one thread memory has none', one.threadTurns === null);
 
-  // Frozen PAST the cap, not at it: the twelfth turn is still carried.
-  ok('turn 12 is still carried on free', memoryFrozen('free', 12) === false);
-  ok('turn 13 is not', memoryFrozen('free', 13) === true);
+  // No plan freezes a thread's memory now — a conversation that quietly
+  // stopped remembering itself halfway through read as broken, not as a
+  // boundary. memoryFrozen stays, and stays correct if a cap comes back.
+  ok('free never freezes', memoryFrozen('free', 500) === false);
   ok('one never freezes', memoryFrozen('one', 500) === false);
 }
 
@@ -348,7 +356,12 @@ console.log('\n=== the assertions that fail if the feature is deleted ===');
     !renderPersonMemory(selectRelevant(back, 'afraid of being wrong', { now: NOW, n: 5, excludePrivate: true }), 'logos').includes('afraid of being wrong'));
 
   // The composition the route uses for free Logos: window → stated only →
-  // patterns and decisions → at most two → never private.
+  // patterns and decisions → the plan's Logos cap → never private.
+  //
+  // That cap used to be two, on the reasoning that a taste sells the meal.
+  // It did not: nine entries in twelve withheld made memory look broken, and
+  // nobody buys more of a thing they have watched fail. The free window is
+  // rendered whole now, and what One sells is that the window is wider.
   const store = [
     entry('pattern', 'Compares several options before deciding', { seen: 5 }),
     entry('pattern', 'Seeks certainty before acting', { seen: 3 }),
@@ -362,7 +375,8 @@ console.log('\n=== the assertions that fail if the feature is deleted ===');
     'anything at all',
     { now: NOW, n: memoryCaps('free').injectLogos, kinds: ['pattern', 'decision'], excludePrivate: true }
   );
-  ok('free Logos carries at most two', freeLogos.length <= 2 && freeLogos.length > 0);
+  ok('free Logos carries what the window holds',
+    freeLogos.length > 0 && freeLogos.length <= memoryCaps('free').injectLogos);
   ok('...only patterns or decisions', freeLogos.every((e) => e.kind === 'pattern' || e.kind === 'decision'));
   ok('...only things they said outright', freeLogos.every((e) => e.confidence === 'stated'));
   ok('...never the private one', freeLogos.every((e) => !e.private));

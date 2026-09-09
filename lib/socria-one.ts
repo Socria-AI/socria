@@ -3,11 +3,16 @@
 // Socria One — the subscription that opens the complete reasoning
 // environment. Logos is the premium product; Core stays available on its own.
 //
-// The shape of the free tier matters more than its size. It is a real trial,
-// not a demo: you get the whole Chat → Map → Explore loop, you get to see your
-// thinking become a map, and you get to research something. What you run into
-// is a BOUNDARY, not a wall — the map you built stays on screen, stays
-// interactive, and stays yours. Nothing you have thought is ever taken back.
+// The shape of the free tier matters more than its size. INSIDE a line of
+// thinking it is not a trial at all — it is the product, at full strength:
+// every depth, every lens, a map that grows as far as the thinking does. What
+// Socria One sells is how MANY lines of thinking you get, and the memory that
+// runs between them. See the long note at the top of lib/entitlements.ts for
+// why the axis is that one and not the other.
+//
+// Where a boundary is still met it is a BOUNDARY, not a wall — the map you
+// built stays on screen, stays interactive, and stays yours. Nothing you have
+// thought is ever taken back.
 //
 // Two things are never gated, at any tier: TRACE (where a thought came from)
 // and CORRECTION (telling Logos it read you wrong). Charging for the ability
@@ -88,6 +93,14 @@ export function isOne(plan: Plan): boolean {
 // ── what One opens ──────────────────────────────────────────────────
 // Written as capabilities of a thinking environment, not as quantities of
 // AI. Nobody is buying tokens here.
+//
+// WHAT IS DELIBERATELY ABSENT. This list used to lead with Full Thinking
+// Maps, all four depth modes, Research as often as needed and Draft Space.
+// The free tier has every one of those now, so naming them here would be
+// selling somebody a thing they are already using — the fastest way to teach
+// a person that the pricing page is not to be believed. What is left is what
+// is actually on the other side of the price: how MANY lines of thinking, and
+// what Socria carries between them.
 
 export type OneFeature =
   | 'map'
@@ -102,29 +115,19 @@ export type OneFeature =
 
 export const ONE_FEATURES: { id: OneFeature; title: string; blurb: string }[] = [
   {
-    id: 'depth',
-    title: 'Deeper thinking',
-    blurb: 'all four depth modes, at your pace.',
-  },
-  {
-    id: 'map',
-    title: 'Full Thinking Maps',
-    blurb: 'unbounded branching and every view.',
-  },
-  {
-    id: 'research',
-    title: 'Research',
-    blurb: 'across the whole map, as often as it\u2019s needed.',
-  },
-  {
-    id: 'draft',
-    title: 'Advanced Logos tools',
-    blurb: 'Draft Space, long-form, multimodal.',
+    id: 'conversations',
+    title: 'Every line of thinking',
+    blurb: 'as many in a month as you have, kept with their history.',
   },
   {
     id: 'history',
-    title: 'Persistent reasoning',
-    blurb: 'your history and personalization, kept.',
+    title: 'It remembers how you reason',
+    blurb: 'the durable things about your thinking, carried into each new one.',
+  },
+  {
+    id: 'map',
+    title: 'The thread between them',
+    blurb: 'what you are working through, held across conversations.',
   },
   {
     id: 'connections',
@@ -150,7 +153,14 @@ export function meaningfulNodes(map: MapLike | null | undefined): number {
 }
 
 /**
- * Hold a free map at its boundary.
+ * Hold a map at its plan's boundary.
+ *
+ * As of the free tier's reshaping there is no such boundary on either plan —
+ * `PLANS.free.mapNodes` is null and this returns the map untouched. It is kept
+ * whole, and still covered by its suite, because "how the map behaves when it
+ * is full" is a question a future plan table can ask again, and the answer
+ * below is the careful one: it took several passes to get right and should not
+ * have to be rediscovered.
  *
  * The rule is "stop taking on NEW thinking", not "throw thinking away". Nodes
  * already on the map are kept — including any refinement of what they say,
@@ -163,10 +173,10 @@ export function meaningfulNodes(map: MapLike | null | undefined): number {
 export function capMapForFree<T extends MapLike>(
   next: T,
   current: MapLike | null | undefined,
-  limit: number = PLANS.free.mapNodes ?? 8
+  limit: number | null = PLANS.free.mapNodes
 ): { map: T; capped: boolean } {
   const nodes = next?.nodes ?? [];
-  if (nodes.length <= limit) return { map: next, capped: false };
+  if (limit === null || nodes.length <= limit) return { map: next, capped: false };
 
   const known = new Set((current?.nodes ?? []).map((n) => n.id));
   // Everything they already had, in the order the new extraction puts it…
@@ -191,9 +201,17 @@ export function capMapForFree<T extends MapLike>(
   };
 }
 
-/** Free thinking happens at Balanced; the other registers are One's. */
+/** Where thinking happens when a plan does not open the other registers. */
 export const FREE_DEPTH = 'balanced';
 
+/**
+ * The depth a plan will actually think at.
+ *
+ * Both plans now open all four — clipping the free tier to Balanced was the
+ * single clearest way to make Socria look mediocre to somebody deciding
+ * whether to pay for it. This stays table-driven rather than being deleted so
+ * that the answer lives in one place if that ever changes back.
+ */
 export function depthForPlan<T extends string>(depth: T, plan: Plan): T | 'balanced' {
-  return plan === 'one' ? depth : FREE_DEPTH;
+  return PLANS[plan].allDepths ? depth : FREE_DEPTH;
 }

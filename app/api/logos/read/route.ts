@@ -45,9 +45,10 @@ export async function POST(req: NextRequest) {
   }
 
   // Reading an image is where the cost is, so it is where the count is —
-  // attaching one is free and the boundary is met at the moment Logos would
-  // actually look. A free reader gets one per line of thinking, so they see
-  // what reading an image DOES before they meet the limit.
+  // attaching one is free and the ceiling is met at the moment Logos would
+  // actually look. That ceiling is fair use rather than a plan boundary —
+  // identical on both plans and set where serious work does not reach it —
+  // so the 402 explains itself and never offers a subscription as the fix.
   const plan = await resolvePlanForRequest(req, userId);
   const allowance = await spend(
     userId,

@@ -73,16 +73,6 @@ function GlThread() {
     </span>
   );
 }
-function GlSearch() {
-  return (
-    <span className="gl">
-      <svg viewBox="0 0 18 18">
-        <circle cx="8" cy="8" r="5" />
-        <path d="M12,12 L16,16" />
-      </svg>
-    </span>
-  );
-}
 function GlLink() {
   return (
     <span className="gl">
@@ -433,13 +423,15 @@ export function OneStory() {
           <div className="wrap narrow">
             <div className="spread-head"><span className="num">·</span><span className="label">The Idea</span></div>
             <p className="big fade">
-              One isn&rsquo;t more AI. It&rsquo;s the <em>complete reasoning environment</em> — the
-              full map, the full depth, the full continuity of your own thinking.
+              One isn&rsquo;t more AI. It is <em>more of your own thinking</em>, and a Socria
+              that does not start from nothing each time you return.
             </p>
             <p className="body fade d1">
-              The free tier is a genuine beginning: real Thinking Maps, real Research, nothing
-              crippled. One removes the ceiling — so a line of thought can branch as far, run as
-              deep, and return as often as it deserves.
+              Inside a single line of thinking the free tier is not a sample of Socria — it is
+              Socria: the full map, every lens, all four depths, Research, Draft Space, nothing
+              clipped. What it holds two of is <em>lines of thinking</em>, each month. One stops
+              counting them, and carries what it learns about how you reason from each one into
+              the next.
             </p>
           </div>
         </section>
@@ -452,17 +444,17 @@ export function OneStory() {
             <div style={{ marginTop: 'clamp(30px,5vh,50px)' }}>
               <div className="chapter fade">
                 <div className="ch-side">
-                  <div className="ch-t"><span className="rn">i</span><span className="tt">The Map</span></div>
+                  <div className="ch-t"><span className="rn">i</span><span className="tt">The Room</span></div>
                   <span className="seal"><span className="sr">I</span>Included with One</span>
                 </div>
                 <div className="ch-list">
                   <ul>
-                    <li><GlBranch />Members think on full, <em>extended Thinking Maps</em> — no boundary on how far a thought can grow.</li>
-                    <li><GlBranch />Branch every line of inquiry as far as it deserves to go.</li>
-                    <li><GlBranch />See it every way it can be seen: <em>Structure, Graph, and Board.</em></li>
+                    <li><GlBranch />Begin <em>as many lines of thinking</em> in a month as you actually have.</li>
+                    <li><GlBranch />No counting, no rationing, no deciding whether a question is worth one.</li>
+                    <li><GlBranch />Every one of them kept, with its map and its whole history.</li>
                   </ul>
-                  <p className="payoff">— so a thought can grow to its real size.</p>
-                  <p className="stoprow"><span className="o" />Free pauses at four branches<span className="sep">·</span><span className="f" />One branches without end</p>
+                  <p className="payoff">— so a question never has to wait for next month.</p>
+                  <p className="stoprow"><span className="o" />Free holds two a month<span className="sep">·</span><span className="f" />One does not count them</p>
                 </div>
                 <div className="mini" aria-hidden="true">
                   <svg viewBox="0 0 120 120">
@@ -475,17 +467,17 @@ export function OneStory() {
               </div>
               <div className="chapter fade">
                 <div className="ch-side">
-                  <div className="ch-t"><span className="rn">ii</span><span className="tt">The Depth</span></div>
+                  <div className="ch-t"><span className="rn">ii</span><span className="tt">The Memory</span></div>
                   <span className="seal"><span className="sr">I</span>Included with One</span>
                 </div>
                 <div className="ch-list">
                   <ul>
-                    <li><GlCircle />All four depth modes, at will: <em>Quick, Balanced, Deep, Abstract.</em></li>
-                    <li><GlCircle />Run full <em>Research across the map</em> — whenever the question calls, as often as it calls.</li>
-                    <li><GlCircle />More Logos conversations, at the pace your thinking sets.</li>
+                    <li><GlCircle />Socria keeps <em>how you reason</em> — the assumptions you lean on, the constraints you work under, what you have already decided.</li>
+                    <li><GlCircle />Carried into every later conversation, and into Logos, so you stop re-explaining yourself.</li>
+                    <li><GlCircle />Yours to read, correct and delete, entry by entry, at any time.</li>
                   </ul>
-                  <p className="payoff">— so no question has to stay shallow.</p>
-                  <p className="stoprow"><span className="o" />Free tastes Research once<span className="sep">·</span><span className="f" />One researches without asking twice</p>
+                  <p className="payoff">— so the second conversation begins where the first ended.</p>
+                  <p className="stoprow"><span className="o" />Free carries a dozen things<span className="sep">·</span><span className="f" />One carries the whole picture</p>
                 </div>
                 <div className="mini" aria-hidden="true">
                   <svg viewBox="0 0 120 120">
@@ -496,17 +488,17 @@ export function OneStory() {
               </div>
               <div className="chapter fade">
                 <div className="ch-side">
-                  <div className="ch-t"><span className="rn">iii</span><span className="tt">The Craft</span></div>
+                  <div className="ch-t"><span className="rn">iii</span><span className="tt">The Record</span></div>
                   <span className="seal"><span className="sr">I</span>Included with One</span>
                 </div>
                 <div className="ch-list">
                   <ul>
-                    <li><GlQuill /><em>Draft Space</em> — a studio for advanced writing and creative work.</li>
-                    <li><GlQuill />Bring real material: long-form and pasted-content workflows.</li>
-                    <li><GlQuill />Images and multimodal reasoning <span className="when">— when available.</span></li>
+                    <li><GlQuill />Every map, every draft and every conversation <em>kept and returnable to</em>.</li>
+                    <li><GlQuill />A season of thinking that can be re-read, not a folder of forgotten chats.</li>
+                    <li><GlQuill />Yours at every tier: nothing you have made is ever taken back.</li>
                   </ul>
                   <p className="payoff">— so the thinking becomes the work.</p>
-                  <p className="stoprow"><span className="o" />Free drafts in fragments<span className="sep">·</span><span className="f" />One opens the full Draft Space</p>
+                  <p className="stoprow"><span className="o" />Free keeps what it made<span className="sep">·</span><span className="f" />One keeps making more of it</p>
                 </div>
                 <div className="mini" aria-hidden="true">
                   <svg viewBox="0 0 120 120">
@@ -518,17 +510,17 @@ export function OneStory() {
               </div>
               <div className="chapter fade">
                 <div className="ch-side">
-                  <div className="ch-t"><span className="rn">iv</span><span className="tt">The Continuity</span></div>
+                  <div className="ch-t"><span className="rn">iv</span><span className="tt">The Thread</span></div>
                   <span className="seal"><span className="sr">I</span>Included with One</span>
                 </div>
                 <div className="ch-list">
                   <ul>
-                    <li><GlThread /><em>Persistent reasoning</em> and history — every map, every thread, kept.</li>
-                    <li><GlThread />Personalization that learns <em>how you reason</em>, not just what you ask.</li>
+                    <li><GlThread />The <em>journey</em> — what you are working through, held across all of them.</li>
+                    <li><GlThread />Questions you left open, picked back up rather than asked again.</li>
                     <li><GlThread />Connected sources — Google Drive, Docs, Notion <span className="when">— when available.</span></li>
                   </ul>
-                  <p className="payoff">— so nothing you build is ever lost.</p>
-                  <p className="stoprow"><span className="o" />Free forgets between visits<span className="sep">·</span><span className="f" />One keeps every thread</p>
+                  <p className="payoff">— so a season of thinking is one thing, not thirty.</p>
+                  <p className="stoprow"><span className="o" />Free reads the last few<span className="sep">·</span><span className="f" />One reads the whole arc</p>
                 </div>
                 <div className="mini" aria-hidden="true">
                   <svg viewBox="0 0 120 120">
@@ -561,8 +553,10 @@ export function OneStory() {
             <div className="spread-head"><span className="num">II.</span><span className="label">The Boundary, Kept Gracefully</span></div>
             <h2 className="fade">A limit should end the asking — never the thinking.</h2>
             <p className="intro fade d1">
-              When a free map reaches its natural edge, nothing is taken away. The map stays whole,
-              visible, and yours to work with. One simply lets it keep growing.
+              A free line of thinking runs to its own end, not to ours: the map grows as far as
+              the thought does, and when the month&rsquo;s second one is spent, nothing is taken
+              away. Every map stays whole, visible, and yours to work with, and the conversations
+              you have already begun keep going.
             </p>
             <div className="artifacts">
               <div className="fade d1">
@@ -630,12 +624,16 @@ export function OneStory() {
               <h3>Socria <span className="one">One</span></h3>
               <div className="m-price"><span className="amt">{priceLabel()}</span><span className="per">/ {SOCRIA_ONE.period}</span></div>
               <p className="m-line">Membership in the complete reasoning environment.</p>
+              {/* Every line here is something the free tier does NOT have.
+                  Depth, the full map, every lens, Research and Draft Space
+                  came off this list when they were opened to everyone — an
+                  invitation that offers you what you already hold is not an
+                  invitation, it is a reason to stop reading the page. */}
               <ul>
-                <li><GlCircle /><em>Deeper thinking</em> — all four depth modes, at your pace.</li>
-                <li><GlBranch /><em>Full Thinking Maps</em> — unbounded branching and every view.</li>
-                <li><GlSearch /><em>Research</em> — across the whole map, as often as it&rsquo;s needed.</li>
-                <li><GlQuill /><em>Advanced Logos tools</em> — Draft Space, long-form, multimodal.</li>
-                <li><GlThread /><em>Persistent reasoning</em> — your history and personalization, kept.</li>
+                <li><GlBranch /><em>Every line of thinking</em> — as many in a month as you have.</li>
+                <li><GlThread /><em>It remembers how you reason</em> — carried from each one into the next.</li>
+                <li><GlCircle /><em>The thread between them</em> — what you are working through, held across conversations.</li>
+                <li><GlQuill /><em>Your whole history</em> — every map and every conversation, kept and yours.</li>
                 <li><GlLink /><em>Connected context</em> — Drive, Docs, and Notion, when available.</li>
               </ul>
               <button type="button" className="m-cta" onClick={subscribe} disabled={busy}>

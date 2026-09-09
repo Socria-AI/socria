@@ -76,10 +76,10 @@ export function ThinkingMapDoc() {
         <code>resolved</code> / <code>revised</code>), optional LaTeX, an
         optional note, and a &ldquo;+N folded in&rdquo; badge listing wordings
         that were merged into them. Maps hold up to 16 nodes and 22 edges —
-        26 and 34 for math, because a solution chain is long by nature. On
-        the free tier the map stops taking on <em>new</em> nodes at four;{' '}
-        <Link href="/docs/socria-one">Socria One</Link> lets it keep growing,
-        and nothing already drawn is ever taken back.
+        26 and 34 for math, because a solution chain is long by nature. Those
+        are the model&rsquo;s limits, not a plan&rsquo;s: a map grows as far as
+        the thinking does on every tier, and nothing already drawn is ever
+        taken back.
       </p>
 
       <H2 id="edges">Relationships</H2>
@@ -161,9 +161,8 @@ export function ThinkingMapDoc() {
         A map opens on the reading that <em>is</em> its answer: the Solution
         chain where there is one, the diagram where a scene exists, otherwise
         the Graph — until you pick a lens by hand, after which the choice is
-        yours and stays yours. On the free tier that lead lens is the one
-        that is open; the other readings are{' '}
-        <Link href="/docs/socria-one">Socria One</Link>&rsquo;s.
+        yours and stays yours. Every lens is open on every tier — a map read
+        only one way looks like a diagram rather than like thinking.
       </p>
       <p>
         On the Solution chain and the Board, a step that has been checked

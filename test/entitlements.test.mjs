@@ -1,60 +1,130 @@
-import { PLANS, COUNTERS, COUNTER_SCOPE, limitsFor, limitOf, isSpent, remaining, boundaryNote } from './.tmp/entitlements.mjs';
-let pass=0, fail=0;
-const ok=(n,c,x='')=>c?pass++:(fail++,console.log('FAIL',n,x));
+// The plan table, and the one axis it turns on.
+//
+// The free tier used to clip every dimension at once — eight map nodes, one
+// lens, one depth, one Explore, one Research, twelve turns of memory, AND two
+// lines of thinking a month. This suite was written against those numbers and
+// asserted them one by one, which meant it was the thing standing behind a
+// free tier nobody could watch be good.
+//
+// It asserts the SHAPE now rather than a list of figures: that inside a line
+// of thinking the two plans are identical, that exactly the rows the product
+// is sold on differ, and — the assertion that keeps the copy honest — that no
+// boundary note offers Socria One at a ceiling Socria One also has.
 
-console.log('=== the requested free limits ===');
+import {
+  PLANS,
+  COUNTERS,
+  COUNTER_SCOPE,
+  TIERED_COUNTERS,
+  limitsFor,
+  limitOf,
+  isSpent,
+  remaining,
+  boundaryNote,
+} from './.tmp/entitlements.mjs';
+
+let pass = 0, fail = 0;
+const ok = (n, c, x = '') => (c ? pass++ : (fail++, console.log('FAIL', n, x)));
+
 const f = PLANS.free;
-ok('2 chats per month', f.counters.chats===2);
-ok('1 explore per chat', f.counters.explore===1);
-ok('1 research per chat', f.counters.research===1);
-ok('1 challenge per chat', f.counters.challenge===1);
-ok('1 context per chat', f.counters.context===1);
-ok('1 image per chat', f.counters.images===1);
-ok('1 file per chat', f.counters.files===1);
-ok('map depth limited but usable', f.mapNodes===8, String(f.mapNodes));
-ok('map structures limited, not withheld', f.lenses===2, String(f.lenses));
-ok('depth limited', f.allDepths===false);
-ok('live map evolution limited', f.liveMap===false);
-ok('memory limited', typeof f.memoryTurns==='number');
-
-console.log('\n=== One is genuinely unrestricted where it matters ===');
 const o = PLANS.one;
-ok('One: explore uncapped', o.counters.explore===null);
-ok('One: challenge uncapped', o.counters.challenge===null);
-ok('One: context uncapped', o.counters.context===null);
-ok('One: map nodes uncapped', o.mapNodes===null);
-ok('One: all lenses', o.lenses===null);
-ok('One: all depths', o.allDepths===true);
-ok('One: full live map', o.liveMap===true);
-ok('One: full memory', o.memoryTurns===null);
-ok('One: chats far above free', (o.counters.chats??0) >= 100);
-ok('One: every counter >= free', COUNTERS.every(c => o.counters[c]===null || (f.counters[c]??0) <= (o.counters[c]??0)));
+const tiered = (c) => TIERED_COUNTERS.includes(c);
+const shared = COUNTERS.filter((c) => !tiered(c));
 
-console.log('\n=== try once, THEN the boundary ===');
-for (const c of ['explore','research','challenge','context','images','files']) {
-  ok(`${c}: first use allowed`, !isSpent('free', c, 0));
-  ok(`${c}: second use blocked`, isSpent('free', c, 1));
-  ok(`${c}: One never blocked at 50`, !isSpent('one', c, 50));
+console.log('=== the axis: what differs is volume, not quality ===');
+{
+  // The claim the whole reshaping rests on. If this fails, the free tier has
+  // started clipping a conversation again and the pitch is a lie.
+  for (const c of shared) {
+    ok(`${c} is identical on both plans`, f.counters[c] === o.counters[c],
+      `free=${f.counters[c]} one=${o.counters[c]}`);
+  }
+  ok('the map grows as far on both', f.mapNodes === o.mapNodes && f.mapNodes === null);
+  ok('every lens on both', f.lenses === o.lenses && f.lenses === null);
+  ok('every depth on both', f.allDepths === true && o.allDepths === true);
+  ok('Draft Space on both', f.draftSpace === true && o.draftSpace === true);
+  ok('a thread carries its own memory the whole way on both',
+    f.memoryTurns === null && o.memoryTurns === null);
 }
-ok('chats: 1st and 2nd allowed, 3rd blocked',
-  !isSpent('free','chats',0) && !isSpent('free','chats',1) && isSpent('free','chats',2));
 
-console.log('\n=== remaining, for the panel ===');
-ok('2 left at zero used', remaining('free','chats',0)===2);
-ok('0 left at two used', remaining('free','chats',2)===0);
-ok('never negative', remaining('free','chats',99)===0);
-ok('uncapped reads as null', remaining('one','explore',999)===null);
+console.log('\n=== ...and exactly two rows do differ ===');
+{
+  ok('two free lines of thinking a month', f.counters.chats === 2);
+  ok('chats is the only tiered counter',
+    TIERED_COUNTERS.length === 1 && TIERED_COUNTERS[0] === 'chats');
+  ok('TIERED_COUNTERS is the truth, not a comment',
+    COUNTERS.filter((c) => f.counters[c] !== o.counters[c]).join() === TIERED_COUNTERS.join());
+  ok('One holds far more of them', (o.counters.chats ?? 0) >= 100);
+  ok('memory carried between them is the other half',
+    (f.memoryEntries ?? 0) > 0 && (o.memoryEntries ?? 0) > (f.memoryEntries ?? 0));
+}
+
+console.log('\n=== no plan is a smaller product than the other ===');
+{
+  const atLeast = (a, b) => b === null || (a !== null && a >= b);
+  ok('every counter: One >= free', COUNTERS.every((c) => atLeast(o.counters[c], f.counters[c]) || o.counters[c] === null));
+  ok('One never has a ceiling free lacks',
+    COUNTERS.every((c) => !(f.counters[c] === null && o.counters[c] !== null)));
+  ok('One never carries less memory', (o.memoryEntries ?? Infinity) >= (f.memoryEntries ?? Infinity));
+}
+
+console.log('\n=== the month, counted ===');
+{
+  ok('1st and 2nd allowed, 3rd is the boundary',
+    !isSpent('free', 'chats', 0) && !isSpent('free', 'chats', 1) && isSpent('free', 'chats', 2));
+  ok('a member is not stopped at three', !isSpent('one', 'chats', 3));
+  ok('2 left at zero used', remaining('free', 'chats', 0) === 2);
+  ok('0 left at two used', remaining('free', 'chats', 2) === 0);
+  ok('never negative', remaining('free', 'chats', 99) === 0);
+  ok('limitOf agrees with the table', limitOf('free', 'chats') === f.counters.chats);
+  ok('limitsFor returns the row', limitsFor('one') === o);
+}
+
+console.log('\n=== the fair-use ceilings are guards, not boundaries ===');
+{
+  // Nobody working seriously meets these, on either plan. A number small
+  // enough to be met in an afternoon is not fair use, it is a clip wearing
+  // the word — so the bar is deliberately here and deliberately high.
+  for (const c of shared) {
+    const cap = f.counters[c];
+    ok(`${c}: uncapped or far out of reach`, cap === null || cap >= 50, String(cap));
+    ok(`${c}: not spent at 20 uses on either plan`,
+      !isSpent('free', c, 20) && !isSpent('one', c, 20));
+  }
+  ok('uncapped reads as null in remaining()', remaining('one', 'explore', 999) === null);
+}
 
 console.log('\n=== scopes ===');
-ok('chats reset monthly', COUNTER_SCOPE.chats==='month');
-ok('everything else is per chat', COUNTERS.filter(c=>c!=='chats').every(c=>COUNTER_SCOPE[c]==='chat'));
-
-console.log('\n=== the boundary is said calmly ===');
-for (const c of COUNTERS) {
-  const note = boundaryNote(c);
-  ok(`${c}: two sentences, names One`, note.includes('Socria One') && note.length > 40, note);
-  ok(`${c}: no pressure words`, !/upgrade now|hurry|only|!|limited time/i.test(note), note);
+{
+  ok('chats reset monthly', COUNTER_SCOPE.chats === 'month');
+  ok('everything else lives with one conversation',
+    COUNTERS.filter((c) => c !== 'chats').every((c) => COUNTER_SCOPE[c] === 'chat'));
 }
-console.log('\n  example:', boundaryNote('explore'));
+
+console.log('\n=== the boundary is said calmly, and only sold where there is something to sell ===');
+{
+  for (const c of COUNTERS) {
+    const note = boundaryNote(c);
+    ok(`${c}: two sentences`, note.length > 40 && /\.\s/.test(note), note);
+    ok(`${c}: no pressure words`, !/upgrade now|hurry|only|!|limited time/i.test(note), note);
+  }
+
+  // THE ONE THAT MATTERS. A shared ceiling must never be dressed as a reason
+  // to pay: offering somebody a thing they already hold, at the exact moment
+  // they are annoyed, is the most expensive sentence in the product.
+  ok('the month names One', boundaryNote('chats').includes('Socria One keeps as many'));
+  for (const c of shared) {
+    const note = boundaryNote(c);
+    ok(`${c}: does not offer One as the fix`, !/Socria One (gives|opens|lets|grounds|reads|keeps)/.test(note), note);
+    ok(`${c}: says the ceiling is shared`, /same place/.test(note), note);
+  }
+
+  // And the count itself is read from the table rather than written twice.
+  ok('the month’s copy matches the table',
+    f.counters.chats !== 2 || boundaryNote('chats').includes('both of your free lines'));
+}
+
+console.log('\n  the month:', boundaryNote('chats'));
+console.log('  a ceiling:', boundaryNote('research'));
 console.log(`\n${pass} passed, ${fail} failed`);
-process.exit(fail?1:0);
+process.exit(fail ? 1 : 0);
