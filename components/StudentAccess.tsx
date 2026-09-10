@@ -33,7 +33,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useClerk, useUser } from '@clerk/nextjs';
 import type { EmailAddressResource } from '@clerk/types';
-import { clerkMessage, looksUnreachable, needsReverification } from '@/lib/clerk-errors';
+import {
+  clerkMessage,
+  looksUnreachable,
+  needsReverification,
+  reverificationOpener,
+} from '@/lib/clerk-errors';
 import { emailMatchesHosts } from '@/lib/socria-edu';
 import type { PlanState } from './usePlan';
 
@@ -97,23 +102,28 @@ export function StudentAccess({ state }: { state: PlanState }) {
         return await op();
       } catch (e) {
         if (!needsReverification(e)) throw e;
-        const open = (
-          clerk as unknown as {
-            __experimental_openUserVerification?: (p: {
-              afterVerification?: () => void;
-              afterVerificationCancelled?: () => void;
-            }) => void;
-          }
-        ).__experimental_openUserVerification;
-        // Still flagged experimental in the SDK, and absent from older
-        // clerk-js builds. Where it is missing the original refusal is the
-        // honest thing to show — with the way out named, below.
-        if (typeof open !== 'function') throw e;
+        // Found by name across the versions we know, then by shape. clerk-js
+        // ships from Clerk's CDN independently of the pinned SDK, and this
+        // method has already been renamed once under us — see
+        // lib/clerk-errors.ts. Where it genuinely does not exist the original
+        // refusal is the honest thing to show, with the way out named below.
+        const open = reverificationOpener(clerk);
+        if (!open) throw e;
         await new Promise<void>((resolve, reject) => {
+          // Clerk calls exactly one of these, but a build that called both —
+          // or neither and then one late — would settle a promise twice and
+          // leave the button spinning for ever. Settle once, whatever it does.
+          let done = false;
+          const once = (f: () => void) => () => {
+            if (done) return;
+            done = true;
+            f();
+          };
           open({
-            afterVerification: () => resolve(),
-            afterVerificationCancelled: () =>
+            afterVerification: once(() => resolve()),
+            afterVerificationCancelled: once(() =>
               reject(new ReverifyCancelled('verification cancelled')),
+            ),
           });
         });
         return await op();

@@ -12,7 +12,12 @@
 // the same condition session_reverification_required, and this must not start
 // failing silently on an upgrade.
 
-import { needsReverification, clerkMessage, looksUnreachable } from './.tmp/clerk-errors.mjs';
+import {
+  needsReverification,
+  clerkMessage,
+  looksUnreachable,
+  reverificationOpener,
+} from './.tmp/clerk-errors.mjs';
 
 let pass = 0, fail = 0;
 const ok = (n, c, x = '') => (c ? pass++ : (fail++, console.log('FAIL', n, x)));
@@ -136,6 +141,91 @@ console.log('\n=== unreachable is not the same as refused ===');
   for (const junk of [null, undefined, {}, 42, 'Failed to fetch', { errors: [] }]) {
     ok(`${JSON.stringify(junk)} is not a network failure`, looksUnreachable(junk) === false);
   }
+}
+
+console.log('\n=== a JS bug is not a network failure ===');
+{
+  // This is the false positive that cost a real evening. clerk-js answered
+  // 403 and the panel said "could not reach Clerk, this is usually a
+  // production key on a preview domain" — sending everyone after a
+  // configuration problem that did not exist. Any TypeError counted as a
+  // transport failure, and a property read on undefined is a TypeError.
+  for (const bug of [
+    "Cannot read properties of undefined (reading 'emailAddress')",
+    'undefined is not an object',
+    'clerk.openThing is not a function',
+    'open is not defined',
+    'x is not iterable',
+  ]) {
+    ok(`"${bug.slice(0, 34)}…" is a bug, not a network failure`,
+      looksUnreachable(new TypeError(bug)) === false, bug);
+  }
+  // …while the transport phrasings a TypeError really does carry still count.
+  ok('but a bare TypeError with an unfamiliar phrasing still counts',
+    looksUnreachable(new TypeError('The network connection was lost')) === true);
+}
+
+console.log('\n=== finding the box that says "prove it is you" ===');
+{
+  // clerk-js ships from Clerk's CDN at whatever version they are on, while
+  // @clerk/nextjs is pinned in package.json. The reverification method has
+  // already been renamed underneath us once, and the panel dead-ended on a
+  // 403 with no way past it. These are the names, and then the shape.
+  const noop = () => {};
+
+  const modern = { __internal_openReverification: noop, __internal_closeReverification: noop };
+  ok('the current name is found', typeof reverificationOpener(modern) === 'function');
+
+  const legacy = { __experimental_openUserVerification: noop };
+  ok('the older name is found', typeof reverificationOpener(legacy) === 'function');
+
+  // Both present: the newer one wins, because the older is the one on its
+  // way out and may be a deprecation shim.
+  let which = '';
+  const both = {
+    __internal_openReverification: () => { which = 'new'; },
+    __experimental_openUserVerification: () => { which = 'old'; },
+  };
+  reverificationOpener(both)({});
+  ok('the newer name wins when both exist', which === 'new', which);
+
+  // A rename we have never seen must not be a dead end.
+  let shapeCalled = false;
+  const renamed = { __private_openIdentityVerification: () => { shapeCalled = true; } };
+  const byShape = reverificationOpener(renamed);
+  ok('an unknown rename is found by shape', typeof byShape === 'function');
+  if (byShape) byShape({});
+  ok('...and is the one that runs', shapeCalled === true);
+
+  // The exact keys clerk-js 5.127.2 exposes, from a real console. Closing the
+  // box and handling a magic link are both "verification" and neither is this.
+  const real = {
+    __internal_openReverification: noop,
+    __internal_closeReverification: noop,
+    handleEmailLinkVerification: noop,
+  };
+  ok('clerk-js 5.127 resolves', typeof reverificationOpener(real) === 'function');
+  ok('close is never mistaken for open',
+    typeof reverificationOpener({ __internal_closeReverification: noop }) !== 'function');
+  ok('nor is the email-link handler',
+    typeof reverificationOpener({ handleEmailLinkVerification: noop }) !== 'function');
+
+  // Bound, so the caller can hold it detached without losing `this`.
+  const host = {
+    marker: 'me',
+    seen: null,
+    __internal_openReverification() { this.seen = this.marker; },
+  };
+  reverificationOpener(host)({});
+  ok('it is bound to the Clerk instance', host.seen === 'me');
+
+  // Nothing to find, and nothing to crash on.
+  ok('a build without it returns null', reverificationOpener({ signOut: noop }) === null);
+  for (const junk of [null, undefined, 42, 'clerk', []]) {
+    ok(`${JSON.stringify(junk)} yields null`, reverificationOpener(junk) === null);
+  }
+  ok('a non-function under the right name is refused',
+    reverificationOpener({ __internal_openReverification: 'nope' }) === null);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
