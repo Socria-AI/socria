@@ -55,6 +55,7 @@ import {
   type Plan,
 } from '@/lib/socria-one';
 import { MathText } from '@/components/TeX';
+import { Inline, RichText } from '@/components/RichText';
 import {
   SOCRIA_MODELS,
   THINKING_DEPTHS,
@@ -2368,7 +2369,17 @@ export function LogosApp({
                   {!!m.attachments?.length && <AttachmentList items={m.attachments} />}
                   {m.content && (
                     <div className="lg-msg-body">
-                      <MathText>{m.content}</MathText>
+                      {m.role === 'assistant' ? (
+                        // Socria's prose carries the same small vocabulary
+                        // Core's does — a list, a numbered sequence, a bold
+                        // label, the one word in emphasis — and until this it
+                        // arrived as literal asterisks and hyphens. What the
+                        // person typed is never reinterpreted: their own
+                        // asterisks stay asterisks.
+                        <RichText text={m.content} math />
+                      ) : (
+                        <MathText>{m.content}</MathText>
+                      )}
                     </div>
                   )}
                 </div>
@@ -2378,8 +2389,12 @@ export function LogosApp({
             {streaming && (
               <div className="lg-msg lg-msg-assistant">
                 <span className="lg-msg-who">Socria</span>
-                <div className="lg-msg-body">
-                  <MathText>{streaming}</MathText>
+                {/* Inline marks only while the words are still arriving.
+                    Blocks settle when the text stops: re-deciding "is this a
+                    list yet?" on every token makes a half-written reply jump
+                    about under somebody who is reading it. */}
+                <div className="lg-msg-body is-streaming">
+                  <Inline text={streaming} math />
                 </div>
               </div>
             )}
