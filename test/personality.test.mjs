@@ -137,8 +137,15 @@ console.log('\n=== the two dials that were losing to the base prompt ===');
   ok('and points at the setting that replaces it',
     /LENGTH setting/.test(lengthRule || ''), lengthRule);
 
-  const formatRule = LOGOS_CHAT_PROMPT.split('\n').find((l) => l.includes('No lists, no headings'));
-  ok('the formatting bullet is still there', !!formatRule);
+  // Matched on the shape of the rule rather than its wording: the bullet has
+  // been rewritten once already, to name the marks the surface actually
+  // draws, and what must not change is that it presents itself as a DEFAULT
+  // and points at the setting that replaces it.
+  const formatRule = LOGOS_CHAT_PROMPT.split('\n').find(
+    (l) => l.startsWith('- Plain conversational prose')
+  );
+  ok('the formatting bullet is still there', !!formatRule, formatRule);
+  ok('and says it is only the default', /by default/.test(formatRule || ''), formatRule);
   ok('and defers to the setting', /FORMATTING setting/.test(formatRule || ''), formatRule);
 
   // Half two — the block says, in as many words, which one wins.

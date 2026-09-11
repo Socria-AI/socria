@@ -488,6 +488,19 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
 }
 .prose-socria th { font-weight: 600; background: rgba(0, 0, 0, 0.025); }
 .prose-socria .socria-strong { font-weight: 650; color: var(--ink, #1f1f1f); }
+/* Socria's signature: the one word that carries the turn, in italic
+   Instrument Serif and the green. Was four Tailwind utilities inline in
+   app/chat/page.tsx; it is a class now because Logos draws the same mark
+   from the same renderer and the two must not drift. Values unchanged. */
+.prose-socria .socria-em {
+  font-family: var(--serif);
+  font-style: italic;
+  color: var(--moss-700);
+  font-size: 1.18em;
+  line-height: 1;
+}
+/* The same signature inside a bold label, where it most often lands. */
+.prose-socria .socria-em.is-strong { font-weight: 600; }
 /* Titled groups — a labeled list rendered as a light visual map. */
 .prose-socria .socria-groups {
   margin: 0.6em 0;
@@ -3442,6 +3455,144 @@ html.js-anim .scrolly-root .fade.d3 { transition-delay: .3s; }
   max-width: 62ch;
   white-space: pre-wrap;
 }
+
+/* ── the typography of a reply ────────────────────────────────────────
+   Logos writes in the same small vocabulary Core does — a list, a numbered
+   sequence, a bold label, the one word in emphasis — and until this it had
+   no renderer at all, so every mark arrived as the character it was. The
+   markup comes from components/RichText.tsx; these are the rules that make
+   it read. `pre-wrap` above still holds, so a line break the model put
+   inside a paragraph is still a line break: blank lines become blocks and
+   single ones stay where they were written. */
+
+.logos-root .lg-msg-assistant .lg-msg-body > p { margin: 0 0 0.95em; }
+.logos-root .lg-msg-assistant .lg-msg-body > :last-child { margin-bottom: 0; }
+.logos-root .lg-msg-assistant .lg-msg-body > :first-child { margin-top: 0; }
+
+/* Lists. The marker sits in the margin so the text of every item lines up
+   with the prose above it — a bullet that pushes its own line out of the
+   measure is what makes a list feel bolted on. */
+.logos-root .lg-msg-assistant .lg-msg-body ul,
+.logos-root .lg-msg-assistant .lg-msg-body ol {
+  margin: 0.85em 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5em;
+}
+.logos-root .lg-msg-assistant .lg-msg-body li {
+  position: relative;
+  padding-left: 1.35em;
+  line-height: 1.62;
+  /* An item is one line of thought: the model's own wrapping inside it is
+     not meaningful, and honouring it would ladder the text. */
+  white-space: normal;
+}
+.logos-root .lg-msg-assistant .lg-msg-body ul > li::before {
+  content: "";
+  position: absolute;
+  left: 0.34em;
+  top: 0.72em;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--lg-primary);
+  opacity: 0.55;
+}
+/* Numbers in the same italic serif as the emphasis — the sequence is part of
+   the voice, not a browser default in a different typeface. */
+.logos-root .lg-msg-assistant .lg-msg-body ol { counter-reset: lg-step; }
+.logos-root .lg-msg-assistant .lg-msg-body ol > li { padding-left: 1.75em; }
+.logos-root .lg-msg-assistant .lg-msg-body ol > li::before {
+  counter-increment: lg-step;
+  content: counter(lg-step) ".";
+  position: absolute;
+  left: 0;
+  top: 0;
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 1.05em;
+  line-height: 1.62;
+  color: var(--lg-primary);
+  opacity: 0.75;
+}
+
+/* A bold label. Weight, not colour — a second colour in the middle of a
+   sentence reads as a link. */
+.logos-root .lg-msg-assistant .lg-msg-body .socria-strong {
+  font-weight: 650;
+  color: var(--lg-ink);
+}
+
+/* Socria's signature, and the thing this surface was missing most: the one
+   word that carries the turn, in italic Instrument Serif and the green. Same
+   mark, same renderer and very nearly the same size as Core's. */
+.logos-root .lg-msg-assistant .lg-msg-body .socria-em {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 1.16em;
+  line-height: 1;
+  color: var(--lg-primary);
+}
+.logos-root .lg-msg-assistant .lg-msg-body .socria-em.is-strong { font-weight: 600; }
+
+/* A labelled list is a set of small sections. The rule down the left is what
+   turns eight bullets into three things worth reading. */
+.logos-root .lg-msg-assistant .lg-msg-body .socria-groups {
+  margin: 0.9em 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1em;
+}
+.logos-root .lg-msg-assistant .lg-msg-body .socria-group {
+  border-left: 2px solid var(--lg-line);
+  padding-left: 0.95em;
+}
+.logos-root .lg-msg-assistant .lg-msg-body .socria-group-head {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 1.16em;
+  line-height: 1.2;
+  color: var(--lg-primary);
+  margin-bottom: 0.28em;
+  white-space: normal;
+}
+.logos-root .lg-msg-assistant .lg-msg-body .socria-group ul { margin: 0; }
+
+/* A small table, scrolling inside itself so a wide one never makes the whole
+   conversation slide sideways. */
+.logos-root .lg-msg-assistant .lg-msg-body .socria-table-wrap {
+  margin: 0.95em 0;
+  overflow-x: auto;
+}
+.logos-root .lg-msg-assistant .lg-msg-body table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.95em;
+  white-space: normal;
+}
+.logos-root .lg-msg-assistant .lg-msg-body th,
+.logos-root .lg-msg-assistant .lg-msg-body td {
+  border-bottom: 1px solid var(--lg-line);
+  padding: 0.5em 0.85em 0.5em 0;
+  text-align: left;
+  vertical-align: top;
+  line-height: 1.5;
+}
+.logos-root .lg-msg-assistant .lg-msg-body th {
+  font-family: var(--serif);
+  font-style: italic;
+  font-weight: 400;
+  font-size: 1.06em;
+  color: var(--lg-primary);
+  border-bottom-color: rgba(53, 70, 32, 0.28);
+}
+.logos-root .lg-msg-assistant .lg-msg-body tbody tr:last-child td { border-bottom: 0; }
+
+/* Still arriving: inline marks only, no blocks, so a half-written reply does
+   not rearrange itself under somebody who is reading it. */
+.logos-root .lg-msg-assistant .lg-msg-body.is-streaming { white-space: pre-wrap; }
 .logos-root .lg-error { font-size: 13px; color: var(--lg-tension); margin-top: 8px; }
 
 .logos-root .lg-thinking { display: flex; gap: 5px; padding: 4px 0; }
