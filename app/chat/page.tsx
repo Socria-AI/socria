@@ -39,6 +39,8 @@ import {
 import { DepthPicker } from '@/components/DepthPicker';
 import { TryLogosPill } from '@/components/TryLogosPill';
 import { TryLogosModal } from '@/components/TryLogosModal';
+import { RichText } from '@/components/RichText';
+import { splitInline } from '@/lib/rich-text';
 import { InsightCard } from '@/components/InsightCard';
 import { InsightShareModal } from '@/components/InsightShareModal';
 import { ImportProfileModal } from '@/components/ImportProfileModal';
@@ -2254,7 +2256,7 @@ function Bubble({
               key={i}
               className="prose-socria text-ink/90 text-[15.5px]"
             >
-              {animate ? renderAnimated(seg.text) : renderRichText(seg.text)}
+              {animate ? renderAnimated(seg.text) : <RichText text={seg.text} />}
             </div>
           );
         })}
@@ -2263,260 +2265,29 @@ function Bubble({
   );
 }
 
-// Inline renderer: `*emphasis*` → italic moss serif (Core 3.1's language-
-// noticing signature); `**bold**` → bold label (the model uses it for list
-// headings). Handling both keeps stray asterisks from ever leaking through.
-function renderInline(text: string, keyBase: string): React.ReactNode[] {
-  const parts: React.ReactNode[] = [];
-  // Bold first so `**x**` isn't mistaken for two single-asterisk runs.
-  const re = /\*\*([^*\n]+)\*\*|\*([^*\n]+)\*/g;
-  let last = 0;
-  let m: RegExpExecArray | null;
-  let key = 0;
-  while ((m = re.exec(text)) !== null) {
-    if (m.index > last) parts.push(text.slice(last, m.index));
-    if (m[1] !== undefined) {
-      parts.push(
-        <strong key={`${keyBase}-b${key++}`} className="socria-strong">
-          {m[1]}
-        </strong>
-      );
-    } else {
-      parts.push(
-        <em
-          key={`${keyBase}-e${key++}`}
-          className="font-serif italic text-moss-700 text-[1.18em] leading-[1]"
-          style={{ fontStyle: 'italic' }}
-        >
-          {m[2]}
-        </em>
-      );
-    }
-    last = m.index + m[0].length;
-  }
-  if (last < text.length) parts.push(text.slice(last));
-  return parts;
-}
-
-const BULLET_RE = /^\s*([-•]|\*)\s+(.*)$/;
-const ORDERED_RE = /^\s*\d+[.)]\s+(.*)$/;
-const TABLE_SEP_RE = /^\s*\|?[\s:|-]*-{2,}[\s:|-]*\|?\s*$/;
-
-function splitTableRow(line: string): string[] {
-  return line
-    .trim()
-    .replace(/^\|/, '')
-    .replace(/\|$/, '')
-    .split('|')
-    .map((c) => c.trim());
-}
-
-// A bullet item is a group "header" when it's a short label ending in a colon
-// (e.g. "**Chipotle:**", "Mood-based decision:") rather than a full point.
-// These become titled sections so a labeled list reads as a clean visual map.
-function stripMarks(s: string): string {
-  return s.replace(/\*+/g, '').trim();
-}
-function isGroupHeader(item: string): boolean {
-  const s = stripMarks(item);
-  return /:$/.test(s) && s.length <= 42;
-}
-
-// Static renderer for persisted assistant messages. Core 3.1 formats
-// adaptively — mostly conversational prose, but bullet lists, numbered
-// steps, and small pipe tables when comparing or planning. Parse those
-// blocks so they render as real lists/tables instead of raw markup;
-// everything inside still gets inline `*emphasis*`.
-function renderRichText(text: string): React.ReactNode {
-  const lines = text.replace(/\r/g, '').split('\n');
-  const blocks: React.ReactNode[] = [];
-  let i = 0;
-  let key = 0;
-
-  while (i < lines.length) {
-    const line = lines[i];
-    if (line.trim() === '') {
-      i++;
-      continue;
-    }
-
-    // Table: a `|` line immediately followed by a separator row.
-    if (
-      line.includes('|') &&
-      i + 1 < lines.length &&
-      TABLE_SEP_RE.test(lines[i + 1]) &&
-      lines[i + 1].includes('-')
-    ) {
-      const header = splitTableRow(line);
-      i += 2;
-      const rows: string[][] = [];
-      while (i < lines.length && lines[i].includes('|') && lines[i].trim() !== '') {
-        rows.push(splitTableRow(lines[i]));
-        i++;
-      }
-      const k = key++;
-      blocks.push(
-        <div key={`tbl-${k}`} className="socria-table-wrap">
-          <table>
-            <thead>
-              <tr>
-                {header.map((c, ci) => (
-                  <th key={ci}>{renderInline(c, `tbl-${k}-h${ci}`)}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r, ri) => (
-                <tr key={ri}>
-                  {r.map((c, ci) => (
-                    <td key={ci}>{renderInline(c, `tbl-${k}-${ri}-${ci}`)}</td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      );
-      continue;
-    }
-
-    // Bullet list.
-    if (BULLET_RE.test(line)) {
-      const items: string[] = [];
-      while (i < lines.length && BULLET_RE.test(lines[i])) {
-        items.push(lines[i].replace(BULLET_RE, '$2'));
-        i++;
-      }
-      const k = key++;
-
-      // If the list uses "Label:" headers, render it as titled groups — a
-      // light visual map — instead of one flat bullet run.
-      if (items.some(isGroupHeader) && items.some((it) => !isGroupHeader(it))) {
-        const groups: { header: string | null; items: string[] }[] = [];
-        let cur: { header: string | null; items: string[] } = { header: null, items: [] };
-        for (const it of items) {
-          if (isGroupHeader(it)) {
-            if (cur.header || cur.items.length) groups.push(cur);
-            cur = { header: it, items: [] };
-          } else {
-            cur.items.push(it);
-          }
-        }
-        if (cur.header || cur.items.length) groups.push(cur);
-
-        blocks.push(
-          <div key={`grp-${k}`} className="socria-groups">
-            {groups.map((g, gi) => (
-              <div key={gi} className="socria-group">
-                {g.header && (
-                  <div className="socria-group-head">
-                    {stripMarks(g.header).replace(/:$/, '')}
-                  </div>
-                )}
-                {g.items.length > 0 && (
-                  <ul>
-                    {g.items.map((it, ii) => (
-                      <li key={ii}>{renderInline(it, `grp-${k}-${gi}-${ii}`)}</li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            ))}
-          </div>
-        );
-        continue;
-      }
-
-      blocks.push(
-        <ul key={`ul-${k}`}>
-          {items.map((it, ii) => (
-            <li key={ii}>{renderInline(it, `ul-${k}-${ii}`)}</li>
-          ))}
-        </ul>
-      );
-      continue;
-    }
-
-    // Numbered / ordered list.
-    if (ORDERED_RE.test(line)) {
-      const items: string[] = [];
-      while (i < lines.length && ORDERED_RE.test(lines[i])) {
-        items.push(lines[i].replace(ORDERED_RE, '$1'));
-        i++;
-      }
-      const k = key++;
-      blocks.push(
-        <ol key={`ol-${k}`}>
-          {items.map((it, ii) => (
-            <li key={ii}>{renderInline(it, `ol-${k}-${ii}`)}</li>
-          ))}
-        </ol>
-      );
-      continue;
-    }
-
-    // Paragraph: gather until a blank line or a structural line.
-    const para: string[] = [];
-    while (
-      i < lines.length &&
-      lines[i].trim() !== '' &&
-      !BULLET_RE.test(lines[i]) &&
-      !ORDERED_RE.test(lines[i]) &&
-      !(
-        lines[i].includes('|') &&
-        i + 1 < lines.length &&
-        TABLE_SEP_RE.test(lines[i + 1]) &&
-        lines[i + 1].includes('-')
-      )
-    ) {
-      para.push(lines[i]);
-      i++;
-    }
-    const k = key++;
-    blocks.push(<p key={`p-${k}`}>{renderInline(para.join('\n'), `p-${k}`)}</p>);
-  }
-
-  return blocks;
-}
-
-// Animated renderer for the *currently streaming* assistant bubble: every
-// word becomes a span with the bubbleIn CSS entrance animation. Stable
-// keys mean existing words don't replay the animation as the bubble re-
-// renders — only the newly arrived word at the end pops in.
+// Word-by-word entrance for the bubble that is still arriving.
+//
+// Streaming stays plain-flow on purpose: block structures settle once the
+// text stops, through <RichText/> below, because re-deciding "is this a list
+// yet?" on every token makes a half-written reply jump about under somebody
+// who is reading it. The marks themselves are read by the shared splitter, so
+// an emphasis that appears mid-stream is the same emphasis when it lands.
 function renderAnimated(text: string): React.ReactNode {
-  // First pass: split content into typed segments (plain | em) using the
-  // same `*…*` rule as renderInline. (Streaming stays plain-flow — block
-  // structures like lists/tables only render once persisted via renderRichText.)
-  type Seg = { type: 'plain' | 'em' | 'bold'; text: string };
-  const segs: Seg[] = [];
-  const re = /\*\*([^*\n]+)\*\*|\*([^*\n]+)\*/g;
-  let last = 0;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(text)) !== null) {
-    if (m.index > last) segs.push({ type: 'plain', text: text.slice(last, m.index) });
-    if (m[1] !== undefined) segs.push({ type: 'bold', text: m[1] });
-    else segs.push({ type: 'em', text: m[2] });
-    last = m.index + m[0].length;
-  }
-  if (last < text.length) segs.push({ type: 'plain', text: text.slice(last) });
-
-  // Second pass: split each segment by whitespace, keep whitespace as
-  // text nodes, wrap each non-whitespace word in a `.bubble-word` span.
-  // Keys are stable: `${segIndex}-${partIndex}`.
   const out: React.ReactNode[] = [];
-  segs.forEach((seg, si) => {
-    const parts = seg.text.split(/(\s+)/);
-    parts.forEach((p, pi) => {
+  splitInline(text).forEach((seg, si) => {
+    const mark =
+      seg.kind === 'em' ? ' em' : seg.kind === 'strong' ? ' bold' : seg.kind === 'strong-em' ? ' em bold' : '';
+    // Whitespace stays a text node so the line wraps where it should; every
+    // other run becomes a word with the entrance animation on it. Keys are
+    // stable, so words already on screen do not replay it as the next arrives.
+    seg.text.split(/(\s+)/).forEach((p, pi) => {
       if (p === '') return;
       if (/^\s+$/.test(p)) {
         out.push(p);
         return;
       }
       out.push(
-        <span
-          key={`${si}-${pi}`}
-          className={`bubble-word${seg.type === 'em' ? ' em' : seg.type === 'bold' ? ' bold' : ''}`}
-        >
+        <span key={`${si}-${pi}`} className={`bubble-word${mark}`}>
           {p}
         </span>
       );
