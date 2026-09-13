@@ -17,7 +17,14 @@ import { OneFoot } from '@/components/OneMark';
 import { ModelGlyph } from '@/components/ModelGlyph';
 import { LogosApp } from '@/components/LogosApp';
 import { isValidOneKey } from '@/lib/socria-one';
-import { MODEL_KEY, rememberModel } from '@/lib/socria-model-store';
+import {
+  MODEL_KEY,
+  autoModel,
+  chooseModel,
+  modelWasChosen,
+  readStoredModel,
+  rememberModel,
+} from '@/lib/socria-model-store';
 import { buildStarters } from '@/lib/starters';
 import {
   loadLocal as loadLocalLogos,
@@ -117,13 +124,10 @@ const DRIFT_KEY = 'socria.chat.driftDismissals.v1';
 
 function readModel(): SocriaModel {
   if (typeof window === 'undefined') return 'core-2';
-  try {
-    const raw = localStorage.getItem(MODEL_KEY);
-    if (raw === 'core-3' || raw === 'logos') return raw;
-    return 'core-2';
-  } catch {
-    return 'core-2';
-  }
+  // Core 2 only until we know better. The automatic default needs Clerk and
+  // the plan route to have answered, and guessing before they do would show
+  // somebody Logos and then take it away again.
+  return readStoredModel() ?? 'core-2';
 }
 
 function readDepth(): ThinkingDepth {
@@ -497,6 +501,33 @@ export default function ChatPage() {
       rememberModel('core-2');
     }
   }, [isLoaded, canUseCore3, model]);
+
+  // Open on the surface they are entitled to, when they have never said
+  // otherwise.
+  //
+  // Everyone used to land on Core 2 — the model that needs no account —
+  // including people who have one and people paying for the environment Core 2
+  // is not. The product opened on its own weakest surface and waited to be
+  // corrected, which is a strange thing to do to somebody who just signed in
+  // and a worse one to do to a member.
+  //
+  // Waits for BOTH answers. Clerk decides whether Core 3.1 is theirs and the
+  // plan route decides whether Logos is; resolving on the first alone would
+  // land a member on Core 3.1 and then move them, and a surface that changes
+  // under somebody is worse than one that took a moment.
+  //
+  // Written back so it happens once per browser rather than on every load:
+  // the next visit reads it during hydration and opens there directly, with
+  // no flash. Written WITHOUT the chosen flag, so it stays a default — if
+  // their membership lapses they are moved back, and the moment they pick
+  // anything themselves this stops deciding for them.
+  useEffect(() => {
+    if (!isLoaded || !planState.known || modelWasChosen()) return;
+    const next = autoModel({ canUseCore3, isOne: planState.plan === 'one' });
+    setModel(next);
+    rememberModel(next);
+  }, [isLoaded, planState.known, planState.plan, canUseCore3]);
+
   function pickModel(next: SocriaModel) {
     const config = SOCRIA_MODELS[next];
     // Gated model, and the user hasn't signed in or unlocked with the key:
@@ -511,7 +542,7 @@ export default function ChatPage() {
       return;
     }
     setModel(next);
-    rememberModel(next);
+    chooseModel(next);
   }
 
   // Validate + persist a typed access key. Returns true when accepted.
@@ -576,7 +607,7 @@ export default function ChatPage() {
       setLogosDismissed(true);
       setLogosModalOpen(false);
       setModel('logos');
-      rememberModel('logos');
+      chooseModel('logos');
       return;
     }
     setLogosModalOpen(false);
@@ -592,7 +623,7 @@ export default function ChatPage() {
     setLogosDismissed(true);
     setLogosModalOpen(false);
     setModel('logos');
-    rememberModel('logos');
+    chooseModel('logos');
     return true;
   }
 
@@ -1441,7 +1472,7 @@ export default function ChatPage() {
 
     if (want !== 'logos' && want !== 'core-3' && want !== 'core-2') return;
     setModel(want);
-    rememberModel(want);
+    chooseModel(want);
     const url = new URL(window.location.href);
     url.searchParams.delete('model');
     window.history.replaceState({}, '', url.pathname + url.search);
@@ -1463,7 +1494,7 @@ export default function ChatPage() {
       <LogosApp
         onSwitchModel={(next) => {
           setModel(next);
-          rememberModel(next);
+          chooseModel(next);
         }}
       />
     );
@@ -1685,7 +1716,7 @@ export default function ChatPage() {
                         // navigation: record it before leaving, or coming back
                         // to /chat would land on whatever was active before and
                         // contradict where they just were.
-                        onClick={() => rememberModel('logos')}
+                        onClick={() => chooseModel('logos')}
                         onDoubleClick={(e) => {
                           e.preventDefault();
                           startRename();
