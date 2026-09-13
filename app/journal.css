@@ -1,0 +1,868 @@
+/* app/journal.css — The Socria Journal, Issue No. 4.
+ *
+ * Ported from the Claude Design prototype ("Socria Site"): the design system's
+ * token sheets, then issue.css, motion.css and stage.css.
+ *
+ * EVERYTHING IS SCOPED TO `.jr-root`. The prototype was a standalone page and
+ * styled bare selectors — `:root`, `body`, `.cover`, `.turn`, `a`. Imported
+ * into the app as-is it would restyle /chat, /docs and every other route, and
+ * its `--paper` and `--ink` would silently overwrite the ones in globals.css.
+ * So `:root` becomes `.jr-root` and every bare selector is nested under it —
+ * the pattern app/logos/logos.css already uses with `.lgx-root`.
+ *
+ * The exception is `html.anim-off` / `body.on-dark`: the scroll drivers set
+ * those flags on the document, so they are kept as ancestors of the scope
+ * rather than moved inside it.
+ *
+ * Hand-edit with care — this is a port, and the prototype in the design
+ * project is still the upstream.
+ */
+
+/* ── design system · tokens/colors.css ─────────────────────── */
+/* Colour.
+
+   Three colours are the core and never change — moss, paper, ink. Everything
+   else answers to the code in tokens/code.css.
+
+   Canonical values are the published ones (Socria · The design system, Vol. I
+   No. 3, sheet 14). Where the codebase and the spec disagreed, the spec wins;
+   the codebase's app-side variants are kept below as the scoped exceptions
+   they are (the screen runs a step cooler than print).
+
+   Secondary text is ink at an opacity — never a grey, never a tinted green.
+
+   Contrast, measured on paper:
+     ink / paper        14.5:1  — all body text
+     moss / paper        4.5:1  — only just clears AA. Fine at 16px and above,
+                                  NEVER for a 13px label.
+     moss-700 / paper    6.8:1  — the correct step for small text
+     sage / paper        fails at every size. Sage is for dark grounds only. */
+.jr-root{
+  /* ── paper & ink ─────────────────────────────────────────────── */
+  --paper: #F4F1E8;          /* the canonical warm paper. Never pure white. */
+  --paper-2: #E9E5D9;        /* the second tone */
+  --paper-screen: #F5F3EB;   /* the screen runs a step cooler */
+  --paper-journal: #F4F1E8;  /* alias — the canonical paper */
+  --paper-journal-2: #E9E5D9;
+  --ink: #20201B;            /* all text */
+  --ink-journal: #20201B;    /* alias */
+  /* the ladder — four steps, and only these four:
+     100% primary text · 70% supporting prose · 45% micro-labels and metadata
+     · 25% dashed rules and disabled */
+  --ink-70: rgba(32, 32, 27, .7);
+  --ink-45: rgba(32, 32, 27, .45);
+  --ink-25: rgba(32, 32, 27, .25);
+  --ink-12: rgba(32, 32, 27, .12);   /* hairlines only, not text */
+  --ink-70-journal: var(--ink-70);
+  --ink-45-journal: var(--ink-45);
+  --ink-25-journal: var(--ink-25);
+  --ink-12-journal: var(--ink-12);
+  --ink-60: rgba(32, 32, 27, 0.6);   /* legacy app value */
+  --ink-40: var(--ink-45);
+  --ink-16: var(--ink-12);
+
+  /* ── moss: the one brand colour ──────────────────────────────── */
+  --moss: #5E7633;           /* the primary. One word in a headline that turns,
+                                a link, the spine filling, a whole surface when
+                                the surface IS the statement. Never a tint
+                                behind body copy, never three times in a view. */
+  --moss-50: #f4f6ee;
+  --moss-100: #E4EADA;       /* on moss */
+  --moss-200: #cad5b6;
+  --moss-600: #5E7633;
+  --moss-700: #465A26;       /* small text — 6.8:1 on paper */
+  --moss-700-journal: #465A26;
+  --moss-800: #38481f;
+
+  /* ── the green family ────────────────────────────────────────── */
+  --sage: #9CB874;           /* emphasis on forest — the role moss plays on
+                                paper. Also the cursor glow. Never on paper. */
+  --sage-bright: #aecb86;
+  --forest: #2c3b18;
+  --forest-2: #1A2410;       /* the deepest, and rare: a spread that must go
+                                quieter and heavier than moss — a credo, a
+                                single claim, an end card. Never the default
+                                dark; moss is the brand surface. */
+  --forest-journal: #232f14;
+  --forest-2-journal: #1A2410;
+
+  /* ── secondaries, used sparingly ─────────────────────────────── */
+  --gold: #B8A26B;           /* a single ornament on an editorial page — an
+                                issue number, a seal. Once per piece. Not a
+                                second brand colour. */
+  --blue: #9fbfd3;
+  --prussian: #26485A;       /* Socria One, and the One lock inside Logos.
+                                The colour IS the boundary. */
+
+  /* ── lines ───────────────────────────────────────────────────── */
+  --border: #DED8C6;         /* the hairline */
+  --border-journal: #DED8C6;
+  --border-app: #e7e2d3;
+  --line-dark: rgba(245, 243, 235, 0.16);
+
+  /* ── semantic aliases ────────────────────────────────────────── */
+  --surface-page: var(--paper);
+  --surface-page-editorial: var(--paper-journal);
+  --surface-card: #ffffff;
+  --surface-card-warm: #FAF8F2;
+  --surface-inverse: var(--forest-2);
+  --text-body: var(--ink);
+  --text-muted: var(--ink-60);
+  --text-faint: var(--ink-40);
+  --text-accent: var(--moss-700);
+  --text-on-inverse: var(--paper);
+  --text-on-inverse-accent: var(--sage);
+  --accent: #5e7633;
+  --accent-700: #475a28;
+  --focus-ring: rgba(94, 118, 51, 0.15);
+  --danger: #c0492f;
+}
+
+/* ── design system · tokens/code.css ─────────────────────── */
+/* THE CODE — four colours, each meaning exactly one thing.
+
+   The core (moss, paper, ink) is the ground the brand stands on. This is the
+   code that runs on top of it: colour is never applied for mood. A red line,
+   a red panel and a red word all say *the machine*. Learn it once and every
+   figure in the brand reads without a legend.
+
+   Rules:
+     One meaning, forever.  Vermilion never decorates. If a red shape is not
+                            the machine, it is wrong.
+     Colour appears when it argues.  A closing line sits on paper unless its
+                            subject is one of the four.
+     Moss leads.            It is the primary, and the person is always in
+                            the room.
+
+   When a subject spans two, the ground takes the one it argues *from*; the
+   other appears only inside the figure. A piece needing three is two pieces.
+
+   Source: Socria · The design system, Vol. I No. 3, sheet 16. */
+.jr-root{
+  --person: #5E7633;      /* moss — your thinking, your map, your call; the dashed line that rises */
+  --machine: #D8402F;     /* vermilion — capability, speed, the answer arriving too fast */
+  --evidence: #3A6EA5;    /* slate — sources, citations, what can be checked */
+  --question: #E8B62C;    /* mustard — the open question, the unexamined assumption, the turn word */
+
+  --vermilion: var(--machine);
+  --slate: var(--evidence);
+  --mustard: var(--question);
+
+  /* figure grounds — a coded tint behind a diagram, never behind body copy */
+  --ground-person: #E4EADA;
+  --ground-machine: #FBE7E3;
+  --ground-evidence: #E4EDF6;
+  --ground-question: #FBF1D9;
+}
+
+/* ── design system · tokens/typography.css ─────────────────────── */
+/* Type. Two voices carry the brand — Instrument Serif for anything said,
+   Inter for anything operated. Kalam and STIX Two are the Board's voices.
+   Serif is always weight 400; italic serif in moss is the house emphasis. */
+.jr-root{
+  /* THE FOUR FAMILIES ARE NOT REDECLARED HERE, deliberately.
+     The design system's token sheet names them literally — 'Instrument
+     Serif', 'Inter' — because it was written for a standalone page that
+     loads them from Google by name. In the app they come from
+     next/font/google (app/layout.tsx), which self-hosts each face under a
+     GENERATED family name and exposes it as --font-serif on <html>. Asking
+     for 'Instrument Serif' by name there resolves to nothing and falls
+     through to Georgia — the right words in the wrong typeface, which looks
+     deliberate and so goes unreported.
+     So --font-serif/--font-sans/--font-hand/--font-math are left to cascade
+     in from <html>, and only the two aliases below are bound. */
+  --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+
+  /* aliases as they appear in the codebase */
+  --serif: var(--font-serif), 'Instrument Serif', Georgia, serif;
+  --sans: var(--font-sans), 'Inter', system-ui, sans-serif;
+
+  /* display scale — fluid, editorial, tight tracking */
+  --type-cover: clamp(3rem, 10vw, 9rem);          /* cover question, close */
+  --type-display: clamp(2.2rem, 5vw, 4rem);        /* spread headline */
+  --type-head: clamp(1.5rem, 2.4vw, 2.1rem);       /* dispatch h3 */
+  --type-standfirst: clamp(1.3rem, 2.3vw, 1.9rem); /* italic serif deck */
+  --type-lede: clamp(1.14rem, 1.6vw, 1.4rem);
+  --type-body: 1.02rem;
+  --type-body-app: 15.5px;
+  --type-small: 13px;
+  --type-micro: 11.5px;
+  --type-label: .7rem;
+
+  --tracking-cover: -.035em; /* @kind other */
+  --tracking-display: -.02em; /* @kind other */
+  --tracking-tight: -.015em; /* @kind other */
+  --tracking-label: .28em; /* @kind other */      /* the micro-label / eyebrow */
+  --tracking-label-app: .18em; /* @kind other */
+
+  --leading-cover: .98; /* @kind other */
+  --leading-display: 1.02; /* @kind other */
+  --leading-body: 1.55; /* @kind other */
+  --leading-prose: 1.7; /* @kind other */
+
+  --measure-prose: 60ch; /* @kind spacing */
+  --measure-standfirst: 34ch; /* @kind spacing */
+  --measure-answer: 62ch; /* @kind spacing */
+}
+
+/* ── design system · tokens/space.css ─────────────────────── */
+/* Space, measure, radius, shadow.
+   The editorial pages are governed by two variables — --edge (the page
+   margin) and --measure (the column). App surfaces use fixed pixel gutters. */
+.jr-root{
+  /* the journal / editorial page margin */
+  --edge: clamp(24px, 6vw, 120px); /* @kind spacing */
+  --edge-app: clamp(20px, 4vw, 64px); /* @kind spacing */
+  --measure: min(1080px, 92vw); /* @kind spacing */
+  --measure-narrow: min(760px, 92vw); /* @kind spacing */
+
+  --space-1: 4px;
+  --space-2: 6px;
+  --space-3: 8px;
+  --space-4: 10px;
+  --space-5: 12px;
+  --space-6: 14px;
+  --space-7: 18px;
+  --space-8: 22px;
+  --space-9: 26px;
+  --space-10: 32px;
+  --space-11: 40px;
+  --spread-y: clamp(90px, 14vh, 150px); /* @kind spacing */
+
+  /* Editorial surfaces are square-cornered; app surfaces are rounded. */
+  --radius-none: 0;
+  --radius-xs: 3px;
+  --radius-sm: 6px;
+  --radius-md: 9px;      /* the Thinking Map node */
+  --radius-lg: 12px;
+  --radius-xl: 16px;     /* composer, user bubble */
+  --radius-2xl: 18px;
+  --radius-pill: 999px;
+
+  /* Elevation is rare and always soft, long and low-opacity. */
+  --shadow-node: 0 1px 2px rgba(35, 36, 31, 0.04);
+  --shadow-node-hover: 0 2px 4px rgba(35,36,31,0.04), 0 14px 28px -16px rgba(35,36,31,0.4);
+  --shadow-card: 0 40px 90px -50px rgba(31, 31, 31, 0.55);
+  --shadow-modal: 0 16px 40px -18px rgba(0, 0, 0, .55);
+  --shadow-drawer: -24px 0 60px -40px rgba(35, 36, 31, 0.5);
+  --shadow-slip: 0 16px 36px -14px rgba(0, 0, 0, 0.5);
+}
+
+/* ── design system · tokens/motion.css ─────────────────────── */
+/* Motion. One easing curve does almost all the work, and nothing bounces.
+   Things fade up a short distance, ink draws itself, and reduced-motion
+   removes every animation rather than shortening it. */
+.jr-root{
+  /* the house curve */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1); /* @kind other */
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1); /* @kind other */
+  --dur-hover: .2s; /* @kind other */
+  --dur-state: .35s; /* @kind other */
+  --dur-enter: .5s; /* @kind other */
+  --dur-reveal: 1s; /* @kind other */
+  /* a hand-drawn mark drawing itself in */
+  --dur-ink: 1.2s; /* @kind other */
+  /* buttons and cards rise, never scale */
+  --lift-hover: -2px; /* @kind spacing */
+  --fade-up-distance: 20px; /* @kind spacing */
+}
+
+/* the grain that sits over every editorial page */
+.jr-root{
+  --paper-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.045'/%3E%3C/svg%3E"); /* @kind other */
+  --notebook-grid: radial-gradient(circle, rgba(53, 70, 32, 0.09) 1px, transparent 1px); /* @kind other */
+  --chat-wash:
+    radial-gradient(at 0% 0%, rgba(94, 118, 51, 0.05) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(156, 184, 116, 0.06) 0px, transparent 50%); /* @kind other */
+}
+
+/* ── design system · tokens/print.css ─────────────────────── */
+/* The document layer — the register the brand uses for internal printed
+   matter (the Manifesto, the Recruiting Standard, any memo that wants
+   authority). Same palette and same two families as the journal; a different
+   scale and a page frame instead of a viewport.
+
+   Every value is measured off Socria Employee Manifesto.pdf, US Letter at
+   612×792pt: a 65pt margin all round, a 481pt measure, and body at 15.5px
+   on 20.6pt. Sizes are px because the source is a browser print. */
+.jr-root{
+  /* page frame */
+  --doc-margin: 65pt; /* @kind spacing */
+  /* the single text column */
+  --doc-measure: 481pt; /* @kind spacing */
+  /* running head baseline */
+  --doc-head-y: 35pt; /* @kind spacing */
+  /* running foot baseline */
+  --doc-foot-y: 762pt; /* @kind spacing */
+
+  /* scale */
+  --doc-cover: 62px;             /* the document's own title */
+  --doc-standard: 46px;          /* the closing standard */
+  --doc-claim: 44px;             /* the uppercase closing claim */
+  --doc-chapter: 31px;           /* CHAPTER TITLE, uppercase serif */
+  --doc-statement: 30px;         /* a proposition standing alone mid-flow */
+  --doc-deck: 26px;              /* the cover's italic serif deck */
+  --doc-line: 25px;              /* one line of the standard */
+  --doc-question: 23px;          /* the contrast pair's two questions */
+  --doc-close: 22px;             /* the line a chapter closes on */
+  --doc-pull: 16.5px;            /* the question a chapter leaves you with */
+  --doc-body: 15.5px;            /* @kind other */
+  --doc-row: 10.5px;             /* a spec-table row */
+  --doc-label: 10.5px;           /* eyebrow, chapter number, table head */
+  --doc-caption: 9.5px;          /* FIG. captions, running head and foot */
+  --doc-figure: 9px;             /* labels inside a diagram */
+
+  --doc-leading-body: 20.6pt;    /* @kind other */
+  --doc-leading-tight: 1.06;     /* @kind other */
+  /* the tracked-caps furniture */
+  --doc-tracking-caps: 0.24em; /* @kind other */
+  --doc-tracking-title: -0.015em; /* @kind other */
+
+  /* semantic aliases — the document borrows the journal's colours exactly */
+  --doc-paper: var(--paper-journal);  /* paper is the default background, printed or not */
+  --doc-ink: var(--ink-journal);
+  --doc-muted: var(--ink-45-journal);
+  --doc-rule: var(--border-journal);
+  --doc-rule-faint: #e9e5d9;
+  --doc-accent: var(--moss);            /* eyebrows, chapter numbers, "WE ASK" */
+  --doc-turn: var(--moss-700-journal);  /* the phrase a sentence turns on */
+}
+
+/* ── design system · tokens/logos.css ─────────────────────── */
+/* Socria Logos — the reasoning environment has its own, cooler set.
+   Deeper primary, a Prussian accent for research, rust for friction.
+   Lifted verbatim from the .logos-root scope in app/globals.css. */
+.jr-root{
+  --lg-paper: #F5F3EB;
+  --lg-panel: #FAF8F2;
+  --lg-primary: #354620;      /* deeper than moss — the app's green */
+  --lg-accent: #264653;       /* research, sources, "depends on" */
+  --lg-secondary: #B8A26B;
+  --lg-tension: #9C5B3C;      /* friction, conflict, a struck-through step */
+  --lg-ink: #23241F;
+  --lg-ink-60: rgba(35, 36, 31, 0.6);
+  --lg-ink-40: rgba(35, 36, 31, 0.4);
+  --lg-ink-24: rgba(35, 36, 31, 0.24);
+  --lg-line: rgba(53, 70, 32, 0.14);
+
+  /* Socria One — the one place Logos reaches for Prussian blue */
+  --lg-one: #4A6FA5;
+  --lg-one-soft: rgba(74, 111, 165, 0.1);
+  --lg-one-line: rgba(74, 111, 165, 0.32);
+
+  /* Thinking Map node fills. Every type has a fill, a border and a
+     silhouette; the colour alone never carries the meaning. */
+  --node-goal-bg: #22374F;
+  --node-decision-bg: var(--lg-primary);
+  --node-value-bg: #EDF3E8;      --node-value-line: #CFE0C0;   --node-value-ink: #5A7247;
+  --node-belief-bg: #F0F1EA;     --node-belief-line: #D6D8C8;  --node-belief-ink: #6B705C;
+  --node-idea-bg: #EBF2F8;       --node-idea-line: #C9DBE8;    --node-idea-ink: var(--lg-accent);
+  --node-assumption-bg: #FAF3E3; --node-assumption-line: #E8D9B0; --node-assumption-ink: #8A7742;
+  --node-evidence-bg: #ffffff;   --node-evidence-line: #DDE3E8; --node-evidence-ink: #5A7247;
+  --node-question-bg: #EEF2F5;   --node-question-line: #D2DCE4; --node-question-ink: #3E6B7A;
+  --node-tension-bg: #FBEEE9;    --node-tension-line: #EBC8B8;  --node-tension-ink: var(--lg-tension);
+  --node-consequence-bg: #F7F4EC; --node-consequence-line: #E2DAC6; --node-consequence-ink: #7A6A4A;
+  --node-claim-bg: #FFFDF7;      --node-claim-line: #DCD3B8;    --node-claim-ink: #7A6A3A;
+  --node-counterpoint-bg: #FAF0EC; --node-counterpoint-line: #E4C6B8; --node-counterpoint-ink: var(--lg-tension);
+  --node-source-bg: #ffffff;     --node-source-line: #D3DCE2;   --node-source-ink: var(--lg-accent);
+  --node-concept-bg: #F2F4F0;    --node-concept-line: #D2DACB;  --node-concept-ink: #4F6247;
+  --node-misconception-bg: #FAF1EF; --node-misconception-line: #E6C9C2; --node-misconception-ink: #9C5B4C;
+  --node-theme-bg: #F4F1F6;      --node-theme-line: #DAD2E0;    --node-theme-ink: #6B5F7A;
+  --node-character-bg: #FBF3EC;  --node-character-line: #E6D2BE; --node-character-ink: #8A6B4A;
+  --node-constraint-bg: #F2F2EE; --node-constraint-line: #D6D6CB; --node-constraint-ink: #6B6B5C;
+  --node-milestone-bg: #EDF3E8;  --node-milestone-line: #C7D9BA; --node-milestone-ink: #4F6B3C;
+
+  /* edge colours by relation */
+  --edge-supports: var(--lg-primary);
+  --edge-relates: var(--lg-ink-24);
+  --edge-depends: var(--lg-accent);
+  --edge-conflicts: var(--lg-tension);
+}
+
+/* Docs wiki */
+.jr-root{
+  --d-paper: #f4f1e8;
+  --d-paper-2: #ece8da;
+  --d-card: #faf8f1;
+  --d-ink: #20201b;
+  --d-ink-70: rgba(32, 32, 27, 0.7);
+  --d-ink-45: rgba(32, 32, 27, 0.45);
+  --d-ink-25: rgba(32, 32, 27, 0.25);
+  --d-line: rgba(53, 70, 32, 0.16);
+  --d-moss: #5e7633;
+  --d-moss-deep: #354620;
+}
+
+/* ── design system · tokens/one.css ─────────────────────── */
+/* Socria One — the subscription. The one surface in the brand that leaves the
+   paper behind entirely: a Prussian-slate spread that deepens as you scroll,
+   with cream type instead of ink and pale blue as the emphasis.
+
+   The cover opens in Socria green and then floods blue from the monogram —
+   the subscription is a boundary being crossed, and the colour change is how
+   the page says so. Values verbatim from the .one-root scope of app/one/one.css. */
+.jr-root{
+  --blue-0: #0f2430;   /* the deep — dark spreads, the invitation modal's foot */
+  --blue-1: #16303d;
+  --blue-2: #1d3a4a;
+  --pblue: #26485a;    /* the accent: emphasis, glyph strokes, seals, chapter titles */
+  --pale: #b8cdd9;     /* emphasis on the deep — italics, numerals, labels */
+  --pale-70: rgba(184, 205, 217, .7);
+  --cream: #f0ead8;    /* body copy on the deep — warmer than paper, never white */
+
+  /* semantic aliases */
+  --one-surface: var(--blue-0);
+  --one-surface-mid: var(--blue-2);
+  --one-accent: var(--pblue);
+  --one-text: var(--cream);
+  --one-text-emphasis: var(--pale);
+  --one-text-muted: rgba(240, 234, 216, .7);
+  --one-line: rgba(240, 234, 216, .25);
+  --one-line-faint: rgba(240, 234, 216, .16);
+
+  /* the deepening layer, the join band, and the green cover it blooms out of */
+  --one-deep: radial-gradient(120% 90% at 70% 8%, var(--pblue) 0%, var(--blue-2) 34%, var(--blue-1) 62%, var(--blue-0) 100%); /* @kind other */
+  --one-join: radial-gradient(120% 140% at 70% 0%, var(--pblue) 0%, var(--blue-2) 40%, var(--blue-0) 100%); /* @kind other */
+  --one-cover: radial-gradient(120% 90% at 70% 8%, #5e7633 0%, #4a5f2a 34%, #38481f 62%, #263314 100%); /* @kind other */
+}
+
+/* tokens/fonts.css is deliberately NOT ported: it @imports the four families
+   from Google, and app/layout.tsx already loads exactly those through
+   next/font/google. Binding them again here is what created a cycle —
+   --serif: var(--font-serif) in globals.css against --font-serif:
+   var(--serif) here — which resolves to nothing at all in both directions. */
+
+/* ── issue.css ────────────────────────────────────────────── */
+/* ===== Socria — Issue No. 4 · the interrogation =====
+   Two registers, deliberately opposite:
+     .turn    — one question at cover scale, alone, with silence around it
+     .reading — dense justified columns, the argument set as printed matter
+   Palette scopes: (default) paper · .lg-scope Logos · .one-scope Socria One */
+
+.jr-root *{box-sizing:border-box}
+.jr-root{-webkit-text-size-adjust:100%;overflow-x:clip}
+.jr-root{margin:0;background:var(--paper);color:var(--ink);font-family:var(--font-sans);line-height:var(--leading-body);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;overflow-x:clip}
+.jr-root p{margin:0}
+.jr-root img{display:block;max-width:100%}
+.jr-root h1, .jr-root h2, .jr-root h3{font-family:var(--font-serif);font-weight:400;margin:0;letter-spacing:var(--tracking-tight);line-height:1}
+.jr-root a{color:var(--moss-700);text-decoration:none}
+.jr-root a:hover{color:var(--moss)}
+
+.jr-root .grain{position:fixed;inset:0;z-index:1;pointer-events:none;opacity:.5;mix-blend-mode:multiply;background-image:var(--paper-grain)}
+.jr-root .lbl{font-family:var(--font-sans);font-size:.68rem;font-weight:600;letter-spacing:var(--tracking-label);text-transform:uppercase;color:var(--ink-45)}
+.jr-root .lbl.moss{color:var(--moss-700)}
+
+/* ---------- fixed chrome ---------- */
+.jr-root .progress{position:fixed;top:0;left:0;height:2px;width:0%;background:var(--moss);z-index:60}
+/* The masthead cannot know what is behind it without JS, and JS can freeze —
+   so it carries its own paper ground and is legible over every spread. */
+.jr-root .mast{position:fixed;top:0;left:0;right:0;z-index:50;display:flex;justify-content:space-between;align-items:center;gap:16px;padding:14px var(--edge);background:rgba(244,241,232,.94);backdrop-filter:blur(9px);border-bottom:1px solid var(--ink-12);transition:transform .5s var(--ease-out-expo),opacity .5s}
+.jr-root .mast.hidden{transform:translateY(-108%);opacity:0}
+.jr-root .mast .brand{display:flex;align-items:center;gap:.5em;color:var(--ink)}
+.jr-root .mast .brand img{height:22px}
+.jr-root .mast .brand .nm{font-family:var(--font-serif);font-size:1.3rem;line-height:1}
+.jr-root .mast nav{display:flex;align-items:center;gap:20px}
+.jr-root .mast nav a{font-size:.85rem;font-weight:500;color:var(--ink-70)}
+.jr-root .mast nav a:hover{color:var(--ink)}
+.jr-root .mast nav a.go{color:var(--moss-700);border-bottom:1px solid var(--moss);padding-bottom:1px}
+@media(max-width:640px){.jr-root .mast nav a.hs{display:none}}
+
+/* the count, in the margin */
+/* Like the masthead, this sits over both paper and deep spreads, so it owns
+   its ground and never depends on a JS-set state class. */
+.jr-root .count{position:fixed;left:calc(var(--edge)/2 - 14px);top:50%;transform:translateY(-50%);z-index:40;display:flex;flex-direction:column;align-items:center;gap:12px;pointer-events:none;padding:12px 7px;border-radius:var(--radius-pill);background:rgba(244,241,232,.92);backdrop-filter:blur(6px)}
+.jr-root .count .n{font-family:var(--font-serif);font-style:italic;font-size:1.05rem;color:var(--moss-700);writing-mode:vertical-rl}
+.jr-root .count .bar{width:1px;height:120px;background:var(--ink-12);position:relative}
+.jr-root .count .bar i{position:absolute;top:0;left:0;width:1px;height:0%;background:var(--moss);display:block;transition:height .4s var(--ease-standard)}
+@media(max-width:1000px){.jr-root .count{display:none}}
+
+/* ---------- the cover ---------- */
+.jr-root .cover{min-height:100svh;display:flex;flex-direction:column;justify-content:center;padding:clamp(110px,16vh,180px) var(--edge) clamp(70px,10vh,110px);position:relative;z-index:2}
+.jr-root .cover .wrap{width:min(1000px,100%);margin:0 auto}
+.jr-root .cover h1{font-size:clamp(3rem,11.5vw,11rem);line-height:.86;letter-spacing:-.045em;margin:.14em 0 0}
+.jr-root .cover h1 .b{display:block}
+.jr-root .cover h1 .em{font-style:italic;color:var(--moss-700)}
+.jr-root .cover .st{font-family:var(--font-serif);font-style:italic;font-size:var(--type-standfirst);color:var(--ink-70);max-width:36ch;margin:clamp(24px,4vh,40px) 0 0;line-height:1.3}
+.jr-root .cover .begin{margin-top:clamp(34px,6vh,60px);display:flex;align-items:center;gap:14px;transition:opacity .5s}
+.jr-root .cover .begin .ln{width:54px;height:1px;background:var(--ink-12);position:relative;overflow:hidden}
+.jr-root .cover .begin .ln::after{content:"";position:absolute;left:0;top:0;height:1px;width:20px;background:var(--moss);animation:cdrip 2.2s ease-in-out infinite}
+@keyframes cdrip{0%{transform:translateX(-22px)}100%{transform:translateX(56px)}}
+@media(prefers-reduced-motion:reduce){.jr-root .cover .begin .ln::after{animation:none}}
+
+/* ---------- the turns ---------- */
+.jr-root .turn{position:relative;z-index:2;min-height:96svh;display:flex;flex-direction:column;justify-content:center;padding:10vh var(--edge);overflow:hidden}
+.jr-root .turn .wrap{width:min(1080px,100%);margin:0 auto;position:relative;z-index:2}
+/* the numeral, set as furniture */
+.jr-root .turn .rn{position:absolute;right:calc(var(--edge) * .4);top:50%;transform:translateY(-50%);font-family:var(--font-serif);font-style:italic;font-size:clamp(7rem,20vw,17rem);line-height:.8;color:var(--ink);opacity:.055;pointer-events:none;z-index:1;user-select:none}
+.jr-root .turn .who{display:block;font-family:var(--font-sans);font-size:.66rem;font-weight:600;letter-spacing:var(--tracking-label);text-transform:uppercase;color:var(--ink-45);margin-bottom:18px}
+.jr-root .turn .q{font-family:var(--font-serif);font-size:clamp(2.3rem,8.6vw,7rem);line-height:.98;letter-spacing:-.032em;text-wrap:balance;margin:0}
+.jr-root .turn .a{margin-top:clamp(24px,3.6vh,38px);font-size:var(--type-lede);line-height:var(--leading-prose);color:var(--ink-70);max-width:54ch}
+.jr-root .turn .a em{font-style:italic;color:var(--ink)}
+/* a quieter turn, for the reader's interjections */
+.jr-root .turn.quiet{min-height:72svh}
+.jr-root .turn.quiet .q{font-size:clamp(1.7rem,5vw,3.6rem);letter-spacing:-.024em;color:var(--ink-70)}
+.jr-root .turn.quiet .rn{display:none}
+/* Socria's register */
+.jr-root .turn.socria .who{color:var(--moss-700)}
+.jr-root .turn.socria .q{font-style:italic;color:var(--moss-700)}
+.jr-root .turn.socria .a{max-width:52ch}
+/* coded grounds — colour appears when it argues */
+.jr-root .turn.g-question{background:var(--ground-question)}
+.jr-root .turn.g-question .who{color:#8a6a10}
+.jr-root .turn.g-question .rn{color:#a37c12;opacity:.12}
+.jr-root .turn.g-person{background:var(--ground-person)}
+.jr-root .turn.g-evidence{background:var(--ground-evidence)}
+.jr-root .turn.g-evidence .who{color:var(--evidence)}
+.jr-root .turn.g-evidence .rn{color:var(--evidence);opacity:.1}
+/* the machine, at full volume */
+.jr-root .turn.slam{background:var(--machine);color:var(--paper)}
+.jr-root .turn.slam .who{color:rgba(244,241,232,.75)}
+.jr-root .turn.slam .q{color:var(--paper);font-style:normal;letter-spacing:-.04em}
+.jr-root .turn.slam .a{color:rgba(244,241,232,.82);max-width:50ch}
+.jr-root .turn.slam .a em{color:#fff}
+.jr-root .turn.slam .rn{color:var(--paper);opacity:.13}
+
+.jr-root .turn.pre .who, .jr-root .turn.pre .q, .jr-root .turn.pre .a{opacity:0;transform:translateY(18px)}
+.jr-root .turn.pre.in .who{opacity:1;transform:none;transition:opacity .7s var(--ease-out-expo),transform .7s var(--ease-out-expo)}
+.jr-root .turn.pre.in .q{opacity:1;transform:none;transition:opacity .9s var(--ease-out-expo) .1s,transform .9s var(--ease-out-expo) .1s}
+.jr-root .turn.pre.in .a{opacity:1;transform:none;transition:opacity .9s var(--ease-out-expo) .26s,transform .9s var(--ease-out-expo) .26s}
+@media print{.jr-root .turn.pre .who, .jr-root .turn.pre .q, .jr-root .turn.pre .a{opacity:1!important;transform:none!important}}
+
+/* words typeset in — no mask: at .86 leading a clip would guillotine the ink box */
+.jr-root .w{display:inline-block;vertical-align:top}
+.jr-root .w i{display:inline-block;font-style:inherit}
+.jr-root .pre .w i{opacity:0;transform:translateY(.44em);transition:opacity .55s var(--ease-standard),transform .7s var(--ease-out-expo);transition-delay:calc(var(--i,0)*36ms)}
+.jr-root .pre.in .w i{opacity:1;transform:none}
+.jr-root .rv.pre{opacity:0;transform:translateY(var(--fade-up-distance))}
+.jr-root .rv.pre.in{opacity:1;transform:none;transition:opacity var(--dur-reveal) var(--ease-out-expo),transform var(--dur-reveal) var(--ease-out-expo)}
+.jr-root .rv.pre.d1{transition-delay:.12s}
+.jr-root .rv.pre.d2{transition-delay:.24s}
+@media print{.jr-root .pre .w i, .jr-root .rv.pre{opacity:1!important;transform:none!important}}
+
+/* If the document timeline is frozen (throttled tab, embedded preview, print
+   snapshot) a 0→1 opacity transition never advances. JS detects that and sets
+   this class, which drops every staged state so the finished page is shown. */
+html.anim-off .jr-root .rv.pre, html.anim-off .jr-root .turn.pre .who, html.anim-off .jr-root .turn.pre .q, html.anim-off .jr-root .turn.pre .a, html.anim-off .jr-root .pre .w i, html.anim-off .jr-root .fig.pre .pop{opacity:1!important;transform:none!important;transition:none!important}
+html.anim-off .jr-root .fig.pre .draw{stroke-dasharray:none!important;stroke-dashoffset:0!important;transition:none!important}
+html.anim-off .jr-root .mapbox.pre .edges path{opacity:1!important;transition:none!important}
+html.anim-off .jr-root .mapbox.pre .mapnode{opacity:1!important;transform:translate(-50%,-50%)!important;transition:none!important}
+
+/* ---------- the silences ---------- */
+.jr-root .silence{position:relative;z-index:2;min-height:52svh;display:grid;place-items:center;text-align:center;padding:0 var(--edge)}
+.jr-root .silence p{font-family:var(--font-serif);font-style:italic;font-size:clamp(1.1rem,2vw,1.55rem);color:var(--ink-45);max-width:26ch;line-height:1.34}
+.jr-root .silence .dot{width:5px;height:5px;border-radius:50%;background:var(--moss);margin:0 auto 22px;opacity:.55}
+@media(prefers-reduced-motion:no-preference){.jr-root .silence .dot{animation:breathe 3.6s ease-in-out infinite}}
+@keyframes breathe{0%,100%{transform:scale(1);opacity:.35}50%{transform:scale(1.9);opacity:.7}}
+
+/* ---------- the reading interludes ---------- */
+.jr-root .reading{position:relative;z-index:2;padding:clamp(70px,11vh,130px) var(--edge);border-top:3px solid var(--ink);border-bottom:1px solid var(--ink)}
+.jr-root .reading.tint{background:var(--paper-2)}
+.jr-root .reading .wrap{width:min(1180px,100%);margin:0 auto}
+.jr-root .reading .rhead{display:flex;justify-content:space-between;align-items:baseline;gap:16px;flex-wrap:wrap;padding-bottom:12px;border-bottom:1px solid var(--ink-12)}
+.jr-root .reading h2{font-size:clamp(2.4rem,7vw,6rem);line-height:.94;letter-spacing:-.038em;margin:clamp(18px,3vh,30px) 0 0;max-width:17ch}
+.jr-root .reading h2 .em{font-style:italic;color:var(--moss-700)}
+.jr-root .reading .deck{font-family:var(--font-serif);font-style:italic;font-size:clamp(1.15rem,2vw,1.6rem);color:var(--ink-70);max-width:44ch;margin-top:16px;line-height:1.32}
+.jr-root .cols{margin-top:clamp(24px,4vh,42px);columns:3;column-gap:clamp(22px,3vw,44px);column-rule:1px solid var(--ink-12)}
+@media(max-width:1000px){.jr-root .cols{columns:2}}
+@media(max-width:660px){.jr-root .cols{columns:1}}
+.jr-root .cols p{margin:0 0 1em;font-size:.99rem;line-height:1.66;color:var(--ink-70);text-align:justify;hyphens:auto}
+.jr-root .cols p em{font-style:italic;color:var(--ink)}
+.jr-root .cols .drop::first-letter{float:left;font-family:var(--font-serif);font-size:3.5em;line-height:.76;padding:.04em .12em 0 0;color:var(--moss-700)}
+.jr-root .cols .kick{font-family:var(--font-sans);font-size:.66rem;font-weight:600;letter-spacing:var(--tracking-label);text-transform:uppercase;color:var(--moss-700);display:block;margin-bottom:.5em}
+.jr-root .cols .breakout{break-inside:avoid;font-family:var(--font-serif);font-style:italic;font-size:1.3rem;line-height:1.24;color:var(--moss-700);border-top:1px solid var(--ink-12);border-bottom:1px solid var(--ink-12);padding:14px 0;margin:0 0 1em;text-align:left}
+/* the deadpan cliché, set flat and struck where it stands */
+.jr-root .jargon{text-decoration:line-through;text-decoration-color:var(--ink-25);color:var(--ink-45)}
+
+/* ---------- coded figures ---------- */
+.jr-root .fig{margin-top:clamp(26px,4.5vh,48px);break-inside:avoid}
+.jr-root .fig-frame{border:1px solid var(--ink-12);padding:clamp(18px,2.6vw,34px)}
+.jr-root .fig svg{display:block;width:100%;height:auto;overflow:visible}
+.jr-root .fig figcaption{margin-top:12px;font-family:var(--font-sans);font-size:.66rem;font-weight:600;letter-spacing:var(--tracking-label);text-transform:uppercase;color:var(--ink-45)}
+.jr-root .fig figcaption .cl{color:var(--moss-700)}
+.jr-root .ax{stroke:var(--ink-25);stroke-width:1}
+.jr-root .l-machine{fill:none;stroke:var(--machine);stroke-width:2.4;stroke-linecap:round}
+.jr-root .l-person{fill:none;stroke:var(--person);stroke-width:2.4;stroke-linecap:round;stroke-dasharray:7 6}
+.jr-root .l-evidence{fill:none;stroke:var(--evidence);stroke-width:2;stroke-linecap:round}
+.jr-root .l-question{fill:none;stroke:var(--question);stroke-width:2;stroke-linecap:round}
+.jr-root .fl{font-family:var(--font-sans);font-size:9px;font-weight:600;letter-spacing:.24em;text-transform:uppercase}
+.jr-root .fl.machine{fill:var(--machine)}.jr-root .fl.person{fill:var(--moss-700)}
+.jr-root .fl.evidence{fill:var(--evidence)}.jr-root .fl.question{fill:#a37c12}.jr-root .fl.faint{fill:var(--ink-45)}
+.jr-root .fig.pre .draw{stroke-dasharray:var(--len,600);stroke-dashoffset:var(--len,600)}
+.jr-root .fig.pre .draw.dp{stroke-dasharray:7 6}
+.jr-root .fig.pre.in .draw{stroke-dashoffset:0;transition:stroke-dashoffset 1.6s var(--ease-standard) var(--dly,0s)}
+.jr-root .fig.pre .pop{opacity:0}
+.jr-root .fig.pre.in .pop{opacity:1;transition:opacity .6s ease var(--dly,0s)}
+@media(prefers-reduced-motion:reduce),print{.jr-root .fig.pre .draw{stroke-dasharray:none;stroke-dashoffset:0}.jr-root .fig.pre .pop{opacity:1}}
+.jr-root .key{display:flex;gap:clamp(14px,2.4vw,28px);flex-wrap:wrap;margin-top:14px}
+.jr-root .key span{display:inline-flex;align-items:center;gap:.5em;font-size:.66rem;font-weight:600;letter-spacing:var(--tracking-label);text-transform:uppercase;color:var(--ink-45)}
+.jr-root .key i{width:9px;height:9px;border-radius:50%;display:inline-block}
+.jr-root .key .k-person{background:var(--person)}.jr-root .key .k-machine{background:var(--machine)}
+.jr-root .key .k-evidence{background:var(--evidence)}.jr-root .key .k-question{background:var(--question)}
+
+/* the map that builds itself */
+.jr-root .mapbox{margin-top:clamp(24px,4vh,42px);position:relative;aspect-ratio:16/9;min-height:300px;border:1px solid var(--ink-12);background-image:var(--notebook-grid);background-size:26px 26px;overflow:hidden}
+.jr-root .mapbox .edges{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}
+.jr-root .mapbox .edges path{fill:none;stroke-width:1.4;opacity:1;transition:opacity .6s}
+.jr-root .mapbox.pre .edges path{opacity:0}
+.jr-root .mapbox.pre .edges path.on{opacity:1}
+.jr-root .mapbox .e-person{stroke:rgba(94,118,51,.55)}
+.jr-root .mapbox .e-question{stroke:var(--question);stroke-dasharray:5 5}
+.jr-root .mapbox .e-evidence{stroke:rgba(58,110,165,.6)}
+.jr-root .mapnode{position:absolute;transform:translate(-50%,-50%);opacity:1;transition:opacity .5s ease,transform .55s var(--ease-out-expo)}
+.jr-root .mapbox.pre .mapnode{opacity:0;transform:translate(-50%,-50%) scale(.92)}
+.jr-root .mapbox.pre .mapnode.on{opacity:1;transform:translate(-50%,-50%) scale(1)}
+
+/* ---------- the close ---------- */
+.jr-root .close{position:relative;z-index:2;min-height:100svh;display:flex;flex-direction:column;justify-content:center;padding:clamp(80px,12vh,140px) var(--edge);background:var(--forest-2);color:var(--paper);overflow:hidden}
+.jr-root .close .glow{position:absolute;inset:0;pointer-events:none;background:radial-gradient(620px circle at var(--gx,50%) var(--gy,44%),rgba(156,184,116,.16),transparent 62%)}
+.jr-root .close .wrap{position:relative;z-index:2;width:min(1000px,100%);margin:0 auto}
+.jr-root .close h2{font-size:clamp(3rem,11.5vw,10.5rem);line-height:.86;letter-spacing:-.045em}
+.jr-root .close h2 .em{font-style:italic;color:var(--sage)}
+.jr-root .close .coda{margin-top:clamp(22px,4vh,40px);font-family:var(--font-serif);font-style:italic;font-size:clamp(1.25rem,2.2vw,1.8rem);color:rgba(244,241,232,.72);max-width:36ch;line-height:1.3}
+.jr-root .close .row{margin-top:clamp(28px,5vh,50px);display:flex;gap:20px;align-items:center;flex-wrap:wrap}
+.jr-root .colophon{margin-top:clamp(56px,10vh,110px);padding-top:24px;border-top:1px solid rgba(244,241,232,.16);display:flex;justify-content:space-between;gap:14px 28px;flex-wrap:wrap;font-size:.8rem;color:rgba(244,241,232,.55)}
+.jr-root .colophon .it{font-family:var(--font-serif);font-style:italic;color:var(--sage)}
+.jr-root .colophon a{color:rgba(244,241,232,.55)}
+.jr-root .colophon a:hover{color:var(--paper)}
+
+
+/* ---------- the map answers the cursor (Logos) ---------- */
+.jr-root .mapbox.has-focus .edges path{opacity:.25;transition:opacity .35s}
+.jr-root .mapbox.has-focus .edges path.lit{opacity:1;stroke-width:2}
+.jr-root .mapbox .mapnode{transition:transform .4s var(--ease-out-expo)}
+.jr-root .mapbox .mapnode.is-focus{z-index:3;transform:translate(-50%,-50%) translateY(-3px)}
+@keyframes tense{0%,100%{transform:translate(-50%,-50%) scale(1)}50%{transform:translate(-50%,-50%) scale(1.04)}}
+.jr-root .mapbox.has-focus .mapnode.n-tension.is-near{animation:tense 1.6s var(--ease-standard) infinite}
+.jr-root .mapbox .map-hint{position:absolute;right:14px;bottom:10px;font-family:var(--font-serif);font-style:italic;font-size:.92rem;color:var(--ink-45);pointer-events:none;transition:opacity .3s}
+@media(prefers-reduced-motion:reduce){.jr-root .mapbox .mapnode{animation:none!important}}
+
+/* ---------- the refusal, as a set-piece ---------- */
+.jr-root .refusal{position:relative;z-index:2;height:280svh;background:var(--forest-2);color:var(--paper)}
+.jr-root .refusal .pinr{position:sticky;top:0;height:100svh;display:flex;flex-direction:column;justify-content:center;padding:0 var(--edge);overflow:hidden}
+.jr-root .refusal .rn{position:absolute;right:calc(var(--edge) * .4);top:50%;transform:translateY(-50%);font-family:var(--font-serif);font-style:italic;font-size:clamp(7rem,20vw,17rem);line-height:.8;color:var(--paper);opacity:.08;pointer-events:none}
+.jr-root .refusal .who{display:block;font-family:var(--font-sans);font-size:.66rem;font-weight:600;letter-spacing:var(--tracking-label);text-transform:uppercase;color:rgba(244,241,232,.6);margin-bottom:18px}
+.jr-root .refusal .q{font-family:var(--font-serif);font-size:clamp(2.3rem,8.6vw,7rem);line-height:.98;letter-spacing:-.04em;margin:0;max-width:16ch}
+.jr-root .refusal svg{display:block;width:100%;height:auto;max-height:34svh;margin:clamp(20px,4vh,40px) 0 0;overflow:visible}
+.jr-root .refusal .ans{fill:none;stroke:var(--machine);stroke-width:3;stroke-linecap:round}
+.jr-root .refusal .head{fill:var(--machine)}
+.jr-root .refusal .wall{stroke:var(--sage);stroke-width:3}
+.jr-root .refusal .you{fill:var(--sage)}
+.jr-root .refusal .fl{font-family:var(--font-sans);font-size:11px;font-weight:600;letter-spacing:.2em;text-transform:uppercase;fill:rgba(244,241,232,.6)}
+.jr-root .refusal .fl.m{fill:var(--machine)}.jr-root .refusal .fl.s{fill:var(--sage)}
+.jr-root .refusal .a{margin-top:clamp(18px,3vh,30px);font-size:var(--type-lede);line-height:var(--leading-prose);color:rgba(244,241,232,.82);max-width:50ch}
+.jr-root .refusal .a em{color:#fff;font-style:italic}
+.jr-root .refusal .held{font-family:var(--font-serif);font-style:italic;font-size:clamp(1.2rem,2.2vw,1.7rem);color:var(--sage);margin-top:14px;opacity:0;transition:opacity .6s}
+.jr-root .refusal.live.stopped .held{opacity:1}
+html.anim-off .jr-root .refusal .held{opacity:1}
+@media(prefers-reduced-motion:reduce){.jr-root .refusal{height:auto;padding:clamp(70px,12vh,130px) 0}.jr-root .refusal .pinr{position:static;height:auto}.jr-root .refusal .held{opacity:1}}
+
+/* ---------- read-time, in the spine and at the close ---------- */
+.jr-root .count .t{font-family:var(--font-serif);font-style:italic;font-size:.82rem;color:var(--moss-700);writing-mode:vertical-rl;transform:rotate(180deg);letter-spacing:.02em;opacity:0;transition:opacity .6s}
+.jr-root .count .t.on{opacity:1}
+.jr-root .close .said{margin-top:clamp(16px,3vh,26px);font-family:var(--font-serif);font-style:italic;font-size:clamp(1.15rem,2vw,1.6rem);color:var(--sage);max-width:34ch;line-height:1.3}
+.jr-root .close .said em{color:#fff;font-style:italic}
+
+/* ---------- print: the issue as a magazine ---------- */
+.jr-root .print-link{cursor:pointer}
+@media print{
+  .jr-root .mast, .jr-root .count, .jr-root .progress, .jr-root .grain, .jr-root .ticks, .jr-root .cue, .jr-root .aside-note, .jr-root .map-hint, .jr-root .begin, .jr-root .silence{display:none!important}
+  .jr-root .cover, .jr-root .turn, .jr-root .reading, .jr-root .close, .jr-root .refusal{min-height:0;break-after:page;padding-top:48pt;padding-bottom:48pt}
+  .jr-root .stage-sec, .jr-root .refusal{height:auto}
+  .jr-root .stage-sec .pin, .jr-root .refusal .pinr{position:static;height:auto}
+  .jr-root .stage-sec .st{display:revert!important;visibility:visible!important;opacity:1!important;animation:none!important}
+  .jr-root .app{height:auto;box-shadow:none;break-inside:avoid}
+  .jr-root .app .body{grid-template-columns:1fr 1fr!important}
+  .jr-root .app .pane-map{min-height:520px}
+  .jr-root .pane-map .plot{display:none!important}
+  .jr-root .thread{overflow:visible}
+  .jr-root .rv, .jr-root .turn .q, .jr-root .turn .a, .jr-root .turn .who, .jr-root .w i{opacity:1!important;transform:none!important}
+  .jr-root .refusal, .jr-root .close, .jr-root .turn.slam{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+
+/* ── motion.css ────────────────────────────────────────────── */
+/* ===== Socria — the annotation layer =====
+   Seven motion moments, on the one house curve. Every one is ADDITIVE: the
+   text, figure and label are legible with the script removed. Motion adds ink,
+   colour and position — never the content itself. A frozen timeline therefore
+   costs the reader an effect, never a sentence. */
+
+/* ---------- i · the strike-through ---------- */
+/* The cliché is set in plain body copy. Ink crosses it out as you reach it. */
+.jr-root .jargon{position:relative;display:inline}
+.jr-root .jargon .ink-strike{position:absolute;left:-1.5%;top:46%;width:103%;height:.62em;overflow:visible;pointer-events:none}
+.jr-root .jargon .ink-strike path{fill:none;stroke:var(--moss);stroke-width:2.1;stroke-linecap:round;
+  stroke-dasharray:var(--sl,120);stroke-dashoffset:var(--sl,120)}
+.jr-root .jargon.struck .ink-strike path{stroke-dashoffset:0;transition:stroke-dashoffset .62s var(--ease-standard)}
+.jr-root .jargon.struck{color:var(--ink-45)}
+@media(prefers-reduced-motion:reduce),print{
+  .jr-root .jargon .ink-strike path{stroke-dashoffset:0}
+  .jr-root .jargon{color:var(--ink-45)}
+}
+
+/* ---------- ii · the turn word lands late ---------- */
+/* The claim arrives; its pivot word follows a beat behind, in ink, and turns
+   moss where it lands. Absent motion it is simply already moss. */
+.jr-root .pre .w i.tw{color:var(--ink);transition-delay:calc(var(--i,0) * 36ms + 500ms)!important;
+  transition:opacity .6s var(--ease-standard),transform .8s var(--ease-out-expo),color .9s var(--ease-standard)}
+.jr-root .pre.in .w i.tw{color:inherit}
+html.anim-off .jr-root .w i.tw{color:inherit!important}
+@media print{.jr-root .w i.tw{color:inherit!important}}
+
+/* ---------- iii · the stillness aside ---------- */
+/* Stop scrolling and the reader's own marginal note fades in. Scroll past and
+   it never appears — the page rewards pausing, and asks for nothing. */
+.jr-root .aside-note{display:flex;align-items:flex-start;gap:10px;margin-top:clamp(20px,3vh,32px);
+  max-width:30ch;font-family:var(--font-serif);font-style:italic;font-size:1.06rem;line-height:1.36;
+  color:var(--moss-700);transform:rotate(-1.4deg);pointer-events:none;
+  transition:opacity 1.1s var(--ease-standard),transform 1.1s var(--ease-out-expo)}
+/* Hidden only once the script is running and has the means to show it. */
+html.motion-live .jr-root .aside-note{opacity:0;transform:translateY(8px) rotate(-1.4deg)}
+html.motion-live .jr-root .aside-note.shown{opacity:1;transform:rotate(-1.4deg)}
+.jr-root .aside-note svg{flex:0 0 auto;width:34px;height:26px;overflow:visible;margin-top:.2em}
+.jr-root .aside-note svg path{fill:none;stroke:var(--moss);stroke-width:1.7;stroke-linecap:round}
+.jr-root .turn.slam .aside-note, .jr-root .close .aside-note, .jr-root .one-deep .aside-note{color:var(--sage)}
+.jr-root .turn.slam .aside-note svg path, .jr-root .close .aside-note svg path, .jr-root .one-deep .aside-note svg path{stroke:var(--sage)}
+@media(min-width:1400px){
+  .jr-root .turn .wrap, .jr-root .reading .wrap{position:relative}
+  .jr-root .turn .aside-note, .jr-root .reading .aside-note{position:absolute;right:-210px;bottom:0;width:180px;max-width:180px;margin:0}
+}
+@media(prefers-reduced-motion:reduce){html.motion-live .jr-root .aside-note{opacity:1;transform:rotate(-1.4deg);transition:none}}
+html.anim-off .jr-root .aside-note{opacity:1!important;transform:rotate(-1.4deg)!important}
+@media print{.jr-root .aside-note{display:none}}
+
+/* ---------- iv · the trade, scrubbed ---------- */
+/* The two curves are drawn by the scroll itself: the machine line races, the
+   human line creeps. Default state is fully drawn, so no scroll means no loss. */
+.jr-root .fig.scrub .draw{stroke-dasharray:none;stroke-dashoffset:0}
+.jr-root .fig.scrub .l-person{stroke-dasharray:7 6}
+
+/* ---------- v · the unexamined ring ---------- */
+/* An assumption's dashed ring turns once, very slowly, as it arrives. */
+@keyframes ring-turn{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+.jr-root .mapnode.n-assumption.on svg, .jr-root .stage .locked.n-assumption.on svg{animation:ring-turn 11s linear .5s 1 both;transform-origin:50% 50%}
+@media(prefers-reduced-motion:reduce){.jr-root .mapnode.n-assumption.on svg{animation:none}}
+
+/* ---------- vi · depth drawn outward ---------- */
+.jr-root .depth-viz{display:block;width:100%;height:auto;overflow:visible}
+.jr-root .depth-viz .dr{fill:none;stroke:var(--moss);stroke-width:1.4}
+.jr-root .depth-viz .dr.far{stroke:var(--ink-25)}
+.jr-root .depth-viz .dl{font-family:var(--font-sans);font-size:11px;font-weight:600;letter-spacing:var(--tracking-label);
+  text-transform:uppercase;fill:var(--moss-700)}
+.jr-root .depth-viz .dl.faint{fill:var(--ink-45)}
+
+/* ---------- vii · the guard types ---------- */
+/* It writes the answer, deletes it, and writes the question instead. The
+   question is what sits in the markup, so a frozen timeline shows the ending. */
+.jr-root .guard-type{font-family:var(--font-serif);font-style:italic;font-size:clamp(1.2rem,2.4vw,1.9rem);
+  line-height:1.26;color:var(--moss-700);margin:clamp(20px,3vh,30px) 0 0;min-height:2.6em}
+.jr-root .guard-type .gt-caret{display:inline-block;width:2px;height:1em;background:var(--moss);
+  vertical-align:-.1em;margin-left:2px;animation:gt-blink 1.05s steps(1) infinite}
+.jr-root .guard-type.is-answer{color:var(--machine);font-style:normal;font-family:var(--font-sans);font-size:clamp(1.05rem,2vw,1.5rem)}
+.jr-root .guard-type.is-answer .gt-caret{background:var(--machine)}
+@keyframes gt-blink{50%{opacity:0}}
+@media(prefers-reduced-motion:reduce),print{.jr-root .guard-type .gt-caret{display:none;animation:none}}
+
+/* ── stage.css ────────────────────────────────────────────── */
+/* ===== the stage — the product, scroll-driven, inside a minimal Socria window ===== */
+.jr-root .stage-sec{position:relative;z-index:2;height:calc(var(--steps,14) * 46vh + 100svh)}
+.jr-root .stage-sec .pin{position:sticky;top:0;height:100svh;display:flex;flex-direction:column;justify-content:center;padding:clamp(56px,7vh,80px) var(--edge) clamp(18px,3vh,30px)}
+.jr-root .stage-sec .cue{display:flex;justify-content:space-between;align-items:baseline;gap:16px;flex-wrap:wrap;margin:0 auto 12px;width:min(1180px,100%)}
+.jr-root .stage-sec .cue .lbl{font-family:var(--font-sans);font-size:.66rem;font-weight:600;letter-spacing:var(--tracking-label);text-transform:uppercase;color:var(--ink-45)}
+.jr-root .stage-sec .cue .lbl.moss{color:var(--moss-700)}
+.jr-root .stage-sec .cue .scr{font-family:var(--font-serif);font-style:italic;font-size:1.05rem;color:var(--ink-45);transition:opacity .5s}
+.jr-root .stage-sec.live.deep .cue .scr{opacity:.3}
+
+/* the window */
+.jr-root .app{width:min(1180px,100%);margin:0 auto;height:clamp(420px,74svh,760px);background:var(--paper-2,#F5F3EB);border:1px solid var(--border);border-radius:18px;
+  box-shadow:0 40px 90px -50px rgba(31,31,31,.55);display:grid;grid-template-rows:auto 1fr;overflow:hidden;position:relative}
+.jr-root .app .bar{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:11px 18px;border-bottom:1px solid var(--border);background:rgba(244,241,232,.92)}
+.jr-root .app .bar .l{display:flex;align-items:center;gap:10px}
+.jr-root .app .bar img{height:18px}
+.jr-root .app .bar .nm{font-family:var(--font-serif);font-size:1.05rem;line-height:1}
+.jr-root .app .bar .model{display:inline-flex;align-items:center;gap:.5em;font-family:var(--font-sans);font-size:.68rem;font-weight:600;letter-spacing:var(--tracking-label);text-transform:uppercase;color:var(--ink-45);padding-left:12px;border-left:1px solid var(--border)}
+.jr-root .app .bar .model i{width:7px;height:7px;border-radius:50%;background:var(--moss);box-shadow:0 0 0 3px rgba(94,118,51,.14)}
+.jr-root .app .bar .model .m-core, .jr-root .app .bar .model .m-logos{transition:opacity .4s}
+.jr-root .app .bar .model .m-logos{display:none}
+.jr-root .app.logos .bar .model .m-core{display:none}
+.jr-root .app.logos .bar .model .m-logos{display:inline}
+.jr-root .app .bar .r{font-family:var(--font-serif);font-style:italic;font-size:.9rem;color:var(--ink-45)}
+.jr-root .app .body{display:grid;grid-template-columns:1fr 0fr;min-height:0;transition:grid-template-columns .9s var(--ease-out-expo)}
+.jr-root .app.logos .body{grid-template-columns:1fr .92fr}
+@media(max-width:820px){.jr-root .app.logos .body{grid-template-columns:1fr}.jr-root .app .pane-map{display:none}}
+
+/* chat pane */
+.jr-root .pane-chat{min-height:0;display:grid;grid-template-rows:minmax(0,1fr) auto;background:
+  radial-gradient(700px 300px at 0% 0%,rgba(94,118,51,.06),transparent 60%),
+  radial-gradient(600px 300px at 100% 100%,rgba(94,118,51,.05),transparent 60%),var(--paper-2,#F5F3EB)}
+.jr-root .thread{overflow:hidden;padding:clamp(16px,2.4vw,28px) clamp(16px,2.6vw,30px) 8px;display:flex;flex-direction:column;justify-content:flex-end;gap:14px}
+.jr-root .thread > *{max-width:62ch}
+.jr-root .thread .from-user{align-self:flex-end}
+.jr-root .pane-chat .foot{padding:6px clamp(14px,2.2vw,26px) clamp(12px,1.8vw,20px)}
+.jr-root .thread .guard{max-width:none;align-self:stretch}
+
+/* map / board pane */
+.jr-root .pane-map{min-width:0;border-left:1px solid var(--border);position:relative;overflow:hidden;
+  background-image:radial-gradient(circle,rgba(53,70,32,.18) 1px,transparent 1px);background-size:26px 26px;background-color:#f3f0e6}
+.jr-root .pane-map .ph{position:absolute;left:14px;top:12px;font-family:var(--font-sans);font-size:.62rem;font-weight:600;letter-spacing:var(--tracking-label);text-transform:uppercase;color:var(--ink-45)}
+.jr-root .pane-map .edges{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.jr-root .pane-map .edges path{fill:none;stroke-width:1.4}
+.jr-root .pane-map .e-person{stroke:rgba(94,118,51,.7)}
+.jr-root .pane-map .e-question{stroke:#E8B62C;stroke-dasharray:5 5}
+.jr-root .pane-map .e-evidence{stroke:#3A6EA5}
+.jr-root .pane-map .mapnode{position:absolute;max-width:min(52%,230px)}
+.jr-root .pane-map .plot{position:absolute;inset:0;display:none;flex-direction:column;padding:clamp(14px,2.4vw,28px);background:#f3f0e6}
+.jr-root .app.plot .pane-map .plot{display:flex}
+.jr-root .app.plot .pane-map .edges, .jr-root .app.plot .pane-map .mapnode, .jr-root .app.plot .pane-map .ph{display:none}
+.jr-root .plot .bt{font-family:var(--font-sans);font-size:.62rem;font-weight:600;letter-spacing:var(--tracking-label);text-transform:uppercase;color:var(--ink-45)}
+.jr-root .plot svg{display:block;width:100%;height:auto;max-height:calc(100% - 60px);margin:auto 0;overflow:visible}
+.jr-root .plot .ax{stroke:var(--ink-25);stroke-width:1}
+.jr-root .plot .fn{fill:none;stroke:var(--moss);stroke-width:2.2;stroke-linecap:round}
+.jr-root .plot .lvl{fill:none;stroke:#E8B62C;stroke-width:1.6;stroke-dasharray:6 5}
+.jr-root .plot .gap{fill:none;stroke:var(--ink-45);stroke-width:1.4;stroke-dasharray:3 4}
+.jr-root .plot .drop{fill:none;stroke:var(--moss);stroke-width:1.2;stroke-dasharray:3 4;opacity:.7}
+.jr-root .plot .pt.q{fill:#F4F1E8;stroke:#E8B62C;stroke-width:2;stroke-dasharray:3 3}
+.jr-root .plot .pt.hollow{fill:none;stroke:var(--ink-45);stroke-width:1.4}
+.jr-root .plot .pt.p{fill:var(--moss);stroke:var(--moss)}
+.jr-root .plot .pl{font-family:var(--font-sans);font-size:10.5px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;fill:var(--ink-45)}
+.jr-root .plot .pl.person{fill:var(--moss-700)}.jr-root .plot .pl.question{fill:#a37c12}.jr-root .plot .pl.faint{fill:var(--ink-45)}
+.jr-root .plot .note{font-family:var(--font-serif);font-style:italic;color:var(--moss-700);font-size:1rem;margin-top:8px}
+/* the plot paints in: the function draws, the points settle */
+.jr-root .stage-sec.live .plot .st.on .fn{stroke-dasharray:420;stroke-dashoffset:420;animation:fn-draw 1.1s var(--ease-standard) both}
+@keyframes fn-draw{to{stroke-dashoffset:0}}
+/* once you answer, the wrong guess steps back */
+.jr-root .app.plot .plot .st[data-step="12"].on ~ .st[data-step="9"] .pt.q{opacity:.3}
+/* step gating — only once the driver is alive; default is the finished state */
+@keyframes st-rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes nd-in{from{opacity:0;scale:.92}to{opacity:1;scale:1}}
+.jr-root .stage-sec.live .st:not(.on){display:none!important}
+.jr-root .stage-sec.live .thread .st.on{animation:st-rise .55s var(--ease-out-expo) both}
+.jr-root .stage-sec.live .mapnode.st.on{animation:nd-in .55s var(--ease-out-expo) both}
+.jr-root .stage-sec.live .edges path.st{transition:opacity .5s}
+.jr-root .stage-sec.live .edges path.st:not(.on){display:block!important;opacity:0}
+.jr-root .stage-sec.live .plot .st:not(.on){display:block!important;visibility:hidden}
+.jr-root .stage-sec.live .plot .st.on{visibility:visible}
+html.anim-off .jr-root .stage-sec.live .st{display:revert!important;visibility:visible!important;opacity:1!important;animation:none!important}
+/* frozen timeline: the finished conversation beside the finished map, no transition to stall on */
+html.anim-off .jr-root .app .body{transition:none;grid-template-columns:1fr .92fr}
+html.anim-off .jr-root .app .bar .model .m-core{display:none}
+html.anim-off .jr-root .app .bar .model .m-logos{display:inline}
+@media(max-width:820px){html.anim-off .jr-root .app .body{grid-template-columns:1fr}}
+/* frozen: the map is the state worth showing; the plot yields to it */
+html.anim-off .jr-root .app.plot .pane-map .plot{display:none}
+html.anim-off .jr-root .app.plot .pane-map .edges, html.anim-off .jr-root .app.plot .pane-map .mapnode, html.anim-off .jr-root .app.plot .pane-map .ph{display:block}
+@media(prefers-reduced-motion:reduce){.jr-root .stage-sec{height:auto}.jr-root .stage-sec .pin{position:static;height:auto}}
+
+/* progress ticks under the window */
+.jr-root .stage-sec .ticks{width:min(1180px,100%);margin:12px auto 0;display:flex;gap:6px}
+.jr-root .stage-sec .ticks i{flex:1;height:2px;background:var(--ink-12);position:relative;overflow:hidden}
+.jr-root .stage-sec .ticks i b{position:absolute;inset:0;background:var(--moss);transform:scaleX(0);transform-origin:left;display:block}
+.jr-root .stage-sec .ticks i.on b{transform:scaleX(1);transition:transform .35s var(--ease-out-expo)}
+
+/* ── the auth chrome in the masthead ──────────────────────────────────
+   Not in the prototype: it was a standalone export with nowhere to sign in
+   to. These match the nav's own type so the addition reads as part of the
+   design rather than bolted to it. */
+.jr-root .mast nav a.hs.auth { font-variant: inherit; }
+.jr-root .mast nav .auth-btn { display: inline-flex; align-items: center; margin-left: 2px; }
+.jr-root .mast nav .auth-btn .cl-userButtonTrigger { width: 28px; height: 28px; }
+@media (max-width: 640px) { .jr-root .mast nav a.hs.auth { display: inline-flex; } }
