@@ -71,7 +71,7 @@ import {
   sanitizePersonality,
   type Personality,
 } from '@/lib/logos-personality';
-import { lastCoreModel, rememberModel } from '@/lib/socria-model-store';
+import { chooseModel, lastCoreModel } from '@/lib/socria-model-store';
 import { buildStarters, PENDING_TYPES } from '@/lib/starters';
 import { billingError, billingLine } from '@/lib/billing-message';
 import { PersonalityDial } from '@/components/PersonalityDial';
@@ -541,7 +541,10 @@ export function LogosApp({
   // our host, hand the switch back to it and let it re-render; the router is
   // only for the case where this is mounted somewhere else.
   function switchTo(next: SocriaModel) {
-    rememberModel(next);
+    // Pressing "Socria chat" is a choice, and it outranks the automatic
+    // default from here on — otherwise a member who wanted Core back would be
+    // put into Logos again on the next visit, for ever.
+    chooseModel(next);
     if (onSwitchModel) {
       onSwitchModel(next);
       return;
