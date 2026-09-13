@@ -14,3 +14,8 @@ build/
 # derived — regenerate them with .trailer/export.mjs + .trailer/build.mjs.
 .trailer/socria-logos-trailer.html
 .trailer/frag/
+.ds-sync/
+ds-bundle/
+.design-sync/.cache/
+.design-sync/learnings/
+.design-sync/node_modules
