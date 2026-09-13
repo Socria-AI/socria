@@ -1,0 +1,36 @@
+/* .design-sync/fonts.css — the typefaces, for anything that is not the app.
+ *
+ * Socria loads its four families through `next/font/google` in app/layout.tsx,
+ * which self-hosts them at BUILD time and injects `--font-serif`, `--font-sans`,
+ * `--font-hand` and `--font-stix` as CSS variables on <html>. Both halves of
+ * that are unavailable outside a Next build: there is no .woff2 anywhere in the
+ * repo to ship, and nothing defines the variables.
+ *
+ * Left alone, every design built with this system renders in Georgia and
+ * system-ui — and nothing downstream would catch it, because it looks like a
+ * deliberate choice rather than a missing file. Instrument Serif in particular
+ * IS the brand: the italic emphasis that carries a Socria reply, every heading
+ * on the journal, the numerals in an ordered list.
+ *
+ * So this file does what layout.tsx does, from the same source. It is not a
+ * substitute stack — it is the same four families, fetched from Google the way
+ * next/font fetches them, with the variables defined to match. `--serif` and
+ * `--sans` are the aliases app/globals.css actually reads; `--font-*` are the
+ * names Next would have set, kept so anything copied out of the app resolves.
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@300..700&family=Kalam:wght@300;400;700&family=STIX+Two+Text:ital,wght@0,400..700;1,400..700&display=swap');
+
+:root {
+  /* What next/font/google would have injected. */
+  --font-serif: 'Instrument Serif';
+  --font-sans: 'Inter';
+  --font-hand: 'Kalam';
+  --font-stix: 'STIX Two Text';
+
+  /* The aliases app/globals.css and app/logos/logos.css read. Fallbacks are
+     the app's own, so a family that fails to load degrades the way the app
+     degrades rather than to something else. */
+  --serif: var(--font-serif), 'Instrument Serif', Georgia, serif;
+  --sans: var(--font-sans), 'Inter', system-ui, sans-serif;
+}
