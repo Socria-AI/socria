@@ -81,6 +81,7 @@ import type { Attachment, AttachmentOrigin } from '@/lib/logos-attachments';
 import { MAX_CONTEXTS_PER_NODE, sanitizeContexts, type NodeContext } from '@/lib/logos-sources';
 import { relevantNodes, type DraftAction, type DraftResponse } from '@/lib/logos-draft';
 import { boundaryNote, limitsFor, type Counter } from '@/lib/entitlements';
+import { failureText } from '@/lib/upstream-error';
 import { DRIFT_DISMISS_LIMIT, readDrift, type DriftVerdict } from '@/lib/topic-drift';
 import {
   MATH_FADE_MS,
@@ -1734,7 +1735,7 @@ export function LogosApp({
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        throw new Error(body.error || 'Something went wrong.');
+        throw new Error(failureText(body));
       }
 
       // Accepted — the reasoning done in this node belongs on the map. Same
@@ -1898,7 +1899,7 @@ export function LogosApp({
       }
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        throw new Error(body.error || 'Something went wrong.');
+        throw new Error(failureText(body));
       }
 
       // The turn was accepted. Now the map may be rebuilt from it.
