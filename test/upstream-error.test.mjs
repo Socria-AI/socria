@@ -14,7 +14,7 @@
 // somebody sees names something they can act on, and that nothing from the
 // upstream error object rides along with it.
 
-import { classifyUpstream } from './.tmp/upstream-error.mjs';
+import { classifyUpstream, failureText } from './.tmp/upstream-error.mjs';
 
 let pass = 0, fail = 0;
 const ok = (n, c, x = '') => (c ? pass++ : (fail++, console.log('FAIL', n, x)));
@@ -105,6 +105,55 @@ console.log('\n=== junk is classified, never thrown on ===');
     const f = classifyUpstream(junk);
     ok(`${JSON.stringify(junk) ?? typeof junk} classifies`, typeof f.code === 'string' && typeof f.ref === 'string');
   }
+}
+
+
+console.log('\n=== the reference reaches a human, or it was never worth minting ===');
+{
+  // THE OMISSION. classifyUpstream mints a ref and logs it; the client read
+  // body.error and threw the rest away, so no user ever saw one.
+  const f = classifyUpstream({ status: 401 });
+  const shown = failureText({ error: f.reason, code: f.code, ref: f.ref });
+  ok('the sentence survives', shown.includes(f.reason), shown);
+  ok('and so does the reference', shown.includes(f.ref), shown);
+  ok('the ref is readable, not buried', /\(ref [a-z0-9]{4,12}\)$/.test(shown), shown);
+
+  // A body with no ref reads as a plain sentence — no empty brackets.
+  ok('no ref, no brackets', failureText({ error: 'Nope.' }) === 'Nope.', failureText({ error: 'Nope.' }));
+  ok('no trailing "(ref )"', !failureText({ error: 'Nope.', ref: '' }).includes('(ref'));
+}
+
+console.log('\n=== it runs inside a catch, so it may not throw ===');
+{
+  for (const junk of [null, undefined, 0, '', 'a string', [], true, () => {}, NaN]) {
+    let threw = null, out;
+    try { out = failureText(junk); } catch (e) { threw = e; }
+    ok(`${typeof junk} does not throw`, threw === null, String(threw));
+    ok(`${typeof junk} still yields a sentence`, typeof out === 'string' && out.length > 0, String(out));
+  }
+  ok('the default fallback is used', failureText(null) === 'Something went wrong.');
+  ok('a caller may pass its own', failureText(null, 'Nope') === 'Nope');
+}
+
+console.log('\n=== nothing from a body is trusted into the UI unchecked ===');
+{
+  // `error` and `ref` arrive over the wire. They are rendered to a person, so
+  // neither may be a channel for arbitrary text.
+  const huge = failureText({ error: 'x'.repeat(5000) });
+  ok('an absurd sentence falls back rather than rendering', huge === 'Something went wrong.', huge.slice(0, 40));
+
+  for (const bad of ['<script>', 'a b', 'ref with spaces', '../../etc', 'x'.repeat(200), 'ABC123', '!!', 'a']) {
+    const out = failureText({ error: 'Failed.', ref: bad });
+    ok(`a ref of ${JSON.stringify(bad.slice(0, 16))} is not echoed`, out === 'Failed.', out);
+  }
+  // Non-string fields are ignored rather than stringified.
+  ok('an object error is not [object Object]',
+    failureText({ error: { a: 1 } }) === 'Something went wrong.',
+    failureText({ error: { a: 1 } }));
+  ok('a numeric ref is not echoed', failureText({ error: 'Failed.', ref: 123456 }) === 'Failed.');
+  // The real shape still passes.
+  ok('a genuine six-char ref is kept',
+    failureText({ error: 'Failed.', ref: 'a1b2c3' }) === 'Failed. (ref a1b2c3)');
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
