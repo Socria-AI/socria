@@ -18,6 +18,7 @@ import {
 import { renderMessageForModel, sanitizeAttachments } from '@/lib/logos-attachments';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { boundaryNote, limitOf } from '@/lib/entitlements';
+import { reportUpstream } from '@/lib/upstream-error';
 import {
   bumpUsage,
   chatAlreadyCounted,
@@ -376,7 +377,11 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (e: any) {
-    console.error('logos chat error:', e);
-    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
+    // This used to answer every failure with { error: 'Internal error' }, and
+    // that single string is why a person who reported the fault, offered to
+    // help, and pasted four network responses still could not say what had
+    // happened — the one response that knew had thrown the reason away.
+    const f = reportUpstream('logos chat', e);
+    return NextResponse.json({ error: f.reason, code: f.code, ref: f.ref }, { status: f.status });
   }
 }
