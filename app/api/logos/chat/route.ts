@@ -30,6 +30,7 @@ import {
   sanitizeUserUnderstanding,
 } from '@/lib/socria-prompt';
 import { enforceRateLimit } from '@/lib/rate-limit';
+import { eggFor } from '@/lib/easter-eggs';
 import { claimLifecycle } from '@/lib/lifecycle-store';
 import { LIMIT_DELAY_MS } from '@/lib/lifecycle';
 import { lifecycleEmailsOn, withTimeout } from '@/lib/email';
@@ -70,6 +71,32 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json().catch(() => null);
     const messages = body?.messages;
+
+    // ── "Can you?" ───────────────────────────────────────────────────
+    //
+    // Answered here, before the model and before any counter is spent: it is
+    // a fixed two-word reply, so paying OpenAI for it — or charging one of a
+    // free tier's two lines of thinking for it — would both be absurd. After
+    // the rate limit, though, so it cannot be used to get around one.
+    //
+    // See lib/easter-eggs.ts for why this is a real answer in Socria's voice
+    // rather than a gag, and for the care taken to keep it from firing on
+    // somebody's genuine question.
+    const lastUser = Array.isArray(messages)
+      ? [...messages].reverse().find((m: { role?: string }) => m?.role === 'user')
+      : null;
+    const egg = eggFor((lastUser as { content?: unknown } | undefined)?.content);
+    if (egg) {
+      // The same content type the streamed replies use, so every client reads
+      // it the way it reads any other turn — one chunk instead of many.
+      return new Response(egg.reply, {
+        headers: {
+          'Content-Type': 'text/plain; charset=utf-8',
+          'Cache-Control': 'no-store',
+          'X-Content-Type-Options': 'nosniff',
+        },
+      });
+    }
     if (!Array.isArray(messages) || messages.length === 0) {
       return NextResponse.json({ error: 'messages array required' }, { status: 400 });
     }
