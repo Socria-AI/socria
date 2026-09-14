@@ -17,6 +17,7 @@ import { OneFoot } from '@/components/OneMark';
 import { ModelGlyph } from '@/components/ModelGlyph';
 import { LogosApp } from '@/components/LogosApp';
 import { isValidOneKey } from '@/lib/socria-one';
+import { failureText } from '@/lib/upstream-error';
 import {
   MODEL_KEY,
   autoModel,
@@ -1246,7 +1247,7 @@ export default function ChatPage() {
 
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        throw new Error(body.error || 'Something went wrong');
+        throw new Error(failureText(body, 'Something went wrong'));
       }
 
       const reader = res.body?.getReader();
