@@ -122,3 +122,31 @@ export function reportUpstream(where: string, err: unknown): UpstreamFailure {
   console.error(`[${where}] ${f.code} ref=${f.ref}`, err);
   return f;
 }
+
+/**
+ * What the person actually reads when a request fails.
+ *
+ * THE OMISSION THIS FIXES. classifyUpstream put a six-character reference in
+ * every error body so somebody could quote it and we could find their failure
+ * in the log. The client then read `body.error` and dropped `code` and `ref`
+ * on the floor — so the reference existed, was written to the log, and was
+ * never once shown to a human. A reference nobody can see is a reference
+ * nobody can quote, which was the entire point of producing it.
+ *
+ * Kept here, beside the thing that mints the reference, so the two halves of
+ * one idea cannot drift apart. Pure and total: this runs inside a catch, and
+ * an error formatter that throws would replace a bad error with a worse one.
+ */
+export function failureText(body: unknown, fallback = 'Something went wrong.'): string {
+  const b = body as { error?: unknown; ref?: unknown } | null;
+  const said = typeof b?.error === 'string' ? b.error.trim() : '';
+  // A sentence, or the fallback — never an empty banner, and never an object
+  // stringified into something nobody can read.
+  const sentence = said && said.length <= 400 ? said : fallback;
+  const ref = typeof b?.ref === 'string' ? b.ref.trim() : '';
+  // The reference is ours, not theirs: six characters of [a-z0-9] from
+  // reference(). Anything else in that field did not come from us and is not
+  // repeated back into the UI.
+  if (!/^[a-z0-9]{4,12}$/.test(ref)) return sentence;
+  return `${sentence} (ref ${ref})`;
+}
