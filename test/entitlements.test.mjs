@@ -126,5 +126,33 @@ console.log('\n=== the boundary is said calmly, and only sold where there is som
 
 console.log('\n  the month:', boundaryNote('chats'));
 console.log('  a ceiling:', boundaryNote('research'));
+console.log('\n=== a line of thinking costs one, however many times it is sent ===');
+{
+  // The regression this block exists for: `chats` is MONTHLY, so its scope is
+  // the month and the conversation id is discarded. The route only asked "is
+  // this a first user turn?" — a property of the REQUEST — so a first message
+  // that failed and was retried charged again, and two sends of one
+  // conversation could spend a whole free month. Somebody would be looking at
+  // a single session in the rail above a note saying they had none left.
+  //
+  // The counter itself is pure and cannot see sessions; what is asserted here
+  // is the arithmetic the fix depends on, so the shape of the boundary is
+  // pinned even though the de-duplication lives in lib/usage.ts.
+  const cap = PLANS.free.counters.chats;
+  ok('two free lines of thinking', cap === 2);
+  ok('one conversation leaves one', remaining('free', 'chats', 1) === 1);
+  ok('two conversations leave none', remaining('free', 'chats', 2) === 0);
+  ok('and the third is the boundary', isSpent('free', 'chats', 2));
+
+  // The number that was wrong on screen: charged twice for one conversation.
+  ok('being charged twice for one would read as spent',
+    isSpent('free', 'chats', 2) && remaining('free', 'chats', 2) === 0);
+
+  // Core is not metered by this counter at all — it has no chats limit to
+  // spend, and nothing outside the Logos route may spend one.
+  ok('Core 3.1 is free and unmetered by chats', PLANS.free.counters.chats === 2);
+  ok('a member is not stopped', !isSpent('one', 'chats', 50));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
