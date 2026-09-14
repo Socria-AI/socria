@@ -27,6 +27,7 @@ const MODULES = [
   'lib/socria-one.ts',
   'lib/rich-text.ts',
   'lib/easter-eggs.ts',
+  'lib/upstream-error.ts',
   'lib/socria-model-store.ts',
   'lib/math-context.ts',
   'lib/topic-drift.ts',
