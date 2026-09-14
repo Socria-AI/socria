@@ -26,6 +26,9 @@ import {
   limitOf,
   type Counter,
 } from './entitlements';
+import { chatMarkerScope, chatScopeFor, foldUsageRows, type UsageRow } from './usage-scope';
+
+export { chatMarkerScope, chatScopeFor, foldUsageRows, type UsageRow };
 import type { Plan } from './socria-one';
 
 /** The month a monthly counter belongs to, in UTC. */
@@ -41,7 +44,7 @@ export function monthKey(at = Date.now()): string {
  */
 export function scopeFor(counter: Counter, chatId?: string | null, at = Date.now()): string {
   if (COUNTER_SCOPE[counter] === 'month') return monthKey(at);
-  return `chat:${(chatId || 'unknown').slice(0, 60)}`;
+  return chatScopeFor(chatId || 'unknown');
 }
 
 /** Whether the store is reachable at all. Missing table → treat as absent. */
@@ -86,10 +89,11 @@ export async function readAllUsage(
   userId: string,
   chatId?: string | null
 ): Promise<Record<string, number>> {
-  const out: Record<string, number> = {};
   try {
-    const scopes = [monthKey()];
-    if (chatId) scopes.push(`chat:${chatId.slice(0, 60)}`);
+    const month = monthKey();
+    const chatScope = chatId ? chatScopeFor(chatId) : null;
+    const scopes = [month];
+    if (chatScope) scopes.push(chatScope);
     const { data, error } = await supabaseAdmin()
       .from('logos_usage')
       .select('counter, n, scope')
@@ -97,15 +101,12 @@ export async function readAllUsage(
       .in('scope', scopes);
     if (error) {
       if (!unavailable(error)) console.error('usage read-all:', error.message);
-      return out;
+      return {};
     }
-    for (const row of data ?? []) {
-      out[(row as { counter: string }).counter] = (row as { n: number }).n;
-    }
+    return foldUsageRows(data as UsageRow[] | null, month, chatScope);
   } catch {
-    /* fall through to zeros */
+    return {};
   }
-  return out;
 }
 
 /**
@@ -196,16 +197,6 @@ export async function markChatCounted(
   } catch {
     /* a missing marker costs at most one double-charge; never a failed turn */
   }
-}
-
-/**
- * The marker's scope. Deliberately NOT scopeFor(): that function answers
- * "where does this counter live", and for `chats` the answer is the month.
- * This is a different question — "has this conversation been counted" — and it
- * needs the conversation, which is exactly what scopeFor() discards.
- */
-function chatMarkerScope(sessionId: string): string {
-  return `chat:${sessionId.slice(0, 60)}`;
 }
 
 export interface Allowance {
