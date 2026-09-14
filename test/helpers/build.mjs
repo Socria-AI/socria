@@ -24,6 +24,7 @@ const MODULES = [
   'lib/logos-layout.ts',
   'lib/logos.ts',
   'lib/entitlements.ts',
+  'lib/usage-scope.ts',
   'lib/socria-one.ts',
   'lib/rich-text.ts',
   'lib/easter-eggs.ts',
