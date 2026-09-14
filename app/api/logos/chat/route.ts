@@ -17,13 +17,12 @@ import {
 } from '@/lib/logos';
 import { renderMessageForModel, sanitizeAttachments } from '@/lib/logos-attachments';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
-import { boundaryNote } from '@/lib/entitlements';
+import { boundaryNote, limitOf } from '@/lib/entitlements';
 import {
   bumpUsage,
   chatAlreadyCounted,
   checkAllowance,
   markChatCounted,
-  spend,
 } from '@/lib/usage';
 import { renderContextsForNode, sanitizeNodeContextList } from '@/lib/logos-sources';
 import { guidanceBlock, resolveDepth, resolveGuard } from '@/lib/logos-guidance';
@@ -169,14 +168,12 @@ export async function POST(req: NextRequest) {
     // could spend a whole free month. The marker below is what remembers.
     const isNewChat = !body?.focus && userTurns <= 1;
     const alreadyCounted = isNewChat && (await chatAlreadyCounted(userId, sessionId));
+    // Whether THIS request is the one that will pay for the conversation.
+    // Checked here, charged further down — see the note at the charge itself.
+    const willCharge = isNewChat && !alreadyCounted;
 
-    if (isNewChat && !alreadyCounted) {
-      const allowance = await spend(userId, plan, 'chats');
-      if (allowance.ok) {
-        // Charged. Remember it, so this conversation can never be charged
-        // again however many times its first turn is re-sent.
-        await markChatCounted(userId, sessionId);
-      }
+    if (willCharge) {
+      const allowance = await checkAllowance(userId, plan, 'chats');
       if (!allowance.ok) {
         // A note about this boundary may go by email — a day from now, not
         // now, and only if they are still free then. All that happens here
@@ -331,6 +328,28 @@ export async function POST(req: NextRequest) {
       } else {
         throw e;
       }
+    }
+
+    // ── charged here, and not one line earlier ────────────────────
+    //
+    // The allowance was CHECKED before the model ran, so somebody out of
+    // lines of thinking is still refused without a model call. But the charge
+    // waits until OpenAI has accepted the turn and handed back a stream,
+    // because a turn that never produced an answer must not cost one.
+    //
+    // This is the bug Tobias reported: every one of his chats errored before
+    // saying anything, and after two attempts the product told him he had
+    // used a month he had never got a word out of. Charging up-front makes
+    // the count a record of REQUESTS; the count is supposed to be a record of
+    // CONVERSATIONS, and a conversation that never happened is not one.
+    //
+    // Deliberately before the stream rather than after it: from here the
+    // answer is being written, and a connection that drops halfway through
+    // one is a turn the person had. The marker goes with it, so the retry of
+    // an answered turn is still free.
+    if (willCharge && userId && limitOf(plan, 'chats') !== null) {
+      await bumpUsage(userId, 'chats');
+      await markChatCounted(userId, sessionId);
     }
 
     const encoder = new TextEncoder();
