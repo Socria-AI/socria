@@ -29,11 +29,14 @@
 import { createClerkClient } from '@clerk/backend';
 import { createClient } from '@supabase/supabase-js';
 
-const email = process.argv[2];
-const dry = process.argv.includes('--dry');
+const args = process.argv.slice(2);
+const dry = args.includes('--dry');
+const survey = args.includes('--survey');
+const email = args.find((a) => !a.startsWith('--'));
 
-if (!email || email.startsWith('--')) {
+if (!survey && !email) {
   console.error('usage: node scripts/restore-chats.mjs <email> [--dry]');
+  console.error('       node scripts/restore-chats.mjs --survey   (read-only: who else is stuck)');
   process.exit(1);
 }
 
@@ -52,6 +55,48 @@ const db = createClient(
   need('SUPABASE_SERVICE_ROLE_KEY'),
   { auth: { persistSession: false } }
 );
+
+// --survey: who else is stuck, and how many of them.
+//
+// Tobias is unlikely to be alone. The broken version charged a line of
+// thinking before the model ran, there is no refund path anywhere, and the
+// client hard-stops a spent free account before it sends anything — so every
+// free user who ever saw an error is sitting behind the same gate until the
+// month rolls over. This counts them. It reads and writes nothing.
+if (survey) {
+  const month = new Date().toISOString().slice(0, 7);
+  const { data, error } = await db
+    .from('logos_usage')
+    .select('user_id, n, scope')
+    .eq('counter', 'chats')
+    .eq('scope', month);
+
+  if (error) {
+    console.error('could not read logos_usage:', error.message);
+    process.exit(1);
+  }
+
+  const rows = data ?? [];
+  // 2 is the free allowance. Anyone at or above it is gated; anyone ABOVE it
+  // was charged more times than the limit should have allowed, which is the
+  // double-charge bug leaving its fingerprint.
+  const atLimit = rows.filter((r) => r.n >= 2);
+  const over = rows.filter((r) => r.n > 2);
+
+  console.log(`month           : ${month}`);
+  console.log(`accounts with usage : ${rows.length}`);
+  console.log(`at or over the free limit (gated) : ${atLimit.length}`);
+  console.log(`ABOVE the limit (charged past it) : ${over.length}`);
+  if (over.length) {
+    console.log('\nthese were charged more than the limit permits — a strong sign the');
+    console.log('charge happened without an answer:');
+    for (const r of over.slice(0, 50)) console.log(`  ${r.user_id}  n=${r.n}`);
+    if (over.length > 50) console.log(`  … and ${over.length - 50} more`);
+  }
+  console.log('\nNothing was changed. Clear one account with:');
+  console.log('  node scripts/restore-chats.mjs <email> --dry');
+  process.exit(0);
+}
 
 // 1. The address → the account. Clerk's own lookup, so a person who signed in
 //    with Google and a person who typed a password resolve the same way.
