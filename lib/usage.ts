@@ -136,6 +136,78 @@ export async function bumpUsage(
   }
 }
 
+/**
+ * Has this particular line of thinking already been counted?
+ *
+ * THE BUG THIS EXISTS FOR. `chats` is a MONTHLY counter, so scopeFor()
+ * collapses it to the month and throws the conversation id away — which means
+ * the count had no memory of WHICH session it had charged for. The route only
+ * ever asked "is this a first user turn?", and that is a property of the
+ * REQUEST, not of the conversation. So a first message that failed — a dropped
+ * connection, a model error, a refresh, an impatient second press — charged
+ * again on the retry. Two sends of one conversation could spend both of a free
+ * month's lines of thinking, and the person would be looking at a single
+ * session in the rail above a note saying they had none left.
+ *
+ * The marker is a row in the same table under the conversation's own scope,
+ * so no migration is needed and the write is the same idempotent RPC. It is
+ * written with `by: 0` when it already exists, so re-marking cannot inflate
+ * anything; all that matters is whether the row is there at all.
+ */
+export async function chatAlreadyCounted(
+  userId: string | null,
+  sessionId: string | null | undefined
+): Promise<boolean> {
+  if (!userId || !sessionId) return false;
+  try {
+    const { data, error } = await supabaseAdmin()
+      .from('logos_usage')
+      .select('n')
+      .eq('user_id', userId)
+      .eq('scope', chatMarkerScope(sessionId))
+      .eq('counter', 'chats')
+      .maybeSingle();
+    if (error) {
+      if (!unavailable(error)) console.error('chat marker read:', error.message);
+      // Unreachable store fails OPEN, like everything else here: a person who
+      // cannot be checked is let through rather than charged twice.
+      return false;
+    }
+    return typeof data?.n === 'number' && data.n > 0;
+  } catch {
+    return false;
+  }
+}
+
+/** Remember that this conversation has cost its one chat. */
+export async function markChatCounted(
+  userId: string | null,
+  sessionId: string | null | undefined
+): Promise<void> {
+  if (!userId || !sessionId) return;
+  try {
+    await supabaseAdmin().rpc('bump_logos_usage', {
+      p_user: userId,
+      p_scope: chatMarkerScope(sessionId),
+      p_counter: 'chats',
+      p_by: 1,
+      p_at: Date.now(),
+    });
+  } catch {
+    /* a missing marker costs at most one double-charge; never a failed turn */
+  }
+}
+
+/**
+ * The marker's scope. Deliberately NOT scopeFor(): that function answers
+ * "where does this counter live", and for `chats` the answer is the month.
+ * This is a different question — "has this conversation been counted" — and it
+ * needs the conversation, which is exactly what scopeFor() discards.
+ */
+function chatMarkerScope(sessionId: string): string {
+  return `chat:${sessionId.slice(0, 60)}`;
+}
+
 export interface Allowance {
   /** false when this action is past the plan's limit */
   ok: boolean;

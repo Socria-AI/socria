@@ -18,7 +18,13 @@ import {
 import { renderMessageForModel, sanitizeAttachments } from '@/lib/logos-attachments';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { boundaryNote } from '@/lib/entitlements';
-import { bumpUsage, checkAllowance, spend } from '@/lib/usage';
+import {
+  bumpUsage,
+  chatAlreadyCounted,
+  checkAllowance,
+  markChatCounted,
+  spend,
+} from '@/lib/usage';
 import { renderContextsForNode, sanitizeNodeContextList } from '@/lib/logos-sources';
 import { guidanceBlock, resolveDepth, resolveGuard } from '@/lib/logos-guidance';
 import { styleBlock } from '@/lib/logos-style';
@@ -155,10 +161,22 @@ export async function POST(req: NextRequest) {
     // beginning, whatever its history looks like.
     const sessionId = typeof body?.sessionId === 'string' ? body.sessionId : null;
     const userTurns = clean.filter((m: { role: string }) => m.role === 'user').length;
+    //
+    // …and it is counted ONCE PER CONVERSATION, not once per first-turn
+    // REQUEST. `chats` is monthly, so its scope is the month and the
+    // conversation id is thrown away — which meant a first message that
+    // failed and was retried charged twice, and two sends of one conversation
+    // could spend a whole free month. The marker below is what remembers.
     const isNewChat = !body?.focus && userTurns <= 1;
+    const alreadyCounted = isNewChat && (await chatAlreadyCounted(userId, sessionId));
 
-    if (isNewChat) {
+    if (isNewChat && !alreadyCounted) {
       const allowance = await spend(userId, plan, 'chats');
+      if (allowance.ok) {
+        // Charged. Remember it, so this conversation can never be charged
+        // again however many times its first turn is re-sent.
+        await markChatCounted(userId, sessionId);
+      }
       if (!allowance.ok) {
         // A note about this boundary may go by email — a day from now, not
         // now, and only if they are still free then. All that happens here
