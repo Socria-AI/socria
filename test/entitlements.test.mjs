@@ -154,5 +154,35 @@ console.log('\n=== a line of thinking costs one, however many times it is sent =
   ok('a member is not stopped', !isSpent('one', 'chats', 50));
 }
 
+console.log('\n=== a conversation that never happened is not one ===');
+{
+  // Tobias Lasco, by email: "All my chats errored before giving any responses
+  // … after two attempts, the app thinks I've used all my free tier chats,
+  // despite none succeeding."
+  //
+  // The count was spent BEFORE the model ran, so a turn that errored before
+  // saying a word still cost a line of thinking. Two failures and a free
+  // month was gone, with nothing to show for it. The allowance is still
+  // CHECKED up front — somebody genuinely out of chats is refused without a
+  // model call — but the charge now waits until the model has accepted the
+  // turn and handed back a stream.
+  //
+  // The route owns that ordering; what is pinned here is the arithmetic it
+  // depends on, so the boundary's shape cannot drift underneath it.
+  ok('a failed first turn should leave the month untouched',
+    remaining('free', 'chats', 0) === 2 && !isSpent('free', 'chats', 0));
+  ok('...and a second failure too', !isSpent('free', 'chats', 0));
+  ok('one answered conversation costs exactly one',
+    remaining('free', 'chats', 1) === 1);
+  ok('two answered conversations reach the boundary',
+    isSpent('free', 'chats', 2) && remaining('free', 'chats', 2) === 0);
+
+  // The old behaviour, stated so nobody restores it by accident: two errored
+  // attempts read as spent, which is what put a paying-nothing visitor at a
+  // wall he had never touched.
+  ok('charging for failures would have read as spent at two',
+    isSpent('free', 'chats', 2));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
