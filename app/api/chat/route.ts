@@ -28,6 +28,7 @@ import {
 } from '@/lib/conversation-controller';
 import { enforceRateLimit } from '@/lib/rate-limit';
 import { eggFor } from '@/lib/easter-eggs';
+import { reportUpstream } from '@/lib/upstream-error';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { memoryCaps, selectRelevant, visibleEntries } from '@/lib/person-memory';
 
@@ -379,10 +380,15 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (e: any) {
-    console.error('chat route error:', e);
+    // It used to forward `e?.message` straight to the browser. More useful
+    // than Logos's opaque string, but an upstream error object carries things
+    // a browser should never see, and "Internal error" when the message was
+    // empty put it back in the same hole. Classified instead: a sentence the
+    // person can act on, and a reference that appears in the server log.
+    const f = reportUpstream('core chat', e);
     return NextResponse.json(
-      { error: e?.message || 'Internal error' },
-      { status: 500 }
+      { error: f.reason, code: f.code, ref: f.ref },
+      { status: f.status }
     );
   }
 }
