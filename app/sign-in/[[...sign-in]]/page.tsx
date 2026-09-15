@@ -24,12 +24,12 @@ export default function SignInPage({
     <AuthShell
       kind="sign-in"
       redirectTo={back}
-      eyebrow="Welcome back"
-      title="Continue your thinking."
+      eyebrow="Ask Socria"
+      title="Pick up where your thinking left off."
       // The old subtitle spoke only to returning users — "pick up where you
       // left off" — on the page everyone was sent to, including people with
       // no account. Now it names both.
-      subtitle="Sign in to pick up where you left off, synced across every device. New here? Creating an account takes a moment and is free."
+      subtitle="Sign in and the thread you started this morning is waiting tonight, on whatever you happen to be holding. New here? An account takes a moment and is free."
       quote={{
         text: "The goal isn't to think less. The goal is to think better.",
         source: 'From the Socria manifesto',
