@@ -33,7 +33,11 @@ export default function SignUpPage({
         routing="path"
         path="/sign-up"
         signInUrl={authUrl('sign-in', back)}
-        fallbackRedirectUrl={back ?? '/chat'}
+        // A NEW account lands on the beginning, not in an empty composer.
+        // Someone who came here from a specific page still goes back to it —
+        // an interrupted errand is not a first run.
+        fallbackRedirectUrl={back ?? '/onboarding'}
+        // Signing IN is not beginning; they have been here before.
         signInFallbackRedirectUrl={back ?? '/chat'}
       />
     </AuthShell>
