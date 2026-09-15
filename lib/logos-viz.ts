@@ -29,6 +29,15 @@
 
 import { compileExpr, freeNames, taylorCoeffs, type CompiledExpr } from './logos-math';
 import {
+  contourSet,
+  momentumTerms,
+  quiver,
+  seedPoints,
+  streamline,
+  type Field2,
+  type FlowBox,
+} from './logos-flow';
+import {
   boxLines,
   place,
   sampleSurface,
@@ -309,6 +318,11 @@ export const VIZ_KINDS = [
   // is the picture behind partial derivatives and behind most of what people
   // find hard about a function of two variables.
   'surface',
+  // A FIELD rather than a height: a direction and a speed at every point,
+  // which is a phase portrait, an electric field, a gradient — and fluid
+  // flow, where the exact solutions of Navier-Stokes finally have somewhere
+  // to be drawn. See lib/logos-flow.ts.
+  'flow',
 ] as const;
 export type VizKind = (typeof VIZ_KINDS)[number];
 
@@ -434,6 +448,9 @@ const OBJECT_KINDS = new Set<VizKind>([
   // A diagram's curves each carry their own expression; the scene has no
   // single one, so requiring scene.expr would reject every one of them.
   'diagram',
+  // A flow carries two expressions, u and v, and neither of them is the
+  // scene's single curve. They live in scene.flow.
+  'flow',
 ]);
 
 export function kindNeedsExpr(kind: VizKind): boolean {
@@ -505,6 +522,21 @@ export interface VizScene {
   vectors?: { x: number; y: number; label?: string }[];
   /** distribution: which family */
   dist?: DistName;
+  /**
+   * flow: the field itself, as two expressions in x and y.
+   *
+   * Velocity has two components and neither is "the" function, so this kind
+   * cannot use scene.expr the way a graph does — hence a record of its own.
+   * `p` is optional and is what makes the momentum readout possible: without
+   * a pressure there is no balance to show, only the terms on one side.
+   */
+  flow?: {
+    u: string;
+    v: string;
+    p?: string;
+    /** the quantity drawn as contours underneath the arrows */
+    backdrop?: 'speed' | 'pressure' | 'vorticity' | 'none';
+  };
 
   // ── economics ──
   // Written the way a textbook draws them: price on the vertical axis, so a
@@ -716,6 +748,22 @@ function specialView(
     const p = (hi - lo) * 0.12;
     return [lo - p, hi + p];
   };
+
+  // ── a field ──
+  // Both axes are space, and the picture is the region itself rather than a
+  // curve sampled over it — so the window is the region, held still. A frame
+  // fitted to the arrows would rescale as the clock ran and the flow would
+  // appear to stay the same size while decaying, which is the one thing it
+  // must not look like.
+  if (scene.kind === 'flow') {
+    const yr = scene.yRange;
+    return {
+      xMin: scene.view.xMin,
+      xMax: scene.view.xMax,
+      yMin: yr ? yr.min : -3,
+      yMax: yr ? yr.max : 3,
+    };
+  }
 
   // ── three dimensions ──
   // A surface is drawn inside a normalised unit cube, so its window is a
@@ -3396,6 +3444,156 @@ const buildSurface: Builder = (scene, fn, vals, view, guarded) => {
   };
 };
 
+
+// --- 15. A vector field: arrows, streamlines, and the equation working ----
+//
+// The one kind whose subject is a FIELD rather than a function. Three layers,
+// drawn back to front: contours of a scalar underneath, the arrows that give
+// direction and speed, and streamlines threaded through them.
+//
+// The fourth thing it shows is not a layer at all. When the scene carries a
+// pressure, the readouts become the terms of the momentum equation measured
+// at the centre of the picture — unsteady, advection, pressure, viscous —
+// so the equation is not printed beside the flow but read OFF it. That is
+// the whole reason this kind exists rather than a picture of a vortex.
+
+const buildFlow: Builder = (scene, _fn, vals, view, guarded) => {
+  const spec = scene.flow;
+  if (!spec) return EMPTY_FRAME;
+
+  // Every parameter is in scope for both components, plus the clock, which
+  // is a parameter like any other so that a steady flow needs no special
+  // case: it simply never mentions t.
+  const names = ['x', 'y', ...scene.params.map((q) => q.id)];
+  const cu = compileExpr(spec.u, names);
+  const cv = compileExpr(spec.v, names);
+  const cp = spec.p ? compileExpr(spec.p, names) : null;
+  if (!cu || !cv) return EMPTY_FRAME;
+
+  const scope: Record<string, number> = {};
+  for (const q of scene.params) scope[q.id] = vals[q.id] ?? q.value;
+  const t = vals.t ?? 0;
+
+  /** The field frozen at one instant — which is what a picture can hold. */
+  const at = (tt: number): Field2 => ({
+    u: (x, y) => cu.eval({ ...scope, x, y, t: tt }),
+    v: (x, y) => cv.eval({ ...scope, x, y, t: tt }),
+    ...(cp ? { p: (x: number, y: number) => cp.eval({ ...scope, x, y, t: tt }) } : {}),
+  });
+  const f = at(t);
+  const box: FlowBox = { xMin: view.xMin, xMax: view.xMax, yMin: view.yMin, yMax: view.yMax };
+
+  const objects: VizObject[] = [];
+
+  // ── the backdrop, as contours ──
+  // Lines rather than a filled map: the renderer draws strokes, and a contour
+  // is the more honest picture anyway — it marks where a quantity equals
+  // itself, which needs no colour key to read.
+  const back = spec.backdrop ?? 'speed';
+  if (back !== 'none') {
+    const scalar =
+      back === 'pressure' && cp
+        ? (x: number, y: number) => cp.eval({ ...scope, x, y, t })
+        : back === 'vorticity'
+          ? (x: number, y: number) => {
+              // ∂v/∂x − ∂u/∂y: how fast a speck spins where it sits.
+              const h = 1e-3;
+              return (
+                (f.v(x + h, y) - f.v(x - h, y)) / (2 * h) -
+                (f.u(x, y + h) - f.u(x, y - h)) / (2 * h)
+              );
+            }
+          : (x: number, y: number) => Math.hypot(f.u(x, y), f.v(x, y));
+    const lines = contourSet(scalar, box, 8);
+    if (lines.length) objects.push({ o: 'mesh', id: 'back', lines, tone: 'ghost', width: 1 });
+  }
+
+  // ── the arrows ──
+  const arrows = quiver(f, box);
+  if (arrows.length) objects.push({ o: 'mesh', id: 'field', lines: arrows, tone: 'muted', width: 1.1 });
+
+  // ── the streamlines ──
+  // Drawn as one mesh for the same reason the field is: a dozen separate
+  // curve objects would each become a React node and a separate path.
+  const paths: Pt[][] = [];
+  for (const seed of seedPoints(box)) {
+    const line = streamline(f, seed.x, seed.y, box);
+    if (line.length > 4) paths.push(line);
+  }
+  if (paths.length) objects.push({ o: 'mesh', id: 'stream', lines: paths, tone: 'primary', width: 1.7 });
+
+  // ── where the equation is being read ──
+  const px = (view.xMin + view.xMax) / 2;
+  const py = (view.yMin + view.yMax) / 2;
+  const T = momentumTerms(at, scope.nu ?? scope.mu ?? 0.1, px, py, t);
+  objects.push({ o: 'point', id: 'probe', x: px, y: py, tone: 'accent', hollow: true });
+
+  const readouts: VizReadout[] = [];
+  const show = (id: string, tex: string, v: number | null, help: string) => {
+    if (v === null || !Number.isFinite(v)) return;
+    readouts.push({ id, tex, value: fmt(v, 3), help });
+  };
+
+  // The terms are the MECHANISM, so they are not guarded: seeing viscosity
+  // outweigh advection is the lesson, not the answer to it.
+  show('dudt', '\\frac{\\partial u}{\\partial t}', T.unsteady,
+    'How fast the flow is changing at this fixed point. Zero in a steady flow, however fast the fluid is moving through it.');
+  show('adv', '(u\\cdot\\nabla)u', T.advection,
+    'The parcel being carried somewhere the flow is different. This is the term that is quadratic in the unknown, and it is the reason the equation is hard.');
+  show('grad', '-\\frac{\\partial p}{\\partial x}', T.pressure,
+    'The push from high pressure toward low.');
+  show('visc', '\\nu\\nabla^{2}u', T.viscous,
+    'Momentum leaking sideways. The Laplacian measures how much this parcel differs from its neighbours, so this term always drags it toward them.');
+  show('div', '\\nabla\\cdot u', T.divergence,
+    'What flows in minus what flows out. An incompressible fluid holds this at zero everywhere, and pressure is whatever it must be to keep it there.');
+
+  // The residual IS the answer — whether this really is a solution — so the
+  // guard holds it while the terms above stay readable.
+  if (T.residual !== null && Number.isFinite(T.residual)) {
+    readouts.push({
+      id: 'res',
+      tex: '\\text{residual}',
+      value: guarded ? null : fmt(T.residual, 6),
+      help: 'The two sides of the momentum equation, subtracted. Add up the terms above yourself before you look.',
+    });
+  }
+
+  for (const q of scene.params) {
+    if (q.id === 't') continue;
+    readouts.push({
+      id: q.id,
+      tex: q.symbol || q.id,
+      value: fmt(vals[q.id] ?? q.value, 3),
+      help: q.help ?? 'A constant in the field. Move it and every arrow changes together.',
+    });
+  }
+
+  // A flow that never mentions the clock is steady, and saying "at t = 0.00"
+  // over a picture that will never change is noise dressed as precision.
+  const unsteady = /\bt\b/.test(spec.u) || /\bt\b/.test(spec.v);
+
+  const caption = unsteady
+    ? `The arrows are where the fluid is going and how fast; the lines threaded through them are the paths it takes. Time ${fmt(t, 2)}.`
+    : 'The arrows are where the fluid is going and how fast; the lines threaded through them are the paths it takes. This flow does not change with time.';
+
+  // Narration follows the MOTION, which is what lets it keep speaking while
+  // the guard is up: at the start there is a shape, and later there is less
+  // of it, and noticing that is the entire viscous term.
+  const narration = unsteady
+    ? t < 0.5
+      ? 'This is the flow at the start. Press play.'
+      : 'Watch the arrows shorten. Nothing is pushing the fluid — it is losing its motion sideways, into the fluid beside it.'
+    : undefined;
+
+  return {
+    objects,
+    readouts,
+    caption,
+    ...(narration ? { narration } : {}),
+    ask: 'Add up the four terms on the left. Do they cancel? They have to, everywhere, at every instant — that is what it means for this to be a solution.',
+  };
+};
+
 const KINDS: Record<VizKind, Builder> = {
   function: buildFunction,
   limit: buildLimit,
@@ -3412,6 +3610,7 @@ const KINDS: Record<VizKind, Builder> = {
   'ad-as': buildAdAs,
   diagram: buildDiagram,
   surface: buildSurface,
+  flow: buildFlow,
 };
 
 /**
@@ -3567,6 +3766,25 @@ const REQUIRED: Record<VizKind, (scene: VizScene) => VizParam[]> = {
     const max = span(sc, 5, 2.5);
     return [{ id: 'h', min: max / 1200, max, step: max / 2000, value: max, sweep: 'down', toward: '0', help: 'The gap between the two points on the curve. Shrink it and the line through them stops being a shortcut and starts being a tangent.' }];
   },
+  /**
+   * A flow gets a clock, and it sweeps.
+   *
+   * Every unsteady exact solution of Navier-Stokes decays, and the decay IS
+   * the viscous term doing its work — so the one control this kind cannot do
+   * without is time. A steady flow simply ignores it: `t` appears in neither
+   * expression, every frame is identical, and the slider costs nothing.
+   */
+  flow: () => [
+    {
+      id: 't',
+      min: 0,
+      max: 12,
+      step: 0.05,
+      value: 0,
+      sweep: 'up',
+      help: 'The clock. A flow that changes with time only shows you one instant at a time — press play and watch which way it is going.',
+    },
+  ],
   riemann: () => [{ id: 'n', min: 1, max: 80, step: 1, value: 4, integer: true, sweep: 'up', toward: '\\infty', help: 'How many rectangles the area is chopped into. More rectangles, thinner each, closer to the true area.' }],
   taylor: () => [{ id: 'k', min: 0, max: 10, step: 1, value: 1, integer: true, sweep: 'up', toward: '\\infty', help: 'The degree of the polynomial: how many terms it is allowed. Each extra term buys accuracy further from the centre.' }],
   sequence: (sc) => [
@@ -3749,6 +3967,10 @@ export const RESERVED_PARAM: Record<VizKind, string | null> = {
   // surface, which is the animation that shows a family of cross-sections is
   // what a surface IS.
   surface: 'cut',
+  // The clock. A flow that is not steady is only half visible in one frame,
+  // and pressing play is the whole difference between a diagram of a vortex
+  // and watching one die.
+  flow: 't',
 };
 
 export const KIND_LABEL: Record<VizKind, string> = {
@@ -3767,6 +3989,7 @@ export const KIND_LABEL: Record<VizKind, string> = {
   ode: 'Field',
   diagram: 'Diagram',
   surface: 'Surface (3D)',
+  flow: 'Flow field',
 };
 
 /**
@@ -4386,11 +4609,34 @@ export function sanitizeViz(raw: any): VizScene | null {
     ...(typeof raw.a === 'number' && Number.isFinite(raw.a) ? { a: num(raw.a, -1e4, 1e4, 0) } : {}),
     ...(typeof raw.b === 'number' && Number.isFinite(raw.b) ? { b: num(raw.b, -1e4, 1e4, 1) } : {}),
     ...(raw.rule === 'left' || raw.rule === 'right' || raw.rule === 'midpoint' ? { rule: raw.rule } : {}),
+    // A field's two components. Trimmed and length-capped like every other
+    // expression that reaches the evaluator; whether they COMPILE, and over
+    // which names, is settled below where the rest of the scene is checked.
+    ...(kind === 'flow' && raw.flow && typeof raw.flow === 'object'
+      ? {
+          flow: {
+            u: typeof raw.flow.u === 'string' ? raw.flow.u.trim().slice(0, MAX_EXPR) : '',
+            v: typeof raw.flow.v === 'string' ? raw.flow.v.trim().slice(0, MAX_EXPR) : '',
+            ...(typeof raw.flow.p === 'string' && raw.flow.p.trim()
+              ? { p: raw.flow.p.trim().slice(0, MAX_EXPR) }
+              : {}),
+            // An unrecognised backdrop becomes the default rather than an
+            // error: the name of a contour set is not worth losing a picture
+            // over, and speed is meaningful for every field.
+            backdrop:
+              raw.flow.backdrop === 'pressure' ||
+              raw.flow.backdrop === 'vorticity' ||
+              raw.flow.backdrop === 'none'
+                ? raw.flow.backdrop
+                : ('speed' as const),
+          },
+        }
+      : {}),
     // A surface always has a y range: whatever was given if it is a real
     // interval, and a symmetric default otherwise. Defaulting rather than
     // rejecting means a model that names only the expression still gets a
     // drawable scene, which is how every other kind behaves.
-    ...(kind === 'surface'
+    ...(kind === 'surface' || kind === 'flow'
       ? {
           yRange: (() => {
             const fin = (v: unknown) =>
@@ -4451,6 +4697,37 @@ export function sanitizeViz(raw: any): VizScene | null {
     // A constant is not a curve — except in an ODE, where dy/dx = k is a
     // perfectly good field, and y may appear with or without x.
     if (scene.kind !== 'ode' && !fn.vars.includes(scene.varName)) return null;
+  }
+
+  // A field is its two components, so both have to be real expressions over
+  // names we are prepared to give values to. `x` and `y` are the plane itself
+  // and `t` is the clock, all three bound by the builder rather than by a
+  // slider; anything else must be a declared parameter. A component that does
+  // not compile is not a half-drawn flow, it is no flow at all — and drawing
+  // one arrow of a velocity field is worse than drawing none, because the
+  // picture still looks like an answer.
+  if (scene.kind === 'flow') {
+    const spec = scene.flow;
+    if (!spec || !spec.u || !spec.v) return null;
+    const known = new Set(['x', 'y', 't', ...scene.params.map((q) => q.id)]);
+    for (const src of [spec.u, spec.v, ...(spec.p ? [spec.p] : [])]) {
+      if (freeNames(src).some((nm) => !known.has(nm))) return null;
+      if (!compileExpr(src, [...known])) return null;
+    }
+    // A field that is zero everywhere has no direction anywhere, and every
+    // layer of the picture would come back empty.
+    const probe = (src: string) => {
+      const c = compileExpr(src, [...known]);
+      if (!c) return false;
+      const sc: Record<string, number> = { t: 0 };
+      for (const q of scene.params) sc[q.id] = q.value;
+      for (const [x, y] of [[0.4, 0.7], [1.3, -0.6], [-0.9, 1.1], [2.2, 0.3]]) {
+        const v = c.eval({ ...sc, x, y });
+        if (Number.isFinite(v) && Math.abs(v) > 1e-12) return true;
+      }
+      return false;
+    };
+    if (!probe(spec.u) && !probe(spec.v)) return null;
   }
 
   // An interval kind needs a real interval.
