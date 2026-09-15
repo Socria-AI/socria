@@ -5,6 +5,7 @@ import { ClerkProvider } from '@clerk/nextjs';
 import { Analytics } from '@vercel/analytics/react';
 import './globals.css';
 import './tour.css';
+import './account-sheet.css';
 import {
   clerkConfigured,
   clerkKeyMismatch,
