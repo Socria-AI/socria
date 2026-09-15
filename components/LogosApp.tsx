@@ -205,8 +205,13 @@ export function LogosApp({
   // Set by /chat, which renders this component. Switching model there is a
   // state change, not a navigation — see switchTo.
   onSwitchModel,
+  // The sentence somebody wrote during onboarding. /chat reads it (once —
+  // the handover clears as it is read) and hands it down, so it reaches
+  // whichever composer actually mounted rather than racing for it.
+  initialInput,
 }: {
   onSwitchModel?: (next: SocriaModel) => void;
+  initialInput?: string;
 } = {}) {
   const { isLoaded, isSignedIn } = useUser();
   const [unlocked, setUnlocked] = useState(false);
@@ -301,6 +306,15 @@ export function LogosApp({
   const [revealedIds, setRevealedIds] = useState<Set<string>>(new Set());
 
   const [input, setInput] = useState('');
+
+  // Seeded once, and only while the composer is still untouched: someone who
+  // has started typing their own sentence must never have it replaced.
+  const seeded = useRef(false);
+  useEffect(() => {
+    if (seeded.current || !initialInput) return;
+    seeded.current = true;
+    setInput(initialInput);
+  }, [initialInput]);
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [streaming, setStreaming] = useState('');
   const [busy, setBusy] = useState(false);

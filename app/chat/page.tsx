@@ -33,6 +33,7 @@ import {
 } from '@/lib/logos-sessions';
 import { DRIFT_DISMISS_LIMIT, readDrift, type DriftVerdict } from '@/lib/topic-drift';
 import { readStart, startMessage } from '@/lib/first-session';
+import { takeCarried } from '@/lib/onboarding-script';
 import { isSource } from '@/lib/checkout-attribution';
 import { track } from '@/lib/analytics';
 import { hasJourneyContent as journeyHasContent } from '@/lib/socria-prompt';
@@ -214,6 +215,8 @@ export default function ChatPage() {
   >([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [input, setInput] = useState('');
+  /** the sentence written during onboarding, for whichever composer mounts */
+  const [carriedText, setCarriedText] = useState('');
   const [sending, setSending] = useState(false);
   const [streamed, setStreamed] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -1405,7 +1408,21 @@ export default function ChatPage() {
     // development, the second time with `model` already gone from the URL.
     // `model` state still holds its initial value here — the remembered model
     // is applied by a later effect — so the store is asked directly.
-    if (want !== 'logos' && readModel() !== 'logos') {
+    // The sentence they wrote during onboarding, if they came straight from
+    // it. Read once and cleared by takeCarried, so it prefills the composer
+    // on this landing and never again.
+    // ONE reader. takeCarried clears as it reads, so if both this page and
+    // LogosApp called it the second would get nothing and which composer got
+    // the sentence would depend on mount order. It is read here, once, and
+    // handed down to whichever surface is actually rendering.
+    const carried = takeCarried(sessionStorage);
+    if (carried) {
+      setCarriedText(carried.text);
+      setInput(carried.text);
+      requestAnimationFrame(() => textareaRef.current?.focus());
+    }
+
+    if (!carried && want !== 'logos' && readModel() !== 'logos') {
       const { id } = readStart(window.location.search);
       if (id) {
         const msg = startMessage(id);
@@ -1493,6 +1510,7 @@ export default function ChatPage() {
   if (model === 'logos')
     return (
       <LogosApp
+        initialInput={carriedText}
         onSwitchModel={(next) => {
           setModel(next);
           chooseModel(next);
