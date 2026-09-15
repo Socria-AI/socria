@@ -1,0 +1,492 @@
+/* app/app-shell.css — the application shell, ported from the design package.
+ *
+ * SCOPED UNDER .app-root, and that is not optional. This sheet's own class
+ * names are things like .field, .sec, .stack, .row-split, .person, .plan,
+ * .sheet, .scrim and .avatar — every one of which is a word another part of
+ * this product already uses. Dropped in unscoped it would restyle surfaces
+ * nobody was looking at, in ways nobody would connect back to a design
+ * import weeks later.
+ *
+ * Its :root token block and its `body` rules are scoped here too, for the
+ * same reason: a background and a font set globally by an imported sheet is
+ * how a whole site quietly changes colour.
+ *
+ * Document-level flags keep their position — `html.anim-off .x` becomes
+ * `html.anim-off .app-root .x`, never `.app-root html.anim-off .x`, which
+ * would match nothing at all.
+ */
+/* ===== Socria — the app register: sign-in, 404, and the account sheet ===== */
+.app-root{--app-paper:#F5F3EB;--app-border:#e7e2d3}
+/* Text in the app register never uses --ink-45 (2.7:1 on paper — the step for
+   hairlines and disabled marks). Secondary prose and micro-labels take
+   --ink-70, which measures 5.75:1 here. */
+
+.app-root *{box-sizing:border-box}
+.app-root{margin:0;background:
+  radial-gradient(760px 340px at 0% 0%,rgba(94,118,51,.06),transparent 62%),
+  radial-gradient(660px 320px at 100% 100%,rgba(94,118,51,.05),transparent 62%),var(--app-paper);
+  color:var(--ink);font-family:var(--font-sans);line-height:var(--leading-prose);
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;min-height:100svh}
+.app-root h1, .app-root h2, .app-root h3{font-family:var(--font-serif);font-weight:400;margin:0;letter-spacing:-.02em;line-height:1.06}
+.app-root p{margin:0}
+.app-root a{color:inherit;text-decoration:none}
+.app-root button{font:inherit;color:inherit;background:none;border:none;padding:0;cursor:pointer}
+.app-root input{font:inherit;color:inherit}
+
+/* ---------- the plate: one centred card, no chrome ---------- */
+.app-root .plate-wrap{min-height:100svh;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:clamp(20px,4vh,34px);padding:clamp(28px,7vh,72px) clamp(22px,6vw,64px)}
+.app-root .plate{width:min(440px,100%);display:flex;flex-direction:column;gap:clamp(16px,2.6vh,24px)}
+.app-root .plate.wide{width:min(560px,100%)}
+.app-root .plate .lede{font-family:var(--font-serif);font-style:italic;font-size:clamp(1.1rem,2vw,1.35rem);
+  color:var(--ink-70);line-height:1.32;max-width:34ch}
+.app-root .plate h1{font-size:clamp(1.9rem,4.4vw,2.9rem)}
+.app-root .plate h1 .em{font-style:italic;color:var(--moss-700)}
+.app-root .rule{border:none;border-top:1px solid var(--ink-12);margin:0}
+
+/* ---------- form ---------- */
+.app-root .field{display:flex;flex-direction:column;gap:7px}
+.app-root .field label{font-family:var(--font-sans);font-size:.66rem;font-weight:600;letter-spacing:var(--tracking-label);
+  text-transform:uppercase;color:var(--ink-70)}
+.app-root .field input{width:100%;background:#fff;border:1px solid var(--app-border);border-radius:16px;
+  padding:13px 16px;font-size:1rem;outline:none;transition:border-color .2s,box-shadow .2s}
+.app-root .field input::placeholder{color:var(--ink-70)}
+.app-root .field input:focus{border-color:var(--moss);box-shadow:0 0 0 3px rgba(94,118,51,.13)}
+.app-root .stack{display:flex;flex-direction:column;gap:12px}
+.app-root .row-split{display:flex;align-items:center;gap:14px}
+.app-root .row-split .rule{flex:1}
+.app-root .row-split span{font-family:var(--font-serif);font-style:italic;font-size:.95rem;color:var(--ink-70)}
+
+/* provider button — outlined pill, mark on the left */
+.app-root .provider{display:flex;align-items:center;justify-content:center;gap:.7em;width:100%;height:52px;
+  border:1px solid var(--ink);border-radius:999px;font-size:.98rem;font-weight:500;
+  transition:background .2s,color .2s,transform .2s}
+.app-root .provider:hover{transform:translateY(-2px);background:var(--ink);color:var(--app-paper)}
+.app-root .provider svg{width:17px;height:17px;flex:0 0 auto}
+.app-root .provider:hover svg circle, .app-root .provider:hover svg path{stroke:currentColor}
+
+/* the vow, under everything */
+.app-root .vow{font-family:var(--font-serif);font-style:italic;font-size:.98rem;color:var(--ink-70);line-height:1.4;max-width:38ch}
+.app-root .foot-links{display:flex;gap:20px;flex-wrap:wrap;font-size:.86rem;color:var(--ink-70)}
+.app-root .foot-links a:hover{color:var(--ink)}
+
+/* ---------- 404 ---------- */
+.app-root .gone .path{font-family:var(--font-sans);font-size:.95rem;color:var(--ink-70);
+  background:#fff;border:1px solid var(--app-border);border-radius:999px;padding:9px 18px;
+  display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.app-root .gone .routes{display:flex;flex-direction:column;gap:0;border-top:1px solid var(--ink-12)}
+.app-root .gone .routes a{display:flex;align-items:baseline;justify-content:space-between;gap:16px;
+  padding:15px 0;border-bottom:1px solid var(--ink-12);transition:padding-left .25s var(--ease-out-expo)}
+.app-root .gone .routes a:hover{padding-left:8px}
+.app-root .gone .routes .t{font-family:var(--font-serif);font-size:1.25rem}
+.app-root .gone .routes .d{font-size:.88rem;color:var(--ink-70);text-align:right}
+.app-root .gone .routes a:hover .t{color:var(--moss-700)}
+.app-root .gone .close-line{font-family:var(--font-serif);font-size:clamp(1.2rem,2.4vw,1.7rem);line-height:1.2}
+.app-root .gone .close-line .em{font-style:italic;color:var(--moss-700)}
+
+/* ---------- the account control in the kit's header ----------
+   The chat kit ships no auth control (deliberately not built), so this one
+   button is new; its values are the kit's own: --ink-16 hairline, 13px sans. */
+.app-root .who-btn{display:inline-flex;align-items:center;gap:.55em;padding:4px 5px 4px 12px;border-radius:999px;
+  border:1px solid var(--ink-16);background:#fff;font-size:13px;color:var(--ink);transition:border-color .2s,transform .2s}
+.app-root .who-btn:hover{border-color:var(--ink);transform:translateY(-1px)}
+.app-root .avatar{width:26px;height:26px;border-radius:50%;background:var(--moss-600);color:var(--paper);
+  display:grid;place-items:center;font-family:var(--font-serif);font-style:italic;font-size:.92rem;flex:0 0 auto}
+.app-root .avatar.lg{width:52px;height:52px;font-size:1.5rem}
+
+/* ---------- the account sheet ---------- */
+.app-root .scrim{position:fixed;inset:0;z-index:60;background:rgba(15,36,48,.55);backdrop-filter:blur(3px);
+  display:grid;place-items:center;padding:clamp(16px,4vh,48px) clamp(16px,4vw,40px);overflow:auto}
+.app-root .scrim[hidden]{display:none}
+.app-root .sheet{width:min(560px,100%);background:var(--app-paper);border:1px solid var(--app-border);border-radius:18px;
+  box-shadow:0 40px 90px -50px rgba(31,31,31,.55);overflow:hidden;max-height:100%;
+  display:flex;flex-direction:column}
+/* transform only — a frozen timeline can never hide this */
+@media(prefers-reduced-motion:no-preference){
+  .app-root .scrim:not([hidden]) .sheet{animation:sheet-in .5s var(--ease-out-expo)}
+}
+@keyframes sheet-in{from{transform:translateY(12px)}to{transform:none}}
+.app-root .sheet .head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;
+  padding:16px clamp(20px,3vw,30px) 13px;border-bottom:1px solid var(--ink-12)}
+.app-root .sheet .head h2{font-size:1.45rem;margin-top:5px}
+.app-root .sheet .x{width:34px;height:34px;border-radius:50%;border:1px solid var(--app-border);display:grid;place-items:center;
+  font-size:1.05rem;color:var(--ink-70);flex:0 0 auto;transition:border-color .2s,color .2s}
+.app-root .sheet .x:hover{border-color:var(--ink);color:var(--ink)}
+.app-root .sheet .scroll{overflow:auto;padding:0 clamp(20px,3vw,30px)}
+.app-root .sec{padding:20px 0;border-bottom:1px solid var(--ink-12)}
+.app-root .sec:last-child{border-bottom:none}
+.app-root .sec > .lbl{display:block;font-family:var(--font-sans);font-size:.66rem;font-weight:600;
+  letter-spacing:var(--tracking-label);text-transform:uppercase;color:var(--ink-70);margin-bottom:14px}
+.app-root .person{display:flex;align-items:center;gap:14px}
+.app-root .person .nm{font-family:var(--font-serif);font-size:1.3rem;line-height:1.1}
+.app-root .person .em2{font-size:.9rem;color:var(--ink-70)}
+.app-root .person .since{font-family:var(--font-serif);font-style:italic;font-size:.88rem;color:var(--ink-70);margin-top:2px}
+.app-root .plan{display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap}
+.app-root .plan .tier{display:flex;align-items:center;gap:12px}
+.app-root .plan .tier .t{font-family:var(--font-serif);font-size:1.3rem}
+.app-root .plan .tier .t .em{font-style:italic;color:var(--prussian)}
+.app-root .plan .note{font-size:.9rem;color:var(--ink-70);max-width:30ch;margin-top:4px}
+.app-root .opt-note{margin-top:12px;font-family:var(--font-serif);font-style:italic;font-size:.94rem;color:var(--ink-70)}
+.app-root .acts{display:flex;flex-direction:column;gap:0}
+.app-root .act{display:flex;align-items:baseline;justify-content:space-between;gap:16px;padding:13px 0;
+  border-bottom:1px solid var(--ink-12);text-align:left;width:100%;transition:padding-left .25s var(--ease-out-expo)}
+.app-root .act:last-child{border-bottom:none}
+.app-root .act:hover{padding-left:6px}
+.app-root .act .t{font-size:1rem}
+.app-root .act .d{font-size:.85rem;color:var(--ink-70);text-align:right;max-width:24ch}
+.app-root .act:hover .t{color:var(--moss-700)}
+.app-root .act.danger:hover .t{color:var(--machine)}
+/* chrome stays lean so the sheet's content keeps most of the height */
+.app-root .sheet .footbar{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;
+  padding:11px clamp(20px,3vw,30px) 12px;border-top:1px solid var(--ink-12);background:rgba(244,241,232,.6)}
+.app-root .sheet .footbar .vow{flex:1;min-width:0;max-width:40ch;font-size:.86rem;line-height:1.35}
+.app-root .sheet .footbar .prev{display:block;margin-top:3px;font-size:.82rem;color:var(--ink-45)}
+.app-root .sheet .footbar .prev button{font:inherit;font-style:italic;color:var(--moss-700);
+  border-bottom:1px solid var(--moss);padding-bottom:1px}
+
+/* a locked row: dimmed, not clickable, and marked with the component the
+   design system ships for exactly this — OneLock, Prussian, 9px */
+.app-root .act.src{cursor:default}
+.app-root .act.src .t{display:inline-flex;align-items:center;gap:.5em}
+/* these rows are sales copy, not disabled form controls: dim once, via the ink
+   step, and keep the lock and its sell line at full strength */
+.app-root .act.src.is-locked:hover{padding-left:0}
+.app-root .act.src.is-locked .t{color:var(--ink-70)}
+.app-root .act.src.is-locked svg{color:var(--prussian);opacity:1}
+.app-root .act.src.is-locked .d{color:var(--prussian);font-style:italic;font-family:var(--font-serif)}
+.app-root .link-act{display:flex;flex-direction:column;align-items:flex-end;gap:2px;font-size:.95rem;color:var(--moss-700)}
+.app-root .link-act .d2{font-size:.82rem;color:var(--ink-70)}
+.app-root .sheet .field input{border-radius:16px}
+.app-root .sheet .footbar .prev{display:block;margin-top:5px;color:var(--ink-70)}
+.app-root .sheet .footbar .prev button{font-family:var(--font-serif);font-style:italic;color:var(--moss-700);border-bottom:1px solid var(--moss-700);padding-bottom:1px}
+.app-root .sheet .footbar .prev button:hover{color:var(--moss)}
+
+/* ===== the sessions sidebar — rebuilt: search, time groups, one filter ===== */
+.app-root .s-bar{width:280px;flex:0 0 auto;display:flex;flex-direction:column;min-height:0;
+  border-right:1px solid var(--ink-16);background:rgba(255,255,255,.35)}
+.app-root .s-top{padding:16px 14px 12px}
+.app-root .s-new{display:flex;align-items:center;gap:10px;width:calc(100% - 24px);margin:0 12px 12px;
+  text-align:left;padding:10px 12px;border-radius:8px;border:1px solid var(--ink-16);
+  font-size:13.5px;color:var(--ink);transition:border-color .2s,transform .2s}
+.app-root .s-new:hover{border-color:var(--ink);transform:translateY(-1px)}
+.app-root .s-new .p{color:var(--moss-700)}
+
+/* search */
+.app-root .s-find{position:relative;display:flex;align-items:center;gap:8px;margin:0 12px 10px;
+  padding:7px 10px;border-radius:999px;border:1px solid var(--ink-16);background:#fff;
+  transition:border-color .2s}
+.app-root .s-find:focus-within{border-color:var(--moss-600)}
+.app-root .s-find svg{width:14px;height:14px;flex:0 0 auto;color:var(--ink-45)}
+.app-root .s-find input{flex:1;min-width:0;border:none;outline:none;background:none;font:inherit;font-size:13px;color:var(--ink)}
+.app-root .s-find input::placeholder{color:var(--ink-45)}
+.app-root .s-find .clear{width:18px;height:18px;border-radius:50%;display:grid;place-items:center;
+  font-size:13px;color:var(--ink-45);flex:0 0 auto}
+.app-root .s-find .clear:hover{color:var(--ink)}
+
+/* one filter, not three tabs */
+.app-root .s-filter{display:flex;align-items:center;gap:10px;margin:0 12px 8px}
+.app-root .s-filter .chip{display:inline-flex;align-items:center;gap:.45em;padding:5px 12px;border-radius:999px;
+  border:1px solid var(--ink-16);font-size:12px;color:var(--ink-60);transition:border-color .2s,background .2s,color .2s}
+.app-root .s-filter .chip:hover{border-color:var(--moss-600);color:var(--moss-700)}
+.app-root .s-filter .chip[aria-pressed="true"]{background:var(--moss-50);border-color:var(--moss-600);color:var(--moss-700)}
+.app-root .s-filter .chip .s-glyph{display:inline-flex;color:var(--moss-600)}
+.app-root .s-filter .n{font-family:var(--font-serif);font-style:italic;font-size:11.5px;color:var(--ink-45)}
+
+/* the list: grouped by time, two-line titles, no mid-word cuts */
+.app-root .s-list{flex:1;min-height:0;overflow-y:auto;padding:0 12px 8px}
+.app-root .s-when{margin:12px 4px 5px;font-family:var(--font-sans);font-size:9.5px;font-weight:600;
+  letter-spacing:.24em;text-transform:uppercase;color:var(--ink-45)}
+.app-root .s-row{display:flex;align-items:flex-start;gap:9px;width:100%;text-align:left;
+  padding:8px 9px;border-radius:7px;font-size:13px;line-height:1.35;color:var(--ink-60);
+  transition:background .18s,color .18s}
+.app-root .s-row:hover{background:rgba(31,31,31,.04);color:var(--ink)}
+.app-root .s-row.on{background:rgba(94,118,51,.09);color:var(--ink)}
+.app-root .s-row .s-glyph, .app-root .s-row .s-gap{width:14px;flex:0 0 auto;margin-top:1px;color:var(--moss-600)}
+.app-root .s-glyph{display:inline-flex;align-items:center}
+.app-root .s-glyph svg{display:block}
+.app-root .s-row .t{flex:1;min-width:0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.app-root .s-row .n{flex:0 0 auto;font-variant-numeric:tabular-nums;font-size:11px;color:var(--ink-45);margin-top:1px}
+.app-root .s-row.on .n{color:var(--moss-700)}
+.app-root .s-none{margin:18px 6px;font-size:12.5px;color:var(--ink-45);line-height:1.45}
+.app-root .s-none em{font-family:var(--font-serif);font-style:italic}
+
+/* the tier, and the vow */
+.app-root .s-foot{padding:11px 14px 13px;border-top:1px solid var(--ink-16)}
+.app-root .s-tier{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink-70);flex-wrap:wrap}
+.app-root .s-tier svg{flex:0 0 auto}
+.app-root .s-tier a{font-family:var(--font-serif);font-style:italic;font-size:12.5px;color:var(--prussian);
+  border-bottom:1px solid var(--prussian);padding-bottom:1px;margin-left:auto}
+.app-root .s-tier.one{font-family:var(--font-serif);font-size:1.05rem;color:var(--ink)}
+.app-root .s-tier.one em{font-style:italic;color:var(--prussian)}
+.app-root .s-tier.one .r{width:26px;height:26px;border-radius:50%;background:var(--blue-0,#0f2430);color:#f0ead8;
+  display:grid;place-items:center;font-family:var(--font-serif);font-style:italic;font-size:.85rem;flex:0 0 auto}
+.app-root .s-tier.one .m{font-family:var(--font-sans);font-size:9.5px;font-weight:600;letter-spacing:.24em;
+  text-transform:uppercase;color:var(--prussian);margin-left:auto}
+.app-root .s-vow{margin:8px 0 0;font-family:var(--font-serif);font-style:italic;font-size:10.5px;
+  color:var(--ink-45);line-height:1.4}
+
+/* ===== one control for model and depth, beside the send button ===== */
+.app-root .mp{position:relative;flex:0 0 auto;align-self:flex-end}
+.app-root .mp-btn{display:inline-flex;align-items:center;gap:.4em;height:34px;padding:0 11px;border-radius:999px;
+  border:1px solid var(--ink-16);background:var(--paper);font-size:12.5px;color:var(--ink-70);
+  transition:border-color .2s,transform .2s,background .2s;white-space:nowrap}
+.app-root .mp-btn:hover, .app-root .mp-btn.open{border-color:var(--moss-600);background:#fff;color:var(--ink);transform:translateY(-1px)}
+.app-root .mp-btn .dot{width:7px;height:7px;border-radius:50%;background:var(--moss-600);
+  box-shadow:0 0 0 3px rgba(94,118,51,.14);flex:0 0 auto}
+.app-root .mp-btn .nm{font-family:var(--font-serif);font-size:14.5px;letter-spacing:-.01em;color:var(--ink)}
+.app-root .mp-btn .sep{color:var(--ink-25)}
+.app-root .mp-btn svg{width:13px;height:13px;color:var(--ink-45);transition:transform .25s var(--ease-out-expo)}
+.app-root .mp-btn.open svg{transform:rotate(180deg)}
+
+/* opens upward from the composer; never taller than the room above it */
+.app-root .mp-sheet{position:absolute;right:0;bottom:calc(100% + 9px);z-index:40;width:min(340px,78vw);
+  max-height:calc(100svh - 150px);overflow-y:auto;overscroll-behavior:contain;
+  background:var(--paper);border:1px solid var(--border);border-radius:16px;padding:11px 12px 12px;
+  box-shadow:0 40px 90px -50px rgba(31,31,31,.55)}
+@media(prefers-reduced-motion:no-preference){.app-root .mp-sheet{animation:mp-in .32s var(--ease-out-expo)}}
+@keyframes mp-in{from{transform:translateY(6px)}to{transform:none}}
+.app-root .mp-lbl{margin:2px 4px 7px;font-family:var(--font-sans);font-size:9.5px;font-weight:600;
+  letter-spacing:.24em;text-transform:uppercase;color:var(--ink-45)}
+.app-root .mp-rule{border-top:1px solid var(--ink-12);margin:7px 0}
+.app-root .mp-row{display:flex;flex-direction:column;gap:1px;width:100%;text-align:left;padding:7px 10px;
+  border-radius:10px;transition:background .18s}
+.app-root .mp-row:hover{background:rgba(31,31,31,.04)}
+.app-root .mp-row.on{background:rgba(94,118,51,.1)}
+.app-root .mp-row .does{font-family:var(--font-serif);font-size:1rem;line-height:1.15;color:var(--ink)}
+.app-root .mp-row.on .does{color:var(--moss-700)}
+.app-root .mp-row .meta{font-size:11.5px;line-height:1.4;color:var(--ink-60)}
+.app-root .mp-row .meta .nm{font-family:var(--font-serif);font-size:13px;letter-spacing:-.01em;color:var(--ink)}
+/* Logos is a link, not a setting — it opens another surface */
+.app-root .mp-row.logos{text-decoration:none}
+.app-root .mp-row.logos .top{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.app-root .mp-row.logos .tag{flex:0 0 auto;font-family:var(--font-sans);font-size:9.5px;font-weight:600;
+  letter-spacing:.16em;text-transform:uppercase;color:var(--ink-45)}
+.app-root .mp-row.logos:hover .does{color:var(--moss-700)}
+.app-root .mp-row.logos .does::after{content:" \2192";color:var(--moss-700)}
+
+.app-root .mp-depths{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+.app-root .mp-d{display:flex;flex-direction:column;gap:0;text-align:left;padding:6px 9px;border-radius:9px;
+  border:1px solid var(--ink-16);transition:border-color .18s,background .18s}
+.app-root .mp-d:hover:not(.locked){border-color:var(--moss-600)}
+.app-root .mp-d.on{background:var(--moss-50);border-color:var(--moss-600)}
+.app-root .mp-d .d{display:flex;align-items:center;gap:.4em;font-size:12.5px;color:var(--ink)}
+.app-root .mp-d.on .d{color:var(--moss-700)}
+.app-root .mp-d .does{font-family:var(--font-serif);font-style:italic;font-size:11px;color:var(--ink-45);line-height:1.3}
+.app-root .mp-d.locked{opacity:.62;cursor:default}
+.app-root .mp-d.locked .d{color:var(--ink-45)}
+.app-root .mp-d.locked .does{color:var(--prussian)}
+.app-root .mp-note{margin:9px 4px 0;font-family:var(--font-serif);font-style:italic;font-size:11px;
+  color:var(--ink-45);line-height:1.35}
+
+/* a retirement date is the open question about this model — mustard, per the code */
+.app-root .mp-btn .left{font-family:var(--font-sans);font-size:10px;font-weight:600;letter-spacing:.1em;
+  text-transform:uppercase;color:#6b520b;background:rgba(232,182,44,.22);
+  border:1px solid rgba(232,182,44,.55);border-radius:999px;padding:3px 8px;margin-left:4px;white-space:nowrap}
+.app-root .mp-row .top{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.app-root .mp-row .left{flex:0 0 auto;font-family:var(--font-sans);font-size:9.5px;font-weight:600;
+  letter-spacing:.14em;text-transform:uppercase;color:#6b520b;background:rgba(232,182,44,.22);
+  border:1px solid rgba(232,182,44,.55);border-radius:999px;padding:3px 9px;white-space:nowrap}
+.app-root .mp-row.on .left{background:rgba(232,182,44,.3)}
+.app-root .mp-note em{font-style:italic;color:var(--moss-700)}
+
+/* the one-line explanation behind a locked register — never a modal */
+.app-root .mp-lock{margin:9px 4px 0;font-size:11.5px;line-height:1.5;color:var(--ink-70)}
+.app-root .mp-lock strong{font-weight:500;color:var(--ink)}
+.app-root .mp-lock a{display:block;margin-top:4px;font-family:var(--font-serif);font-style:italic;font-size:12px;
+  color:var(--prussian);text-decoration:none;border-bottom:1px solid var(--prussian);
+  padding-bottom:1px;width:fit-content}
+
+/* ===== find in this conversation — a right rail, not an overlay ===== */
+/* positioned, so the ≤820px find sheet resolves against the conversation row
+   rather than the document */
+.app-root .chat-row{flex:1;min-height:0;display:flex;position:relative}
+.app-root .find-btn{display:inline-flex;align-items:center;gap:.45em;font-size:12.5px;color:var(--ink-60);
+  padding:5px 11px;border-radius:999px;border:1px solid transparent;transition:border-color .2s,color .2s}
+.app-root .find-btn svg{width:13px;height:13px}
+.app-root .find-btn:hover{color:var(--ink);border-color:var(--ink-16)}
+.app-root .find-btn[aria-pressed="true"]{color:var(--moss-700);border-color:var(--moss-600);background:var(--moss-50)}
+
+.app-root .find{flex:0 0 clamp(250px,26vw,318px);min-width:0;display:flex;flex-direction:column;
+  border-left:1px solid var(--ink-16);background:rgba(255,255,255,.42)}
+@media(max-width:820px){.app-root .find{position:absolute;right:0;top:0;bottom:0;z-index:20;
+  background:var(--paper);box-shadow:0 30px 70px -40px rgba(31,31,31,.5)}}
+.app-root .find-top{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:13px 14px 10px}
+.app-root .find-top .lbl{font-family:var(--font-sans);font-size:9.5px;font-weight:600;letter-spacing:.24em;
+  text-transform:uppercase;color:var(--ink-45)}
+.app-root .find-top .x{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:15px;
+  color:var(--ink-45);flex:0 0 auto}
+.app-root .find-top .x:hover{color:var(--ink);background:rgba(31,31,31,.05)}
+
+.app-root .find-field{display:flex;align-items:center;gap:8px;margin:0 14px 10px;padding:7px 11px;border-radius:999px;
+  border:1px solid var(--ink-16);background:#fff;transition:border-color .2s}
+.app-root .find-field:focus-within{border-color:var(--moss-600)}
+.app-root .find-field svg{width:14px;height:14px;flex:0 0 auto;color:var(--ink-45)}
+.app-root .find-field input{flex:1;min-width:0;border:none;outline:none;background:none;font:inherit;font-size:13px;color:var(--ink)}
+.app-root .find-field input::placeholder{color:var(--ink-45)}
+.app-root .find-field .clear{width:18px;height:18px;border-radius:50%;display:grid;place-items:center;font-size:13px;
+  color:var(--ink-45);flex:0 0 auto}
+.app-root .find-field .clear:hover{color:var(--ink)}
+
+.app-root .find-tabs{display:flex;gap:5px;margin:0 14px}
+.app-root .find-tabs button{flex:1;display:inline-flex;align-items:center;justify-content:center;gap:.4em;padding:5px 6px;
+  border-radius:999px;border:1px solid var(--ink-16);font-size:11.5px;color:var(--ink-60);
+  transition:border-color .2s,background .2s,color .2s}
+.app-root .find-tabs button:hover{border-color:var(--moss-600);color:var(--moss-700)}
+.app-root .find-tabs button.on{background:var(--moss-50);border-color:var(--moss-600);color:var(--moss-700)}
+.app-root .find-tabs .n{font-variant-numeric:tabular-nums;font-size:10px;color:var(--ink-45)}
+.app-root .find-tabs button.on .n{color:var(--moss-700)}
+
+.app-root .find-count{margin:10px 16px 6px;font-family:var(--font-serif);font-style:italic;font-size:11.5px;color:var(--ink-45)}
+.app-root .find-hits{flex:1;min-height:0;overflow-y:auto;padding:0 10px 12px}
+.app-root .find-hit{display:flex;flex-direction:column;gap:3px;width:100%;text-align:left;padding:8px 10px;
+  border-radius:8px;transition:background .18s}
+.app-root .find-hit:hover{background:rgba(31,31,31,.045)}
+.app-root .find-hit .w{font-family:var(--font-sans);font-size:9px;font-weight:600;letter-spacing:.2em;
+  text-transform:uppercase;color:var(--ink-45)}
+.app-root .find-hit.you .w{color:var(--moss-700)}
+.app-root .find-hit .t{font-size:12.5px;line-height:1.45;color:var(--ink-70);
+  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.app-root .find-hit.socria .t{font-family:var(--font-serif);font-style:italic;color:var(--ink-60)}
+.app-root .find-hit mark{background:rgba(232,182,44,.34);color:var(--ink);border-radius:2px;padding:0 1px}
+.app-root .find-none{margin:14px 12px;font-size:12px;line-height:1.5;color:var(--ink-45)}
+.app-root .find-none em{font-family:var(--font-serif);font-style:italic}
+
+/* the line you jumped to, named for a moment.
+   Lit paints immediately — a frozen timeline never advances a transition, so
+   only the fade *out* is animated, on the resting state. */
+.app-root .turn-row{border-radius:12px;transition:background .6s var(--ease-standard),box-shadow .6s var(--ease-standard)}
+.app-root .turn-row.lit{background:rgba(232,182,44,.18);box-shadow:0 0 0 6px rgba(232,182,44,.18);transition:none}
+@media(prefers-reduced-motion:reduce){.app-root .turn-row{transition:none}}
+
+/* ---------- hints ----------
+   A note, not a tooltip: paper ground, hairline, italic serif in moss-700
+   (6.8:1, the correct step for small text). One on screen at a time. */
+.app-root .hint{display:flex;align-items:baseline;gap:12px;max-width:34ch;padding:9px 13px;
+  background:#fff;border:1px solid var(--ink-12);box-shadow:0 14px 28px -18px rgba(35,36,31,.32);z-index:30}
+.app-root .hint p{margin:0;font-family:var(--font-serif);font-style:italic;font-size:13.5px;line-height:1.4;color:var(--moss-700)}
+.app-root .hint p em{font-style:italic;color:var(--ink)}
+.app-root .hint button{flex:0 0 auto;font-family:var(--font-sans);font-size:9.5px;font-weight:600;
+  letter-spacing:.18em;text-transform:uppercase;color:var(--ink-45);transition:color .2s}
+.app-root .hint button:hover{color:var(--ink)}
+@media(prefers-reduced-motion:no-preference){
+  .app-root .hint{animation:hint-in .6s cubic-bezier(.16,1,.3,1) both}
+}
+@keyframes hint-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+/* the two anchors are named, so positioning never depends on an inline-styled
+   ancestor happening to be relative */
+.app-root .cp-wrap, .app-root .hd-right{position:relative}
+.app-root .hint-above{position:absolute;right:46px;bottom:calc(100% + 9px)}
+.app-root .hint-below{position:absolute;right:0;top:calc(100% + 11px)}
+/* in the flow of the thread, under the thing it explains */
+.app-root .hint-inline{margin-top:9px;max-width:38ch}
+
+/* ---------- signed out ----------
+   The visitor is told what is true, once, in the two places it matters: the
+   rail (where history would be) and the thread (where the session ends). */
+.app-root .s-anon{margin:0 14px 14px;padding:13px 14px;border:1px solid var(--ink-12);background:#fff}
+.app-root .s-anon .l{margin:0;font-family:var(--font-sans);font-size:9.5px;font-weight:600;
+  letter-spacing:.24em;text-transform:uppercase;color:var(--ink-45)}
+.app-root .s-anon .t{margin:7px 0 0;font-family:var(--font-serif);font-size:13.5px;line-height:1.4;color:var(--ink)}
+.app-root .s-anon .c{margin:6px 0 0;font-family:var(--font-serif);font-style:italic;font-size:13px;color:var(--moss-700)}
+.app-root .s-anon .g{display:inline-block;margin-top:9px;font-size:12.5px;color:var(--moss-700);
+  border-bottom:1px solid var(--moss);padding-bottom:1px}
+.app-root .s-anon .g:hover{color:var(--moss)}
+
+/* the header control, signed out */
+.app-root .signin-btn{font-size:13px;color:var(--ink);border-bottom:1px solid var(--ink-25);padding-bottom:2px;transition:border-color .2s}
+.app-root .signin-btn:hover{border-color:var(--ink)}
+
+/* a model that needs an account. Moss, not Prussian — Prussian is the One
+   boundary, and this is a different kind of line. */
+.app-root .mp-row.gated{cursor:pointer}
+.app-root .mp-row.gated .does, .app-root .mp-row.gated .meta{color:var(--ink-45)}
+.app-root .mp-row.gated .meta .nm{color:var(--ink-70)}
+.app-root .mp-row .need{flex:0 0 auto;font-family:var(--font-sans);font-size:9.5px;font-weight:600;
+  letter-spacing:.18em;text-transform:uppercase;color:var(--moss-700);
+  border:1px solid rgba(94,118,51,.45);border-radius:999px;padding:3px 9px;white-space:nowrap}
+.app-root .mp-need{margin:10px 14px 4px;padding:11px 13px;background:rgba(94,118,51,.07);
+  border:1px solid rgba(94,118,51,.28);font-size:12.5px;line-height:1.5;color:var(--ink-70)}
+.app-root .mp-need strong{font-family:var(--font-serif);font-weight:400;color:var(--ink)}
+.app-root .mp-need em{font-style:italic;color:var(--moss-700)}
+.app-root .mp-need a{display:block;margin-top:7px;font-family:var(--font-serif);font-style:italic;
+  font-size:13px;color:var(--moss-700)}
+
+/* where the free session ends */
+.app-root .gate{margin:22px 0 4px;padding:20px 22px;border:1px solid var(--ink-12);background:#fff;
+  box-shadow:0 30px 70px -50px rgba(35,36,31,.4)}
+.app-root .gate .l{margin:0;font-family:var(--font-sans);font-size:9.5px;font-weight:600;
+  letter-spacing:.24em;text-transform:uppercase;color:var(--ink-45)}
+.app-root .gate .h{margin:9px 0 0;font-family:var(--font-serif);font-size:clamp(1.3rem,2.2vw,1.7rem);
+  line-height:1.15;color:var(--ink)}
+.app-root .gate .b{margin:11px 0 0;font-size:14px;line-height:1.6;color:var(--ink-70);max-width:46ch}
+.app-root .gate .b em{font-style:italic;color:var(--moss-700)}
+.app-root .gate .acts{margin-top:17px;display:flex;align-items:center;gap:20px;flex-wrap:wrap}
+.app-root .gate .acts .q{font-family:var(--font-serif);font-style:italic;font-size:13.5px;color:var(--ink-45);
+  border-bottom:1px solid var(--ink-25);padding-bottom:1px;transition:color .2s,border-color .2s}
+.app-root .gate .acts .q:hover{color:var(--ink);border-color:var(--ink)}
+.app-root .gate .f{margin:15px 0 0;padding-top:13px;border-top:1px solid var(--ink-12);
+  font-size:12.5px;line-height:1.5;color:var(--ink-45)}
+.app-root .gate .f em{font-family:var(--font-serif);font-style:italic;font-size:13.5px;color:var(--ink-70)}
+
+/* the anon rail's explanation is carrying an argument, so it reads at prose
+   contrast rather than at the metadata step it inherited */
+.app-root .s-list .s-none{color:var(--ink-70)}
+.app-root .s-list .s-none em{color:var(--moss-700)}
+
+/* the way through to the picture customiser */
+.app-root .sheet .pfp-link{display:inline-block;margin-top:7px;font-size:12.5px;color:var(--moss-700);
+  text-decoration:none;border-bottom:1px solid var(--ink-16);padding-bottom:1px}
+.app-root .sheet .pfp-link:hover{border-color:var(--moss-700)}
+
+/* ---------- the first-run tour ----------
+   One SVG carries the scrim, the hole, the ink ring and the leader. The hole
+   shows paper, so the ring is moss rather than sage — sage on paper fails at
+   every size. The scrim is the brand's forest, not Prussian: Prussian means the
+   membership boundary and nothing else. */
+.app-root .tour-svg{position:fixed;inset:0;z-index:90}
+.app-root .tour-scrim{fill:rgba(26,36,16,.56)}
+.app-root .tour-ring{fill:none;stroke:var(--moss);stroke-width:1.8;stroke-linecap:round;
+  stroke-dasharray:1400;stroke-dashoffset:1400;animation:tr-draw 1.15s var(--ease-out-expo) .12s forwards}
+.app-root .tour-leader{fill:none;stroke:var(--moss);stroke-width:1.3;stroke-linecap:round;opacity:.8;
+  stroke-dasharray:520;stroke-dashoffset:520;animation:tr-draw .85s var(--ease-out-expo) .55s forwards}
+.app-root .tour-dot{fill:var(--moss);opacity:0;animation:tr-dot .5s var(--ease-out-expo) 1.15s forwards}
+@keyframes tr-draw{to{stroke-dashoffset:0}}
+@keyframes tr-dot{to{opacity:1}}
+
+/* the note: paper, a hairline, and room to actually read */
+.app-root .tour-note{position:fixed;z-index:92;background:var(--paper);border:1px solid var(--ink-16);border-radius:15px;
+  padding:19px 22px 15px;box-shadow:0 44px 90px -44px rgba(26,36,16,.7);
+  animation:tn-in .62s var(--ease-out-expo) both}
+@keyframes tn-in{from{opacity:0;transform:translateY(15px)}to{opacity:1}}
+.app-root .tour-note.tour-above{animation:tn-in-up .62s var(--ease-out-expo) both}
+@keyframes tn-in-up{from{opacity:0;transform:translateY(-100%) translate(0,15px)}to{opacity:1;transform:translateY(-100%)}}
+
+/* the step as a numeral, the way a spread is numbered */
+.app-root .tn-head{display:flex;align-items:baseline;gap:12px}
+.app-root .tn-num{font-family:var(--font-serif);font-style:italic;font-size:1.62rem;line-height:1;
+  color:var(--moss-700);flex:0 0 auto;min-width:1.6ch}
+.app-root .tour-note h3{margin:0;font-family:var(--font-serif);font-size:1.48rem;line-height:1.08;
+  letter-spacing:-.018em;color:var(--ink)}
+.app-root .tour-note p{margin:11px 0 0;font-size:14.5px;line-height:1.62;color:var(--ink-70);max-width:38ch}
+.app-root .tour-note p em{font-style:italic;color:var(--moss-700)}
+
+.app-root .tn-foot{display:flex;align-items:center;gap:14px;margin-top:17px;padding-top:13px;border-top:1px solid var(--ink-12)}
+.app-root .tn-ticks{display:flex;gap:5px;margin-right:auto}
+.app-root .tn-ticks i{width:18px;height:2px;background:var(--ink-12);display:block;transition:background .45s var(--ease-standard)}
+.app-root .tn-ticks i.on{background:var(--moss)}
+.app-root .tn-skip{font-family:var(--font-sans);font-size:10px;font-weight:600;letter-spacing:.2em;
+  text-transform:uppercase;color:var(--ink-45);background:none;border:none;cursor:pointer;transition:color .2s}
+.app-root .tn-skip:hover{color:var(--ink)}
+.app-root .tn-next{display:inline-flex;align-items:center;gap:.5em;height:38px;padding:0 19px;border-radius:999px;
+  background:var(--ink);color:var(--paper);border:none;cursor:pointer;
+  font-family:var(--font-sans);font-size:13px;font-weight:500;transition:background .2s,transform .2s}
+.app-root .tn-next:hover{background:var(--moss);transform:translateY(-2px)}
+.app-root .tn-next .ar{transition:transform .2s}
+.app-root .tn-next:hover .ar{transform:translateX(3px)}
+
+@media(prefers-reduced-motion:reduce){
+  .app-root .tour-ring, .app-root .tour-leader{stroke-dashoffset:0;animation:none}
+  .app-root .tour-dot{opacity:1;animation:none}
+  .app-root .tour-note, .app-root .tour-note.tour-above{animation:none}
+}
