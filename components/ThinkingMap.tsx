@@ -92,6 +92,7 @@ export function ThinkingMap({
   map,
   initialLens = 'graph',
   onAction,
+  onNodePress,
   explored,
   changed,
   relevant,
@@ -109,6 +110,8 @@ export function ThinkingMap({
   initialLens?: LensId;
   /** a card is never inert: pick what to do with this piece of reasoning */
   onAction?: (mode: NodeMode, node: MapNodeRef) => void;
+  /** a card was pressed and its actions appeared — for the first-run sequence */
+  onNodePress?: () => void;
   /** ids already looked at — marked so you can see what you've examined */
   explored?: Set<string>;
   /** ids that moved in the last extraction, briefly highlighted */
@@ -784,6 +787,7 @@ export function ThinkingMap({
                   // The menu sits inside the scrollable, scaled sizer, so it is
                   // placed in scroll-content coordinates — client rects are
                   // viewport-relative, hence the scroll offsets.
+                  onNodePress?.();
                   setMenu({
                     id: p.id,
                     x: card.left - box.left + el.scrollLeft + card.width / 2,
