@@ -28,6 +28,7 @@ const MODULES = [
   'lib/logos-flow.ts',
   'lib/onboarding.ts',
   'lib/onboarding-script.ts',
+  'lib/pfp.ts',
   'lib/socria-one.ts',
   'lib/rich-text.ts',
   'lib/easter-eggs.ts',

@@ -1,0 +1,160 @@
+/* app/account/picture/picture.css — the picture composer, ported from the
+ * design package.
+ *
+ * Tokens restated on .pfp-root for the same reason as the onboarding sheet:
+ * the ones this reaches for live under .jr-root in journal.css and do not
+ * exist on a page that is not the journal. Nothing here leaks out and
+ * nothing in it depends on which root it sits under.
+ */
+.pfp-root {
+  --ink-12: rgba(32, 32, 27, .12);
+  --ink-25: rgba(32, 32, 27, .25);
+  --ink-45: rgba(32, 32, 27, .45);
+  --ink-70: rgba(32, 32, 27, .70);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --font-serif-stack: var(--font-serif-stack), "Instrument Serif", Georgia, serif;
+}
+
+/* ===== Your picture — the Socria pfp customizer =====
+   Grounds, inks, rings and textures are all from the design system; the marks
+   are the real components (Logo, LogosMark, OneMark) and the thirty NodeGlyphs,
+   never redrawn. Nothing new was invented for this surface. */
+
+.pfp-root{min-height:100vh;background:var(--paper);color:var(--ink)}
+
+/* ---------- head ---------- */
+.pfp-head{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap;
+  padding:clamp(22px,4vh,44px) clamp(20px,5vw,72px) clamp(16px,2.6vh,26px);border-bottom:1px solid var(--ink-12)}
+.pfp-head h1{font-family:var(--font-serif-stack);font-size:clamp(1.9rem,4.4vw,3rem);letter-spacing:-.025em;line-height:1;margin:9px 0 0}
+.pfp-head .sub{font-family:var(--font-serif-stack);font-style:italic;font-size:1.02rem;color:var(--ink-60);margin:8px 0 0;max-width:40ch}
+.pfp-head .back{font-size:12.5px;color:var(--ink-60);text-decoration:none;border-bottom:1px solid var(--ink-16);padding-bottom:1px}
+.pfp-head .back:hover{color:var(--ink);border-color:var(--ink)}
+
+/* ---------- the two columns ---------- */
+.pfp-body{display:grid;grid-template-columns:minmax(260px,.72fr) 1fr;gap:0}
+@media(max-width:860px){.pfp-body{grid-template-columns:1fr}}
+
+.pfp-stage{border-right:1px solid var(--ink-12);
+  padding:clamp(24px,4vh,48px) clamp(20px,3.4vw,42px) clamp(96px,15vh,140px);
+  display:flex;flex-direction:column;align-items:center;gap:clamp(12px,2.2vh,22px);position:sticky;top:0;align-self:start}
+@media(max-width:860px){.pfp-stage{position:static;border-right:none;border-bottom:1px solid var(--ink-12)}}
+
+/* the avatar itself: a circle, because that is what a picture is */
+.av-big{width:min(228px,54vw,30svh);aspect-ratio:1;border-radius:50%;position:relative;overflow:hidden;
+  display:grid;place-items:center;box-shadow:0 14px 34px -20px rgba(35,36,31,.5)}
+.av-big .tex{position:absolute;inset:0;pointer-events:none}
+.av-big .ring{position:absolute;border-radius:50%;border:1px solid currentColor;opacity:.55;pointer-events:none}
+.av-big .mk{position:relative;display:grid;place-items:center;width:52%;height:52%}
+.av-big .mk svg{width:100%;height:100%}
+.av-big .mk img{width:100%;height:100%;object-fit:contain}
+.av-big .mk .ltr{font-family:var(--font-serif-stack);font-style:italic;line-height:1;font-size:clamp(3rem,13vw,5.4rem)}
+
+/* how it reads at the sizes it is actually used */
+.av-sizes{display:flex;align-items:flex-end;gap:16px;flex:0 0 auto}
+.av-sizes .one{display:flex;flex-direction:column;align-items:center;gap:7px}
+.av-sizes .px{font-family:var(--font-sans);font-size:9.5px;font-weight:600;letter-spacing:.22em;
+  text-transform:uppercase;color:var(--ink-45)}
+.av-sm{border-radius:50%;position:relative;overflow:hidden;display:grid;place-items:center;flex:0 0 auto}
+.av-sm .tex{position:absolute;inset:0}
+.av-sm .ring{position:absolute;border-radius:50%;border:1px solid currentColor;opacity:.55}
+.av-sm .mk{position:relative;display:grid;place-items:center;width:52%;height:52%}
+.av-sm .mk svg,.av-sm .mk img{width:100%;height:100%;object-fit:contain}
+.av-sm .mk .ltr{font-family:var(--font-serif-stack);font-style:italic;line-height:1}
+
+.pfp-stage .named{font-family:var(--font-serif-stack);font-style:italic;font-size:.95rem;color:var(--ink-45);text-align:center}
+
+/* ---------- the choices ---------- */
+.pfp-choices{padding-bottom:clamp(90px,14vh,130px)}
+.ch{padding:clamp(18px,2.8vh,26px) clamp(20px,3.4vw,42px);border-bottom:1px solid var(--ink-12)}
+.ch > .lbl{display:block;font-family:var(--font-sans);font-size:9.5px;font-weight:600;letter-spacing:.24em;
+  text-transform:uppercase;color:var(--ink-45);margin-bottom:12px}
+.ch .hint{margin:10px 0 0;font-family:var(--font-serif-stack);font-style:italic;font-size:.9rem;color:var(--ink-45)}
+
+/* the group tabs above the mark grid */
+.tabs{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:14px}
+.tabs button{font-family:var(--font-serif-stack);font-size:1rem;color:var(--ink-45);border-bottom:1px solid transparent;padding-bottom:2px;
+  background:none;border-top:none;border-left:none;border-right:none;cursor:pointer;transition:color .2s,border-color .2s}
+.tabs button:hover{color:var(--ink)}
+.tabs button[aria-pressed="true"]{color:var(--ink);border-bottom-color:var(--moss)}
+
+/* a grid of marks */
+/* auto-fit collapses the empty tracks, and the hairlines are per cell so no
+   track can ever paint a grey block of its own */
+.mk-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(74px,1fr));gap:0;
+  border-top:1px solid var(--ink-12);border-left:1px solid var(--ink-12)}
+.mk-cell{background:var(--paper);border:none;border-right:1px solid var(--ink-12);border-bottom:1px solid var(--ink-12);
+  padding:11px 6px 9px;display:flex;flex-direction:column;align-items:center;gap:7px;
+  cursor:pointer;transition:background .2s}
+.mk-cell:hover{background:#fff}
+.mk-cell .box{width:30px;height:30px;display:grid;place-items:center;color:var(--ink-70)}
+.mk-cell .box svg{width:26px;height:26px}
+.mk-cell .box img{width:26px;height:26px;object-fit:contain}
+.mk-cell .box .ltr{font-family:var(--font-serif-stack);font-style:italic;font-size:1.35rem;line-height:1}
+.mk-cell .nm{font-family:var(--font-sans);font-size:9.5px;letter-spacing:.06em;color:var(--ink-45);text-align:center;line-height:1.25}
+.mk-cell[aria-pressed="true"]{background:#fff;box-shadow:inset 0 0 0 1.5px var(--moss)}
+.mk-cell[aria-pressed="true"] .box{color:var(--moss-700)}
+.mk-cell[aria-pressed="true"] .nm{color:var(--ink-70)}
+.mk-cell.is-locked{cursor:default;opacity:.55}
+.mk-cell.is-locked:hover{background:var(--paper)}
+.mk-cell .lk{display:inline-flex;align-items:center;gap:3px}
+
+/* swatches */
+.sw-row{display:flex;gap:10px;flex-wrap:wrap}
+.sw{width:44px;height:44px;border-radius:50%;border:1px solid var(--ink-16);cursor:pointer;position:relative;
+  padding:0;transition:transform .2s,box-shadow .2s}
+.sw:hover{transform:translateY(-2px)}
+.sw[aria-pressed="true"]{box-shadow:0 0 0 1.5px var(--paper),0 0 0 3px var(--moss)}
+.sw.is-locked{cursor:default;opacity:.5}
+.sw.is-locked:hover{transform:none}
+.sw .lk{position:absolute;right:-2px;bottom:-2px;background:var(--paper);border-radius:50%;padding:1px;display:grid;place-items:center}
+.sw-name{font-family:var(--font-serif-stack);font-style:italic;font-size:.9rem;color:var(--ink-45);margin-left:2px;align-self:center}
+
+/* pill options */
+.opts{display:flex;gap:8px;flex-wrap:wrap}
+.opts button{font-family:var(--font-sans);font-size:12.5px;padding:8px 15px;border-radius:999px;
+  border:1px solid var(--ink-16);background:#fff;color:var(--ink-70);cursor:pointer;
+  display:inline-flex;align-items:center;gap:.45em;transition:border-color .2s,color .2s,background .2s}
+.opts button:hover{border-color:var(--ink);color:var(--ink)}
+.opts button[aria-pressed="true"]{background:var(--moss);border-color:var(--moss);color:var(--paper)}
+.opts button.is-locked{cursor:default;opacity:.55}
+.opts button.is-locked:hover{border-color:var(--ink-16);color:var(--ink-70)}
+
+/* initials field */
+.ltr-field{display:flex;align-items:center;gap:10px}
+.ltr-field input{width:88px;font-family:var(--font-serif-stack);font-style:italic;font-size:1.3rem;text-align:center;
+  padding:7px 10px;border:1px solid var(--ink-16);border-radius:12px;background:#fff;color:var(--ink);outline:none}
+.ltr-field input:focus{border-color:var(--moss)}
+.ltr-field span{font-family:var(--font-serif-stack);font-style:italic;font-size:.9rem;color:var(--ink-45)}
+
+/* ---------- the bar at the foot ---------- */
+.pfp-bar{position:fixed;left:0;right:0;bottom:0;z-index:60;display:flex;align-items:center;justify-content:space-between;
+  gap:14px;flex-wrap:nowrap;padding:12px clamp(20px,5vw,72px);
+  background:rgba(244,241,232,.94);backdrop-filter:blur(8px);border-top:1px solid var(--ink-12)}
+.pfp-bar .vow{margin:0;font-family:var(--font-serif-stack);font-style:italic;font-size:.88rem;color:var(--ink-45);
+  max-width:44ch;min-width:0;line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media(max-width:820px){.pfp-bar .vow{display:none}}
+@media(max-width:560px){.pfp-bar .preview-toggle{display:none}}
+.pfp-bar .acts{display:flex;flex-direction:row;align-items:center;gap:12px;margin-left:auto;flex:0 0 auto;flex-wrap:nowrap}
+.pfp-bar .acts > *{white-space:nowrap;flex:0 0 auto}
+/* the preview pill lives in the bar, so the two can never claim one corner */
+.pfp-bar .preview-toggle{position:static;margin:0;background:none;border:none;padding:0;backdrop-filter:none;
+  font-family:var(--font-serif-stack);font-style:italic;font-size:.88rem;color:var(--ink-45);flex:0 0 auto}
+.pfp-bar .saved{font-family:var(--font-serif-stack);font-style:italic;font-size:.9rem;color:var(--moss-700)}
+
+/* the One invitation, only where a locked style was reached for */
+.one-note{margin:12px 0 0;display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  font-family:var(--font-serif-stack);font-style:italic;font-size:.93rem;color:var(--prussian)}
+.one-note a{color:var(--prussian);border-bottom:1px solid var(--prussian);text-decoration:none;padding-bottom:1px}
+
+/* a short viewport cannot stack a 220px picture over its size row, so the
+   column becomes a row and the proof of chip-scale stays visible */
+/* the sizes and the caption travel together, so a short viewport can lay the
+   stage out as two columns without either of them wrapping to a third row */
+.stage-side{display:flex;flex-direction:column;align-items:center;gap:clamp(10px,2vh,18px);min-width:0}
+@media(max-height:760px){
+  .pfp-stage{flex-direction:row;flex-wrap:nowrap;align-items:center;justify-content:center;gap:clamp(14px,3vw,26px)}
+  .pfp-stage .av-big{width:min(158px,38vw)}
+  .stage-side{align-items:flex-start}
+  .pfp-stage .av-sizes{gap:12px}
+  .pfp-stage .named{text-align:left;max-width:18ch}
+}
