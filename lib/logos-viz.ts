@@ -126,6 +126,8 @@ export function sweepProgress(p: VizParam, v: number): number {
 }
 
 const clamp01 = (n: number) => Math.min(1, Math.max(0, n));
+/** Hold a value inside a range — a probe dragged past the edge of the world. */
+const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
 
 // ── objects the renderer knows how to draw ──────────────────────────
 
@@ -3523,9 +3525,32 @@ const buildFlow: Builder = (scene, _fn, vals, view, guarded) => {
   if (paths.length) objects.push({ o: 'mesh', id: 'stream', lines: paths, tone: 'primary', width: 1.7 });
 
   // ── where the equation is being read ──
-  const px = (view.xMin + view.xMax) / 2;
-  const py = (view.yMin + view.yMax) / 2;
+  // WHERE the equation is being read, and it MOVES.
+  //
+  // Pinned to the middle this was a fixed fact about one point, which is the
+  // least interesting point in most fields. The terms only become a question
+  // when you can put them somewhere: in the shear layer between two vortices
+  // advection is doing the work, a hand's width away in the quiet core it is
+  // viscosity, and the same equation reads completely differently in the two
+  // places. Sliders rather than a click because that is the instrument this
+  // surface already has, and because a swept probe walks the balance across
+  // the picture on its own.
+  const px = clamp(vals.px ?? (view.xMin + view.xMax) / 2, view.xMin, view.xMax);
+  const py = clamp(vals.py ?? (view.yMin + view.yMax) / 2, view.yMin, view.yMax);
   const T = momentumTerms(at, scope.nu ?? scope.mu ?? 0.1, px, py, t);
+  // Crosshairs, so the point is findable in a field full of short strokes.
+  const rx = (view.xMax - view.xMin) * 0.028;
+  const ry = (view.yMax - view.yMin) * 0.028;
+  objects.push({
+    o: 'mesh',
+    id: 'probe-cross',
+    lines: [
+      [{ x: px - rx * 2.2, y: py }, { x: px + rx * 2.2, y: py }],
+      [{ x: px, y: py - ry * 2.2 }, { x: px, y: py + ry * 2.2 }],
+    ],
+    tone: 'accent',
+    width: 1,
+  });
   objects.push({ o: 'point', id: 'probe', x: px, y: py, tone: 'accent', hollow: true });
 
   const readouts: VizReadout[] = [];
@@ -3774,7 +3799,25 @@ const REQUIRED: Record<VizKind, (scene: VizScene) => VizParam[]> = {
    * without is time. A steady flow simply ignores it: `t` appears in neither
    * expression, every frame is identical, and the slider costs nothing.
    */
-  flow: () => [
+  flow: (sc) => [
+    {
+      id: 'px',
+      symbol: 'x',
+      min: sc.view.xMin,
+      max: sc.view.xMax,
+      step: (sc.view.xMax - sc.view.xMin) / 200,
+      value: (sc.view.xMin + sc.view.xMax) / 2,
+      help: 'Where the equation is being read, left to right. Move it into a shear layer and then into a quiet core: the same four terms, in a completely different balance.',
+    },
+    {
+      id: 'py',
+      symbol: 'y',
+      min: sc.yRange ? sc.yRange.min : -3,
+      max: sc.yRange ? sc.yRange.max : 3,
+      step: ((sc.yRange ? sc.yRange.max - sc.yRange.min : 6) / 200),
+      value: sc.yRange ? (sc.yRange.min + sc.yRange.max) / 2 : 0,
+      help: 'The same point, up and down.',
+    },
     {
       id: 't',
       min: 0,
@@ -4762,4 +4805,88 @@ export function sanitizeViz(raw: any): VizScene | null {
     return null;
   }
   return scene;
+}
+
+/**
+ * What is on screen, in a sentence the model can read.
+ *
+ * THE GAP THIS CLOSES. Until now the picture was strictly one-way: the person
+ * talks, the extractor turns what they said into a scene, and the scene is
+ * drawn. Nothing carried it back. So somebody looking at a vortex lattice who
+ * typed "why is that corner still moving" was asking about something the
+ * model had never seen — it could infer a picture from the transcript that
+ * produced it, which is not the same as knowing what is actually drawn, what
+ * the sliders have since been moved to, or which of sixteen kinds is up.
+ *
+ * DELIBERATELY ONLY THE INPUTS. Every value here is something the reader can
+ * already see and change: the expressions, the window, the slider positions.
+ * Nothing computed appears — not a limit, not a derivative, not an area, not
+ * a residual. That is what makes this safe to send while the Answer Guard is
+ * up: it tells the model what is being LOOKED at, never what it comes to.
+ */
+export function describeScene(scene: VizScene, vals?: Record<string, number>): string {
+  const bits: string[] = [];
+  const label = KIND_LABEL[scene.kind] ?? scene.kind;
+
+  if (scene.kind === 'flow' && scene.flow) {
+    bits.push(`a ${label}: u = ${scene.flow.u}, v = ${scene.flow.v}`);
+    if (scene.flow.p) bits.push(`pressure p = ${scene.flow.p}`);
+    if (scene.flow.backdrop && scene.flow.backdrop !== 'none') {
+      bits.push(`contours of ${scene.flow.backdrop}`);
+    }
+  } else if (scene.expr) {
+    bits.push(`a ${label} of ${scene.varName} ↦ ${scene.expr}`);
+  } else {
+    bits.push(`a ${label}`);
+  }
+
+  if (typeof scene.a === 'number') bits.push(`at ${fmt(scene.a)}`);
+  if (typeof scene.b === 'number') bits.push(`to ${fmt(scene.b)}`);
+
+  const shown = (scene.overlays ?? []).filter((o) => o.visible !== false);
+  if (shown.length) bits.push(`also plotted: ${shown.map((o) => o.expr).join(', ')}`);
+
+  // The controls, and where they stand.
+  //
+  // `vals` is the live position when a caller has it. Most do not: dragging a
+  // slider is not persisted back to the scene (only editor edits are), so the
+  // fallback is the value the scene DECLARES. That is right the moment a
+  // picture appears and drifts if somebody has been playing with it — which
+  // is a reason to say "the curve you are looking at" rather than to quote a
+  // number back at them, and the prompt block says so.
+  const knobs = scene.params
+    .map((q) => {
+      const live = vals?.[q.id];
+      const v = typeof live === 'number' && Number.isFinite(live) ? live : q.value;
+      return typeof v === 'number' && Number.isFinite(v) ? `${q.id} = ${fmt(v, 3)}` : null;
+    })
+    .filter(Boolean);
+  if (knobs.length) bits.push(`controls: ${knobs.join(', ')}`);
+
+  return bits.join('; ');
+}
+
+/**
+ * The block that goes in the system prompt, or nothing at all.
+ *
+ * Nothing is the common case and the right default: most turns are not about
+ * the picture, and a description of one pushed in front of every message
+ * would have the model reaching for it when nobody asked.
+ */
+export function sceneBlock(scene: VizScene | null | undefined, vals?: Record<string, number>): string {
+  if (!scene) return '';
+  const said = describeScene(scene, vals);
+  if (!said) return '';
+  return `
+
+=== WHAT IS ON THEIR SCREEN ===
+Beside this conversation there is a live picture, and right now it shows ${said}.
+
+They can see it, move its sliders and pan it. So "that spike", "the left half", "why is it flat there" and "what happens if I turn this up" are about THIS, and you may answer them as if you were looking at it too — because now you are.
+
+It is a picture of the INPUTS, not of a result. It tells you what is being looked at, never what it comes out to, and it changes nothing about the Answer Guard: if they are working something out, seeing their picture is not a reason to finish it for them.
+
+The slider positions above are where the picture OPENED. They may have moved one since, and you are not told when they do — so never quote a control's value back as though you had just read it. Talk about the shape, and ask what they have it set to if it matters.
+
+Do not describe it back to them unprompted. They are looking at it.`;
 }

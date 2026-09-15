@@ -1883,6 +1883,9 @@ export function LogosApp({
           // decides what the plan carries of it. The recurrence line is
           // owed until it has been injected once in this session.
           ...(u ? { understanding: u, recurrence: !recurrenceSaidRef.current.has(sid) } : {}),
+          // What they are looking at, so "why is it flat there" has something
+          // to be about. Re-sanitised on the server like every other field.
+          ...(mapRef.current?.viz ? { viz: mapRef.current.viz } : {}),
         }),
       });
       if (res.status === 402) {

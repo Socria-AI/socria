@@ -19,6 +19,7 @@ import { renderMessageForModel, sanitizeAttachments } from '@/lib/logos-attachme
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { boundaryNote, limitOf } from '@/lib/entitlements';
 import { reportUpstream } from '@/lib/upstream-error';
+import { sanitizeViz, sceneBlock } from '@/lib/logos-viz';
 import {
   bumpUsage,
   chatAlreadyCounted,
@@ -291,6 +292,13 @@ export async function POST(req: NextRequest) {
       // instructions — each block subordinating itself to what came before.
       personalityBlock(body?.persona) +
       styleBlock(body?.style) +
+      // What they are looking at. Re-sanitised here rather than trusted: the
+      // scene arrives from the browser like everything else in this body, and
+      // a picture is a place to hide an instruction.
+      sceneBlock(
+        body?.viz ? sanitizeViz(body.viz) : null,
+        body?.vizValues && typeof body.vizValues === 'object' ? body.vizValues : undefined
+      ) +
       memoryBlock;
 
     const openai = new OpenAI({ apiKey });
