@@ -29,6 +29,26 @@
 
 import { compileExpr, freeNames, taylorCoeffs, type CompiledExpr } from './logos-math';
 import {
+  contourSet,
+  momentumTerms,
+  quiver,
+  seedPoints,
+  streamline,
+  type Field2,
+  type FlowBox,
+} from './logos-flow';
+import {
+  boxLines,
+  place,
+  sampleSurface,
+  sliceLines,
+  slicePlane,
+  surfaceLines,
+  zRange,
+  type Camera,
+  type Frame3,
+} from './logos-viz3d';
+import {
   binds as econBinds,
   equilibrium as econEquilibrium,
   frontierAt as econFrontierAt,
@@ -106,6 +126,8 @@ export function sweepProgress(p: VizParam, v: number): number {
 }
 
 const clamp01 = (n: number) => Math.min(1, Math.max(0, n));
+/** Hold a value inside a range — a probe dragged past the edge of the world. */
+const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
 
 // ── objects the renderer knows how to draw ──────────────────────────
 
@@ -293,6 +315,16 @@ export const VIZ_KINDS = [
   // other builders emit, so it is live, zoomable and slider-driven like the
   // rest rather than a picture of a picture.
   'diagram',
+  // Three dimensions, projected. z = f(x, y) as a wireframe you can turn,
+  // with the cross-section at one y drawn on the sheet that cuts it — which
+  // is the picture behind partial derivatives and behind most of what people
+  // find hard about a function of two variables.
+  'surface',
+  // A FIELD rather than a height: a direction and a speed at every point,
+  // which is a phase portrait, an electric field, a gradient — and fluid
+  // flow, where the exact solutions of Navier-Stokes finally have somewhere
+  // to be drawn. See lib/logos-flow.ts.
+  'flow',
 ] as const;
 export type VizKind = (typeof VIZ_KINDS)[number];
 
@@ -418,6 +450,9 @@ const OBJECT_KINDS = new Set<VizKind>([
   // A diagram's curves each carry their own expression; the scene has no
   // single one, so requiring scene.expr would reject every one of them.
   'diagram',
+  // A flow carries two expressions, u and v, and neither of them is the
+  // scene's single curve. They live in scene.flow.
+  'flow',
 ]);
 
 export function kindNeedsExpr(kind: VizKind): boolean {
@@ -475,12 +510,35 @@ export interface VizScene {
   b?: number;
   /** which corner of each Riemann bar sits on the curve */
   rule?: 'left' | 'right' | 'midpoint';
+  /**
+   * surface: the range of the SECOND domain variable.
+   *
+   * x comes from the viewport, which the reader can already pan and zoom;
+   * y has no equivalent because the viewport is the page, not the domain. So
+   * it is carried here, and the cut slider inherits its bounds from it.
+   */
+  yRange?: { min: number; max: number };
   /** matrix: the 2×2 transformation, rows first: [[a, b], [c, d]] */
   matrix?: [[number, number], [number, number]];
   /** vectors: the arrows themselves; with exactly two, s·u + t·v is offered */
   vectors?: { x: number; y: number; label?: string }[];
   /** distribution: which family */
   dist?: DistName;
+  /**
+   * flow: the field itself, as two expressions in x and y.
+   *
+   * Velocity has two components and neither is "the" function, so this kind
+   * cannot use scene.expr the way a graph does — hence a record of its own.
+   * `p` is optional and is what makes the momentum readout possible: without
+   * a pressure there is no balance to show, only the terms on one side.
+   */
+  flow?: {
+    u: string;
+    v: string;
+    p?: string;
+    /** the quantity drawn as contours underneath the arrows */
+    backdrop?: 'speed' | 'pressure' | 'vorticity' | 'none';
+  };
 
   // ── economics ──
   // Written the way a textbook draws them: price on the vertical axis, so a
@@ -692,6 +750,34 @@ function specialView(
     const p = (hi - lo) * 0.12;
     return [lo - p, hi + p];
   };
+
+  // ── a field ──
+  // Both axes are space, and the picture is the region itself rather than a
+  // curve sampled over it — so the window is the region, held still. A frame
+  // fitted to the arrows would rescale as the clock ran and the flow would
+  // appear to stay the same size while decaying, which is the one thing it
+  // must not look like.
+  if (scene.kind === 'flow') {
+    const yr = scene.yRange;
+    return {
+      xMin: scene.view.xMin,
+      xMax: scene.view.xMax,
+      yMin: yr ? yr.min : -3,
+      yMax: yr ? yr.max : 3,
+    };
+  }
+
+  // ── three dimensions ──
+  // A surface is drawn inside a normalised unit cube, so its window is a
+  // property of the PROJECTION and not of the function: whatever z does, the
+  // box is the same size. Fixed, and deliberately not fitted to the frame —
+  // a window that re-fitted itself as the model turned would make the object
+  // appear to breathe, and the one thing a rotation must show is a rigid
+  // shape. The bound is the furthest a unit cube's corner can project, plus
+  // room for the axis labels.
+  if (scene.kind === 'surface') {
+    return { xMin: -1.85, xMax: 1.85, yMin: -1.95, yMax: 1.95 };
+  }
 
   // ── the open kind ──
   // A diagram's window is its own contents and nothing else: the parts were
@@ -1269,9 +1355,27 @@ const buildLimit: Builder = (scene, fn, vals, view, guarded) => {
   const yl = at(fn, varName, vals, left);
   const yr = at(fn, varName, vals, right);
 
+  // The one-sided limits are needed before the objects are built, not after:
+  // whether this point is a POLE — a division by something on its way to zero
+  // — changes how the line at x = a should be drawn. A muted dashed marker
+  // says "the point of interest"; an asymptote is a wall the curve never
+  // reaches, and drawing the two the same way was the picture failing to
+  // distinguish the case somebody asking about 1/0 has come to see.
+  const Ln = oneSidedLimit(fn, varName, vals, a, -1);
+  const Rn = oneSidedLimit(fn, varName, vals, a, 1);
+  const Two = twoSidedLimit(Ln, Rn);
+  const blowsUp = Ln.kind === 'infinite' || Rn.kind === 'infinite';
+
   const objects: VizObject[] = [
     { o: 'curve', id: 'f', pts: sampleCurve(fn, varName, vals, view.xMin, view.xMax, SAMPLES, view), tone: 'primary', width: 2 },
-    { o: 'vrule', id: 'a', at: a, tone: 'muted', dashed: true, label: `${varName} = ${fmt(a)}` },
+    {
+      o: 'vrule',
+      id: 'a',
+      at: a,
+      tone: blowsUp ? 'tension' : 'muted',
+      dashed: true,
+      label: `${varName} = ${fmt(a)}`,
+    },
   ];
 
   // The two sample points and their guides. The horizontal guide runs from the
@@ -1324,10 +1428,6 @@ const buildLimit: Builder = (scene, fn, vals, view, guarded) => {
     objects.push({ o: 'point', id: 'fa', x: a, y: fa, tone: 'muted', hollow: true });
   }
 
-  const Ln = oneSidedLimit(fn, varName, vals, a, -1);
-  const Rn = oneSidedLimit(fn, varName, vals, a, 1);
-  const Two = twoSidedLimit(Ln, Rn);
-
   // What you read at the δ you have, and where those readings are heading.
   //
   // δ itself is deliberately NOT here: the slider a few pixels away is
@@ -1348,6 +1448,25 @@ const buildLimit: Builder = (scene, fn, vals, view, guarded) => {
       help: 'The same reading from the right-hand side. As δ shrinks these two close in on each other — or they do not, which tells you just as much.',
     },
   ];
+
+  // What the function actually is AT the point.
+  //
+  // This is the question somebody arrives with — "what happens if you divide
+  // by zero" — and until now the panel never answered it. It showed the
+  // approach from both sides and the limit, and left the one value they asked
+  // about off the board entirely. It is not the guarded answer either: that a
+  // function is undefined at a point is the PREMISE of asking what happens
+  // near it, and hiding the premise leaves the picture unmotivated.
+  if (!defined) {
+    readouts.push({
+      id: 'fa',
+      tex: `f(${fmt(a)})`,
+      value: 'undefined',
+      help: blowsUp
+        ? `There is no such number. Dividing by something smaller always gives something bigger, and nothing is smaller than zero is — so there is no height here for the curve to have. That is what the gap in the curve at ${varName} = ${fmt(a)} is.`
+        : `The function has no value at ${varName} = ${fmt(a)}. The limit asks a different question: not what it IS there, but what it is heading towards.`,
+    });
+  }
 
   // The two one-sided limits are shown only when they have something to say.
   //
@@ -1400,7 +1519,11 @@ const buildLimit: Builder = (scene, fn, vals, view, guarded) => {
   }
 
   const sidesDiffer = Ln.kind === 'value' && Rn.kind === 'value' && Two.kind === 'none';
-  const blowsUp = Ln.kind === 'infinite' || Rn.kind === 'infinite';
+  // Both run away, in opposite directions — 1/x at 0. This is the reason
+  // "1 ÷ 0 = ∞" is wrong rather than merely sloppy, and it is worth its own
+  // sentence: the two halves of the curve disagree about WHICH infinity.
+  const sidesOppose =
+    Ln.kind === 'infinite' && Rn.kind === 'infinite' && Ln.sign !== Rn.sign;
   const removable = !defined && Two.kind === 'value';
   const hole = defined && Two.kind === 'value' && Math.abs(fa - Two.v) > 1e-6;
 
@@ -1415,7 +1538,14 @@ const buildLimit: Builder = (scene, fn, vals, view, guarded) => {
           : sidesDiffer
             ? 'δ is almost nothing, and the two heights have still not met. They are heading for different places.'
             : blowsUp
-              ? 'δ is almost nothing, and the curve is still running away. There is no height for it to settle on.'
+              ? // Named with the numbers actually on screen, because "grows
+                // without bound" is the thing being explained, not an
+                // explanation of it. Halving δ doubling the height is the
+                // whole mechanism, and it is visible in the two readouts
+                // above the moment somebody moves the slider.
+                sidesOppose
+                ? `δ is almost nothing and the height is still climbing — and the two sides are climbing in OPPOSITE directions. So there is no single answer waiting at ${varName} = ${fmt(a)}, not even infinity: the left and the right cannot agree on which one.`
+                : `δ is almost nothing, and the curve is still running away. Halve δ again and the height roughly doubles again. Dividing by something smaller always gives something bigger, so there is nothing here for it to settle on.`
               : 'δ is almost nothing now, and both sides have arrived at the same place.';
 
   return {
@@ -3196,6 +3326,299 @@ const buildDiagram: Builder = (scene, _fn, vals, view, guarded) => {
   };
 };
 
+/**
+ * z = f(x, y), turned into lines on the page.
+ *
+ * Everything here is projection plus the renderer's existing vocabulary: the
+ * wireframe and the bounding box are `mesh` objects (many polylines, one path
+ * node each — a 20×20 grid is two nodes, not four hundred), the cutting plane
+ * is a `region`, and the cross-section is a `mesh` drawn over both. There is
+ * no 3D renderer and nothing new for the drawing layer to learn.
+ *
+ * WHAT IT DELIBERATELY DOES NOT DO. There is no hidden-line removal and no
+ * shading. A wireframe you can see through is how mathematical surfaces have
+ * been drawn since long before anyone could shade one, it suits a product
+ * that draws in ink, and — the practical reason — sorting several hundred
+ * quads on every frame of an animation is a cost paid on every drag.
+ */
+const buildSurface: Builder = (scene, fn, vals, view, guarded) => {
+  if (!fn) return EMPTY_FRAME;
+  const yr = scene.yRange ?? { min: -3, max: 3 };
+  // The DOMAIN, from the scene — not from `view`, which for a surface is the
+  // fixed window the projected cube is drawn into and has nothing to do with
+  // x. Reading the domain off the viewport silently shrank it to the
+  // projection bounds: x² − y² over [−3, 3]² topped out at 3.42 instead of 9,
+  // and the surface was a correct drawing of the wrong function.
+  const xr = { min: scene.view.xMin, max: scene.view.xMax };
+  const cam: Camera = {
+    yaw: ((vals.yaw ?? 38) * Math.PI) / 180,
+    pitch: ((vals.turn ?? 26) * Math.PI) / 180,
+  };
+  const at3 = (x: number, y: number) =>
+    fn.eval({ ...vals, [scene.varName]: x, y });
+
+  // Coarse enough to stay readable and to redraw instantly while dragging.
+  const rows = sampleSurface(at3, xr, yr, 18);
+  const zr = zRange(rows);
+  if (!zr) {
+    return {
+      objects: [],
+      readouts: [],
+      caption: 'Nothing finite to draw over this domain. Try a smaller window.',
+    };
+  }
+  const frame: Frame3 = { x: xr, y: yr, z: zr };
+
+  const objects: VizObject[] = [
+    { o: 'mesh', id: 'box', lines: boxLines(frame, cam), tone: 'ghost', width: 1 },
+  ];
+
+  const cut = Math.min(yr.max, Math.max(yr.min, vals.cut ?? (yr.min + yr.max) / 2));
+  // The sheet first, so the wireframe and the cross-section sit on top of it.
+  objects.push({ o: 'region', id: 'sheet', pts: slicePlane(cut, frame, cam), tone: 'ghost' });
+  objects.push({
+    o: 'mesh',
+    id: 'surf',
+    lines: surfaceLines(rows, frame, cam),
+    tone: 'primary',
+    width: 1.15,
+  });
+  objects.push({
+    o: 'mesh',
+    id: 'cutline',
+    lines: sliceLines(at3, cut, xr, frame, cam),
+    tone: 'accent',
+    width: 2.4,
+  });
+
+  // Which way is up, and how far the domain runs. Three labels rather than
+  // full tick marks: the numbers that matter are in the readouts, and a
+  // projected axis with ticks on it reads as clutter at this size.
+  const corner = place({ x: xr.max, y: yr.min, z: zr.min }, frame, cam);
+  const yEnd = place({ x: xr.min, y: yr.max, z: zr.min }, frame, cam);
+  const zTop = place({ x: xr.min, y: yr.min, z: zr.max }, frame, cam);
+  objects.push({ o: 'label', id: 'ax', x: corner.x, y: corner.y, text: scene.varName, tone: 'muted', dy: 14 });
+  objects.push({ o: 'label', id: 'ay', x: yEnd.x, y: yEnd.y, text: 'y', tone: 'muted', dy: 14 });
+  objects.push({ o: 'label', id: 'az', x: zTop.x, y: zTop.y, text: 'z', tone: 'muted', dy: -8 });
+
+  const readouts: VizReadout[] = [
+    {
+      id: 'cutAt',
+      tex: 'y',
+      value: fmt(cut),
+      help: 'Where the sheet is. The bright curve is the surface cut there — a plain 2D graph in x, with y held still.',
+    },
+    {
+      id: 'zspan',
+      tex: 'z',
+      value: `${fmt(zr.min)} … ${fmt(zr.max)}`,
+      help: 'How high and how low the surface goes over this window. The box is drawn to exactly this range, so a tall thin surface and a flat one both fill it — the numbers here are the scale, not the picture.',
+    },
+  ];
+
+  // The height directly under the knife at the middle of the window: one
+  // concrete number tying the drawing to arithmetic they can check.
+  const midX = (xr.min + xr.max) / 2;
+  const zMid = at3(midX, cut);
+  if (Number.isFinite(zMid)) {
+    readouts.push({
+      id: 'sample',
+      tex: `f(${fmt(midX)}, ${fmt(cut)})`,
+      value: guarded ? null : fmt(zMid, 4),
+      help: 'The height of the surface at one point — the middle of the window, on the sheet.',
+    });
+  }
+
+  const stage = sweepStage(scene.params.find((p) => p.id === 'cut') ?? null, cut);
+  const narration =
+    stage === 0
+      ? 'The sheet is at one edge of the domain. The bright curve on it is the surface cut there.'
+      : stage < 3
+        ? 'The sheet is moving, and the curve on it changes shape as it goes. Each position is a different ordinary graph.'
+        : 'The sheet has crossed the whole domain. The surface is every one of those curves, stacked.';
+
+  return {
+    objects,
+    readouts,
+    narration,
+    caption: scene.says?.caption ?? 'Drag to turn it. The sheet slices it.',
+    ask: scene.says?.ask,
+  };
+};
+
+
+// --- 15. A vector field: arrows, streamlines, and the equation working ----
+//
+// The one kind whose subject is a FIELD rather than a function. Three layers,
+// drawn back to front: contours of a scalar underneath, the arrows that give
+// direction and speed, and streamlines threaded through them.
+//
+// The fourth thing it shows is not a layer at all. When the scene carries a
+// pressure, the readouts become the terms of the momentum equation measured
+// at the centre of the picture — unsteady, advection, pressure, viscous —
+// so the equation is not printed beside the flow but read OFF it. That is
+// the whole reason this kind exists rather than a picture of a vortex.
+
+const buildFlow: Builder = (scene, _fn, vals, view, guarded) => {
+  const spec = scene.flow;
+  if (!spec) return EMPTY_FRAME;
+
+  // Every parameter is in scope for both components, plus the clock, which
+  // is a parameter like any other so that a steady flow needs no special
+  // case: it simply never mentions t.
+  const names = ['x', 'y', ...scene.params.map((q) => q.id)];
+  const cu = compileExpr(spec.u, names);
+  const cv = compileExpr(spec.v, names);
+  const cp = spec.p ? compileExpr(spec.p, names) : null;
+  if (!cu || !cv) return EMPTY_FRAME;
+
+  const scope: Record<string, number> = {};
+  for (const q of scene.params) scope[q.id] = vals[q.id] ?? q.value;
+  const t = vals.t ?? 0;
+
+  /** The field frozen at one instant — which is what a picture can hold. */
+  const at = (tt: number): Field2 => ({
+    u: (x, y) => cu.eval({ ...scope, x, y, t: tt }),
+    v: (x, y) => cv.eval({ ...scope, x, y, t: tt }),
+    ...(cp ? { p: (x: number, y: number) => cp.eval({ ...scope, x, y, t: tt }) } : {}),
+  });
+  const f = at(t);
+  const box: FlowBox = { xMin: view.xMin, xMax: view.xMax, yMin: view.yMin, yMax: view.yMax };
+
+  const objects: VizObject[] = [];
+
+  // ── the backdrop, as contours ──
+  // Lines rather than a filled map: the renderer draws strokes, and a contour
+  // is the more honest picture anyway — it marks where a quantity equals
+  // itself, which needs no colour key to read.
+  const back = spec.backdrop ?? 'speed';
+  if (back !== 'none') {
+    const scalar =
+      back === 'pressure' && cp
+        ? (x: number, y: number) => cp.eval({ ...scope, x, y, t })
+        : back === 'vorticity'
+          ? (x: number, y: number) => {
+              // ∂v/∂x − ∂u/∂y: how fast a speck spins where it sits.
+              const h = 1e-3;
+              return (
+                (f.v(x + h, y) - f.v(x - h, y)) / (2 * h) -
+                (f.u(x, y + h) - f.u(x, y - h)) / (2 * h)
+              );
+            }
+          : (x: number, y: number) => Math.hypot(f.u(x, y), f.v(x, y));
+    const lines = contourSet(scalar, box, 8);
+    if (lines.length) objects.push({ o: 'mesh', id: 'back', lines, tone: 'ghost', width: 1 });
+  }
+
+  // ── the arrows ──
+  const arrows = quiver(f, box);
+  if (arrows.length) objects.push({ o: 'mesh', id: 'field', lines: arrows, tone: 'muted', width: 1.1 });
+
+  // ── the streamlines ──
+  // Drawn as one mesh for the same reason the field is: a dozen separate
+  // curve objects would each become a React node and a separate path.
+  const paths: Pt[][] = [];
+  for (const seed of seedPoints(box)) {
+    const line = streamline(f, seed.x, seed.y, box);
+    if (line.length > 4) paths.push(line);
+  }
+  if (paths.length) objects.push({ o: 'mesh', id: 'stream', lines: paths, tone: 'primary', width: 1.7 });
+
+  // ── where the equation is being read ──
+  // WHERE the equation is being read, and it MOVES.
+  //
+  // Pinned to the middle this was a fixed fact about one point, which is the
+  // least interesting point in most fields. The terms only become a question
+  // when you can put them somewhere: in the shear layer between two vortices
+  // advection is doing the work, a hand's width away in the quiet core it is
+  // viscosity, and the same equation reads completely differently in the two
+  // places. Sliders rather than a click because that is the instrument this
+  // surface already has, and because a swept probe walks the balance across
+  // the picture on its own.
+  const px = clamp(vals.px ?? (view.xMin + view.xMax) / 2, view.xMin, view.xMax);
+  const py = clamp(vals.py ?? (view.yMin + view.yMax) / 2, view.yMin, view.yMax);
+  const T = momentumTerms(at, scope.nu ?? scope.mu ?? 0.1, px, py, t);
+  // Crosshairs, so the point is findable in a field full of short strokes.
+  const rx = (view.xMax - view.xMin) * 0.028;
+  const ry = (view.yMax - view.yMin) * 0.028;
+  objects.push({
+    o: 'mesh',
+    id: 'probe-cross',
+    lines: [
+      [{ x: px - rx * 2.2, y: py }, { x: px + rx * 2.2, y: py }],
+      [{ x: px, y: py - ry * 2.2 }, { x: px, y: py + ry * 2.2 }],
+    ],
+    tone: 'accent',
+    width: 1,
+  });
+  objects.push({ o: 'point', id: 'probe', x: px, y: py, tone: 'accent', hollow: true });
+
+  const readouts: VizReadout[] = [];
+  const show = (id: string, tex: string, v: number | null, help: string) => {
+    if (v === null || !Number.isFinite(v)) return;
+    readouts.push({ id, tex, value: fmt(v, 3), help });
+  };
+
+  // The terms are the MECHANISM, so they are not guarded: seeing viscosity
+  // outweigh advection is the lesson, not the answer to it.
+  show('dudt', '\\frac{\\partial u}{\\partial t}', T.unsteady,
+    'How fast the flow is changing at this fixed point. Zero in a steady flow, however fast the fluid is moving through it.');
+  show('adv', '(u\\cdot\\nabla)u', T.advection,
+    'The parcel being carried somewhere the flow is different. This is the term that is quadratic in the unknown, and it is the reason the equation is hard.');
+  show('grad', '-\\frac{\\partial p}{\\partial x}', T.pressure,
+    'The push from high pressure toward low.');
+  show('visc', '\\nu\\nabla^{2}u', T.viscous,
+    'Momentum leaking sideways. The Laplacian measures how much this parcel differs from its neighbours, so this term always drags it toward them.');
+  show('div', '\\nabla\\cdot u', T.divergence,
+    'What flows in minus what flows out. An incompressible fluid holds this at zero everywhere, and pressure is whatever it must be to keep it there.');
+
+  // The residual IS the answer — whether this really is a solution — so the
+  // guard holds it while the terms above stay readable.
+  if (T.residual !== null && Number.isFinite(T.residual)) {
+    readouts.push({
+      id: 'res',
+      tex: '\\text{residual}',
+      value: guarded ? null : fmt(T.residual, 6),
+      help: 'The two sides of the momentum equation, subtracted. Add up the terms above yourself before you look.',
+    });
+  }
+
+  for (const q of scene.params) {
+    if (q.id === 't') continue;
+    readouts.push({
+      id: q.id,
+      tex: q.symbol || q.id,
+      value: fmt(vals[q.id] ?? q.value, 3),
+      help: q.help ?? 'A constant in the field. Move it and every arrow changes together.',
+    });
+  }
+
+  // A flow that never mentions the clock is steady, and saying "at t = 0.00"
+  // over a picture that will never change is noise dressed as precision.
+  const unsteady = /\bt\b/.test(spec.u) || /\bt\b/.test(spec.v);
+
+  const caption = unsteady
+    ? `The arrows are where the fluid is going and how fast; the lines threaded through them are the paths it takes. Time ${fmt(t, 2)}.`
+    : 'The arrows are where the fluid is going and how fast; the lines threaded through them are the paths it takes. This flow does not change with time.';
+
+  // Narration follows the MOTION, which is what lets it keep speaking while
+  // the guard is up: at the start there is a shape, and later there is less
+  // of it, and noticing that is the entire viscous term.
+  const narration = unsteady
+    ? t < 0.5
+      ? 'This is the flow at the start. Press play.'
+      : 'Watch the arrows shorten. Nothing is pushing the fluid — it is losing its motion sideways, into the fluid beside it.'
+    : undefined;
+
+  return {
+    objects,
+    readouts,
+    caption,
+    ...(narration ? { narration } : {}),
+    ask: 'Add up the four terms on the left. Do they cancel? They have to, everywhere, at every instant — that is what it means for this to be a solution.',
+  };
+};
+
 const KINDS: Record<VizKind, Builder> = {
   function: buildFunction,
   limit: buildLimit,
@@ -3211,6 +3634,8 @@ const KINDS: Record<VizKind, Builder> = {
   ppc: buildPpc,
   'ad-as': buildAdAs,
   diagram: buildDiagram,
+  surface: buildSurface,
+  flow: buildFlow,
 };
 
 /**
@@ -3310,6 +3735,7 @@ export function compileScene(scene: VizScene): CompiledExpr | null {
   if (!sceneHasOwnCurve(scene)) return null;
   const names = [scene.varName, ...scene.params.map((p) => p.id)];
   if (scene.kind === 'ode') names.push('y'); // dy/dx = f(x, y)
+  if (scene.kind === 'surface') names.push('y'); // z = f(x, y)
   return compileExpr(scene.expr, names);
 }
 
@@ -3326,6 +3752,33 @@ const REQUIRED: Record<VizKind, (scene: VizScene) => VizParam[]> = {
   // is about, and inventing one would put a slider under a drawing that has
   // nothing to move.
   diagram: () => [],
+  /**
+   * A surface needs three controls, and they are all camera or knife.
+   *
+   * `cut` is reserved (see RESERVED_PARAM) and sweeps, so pressing play walks
+   * the cutting plane across the whole domain — a family of cross-sections,
+   * which is the most useful single thing to see about a function of two
+   * variables. yaw and turn are the camera; they are ordinary sliders as well
+   * as being what dragging the picture moves, so the view is reachable
+   * without a pointer at all.
+   */
+  surface: (sc) => {
+    const yr = sc.yRange ?? { min: -3, max: 3 };
+    return [
+      {
+        id: 'cut',
+        min: yr.min,
+        max: yr.max,
+        step: (yr.max - yr.min) / 200,
+        value: (yr.min + yr.max) / 2,
+        sweep: 'up',
+        toward: fmt(yr.max),
+        help: 'Where the knife is. The curve drawn on the pale sheet is the surface cut at this value — hold y still and a function of two variables becomes an ordinary graph.',
+      },
+      { id: 'yaw', min: -180, max: 180, step: 1, value: 38, help: 'Spin the model on its turntable. Dragging the picture does the same thing.' },
+      { id: 'turn', min: 2, max: 88, step: 1, value: 26, help: 'How high the camera sits. Near zero you are looking along the surface edge-on; near ninety you are looking straight down at it.' },
+    ];
+  },
   // δ and h open at a fraction of the window rather than a fixed 2. The second
   // point has to be ON SCREEN in the first frame: with a tight window around
   // the point of interest, a fixed starting h puts Q above the top edge and
@@ -3338,6 +3791,43 @@ const REQUIRED: Record<VizKind, (scene: VizScene) => VizParam[]> = {
     const max = span(sc, 5, 2.5);
     return [{ id: 'h', min: max / 1200, max, step: max / 2000, value: max, sweep: 'down', toward: '0', help: 'The gap between the two points on the curve. Shrink it and the line through them stops being a shortcut and starts being a tangent.' }];
   },
+  /**
+   * A flow gets a clock, and it sweeps.
+   *
+   * Every unsteady exact solution of Navier-Stokes decays, and the decay IS
+   * the viscous term doing its work — so the one control this kind cannot do
+   * without is time. A steady flow simply ignores it: `t` appears in neither
+   * expression, every frame is identical, and the slider costs nothing.
+   */
+  flow: (sc) => [
+    {
+      id: 'px',
+      symbol: 'x',
+      min: sc.view.xMin,
+      max: sc.view.xMax,
+      step: (sc.view.xMax - sc.view.xMin) / 200,
+      value: (sc.view.xMin + sc.view.xMax) / 2,
+      help: 'Where the equation is being read, left to right. Move it into a shear layer and then into a quiet core: the same four terms, in a completely different balance.',
+    },
+    {
+      id: 'py',
+      symbol: 'y',
+      min: sc.yRange ? sc.yRange.min : -3,
+      max: sc.yRange ? sc.yRange.max : 3,
+      step: ((sc.yRange ? sc.yRange.max - sc.yRange.min : 6) / 200),
+      value: sc.yRange ? (sc.yRange.min + sc.yRange.max) / 2 : 0,
+      help: 'The same point, up and down.',
+    },
+    {
+      id: 't',
+      min: 0,
+      max: 12,
+      step: 0.05,
+      value: 0,
+      sweep: 'up',
+      help: 'The clock. A flow that changes with time only shows you one instant at a time — press play and watch which way it is going.',
+    },
+  ],
   riemann: () => [{ id: 'n', min: 1, max: 80, step: 1, value: 4, integer: true, sweep: 'up', toward: '\\infty', help: 'How many rectangles the area is chopped into. More rectangles, thinner each, closer to the true area.' }],
   taylor: () => [{ id: 'k', min: 0, max: 10, step: 1, value: 1, integer: true, sweep: 'up', toward: '\\infty', help: 'The degree of the polynomial: how many terms it is allowed. Each extra term buys accuracy further from the centre.' }],
   sequence: (sc) => [
@@ -3516,6 +4006,14 @@ export const RESERVED_PARAM: Record<VizKind, string | null> = {
   // A diagram's parameters are whatever the picture is about, so none of them
   // is reserved and the editor may offer every name.
   diagram: null,
+  // The slice position. Sweeping it walks the cutting plane across the
+  // surface, which is the animation that shows a family of cross-sections is
+  // what a surface IS.
+  surface: 'cut',
+  // The clock. A flow that is not steady is only half visible in one frame,
+  // and pressing play is the whole difference between a diagram of a vortex
+  // and watching one die.
+  flow: 't',
 };
 
 export const KIND_LABEL: Record<VizKind, string> = {
@@ -3533,6 +4031,8 @@ export const KIND_LABEL: Record<VizKind, string> = {
   'ad-as': 'AD–AS',
   ode: 'Field',
   diagram: 'Diagram',
+  surface: 'Surface (3D)',
+  flow: 'Flow field',
 };
 
 /**
@@ -3556,6 +4056,7 @@ export function autoParams(
   for (const name of freeNames(expr)) {
     if (name === varName || name === reserved) continue;
     if (kind === 'ode' && name === 'y') continue; // the solution, not a knob
+    if (kind === 'surface' && name === 'y') continue; // the second axis, not a knob
     if (name.length > 2) continue; // not a coefficient; the sanitizer rejects it anyway
     const had = by.get(name);
     out.push(had ?? { id: name, min: -5, max: 5, step: 0.1, value: 1 });
@@ -4089,6 +4590,7 @@ export function sanitizeViz(raw: any): VizScene | null {
       // has just redefined Euler's number underneath itself.
       if (id === 'e' || id === 'pi' || id === 'tau') return null;
       if (kind === 'ode' && id === 'y') return null; // y is the solution, not a slider
+      if (kind === 'surface' && id === 'y') return null; // y is an axis, not a slider
       const min = num(p?.min, -1e4, 1e4, 0);
       const max = num(p?.max, -1e4, 1e4, 1);
       if (!(max > min)) return null;
@@ -4150,6 +4652,46 @@ export function sanitizeViz(raw: any): VizScene | null {
     ...(typeof raw.a === 'number' && Number.isFinite(raw.a) ? { a: num(raw.a, -1e4, 1e4, 0) } : {}),
     ...(typeof raw.b === 'number' && Number.isFinite(raw.b) ? { b: num(raw.b, -1e4, 1e4, 1) } : {}),
     ...(raw.rule === 'left' || raw.rule === 'right' || raw.rule === 'midpoint' ? { rule: raw.rule } : {}),
+    // A field's two components. Trimmed and length-capped like every other
+    // expression that reaches the evaluator; whether they COMPILE, and over
+    // which names, is settled below where the rest of the scene is checked.
+    ...(kind === 'flow' && raw.flow && typeof raw.flow === 'object'
+      ? {
+          flow: {
+            u: typeof raw.flow.u === 'string' ? raw.flow.u.trim().slice(0, MAX_EXPR) : '',
+            v: typeof raw.flow.v === 'string' ? raw.flow.v.trim().slice(0, MAX_EXPR) : '',
+            ...(typeof raw.flow.p === 'string' && raw.flow.p.trim()
+              ? { p: raw.flow.p.trim().slice(0, MAX_EXPR) }
+              : {}),
+            // An unrecognised backdrop becomes the default rather than an
+            // error: the name of a contour set is not worth losing a picture
+            // over, and speed is meaningful for every field.
+            backdrop:
+              raw.flow.backdrop === 'pressure' ||
+              raw.flow.backdrop === 'vorticity' ||
+              raw.flow.backdrop === 'none'
+                ? raw.flow.backdrop
+                : ('speed' as const),
+          },
+        }
+      : {}),
+    // A surface always has a y range: whatever was given if it is a real
+    // interval, and a symmetric default otherwise. Defaulting rather than
+    // rejecting means a model that names only the expression still gets a
+    // drawable scene, which is how every other kind behaves.
+    ...(kind === 'surface' || kind === 'flow'
+      ? {
+          yRange: (() => {
+            const fin = (v: unknown) =>
+              typeof v === 'number' && Number.isFinite(v) ? v : undefined;
+            const lo = fin(raw.yRange?.min);
+            const hi = fin(raw.yRange?.max);
+            return lo !== undefined && hi !== undefined && hi > lo
+              ? { min: lo, max: hi }
+              : { min: -3, max: 3 };
+          })(),
+        }
+      : {}),
     ...(kind === 'matrix' ? { matrix: sanitizeMatrix(raw.matrix) ?? undefined } : {}),
     ...(kind === 'vectors' ? { vectors: sanitizeVectors(raw.vectors) ?? undefined } : {}),
     ...(kind === 'distribution' && DISTS.includes(raw.dist) ? { dist: raw.dist as DistName } : {}),
@@ -4189,12 +4731,46 @@ export function sanitizeViz(raw: any): VizScene | null {
   if (needsExpr && scene.expr) {
     const known = new Set([scene.varName, ...scene.params.map((p) => p.id)]);
     if (scene.kind === 'ode') known.add('y');
+    // z = f(x, y): the second axis is bound by the sampler, not by a slider,
+    // so it is a name we ARE prepared to give a value to.
+    if (scene.kind === 'surface') known.add('y');
     if (freeNames(scene.expr).some((nm) => !known.has(nm))) return null;
     fn = compileScene(scene);
     if (!fn) return null;
     // A constant is not a curve — except in an ODE, where dy/dx = k is a
     // perfectly good field, and y may appear with or without x.
     if (scene.kind !== 'ode' && !fn.vars.includes(scene.varName)) return null;
+  }
+
+  // A field is its two components, so both have to be real expressions over
+  // names we are prepared to give values to. `x` and `y` are the plane itself
+  // and `t` is the clock, all three bound by the builder rather than by a
+  // slider; anything else must be a declared parameter. A component that does
+  // not compile is not a half-drawn flow, it is no flow at all — and drawing
+  // one arrow of a velocity field is worse than drawing none, because the
+  // picture still looks like an answer.
+  if (scene.kind === 'flow') {
+    const spec = scene.flow;
+    if (!spec || !spec.u || !spec.v) return null;
+    const known = new Set(['x', 'y', 't', ...scene.params.map((q) => q.id)]);
+    for (const src of [spec.u, spec.v, ...(spec.p ? [spec.p] : [])]) {
+      if (freeNames(src).some((nm) => !known.has(nm))) return null;
+      if (!compileExpr(src, [...known])) return null;
+    }
+    // A field that is zero everywhere has no direction anywhere, and every
+    // layer of the picture would come back empty.
+    const probe = (src: string) => {
+      const c = compileExpr(src, [...known]);
+      if (!c) return false;
+      const sc: Record<string, number> = { t: 0 };
+      for (const q of scene.params) sc[q.id] = q.value;
+      for (const [x, y] of [[0.4, 0.7], [1.3, -0.6], [-0.9, 1.1], [2.2, 0.3]]) {
+        const v = c.eval({ ...sc, x, y });
+        if (Number.isFinite(v) && Math.abs(v) > 1e-12) return true;
+      }
+      return false;
+    };
+    if (!probe(spec.u) && !probe(spec.v)) return null;
   }
 
   // An interval kind needs a real interval.
@@ -4229,4 +4805,88 @@ export function sanitizeViz(raw: any): VizScene | null {
     return null;
   }
   return scene;
+}
+
+/**
+ * What is on screen, in a sentence the model can read.
+ *
+ * THE GAP THIS CLOSES. Until now the picture was strictly one-way: the person
+ * talks, the extractor turns what they said into a scene, and the scene is
+ * drawn. Nothing carried it back. So somebody looking at a vortex lattice who
+ * typed "why is that corner still moving" was asking about something the
+ * model had never seen — it could infer a picture from the transcript that
+ * produced it, which is not the same as knowing what is actually drawn, what
+ * the sliders have since been moved to, or which of sixteen kinds is up.
+ *
+ * DELIBERATELY ONLY THE INPUTS. Every value here is something the reader can
+ * already see and change: the expressions, the window, the slider positions.
+ * Nothing computed appears — not a limit, not a derivative, not an area, not
+ * a residual. That is what makes this safe to send while the Answer Guard is
+ * up: it tells the model what is being LOOKED at, never what it comes to.
+ */
+export function describeScene(scene: VizScene, vals?: Record<string, number>): string {
+  const bits: string[] = [];
+  const label = KIND_LABEL[scene.kind] ?? scene.kind;
+
+  if (scene.kind === 'flow' && scene.flow) {
+    bits.push(`a ${label}: u = ${scene.flow.u}, v = ${scene.flow.v}`);
+    if (scene.flow.p) bits.push(`pressure p = ${scene.flow.p}`);
+    if (scene.flow.backdrop && scene.flow.backdrop !== 'none') {
+      bits.push(`contours of ${scene.flow.backdrop}`);
+    }
+  } else if (scene.expr) {
+    bits.push(`a ${label} of ${scene.varName} ↦ ${scene.expr}`);
+  } else {
+    bits.push(`a ${label}`);
+  }
+
+  if (typeof scene.a === 'number') bits.push(`at ${fmt(scene.a)}`);
+  if (typeof scene.b === 'number') bits.push(`to ${fmt(scene.b)}`);
+
+  const shown = (scene.overlays ?? []).filter((o) => o.visible !== false);
+  if (shown.length) bits.push(`also plotted: ${shown.map((o) => o.expr).join(', ')}`);
+
+  // The controls, and where they stand.
+  //
+  // `vals` is the live position when a caller has it. Most do not: dragging a
+  // slider is not persisted back to the scene (only editor edits are), so the
+  // fallback is the value the scene DECLARES. That is right the moment a
+  // picture appears and drifts if somebody has been playing with it — which
+  // is a reason to say "the curve you are looking at" rather than to quote a
+  // number back at them, and the prompt block says so.
+  const knobs = scene.params
+    .map((q) => {
+      const live = vals?.[q.id];
+      const v = typeof live === 'number' && Number.isFinite(live) ? live : q.value;
+      return typeof v === 'number' && Number.isFinite(v) ? `${q.id} = ${fmt(v, 3)}` : null;
+    })
+    .filter(Boolean);
+  if (knobs.length) bits.push(`controls: ${knobs.join(', ')}`);
+
+  return bits.join('; ');
+}
+
+/**
+ * The block that goes in the system prompt, or nothing at all.
+ *
+ * Nothing is the common case and the right default: most turns are not about
+ * the picture, and a description of one pushed in front of every message
+ * would have the model reaching for it when nobody asked.
+ */
+export function sceneBlock(scene: VizScene | null | undefined, vals?: Record<string, number>): string {
+  if (!scene) return '';
+  const said = describeScene(scene, vals);
+  if (!said) return '';
+  return `
+
+=== WHAT IS ON THEIR SCREEN ===
+Beside this conversation there is a live picture, and right now it shows ${said}.
+
+They can see it, move its sliders and pan it. So "that spike", "the left half", "why is it flat there" and "what happens if I turn this up" are about THIS, and you may answer them as if you were looking at it too — because now you are.
+
+It is a picture of the INPUTS, not of a result. It tells you what is being looked at, never what it comes out to, and it changes nothing about the Answer Guard: if they are working something out, seeing their picture is not a reason to finish it for them.
+
+The slider positions above are where the picture OPENED. They may have moved one since, and you are not told when they do — so never quote a control's value back as though you had just read it. Talk about the shape, and ask what they have it set to if it matters.
+
+Do not describe it back to them unprompted. They are looking at it.`;
 }

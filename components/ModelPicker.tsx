@@ -41,7 +41,8 @@ export function ModelPicker({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-2 rounded-full border border-moss-600/30 bg-white px-3 py-1.5 font-serif text-[13.5px] text-ink shadow-sm transition-colors hover:border-moss-600/50 hover:bg-moss-50/60"
+        data-tour="model"
+      className="flex items-center gap-2 rounded-full border border-moss-600/30 bg-white px-3 py-1.5 font-serif text-[13.5px] text-ink shadow-sm transition-colors hover:border-moss-600/50 hover:bg-moss-50/60"
         aria-haspopup="listbox"
         aria-expanded={open}
       >

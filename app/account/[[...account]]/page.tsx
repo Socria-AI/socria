@@ -8,6 +8,7 @@ import Image from 'next/image';
 import { UserProfile, useUser } from '@clerk/nextjs';
 import { usePlan } from '@/components/usePlan';
 import { OneCard } from '@/components/OneMark';
+import { StudentAccess } from '@/components/StudentAccess';
 
 export default function AccountPage() {
   const { isLoaded, isSignedIn } = useUser();
@@ -88,8 +89,11 @@ export default function AccountPage() {
           </div>
 
           {planState.known && (
-            <div className="mb-10 md:mb-14 max-w-[452px]">
+            <div className="mb-10 md:mb-14 max-w-[452px] flex flex-col gap-6">
               <OneCard state={planState} />
+              {/* Only where the deployment runs the programme; renders
+                  nothing at all anywhere else. */}
+              <StudentAccess state={planState} />
             </div>
           )}
 

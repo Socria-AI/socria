@@ -73,6 +73,16 @@ import {
 } from '@/lib/logos-personality';
 import { chooseModel, lastCoreModel } from '@/lib/socria-model-store';
 import { buildStarters, PENDING_TYPES } from '@/lib/starters';
+import { FirstMap } from '@/components/FirstMap';
+import {
+  advance as fmAdvance,
+  finish as fmFinish,
+  isRunning as fmRunning,
+  shouldStart as fmShouldStart,
+  IDLE as FM_IDLE,
+  ONBOARDING_KEY,
+  type State as FirstMapState,
+} from '@/lib/onboarding';
 import { billingError, billingLine } from '@/lib/billing-message';
 import { PersonalityDial } from '@/components/PersonalityDial';
 import { ContextPanel } from '@/components/ContextPanel';
@@ -195,8 +205,13 @@ export function LogosApp({
   // Set by /chat, which renders this component. Switching model there is a
   // state change, not a navigation — see switchTo.
   onSwitchModel,
+  // The sentence somebody wrote during onboarding. /chat reads it (once —
+  // the handover clears as it is read) and hands it down, so it reaches
+  // whichever composer actually mounted rather than racing for it.
+  initialInput,
 }: {
   onSwitchModel?: (next: SocriaModel) => void;
+  initialInput?: string;
 } = {}) {
   const { isLoaded, isSignedIn } = useUser();
   const [unlocked, setUnlocked] = useState(false);
@@ -291,6 +306,15 @@ export function LogosApp({
   const [revealedIds, setRevealedIds] = useState<Set<string>>(new Set());
 
   const [input, setInput] = useState('');
+
+  // Seeded once, and only while the composer is still untouched: someone who
+  // has started typing their own sentence must never have it replaced.
+  const seeded = useRef(false);
+  useEffect(() => {
+    if (seeded.current || !initialInput) return;
+    seeded.current = true;
+    setInput(initialInput);
+  }, [initialInput]);
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [streaming, setStreaming] = useState('');
   const [busy, setBusy] = useState(false);
@@ -430,6 +454,30 @@ export function LogosApp({
   }, [contexts]);
   const mapRef = useRef<TMap>(EMPTY_MAP);
   mapRef.current = map;
+
+  // ── the first map ──
+  // Read once, from storage, so a person who has been through this never
+  // meets it again on any device where they finished it.
+  const [firstMap, setFirstMap] = useState<FirstMapState>(FM_IDLE);
+  const [fmDone, setFmDone] = useState(true); // assume done until storage says otherwise
+  useEffect(() => {
+    try {
+      setFmDone(localStorage.getItem(ONBOARDING_KEY) === 'done');
+    } catch {
+      // No storage is not a reason to teach somebody the product twice a day.
+      setFmDone(true);
+    }
+  }, []);
+  const endFirstMap = useCallback(() => {
+    setFirstMap(fmFinish());
+    try {
+      localStorage.setItem(ONBOARDING_KEY, 'done');
+    } catch {}
+    setFmDone(true);
+  }, []);
+  const signalFirstMap = useCallback((sig: Parameters<typeof fmAdvance>[1]) => {
+    setFirstMap((cur) => fmAdvance(cur, sig));
+  }, []);
 
   // The Answer Guard is one shared state: on only while LEARNING math and the
   // person hasn't chosen to reveal this session's solution. Every surface reads
@@ -576,6 +624,29 @@ export function LogosApp({
   // empty list.
   const noSessions =
     !hydrating && sessions.every((x) => x.messages.length === 0 && !(x.map?.nodes?.length));
+
+  // The map just took a shape worth pointing at. Runs on every map change and
+  // is a no-op in all but one moment of a person's life, because shouldStart
+  // refuses on a finished flag, a thin map, a stream in flight, or a sentence
+  // half typed.
+  useEffect(() => {
+    if (fmRunning(firstMap) || fmDone) return;
+    if (
+      fmShouldStart({
+        signedIn: !!isSignedIn,
+        completed: fmDone,
+        nodes: map.nodes?.length ?? 0,
+        // LogosGuide auto-opens on a first visit and is a modal. Two
+        // onboardings on screen at once is worse than either alone, and the
+        // guide comes first by nature — it runs on an empty state, this runs
+        // on their own first map — so this one simply waits it out.
+        busy: busy || guideOpen,
+        composing: input.trim().length > 0,
+      })
+    ) {
+      setFirstMap((cur) => fmAdvance(cur, 'map-drew'));
+    }
+  }, [map.nodes?.length, isSignedIn, fmDone, busy, guideOpen, input, firstMap]);
 
   const logosStarters = buildStarters(
     {
@@ -1883,6 +1954,9 @@ export function LogosApp({
           // decides what the plan carries of it. The recurrence line is
           // owed until it has been injected once in this session.
           ...(u ? { understanding: u, recurrence: !recurrenceSaidRef.current.has(sid) } : {}),
+          // What they are looking at, so "why is it flat there" has something
+          // to be about. Re-sanitised on the server like every other field.
+          ...(mapRef.current?.viz ? { viz: mapRef.current.viz } : {}),
         }),
       });
       if (res.status === 402) {
@@ -2754,7 +2828,11 @@ export function LogosApp({
           )}
           <ThinkingMap
             map={map}
-            onAction={runAction}
+            onAction={(mode, node) => {
+              signalFirstMap('action-taken');
+              runAction(mode, node);
+            }}
+            onNodePress={() => signalFirstMap('node-pressed')}
             lensLimit={limits.lenses}
             onLocked={() =>
               ask('lenses-locked')
@@ -2772,6 +2850,7 @@ export function LogosApp({
               patchActive((s) => ({ ...s, map: { ...(s.map ?? EMPTY_MAP), viz } }))
             }
           />
+          <FirstMap state={firstMap} onSkip={endFirstMap} onFinish={endFirstMap} />
           <ExplorePanel
             open={explore.open}
             mode={explore.mode}

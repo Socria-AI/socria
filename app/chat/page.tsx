@@ -1,7 +1,7 @@
 // app/chat/page.tsx
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   SignedIn,
@@ -33,6 +33,10 @@ import {
 } from '@/lib/logos-sessions';
 import { DRIFT_DISMISS_LIMIT, readDrift, type DriftVerdict } from '@/lib/topic-drift';
 import { readStart, startMessage } from '@/lib/first-session';
+import { takeCarried } from '@/lib/onboarding-script';
+import { Tour } from '@/components/Tour';
+import { AccountSheet } from '@/components/account/AccountSheet';
+import { TOUR_KEY, shouldRunTour } from '@/lib/tour';
 import { isSource } from '@/lib/checkout-attribution';
 import { track } from '@/lib/analytics';
 import { hasJourneyContent as journeyHasContent } from '@/lib/socria-prompt';
@@ -214,6 +218,21 @@ export default function ChatPage() {
   >([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [input, setInput] = useState('');
+  /** the sentence written during onboarding, for whichever composer mounts */
+  const [carriedText, setCarriedText] = useState('');
+
+  // ── the first-run tour ──
+  // Held off for anybody who has just come through /onboarding: that walks
+  // them through what Socria is FOR, on their own sentence, and this walks
+  // them round the furniture. Both in one sitting is too much teaching at
+  // once, so it waits for a later visit — which is also when the furniture
+  // starts to matter.
+  const [tourOpen, setTourOpen] = useState(false);
+  const [acctOpen, setAcctOpen] = useState(false);
+  const endTour = useCallback(() => {
+    setTourOpen(false);
+    try { localStorage.setItem(TOUR_KEY, '1'); } catch {}
+  }, []);
   const [sending, setSending] = useState(false);
   const [streamed, setStreamed] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -1405,7 +1424,38 @@ export default function ChatPage() {
     // development, the second time with `model` already gone from the URL.
     // `model` state still holds its initial value here — the remembered model
     // is applied by a later effect — so the store is asked directly.
-    if (want !== 'logos' && readModel() !== 'logos') {
+    // The sentence they wrote during onboarding, if they came straight from
+    // it. Read once and cleared by takeCarried, so it prefills the composer
+    // on this landing and never again.
+    // ONE reader. takeCarried clears as it reads, so if both this page and
+    // LogosApp called it the second would get nothing and which composer got
+    // the sentence would depend on mount order. It is read here, once, and
+    // handed down to whichever surface is actually rendering.
+    // The tour, decided once on mount. `justOnboarded` is exactly the carried
+    // handover: if they arrived with a sentence from /onboarding, they were
+    // taught ninety seconds ago and are left alone.
+    const carried = takeCarried(sessionStorage);
+    if (carried) {
+      setCarriedText(carried.text);
+      setInput(carried.text);
+      requestAnimationFrame(() => textareaRef.current?.focus());
+    }
+    try {
+      if (
+        shouldRunTour({
+          done: localStorage.getItem(TOUR_KEY) === '1',
+          signedIn: true,
+          justOnboarded: !!carried,
+          blocked: false,
+        })
+      ) {
+        setTourOpen(true);
+      }
+    } catch {
+      /* no storage: teach nobody twice a day */
+    }
+
+    if (!carried && want !== 'logos' && readModel() !== 'logos') {
       const { id } = readStart(window.location.search);
       if (id) {
         const msg = startMessage(id);
@@ -1493,6 +1543,7 @@ export default function ChatPage() {
   if (model === 'logos')
     return (
       <LogosApp
+        initialInput={carriedText}
         onSwitchModel={(next) => {
           setModel(next);
           chooseModel(next);
@@ -1572,7 +1623,15 @@ export default function ChatPage() {
       )}
 
       {/* Sidebar — overlay on mobile, static column on desktop */}
+      <Tour open={tourOpen} onDone={endTour} />
+      <AccountSheet
+        open={acctOpen}
+        onClose={() => setAcctOpen(false)}
+        isOne={planState.plan === 'one'}
+        onRetakeTour={() => setTourOpen(true)}
+      />
       <aside
+        data-tour="sessions"
         className={`${
           sidebarOpen ? 'flex' : 'hidden'
         } md:flex flex-col w-[min(18rem,84vw)] md:w-72 shrink-0 border-r border-border/60 h-dvh fixed md:static top-0 left-0 z-40 bg-paper md:bg-paper/80 backdrop-blur-sm`}
@@ -1846,7 +1905,14 @@ export default function ChatPage() {
             </span>
           </button>
           <SignedIn>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3" data-tour="account">
+              <button
+                type="button"
+                className="text-[12px] text-ink/55 hover:text-ink transition-colors"
+                onClick={() => setAcctOpen(true)}
+              >
+                Account
+              </button>
               <UserButton afterSignOutUrl="/chat" userProfileMode="navigation" userProfileUrl="/account" />
               <div className="text-[11px] text-ink/50 font-serif italic leading-tight">
                 Synced across your devices
@@ -2193,6 +2259,7 @@ export default function ChatPage() {
             <div className="flex items-end gap-3 rounded-2xl border border-ink/15 bg-white px-4 py-3 focus-within:border-moss-600 transition-colors">
               <textarea
                 ref={textareaRef}
+                data-tour="composer"
                 value={input}
                 onChange={handleInputChange}
                 onKeyDown={handleKeyDown}

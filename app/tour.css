@@ -1,0 +1,52 @@
+/* app/tour.css — the first-run tour overlay.
+ *
+ * Deliberately NOT part of app-shell.css. That sheet is scoped under
+ * .app-root, whose own rule paints a full-page paper background and claims
+ * 100svh — correct for a page built out of it, and ruinous for an overlay
+ * that has to sit on top of the chat without covering it.
+ *
+ * These class names (.tour-*, .tn-*) are distinctive enough to stand
+ * unscoped, and the tour is rendered into the chat, which is not an app-root
+ * page.
+ */
+/* ---------- the first-run tour ----------
+   One SVG carries the scrim, the hole, the ink ring and the leader. The hole
+   shows paper, so the ring is moss rather than sage — sage on paper fails at
+   every size. The scrim is the brand's forest, not Prussian: Prussian means the
+   membership boundary and nothing else. */
+.tour-svg{position:fixed;inset:0;z-index:90}
+.tour-scrim{fill:rgba(26,36,16,.56)}
+.tour-ring{fill:none;stroke:var(--moss);stroke-width:1.8;stroke-linecap:round;
+  stroke-dasharray:1400;stroke-dashoffset:1400;animation:tr-draw 1.15s var(--ease-out-expo) .12s forwards}
+.tour-leader{fill:none;stroke:var(--moss);stroke-width:1.3;stroke-linecap:round;opacity:.8;
+  stroke-dasharray:520;stroke-dashoffset:520;animation:tr-draw .85s var(--ease-out-expo) .55s forwards}
+.tour-dot{fill:var(--moss);opacity:0;animation:tr-dot .5s var(--ease-out-expo) 1.15s forwards}
+/* the note: paper, a hairline, and room to actually read */
+.tour-note{position:fixed;z-index:92;background:var(--paper);border:1px solid var(--ink-16);border-radius:15px;
+  padding:19px 22px 15px;box-shadow:0 44px 90px -44px rgba(26,36,16,.7);
+  animation:tn-in .62s var(--ease-out-expo) both}
+.tour-note.tour-above{animation:tn-in-up .62s var(--ease-out-expo) both}
+/* the step as a numeral, the way a spread is numbered */
+.tn-head{display:flex;align-items:baseline;gap:12px}
+.tn-num{font-family:var(--font-serif);font-style:italic;font-size:1.62rem;line-height:1;
+  color:var(--moss-700);flex:0 0 auto;min-width:1.6ch}
+.tour-note h3{margin:0;font-family:var(--font-serif);font-size:1.48rem;line-height:1.08;
+  letter-spacing:-.018em;color:var(--ink)}
+.tour-note p{margin:11px 0 0;font-size:14.5px;line-height:1.62;color:var(--ink-70);max-width:38ch}
+.tour-note p em{font-style:italic;color:var(--moss-700)}
+.tn-foot{display:flex;align-items:center;gap:14px;margin-top:17px;padding-top:13px;border-top:1px solid var(--ink-12)}
+.tn-ticks{display:flex;gap:5px;margin-right:auto}
+.tn-ticks i{width:18px;height:2px;background:var(--ink-12);display:block;transition:background .45s var(--ease-standard)}
+.tn-ticks i.on{background:var(--moss)}
+.tn-skip{font-family:var(--font-sans);font-size:10px;font-weight:600;letter-spacing:.2em;
+  text-transform:uppercase;color:var(--ink-45);background:none;border:none;cursor:pointer;transition:color .2s}
+.tn-skip:hover{color:var(--ink)}
+.tn-next{display:inline-flex;align-items:center;gap:.5em;height:38px;padding:0 19px;border-radius:999px;
+  background:var(--ink);color:var(--paper);border:none;cursor:pointer;
+  font-family:var(--font-sans);font-size:13px;font-weight:500;transition:background .2s,transform .2s}
+.tn-next:hover{background:var(--moss);transform:translateY(-2px)}
+.tn-next .ar{transition:transform .2s}
+.tn-next:hover .ar{transform:translateX(3px)}
+.tour-ring,.tour-leader{stroke-dashoffset:0;animation:none}
+.tour-dot{opacity:1;animation:none}
+.tour-note,.tour-note.tour-above{animation:none}

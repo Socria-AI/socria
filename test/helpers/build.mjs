@@ -25,6 +25,11 @@ const MODULES = [
   'lib/logos.ts',
   'lib/entitlements.ts',
   'lib/usage-scope.ts',
+  'lib/logos-flow.ts',
+  'lib/onboarding.ts',
+  'lib/onboarding-script.ts',
+  'lib/pfp.ts',
+  'lib/tour.ts',
   'lib/socria-one.ts',
   'lib/rich-text.ts',
   'lib/easter-eggs.ts',
@@ -42,6 +47,7 @@ const MODULES = [
   'lib/billing-message.ts',
   'lib/stripe-diagnosis.ts',
   'lib/logos-personality.ts',
+  'lib/logos-viz3d.ts',
   'lib/why-not-answer.ts',
   'lib/wrong-chat.ts',
   'lib/auth-links.ts',
@@ -53,6 +59,9 @@ const MODULES = [
   'lib/lifecycle.ts',
   'lib/email.ts',
   'lib/socria-prompt.ts',
+  'app/explore/scenarios.ts',
+  'lib/socria-edu.ts',
+  'lib/clerk-errors.ts',
 ];
 
 export async function buildAll() {

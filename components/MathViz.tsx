@@ -54,6 +54,7 @@ import {
 } from '@/lib/logos-viz';
 import { TeX } from './TeX';
 import { LogosMark } from './LogosMark';
+import { MathField } from './MathField';
 
 const TONE: Record<Tone, string> = {
   primary: 'var(--lg-primary)',
@@ -168,6 +169,8 @@ export function MathViz({
   const ptrs = useRef<Map<number, { x: number; y: number }>>(new Map());
   /** Span and midpoint of the pinch when the second finger landed. */
   const pinchRef = useRef<{ dist: number; view: Viewport; cx: number; cy: number } | null>(null);
+  /** Where the camera was when a drag on a 3D scene began. */
+  const camRef = useRef<{ yaw: number; turn: number } | null>(null);
   const persistRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // A different scene is a different problem: back to its own defaults, its
@@ -179,6 +182,47 @@ export function MathViz({
     const p = sweptParam(active);
     progRef.current = p ? sweepProgress(p, defaults(active)[p.id]) : 0;
   }, [activeKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /**
+   * A picture that moves says so by moving, once, when it first arrives.
+   *
+   * The sweep was reachable only through the play button, which meant the one
+   * thing that makes this a model rather than a diagram — the parameter
+   * running — was invisible until somebody guessed there was something to
+   * press. So a scene that HAS a swept parameter runs it through once the
+   * first time it appears.
+   *
+   * Once, and only for a scene arriving from outside. `propKey` rather than
+   * `activeKey` is the whole distinction: editing the expression produces a
+   * new active scene several times a second, and replaying the animation on
+   * each keystroke would be a strobe attached to a text box. Anything the
+   * reader has already touched — played, scrubbed, edited — is left alone,
+   * and prefers-reduced-motion opts out entirely.
+   */
+  const introduced = useRef<string | null>(null);
+  useEffect(() => {
+    if (introduced.current === propKey) return;
+    // `swept` rather than sweptParam(scene): that memo is what the play
+    // button and the clock both read, and a scene whose parameters have been
+    // filled in on the way through would otherwise look unsweepable here
+    // while animating perfectly well everywhere else.
+    if (!swept) return;
+    if (typeof window === 'undefined') return;
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+    // A beat after it lands, so the curve is drawn and settled before the
+    // parameter starts moving and there is something to watch it against.
+    // Marked when it FIRES, not when it is scheduled. React runs effects
+    // twice in development and throws the first one away; a flag set before
+    // the timer meant the surviving run saw "already introduced" and the
+    // animation never played at all — in development only, which is the
+    // worst place for it to hide.
+    const t = setTimeout(() => {
+      introduced.current = propKey;
+      progRef.current = 0;
+      setPlaying(true);
+    }, 450);
+    return () => clearTimeout(t);
+  }, [propKey, swept]);
 
   const setProgress = useCallback(
     (p: number) => {
@@ -330,6 +374,11 @@ export function MathViz({
     }
     if (ptrs.current.size === 1) {
       dragRef.current = { x: e.clientX, y: e.clientY, view: g.view };
+      // A surface turns instead of panning, so the drag has to remember where
+      // the camera started as well as where the window did. Measured from the
+      // START of the drag rather than accumulated frame by frame, for the same
+      // reason the pinch is: accumulation drifts.
+      camRef.current = { yaw: vals.yaw ?? 38, turn: vals.turn ?? 26 };
     }
   };
 
@@ -353,9 +402,27 @@ export function MathViz({
       return;
     }
 
-    // ── one pointer: pan ──
+    // ── one pointer: pan, or turn the model ──
     const d = dragRef.current;
     if (!d) return;
+
+    // Dragging a surface rotates it. Panning a projection is meaningless —
+    // the window is the fixed box the cube is drawn into, not a region of the
+    // domain — so the same gesture is given the job it obviously has here.
+    if (active.kind === 'surface') {
+      const start = camRef.current;
+      if (!start) return;
+      const box = svgRef.current?.getBoundingClientRect();
+      const w = box?.width || 400;
+      const h = box?.height || 300;
+      // A full drag across the picture is most of a turn; vertically it is
+      // the whole tilt. Clamped short of the poles, where the projection
+      // degenerates into a flat line and the model appears to vanish.
+      const yaw = start.yaw + ((e.clientX - d.x) / w) * 260;
+      const turn = Math.min(88, Math.max(2, start.turn - ((e.clientY - d.y) / h) * 150));
+      setVals((v) => ({ ...v, yaw: ((yaw + 180) % 360 + 360) % 360 - 180, turn }));
+      return;
+    }
     // Convert the pixel drag into data units through the same matrix the
     // drawing uses, so the graph tracks the cursor exactly rather than
     // approximately.
@@ -1082,15 +1149,13 @@ function Editor({
         <span className="lg-viz-eqlab">
           <TeX tex={eqLabel(draft.kind, varName)} />
         </span>
-        <input
+        <MathField
           className="lg-viz-eq"
           value={draft.expr}
-          spellCheck={false}
-          autoComplete="off"
           autoFocus
-          aria-label="Expression"
-          placeholder="x^2 - 3"
-          onChange={(e) => onChange({ ...draft, expr: e.target.value })}
+          ariaLabel="Expression"
+          placeholder="x²-3"
+          onChange={(expr) => onChange({ ...draft, expr })}
         />
       </div>
       )}

@@ -1,0 +1,147 @@
+/* app/onboarding.css — the four beats, ported from the design package.
+ *
+ * SELF-CONTAINED TOKENS, on purpose. The values this sheet reaches for —
+ * --ink-45, --ink-12, --ease-out-expo — are declared in journal.css under
+ * `.jr-root`, so they do not exist on a page that is not the journal. Rather
+ * than widen those to :root (which would let a magazine's palette leak into
+ * every surface in the product) the handful this needs are restated here, on
+ * `.ob` itself. Nothing outside this page can see them and nothing inside it
+ * depends on which root it happens to be under.
+ *
+ * Every selector is already .ob-prefixed in the source, so unlike the journal
+ * sheet this one needed no scoping transform.
+ */
+.ob {
+  --ink-12: rgba(32, 32, 27, .12);
+  --ink-25: rgba(32, 32, 27, .25);
+  --ink-45: rgba(32, 32, 27, .45);
+  --ink-70: rgba(32, 32, 27, .70);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --font-serif-stack: var(--font-serif-stack), "Instrument Serif", Georgia, serif;
+}
+
+/* ===== onboarding — four beats on paper, then the chat ===== */
+.ob{min-height:100svh;display:flex;flex-direction:column;background:var(--paper);position:relative}
+.ob-grain{position:fixed;inset:0;z-index:1;pointer-events:none;opacity:.5;mix-blend-mode:multiply;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.045'/%3E%3C/svg%3E")}
+
+/* furniture: four short rules, a mark, one quiet exit */
+.ob-top{position:relative;z-index:2;display:flex;align-items:center;justify-content:space-between;gap:16px;
+  padding:18px clamp(20px,5vw,56px)}
+.ob-beats{display:flex;gap:6px;align-items:center}
+.ob-beats i{width:26px;height:2px;background:var(--ink-12);position:relative;overflow:hidden;display:block}
+.ob-beats i b{position:absolute;inset:0;background:var(--moss);transform:scaleX(0);transform-origin:left;display:block;
+  transition:transform .5s var(--ease-out-expo)}
+.ob-beats i.on b{transform:scaleX(1)}
+.ob-skip{font-family:var(--font-serif-stack);font-style:italic;font-size:.95rem;color:var(--ink-45);text-decoration:none;
+  transition:color .2s}
+.ob-skip:hover{color:var(--moss-700)}
+
+.ob-stage{position:relative;z-index:2;flex:1;min-height:0;display:flex;align-items:center;
+  padding:clamp(20px,4vh,48px) clamp(20px,5vw,56px) clamp(34px,6vh,70px)}
+.ob-wrap{width:min(760px,100%);margin:0 auto}
+.ob-wrap.wide{width:min(1060px,100%)}
+
+/* the question */
+.ob-q{font-family:var(--font-serif-stack);font-weight:400;font-size:clamp(2rem,5.4vw,3.6rem);line-height:1.02;
+  letter-spacing:-.03em;color:var(--ink);margin:14px 0 0;text-wrap:balance}
+.ob-sf{margin:16px 0 0;font-family:var(--font-serif-stack);font-style:italic;font-size:clamp(1.05rem,1.7vw,1.35rem);
+  line-height:1.35;color:var(--ink-70);max-width:34ch}
+
+/* word rise, mount-driven — nothing depends on scroll */
+.ob-w{display:inline-block;vertical-align:top}
+.ob-w i{display:inline-block;font-style:inherit}
+@media(prefers-reduced-motion:no-preference){
+  .ob-w i{opacity:0;transform:translateY(.4em);animation:ob-rise .7s var(--ease-out-expo) forwards;
+    animation-delay:calc(var(--i,0) * 38ms)}
+}
+@keyframes ob-rise{to{opacity:1;transform:none}}
+.ob-fade{opacity:1}
+@media(prefers-reduced-motion:no-preference){
+  .ob-fade{opacity:0;animation:ob-in .9s var(--ease-out-expo) forwards;animation-delay:var(--d,.25s)}
+}
+@keyframes ob-in{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+
+/* beat i — the four intents */
+.ob-cards{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--ink-12);
+  border:1px solid var(--ink-12);margin-top:clamp(26px,5vh,46px)}
+@media(max-width:640px){.ob-cards{grid-template-columns:1fr}}
+.ob-card{background:var(--paper);padding:clamp(20px,2.6vw,30px);text-align:left;display:flex;flex-direction:column;gap:7px;
+  min-height:126px;transition:background .22s,transform .22s}
+.ob-card:hover{background:#fff;transform:translateY(-2px)}
+.ob-card .rn{font-family:var(--font-serif-stack);font-style:italic;font-size:.98rem;color:var(--moss-700)}
+.ob-card .t{font-family:var(--font-serif-stack);font-size:clamp(1.25rem,2.1vw,1.65rem);line-height:1.1;color:var(--ink)}
+.ob-card .d{font-size:.94rem;line-height:1.45;color:var(--ink-60);margin-top:auto}
+.ob-card:hover .t{color:var(--moss-700)}
+/* the fifth spans the pair and sits quieter — an escape, not a fifth equal */
+.ob-card.wide{grid-column:1 / -1;min-height:0;flex-direction:row;align-items:baseline;gap:14px;flex-wrap:wrap;
+  padding-top:17px;padding-bottom:17px}
+.ob-card.wide .t{font-size:clamp(1.1rem,1.7vw,1.3rem);color:var(--ink-70)}
+.ob-card.wide .d{margin-top:0}
+@media(max-width:640px){.ob-card.wide{flex-direction:column;align-items:flex-start;gap:6px}}
+
+/* beat ii — one real thing */
+.ob-field{margin-top:clamp(24px,4.5vh,42px);border-bottom:1px solid var(--ink-25);
+  display:flex;align-items:flex-end;gap:14px;transition:border-color .25s}
+.ob-field:focus-within{border-color:var(--moss)}
+.ob-field textarea{flex:1;min-width:0;border:none;outline:none;resize:none;background:none;
+  font-family:var(--font-serif-stack);font-size:clamp(1.3rem,2.6vw,1.9rem);line-height:1.34;color:var(--ink);
+  padding:0 0 12px}
+.ob-field textarea::placeholder{color:var(--ink-25)}
+.ob-go{flex:0 0 auto;margin-bottom:12px;width:40px;height:40px;border-radius:50%;background:var(--moss);
+  color:var(--paper);display:grid;place-items:center;transition:opacity .2s,transform .2s}
+.ob-go:hover{transform:translateY(-2px)}
+.ob-go[disabled]{opacity:.3;cursor:not-allowed;transform:none}
+.ob-hint{margin:11px 2px 0;font-family:var(--font-serif-stack);font-style:italic;font-size:.92rem;color:var(--ink-45)}
+.ob-eg{display:flex;flex-wrap:wrap;gap:9px;margin-top:20px}
+.ob-eg button{padding:8px 15px;border-radius:999px;border:1px solid var(--ink-16);background:var(--paper);
+  font-size:.9rem;color:var(--ink-60);text-align:left;transition:border-color .2s,color .2s,background .2s}
+.ob-eg button:hover{border-color:var(--moss);color:var(--moss-700);background:#fff}
+
+/* beat iii — the exchange */
+.ob-said{padding:0 0 clamp(18px,3vh,28px);border-bottom:1px solid var(--ink-12)}
+.ob-said .lbl{display:block;font-family:var(--font-sans);font-size:9.5px;font-weight:600;letter-spacing:.24em;
+  text-transform:uppercase;color:var(--ink-45);margin-bottom:8px}
+.ob-said .v{font-family:var(--font-serif-stack);font-size:clamp(1.15rem,2vw,1.5rem);line-height:1.3;color:var(--ink-70)}
+.ob-reply{margin-top:clamp(20px,3.4vh,32px)}
+.ob-reply .lbl{display:block;font-family:var(--font-sans);font-size:9.5px;font-weight:600;letter-spacing:.24em;
+  text-transform:uppercase;color:var(--moss-700);margin-bottom:9px}
+.ob-reply .v{font-family:var(--font-serif-stack);font-size:clamp(1.5rem,3.6vw,2.5rem);line-height:1.1;letter-spacing:-.02em;color:var(--ink)}
+.ob-reply .v em{font-style:italic;color:var(--moss-700)}
+.ob-caret{display:inline-block;width:2px;height:1em;background:var(--moss);vertical-align:-.12em;margin-left:2px;
+  animation:ob-blink 1s steps(1) infinite}
+@keyframes ob-blink{50%{opacity:0}}
+@media(prefers-reduced-motion:reduce){.ob-caret{animation:none}}
+.ob-noticed{margin-top:clamp(22px,3.6vh,34px)}
+.ob-next{display:flex;align-items:center;gap:20px;flex-wrap:wrap;margin-top:clamp(24px,4vh,38px)}
+.ob-next .q2{font-family:var(--font-serif-stack);font-style:italic;font-size:clamp(1.1rem,1.9vw,1.45rem);color:var(--ink-70)}
+
+/* beat iv — the map, and the one sentence */
+.ob-map{position:relative;margin-top:clamp(22px,4vh,38px);aspect-ratio:16/9;min-height:300px;
+  border:1px solid var(--border);background-color:#f3f0e6;
+  background-image:radial-gradient(circle,rgba(53,70,32,.18) 1px,transparent 1px);background-size:26px 26px}
+@media(max-width:700px){.ob-map{aspect-ratio:4/5;min-height:380px}}
+.ob-map .ph{position:absolute;left:14px;top:12px;font-family:var(--font-sans);font-size:9.5px;font-weight:600;
+  letter-spacing:.24em;text-transform:uppercase;color:var(--ink-45)}
+.ob-map .edges{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.ob-map .edges path{fill:none;stroke-width:1.4;stroke:rgba(94,118,51,.7)}
+.ob-map .edges path.dash{stroke:#E8B62C;stroke-dasharray:5 5}
+.ob-map .nd{position:absolute;max-width:min(54%,236px)}
+@media(prefers-reduced-motion:no-preference){
+  .ob-map .edges path{stroke-dasharray:200;stroke-dashoffset:200;animation:ob-draw .9s var(--ease-standard) forwards;
+    animation-delay:calc(.2s + var(--i,0) * .26s)}
+  .ob-map .edges path.dash{animation:ob-dash .6s var(--ease-standard) forwards;animation-delay:calc(.4s + var(--i,0) * .26s)}
+  .ob-map .nd{opacity:0;scale:.92;animation:ob-pop .55s var(--ease-out-expo) forwards;
+    animation-delay:calc(.1s + var(--i,0) * .26s)}
+}
+@keyframes ob-draw{to{stroke-dashoffset:0}}
+@keyframes ob-dash{from{opacity:0}to{opacity:1;stroke-dashoffset:0}}
+@keyframes ob-pop{to{opacity:1;scale:1}}
+
+.ob-creed{margin-top:clamp(26px,4.6vh,46px);padding-top:clamp(20px,3vh,28px);border-top:2px solid var(--ink)}
+.ob-creed .one{font-family:var(--font-serif-stack);font-size:clamp(1.35rem,2.8vw,2.1rem);line-height:1.18;color:var(--ink);max-width:40ch}
+.ob-creed .one em{font-style:italic;color:var(--moss-700)}
+.ob-creed .row{display:flex;align-items:center;gap:22px;flex-wrap:wrap;margin-top:clamp(20px,3.4vh,30px)}
+.ob-creed .aside{font-family:var(--font-serif-stack);font-style:italic;font-size:.95rem;color:var(--ink-45)}
+.ob-kept{margin:10px 2px 0;font-family:var(--font-serif-stack);font-size:.95rem;color:var(--ink-45)}
+.ob-kept em{font-style:italic;color:var(--moss-700)}
