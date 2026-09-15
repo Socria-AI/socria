@@ -3,7 +3,9 @@ import type { Metadata } from 'next';
 import './one.css';
 import { OneStory } from './OneStory';
 import { priceWithPeriod } from '@/lib/socria-one';
-import { Colophon } from '@/components/Colophon';
+import '../quiet.css';
+import { QuietMast, QuietProgress, QuietFoot } from '@/components/quiet/Quiet';
+import { QuietMotion } from '@/components/quiet/QuietMotion';
 
 export const metadata: Metadata = {
   title: 'Socria One — the complete reasoning environment',
@@ -12,11 +14,12 @@ export const metadata: Metadata = {
 
 export default function OnePage() {
   return (
-    <>
+    <div className="q-root">
+      <QuietMotion />
+      <QuietProgress />
+      <QuietMast section="Socria One" current="one" />
       <OneStory />
-      <div className="sc-colophon-wrap">
-        <Colophon />
-      </div>
-    </>
+      <QuietFoot />
+    </div>
   );
 }
