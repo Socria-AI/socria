@@ -35,6 +35,7 @@ import { DRIFT_DISMISS_LIMIT, readDrift, type DriftVerdict } from '@/lib/topic-d
 import { readStart, startMessage } from '@/lib/first-session';
 import { takeCarried } from '@/lib/onboarding-script';
 import { Tour } from '@/components/Tour';
+import { AccountSheet } from '@/components/account/AccountSheet';
 import { TOUR_KEY, shouldRunTour } from '@/lib/tour';
 import { isSource } from '@/lib/checkout-attribution';
 import { track } from '@/lib/analytics';
@@ -227,6 +228,7 @@ export default function ChatPage() {
   // once, so it waits for a later visit — which is also when the furniture
   // starts to matter.
   const [tourOpen, setTourOpen] = useState(false);
+  const [acctOpen, setAcctOpen] = useState(false);
   const endTour = useCallback(() => {
     setTourOpen(false);
     try { localStorage.setItem(TOUR_KEY, '1'); } catch {}
@@ -1622,6 +1624,12 @@ export default function ChatPage() {
 
       {/* Sidebar — overlay on mobile, static column on desktop */}
       <Tour open={tourOpen} onDone={endTour} />
+      <AccountSheet
+        open={acctOpen}
+        onClose={() => setAcctOpen(false)}
+        isOne={planState.plan === 'one'}
+        onRetakeTour={() => setTourOpen(true)}
+      />
       <aside
         data-tour="sessions"
         className={`${
@@ -1898,6 +1906,13 @@ export default function ChatPage() {
           </button>
           <SignedIn>
             <div className="flex items-center gap-3" data-tour="account">
+              <button
+                type="button"
+                className="text-[12px] text-ink/55 hover:text-ink transition-colors"
+                onClick={() => setAcctOpen(true)}
+              >
+                Account
+              </button>
               <UserButton afterSignOutUrl="/chat" userProfileMode="navigation" userProfileUrl="/account" />
               <div className="text-[11px] text-ink/50 font-serif italic leading-tight">
                 Synced across your devices
