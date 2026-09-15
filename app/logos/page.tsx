@@ -11,6 +11,9 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import './logos.css';
+import '../quiet.css';
+import { QuietMast, QuietProgress, QuietFoot } from '@/components/quiet/Quiet';
+import { QuietMotion } from '@/components/quiet/QuietMotion';
 import { LogosStory } from './LogosStory';
 
 export const metadata: Metadata = {
@@ -35,5 +38,13 @@ export default function LogosPage({
     q.set('model', 'logos');
     redirect(`/chat?${q.toString()}`);
   }
-  return <LogosStory />;
+  return (
+    <div className="q-root">
+      <QuietMotion />
+      <QuietProgress />
+      <QuietMast section="Logos" current="logos" />
+      <LogosStory />
+      <QuietFoot />
+    </div>
+  );
 }
