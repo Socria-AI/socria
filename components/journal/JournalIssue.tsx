@@ -21,7 +21,7 @@
 // split.
 
 import { useEffect } from 'react';
-import Link from 'next/link';
+import { Colophon } from '@/components/Colophon';
 import {
   Grain,
   Progress,
@@ -538,37 +538,11 @@ export function JournalIssue() {
           {/* The colophon carries the whole site, including the legal pages.
               `subprocessors` was previously reachable only by typing its URL —
               a page nobody could find is not a published policy. */}
-          <div className="colophon">
-            <span>Socria · Human-first AI</span>
-            <span>
-              <Link href="/logos">Logos</Link>
-            </span>
-            <span>
-              <Link href="/blog">Blog</Link>
-            </span>
-            <span>
-              <Link href="/docs">Docs</Link>
-            </span>
-            <span>
-              <Link href="/privacy">Privacy</Link>
-            </span>
-            <span>
-              <Link href="/terms">Terms</Link>
-            </span>
-            <span>
-              <Link href="/security">Security</Link>
-            </span>
-            <span>
-              <Link href="/subprocessors">Subprocessors</Link>
-            </span>
+          <Colophon className="colophon">
             <span>
               <PrintLink />
             </span>
-            <span className="it">Think For Yourself.</span>
-            <span>
-              © <span data-year="">{new Date().getFullYear()}</span>
-            </span>
-          </div>
+          </Colophon>
         </div>
       </section>
     </div>

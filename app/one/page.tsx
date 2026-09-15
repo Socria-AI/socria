@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import './one.css';
 import { OneStory } from './OneStory';
 import { priceWithPeriod } from '@/lib/socria-one';
+import { Colophon } from '@/components/Colophon';
 
 export const metadata: Metadata = {
   title: 'Socria One — the complete reasoning environment',
@@ -10,5 +11,12 @@ export const metadata: Metadata = {
 };
 
 export default function OnePage() {
-  return <OneStory />;
+  return (
+    <>
+      <OneStory />
+      <div className="sc-colophon-wrap">
+        <Colophon />
+      </div>
+    </>
+  );
 }

@@ -130,6 +130,10 @@ export function BlogFooter() {
           <Link href="/privacy">Privacy</Link>
           <Link href="/terms">Terms</Link>
           <Link href="/security">Security</Link>
+          {/* Reachable by URL alone until now. A policy nobody can navigate
+              to is not a published policy. */}
+          <Link href="/subprocessors">Subprocessors</Link>
+          <Link href="/explore">Explore</Link>
           <Link href="/studio">Studio</Link>
         </div>
       </div>
