@@ -29,6 +29,7 @@ const MODULES = [
   'lib/onboarding.ts',
   'lib/onboarding-script.ts',
   'lib/pfp.ts',
+  'lib/tour.ts',
   'lib/socria-one.ts',
   'lib/rich-text.ts',
   'lib/easter-eggs.ts',
