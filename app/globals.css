@@ -8262,3 +8262,91 @@ a.one-mark.is-strip:hover { background: rgba(38, 72, 90, 0.075); }
   .edu-panel { padding: 18px 16px 16px; }
   .edu-go { width: 100%; }
 }
+/* ── the first map ──────────────────────────────────────────────────
+ *
+ * A sheet at the bottom of the map pane, at every width. The invitation it
+ * replaces was desktop-only, which is the one mistake worth not repeating.
+ */
+.logos-root .lg-fm {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: center;
+  padding: 0 12px 12px;
+  pointer-events: none;
+  z-index: 40;
+}
+.logos-root .lg-fm-card {
+  pointer-events: auto;
+  width: 100%;
+  max-width: 420px;
+  background: var(--lg-panel);
+  border: 1px solid var(--lg-line);
+  border-radius: 14px;
+  padding: 13px 15px 12px;
+  box-shadow: 0 8px 28px rgba(60, 48, 32, 0.13);
+}
+.logos-root .lg-fm-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 9px;
+}
+.logos-root .lg-fm-dots { display: inline-flex; gap: 5px; }
+.logos-root .lg-fm-dots i {
+  width: 14px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--lg-line);
+  transition: background 220ms ease;
+}
+.logos-root .lg-fm-dots i.is-on { background: var(--lg-primary); }
+.logos-root .lg-fm-skip {
+  font-size: 12px;
+  color: var(--lg-ink-60);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+.logos-root .lg-fm-skip:hover { color: var(--lg-ink); }
+.logos-root .lg-fm-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--lg-ink);
+  margin: 0 0 4px;
+}
+.logos-root .lg-fm-body {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--lg-ink-60);
+  margin: 0;
+}
+.logos-root .lg-fm-foot { margin-top: 10px; min-height: 26px; display: flex; align-items: center; }
+.logos-root .lg-fm-cue {
+  font-size: 12px;
+  color: var(--lg-primary);
+  font-weight: 500;
+}
+.logos-root .lg-fm-go {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--lg-paper);
+  background: var(--lg-primary);
+  border: 0;
+  border-radius: 8px;
+  padding: 6px 14px;
+  cursor: pointer;
+}
+
+/* The card being talked about, while the sequence is on it. */
+.logos-root.is-firstmap-node .lg-node {
+  animation: lg-fm-pulse 2.1s ease-in-out infinite;
+}
+@keyframes lg-fm-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(53, 70, 32, 0); }
+  50% { box-shadow: 0 0 0 4px rgba(53, 70, 32, 0.16); }
+}
+html.anim-off .logos-root.is-firstmap-node .lg-node { animation: none; }
