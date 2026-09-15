@@ -9,6 +9,7 @@
 
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { Colophon } from '@/components/Colophon';
 import Image from 'next/image';
 import { ExploreShowcase } from './ExploreShowcase';
 
@@ -67,7 +68,9 @@ export default function ExplorePage() {
         </section>
       </main>
 
-      <footer className="exp-foot">Think for yourself.</footer>
+      <footer className="exp-foot">
+        <Colophon />
+      </footer>
     </div>
   );
 }

@@ -8479,3 +8479,24 @@ a.one-mark.is-strip:hover { background: rgba(38, 72, 90, 0.075); }
   50% { box-shadow: 0 0 0 4px rgba(53, 70, 32, 0.16); }
 }
 html.anim-off .logos-root.is-firstmap-node .lg-node { animation: none; }
+
+/* ── the shared colophon ────────────────────────────────────────────
+ *
+ * The base treatment, for paper grounds. The journal issue overrides it
+ * with `.jr-root .colophon`, which is more specific and wins — see
+ * components/Colophon.tsx for why the two exist.
+ */
+.sc-colophon {
+  margin-top: clamp(48px, 8vh, 96px);
+  padding-top: 22px;
+  border-top: 1px solid var(--line, rgba(35, 36, 31, 0.12));
+  display: flex;
+  justify-content: space-between;
+  gap: 12px 26px;
+  flex-wrap: wrap;
+  font-size: 0.8rem;
+  color: rgba(35, 36, 31, 0.6);
+}
+.sc-colophon a { color: rgba(35, 36, 31, 0.6); text-decoration: none; }
+.sc-colophon a:hover { color: rgba(35, 36, 31, 0.95); text-decoration: underline; }
+.sc-colophon .it { font-style: italic; }
