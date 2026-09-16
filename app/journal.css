@@ -866,3 +866,159 @@ html.anim-off .jr-root .app.plot .pane-map .edges, html.anim-off .jr-root .app.p
 .jr-root .mast nav .auth-btn { display: inline-flex; align-items: center; margin-left: 2px; }
 .jr-root .mast nav .auth-btn .cl-userButtonTrigger { width: 28px; height: 28px; }
 @media (max-width: 640px) { .jr-root .mast nav a.hs.auth { display: inline-flex; } }
+
+/* ---------- Issue No. 1 · Logos — the page's own deeper set ----------
+ *
+ * Ported from the inline <style> in `Socria Logos.html`. Scoped under
+ * `.lg-issue` rather than applied to `body`, so the Logos issue can run a
+ * darker moss and its own accent roles without the journal homepage — which
+ * shares every other rule in this sheet — changing colour underneath it.
+ */
+.jr-root.lg-issue{--moss:#354620;--moss-700:#2c3b18;--person:#354620;--evidence:#264653;--friction:#9C5B3C}
+.jr-root .lg-moves{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--ink-12);border:1px solid var(--ink-12);margin-top:clamp(24px,4vh,42px)}
+@media(max-width:820px){.jr-root .lg-moves{grid-template-columns:1fr 1fr}}
+@media(max-width:480px){.jr-root .lg-moves{grid-template-columns:1fr}}
+.jr-root .lg-move{background:var(--paper);padding:clamp(20px,2.6vw,32px);display:flex;flex-direction:column;gap:10px;min-height:180px}
+.jr-root .lg-move .rn{font-family:var(--font-serif);font-style:italic;color:var(--moss-700);font-size:1rem}
+.jr-root .lg-move h3{font-size:clamp(1.3rem,2vw,1.7rem)}
+.jr-root .lg-move p{font-size:.94rem;color:var(--ink-70);line-height:1.5}
+.jr-root .lg-move svg{width:44px;height:44px;overflow:visible;margin-top:auto;fill:none;stroke:var(--moss);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.jr-root .board{margin-top:clamp(24px,4vh,42px);background:linear-gradient(172deg,#232f14,#1a2410);border:9px solid #3d3428;padding:clamp(24px,3.6vw,48px);color:rgba(240,234,216,.88);box-shadow:inset 0 0 60px rgba(0,0,0,.5)}
+.jr-root .board .bt{font-family:var(--font-sans);font-size:.66rem;font-weight:600;letter-spacing:var(--tracking-label);text-transform:uppercase;color:rgba(240,234,216,.55)}
+.jr-root .board .eq{font-family:var(--font-math),Georgia,serif;font-size:clamp(1.4rem,2.8vw,2.2rem);line-height:1.9;margin-top:12px}
+.jr-root .board .eq .row{display:block;width:fit-content}
+.jr-root .board .strike{position:relative;display:inline-block}
+.jr-root .board .strike svg{position:absolute;left:-4%;top:46%;width:108%;height:.5em;overflow:visible}
+.jr-root .board .strike svg path{fill:none;stroke:rgba(240,234,216,.9);stroke-width:2.6;stroke-linecap:round;stroke-dasharray:130;stroke-dashoffset:130}
+.jr-root .reading.in .board .strike svg path{stroke-dashoffset:0;transition:stroke-dashoffset .7s ease 1s}
+/* The struck error and its fix start hidden and are revealed by the reading
+   coming into view. Both have a print fallback below, and neither is the only
+   thing standing between somebody and the working — the equation above them
+   is plain text. */
+.jr-root .board .fix{font-style:italic;color:var(--sage);margin-left:.7em;opacity:0}
+.jr-root .reading.in .board .fix{opacity:1;transition:opacity .7s ease 1.6s}
+.jr-root .board .note{font-family:var(--font-hand),cursive;font-size:1.05rem;color:rgba(240,234,216,.6);margin-top:14px}
+@media print{.jr-root .board .strike svg path{stroke-dashoffset:0}.jr-root .board .fix{opacity:1}}
+/* Same rule as everywhere else here: if the reveal never runs, show it. */
+html.anim-off .jr-root .board .strike svg path{stroke-dashoffset:0}
+html.anim-off .jr-root .board .fix{opacity:1}
+
+/* the close section's two actions */
+.jr-root .btn-xl{display:inline-flex;align-items:center;gap:10px;background:var(--sage);color:var(--forest-2);font-weight:500;padding:16px 30px;border-radius:2px;font-size:1.02rem}
+.jr-root .btn-xl:hover{background:var(--sage-bright)}
+.jr-root .btn-link{color:rgba(244,241,232,.7);text-decoration:underline;text-underline-offset:4px}
+.jr-root .btn-link:hover{color:var(--paper)}
+
+
+/* ---------- Socria One · the invitation ----------
+ *
+ * Ported from the inline <style> in `Socria One.html`, scoped under
+ * `.one-issue`. The One page floods from Socria green into Prussian and runs
+ * a pale-on-deep register for most of its length; unscoped, `.deep`, `.stage`
+ * and `.plate` would repaint the journal homepage, which shares this sheet.
+ */
+/* ── Socria One · the one surface that leaves the paper behind ── */
+.jr-root.one-issue .deep{background:radial-gradient(120% 92% at 68% 6%,#26485A 0%,#1d3a4a 34%,#16303e 62%,#0f2430 100%);color:#f0ead8}
+.jr-root.one-issue .deep .st,.deep .coda,.deep .a{color:rgba(240,234,216,.72)}
+.jr-root.one-issue .deep .who{color:rgba(240,234,216,.72)}
+/* Label sets its colour inline on its own span, so override that span directly */
+.jr-root.one-issue .deep .eb span{color:#f0ead8!important}
+.jr-root.one-issue .deep .q{color:#f0ead8}
+.jr-root.one-issue .deep .q .em,.deep h1 .em,.deep h2 .em{font-style:italic;color:#b8cdd9}
+.jr-root.one-issue .deep .rn{color:#f0ead8;opacity:.08}
+
+/* the cover floods from Socria green into Prussian */
+.jr-root.one-issue .one-cover{position:relative;overflow:hidden;background:radial-gradient(120% 92% at 68% 6%,#5e7633 0%,#4a5f2a 34%,#38481f 62%,#263314 100%)}
+.jr-root.one-issue .one-cover .flood{position:absolute;inset:0;z-index:0;pointer-events:none;background:radial-gradient(120% 92% at 68% 6%,#26485A 0%,#1d3a4a 34%,#16303e 62%,#0f2430 100%);clip-path:circle(0% at 22% 34%)}
+.jr-root.one-issue .one-cover.bloom .flood{clip-path:circle(190% at 22% 34%);transition:clip-path 1.9s cubic-bezier(.3,.7,.2,1)}
+.jr-root.one-issue .one-cover .wrap{position:relative;z-index:2}
+.jr-root.one-issue .one-cover h1{font-size:clamp(3rem,12vw,11rem);line-height:.84;letter-spacing:-.048em;margin:.14em 0 0}
+.jr-root.one-issue .priceline{margin-top:clamp(22px,3.6vh,38px);display:flex;align-items:baseline;gap:.45em;flex-wrap:nowrap;white-space:nowrap}
+.jr-root.one-issue .priceline .amt{display:inline-block;font-family:var(--font-serif);font-size:clamp(2.6rem,7vw,5.4rem);line-height:1;color:#f0ead8}
+.jr-root.one-issue .priceline .per{display:inline-block;font-family:var(--font-serif);font-style:italic;font-size:clamp(1.1rem,2vw,1.7rem);color:rgba(240,234,216,.78)}
+.jr-root.one-issue .one-cover .st{margin-top:clamp(20px,3vh,32px);color:rgba(240,234,216,.74)}
+.jr-root.one-issue .one-cover .begin .lbl{color:rgba(240,234,216,.74)}
+.jr-root.one-issue .one-cover .begin .ln{background:rgba(240,234,216,.25)}
+.jr-root.one-issue .one-cover .begin .ln::after{background:#b8cdd9}
+@media(prefers-reduced-motion:reduce),print{.jr-root.one-issue .one-cover .flood{clip-path:none!important;transition:none!important}}
+
+/* ── the boundary, demonstrated ── */
+.jr-root.one-issue .demo{position:relative;z-index:2;padding:clamp(70px,11vh,130px) var(--edge)}
+.jr-root.one-issue .demo .wrap{width:min(1180px,100%);margin:0 auto}
+.jr-root.one-issue .demo h2{font-size:clamp(2.2rem,6.4vw,5rem);line-height:.94;letter-spacing:-.038em;margin:clamp(16px,3vh,26px) 0 0;max-width:18ch}
+.jr-root.one-issue .demo .deck{font-family:var(--font-serif);font-style:italic;font-size:clamp(1.15rem,2vw,1.6rem);color:rgba(240,234,216,.7);max-width:44ch;margin-top:16px;line-height:1.32}
+.jr-root.one-issue .stage{margin-top:clamp(26px,4.5vh,48px);position:relative;aspect-ratio:16/9;min-height:330px;border:1px solid rgba(240,234,216,.18);background-image:radial-gradient(circle,rgba(240,234,216,.08) 1px,transparent 1px);background-size:26px 26px;overflow:hidden}
+.jr-root.one-issue .stage .edges{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}
+.jr-root.one-issue .stage .edges path{fill:none;stroke-width:1.4}   /* no transition: a frozen timeline would strand the unlock */
+.jr-root.one-issue .stage .e-open{stroke:rgba(156,184,116,.55)}
+.jr-root.one-issue .stage .e-lock{stroke:#b8cdd9;stroke-dasharray:5 5}
+.jr-root.one-issue .stage .nd{position:absolute;transform:translate(-50%,-50%);transition:opacity .6s var(--ease-out-expo),transform .6s var(--ease-out-expo)}
+.jr-root.one-issue .stage .locked{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:8px;transition:opacity .7s var(--ease-out-expo),transform .7s var(--ease-out-expo)}
+.jr-root.one-issue .stage .locked .ghost{width:132px;height:52px;border:1px dashed rgba(240,234,216,.38);border-radius:var(--radius-md);display:grid;place-items:center;font-family:var(--font-serif);font-style:italic;font-size:.92rem;color:#f0ead8;padding:0 10px;text-align:center;transition:border-color .5s,background .5s}
+.jr-root.one-issue .stage.unlocked .locked .ghost{border-style:solid;border-color:#b8cdd9;color:#f0ead8;background:rgba(38,72,90,.55)}
+.jr-root.one-issue .stage .capline{position:absolute;left:0;right:0;bottom:0;padding:12px 16px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-family:var(--font-sans);font-size:.66rem;font-weight:600;letter-spacing:var(--tracking-label);text-transform:uppercase;color:rgba(240,234,216,.74);border-top:1px solid rgba(240,234,216,.14);background:rgba(15,36,48,.5)}
+.jr-root.one-issue .stage .capline .on-state{color:#b8cdd9}
+.jr-root.one-issue .stage.unlocked .capline .off-state{opacity:.4}
+.jr-root.one-issue .demo .controls{margin-top:22px;display:flex;gap:18px;align-items:center;flex-wrap:wrap}
+.jr-root.one-issue .btn-one{display:inline-flex;align-items:center;gap:.6em;height:50px;padding:0 26px;border-radius:var(--radius-pill);background:#f0ead8;color:#0f2430;font-family:var(--font-sans);font-size:.96rem;font-weight:500;border:none;cursor:pointer;transition:background .2s,transform .2s}
+.jr-root.one-issue .btn-one:hover{background:#fff;transform:translateY(-2px)}
+.jr-root.one-issue .btn-quiet{font-family:var(--font-serif);font-style:italic;font-size:1.06rem;color:#b8cdd9;border-bottom:1px solid #b8cdd9;padding-bottom:2px;background:none;border-top:none;border-left:none;border-right:none;cursor:pointer}
+.jr-root.one-issue .demo .vow{margin-top:22px;font-family:var(--font-serif);font-style:italic;font-size:clamp(1.05rem,1.7vw,1.35rem);color:rgba(240,234,216,.62);max-width:46ch}
+
+/* ── the ledger: four sealed chapters ── */
+.jr-root.one-issue .ledger{padding:clamp(70px,11vh,130px) var(--edge);position:relative;z-index:2;border-top:3px solid var(--ink);border-bottom:1px solid var(--ink)}
+.jr-root.one-issue .ledger .wrap{width:min(1180px,100%);margin:0 auto}
+.jr-root.one-issue .ledger h2{font-size:clamp(2.2rem,6.4vw,5rem);line-height:.94;letter-spacing:-.038em;margin:clamp(16px,3vh,26px) 0 0;max-width:18ch}
+.jr-root.one-issue .ledger h2 .em{font-style:italic;color:var(--prussian)}
+.jr-root.one-issue .ledger .deck{font-family:var(--font-serif);font-style:italic;font-size:clamp(1.15rem,2vw,1.6rem);color:var(--ink-70);max-width:44ch;margin-top:16px;line-height:1.32}
+.jr-root.one-issue .plates{margin-top:clamp(28px,5vh,54px)}
+.jr-root.one-issue .ledger-note{margin-top:18px;font-size:1.04rem;line-height:1.6;color:var(--ink-70);max-width:52ch}
+.jr-root.one-issue .plate{display:grid;grid-template-columns:minmax(190px,.44fr) 1fr;gap:clamp(22px,4vw,60px);padding:clamp(26px,4.4vh,44px) 0;border-top:1px solid var(--ink-12)}
+.jr-root.one-issue .plate:last-child{border-bottom:1px solid var(--ink-12)}
+@media(max-width:800px){.jr-root.one-issue .plate{grid-template-columns:1fr;gap:18px}}
+.jr-root.one-issue .plate .seal{display:flex;align-items:center;gap:16px}
+.jr-root.one-issue .plate .seal .ct{font-family:var(--font-serif);font-size:clamp(1.5rem,2.6vw,2.2rem);line-height:1.04}
+.jr-root.one-issue .plate ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px}
+.jr-root.one-issue .plate li{font-size:1.04rem;line-height:1.55;color:var(--ink-70);padding-left:26px;position:relative}
+.jr-root.one-issue .plate li::before{content:"";position:absolute;left:2px;top:.5em;width:9px;height:9px;border-radius:50%;background:var(--prussian)}
+.jr-root.one-issue .plate li em{font-style:italic;color:var(--ink)}
+.jr-root.one-issue .plate .payoff{margin-top:20px;font-family:var(--font-serif);font-style:italic;font-size:clamp(1.15rem,1.8vw,1.5rem);color:var(--prussian)}
+.jr-root.one-issue .plate .stop{margin-top:14px;display:flex;align-items:center;gap:.6em;flex-wrap:wrap;font-family:var(--font-serif);font-style:italic;font-size:1rem;color:var(--ink-70)}
+.jr-root.one-issue .plate .stop .o,.plate .stop .f{width:9px;height:9px;border-radius:50%;border:1px solid var(--prussian);display:inline-block;flex:0 0 auto}
+.jr-root.one-issue .plate .stop .f{background:var(--prussian)}
+.jr-root.one-issue .plate .stop .sep{color:var(--ink-25)}
+
+/* ── the standard ── */
+.jr-root.one-issue .standard{padding:clamp(64px,10vh,120px) var(--edge);background:var(--paper-2);position:relative;z-index:2;border-bottom:1px solid var(--ink)}
+.jr-root.one-issue .standard .wrap{width:min(900px,100%);margin:0 auto}
+/* SpecTable styles itself from the document register; scope those tokens up to
+   web reading size for this spread rather than shipping 10.5px sales copy. */
+.jr-root.one-issue .standard{--doc-row:1.02rem;--doc-label:.72rem;--doc-muted:var(--ink-70)}
+.jr-root.one-issue .standard h2{font-size:clamp(1.9rem,4.6vw,3.4rem);line-height:.98;letter-spacing:-.03em;margin:14px 0 clamp(20px,3.4vh,34px)}
+
+/* ── the vow ── */
+.jr-root.one-issue .vowplate{padding:clamp(64px,10vh,120px) var(--edge);position:relative;z-index:2}
+.jr-root.one-issue .vowplate .wrap{width:min(1000px,100%);margin:0 auto}
+.jr-root.one-issue .vowplate h2{font-size:clamp(2rem,5.4vw,4.2rem);line-height:.96;letter-spacing:-.034em;max-width:18ch;margin-top:14px}
+.jr-root.one-issue .vowplate h2 .em{font-style:italic;color:#b8cdd9}
+.jr-root.one-issue .vowgrid{margin-top:clamp(26px,4.4vh,46px);display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:rgba(240,234,216,.16);border:1px solid rgba(240,234,216,.16)}
+@media(max-width:760px){.jr-root.one-issue .vowgrid{grid-template-columns:1fr}}
+.jr-root.one-issue .vowgrid .c{background:#132b38;padding:clamp(22px,3vw,34px);display:flex;flex-direction:column;gap:10px}
+.jr-root.one-issue .vowgrid .c .rn2{font-family:var(--font-serif);font-style:italic;color:#b8cdd9;font-size:1.05rem}
+.jr-root.one-issue .vowgrid .c h3{font-size:clamp(1.25rem,2.1vw,1.7rem);color:#f0ead8}
+.jr-root.one-issue .vowgrid .c p{font-size:.96rem;line-height:1.55;color:rgba(240,234,216,.68)}
+
+/* ── the invitation ── */
+.jr-root.one-issue .invite{min-height:100svh;display:flex;flex-direction:column;justify-content:center;padding:clamp(80px,12vh,140px) var(--edge);position:relative;overflow:hidden;z-index:2}
+.jr-root.one-issue .invite .glow{position:absolute;inset:0;pointer-events:none;background:radial-gradient(620px circle at var(--gx,50%) var(--gy,44%),rgba(184,205,217,.14),transparent 62%)}
+.jr-root.one-issue .invite .wrap{position:relative;z-index:2;width:min(1000px,100%);margin:0 auto}
+.jr-root.one-issue .invite h2{font-size:clamp(2.8rem,10.5vw,9.5rem);line-height:.86;letter-spacing:-.046em}
+.jr-root.one-issue .invite .terms{margin-top:clamp(26px,4.4vh,44px);display:flex;gap:clamp(20px,4vw,52px);flex-wrap:wrap;padding-top:22px;border-top:1px solid rgba(240,234,216,.18)}
+.jr-root.one-issue .invite .terms div{display:flex;flex-direction:column;gap:5px}
+.jr-root.one-issue .invite .terms .k{font-family:var(--font-sans);font-size:.66rem;font-weight:600;letter-spacing:var(--tracking-label);text-transform:uppercase;color:rgba(240,234,216,.74)}
+.jr-root.one-issue .invite .terms .v{font-family:var(--font-serif);font-size:1.35rem;color:#f0ead8}
+.jr-root.one-issue .invite .row{margin-top:clamp(28px,5vh,50px);display:flex;gap:22px;align-items:center;flex-wrap:wrap}
+.jr-root.one-issue .invite .cta{display:inline-flex;align-items:center;gap:.6em;height:60px;padding:0 36px;border-radius:var(--radius-pill);background:#f0ead8;color:#0f2430;font-family:var(--font-sans);font-size:1.06rem;font-weight:500;transition:background .2s,transform .25s}
+.jr-root.one-issue .invite .cta:hover{background:#fff;color:#0f2430;transform:translateY(-2px)}
+.jr-root.one-issue .invite .quiet{font-family:var(--font-serif);font-style:italic;font-size:1.12rem;color:#b8cdd9;border-bottom:1px solid #b8cdd9;padding-bottom:2px}
+.jr-root.one-issue .invite .colophon .it{color:#b8cdd9}
