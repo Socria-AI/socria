@@ -18,12 +18,25 @@ import type { LogosNodeType } from '@/lib/logos';
 const GRAIN =
   "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.07'/%3E%3C/svg%3E\")";
 
+/**
+ * WHO OWNS THE SIZE.
+ *
+ * `.av-big` sizes itself in CSS — `min(228px, 54vw, 30svh)` — and sizes the
+ * mark inside it at 52%. `.av-sm` sets no size at all and expects the caller
+ * to give one. So passing a pixel `size` for the big preview did not make it
+ * 220px "as well"; inline styles beat the stylesheet, so it REPLACED the
+ * responsive rule and the preview stopped shrinking on a narrow window.
+ *
+ * Hence: `size` is optional. Give it for the small marks; leave it off for
+ * the big one and let the sheet do its job.
+ */
 export function Avatar({
   cfg,
-  size = 220,
+  size,
   className = 'av-big',
 }: {
   cfg: PfpConfig;
+  /** px. Omit where the stylesheet owns the size (.av-big). */
   size?: number;
   className?: string;
 }) {
@@ -34,27 +47,33 @@ export function Avatar({
   const glyph =
     m.kind === 'img' || m.kind === 'one' ? (
       // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={m.src}
-        alt=""
-        style={{ width: size * 0.52, filter: light ? 'invert(1) brightness(1.7)' : 'none' }}
-      />
+      <img src={m.src} alt="" style={{ filter: light ? 'invert(1) brightness(1.7)' : 'none' }} />
     ) : m.kind === 'logos' ? (
-      <LogosMark size={size * 0.52} />
+      <LogosMark size={size ? size * 0.52 : 64} />
     ) : m.kind === 'letter' ? (
-      <span className="ltr" style={{ fontSize: size * 0.42 }}>
+      // .av-big gives the letter its own clamp(); .av-sm has none, so a
+      // caller that set a size sets the type too.
+      <span className="ltr" style={size ? { fontSize: size * 0.42 } : undefined}>
         {(cfg.letter || 'A').slice(0, 2)}
       </span>
     ) : (
-      // The repo's NodeGlyph draws into a 16px box, so it is sized by its
-      // wrapper rather than by a prop.
-      <span style={{ display: 'block', width: size * 0.52, height: size * 0.52 }}>
+      // NodeGlyph draws into a 16px box, so its wrapper carries the size —
+      // and the sheet already constrains .mk to 52%, so 100% is right at
+      // both scales.
+      <span style={{ display: 'block', width: '100%', height: '100%' }}>
         <NodeGlyph type={m.id as LogosNodeType} />
       </span>
     );
 
   return (
-    <div className={className} style={{ width: size, height: size, background: g.bg, color: g.ink }}>
+    <div
+      className={className}
+      style={{
+        ...(size ? { width: size, height: size } : null),
+        background: g.bg,
+        color: g.ink,
+      }}
+    >
       {cfg.texture === 'grid' && (
         <span
           className="tex"
@@ -62,7 +81,7 @@ export function Avatar({
             backgroundImage: `radial-gradient(circle, ${
               light ? 'rgba(244,241,232,.22)' : 'rgba(53,70,32,.2)'
             } 1px, transparent 1px)`,
-            backgroundSize: `${Math.max(7, size * 0.118)}px ${Math.max(7, size * 0.118)}px`,
+            backgroundSize: `${Math.max(7, (size ?? 220) * 0.118)}px ${Math.max(7, (size ?? 220) * 0.118)}px`,
           }}
         />
       )}
@@ -73,9 +92,9 @@ export function Avatar({
         />
       )}
       {(cfg.ring === 'ring' || cfg.ring === 'seal') && (
-        <span className="ring" style={{ inset: size * 0.055 }} />
+        <span className="ring" style={{ inset: size ? size * 0.055 : '5.5%' }} />
       )}
-      {cfg.ring === 'seal' && <span className="ring" style={{ inset: size * 0.105 }} />}
+      {cfg.ring === 'seal' && <span className="ring" style={{ inset: size ? size * 0.105 : '10.5%' }} />}
       <span className="mk">{glyph}</span>
     </div>
   );

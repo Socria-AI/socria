@@ -450,9 +450,9 @@
   stroke-dasharray:1400;stroke-dashoffset:1400;animation:tr-draw 1.15s var(--ease-out-expo) .12s forwards}
 .app-root .tour-leader{fill:none;stroke:var(--moss);stroke-width:1.3;stroke-linecap:round;opacity:.8;
   stroke-dasharray:520;stroke-dashoffset:520;animation:tr-draw .85s var(--ease-out-expo) .55s forwards}
-.app-root .tour-dot{fill:var(--moss);opacity:0;animation:tr-dot .5s var(--ease-out-expo) 1.15s forwards}
+.app-root .tour-dot{fill:var(--moss);animation:tr-dot .5s var(--ease-out-expo) 1.15s both}
 @keyframes tr-draw{to{stroke-dashoffset:0}}
-@keyframes tr-dot{to{opacity:1}}
+@keyframes tr-dot{from{opacity:0}to{opacity:1}}
 
 /* the note: paper, a hairline, and room to actually read */
 .app-root .tour-note{position:fixed;z-index:92;background:var(--paper);border:1px solid var(--ink-16);border-radius:15px;
