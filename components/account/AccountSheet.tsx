@@ -24,6 +24,8 @@ import { useClerk, useUser } from '@clerk/nextjs';
 import { Avatar } from './Avatar';
 import { PFP_KEY, sanitizePfp, type PfpConfig } from '@/lib/pfp';
 import { TOUR_KEY } from '@/lib/tour';
+import { resetSeen } from '@/lib/hints';
+import { HINTS_CHANGED } from '@/components/Hint';
 
 export function AccountSheet({
   open,
@@ -157,6 +159,22 @@ export function AccountSheet({
                 <button type="button" className="act" onClick={retake}>
                   <span className="t">Take the tour again</span>
                   <span className="d">Four notes on the four controls</span>
+                </button>
+                {/* The thing that makes showing hints at all defensible: a
+                    person who dismissed one before reading it can get it
+                    back. Without this, the product teaches you once and
+                    punishes you for blinking. */}
+                <button
+                  type="button"
+                  className="act"
+                  onClick={() => {
+                    resetSeen(window.localStorage);
+                    window.dispatchEvent(new Event(HINTS_CHANGED));
+                    onClose();
+                  }}
+                >
+                  <span className="t">Show hints again</span>
+                  <span className="d">The one-line notes beside new things</span>
                 </button>
                 <button type="button" className="act" onClick={() => void signOut()}>
                   <span className="t">Sign out</span>
