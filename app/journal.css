@@ -542,10 +542,10 @@
 /* If the document timeline is frozen (throttled tab, embedded preview, print
    snapshot) a 0→1 opacity transition never advances. JS detects that and sets
    this class, which drops every staged state so the finished page is shown. */
-html.anim-off .jr-root .rv.pre, html.anim-off .jr-root .turn.pre .who, html.anim-off .jr-root .turn.pre .q, html.anim-off .jr-root .turn.pre .a, html.anim-off .jr-root .pre .w i, html.anim-off .jr-root .fig.pre .pop{opacity:1!important;transform:none!important;transition:none!important}
-html.anim-off .jr-root .fig.pre .draw{stroke-dasharray:none!important;stroke-dashoffset:0!important;transition:none!important}
-html.anim-off .jr-root .mapbox.pre .edges path{opacity:1!important;transition:none!important}
-html.anim-off .jr-root .mapbox.pre .mapnode{opacity:1!important;transform:translate(-50%,-50%)!important;transition:none!important}
+html.anim-off .jr-root .rv.pre, html:not(.js) .jr-root .rv.pre, html.anim-off .jr-root .turn.pre .who, html:not(.js) .jr-root .turn.pre .who, html.anim-off .jr-root .turn.pre .q, html:not(.js) .jr-root .turn.pre .q, html.anim-off .jr-root .turn.pre .a, html:not(.js) .jr-root .turn.pre .a, html.anim-off .jr-root .pre .w i, html:not(.js) .jr-root .pre .w i, html.anim-off .jr-root .fig.pre .pop, html:not(.js) .jr-root .fig.pre .pop{opacity:1!important;transform:none!important;transition:none!important}
+html.anim-off .jr-root .fig.pre .draw, html:not(.js) .jr-root .fig.pre .draw{stroke-dasharray:none!important;stroke-dashoffset:0!important;transition:none!important}
+html.anim-off .jr-root .mapbox.pre .edges path, html:not(.js) .jr-root .mapbox.pre .edges path{opacity:1!important;transition:none!important}
+html.anim-off .jr-root .mapbox.pre .mapnode, html:not(.js) .jr-root .mapbox.pre .mapnode{opacity:1!important;transform:translate(-50%,-50%)!important;transition:none!important}
 
 /* ---------- the silences ---------- */
 .jr-root .silence{position:relative;z-index:2;min-height:52svh;display:grid;place-items:center;text-align:center;padding:0 var(--edge)}
@@ -653,7 +653,7 @@ html.anim-off .jr-root .mapbox.pre .mapnode{opacity:1!important;transform:transl
 .jr-root .refusal .a em{color:#fff;font-style:italic}
 .jr-root .refusal .held{font-family:var(--font-serif);font-style:italic;font-size:clamp(1.2rem,2.2vw,1.7rem);color:var(--sage);margin-top:14px;opacity:0;transition:opacity .6s}
 .jr-root .refusal.live.stopped .held{opacity:1}
-html.anim-off .jr-root .refusal .held{opacity:1}
+html.anim-off .jr-root .refusal .held, html:not(.js) .jr-root .refusal .held{opacity:1}
 @media(prefers-reduced-motion:reduce){.jr-root .refusal{height:auto;padding:clamp(70px,12vh,130px) 0}.jr-root .refusal .pinr{position:static;height:auto}.jr-root .refusal .held{opacity:1}}
 
 /* ---------- read-time, in the spine and at the close ---------- */
@@ -676,6 +676,10 @@ html.anim-off .jr-root .refusal .held{opacity:1}
   .jr-root .pane-map .plot{display:none!important}
   .jr-root .thread{overflow:visible}
   .jr-root .rv, .jr-root .turn .q, .jr-root .turn .a, .jr-root .turn .who, .jr-root .w i{opacity:1!important;transform:none!important}
+  /* The refusal's payoff line. It is revealed by driveRefusal when the
+     vermilion line reaches the sage wall, and printing never scrolls, so
+     without this the spread prints the wall and not what it means. */
+  .jr-root .refusal .held{opacity:1!important}
   .jr-root .refusal, .jr-root .close, .jr-root .turn.slam{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 }
 
@@ -705,7 +709,7 @@ html.anim-off .jr-root .refusal .held{opacity:1}
 .jr-root .pre .w i.tw{color:var(--ink);transition-delay:calc(var(--i,0) * 36ms + 500ms)!important;
   transition:opacity .6s var(--ease-standard),transform .8s var(--ease-out-expo),color .9s var(--ease-standard)}
 .jr-root .pre.in .w i.tw{color:inherit}
-html.anim-off .jr-root .w i.tw{color:inherit!important}
+html.anim-off .jr-root .w i.tw, html:not(.js) .jr-root .w i.tw{color:inherit!important}
 @media print{.jr-root .w i.tw{color:inherit!important}}
 
 /* ---------- iii · the stillness aside ---------- */
@@ -727,7 +731,7 @@ html.motion-live .jr-root .aside-note.shown{opacity:1;transform:rotate(-1.4deg)}
   .jr-root .turn .aside-note, .jr-root .reading .aside-note{position:absolute;right:-210px;bottom:0;width:180px;max-width:180px;margin:0}
 }
 @media(prefers-reduced-motion:reduce){html.motion-live .jr-root .aside-note{opacity:1;transform:rotate(-1.4deg);transition:none}}
-html.anim-off .jr-root .aside-note{opacity:1!important;transform:rotate(-1.4deg)!important}
+html.anim-off .jr-root .aside-note, html:not(.js) .jr-root .aside-note{opacity:1!important;transform:rotate(-1.4deg)!important}
 @media print{.jr-root .aside-note{display:none}}
 
 /* ---------- iv · the trade, scrubbed ---------- */
@@ -841,15 +845,15 @@ html.anim-off .jr-root .aside-note{opacity:1!important;transform:rotate(-1.4deg)
 .jr-root .stage-sec.live .edges path.st:not(.on){display:block!important;opacity:0}
 .jr-root .stage-sec.live .plot .st:not(.on){display:block!important;visibility:hidden}
 .jr-root .stage-sec.live .plot .st.on{visibility:visible}
-html.anim-off .jr-root .stage-sec.live .st{display:revert!important;visibility:visible!important;opacity:1!important;animation:none!important}
+html.anim-off .jr-root .stage-sec.live .st, html:not(.js) .jr-root .stage-sec.live .st{display:revert!important;visibility:visible!important;opacity:1!important;animation:none!important}
 /* frozen timeline: the finished conversation beside the finished map, no transition to stall on */
-html.anim-off .jr-root .app .body{transition:none;grid-template-columns:1fr .92fr}
-html.anim-off .jr-root .app .bar .model .m-core{display:none}
-html.anim-off .jr-root .app .bar .model .m-logos{display:inline}
+html.anim-off .jr-root .app .body, html:not(.js) .jr-root .app .body{transition:none;grid-template-columns:1fr .92fr}
+html.anim-off .jr-root .app .bar .model .m-core, html:not(.js) .jr-root .app .bar .model .m-core{display:none}
+html.anim-off .jr-root .app .bar .model .m-logos, html:not(.js) .jr-root .app .bar .model .m-logos{display:inline}
 @media(max-width:820px){html.anim-off .jr-root .app .body{grid-template-columns:1fr}}
 /* frozen: the map is the state worth showing; the plot yields to it */
-html.anim-off .jr-root .app.plot .pane-map .plot{display:none}
-html.anim-off .jr-root .app.plot .pane-map .edges, html.anim-off .jr-root .app.plot .pane-map .mapnode, html.anim-off .jr-root .app.plot .pane-map .ph{display:block}
+html.anim-off .jr-root .app.plot .pane-map .plot, html:not(.js) .jr-root .app.plot .pane-map .plot{display:none}
+html.anim-off .jr-root .app.plot .pane-map .edges, html:not(.js) .jr-root .app.plot .pane-map .edges, html.anim-off .jr-root .app.plot .pane-map .mapnode, html:not(.js) .jr-root .app.plot .pane-map .mapnode, html.anim-off .jr-root .app.plot .pane-map .ph, html:not(.js) .jr-root .app.plot .pane-map .ph{display:block}
 @media(prefers-reduced-motion:reduce){.jr-root .stage-sec{height:auto}.jr-root .stage-sec .pin{position:static;height:auto}}
 
 /* progress ticks under the window */
@@ -900,8 +904,8 @@ html.anim-off .jr-root .app.plot .pane-map .edges, html.anim-off .jr-root .app.p
 .jr-root .board .note{font-family:var(--font-hand),cursive;font-size:1.05rem;color:rgba(240,234,216,.6);margin-top:14px}
 @media print{.jr-root .board .strike svg path{stroke-dashoffset:0}.jr-root .board .fix{opacity:1}}
 /* Same rule as everywhere else here: if the reveal never runs, show it. */
-html.anim-off .jr-root .board .strike svg path{stroke-dashoffset:0}
-html.anim-off .jr-root .board .fix{opacity:1}
+html.anim-off .jr-root .board .strike svg path, html:not(.js) .jr-root .board .strike svg path{stroke-dashoffset:0}
+html.anim-off .jr-root .board .fix, html:not(.js) .jr-root .board .fix{opacity:1}
 
 /* the close section's two actions */
 .jr-root .btn-xl{display:inline-flex;align-items:center;gap:10px;background:var(--sage);color:var(--forest-2);font-weight:500;padding:16px 30px;border-radius:2px;font-size:1.02rem}

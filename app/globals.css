@@ -7940,7 +7940,7 @@ a.one-mark.is-strip:hover { background: rgba(38, 72, 90, 0.075); }
   0%, 100% { box-shadow: 0 0 0 0 rgba(53, 70, 32, 0); }
   50% { box-shadow: 0 0 0 4px rgba(53, 70, 32, 0.16); }
 }
-html.anim-off .logos-root.is-firstmap-node .lg-node { animation: none; }
+html.anim-off .logos-root.is-firstmap-node .lg-node, html:not(.js) .logos-root.is-firstmap-node .lg-node{ animation: none; }
 
 /* ── the shared colophon ────────────────────────────────────────────
  *
@@ -8026,3 +8026,37 @@ html.anim-off .logos-root.is-firstmap-node .lg-node { animation: none; }
   font-size: 12px; color: var(--moss-700); text-decoration: underline; text-underline-offset: 3px;
 }
 .hint button:hover { color: var(--moss-800); }
+
+/* ── print: everything a driver was going to reveal ──────────────────
+ *
+ * The reveal contract has three fallbacks and this is the third. `html.js-anim`
+ * hides `.reveal` only while scripting is on and motion is welcome; the
+ * observer then adds `.in` as each element crosses the viewport. Printing
+ * never scrolls, so anything below the fold at print time is laid out on the
+ * page at opacity 0 — the paper shows the space a paragraph occupies and not
+ * the paragraph.
+ *
+ * Scoped to the classes that a driver owns, not a blanket `* { opacity: 1 }`:
+ * ink at 70/45/25 is the design's own secondary-text ladder, and flattening
+ * it would print every caption at full strength.
+ */
+@media print {
+  .reveal,
+  html.js-anim .reveal,
+  .reveal-in,
+  .ob-fade,
+  .q-root .rv,
+  .q-root .rv.pre {
+    opacity: 1 !important;
+    transform: none !important;
+    animation: none !important;
+    transition: none !important;
+  }
+  /* Chrome that means nothing on paper. */
+  .env-badge,
+  .tour-layer,
+  .find,
+  .hint {
+    display: none !important;
+  }
+}
