@@ -52,6 +52,20 @@
      --prussian and the pages written here say --one-pblue. */
   --prussian: #26485A;
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  /* THE APP REGISTER'S GROUND, AT THE ROOT — and it has to be here.
+   *
+   * app/app-shell.css declares these on `.app-root`, which is right for that
+   * sheet. app/account-sheet.css was then re-scoped from it under
+   * `.acct-sheet` and kept reading them by name — so on the account sheet
+   * `background: var(--app-paper)` resolved to nothing and the panel rendered
+   * WITH NO BACKGROUND AT ALL. You could read the conversation straight
+   * through it. Same for --app-border, which made its hairlines invisible.
+   *
+   * Declaring them at the root means the next stylesheet re-scoped out of the
+   * register inherits a ground instead of a hole. `.app-root` still sets its
+   * own copy, so nothing about that surface changes. */
+  --app-paper: #F5F3EB;
+  --app-border: #e7e2d3;
   --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
   /* Vermilion — the design system's one alarm colour: capability, speed, the
      answer arriving too fast. */
@@ -75,6 +89,18 @@
   --accent-700: #475a28;
   --serif: var(--font-serif), "Instrument Serif", Georgia, serif;
   --sans: var(--font-sans), "Inter", system-ui, sans-serif;
+  /* The mathematics face, AT THE ROOT — and it has to be here.
+   *
+   * It was declared inside `.logos-root`, so it reached the Logos Board and
+   * nothing else. app/journal.css reads it for the homepage Board's equations
+   * (`.jr-root .board .eq`), and its own header says these tokens are "left to
+   * cascade" — meaning from the root. Scoped to Logos, the declaration on the
+   * journal was invalid and the notation fell through to the inherited serif,
+   * which is exactly the failure the token's own comment warns about: Georgia
+   * is a serif but not a maths face, and the minus signs give it away.
+   *
+   * next/font sets --font-stix on <html>, so the stack resolves everywhere. */
+  --font-math: var(--font-stix), 'STIX Two Math', 'Cambria Math', KaTeX_Main, Georgia, serif;
   --edge: clamp(20px, 4vw, 64px);
 }
 
@@ -2472,12 +2498,8 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
      vanishes and \neq reads as =. Fallback is per glyph, so only the slash
      comes from KaTeX_Main. */
   --lg-stix: var(--font-stix), 'STIX Two Math', 'Cambria Math', KaTeX_Main, Georgia, serif;
-  /* The design system names its maths face --font-math. The repo already
-     loads STIX for exactly that, so the token points at the stack rather
-     than at a second webfont — without it the Logos Board's notation falls
-     through to Georgia, which is a serif but not a maths face, and the
-     minus signs and negation slashes are the giveaway. */
-  --font-math: var(--font-stix), 'STIX Two Math', 'Cambria Math', KaTeX_Main, Georgia, serif;
+  /* --font-math lives at :root now, not here — the journal's Board reads it
+     too, and scoped to Logos it was invalid there. See the note beside it. */
 
   position: fixed;
   inset: 0;
@@ -7778,7 +7800,8 @@ a.one-mark.is-strip:hover { background: rgba(38, 72, 90, 0.075); }
   --smart-fence-color: var(--lg-ink-60);
 }
 .logos-root math-field.lg-viz-eq::part(virtual-keyboard-toggle) {
-  color: var(--lg-ink-45);
+  /* --lg-ink-45 does not exist; this ladder is 60/40. */
+  color: var(--lg-ink-40);
 }
 /* Before the element upgrades it is an unknown tag with no box; without this
    the row jumps when MathLive finishes loading. */
@@ -7965,53 +7988,19 @@ html.anim-off .logos-root.is-firstmap-node .lg-node, html:not(.js) .logos-root.i
 
 /* ── find in this conversation ──────────────────────────────────────
  *
- * A panel over the thread, opened with Cmd/Ctrl-F. It searches the whole
- * conversation rather than the rendered page — including insight cards,
- * which are the lines people most often come back for and which the
- * browser's own find will miss the moment one scrolls out of the DOM.
+ * THE STYLES FOR THIS LIVE IN app/app-shell.css, under .app-root.
+ *
+ * There used to be a second, unscoped copy right here, and because it was
+ * unscoped it won — turning the design's RIGHT RAIL into a fixed panel
+ * floating over the conversation it was meant to sit beside, covering the
+ * first message. app-shell.css's own comment on those rules reads "a right
+ * rail, not an overlay"; this block was the overlay.
+ *
+ * It also diverged in markup: .find-x for the close where the design uses
+ * .find-top .x, and .who/.txt on a hit where the design uses .w/.t — so
+ * removing it required bringing FindPanel back to the design's markup, which
+ * is where it should have been.
  */
-.find {
-  position: fixed;
-  top: 64px; right: 20px;
-  width: min(420px, calc(100vw - 40px));
-  max-height: min(70vh, 620px);
-  display: flex; flex-direction: column;
-  background: var(--paper);
-  border: 1px solid rgba(31, 31, 31, 0.14);
-  border-radius: 12px;
-  box-shadow: 0 18px 48px -18px rgba(31, 31, 31, 0.32);
-  z-index: 60;
-  overflow: hidden;
-}
-.find-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px 8px; }
-.find-top .lbl { font-size: 10.5px; font-weight: 600; letter-spacing: 0.2em; text-transform: uppercase; color: var(--moss-700); }
-.find-x { background: none; border: 0; font-size: 20px; line-height: 1; color: var(--ink-40); cursor: pointer; padding: 0 2px; }
-.find-x:hover { color: var(--ink); }
-.find-field { padding: 0 14px 10px; }
-.find-field input {
-  width: 100%; padding: 9px 11px; font-size: 14px;
-  border: 1px solid rgba(31, 31, 31, 0.16); border-radius: 8px;
-  background: #fff; color: var(--ink);
-}
-.find-field input:focus { outline: none; border-color: var(--moss); }
-.find-tabs { display: flex; gap: 4px; padding: 0 14px 10px; }
-.find-tabs button {
-  font-size: 12px; padding: 5px 10px; border-radius: 999px;
-  border: 1px solid transparent; background: none; color: var(--ink-60); cursor: pointer;
-}
-.find-tabs button.on { background: var(--moss-50); border-color: var(--moss-200); color: var(--moss-800); }
-.find-count { opacity: 0.55; margin-left: 3px; }
-.find-hits { overflow-y: auto; border-top: 1px solid rgba(31, 31, 31, 0.08); }
-.find-hit {
-  display: flex; gap: 10px; width: 100%; text-align: left;
-  padding: 10px 14px; background: none; border: 0; cursor: pointer;
-  border-bottom: 1px solid rgba(31, 31, 31, 0.06);
-}
-.find-hit:hover { background: var(--moss-50); }
-.find-hit .who { flex: 0 0 auto; font-size: 10.5px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-40); padding-top: 2px; }
-.find-hit .txt { font-size: 13.5px; line-height: 1.5; color: var(--ink); }
-.find-hit mark { background: rgba(184, 162, 107, 0.34); color: inherit; border-radius: 2px; }
-.find-none { padding: 16px 14px; font-size: 13px; color: var(--ink-60); margin: 0; }
 
 /* ── one-line hints ──────────────────────────────────────────────── */
 .hint {

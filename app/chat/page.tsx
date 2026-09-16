@@ -1654,23 +1654,13 @@ export default function ChatPage() {
 
       {/* Sidebar — overlay on mobile, static column on desktop */}
       <Tour open={tourOpen} onDone={endTour} />
-      {findOpen && (
-        <FindPanel
-          turns={messages as never}
-          onClose={() => setFindOpen(false)}
-          onJump={(i) => {
-            // The turns carry their index as a dom id, so a hit scrolls to
-            // the real message rather than an approximation of it.
-            document
-              .getElementById(`turn-${i}`)
-              ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          }}
-        />
-      )}
       <AccountSheet
         open={acctOpen}
         onClose={() => setAcctOpen(false)}
         isOne={planState.plan === 'one'}
+        // The whole answer, so the sheet can show the university section
+        // where the deployment runs the programme.
+        plan={planState}
         onRetakeTour={() => setTourOpen(true)}
       />
       {/* The sessions rail, in the design's own markup and its own stylesheet
@@ -2002,8 +1992,30 @@ export default function ChatPage() {
             </button>
           </div>
 
-          {/* Right: the Logos invitation (desktop) + auth */}
+          {/* Right: find, the Logos invitation (desktop) + auth */}
           <div className="flex items-center gap-2 shrink-0">
+            {/* Find had no control at all — only a Cmd/Ctrl-F handler, which
+                is the shortcut the browser itself claims, so on most machines
+                the feature was simply unreachable. It is a button now, and
+                the shortcut is a shortcut rather than the only door. Shown
+                once there is a conversation to search. */}
+            {hasMessages && (
+              <span className="app-root app-inline">
+                <button
+                  type="button"
+                  className="find-btn"
+                  aria-pressed={findOpen}
+                  onClick={() => setFindOpen((v) => !v)}
+                  title="Find in this conversation (⌘F)"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"
+                       strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <circle cx="11" cy="11" r="6.5" /><path d="M16 16l4.5 4.5" />
+                  </svg>
+                  Find
+                </button>
+              </span>
+            )}
             <div className="hidden sm:block">
               <TryLogosPill
                 currentModel={model}
@@ -2034,6 +2046,14 @@ export default function ChatPage() {
           </div>
         </div>
 
+        {/* The conversation and the find rail, side by side.
+            `.chat-row` is the design's own container (app/app-shell.css:
+            `flex:1;min-height:0;display:flex;position:relative`) and the
+            reason Find is a COLUMN beside the thread rather than a panel
+            floating over it. The wrapper is display:contents, so the row is
+            still a direct flex child of the page column. */}
+        <div className="app-root app-inline">
+        <div className="chat-row">
         <div className="flex-1 overflow-y-auto">
           <div className="max-w-2xl mx-auto px-6 py-10">
             {!hasMessages && !isSignedIn && !smartUnlocked && usedFree ? (
@@ -2257,6 +2277,29 @@ export default function ChatPage() {
 
             <div ref={bottomRef} />
           </div>
+        </div>
+        {/* Not an overlay. It takes its width from the row and pushes the
+            conversation over; below 820px app-shell.css turns it into a
+            sheet anchored to this row, which is why the row is positioned. */}
+        {findOpen && (
+          <FindPanel
+            turns={messages}
+            onClose={() => setFindOpen(false)}
+            onJump={(i) => {
+              // The turns carry their index as a dom id, so a hit scrolls to
+              // the real message rather than an approximation of it. The
+              // flash is re-armed by reading offsetWidth, so jumping to the
+              // same line twice lights it twice.
+              const el = document.getElementById(`turn-${i}`);
+              if (!el) return;
+              el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              el.classList.remove('lit');
+              void el.offsetWidth;
+              el.classList.add('lit');
+            }}
+          />
+        )}
+        </div>
         </div>
 
         <div className="border-t border-border/60 bg-paper/80 backdrop-blur-sm">
