@@ -179,7 +179,7 @@ function GuardFig() {
 
 export function JournalIssue() {
   useEffect(() => {
-    initJournal();
+    return initJournal();
   }, []);
 
   return (

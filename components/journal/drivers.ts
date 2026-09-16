@@ -26,12 +26,75 @@
 
 declare const window: any;
 
-export function initJournal() {
+export function initJournal(): () => void {
   // React 18 StrictMode mounts effects twice in development; every driver
   // below installs listeners and intervals, so running them twice would
   // double every animation and leak a timer per mount.
-  if (typeof window === 'undefined' || window.__socriaJournalStarted) return;
+  //
+  // THE LATCH HAS TO BE RELEASED ON UNMOUNT, and for a long time it was not.
+  // `__socriaJournalStarted` is a property of the TAB, so after any in-app
+  // navigation between the three journal pages the second mount returned here
+  // and installed nothing: arriving at / from a link rather than a fresh load
+  // left the homepage's Stage inert — fourteen steps stacked at once, the map
+  // pane never opening — and froze the margin counter and the spine. The
+  // centrepiece of the page worked only on a hard reload.
+  //
+  // Rather than thread a teardown through twenty-eight installations in a
+  // machine-ported file, the four APIs the drivers use are stood in front of
+  // for the duration of this call, so everything they install is collected
+  // and one returned cleanup undoes all of it. The single element-level
+  // listener (`host.addEventListener`) needs no undoing: React discards that
+  // node on unmount.
+  if (typeof window === 'undefined') return () => {};
+  if (window.__socriaJournalStarted) return () => {};
   window.__socriaJournalStarted = true;
+
+  const undo: Array<() => void> = [];
+  const realAdd = window.addEventListener.bind(window);
+  const realInterval = window.setInterval.bind(window);
+  const RealIO = window.IntersectionObserver;
+  const RealRO = window.ResizeObserver;
+
+  window.addEventListener = function (this: any, ...a: any[]) {
+    undo.push(() => { try { window.removeEventListener(...(a as [any, any, any])); } catch {} });
+    return realAdd(...(a as [any, any, any]));
+  } as any;
+  window.setInterval = function (this: any, ...a: any[]) {
+    const id = realInterval(...(a as [any, any]));
+    undo.push(() => clearInterval(id));
+    return id;
+  } as any;
+  window.IntersectionObserver = class extends RealIO {
+    constructor(...a: any[]) { super(...(a as [any, any])); undo.push(() => this.disconnect()); }
+  } as any;
+  if (RealRO) {
+    window.ResizeObserver = class extends RealRO {
+      constructor(...a: any[]) { super(...(a as [any])); undo.push(() => this.disconnect()); }
+    } as any;
+  }
+
+  const restore = () => {
+    window.addEventListener = realAdd;
+    window.setInterval = realInterval;
+    window.IntersectionObserver = RealIO;
+    if (RealRO) window.ResizeObserver = RealRO;
+  };
+  const stop = () => {
+    for (const f of undo) { try { f(); } catch {} }
+    undo.length = 0;
+    window.__socriaJournalStarted = false;
+  };
+
+  try {
+    return runJournal(), restore(), stop;
+  } catch (e) {
+    restore();
+    stop();
+    throw e;
+  }
+}
+
+function runJournal() {
 
   /* ── issue.js — reveal, progress, counter, the word split ────────── */
   /* ===== Socria — Issue No. 4 · behaviour =====
