@@ -23,7 +23,13 @@ import {
   hasMap,
   matchesTab,
   shouldShowTabs,
+  shouldShowSearch,
   tabCounts,
+  SESSION_GROUPS,
+  groupOf,
+  groupRail,
+  matchesQuery,
+  searchRail,
 } from './.tmp/session-rail.mjs';
 
 let pass = 0, fail = 0;
@@ -151,6 +157,132 @@ console.log('\n=== and a name stays a name ===');
   const sentence = ('word '.repeat(40)).trim();
   ok('no trailing space after the cut', !/\s$/.test(cleanTitle(sentence)));
   ok('and the server bound is not smaller', MAX_TITLE_LEN <= 200);
+}
+
+// ── the headings, and the search above them ─────────────────────────
+//
+// Recency ordering says which row is newest; it does not say whether the
+// newest is from this morning or from March. These three headings answer that
+// without making anybody read a date, and the two filters above them are the
+// ones the list actually needs: type a word, or ask for the ones with maps.
+
+{
+  // A fixed "now" so the boundaries are assertions and not a lottery: noon on
+  // a Wednesday, which puts the week boundary in the middle of the previous
+  // week rather than on a Sunday, where an off-by-one would hide.
+  const now = new Date('2026-03-11T12:00:00Z').getTime();
+  const startOfToday = new Date(now).setHours(0, 0, 0, 0);
+  const DAY = 86400000;
+
+  ok('this morning is Today', groupOf(startOfToday + 60_000, now) === 'Today');
+  ok('a moment ago is Today', groupOf(now - 1000, now) === 'Today');
+
+  // The calendar day, not the last 24 hours. 11pm last night is yesterday to
+  // the person who was there, however few hours ago that was.
+  ok('one minute before midnight is not Today',
+     groupOf(startOfToday - 60_000, now) === 'This week');
+  ok('five days back is still This week',
+     groupOf(startOfToday - 5 * DAY, now) === 'This week');
+  ok('six days back is the last day of This week',
+     groupOf(startOfToday - 6 * DAY, now) === 'This week');
+  ok('seven days back has fallen off the end',
+     groupOf(startOfToday - 7 * DAY, now) === 'Earlier');
+  ok('last year is Earlier', groupOf(startOfToday - 400 * DAY, now) === 'Earlier');
+
+  // Clock skew between a device and the server is ordinary. Filing somebody's
+  // newest session under Earlier because their laptop runs fast is worse than
+  // calling a future timestamp today.
+  ok('a future stamp files under Today', groupOf(now + 90_000, now) === 'Today');
+
+  // A row with no usable timestamp still has to land somewhere, and the
+  // bottom of the list is the honest place for it.
+  ok('a missing stamp is Earlier', groupOf(NaN, now) === 'Earlier');
+  ok('undefined is Earlier', groupOf(undefined, now) === 'Earlier');
+}
+
+{
+  const now = new Date('2026-03-11T12:00:00Z').getTime();
+  const startOfToday = new Date(now).setHours(0, 0, 0, 0);
+  const DAY = 86400000;
+  const rows = [
+    { id: 'a', title: 'The Berlin offer', nodes: 5, updatedAt: now - 1000 },
+    { id: 'b', title: 'Whether to rewrite the essay', nodes: 0, updatedAt: now - 3000 },
+    { id: 'c', title: 'Bounded rationality', nodes: 3, updatedAt: startOfToday - 2 * DAY },
+    { id: 'd', title: 'Berlin, again', nodes: 0, updatedAt: startOfToday - 90 * DAY },
+  ];
+
+  const groups = groupRail(rows, now);
+  ok('only the groups that have rows', groups.length === 3);
+  ok('and they come in reading order',
+     groups.map((g) => g.group).join('|') === 'Today|This week|Earlier',
+     groups.map((g) => g.group).join('|'));
+  ok('Today holds both of its rows', groups[0].items.length === 2);
+  ok('in the order they arrived',
+     groups[0].items.map((r) => r.id).join('') === 'ab');
+
+  // An empty group is a heading with nothing under it — a promise the list
+  // did not keep.
+  const onlyOld = groupRail([rows[3]], now);
+  ok('no empty headings', onlyOld.length === 1 && onlyOld[0].group === 'Earlier');
+  ok('nothing at all groups to nothing', groupRail([], now).length === 0);
+
+  // Every group in the constant is one groupOf can actually return, or a
+  // heading would be unreachable.
+  ok('the headings and the classifier agree',
+     SESSION_GROUPS.every((g) =>
+       [now, startOfToday - 2 * DAY, startOfToday - 90 * DAY]
+         .some((t) => groupOf(t, now) === g)));
+}
+
+{
+  const rows = [
+    { id: 'a', title: 'The Berlin offer', nodes: 5 },
+    { id: 'b', title: 'Whether to rewrite the essay', nodes: 0 },
+    { id: 'c', title: 'Berlin, again', nodes: 3 },
+    { id: 'd', title: '', nodes: 0 },
+  ];
+
+  // Nothing typed is not a filter. The caller should not have to special-case
+  // the empty box.
+  ok('an empty query keeps everything', searchRail(rows, '').length === 4);
+  ok('and so does whitespace', searchRail(rows, '   ').length === 4);
+
+  ok('case does not matter', searchRail(rows, 'berlin').map((r) => r.id).join('') === 'ac');
+  ok('nor does surrounding space', searchRail(rows, '  Berlin ').length === 2);
+  ok('a miss is a miss', searchRail(rows, 'zzzz').length === 0);
+  ok('a row with no title never matches', matchesQuery(rows[3], 'a') === false);
+  ok('but it survives an empty query', matchesQuery(rows[3], '') === true);
+
+  // The two filters are conjunctive, which is what lets one count — "2 of 4" —
+  // mean the same thing however many of them are on.
+  ok('maps only, on its own', searchRail(rows, '', true).map((r) => r.id).join('') === 'ac');
+  ok('maps only, with a query', searchRail(rows, 'essay', true).length === 0);
+  ok('both together', searchRail(rows, 'berlin', true).map((r) => r.id).join('') === 'ac');
+
+  // hasMap is the shared rule: the chip and the Maps tab must not disagree
+  // about what counts as a map.
+  ok('the chip and the tab agree',
+     searchRail(rows, '', true).length === filterByTab(rows, 'maps').length);
+}
+
+{
+  const rows = (n, maps = 0) =>
+    Array.from({ length: n }, (_, i) => ({ id: String(i), nodes: i < maps ? 3 : 0 }));
+
+  // A search box over four rows is furniture: you can see all four.
+  ok('four rows need no search', shouldShowSearch(rows(4)) === false);
+  ok('nor does an empty rail', shouldShowSearch([]) === false);
+  ok('twelve rows do', shouldShowSearch(rows(12)) === true);
+
+  // The one place it deliberately differs from the tab bar. Tabs need both
+  // kinds present or one of them is always empty; typing a word is useful in
+  // a list of twelve chats with no map between them.
+  ok('search does not need both kinds', shouldShowSearch(rows(12, 0)) === true);
+  ok('where the tabs would have hidden themselves', shouldShowTabs(rows(12, 0)) === false);
+
+  // And they agree at the threshold, because it is the same threshold.
+  ok('same boundary as the tabs',
+     shouldShowSearch(rows(6, 3)) === shouldShowTabs(rows(6, 3)));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
