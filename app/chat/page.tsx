@@ -2362,16 +2362,22 @@ export default function ChatPage() {
             turns={messages}
             onClose={() => setFindOpen(false)}
             onJump={(i) => {
-              // The turns carry their index as a dom id, so a hit scrolls to
-              // the real message rather than an approximation of it. The
-              // flash is re-armed by reading offsetWidth, so jumping to the
-              // same line twice lights it twice.
+              // NEVER scrollIntoView, which is the design's own note and it
+              // is right: it scrolls every scrollable ancestor, so in a chat
+              // the page moves as well as the thread. Move the container
+              // itself, then flash the line so the eye knows where it landed
+              // — a jump with no flash leaves you hunting for the thing you
+              // just found. The flash is re-armed by reading offsetWidth, so
+              // landing on the same line twice lights it twice.
               const el = document.getElementById(`turn-${i}`);
-              if (!el) return;
-              el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              const box = el?.closest('.overflow-y-auto') as HTMLElement | null;
+              if (!el || !box) return;
+              box.scrollTop +=
+                el.getBoundingClientRect().top - box.getBoundingClientRect().top - 20;
               el.classList.remove('lit');
               void el.offsetWidth;
               el.classList.add('lit');
+              setTimeout(() => el.classList.remove('lit'), 1600);
             }}
           />
         )}
