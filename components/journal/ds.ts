@@ -71,3 +71,24 @@ export const LogosNode = B._LogosNode as C<{
   state?: 'default' | 'lit' | 'focused' | 'dim';
   onClick?: () => void; style?: React.CSSProperties;
 }>;
+
+/** The One seal. `letter` turns it into a numbered plate on the ledger. */
+export const OneMark = B._OneMark as C<{
+  size?: number;
+  tone?: 'light' | 'dark';
+  drawn?: boolean;
+  letter?: string;
+}>;
+/**
+ * The lock beside a node a free map stops short of.
+ *
+ * Not a bare glyph — it carries its own label and is pressable, so the lock
+ * IS the invitation rather than a decoration next to one. Typed from the
+ * bundle's own signature rather than from what I assumed it would be.
+ */
+export const OneLock = B._OneLock as C<{ label?: string; onClick?: () => void }>;
+/** The free/One standard, written down so nothing is implied. */
+export const SpecTable = B._SpecTable as C<{
+  head?: [string, string];
+  rows?: [string, string][];
+}>;
