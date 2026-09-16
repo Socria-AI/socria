@@ -935,12 +935,12 @@ html.anim-off .jr-root .board .fix, html:not(.js) .jr-root .board .fix{opacity:1
  */
 /* ── Socria One · the one surface that leaves the paper behind ── */
 .jr-root.one-issue .deep{background:radial-gradient(120% 92% at 68% 6%,#26485A 0%,#1d3a4a 34%,#16303e 62%,#0f2430 100%);color:#f0ead8}
-.jr-root.one-issue .deep .st,.deep .coda,.deep .a{color:rgba(240,234,216,.72)}
+.jr-root.one-issue .deep .st,.jr-root.one-issue .deep .coda,.jr-root.one-issue .deep .a{color:rgba(240,234,216,.72)}
 .jr-root.one-issue .deep .who{color:rgba(240,234,216,.72)}
 /* Label sets its colour inline on its own span, so override that span directly */
 .jr-root.one-issue .deep .eb span{color:#f0ead8!important}
 .jr-root.one-issue .deep .q{color:#f0ead8}
-.jr-root.one-issue .deep .q .em,.deep h1 .em,.deep h2 .em{font-style:italic;color:#b8cdd9}
+.jr-root.one-issue .deep .q .em,.jr-root.one-issue .deep h1 .em,.jr-root.one-issue .deep h2 .em{font-style:italic;color:#b8cdd9}
 .jr-root.one-issue .deep .rn{color:#f0ead8;opacity:.08}
 
 /* the cover floods from Socria green into Prussian */
@@ -1000,7 +1000,7 @@ html.anim-off .jr-root .board .fix, html:not(.js) .jr-root .board .fix{opacity:1
 .jr-root.one-issue .plate li em{font-style:italic;color:var(--ink)}
 .jr-root.one-issue .plate .payoff{margin-top:20px;font-family:var(--font-serif);font-style:italic;font-size:clamp(1.15rem,1.8vw,1.5rem);color:var(--prussian)}
 .jr-root.one-issue .plate .stop{margin-top:14px;display:flex;align-items:center;gap:.6em;flex-wrap:wrap;font-family:var(--font-serif);font-style:italic;font-size:1rem;color:var(--ink-70)}
-.jr-root.one-issue .plate .stop .o,.plate .stop .f{width:9px;height:9px;border-radius:50%;border:1px solid var(--prussian);display:inline-block;flex:0 0 auto}
+.jr-root.one-issue .plate .stop .o,.jr-root.one-issue .plate .stop .f{width:9px;height:9px;border-radius:50%;border:1px solid var(--prussian);display:inline-block;flex:0 0 auto}
 .jr-root.one-issue .plate .stop .f{background:var(--prussian)}
 .jr-root.one-issue .plate .stop .sep{color:var(--ink-25)}
 

@@ -2177,6 +2177,41 @@ export default function ChatPage() {
                   </div>
                 )}
 
+                {/* The design's closing offer on an empty screen. Signed
+                    out it says WHY an account is needed rather than just
+                    asking for one — a map has to be kept somewhere.
+                    (Lost here in the rail rewrite and recovered from main
+                    while carrying this work across; the register supplies
+                    the scope.) */}
+                <div className="app-root app-inline">
+                <div className="logos-offer">
+                  <div>
+                    <div className="lo-t">Want to see your reasoning drawn?</div>
+                    <p className="lo-b">
+                      {isSignedIn ? (
+                        'Logos puts a live Thinking Map beside the conversation.'
+                      ) : (
+                        <>
+                          Logos draws a live Thinking Map beside the conversation.{' '}
+                          <em>A map has to be kept somewhere, so it needs an account.</em>
+                        </>
+                      )}
+                    </p>
+                  </div>
+                  {isSignedIn ? (
+                    <button type="button" className="lo-go" onClick={() => pickModel('logos')}>
+                      Open Logos <span aria-hidden="true">→</span>
+                    </button>
+                  ) : (
+                    <SignInButton>
+                      <button type="button" className="lo-go">
+                        Sign in for Logos <span aria-hidden="true">→</span>
+                      </button>
+                    </SignInButton>
+                  )}
+                </div>
+                </div>
+
                 <div className={`${returnChips.length ? 'mt-3' : 'mt-10'} grid sm:grid-cols-2 gap-3 text-left`}>
                   {starters.map((p) => (
                     <button
