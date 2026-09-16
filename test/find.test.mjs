@@ -137,5 +137,46 @@ console.log('\n=== hints: one at a time, once ===');
   ok('writing to a throwing store does not throw', threw === null, String(threw));
 }
 
+
+// ── the shape the chat actually stores ──────────────────────────────
+//
+// This is the bug that made Find look completely broken: /chat stores a
+// message as {role, content} while the Logos thread stores {role, text}.
+// saidIn read `text`, found undefined on every chat message, skipped them
+// all, and the panel reported "Nothing has been said here yet" over a
+// conversation that was visibly on screen. The call site cast the array to
+// `never`, which silenced the one type error that would have caught it.
+{
+  const chat = [
+    { role: 'user', content: 'I got an offer with more money.' },
+    { role: 'assistant', content: 'What made you open to leaving?' },
+  ];
+  const said = saidIn(chat);
+  ok('a chat message is a line', said.length === 2);
+  ok('and it keeps who said it', said[0].who === 'you' && said[1].who === 'socria');
+  ok('and the words', said[0].text === 'I got an offer with more money.');
+  ok('find works on it', findIn(said, 'offer', 'you').length === 1);
+
+  // Both spellings in one thread, which is what a mixed surface would hand us.
+  const mixed = [
+    { role: 'user', text: 'spelled text' },
+    { role: 'assistant', content: 'spelled content' },
+  ];
+  ok('both spellings read', saidIn(mixed).length === 2);
+
+  // `text` wins when a turn somehow carries both, because that is the name
+  // the richer surface uses.
+  ok('text wins over content',
+     saidIn([{ role: 'user', text: 'a', content: 'b' }])[0].text === 'a');
+
+  // An insight still comes off insight.text, not content.
+  ok('an insight is unaffected',
+     saidIn([{ role: 'insight', insight: { text: 'the realisation' }, content: 'ignored' }])[0].text
+       === 'the realisation');
+
+  // Neither field is not a line.
+  ok('a turn with no words is skipped', saidIn([{ role: 'user' }]).length === 0);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

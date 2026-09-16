@@ -53,9 +53,7 @@ export function BlogNav() {
             <SignedIn>
               {/* Socria's own, not Clerk's. On a reading surface it links
                   rather than opening a sheet — see AccountControl. */}
-              <span className="app-root app-inline">
-                <AccountControl href="/account" />
-              </span>
+              <AccountControl href="/account" />
             </SignedIn>
           </ClerkLoaded>
           <Link href="/chat" className="btn btn-nav">

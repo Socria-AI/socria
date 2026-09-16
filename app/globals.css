@@ -52,6 +52,20 @@
      --prussian and the pages written here say --one-pblue. */
   --prussian: #26485A;
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  /* THE APP REGISTER'S GROUND, AT THE ROOT — and it has to be here.
+   *
+   * app/app-shell.css declares these on `.app-root`, which is right for that
+   * sheet. app/account-sheet.css was then re-scoped from it under
+   * `.acct-sheet` and kept reading them by name — so on the account sheet
+   * `background: var(--app-paper)` resolved to nothing and the panel rendered
+   * WITH NO BACKGROUND AT ALL. You could read the conversation straight
+   * through it. Same for --app-border, which made its hairlines invisible.
+   *
+   * Declaring them at the root means the next stylesheet re-scoped out of the
+   * register inherits a ground instead of a hole. `.app-root` still sets its
+   * own copy, so nothing about that surface changes. */
+  --app-paper: #F5F3EB;
+  --app-border: #e7e2d3;
   --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
   /* Vermilion — the design system's one alarm colour: capability, speed, the
      answer arriving too fast. */
@@ -75,6 +89,18 @@
   --accent-700: #475a28;
   --serif: var(--font-serif), "Instrument Serif", Georgia, serif;
   --sans: var(--font-sans), "Inter", system-ui, sans-serif;
+  /* The mathematics face, AT THE ROOT — and it has to be here.
+   *
+   * It was declared inside `.logos-root`, so it reached the Logos Board and
+   * nothing else. app/journal.css reads it for the homepage Board's equations
+   * (`.jr-root .board .eq`), and its own header says these tokens are "left to
+   * cascade" — meaning from the root. Scoped to Logos, the declaration on the
+   * journal was invalid and the notation fell through to the inherited serif,
+   * which is exactly the failure the token's own comment warns about: Georgia
+   * is a serif but not a maths face, and the minus signs give it away.
+   *
+   * next/font sets --font-stix on <html>, so the stack resolves everywhere. */
+  --font-math: var(--font-stix), 'STIX Two Math', 'Cambria Math', KaTeX_Main, Georgia, serif;
   --edge: clamp(20px, 4vw, 64px);
 }
 
@@ -101,12 +127,22 @@ body {
 /* The chat page styles itself with Tailwind utilities (paper-bg), so isolate
    the landing-only heading reset scoped rather than global. */
 
-/* full-bleed block helpers */
-.block { position: relative; padding: clamp(56px, 9vw, 128px) var(--edge); }
-.block.tight { padding: clamp(40px, 6vw, 80px) var(--edge); }
+/* Full-bleed section helpers, renamed off `block`.
+ *
+ * `.block` is also a TAILWIND UTILITY — `display:block` — and this rule came
+ * after it in the sheet, so anything carrying the utility got up to 128px of
+ * section padding instead. The chat's "still open" chips wore it and blew
+ * open to several hundred pixels tall. Two different meanings cannot share
+ * one class name when one of them is generated. */
+.sc-block { position: relative; padding: clamp(56px, 9vw, 128px) var(--edge); }
+.sc-block.tight { padding: clamp(40px, 6vw, 80px) var(--edge); }
 .inner { max-width: 1320px; margin: 0 auto; width: 100%; }
 
-.bg-paper { background: var(--paper); color: var(--ink); }
+/* `bg-paper` is a Tailwind colour utility too, and this rule follows it in
+   the sheet — so its `color` won over any `text-*` utility written beside it
+   and `bg-paper text-ink/60` came out at full ink. The ground is all this was
+   ever for; the text colour is the caller's business. */
+.bg-paper { background: var(--paper); }
 .bg-moss { background: var(--moss); color: var(--paper); }
 .bg-forest { background: var(--forest); color: var(--paper); }
 .bg-sage { background: var(--sage); color: var(--forest-2); }
@@ -173,8 +209,21 @@ body {
 
 /* nav */
 .nav-inner { display: flex; align-items: center; justify-content: space-between; }
-.brand { display: flex; align-items: center; gap: 0.5em; color: var(--paper); }
-.brand img { height: 30px; filter: invert(1) brightness(1.7); }
+/* THE MARK IS BLACK LINE ART AND THE GROUND IS CREAM.
+ *
+ * These two lines came from a landing page whose nav sat on a dark band, so
+ * they set the wordmark to paper and inverted the mark to match. That page is
+ * gone; every surface that still renders `.brand` — the journal masthead on
+ * /, /one and /logos, and the 404 plate — is cream. The invert was turning a
+ * black mark WHITE ON CREAM: the logo was simply not there, and the link to
+ * home was a blank space beside the word. The blog was the only surface that
+ * looked right, because it alone carries an override (`filter: none`, below).
+ *
+ * The handoff is explicit that the mark has no light variant and is inverted
+ * on dark, never recoloured — so inverting belongs on a dark ground and
+ * nowhere else. No live surface has one. */
+.brand { display: flex; align-items: center; gap: 0.5em; color: var(--ink); }
+.brand img { height: 30px; }
 .brand .name { font-family: var(--serif); font-size: 1.8rem; line-height: 1; letter-spacing: -0.01em; }
 .nav-right { display: flex; align-items: center; gap: 30px; }
 .nav-links { display: flex; gap: 26px; }
@@ -277,7 +326,11 @@ body {
 .chat-bar .status { margin-left: auto; font-size: 0.66rem; letter-spacing: 0.13em; text-transform: uppercase; color: var(--ink-60); display: flex; align-items: center; gap: 0.5em; }
 .chat-bar .status::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--moss); }
 .chat-body { padding: 24px 20px; display: flex; flex-direction: column; gap: 15px; }
-.msg { display: flex; gap: 10px; max-width: 88%; }
+/* Scoped to the dead landing page's chat mock-up, which is the only thing
+   that ever wanted it. Unscoped it also matched the Logos issue's pull-quote
+   (`<p className="msg">`), turning a block of prose into an 88%-wide flex
+   container. */
+.chat-body .msg { display: flex; gap: 10px; max-width: 88%; }
 .msg .av { width: 28px; height: 28px; flex: 0 0 auto; display: grid; place-items: center; background: var(--paper-2); border: 1px solid var(--border); overflow: hidden; }
 .msg .av img { width: 18px; }
 .msg.user { align-self: flex-end; flex-direction: row-reverse; }
@@ -2472,12 +2525,8 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
      vanishes and \neq reads as =. Fallback is per glyph, so only the slash
      comes from KaTeX_Main. */
   --lg-stix: var(--font-stix), 'STIX Two Math', 'Cambria Math', KaTeX_Main, Georgia, serif;
-  /* The design system names its maths face --font-math. The repo already
-     loads STIX for exactly that, so the token points at the stack rather
-     than at a second webfont — without it the Logos Board's notation falls
-     through to Georgia, which is a serif but not a maths face, and the
-     minus signs and negation slashes are the giveaway. */
-  --font-math: var(--font-stix), 'STIX Two Math', 'Cambria Math', KaTeX_Main, Georgia, serif;
+  /* --font-math lives at :root now, not here — the journal's Board reads it
+     too, and scoped to Logos it was invalid there. See the note beside it. */
 
   position: fixed;
   inset: 0;
@@ -7778,7 +7827,8 @@ a.one-mark.is-strip:hover { background: rgba(38, 72, 90, 0.075); }
   --smart-fence-color: var(--lg-ink-60);
 }
 .logos-root math-field.lg-viz-eq::part(virtual-keyboard-toggle) {
-  color: var(--lg-ink-45);
+  /* --lg-ink-45 does not exist; this ladder is 60/40. */
+  color: var(--lg-ink-40);
 }
 /* Before the element upgrades it is an unknown tag with no box; without this
    the row jumps when MathLive finishes loading. */
@@ -7965,53 +8015,19 @@ html.anim-off .logos-root.is-firstmap-node .lg-node, html:not(.js) .logos-root.i
 
 /* ── find in this conversation ──────────────────────────────────────
  *
- * A panel over the thread, opened with Cmd/Ctrl-F. It searches the whole
- * conversation rather than the rendered page — including insight cards,
- * which are the lines people most often come back for and which the
- * browser's own find will miss the moment one scrolls out of the DOM.
+ * THE STYLES FOR THIS LIVE IN app/app-shell.css, under .app-root.
+ *
+ * There used to be a second, unscoped copy right here, and because it was
+ * unscoped it won — turning the design's RIGHT RAIL into a fixed panel
+ * floating over the conversation it was meant to sit beside, covering the
+ * first message. app-shell.css's own comment on those rules reads "a right
+ * rail, not an overlay"; this block was the overlay.
+ *
+ * It also diverged in markup: .find-x for the close where the design uses
+ * .find-top .x, and .who/.txt on a hit where the design uses .w/.t — so
+ * removing it required bringing FindPanel back to the design's markup, which
+ * is where it should have been.
  */
-.find {
-  position: fixed;
-  top: 64px; right: 20px;
-  width: min(420px, calc(100vw - 40px));
-  max-height: min(70vh, 620px);
-  display: flex; flex-direction: column;
-  background: var(--paper);
-  border: 1px solid rgba(31, 31, 31, 0.14);
-  border-radius: 12px;
-  box-shadow: 0 18px 48px -18px rgba(31, 31, 31, 0.32);
-  z-index: 60;
-  overflow: hidden;
-}
-.find-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px 8px; }
-.find-top .lbl { font-size: 10.5px; font-weight: 600; letter-spacing: 0.2em; text-transform: uppercase; color: var(--moss-700); }
-.find-x { background: none; border: 0; font-size: 20px; line-height: 1; color: var(--ink-40); cursor: pointer; padding: 0 2px; }
-.find-x:hover { color: var(--ink); }
-.find-field { padding: 0 14px 10px; }
-.find-field input {
-  width: 100%; padding: 9px 11px; font-size: 14px;
-  border: 1px solid rgba(31, 31, 31, 0.16); border-radius: 8px;
-  background: #fff; color: var(--ink);
-}
-.find-field input:focus { outline: none; border-color: var(--moss); }
-.find-tabs { display: flex; gap: 4px; padding: 0 14px 10px; }
-.find-tabs button {
-  font-size: 12px; padding: 5px 10px; border-radius: 999px;
-  border: 1px solid transparent; background: none; color: var(--ink-60); cursor: pointer;
-}
-.find-tabs button.on { background: var(--moss-50); border-color: var(--moss-200); color: var(--moss-800); }
-.find-count { opacity: 0.55; margin-left: 3px; }
-.find-hits { overflow-y: auto; border-top: 1px solid rgba(31, 31, 31, 0.08); }
-.find-hit {
-  display: flex; gap: 10px; width: 100%; text-align: left;
-  padding: 10px 14px; background: none; border: 0; cursor: pointer;
-  border-bottom: 1px solid rgba(31, 31, 31, 0.06);
-}
-.find-hit:hover { background: var(--moss-50); }
-.find-hit .who { flex: 0 0 auto; font-size: 10.5px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-40); padding-top: 2px; }
-.find-hit .txt { font-size: 13.5px; line-height: 1.5; color: var(--ink); }
-.find-hit mark { background: rgba(184, 162, 107, 0.34); color: inherit; border-radius: 2px; }
-.find-none { padding: 16px 14px; font-size: 13px; color: var(--ink-60); margin: 0; }
 
 /* ── one-line hints ──────────────────────────────────────────────── */
 .hint {
@@ -8027,46 +8043,6 @@ html.anim-off .logos-root.is-firstmap-node .lg-node, html:not(.js) .logos-root.i
 }
 .hint button:hover { color: var(--moss-800); }
 
-/* The Find control in the chat header. */
-.find-btn {
-  display: inline-flex; align-items: center; gap: 6px;
-  height: 28px; padding: 0 11px; border-radius: 999px;
-  border: 1px solid rgba(31, 31, 31, 0.14); background: #fff;
-  font-size: 12.5px; color: var(--ink-60); cursor: pointer;
-  transition: border-color 0.18s, color 0.18s, background 0.18s;
-  white-space: nowrap;
-}
-.find-btn svg { width: 13px; height: 13px; }
-.find-btn:hover { border-color: var(--moss-600); color: var(--ink); }
-.find-btn[aria-pressed='true'] { background: var(--moss-50); border-color: var(--moss-200); color: var(--moss-800); }
-
-/* The line Find just landed on. Brief, and it re-fires on a repeat jump —
-   see the reflow read in the onJump handler. */
-@keyframes turn-lit {
-  0% { background: rgba(184, 162, 107, 0.26); }
-  100% { background: transparent; }
-}
-[id^='turn-'].lit { animation: turn-lit 1.6s ease-out; border-radius: 10px; }
-html.anim-off [id^='turn-'].lit { animation: none; background: transparent; }
-
-/* The Logos offer on an empty chat. */
-.logos-offer {
-  margin-top: 32px; padding: 20px; border-radius: 12px;
-  border: 1px solid rgba(202, 213, 182, 0.6); background: rgba(244, 246, 238, 0.6);
-  text-align: left; display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
-}
-.logos-offer > div:first-child { flex: 1; min-width: 12rem; }
-.logos-offer .lo-t { font-family: var(--serif); font-size: 1.15rem; color: var(--ink); }
-.logos-offer .lo-b { margin: 4px 0 0; font-size: 13px; color: var(--ink-60); line-height: 1.5; }
-.logos-offer .lo-b em { font-style: italic; color: var(--moss-700); }
-.logos-offer .lo-go {
-  flex: 0 0 auto; display: inline-flex; align-items: center; gap: 7px;
-  padding: 9px 16px; border-radius: 999px; border: 0;
-  background: var(--moss); color: var(--paper);
-  font-size: 13.5px; font-weight: 500; cursor: pointer;
-  transition: background 0.18s;
-}
-.logos-offer .lo-go:hover { background: var(--moss-700); }
 /* ── print: everything a driver was going to reveal ──────────────────
  *
  * The reveal contract has three fallbacks and this is the third. `html.js-anim`
@@ -8100,3 +8076,8 @@ html.anim-off [id^='turn-'].lit { animation: none; background: transparent; }
     display: none !important;
   }
 }
+
+/* The account control in the Logos header. It carries its own stylesheet
+   (components/account/account-control.css); this only places it, after the
+   trailing "Socria chat →" button. */
+.logos-root .lg-head .who-btn { margin-left: 10px; flex: 0 0 auto; }

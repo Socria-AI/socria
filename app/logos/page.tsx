@@ -10,7 +10,11 @@
 
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
-import './logos.css';
+// logos.css is NOT imported: it styles `.lgx-root`, the root of LogosStory,
+// which this page replaced and which nothing renders. It was 54KB of
+// render-blocking CSS matching no element on the page. The file and the
+// component stay in the tree — LogosDemo, which the docs still mount, takes
+// its chrome from docs.css and the `.logos-root` block in globals.css.
 import '../journal.css';
 import { LogosIssue } from './LogosIssue';
 

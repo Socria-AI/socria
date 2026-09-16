@@ -30,9 +30,15 @@
 .tn-head{display:flex;align-items:baseline;gap:12px}
 .tn-num{font-family:var(--font-serif);font-style:italic;font-size:1.62rem;line-height:1;
   color:var(--moss-700);flex:0 0 auto;min-width:1.6ch}
-.tour-note h3{margin:0;font-family:var(--font-serif);font-size:1.48rem;line-height:1.08;
+/* The title is a <p class="tn-t">, not an <h3> — Tour.tsx renders a heading
+   only in the sense that it reads as one, because an aside beside a control
+   is not a document section. This selector still said h3, so the title fell
+   through to the body rule below and rendered at 14.5px: the note had no
+   headline at all, just two paragraphs. */
+.tour-note .tn-t{margin:0;font-family:var(--font-serif);font-size:1.48rem;line-height:1.08;
   letter-spacing:-.018em;color:var(--ink)}
 .tour-note p{margin:11px 0 0;font-size:14.5px;line-height:1.62;color:var(--ink-70);max-width:38ch}
+.tour-note .tn-t{margin-top:0}
 .tour-note p em{font-style:italic;color:var(--moss-700)}
 .tn-foot{display:flex;align-items:center;gap:14px;margin-top:17px;padding-top:13px;border-top:1px solid var(--ink-12)}
 .tn-ticks{display:flex;gap:5px;margin-right:auto}
@@ -47,9 +53,17 @@
 .tn-next:hover{background:var(--moss);transform:translateY(-2px)}
 .tn-next .ar{transition:transform .2s}
 .tn-next:hover .ar{transform:translateX(3px)}
-.tour-ring,.tour-leader{stroke-dashoffset:0;animation:none}
-.tour-dot{opacity:1;animation:none}
-.tour-note,.tour-note.tour-above{animation:none}
+/* These three belong INSIDE the reduced-motion query, and upstream they are
+   (app.css: `@media(prefers-reduced-motion:reduce){ … }`). The wrapper was
+   lost in the port and the rules landed at the top level, so the ring never
+   drew itself, the leader never ran and the note never arrived — for
+   everyone, whatever they had asked for. A motion preference that is honoured
+   unconditionally is just the animation deleted. */
+@media(prefers-reduced-motion:reduce){
+  .tour-ring,.tour-leader{stroke-dashoffset:0;animation:none}
+  .tour-dot{opacity:1;animation:none}
+  .tour-note,.tour-note.tour-above{animation:none}
+}
 
 
 /* The keyframes these rules actually name.

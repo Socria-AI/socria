@@ -238,12 +238,6 @@ export default function ChatPage() {
   // conversation, including insight cards, which are the lines people most
   // often come back for.
   const [findOpen, setFindOpen] = useState(false);
-
-  // ── which single hint, if any, this screen currently justifies ──
-  // A hint is only eligible once its SUBJECT is on screen — that is what
-  // keeps this from being a tour. pickHint then takes the first unseen one
-  // in a fixed order, so there is never more than one.
-  const seenHints = useSeenHints();
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'f') {
@@ -254,6 +248,7 @@ export default function ChatPage() {
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
   }, []);
+
   const endTour = useCallback(() => {
     setTourOpen(false);
     try { localStorage.setItem(TOUR_KEY, '1'); } catch {}
@@ -284,12 +279,41 @@ export default function ChatPage() {
   const [depth, setDepth] = useState<ThinkingDepth>('balanced');
   const [smartUnlocked, setSmartUnlocked] = useState(false);
   const [logosModalOpen, setLogosModalOpen] = useState(false);
+  /** they arrived straight from /onboarding this session */
+  const justOnboarded = useRef(false);
   const [logosDismissed, setLogosDismissed] = useState(false);
   const [autoOpenChecked, setAutoOpenChecked] = useState(false);
   const [shareInsight, setShareInsight] = useState<Insight | null>(null);
   const [importedProfile, setImportedProfile] = useState('');
   const [importOpen, setImportOpen] = useState(false);
   const [journeyDebugOpen, setJourneyDebugOpen] = useState(false);
+
+  // WHEN THE TOUR MAY OPEN.
+  //
+  // Only once nothing else owns the screen. `blocked` is the condition
+  // lib/tour.ts already asks about and it was being answered `false`
+  // unconditionally, which is how the tour came to be consumed invisibly
+  // under the Logos modal on a first visit. Depending on the real state
+  // means the tour simply waits, and opens when the screen is free.
+  const anythingOpen =
+    logosModalOpen || acctOpen || importOpen || journeyDebugOpen || !!shareInsight;
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn || tourOpen || anythingOpen) return;
+    try {
+      if (
+        shouldRunTour({
+          done: localStorage.getItem(TOUR_KEY) === '1',
+          signedIn: true,
+          justOnboarded: justOnboarded.current,
+          blocked: false,
+        })
+      ) {
+        setTourOpen(true);
+      }
+    } catch {
+      /* no storage: teach nobody twice a day */
+    }
+  }, [isLoaded, isSignedIn, tourOpen, anythingOpen]);
   const [journey, setJourney] = useState<UserUnderstanding | null>(null);
   // Freshest journey, immune to stale closures (the cadence update fires from
   // async flows that captured an older render).
@@ -813,6 +837,10 @@ export default function ChatPage() {
     if (mode === 'local') saveLocal(trimmed);
     setActiveId(null);
     setSidebarOpen(false);
+    // Same reason as newSession: a filtered rail would hide the session this
+    // message was just moved into.
+    setRailQuery('');
+    setMapsOnly(false);
     // `send` would otherwise read the list it was rendered with, and put the
     // message back into the conversation it was just taken out of.
     void send(d.text, { convos: trimmed, id: null });
@@ -1185,6 +1213,11 @@ export default function ChatPage() {
     setActiveId(id);
     setSidebarOpen(false);
     setError(null);
+    // Clear the rail's filters. With a word in the search box or the Maps-only
+    // chip down, the new row did not match and simply never appeared — the
+    // button looked broken while quietly working.
+    setRailQuery('');
+    setMapsOnly(false);
     // Don't write empty sessions to the cloud; they'll be saved on first message.
     if (mode === 'local') saveLocal(next);
   }
@@ -1478,20 +1511,13 @@ export default function ChatPage() {
       setInput(carried.text);
       requestAnimationFrame(() => textareaRef.current?.focus());
     }
-    try {
-      if (
-        shouldRunTour({
-          done: localStorage.getItem(TOUR_KEY) === '1',
-          signedIn: true,
-          justOnboarded: !!carried,
-          blocked: false,
-        })
-      ) {
-        setTourOpen(true);
-      }
-    } catch {
-      /* no storage: teach nobody twice a day */
-    }
+    // The tour decision moved out of this mount effect — see the effect
+    // below. It ran here with `blocked: false` hard-coded, so on a first
+    // signed-in visit it opened UNDER the Try-Logos modal, which mounts at
+    // the same moment: the visitor saw only the modal, and the one Escape
+    // that dismissed it also ended the tour and wrote TOUR_KEY. The
+    // first-run tour was spent without ever having been on screen.
+    if (carried) justOnboarded.current = true;
 
     if (!carried && want !== 'logos' && readModel() !== 'logos') {
       const { id } = readStart(window.location.search);
@@ -1572,11 +1598,26 @@ export default function ChatPage() {
   const messages = active?.messages || [];
   const hasMessages = messages.length > 0;
 
-  const eligibleHints: string[] = [];
-  if (messages.length >= 2) eligibleHints.push('picker');
-  if (messages.length >= 6 && isSignedIn) eligibleHints.push('logos');
-  if (messages.length >= 4) eligibleHints.push('find');
-  const liveHint = pickHint(eligibleHints, seenHints);
+  // WHICH ONE-LINE HINT, IF ANY.
+  //
+  // The account sheet has offered "Show hints again" since the register was
+  // ported, and there was nothing to show: no <Hint> was rendered anywhere in
+  // the product, so the button reset a key nothing read. The machinery was
+  // all here — lib/hints.ts, components/Hint.tsx, both covered — and only the
+  // rendering was missing.
+  //
+  // A hint earns its place only when something has appeared for the first
+  // time, so eligibility is about what is ON SCREEN. pickHint returns at most
+  // one, in HINT_ORDER, and never one already dismissed.
+  const seenHints = useSeenHints();
+  const liveHint = pickHint(
+    [
+      ...(hasMessages ? ['picker'] : []),
+      ...(model !== 'logos' && hasMessages ? ['logos'] : []),
+      ...(messages.length >= 6 ? ['find'] : []),
+    ],
+    seenHints
+  );
 
   // Logos is a model, not a destination: selecting it swaps the whole
   // experience in here rather than navigating away, so /chat stays the
@@ -1668,31 +1709,13 @@ export default function ChatPage() {
 
       {/* Sidebar — overlay on mobile, static column on desktop */}
       <Tour open={tourOpen} onDone={endTour} />
-      {findOpen && (
-        <FindPanel
-          turns={messages as never}
-          onClose={() => setFindOpen(false)}
-          onJump={(i) => {
-            // The design's own note, and it is right: never scrollIntoView.
-            // It scrolls every scrollable ancestor, which in a chat means the
-            // page moves as well as the thread. Move the container itself,
-            // then flash the line so the eye knows where it landed — a jump
-            // with no flash leaves you looking for the thing you just found.
-            const el = document.getElementById(`turn-${i}`);
-            const box = el?.closest('.overflow-y-auto') as HTMLElement | null;
-            if (!el || !box) return;
-            box.scrollTop += el.getBoundingClientRect().top - box.getBoundingClientRect().top - 20;
-            el.classList.remove('lit');
-            void el.offsetWidth; // a synchronous reflow, so a line already lit re-flashes
-            el.classList.add('lit');
-            setTimeout(() => el.classList.remove('lit'), 1600);
-          }}
-        />
-      )}
       <AccountSheet
         open={acctOpen}
         onClose={() => setAcctOpen(false)}
         isOne={planState.plan === 'one'}
+        // The whole answer, so the sheet can show the university section
+        // where the deployment runs the programme.
+        plan={planState}
         onRetakeTour={() => setTourOpen(true)}
       />
       {/* The sessions rail, in the design's own markup and its own stylesheet
@@ -1873,10 +1896,15 @@ export default function ChatPage() {
                           // back to /chat would land on whatever was active
                           // before and contradict where they just were.
                           onClick={() => chooseModel('logos')}
-                          onDoubleClick={(e) => {
-                            e.preventDefault();
-                            startRename();
-                          }}
+                          // NO onDoubleClick HERE, deliberately. A Logos row
+                          // is a link, and a link navigates on the FIRST
+                          // click — by the time a second arrives the page is
+                          // already leaving, so double-click-to-rename could
+                          // never fire. Making it work would mean cancelling
+                          // every click and navigating on a timer, which buys
+                          // a nicety by putting a delay on every open. The
+                          // pencil beside the row renames both kinds and is
+                          // always there.
                           title={`${item.title} — opens in Logos`}
                         >
                           {mark}
@@ -2026,27 +2054,32 @@ export default function ChatPage() {
 
           {/* Right: find, the Logos invitation (desktop) + auth */}
           <div className="flex items-center gap-2 shrink-0">
-            {/* Find was keyboard-only when it shipped, which meant it did not
-                exist for anyone who did not already know it was there. */}
-            {liveHint === 'find' && (
-              <Hint id="find" place="below">
-                Long thread. <em>Find</em> searches this one, not all of them.
-              </Hint>
-            )}
+            {/* Find had no control at all — only a Cmd/Ctrl-F handler, which
+                is the shortcut the browser itself claims, so on most machines
+                the feature was simply unreachable. It is a button now, and
+                the shortcut is a shortcut rather than the only door. Shown
+                once there is a conversation to search. */}
             {hasMessages && (
-              <button
-                type="button"
-                className="find-btn"
-                onClick={() => setFindOpen((v) => !v)}
-                aria-pressed={findOpen}
-                title="Find in this conversation (⌘F)"
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <circle cx="11" cy="11" r="6.5" />
-                  <path d="M16 16l4.5 4.5" />
-                </svg>
-                Find
-              </button>
+              <span className="app-root app-inline">
+                {liveHint === 'find' && (
+                  <Hint id="find" place="below">
+                    Long thread. <em>Find</em> searches this one, not all of them.
+                  </Hint>
+                )}
+                <button
+                  type="button"
+                  className="find-btn"
+                  aria-pressed={findOpen}
+                  onClick={() => setFindOpen((v) => !v)}
+                  title="Find in this conversation (⌘F)"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"
+                       strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <circle cx="11" cy="11" r="6.5" /><path d="M16 16l4.5 4.5" />
+                  </svg>
+                  Find
+                </button>
+              </span>
             )}
             <div className="hidden sm:block">
               <TryLogosPill
@@ -2066,18 +2099,24 @@ export default function ChatPage() {
               {/* Socria's own, not Clerk's — see AccountControl for why. The
                   tour's fourth note rings this, so the attribute is on the
                   wrapper rather than inside the register's display:contents. */}
-              <span className="app-root app-inline">
-                <span data-tour="account">
-                  <AccountControl
-                    onOpen={() => setAcctOpen(true)}
-                    isOne={planState.plan === 'one'}
-                  />
-                </span>
+              <span data-tour="account">
+                <AccountControl
+                  onOpen={() => setAcctOpen(true)}
+                  isOne={planState.plan === 'one'}
+                />
               </span>
             </SignedIn>
           </div>
         </div>
 
+        {/* The conversation and the find rail, side by side.
+            `.chat-row` is the design's own container (app/app-shell.css:
+            `flex:1;min-height:0;display:flex;position:relative`) and the
+            reason Find is a COLUMN beside the thread rather than a panel
+            floating over it. The wrapper is display:contents, so the row is
+            still a direct flex child of the page column. */}
+        <div className="app-root app-inline">
+        <div className="chat-row">
         <div className="flex-1 overflow-y-auto">
           <div className="max-w-2xl mx-auto px-6 py-10">
             {!hasMessages && !isSignedIn && !smartUnlocked && usedFree ? (
@@ -2140,7 +2179,11 @@ export default function ChatPage() {
 
                 {/* The design's closing offer on an empty screen. Signed
                     out it says WHY an account is needed rather than just
-                    asking for one — a map has to be kept somewhere. */}
+                    asking for one — a map has to be kept somewhere.
+                    (Lost here in the rail rewrite and recovered from main
+                    while carrying this work across; the register supplies
+                    the scope.) */}
+                <div className="app-root app-inline">
                 <div className="logos-offer">
                   <div>
                     <div className="lo-t">Want to see your reasoning drawn?</div>
@@ -2166,6 +2209,7 @@ export default function ChatPage() {
                       </button>
                     </SignInButton>
                   )}
+                </div>
                 </div>
 
                 <div className={`${returnChips.length ? 'mt-3' : 'mt-10'} grid sm:grid-cols-2 gap-3 text-left`}>
@@ -2220,6 +2264,10 @@ export default function ChatPage() {
               </div>
             )}
 
+            {/* One scope for the whole thread: `.turn-row` and its `.lit`
+                flash are register rules, and display:contents means this
+                wrapper adds no box of its own. */}
+            <div className="app-root app-inline">
             {messages.map((m, i) => {
               const isAssistant = m.role === 'assistant';
               const { body, choices } = isAssistant
@@ -2235,8 +2283,16 @@ export default function ChatPage() {
                 !sending &&
                 !streamed;
               return (
-                // The index is the anchor Find scrolls to.
-                <div key={i} id={`turn-${i}`}>
+                // The index is the anchor Find scrolls to, and `turn-row`
+                // is what the flash hangs on: the only rule that paints a hit
+                // is `.app-root .turn-row.lit`. Without the class, jumping to
+                // a result scrolled and lit nothing, so on a long thread
+                // there was no way to see which line you had landed on.
+                // Both stay on THIS element — the register's scope is
+                // supplied once by the list's wrapper, because `app-inline`
+                // is display:contents and an element with no box cannot be
+                // scrolled into view.
+                <div key={i} id={`turn-${i}`} className="turn-row">
                   <Bubble role={m.role} content={body} />
                   {showChoices && (
                     <ChoiceChips
@@ -2248,6 +2304,7 @@ export default function ChatPage() {
                 </div>
               );
             })}
+            </div>
 
             {streamed && (
               <Bubble
@@ -2331,6 +2388,35 @@ export default function ChatPage() {
 
             <div ref={bottomRef} />
           </div>
+        </div>
+        {/* Not an overlay. It takes its width from the row and pushes the
+            conversation over; below 820px app-shell.css turns it into a
+            sheet anchored to this row, which is why the row is positioned. */}
+        {findOpen && (
+          <FindPanel
+            turns={messages}
+            onClose={() => setFindOpen(false)}
+            onJump={(i) => {
+              // NEVER scrollIntoView, which is the design's own note and it
+              // is right: it scrolls every scrollable ancestor, so in a chat
+              // the page moves as well as the thread. Move the container
+              // itself, then flash the line so the eye knows where it landed
+              // — a jump with no flash leaves you hunting for the thing you
+              // just found. The flash is re-armed by reading offsetWidth, so
+              // landing on the same line twice lights it twice.
+              const el = document.getElementById(`turn-${i}`);
+              const box = el?.closest('.overflow-y-auto') as HTMLElement | null;
+              if (!el || !box) return;
+              box.scrollTop +=
+                el.getBoundingClientRect().top - box.getBoundingClientRect().top - 20;
+              el.classList.remove('lit');
+              void el.offsetWidth;
+              el.classList.add('lit');
+              setTimeout(() => el.classList.remove('lit'), 1600);
+            }}
+          />
+        )}
+        </div>
         </div>
 
         <div className="border-t border-border/60 bg-paper/80 backdrop-blur-sm">
@@ -2424,6 +2510,13 @@ export default function ChatPage() {
                 Enter to send, Shift+Enter for a new line.
               </p>
               <div className="flex items-center gap-2 shrink-0 ml-auto">
+                {liveHint === 'picker' && (
+                  <span className="app-root app-inline">
+                    <Hint id="picker" place="above">
+                      One control, two questions: <em>which model</em>, and how far it goes.
+                    </Hint>
+                  </span>
+                )}
                 <ModelPicker
                   value={model}
                   onChange={pickModel}
