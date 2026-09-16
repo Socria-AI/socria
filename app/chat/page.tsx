@@ -7,10 +7,11 @@ import {
   SignedIn,
   SignedOut,
   SignInButton,
-  UserButton,
   useUser,
 } from '@clerk/nextjs';
+import '../app-shell.css';
 import { Logo } from '@/components/Logo';
+import { AccountControl } from '@/components/account/AccountControl';
 import { ModelPicker } from '@/components/ModelPicker';
 import { usePlan } from '@/components/usePlan';
 import { OneFoot } from '@/components/OneMark';
@@ -42,14 +43,11 @@ import { isSource } from '@/lib/checkout-attribution';
 import { track } from '@/lib/analytics';
 import { hasJourneyContent as journeyHasContent } from '@/lib/socria-prompt';
 import {
-  SESSION_TABS,
   cleanTitle,
-  filterByTab,
-  shouldShowTabs,
-  tabCounts,
-  type SessionTab,
+  groupRail,
+  searchRail,
+  shouldShowSearch,
 } from '@/lib/session-rail';
-import { DepthPicker } from '@/components/DepthPicker';
 import { TryLogosPill } from '@/components/TryLogosPill';
 import { TryLogosModal } from '@/components/TryLogosModal';
 import { RichText } from '@/components/RichText';
@@ -256,7 +254,11 @@ export default function ChatPage() {
   const [streamed, setStreamed] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [railTab, setRailTab] = useState<SessionTab>('all');
+  // What is typed in the rail's search box, and whether the "Maps only" chip
+  // is down. Neither is persisted: a filter that survives a reload is a list
+  // that lies about what is in it.
+  const [railQuery, setRailQuery] = useState('');
+  const [mapsOnly, setMapsOnly] = useState(false);
   // Which row is being renamed, and what is in the box. Rows from both
   // surfaces share it, so the id is prefixed the way the keys are.
   const [renaming, setRenaming] = useState<string | null>(null);
@@ -702,12 +704,21 @@ export default function ChatPage() {
   ].sort((a, b) => b.updatedAt - a.updatedAt);
 
   // ...but once the list is long, "which of these has the map I drew" is a
-  // question the ordering cannot answer. The split is by whether there IS a
-  // map, not by which surface made it — see lib/session-rail.ts.
-  const railTabbed = shouldShowTabs(sessionRail);
-  const railCounts = tabCounts(sessionRail);
-  const activeTab: SessionTab = railTabbed && railCounts[railTab] > 0 ? railTab : 'all';
-  const shownRail = railTabbed ? filterByTab(sessionRail, activeTab) : sessionRail;
+  // question the ordering cannot answer. Two filters answer it — type a word,
+  // or ask for the ones with maps — and three headings say where in the week
+  // each row sits. All three live in lib/session-rail.ts.
+  //
+  // The controls only appear once the list is long enough to need them; the
+  // same threshold the tab bar used, for the same reason. A search box over
+  // four rows is furniture.
+  const railSearchable = shouldShowSearch(sessionRail);
+  const railHits = railSearchable
+    ? searchRail(sessionRail, railQuery, mapsOnly)
+    : sessionRail;
+  const railGroups = groupRail(railHits);
+  // The chip is hidden on its own when nothing would survive it. A filter
+  // whose only outcome is "nothing here" teaches people not to press it.
+  const railHasMaps = sessionRail.some((i) => i.nodes > 0);
 
   /**
    * Rename a row, whichever surface it belongs to.
@@ -1662,246 +1673,269 @@ export default function ChatPage() {
         isOne={planState.plan === 'one'}
         onRetakeTour={() => setTourOpen(true)}
       />
-      <aside
-        data-tour="sessions"
-        className={`${
-          sidebarOpen ? 'flex' : 'hidden'
-        } md:flex flex-col w-[min(18rem,84vw)] md:w-72 shrink-0 border-r border-border/60 h-dvh fixed md:static top-0 left-0 z-40 bg-paper md:bg-paper/80 backdrop-blur-sm`}
-      >
-        <div className="px-5 h-16 flex items-center justify-between border-b border-border/60">
+      {/* The sessions rail, in the design's own markup and its own stylesheet
+          (app/app-shell.css, scoped under .app-root). The wrapper is
+          `app-inline`, which is display:contents — the register's resets and
+          type reach the rail, its full-viewport background does not. */}
+      <div className="app-root app-inline">
+      {/* Below 860px the rail is an overlay, so it has to be able to be
+          shut; above it, it is a column and is always there. One attribute
+          says which, and the stylesheet decides what that means at each
+          width — rather than a class that would hide it on desktop too. */}
+      <aside data-tour="sessions" className="s-bar" data-open={sidebarOpen ? 'yes' : 'no'}>
+        <div className="s-top">
           <Logo />
           <button
+            className="s-close"
             onClick={() => setSidebarOpen(false)}
-            className="md:hidden text-ink/50 hover:text-ink p-1 -mr-1"
             aria-label="Close sidebar"
           >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
               <line x1="18" y1="6" x2="6" y2="18" />
               <line x1="6" y1="6" x2="18" y2="18" />
             </svg>
           </button>
         </div>
 
-        <div className="p-3">
-          <button
-            onClick={newSession}
-            className="w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-lg border border-ink/15 hover:border-moss-600 hover:bg-moss-50/40 transition-all group"
-            title={
-              lockedOut
-                ? 'Sign in to start more sessions'
-                : 'Start a new thought session'
-            }
-          >
-            <span className="text-moss-700 text-lg leading-none">
-              {lockedOut ? '↗' : '+'}
-            </span>
-            <span className="text-[14px] text-ink/80 group-hover:text-ink font-medium">
-              {lockedOut ? 'Sign in for more sessions' : 'New thought session'}
-            </span>
-          </button>
-        </div>
+        <button
+          className="s-new"
+          onClick={newSession}
+          title={
+            lockedOut
+              ? 'Sign in to start more sessions'
+              : 'Start a new thought session'
+          }
+        >
+          <span className="p" aria-hidden="true">{lockedOut ? '↗' : '+'}</span>
+          {lockedOut ? 'Sign in for more sessions' : 'New thought session'}
+        </button>
 
-        <div className="px-5 pt-2 pb-1 text-[10px] uppercase tracking-wider text-ink/40">
-          Saved sessions
-        </div>
-
-        {/* Only when it divides something. A switcher whose every option but
-            one leads to "nothing here" teaches people not to press it. */}
-        {railTabbed && (
-          <div
-            className="mx-3 mb-2 flex gap-0.5 rounded-lg bg-ink/[0.05] p-0.5"
-            role="tablist"
-            aria-label="Filter sessions"
-          >
-            {SESSION_TABS.map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                role="tab"
-                aria-selected={activeTab === t.id}
-                onClick={() => setRailTab(t.id)}
-                className={`flex-1 flex items-center justify-center gap-1.5 rounded-md px-2 py-1 text-[11.5px] transition-colors ${
-                  activeTab === t.id
-                    ? 'bg-white text-ink shadow-sm'
-                    : 'text-ink/45 hover:text-ink/70'
-                }`}
-              >
-                {t.label}
-                <span className="text-[10px] tabular-nums text-ink/30">
-                  {railCounts[t.id]}
-                </span>
-              </button>
-            ))}
+        <SignedOut>
+          <div className="s-anon">
+            <p className="l">Signed out</p>
+            <p className="t">This session lives in this browser, and nowhere else.</p>
+            <p className="c">
+              {lockedOut
+                ? 'Your free session is complete.'
+                : 'One free session, then sign in.'}
+            </p>
+            <SignInButton>
+              <button className="g">Sign in to keep it <span aria-hidden="true">→</span></button>
+            </SignInButton>
           </div>
+        </SignedOut>
+
+        {/* Search and the one filter. Both only earn their place once the
+            list is long enough to need them — over a handful of rows,
+            "which of these has the map I drew" is a question the ordering
+            cannot answer, and under it they are furniture.
+            Not gated on being signed in: the list itself is not, and a
+            signed-out person with a browser full of local sessions needs to
+            search them exactly as much. The row count does the gating. */}
+        {railSearchable && (
+          <>
+            <div className="s-find">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"
+                   strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <circle cx="11" cy="11" r="6.5" /><path d="M16 16l4.5 4.5" />
+              </svg>
+              <input
+                value={railQuery}
+                onChange={(e) => setRailQuery(e.target.value)}
+                placeholder="Search your sessions"
+                aria-label="Search your sessions"
+              />
+              {railQuery && (
+                <button className="clear" onClick={() => setRailQuery('')} aria-label="Clear search">
+                  ×
+                </button>
+              )}
+            </div>
+
+            {(railHasMaps || railQuery) && (
+              <div className="s-filter">
+                {railHasMaps && (
+                  <button
+                    className="chip"
+                    aria-pressed={mapsOnly}
+                    onClick={() => setMapsOnly((v) => !v)}
+                  >
+                    <span className="s-glyph" aria-hidden="true">
+                      <ModelGlyph model="logos" size={13} />
+                    </span>
+                    Maps only
+                  </button>
+                )}
+                {(railQuery || mapsOnly) && (
+                  <span className="n">
+                    {railHits.length} of {sessionRail.length}
+                  </span>
+                )}
+              </div>
+            )}
+          </>
         )}
 
-        <div className="flex-1 overflow-y-auto px-2 pb-2">
+        <div className="s-list">
           {hydrating ? (
-            <p className="px-3 py-2 text-xs text-ink/40 font-serif italic">
-              Loading sessions…
-            </p>
+            <p className="s-none">Loading sessions…</p>
           ) : sessionRail.length === 0 ? (
-            <p className="px-3 py-2 text-xs text-ink/40 font-serif italic">
-              No sessions yet. Start one.
-            </p>
+            <p className="s-none">No sessions yet. <em>Start one.</em></p>
+          ) : railHits.length === 0 ? (
+            <p className="s-none">Nothing matches. <em>Try fewer words.</em></p>
           ) : (
-            <>
-              {railTabbed && shownRail.length === 0 && (
-                <p className="px-3 py-2 text-xs text-ink/40 font-serif italic">
-                  Nothing here yet.
-                </p>
-              )}
-              {shownRail.map((item) => {
-                const rowKey = `${item.kind}-${item.id}`;
-                const startRename = () => {
-                  setRenameDraft(item.title);
-                  setRenaming(rowKey);
-                };
-                // The box replaces the row rather than sitting inside it: a
-                // Logos row is a link, and a text field inside a link is a
-                // fight between typing and navigating that typing loses.
-                if (renaming === rowKey) {
+            railGroups.map(({ group, items }) => (
+              <section key={group}>
+                <p className="s-when">{group}</p>
+                {items.map((item) => {
+                  const rowKey = `${item.kind}-${item.id}`;
+                  const startRename = () => {
+                    setRenameDraft(item.title);
+                    setRenaming(rowKey);
+                  };
+                  // The box replaces the row rather than sitting inside it: a
+                  // Logos row is a link, and a text field inside a link is a
+                  // fight between typing and navigating that typing loses.
+                  if (renaming === rowKey) {
+                    return (
+                      <div key={rowKey} className="s-row">
+                        {item.nodes ? (
+                          <span className="s-glyph" aria-hidden="true">
+                            <ModelGlyph model="logos" size={14} />
+                          </span>
+                        ) : (
+                          <span className="s-gap" aria-hidden="true" />
+                        )}
+                        <input
+                          autoFocus
+                          className="s-rename"
+                          value={renameDraft}
+                          aria-label="Rename this session"
+                          onChange={(e) => setRenameDraft(e.target.value)}
+                          onFocus={(e) => e.currentTarget.select()}
+                          // Blur commits as well as Enter: clicking away from
+                          // a box you have typed in should keep what you typed.
+                          onBlur={() => commitRename(item.kind, item.id)}
+                          onKeyDown={(e) => {
+                            e.stopPropagation();
+                            if (e.key === 'Enter') commitRename(item.kind, item.id);
+                            if (e.key === 'Escape') setRenaming(null);
+                          }}
+                        />
+                      </div>
+                    );
+                  }
+
+                  const mark = item.nodes ? (
+                    <span className="s-glyph" aria-hidden="true">
+                      <ModelGlyph model="logos" size={14} />
+                    </span>
+                  ) : (
+                    <span className="s-gap" aria-hidden="true" />
+                  );
+                  const count = item.nodes ? <span className="n">{item.nodes}</span> : null;
+
                   return (
                     <div
                       key={rowKey}
-                      className="flex items-center gap-2 px-3 py-1.5"
+                      className={`s-row${
+                        item.kind === 'chat' && item.id === activeId ? ' on' : ''
+                      }`}
                     >
-                      {item.kind === 'logos' && (
-                        <ModelGlyph
-                          model="logos"
-                          size={13}
-                          className="text-moss-700 shrink-0"
-                        />
+                      {item.kind === 'logos' ? (
+                        <a
+                          className="s-open"
+                          href={`/chat?s=${encodeURIComponent(item.id)}`}
+                          // Opening one of these is a model switch as well as
+                          // a navigation: record it before leaving, or coming
+                          // back to /chat would land on whatever was active
+                          // before and contradict where they just were.
+                          onClick={() => chooseModel('logos')}
+                          onDoubleClick={(e) => {
+                            e.preventDefault();
+                            startRename();
+                          }}
+                          title={`${item.title} — opens in Logos`}
+                        >
+                          {mark}
+                          <span className="t">{item.title}</span>
+                          {count}
+                        </a>
+                      ) : (
+                        <button
+                          type="button"
+                          className="s-open"
+                          onClick={() => {
+                            setActiveId(item.id);
+                            setSidebarOpen(false);
+                          }}
+                          onDoubleClick={startRename}
+                          title={item.title}
+                        >
+                          {mark}
+                          <span className="t">{item.title}</span>
+                          {count}
+                        </button>
                       )}
-                      <input
-                        autoFocus
-                        value={renameDraft}
-                        aria-label="Rename this session"
-                        onChange={(e) => setRenameDraft(e.target.value)}
-                        onFocus={(e) => e.currentTarget.select()}
-                        // Blur commits as well as Enter: clicking away from a
-                        // box you have typed in should keep what you typed.
-                        onBlur={() => commitRename(item.kind, item.id)}
-                        onKeyDown={(e) => {
-                          e.stopPropagation();
-                          if (e.key === 'Enter') commitRename(item.kind, item.id);
-                          if (e.key === 'Escape') setRenaming(null);
-                        }}
-                        className="min-w-0 flex-1 rounded-md border border-moss-600 bg-white px-2 py-1 text-[13px] text-ink outline-none"
-                      />
+                      <span className="s-act">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            startRename();
+                          }}
+                          aria-label={`Rename ${item.title}`}
+                          title="Rename"
+                        >
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M12 20h9" />
+                            <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                          </svg>
+                        </button>
+                        {item.kind === 'chat' && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deleteSession(item.id);
+                            }}
+                            aria-label={`Delete ${item.title}`}
+                            title="Delete"
+                          >
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                              <line x1="18" y1="6" x2="6" y2="18" />
+                              <line x1="6" y1="6" x2="18" y2="18" />
+                            </svg>
+                          </button>
+                        )}
+                      </span>
                     </div>
                   );
+                })
                 }
-                return (
-                  <div
-                    key={rowKey}
-                    className={`group flex items-center rounded-md pr-1 transition-colors ${
-                      item.kind === 'chat' && item.id === activeId
-                        ? 'bg-moss-50 text-ink'
-                        : 'text-ink/70 hover:bg-ink/5 hover:text-ink'
-                    }`}
-                  >
-                    {item.kind === 'logos' ? (
-                      <a
-                        href={`/chat?s=${encodeURIComponent(item.id)}`}
-                        // Opening one of these is a model switch as well as a
-                        // navigation: record it before leaving, or coming back
-                        // to /chat would land on whatever was active before and
-                        // contradict where they just were.
-                        onClick={() => chooseModel('logos')}
-                        onDoubleClick={(e) => {
-                          e.preventDefault();
-                          startRename();
-                        }}
-                        className="flex min-w-0 flex-1 items-center gap-2 px-3 py-2 text-[13px]"
-                        title={`${item.title} — opens in Logos`}
-                      >
-                        <ModelGlyph
-                          model="logos"
-                          size={13}
-                          className="text-moss-700 shrink-0"
-                        />
-                        <span className="truncate flex-1">{item.title}</span>
-                        <span className="text-[10px] text-ink/35 shrink-0">
-                          {item.nodes ? `${item.nodes} nodes` : 'no map'}
-                        </span>
-                      </a>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setActiveId(item.id);
-                          setSidebarOpen(false);
-                        }}
-                        onDoubleClick={startRename}
-                        className="min-w-0 flex-1 truncate px-3 py-2 text-left text-[13px]"
-                        title={item.title}
-                      >
-                        {item.title}
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        startRename();
-                      }}
-                      className="shrink-0 px-1 text-ink/35 opacity-0 transition-opacity hover:text-ink group-hover:opacity-100"
-                      aria-label={`Rename ${item.title}`}
-                      title="Rename"
-                    >
-                      <svg
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.8"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        width="13"
-                        height="13"
-                      >
-                        <path d="M12 20h9" />
-                        <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
-                      </svg>
-                    </button>
-                    {item.kind === 'chat' && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          deleteSession(item.id);
-                        }}
-                        className="shrink-0 px-1 text-ink/40 opacity-0 transition-opacity hover:text-ink group-hover:opacity-100"
-                        aria-label="Delete"
-                      >
-                        ×
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
-            </>
+              </section>
+            ))
           )}
         </div>
 
-        <div className="border-t border-border/60 p-4">
+        <div className="s-foot">
           {/* Socria One, said once and left alone. The same plate as the
               /one cover, at the size of a sidebar row; it never moves and
               never changes what it says. A member sees what they hold. */}
           {planState.known && (
-            <div className="mb-3">
+            <div style={{ marginBottom: 11 }}>
               <OneFoot state={planState} />
             </div>
           )}
           <button
             type="button"
+            className="s-link"
             onClick={() => {
               setImportOpen(true);
               setSidebarOpen(false);
             }}
-            className="mb-3 w-full flex items-center gap-2 text-left text-[12.5px] text-ink/70 hover:text-ink transition-colors"
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-moss-700">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 3v12" />
               <path d="M7 10l5 5 5-5" />
               <path d="M4 19h16" />
@@ -1909,60 +1943,45 @@ export default function ChatPage() {
             <span>
               Import your history{' '}
               {importedProfile ? (
-                <span className="text-moss-700 font-medium">· active</span>
+                <span className="yes">· active</span>
               ) : (
-                <span className="text-ink/40">from other AIs</span>
+                <span className="no">from other AIs</span>
               )}
             </span>
           </button>
           <button
             type="button"
+            className="s-link"
             onClick={() => {
               setJourneyDebugOpen(true);
               setSidebarOpen(false);
             }}
-            className="mb-3 w-full flex items-center gap-2 text-left text-[12.5px] text-ink/70 hover:text-ink transition-colors"
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-moss-700">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="9" />
               <path d="M12 8v4l2.5 2.5" strokeLinecap="round" />
             </svg>
             <span>
               What Socria remembers{' '}
               {journeyHasContent(journey) ? (
-                <span className="text-moss-700 font-medium">· view</span>
+                <span className="yes">· view</span>
               ) : (
-                <span className="text-ink/40">· nothing yet</span>
+                <span className="no">· nothing yet</span>
               )}
             </span>
           </button>
           <SignedIn>
-            <div className="flex items-center gap-3" data-tour="account">
-              <button
-                type="button"
-                className="text-[12px] text-ink/55 hover:text-ink transition-colors"
-                onClick={() => setAcctOpen(true)}
-              >
-                Account
-              </button>
-              <UserButton afterSignOutUrl="/chat" userProfileMode="navigation" userProfileUrl="/account" />
-              <div className="text-[11px] text-ink/50 font-serif italic leading-tight">
-                Synced across your devices
-              </div>
-            </div>
+            <p className="s-vow">Synced across your devices. Your reasoning is yours.</p>
           </SignedIn>
           <SignedOut>
-            <SignInButton >
-              <button className="w-full text-left text-[12px] text-ink/70 hover:text-ink font-serif italic">
-                Sign in to sync across devices →
-              </button>
+            <SignInButton>
+              <button className="s-link">Sign in to sync across devices →</button>
             </SignInButton>
-            <p className="mt-2 text-[10px] text-ink/40 font-serif italic">
-              Saved on this device only
-            </p>
+            <p className="s-vow">Nothing here is sent anywhere. Your reasoning is yours.</p>
           </SignedOut>
         </div>
       </aside>
+      </div>
 
       {/* Main */}
       <div className="flex-1 flex flex-col min-w-0">
@@ -2000,7 +2019,17 @@ export default function ChatPage() {
               </SignInButton>
             </SignedOut>
             <SignedIn>
-              <UserButton afterSignOutUrl="/chat" userProfileMode="navigation" userProfileUrl="/account" />
+              {/* Socria's own, not Clerk's — see AccountControl for why. The
+                  tour's fourth note rings this, so the attribute is on the
+                  wrapper rather than inside the register's display:contents. */}
+              <span className="app-root app-inline">
+                <span data-tour="account">
+                  <AccountControl
+                    onOpen={() => setAcctOpen(true)}
+                    isOne={planState.plan === 'one'}
+                  />
+                </span>
+              </span>
             </SignedIn>
           </div>
         </div>
@@ -2312,24 +2341,22 @@ export default function ChatPage() {
                 </svg>
               </button>
             </div>
-            {/* Which mind you're talking to, and how deep it goes — kept
-                within reach of the box you type in rather than parked in the
-                header. Both menus open upward; they sit at the screen's edge. */}
+            {/* Which mind you're talking to, and how far it goes — one
+                control now rather than two, within reach of the box you type
+                in rather than parked in the header. It opens upward; it sits
+                at the bottom of the screen. */}
             <div className="mt-2 flex items-center justify-between gap-3">
               <p className="hidden sm:block text-[11px] text-ink/40 font-serif italic min-w-0 truncate">
                 Enter to send, Shift+Enter for a new line.
               </p>
               <div className="flex items-center gap-2 shrink-0 ml-auto">
-                {SOCRIA_MODELS[model].supportsDepth && (
-                  <DepthPicker value={depth} onChange={pickDepth} dropUp align="right" />
-                )}
                 <ModelPicker
                   value={model}
                   onChange={pickModel}
+                  depth={depth}
+                  onDepth={pickDepth}
                   isSignedIn={canUseCore3}
                   onLockedAttempt={() => setLogosModalOpen(true)}
-                  dropUp
-                  align="right"
                   plan={planState.known ? planState.plan : undefined}
                 />
               </div>

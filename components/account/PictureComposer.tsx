@@ -18,6 +18,7 @@ import {
   BRAND_MARKS, DEFAULT_PFP, GROUNDS, GROUPS, PFP_KEY, RINGS, TEXTURES,
   groundOf, markOf, needsOne, sanitizePfp, type PfpConfig,
 } from '@/lib/pfp';
+import { PFP_CHANGED } from './AccountControl';
 
 export function PictureComposer({ isOne = false }: { isOne?: boolean }) {
   const [cfg, setCfg] = useState<PfpConfig>(DEFAULT_PFP);
@@ -43,6 +44,10 @@ export function PictureComposer({ isOne = false }: { isOne?: boolean }) {
   const save = useCallback(() => {
     try {
       localStorage.setItem(PFP_KEY, JSON.stringify(cfg));
+      // The chip in the rail reads the same key. Saying so here is what makes
+      // composing a picture change it everywhere without a reload — a storage
+      // event only fires in OTHER tabs, never the one that wrote.
+      window.dispatchEvent(new Event(PFP_CHANGED));
       setSaved(true);
     } catch {
       setSaved(false);
