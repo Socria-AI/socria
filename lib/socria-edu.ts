@@ -42,6 +42,33 @@ export function eduProgrammeOn(): boolean {
 }
 
 /**
+ * Say once, on the server, when the programme is off.
+ *
+ * WHY THIS EXISTS. With SOCRIA_EDU_DOMAINS unset, eduDomains() is empty,
+ * eduProgrammeOn() is false, the plan route omits `student`, and
+ * StudentAccess returns null — so the whole university-verification feature
+ * disappears from the account page with no error, no warning and no trace.
+ * Which is correct behaviour for a deployment that does not run the
+ * programme, and indistinguishable from the feature being broken or deleted
+ * for one that does. That ambiguity has already cost an afternoon.
+ *
+ * So the off state says so, once per process, naming the variable and what
+ * it wants. Once rather than per request, because this is called on a route
+ * a signed-in page polls, and a line per poll is a log nobody reads.
+ */
+let saidOff = false;
+export function warnIfEduOff(): void {
+  if (saidOff || eduProgrammeOn()) return;
+  saidOff = true;
+  console.warn(
+    '[socria] university verification is OFF: SOCRIA_EDU_DOMAINS is unset, ' +
+      'so the student panel renders nothing. Set it to the comma-separated ' +
+      'domains that qualify (e.g. SOCRIA_EDU_DOMAINS=mavs.uta.edu) to turn ' +
+      'the programme on.'
+  );
+}
+
+/**
  * Does this address belong to an approved university?
  *
  * Matched on the domain after the LAST "@", and only as a whole label, so
