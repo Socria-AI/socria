@@ -7789,3 +7789,67 @@ html.anim-off .logos-root.is-firstmap-node .lg-node { animation: none; }
 .sc-colophon a { color: rgba(35, 36, 31, 0.6); text-decoration: none; }
 .sc-colophon a:hover { color: rgba(35, 36, 31, 0.95); text-decoration: underline; }
 .sc-colophon .it { font-style: italic; }
+
+/* ── find in this conversation ──────────────────────────────────────
+ *
+ * A panel over the thread, opened with Cmd/Ctrl-F. It searches the whole
+ * conversation rather than the rendered page — including insight cards,
+ * which are the lines people most often come back for and which the
+ * browser's own find will miss the moment one scrolls out of the DOM.
+ */
+.find {
+  position: fixed;
+  top: 64px; right: 20px;
+  width: min(420px, calc(100vw - 40px));
+  max-height: min(70vh, 620px);
+  display: flex; flex-direction: column;
+  background: var(--paper);
+  border: 1px solid rgba(31, 31, 31, 0.14);
+  border-radius: 12px;
+  box-shadow: 0 18px 48px -18px rgba(31, 31, 31, 0.32);
+  z-index: 60;
+  overflow: hidden;
+}
+.find-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px 8px; }
+.find-top .lbl { font-size: 10.5px; font-weight: 600; letter-spacing: 0.2em; text-transform: uppercase; color: var(--moss-700); }
+.find-x { background: none; border: 0; font-size: 20px; line-height: 1; color: var(--ink-40); cursor: pointer; padding: 0 2px; }
+.find-x:hover { color: var(--ink); }
+.find-field { padding: 0 14px 10px; }
+.find-field input {
+  width: 100%; padding: 9px 11px; font-size: 14px;
+  border: 1px solid rgba(31, 31, 31, 0.16); border-radius: 8px;
+  background: #fff; color: var(--ink);
+}
+.find-field input:focus { outline: none; border-color: var(--moss); }
+.find-tabs { display: flex; gap: 4px; padding: 0 14px 10px; }
+.find-tabs button {
+  font-size: 12px; padding: 5px 10px; border-radius: 999px;
+  border: 1px solid transparent; background: none; color: var(--ink-60); cursor: pointer;
+}
+.find-tabs button.on { background: var(--moss-50); border-color: var(--moss-200); color: var(--moss-800); }
+.find-count { opacity: 0.55; margin-left: 3px; }
+.find-hits { overflow-y: auto; border-top: 1px solid rgba(31, 31, 31, 0.08); }
+.find-hit {
+  display: flex; gap: 10px; width: 100%; text-align: left;
+  padding: 10px 14px; background: none; border: 0; cursor: pointer;
+  border-bottom: 1px solid rgba(31, 31, 31, 0.06);
+}
+.find-hit:hover { background: var(--moss-50); }
+.find-hit .who { flex: 0 0 auto; font-size: 10.5px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-40); padding-top: 2px; }
+.find-hit .txt { font-size: 13.5px; line-height: 1.5; color: var(--ink); }
+.find-hit mark { background: rgba(184, 162, 107, 0.34); color: inherit; border-radius: 2px; }
+.find-none { padding: 16px 14px; font-size: 13px; color: var(--ink-60); margin: 0; }
+
+/* ── one-line hints ──────────────────────────────────────────────── */
+.hint {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 9px 12px; margin: 8px 0;
+  background: var(--moss-50); border: 1px solid var(--moss-200);
+  border-radius: 9px; font-size: 12.5px; line-height: 1.45; color: var(--moss-800);
+}
+.hint p { margin: 0; flex: 1; }
+.hint button {
+  flex: 0 0 auto; background: none; border: 0; cursor: pointer;
+  font-size: 12px; color: var(--moss-700); text-decoration: underline; text-underline-offset: 3px;
+}
+.hint button:hover { color: var(--moss-800); }
