@@ -52,12 +52,33 @@ export function Tour({ open, onDone }: { open: boolean; onDone: () => void }) {
     [measure, onDone]
   );
 
+  // TWO EFFECTS, AND THEY MUST STAY TWO.
+  //
+  // These were one, and its dependency list carried `i` because the resize
+  // listener has to re-measure the CURRENT step. That meant every advance
+  // re-ran the effect — and the effect's first act is `settle(0)`. So
+  // pressing Next set i to 1, the effect re-ran, and it was put straight
+  // back to 0. The tour could not leave its first note: the only way out
+  // was Skip, and a first-time visitor pressing Next four times got the
+  // same card four times.
+  //
+  // Starting the tour is a once-per-open event; re-measuring on resize is a
+  // per-step one. Mixing them is what broke it.
   useEffect(() => {
     if (!open) return;
     setVw(window.innerWidth);
     setVh(window.innerHeight);
     // A frame's grace so the chat has laid out before anything is measured.
     const t = requestAnimationFrame(() => settle(0));
+    return () => cancelAnimationFrame(t);
+    // settle is deliberately NOT a dependency: it changes identity whenever
+    // the caller's onDone does, and re-running this would restart the tour
+    // mid-way for the same reason as above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
     const sync = () => {
       setVw(window.innerWidth);
       setVh(window.innerHeight);
@@ -66,11 +87,16 @@ export function Tour({ open, onDone }: { open: boolean; onDone: () => void }) {
     window.addEventListener('resize', sync);
     window.addEventListener('scroll', sync, true);
     return () => {
-      cancelAnimationFrame(t);
       window.removeEventListener('resize', sync);
       window.removeEventListener('scroll', sync, true);
     };
-  }, [open, i, measure, settle]);
+  }, [open, i, measure]);
+
+  // Opening it a second time — "Take the tour again" from the account sheet
+  // — must start at the beginning rather than wherever it was abandoned.
+  useEffect(() => {
+    if (!open) setI(0);
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;

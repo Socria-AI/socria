@@ -519,7 +519,13 @@
 
 /* On a phone there is no room for a column beside the conversation, so the
    rail becomes an overlay over it. The page supplies the backdrop. */
-@media(max-width:860px){
+/* 768px, NOT a number of my own choosing — it is Tailwind's `md`, which is
+   what the toggle button and the backdrop in app/chat/page.tsx use
+   (`md:hidden`). This was 860px, and the 92px between the two was a window
+   width where the rail had gone to overlay and hidden itself while the button
+   that opens it was already hidden too: the sessions list was unreachable.
+   One breakpoint, or none. */
+@media(max-width:767.98px){
   .app-root .s-bar{position:fixed;top:0;left:0;z-index:40;height:100dvh;
     width:min(280px,84vw);background:var(--app-paper);
     -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
@@ -531,7 +537,7 @@
 .app-root .s-top{display:flex;align-items:center;justify-content:space-between;gap:10px}
 .app-root .s-close{color:var(--ink-45);padding:4px;margin:-4px;line-height:0}
 .app-root .s-close:hover{color:var(--ink)}
-@media(min-width:861px){.app-root .s-close{display:none}}
+@media(min-width:768px){.app-root .s-close{display:none}}
 
 /* The mock's row IS the button. A real row also carries rename and delete,
    and a button inside a button is not markup — so the row became a
