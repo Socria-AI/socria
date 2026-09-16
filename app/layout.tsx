@@ -164,6 +164,31 @@ export default function RootLayout({
       }}
     >
       <html lang="en" className={`${serif.variable} ${sans.variable} ${hand.variable} ${stix.variable}`}>
+        <head>
+          {/* THE REVEAL CONTRACT, KEPT WITHOUT JAVASCRIPT.
+             *
+             * The scroll drivers stage content and carry an `html.anim-off`
+             * fallback that un-hides everything if a promoted element's
+             * opacity never advanced — a frozen timeline, a throttled tab,
+             * print. But that class is added BY JavaScript, so with
+             * JavaScript OFF the fallback never fires and every staged
+             * element sits at opacity 0 forever. The page rendered its
+             * markup and showed none of it.
+             *
+             * So the stylesheets match `html:not(.js)` wherever they match
+             * `html.anim-off`, and this is what sets `.js`. It is inline and
+             * first in <head> so it runs before first paint — no flash — and
+             * React never manages the class, so there is nothing to hydrate
+             * against. Scripting off means the class is simply never added
+             * and every staged state is dropped, which is the contract:
+             * visible is the default, and nothing is hidden unless the
+             * driver has proven it can bring it back. */}
+          <script
+            dangerouslySetInnerHTML={{
+              __html: "document.documentElement.classList.add('js')",
+            }}
+          />
+        </head>
         <body className="paper-bg antialiased">
           {children}
           {/* Non-production only, so the real site never carries it. */}
