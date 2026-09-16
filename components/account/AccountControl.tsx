@@ -22,6 +22,7 @@
 // and a component that reads it there hydrates into a mismatch.
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useUser } from '@clerk/nextjs';
 import { Avatar } from './Avatar';
 import { PFP_KEY, sanitizePfp, type PfpConfig } from '@/lib/pfp';
@@ -31,9 +32,18 @@ export const PFP_CHANGED = 'socria:pfp';
 
 export function AccountControl({
   onOpen,
+  href,
   isOne = false,
 }: {
-  onOpen: () => void;
+  /** open the account sheet — what /chat and /logos want, over the app */
+  onOpen?: () => void;
+  /**
+   * Navigate instead, for the pages that have no sheet to open over.
+   * The journal and the blog are reading surfaces; putting a modal over an
+   * article to change a password would be the wrong shape of thing entirely,
+   * so there they link to /account.
+   */
+  href?: string;
   /** One opens marks the free tier does not carry; sanitize needs to know. */
   isOne?: boolean;
 }) {
@@ -70,14 +80,8 @@ export function AccountControl({
     'You';
   const initial = first.charAt(0).toUpperCase();
 
-  return (
-    <button
-      type="button"
-      className="who-btn"
-      onClick={onOpen}
-      aria-haspopup="dialog"
-      title="Your account"
-    >
+  const inside = (
+    <>
       <span className="who-nm">{first}</span>
       {pfp ? (
         <Avatar cfg={pfp} size={26} className="av-sm" />
@@ -86,6 +90,26 @@ export function AccountControl({
           {initial}
         </span>
       )}
+    </>
+  );
+
+  if (href) {
+    return (
+      <Link href={href} className="who-btn" title="Your account">
+        {inside}
+      </Link>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      className="who-btn"
+      onClick={onOpen}
+      aria-haspopup="dialog"
+      title="Your account"
+    >
+      {inside}
     </button>
   );
 }

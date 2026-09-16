@@ -561,3 +561,42 @@
 .app-root .s-me{display:flex;align-items:center;gap:9px;margin-top:9px}
 .app-root .s-me .nm{flex:1;min-width:0;font-size:12.5px;color:var(--ink-70);
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ---------- the auth plate's own parts ---------- *
+ *
+ * The design's sign-in page is the register's `.plate`, so most of what this
+ * screen needs is already above: .plate-wrap, .plate, .field, .stack,
+ * .provider, .row-split, .rule, .vow, .foot-links, .opt-note. What follows is
+ * only the pieces that page did not have, because the mock had no real form
+ * behind it: a mark that links home, the cross-link to the other door, the
+ * inline buttons inside a note, and a place to say why something failed.
+ */
+.app-root .auth-mark{display:inline-flex;align-items:center;gap:10px;width:fit-content;
+  font-family:var(--font-serif);font-size:1.7rem;letter-spacing:-.02em;color:var(--ink)}
+.app-root .auth-mark img{display:block}
+
+.app-root .auth-cross{font-size:.92rem;color:var(--ink-70)}
+.app-root .auth-cross a{font-family:var(--font-serif);font-style:italic;font-size:1rem;
+  color:var(--moss-700);border-bottom:1px solid var(--moss-700);padding-bottom:1px}
+.app-root .auth-cross a:hover{color:var(--ink);border-color:var(--ink)}
+
+/* "use a different address", "send it again" — actions inside a sentence.
+   They are buttons because they act; they read as text because that is where
+   they are. */
+.app-root .opt-note button{font-family:var(--font-serif);font-style:italic;color:var(--moss-700);
+  border-bottom:1px solid var(--moss-700);padding-bottom:1px}
+.app-root .opt-note button:hover{color:var(--ink);border-color:var(--ink)}
+
+/* The refusal, in Clerk's own words — see lib/clerk-errors.ts. Vermilion
+   rather than red: it is this system's one alarm colour and it already means
+   "the machine has something to say". */
+.app-root .auth-err{margin:2px 0 0;padding:11px 14px;border-radius:12px;
+  border:1px solid rgba(216,64,47,.34);background:rgba(216,64,47,.07);
+  font-size:.92rem;line-height:1.5;color:var(--ink)}
+
+/* The plate is centred on a tall screen and top-aligned on a short one; a
+   form that needs three fields must not push its own submit button off the
+   bottom of a phone in landscape. */
+@media(max-height:680px){
+  .app-root .plate-wrap{justify-content:flex-start;padding-top:clamp(20px,4vh,40px)}
+}

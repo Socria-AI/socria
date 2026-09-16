@@ -52,6 +52,24 @@
      --prussian and the pages written here say --one-pblue. */
   --prussian: #26485A;
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  /* Vermilion — the design system's one alarm colour: capability, speed, the
+     answer arriving too fast. */
+  --machine: #D8402F;
+  --radius-pill: 999px;
+  --type-label: 0.7rem;
+  --tracking-label: 0.28em;
+  --leading-prose: 1.7;
+  /* app/journal.css scopes its whole token block under .jr-root, which is
+     right for a stylesheet that only ships on the journal routes — but the
+     design system's primitives (Label, Button) read these by name wherever
+     they are mounted, and the auth plate mounts them outside it. These are
+     the same values, at the root, so a primitive is not silently unstyled
+     the first time it is used somewhere new. */
+  --ink-45-journal: rgba(31, 31, 31, 0.45);
+  --ink-70-journal: rgba(31, 31, 31, 0.7);
+  --ink-25-journal: rgba(31, 31, 31, 0.25);
+  --ink-12-journal: rgba(31, 31, 31, 0.12);
   --line-dark: rgba(245, 243, 235, 0.16);
   --accent: #5e7633;
   --accent-700: #475a28;
