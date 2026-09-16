@@ -68,3 +68,9 @@
 @keyframes tn-in-up{from{opacity:0;transform:translateY(-100%) translate(0,15px)}to{opacity:1;transform:translateY(-100%)}}
 @keyframes tr-dot{from{opacity:0}to{opacity:1}}
 @keyframes tr-draw{to{stroke-dashoffset:0}}
+
+/* The wrapper is inert: .tour-svg and .tour-note already position
+   themselves fixed with their own z-index, so a positioned wrapper would
+   only create a stacking context between them and the page.
+   (`.tour-scrim` is the SVG rect's fill — not this element.) */
+.tour-layer { display: contents; }
