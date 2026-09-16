@@ -1,153 +1,259 @@
 'use client';
+// components/ModelPicker.tsx
+//
+// One control for both axes, beside the send button.
+//
+// It used to be two: a model pill and, next to it, a depth pill that appeared
+// and disappeared depending on which model was chosen. Two controls for one
+// decision, one of which moves — and the second is meaningless without the
+// first, since Core 2 answers at one register and Logos has a map instead of
+// a depth. The design collapses them: the button reads "Core 3.1 · Balanced",
+// and the sheet asks the two questions in order — how it answers, then how
+// far it goes — with the second section simply absent when the chosen model
+// has no second axis.
+//
+// Ported from the design's chat kit; the stylesheet is app/app-shell.css,
+// scoped under .app-root, so the button lives inside an `app-inline` wrapper.
+// What is NOT the design's: every list here comes from this product's own
+// tables. SOCRIA_MODELS decides which models exist and which need an account;
+// THINKING_DEPTHS decides the registers; PLANS decides whether a register is
+// locked. The mock hard-coded all three, and a menu that disagrees with the
+// server about what you can pick is worse than no menu.
 
-import { useState } from 'react';
-import { SOCRIA_MODELS, type SocriaModel } from '@/lib/socria-prompt';
-import type { Plan } from '@/lib/socria-one';
+import { useEffect, useRef, useState } from 'react';
+import {
+  SOCRIA_MODELS,
+  THINKING_DEPTHS,
+  type SocriaModel,
+  type ThinkingDepth,
+} from '@/lib/socria-prompt';
+import { PLANS } from '@/lib/entitlements';
+import { type Plan } from '@/lib/socria-one';
 import { ModelGlyph } from './ModelGlyph';
-import { OneStrip } from './OneMark';
+import { OneLock } from './OneLock';
+
+/** Logos is listed apart: it is a surface, not a register of the same one. */
+const LOGOS: SocriaModel = 'logos';
+const ANSWERERS = (Object.keys(SOCRIA_MODELS) as SocriaModel[]).filter(
+  (id) => id !== LOGOS
+);
 
 export function ModelPicker({
   value,
   onChange,
+  depth,
+  onDepth,
   isSignedIn = true,
   onLockedAttempt,
-  dropUp = false,
-  align = 'left',
   plan,
 }: {
   value: SocriaModel;
   onChange: (next: SocriaModel) => void;
+  /** Omit both to render the model axis alone (the docs demo does). */
+  depth?: ThinkingDepth;
+  onDepth?: (next: ThinkingDepth) => void;
   isSignedIn?: boolean;
   onLockedAttempt?: (locked: SocriaModel) => void;
   /**
-   * What the person holds, when the caller knows. Logos is listed here as a
-   * model, and Socria One is the plan that keeps as many lines of thinking in
-   * it as you have — so this menu is the one place a mention of One is
-   * information about the menu rather than a pitch. Undefined means "not known yet", and nothing is shown:
-   * a member flashed a price for the half-second before the server answers
-   * is exactly the kind of thing that makes a product feel like it is
-   * selling.
+   * What the person holds, when the caller knows. Undefined means "not known
+   * yet", and nothing about One is shown: a member flashed a lock for the
+   * half-second before the server answers is exactly the kind of thing that
+   * makes a product feel like it is selling.
    */
   plan?: Plan;
-  /** open the menu above the button — it sits at the bottom of the screen */
-  dropUp?: boolean;
-  align?: 'left' | 'right';
 }) {
   const [open, setOpen] = useState(false);
+  /** the register they pressed that their plan does not open, if any */
+  const [locked, setLocked] = useState<string | null>(null);
+  /** the model they pressed that needs an account, if any */
+  const [needs, setNeeds] = useState<string | null>(null);
+  const box = useRef<HTMLDivElement>(null);
+
+  // Pointerdown rather than click, so the menu is already gone by the time
+  // whatever they pressed outside it reacts.
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: PointerEvent) => {
+      if (box.current && !box.current.contains(e.target as Node)) setOpen(false);
+    };
+    const key = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    window.addEventListener('pointerdown', away);
+    window.addEventListener('keydown', key);
+    return () => {
+      window.removeEventListener('pointerdown', away);
+      window.removeEventListener('keydown', key);
+    };
+  }, [open]);
+
+  // Whatever they were told last time is stale the moment the sheet reopens.
+  useEffect(() => {
+    if (!open) {
+      setLocked(null);
+      setNeeds(null);
+    }
+  }, [open]);
+
   const current = SOCRIA_MODELS[value];
+  // The depth axis exists when the model has one AND the caller gave us the
+  // state for it. Both, because the docs demo shows the model axis alone.
+  const hasDepth = current.supportsDepth && !!depth && !!onDepth;
+  const allDepths = plan ? PLANS[plan].allDepths : true;
+
+  const pick = (id: SocriaModel) => {
+    if (SOCRIA_MODELS[id].requiresAuth && !isSignedIn) {
+      setNeeds(SOCRIA_MODELS[id].short);
+      onLockedAttempt?.(id);
+      return;
+    }
+    onChange(id);
+    setOpen(false);
+  };
+
+  const row = (id: SocriaModel) => {
+    const m = SOCRIA_MODELS[id];
+    const gated = m.requiresAuth && !isSignedIn;
+    return (
+      <button
+        key={id}
+        type="button"
+        role="menuitemradio"
+        aria-checked={value === id}
+        className={`mp-row${value === id ? ' on' : ''}${gated ? ' gated' : ''}${
+          id === LOGOS ? ' logos' : ''
+        }`}
+        onClick={() => pick(id)}
+      >
+        <span className="top">
+          <span className="does">{m.description}</span>
+          {gated ? (
+            <span className="need">Sign in</span>
+          ) : id === LOGOS ? (
+            <span className="tag">a different surface</span>
+          ) : null}
+        </span>
+        {/* The headline says what it DOES; the name is the footnote. That
+            is the design's whole point about naming models — and this table
+            already writes the description that way, so nothing is invented
+            here and nothing is said twice. */}
+        <span className="meta">
+          <span className="nm">{m.short}</span>
+          {!m.supportsDepth && id !== LOGOS ? ' — no depth modes.' : ''}
+        </span>
+      </button>
+    );
+  };
 
   return (
-    <div className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        data-tour="model"
-      className="flex items-center gap-2 rounded-full border border-moss-600/30 bg-white px-3 py-1.5 font-serif text-[13.5px] text-ink shadow-sm transition-colors hover:border-moss-600/50 hover:bg-moss-50/60"
-        aria-haspopup="listbox"
-        aria-expanded={open}
-      >
-        <ModelGlyph model={value} size={15} className="text-moss-700" />
-        <span>{current.short}</span>
-        <svg
-          width="10"
-          height="10"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.5"
-          className={`transition-transform ${
-            dropUp ? (open ? '' : 'rotate-180') : open ? 'rotate-180' : ''
-          }`}
+    <span className="app-root app-inline">
+      <div className="mp" ref={box}>
+        <button
+          type="button"
+          data-tour="model"
+          className={`mp-btn${open ? ' open' : ''}`}
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          aria-haspopup="menu"
         >
-          <path d="M6 9l6 6 6-6" />
-        </svg>
-      </button>
+          <span className="dot" aria-hidden="true" />
+          <span className="nm">{current.short}</span>
+          {hasDepth && (
+            <>
+              <span className="sep" aria-hidden="true">
+                ·
+              </span>
+              <span className="dp">
+                {THINKING_DEPTHS.find((d) => d.id === depth)?.label}
+              </span>
+            </>
+          )}
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M6 15l6-6 6 6" />
+          </svg>
+        </button>
 
-      {open && (
-        <>
-          <div
-            className="fixed inset-0 z-30"
-            onClick={() => setOpen(false)}
-            aria-hidden
-          />
-          <div
-            className={`absolute ${align === 'right' ? 'right-0' : 'left-0'} ${
-              dropUp ? 'bottom-full mb-2' : 'mt-2'
-            } w-72 max-w-[calc(100vw-1.5rem)] rounded-xl border border-ink/10 bg-white shadow-lg z-40 overflow-hidden`}
-          >
-            {(Object.keys(SOCRIA_MODELS) as SocriaModel[]).map((id) => {
-              const m = SOCRIA_MODELS[id];
-              const active = id === value;
-              const locked = m.requiresAuth && !isSignedIn;
-              // No tag on the Logos row any more. It said "One", which read
-              // as "this model is the paid one" — and Logos is not: the free
-              // tier gets all of it, twice a month. The strip below the list
-              // says what One actually adds, which is more of them.
-              const oneTag = false;
-              return (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => {
-                    if (locked) {
-                      onLockedAttempt?.(id);
-                    } else {
-                      onChange(id);
-                    }
-                    setOpen(false);
-                  }}
-                  className={`w-full text-left px-4 py-3 transition-colors ${
-                    active
-                      ? 'bg-moss-50/50'
-                      : 'hover:bg-ink/[0.03]'
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-serif text-[15px] text-ink flex items-center gap-2">
-                      <ModelGlyph model={id} size={15} className="text-moss-700" />
-                      {m.short}
-                      {oneTag && <span className="one-tag">One</span>}
-                      {locked && (
-                        <svg
-                          width="11"
-                          height="11"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2.4"
-                          className="text-ink/40"
-                          aria-label="Sign in required"
-                        >
-                          <rect x="4" y="11" width="16" height="10" rx="2" />
-                          <path d="M8 11V8a4 4 0 018 0v3" />
-                        </svg>
-                      )}
-                    </span>
-                    {active ? (
-                      <span className="text-moss-700 text-xs shrink-0">●</span>
-                    ) : locked ? (
-                      <span className="text-[11px] uppercase tracking-wider text-moss-700 font-medium shrink-0">
-                        Unlock
-                      </span>
-                    ) : m.href ? (
-                      <span
-                        className="text-[13px] text-ink/30 shrink-0"
-                        aria-label="Opens its own view"
+        {open && (
+          <div className="mp-sheet" role="menu">
+            <p className="mp-lbl">How it answers</p>
+            {ANSWERERS.map(row)}
+
+            {/* Logos below a rule, because picking it is not the same kind of
+                choice: the map opens beside the conversation. */}
+            <div className="mp-rule" />
+            {row(LOGOS)}
+
+            {needs && (
+              <p className="mp-need">
+                <strong>{needs}</strong> needs an account — a map has to be kept
+                somewhere, and that somewhere is yours.{' '}
+                <em>Core 2 stays open, signed out.</em>
+              </p>
+            )}
+
+            {hasDepth && (
+              <>
+                <div className="mp-rule" />
+                <p className="mp-lbl">How far it goes</p>
+                <div className="mp-depths">
+                  {THINKING_DEPTHS.map((d) => {
+                    // Today both plans open all four; the table says so, and
+                    // this reads the table rather than a list of ids, so the
+                    // menu is already right if that ever changes back.
+                    const shut = !allDepths && d.id !== 'balanced';
+                    return (
+                      <button
+                        key={d.id}
+                        type="button"
+                        role="menuitemradio"
+                        aria-checked={depth === d.id}
+                        className={`mp-d${depth === d.id ? ' on' : ''}${
+                          shut ? ' locked' : ''
+                        }`}
+                        onClick={() => {
+                          if (shut) {
+                            setLocked(d.label);
+                            return;
+                          }
+                          onDepth?.(d.id);
+                          setOpen(false);
+                        }}
                       >
-                        ↗
-                      </span>
-                    ) : null}
-                  </div>
-                  <p className="mt-1 text-[12px] text-ink/55 leading-snug">
-                    {m.description}
+                        <span className="d">
+                          {d.label}
+                          {shut && <OneLock />}
+                        </span>
+                        <span className="does">
+                          {shut ? 'opens with One' : d.description}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+                {locked ? (
+                  <p className="mp-lock">
+                    <strong>{locked}</strong> is a Socria One register — slower,
+                    and it holds a question longer. Quick and Balanced stay
+                    free, always.
+                    <a href="/one">See what One opens →</a>
                   </p>
-                </button>
-              );
-            })}
-            {plan === 'free' && <OneStrip />}
+                ) : (
+                  <p className="mp-note">
+                    Depth changes what it asks — never who is doing the
+                    thinking.
+                  </p>
+                )}
+              </>
+            )}
+            {!hasDepth && current.supportsDepth === false && (
+              <p className="mp-note">
+                {current.short} answers at one register.{' '}
+                <em>Core 3.1 is the one that asks how far to go.</em>
+              </p>
+            )}
           </div>
-        </>
-      )}
-    </div>
+        )}
+      </div>
+    </span>
   );
 }
