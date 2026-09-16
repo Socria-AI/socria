@@ -1571,4 +1571,183 @@ function _LogosNode({
 
 
 
-export { _Logo, _Label, _Button, _InkMark, _InsightCard, _Message, _SynthesisCard, _Transcript, _DefinitionEntry, _Composer, _GuardBar, _LogosNode };
+
+
+/* ── three more primitives, for the Socria One issue ──────────────────
+ *
+ * OneLock, OneMark and SpecTable, lifted from the same _ds_bundle.js as the
+ * twelve above. They were not needed until the One page, which uses the mark
+ * as a numbered seal on each ledger plate, the lock on the two nodes a free
+ * map stops short of, and the table for the free/One standard.
+ */
+function _OneLock({
+  label = 'Socria One',
+  onClick
+}) {
+  const glyph = /*#__PURE__*/React.createElement("svg", {
+    viewBox: "0 0 24 24",
+    width: "9",
+    height: "9",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: "2.2",
+    strokeLinecap: "round",
+    "aria-hidden": "true"
+  }, /*#__PURE__*/React.createElement("rect", {
+    x: "5",
+    y: "11",
+    width: "14",
+    height: "9",
+    rx: "2.2"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M8.5 11V7.8a3.5 3.5 0 0 1 7 0V11"
+  }));
+  const style = {
+    display: 'inline-grid',
+    placeItems: 'center',
+    width: 18,
+    height: 18,
+    padding: 0,
+    border: '1px solid var(--lg-one-line)',
+    borderRadius: 999,
+    background: 'var(--lg-one-soft)',
+    color: 'var(--lg-one)',
+    cursor: onClick ? 'pointer' : 'default'
+  };
+  if (!onClick) return /*#__PURE__*/React.createElement("span", {
+    title: `${label} opens this`,
+    style: style
+  }, glyph);
+  return /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    style: style,
+    title: `${label} opens this`,
+    "aria-label": `${label} opens this`,
+    onClick: e => {
+      e.stopPropagation();
+      onClick();
+    }
+  }, glyph);
+}
+
+function _OneMark({
+  size = 96,
+  tone = 'dark',
+  drawn = true,
+  letter = 'I'
+}) {
+  const onDark = tone === 'dark';
+  const ring = onDark ? 'rgba(240,234,216,.45)' : 'var(--pblue)';
+  const outer = onDark ? 'rgba(240,234,216,.18)' : 'rgba(38,72,90,.3)';
+  const ink = onDark ? 'var(--pale)' : 'var(--pblue)';
+  const C = 2 * Math.PI * 46;
+  return /*#__PURE__*/React.createElement("span", {
+    style: {
+      position: 'relative',
+      display: 'grid',
+      placeItems: 'center',
+      width: size,
+      height: size,
+      flex: '0 0 auto'
+    }
+  }, /*#__PURE__*/React.createElement("svg", {
+    viewBox: "0 0 100 100",
+    style: {
+      position: 'absolute',
+      inset: 0,
+      width: '100%',
+      height: '100%',
+      transform: 'rotate(-90deg)',
+      overflow: 'visible'
+    },
+    "aria-hidden": "true"
+  }, /*#__PURE__*/React.createElement("circle", {
+    cx: "50",
+    cy: "50",
+    r: "46",
+    fill: "none",
+    stroke: ring,
+    strokeWidth: "1.1",
+    strokeDasharray: C,
+    strokeDashoffset: drawn ? 0 : C,
+    style: {
+      transition: 'stroke-dashoffset 1.4s cubic-bezier(.16,1,.3,1)'
+    }
+  })), /*#__PURE__*/React.createElement("span", {
+    "aria-hidden": "true",
+    style: {
+      position: 'absolute',
+      inset: -size * 0.073,
+      borderRadius: '50%',
+      border: `1px solid ${outer}`,
+      opacity: drawn ? 1 : 0,
+      transition: 'opacity .7s ease .85s'
+    }
+  }), /*#__PURE__*/React.createElement("span", {
+    style: {
+      position: 'relative',
+      fontFamily: 'var(--font-serif)',
+      fontStyle: 'italic',
+      fontSize: size * 0.34,
+      lineHeight: 1,
+      color: ink,
+      transform: 'translateY(-2px)',
+      opacity: drawn ? 1 : 0,
+      transition: 'opacity .8s ease .5s'
+    }
+  }, letter));
+}
+
+function _SpecTable({
+  head = ['Dimension', "What we're looking for"],
+  rows = []
+}) {
+  const caps = {
+    fontFamily: 'var(--font-sans)',
+    fontSize: 'var(--doc-label)',
+    fontWeight: 500,
+    letterSpacing: 'var(--doc-tracking-caps)',
+    textTransform: 'uppercase',
+    color: 'var(--doc-muted)',
+    textAlign: 'left',
+    paddingBottom: 12
+  };
+  const cell = {
+    fontSize: 'var(--doc-row)',
+    lineHeight: 1.5,
+    padding: '11px 0',
+    verticalAlign: 'top',
+    borderTop: '1px solid var(--doc-rule)'
+  };
+  return /*#__PURE__*/React.createElement("table", {
+    style: {
+      width: '100%',
+      borderCollapse: 'collapse',
+      margin: '28px 0',
+      fontFamily: 'var(--font-sans)'
+    }
+  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", {
+    style: {
+      ...caps,
+      width: 132
+    }
+  }, head[0]), /*#__PURE__*/React.createElement("th", {
+    style: caps
+  }, head[1]))), /*#__PURE__*/React.createElement("tbody", null, rows.map(([k, v]) => /*#__PURE__*/React.createElement("tr", {
+    key: k
+  }, /*#__PURE__*/React.createElement("td", {
+    style: {
+      ...cell,
+      fontWeight: 600,
+      color: 'var(--doc-ink)',
+      paddingRight: 20
+    }
+  }, k), /*#__PURE__*/React.createElement("td", {
+    style: {
+      ...cell,
+      color: 'var(--ink-70-journal)'
+    }
+  }, v)))));
+}
+
+export { _Logo, _Label, _Button, _InkMark, _InsightCard, _Message, _SynthesisCard, _Transcript, _DefinitionEntry, _Composer, _GuardBar, _LogosNode, _OneLock, _OneMark, _SpecTable };

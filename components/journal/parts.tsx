@@ -374,3 +374,57 @@ export function PrintLink({ children = 'Print this issue' }: { children?: ReactN
 }
 
 export { Label, InkMark };
+
+
+/**
+ * The depth dial, as four concentric rings.
+ *
+ * Ported with the Logos issue. The claim under it is the whole point of the
+ * control: it sets how far the thinking goes and has never set how fast the
+ * answer arrives, which is the one thing people assume a "depth" dial means.
+ */
+export function DepthFig() {
+  const rings: [number, string, number, boolean][] = [
+    [34, 'Quick', 0.15, false],
+    [66, 'Balanced', 0.5, false],
+    [98, 'Deep', 0.85, false],
+    [130, 'Abstract', 1.2, true],
+  ];
+  return (
+    <Fig n="II" caption="Four registers, one dial." claim="It sets depth, never speed.">
+      <svg
+        className="depth-viz"
+        viewBox="0 0 640 310"
+        role="img"
+        aria-label="Four concentric rings: Quick, Balanced, Deep, Abstract."
+      >
+        {rings.map(([r, label, dly, far]) => (
+          <circle
+            key={label}
+            className={'dr draw' + (far ? ' far' : '')}
+            cx="320"
+            cy="170"
+            r={r}
+            style={{ '--len': Math.round(2 * Math.PI * r), '--dly': dly + 's' } as React.CSSProperties}
+          />
+        ))}
+        {rings.map(([r, label, dly, far]) => (
+          <text
+            key={label + 't'}
+            className={'dl pop' + (far ? ' faint' : '')}
+            x="320"
+            y={170 - r + 17}
+            textAnchor="middle"
+            style={{ '--dly': dly + 0.5 + 's' } as React.CSSProperties}
+          >
+            {label}
+          </text>
+        ))}
+        <circle className="pop" style={{ '--dly': '.1s' } as React.CSSProperties} cx="320" cy="170" r="4" fill="var(--person)" />
+        <text className="dl faint pop" style={{ '--dly': '1.9s' } as React.CSSProperties} x="320" y="300" textAnchor="middle">
+          You choose how far, not how fast
+        </text>
+      </svg>
+    </Fig>
+  );
+}
