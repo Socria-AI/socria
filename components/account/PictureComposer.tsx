@@ -65,11 +65,17 @@ export function PictureComposer({ isOne = false }: { isOne?: boolean }) {
       <div className="pfp-body">
         {/* the preview, and the sizes it will actually be seen at */}
         <div className="pfp-stage">
-          <Avatar cfg={cfg} size={220} className="av-big" />
+          <Avatar cfg={cfg} className="av-big" />
+          {/* The sizes it will actually be seen at. `.ch` is a SECTION in this
+              sheet — padding and a rule — not a caption, which is why the
+              first version drew a bordered box around the label. */}
           <div className="av-sizes">
-            <Avatar cfg={cfg} size={44} className="av-sm" />
-            <Avatar cfg={cfg} size={28} className="av-sm" />
-            <span className="ch">44 and 28 — where it is usually seen</span>
+            {[44, 28, 20].map((n) => (
+              <span className="one" key={n}>
+                <Avatar cfg={cfg} size={n} className="av-sm" />
+                <span className="px">{n}px</span>
+              </span>
+            ))}
           </div>
         </div>
 
@@ -132,59 +138,66 @@ export function PictureComposer({ isOne = false }: { isOne?: boolean }) {
             </div>
           )}
 
-          {/* ── the ground ── */}
-          <div className="opts">
-            <span className="lbl">Ground</span>
+          {/* ── the ground ──
+              A bare swatch is a 44px circle with NOTHING in it; the name
+              belongs to the SELECTED one and sits beside the row. Putting a
+              label inside each swatch (which is what I first wrote) stacks
+              text on top of every circle. */}
+          <div className="ch">
+            <span className="lbl">The ground</span>
             <div className="sw-row">
-              {GROUNDS.map((g) => (
-                <button
-                  key={g.id}
-                  type="button"
-                  className={'sw' + (cfg.ground === g.id ? ' on' : '') + (locked(g.one) ? ' locked' : '')}
-                  style={{ background: g.bg, color: g.ink }}
-                  onClick={() => !locked(g.one) && set({ ground: g.id })}
-                  aria-pressed={cfg.ground === g.id}
-                  title={locked(g.one) ? `${g.name} — Socria One` : g.name}
-                >
-                  <span className="sw-name">{g.name}</span>
-                </button>
-              ))}
+              {GROUNDS.map((g) => {
+                const lk = locked(g.one);
+                return (
+                  <button
+                    key={g.id}
+                    type="button"
+                    className={'sw' + (lk ? ' is-locked' : '')}
+                    style={{ background: g.bg }}
+                    aria-pressed={cfg.ground === g.id}
+                    aria-label={g.name + (lk ? ' — opens with One' : '')}
+                    title={lk ? `${g.name} — Socria One` : g.name}
+                    onClick={() => !lk && set({ ground: g.id })}
+                  />
+                );
+              })}
+              <span className="sw-name">{groundOf(cfg.ground).name}</span>
             </div>
           </div>
 
-          {/* ── ring and texture ── */}
-          <div className="opts">
-            <span className="lbl">Edge</span>
-            <div className="sw-row">
+          {/* ── the frame ── pills, not swatches */}
+          <div className="ch">
+            <span className="lbl">The frame</span>
+            <div className="opts">
               {RINGS.map((r) => {
                 const one = 'one' in r && r.one === true;
+                const lk = locked(one);
                 return (
                   <button
                     key={r.id}
                     type="button"
-                    className={'sw' + (cfg.ring === r.id ? ' on' : '') + (locked(one) ? ' locked' : '')}
-                    onClick={() => !locked(one) && set({ ring: r.id })}
+                    className={lk ? 'is-locked' : ''}
                     aria-pressed={cfg.ring === r.id}
+                    onClick={() => !lk && set({ ring: r.id })}
                   >
-                    <span className="sw-name">{r.name}</span>
+                    {r.name}
                   </button>
                 );
               })}
             </div>
           </div>
 
-          <div className="opts">
-            <span className="lbl">Surface</span>
-            <div className="sw-row">
+          <div className="ch">
+            <span className="lbl">The surface</span>
+            <div className="opts">
               {TEXTURES.map((t) => (
                 <button
                   key={t.id}
                   type="button"
-                  className={'sw' + (cfg.texture === t.id ? ' on' : '')}
-                  onClick={() => set({ texture: t.id })}
                   aria-pressed={cfg.texture === t.id}
+                  onClick={() => set({ texture: t.id })}
                 >
-                  <span className="sw-name">{t.name}</span>
+                  {t.name}
                 </button>
               ))}
             </div>
