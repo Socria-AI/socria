@@ -87,17 +87,10 @@
 /* ---------- the account control in the kit's header ----------
    The chat kit ships no auth control (deliberately not built), so this one
    button is new; its values are the kit's own: --ink-16 hairline, 13px sans. */
-.app-root .who-btn{display:inline-flex;align-items:center;gap:.55em;padding:4px 5px 4px 12px;border-radius:999px;
-  border:1px solid var(--ink-16);background:#fff;font-size:13px;color:var(--ink);transition:border-color .2s,transform .2s}
-.app-root .who-btn:hover{border-color:var(--ink);transform:translateY(-1px)}
-/* A name long enough to push the avatar off the header is a name that gets
-   cut, not a header that reflows. Below 520px the name goes entirely and the
-   picture stands on its own. */
-.app-root .who-nm{max-width:10ch;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-@media(max-width:520px){
-  .app-root .who-nm{display:none}
-  .app-root .who-btn{padding:4px}
-}
+/* .who-btn lives with its component now — components/account/account-control.css
+   — because it is rendered on the journal, Logos and One as well, and those
+   do not load this sheet. Keeping a copy here would be two definitions of one
+   control, differing the first time either changed. */
 .app-root .avatar{width:26px;height:26px;border-radius:50%;background:var(--moss-600);color:var(--paper);
   display:grid;place-items:center;font-family:var(--font-serif);font-style:italic;font-size:.92rem;flex:0 0 auto}
 .app-root .avatar.lg{width:52px;height:52px;font-size:1.5rem}

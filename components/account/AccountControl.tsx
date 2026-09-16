@@ -26,6 +26,7 @@ import Link from 'next/link';
 import { useUser } from '@clerk/nextjs';
 import { Avatar } from './Avatar';
 import { PFP_KEY, sanitizePfp, type PfpConfig } from '@/lib/pfp';
+import './account-control.css';
 
 /** Broadcast by the composer when a picture is saved. */
 export const PFP_CHANGED = 'socria:pfp';

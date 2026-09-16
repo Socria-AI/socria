@@ -2034,13 +2034,11 @@ export default function ChatPage() {
               {/* Socria's own, not Clerk's — see AccountControl for why. The
                   tour's fourth note rings this, so the attribute is on the
                   wrapper rather than inside the register's display:contents. */}
-              <span className="app-root app-inline">
-                <span data-tour="account">
-                  <AccountControl
-                    onOpen={() => setAcctOpen(true)}
-                    isOne={planState.plan === 'one'}
-                  />
-                </span>
+              <span data-tour="account">
+                <AccountControl
+                  onOpen={() => setAcctOpen(true)}
+                  isOne={planState.plan === 'one'}
+                />
               </span>
             </SignedIn>
           </div>

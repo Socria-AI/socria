@@ -79,8 +79,10 @@ export function Mast({
           <SignedIn>
             {/* Socria's own, not Clerk's. The journal is a reading surface,
                 so it links to /account rather than opening a sheet over an
-                article — see AccountControl. */}
-            <span className="auth-btn app-root app-inline">
+                article — see AccountControl. It carries its own stylesheet,
+                so it needs no scope wrapper here; it used to have one, and
+                this page does not load the sheet that wrapper pointed at. */}
+            <span className="auth-btn">
               <AccountControl href="/account" />
             </span>
           </SignedIn>
