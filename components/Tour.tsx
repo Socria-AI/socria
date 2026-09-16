@@ -109,7 +109,7 @@ export function Tour({ open, onDone }: { open: boolean; onDone: () => void }) {
         : Math.min(Math.max(16, by), vh - 170);
 
   return (
-    <div className="tour-scrim" role="dialog" aria-modal="false" aria-label={step.title}>
+    <div className="tour-layer" role="dialog" aria-modal="false" aria-label={step.title}>
       <svg className="tour-svg" width={vw} height={vh} aria-hidden="true">
         <defs>
           <mask id="tour-hole">
@@ -117,7 +117,11 @@ export function Tour({ open, onDone }: { open: boolean; onDone: () => void }) {
             <rect x={bx} y={by} width={bw} height={bh} rx="8" fill="#000" />
           </mask>
         </defs>
-        <rect x="0" y="0" width={vw} height={vh} mask="url(#tour-hole)" className="tour-dot" />
+        {/* The scrim: a 56% dark wash with the control's hole cut out of it.
+            This carried .tour-dot at first, which is the small mark at the
+            leader's end — an opaque moss fill — so the whole page went solid
+            green and you could not see the thing being pointed at. */}
+        <rect x="0" y="0" width={vw} height={vh} mask="url(#tour-hole)" className="tour-scrim" />
         <path d={inkRect(bx, by, bw, bh)} className="tour-ring" />
         <path
           className="tour-leader"
@@ -125,6 +129,8 @@ export function Tour({ open, onDone }: { open: boolean; onDone: () => void }) {
             (by + bh / 2 + noteY) / 2
           } ${noteX + NW / 2},${noteY + 20}`}
         />
+        {/* where the leader lands on the note */}
+        <circle className="tour-dot" cx={noteX + NW / 2} cy={noteY + 20} r="3.5" />
       </svg>
 
       <div className="tour-note" style={{ left: noteX, top: noteY, width: NW }}>
