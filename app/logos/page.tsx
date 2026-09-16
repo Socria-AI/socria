@@ -11,10 +11,8 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import './logos.css';
-import '../quiet.css';
-import { QuietMast, QuietProgress, QuietFoot } from '@/components/quiet/Quiet';
-import { QuietMotion } from '@/components/quiet/QuietMotion';
-import { LogosStory } from './LogosStory';
+import '../journal.css';
+import { LogosIssue } from './LogosIssue';
 
 export const metadata: Metadata = {
   title: 'Logos — think out loud, watch it take shape',
@@ -38,13 +36,5 @@ export default function LogosPage({
     q.set('model', 'logos');
     redirect(`/chat?${q.toString()}`);
   }
-  return (
-    <div className="q-root">
-      <QuietMotion />
-      <QuietProgress />
-      <QuietMast section="Logos" current="logos" />
-      <LogosStory />
-      <QuietFoot />
-    </div>
-  );
+  return <LogosIssue />;
 }

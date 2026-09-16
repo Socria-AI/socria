@@ -1,11 +1,9 @@
 // app/one/page.tsx — the Socria One page, at its own address.
 import type { Metadata } from 'next';
 import './one.css';
-import { OneStory } from './OneStory';
+import { OneIssue } from './OneIssue';
 import { priceWithPeriod } from '@/lib/socria-one';
-import '../quiet.css';
-import { QuietMast, QuietProgress, QuietFoot } from '@/components/quiet/Quiet';
-import { QuietMotion } from '@/components/quiet/QuietMotion';
+import '../journal.css';
 
 export const metadata: Metadata = {
   title: 'Socria One — the complete reasoning environment',
@@ -13,13 +11,5 @@ export const metadata: Metadata = {
 };
 
 export default function OnePage() {
-  return (
-    <div className="q-root">
-      <QuietMotion />
-      <QuietProgress />
-      <QuietMast section="Socria One" current="one" />
-      <OneStory />
-      <QuietFoot />
-    </div>
-  );
+  return <OneIssue />;
 }
