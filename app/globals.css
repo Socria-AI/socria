@@ -2445,6 +2445,12 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
      vanishes and \neq reads as =. Fallback is per glyph, so only the slash
      comes from KaTeX_Main. */
   --lg-stix: var(--font-stix), 'STIX Two Math', 'Cambria Math', KaTeX_Main, Georgia, serif;
+  /* The design system names its maths face --font-math. The repo already
+     loads STIX for exactly that, so the token points at the stack rather
+     than at a second webfont — without it the Logos Board's notation falls
+     through to Georgia, which is a serif but not a maths face, and the
+     minus signs and negation slashes are the giveaway. */
+  --font-math: var(--font-stix), 'STIX Two Math', 'Cambria Math', KaTeX_Main, Georgia, serif;
 
   position: fixed;
   inset: 0;
