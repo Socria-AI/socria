@@ -13,6 +13,7 @@
 // than rewriting it, so a picture returns whole if they subscribe again.
 
 import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { Avatar } from './Avatar';
 import {
   BRAND_MARKS, DEFAULT_PFP, GROUNDS, GROUPS, PFP_KEY, RINGS, TEXTURES,
@@ -60,11 +61,22 @@ export function PictureComposer({ isOne = false }: { isOne?: boolean }) {
   return (
     <div className="pfp-root">
       <div className="pfp-head">
-        <h1>Your picture</h1>
-        <p>
-          Composed from the marks Socria already uses — the brand&rsquo;s own, and the glyphs the
-          map draws with. Nothing new was invented for it.
-        </p>
+        <div>
+          <h1>Your picture</h1>
+          {/* `.sub` is what the sheet styles this as; it was a bare <p>. */}
+          <p className="sub">
+            Composed from the marks Socria already uses — the brand&rsquo;s own, and the glyphs the
+            map draws with. Nothing new was invented for it.
+          </p>
+        </div>
+        {/* THE WAY OUT. This is a full-viewport page with no masthead and no
+            nav, reached from the account sheet — and it had no link back
+            anywhere, so the only exit was the browser's Back button. The
+            stylesheet has styled a `.back` here all along; nothing rendered
+            one. */}
+        <Link className="back" href="/chat">
+          ← Back to Socria
+        </Link>
       </div>
 
       <div className="pfp-body">

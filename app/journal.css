@@ -653,7 +653,12 @@ html.anim-off .jr-root .mapbox.pre .mapnode, html:not(.js) .jr-root .mapbox.pre 
 .jr-root .refusal .a em{color:#fff;font-style:italic}
 .jr-root .refusal .held{font-family:var(--font-serif);font-style:italic;font-size:clamp(1.2rem,2.2vw,1.7rem);color:var(--sage);margin-top:14px;opacity:0;transition:opacity .6s}
 .jr-root .refusal.live.stopped .held{opacity:1}
-html.anim-off .jr-root .refusal .held, html:not(.js) .jr-root .refusal .held{opacity:1}
+/* `transition:none` as well as the target. `.held` carries
+   `transition:opacity .6s`, so setting the target alone leaves the computed
+   value part-way there until something advances it — and on a frozen
+   timeline, with no script, or on paper, nothing will. A fallback that needs
+   time to arrive is not a fallback. */
+html.anim-off .jr-root .refusal .held, html:not(.js) .jr-root .refusal .held{opacity:1;transition:none}
 @media(prefers-reduced-motion:reduce){.jr-root .refusal{height:auto;padding:clamp(70px,12vh,130px) 0}.jr-root .refusal .pinr{position:static;height:auto}.jr-root .refusal .held{opacity:1}}
 
 /* ---------- read-time, in the spine and at the close ---------- */
@@ -679,7 +684,7 @@ html.anim-off .jr-root .refusal .held, html:not(.js) .jr-root .refusal .held{opa
   /* The refusal's payoff line. It is revealed by driveRefusal when the
      vermilion line reaches the sage wall, and printing never scrolls, so
      without this the spread prints the wall and not what it means. */
-  .jr-root .refusal .held{opacity:1!important}
+  .jr-root .refusal .held{opacity:1!important;transition:none!important}
   .jr-root .refusal, .jr-root .close, .jr-root .turn.slam{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 }
 
@@ -850,7 +855,14 @@ html.anim-off .jr-root .stage-sec.live .st, html:not(.js) .jr-root .stage-sec.li
 html.anim-off .jr-root .app .body, html:not(.js) .jr-root .app .body{transition:none;grid-template-columns:1fr .92fr}
 html.anim-off .jr-root .app .bar .model .m-core, html:not(.js) .jr-root .app .bar .model .m-core{display:none}
 html.anim-off .jr-root .app .bar .model .m-logos, html:not(.js) .jr-root .app .bar .model .m-logos{display:inline}
-@media(max-width:820px){html.anim-off .jr-root .app .body{grid-template-columns:1fr}}
+/* The one rule the `html:not(.js)` pass missed, because it is nested inside a
+   single-line @media and the transform read the media query's brace as the
+   selector's. Without the twin, a no-JS phone got the Stage as two columns —
+   the conversation squeezed into half the width beside an empty dotted pane. */
+@media(max-width:820px){
+  html.anim-off .jr-root .app .body,
+  html:not(.js) .jr-root .app .body{grid-template-columns:1fr}
+}
 /* frozen: the map is the state worth showing; the plot yields to it */
 html.anim-off .jr-root .app.plot .pane-map .plot, html:not(.js) .jr-root .app.plot .pane-map .plot{display:none}
 html.anim-off .jr-root .app.plot .pane-map .edges, html:not(.js) .jr-root .app.plot .pane-map .edges, html.anim-off .jr-root .app.plot .pane-map .mapnode, html:not(.js) .jr-root .app.plot .pane-map .mapnode, html.anim-off .jr-root .app.plot .pane-map .ph, html:not(.js) .jr-root .app.plot .pane-map .ph{display:block}

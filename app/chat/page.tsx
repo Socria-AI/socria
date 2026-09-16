@@ -37,6 +37,8 @@ import { readStart, startMessage } from '@/lib/first-session';
 import { takeCarried } from '@/lib/onboarding-script';
 import { Tour } from '@/components/Tour';
 import { FindPanel } from '@/components/FindPanel';
+import { Hint, useSeenHints } from '@/components/Hint';
+import { pickHint } from '@/lib/hints';
 import { AccountSheet } from '@/components/account/AccountSheet';
 import { TOUR_KEY, shouldRunTour } from '@/lib/tour';
 import { isSource } from '@/lib/checkout-attribution';
@@ -835,6 +837,10 @@ export default function ChatPage() {
     if (mode === 'local') saveLocal(trimmed);
     setActiveId(null);
     setSidebarOpen(false);
+    // Same reason as newSession: a filtered rail would hide the session this
+    // message was just moved into.
+    setRailQuery('');
+    setMapsOnly(false);
     // `send` would otherwise read the list it was rendered with, and put the
     // message back into the conversation it was just taken out of.
     void send(d.text, { convos: trimmed, id: null });
@@ -1207,6 +1213,11 @@ export default function ChatPage() {
     setActiveId(id);
     setSidebarOpen(false);
     setError(null);
+    // Clear the rail's filters. With a word in the search box or the Maps-only
+    // chip down, the new row did not match and simply never appeared — the
+    // button looked broken while quietly working.
+    setRailQuery('');
+    setMapsOnly(false);
     // Don't write empty sessions to the cloud; they'll be saved on first message.
     if (mode === 'local') saveLocal(next);
   }
@@ -1587,6 +1598,27 @@ export default function ChatPage() {
   const messages = active?.messages || [];
   const hasMessages = messages.length > 0;
 
+  // WHICH ONE-LINE HINT, IF ANY.
+  //
+  // The account sheet has offered "Show hints again" since the register was
+  // ported, and there was nothing to show: no <Hint> was rendered anywhere in
+  // the product, so the button reset a key nothing read. The machinery was
+  // all here — lib/hints.ts, components/Hint.tsx, both covered — and only the
+  // rendering was missing.
+  //
+  // A hint earns its place only when something has appeared for the first
+  // time, so eligibility is about what is ON SCREEN. pickHint returns at most
+  // one, in HINT_ORDER, and never one already dismissed.
+  const seenHints = useSeenHints();
+  const liveHint = pickHint(
+    [
+      ...(hasMessages ? ['picker'] : []),
+      ...(model !== 'logos' && hasMessages ? ['logos'] : []),
+      ...(messages.length >= 6 ? ['find'] : []),
+    ],
+    seenHints
+  );
+
   // Logos is a model, not a destination: selecting it swaps the whole
   // experience in here rather than navigating away, so /chat stays the
   // address of "talking to Socria" whichever mind is answering. Every hook
@@ -1864,10 +1896,15 @@ export default function ChatPage() {
                           // back to /chat would land on whatever was active
                           // before and contradict where they just were.
                           onClick={() => chooseModel('logos')}
-                          onDoubleClick={(e) => {
-                            e.preventDefault();
-                            startRename();
-                          }}
+                          // NO onDoubleClick HERE, deliberately. A Logos row
+                          // is a link, and a link navigates on the FIRST
+                          // click — by the time a second arrives the page is
+                          // already leaving, so double-click-to-rename could
+                          // never fire. Making it work would mean cancelling
+                          // every click and navigating on a timer, which buys
+                          // a nicety by putting a delay on every open. The
+                          // pencil beside the row renames both kinds and is
+                          // always there.
                           title={`${item.title} — opens in Logos`}
                         >
                           {mark}
@@ -2024,6 +2061,11 @@ export default function ChatPage() {
                 once there is a conversation to search. */}
             {hasMessages && (
               <span className="app-root app-inline">
+                {liveHint === 'find' && (
+                  <Hint id="find" place="below">
+                    Long thread. <em>Find</em> searches this one, not all of them.
+                  </Hint>
+                )}
                 <button
                   type="button"
                   className="find-btn"
@@ -2427,6 +2469,13 @@ export default function ChatPage() {
                 Enter to send, Shift+Enter for a new line.
               </p>
               <div className="flex items-center gap-2 shrink-0 ml-auto">
+                {liveHint === 'picker' && (
+                  <span className="app-root app-inline">
+                    <Hint id="picker" place="above">
+                      One control, two questions: <em>which model</em>, and how far it goes.
+                    </Hint>
+                  </span>
+                )}
                 <ModelPicker
                   value={model}
                   onChange={pickModel}
