@@ -1,8 +1,9 @@
 // app/sign-in/[[...sign-in]]/page.tsx
 import type { Metadata } from 'next';
-import { SignIn } from '@clerk/nextjs';
-import { AuthShell } from '@/components/AuthShell';
-import { authUrl, isSafeRedirect } from '@/lib/auth-links';
+import { AuthPlate } from '@/components/auth/AuthPlate';
+import { AuthForm } from '@/components/auth/AuthForm';
+import { isSafeRedirect } from '@/lib/auth-links';
+import '../../app-shell.css';
 
 export const metadata: Metadata = {
   title: 'Sign in — Socria',
@@ -21,27 +22,17 @@ export default function SignInPage({
     ? searchParams!.redirect_url!
     : undefined;
   return (
-    <AuthShell
+    <AuthPlate
       kind="sign-in"
       redirectTo={back}
       eyebrow="Ask Socria"
-      title="Pick up where your thinking left off."
-      // The old subtitle spoke only to returning users — "pick up where you
-      // left off" — on the page everyone was sent to, including people with
-      // no account. Now it names both.
-      subtitle="Sign in and the thread you started this morning is waiting tonight, on whatever you happen to be holding. New here? An account takes a moment and is free."
-      quote={{
-        text: "The goal isn't to think less. The goal is to think better.",
-        source: 'From the Socria manifesto',
-      }}
+      title="Pick up where your thinking"
+      emphasis="left off."
+      // The old subtitle spoke only to returning users on the page everyone
+      // is sent to, including people with no account. This names both.
+      lede="Sign in and the thread you started this morning is waiting tonight, on whatever you happen to be holding. New here? An account takes a moment and is free."
     >
-      <SignIn
-        routing="path"
-        path="/sign-in"
-        signUpUrl={authUrl('sign-up', back)}
-        fallbackRedirectUrl={back ?? '/chat'}
-        signUpFallbackRedirectUrl={back ?? '/chat'}
-      />
-    </AuthShell>
+      <AuthForm kind="sign-in" redirectTo={back} />
+    </AuthPlate>
   );
 }

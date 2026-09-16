@@ -53,6 +53,7 @@ const MODULES = [
   'lib/why-not-answer.ts',
   'lib/wrong-chat.ts',
   'lib/auth-links.ts',
+  'lib/auth-flow.ts',
   'lib/session-rail.ts',
   'lib/checkout-attribution.ts',
   'lib/person-memory.ts',

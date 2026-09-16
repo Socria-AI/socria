@@ -18,7 +18,8 @@
 
 import type { ReactNode } from 'react';
 import Link from 'next/link';
-import { SignedIn, SignedOut, UserButton, ClerkLoaded } from '@clerk/nextjs';
+import { SignedIn, SignedOut, ClerkLoaded } from '@clerk/nextjs';
+import { AccountControl } from '@/components/account/AccountControl';
 import { Label, InkMark } from './ds';
 
 /* Where the issue system's pages actually live in the app.
@@ -76,8 +77,11 @@ export function Mast({
             </Link>
           </SignedOut>
           <SignedIn>
-            <span className="auth-btn">
-              <UserButton afterSignOutUrl="/" />
+            {/* Socria's own, not Clerk's. The journal is a reading surface,
+                so it links to /account rather than opening a sheet over an
+                article — see AccountControl. */}
+            <span className="auth-btn app-root app-inline">
+              <AccountControl href="/account" />
             </span>
           </SignedIn>
         </ClerkLoaded>
