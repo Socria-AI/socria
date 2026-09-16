@@ -18,7 +18,7 @@
 
 import type { ReactNode } from 'react';
 import Link from 'next/link';
-import { SignedIn, SignedOut, ClerkLoaded } from '@clerk/nextjs';
+import { SignedIn, SignedOut, ClerkLoaded, ClerkLoading } from '@clerk/nextjs';
 import { AccountControl } from '@/components/account/AccountControl';
 import { Label, InkMark } from './ds';
 
@@ -70,6 +70,15 @@ export function Mast({
             nowhere to sign in to. Dropping it here would have quietly removed
             the only way into an account from the front page, so it is kept,
             wrapped in ClerkLoaded so nothing flickers between states. */}
+        {/* The slot is never empty. Without this the nav rendered with no
+            Sign in link, then inserted one when Clerk resolved and shifted
+            the whole right-hand side — and with JavaScript off it never
+            appeared at all, so the masthead had no way into an account. */}
+        <ClerkLoading>
+          <Link href="/sign-in" className="hs auth">
+            Sign in
+          </Link>
+        </ClerkLoading>
         <ClerkLoaded>
           <SignedOut>
             <Link href="/sign-in" className="hs auth">
@@ -79,8 +88,10 @@ export function Mast({
           <SignedIn>
             {/* Socria's own, not Clerk's. The journal is a reading surface,
                 so it links to /account rather than opening a sheet over an
-                article — see AccountControl. */}
-            <span className="auth-btn app-root app-inline">
+                article — see AccountControl. It carries its own stylesheet,
+                so it needs no scope wrapper here; it used to have one, and
+                this page does not load the sheet that wrapper pointed at. */}
+            <span className="auth-btn">
               <AccountControl href="/account" />
             </span>
           </SignedIn>

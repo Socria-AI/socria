@@ -26,6 +26,18 @@ export type AuthStep =
   | 'password'
   /** asking for the code we just mailed */
   | 'code'
+  /**
+   * Asking for the authenticator code, AFTER the first factor succeeded.
+   *
+   * This did not exist, and `needs_second_factor` fell through to
+   * 'identify' — so anybody with an authenticator app typed the right
+   * mailed code, was told "That code was not accepted", and could never
+   * get in however many times they tried. A state that is not modelled is
+   * not handled gracefully; it is a dead end wearing an error message.
+   */
+  | 'second-factor'
+  /** Clerk will not proceed until they choose a new password */
+  | 'new-password'
   /** Clerk says the session is ready; the caller activates it */
   | 'done';
 
@@ -74,6 +86,24 @@ export interface ChosenFactor {
 }
 
 /**
+ * Which second factor to attempt.
+ *
+ * TOTP is preferred over a mailed backup code for the same reason a mailed
+ * code beats a password on the first factor: it is the one the person
+ * actually has to hand. `backup_code` is the fallback for an account that
+ * only ever generated those.
+ */
+export function chooseSecondFactor(
+  factors: readonly FirstFactor[] | null | undefined
+): 'totp' | 'backup_code' | 'phone_code' | null {
+  const list = Array.isArray(factors) ? factors : [];
+  for (const want of ['totp', 'phone_code', 'backup_code'] as const) {
+    if (list.some((f) => f?.strategy === want)) return want;
+  }
+  return null;
+}
+
+/**
  * Which first factor to use.
  *
  * A mailed code is preferred over a password wherever the instance offers
@@ -115,8 +145,10 @@ export function signInStep(
   if (status === 'needs_first_factor') {
     return factor?.strategy === 'password' ? 'password' : 'code';
   }
-  // needs_second_factor, needs_identifier, needs_new_password, or something
-  // added after this was written.
+  if (status === 'needs_second_factor') return 'second-factor';
+  if (status === 'needs_new_password') return 'new-password';
+  // needs_identifier, or something added after this was written. Back to the
+  // top, which always has a next thing to press.
   return 'identify';
 }
 

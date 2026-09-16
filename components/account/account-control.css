@@ -1,0 +1,68 @@
+/* components/account/account-control.css
+ *
+ * The account control carries its own styles, and that is the point.
+ *
+ * It began as markup borrowed from app/app-shell.css, which scopes everything
+ * under `.app-root` — so every render site needed an `app-inline` wrapper to
+ * supply that scope. That works on /chat, which imports app-shell.css. It does
+ * NOT work on the journal, Logos or One, which do not: the wrapper was there,
+ * the scope was correct, and the rules simply were not on the page. The
+ * control rendered as bare unstyled text beside the wordmark on three of the
+ * most-visited surfaces in the product.
+ *
+ * A component that can be dropped anywhere has to travel with its styles.
+ * Importing this from the component means Next includes it on every route
+ * that renders one, and nowhere else.
+ *
+ * `.avatar` is a word other surfaces use (app-shell.css and account-sheet.css
+ * both style one), so it is only ever addressed HERE as a descendant of
+ * `.who-btn` — never on its own.
+ */
+
+.who-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55em;
+  padding: 4px 5px 4px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--ink-16, rgba(31, 31, 31, 0.16));
+  background: #fff;
+  font-family: var(--sans);
+  font-size: 13px;
+  color: var(--ink);
+  text-decoration: none;
+  cursor: pointer;
+  transition: border-color 0.2s, transform 0.2s;
+}
+.who-btn:hover {
+  border-color: var(--ink);
+  transform: translateY(-1px);
+}
+
+/* A name long enough to push the picture off the header is a name that gets
+   cut, not a header that reflows. Below 520px the name goes entirely and the
+   picture stands on its own. */
+.who-btn .who-nm {
+  max-width: 10ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@media (max-width: 520px) {
+  .who-btn .who-nm { display: none; }
+  .who-btn { padding: 4px; }
+}
+
+.who-btn .avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--moss-600);
+  color: var(--paper);
+  display: grid;
+  place-items: center;
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 0.92rem;
+  flex: 0 0 auto;
+}

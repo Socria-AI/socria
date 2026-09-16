@@ -12,6 +12,7 @@
 
 import {
   AFTER_AUTH,
+  chooseSecondFactor,
   RESEND_AFTER_SECONDS,
   chooseFactor,
   cleanCode,
@@ -92,10 +93,18 @@ const ok = (n, c, x = '') => (c ? pass++ : (fail++, console.log('FAIL', n, x)));
   ok('a password factor asks for the password',
      signInStep('needs_first_factor', pw) === 'password');
 
+  // An authenticator app is a step, not a failure. This used to fall through
+  // to 'identify', so somebody with 2FA typed the right mailed code, was told
+  // "That code was not accepted", and could never get in however many times
+  // they tried.
+  ok('second factor asks for the second factor',
+     signInStep('needs_second_factor', code) === 'second-factor');
+  ok('and a forced reset says so', signInStep('needs_new_password', code) === 'new-password');
+
   // A status nobody here has heard of must not read as success. A form that
   // believes it succeeded hands the caller a session id that is not there.
-  ok('an unknown status is not done', signInStep('needs_new_password', code) === 'identify');
-  ok('second factor is not done', signInStep('needs_second_factor', code) === 'identify');
+  ok('an unknown status is not done', signInStep('needs_identifier', code) === 'identify');
+  ok('nor is a status invented tomorrow', signInStep('needs_something_new', code) === 'identify');
   ok('undefined is not done', signInStep(undefined, code) === 'identify');
   ok('null is not done', signInStep(null, null) === 'identify');
 }
@@ -152,6 +161,21 @@ const ok = (n, c, x = '') => (c ? pass++ : (fail++, console.log('FAIL', n, x)));
 }
 
 ok('one default landing, shared by both doors and the callback', AFTER_AUTH === '/chat');
+
+
+// ── the second factor ────────────────────────────────────────────────
+{
+  const totp = { strategy: 'totp' };
+  const backup = { strategy: 'backup_code' };
+  const phone = { strategy: 'phone_code' };
+
+  // The one they have to hand beats the one in a drawer.
+  ok('totp wins', chooseSecondFactor([backup, phone, totp]) === 'totp');
+  ok('then phone', chooseSecondFactor([backup, phone]) === 'phone_code');
+  ok('backup codes last', chooseSecondFactor([backup]) === 'backup_code');
+  ok('nothing usable is null', chooseSecondFactor([{ strategy: 'weird' }]) === null);
+  ok('absent is null', chooseSecondFactor(undefined) === null && chooseSecondFactor([]) === null);
+}
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -26,16 +26,28 @@ import { PFP_KEY, sanitizePfp, type PfpConfig } from '@/lib/pfp';
 import { TOUR_KEY } from '@/lib/tour';
 import { resetSeen } from '@/lib/hints';
 import { HINTS_CHANGED } from '@/components/Hint';
+import { StudentAccess } from '@/components/StudentAccess';
+import type { PlanState } from '@/components/usePlan';
 
 export function AccountSheet({
   open,
   onClose,
   isOne = false,
+  plan,
   onRetakeTour,
 }: {
   open: boolean;
   onClose: () => void;
   isOne?: boolean;
+  /**
+   * The whole plan answer, when the caller has it.
+   *
+   * Needed for the university section: whether the deployment runs the
+   * programme at all is a server fact (SOCRIA_EDU_DOMAINS), and it arrives
+   * on this object as `student`. Optional so a caller that only knows the
+   * tier can still open the sheet — the section simply does not render.
+   */
+  plan?: PlanState;
   onRetakeTour?: () => void;
 }) {
   const { user } = useUser();
@@ -140,6 +152,25 @@ export function AccountSheet({
                 </Link>
               </div>
             </div>
+
+            {/* The university programme.
+              *
+              * It lived only on /account, the full page — and the account is
+              * this sheet now, so for anyone who never types that URL the
+              * feature had effectively disappeared. StudentAccess renders
+              * nothing at all where the deployment does not run the
+              * programme (SOCRIA_EDU_DOMAINS unset, see lib/socria-edu.ts),
+              * so this section is gated on the same fact rather than showing
+              * an empty heading.
+              *
+              * The panel carries its own .edu-* styles, which are global and
+              * name nothing else, so it needs no wrapper to survive here. */}
+            {plan?.student && (
+              <div className="sec">
+                <span className="lbl">University</span>
+                <StudentAccess state={plan} />
+              </div>
+            )}
 
             <div className="sec">
               <span className="lbl">Your thinking</span>

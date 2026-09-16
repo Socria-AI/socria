@@ -31,6 +31,12 @@ import { PLANS } from '@/lib/entitlements';
 import { type Plan } from '@/lib/socria-one';
 import { ModelGlyph } from './ModelGlyph';
 import { OneLock } from './OneLock';
+// The .mp-* rules live in app/app-shell.css, which only the app routes
+// import — and this is rendered on /docs/models too, where it was showing as
+// an unstyled stack of text in a 420px-tall empty frame. Importing the sheet
+// from the component means every route that renders a picker gets the rules.
+// It stays .app-root-scoped, so nothing on /docs is touched by it.
+import '@/app/app-shell.css';
 
 /** Logos is listed apart: it is a surface, not a register of the same one. */
 const LOGOS: SocriaModel = 'logos';

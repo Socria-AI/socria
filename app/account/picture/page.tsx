@@ -1,7 +1,7 @@
 // app/account/picture/page.tsx — compose the picture that represents you.
 import type { Metadata } from 'next';
 import './picture.css';
-import { PictureComposer } from '@/components/account/PictureComposer';
+import { PicturePane } from './PicturePane';
 
 export const metadata: Metadata = {
   title: 'Your picture — Socria',
@@ -10,5 +10,5 @@ export const metadata: Metadata = {
 };
 
 export default function PicturePage() {
-  return <PictureComposer />;
+  return <PicturePane />;
 }

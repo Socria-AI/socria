@@ -35,6 +35,7 @@ import { clerkMessage } from '@/lib/clerk-errors';
 import {
   AFTER_AUTH,
   chooseFactor,
+  chooseSecondFactor,
   cleanCode,
   cleanEmail,
   resendIn,
@@ -83,6 +84,8 @@ export function AuthForm({
   const [err, setErr] = useState<string | null>(null);
   /** which first factor sign-in settled on; null until we have asked */
   const [factor, setFactor] = useState<ChosenFactor | null>(null);
+  /** which second factor Clerk offered, once the first one has passed */
+  const [second, setSecond] = useState<'totp' | 'backup_code' | 'phone_code' | null>(null);
   /** when the current code was sent, for the resend hold */
   const [sentAt, setSentAt] = useState(0);
   const [hold, setHold] = useState(0);
@@ -148,6 +151,20 @@ export function AuthForm({
       fail(e, 'Could not reach Google. Try again, or use your email.');
     }
   }
+
+  // Backing out of Google — pressing Back, or closing the consent screen —
+  // returns to this page with `busy` still true from the redirect that never
+  // happened, so every control was disabled and the only way forward was a
+  // reload. A restored page is a fresh one.
+  useEffect(() => {
+    const revive = () => setBusy(false);
+    window.addEventListener('pageshow', revive);
+    window.addEventListener('focus', revive);
+    return () => {
+      window.removeEventListener('pageshow', revive);
+      window.removeEventListener('focus', revive);
+    };
+  }, []);
 
   // ── the email step ────────────────────────────────────────────────
   // NOTE ON HOW THESE ARE FIRED. The design system's <Button> renders
@@ -237,7 +254,19 @@ export function AuthForm({
           land(res.createdSessionId, false);
           return;
         }
-        setStep(signInStep(res.status, factor));
+        const next = signInStep(res.status, factor);
+        if (next === 'second-factor') {
+          const how = chooseSecondFactor(
+            (res as { supportedSecondFactors?: unknown }).supportedSecondFactors as never
+          );
+          setSecond(how);
+          if (how === 'phone_code') {
+            await signIn!.prepareSecondFactor({ strategy: 'phone_code' });
+            setSentAt(Date.now());
+          }
+          setCode('');
+        }
+        setStep(next);
       } else {
         const res = await signUp!.update({ password });
         const next = signUpStep(res.status, res.missingFields, res.unverifiedFields);
@@ -275,6 +304,31 @@ export function AuthForm({
           land(res.createdSessionId, false);
           return;
         }
+        // The code may have been RIGHT and the account simply have a second
+        // factor. Reporting that as a bad code is how 2FA users were locked
+        // out entirely — see signInStep.
+        const next = signInStep(res.status, factor);
+        if (next === 'second-factor') {
+          const how = chooseSecondFactor(
+            (res as { supportedSecondFactors?: unknown }).supportedSecondFactors as never
+          );
+          setSecond(how);
+          if (how === 'phone_code') {
+            await signIn!.prepareSecondFactor({ strategy: 'phone_code' });
+            setSentAt(Date.now());
+          }
+          setCode('');
+          setStep('second-factor');
+          setBusy(false);
+          return;
+        }
+        if (next === 'new-password') {
+          setErr(
+            'This account needs a new password before it can be used. Use "Forgot password" on the sign-in page to set one.'
+          );
+          setBusy(false);
+          return;
+        }
         setErr('That code was not accepted. Check it, or send a new one.');
       } else {
         const res = await signUp!.attemptEmailAddressVerification({ code: c });
@@ -284,6 +338,37 @@ export function AuthForm({
         }
         setErr('That code was not accepted. Check it, or send a new one.');
       }
+      setBusy(false);
+    } catch (e) {
+      fail(e, 'That code was not accepted.');
+    }
+  }
+
+  // ── the second factor ─────────────────────────────────────────────
+  async function submitSecond(e?: React.FormEvent) {
+    e?.preventDefault();
+    if (!ready || busy) return;
+    const c = cleanCode(code);
+    if (!c) {
+      setErr(
+        second === 'backup_code'
+          ? 'A backup code, exactly as it was given to you.'
+          : 'The six digits from your authenticator app.'
+      );
+      return;
+    }
+    setBusy(true);
+    setErr(null);
+    try {
+      const res = await signIn!.attemptSecondFactor({
+        strategy: (second ?? 'totp') as 'totp',
+        code: c,
+      });
+      if (res.status === 'complete') {
+        land(res.createdSessionId, false);
+        return;
+      }
+      setErr('That code was not accepted.');
       setBusy(false);
     } catch (e) {
       fail(e, 'That code was not accepted.');
@@ -320,6 +405,7 @@ export function AuthForm({
     setPassword('');
     setErr(null);
     setSentAt(0);
+    setSecond(null);
   }
 
   const cta = kind === 'sign-in' ? 'Continue' : 'Create my account';
@@ -415,6 +501,52 @@ export function AuthForm({
             </button>
           </p>
         </form>
+      )}
+
+      {step === 'second-factor' && (
+        <form className="stack" onSubmit={submitSecond}>
+          <div className="field">
+            <label htmlFor="auth-2fa">
+              {second === 'backup_code'
+                ? 'One of your backup codes'
+                : second === 'phone_code'
+                  ? 'The code we texted you'
+                  : 'Your authenticator code'}
+            </label>
+            <input
+              ref={box}
+              id="auth-2fa"
+              type="text"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              placeholder="000000"
+              value={code}
+              onChange={(ev) => setCode(ev.target.value)}
+            />
+          </div>
+          <Button variant="primary" size="lg" arrow disabled={!ready || busy} onClick={() => void submitSecond()}>
+            {busy ? 'One moment…' : 'Continue'}
+          </Button>
+          <p className="opt-note">
+            {second === 'totp'
+              ? 'From the app you set up when you turned on two-factor.'
+              : second === 'backup_code'
+                ? 'The one-time codes you saved when you turned on two-factor.'
+                : `Sent to the number on your account.`}{' '}
+            <button type="button" onClick={back}>
+              Start again
+            </button>
+          </p>
+        </form>
+      )}
+
+      {step === 'new-password' && (
+        <p className="auth-err" role="alert">
+          This account needs a new password before it can be used.{' '}
+          <button type="button" onClick={back}>
+            Start again
+          </button>
+        </p>
       )}
 
       {/* Clerk's reason, in Clerk's words — see lib/clerk-errors.ts for why
