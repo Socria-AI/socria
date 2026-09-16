@@ -10,7 +10,7 @@ import { auth } from '@clerk/nextjs/server';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { getSubscription, isCompCustomer } from '@/lib/subscriptions';
 import { mirrorEntitles, readStripeMirror, studentEmail } from '@/lib/socria-one-grant';
-import { eduDomainLabel, eduDomains, eduProgrammeOn, eduSchool } from '@/lib/socria-edu';
+import { eduDomainLabel, eduDomains, eduProgrammeOn, eduSchool, warnIfEduOff } from '@/lib/socria-edu';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -41,6 +41,9 @@ export async function GET(req: NextRequest) {
   // and reads as prose ("@mavs.uta.edu or @uta.edu"); the form that checks
   // what somebody typed needs the domains themselves, and parsing them back
   // out of the sentence would be a second, worse copy of eduDomains().
+  // Says once per process when SOCRIA_EDU_DOMAINS is unset, so an absent
+  // student panel can be told from a broken one.
+  warnIfEduOff();
   const student = eduProgrammeOn()
     ? {
         on: true,
