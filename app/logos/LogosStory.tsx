@@ -80,12 +80,30 @@ export function LogosStory() {
     }
 
     // cover: the brain draws stroke by stroke, then the type arrives in beats
+    //
+    // THE HERO USED TO BE ABLE TO STAY BLANK. `.cover .seq` is hidden until
+    // `.intro` lands, and `.intro` was set from a single requestAnimationFrame.
+    // A rAF does not fire in a backgrounded or throttled tab, so opening this
+    // page in a background tab and coming back to it showed the masthead over
+    // an empty sheet — with nothing to recover it, because the self-heal above
+    // only watches `.fade`, `.ink-mark` and `.io`.
+    //
+    // So the class is set by whichever of the two arrives first, and a
+    // backstop forces the whole sequence done shortly after. The animation is
+    // unchanged when the frame does fire; it simply can no longer be the only
+    // thing standing between somebody and the page.
     const coverEl = root.querySelector('.cover');
     if (coverEl) {
       if (reduce) coverEl.classList.add('intro', 'settled');
       else {
-        requestAnimationFrame(() => coverEl.classList.add('intro'));
+        const intro = () => coverEl.classList.add('intro');
+        requestAnimationFrame(intro);
+        timers.push(setTimeout(intro, 120));
         timers.push(setTimeout(() => coverEl.classList.add('settled'), 3400));
+        // Last resort: if neither path ran, show it rather than hide it.
+        timers.push(
+          setTimeout(() => coverEl.classList.add('intro', 'settled'), 4200)
+        );
       }
     }
 

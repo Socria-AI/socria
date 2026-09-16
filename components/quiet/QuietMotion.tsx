@@ -1,24 +1,49 @@
 'use client';
 // components/quiet/QuietMotion.tsx
 //
-// Starts the scroll drivers on a quiet-register page.
+// The register's own behaviour, and nothing else.
 //
-// It reuses the journal's initJournal() rather than porting quiet.js's own
-// copy, because they ARE the same code — quiet.js and issue.js share the
-// reveal contract, the reading-progress fill and the anim-off guard, and a
-// second implementation of that would be a second thing to keep in step.
+// WHAT THIS REPLACED, AND WHY. The first version called initJournal() on the
+// grounds that quiet.js and issue.js share their reveal code. They do — but
+// initJournal is the JOURNAL's driver, and it does far more than fill a
+// progress bar: it adds `.pre` (opacity: 0) to every `.rv`, `[data-split]`,
+// `.turn`, `.fig` and `.reading` it can find, and it REWRITES text nodes to
+// wrap each word in a span for the rise animation.
 //
-// Safe to call from anywhere: it is guarded against running twice (React 18
-// mounts effects twice in development, and every driver installs listeners),
-// and each driver queries for its own elements and no-ops when they are not
-// on the page — which is most of them, here.
+// Pointed at /logos, which has none of those affordances and its own motion
+// already, that hid most of the page and mangled the rest. The page came out
+// as a masthead over an empty sheet.
+//
+// So this does the two things the register actually asks for — fill the
+// hairline as the page is read, and mark the masthead once it has scrolled —
+// and touches nothing it did not render itself. It never adds `.pre`, so
+// `.q-root .rv.pre { opacity: 0 }` can never fire and nothing here can hide
+// content that was on the page before it mounted.
 
 import { useEffect } from 'react';
-import { initJournal } from '@/components/journal/drivers';
 
 export function QuietMotion() {
   useEffect(() => {
-    initJournal();
+    const doc = document.documentElement;
+    const bar = document.querySelector<HTMLElement>('.rp');
+    const mast = document.querySelector<HTMLElement>('.qmast');
+    if (!bar && !mast) return;
+
+    const onScroll = () => {
+      const top = window.scrollY || doc.scrollTop;
+      const span = doc.scrollHeight - window.innerHeight;
+      if (bar) bar.style.width = `${span > 0 ? (top / span) * 100 : 0}%`;
+      if (mast) mast.classList.toggle('scrolled', top > 8);
+    };
+
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
+    };
   }, []);
+
   return null;
 }
