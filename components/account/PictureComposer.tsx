@@ -15,6 +15,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Avatar } from './Avatar';
+import { Label, OneMark } from '@/components/journal/ds';
+import { NodeGlyph } from '@/components/NodeGlyph';
+import { LogosMark } from '@/components/LogosMark';
+import { OneLock } from '@/components/OneLock';
+import type { LogosNodeType } from '@/lib/logos';
 import {
   BRAND_MARKS, DEFAULT_PFP, GROUNDS, GROUPS, PFP_KEY, RINGS, TEXTURES,
   groundOf, markOf, needsOne, sanitizePfp, type PfpConfig,
@@ -56,12 +61,35 @@ export function PictureComposer({ isOne = false }: { isOne?: boolean }) {
   }, [cfg]);
 
   const locked = (one?: boolean) => !!one && !isOne;
+
+  /**
+   * What a grid cell draws.
+   *
+   * The mark itself, at 26px, on the cell's own paper — NOT a miniature of
+   * the finished avatar. The point of the grid is to compare marks; drawing
+   * each one on the chosen ground would compare grounds instead, and at 38px
+   * the discs crowd out the names.
+   */
+  const cellGlyph = (m: (typeof BRAND_MARKS)[number]) =>
+    m.kind === 'img' ? (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={m.src} alt="" />
+    ) : m.kind === 'logos' ? (
+      <LogosMark size={26} />
+    ) : m.kind === 'one' ? (
+      <OneMark size={26} tone="light" />
+    ) : m.kind === 'letter' ? (
+      <span className="ltr">{(cfg.letter || 'A').slice(0, 1)}</span>
+    ) : (
+      <NodeGlyph type={m.id as LogosNodeType} />
+    );
   const group = GROUPS.find((g) => g.id === tab) ?? GROUPS[0];
 
   return (
     <div className="pfp-root">
       <div className="pfp-head">
         <div>
+          <Label tone="moss">Your account · your picture</Label>
           <h1>Your picture</h1>
           {/* `.sub` is what the sheet styles this as; it was a bare <p>. */}
           <p className="sub">
@@ -83,21 +111,42 @@ export function PictureComposer({ isOne = false }: { isOne?: boolean }) {
         {/* the preview, and the sizes it will actually be seen at */}
         <div className="pfp-stage">
           <Avatar cfg={cfg} className="av-big" />
-          {/* The sizes it will actually be seen at. `.ch` is a SECTION in this
-              sheet — padding and a rule — not a caption, which is why the
-              first version drew a bordered box around the label. */}
-          <div className="av-sizes">
-            {[44, 28, 20].map((n) => (
-              <span className="one" key={n}>
-                <Avatar cfg={cfg} size={n} className="av-sm" />
-                <span className="px">{n}px</span>
-              </span>
-            ))}
+          {/* `.stage-side` groups the sizes with the caption, which is what
+              lets the whole stage turn into a row below 620px instead of the
+              avatar sitting alone above a stack. */}
+          <div className="stage-side">
+            <div className="av-sizes">
+              {[44, 28, 20].map((n) => (
+                <span className="one" key={n}>
+                  <Avatar cfg={cfg} size={n} className="av-sm" />
+                  <span className="px">{n}px</span>
+                </span>
+              ))}
+            </div>
+            {/* What you have actually composed, named. Without it the stage
+                is a picture floating in half a screen of paper. */}
+            <p className="named">
+              {markOf(cfg.mark).kind === 'node' ? (
+                <>
+                  the <em>{cfg.mark}</em> mark, on {groundOf(cfg.ground).name.toLowerCase()}
+                </>
+              ) : (
+                <>
+                  {markOf(cfg.mark).name}, on {groundOf(cfg.ground).name.toLowerCase()}
+                </>
+              )}
+            </p>
           </div>
         </div>
 
         <div className="pfp-choices">
-          {/* ── the mark ── */}
+          {/* ── the mark ──
+              A SECTION, like the three below it. Without the `.ch` wrapper and
+              its label the tabs and the grid sat bare against the column edge,
+              with none of the padding or the hairline the others have — which
+              is most of why this page read as unfinished. */}
+          <div className="ch">
+          <span className="lbl">The mark</span>
           <div className="tabs" role="tablist" aria-label="Which mark">
             {GROUPS.map((g) => (
               <button
@@ -113,47 +162,81 @@ export function PictureComposer({ isOne = false }: { isOne?: boolean }) {
             ))}
           </div>
 
+          {/* THE CELL IS A GLYPH IN A BOX, NOT A LITTLE AVATAR.
+              picture.css has always described `.mk-cell > .box + .nm` — a
+              30px box holding a 26px glyph, and a 9.5px caption. This rendered
+              a 38px Avatar and labelled it `.sw-name`, which is the GROUND
+              swatch's class: so every cell was an oversized disc with a name
+              styled for something else, in a grid sized for neither. */}
           <div className="mk-grid">
             {group.types === null
-              ? BRAND_MARKS.map((m) => (
-                  <button
-                    key={m.id}
-                    type="button"
-                    className={'mk-cell' + (cfg.mark === m.id ? ' on' : '') + (locked(m.one) ? ' is-locked' : '')}
-                    onClick={() => !locked(m.one) && set({ mark: m.id })}
-                    aria-pressed={cfg.mark === m.id}
-                    title={locked(m.one) ? `${m.name} — Socria One` : m.name}
-                  >
-                    <Avatar cfg={{ ...cfg, mark: m.id }} size={38} className="av-sm" />
-                    <span className="sw-name">{m.name}</span>
-                  </button>
-                ))
+              ? BRAND_MARKS.map((m) => {
+                  const lk = locked(m.one);
+                  return (
+                    <button
+                      key={m.id}
+                      type="button"
+                      className={'mk-cell' + (lk ? ' is-locked' : '')}
+                      onClick={() => !lk && set({ mark: m.id })}
+                      aria-pressed={cfg.mark === m.id}
+                      title={lk ? `${m.name} — Socria One` : m.name}
+                    >
+                      <span className="box">{cellGlyph(m)}</span>
+                      <span className="nm">
+                        {lk ? (
+                          <span className="lk">
+                            {m.name}
+                            <OneLock />
+                          </span>
+                        ) : (
+                          m.name
+                        )}
+                      </span>
+                    </button>
+                  );
+                })
               : group.types.map((t) => (
                   <button
                     key={t}
                     type="button"
-                    className={'mk-cell' + (cfg.mark === t ? ' on' : '')}
+                    className="mk-cell"
                     onClick={() => set({ mark: t })}
                     aria-pressed={cfg.mark === t}
                     title={t}
                   >
-                    <Avatar cfg={{ ...cfg, mark: t }} size={38} className="av-sm" />
-                    <span className="sw-name">{t}</span>
+                    <span className="box">
+                      <NodeGlyph type={t as LogosNodeType} />
+                    </span>
+                    <span className="nm">{t}</span>
                   </button>
                 ))}
           </div>
 
           {markOf(cfg.mark).kind === 'letter' && (
-            <div className="ltr-field">
-              <label htmlFor="pfp-letter">Your initial</label>
+            <div className="ltr-field" style={{ marginTop: 14 }}>
               <input
-                id="pfp-letter"
                 value={cfg.letter}
                 maxLength={2}
-                onChange={(e) => set({ letter: e.target.value.slice(0, 2) })}
+                aria-label="Your initials"
+                onChange={(e) => set({ letter: e.target.value.toUpperCase().slice(0, 2) })}
               />
+              <span>one letter, or two</span>
             </div>
           )}
+          {/* One line, and only where it says something the grid cannot.
+              These are the design's own, per tab. */}
+          {tab === 'maths' && (
+            <p className="hint">
+              The Board&rsquo;s own marks. Given, unknown, and the step where it went wrong.
+            </p>
+          )}
+          {tab === 'reasoning' && (
+            <p className="hint">
+              The dashed ring is an assumption nobody has examined yet. It is the most honest one
+              here.
+            </p>
+          )}
+          </div>
 
           {/* ── the ground ──
               A bare swatch is a 44px circle with NOTHING in it; the name
@@ -202,6 +285,10 @@ export function PictureComposer({ isOne = false }: { isOne?: boolean }) {
                 );
               })}
             </div>
+            <p className="hint">
+              Two rings is the Socria One seal — the inner is the seal, the outer the invitation
+              around it.
+            </p>
           </div>
 
           <div className="ch">
@@ -220,28 +307,47 @@ export function PictureComposer({ isOne = false }: { isOne?: boolean }) {
             </div>
           </div>
 
+          {/* A section like the others, so it sits on the same rhythm rather
+              than pressing against the one above it. */}
           {needsOne(cfg) && !isOne && (
-            <p className="one-note">
-              This one is part of Socria One. Your choice is kept either way — it comes back if you
-              join.
-            </p>
-          )}
-
-          {/* The bar's stylesheet describes a vow on the left and an
-              `.acts` group on the right; without them `space-between` threw
-              the two buttons to opposite edges of the window. */}
-          <div className="pfp-bar">
-            <p className="vow">What you make here is yours.</p>
-            <div className="acts">
-              {saved && <span className="saved">Saved</span>}
-              <button type="button" className="reset" onClick={() => { setCfg(DEFAULT_PFP); setSaved(false); }}>
-                Reset
-              </button>
-              <button type="button" className="save" onClick={save}>
-                {saved ? 'Saved' : 'Save picture'}
-              </button>
+            <div className="ch">
+              <p className="one-note">
+                <OneLock />
+                Prussian, the gold seal and the double ring belong to Socria One. Your choice is
+                kept either way — it comes back if you join.
+                <Link href="/one">See what else opens →</Link>
+              </p>
             </div>
-          </div>
+          )}
+        </div>
+      </div>
+
+      {/* The bar is a SIBLING of the body, not a child of the choices column.
+          It is position:fixed either way, but nesting it inside the scrolling
+          column put a fixed element inside a grid track for no reason.
+          Its stylesheet describes a vow on the left and an `.acts` group on
+          the right; without them `space-between` threw the buttons to
+          opposite edges of the window. */}
+      <div className="pfp-bar">
+        <p className="vow">
+          It is a picture, not an identity. Change it whenever you like, and take the file with
+          you.
+        </p>
+        <div className="acts">
+          {saved && <span className="saved">Saved.</span>}
+          <button
+            type="button"
+            className="reset"
+            onClick={() => {
+              setCfg(DEFAULT_PFP);
+              setSaved(false);
+            }}
+          >
+            Reset
+          </button>
+          <button type="button" className="save" onClick={save}>
+            {saved ? 'Saved' : 'Use this picture'}
+          </button>
         </div>
       </div>
     </div>
