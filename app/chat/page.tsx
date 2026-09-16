@@ -246,6 +246,7 @@ export default function ChatPage() {
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
   }, []);
+
   const endTour = useCallback(() => {
     setTourOpen(false);
     try { localStorage.setItem(TOUR_KEY, '1'); } catch {}
@@ -276,12 +277,41 @@ export default function ChatPage() {
   const [depth, setDepth] = useState<ThinkingDepth>('balanced');
   const [smartUnlocked, setSmartUnlocked] = useState(false);
   const [logosModalOpen, setLogosModalOpen] = useState(false);
+  /** they arrived straight from /onboarding this session */
+  const justOnboarded = useRef(false);
   const [logosDismissed, setLogosDismissed] = useState(false);
   const [autoOpenChecked, setAutoOpenChecked] = useState(false);
   const [shareInsight, setShareInsight] = useState<Insight | null>(null);
   const [importedProfile, setImportedProfile] = useState('');
   const [importOpen, setImportOpen] = useState(false);
   const [journeyDebugOpen, setJourneyDebugOpen] = useState(false);
+
+  // WHEN THE TOUR MAY OPEN.
+  //
+  // Only once nothing else owns the screen. `blocked` is the condition
+  // lib/tour.ts already asks about and it was being answered `false`
+  // unconditionally, which is how the tour came to be consumed invisibly
+  // under the Logos modal on a first visit. Depending on the real state
+  // means the tour simply waits, and opens when the screen is free.
+  const anythingOpen =
+    logosModalOpen || acctOpen || importOpen || journeyDebugOpen || !!shareInsight;
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn || tourOpen || anythingOpen) return;
+    try {
+      if (
+        shouldRunTour({
+          done: localStorage.getItem(TOUR_KEY) === '1',
+          signedIn: true,
+          justOnboarded: justOnboarded.current,
+          blocked: false,
+        })
+      ) {
+        setTourOpen(true);
+      }
+    } catch {
+      /* no storage: teach nobody twice a day */
+    }
+  }, [isLoaded, isSignedIn, tourOpen, anythingOpen]);
   const [journey, setJourney] = useState<UserUnderstanding | null>(null);
   // Freshest journey, immune to stale closures (the cadence update fires from
   // async flows that captured an older render).
@@ -1470,20 +1500,13 @@ export default function ChatPage() {
       setInput(carried.text);
       requestAnimationFrame(() => textareaRef.current?.focus());
     }
-    try {
-      if (
-        shouldRunTour({
-          done: localStorage.getItem(TOUR_KEY) === '1',
-          signedIn: true,
-          justOnboarded: !!carried,
-          blocked: false,
-        })
-      ) {
-        setTourOpen(true);
-      }
-    } catch {
-      /* no storage: teach nobody twice a day */
-    }
+    // The tour decision moved out of this mount effect — see the effect
+    // below. It ran here with `blocked: false` hard-coded, so on a first
+    // signed-in visit it opened UNDER the Try-Logos modal, which mounts at
+    // the same moment: the visitor saw only the modal, and the one Escape
+    // that dismissed it also ended the tour and wrote TOUR_KEY. The
+    // first-run tour was spent without ever having been on screen.
+    if (carried) justOnboarded.current = true;
 
     if (!carried && want !== 'logos' && readModel() !== 'logos') {
       const { id } = readStart(window.location.search);
@@ -2164,6 +2187,10 @@ export default function ChatPage() {
               </div>
             )}
 
+            {/* One scope for the whole thread: `.turn-row` and its `.lit`
+                flash are register rules, and display:contents means this
+                wrapper adds no box of its own. */}
+            <div className="app-root app-inline">
             {messages.map((m, i) => {
               const isAssistant = m.role === 'assistant';
               const { body, choices } = isAssistant
@@ -2179,8 +2206,16 @@ export default function ChatPage() {
                 !sending &&
                 !streamed;
               return (
-                // The index is the anchor Find scrolls to.
-                <div key={i} id={`turn-${i}`}>
+                // The index is the anchor Find scrolls to, and `turn-row`
+                // is what the flash hangs on: the only rule that paints a hit
+                // is `.app-root .turn-row.lit`. Without the class, jumping to
+                // a result scrolled and lit nothing, so on a long thread
+                // there was no way to see which line you had landed on.
+                // Both stay on THIS element — the register's scope is
+                // supplied once by the list's wrapper, because `app-inline`
+                // is display:contents and an element with no box cannot be
+                // scrolled into view.
+                <div key={i} id={`turn-${i}`} className="turn-row">
                   <Bubble role={m.role} content={body} />
                   {showChoices && (
                     <ChoiceChips
@@ -2192,6 +2227,7 @@ export default function ChatPage() {
                 </div>
               );
             })}
+            </div>
 
             {streamed && (
               <Bubble

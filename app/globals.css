@@ -127,12 +127,22 @@ body {
 /* The chat page styles itself with Tailwind utilities (paper-bg), so isolate
    the landing-only heading reset scoped rather than global. */
 
-/* full-bleed block helpers */
-.block { position: relative; padding: clamp(56px, 9vw, 128px) var(--edge); }
-.block.tight { padding: clamp(40px, 6vw, 80px) var(--edge); }
+/* Full-bleed section helpers, renamed off `block`.
+ *
+ * `.block` is also a TAILWIND UTILITY — `display:block` — and this rule came
+ * after it in the sheet, so anything carrying the utility got up to 128px of
+ * section padding instead. The chat's "still open" chips wore it and blew
+ * open to several hundred pixels tall. Two different meanings cannot share
+ * one class name when one of them is generated. */
+.sc-block { position: relative; padding: clamp(56px, 9vw, 128px) var(--edge); }
+.sc-block.tight { padding: clamp(40px, 6vw, 80px) var(--edge); }
 .inner { max-width: 1320px; margin: 0 auto; width: 100%; }
 
-.bg-paper { background: var(--paper); color: var(--ink); }
+/* `bg-paper` is a Tailwind colour utility too, and this rule follows it in
+   the sheet — so its `color` won over any `text-*` utility written beside it
+   and `bg-paper text-ink/60` came out at full ink. The ground is all this was
+   ever for; the text colour is the caller's business. */
+.bg-paper { background: var(--paper); }
 .bg-moss { background: var(--moss); color: var(--paper); }
 .bg-forest { background: var(--forest); color: var(--paper); }
 .bg-sage { background: var(--sage); color: var(--forest-2); }
@@ -199,8 +209,21 @@ body {
 
 /* nav */
 .nav-inner { display: flex; align-items: center; justify-content: space-between; }
-.brand { display: flex; align-items: center; gap: 0.5em; color: var(--paper); }
-.brand img { height: 30px; filter: invert(1) brightness(1.7); }
+/* THE MARK IS BLACK LINE ART AND THE GROUND IS CREAM.
+ *
+ * These two lines came from a landing page whose nav sat on a dark band, so
+ * they set the wordmark to paper and inverted the mark to match. That page is
+ * gone; every surface that still renders `.brand` — the journal masthead on
+ * /, /one and /logos, and the 404 plate — is cream. The invert was turning a
+ * black mark WHITE ON CREAM: the logo was simply not there, and the link to
+ * home was a blank space beside the word. The blog was the only surface that
+ * looked right, because it alone carries an override (`filter: none`, below).
+ *
+ * The handoff is explicit that the mark has no light variant and is inverted
+ * on dark, never recoloured — so inverting belongs on a dark ground and
+ * nowhere else. No live surface has one. */
+.brand { display: flex; align-items: center; gap: 0.5em; color: var(--ink); }
+.brand img { height: 30px; }
 .brand .name { font-family: var(--serif); font-size: 1.8rem; line-height: 1; letter-spacing: -0.01em; }
 .nav-right { display: flex; align-items: center; gap: 30px; }
 .nav-links { display: flex; gap: 26px; }
@@ -303,7 +326,11 @@ body {
 .chat-bar .status { margin-left: auto; font-size: 0.66rem; letter-spacing: 0.13em; text-transform: uppercase; color: var(--ink-60); display: flex; align-items: center; gap: 0.5em; }
 .chat-bar .status::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--moss); }
 .chat-body { padding: 24px 20px; display: flex; flex-direction: column; gap: 15px; }
-.msg { display: flex; gap: 10px; max-width: 88%; }
+/* Scoped to the dead landing page's chat mock-up, which is the only thing
+   that ever wanted it. Unscoped it also matched the Logos issue's pull-quote
+   (`<p className="msg">`), turning a block of prose into an 88%-wide flex
+   container. */
+.chat-body .msg { display: flex; gap: 10px; max-width: 88%; }
 .msg .av { width: 28px; height: 28px; flex: 0 0 auto; display: grid; place-items: center; background: var(--paper-2); border: 1px solid var(--border); overflow: hidden; }
 .msg .av img { width: 18px; }
 .msg.user { align-self: flex-end; flex-direction: row-reverse; }
@@ -8049,3 +8076,8 @@ html.anim-off .logos-root.is-firstmap-node .lg-node, html:not(.js) .logos-root.i
     display: none !important;
   }
 }
+
+/* The account control in the Logos header. It carries its own stylesheet
+   (components/account/account-control.css); this only places it, after the
+   trailing "Socria chat →" button. */
+.logos-root .lg-head .who-btn { margin-left: 10px; flex: 0 0 auto; }

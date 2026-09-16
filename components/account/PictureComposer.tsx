@@ -107,7 +107,7 @@ export function PictureComposer({ isOne = false }: { isOne?: boolean }) {
                   <button
                     key={m.id}
                     type="button"
-                    className={'mk-cell' + (cfg.mark === m.id ? ' on' : '') + (locked(m.one) ? ' locked' : '')}
+                    className={'mk-cell' + (cfg.mark === m.id ? ' on' : '') + (locked(m.one) ? ' is-locked' : '')}
                     onClick={() => !locked(m.one) && set({ mark: m.id })}
                     aria-pressed={cfg.mark === m.id}
                     title={locked(m.one) ? `${m.name} — Socria One` : m.name}
@@ -215,13 +215,20 @@ export function PictureComposer({ isOne = false }: { isOne?: boolean }) {
             </p>
           )}
 
+          {/* The bar's stylesheet describes a vow on the left and an
+              `.acts` group on the right; without them `space-between` threw
+              the two buttons to opposite edges of the window. */}
           <div className="pfp-bar">
-            <button type="button" className="save" onClick={save}>
-              {saved ? 'Saved' : 'Save picture'}
-            </button>
-            <button type="button" className="reset" onClick={() => { setCfg(DEFAULT_PFP); setSaved(false); }}>
-              Reset
-            </button>
+            <p className="vow">What you make here is yours.</p>
+            <div className="acts">
+              {saved && <span className="saved">Saved</span>}
+              <button type="button" className="reset" onClick={() => { setCfg(DEFAULT_PFP); setSaved(false); }}>
+                Reset
+              </button>
+              <button type="button" className="save" onClick={save}>
+                {saved ? 'Saved' : 'Save picture'}
+              </button>
+            </div>
           </div>
         </div>
       </div>
