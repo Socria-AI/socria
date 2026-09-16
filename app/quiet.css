@@ -160,4 +160,4 @@
 .q-root .rv.pre.in{opacity:1;transform:none;transition:opacity .8s var(--ease-out-expo),transform .8s var(--ease-out-expo)}
 @media(prefers-reduced-motion:reduce),print{.q-root .rv.pre{opacity:1!important;transform:none!important}}
 /* frozen timeline fallback — see issue.css */
-html.anim-off .q-root .rv.pre{opacity:1!important;transform:none!important;transition:none!important}
+html.anim-off .q-root .rv.pre, html:not(.js) .q-root .rv.pre{opacity:1!important;transform:none!important;transition:none!important}
