@@ -16,7 +16,21 @@ export type FindScope = Speaker | 'all';
 
 export interface Turn {
   role: string;
+  /**
+   * The line itself, under EITHER name.
+   *
+   * WHY BOTH. The Logos thread stores a turn as `{role, text}`; /chat stores
+   * a message as `{role, content}`. Find was written against the first and
+   * handed the second, so `t.text` was undefined on every chat message, every
+   * turn was skipped, and the panel said "Nothing has been said here yet" over
+   * a conversation that was visibly on screen. The call site cast the array to
+   * `never`, which is precisely the type error that would have caught it.
+   *
+   * Reading both is the honest fix: the two shapes are the same idea and this
+   * module has no business preferring one surface's spelling.
+   */
   text?: string;
+  content?: string;
   insight?: { text?: string };
 }
 
@@ -39,7 +53,7 @@ export function saidIn(turns: readonly Turn[] | null | undefined): Said[] {
   const out: Said[] = [];
   (turns ?? []).forEach((t, i) => {
     if (!t || typeof t.role !== 'string') return;
-    const text = t.role === 'insight' ? t.insight?.text : t.text;
+    const text = t.role === 'insight' ? t.insight?.text : t.text ?? t.content;
     if (typeof text !== 'string' || !text) return;
     out.push({ i, who: t.role === 'user' ? 'you' : 'socria', text });
   });

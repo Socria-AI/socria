@@ -148,9 +148,18 @@ const DAY = 86_400_000;
  */
 export function groupOf(updatedAt: number, now: number = Date.now()): SessionGroup {
   if (!Number.isFinite(updatedAt)) return 'Earlier';
-  const startOfToday = new Date(now).setHours(0, 0, 0, 0);
+  const midnight = new Date(now);
+  midnight.setHours(0, 0, 0, 0);
+  const startOfToday = midnight.getTime();
   if (updatedAt >= startOfToday) return 'Today';
-  if (updatedAt >= startOfToday - 6 * DAY) return 'This week';
+  // Six days back by the CALENDAR, not by 6×86,400,000. Subtracting a fixed
+  // number of milliseconds drifts by an hour across a daylight-saving change,
+  // and for the week after one a session touched in that hour lands under the
+  // wrong heading. setDate keeps the local wall-clock time, so the boundary
+  // stays on local midnight the way the heading claims.
+  const weekAgo = new Date(startOfToday);
+  weekAgo.setDate(weekAgo.getDate() - 6);
+  if (updatedAt >= weekAgo.getTime()) return 'This week';
   return 'Earlier';
 }
 

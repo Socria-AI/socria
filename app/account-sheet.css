@@ -40,6 +40,11 @@
 .acct-sheet .scrim:not([hidden]) .sheet{animation:sheet-in .5s var(--ease-out-expo)}
 .acct-sheet .sheet .head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;
   padding:16px clamp(20px,3vw,30px) 13px;border-bottom:1px solid var(--ink-12)}
+/* The register's own element resets (`.app-root h1,h2,h3{font-family:serif;
+   font-weight:400}`) did not come across when this sheet was re-scoped, so
+   the heading fell back to the browser's bold sans and the head's micro-label
+   to plain body text. Both are stated here rather than inherited. */
+.acct-sheet h2{font-family:var(--serif);font-weight:400;letter-spacing:-.02em;line-height:1.06;margin:0}
 .acct-sheet .sheet .head h2{font-size:1.45rem;margin-top:5px}
 .acct-sheet .sheet .x{width:34px;height:34px;border-radius:50%;border:1px solid var(--app-border);display:grid;place-items:center;
   font-size:1.05rem;color:var(--ink-70);flex:0 0 auto;transition:border-color .2s,color .2s}
@@ -47,6 +52,7 @@
 .acct-sheet .sheet .scroll{overflow:auto;padding:0 clamp(20px,3vw,30px)}
 .acct-sheet .sec{padding:20px 0;border-bottom:1px solid var(--ink-12)}
 .acct-sheet .sec:last-child{border-bottom:none}
+.acct-sheet .head .lbl,
 .acct-sheet .sec > .lbl{display:block;font-family:var(--font-sans);font-size:.66rem;font-weight:600;
   letter-spacing:var(--tracking-label);text-transform:uppercase;color:var(--ink-70);margin-bottom:14px}
 .acct-sheet .person{display:flex;align-items:center;gap:14px}

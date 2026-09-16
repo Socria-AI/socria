@@ -1,0 +1,66 @@
+/* components/account/avatar.css
+ *
+ * The avatar's own geometry, travelling with its component.
+ *
+ * These rules lived in app/account/picture/picture.css — the route sheet for
+ * the composer. That is the one page where the avatar was NOT broken. Next
+ * emits CSS per route, so everywhere the picture is actually USED — the
+ * account chip in the chat header, the 52px avatar at the top of the account
+ * sheet, the journal and blog mastheads — it had no rules at all: a
+ * hard-edged square with the mark at its natural size spilling out of it,
+ * no clip, no ring, no texture.
+ *
+ * Same lesson as components/account/account-control.css, which is next door:
+ * a component that can be dropped anywhere carries its styles with it. The
+ * composer's own page keeps its `.pfp-stage .av-big` size override, which is
+ * genuinely about that layout.
+ *
+ * `.av-big` and `.av-sm` are distinctive enough to stay unscoped — nothing
+ * else in the tree renders them.
+ */
+
+/* the avatar itself: a circle, because that is what a picture is */
+.av-big {
+  width: min(228px, 54vw, 30svh);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 14px 34px -20px rgba(35, 36, 31, 0.5);
+}
+.av-big .tex { position: absolute; inset: 0; pointer-events: none; }
+.av-big .ring {
+  position: absolute;
+  border-radius: 50%;
+  border: 1px solid currentColor;
+  opacity: 0.55;
+  pointer-events: none;
+}
+.av-big .mk { position: relative; display: grid; place-items: center; width: 52%; height: 52%; }
+.av-big .mk svg { width: 100%; height: 100%; }
+.av-big .mk img { width: 100%; height: 100%; object-fit: contain; }
+/* --serif, not --font-serif-stack: that name is declared on .pfp-root and
+   nowhere else, so out here it would be undefined and an initials avatar
+   would render in italic sans. */
+.av-big .mk .ltr {
+  font-family: var(--serif);
+  font-style: italic;
+  line-height: 1;
+  font-size: clamp(3rem, 13vw, 5.4rem);
+}
+
+.av-sm {
+  border-radius: 50%;
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+}
+.av-sm .tex { position: absolute; inset: 0; }
+.av-sm .ring { position: absolute; border-radius: 50%; border: 1px solid currentColor; opacity: 0.55; }
+.av-sm .mk { position: relative; display: grid; place-items: center; width: 52%; height: 52%; }
+.av-sm .mk svg, .av-sm .mk img { width: 100%; height: 100%; object-fit: contain; }
+.av-sm .mk .ltr { font-family: var(--serif); font-style: italic; line-height: 1; }

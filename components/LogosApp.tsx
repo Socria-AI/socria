@@ -23,6 +23,8 @@ import { DraftSpace, type DraftHandle, type DraftSelection } from '@/components/
 import { DraftResponsePanel } from '@/components/DraftResponsePanel';
 import { LogosGuide, GUIDE_SEEN_KEY } from '@/components/LogosGuide';
 import { LogosMark } from '@/components/LogosMark';
+import { AccountControl } from '@/components/account/AccountControl';
+import { AccountSheet } from '@/components/account/AccountSheet';
 import { ModelGlyph } from '@/components/ModelGlyph';
 import { SocriaOneModal } from '@/components/SocriaOneModal';
 import { OnePrompt } from '@/components/OnePrompt';
@@ -294,6 +296,14 @@ export function LogosApp({
   // Just came back from a completed checkout.
   const [oneWelcome, setOneWelcome] = useState(false);
   const one = plan === 'one';
+  // THE ACCOUNT, FROM HERE TOO.
+  //
+  // This surface had no account control at all — no sheet, no sign-out, no
+  // route to /account, and so no University verification section either. That
+  // would be a gap anywhere; it is a hole here, because a One member (which
+  // includes a verified student) opens /chat and lands STRAIGHT in Logos.
+  // The most-entitled people in the product had the least reachable account.
+  const [acctOpen, setAcctOpen] = useState(false);
   // What this plan opens, read from the table rather than from `one`.
   //
   // These are all true on both plans now — inside a line of thinking the free
@@ -2207,6 +2217,14 @@ export function LogosApp({
         </div>
       )}
 
+      {/* The account, over the map — the same sheet /chat opens, so there is
+          one account surface in the product rather than two that drift. */}
+      <AccountSheet
+        open={acctOpen}
+        onClose={() => setAcctOpen(false)}
+        isOne={one}
+      />
+
       <SocriaOneModal
         open={oneOpen}
         onClose={() => setOneOpen(false)}
@@ -2384,6 +2402,9 @@ export function LogosApp({
             <button type="button" className="lg-back" onClick={leaveForChat}>
               Socria chat <span aria-hidden="true">→</span>
             </button>
+            {isSignedIn && (
+              <AccountControl onOpen={() => setAcctOpen(true)} isOne={one} />
+            )}
           </header>
 
           <div className="lg-thread">

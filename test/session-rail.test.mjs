@@ -181,12 +181,19 @@ console.log('\n=== and a name stays a name ===');
   // the person who was there, however few hours ago that was.
   ok('one minute before midnight is not Today',
      groupOf(startOfToday - 60_000, now) === 'This week');
-  ok('five days back is still This week',
-     groupOf(startOfToday - 5 * DAY, now) === 'This week');
-  ok('six days back is the last day of This week',
-     groupOf(startOfToday - 6 * DAY, now) === 'This week');
-  ok('seven days back has fallen off the end',
-     groupOf(startOfToday - 7 * DAY, now) === 'Earlier');
+  // Calendar days, not 86,400,000ms steps — so these are computed the way
+  // groupOf computes them, which is also what makes the assertions hold in a
+  // zone that changed its clocks. A fixed-ms boundary drifts by an hour
+  // across a DST change and files a session under the wrong heading for the
+  // week after one.
+  const daysBack = (n) => { const d = new Date(startOfToday); d.setDate(d.getDate() - n); return d.getTime(); };
+  ok('five days back is still This week', groupOf(daysBack(5), now) === 'This week');
+  ok('six days back is the last day of This week', groupOf(daysBack(6), now) === 'This week');
+  ok('seven days back has fallen off the end', groupOf(daysBack(7), now) === 'Earlier');
+  // One millisecond either side of the boundary, which is where an off-by-one
+  // would hide.
+  ok('the boundary itself is This week', groupOf(daysBack(6), now) === 'This week');
+  ok('and a tick before it is not', groupOf(daysBack(6) - 1, now) === 'Earlier');
   ok('last year is Earlier', groupOf(startOfToday - 400 * DAY, now) === 'Earlier');
 
   // Clock skew between a device and the server is ordinary. Filing somebody's

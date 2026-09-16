@@ -87,17 +87,10 @@
 /* ---------- the account control in the kit's header ----------
    The chat kit ships no auth control (deliberately not built), so this one
    button is new; its values are the kit's own: --ink-16 hairline, 13px sans. */
-.app-root .who-btn{display:inline-flex;align-items:center;gap:.55em;padding:4px 5px 4px 12px;border-radius:999px;
-  border:1px solid var(--ink-16);background:#fff;font-size:13px;color:var(--ink);transition:border-color .2s,transform .2s}
-.app-root .who-btn:hover{border-color:var(--ink);transform:translateY(-1px)}
-/* A name long enough to push the avatar off the header is a name that gets
-   cut, not a header that reflows. Below 520px the name goes entirely and the
-   picture stands on its own. */
-.app-root .who-nm{max-width:10ch;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-@media(max-width:520px){
-  .app-root .who-nm{display:none}
-  .app-root .who-btn{padding:4px}
-}
+/* .who-btn lives with its component now — components/account/account-control.css
+   — because it is rendered on the journal, Logos and One as well, and those
+   do not load this sheet. Keeping a copy here would be two definitions of one
+   control, differing the first time either changed. */
 .app-root .avatar{width:26px;height:26px;border-radius:50%;background:var(--moss-600);color:var(--paper);
   display:grid;place-items:center;font-family:var(--font-serif);font-style:italic;font-size:.92rem;flex:0 0 auto}
 .app-root .avatar.lg{width:52px;height:52px;font-size:1.5rem}
@@ -519,7 +512,13 @@
 
 /* On a phone there is no room for a column beside the conversation, so the
    rail becomes an overlay over it. The page supplies the backdrop. */
-@media(max-width:860px){
+/* 768px, NOT a number of my own choosing — it is Tailwind's `md`, which is
+   what the toggle button and the backdrop in app/chat/page.tsx use
+   (`md:hidden`). This was 860px, and the 92px between the two was a window
+   width where the rail had gone to overlay and hidden itself while the button
+   that opens it was already hidden too: the sessions list was unreachable.
+   One breakpoint, or none. */
+@media(max-width:767.98px){
   .app-root .s-bar{position:fixed;top:0;left:0;z-index:40;height:100dvh;
     width:min(280px,84vw);background:var(--app-paper);
     -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
@@ -531,7 +530,7 @@
 .app-root .s-top{display:flex;align-items:center;justify-content:space-between;gap:10px}
 .app-root .s-close{color:var(--ink-45);padding:4px;margin:-4px;line-height:0}
 .app-root .s-close:hover{color:var(--ink)}
-@media(min-width:861px){.app-root .s-close{display:none}}
+@media(min-width:768px){.app-root .s-close{display:none}}
 
 /* The mock's row IS the button. A real row also carries rename and delete,
    and a button inside a button is not markup — so the row became a
@@ -600,3 +599,20 @@
 @media(max-height:680px){
   .app-root .plate-wrap{justify-content:flex-start;padding-top:clamp(20px,4vh,40px)}
 }
+
+/* ---------- the Logos offer on an empty chat ---------- *
+ * Recovered from main while carrying this work across — the rail rewrite had
+ * dropped both the card and its styles here. It lives in the register rather
+ * than globals because that is where the rest of the chat's chrome lives now,
+ * and .app-root keeps it off every other surface. */
+.app-root .logos-offer{margin-top:32px;padding:20px;border-radius:12px;
+  border:1px solid rgba(202,213,182,.6);background:rgba(244,246,238,.6);
+  text-align:left;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.app-root .logos-offer > div:first-child{flex:1;min-width:12rem}
+.app-root .logos-offer .lo-t{font-family:var(--serif);font-size:1.15rem;color:var(--ink)}
+.app-root .logos-offer .lo-b{margin:4px 0 0;font-size:13px;color:var(--ink-60);line-height:1.5}
+.app-root .logos-offer .lo-b em{font-style:italic;color:var(--moss-700)}
+.app-root .logos-offer .lo-go{flex:0 0 auto;display:inline-flex;align-items:center;gap:7px;
+  padding:9px 16px;border-radius:999px;border:0;background:var(--moss);color:var(--paper);
+  font-size:13.5px;font-weight:500;cursor:pointer;transition:background .18s}
+.app-root .logos-offer .lo-go:hover{background:var(--moss-700)}
