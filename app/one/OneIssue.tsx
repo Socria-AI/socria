@@ -145,15 +145,21 @@ export function OneIssue() {
   const [bloom, setBloom] = useState(false);
 
   useEffect(() => {
-    initJournal();
+    // Both teardowns, not one: initJournal returns a cleanup that releases
+    // its per-tab latch, and without it an in-app navigation back to this
+    // page leaves every driver uninstalled.
+    const stopJournal = initJournal();
     const reduce =
       typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (reduce) {
       setBloom(true);
-      return;
+      return stopJournal;
     }
     const t = setTimeout(() => setBloom(true), 1000);
-    return () => clearTimeout(t);
+    return () => {
+      clearTimeout(t);
+      stopJournal();
+    };
   }, []);
 
   return (

@@ -114,7 +114,7 @@ const MOVES: [string, string, string, string][] = [
 
 export function LogosIssue() {
   useEffect(() => {
-    initJournal();
+    return initJournal();
   }, []);
 
   return (
