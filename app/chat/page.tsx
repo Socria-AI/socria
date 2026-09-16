@@ -35,6 +35,7 @@ import { DRIFT_DISMISS_LIMIT, readDrift, type DriftVerdict } from '@/lib/topic-d
 import { readStart, startMessage } from '@/lib/first-session';
 import { takeCarried } from '@/lib/onboarding-script';
 import { Tour } from '@/components/Tour';
+import { FindPanel } from '@/components/FindPanel';
 import { AccountSheet } from '@/components/account/AccountSheet';
 import { TOUR_KEY, shouldRunTour } from '@/lib/tour';
 import { isSource } from '@/lib/checkout-attribution';
@@ -229,6 +230,24 @@ export default function ChatPage() {
   // starts to matter.
   const [tourOpen, setTourOpen] = useState(false);
   const [acctOpen, setAcctOpen] = useState(false);
+
+  // ── find in this conversation ──
+  // Cmd/Ctrl-F, the shortcut people already have in their hands for exactly
+  // this. The browser's own find searches the rendered page, which in a long
+  // thread means whatever happens to be mounted — this searches the whole
+  // conversation, including insight cards, which are the lines people most
+  // often come back for.
+  const [findOpen, setFindOpen] = useState(false);
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'f') {
+        e.preventDefault();
+        setFindOpen(true);
+      }
+    };
+    window.addEventListener('keydown', key);
+    return () => window.removeEventListener('keydown', key);
+  }, []);
   const endTour = useCallback(() => {
     setTourOpen(false);
     try { localStorage.setItem(TOUR_KEY, '1'); } catch {}
@@ -1624,6 +1643,19 @@ export default function ChatPage() {
 
       {/* Sidebar — overlay on mobile, static column on desktop */}
       <Tour open={tourOpen} onDone={endTour} />
+      {findOpen && (
+        <FindPanel
+          turns={messages as never}
+          onClose={() => setFindOpen(false)}
+          onJump={(i) => {
+            // The turns carry their index as a dom id, so a hit scrolls to
+            // the real message rather than an approximation of it.
+            document
+              .getElementById(`turn-${i}`)
+              ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }}
+        />
+      )}
       <AccountSheet
         open={acctOpen}
         onClose={() => setAcctOpen(false)}
@@ -2100,7 +2132,8 @@ export default function ChatPage() {
                 !sending &&
                 !streamed;
               return (
-                <div key={i}>
+                // The index is the anchor Find scrolls to.
+                <div key={i} id={`turn-${i}`}>
                   <Bubble role={m.role} content={body} />
                   {showChoices && (
                     <ChoiceChips
