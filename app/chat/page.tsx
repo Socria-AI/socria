@@ -36,6 +36,8 @@ import { readStart, startMessage } from '@/lib/first-session';
 import { takeCarried } from '@/lib/onboarding-script';
 import { Tour } from '@/components/Tour';
 import { FindPanel } from '@/components/FindPanel';
+import { Hint, useSeenHints } from '@/components/Hint';
+import { pickHint } from '@/lib/hints';
 import { AccountSheet } from '@/components/account/AccountSheet';
 import { TOUR_KEY, shouldRunTour } from '@/lib/tour';
 import { isSource } from '@/lib/checkout-attribution';
@@ -238,6 +240,12 @@ export default function ChatPage() {
   // conversation, including insight cards, which are the lines people most
   // often come back for.
   const [findOpen, setFindOpen] = useState(false);
+
+  // ── which single hint, if any, this screen currently justifies ──
+  // A hint is only eligible once its SUBJECT is on screen — that is what
+  // keeps this from being a tour. pickHint then takes the first unseen one
+  // in a fixed order, so there is never more than one.
+  const seenHints = useSeenHints();
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'f') {
@@ -1553,6 +1561,12 @@ export default function ChatPage() {
   const messages = active?.messages || [];
   const hasMessages = messages.length > 0;
 
+  const eligibleHints: string[] = [];
+  if (messages.length >= 2) eligibleHints.push('picker');
+  if (messages.length >= 6 && isSignedIn) eligibleHints.push('logos');
+  if (messages.length >= 4) eligibleHints.push('find');
+  const liveHint = pickHint(eligibleHints, seenHints);
+
   // Logos is a model, not a destination: selecting it swaps the whole
   // experience in here rather than navigating away, so /chat stays the
   // address of "talking to Socria" whichever mind is answering. Every hook
@@ -1648,11 +1662,19 @@ export default function ChatPage() {
           turns={messages as never}
           onClose={() => setFindOpen(false)}
           onJump={(i) => {
-            // The turns carry their index as a dom id, so a hit scrolls to
-            // the real message rather than an approximation of it.
-            document
-              .getElementById(`turn-${i}`)
-              ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            // The design's own note, and it is right: never scrollIntoView.
+            // It scrolls every scrollable ancestor, which in a chat means the
+            // page moves as well as the thread. Move the container itself,
+            // then flash the line so the eye knows where it landed — a jump
+            // with no flash leaves you looking for the thing you just found.
+            const el = document.getElementById(`turn-${i}`);
+            const box = el?.closest('.overflow-y-auto') as HTMLElement | null;
+            if (!el || !box) return;
+            box.scrollTop += el.getBoundingClientRect().top - box.getBoundingClientRect().top - 20;
+            el.classList.remove('lit');
+            void el.offsetWidth; // a synchronous reflow, so a line already lit re-flashes
+            el.classList.add('lit');
+            setTimeout(() => el.classList.remove('lit'), 1600);
           }}
         />
       )}
@@ -1983,8 +2005,30 @@ export default function ChatPage() {
             </button>
           </div>
 
-          {/* Right: the Logos invitation (desktop) + auth */}
+          {/* Right: find, the Logos invitation (desktop) + auth */}
           <div className="flex items-center gap-2 shrink-0">
+            {/* Find was keyboard-only when it shipped, which meant it did not
+                exist for anyone who did not already know it was there. */}
+            {liveHint === 'find' && (
+              <Hint id="find" place="below">
+                Long thread. <em>Find</em> searches this one, not all of them.
+              </Hint>
+            )}
+            {hasMessages && (
+              <button
+                type="button"
+                className="find-btn"
+                onClick={() => setFindOpen((v) => !v)}
+                aria-pressed={findOpen}
+                title="Find in this conversation (⌘F)"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <circle cx="11" cy="11" r="6.5" />
+                  <path d="M16 16l4.5 4.5" />
+                </svg>
+                Find
+              </button>
+            )}
             <div className="hidden sm:block">
               <TryLogosPill
                 currentModel={model}
@@ -2064,6 +2108,36 @@ export default function ChatPage() {
                     ))}
                   </div>
                 )}
+
+                {/* The design's closing offer on an empty screen. Signed
+                    out it says WHY an account is needed rather than just
+                    asking for one — a map has to be kept somewhere. */}
+                <div className="logos-offer">
+                  <div>
+                    <div className="lo-t">Want to see your reasoning drawn?</div>
+                    <p className="lo-b">
+                      {isSignedIn ? (
+                        'Logos puts a live Thinking Map beside the conversation.'
+                      ) : (
+                        <>
+                          Logos draws a live Thinking Map beside the conversation.{' '}
+                          <em>A map has to be kept somewhere, so it needs an account.</em>
+                        </>
+                      )}
+                    </p>
+                  </div>
+                  {isSignedIn ? (
+                    <button type="button" className="lo-go" onClick={() => pickModel('logos')}>
+                      Open Logos <span aria-hidden="true">→</span>
+                    </button>
+                  ) : (
+                    <SignInButton>
+                      <button type="button" className="lo-go">
+                        Sign in for Logos <span aria-hidden="true">→</span>
+                      </button>
+                    </SignInButton>
+                  )}
+                </div>
 
                 <div className={`${returnChips.length ? 'mt-3' : 'mt-10'} grid sm:grid-cols-2 gap-3 text-left`}>
                   {starters.map((p) => (
