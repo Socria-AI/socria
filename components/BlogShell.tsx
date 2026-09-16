@@ -1,12 +1,12 @@
 'use client';
 
+import { AccountControl } from '@/components/account/AccountControl';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   SignedIn,
   SignedOut,
-  UserButton,
   ClerkLoading,
   ClerkLoaded,
 } from '@clerk/nextjs';
@@ -51,7 +51,11 @@ export function BlogNav() {
               </Link>
             </SignedOut>
             <SignedIn>
-              <UserButton afterSignOutUrl="/" userProfileMode="navigation" userProfileUrl="/account" />
+              {/* Socria's own, not Clerk's. On a reading surface it links
+                  rather than opening a sheet — see AccountControl. */}
+              <span className="app-root app-inline">
+                <AccountControl href="/account" />
+              </span>
             </SignedIn>
           </ClerkLoaded>
           <Link href="/chat" className="btn btn-nav">

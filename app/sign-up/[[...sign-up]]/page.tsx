@@ -1,8 +1,9 @@
 // app/sign-up/[[...sign-up]]/page.tsx
 import type { Metadata } from 'next';
-import { SignUp } from '@clerk/nextjs';
-import { AuthShell } from '@/components/AuthShell';
-import { authUrl, isSafeRedirect } from '@/lib/auth-links';
+import { AuthPlate } from '@/components/auth/AuthPlate';
+import { AuthForm } from '@/components/auth/AuthForm';
+import { isSafeRedirect } from '@/lib/auth-links';
+import '../../app-shell.css';
 
 export const metadata: Metadata = {
   title: 'Create your account — Socria',
@@ -19,27 +20,19 @@ export default function SignUpPage({
     ? searchParams!.redirect_url!
     : undefined;
   return (
-    <AuthShell
+    <AuthPlate
       kind="sign-up"
       redirectTo={back}
       eyebrow="Create your account"
-      title="Think with Socria across every device."
-      subtitle="Free account. Socria Core 3 with adjustable thinking depth, and two full lines of thinking in Logos every month."
-      quote={{
-        text: 'AI should multiply human thinking, not automate it.',
-      }}
+      title="Think with Socria across"
+      emphasis="every device."
+      lede="Free account. Socria Core 3.1 with adjustable thinking depth, and Logos — the map of your own reasoning — drawn beside the conversation."
     >
-      <SignUp
-        routing="path"
-        path="/sign-up"
-        signInUrl={authUrl('sign-in', back)}
-        // A NEW account lands on the beginning, not in an empty composer.
-        // Someone who came here from a specific page still goes back to it —
-        // an interrupted errand is not a first run.
-        fallbackRedirectUrl={back ?? '/onboarding'}
-        // Signing IN is not beginning; they have been here before.
-        signInFallbackRedirectUrl={back ?? '/chat'}
-      />
-    </AuthShell>
+      {/* A NEW account lands on the beginning, not in an empty composer.
+          Someone who came here from a specific page still goes back to it —
+          an interrupted errand is not a first run. AuthForm makes that call;
+          see `land()` there. */}
+      <AuthForm kind="sign-up" redirectTo={back} />
+    </AuthPlate>
   );
 }
