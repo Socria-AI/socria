@@ -8029,19 +8029,20 @@ html.anim-off .logos-root.is-firstmap-node .lg-node, html:not(.js) .logos-root.i
  * is where it should have been.
  */
 
-/* ── one-line hints ──────────────────────────────────────────────── */
-.hint {
-  display: flex; align-items: flex-start; gap: 10px;
-  padding: 9px 12px; margin: 8px 0;
-  background: var(--moss-50); border: 1px solid var(--moss-200);
-  border-radius: 9px; font-size: 12.5px; line-height: 1.45; color: var(--moss-800);
-}
-.hint p { margin: 0; flex: 1; }
-.hint button {
-  flex: 0 0 auto; background: none; border: 0; cursor: pointer;
-  font-size: 12px; color: var(--moss-700); text-decoration: underline; text-underline-offset: 3px;
-}
-.hint button:hover { color: var(--moss-800); }
+/* ── one-line hints ────────────────────────────────────────────────
+ *
+ * THE STYLES FOR THESE LIVE IN app/app-shell.css, under .app-root.
+ *
+ * There used to be a second, unscoped copy here — the same mistake the
+ * `.find` block made — and because it was unscoped it did not only style
+ * the chat's hints. `.hint` is a plain enough word that the picture
+ * composer uses it too, for the italic one-liners under its sections, and
+ * those were being wrapped in a moss-50 box with a border and flex-laid-out
+ * as if they carried a dismiss button. A caption rendered as a callout.
+ *
+ * The scoped copy is also the better one: it is the design's, with the
+ * serif italic and the three placements (above / below / inline).
+ */
 
 /* ── print: everything a driver was going to reveal ──────────────────
  *
