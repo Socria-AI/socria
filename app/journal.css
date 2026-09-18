@@ -958,6 +958,62 @@ html.anim-off .jr-root .board .fix, html:not(.js) .jr-root .board .fix{opacity:1
 .jr-root.one-issue .one-cover .begin .ln::after{background:#b8cdd9}
 @media(prefers-reduced-motion:reduce),print{.jr-root.one-issue .one-cover .flood{clip-path:none!important;transition:none!important}}
 
+/* ── the plan rail: the first thing the page does is let you subscribe ──
+ *
+ * New in the design, and it changes what the cover IS: the price used to be a
+ * single big line and the page asked you to read four spreads before it would
+ * let you buy. Now the cover carries both tiers side by side, and the One card
+ * carries the checkout. The two overrides below are the design's own — the
+ * headline gives up some scale to make room, and the cover gains bottom
+ * padding so the rail is not flush against the fold.
+ */
+.jr-root.one-issue .one-cover{padding-bottom:clamp(30px,5vh,56px)}
+.jr-root.one-issue .one-cover h1{font-size:clamp(2.3rem,7vw,5rem);line-height:.9}
+.jr-root.one-issue .plans{margin-top:clamp(24px,4vh,42px);display:grid;gap:14px;align-items:stretch;
+  grid-template-columns:repeat(auto-fit,minmax(248px,1fr));max-width:820px}
+.jr-root.one-issue .plan{display:flex;flex-direction:column;gap:12px;padding:clamp(18px,2.4vw,26px);
+  border:1px solid rgba(240,234,216,.22);border-radius:16px;background:rgba(240,234,216,.05);
+  transition:border-color .3s var(--ease-standard),background .3s var(--ease-standard),transform .3s var(--ease-out-expo)}
+.jr-root.one-issue .plan:hover{border-color:rgba(240,234,216,.4)}
+.jr-root.one-issue .plan .pn{display:flex;align-items:center;gap:.5em;font-family:var(--font-serif);font-size:1.4rem;line-height:1;color:#f0ead8}
+.jr-root.one-issue .plan .pn .em{font-style:italic;color:#b8cdd9}
+.jr-root.one-issue .plan .pp{display:flex;align-items:baseline;gap:.35em;white-space:nowrap}
+.jr-root.one-issue .plan .pp .a{font-family:var(--font-serif);font-size:clamp(2rem,4vw,2.9rem);line-height:1;color:#f0ead8}
+.jr-root.one-issue .plan .pp .b{font-family:var(--font-serif);font-style:italic;font-size:1rem;color:rgba(240,234,216,.78)}
+.jr-root.one-issue .plan ul{list-style:none;margin:2px 0 0;padding:0;display:flex;flex-direction:column;gap:8px}
+.jr-root.one-issue .plan li{position:relative;padding-left:20px;font-size:13.5px;line-height:1.5;color:rgba(240,234,216,.82)}
+.jr-root.one-issue .plan li::before{content:"";position:absolute;left:1px;top:.52em;width:7px;height:7px;border-radius:50%;
+  background:rgba(240,234,216,.45)}
+.jr-root.one-issue .plan .go{margin-top:auto;padding-top:6px}
+.jr-root.one-issue .plan .note{font-family:var(--font-serif);font-style:italic;font-size:12.5px;color:rgba(240,234,216,.72);margin:0}
+.jr-root.one-issue .plan .state{font-family:var(--font-sans);font-size:10px;font-weight:600;letter-spacing:.2em;text-transform:uppercase;
+  color:rgba(240,234,216,.78);border:1px solid rgba(240,234,216,.3);border-radius:999px;padding:4px 10px;align-self:flex-start}
+
+/* the one you can buy carries the cream ground, so the choice is not a puzzle */
+.jr-root.one-issue .plan.is-one{background:rgba(240,234,216,.1);border-color:#b8cdd9}
+.jr-root.one-issue .plan.is-one:hover{transform:translateY(-2px)}
+.jr-root.one-issue .plan.is-one .pp .a{font-size:clamp(2.3rem,4.6vw,3.3rem)}
+.jr-root.one-issue .plan.is-one .state{background:#b8cdd9;border-color:#b8cdd9;color:#0f2430}
+.jr-root.one-issue .plan.is-one li::before{background:#b8cdd9}
+.jr-root.one-issue .plan-cta{display:inline-flex;align-items:center;gap:.55em;width:100%;justify-content:center;
+  height:52px;padding:0 22px;border-radius:999px;background:#f0ead8;color:#0f2430;
+  font-family:var(--font-sans);font-size:.98rem;font-weight:500;text-decoration:none;border:none;cursor:pointer;
+  transition:background .2s,transform .2s}
+.jr-root.one-issue .plan-cta:hover{background:#fff;color:#0f2430;transform:translateY(-2px)}
+.jr-root.one-issue .plan-cta[disabled]{opacity:.6;cursor:default;transform:none}
+.jr-root.one-issue .plan-cta .ar{transition:transform .2s}
+.jr-root.one-issue .plan-cta:hover .ar{transform:translateX(3px)}
+/* Checkout can refuse, and when it does the reason belongs beside the button
+   that raised it — not in a toast the eye has already left. */
+.jr-root.one-issue .plan .err{margin:9px 0 0;font-size:12.5px;line-height:1.45;color:#f0d8d2}
+
+.jr-root.one-issue .one-cover .terms{margin-top:clamp(18px,3vh,30px);display:flex;gap:clamp(14px,3vw,34px);flex-wrap:wrap;
+  padding-top:16px;border-top:1px solid rgba(240,234,216,.18)}
+.jr-root.one-issue .one-cover .terms div{display:flex;flex-direction:column;gap:4px}
+.jr-root.one-issue .one-cover .terms .k{font-family:var(--font-sans);font-size:9.5px;font-weight:600;letter-spacing:.24em;
+  text-transform:uppercase;color:rgba(240,234,216,.74)}
+.jr-root.one-issue .one-cover .terms .v{font-family:var(--font-serif);font-size:1.15rem;color:#f0ead8}
+
 /* ── the boundary, demonstrated ── */
 .jr-root.one-issue .demo{position:relative;z-index:2;padding:clamp(70px,11vh,130px) var(--edge)}
 .jr-root.one-issue .demo .wrap{width:min(1180px,100%);margin:0 auto}
