@@ -9,13 +9,198 @@
 // the mockup hardcodes $15 in four places and that is exactly the kind of
 // number that goes stale in one of them.
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Count, Grain, Mast, PrintLink, Progress, Turn } from '@/components/journal/parts';
 import { Label, LogosNode, OneLock, OneMark, SpecTable, type NodeType } from '@/components/journal/ds';
 import { Colophon } from '@/components/Colophon';
 import { initJournal } from '@/components/journal/drivers';
 import { priceLabel, priceWithPeriod } from '@/lib/socria-one';
+import { billingError, billingLine } from '@/lib/billing-message';
+import { usePlan } from '@/components/usePlan';
+
+/* ── the plan rail ───────────────────────────────────────────────────
+ *
+ * The tiers as data, so adding a purchasable plan is one entry and no layout
+ * work — the design's own arrangement.
+ *
+ * TWO DELIBERATE DEPARTURES FROM THE MOCKUP, both because this page has a
+ * real checkout behind it and the mockup did not:
+ *
+ *   THE PRICE IS READ, NOT WRITTEN. The mockup hardcodes '$15' and '$0'; both
+ *   come from lib/socria-one here, so the rail and the charge cannot disagree.
+ *
+ *   THE STATE PILL TELLS THE TRUTH. The mockup labels the free card "Your
+ *   plan now" unconditionally, which is a lie to a member and the one thing
+ *   on a pricing page that must never be wrong. It reads the real
+ *   entitlement, and a member is shown what they hold rather than sold it
+ *   again.
+ */
+interface Tier {
+  id: 'free' | 'one';
+  name: string;
+  em?: string;
+  price: string;
+  per: string;
+  items: string[];
+  cta?: string;
+  note: string;
+}
+
+const TIERS: Tier[] = [
+  {
+    id: 'free',
+    name: 'Logos, free',
+    price: '$0',
+    per: '/ forever',
+    items: [
+      'Real Thinking Maps, drawn live',
+      'Every lens and every move',
+      'Research, once per map',
+      'Quick and Balanced depth',
+    ],
+    note: 'Free is a beginning, not a demonstration.',
+  },
+  {
+    id: 'one',
+    name: 'Socria ',
+    em: 'One',
+    price: priceLabel(),
+    per: '/ month',
+    items: [
+      'Unbounded maps — branch without end',
+      'Research across the whole map',
+      'All four depths, including Abstract',
+      'Draft Space in full, and long-form',
+      'Persistent reasoning, on every device',
+    ],
+    cta: `Subscribe — ${priceWithPeriod()}`,
+    note: 'Secure checkout by Stripe. Cancel any time.',
+  },
+];
+
+function PlanRail() {
+  const plan = usePlan();
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const isOne = plan.known && plan.plan === 'one';
+
+  /**
+   * The mockup's CTA is a hardcoded Stripe Payment Link placeholder
+   * ('buy.stripe.com/00wSOCRIAONE15') with a comment to swap it for the real
+   * one. This product already HAS a real checkout, so it goes through that
+   * instead: the route knows who is asking, refuses to sell One twice, and
+   * records which surface led to the payment.
+   */
+  const subscribe = useCallback(async () => {
+    if (busy) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      const res = await fetch('/api/stripe/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ surface: 'one-page' }),
+      });
+      // Signed out is not a fault — take them to sign in and bring them back
+      // to finish, rather than refusing with "sign in to subscribe".
+      if (res.status === 401) {
+        const back = window.location.pathname + window.location.search;
+        window.location.href = '/sign-in?redirect_url=' + encodeURIComponent(back);
+        return;
+      }
+      // They already hold it. The server will not sell it twice, and that is
+      // not an error: open the thing they are paying for.
+      if (res.status === 409) {
+        window.location.href = '/chat?model=logos';
+        return;
+      }
+      const json = await res.json().catch(() => null);
+      if (res.ok && json?.url) {
+        window.location.href = json.url;
+        return;
+      }
+      setErr(billingLine(billingError(json)));
+    } catch {
+      setErr('Could not reach checkout. Try again.');
+    }
+    setBusy(false);
+  }, [busy]);
+
+  return (
+    <div className="plans rv d2">
+      {TIERS.map((t) => {
+        const held = plan.known && (t.id === 'one') === isOne;
+        return (
+          <div key={t.id} className={'plan' + (t.id === 'one' ? ' is-one' : '')}>
+            <span className="pn">
+              {t.id === 'one' && <OneMark size={26} tone="dark" />}
+              {t.name}
+              {t.em && <span className="em">{t.em}</span>}
+            </span>
+            <span className="pp">
+              <span className="a">{t.price}</span>
+              <span className="b">{t.per}</span>
+            </span>
+            {/* Nothing until the server has answered: a member flashed "Your
+                plan now" on the FREE card for half a second is the kind of
+                thing that makes a pricing page feel untrustworthy. */}
+            {plan.known && (
+              <span className="state">
+                {held
+                  ? 'Your plan now'
+                  : t.id === 'one'
+                    ? 'The complete environment'
+                    : 'Where everyone starts'}
+              </span>
+            )}
+            <ul>
+              {t.items.map((it, k) => (
+                <li key={k}>{it}</li>
+              ))}
+            </ul>
+            <div className="go">
+              {t.id === 'one' && !isOne ? (
+                <>
+                  <button
+                    type="button"
+                    className="plan-cta"
+                    onClick={subscribe}
+                    disabled={busy || !plan.known}
+                  >
+                    {busy ? 'Opening checkout…' : t.cta}{' '}
+                    <span className="ar" aria-hidden="true">
+                      →
+                    </span>
+                  </button>
+                  {err && <p className="err">{err}</p>}
+                  <p className="note" style={{ marginTop: 9 }}>
+                    {t.note}
+                  </p>
+                </>
+              ) : t.id === 'one' ? (
+                // A member gets the way IN, not the way to buy it again.
+                <>
+                  <Link className="plan-cta" href="/chat?model=logos">
+                    Open Logos{' '}
+                    <span className="ar" aria-hidden="true">
+                      →
+                    </span>
+                  </Link>
+                  <p className="note" style={{ marginTop: 9 }}>
+                    Manage or cancel any time from your account.
+                  </p>
+                </>
+              ) : (
+                <p className="note">{t.note}</p>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 /* The free map: four real nodes, and the two it was about to draw. */
 const OPEN: { t: NodeType; l: string; x: number; y: number }[] = [
@@ -184,16 +369,32 @@ export function OneIssue() {
           <h1 data-split="">
             Socria <span className="em">One.</span>
           </h1>
-          <div className="priceline rv d2">
-            <span className="amt">{priceLabel()}</span>
-            <span className="per">/ month</span>
-          </div>
           <p className="st rv d2">
             Everything Socria does, without the ceiling. Not more AI — the complete reasoning
             environment, and every thread you have already started.
           </p>
+
+          {/* The rail replaces the single big price line the cover used to
+              carry: the new design lets you subscribe before it asks you to
+              read anything. */}
+          <PlanRail />
+
+          <div className="terms rv d2">
+            <div>
+              <span className="k">Billing</span>
+              <span className="v">Monthly, by card</span>
+            </div>
+            <div>
+              <span className="k">Commitment</span>
+              <span className="v">Cancel any time</span>
+            </div>
+            <div>
+              <span className="k">Your maps</span>
+              <span className="v">Yours, either way</span>
+            </div>
+          </div>
           <div className="begin">
-            <span className="lbl">Begin</span>
+            <span className="lbl">What opens</span>
             <span className="ln" />
           </div>
         </div>
