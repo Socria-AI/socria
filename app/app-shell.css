@@ -401,6 +401,10 @@
 /* a model that needs an account. Moss, not Prussian — Prussian is the One
    boundary, and this is a different kind of line. */
 .app-root .mp-row.gated{cursor:pointer}
+/* A `soon` model (Core 4) is announced, not selectable: it takes the same
+   dimmed treatment as a sign-in-gated row but the cursor tells the truth —
+   nothing happens on a press. */
+.app-root .mp-row[aria-disabled="true"]{cursor:default}
 .app-root .mp-row.gated .does, .app-root .mp-row.gated .meta{color:var(--ink-45)}
 .app-root .mp-row.gated .meta .nm{color:var(--ink-70)}
 .app-root .mp-row .need{flex:0 0 auto;font-family:var(--font-sans);font-size:9.5px;font-weight:600;

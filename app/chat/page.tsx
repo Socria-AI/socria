@@ -128,6 +128,17 @@ const DEPTH_KEY = 'socria.depth.v1';
 /** How often this person has told us a topic change was intentional. */
 const DRIFT_KEY = 'socria.chat.driftDismissals.v1';
 
+/** Both Logos and Logos 2 open the split-screen surface. Safe on any input:
+    a URL string that is not a real model id is simply not a logos surface. */
+function isLogosSurface(m: unknown): boolean {
+  return typeof m === 'string' && m in SOCRIA_MODELS && !!SOCRIA_MODELS[m as SocriaModel].logosSurface;
+}
+
+/** A model id that may actually be selected — real, and not a `soon` teaser. */
+function isSelectable(m: unknown): m is SocriaModel {
+  return typeof m === 'string' && m in SOCRIA_MODELS && !SOCRIA_MODELS[m as SocriaModel].soon;
+}
+
 function readModel(): SocriaModel {
   if (typeof window === 'undefined') return 'core-2';
   // Core 2 only until we know better. The automatic default needs Clerk and
@@ -653,7 +664,7 @@ export default function ChatPage() {
     try {
       const dismissed = localStorage.getItem(LOGOS_INTRO_DISMISS_KEY) === '1';
       setLogosDismissed(dismissed);
-      if (!dismissed && localStorage.getItem(MODEL_KEY) !== 'logos') {
+      if (!dismissed && !isLogosSurface(readModel())) {
         setLogosModalOpen(true);
       }
     } catch {}
@@ -1519,7 +1530,7 @@ export default function ChatPage() {
     // first-run tour was spent without ever having been on screen.
     if (carried) justOnboarded.current = true;
 
-    if (!carried && want !== 'logos' && readModel() !== 'logos') {
+    if (!carried && !isLogosSurface(want) && !isLogosSurface(readModel())) {
       const { id } = readStart(window.location.search);
       if (id) {
         const msg = startMessage(id);
@@ -1548,7 +1559,7 @@ export default function ChatPage() {
     // is said in the thread and the plan is re-read until Stripe's webhook
     // has landed. Counted from the browser too (once per checkout session):
     // the webhook's event arrives as a visit by Stripe.
-    if (params.get('one') === 'welcome' && want !== 'logos' && readModel() !== 'logos') {
+    if (params.get('one') === 'welcome' && !isLogosSurface(want) && !isLogosSurface(readModel())) {
       const sessionId = params.get('session_id');
       const u = new URL(window.location.href);
       u.searchParams.delete('one');
@@ -1585,7 +1596,7 @@ export default function ChatPage() {
       }
     }
 
-    if (want !== 'logos' && want !== 'core-3' && want !== 'core-2') return;
+    if (!isSelectable(want)) return;
     setModel(want);
     chooseModel(want);
     const url = new URL(window.location.href);
@@ -1613,7 +1624,7 @@ export default function ChatPage() {
   const liveHint = pickHint(
     [
       ...(hasMessages ? ['picker'] : []),
-      ...(model !== 'logos' && hasMessages ? ['logos'] : []),
+      ...(!isLogosSurface(model) && hasMessages ? ['logos'] : []),
       ...(messages.length >= 6 ? ['find'] : []),
     ],
     seenHints
@@ -1625,10 +1636,11 @@ export default function ChatPage() {
   // above has already run, so this branch is safe.
   // Switching back out of Logos is the same swap in reverse, so it has to be
   // a state change here — Logos pushing /chat would only re-render itself.
-  if (model === 'logos')
+  if (isLogosSurface(model))
     return (
       <LogosApp
         initialInput={carriedText}
+        collab={SOCRIA_MODELS[model].collab ? true : undefined}
         onSwitchModel={(next) => {
           setModel(next);
           chooseModel(next);

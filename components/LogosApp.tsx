@@ -23,6 +23,9 @@ import { DraftSpace, type DraftHandle, type DraftSelection } from '@/components/
 import { DraftResponsePanel } from '@/components/DraftResponsePanel';
 import { LogosGuide, GUIDE_SEEN_KEY } from '@/components/LogosGuide';
 import { LogosMark } from '@/components/LogosMark';
+import { CollabBar } from '@/components/CollabBar';
+import { useLogosCollab } from '@/components/useLogosCollab';
+import { cleanName, joinCodeFrom, SEAT_COLOR } from '@/lib/collab';
 import { AccountControl } from '@/components/account/AccountControl';
 import { AccountSheet } from '@/components/account/AccountSheet';
 import { ModelGlyph } from '@/components/ModelGlyph';
@@ -211,11 +214,15 @@ export function LogosApp({
   // the handover clears as it is read) and hands it down, so it reaches
   // whichever composer actually mounted rather than racing for it.
   initialInput,
+  // Logos 2: this surface is a two-seat room. Everything below is unchanged
+  // when it is absent — single-player Logos does not know collab exists.
+  collab,
 }: {
   onSwitchModel?: (next: SocriaModel) => void;
   initialInput?: string;
+  collab?: boolean;
 } = {}) {
-  const { isLoaded, isSignedIn } = useUser();
+  const { isLoaded, isSignedIn, user } = useUser();
   const [unlocked, setUnlocked] = useState(false);
   // Don't hang behind Clerk: if it never initializes (preview builds), fall
   // through to the key gate rather than showing nothing forever.
@@ -1216,6 +1223,37 @@ export function LogosApp({
     [applySessions, persist]
   );
 
+  // ── Logos 2 — two people in one workspace ───────────────────────────
+  //
+  // The whole of collaboration lives in this hook and the bar it feeds; the
+  // rest of LogosApp calls it at three points (a message sent, a map
+  // extracted, a node handed onto the map) and is otherwise untouched. When
+  // `collab` is absent the hook is disabled and nothing here runs.
+  const joinCode = useMemo(
+    () => (typeof window === 'undefined' ? null : joinCodeFrom(window.location.search)),
+    []
+  );
+  const roomIdRef = useRef<string | null>(null);
+  const room = useLogosCollab({
+    enabled: !!collab,
+    identity: { id: user?.id || '', name: cleanName(user?.firstName || user?.username, 'You') },
+    joinCode,
+    getSession: () => sessionsRef.current.find((x) => x.id === activeIdRef.current) ?? null,
+    setSession: (shared) => {
+      // A guest with no session of its own adopts the host's; both then keep
+      // the shared session as the active one, merged by the reducer.
+      roomIdRef.current = shared.id;
+      applySessions(
+        sessionsRef.current.some((x) => x.id === shared.id)
+          ? sessionsRef.current.map((x) => (x.id === shared.id ? shared : x))
+          : [shared, ...sessionsRef.current]
+      );
+      if (activeIdRef.current !== shared.id) setActiveId(shared.id);
+    },
+  });
+  const roomRef = useRef(room);
+  roomRef.current = room;
+
   // Load the session list once access resolves.
   useEffect(() => {
     if (!hasAccess || !authSettled) return;
@@ -1518,7 +1556,12 @@ export function LogosApp({
                 viz = { ...json.map.viz, overlays: s.map.viz.overlays };
               }
               const map = { ...json.map, ...(viz ? { viz } : {}) };
-              return { ...s, map, contexts };
+              // Share the extraction: the host draws, both see it. onLocalMap
+              // returns the map with each node attributed, so the local view
+              // shows the same author dots the other person sees; alone it
+              // returns the map unchanged.
+              const shown = roomRef.current.active ? roomRef.current.onLocalMap(map) : map;
+              return { ...s, map: shown, contexts };
             });
             setChanged(new Set(delta.changed));
             setDeltaNote(summarizeDelta(delta));
@@ -1923,10 +1966,14 @@ export function LogosApp({
       content,
       ...(atts.length ? { attachments: atts } : {}),
     };
+    // In a shared room the turn is stamped with who wrote it and broadcast to
+    // the other person before anything else happens. Alone, this returns the
+    // turn unchanged and sends nothing.
+    const sent = roomRef.current.active ? roomRef.current.onLocalMessage(turn) : turn;
     const before = messages;
-    const next = [...before, turn];
+    const next = [...before, sent];
     patchActive((s) => ({ ...s, messages: next }), false);
-    chronRef.current = [...chronRef.current, turn];
+    chronRef.current = [...chronRef.current, sent];
     setBusy(true);
     setStreaming('');
 
@@ -1967,6 +2014,11 @@ export function LogosApp({
           // What they are looking at, so "why is it flat there" has something
           // to be about. Re-sanitised on the server like every other field.
           ...(mapRef.current?.viz ? { viz: mapRef.current.viz } : {}),
+          // Logos 2: the two people in the room, so Socria answers as the
+          // layer between them. Names only — never who is signed in.
+          ...(roomRef.current.active && roomRef.current.people.length >= 2
+            ? { collab: { people: roomRef.current.people } }
+            : {}),
         }),
       });
       if (res.status === 402) {
@@ -2306,7 +2358,7 @@ export function LogosApp({
 
         {/* ── Conversation ───────────────────────────────── */}
         <section className="lg-convo" aria-label="Conversation">
-          <header className="lg-head">
+          <header className={`lg-head${collab ? ' lg-head-collab' : ''}`}>
             {/* mobile: the rail lives behind this; on desktop the rail has
                 its own toggle and this button does not exist */}
             <button
@@ -2340,6 +2392,9 @@ export function LogosApp({
             >
               ?
             </button>
+            {/* Logos 2: who is here, and how to bring someone in. Renders
+                nothing on plain Logos — the hook is disabled there. */}
+            {collab && <CollabBar room={room} />}
             <button
               type="button"
               className="lg-style-open"
@@ -2462,8 +2517,15 @@ export function LogosApp({
             )}
 
             {messages.map((m, i) => (
-              <div key={i} className={`lg-msg lg-msg-${m.role}`}>
+              <div
+                key={i}
+                className={`lg-msg lg-msg-${m.role}${m.by ? ' lg-msg-by' : ''}`}
+                style={m.by ? ({ '--by': SEAT_COLOR[m.by.seat] } as React.CSSProperties) : undefined}
+              >
                 {m.role === 'assistant' && <span className="lg-msg-who">Socria</span>}
+                {/* In a shared room a person's own line is signed with their
+                    name in their seat colour, so two voices never blur. */}
+                {m.role === 'user' && m.by && <span className="lg-msg-who lg-msg-mine">{m.by.name}</span>}
                 <div className="lg-msg-stack">
                   {!!m.attachments?.length && <AttachmentList items={m.attachments} />}
                   {m.content && (

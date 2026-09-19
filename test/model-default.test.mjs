@@ -176,12 +176,27 @@ console.log('\n=== nothing here throws in a browser that refuses storage ===');
 console.log('\n=== junk in storage is not a model ===');
 {
   fresh();
+  // 'core-4' is a REAL id but a `soon` teaser — never selectable, so never a
+  // valid stored active model. It belongs on this list for that reason.
   for (const junk of ['', 'core-4', 'LOGOS', 'null', '{}', 'gpt-4']) {
     localStorage.setItem(MODEL_KEY, junk);
-    ok(`"${junk}" is not a model`, readStoredModel() === null);
+    ok(`"${junk}" is not a stored model`, readStoredModel() === null);
   }
   localStorage.setItem(MODEL_KEY, 'logos');
   ok('a real one still reads', readStoredModel() === 'logos');
+  // Logos 2 is real and selectable — it must store like any other.
+  localStorage.setItem(MODEL_KEY, 'logos-2');
+  ok('Logos 2 is a stored model', readStoredModel() === 'logos-2');
+}
+
+console.log('\n=== leaving a logos surface returns to a Core model ===');
+{
+  fresh();
+  rememberModel('core-3');
+  rememberModel('logos-2');   // a logos surface must not become "last core"
+  ok('Logos 2 does not overwrite the last Core', lastCoreModel() === 'core-3');
+  rememberModel('logos');
+  ok('nor does plain Logos', lastCoreModel() === 'core-3');
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

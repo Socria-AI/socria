@@ -137,11 +137,40 @@ export type LogosNodeStatus = (typeof NODE_STATUSES)[number];
 export const EDGE_STRENGTHS = ['weak', 'normal', 'strong'] as const;
 export type LogosEdgeStrength = (typeof EDGE_STRENGTHS)[number];
 
+// ── who said it ──────────────────────────────────────────────────────
+//
+// Defined here rather than in lib/collab.ts because a node and a message
+// carry one, and this is the module they both already depend on. The seat
+// decides the colour (lib/collab.ts SEAT_COLOR); the id is stable across
+// reconnects; the name is what the other person sees.
+export type Seat = 'host' | 'guest';
+export interface ByRef {
+  id: string;
+  name: string;
+  seat: Seat;
+}
+
+/**
+ * A `by` from the wire or from storage, trusted for nothing. Anything that
+ * is not a plausible reference reads as unattributed — never as a crash.
+ */
+export function sanitizeByRef(raw: unknown): ByRef | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const r = raw as Record<string, unknown>;
+  const id = typeof r.id === 'string' ? r.id.trim().slice(0, 64) : '';
+  const seat: Seat | null = r.seat === 'host' || r.seat === 'guest' ? r.seat : null;
+  if (!id || !seat) return undefined;
+  const raw_name = typeof r.name === 'string' ? r.name.replace(/\s+/g, ' ').trim().slice(0, 40) : '';
+  return { id, name: raw_name || (seat === 'host' ? 'Host' : 'Guest'), seat };
+}
+
 export interface LogosNode {
   id: string;
   type: LogosNodeType;
   label: string;
   status?: LogosNodeStatus;
+  /** who put it on the map, when two people are thinking together */
+  by?: ByRef;
   /** labels folded into this node by a merge — kept so the merge is visible */
   merged?: string[];
   /** LaTeX to render for the label, when this node is mathematical */
@@ -295,6 +324,7 @@ export function sanitizeMap(raw: any): ThinkingMap {
         ? (n.flag as MathFlag)
         : undefined;
       const note = str(n?.note, MAX_NOTE);
+      const by = sanitizeByRef(n?.by);
       return {
         id,
         type,
@@ -304,6 +334,7 @@ export function sanitizeMap(raw: any): ThinkingMap {
         ...(tex ? { tex } : {}),
         ...(flag ? { flag } : {}),
         ...(note ? { note } : {}),
+        ...(by ? { by } : {}),
       };
     })
     .filter((n: LogosNode | null): n is LogosNode => {

@@ -59,6 +59,8 @@ const MODULES = [
   'lib/auth-links.ts',
   'lib/auth-flow.ts',
   'lib/session-rail.ts',
+  'lib/collab.ts',
+  'lib/collab-transport.ts',
   'lib/checkout-attribution.ts',
   'lib/person-memory.ts',
   'lib/first-session.ts',

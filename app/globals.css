@@ -8082,3 +8082,44 @@ html.anim-off .logos-root.is-firstmap-node .lg-node, html:not(.js) .logos-root.i
    (components/account/account-control.css); this only places it, after the
    trailing "Socria chat →" button. */
 .logos-root .lg-head .who-btn { margin-left: 10px; flex: 0 0 auto; }
+
+/* ── Logos 2 — thinking together ────────────────────────────────────
+ * The header controls, the message signatures, and the who-drew-it dot on a
+ * map node. Scoped to .logos-root so none of it touches single-player Core.
+ * The two seat colours match lib/collab.ts SEAT_COLOR: moss the host, slate
+ * the guest. */
+.logos-root .lg-collab-start{display:inline-flex;align-items:center;gap:.45em;height:30px;padding:0 12px;
+  border-radius:999px;border:1px solid var(--lg-ink-16, rgba(35,36,31,.16));background:transparent;
+  font-family:var(--font-sans);font-size:12.5px;color:var(--lg-ink-60, rgba(35,36,31,.6));cursor:pointer;
+  transition:border-color .2s,color .2s}
+.logos-root .lg-collab-start:hover{border-color:var(--lg-primary);color:var(--lg-ink)}
+.logos-root .lg-collab{display:inline-flex;align-items:center;gap:10px}
+.logos-root .lg-collab-who{display:inline-flex;align-items:center}
+.logos-root .lg-collab-who .lg-collab-dot:not(:first-child){margin-left:-6px}
+.logos-root .lg-collab-dot{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;
+  font-family:var(--font-serif);font-style:italic;font-size:12px;color:#fff;
+  box-shadow:0 0 0 2px var(--lg-paper, #F5F3EB)}
+.logos-root .lg-collab-invite{display:inline-flex;flex-direction:column;align-items:flex-start;line-height:1.1;
+  padding:4px 12px;border-radius:12px;border:1px solid var(--lg-primary);background:rgba(94,118,51,.08);
+  font-family:var(--font-sans);font-size:12px;font-weight:500;color:var(--lg-primary);cursor:pointer;
+  transition:background .2s}
+.logos-root .lg-collab-invite:hover{background:rgba(94,118,51,.15)}
+.logos-root .lg-collab-reach{font-weight:400;font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--lg-ink-45, rgba(35,36,31,.45))}
+.logos-root .lg-collab-live{font-family:var(--font-serif);font-style:italic;font-size:13px;color:var(--lg-primary)}
+.logos-root .lg-collab-leave{background:none;border:none;font-family:var(--font-sans);font-size:11.5px;
+  color:var(--lg-ink-45, rgba(35,36,31,.45));cursor:pointer;padding:2px 4px}
+.logos-root .lg-collab-leave:hover{color:var(--lg-ink)}
+
+/* With two people in the room the header carries the collab bar and Leave,
+   so the standing strapline yields to make room — the room's people and how
+   to leave it matter more than a subtitle here. */
+.logos-root .lg-head-collab .lg-head-note{display:none}
+.logos-root .lg-head-collab .lg-memory-btn{margin-left:auto}
+
+/* a person's own line, signed in their colour */
+.logos-root .lg-msg-mine{color:var(--by, var(--lg-primary));font-weight:600}
+.logos-root .lg-msg-by .lg-msg-body{box-shadow:inset 3px 0 0 var(--by, transparent);padding-left:12px}
+
+/* whose idea a node was */
+.logos-root .lg-node-by{width:8px;height:8px;border-radius:50%;flex:0 0 auto;margin-left:auto}

@@ -1244,7 +1244,7 @@ It should feel like a conversation that develops naturally, accumulates insight,
 
 // ===== Public API =====
 
-export type SocriaModel = 'core-2' | 'core-3' | 'logos';
+export type SocriaModel = 'core-2' | 'core-3' | 'logos' | 'logos-2' | 'core-4';
 export type ThinkingDepth = 'quick' | 'balanced' | 'deep' | 'abstract';
 
 export interface ModelConfig {
@@ -1261,6 +1261,20 @@ export interface ModelConfig {
   // screen for its Thinking Map). Picking one navigates instead of swapping
   // the model in place.
   href?: string;
+  /**
+   * Announced but not yet built. The picker shows it, greyed, with `soon` as
+   * the label where a lock or a retirement date would go, and refuses to
+   * select it — so a model can be named on the roadmap without pretending it
+   * answers. Core 4 is the first of these.
+   */
+  soon?: string;
+  /**
+   * This model opens the Logos surface (a Thinking Map beside the chat).
+   * Both Logos and Logos 2 set it; Logos 2 adds `collab` on top.
+   */
+  logosSurface?: boolean;
+  /** Logos 2: two people in one workspace. See lib/collab.ts. */
+  collab?: boolean;
 }
 
 // Primary chat model for Core 3.1 ("GPT 5.6 Luna"). If OpenAI exposes Luna
@@ -1300,6 +1314,35 @@ export const SOCRIA_MODELS: Record<SocriaModel, ModelConfig> = {
     defaultOpenAIModel: 'gpt-5.6-sol',
     supportsDepth: false,
     requiresAuth: true,
+    logosSurface: true,
+  },
+  // Logos 2 — two people in one Logos workspace, thinking together in real
+  // time. Socria sits between them as the shared reasoning layer. It is the
+  // same surface and the same model as Logos; `collab` is what turns the room
+  // into a two-seat one. See lib/collab.ts.
+  'logos-2': {
+    id: 'logos-2',
+    label: 'Socria Logos 2',
+    short: 'Logos 2',
+    description:
+      'Think together. Two people, one Thinking Map, Socria between you — naming the connections, the disagreements and the open questions.',
+    defaultOpenAIModel: 'gpt-5.6-sol',
+    supportsDepth: false,
+    requiresAuth: true,
+    logosSurface: true,
+    collab: true,
+  },
+  // Core 4 — announced, not built. The picker shows it and will not let it be
+  // chosen; `soon` is the copy that says why.
+  'core-4': {
+    id: 'core-4',
+    label: 'Socria Core 4',
+    short: 'Core 4',
+    description: 'The next Core. In development.',
+    defaultOpenAIModel: CORE_3_MODEL,
+    supportsDepth: false,
+    requiresAuth: true,
+    soon: 'In development',
   },
 };
 

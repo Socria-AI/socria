@@ -8,7 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { sanitizeMemory, EMPTY_MEMORY } from '@/lib/socria-prompt';
-import { EMPTY_MAP, sanitizeMap } from '@/lib/logos';
+import { EMPTY_MAP, sanitizeMap, sanitizeByRef } from '@/lib/logos';
 import { sanitizeAttachments } from '@/lib/logos-attachments';
 import { sanitizeContexts } from '@/lib/logos-sources';
 
@@ -37,9 +37,16 @@ function sanitizeMessages(raw: unknown): Msg[] {
     .slice(-MAX_MESSAGES_PER_CONVO)
     .map((m: any) => {
       const attachments = sanitizeAttachments(m.attachments);
-      return attachments.length
-        ? { role: m.role, content: m.content, attachments }
-        : { role: m.role, content: m.content };
+      // Who said it, when two people were thinking together (Logos 2). Kept
+      // so a shared session opened alone later still shows whose idea each
+      // one was; validated so a broken author reads as none, not as a crash.
+      const by = sanitizeByRef(m.by);
+      return {
+        role: m.role,
+        content: m.content,
+        ...(attachments.length ? { attachments } : {}),
+        ...(by ? { by } : {}),
+      };
     });
 }
 

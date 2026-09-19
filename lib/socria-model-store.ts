@@ -20,7 +20,7 @@
 // "open on their best surface" becomes "override what they asked for", which
 // is worse than the bug.
 
-import type { SocriaModel } from './socria-prompt';
+import { SOCRIA_MODELS, type SocriaModel } from './socria-prompt';
 
 export const MODEL_KEY = 'socria.model.v1';
 const LAST_CORE_KEY = 'socria.model.lastCore.v1';
@@ -28,7 +28,10 @@ const LAST_CORE_KEY = 'socria.model.lastCore.v1';
 const MODEL_CHOSEN_KEY = 'socria.model.chosen.v1';
 
 function isModel(v: unknown): v is SocriaModel {
-  return v === 'core-2' || v === 'core-3' || v === 'logos';
+  // From the registry, not a hand-kept list — a new model is added in one
+  // place. `soon` models (Core 4) are real ids but never selectable, so they
+  // are excluded here: nothing should ever store one as the active model.
+  return typeof v === 'string' && v in SOCRIA_MODELS && !SOCRIA_MODELS[v as SocriaModel].soon;
 }
 
 /**
@@ -41,7 +44,7 @@ function isModel(v: unknown): v is SocriaModel {
 export function rememberModel(model: SocriaModel): void {
   try {
     localStorage.setItem(MODEL_KEY, model);
-    if (model !== 'logos') localStorage.setItem(LAST_CORE_KEY, model);
+    if (!SOCRIA_MODELS[model].logosSurface) localStorage.setItem(LAST_CORE_KEY, model);
   } catch {}
 }
 
