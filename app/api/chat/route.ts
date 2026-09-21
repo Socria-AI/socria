@@ -12,6 +12,8 @@ import {
   SOCRIA_MODELS,
   SOCRIA_PROMPT_VERSION,
   CORE_3_FALLBACK_MODEL,
+  CORE_4_PROMPT_VERSION,
+  resolveModel,
   sanitizeUserUnderstanding,
   hasJourneyContent,
   renderJourneyBrief,
@@ -106,10 +108,11 @@ export async function POST(req: NextRequest) {
     const { userId } = auth();
     const keyUnlocked = mayUse(req, userId);
     const requestedModelId = body?.model;
-    const requestedConfig =
-      requestedModelId === 'core-3'
-        ? SOCRIA_MODELS['core-3']
-        : SOCRIA_MODELS['core-2'];
+    // Read the config of the model actually asked for. Written as a ternary
+    // pair it silently answered "Core 2" for any Core added later — which
+    // meant a new model both skipped its own auth requirement and ran on the
+    // wrong prompt. resolveModel is the single place that decides.
+    const requestedConfig = SOCRIA_MODELS[resolveModel(requestedModelId)];
     if (requestedConfig.requiresAuth && !userId && !keyUnlocked) {
       return NextResponse.json(
         {
@@ -297,12 +300,19 @@ export async function POST(req: NextRequest) {
         socriaModel: model,
         openaiModel: resolveOpenAIModel(model),
         depth,
-        promptVersion: model === 'core-3' ? SOCRIA_PROMPT_VERSION : 'core-2',
+        promptVersion:
+          model === 'core-3'
+            ? SOCRIA_PROMPT_VERSION
+            : model === 'core-4'
+              ? CORE_4_PROMPT_VERSION
+              : 'core-2',
         promptChars: systemPrompt.length,
         approxPromptTokens: Math.round(systemPrompt.length / 4),
-        memoryInjected: model === 'core-3' && !!body?.memory,
-        profileInjected: model === 'core-3' && !!body?.profile,
-        journeyInjected: model === 'core-3' && !!journey,
+        // Core 4 receives context too — its own prompt says to expect it —
+        // so these can no longer mean "Core 3.1 and nothing else".
+        memoryInjected: model !== 'core-2' && !!body?.memory,
+        profileInjected: model !== 'core-2' && !!body?.profile,
+        journeyInjected: model !== 'core-2' && !!journey,
         userTurns,
         assistantTurns,
         stage: guidance?.stage ?? null,

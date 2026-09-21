@@ -1471,13 +1471,21 @@ export default function ChatPage() {
         setUsedFree(true);
       }
 
-      // Core 3 thread memory: extract in the background. The next turn
-      // will read whatever's in the conversation's memory field. If this
-      // fails, the conversation still works — memory just doesn't update.
-      if (canUseCore3 && model === 'core-3') {
+      // Thread memory: extract in the background. The next turn reads
+      // whatever is in the conversation's memory field. If this fails the
+      // conversation still works — memory just does not update.
+      //
+      // Core 4 gets this too. Its prompt says in as many words that it may
+      // receive context from Socria's memory system, and buildSystemPrompt
+      // duly hands it any that exists — so without extraction it would be
+      // told to expect something nothing ever writes.
+      if (canUseCore3 && (model === 'core-3' || model === 'core-4')) {
         void extractAndPersistMemory(workingId!, updated);
-        // Also consider generating an Insight Card + auto-synthesis. Both
-        // run in parallel and dedupe internally against their turn markers.
+      }
+      // Insight Cards and auto-synthesis stay Core 3.1's. They are surfaces
+      // of their own rather than things the prompt asks for, and Core 4 is
+      // deliberately just its prompt for now.
+      if (canUseCore3 && model === 'core-3') {
         void maybeGenerateInsight(workingId!, updated);
         void maybeGenerateSynthesis(workingId!, updated);
       }

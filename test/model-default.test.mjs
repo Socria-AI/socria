@@ -176,9 +176,10 @@ console.log('\n=== nothing here throws in a browser that refuses storage ===');
 console.log('\n=== junk in storage is not a model ===');
 {
   fresh();
-  // 'core-4' is a REAL id but a `soon` teaser — never selectable, so never a
-  // valid stored active model. It belongs on this list for that reason.
-  for (const junk of ['', 'core-4', 'LOGOS', 'null', '{}', 'gpt-4']) {
+  // 'core-4' used to belong on this list: it was a `soon` teaser, never
+  // selectable, so never a valid stored model. It is a real Core now and is
+  // covered by test/core-4 instead. A future teaser goes back here.
+  for (const junk of ['', 'core-5', 'LOGOS', 'null', '{}', 'gpt-4']) {
     localStorage.setItem(MODEL_KEY, junk);
     ok(`"${junk}" is not a stored model`, readStoredModel() === null);
   }

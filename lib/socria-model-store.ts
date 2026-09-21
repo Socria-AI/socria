@@ -105,7 +105,18 @@ export function autoModel(opts: { canUseCore3: boolean; isOne: boolean }): Socri
 export function lastCoreModel(): SocriaModel {
   try {
     const raw = localStorage.getItem(LAST_CORE_KEY);
-    if (raw === 'core-3' || raw === 'core-2') return raw;
+    // Any real, selectable, non-Logos model — not a hand-written pair. Named
+    // ids meant a Core added later was written to this key by rememberModel
+    // and then silently thrown away on the way back, dropping the person on
+    // Core 2 with no explanation.
+    if (
+      typeof raw === 'string' &&
+      raw in SOCRIA_MODELS &&
+      !SOCRIA_MODELS[raw as SocriaModel].soon &&
+      !SOCRIA_MODELS[raw as SocriaModel].logosSurface
+    ) {
+      return raw as SocriaModel;
+    }
   } catch {}
   return 'core-2';
 }
