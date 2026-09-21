@@ -1,0 +1,329 @@
+// lib/mind/types.ts
+//
+// The Mind Graph's vocabulary. Pure: no React, no storage, no network, no
+// clock of its own.
+//
+// THE ARCHITECTURAL COMMITMENT, because everything here depends on it: there
+// is no memory store behind this graph. A node IS a memory. Nothing extracts
+// memories into a list and then draws a graph of them — extraction produces
+// nodes and edges directly, retrieval walks edges, and the Memory page reads
+// the same rows the prompt was built from. If a node is not in the graph,
+// Core does not know it.
+//
+// What that rules out is the shape this replaces: lib/person-memory.ts, a
+// flat list of typed one-liners scored against the current message and cut at
+// k. That store cannot say a constraint CAUSED a decision, cannot hold a
+// belief becoming another belief, and lives inside a jsonb array on one row
+// where nothing can be indexed or joined.
+//
+// Four invariants come across from it unchanged, because each was learned the
+// hard way and each would be easy to lose in a rewrite:
+//
+//   1. FORGETTING HOLDS. A deleted node leaves a tombstone, and every write
+//      path checks tombstones before creating. Otherwise the next extraction
+//      notices the same thing again and resurrects it.
+//   2. STATED IS NOT INFERRED. Now one axis of a wider provenance taxonomy.
+//   3. PRIVATE STAYS PRIVATE. Nodes from weighty Core conversations never
+//      reach Logos, whose map can be exported as an image.
+//   4. A PLAN IS A WINDOW. Every account stores the same amount; a plan
+//      changes how much is carried into a conversation, never what is kept.
+
+// ── what a node can be ───────────────────────────────────────────────
+
+/**
+ * The seed ontology. `type` is a STRING, not a union, on purpose: the brief
+ * asks for extensibility and a closed set would mean a migration every time
+ * the ontology grows. This list drives the picker, the colours and the
+ * extractor's suggestions; an unrecognised type still stores and still
+ * renders, in a neutral colour.
+ */
+export const KNOWN_NODE_TYPES = [
+  'Person', 'Organization', 'Project', 'Place', 'Concept', 'Goal', 'Plan',
+  'Decision', 'Preference', 'Belief', 'Assumption', 'Question', 'Uncertainty',
+  'Insight', 'Evidence', 'Source', 'Event', 'Experience', 'Conversation',
+] as const;
+
+export type KnownNodeType = (typeof KNOWN_NODE_TYPES)[number];
+/** A node's type. Known ones are listed above; anything else is allowed. */
+export type NodeType = KnownNodeType | (string & {});
+
+export function isKnownType(t: string): t is KnownNodeType {
+  return (KNOWN_NODE_TYPES as readonly string[]).includes(t);
+}
+
+/**
+ * Types that make a claim ABOUT THE PERSON rather than recording something
+ * that happened. These are the ones the gate holds back until a second
+ * sighting: one stressful afternoon is an Event, not evidence of a
+ * personality.
+ */
+export const GENERALISING_TYPES = new Set<string>([
+  'Belief', 'Preference', 'Assumption',
+]);
+
+// ── status ──────────────────────────────────────────────────────────
+
+export const NODE_STATUSES = [
+  'active', 'tentative', 'uncertain', 'historical',
+  'superseded', 'contradicted', 'archived',
+] as const;
+export type NodeStatus = (typeof NODE_STATUSES)[number];
+
+/**
+ * How much a status discounts a node during retrieval.
+ *
+ * Note what this is NOT: a filter. `superseded` is 0.5 rather than 0
+ * deliberately — "you used to think A, and moved to B in March when the
+ * lease fell through" is frequently the most useful thing in the graph, and
+ * excluding it would make preserving evolution pointless. Status changes how
+ * a node scores and how it is LABELLED in the prompt, never whether it can
+ * be reached.
+ */
+export const STATUS_WEIGHT: Record<NodeStatus, number> = {
+  active: 1.0,
+  tentative: 0.8,
+  uncertain: 0.7,
+  contradicted: 0.7,
+  historical: 0.6,
+  superseded: 0.5,
+  archived: 0.2,
+};
+
+// ── relationships ───────────────────────────────────────────────────
+
+export const KNOWN_RELATIONSHIPS = [
+  'supports', 'contradicts', 'depends_on', 'part_of', 'caused',
+  'motivated_by', 'constrained_by', 'changed_into', 'superseded_by',
+  'evidence_for', 'associated_with', 'belongs_to', 'resulted_in',
+  'version_of', 'works_on', 'learned_from', 'mentioned_in', 'derived_from',
+] as const;
+export type KnownRelationship = (typeof KNOWN_RELATIONSHIPS)[number];
+export type Relationship = KnownRelationship | (string & {});
+
+/**
+ * How well a relationship conducts activation.
+ *
+ * Not all relationships carry recall equally. Being told about a decision
+ * should bring to mind what caused it and what it superseded; it should bring
+ * to mind something merely "associated with" it much more weakly, or the
+ * graph floods on every hop. Unlisted relationships take the default.
+ */
+export const REL_WEIGHT: Record<string, number> = {
+  superseded_by: 1.0,
+  contradicts: 1.0,
+  caused: 0.95,
+  motivated_by: 0.95,
+  resulted_in: 0.9,
+  evidence_for: 0.9,
+  supports: 0.85,
+  constrained_by: 0.85,
+  depends_on: 0.8,
+  part_of: 0.8,
+  works_on: 0.8,
+  belongs_to: 0.75,
+  changed_into: 0.9,
+  version_of: 0.7,
+  learned_from: 0.7,
+  derived_from: 0.6,
+  mentioned_in: 0.4,
+  associated_with: 0.4,
+};
+export const REL_WEIGHT_DEFAULT = 0.5;
+
+export function relWeight(r: Relationship): number {
+  return REL_WEIGHT[r] ?? REL_WEIGHT_DEFAULT;
+}
+
+/** Relationships that mean "this node has a partner you must not show alone". */
+export const PARTNER_RELATIONSHIPS = new Set<string>([
+  'superseded_by', 'contradicts', 'changed_into',
+]);
+
+// ── provenance ──────────────────────────────────────────────────────
+
+/**
+ * WHERE a claim came from, and in what register it was offered.
+ *
+ * The register half is the brief's §3 and it does real work rather than
+ * sitting in the record: see gate.ts, where `joke`, `hypothetical` and
+ * `example` are refused a node at all, and `inferred` is refused the right to
+ * mint a belief about the person on first sight.
+ */
+export const PROVENANCE_KINDS = [
+  'stated',       // said in so many words
+  'inferred',     // read between the lines
+  'hypothesis',   // Socria's own guess, offered as one
+  'temporary',    // true right now and not after — never persists
+  'joke',
+  'hypothetical', // "suppose I did move to Berlin"
+  'example',      // offered to illustrate, not to assert
+  'tentative',    // a position being tried on
+  'established',  // held and repeated
+  'researched',   // fetched from a source
+  'calculated',   // computed
+] as const;
+export type ProvenanceKind = (typeof PROVENANCE_KINDS)[number];
+
+export const PROVENANCE_SURFACES = ['core', 'logos', 'file', 'import', 'tool', 'user'] as const;
+export type ProvenanceSurface = (typeof PROVENANCE_SURFACES)[number];
+
+export interface Provenance {
+  kind: ProvenanceKind;
+  surface: ProvenanceSurface;
+  at: number;
+  conversationId?: string;
+  messageId?: string;
+  /** the Source node a file-derived claim came from */
+  sourceNodeId?: string;
+  /** where in that file, so the Memory page can show the sentence */
+  charStart?: number;
+  charEnd?: number;
+  /** what the person said when they challenged or corrected it */
+  note?: string;
+}
+
+// ── the objects themselves ──────────────────────────────────────────
+
+export interface MindNode {
+  id: string;
+  type: NodeType;
+  /** short canonical name: the resolution key and the UI label */
+  label: string;
+  /** the claim itself, a sentence or two */
+  content: string;
+  /** other surface forms seen for the same thing */
+  aliases: string[];
+  status: NodeStatus;
+  /** 0..1 — how sure SOCRIA is this is true */
+  confidence: number;
+  /** 0..1 — how sure THE PERSON seemed. A different question. */
+  certainty: number;
+  /** 0..1 — how much it matters to them */
+  importance: number;
+  /** 0..1 — decayed recall strength, written on access */
+  activation: number;
+  /** distinct extractions that reinforced it; never below 1 */
+  seen: number;
+  /** from a weighty conversation: never carried into Logos */
+  private: boolean;
+  /** grounds, oldest first. An ARRAY because grounds accumulate. */
+  provenance: Provenance[];
+  createdAt: number;
+  updatedAt: number;
+  lastAccessed: number;
+}
+
+export interface MindEdge {
+  id: string;
+  sourceId: string;
+  targetId: string;
+  relationship: Relationship;
+  confidence: number;
+  /** 0..1 — how strongly activation flows across it */
+  strength: number;
+  provenance: Provenance[];
+  createdAt: number;
+  updatedAt: number;
+  lastReinforced: number;
+}
+
+/**
+ * A claim about the person that has been noticed once and is not yet
+ * believed.
+ *
+ * This is what makes "a generalisation needs a second sighting" implementable
+ * rather than merely stated. Without somewhere to record the first sighting,
+ * the rule blocks every sighting forever: nothing is created, so nothing can
+ * be matched, so the second sighting looks exactly like the first and a real
+ * pattern could never be learned. Holding the candidate here — not as a node,
+ * invisible to retrieval, never reaching a prompt — lets corroboration
+ * accumulate without anything being believed on one afternoon's evidence.
+ */
+export interface PendingClaim {
+  fingerprint: string;
+  type: NodeType;
+  label: string;
+  content: string;
+  /**
+   * The DISTINCT conversations that have proposed it.
+   *
+   * Counting extractions would not do. Ten turns of one conversation about
+   * one difficult meeting will have the model concluding the same thing
+   * about the person ten times, and that is one afternoon read ten times
+   * over, not ten pieces of evidence. The brief's word is "isolated", and
+   * isolation is per conversation, not per turn.
+   */
+  sources: string[];
+  firstAt: number;
+  lastAt: number;
+}
+
+/** How long a lone sighting waits for corroboration before it is dropped. */
+export const PENDING_TTL_MS = 60 * 86_400_000;
+export const MAX_PENDING = 200;
+
+/** A whole graph, as the pure functions take it. */
+export interface MindGraph {
+  nodes: MindNode[];
+  edges: MindEdge[];
+  /** fingerprints of what has been forgotten; only ever grows */
+  tombstones: string[];
+  /** noticed once, not yet believed — see PendingClaim */
+  pending: PendingClaim[];
+}
+
+export const EMPTY_GRAPH: MindGraph = { nodes: [], edges: [], tombstones: [], pending: [] };
+
+// ── identity and forgetting ─────────────────────────────────────────
+
+/** Casefold, strip punctuation, collapse whitespace. */
+export function normalize(s: unknown): string {
+  return typeof s === 'string'
+    ? s
+        .toLowerCase()
+        .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+    : '';
+}
+
+/**
+ * What a tombstone remembers about a node.
+ *
+ * Type plus normalised label, NOT the id: an id is regenerated on every
+ * extraction, so an id-keyed tombstone would stop nothing. The point is that
+ * re-deriving the same thing under a new id is still refused.
+ */
+export function fingerprintNode(type: string, label: string): string {
+  return `n:${normalize(type)}|${normalize(label)}`;
+}
+
+export function fingerprintEdge(
+  sourceType: string, sourceLabel: string,
+  relationship: string,
+  targetType: string, targetLabel: string
+): string {
+  return `e:${fingerprintNode(sourceType, sourceLabel)}|${normalize(relationship)}|${fingerprintNode(targetType, targetLabel)}`;
+}
+
+export function isForgotten(graph: MindGraph, fingerprint: string): boolean {
+  return graph.tombstones.includes(fingerprint);
+}
+
+// ── limits ──────────────────────────────────────────────────────────
+
+export const MAX_LABEL = 80;
+export const MAX_CONTENT = 400;
+export const MAX_ALIASES = 8;
+/** Per user. Not a plan boundary — see the header's invariant 4. */
+export const MAX_NODES = 5_000;
+export const MAX_EDGES = 20_000;
+
+export function clamp01(n: unknown): number {
+  const v = typeof n === 'number' && Number.isFinite(n) ? n : 0;
+  return v < 0 ? 0 : v > 1 ? 1 : v;
+}
+
+export function clip(s: unknown, n: number): string {
+  return typeof s === 'string' ? s.replace(/\s+/g, ' ').trim().slice(0, n) : '';
+}
