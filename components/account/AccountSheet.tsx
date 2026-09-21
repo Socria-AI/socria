@@ -178,6 +178,9 @@ export function AccountSheet({
               <div className="acts">
                 {/* One path to an irreversible action, and it is the one
                     that already has the confirmations. */}
+                <Link className="act" href="/memory" onClick={onClose}>
+                  Memory
+                </Link>
                 <Link className="act" href="/account/data" onClick={onClose}>
                   <span className="t">Export or delete everything</span>
                   <span className="d">Verbatim, nothing summarised — and it does not come back</span>

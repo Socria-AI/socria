@@ -93,6 +93,41 @@ export async function GET(req: NextRequest) {
     .eq('user_id', userId);
   out.logosUsage = usage ?? [];
 
+  // ── The Mind Graph ──────────────────────────────────────────────────
+  //
+  // Exported whole, not summarised. It is what Socria understands about this
+  // person, and an export that paraphrased it would be answering a different
+  // question than the one someone asks when they want their data.
+  const { data: mindNodes, error: mindNodesErr } = await db
+    .from('mind_nodes')
+    .select('id, type, label, content, aliases, status, confidence, certainty, importance, seen, private, provenance, created_at, updated_at, last_accessed')
+    .eq('user_id', userId);
+  out.mindNodes = mindNodes ?? [];
+
+  const { data: mindEdges, error: mindEdgesErr } = await db
+    .from('mind_edges')
+    .select('id, source_id, target_id, relationship, confidence, strength, provenance, created_at, updated_at, last_reinforced')
+    .eq('user_id', userId);
+  out.mindEdges = mindEdges ?? [];
+
+  // What was forgotten, and what was noticed once without being believed.
+  // Both are things Socria holds about this person, so both belong here —
+  // and seeing the pending list is the only way to know a claim is one
+  // sighting away from becoming a belief.
+  const { data: mindTombstones, error: mindTombstonesErr } = await db
+    .from('mind_tombstones').select('fingerprint, created_at').eq('user_id', userId);
+  out.mindForgotten = mindTombstones ?? [];
+
+  const { data: mindPending, error: mindPendingErr } = await db
+    .from('mind_pending').select('type, label, content, sources, first_at, last_at').eq('user_id', userId);
+  out.mindPending = mindPending ?? [];
+
+  // Uploaded files, with their text: a provenance offset into a file that is
+  // not in the export points at nothing.
+  const { data: mindSources, error: mindSourcesErr } = await db
+    .from('mind_sources').select('id, name, bytes, text, created_at').eq('user_id', userId);
+  out.mindSources = mindSources ?? [];
+
   // ── Logos 2: shared rooms ───────────────────────────────────────────
   //
   // A shared room is the one place in Socria where an export cannot simply
@@ -148,6 +183,11 @@ export async function GET(req: NextRequest) {
     ['collabMemberships', membershipsErr],
     ['collabRooms', roomsErr],
     ['collabContributions', myEventsErr],
+    ['mindNodes', mindNodesErr],
+    ['mindEdges', mindEdgesErr],
+    ['mindForgotten', mindTombstonesErr],
+    ['mindPending', mindPendingErr],
+    ['mindSources', mindSourcesErr],
   ]
     .filter(([, e]) => !!e)
     .map(([name]) => name as string);

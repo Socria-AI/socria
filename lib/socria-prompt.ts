@@ -2142,7 +2142,14 @@ export function buildSystemPrompt(
    * selected and capped by the caller against the plan (see
    * lib/person-memory.ts selectRelevant). Rendered beside the journey.
    */
-  personMemory?: readonly MemoryEntry[] | null
+  personMemory?: readonly MemoryEntry[] | null,
+  /**
+   * The activated region of this person's Mind Graph, already rendered (see
+   * lib/mind/serialize.ts). A STRING rather than a graph on purpose: this
+   * module knows nothing about how memory is stored, which is what lets the
+   * graph belong to Socria rather than to any one prompt.
+   */
+  mindGraph?: string | null
 ): { prompt: string; model: SocriaModel; depth: ThinkingDepth } {
   const model = resolveModel(modelInput);
   const depth = resolveDepth(depthInput);
@@ -2175,6 +2182,10 @@ export function buildSystemPrompt(
     if (personMemory && personMemory.length) {
       out += renderPersonMemory(personMemory, 'core');
     }
+    // Last, so it sits closest to the conversation. The Mind Graph is the
+    // richest of these and the one a model should still have in view when it
+    // starts reading what was actually said.
+    if (mindGraph) out += mindGraph;
     return out;
   };
 

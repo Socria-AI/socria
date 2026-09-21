@@ -68,6 +68,8 @@ const MODULES = [
   'lib/mind/apply.ts',
   'lib/mind/activate.ts',
   'lib/mind/serialize.ts',
+  'lib/mind/extract.ts',
+  'lib/mind/ingest-text.ts',
   'lib/collab.ts',
   'lib/collab-transport.ts',
   'lib/checkout-attribution.ts',
@@ -109,7 +111,10 @@ export async function buildAll() {
         // undici uses dynamic require() internally, which does not survive
         // being bundled into ESM. It is a real dependency at runtime, so let
         // Node resolve it there instead of inlining it.
-        external: ['undici'],
+        // Both use dynamic require() internally, which does not survive
+        // being bundled into ESM. They are real dependencies at runtime, so
+        // Node resolves them there.
+        external: ['undici', 'openai'],
         logLevel: 'error',
       })
     )

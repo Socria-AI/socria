@@ -14,6 +14,10 @@ import {
   CORE_3_FALLBACK_MODEL,
   CORE_4_PROMPT_VERSION,
   resolveModel,
+} from '@/lib/socria-prompt';
+import { recall, remember } from '@/lib/mind/pipeline';
+import type { ActivatedSubgraph } from '@/lib/mind/activate';
+import {
   sanitizeUserUnderstanding,
   hasJourneyContent,
   renderJourneyBrief,
@@ -193,14 +197,7 @@ export async function POST(req: NextRequest) {
           }
         : null;
 
-    const { prompt: basePrompt, model, depth } = buildSystemPrompt(
-      body?.model,
-      body?.depth,
-      body?.memory,
-      typeof body?.profile === 'string' ? body.profile : null,
-      journey,
-      personMemory
-    );
+
 
     if (!Array.isArray(messages) || messages.length === 0) {
       return NextResponse.json(
@@ -223,6 +220,40 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
+
+    // ── the Mind Graph ────────────────────────────────────────────
+    //
+    // Core 4's persistent memory. Activated by what they just said — a region
+    // of the graph reached through its edges, not a top-k list of snippets —
+    // and rendered into the system prompt.
+    //
+    // Never blocks and never throws. A graph that cannot be read means a
+    // conversation without memory, which is how this worked last week; a
+    // conversation that breaks BECAUSE of memory is a regression nobody
+    // accepts. recall() already swallows its own failures; this is the second
+    // reason it is called on its own line rather than inline.
+    const socriaModel = resolveModel(body?.model);
+    let mindBlock: string | null = null;
+    let mindSubgraph: ActivatedSubgraph | null = null;
+    if (socriaModel === 'core-4' && userId) {
+      const r = await recall(userId, last.content, {
+        now: Date.now(),
+        plan: await resolvePlanForRequest(req, userId),
+        surface: 'core',
+      });
+      mindBlock = r.block || null;
+      mindSubgraph = r.subgraph;
+    }
+
+    const { prompt: basePrompt, model, depth } = buildSystemPrompt(
+      body?.model,
+      body?.depth,
+      body?.memory,
+      typeof body?.profile === 'string' ? body.profile : null,
+      journey,
+      personMemory,
+      mindBlock
+    );
 
     // Clean / clip the message history
     const clean = messages
@@ -313,6 +344,8 @@ export async function POST(req: NextRequest) {
         memoryInjected: model !== 'core-2' && !!body?.memory,
         profileInjected: model !== 'core-2' && !!body?.profile,
         journeyInjected: model !== 'core-2' && !!journey,
+        mindNodes: mindSubgraph?.nodes.length ?? 0,
+        mindEdges: mindSubgraph?.edges.length ?? 0,
         userTurns,
         assistantTurns,
         stage: guidance?.stage ?? null,
@@ -366,10 +399,14 @@ export async function POST(req: NextRequest) {
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
       async start(controller) {
+        let reply = '';
         try {
           for await (const chunk of completion) {
             const delta = chunk.choices?.[0]?.delta?.content ?? '';
-            if (delta) controller.enqueue(encoder.encode(delta));
+            if (delta) {
+              reply += delta;
+              controller.enqueue(encoder.encode(delta));
+            }
           }
         } catch (e) {
           console.error('stream error:', e);
@@ -378,6 +415,26 @@ export async function POST(req: NextRequest) {
           );
         } finally {
           controller.close();
+          // ── learn from the turn ────────────────────────────────
+          //
+          // After the reply is closed, never before: the person waits for
+          // words, not for a graph. Fire-and-forget, and remember() swallows
+          // its own failures — a turn the graph did not learn from is
+          // recoverable and invisible; a reply that failed because of the
+          // graph is neither.
+          //
+          // Both halves go in. A conversation is what was said AND what
+          // Socria said back, and half of it is the half that contains the
+          // question somebody was answering.
+          if (socriaModel === 'core-4' && userId && apiKey) {
+            void remember(userId, `User: ${last.content}\n\nSocria: ${reply}`, {
+              now: Date.now(),
+              apiKey,
+              surface: 'core',
+              conversationId: typeof body?.conversationId === 'string' ? body.conversationId : undefined,
+              existing: mindSubgraph,
+            });
+          }
         }
       },
     });

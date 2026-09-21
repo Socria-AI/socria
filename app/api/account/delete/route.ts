@@ -38,6 +38,13 @@ const OWNED_TABLES = [
   'socria_subscriptions',
   'lifecycle_emails',
   'logos_usage',
+  // The Mind Graph. Every row is keyed to one person, so a flat delete is
+  // the right shape here — unlike the shared logos_room_* tables below.
+  'mind_nodes',
+  'mind_edges',
+  'mind_tombstones',
+  'mind_pending',
+  'mind_sources',
 ] as const;
 
 /**
@@ -49,6 +56,11 @@ const OWNED_TABLES = [
  */
 const LATE_TABLES = new Set<string>([
   'lifecycle_emails',
+  'mind_nodes',
+  'mind_edges',
+  'mind_tombstones',
+  'mind_pending',
+  'mind_sources',
   'logos_usage',
   'logos_room_events',
   'logos_room_members',

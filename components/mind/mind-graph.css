@@ -1,0 +1,124 @@
+/* components/mind/mind-graph.css
+ *
+ * The Memory page. Scoped under .mg so nothing here can reach the rest of
+ * the product — the same discipline as .logos-root and .app-root.
+ *
+ * Socria's colour code is doing real work on this page rather than
+ * decorating it: moss is the person and the people around them, prussian is
+ * the work they are doing, slate is evidence and belief, vermilion is a
+ * decision. Status is opacity, so a superseded belief is visibly present and
+ * visibly past. */
+
+.mg { margin-top: 1.5rem }
+
+.mg-bar {
+  display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
+  padding-bottom: .75rem; border-bottom: 1px solid var(--ink-12, rgba(35,36,31,.12));
+}
+.mg-count { font-family: var(--font-sans); font-size: 13px; color: var(--ink-60, rgba(35,36,31,.6)) }
+.mg-views { display: inline-flex; gap: 0; border: 1px solid var(--ink-16, rgba(35,36,31,.16)); border-radius: 999px; overflow: hidden }
+.mg-views button {
+  appearance: none; border: 0; background: transparent; cursor: pointer;
+  font-family: var(--font-sans); font-size: 12.5px; padding: .3em 1em; color: var(--ink-60, rgba(35,36,31,.6));
+}
+.mg-views button.on { background: var(--ink, #23241f); color: var(--paper, #F5F3EB) }
+.mg-upload {
+  margin-left: auto; font-family: var(--font-sans); font-size: 12.5px; cursor: pointer;
+  border: 1px solid var(--moss-700, #5e7633); color: var(--moss-700, #5e7633);
+  border-radius: 999px; padding: .35em 1em;
+}
+.mg-upload input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none }
+.mg-upload:hover { background: rgba(94,118,51,.08) }
+
+.mg-note { font-family: var(--font-sans); font-size: 13px; color: var(--moss-700, #5e7633); margin: .75rem 0 0 }
+.mg-quiet { font-family: var(--font-serif); font-style: italic; color: var(--ink-45, rgba(35,36,31,.45)); margin-top: 1.5rem }
+
+.mg-canvas {
+  display: block; margin-top: 1rem; cursor: pointer;
+  border: 1px solid var(--ink-12, rgba(35,36,31,.12)); border-radius: 10px;
+  background: var(--paper-2, #faf9f4);
+}
+
+.mg-list { list-style: none; margin: 1rem 0 0; padding: 0 }
+.mg-list li { border-bottom: 1px solid var(--ink-08, rgba(35,36,31,.08)) }
+.mg-list button {
+  display: flex; align-items: center; gap: .6rem; width: 100%; text-align: left;
+  appearance: none; border: 0; background: transparent; cursor: pointer;
+  padding: .55em .4em; font-family: var(--font-sans); font-size: 14px;
+}
+.mg-list button:hover, .mg-list button.on { background: rgba(94,118,51,.07) }
+.mg-dot { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto }
+.mg-li-type {
+  font-size: 9.5px; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--ink-45, rgba(35,36,31,.45)); flex: 0 0 auto; min-width: 5.5em;
+}
+.mg-li-label { flex: 1 1 auto; color: var(--ink, #23241f) }
+.mg-li-status, .mg-li-private {
+  font-size: 10px; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--ink-45, rgba(35,36,31,.45)); border: 1px solid var(--ink-16, rgba(35,36,31,.16));
+  border-radius: 999px; padding: .15em .6em; flex: 0 0 auto;
+}
+
+.mg-panel {
+  margin-top: 1.25rem; padding: 1.1rem 1.2rem;
+  border: 1px solid var(--ink-16, rgba(35,36,31,.16)); border-radius: 12px;
+  background: var(--paper-2, #faf9f4);
+}
+.mg-panel-head { display: flex; align-items: center; gap: .5rem }
+.mg-panel-type { font-size: 9.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-45, rgba(35,36,31,.45)) }
+.mg-x { margin-left: auto; appearance: none; border: 0; background: transparent; font-size: 20px; line-height: 1; cursor: pointer; color: var(--ink-45, rgba(35,36,31,.45)) }
+.mg-panel h3 { font-family: var(--font-serif); font-size: 20px; margin: .3rem 0 .6rem }
+.mg-panel h4 { font-family: var(--font-sans); font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-45, rgba(35,36,31,.45)); margin: 1.1rem 0 .4rem }
+
+.mg-edit {
+  width: 100%; font: inherit; font-size: 14px; line-height: 1.5;
+  border: 1px solid var(--ink-12, rgba(35,36,31,.12)); border-radius: 8px;
+  padding: .55em .7em; background: var(--paper, #F5F3EB); resize: vertical;
+}
+.mg-save, .mg-actions button {
+  appearance: none; cursor: pointer; font-family: var(--font-sans); font-size: 12.5px;
+  border: 1px solid var(--ink-16, rgba(35,36,31,.16)); background: transparent;
+  border-radius: 999px; padding: .35em 1em; margin-top: .5rem;
+}
+.mg-save { border-color: var(--moss-700, #5e7633); color: var(--moss-700, #5e7633) }
+
+.mg-meta { display: grid; grid-template-columns: 1fr 1fr; gap: .4rem 1rem; margin: 1rem 0 0 }
+.mg-meta div { display: flex; flex-direction: column }
+.mg-meta dt { font-size: 9.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-45, rgba(35,36,31,.45)) }
+.mg-meta dd { margin: 0; font-family: var(--font-sans); font-size: 13px }
+.mg-meta select { font: inherit; font-size: 13px; border: 1px solid var(--ink-12, rgba(35,36,31,.12)); border-radius: 6px; padding: .1em .3em; background: var(--paper, #F5F3EB) }
+
+.mg-conn ul, .mg-prov ul, .mg-pending ul { list-style: none; margin: 0; padding: 0 }
+.mg-conn li { display: flex; flex-direction: column; padding: .18em 0 }
+.mg-conn-row { display: flex; align-items: baseline; gap: .5rem }
+/* Why a belief changed: the note lives on the edge, because it is a fact
+   about the transition rather than about either end of it. */
+.mg-conn-why { font-family: var(--font-serif); font-style: italic; font-size: 12px;
+  color: var(--ink-45, rgba(35,36,31,.45)); padding-left: 1.1rem }
+.mg-link { appearance: none; border: 0; background: transparent; cursor: pointer; font-family: var(--font-sans); font-size: 13px; text-align: left; padding: 0; color: var(--ink, #23241f) }
+.mg-link em { font-style: normal; color: var(--slate-600, #3A6EA5) }
+.mg-unlink { appearance: none; border: 0; background: transparent; cursor: pointer; font-size: 11px; color: var(--ink-45, rgba(35,36,31,.45)); margin-left: auto }
+.mg-unlink:hover { color: var(--vermilion, #D8402F) }
+
+.mg-prov li { font-family: var(--font-sans); font-size: 12px; color: var(--ink-60, rgba(35,36,31,.6)); padding: .15em 0 }
+.mg-kind { color: var(--slate-600, #3A6EA5) }
+.mg-prov-note { font-style: italic; color: var(--ink-45, rgba(35,36,31,.45)); padding-left: .5rem }
+
+.mg-challenge p { font-family: var(--font-sans); font-size: 12.5px; color: var(--ink-60, rgba(35,36,31,.6)); margin: 0 0 .5rem }
+.mg-challenge input { width: 100%; font: inherit; font-size: 13px; border: 1px solid var(--ink-12, rgba(35,36,31,.12)); border-radius: 8px; padding: .45em .7em; background: var(--paper, #F5F3EB) }
+.mg-actions { display: flex; gap: .5rem; flex-wrap: wrap }
+.mg-forget { color: var(--ink-60, rgba(35,36,31,.6)) }
+.mg-forget.go { border-color: var(--vermilion, #D8402F); color: var(--vermilion, #D8402F) }
+
+.mg-pending { margin-top: 2rem; padding-top: 1.2rem; border-top: 1px solid var(--ink-12, rgba(35,36,31,.12)) }
+.mg-pending h2 { font-family: var(--font-serif); font-size: 17px; margin: 0 0 .35rem }
+.mg-pending p { font-family: var(--font-sans); font-size: 12.5px; color: var(--ink-60, rgba(35,36,31,.6)); margin: 0 0 .6rem; max-width: 46em }
+.mg-pending li { font-family: var(--font-sans); font-size: 13px; color: var(--ink-60, rgba(35,36,31,.6)); padding: .15em 0 }
+
+@media (max-width: 640px) {
+  .mg-meta { grid-template-columns: 1fr }
+  .mg-upload { margin-left: 0 }
+}
+
+/* The canvas is a picture of a thing the list already says. Print the list. */
+@media print { .mg-canvas, .mg-views, .mg-upload { display: none } }

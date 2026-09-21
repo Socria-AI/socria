@@ -343,3 +343,133 @@ create index if not exists logos_room_events_user_idx
 -- honest outcome of two people owning their own words, and it is preferable
 -- to either alternative — one person holding the other's words permanently,
 -- or one person's departure destroying the other's record.
+
+-- ── The Mind Graph ──────────────────────────────────────────────────
+--
+-- Core 4's persistent memory. Not a store that a graph is drawn FROM — the
+-- graph IS the store. A row in mind_nodes is a memory; retrieval walks
+-- mind_edges; the Memory page reads these same rows. If a node is not here,
+-- Core does not know it.
+--
+-- Rows rather than a jsonb blob on user_profiles, which is where the flat
+-- memory it replaces lives. One array per user means every read pulls the
+-- whole thing, nothing can be indexed, two-hop traversal happens in
+-- application memory, and the Memory page would load a person's entire
+-- history to draw anything. Rows are the difference between a graph and a
+-- list that mentions relationships.
+--
+-- Postgres rather than a graph database: a realistic graph is hundreds to
+-- low thousands of nodes per person, which two- and three-hop traversal
+-- handles comfortably here — and staying in Postgres means account deletion
+-- and export already reach it by the rules this codebase enforces.
+
+create table if not exists mind_nodes (
+  user_id text not null,
+  id text not null,
+  -- A STRING, not an enum. The ontology is meant to grow, and an enum makes
+  -- that a migration every time. Unknown types store and render; see
+  -- KNOWN_NODE_TYPES in lib/mind/types.ts for the ones with colours.
+  type text not null,
+  label text not null,
+  content text not null default '',
+  aliases jsonb not null default '[]'::jsonb,
+  status text not null default 'active',
+  -- Two axes on purpose. `confidence` is how sure SOCRIA is this is true;
+  -- `certainty` is how sure the PERSON seemed. Collapsing them loses the
+  -- difference between "they are sure" and "we are sure".
+  confidence real not null default 0.5,
+  certainty real not null default 0.5,
+  importance real not null default 0.4,
+  -- Decayed recall strength, written on access: recall strengthens memory
+  -- and unused regions fade.
+  activation real not null default 0.2,
+  seen integer not null default 1,
+  -- Never carried into Logos, whose map can be exported as an image.
+  private boolean not null default false,
+  -- An ARRAY because grounds accumulate: first inferred from a remark, later
+  -- stated outright, later supported by a file. That history is what
+  -- justifies a rising confidence.
+  provenance jsonb not null default '[]'::jsonb,
+  created_at bigint not null,
+  updated_at bigint not null,
+  last_accessed bigint not null,
+  primary key (user_id, id)
+);
+
+create index if not exists mind_nodes_user_type_idx on mind_nodes (user_id, type);
+create index if not exists mind_nodes_user_status_idx on mind_nodes (user_id, status);
+create index if not exists mind_nodes_user_seen_idx on mind_nodes (user_id, last_accessed desc);
+create index if not exists mind_nodes_label_idx on mind_nodes (user_id, lower(label));
+
+-- Edges are first-class rows with their own provenance and their own
+-- reinforcement history, not a column on a node.
+create table if not exists mind_edges (
+  user_id text not null,
+  id text not null,
+  source_id text not null,
+  target_id text not null,
+  relationship text not null,
+  confidence real not null default 0.6,
+  -- How strongly activation flows across it. Reinforced on each sighting.
+  strength real not null default 0.5,
+  provenance jsonb not null default '[]'::jsonb,
+  created_at bigint not null,
+  updated_at bigint not null,
+  last_reinforced bigint not null,
+  primary key (user_id, id)
+);
+
+-- Indexed BOTH ways: activation spreads in both directions, because a
+-- project reaches its goals and a goal reaches the project it belongs to.
+create index if not exists mind_edges_source_idx on mind_edges (user_id, source_id);
+create index if not exists mind_edges_target_idx on mind_edges (user_id, target_id);
+
+-- What has been forgotten. The one table here that only ever grows.
+--
+-- Without it, deleting a memory is theatre: the next extraction notices the
+-- same thing again and puts it back, the person deletes it a second time,
+-- and concludes — correctly — that deletion does not work. The fingerprint
+-- is type + normalised label rather than an id, because an id is regenerated
+-- on every extraction and an id-keyed tombstone would stop nothing.
+create table if not exists mind_tombstones (
+  user_id text not null,
+  fingerprint text not null,
+  created_at bigint not null,
+  primary key (user_id, fingerprint)
+);
+
+-- Claims about the person noticed once and not yet believed.
+--
+-- This is what makes "a generalisation needs a second sighting" possible
+-- rather than merely stated. Without somewhere to record a first sighting
+-- the rule blocks every sighting forever — nothing is created, so nothing
+-- can be matched, so a real pattern could never be learned. These are NOT
+-- nodes: retrieval cannot reach them and no prompt ever sees them.
+--
+-- `sources` holds distinct CONVERSATION ids, not a count. Ten turns of one
+-- conversation about one difficult meeting is one afternoon read ten times,
+-- not ten pieces of evidence.
+create table if not exists mind_pending (
+  user_id text not null,
+  fingerprint text not null,
+  type text not null,
+  label text not null,
+  content text not null default '',
+  sources jsonb not null default '[]'::jsonb,
+  first_at bigint not null,
+  last_at bigint not null,
+  primary key (user_id, fingerprint)
+);
+
+-- Uploaded files, kept so a character offset points at something. A claim
+-- derived from a file carries charStart/charEnd in its provenance, and the
+-- Memory page shows the sentence it came from — which needs the text.
+create table if not exists mind_sources (
+  user_id text not null,
+  id text not null,
+  name text not null,
+  bytes integer not null default 0,
+  text text not null default '',
+  created_at bigint not null,
+  primary key (user_id, id)
+);

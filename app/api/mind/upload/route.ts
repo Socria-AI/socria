@@ -1,0 +1,58 @@
+// app/api/mind/upload/route.ts
+// POST { name, text } → read a .txt file into the Mind Graph.
+//
+// TXT first, as asked. The pipeline behind it is format-agnostic after the
+// parse step, so PDF or Markdown is a matter of swapping that one step.
+
+import { NextRequest, NextResponse } from 'next/server';
+import { auth } from '@clerk/nextjs/server';
+import { enforceRateLimit } from '@/lib/rate-limit';
+import { ingestTextFile, MAX_FILE_BYTES } from '@/lib/mind/ingest-text';
+import { listSources } from '@/lib/mind/store';
+
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
+/** Enough to be useful, few enough that the graph stays somebody's own. */
+const MAX_FILES = 20;
+
+export async function POST(req: NextRequest) {
+  const { userId } = auth();
+  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  // Ingestion is many model calls, so it draws on the expensive budget rather
+  // than the cheap one.
+  const limited = await enforceRateLimit(req, userId, 'chat');
+  if (limited) return limited;
+
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    return NextResponse.json({ error: 'Reading files is not configured.' }, { status: 503 });
+  }
+
+  const body = await req.json().catch(() => null);
+  const name = typeof body?.name === 'string' ? body.name : 'Uploaded file';
+  const text = typeof body?.text === 'string' ? body.text : '';
+  if (!text.trim()) {
+    return NextResponse.json({ error: 'That file had no text in it.' }, { status: 400 });
+  }
+  if (text.length > MAX_FILE_BYTES) {
+    return NextResponse.json(
+      { error: `That file is too long (max ${Math.round(MAX_FILE_BYTES / 1024)} KB of text).` },
+      { status: 413 }
+    );
+  }
+
+  const already = await listSources(userId);
+  if (already.length >= MAX_FILES) {
+    return NextResponse.json(
+      { error: `You can keep ${MAX_FILES} files. Remove one from Memory first.` },
+      { status: 409 }
+    );
+  }
+
+  const result = await ingestTextFile(userId, { name, text }, { now: Date.now(), apiKey });
+  if (!result) {
+    return NextResponse.json({ error: 'That file could not be read.' }, { status: 500 });
+  }
+  return NextResponse.json({ ok: true, ...result });
+}

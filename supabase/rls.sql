@@ -27,6 +27,11 @@ alter table lifecycle_emails     enable row level security;
 alter table logos_rooms         enable row level security;
 alter table logos_room_members  enable row level security;
 alter table logos_room_events   enable row level security;
+alter table mind_nodes          enable row level security;
+alter table mind_edges          enable row level security;
+alter table mind_tombstones     enable row level security;
+alter table mind_pending        enable row level security;
+alter table mind_sources        enable row level security;
 
 -- Force it for the table owner too, so a future superuser-ish role does not
 -- silently slip past the policies it thinks are protecting it. The service
@@ -41,6 +46,11 @@ alter table lifecycle_emails     force row level security;
 alter table logos_rooms         force row level security;
 alter table logos_room_members  force row level security;
 alter table logos_room_events   force row level security;
+alter table mind_nodes          force row level security;
+alter table mind_edges          force row level security;
+alter table mind_tombstones     force row level security;
+alter table mind_pending        force row level security;
+alter table mind_sources        force row level security;
 
 -- Deliberately no policies. With RLS on and no policy granting access, anon
 -- and authenticated see nothing. If direct client access is ever added, add
@@ -58,6 +68,11 @@ revoke all on lifecycle_emails     from anon, authenticated;
 revoke all on logos_rooms         from anon, authenticated;
 revoke all on logos_room_members  from anon, authenticated;
 revoke all on logos_room_events   from anon, authenticated;
+revoke all on mind_nodes          from anon, authenticated;
+revoke all on mind_edges          from anon, authenticated;
+revoke all on mind_tombstones     from anon, authenticated;
+revoke all on mind_pending        from anon, authenticated;
+revoke all on mind_sources        from anon, authenticated;
 
 -- lifecycle_emails is the one table here that holds a STATED PREFERENCE
 -- rather than something the person made: the `unsubscribed` row is somebody
