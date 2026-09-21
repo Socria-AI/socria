@@ -433,7 +433,12 @@ export async function POST(req: NextRequest) {
               surface: 'core',
               conversationId: typeof body?.conversationId === 'string' ? body.conversationId : undefined,
               existing: mindSubgraph,
-            });
+              // remember() already swallows its own failures, so this only
+              // catches a rejection it could not — but an unhandled rejection
+              // inside a `finally` after the stream has closed is the kind of
+              // thing that shows up as a mystery 500 with no stack pointing
+              // anywhere useful.
+            }).catch(() => {});
           }
         }
       },

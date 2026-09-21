@@ -27,6 +27,7 @@
 // nodes", not "none". Which is why the Memory page exists.
 
 import { compatibleTypes } from './resolve';
+import { UNKNOWN_SOURCE } from './types';
 import {
   GENERALISING_TYPES, fingerprintNode, isForgotten, normalize,
   type MindGraph, type NodeType, type ProvenanceKind,
@@ -130,12 +131,23 @@ export function gate(input: GateInput): GateVerdict {
     // Corroborated by an earlier sighting held in `pending`? Then it may be
     // believed now. Otherwise it is refused and the caller records it, so
     // the NEXT sighting can find it here.
+    // WITHOUT A CONVERSATION ID, NOTHING IS CORROBORATED.
+    //
+    // Isolation is per conversation, so with no id there is nothing to
+    // compare and no way to tell a pattern from one afternoon read twice.
+    // This failed open once: notePending stored a missing id as '?' while
+    // this compared against '', so '?' !== '' counted as "a different
+    // conversation" and a second sighting in the SAME one was believed. The
+    // unit test passed because it supplied an id; the live path did not send
+    // one. A rule that depends on every caller remembering is not a rule.
+    const here = input.conversationId;
+    if (!here) {
+      return { pass: false, reason: 'generalisation-needs-second-sighting' };
+    }
     const fp = fingerprintNode(input.type, input.label);
     const seenBefore = input.graph.pending.find((p) => p.fingerprint === fp);
-    // Corroborated by a DIFFERENT conversation? Then it may be believed.
-    // The same conversation proposing it again is the same evidence.
     const elsewhere = seenBefore
-      ? seenBefore.sources.filter((sid) => sid !== (input.conversationId ?? '')).length
+      ? seenBefore.sources.filter((sid) => sid && sid !== UNKNOWN_SOURCE && sid !== here).length
       : 0;
     if (elsewhere < 1) {
       return { pass: false, reason: 'generalisation-needs-second-sighting' };

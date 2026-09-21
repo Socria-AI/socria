@@ -18,7 +18,7 @@
 import { gate, rank, type Budget, type GateRefusal } from './gate';
 import { resolveNode, type Candidate } from './resolve';
 import {
-  MAX_ALIASES, MAX_CONTENT, MAX_LABEL, MAX_PENDING, PENDING_TTL_MS,
+  MAX_ALIASES, MAX_CONTENT, MAX_LABEL, MAX_PENDING, PENDING_TTL_MS, UNKNOWN_SOURCE,
   clamp01, clip, fingerprintEdge, fingerprintNode, isForgotten, normalize,
   type MindEdge, type MindGraph, type MindNode, type NodeType,
   type PendingClaim, type Provenance, type Relationship,
@@ -268,7 +268,7 @@ function notePending(
   now: number, conversationId?: string
 ): PendingClaim[] {
   const fp = fingerprintNode(type, label);
-  const sid = conversationId ?? '?';
+  const sid = conversationId ?? UNKNOWN_SOURCE;
   const i = pending.findIndex((p) => p.fingerprint === fp);
   if (i >= 0) {
     const next = [...pending];

@@ -199,6 +199,37 @@ console.log('\n=== ONE EVENT IS ONE EVENT ===');
   ok('a stated preference goes straight in', g2.nodes.length === 1, `${g2.nodes.length}`);
 }
 
+console.log('\n=== isolation fails CLOSED without a conversation id ===');
+{
+  // The bug this pins: notePending stored a missing id as '?' while the gate
+  // compared against '', so '?' !== '' read as "a different conversation" and
+  // a second sighting in the SAME one was believed. The unit tests passed
+  // because they supplied an id; the live client did not send one.
+  const claim = C('Belief', 'Dislikes deadlines', 'They seem to resent deadlines', 'inferred');
+  const noId = { provenance: { surface: 'core' } };  // no conversationId
+  let g = EMPTY_GRAPH;
+  ({ graph: g } = apply(g, [claim], [], noId));
+  ok('a sighting with no conversation is held back', g.nodes.length === 0);
+  ({ graph: g } = apply(g, [claim], [], noId));
+  ({ graph: g } = apply(g, [claim], [], noId));
+  ({ graph: g } = apply(g, [claim], [], noId));
+  ok('and never corroborates itself, however often', g.nodes.length === 0,
+     'an unknown conversation is not a second one');
+
+  // A real id still corroborates a genuinely different conversation.
+  let g2 = EMPTY_GRAPH;
+  ({ graph: g2 } = apply(g2, [claim], [], { provenance: { surface: 'core', conversationId: 'a' } }));
+  ({ graph: g2 } = apply(g2, [claim], [], { provenance: { surface: 'core', conversationId: 'b' } }));
+  ok('two real conversations still corroborate', g2.nodes.length === 1, JSON.stringify(g2.pending));
+
+  // And a sighting recorded WITHOUT an id cannot be the corroborating one.
+  let g3 = EMPTY_GRAPH;
+  ({ graph: g3 } = apply(g3, [claim], [], noId));
+  ({ graph: g3 } = apply(g3, [claim], [], { provenance: { surface: 'core', conversationId: 'a' } }));
+  ok('an anonymous sighting cannot corroborate a named one', g3.nodes.length === 0,
+     JSON.stringify(g3.pending));
+}
+
 console.log('\n=== register decides what may persist ===');
 {
   for (const kind of ['joke', 'hypothetical', 'example', 'temporary']) {

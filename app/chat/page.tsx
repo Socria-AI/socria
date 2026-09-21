@@ -1360,6 +1360,11 @@ export default function ChatPage() {
           memory: convoForRequest.memory ?? EMPTY_MEMORY,
           profile: importedProfile || undefined,
           understanding: journey ?? undefined,
+          // Which conversation this is. The Mind Graph needs it to tell one
+          // afternoon from a pattern: a claim about the person is only
+          // believed once a DIFFERENT conversation has suggested it too, and
+          // without an id there is nothing to compare.
+          conversationId: workingId ?? undefined,
         }),
       });
 

@@ -258,6 +258,16 @@ export interface PendingClaim {
   lastAt: number;
 }
 
+/**
+ * The source id recorded when a sighting arrives with no conversation.
+ *
+ * It can never corroborate anything: isolation is per conversation, and an
+ * unknown conversation is not a second one. Named rather than inlined so the
+ * ledger and the gate cannot drift apart about what it means — which they
+ * did once, and the rule failed open.
+ */
+export const UNKNOWN_SOURCE = '?';
+
 /** How long a lone sighting waits for corroboration before it is dropped. */
 export const PENDING_TTL_MS = 60 * 86_400_000;
 export const MAX_PENDING = 200;
