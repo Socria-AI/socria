@@ -59,6 +59,9 @@ const MODULES = [
   'lib/auth-links.ts',
   'lib/auth-flow.ts',
   'lib/session-rail.ts',
+  'lib/logos-connect.ts',
+  'lib/access-codes-server.ts',
+  'lib/local-data.ts',
   'lib/collab.ts',
   'lib/collab-transport.ts',
   'lib/checkout-attribution.ts',
@@ -86,6 +89,21 @@ export async function buildAll() {
         // tsconfig says jsx: preserve, which Node cannot load; the one .tsx
         // module under test (the poster) is bundled with the automatic runtime.
         jsx: 'automatic',
+        // `server-only` is a guard, not code: its whole job is to throw when
+        // resolved for a browser. esbuild picks the browser condition by
+        // default even at platform:'node', so a server-only module under test
+        // would explode on import. Resolving it as Next.js does on the server
+        // gives the no-op, and the guard still does its real job at build time
+        // — test/no-client-secrets asserts separately that no client component
+        // imports one of these modules.
+        // See test/helpers/server-only-shim.mjs: the marker package throws
+        // when resolved outside a server component, which would stop a
+        // server-only module being tested at all.
+        alias: { 'server-only': join(here, 'server-only-shim.mjs') },
+        // undici uses dynamic require() internally, which does not survive
+        // being bundled into ESM. It is a real dependency at runtime, so let
+        // Node resolve it there instead of inlining it.
+        external: ['undici'],
         logLevel: 'error',
       })
     )

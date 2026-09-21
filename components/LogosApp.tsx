@@ -53,8 +53,6 @@ import { sanitizeUserUnderstanding, type UserUnderstanding } from '@/lib/socria-
 import { OneLock } from '@/components/OneLock';
 import {
   FREE_DEPTH,
-  SOCRIA_ONE_KEY,
-  isValidOneKey,
   meaningfulNodes,
   type OneFeature,
   type Plan,
@@ -123,7 +121,6 @@ import {
   type LogosMsg as Msg,
   type LogosSession,
 } from '@/lib/logos-sessions';
-import { CORE3_ACCESS_KEY, isValidAccessKey } from '@/lib/socria-prompt';
 
 // Shared with Core 3.1 — unlocking once covers both.
 const KEY_STORAGE = 'socria.core3AccessKey.v1';
@@ -927,9 +924,7 @@ export function LogosApp({
 
   const keyHeaders = useCallback(
     (): Record<string, string> => ({
-      ...(unlocked && !isSignedIn ? { 'x-socria-key': CORE3_ACCESS_KEY } : {}),
       // What the client believes it holds. The routes check for themselves.
-      ...(plan === 'one' ? { 'x-socria-one': SOCRIA_ONE_KEY } : {}),
     }),
     [unlocked, isSignedIn, plan]
   );
@@ -1071,7 +1066,17 @@ export function LogosApp({
    */
   async function takeOne(typed: string): Promise<boolean> {
     if (typed) {
-      if (!isValidOneKey(typed)) return false;
+      // No local judgement: /api/logos/redeem checks the code against the
+      // server's environment and is the only thing that can grant One.
+      const ok = await fetch('/api/access/unlock', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: typed }),
+      })
+        .then((r) => (r.ok ? r.json().catch(() => null) : null))
+        .then((j) => j?.ok === true && j?.scope === 'one')
+        .catch(() => false);
+      if (!ok) return false;
       // One code, whole product: the same key also opens the Core 3 / Logos
       // access gate, so nobody unlocks One and then hits a second door.
       setUnlocked(true);
@@ -1189,6 +1194,25 @@ export function LogosApp({
 
   const persist = useCallback(
     async (s: LogosSession) => {
+      // A shared room is NOT saved to anybody's conversation row.
+      //
+      // It used to be: the host's client held the merged session — both
+      // people's messages — and PUT the whole thing to /api/conversations as
+      // itself. So the guest's words were stored under the host's user_id,
+      // where the guest could neither export nor delete them, and the host's
+      // export contained a second person's thinking.
+      //
+      // The room's own event log is the shared record now
+      // (logos_room_events), and every row in it carries the id of whoever
+      // wrote it. Each person exports what they contributed and deletes what
+      // they wrote; neither ends up holding the other's words by accident.
+      if (roomRef.current?.active) return;
+      // And not after leaving, either: the session still in memory is the
+      // MERGED one, both people's words. Persisting it on the way out would
+      // put the other person's thinking in this account's row — exactly the
+      // thing suppressing it during the room was for. A room's record is the
+      // room's; see lib/logos-rooms-server.ts.
+      if (sharedIdsRef.current.has(s.id)) return;
       if (!cloud) {
         saveLocal(sessionsRef.current);
         return;
@@ -1234,12 +1258,15 @@ export function LogosApp({
     []
   );
   const roomIdRef = useRef<string | null>(null);
+  /** every session id that has ever been a shared room in this tab */
+  const sharedIdsRef = useRef<Set<string>>(new Set());
   const room = useLogosCollab({
     enabled: !!collab,
     identity: { id: user?.id || '', name: cleanName(user?.firstName || user?.username, 'You') },
     joinCode,
     getSession: () => sessionsRef.current.find((x) => x.id === activeIdRef.current) ?? null,
     setSession: (shared) => {
+      sharedIdsRef.current.add(shared.id);
       // A guest with no session of its own adopts the host's; both then keep
       // the shared session as the active one, merged by the reducer.
       roomIdRef.current = shared.id;
@@ -1447,9 +1474,24 @@ export function LogosApp({
     }
   }
 
-  function submitKey() {
+  // The gate is judged by the server, not here. Comparing a typed code
+  // against a constant in this file is what put both codes in the public
+  // bundle; the page now forwards what was typed and keeps only the answer.
+  async function submitKey() {
     const typed = keyInput.trim();
-    if (!isValidAccessKey(typed)) {
+    let scope: 'core' | 'one' | null = null;
+    try {
+      const res = await fetch('/api/access/unlock', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: typed }),
+      });
+      const json = res.ok ? await res.json().catch(() => null) : null;
+      if (json?.ok) scope = json.scope === 'one' ? 'one' : 'core';
+    } catch {
+      /* offline, or the gate is not configured — treated as a wrong code */
+    }
+    if (!scope) {
       setKeyError(true);
       return;
     }
@@ -1458,9 +1500,9 @@ export function LogosApp({
     try {
       localStorage.setItem(KEY_STORAGE, '1');
     } catch {}
-    // The One code is a master key — at this gate it opens everything at
-    // once, and a signed-in redemption is written to the account.
-    if (isValidOneKey(typed)) void takeOne(typed);
+    // The One code opens everything at once, and a signed-in redemption is
+    // written to the account so it follows them.
+    if (scope === 'one') void takeOne(typed);
   }
 
   // ── map ────────────────────────────────────────────────────────────
@@ -1560,7 +1602,10 @@ export function LogosApp({
               // returns the map with each node attributed, so the local view
               // shows the same author dots the other person sees; alone it
               // returns the map unchanged.
-              const shown = roomRef.current.active ? roomRef.current.onLocalMap(map) : map;
+              const shown =
+                roomRef.current.active && sharedIdsRef.current.has(s.id)
+                  ? roomRef.current.onLocalMap(map)
+                  : map;
               return { ...s, map: shown, contexts };
             });
             setChanged(new Set(delta.changed));
@@ -1969,7 +2014,11 @@ export function LogosApp({
     // In a shared room the turn is stamped with who wrote it and broadcast to
     // the other person before anything else happens. Alone, this returns the
     // turn unchanged and sends nothing.
-    const sent = roomRef.current.active ? roomRef.current.onLocalMessage(turn) : turn;
+    // In a room AND in the room's own session: switching to another line of
+    // thinking while a room is open must not broadcast it into that room.
+    const inShared =
+      roomRef.current.active && sharedIdsRef.current.has(activeIdRef.current ?? '');
+    const sent = inShared ? roomRef.current.onLocalMessage(turn) : turn;
     const before = messages;
     const next = [...before, sent];
     patchActive((s) => ({ ...s, messages: next }), false);
@@ -2071,7 +2120,15 @@ export function LogosApp({
         isSignedIn &&
         userTurns >= JOURNEY_EVERY_TURNS &&
         userTurns % JOURNEY_EVERY_TURNS === 0 &&
-        mapRef.current.context !== 'reflecting'
+        mapRef.current.context !== 'reflecting' &&
+        // NEVER from a shared room. The understanding pass reads the whole
+        // conversation and writes what it concludes into this account's
+        // permanent user_profiles row — so in a two-person room it would fold
+        // the other participant's words into a private profile they cannot
+        // see, export or delete. Suppressing the pass is the only version of
+        // this that is honest: there is no way to derive "what you seem to be
+        // working through" from a conversation without reading both halves.
+        !sharedIdsRef.current.has(sid)
       ) {
         void (async () => {
           try {

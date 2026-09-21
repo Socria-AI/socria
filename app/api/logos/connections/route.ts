@@ -5,17 +5,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { connectionStatus, deleteConnection, connectionsConfigured } from '@/lib/logos-connections';
 import { providerConfig } from '@/lib/logos-oauth';
-import { isValidAccessKey } from '@/lib/socria-prompt';
+import { unauthorized } from '@/lib/route-guard';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
   const { userId } = auth();
-  const keyUnlocked = isValidAccessKey(req.headers.get('x-socria-key'));
-  if (!userId && !keyUnlocked) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  // No unlock path here: this route reads a person's connected accounts
+  // (or fetches a URL on their behalf), so it needs a real account.
+  if (!userId) return unauthorized();
   const status = await connectionStatus(userId);
   return NextResponse.json({
     // Only a signed-in user with a configured OAuth app can connect.
@@ -44,7 +43,9 @@ export async function GET(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   const { userId } = auth();
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  // No unlock path here: this route reads a person's connected accounts
+  // (or fetches a URL on their behalf), so it needs a real account.
+  if (!userId) return unauthorized();
   const provider = new URL(req.url).searchParams.get('provider');
   if (provider !== 'google' && provider !== 'notion') {
     return NextResponse.json({ error: 'Unknown provider' }, { status: 400 });

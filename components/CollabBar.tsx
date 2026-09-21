@@ -23,6 +23,8 @@ export function CollabBar({ room }: { room: Handle }) {
 
   if (!room.active) {
     return (
+      <>
+      {room.error && <span className="lg-collab-err" role="alert">{room.error}</span>}
       <button type="button" className="lg-collab-start" onClick={room.share} title="Think together">
         <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <circle cx="9" cy="8" r="3" /><circle cx="17" cy="10" r="2.4" />
@@ -30,6 +32,7 @@ export function CollabBar({ room }: { room: Handle }) {
         </svg>
         Think together
       </button>
+      </>
     );
   }
 
@@ -64,9 +67,12 @@ export function CollabBar({ room }: { room: Handle }) {
       {alone ? (
         <button type="button" className="lg-collab-invite" onClick={copy}>
           {copied ? 'Link copied' : `Invite — ${room.code}`}
-          <span className="lg-collab-reach">
-            {room.reach === 'realtime' ? 'across devices' : 'this browser'}
-          </span>
+          {/* One reach now, and it is the honest one: the room goes through
+              Socria's server, which checks who you are before it hands
+              anyone a word of it. The old copy had to distinguish "across
+              devices" from "this browser" because one of the two paths
+              reached anyone holding a public key. */}
+          <span className="lg-collab-reach">signed-in only</span>
         </button>
       ) : (
         <span className="lg-collab-live">Thinking together</span>
@@ -75,6 +81,11 @@ export function CollabBar({ room }: { room: Handle }) {
       <button type="button" className="lg-collab-leave" onClick={room.leave} title="Leave the shared room">
         Leave
       </button>
+      {room.error && (
+        <span className="lg-collab-err" role="alert">
+          {room.error}
+        </span>
+      )}
     </div>
   );
 }

@@ -1,28 +1,33 @@
 // lib/collab-transport.ts
 //
-// How an event travels between two people. The reducer in lib/collab.ts does
-// not care; this is the only file that does.
+// How an event travels between two people — and who is allowed to be one of
+// them.
 //
-// ONE INTERFACE, TWO BACKENDS.
+// WHAT THIS REPLACED. The first version opened a Supabase Realtime channel
+// from the browser, named after a six-character code, using the public anon
+// key. The channel was not private, so Supabase applied no policy to it:
+// anyone with that key — which every visitor had, because it shipped in the
+// bundle by design — could subscribe to any room whose code they guessed or
+// were given, and read every message and map edit without appearing in the
+// room. The "two people" limit was React state and stopped nobody.
 //
-//   BroadcastChannel — two tabs of the same browser. It needs nothing
-//   configured, it works offline, and it is what the automated check drives:
-//   two clients on one machine, converging through a real channel. It is also
-//   a genuine product path — two people at one shared screen, or one person
-//   with the room open twice.
+// There is now exactly one path, and it goes through Socria's own server:
+// a poll for events, a post to add them, both behind a Clerk session and
+// both refusing anyone who is not a member of that room
+// (app/api/logos/room/events). The browser no longer talks to Supabase at
+// all, which is why NEXT_PUBLIC_SUPABASE_ANON_KEY is gone.
 //
-//   Supabase Realtime — two devices, two networks. Broadcast carries the
-//   events; Presence carries who-is-here. It needs the public Supabase URL
-//   and anon key in the browser (NEXT_PUBLIC_SUPABASE_URL / _ANON_KEY); with
-//   those absent it simply is not offered, and Logos 2 falls back to the
-//   same-browser channel with a line of copy that says so.
+// The trade is latency: a poll is not a socket, and an event lands within
+// about a second rather than instantly. That is the right side of the trade
+// for a feature whose alternative was an unauthenticated broadcast, and the
+// interface below is unchanged, so a properly-authorized socket can replace
+// the polling later without touching the reducer or the UI.
 //
-// Nothing here trusts what arrives: every inbound payload goes through
-// sanitizeEvent before it reaches the reducer. A channel is a place a
-// stranger can shout into — the room code is a soft gate, not a wall.
+// Nothing here trusts what arrives: every inbound payload still goes through
+// sanitizeEvent before it reaches the reducer, and the SERVER overwrites the
+// author of every event with the session that sent it.
 
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { roomFor, sanitizeBy, type CollabEvent, type CollabEventKind } from './collab';
+import { sanitizeBy, type CollabEvent, type CollabEventKind } from './collab';
 import { sanitizeMap, type LogosNode } from './logos';
 
 export interface Transport {
@@ -32,8 +37,8 @@ export interface Transport {
   onEvent(fn: (ev: CollabEvent) => void): void;
   /** tear it all down */
   close(): void;
-  /** which backend this is, for the copy that explains the room's reach */
-  readonly kind: 'local' | 'realtime';
+  /** the one backend there is; kept for the copy that describes the room */
+  readonly kind: 'server';
 }
 
 const EVENT_KINDS: CollabEventKind[] = ['hello', 'bye', 'message', 'node.add', 'node.edit', 'node.remove', 'map'];
@@ -117,90 +122,127 @@ export function sanitizeEvent(raw: unknown): CollabEvent | null {
   }
 }
 
-// ── same browser ────────────────────────────────────────────────────
-
-class LocalTransport implements Transport {
-  readonly kind = 'local' as const;
-  private ch: BroadcastChannel;
-  private fn: ((ev: CollabEvent) => void) | null = null;
-  constructor(code: string) {
-    this.ch = new BroadcastChannel(roomFor(code));
-    this.ch.onmessage = (e) => {
-      const ev = sanitizeEvent(e.data);
-      if (ev && this.fn) this.fn(ev);
-    };
-  }
-  send(ev: CollabEvent) {
-    this.ch.postMessage(ev);
-  }
-  onEvent(fn: (ev: CollabEvent) => void) {
-    this.fn = fn;
-  }
-  close() {
-    this.fn = null;
-    try {
-      this.ch.close();
-    } catch {}
-  }
-}
-
-// ── across devices ──────────────────────────────────────────────────
-
-let browserClient: SupabaseClient | null = null;
-function browserSupabase(): SupabaseClient | null {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !key) return null;
-  if (!browserClient) {
-    browserClient = createClient(url, key, {
-      auth: { persistSession: false, autoRefreshToken: false },
-      realtime: { params: { eventsPerSecond: 20 } },
-    });
-  }
-  return browserClient;
-}
-
-/** Whether the cross-device backend can run here at all. */
-export function realtimeAvailable(): boolean {
-  return !!process.env.NEXT_PUBLIC_SUPABASE_URL && !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-}
-
-class RealtimeTransport implements Transport {
-  readonly kind = 'realtime' as const;
-  private fn: ((ev: CollabEvent) => void) | null = null;
-  private channel: ReturnType<SupabaseClient['channel']>;
-  constructor(client: SupabaseClient, code: string) {
-    this.channel = client.channel(roomFor(code), { config: { broadcast: { self: false } } });
-    this.channel
-      .on('broadcast', { event: 'ev' }, (msg: { payload?: unknown }) => {
-        const ev = sanitizeEvent(msg?.payload);
-        if (ev && this.fn) this.fn(ev);
-      })
-      .subscribe();
-  }
-  send(ev: CollabEvent) {
-    void this.channel.send({ type: 'broadcast', event: 'ev', payload: ev });
-  }
-  onEvent(fn: (ev: CollabEvent) => void) {
-    this.fn = fn;
-  }
-  close() {
-    this.fn = null;
-    try {
-      void this.channel.unsubscribe();
-    } catch {}
-  }
-}
+// ── the only transport: through our own server ──────────────────────
 
 /**
- * Open the room. Cross-device where it can, same-browser where it cannot —
- * and it never throws: a room that only reaches this browser is still a room,
- * and the surface says which one you are in.
+ * How often to ask for what the other person has said.
+ *
+ * Two seconds, not one: the events route spends the shared 'aux' rate-limit
+ * budget, which allows 40 requests a minute for a signed-in caller. A poll
+ * every 1.2s is 50/min from the room alone — so a room would throttle itself
+ * into silence within a minute, and take the rest of Logos down with it,
+ * because the map and memory passes draw on the same pool. 2s leaves room for
+ * the surface's other traffic.
  */
-export function openTransport(code: string, prefer: 'auto' | 'local' = 'auto'): Transport {
-  if (prefer === 'auto') {
-    const client = browserSupabase();
-    if (client) return new RealtimeTransport(client, code);
+export const POLL_MS = 2000;
+
+class ServerTransport implements Transport {
+  readonly kind = 'server' as const;
+  private fn: ((ev: CollabEvent) => void) | null = null;
+  private timer: ReturnType<typeof setInterval> | null = null;
+  private cursor = 0;
+  private busy = false;
+  private stopped = false;
+  private onVisible: (() => void) | null = null;
+  private presenceFn: ((who: { id: string; name: string; seat: 'host' | 'guest' }[]) => void) | null =
+    null;
+
+  /**
+   * `since` lets a caller start from the room's tail instead of replaying it
+   * from the beginning. A guest joining a long-running room wants the state,
+   * which the host's hello carries; it does not want every keystroke since
+   * the room opened.
+   */
+  constructor(
+    private roomId: string,
+    since = 0
+  ) {
+    this.cursor = since;
+    void this.poll();
+    this.timer = setInterval(() => void this.poll(), POLL_MS);
+    if (typeof document !== 'undefined') {
+      this.onVisible = () => {
+        if (document.visibilityState === 'visible') void this.poll();
+      };
+      document.addEventListener('visibilitychange', this.onVisible);
+    }
   }
-  return new LocalTransport(code);
+
+  onPresence(fn: (who: { id: string; name: string; seat: 'host' | 'guest' }[]) => void) {
+    this.presenceFn = fn;
+  }
+
+  private async poll(): Promise<void> {
+    // One request in flight at a time: a slow network must not pile up polls
+    // and deliver the same events several times over.
+    if (this.busy || this.stopped) return;
+    // And not at all while nobody is looking. A room left open in a
+    // background tab would otherwise poll all day — thousands of requests
+    // against a daily budget, for a screen no one is reading. The next
+    // foreground poll catches up from the cursor, so nothing is lost.
+    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+    this.busy = true;
+    try {
+      const res = await fetch(
+        `/api/logos/room/events?roomId=${encodeURIComponent(this.roomId)}&since=${this.cursor}`,
+        { cache: 'no-store' }
+      );
+      if (!res.ok) return;
+      const json = await res.json();
+      if (typeof json?.cursor === 'number') this.cursor = json.cursor;
+      if (this.presenceFn && Array.isArray(json?.present)) this.presenceFn(json.present);
+      if (!Array.isArray(json?.events)) return;
+      for (const raw of json.events) {
+        const ev = sanitizeEvent(raw);
+        // Our own events come back too; the reducer is idempotent by event
+        // id, so replay costs nothing and guarantees both sides converge on
+        // the server's order rather than on their own.
+        if (ev && this.fn && !this.stopped) this.fn(ev);
+      }
+    } catch {
+      // Offline, or the route refused. The next tick tries again; a failed
+      // poll must never take the room down.
+    } finally {
+      this.busy = false;
+    }
+  }
+
+  send(ev: CollabEvent) {
+    if (this.stopped) return;
+    void fetch('/api/logos/room/events', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ roomId: this.roomId, events: [ev] }),
+    }).catch(() => {});
+  }
+
+  onEvent(fn: (ev: CollabEvent) => void) {
+    this.fn = fn;
+  }
+
+  close() {
+    this.stopped = true;
+    this.fn = null;
+    this.presenceFn = null;
+    if (this.timer) clearInterval(this.timer);
+    this.timer = null;
+    if (this.onVisible && typeof document !== 'undefined') {
+      document.removeEventListener('visibilitychange', this.onVisible);
+    }
+    this.onVisible = null;
+  }
+}
+
+export type { ServerTransport };
+
+/**
+ * Open the room's channel.
+ *
+ * Takes the room id the server issued when the person created or joined —
+ * never a code the caller typed. A code is how you ASK for a seat
+ * (POST /api/logos/room/join); a room id is only ever handed back by the
+ * server to somebody it has already seated.
+ */
+export function openTransport(roomId: string, since = 0): Transport {
+  return new ServerTransport(roomId, since);
 }

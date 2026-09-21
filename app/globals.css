@@ -8123,3 +8123,5 @@ html.anim-off .logos-root.is-firstmap-node .lg-node, html:not(.js) .logos-root.i
 
 /* whose idea a node was */
 .logos-root .lg-node-by{width:8px;height:8px;border-radius:50%;flex:0 0 auto;margin-left:auto}
+/* Why a room refused — a wrong code, a full room, or not signed in. */
+.logos-root .lg-collab-err{font-family:var(--font-sans);font-size:11.5px;color:var(--lg-vermilion,#D8402F)}

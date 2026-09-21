@@ -25,7 +25,7 @@ const ev = (kind, by, extra) => ({ id: eventId(++t, () => 0.5), at: t, by: byOf(
 // ── the share code ────────────────────────────────────────────────────
 {
   const code = makeShareCode(() => 0.999);
-  ok('six characters', code.length === CODE_LEN);
+  ok('the length the server issues', code.length === CODE_LEN);
   ok('from the alphabet', [...code].every((c) => CODE_ALPHABET.includes(c)));
   // Nothing that reads as something else over the phone.
   for (const bad of ['0', 'O', '1', 'I', 'L']) ok(`no ${bad} in the alphabet`, !CODE_ALPHABET.includes(bad));
@@ -33,7 +33,7 @@ const ev = (kind, by, extra) => ({ id: eventId(++t, () => 0.5), at: t, by: byOf(
   ok('rejects the wrong length', !isShareCode('ABC'));
   ok('rejects a bad letter', !isShareCode('ABCDE0'));
   ok('lower case is fine', normalizeCode('abcdef'.replace(/[^a-z]/g, 'k')) !== null || true);
-  ok('spaces and dashes are what people add', normalizeCode(' abc-def ') === 'ABCDEF' || normalizeCode(' abc-def ') === null);
+  ok('spaces and dashes are what people add', normalizeCode(' abcd-efgh ') === 'ABCDEFGH');
   ok('a real one round-trips', normalizeCode(code.toLowerCase()) === code);
   ok('one room per code', roomFor('ABCDEF') === 'logos2:ABCDEF');
   // deterministic under a fixed rng
@@ -172,9 +172,12 @@ const ev = (kind, by, extra) => ({ id: eventId(++t, () => 0.5), at: t, by: byOf(
 
 // ── the link ──────────────────────────────────────────────────────────
 {
-  const u = joinUrl('https://socria.app/', 'ABCDEF');
-  ok('the link opens the right surface', u === 'https://socria.app/chat?model=logos-2&join=ABCDEF');
-  ok('and reads back', joinCodeFrom('?model=logos-2&join=abcdef') === 'ABCDEF');
+  const u = joinUrl('https://socria.app/', 'ABCDEFGH');
+  ok('the link opens the right surface', u === 'https://socria.app/chat?model=logos-2&join=ABCDEFGH');
+  // The length here must match what the server issues, or every invite
+  // link silently fails to open — which is exactly what an earlier CODE_LEN
+  // of 6 did once the server moved to 8.
+  ok('and reads back', joinCodeFrom('?model=logos-2&join=abcdefgh') === 'ABCDEFGH');
   ok('a bad code reads as none', joinCodeFrom('?join=nope') === null);
   ok('no code reads as none', joinCodeFrom('') === null);
 }

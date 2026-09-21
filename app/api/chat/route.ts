@@ -12,7 +12,6 @@ import {
   SOCRIA_MODELS,
   SOCRIA_PROMPT_VERSION,
   CORE_3_FALLBACK_MODEL,
-  isValidAccessKey,
   sanitizeUserUnderstanding,
   hasJourneyContent,
   renderJourneyBrief,
@@ -31,6 +30,7 @@ import { eggFor } from '@/lib/easter-eggs';
 import { reportUpstream } from '@/lib/upstream-error';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { memoryCaps, selectRelevant, visibleEntries } from '@/lib/person-memory';
+import { mayUse } from '@/lib/route-guard';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -97,14 +97,14 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => null);
     const messages = body?.messages;
 
-    // Server-side gate: models flagged requiresAuth need a Clerk session OR
-    // a valid access key (typed by the user, sent via the x-socria-key
-    // header). Even if the client UI is bypassed, anon users without either
-    // can't hit Core 3.
+    // Server-side gate: models flagged requiresAuth need a Clerk session OR a
+    // verified unlock grant. The grant is an httpOnly cookie this server
+    // signed (lib/access-codes-server.ts) after checking a typed code against
+    // the environment — not, as before, a constant the browser also carried,
+    // accepted from a header or from `body.accessKey`. Both of those inputs
+    // are caller-composed and are no longer read.
     const { userId } = auth();
-    const keyUnlocked = isValidAccessKey(
-      req.headers.get('x-socria-key') ?? body?.accessKey
-    );
+    const keyUnlocked = mayUse(req, userId);
     const requestedModelId = body?.model;
     const requestedConfig =
       requestedModelId === 'core-3'

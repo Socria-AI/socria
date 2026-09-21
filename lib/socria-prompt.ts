@@ -1346,21 +1346,17 @@ export const SOCRIA_MODELS: Record<SocriaModel, ModelConfig> = {
   },
 };
 
-// A typed access key that unlocks auth-gated models (e.g. Core 3.1) without
-// signing in. Entered in the Core 3 intro modal, saved to localStorage, and
-// sent to the gated API routes via the `x-socria-key` header so the server
-// can honor it. Kept deliberately simple — this is a soft gate, not a secret.
-export const CORE3_ACCESS_KEY = 'SMART';
-// The Socria One code is a master key: anywhere a key is asked for, it
-// opens that gate too (and the client handlers that accept it also switch
-// One on, so one code typed once unlocks the whole product).
-const MASTER_KEY = 'MAVERICKS26LONGHORNS27';
-
-export function isValidAccessKey(key: unknown): boolean {
-  if (typeof key !== 'string') return false;
-  const k = key.trim();
-  return k === CORE3_ACCESS_KEY || k.toUpperCase() === MASTER_KEY;
-}
+// The access codes USED to live here, as two exported constants, in a module
+// eleven client components import — which put both of them in the public
+// browser bundle, where one substituted for a Clerk session on fourteen AI
+// routes and the other granted the paid plan. They are gone. A code the
+// server checks now lives only in the server's environment and is compared in
+// lib/access-codes-server.ts, which `import 'server-only'` keeps out of any
+// client bundle by making the build fail instead.
+//
+// Nothing here replaces them on purpose: this module is client-reachable, so
+// by construction it is the wrong place for a secret. The client asks
+// POST /api/access/unlock whether a typed code is good; it never holds one.
 
 // ===== AI history import =====
 //

@@ -12,21 +12,48 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth, clerkClient } from '@clerk/nextjs/server';
 import { supabaseAdmin } from '@/lib/supabase';
-import { getSubscription, isCompCustomer } from '@/lib/subscriptions';
+import { purgeUserFromRooms } from '@/lib/logos-rooms-server';
+import { ACCESS_COOKIE } from '@/lib/access-codes-server';
+import { readSubscription, isCompCustomer } from '@/lib/subscriptions';
 import { stripe, stripeConfigured } from '@/lib/stripe';
 import { enforceRateLimit } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-/** Every table that keys rows to a user. Keep this list exhaustive. */
+/**
+ * Every table that keys rows to a user. Keep this list exhaustive.
+ *
+ * "Exhaustive" is now checked rather than asserted: test/account-data-complete
+ * reads supabase/schema.sql and fails if a table there is missing from this
+ * list or from the export. `logos_usage` was missing from both for several
+ * releases — a person who asked to be forgotten kept a row of usage counters
+ * keyed to their id — and it was missed precisely because adding a table and
+ * adding it here are two separate acts, only one of which breaks anything.
+ */
 const OWNED_TABLES = [
   'conversations',
   'user_profiles',
   'logos_connections',
   'socria_subscriptions',
   'lifecycle_emails',
+  'logos_usage',
 ] as const;
+
+/**
+ * Tables that arrived in a later migration than the rest. On a database that
+ * has not run it there is nothing of the person's in them, and refusing to
+ * finish a deletion — after the subscription is already cancelled — over a
+ * table that does not exist would be the wrong way round. Only a genuinely
+ * missing table is forgiven; any other error still stops the deletion.
+ */
+const LATE_TABLES = new Set<string>([
+  'lifecycle_emails',
+  'logos_usage',
+  'logos_room_events',
+  'logos_room_members',
+  'logos_rooms',
+]);
 
 function tableMissing(error: { code?: string; message?: string }): boolean {
   const m = `${error.code ?? ''} ${error.message ?? ''}`.toLowerCase();
@@ -58,7 +85,22 @@ export async function DELETE(req: NextRequest) {
   // possible outcome of asking to be forgotten.
   let billingNote: string | null = null;
   try {
-    const sub = await getSubscription(userId);
+    // Fail closed on an unreadable billing row. `getSubscription` returns
+    // null for both "no subscription" and "the query failed", so a database
+    // hiccup here used to look exactly like "nothing to cancel" — the
+    // deletion went ahead, Stripe was never told, and the person kept being
+    // charged for an account that no longer existed.
+    const read = await readSubscription(userId);
+    if (!read.ok) {
+      return NextResponse.json(
+        {
+          error:
+            'We could not check your billing, so nothing was deleted — otherwise you could keep being charged for an account that no longer exists. Please try again in a moment, or email hellosocria@gmail.com.',
+        },
+        { status: 503 }
+      );
+    }
+    const sub = read.row;
     if (sub?.subscriptionId && !isCompCustomer(sub.customerId) && stripeConfigured()) {
       await stripe().subscriptions.cancel(sub.subscriptionId);
       billingNote = 'Your Socria One subscription was cancelled.';
@@ -76,13 +118,7 @@ export async function DELETE(req: NextRequest) {
 
   for (const table of OWNED_TABLES) {
     const { error } = await db.from(table).delete().eq('user_id', userId);
-    // The lifecycle ledger arrived in a later migration than the rest. On a
-    // database that has not run it there is nothing of the person's in it,
-    // and refusing to finish a deletion — after the subscription is already
-    // cancelled — over a table that does not exist would be the wrong way
-    // round. Only a genuinely missing table is forgiven; any other error
-    // stops the deletion as before.
-    if (error && table === 'lifecycle_emails' && tableMissing(error)) continue;
+    if (error && LATE_TABLES.has(table) && tableMissing(error)) continue;
     if (error) {
       console.error(`account delete: ${table} failed`, error);
       return NextResponse.json(
@@ -96,6 +132,37 @@ export async function DELETE(req: NextRequest) {
       );
     }
     deleted.push(table);
+  }
+
+  // Shared rooms, which a flat "delete every row with your id on it" cannot
+  // express. purgeUserFromRooms removes THIS person's events and membership,
+  // clears them as host so the other participant's events are not orphaned,
+  // and drops rooms nobody is left in. The other participant's words stay —
+  // they are that person's to export and to delete. See the deletion note in
+  // supabase/schema.sql.
+  try {
+    await purgeUserFromRooms(userId, Date.now());
+    deleted.push('logos_rooms');
+  } catch (e) {
+    // A database that has not run the collaboration migration genuinely has
+    // nothing of theirs in it; anything else is a real failure and stops the
+    // deletion, exactly like a failed table above. Swallowing it would report
+    // a completed deletion that had left rooms behind.
+    const m = e instanceof Error ? e.message.toLowerCase() : '';
+    const missing =
+      m.includes('42p01') || m.includes('does not exist') || m.includes('schema cache');
+    if (!missing) {
+      console.error('account delete: room purge', e);
+      return NextResponse.json(
+        {
+          error:
+            'Could not delete everything, so nothing further was removed and your account still exists. Please email hellosocria@gmail.com and we will finish it by hand.',
+          failedAt: 'logos_rooms',
+          deleted,
+        },
+        { status: 500 }
+      );
+    }
   }
 
   // The identity last.
@@ -113,5 +180,19 @@ export async function DELETE(req: NextRequest) {
     );
   }
 
-  return NextResponse.json({ ok: true, deleted, billingNote });
+  // The unlock grant is an httpOnly cookie, so only the server can take it
+  // back. An account that no longer exists must not leave one behind on a
+  // shared device, where it would hand the next person an unlock the deleted
+  // account had been given.
+  const done = NextResponse.json({ ok: true, deleted, billingNote });
+  done.cookies.set({
+    name: ACCESS_COOKIE,
+    value: '',
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+    path: '/',
+    maxAge: 0,
+  });
+  return done;
 }

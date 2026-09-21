@@ -18,10 +18,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  applyEvent, byOf, cleanName, eventId, initialState, joinUrl, makeShareCode,
+  applyEvent, byOf, cleanName, eventId, initialState, joinUrl,
   seatFor, type CollabEvent, type CollabState, type Participant, type Seat,
 } from '@/lib/collab';
-import { openTransport, realtimeAvailable, type Transport } from '@/lib/collab-transport';
+import { openTransport, type Transport } from '@/lib/collab-transport';
 import type { LogosMsg, LogosSession } from '@/lib/logos-sessions';
 import type { LogosNode, ThinkingMap } from '@/lib/logos';
 
@@ -32,12 +32,16 @@ export interface CollabHandle {
   code: string | null;
   me: Participant;
   present: Participant[];
-  /** 'realtime' reaches other devices; 'local' is same-browser only */
-  reach: 'realtime' | 'local' | null;
+  /** how the room reaches the other person; one path now, through our server */
+  reach: 'server' | null;
   /** a link that opens this room for the other person */
   link: string | null;
   /** open a room around the current session (become host) */
   share: () => void;
+  /** ask the server for a seat in an existing room */
+  join: (code: string) => void;
+  /** why the last room action failed, if it did */
+  error: string | null;
   /** leave the room; single-player resumes */
   leave: () => void;
   /** call when the local person sends a message — stamps, applies, broadcasts */
@@ -82,11 +86,14 @@ export function useLogosCollab(opts: {
 
   const [code, setCode] = useState<string | null>(null);
   const [present, setPresent] = useState<Participant[]>([]);
-  const [reach, setReach] = useState<'realtime' | 'local' | null>(null);
+  const [reach, setReach] = useState<'server' | null>(null);
 
   const stateRef = useRef<CollabState | null>(null);
   const transportRef = useRef<Transport | null>(null);
   const meRef = useRef<Participant | null>(null);
+  /** the id the server issued for this room; null when not in one */
+  const roomServerIdRef = useRef<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const me: Participant = useMemo(
     () => ({ id: identity.id || tabId(), name: cleanName(identity.name, 'You'), seat: 'host' }),
@@ -94,10 +101,27 @@ export function useLogosCollab(opts: {
   );
 
   // Push whatever the reducer now holds back to the UI.
+  /** Presence straight from the create/join response, so the room is never
+   *  drawn empty — including empty of yourself — while the first poll runs. */
+  const seatPresence = useCallback((who: unknown) => {
+    if (!Array.isArray(who)) return;
+    setPresent(
+      who
+        .filter((p): p is Participant => !!p && typeof (p as Participant).id === 'string')
+        .map((p) => ({
+          id: p.id,
+          name: cleanName(p.name, 'Someone'),
+          seat: p.seat === 'host' ? 'host' : 'guest',
+        }))
+    );
+  }, []);
+
   const flush = useCallback(() => {
     const st = stateRef.current;
     if (!st) return;
-    setPresent(st.present);
+    // NOT st.present: that is the reducer's view, assembled from `hello`
+    // events the other client wrote. Presence comes from the server (see
+    // onPresence above) and nothing else may set it.
     if (st.session) setSession(st.session);
   }, [setSession]);
 
@@ -119,9 +143,10 @@ export function useLogosCollab(opts: {
   const sendHello = useCallback(() => {
     const st = stateRef.current;
     if (!st) return;
-    const session = st.me.seat === 'host' ? getSession() : null;
-    emit({ kind: 'hello', participant: st.me, ...(session ? { session } : {}) } as never);
-  }, [emit, getSession]);
+    // No session rides along: the room holds its own seed (see
+    // logos_rooms.seed_session). This is only "I am here".
+    emit({ kind: 'hello', participant: st.me } as never);
+  }, [emit]);
 
   const applyRemote = useCallback(
     (ev: CollabEvent) => {
@@ -133,10 +158,14 @@ export function useLogosCollab(opts: {
       // who is already here is a reply: when we first see someone's hello, we
       // answer with our own. The "before" check is the loop guard — we reply
       // to a newcomer, not to their reply to us.
-      const known = st.present.some((p) => p.id === ev.by.id) || ev.by.id === st.me.id;
       stateRef.current = applyEvent(st, ev);
       flush();
-      if (ev.kind === 'hello' && !known && ev.by.id !== st.me.id) sendHello();
+      // No hello-reply any more. It existed because BroadcastChannel does not
+      // replay, so a late joiner could only learn who was there by being
+      // told. The server keeps the log and the membership list, so a joiner
+      // is handed both on /join — and the reply, which compared a
+      // server-authored id against a locally-invented one, looped forever
+      // whenever those two disagreed.
     },
     [flush, sendHello]
   );
@@ -144,16 +173,55 @@ export function useLogosCollab(opts: {
   // ── opening a room ──────────────────────────────────────────────────
 
   const openRoom = useCallback(
-    (roomCode: string, seat: Seat) => {
-      const meHere: Participant = { ...me, seat };
+    (
+      roomCode: string,
+      seat: Seat,
+      serverRoomId: string,
+      since = 0,
+      seed: LogosSession | null = null,
+      serverUserId?: string
+    ) => {
+      // OUR id is the one the server knows us by, not a tab id we invented.
+      // They used to differ whenever Clerk had not resolved yet, and since
+      // the server stamps every event with the real id, our own echoed
+      // events looked like a stranger's — which made the hello-reply guard
+      // fire forever on any room opened from an invite link.
+      const meHere: Participant = { ...me, id: serverUserId || me.id, seat };
       meRef.current = meHere;
-      const session = seat === 'host' ? getSession() : null;
+      // The room's session is the seed the server holds, under the ROOM's id
+      // so it never collides with the host's own conversation.
+      const session: LogosSession | null = seed
+        ? ({ ...seed, id: `room_${serverRoomId}` } as LogosSession)
+        : null;
       stateRef.current = initialState(roomCode, meHere, session);
-      const t = openTransport(roomCode);
+      roomServerIdRef.current = serverRoomId;
+      // The transport is opened on the id the SERVER issued after seating us,
+      // never on a code somebody typed. A code asks for a seat; an id is only
+      // ever handed back to someone already seated.
+      const t = openTransport(serverRoomId, since);
       transportRef.current = t;
-      setReach(t.kind === 'realtime' ? 'realtime' : 'local');
+      setReach('server');
       setCode(roomCode);
       t.onEvent(applyRemote);
+    // Presence is whatever the SERVER says it is. It used to be derived from
+    // `hello` events, which are composed by the other client — so a
+    // participant could claim any name, any seat, and a room could appear to
+    // hold any number of people. The events route returns the membership rows
+    // it checked us against; that list is the only one shown.
+    const withPresence = t as Transport & {
+      onPresence?: (fn: (who: Participant[]) => void) => void;
+    };
+    withPresence.onPresence?.((who) => {
+      setPresent(
+        who
+          .filter((p) => p && typeof p.id === 'string')
+          .map((p) => ({
+            id: p.id,
+            name: cleanName(p.name, 'Someone'),
+            seat: p.seat === 'host' ? 'host' : 'guest',
+          }))
+      );
+    });
       // Announce ourselves. Anyone already here replies (see applyRemote), so
       // a guest that opened after the host still learns of it and adopts its
       // session. Realtime's subscribe is async, so the hello is sent a beat
@@ -169,17 +237,93 @@ export function useLogosCollab(opts: {
 
   const share = useCallback(() => {
     if (stateRef.current) return; // already in a room
-    openRoom(makeShareCode(), 'host');
+    void (async () => {
+      try {
+        // The room opens around a COPY of what the host is working on, under
+        // the room's own id. The host's original conversation stays theirs —
+        // saveable, exportable, deletable — and the copy belongs to the room,
+        // where both people's contributions are attributed individually.
+        // Marking the host's existing session as shared instead would have
+        // made it permanently unsaveable the moment they hosted.
+        const current = getSession();
+        const res = await fetch('/api/logos/room', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ session: current ?? null }),
+        });
+        if (!res.ok) {
+          setError(res.status === 401 ? 'Sign in to think together.' : 'Could not open a room.');
+          return;
+        }
+        const json = await res.json();
+        if (!json?.room?.code || !json?.room?.id) return;
+        seatPresence(json.present);
+        openRoom(json.room.code, 'host', json.room.id, 0, json.room.seed, json?.me?.id);
+      } catch {
+        setError('Could not open a room.');
+      }
+    })();
   }, [openRoom]);
+
+  /** Follow an invite: ask the server for a seat, and only then open. */
+  const join = useCallback(
+    (code: string) => {
+      if (stateRef.current) return;
+      void (async () => {
+        try {
+          const res = await fetch('/api/logos/room/join', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code }),
+          });
+          if (!res.ok) {
+            setError(
+              res.status === 401
+                ? 'Sign in to join.'
+                : res.status === 409
+                  ? 'That room already has two people in it.'
+                  : 'No open room with that code.'
+            );
+            return;
+          }
+          const json = await res.json();
+          if (!json?.room?.id) return;
+          seatPresence(json.present);
+          openRoom(
+            json.room.code ?? code,
+            json?.me?.seat === 'host' ? 'host' : 'guest',
+            json.room.id,
+            typeof json.room.since === 'number' ? json.room.since : 0,
+            json.room.seed,
+            json?.me?.id
+          );
+        } catch {
+          setError('Could not join that room.');
+        }
+      })();
+    },
+    [openRoom]
+  );
 
   const leave = useCallback(() => {
     const t = transportRef.current;
     const st = stateRef.current;
+    const serverId = roomServerIdRef.current;
     if (t && st) {
       const at = Date.now();
       t.send({ id: eventId(at), at, by: byOf(st.me), kind: 'bye' } as CollabEvent);
       t.close();
     }
+    // Give the seat back so the room can be re-entered and so it closes when
+    // the last person goes.
+    if (serverId) {
+      void fetch('/api/logos/room/leave', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ roomId: serverId }),
+      }).catch(() => {});
+    }
+    roomServerIdRef.current = null;
     transportRef.current = null;
     stateRef.current = null;
     meRef.current = null;
@@ -191,8 +335,8 @@ export function useLogosCollab(opts: {
   // Follow an invite: as soon as the surface is ready, join as guest.
   useEffect(() => {
     if (!enabled || !joinCode || stateRef.current) return;
-    // The seat is decided by who is already there; a fresh join is a guest.
-    openRoom(joinCode, 'guest');
+    // The seat is decided by the SERVER, not by which door we came through.
+    join(joinCode);
     return () => leave();
     // openRoom/leave are stable enough for a mount-time join; re-running on
     // their identity would re-join the room, which is not what a changed
@@ -253,7 +397,9 @@ export function useLogosCollab(opts: {
     reach,
     link,
     share,
+    join,
     leave,
+    error,
     onLocalMessage,
     onLocalMap,
     onLocalNode,
@@ -261,4 +407,4 @@ export function useLogosCollab(opts: {
   };
 }
 
-export { realtimeAvailable, seatFor };
+export { seatFor };

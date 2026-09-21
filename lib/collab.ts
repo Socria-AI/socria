@@ -90,7 +90,14 @@ export const sanitizeBy = sanitizeByRef;
 // unguessable for the length of a conversation.
 
 export const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ2345679';
-export const CODE_LEN = 6;
+// Eight, not six, and drawn from the system CSPRNG on the server
+// (lib/logos-rooms-server.ts). The old six-character Math.random() code was
+// the ONLY thing between a stranger and a private conversation; it is now one
+// of three things, behind a Clerk session and a server-side membership check,
+// but a share code should still be a random number rather than a plausible
+// one. Anything that validates a typed code must agree with the server about
+// its length, or every invite link silently fails to open.
+export const CODE_LEN = 8;
 
 export function makeShareCode(rng: () => number = Math.random): string {
   let out = '';

@@ -116,7 +116,7 @@ export function TryLogosModal({
   onClose: (dontShowAgain: boolean) => void;
   onTry: () => void;
   /** the access key path, kept for people without an account */
-  onUnlock: (key: string) => boolean;
+  onUnlock: (key: string) => boolean | Promise<boolean>;
   isSignedIn: boolean;
 }) {
   const [dontShow, setDontShow] = useState(false);
@@ -180,8 +180,10 @@ export function TryLogosModal({
     }),
   };
 
-  function submitKey() {
-    if (onUnlock(keyInput.trim())) {
+  // Awaited: judging a code is the server's job now, so the answer arrives
+  // over the network rather than from a constant in this bundle.
+  async function submitKey() {
+    if (await onUnlock(keyInput.trim())) {
       setKeyError(false);
       setKeyInput('');
       return;
