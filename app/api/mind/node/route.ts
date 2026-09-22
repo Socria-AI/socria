@@ -8,7 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { enforceRateLimit } from '@/lib/rate-limit';
-import { loadGraph, persistGraph } from '@/lib/mind/store';
+import { listProjects, loadGraph, persistGraph } from '@/lib/mind/store';
 import { challengeNode, forgetEdge, forgetNode } from '@/lib/mind/apply';
 import { NODE_STATUSES, MAX_CONTENT, MAX_LABEL, clip, fingerprintNode, type NodeStatus } from '@/lib/mind/types';
 
@@ -112,6 +112,23 @@ export async function DELETE(req: NextRequest) {
     if (!saved.ok) return NextResponse.json({ error: 'Could not save that.' }, { status: 500 });
     return NextResponse.json({ ok: true, forgotten: true });
   }
+  // A Project's own node cannot be forgotten from here. Forgetting it would
+  // leave the Project pointing at a node that no longer exists — its
+  // conversations and files still filed under it, nothing new ever tied to
+  // it again, and a tombstone stopping Socria from re-learning that the
+  // person works on it at all. Deleting a Project is its own act, with its
+  // own account of what goes and what stays; it lives on the Projects page.
+  if (kind === 'node') {
+    const projects = await listProjects(userId).catch(() => []);
+    const owner = projects.find((p) => p.nodeId === id);
+    if (owner) {
+      return NextResponse.json(
+        { error: `This is your Project “${owner.name}”. Archive or delete it from Projects instead.` },
+        { status: 409 }
+      );
+    }
+  }
+
   // Both write a tombstone. Without one, deletion is theatre: the next
   // extraction notices the same thing and puts it back, and the person
   // concludes — correctly — that deleting does not work here.

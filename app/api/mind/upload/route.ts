@@ -8,7 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { enforceRateLimit } from '@/lib/rate-limit';
 import { ingestTextFile, MAX_FILE_BYTES } from '@/lib/mind/ingest-text';
-import { deleteSource, listSources } from '@/lib/mind/store';
+import { deleteSource, getProject, listSources } from '@/lib/mind/store';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -50,7 +50,17 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const result = await ingestTextFile(userId, { name, text }, { now: Date.now(), apiKey });
+  // Uploaded inside a Project? Verified here, scoped to the owner: a
+  // Project id that is not theirs is refused outright rather than quietly
+  // ignored, because a file silently landing outside the Project they were
+  // looking at is its own kind of confusing.
+  let project = null;
+  if (typeof body?.projectId === 'string' && body.projectId) {
+    project = await getProject(userId, body.projectId.slice(0, 80)).catch(() => null);
+    if (!project) return NextResponse.json({ error: 'That Project could not be found.' }, { status: 404 });
+  }
+
+  const result = await ingestTextFile(userId, { name, text }, { now: Date.now(), apiKey, project });
   if (!result) {
     return NextResponse.json({ error: 'That file could not be read.' }, { status: 500 });
   }

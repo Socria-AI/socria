@@ -124,9 +124,21 @@ export async function GET(req: NextRequest) {
 
   // Uploaded files, with their text: a provenance offset into a file that is
   // not in the export points at nothing.
+  // `*` rather than a column list, so a file's Project comes with it on a
+  // database that has the column and the read still succeeds on one that
+  // does not yet.
   const { data: mindSources, error: mindSourcesErr } = await db
-    .from('mind_sources').select('id, name, bytes, text, created_at').eq('user_id', userId);
+    .from('mind_sources').select('*').eq('user_id', userId);
   out.mindSources = mindSources ?? [];
+
+  // Projects: the workspaces. What each one contains is already above, in
+  // mindNodes and mindEdges — a Project is a region of that graph, reached
+  // through the edges to its node_id, not a separate copy of anything.
+  const { data: mindProjects, error: mindProjectsErr } = await db
+    .from('mind_projects')
+    .select('id, node_id, name, description, instructions, archived, created_at, updated_at')
+    .eq('user_id', userId);
+  out.mindProjects = mindProjects ?? [];
 
   // ── Logos 2: shared rooms ───────────────────────────────────────────
   //
@@ -188,6 +200,7 @@ export async function GET(req: NextRequest) {
     ['mindForgotten', mindTombstonesErr],
     ['mindPending', mindPendingErr],
     ['mindSources', mindSourcesErr],
+    ['mindProjects', mindProjectsErr],
   ]
     .filter(([, e]) => !!e)
     .map(([name]) => name as string);

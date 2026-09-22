@@ -15,6 +15,7 @@
 // frontier model changes nothing about what is stored or retrieved.
 
 import type { ActivatedSubgraph } from './activate';
+import { MEMBERSHIP_RELATIONSHIPS } from './projects';
 import type { MindEdge, MindNode } from './types';
 
 /** How many relationships one node may show. A hub is not more relevant
@@ -36,6 +37,10 @@ function statusNote(n: MindNode, now: number): string {
 
 /** The reason a change happened, if an edge recorded one. */
 function edgeNote(e: MindEdge): string {
+  // A Project tie's note is bookkeeping ("first came up in this project"),
+  // not a reason, and read outside that Project "this project" points at
+  // nothing.
+  if (MEMBERSHIP_RELATIONSHIPS.has(e.relationship)) return '';
   const withNote = [...e.provenance].reverse().find((p) => p.note);
   return withNote?.note ? ` — ${withNote.note}` : '';
 }
@@ -45,6 +50,13 @@ export interface SerializeOptions {
   /** hard ceiling; sections are dropped from the least-scoring end */
   maxTokens: number;
   scores?: Record<string, number>;
+  /**
+   * Node id → the Project it surfaced from, for nodes that came from a
+   * Project other than the current one. Rendered as a tag on the node's own
+   * line, so Core can say "from your Calculus work" instead of presenting a
+   * memory from elsewhere as though it belonged to this conversation.
+   */
+  origin?: Record<string, string>;
 }
 
 /**
@@ -67,7 +79,8 @@ export function serializeSubgraph(
   const blocks: string[] = [];
   for (const n of ordered) {
     const lines: string[] = [];
-    lines.push(`${n.type}${statusNote(n, opts.now)}: ${n.label} — ${n.content}`);
+    const from = opts.origin?.[n.id] ? ` [from project: ${opts.origin[n.id]}]` : '';
+    lines.push(`${n.type}${statusNote(n, opts.now)}: ${n.label} — ${n.content}${from}`);
 
     let shown = 0;
     for (const e of sub.edges) {

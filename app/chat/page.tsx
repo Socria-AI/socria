@@ -112,6 +112,30 @@ interface Conversation {
   // to replace it with a newer suggestion. If the user renamed manually,
   // c.title will no longer match c.autoTitledAs and we won't override.
   autoTitledAs?: string;
+  /**
+   * The Project this conversation is in, if any. A conversation belongs to
+   * a Project; what is learned in it goes into the one Mind Graph and is
+   * only TIED to the Project (lib/mind/projects.ts).
+   */
+  projectId?: string | null;
+}
+
+/**
+ * What the link that opened /chat asked for, read ONCE and cached.
+ *
+ * Two effects need it — the one that loads conversations (to know which to
+ * open) and the one that tidies the URL — and the second strips the
+ * parameters. Reading the URL in both would make the answer depend on which
+ * ran first.
+ */
+let entryCache: { project: string | null; open: string | null } | null = null;
+function readEntry(): { project: string | null; open: string | null } {
+  if (entryCache) return entryCache;
+  if (typeof window === 'undefined') return { project: null, open: null };
+  const p = new URLSearchParams(window.location.search);
+  const clean = (v: string | null) => (v && /^[A-Za-z0-9_-]{1,120}$/.test(v) ? v : null);
+  entryCache = { project: clean(p.get('project')), open: clean(p.get('open')) };
+  return entryCache;
 }
 
 const STORAGE_KEY = 'socria.conversations.v1';
@@ -226,6 +250,14 @@ export default function ChatPage() {
     { id: string; title: string; nodes: number; updatedAt: number }[]
   >([]);
   const [activeId, setActiveId] = useState<string | null>(null);
+  /**
+   * A Project the NEXT new conversation should start in — set by arriving
+   * from a Project's "New conversation", cleared by starting an ordinary
+   * session or opening another one.
+   */
+  const [projectEntry, setProjectEntry] = useState<{ id: string; name: string } | null>(null);
+  /** Project id → name, for the chip on a conversation that is in one. */
+  const [projectNames, setProjectNames] = useState<Record<string, string>>({});
   const [input, setInput] = useState('');
   /** the sentence written during onboarding, for whichever composer mounts */
   const [carriedText, setCarriedText] = useState('');
@@ -407,7 +439,14 @@ export default function ChatPage() {
               }))
           );
           setConversations(list);
-          setActiveId(list[0]?.id ?? null);
+          // Arrived from a Project: open the conversation that was asked
+          // for, or start a new one inside the Project — never land on
+          // whatever happened to be most recent, which would put the person
+          // in a different Project's conversation without saying so.
+          const entry = readEntry();
+          if (entry.open && list.some((c) => c.id === entry.open)) setActiveId(entry.open);
+          else if (entry.project) setActiveId(null);
+          else setActiveId(list[0]?.id ?? null);
         } catch (e: any) {
           if (!cancelled) setError(e?.message || 'Failed to load conversations');
         }
@@ -1229,6 +1268,9 @@ export default function ChatPage() {
       router.push('/sign-in?redirect_url=/chat');
       return;
     }
+    // An ordinary session. Starting one from the rail after arriving from a
+    // Project must not quietly file it under that Project.
+    setProjectEntry(null);
     const id = uid();
     const fresh: Conversation = {
       id,
@@ -1306,6 +1348,7 @@ export default function ChatPage() {
         title: 'New thought session',
         messages: [],
         updatedAt: Date.now(),
+        ...(projectEntry ? { projectId: projectEntry.id } : {}),
       };
       // `working`, not `conversations` — a caller that handed us a rewritten
       // list means it, and reaching past it here would undo the rewrite.
@@ -1365,6 +1408,9 @@ export default function ChatPage() {
           // believed once a DIFFERENT conversation has suggested it too, and
           // without an id there is nothing to compare.
           conversationId: workingId ?? undefined,
+          // The Project it is in. Retrieval gives that region of the graph
+          // priority — it does not wall anything else off.
+          projectId: convoForRequest.projectId ?? undefined,
         }),
       });
 
@@ -1526,6 +1572,64 @@ export default function ChatPage() {
       send(input);
     }
   }
+
+  // ── arriving from a Project ─────────────────────────────────────
+  //
+  // /chat?project=<id> starts a new conversation inside that Project, on
+  // Core 4 — the only Core whose memory is the Mind Graph, and so the only
+  // one a Project can focus. /chat?open=<id> opens a conversation the
+  // Project page listed. Both are read once (readEntry) and then removed
+  // from the address bar, so a reload does not start a second conversation.
+  useEffect(() => {
+    const entry = readEntry();
+    if (!entry.project && !entry.open) return;
+    const u = new URL(window.location.href);
+    u.searchParams.delete('project');
+    u.searchParams.delete('open');
+    window.history.replaceState({}, '', u.pathname + u.search);
+    if (!entry.project) return;
+    // Set NOW, named later. A message typed before the Project's name has
+    // loaded would otherwise be sent outside the Project — the conversation
+    // is created on the first send, from whatever this holds at that moment.
+    setProjectEntry({ id: entry.project, name: 'this Project' });
+    setModel('core-4');
+    chooseModel('core-4');
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch(`/api/projects/${encodeURIComponent(entry.project!)}`, { cache: 'no-store' });
+        if (cancelled) return;
+        // Not theirs, or gone: an ordinary conversation, said by the chip
+        // disappearing rather than by filing the conversation somewhere that
+        // does not exist.
+        if (!res.ok) { setProjectEntry(null); return; }
+        const j = await res.json();
+        if (!cancelled) setProjectEntry({ id: j.project.id, name: j.project.name });
+      } catch {
+        if (!cancelled) setProjectEntry(null);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Project names, for the chip on a conversation that is in one. Signed-in
+  // only: Projects live in the cloud with the rest of the Mind Graph.
+  useEffect(() => {
+    if (!isSignedIn) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch('/api/projects', { cache: 'no-store' });
+        if (!res.ok) return;
+        const j = await res.json();
+        if (cancelled) return;
+        const names: Record<string, string> = {};
+        for (const p of j.projects ?? []) names[p.id] = p.name;
+        setProjectNames(names);
+      } catch {}
+    })();
+    return () => { cancelled = true; };
+  }, [isSignedIn]);
 
   // Any entry point can ask for a model by link — /chat?model=logos — which is
   // how the explainer page, the Socria One page and the sidebar all open Logos
@@ -1964,6 +2068,7 @@ export default function ChatPage() {
                           className="s-open"
                           onClick={() => {
                             setActiveId(item.id);
+                            setProjectEntry(null);
                             setSidebarOpen(false);
                           }}
                           onDoubleClick={startRename}
@@ -2472,6 +2577,39 @@ export default function ChatPage() {
                 answered; this only asks whether it landed where it was meant
                 to, and it is never in the way of the reply. It belongs to the
                 session it was sent in, so switching away takes it with you. */}
+            {(() => {
+              // Which Project this conversation is in — or, before the first
+              // message, which one it is about to start in. Said plainly,
+              // because retrieval behaves differently inside one and the
+              // person should never have to guess why.
+              const active = conversations.find((c) => c.id === activeId);
+              const pid = active ? active.projectId ?? null : projectEntry?.id ?? null;
+              if (!pid) return null;
+              const name = active ? projectNames[pid] ?? 'a Project' : projectEntry!.name;
+              return (
+                <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-ink/60" role="note">
+                  <span className="font-serif italic">{active ? 'In' : 'Starting in'}</span>
+                  <a
+                    href={`/projects/${encodeURIComponent(pid)}`}
+                    className="rounded-full border border-ink/15 bg-white/70 px-2.5 py-0.5 text-ink/80 hover:border-ink/40"
+                  >
+                    {name}
+                  </a>
+                  {model !== 'core-4' && (
+                    <span className="text-ink/45">· Project memory applies on Core 4</span>
+                  )}
+                  {!active && (
+                    <button
+                      type="button"
+                      className="text-ink/45 underline decoration-ink/20 underline-offset-2 hover:text-ink"
+                      onClick={() => setProjectEntry(null)}
+                    >
+                      not in a Project
+                    </button>
+                  )}
+                </div>
+              );
+            })()}
             {drift && drift.from === activeId && (
               <div
                 className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-ink/12 bg-white/70 px-3 py-2 text-[12.5px] text-ink/70"

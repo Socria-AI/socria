@@ -473,3 +473,42 @@ create table if not exists mind_sources (
   created_at bigint not null,
   primary key (user_id, id)
 );
+
+-- ── Projects ─────────────────────────────────────────────────────────
+--
+-- A Project is a focused REGION of the one Mind Graph, not a second store.
+-- Its presence in the graph is an ordinary `Project` row in mind_nodes (the
+-- anchor, node_id below) with ordinary edges running to it; everything a
+-- Project "contains" is reached through those edges. This table holds only
+-- the workspace: what it is called, what the person says it is for, how they
+-- want its conversations handled, and whether it is archived.
+--
+-- There is deliberately no project_id on mind_nodes or mind_edges. A memory
+-- is not owned by a Project; it is CONNECTED to one, and may be connected to
+-- several. See lib/mind/projects.ts.
+create table if not exists mind_projects (
+  user_id text not null,
+  id text not null,
+  node_id text not null,
+  name text not null,
+  description text not null default '',
+  instructions text not null default '',
+  archived boolean not null default false,
+  created_at bigint not null,
+  updated_at bigint not null,
+  primary key (user_id, id)
+);
+
+create index if not exists mind_projects_user_updated_idx on mind_projects (user_id, updated_at desc);
+create unique index if not exists mind_projects_user_name_idx on mind_projects (user_id, lower(name));
+
+-- Conversations and files are CONTAINERS, and those do belong to a Project.
+-- Nullable: most conversations are in no Project, and deleting a Project
+-- sets these back to null rather than deleting the conversation.
+alter table conversations
+  add column if not exists project_id text;
+create index if not exists conversations_user_project_idx on conversations (user_id, project_id);
+
+alter table mind_sources
+  add column if not exists project_id text;
+create index if not exists mind_sources_user_project_idx on mind_sources (user_id, project_id);

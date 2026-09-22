@@ -2178,7 +2178,16 @@ export function buildSystemPrompt(
    * (lib/cognition/*). Strings rather than objects for the same reason the
    * Mind Graph is: this module knows nothing about how either is produced.
    */
-  cognition?: { state?: string | null; move?: string | null } | null
+  cognition?: { state?: string | null; move?: string | null } | null,
+  /**
+   * The Project this conversation is in, already rendered (see
+   * renderProjectContext in lib/mind/projects.ts): its name, the person's
+   * instructions for it, its live goals and its file names. Never its
+   * contents — those arrive through the Mind Graph block like everything
+   * else, bounded by the plan's window. A string for the same reason the
+   * graph is one.
+   */
+  project?: string | null
 ): { prompt: string; model: SocriaModel; depth: ThinkingDepth } {
   const model = resolveModel(modelInput);
   const depth = resolveDepth(depthInput);
@@ -2221,6 +2230,11 @@ export function buildSystemPrompt(
     // Last, so it sits closest to the conversation. The Mind Graph is the
     // richest of these and the one a model should still have in view when it
     // starts reading what was actually said.
+    // The Project frame immediately before the graph: it says which region
+    // of the graph this conversation is focused on, and the graph block is
+    // then read in that light — including the items marked as coming from
+    // another Project.
+    if (project) out += project;
     if (mindGraph) out += mindGraph;
     // Where the conversation stands, then the move. Last, and in that order:
     // the state is the reading, the move is what to do about it, and the move

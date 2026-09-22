@@ -239,6 +239,49 @@ export async function POST(req: NextRequest) {
       .slice(-MAX_HISTORY)
       .map((m: any) => ({ role: m.role, content: m.content }));
 
+    const socriaModel = resolveModel(body?.model);
+
+    // The Project this conversation is in, if any. Bounded like every other
+    // field off a request body; whether it is actually THEIR Project is
+    // settled inside recall() and remember(), where every lookup is scoped
+    // to the owner — an id that is not theirs reads as no Project at all.
+    const projectId =
+      typeof body?.projectId === 'string' && /^[A-Za-z0-9_-]{1,80}$/.test(body.projectId)
+        ? body.projectId
+        : null;
+
+    // ── the Cognitive State Engine ────────────────────────────────
+    //
+    // The Mind Graph is what Socria understands about this person; this is
+    // what is happening in this conversation, this minute. Read first, then
+    // the move is ROUTED from it deterministically — so the choice cannot be
+    // argued out of by a message that sounds urgent or impatient, and so
+    // there is a reason with a name when Socria asks instead of answering.
+    //
+    // Same failure posture as the graph: an empty state routes toward asking,
+    // which is the recoverable mistake.
+    //
+    // Read BEFORE the graph now, not after. Retrieval is meant to start from
+    // the query, the Project AND the Cognitive State — what the person is
+    // focused on right now is a better seed than the words of one message,
+    // and "we are still on the product rule" should light that region even
+    // when this message only says "ok, and then?". Run after recall, the
+    // state could shape the reply but never what was remembered for it.
+    let cognitiveState: CognitiveState | null = null;
+    let move: Move | null = null;
+    if (socriaModel === 'core-4' && apiKey) {
+      try {
+        cognitiveState = await readState(
+          apiKey,
+          clean.map((m) => `${m.role === 'user' ? 'Them' : 'Socria'}: ${m.content}`).join('\n\n').slice(-8000),
+          null
+        );
+        move = route(cognitiveState);
+      } catch (e) {
+        console.error('[socria/chat] cognitive state unavailable; replying without a routed move', e);
+      }
+    }
+
     // ── the Mind Graph ────────────────────────────────────────────
     //
     // Core 4's persistent memory. Activated by what they just said — a region
@@ -250,9 +293,10 @@ export async function POST(req: NextRequest) {
     // conversation that breaks BECAUSE of memory is a regression nobody
     // accepts. recall() already swallows its own failures; this is the second
     // reason it is called on its own line rather than inline.
-    const socriaModel = resolveModel(body?.model);
     let mindBlock: string | null = null;
     let mindSubgraph: ActivatedSubgraph | null = null;
+    let projectBlock: string | null = null;
+    let inProject = false;
     if (socriaModel === 'core-4' && userId) {
       // WRAPPED HERE, not only inside recall().
       //
@@ -269,39 +313,21 @@ export async function POST(req: NextRequest) {
           // second time: one fewer call, and one fewer thing that can fail.
           plan,
           surface: 'core',
+          // What the Cognitive State says they are focused on, as extra
+          // seed terms. Empty when the state could not be read.
+          focus: cognitiveState?.currentFocus ? [cognitiveState.currentFocus] : undefined,
+          // A weighting, not a filter: see lib/mind/projects.ts.
+          projectId,
         });
         mindBlock = r.block || null;
         mindSubgraph = r.subgraph;
+        projectBlock = r.projectBlock || null;
+        inProject = !!r.project;
       } catch (e) {
         // No memory this turn. Said out loud in the log, because a graph
         // that silently never loads looks exactly like a graph with nothing
         // in it, and those need telling apart.
         console.error('[socria/chat] mind graph recall failed; continuing without it', e);
-      }
-    }
-
-    // ── the Cognitive State Engine ────────────────────────────────
-    //
-    // The Mind Graph is what Socria understands about this person; this is
-    // what is happening in this conversation, this minute. Read first, then
-    // the move is ROUTED from it deterministically — so the choice cannot be
-    // argued out of by a message that sounds urgent or impatient, and so
-    // there is a reason with a name when Socria asks instead of answering.
-    //
-    // Same failure posture as the graph: an empty state routes toward asking,
-    // which is the recoverable mistake.
-    let cognitiveState: CognitiveState | null = null;
-    let move: Move | null = null;
-    if (socriaModel === 'core-4' && apiKey) {
-      try {
-        cognitiveState = await readState(
-          apiKey,
-          clean.map((m) => `${m.role === 'user' ? 'Them' : 'Socria'}: ${m.content}`).join('\n\n').slice(-8000),
-          null
-        );
-        move = route(cognitiveState);
-      } catch (e) {
-        console.error('[socria/chat] cognitive state unavailable; replying without a routed move', e);
       }
     }
 
@@ -315,7 +341,8 @@ export async function POST(req: NextRequest) {
       mindBlock,
       move && cognitiveState
         ? { state: renderState(cognitiveState), move: renderMove(move) }
-        : null
+        : null,
+      projectBlock
     );
 
 
@@ -399,6 +426,11 @@ export async function POST(req: NextRequest) {
         journeyInjected: model !== 'core-2' && !!journey,
         mindNodes: mindSubgraph?.nodes.length ?? 0,
         mindEdges: mindSubgraph?.edges.length ?? 0,
+        // Whether this turn was inside a Project, and how much came across
+        // from other Projects. The second number is the one to watch: if it
+        // is routinely high, cross-project retrieval is flooding.
+        inProject,
+        crossProject: Object.keys(mindSubgraph?.elsewhere ?? {}).length,
         // Which move was chosen, and why. The reason is the point: when
         // Socria asks instead of answering there should be a nameable cause,
         // not a shrug about model judgement.
@@ -554,6 +586,10 @@ export async function POST(req: NextRequest) {
               surface: 'core',
               conversationId: typeof body?.conversationId === 'string' ? body.conversationId : undefined,
               existing: mindSubgraph,
+              // The ONE graph learns exactly as it does outside a Project;
+              // this only ties what the turn touched to the Project it
+              // happened in.
+              projectId,
               // remember() already swallows its own failures, so this only
               // catches a rejection it could not — but an unhandled rejection
               // inside a `finally` after the stream has closed is the kind of

@@ -67,6 +67,7 @@ const MODULES = [
   'lib/cognition/guard.ts',
   'lib/mind/types.ts',
   'lib/mind/layout.ts',
+  'lib/mind/projects.ts',
   'lib/mind/resolve.ts',
   'lib/mind/gate.ts',
   'lib/mind/apply.ts',

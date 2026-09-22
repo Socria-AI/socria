@@ -20,6 +20,10 @@
 
 import { resolveNode } from './resolve';
 import {
+  ANCHOR_SEED, CROSS_MIN_ACTIVATION, MEMBERSHIP_RELATIONSHIPS, SEED_FLOOR, STRONG_EDGE,
+  STRONG_RELATION, affinity, affinityFactor, projectIndex,
+} from './projects';
+import {
   PARTNER_RELATIONSHIPS, STATUS_WEIGHT, normalize, relWeight,
   type MindEdge, type MindGraph, type MindNode,
 } from './types';
@@ -30,6 +34,13 @@ export const MAX_DEPTH = 3;
 export const GAMMA = 0.5;
 /** Most nodes a message may light up directly. */
 export const MAX_SEEDS = 8;
+/**
+ * How much of the message's own activation makes a node part of what the
+ * message is ABOUT, rather than background. About two ordinary hops' worth:
+ * the faint third-hop trickle does not promote something over the Project's
+ * own context.
+ */
+export const QUERY_TIER_MIN = 0.02;
 
 export interface ActivateOptions {
   now: number;
@@ -39,6 +50,15 @@ export interface ActivateOptions {
   excludePrivate?: boolean;
   /** extra terms beyond the message — the Cognitive State's currentFocus */
   focus?: string[];
+  /**
+   * The Project this conversation is in, and every Project anchor there is.
+   *
+   * A WEIGHTING, never a filter. Being in the current Project raises a
+   * node's score; being only in another Project lowers it and sets a bar it
+   * must clear; nothing is excluded for where it came from if it is strongly
+   * enough related to what was just said. See lib/mind/projects.ts.
+   */
+  project?: { current: string | null; anchors: ReadonlySet<string> };
 }
 
 export interface ActivatedSubgraph {
@@ -48,6 +68,12 @@ export interface ActivatedSubgraph {
   seeds: string[];
   /** every node's score, for the Memory page's "why did this come up" */
   scores: Record<string, number>;
+  /**
+   * For nodes that surfaced from ANOTHER Project: which Project anchors they
+   * sit near. So the prompt can say "this came from Calculus" rather than
+   * presenting it as though it belonged here.
+   */
+  elsewhere?: Record<string, string[]>;
 }
 
 /** Pull the nouns worth matching out of a message. */
@@ -137,7 +163,21 @@ export function activate(
   const byId = new Map(visible.map((n) => [n.id, n]));
 
   const seeds = seedActivation({ ...graph, nodes: visible }, message, opts.focus ?? []);
-  if (!seeds.size) return { nodes: [], edges: [], seeds: [], scores: {} };
+
+  const anchors: ReadonlySet<string> = opts.project?.anchors ?? new Set();
+  const current = opts.project?.current && allowed.has(opts.project.current) ? opts.project.current : null;
+  const index = anchors.size ? projectIndex(graph, anchors) : new Map<string, Set<string>>();
+
+  // Inside a Project, its anchor is lit whatever the message says. "What
+  // should I do next?" names nothing, and still has an answer inside the
+  // Project — its goals, its open questions — so the Project has to be able
+  // to supply context without the message having to earn it lexically. It is
+  // spread SEPARATELY from the message's seeds (below), so it can never
+  // displace, or outrank, something the message actually named.
+  // What the MESSAGE named. The Project's anchor is deliberately NOT one of
+  // these: see the two spreads below.
+  const named = new Map(seeds);
+  if (!named.size && !current) return { nodes: [], edges: [], seeds: [], scores: {} };
 
   // Adjacency, both ways: a project reaches its goals, and a goal reaches the
   // project it belongs to.
@@ -148,30 +188,104 @@ export function activate(
     (out.get(e.targetId) ?? out.set(e.targetId, []).get(e.targetId)!).push(e);
   }
 
-  // Spread. Activation SUMS over all paths reaching a node, so something
-  // pulled in from three directions outranks something reached once — which
-  // is the associative behaviour the whole design is for.
-  const activation = new Map<string, number>(seeds);
-  let frontier = [...seeds.entries()];
-  for (let depth = 1; depth <= MAX_DEPTH && frontier.length; depth++) {
-    const next = new Map<string, number>();
-    for (const [id, a] of frontier) {
-      for (const e of out.get(id) ?? []) {
-        const other = e.sourceId === id ? e.targetId : e.sourceId;
-        const delta = a * e.strength * relWeight(e.relationship) * Math.pow(GAMMA, depth);
-        if (delta < 0.01) continue;
-        activation.set(other, (activation.get(other) ?? 0) + delta);
-        next.set(other, Math.max(next.get(other) ?? 0, delta));
+  /**
+   * Spread activation outward from some starting nodes. Activation SUMS over
+   * all paths reaching a node, so something pulled in from three directions
+   * outranks something reached once — the associative behaviour the whole
+   * design is for.
+   */
+  const spread = (start: Map<string, number>) => {
+    const activation = new Map<string, number>(start);
+    /** One strong hop from something the message named — see STRONG_RELATION. */
+    const strongHop = new Set<string>();
+    let frontier = [...start.entries()];
+    for (let depth = 1; depth <= MAX_DEPTH && frontier.length; depth++) {
+      const next = new Map<string, number>();
+      for (const [id, a] of frontier) {
+        // THE HUB RULE. A Project anchor is connected to everything in its
+        // Project, so letting activation fan out of one would light the whole
+        // Project the moment any single thing in it was relevant: one calculus
+        // memory mentioned inside Socria would drag in all of Calculus. An
+        // anchor may RECEIVE activation from anywhere. It passes it on only if
+        // it is the current Project, or if the message named it directly — in
+        // which case the person is asking about that Project and its contents
+        // are what they want.
+        if (anchors.has(id) && id !== current && !named.has(id)) continue;
+        for (const e of out.get(id) ?? []) {
+          const other = e.sourceId === id ? e.targetId : e.sourceId;
+          if (
+            depth === 1 &&
+            (named.get(id) ?? 0) >= SEED_FLOOR &&
+            relWeight(e.relationship) >= STRONG_RELATION &&
+            e.strength >= STRONG_EDGE &&
+            // Membership is where something was worked on, not what it is. A
+            // concept's tie to the Project it came up in is not a reason for
+            // that Project to surface — the [from project] tag already says
+            // where it came from.
+            !MEMBERSHIP_RELATIONSHIPS.has(e.relationship)
+          ) {
+            strongHop.add(other);
+          }
+          const delta = a * e.strength * relWeight(e.relationship) * Math.pow(GAMMA, depth);
+          if (delta < 0.01) continue;
+          activation.set(other, (activation.get(other) ?? 0) + delta);
+          next.set(other, Math.max(next.get(other) ?? 0, delta));
+        }
       }
+      frontier = [...next.entries()];
     }
-    frontier = [...next.entries()];
-  }
+    return { activation, strongHop };
+  };
+
+  // TWO spreads, kept apart, because they answer different questions.
+  //
+  // From what the MESSAGE named: what is this about? From the current
+  // Project's ANCHOR: what does this Project hold? They used to be one
+  // spread, with the anchor as just another seed — and then an unrelated
+  // Project node that received a trickle of spillover from the anchor
+  // competed on equal terms with the exact thing the person asked about.
+  // Measured through the real chat route: inside Socria, asked about
+  // derivatives, a goal called "Ship it" and two file nodes outranked the
+  // memory of how the person learned derivatives, and the prompt's token
+  // ceiling cut that memory out. Relevance to the message has to come first;
+  // the Project fills whatever room is left.
+  const fromMessage = named.size ? spread(named) : { activation: new Map<string, number>(), strongHop: new Set<string>() };
+  const fromProject = current ? spread(new Map([[current, ANCHOR_SEED]])).activation : new Map<string, number>();
+  const strongHop = fromMessage.strongHop;
 
   // Score and bound.
+  //
+  // Project affinity is applied HERE, as a multiplier, after spreading —
+  // never as a filter on what may be reached. A node from another Project
+  // must first clear CROSS_MIN_ACTIVATION on relevance it earned from THIS
+  // MESSAGE (not from the current Project's spillover), or be one strong hop
+  // from something the message named. Then it competes at a discount against
+  // what is in the current Project.
+  //
+  // The integer part of a score is its TIER: 1 if the message reached it, 0
+  // if only the Project did. The fraction is how much it matters. Sorting on
+  // that puts everything the message is about ahead of everything that is
+  // merely nearby, and the prompt's token ceiling trims from the bottom — so
+  // what gets cut is Project background, never the answer to the question.
   const scores: Record<string, number> = {};
-  for (const [id, a] of activation) {
+  const elsewhere: Record<string, string[]> = {};
+  const ids = new Set([...fromMessage.activation.keys(), ...fromProject.keys()]);
+  for (const id of ids) {
+    // The current Project's own node is the frame of the conversation, and
+    // the frame is already in the prompt; as a memory block it was a list of
+    // every "belongs_to" edge, which is bookkeeping and cost real budget.
+    if (id === current) continue;
     const n = byId.get(id);
-    if (n) scores[id] = scoreNode(n, a, opts.now);
+    if (!n) continue;
+    const q = fromMessage.activation.get(id) ?? 0;
+    const b = fromProject.get(id) ?? 0;
+    const aff = anchors.size ? affinity(id, index, current, anchors) : 'global';
+    if (aff === 'elsewhere' && q < CROSS_MIN_ACTIVATION && !strongHop.has(id)) continue;
+    const tier = q >= QUERY_TIER_MIN ? 1 : 0;
+    scores[id] = tier + scoreNode(n, q + b, opts.now) * affinityFactor(aff);
+    if (aff === 'elsewhere') {
+      elsewhere[id] = anchors.has(id) ? [id] : [...(index.get(id) ?? [])];
+    }
   }
   const chosen = new Set(
     Object.entries(scores)
@@ -212,7 +326,13 @@ export function activate(
   // connected subgraph rather than dangling arrows.
   const edges = graph.edges.filter((e) => chosen.has(e.sourceId) && chosen.has(e.targetId));
 
-  return { nodes, edges, seeds: [...seeds.keys()], scores };
+  const outside: Record<string, string[]> = {};
+  for (const n of nodes) if (elsewhere[n.id]) outside[n.id] = elsewhere[n.id];
+
+  return {
+    nodes, edges, seeds: [...seeds.keys()], scores,
+    ...(Object.keys(outside).length ? { elsewhere: outside } : {}),
+  };
 }
 
 /**

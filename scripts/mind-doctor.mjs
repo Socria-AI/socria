@@ -80,6 +80,15 @@ const TABLES = [
   ['mind_tombstones', 'what was deleted — without it deleting is theatre and claims come back'],
   ['mind_pending', 'claims seen once, not yet believed — without it NO trait can ever be learned, because the second sighting has nothing to match'],
   ['mind_sources', 'uploaded files'],
+  ['mind_projects', 'Projects — without it the Projects page cannot load and no conversation can be inside one'],
+];
+
+// Columns that arrived with Projects, as ALTERs on tables that already
+// existed. A database that ran schema.sql before Projects has the tables and
+// not these, and fails in a way nothing else here would catch.
+const COLUMNS = [
+  ['conversations', 'project_id', 'which Project a conversation is in'],
+  ['mind_sources', 'project_id', 'which Project a file was added to'],
 ];
 
 // Not the Mind Graph, but they landed in schema.sql in the same week and go
@@ -108,6 +117,18 @@ for (const [table, why] of TABLES) {
           : `${table}: ${error.message}. If this says permission denied, the key is not the service role key.`);
   } else {
     say(true, table, `${count ?? 0} rows`);
+  }
+}
+
+console.log(bold('\ncolumns added since') + dim('  — present only if schema.sql was re-run after Projects'));
+for (const [table, column, what] of COLUMNS) {
+  const { error } = await db.from(table).select(column, { head: true, count: 'exact' });
+  if (error) {
+    const gone = error.code === '42703' || /column .* does not exist/i.test(error.message || '');
+    say(false, `${table}.${column}`, gone ? 'does not exist' : `${error.code || '?'}: ${error.message}`,
+        `Re-run supabase/schema.sql — ${table}.${column} is missing (${what}). It is idempotent.`);
+  } else {
+    say(true, `${table}.${column}`, 'present');
   }
 }
 

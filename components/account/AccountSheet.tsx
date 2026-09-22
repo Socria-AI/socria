@@ -178,6 +178,9 @@ export function AccountSheet({
               <div className="acts">
                 {/* One path to an irreversible action, and it is the one
                     that already has the confirmations. */}
+                <Link className="act" href="/projects" onClick={onClose}>
+                  Projects
+                </Link>
                 <Link className="act" href="/memory" onClick={onClose}>
                   Memory
                 </Link>

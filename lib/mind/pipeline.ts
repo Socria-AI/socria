@@ -17,7 +17,12 @@ import { applyCandidates, type ApplyReport, type EdgeCandidate, type NodeCandida
 import { extract } from './extract';
 import { FILE_BUDGET, TURN_BUDGET, type Budget } from './gate';
 import { renderMindGraph } from './serialize';
-import { loadGraph, persistGraph, touchNodes } from './store';
+import {
+  associate, projectGoals, renderProjectContext, type ProjectContainer,
+} from './projects';
+import {
+  getProject, listProjects, listSources, loadGraph, persistGraph, touchNodes,
+} from './store';
 import { MAX_EDGES, MAX_NODES, type MindGraph, type ProvenanceSurface } from './types';
 
 /**
@@ -71,6 +76,10 @@ export interface RecallResult {
   block: string;
   subgraph: ActivatedSubgraph;
   graph: MindGraph;
+  /** the Project frame for the system prompt; '' outside a Project */
+  projectBlock: string;
+  /** the Project this conversation is in — verified to be theirs, or null */
+  project: ProjectContainer | null;
 }
 
 /**
@@ -88,18 +97,57 @@ export async function recall(
     plan: 'free' | 'one';
     surface: ProvenanceSurface;
     focus?: string[];
+    /**
+     * The Project the conversation is in. A WEIGHTING on retrieval, never a
+     * filter: see lib/mind/projects.ts. An id that is not this person's —
+     * or no longer exists — reads as no Project, never as an error.
+     */
+    projectId?: string | null;
   }
 ): Promise<RecallResult> {
+  const none: MindGraph = { nodes: [], edges: [], tombstones: [], pending: [] };
   const empty: RecallResult = {
     block: '',
     subgraph: { nodes: [], edges: [], seeds: [], scores: {} },
-    graph: { nodes: [], edges: [], tombstones: [], pending: [] },
+    graph: none,
+    projectBlock: '',
+    project: null,
   };
   try {
-    const graph = await withTimeout(loadGraph(userId), RECALL_TIMEOUT_MS, {
-      nodes: [], edges: [], tombstones: [], pending: [],
-    });
-    if (!graph.nodes.length) return { ...empty, graph };
+    // Everything retrieval needs, in one round of reads under one deadline.
+    // The Project list is read even outside a Project: retrieval needs to
+    // know which nodes ARE Projects so that none of them can flood a
+    // conversation with its whole neighbourhood (the hub rule).
+    //
+    // listProjects throws when mind_projects is missing — a database that
+    // has not re-run schema.sql since Projects arrived. That must cost this
+    // turn its Projects, not its memory, so it is caught on its own.
+    const loaded = await withTimeout(
+      Promise.all([
+        loadGraph(userId),
+        listProjects(userId).catch(() => [] as ProjectContainer[]),
+        opts.projectId
+          ? listSources(userId, { projectId: opts.projectId }).catch(() => [])
+          : Promise.resolve([]),
+      ]),
+      RECALL_TIMEOUT_MS,
+      null
+    );
+    if (!loaded) return empty;
+    const [graph, projects, files] = loaded;
+
+    const present = new Set(graph.nodes.map((n) => n.id));
+    const anchors = new Set(projects.map((p) => p.nodeId).filter((id) => present.has(id)));
+    const project = opts.projectId ? projects.find((p) => p.id === opts.projectId) ?? null : null;
+    const current = project && anchors.has(project.nodeId) ? project.nodeId : null;
+
+    // The frame is built whether or not anything else is remembered: a new
+    // Project with no memories yet still has a name, instructions and goals.
+    const projectBlock = project
+      ? renderProjectContext(project, current ? projectGoals(graph, current) : [], files)
+      : '';
+
+    if (!graph.nodes.length) return { ...empty, graph, projectBlock, project };
 
     const win = windowFor(opts.plan);
     const subgraph = activate(graph, message, {
@@ -109,15 +157,27 @@ export async function recall(
       // image and shown to someone.
       excludePrivate: opts.surface === 'logos',
       focus: opts.focus,
+      project: anchors.size ? { current, anchors } : undefined,
     });
+
+    // Anchor ids -> Project names, for anything that surfaced from a Project
+    // other than this one.
+    const names = new Map(projects.map((p) => [p.nodeId, p.name]));
+    const origin: Record<string, string> = {};
+    for (const [id, from] of Object.entries(subgraph.elsewhere ?? {})) {
+      const label = from.map((a) => names.get(a)).filter(Boolean).join(', ');
+      if (label) origin[id] = label;
+    }
 
     // Recall strengthens memory. Best-effort and not awaited on the hot path.
     void touchNodes(userId, touch(subgraph, opts.now));
 
     return {
-      block: renderMindGraph(subgraph, { now: opts.now, maxTokens: win.tokens }),
+      block: renderMindGraph(subgraph, { now: opts.now, maxTokens: win.tokens, origin }),
       subgraph,
       graph,
+      projectBlock,
+      project,
     };
   } catch (e) {
     // Still swallowed — a conversation must never break because memory did —
@@ -156,10 +216,16 @@ export async function remember(
     budget?: Budget;
     sourceNodeId?: string;
     private?: boolean;
+    /** the Project the turn happened in; what it touched is tied to it */
+    projectId?: string | null;
   }
 ): Promise<RememberResult> {
   try {
-    const before = await loadGraph(userId);
+    const [before, project] = await Promise.all([
+      loadGraph(userId),
+      // Scoped to the owner inside getProject, so a foreign id is null here.
+      opts.projectId ? getProject(userId, opts.projectId).catch(() => null) : Promise.resolve(null),
+    ]);
 
     // A ceiling, not a plan boundary: nobody reaches it, and no tier stores
     // more than another.
@@ -197,7 +263,25 @@ export async function remember(
       }
     );
 
-    const saved = await persistGraph(userId, before, after);
+    // The ONE graph learns normally — everything above is identical inside a
+    // Project and out of it. What the Project adds is only this: what the
+    // turn touched is tied to the Project it happened in, so next time the
+    // Project is open, attention starts there.
+    let graph = after;
+    if (project && after.nodes.some((node) => node.id === project.nodeId)) {
+      graph = associate(
+        after,
+        project.nodeId,
+        report.nodes.map((r) => ({ id: r.id, action: r.action })),
+        {
+          now: opts.now,
+          nextId: () => `m_${opts.now.toString(36)}_p${(n++).toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
+          provenance: { surface: opts.surface, conversationId: opts.conversationId },
+        }
+      ).graph;
+    }
+
+    const saved = await persistGraph(userId, before, graph);
     if (!saved.ok) {
       // persistGraph has already logged which write failed and why. This says
       // what was lost, which is the part that matters when a whole session of

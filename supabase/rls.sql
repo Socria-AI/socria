@@ -32,6 +32,7 @@ alter table mind_edges          enable row level security;
 alter table mind_tombstones     enable row level security;
 alter table mind_pending        enable row level security;
 alter table mind_sources        enable row level security;
+alter table mind_projects       enable row level security;
 
 -- Force it for the table owner too, so a future superuser-ish role does not
 -- silently slip past the policies it thinks are protecting it. The service
@@ -51,6 +52,7 @@ alter table mind_edges          force row level security;
 alter table mind_tombstones     force row level security;
 alter table mind_pending        force row level security;
 alter table mind_sources        force row level security;
+alter table mind_projects       force row level security;
 
 -- Deliberately no policies. With RLS on and no policy granting access, anon
 -- and authenticated see nothing. If direct client access is ever added, add
@@ -73,6 +75,7 @@ revoke all on mind_edges          from anon, authenticated;
 revoke all on mind_tombstones     from anon, authenticated;
 revoke all on mind_pending        from anon, authenticated;
 revoke all on mind_sources        from anon, authenticated;
+revoke all on mind_projects       from anon, authenticated;
 
 -- lifecycle_emails is the one table here that holds a STATED PREFERENCE
 -- rather than something the person made: the `unsubscribed` row is somebody

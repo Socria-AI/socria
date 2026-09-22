@@ -154,6 +154,9 @@ export const KNOWN_RELATIONSHIPS = [
   'motivated_by', 'constrained_by', 'changed_into', 'superseded_by',
   'evidence_for', 'associated_with', 'belongs_to', 'resulted_in',
   'version_of', 'works_on', 'learned_from', 'mentioned_in', 'derived_from',
+  // How things stand toward a Project. A Project is an ordinary node, and
+  // these are ordinary edges to it — see lib/mind/projects.ts.
+  'relevant_to', 'created_in', 'discussed_in', 'used_by', 'shared_with',
 ] as const;
 export type KnownRelationship = (typeof KNOWN_RELATIONSHIPS)[number];
 export type Relationship = KnownRelationship | (string & {});
@@ -185,6 +188,16 @@ export const REL_WEIGHT: Record<string, number> = {
   derived_from: 0.6,
   mentioned_in: 0.4,
   associated_with: 0.4,
+  // Project relationships. `used_by` is a real dependency and conducts like
+  // one; the membership edges are weaker than belongs_to on purpose, because
+  // "this came up while working on X" is a looser tie than "this is part of
+  // X", and a Project's whole neighbourhood lighting up at full strength is
+  // exactly the flood the hub rule in activate.ts exists to prevent.
+  used_by: 0.8,
+  relevant_to: 0.6,
+  created_in: 0.6,
+  discussed_in: 0.5,
+  shared_with: 0.5,
 };
 export const REL_WEIGHT_DEFAULT = 0.5;
 

@@ -45,6 +45,9 @@ const OWNED_TABLES = [
   'mind_tombstones',
   'mind_pending',
   'mind_sources',
+  // Project containers. Their anchors are in mind_nodes above, so a flat
+  // delete of both leaves nothing behind.
+  'mind_projects',
 ] as const;
 
 /**
@@ -61,6 +64,7 @@ const LATE_TABLES = new Set<string>([
   'mind_tombstones',
   'mind_pending',
   'mind_sources',
+  'mind_projects',
   'logos_usage',
   'logos_room_events',
   'logos_room_members',
