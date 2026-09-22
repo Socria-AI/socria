@@ -117,13 +117,13 @@ export async function DELETE(req: NextRequest) {
   // conversations and files still filed under it, nothing new ever tied to
   // it again, and a tombstone stopping Socria from re-learning that the
   // person works on it at all. Deleting a Project is its own act, with its
-  // own account of what goes and what stays; it lives on the Projects page.
+  // own account of what goes and what stays; it lives in the folder's settings.
   if (kind === 'node') {
     const projects = await listProjects(userId).catch(() => []);
     const owner = projects.find((p) => p.nodeId === id);
     if (owner) {
       return NextResponse.json(
-        { error: `This is your Project “${owner.name}”. Archive or delete it from Projects instead.` },
+        { error: `This is your Project “${owner.name}”. Archive or delete it from its folder instead.` },
         { status: 409 }
       );
     }

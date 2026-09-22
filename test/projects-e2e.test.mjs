@@ -299,11 +299,40 @@ ok('or borrow it: no frame, and none of u1\'s memory', !stranger.prompt.includes
 ok('or upload into it', (await call(R.upload.POST, 'POST', '/api/mind/upload', { name: 'a.txt', text: 'x', projectId: SOC })).status === 404);
 globalThis.__uid = 'u1';
 
+// ── 6b. moving a chat into a folder from the rail ───────────────────
+
+console.log('\n=== moving a chat into a folder, and out ===');
+const loose = await chat('Thinking about how Core 4 should pace hints.', {
+  conversationId: 'loose-1',
+  extract: { nodes: [C('Concept', 'hint pacing', 'How quickly Core 4 escalates from a question to a hint.')], edges: [] },
+});
+await call(R.conversations.PUT, 'PUT', '/api/conversations', {
+  conversation: { id: 'loose-1', title: 'Hint pacing', messages: [{ role: 'user', content: 'hi' }], updatedAt: 9 },
+});
+ok('held outside any folder, it is tied to nothing', loose.status === 200 && tiesTo('hint pacing', SOC_NODE).length === 0);
+const mv = await call(R.conversations.PATCH, 'PATCH', '/api/conversations', { id: 'loose-1', projectId: SOC });
+ok('moving it into Socria succeeds', mv.status === 200 && mv.json?.projectId === SOC, mv.text);
+ok('the chat is filed', db.rows('conversations').find((c) => c.id === 'loose-1')?.project_id === SOC);
+ok('and what it taught is now tied to Socria', tiesTo('hint pacing', SOC_NODE).some((e) => e.relationship === 'belongs_to'));
+ok('its title was not touched, nor its place in the list',
+   db.rows('conversations').find((c) => c.id === 'loose-1')?.title === 'Hint pacing' &&
+   db.rows('conversations').find((c) => c.id === 'loose-1')?.updated_at === 9);
+const back = await call(R.conversations.PATCH, 'PATCH', '/api/conversations', { id: 'loose-1', projectId: null });
+ok('moving it out succeeds', back.status === 200 && db.rows('conversations').find((c) => c.id === 'loose-1')?.project_id === null, back.text);
+ok('and unties what it alone had tied', tiesTo('hint pacing', SOC_NODE).length === 0);
+ok('without forgetting it', !!node('hint pacing'));
+ok('a rename still works as before', (await call(R.conversations.PATCH, 'PATCH', '/api/conversations', { id: 'loose-1', title: 'Pacing' })).status === 200 &&
+   db.rows('conversations').find((c) => c.id === 'loose-1')?.title === 'Pacing');
+ok('a folder that does not exist is refused', (await call(R.conversations.PATCH, 'PATCH', '/api/conversations', { id: 'loose-1', projectId: 'p_nope' })).status === 404);
+globalThis.__uid = 'u2';
+ok('nobody else can move your chat', (await call(R.conversations.PATCH, 'PATCH', '/api/conversations', { id: 'loose-1', projectId: SOC })).status === 404);
+globalThis.__uid = 'u1';
+
 // ── 7. the Memory page cannot orphan a Project ──────────────────────
 
 console.log('\n=== forgetting a Project\'s node from Memory ===');
 const orphan = await call(R.node.DELETE, 'DELETE', '/api/mind/node', { id: SOC_NODE });
-ok('is refused, and says where to go instead', orphan.status === 409 && /Projects/.test(orphan.json?.error ?? ''), orphan.text);
+ok('is refused, and says where to go instead', orphan.status === 409 && /folder/.test(orphan.json?.error ?? ''), orphan.text);
 ok('and the node is still there', !!nodes().find((n) => n.id === SOC_NODE));
 const ordinary = await call(R.node.DELETE, 'DELETE', '/api/mind/node', { id: node('Ship it').id });
 ok('an ordinary node still forgets normally', ordinary.status === 200 && !node('Ship it'), ordinary.text);

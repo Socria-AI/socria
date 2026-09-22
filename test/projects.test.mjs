@@ -26,6 +26,7 @@ import { renderMindGraph } from './.tmp/serialize.mjs';
 import {
   associate, createAnchor, findAdoptable, planDeletion, projectGoals, projectIndex,
   renderProjectContext, syncAnchor, MEMBERSHIP_RELATIONSHIPS, MAX_GOALS_SHOWN,
+  adoptConversation, releaseConversation,
 } from './.tmp/projects.mjs';
 
 let pass = 0, fail = 0;
@@ -420,6 +421,49 @@ console.log('\n=== what Core is told about the Project ===');
   ok('every field is bounded', huge.length < 3800, String(huge.length));
   ok('goals are capped', (huge.match(/^- goal/gm) ?? []).length === MAX_GOALS_SHOWN);
   ok('files are capped and counted', /and 28 more/.test(huge));
+}
+
+console.log('\n=== moving a chat into a folder, and out again ===');
+{
+  // A chat held OUTSIDE any Project, then filed under one from the rail. Its
+  // memories already carry the conversation they came from, so filing it
+  // should tie them exactly as if it had been held there — and taking it out
+  // should untie only what it alone put there.
+  let w = createAnchor(EMPTY_GRAPH, 'Research', '', new Set(), { now: NOW, nextId });
+  const R = w.nodeId;
+  let wg = turn(w.graph, null, 'loose-1', [
+    C('Concept', 'survey design', 'How the questionnaire is structured and ordered.'),
+    C('Concept', 'response bias', 'People answering how they think they should.'),
+  ]);
+  // Something that existed before the chat, which the chat then discussed.
+  wg = turn(wg, null, 'older', [C('Concept', 'sampling', 'Who gets asked, and how they are chosen.')]);
+  wg = turn(wg, null, 'loose-1', [C('Concept', 'sampling', 'Who gets asked, and how they are chosen.')]);
+  const tie = (g, l) => g.edges.find((e) => e.targetId === R && e.sourceId === g.nodes.find((n) => n.label === l)?.id);
+
+  const moved = adoptConversation(wg, R, 'loose-1', { now: NOW, nextId });
+  ok('filing the chat ties what it taught to the Project', moved.tied === 3, String(moved.tied));
+  ok('what it created BELONGS to the Project', tie(moved.graph, 'survey design')?.relationship === 'belongs_to');
+  ok('what already existed is RELEVANT to it', tie(moved.graph, 'sampling')?.relationship === 'relevant_to');
+  ok('nothing is copied: same nodes, only edges added', moved.graph.nodes.length === wg.nodes.length);
+  ok('a node the chat never touched is left alone',
+     !moved.graph.edges.some((e) => e.targetId === R && e.sourceId === wg.nodes.find((n) => n.label === 'Research')?.id));
+
+  // A second chat in the Project also discusses "sampling".
+  let two = turn(moved.graph, R, 'in-project', [C('Concept', 'sampling', 'Who gets asked, and how they are chosen.')]);
+  ok('a second chat reinforcing a tie is recorded on it',
+     tie(two, 'sampling').provenance.map((p) => p.conversationId).includes('in-project'));
+
+  const out = releaseConversation(two, R, 'loose-1');
+  ok('taking the chat out unties what it ALONE put there', !tie(out.graph, 'survey design') && !tie(out.graph, 'response bias'));
+  ok('but keeps a tie another chat also justifies', !!tie(out.graph, 'sampling'));
+  ok('minus this chat\'s entry', !tie(out.graph, 'sampling').provenance.some((p) => p.conversationId === 'loose-1'));
+  ok('and reports what it untied', out.untied === 2, String(out.untied));
+  ok('no memory is removed by moving a chat', out.graph.nodes.length === two.nodes.length);
+  ok('and no tombstone is written — filing is not forgetting', out.graph.tombstones.length === two.tombstones.length);
+  ok('a file\'s tie is never released by moving a chat',
+     releaseConversation(associate(two, R, [{ id: two.nodes.find((n) => n.label === 'response bias').id, action: 'reinforced' }],
+       { now: NOW, nextId, provenance: { surface: 'file' } }).graph, R, 'loose-1').graph.edges
+       .some((e) => e.targetId === R && e.sourceId === two.nodes.find((n) => n.label === 'response bias').id));
 }
 
 // ── lifecycle ───────────────────────────────────────────────────────

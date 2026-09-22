@@ -17,6 +17,7 @@ import { usePlan } from '@/components/usePlan';
 import { OneFoot } from '@/components/OneMark';
 import { ModelGlyph } from '@/components/ModelGlyph';
 import { LogosApp } from '@/components/LogosApp';
+import { ProjectSheet } from '@/components/projects/ProjectSheet';
 import { failureText } from '@/lib/upstream-error';
 import {
   MODEL_KEY,
@@ -120,23 +121,31 @@ interface Conversation {
   projectId?: string | null;
 }
 
-/**
- * What the link that opened /chat asked for, read ONCE and cached.
- *
- * Two effects need it — the one that loads conversations (to know which to
- * open) and the one that tidies the URL — and the second strips the
- * parameters. Reading the URL in both would make the answer depend on which
- * ran first.
- */
-let entryCache: { project: string | null; open: string | null } | null = null;
-function readEntry(): { project: string | null; open: string | null } {
-  if (entryCache) return entryCache;
-  if (typeof window === 'undefined') return { project: null, open: null };
-  const p = new URLSearchParams(window.location.search);
-  const clean = (v: string | null) => (v && /^[A-Za-z0-9_-]{1,120}$/.test(v) ? v : null);
-  entryCache = { project: clean(p.get('project')), open: clean(p.get('open')) };
-  return entryCache;
+/** A Project, as the rail needs it: a folder of chats. */
+interface RailProject {
+  id: string;
+  name: string;
+  archived: boolean;
+  updatedAt: number;
 }
+
+const FOLDER_ICON = (
+  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h4.2l1.8 2h9A1.5 1.5 0 0 1 21 9.5v8A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5z" />
+  </svg>
+);
+const PLUS_ICON = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
+);
+const DOTS_ICON = (
+  <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.7" /><circle cx="12" cy="12" r="1.7" /><circle cx="19" cy="12" r="1.7" /></svg>
+);
+const MOVE_ICON = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h4.2l1.8 2h9A1.5 1.5 0 0 1 21 9.5v8A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5z" />
+    <path d="M10 13.5h5M13 11.5l2 2-2 2" />
+  </svg>
+);
 
 const STORAGE_KEY = 'socria.conversations.v1';
 const ACTIVE_KEY = 'socria.activeConversationId.v1';
@@ -256,8 +265,20 @@ export default function ChatPage() {
    * session or opening another one.
    */
   const [projectEntry, setProjectEntry] = useState<{ id: string; name: string } | null>(null);
-  /** Project id → name, for the chip on a conversation that is in one. */
-  const [projectNames, setProjectNames] = useState<Record<string, string>>({});
+  /** The person's Projects — the folders in the rail. Signed-in only. */
+  const [projects, setProjects] = useState<RailProject[]>([]);
+  /** Which folders are open. */
+  const [openFolders, setOpenFolders] = useState<string[]>([]);
+  /** The name being typed for a new folder; null when not making one. */
+  const [folderDraft, setFolderDraft] = useState<string | null>(null);
+  /** The chat whose "Move to" menu is open. */
+  const [moving, setMoving] = useState<string | null>(null);
+  /** The Project whose settings sheet is open. */
+  const [sheet, setSheet] = useState<string | null>(null);
+  /** The folder a chat is being dragged over. */
+  const [dropTarget, setDropTarget] = useState<string | null>(null);
+  /** A chat waiting to go into the folder being named from its menu. */
+  const pendingMove = useRef<string | null>(null);
   const [input, setInput] = useState('');
   /** the sentence written during onboarding, for whichever composer mounts */
   const [carriedText, setCarriedText] = useState('');
@@ -439,14 +460,7 @@ export default function ChatPage() {
               }))
           );
           setConversations(list);
-          // Arrived from a Project: open the conversation that was asked
-          // for, or start a new one inside the Project — never land on
-          // whatever happened to be most recent, which would put the person
-          // in a different Project's conversation without saying so.
-          const entry = readEntry();
-          if (entry.open && list.some((c) => c.id === entry.open)) setActiveId(entry.open);
-          else if (entry.project) setActiveId(null);
-          else setActiveId(list[0]?.id ?? null);
+          setActiveId(list[0]?.id ?? null);
         } catch (e: any) {
           if (!cancelled) setError(e?.message || 'Failed to load conversations');
         }
@@ -791,8 +805,22 @@ export default function ChatPage() {
   // thing to the person reading the list — something they were thinking about
   // — so they interleave by when each was last touched. The Logos mark on the
   // row says which surface opens it; no heading files them apart.
-  const sessionRail = [
+  // A chat in a folder is shown in its folder, not also in the dated list —
+  // unless the person is searching, when every chat is a candidate wherever
+  // it lives. A chat whose Project no longer exists is simply unfiled.
+  const filed = (c: Conversation) => !!c.projectId && projects.some((p) => p.id === c.projectId);
+  const allRail = [
     ...conversations.map((c) => ({
+      kind: 'chat' as const,
+      id: c.id,
+      title: c.title,
+      updatedAt: c.updatedAt,
+      nodes: 0,
+    })),
+    ...logosSessions.map((s) => ({ kind: 'logos' as const, ...s })),
+  ].sort((a, b) => b.updatedAt - a.updatedAt);
+  const sessionRail = [
+    ...conversations.filter((c) => !filed(c)).map((c) => ({
       kind: 'chat' as const,
       id: c.id,
       title: c.title,
@@ -810,14 +838,13 @@ export default function ChatPage() {
   // The controls only appear once the list is long enough to need them; the
   // same threshold the tab bar used, for the same reason. A search box over
   // four rows is furniture.
-  const railSearchable = shouldShowSearch(sessionRail);
-  const railHits = railSearchable
-    ? searchRail(sessionRail, railQuery, mapsOnly)
-    : sessionRail;
+  const railSearchable = shouldShowSearch(allRail);
+  const railFiltering = railSearchable && (!!railQuery || mapsOnly);
+  const railHits = railFiltering ? searchRail(allRail, railQuery, mapsOnly) : sessionRail;
   const railGroups = groupRail(railHits);
   // The chip is hidden on its own when nothing would survive it. A filter
   // whose only outcome is "nothing here" teaches people not to press it.
-  const railHasMaps = sessionRail.some((i) => i.nodes > 0);
+  const railHasMaps = allRail.some((i) => i.nodes > 0);
 
   /**
    * Rename a row, whichever surface it belongs to.
@@ -1573,63 +1600,101 @@ export default function ChatPage() {
     }
   }
 
-  // ── arriving from a Project ─────────────────────────────────────
+  // ── Projects: folders in the rail ─────────────────────────────
   //
-  // /chat?project=<id> starts a new conversation inside that Project, on
-  // Core 4 — the only Core whose memory is the Mind Graph, and so the only
-  // one a Project can focus. /chat?open=<id> opens a conversation the
-  // Project page listed. Both are read once (readEntry) and then removed
-  // from the address bar, so a reload does not start a second conversation.
+  // A Project is a folder of chats that also focuses Core 4's memory: inside
+  // one, retrieval looks at that region of the Mind Graph first, and can
+  // still reach anything else strongly relevant (lib/mind/projects.ts). Here
+  // it is just a folder — make one, open it, start a chat in it, move chats
+  // in and out.
+  const loadProjects = useCallback(async () => {
+    if (!isSignedIn) { setProjects([]); return; }
+    try {
+      const res = await fetch('/api/projects', { cache: 'no-store' });
+      if (!res.ok) return;
+      const j = await res.json();
+      // A deployment without the table answers with a storage fault: no
+      // folders, and chats stay in the ordinary list where they work.
+      setProjects(j.storage?.ok === false ? [] : (j.projects ?? []));
+    } catch {}
+  }, [isSignedIn]);
+  useEffect(() => { void loadProjects(); }, [loadProjects]);
+
+  // Opening a chat that lives in a folder opens the folder, so the row that
+  // is highlighted is one the person can actually see.
   useEffect(() => {
-    const entry = readEntry();
-    if (!entry.project && !entry.open) return;
-    const u = new URL(window.location.href);
-    u.searchParams.delete('project');
-    u.searchParams.delete('open');
-    window.history.replaceState({}, '', u.pathname + u.search);
-    if (!entry.project) return;
-    // Set NOW, named later. A message typed before the Project's name has
-    // loaded would otherwise be sent outside the Project — the conversation
-    // is created on the first send, from whatever this holds at that moment.
-    setProjectEntry({ id: entry.project, name: 'this Project' });
+    const pid = conversations.find((c) => c.id === activeId)?.projectId;
+    if (pid) setOpenFolders((o) => (o.includes(pid) ? o : [...o, pid]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeId]);
+
+  const toggleFolder = (id: string) =>
+    setOpenFolders((o) => (o.includes(id) ? o.filter((x) => x !== id) : [...o, id]));
+
+  async function createFolder() {
+    const name = (folderDraft ?? '').replace(/\s+/g, ' ').trim();
+    setFolderDraft(null);
+    const carry = pendingMove.current;
+    pendingMove.current = null;
+    if (!name) return;
+    try {
+      const res = await fetch('/api/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      });
+      const j = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(j?.error || 'That project could not be created.');
+      await loadProjects();
+      setOpenFolders((o) => [...o, j.project.id]);
+      if (carry) await moveChat(carry, j.project.id);
+    } catch (e: any) {
+      setError(e?.message || 'That project could not be created.');
+    }
+  }
+
+  /**
+   * A new chat inside a Project. Not created yet — the first message creates
+   * it, carrying the Project — and on Core 4, the only Core whose memory is
+   * the Mind Graph and so the only one a Project can focus.
+   */
+  function newChatIn(p: RailProject) {
+    setProjectEntry({ id: p.id, name: p.name });
+    setActiveId(null);
     setModel('core-4');
     chooseModel('core-4');
-    let cancelled = false;
-    void (async () => {
-      try {
-        const res = await fetch(`/api/projects/${encodeURIComponent(entry.project!)}`, { cache: 'no-store' });
-        if (cancelled) return;
-        // Not theirs, or gone: an ordinary conversation, said by the chip
-        // disappearing rather than by filing the conversation somewhere that
-        // does not exist.
-        if (!res.ok) { setProjectEntry(null); return; }
-        const j = await res.json();
-        if (!cancelled) setProjectEntry({ id: j.project.id, name: j.project.name });
-      } catch {
-        if (!cancelled) setProjectEntry(null);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, []);
+    setOpenFolders((o) => (o.includes(p.id) ? o : [...o, p.id]));
+    setSidebarOpen(false);
+    requestAnimationFrame(() => textareaRef.current?.focus());
+  }
 
-  // Project names, for the chip on a conversation that is in one. Signed-in
-  // only: Projects live in the cloud with the rest of the Mind Graph.
-  useEffect(() => {
-    if (!isSignedIn) return;
-    let cancelled = false;
-    void (async () => {
-      try {
-        const res = await fetch('/api/projects', { cache: 'no-store' });
-        if (!res.ok) return;
-        const j = await res.json();
-        if (cancelled) return;
-        const names: Record<string, string> = {};
-        for (const p of j.projects ?? []) names[p.id] = p.name;
-        setProjectNames(names);
-      } catch {}
-    })();
-    return () => { cancelled = true; };
-  }, [isSignedIn]);
+  /**
+   * Move a chat into a folder, out of one, or between two. The server also
+   * re-files what the chat taught in the Mind Graph — see moveToProject in
+   * app/api/conversations/route.ts. Optimistic, and put back if it fails.
+   */
+  async function moveChat(id: string, pid: string | null) {
+    setMoving(null);
+    const c = conversations.find((x) => x.id === id);
+    if (!c || (c.projectId ?? null) === pid) return;
+    const before = conversations;
+    setConversations((cs) => cs.map((x) => (x.id === id ? { ...x, projectId: pid } : x)));
+    if (pid) setOpenFolders((o) => (o.includes(pid) ? o : [...o, pid]));
+    // Not saved yet: its first save will carry the folder with it.
+    if (!c.messages.length) return;
+    try {
+      const res = await fetch('/api/conversations', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, projectId: pid }),
+      });
+      const j = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(j?.error || 'That chat could not be moved.');
+    } catch (e: any) {
+      setConversations(before);
+      setError(e?.message || 'That chat could not be moved.');
+    }
+  }
 
   // Any entry point can ask for a model by link — /chat?model=logos — which is
   // how the explainer page, the Socria One page and the sidebar all open Logos
@@ -1787,8 +1852,272 @@ export default function ChatPage() {
       />
     );
 
+  /** One row of the rail — the dated list and the inside of folders alike. */
+  const renderRow = (item: (typeof allRail)[number]) => {
+    const rowKey = `${item.kind}-${item.id}`;
+    const startRename = () => {
+      setRenameDraft(item.title);
+      setRenaming(rowKey);
+    };
+    // The box replaces the row rather than sitting inside it: a
+    // Logos row is a link, and a text field inside a link is a
+    // fight between typing and navigating that typing loses.
+    if (renaming === rowKey) {
+      return (
+        <div key={rowKey} className="s-row">
+          {item.nodes ? (
+            <span className="s-glyph" aria-hidden="true">
+              <ModelGlyph model="logos" size={14} />
+            </span>
+          ) : (
+            <span className="s-gap" aria-hidden="true" />
+          )}
+          <input
+            autoFocus
+            className="s-rename"
+            value={renameDraft}
+            aria-label="Rename this session"
+            onChange={(e) => setRenameDraft(e.target.value)}
+            onFocus={(e) => e.currentTarget.select()}
+            // Blur commits as well as Enter: clicking away from
+            // a box you have typed in should keep what you typed.
+            onBlur={() => commitRename(item.kind, item.id)}
+            onKeyDown={(e) => {
+              e.stopPropagation();
+              if (e.key === 'Enter') commitRename(item.kind, item.id);
+              if (e.key === 'Escape') setRenaming(null);
+            }}
+          />
+        </div>
+      );
+    }
+
+    const mark = item.nodes ? (
+      <span className="s-glyph" aria-hidden="true">
+        <ModelGlyph model="logos" size={14} />
+      </span>
+    ) : (
+      <span className="s-gap" aria-hidden="true" />
+    );
+    const count = item.nodes ? <span className="n">{item.nodes}</span> : null;
+
+    const convo = item.kind === 'chat' ? conversations.find((c) => c.id === item.id) : undefined;
+    // Folders exist only for a signed-in person, and only Core chats go in them.
+    const fileable = !!isSignedIn && item.kind === 'chat';
+    return (
+      <div key={rowKey}>
+      <div
+        className={`s-row${
+          item.kind === 'chat' && item.id === activeId ? ' on' : ''
+        }`}
+        draggable={fileable && projects.length > 0}
+        onDragStart={(e) => {
+          e.dataTransfer.setData('text/socria-chat', item.id);
+          e.dataTransfer.effectAllowed = 'move';
+        }}
+      >
+        {item.kind === 'logos' ? (
+          <a
+            className="s-open"
+            href={`/chat?s=${encodeURIComponent(item.id)}`}
+            // Opening one of these is a model switch as well as
+            // a navigation: record it before leaving, or coming
+            // back to /chat would land on whatever was active
+            // before and contradict where they just were.
+            onClick={() => chooseModel('logos')}
+            // NO onDoubleClick HERE, deliberately. A Logos row
+            // is a link, and a link navigates on the FIRST
+            // click — by the time a second arrives the page is
+            // already leaving, so double-click-to-rename could
+            // never fire. Making it work would mean cancelling
+            // every click and navigating on a timer, which buys
+            // a nicety by putting a delay on every open. The
+            // pencil beside the row renames both kinds and is
+            // always there.
+            title={`${item.title} — opens in Logos`}
+          >
+            {mark}
+            <span className="t">{item.title}</span>
+            {count}
+          </a>
+        ) : (
+          <button
+            type="button"
+            className="s-open"
+            onClick={() => {
+              setActiveId(item.id);
+              setProjectEntry(null);
+              setSidebarOpen(false);
+            }}
+            onDoubleClick={startRename}
+            title={item.title}
+          >
+            {mark}
+            <span className="t">{item.title}</span>
+            {count}
+          </button>
+        )}
+        <span className="s-act">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              startRename();
+            }}
+            aria-label={`Rename ${item.title}`}
+            title="Rename"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 20h9" />
+              <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+            </svg>
+          </button>
+          {fileable && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setMoving((m) => (m === item.id ? null : item.id));
+              }}
+              aria-label={`Move ${item.title} to a project`}
+              aria-expanded={moving === item.id}
+              title="Move to project"
+            >
+              {MOVE_ICON}
+            </button>
+          )}
+          {item.kind === 'chat' && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                deleteSession(item.id);
+              }}
+              aria-label={`Delete ${item.title}`}
+              title="Delete"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          )}
+        </span>
+      </div>
+      {moving === item.id && (
+        <div className="s-move" role="menu" aria-label="Move to a project">
+          <p>Move to</p>
+          {projects.filter((pr) => !pr.archived).map((pr) => (
+            <button
+              key={pr.id}
+              type="button"
+              role="menuitem"
+              aria-current={convo?.projectId === pr.id}
+              onClick={() => void moveChat(item.id, pr.id)}
+            >
+              {pr.name}
+            </button>
+          ))}
+          {convo?.projectId && (
+            <button type="button" role="menuitem" onClick={() => void moveChat(item.id, null)}>
+              Out of the project
+            </button>
+          )}
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              pendingMove.current = item.id;
+              setMoving(null);
+              setFolderDraft('');
+            }}
+          >
+            New project…
+          </button>
+        </div>
+      )}
+      </div>
+    );
+  };
+
+  /** A folder, and — when open — the chats in it. */
+  const folderRow = (pr: RailProject) => {
+    const kids = conversations
+      .filter((c) => c.projectId === pr.id)
+      .sort((a, b) => b.updatedAt - a.updatedAt);
+    const open = openFolders.includes(pr.id);
+    return (
+      <div key={`p-${pr.id}`}>
+        <div
+          className={`s-row s-fold${dropTarget === pr.id ? ' drop' : ''}`}
+          onDragOver={(e) => {
+            if (!e.dataTransfer.types.includes('text/socria-chat')) return;
+            e.preventDefault();
+            setDropTarget(pr.id);
+          }}
+          onDragLeave={() => setDropTarget((t) => (t === pr.id ? null : t))}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDropTarget(null);
+            const id = e.dataTransfer.getData('text/socria-chat');
+            if (id) void moveChat(id, pr.id);
+          }}
+        >
+          <button type="button" className="s-open" aria-expanded={open} onClick={() => toggleFolder(pr.id)} title={pr.name}>
+            <span className="chev" aria-hidden="true">{open ? '▾' : '▸'}</span>
+            <span className="s-glyph" aria-hidden="true">{FOLDER_ICON}</span>
+            <span className="t">{pr.name}</span>
+            {kids.length > 0 && <span className="n">{kids.length}</span>}
+          </button>
+          <span className="s-act">
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); newChatIn(pr); }}
+              aria-label={`New chat in ${pr.name}`}
+              title="New chat in this project"
+            >
+              {PLUS_ICON}
+            </button>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setSheet(pr.id); }}
+              aria-label={`${pr.name} settings`}
+              title="Project settings"
+            >
+              {DOTS_ICON}
+            </button>
+          </span>
+        </div>
+        {open && (
+          <div className="s-kids">
+            {kids.length
+              ? kids.map((c) => renderRow({ kind: 'chat', id: c.id, title: c.title, updatedAt: c.updatedAt, nodes: 0 }))
+              : <p className="s-none">No chats yet. <em>Start one with +.</em></p>}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="flex h-dvh">
+      {sheet && (
+        <ProjectSheet
+          id={sheet}
+          onClose={() => setSheet(null)}
+          onChanged={() => void loadProjects()}
+          onDeleted={() => {
+            // The server moved its chats out; say so here too, or the next
+            // save of one of them would file it back under a Project that no
+            // longer exists.
+            const gone = sheet;
+            setConversations((cs) => cs.map((c) => (c.projectId === gone ? { ...c, projectId: null } : c)));
+            if (projectEntry?.id === gone) setProjectEntry(null);
+            setSheet(null);
+            void loadProjects();
+          }}
+        />
+      )}
       <TryLogosModal
         open={logosModalOpen}
         onClose={handleLogosModalClose}
@@ -1964,7 +2293,7 @@ export default function ChatPage() {
                 )}
                 {(railQuery || mapsOnly) && (
                   <span className="n">
-                    {railHits.length} of {sessionRail.length}
+                    {railHits.length} of {allRail.length}
                   </span>
                 )}
               </div>
@@ -1973,148 +2302,65 @@ export default function ChatPage() {
         )}
 
         <div className="s-list">
+          {/* Projects: folders of chats, above the dated list. Hidden while
+              searching — a search looks through every chat wherever it is
+              filed, and the folders would show the same rows twice. */}
+          {!hydrating && isSignedIn && !railFiltering && (
+            <section className="s-proj" aria-label="Projects">
+              <div className="s-proj-h">
+                <p className="s-when">Projects</p>
+                <button
+                  type="button"
+                  onClick={() => { pendingMove.current = null; setFolderDraft(''); }}
+                  aria-label="New project"
+                  title="New project"
+                >
+                  +
+                </button>
+              </div>
+              {folderDraft !== null && (
+                <div className="s-row s-new-proj">
+                  <span className="s-glyph" aria-hidden="true">{FOLDER_ICON}</span>
+                  <input
+                    autoFocus
+                    className="s-rename"
+                    value={folderDraft}
+                    maxLength={80}
+                    placeholder="Name the project"
+                    aria-label="New project name"
+                    onChange={(e) => setFolderDraft(e.target.value)}
+                    onBlur={() => void createFolder()}
+                    onKeyDown={(e) => {
+                      e.stopPropagation();
+                      if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                      if (e.key === 'Escape') { pendingMove.current = null; setFolderDraft(null); }
+                    }}
+                  />
+                </div>
+              )}
+              {projects.filter((pr) => !pr.archived).map(folderRow)}
+              {!projects.length && folderDraft === null && (
+                <p className="s-none">Group chats into a project, and Socria keeps <em>its</em> context in view.</p>
+              )}
+              {projects.some((pr) => pr.archived) && (
+                <details className="s-arch">
+                  <summary>Archived · {projects.filter((pr) => pr.archived).length}</summary>
+                  {projects.filter((pr) => pr.archived).map(folderRow)}
+                </details>
+              )}
+            </section>
+          )}
           {hydrating ? (
             <p className="s-none">Loading sessions…</p>
-          ) : sessionRail.length === 0 ? (
+          ) : allRail.length === 0 ? (
             <p className="s-none">No sessions yet. <em>Start one.</em></p>
           ) : railHits.length === 0 ? (
-            <p className="s-none">Nothing matches. <em>Try fewer words.</em></p>
+            railFiltering ? <p className="s-none">Nothing matches. <em>Try fewer words.</em></p> : null
           ) : (
             railGroups.map(({ group, items }) => (
               <section key={group}>
                 <p className="s-when">{group}</p>
-                {items.map((item) => {
-                  const rowKey = `${item.kind}-${item.id}`;
-                  const startRename = () => {
-                    setRenameDraft(item.title);
-                    setRenaming(rowKey);
-                  };
-                  // The box replaces the row rather than sitting inside it: a
-                  // Logos row is a link, and a text field inside a link is a
-                  // fight between typing and navigating that typing loses.
-                  if (renaming === rowKey) {
-                    return (
-                      <div key={rowKey} className="s-row">
-                        {item.nodes ? (
-                          <span className="s-glyph" aria-hidden="true">
-                            <ModelGlyph model="logos" size={14} />
-                          </span>
-                        ) : (
-                          <span className="s-gap" aria-hidden="true" />
-                        )}
-                        <input
-                          autoFocus
-                          className="s-rename"
-                          value={renameDraft}
-                          aria-label="Rename this session"
-                          onChange={(e) => setRenameDraft(e.target.value)}
-                          onFocus={(e) => e.currentTarget.select()}
-                          // Blur commits as well as Enter: clicking away from
-                          // a box you have typed in should keep what you typed.
-                          onBlur={() => commitRename(item.kind, item.id)}
-                          onKeyDown={(e) => {
-                            e.stopPropagation();
-                            if (e.key === 'Enter') commitRename(item.kind, item.id);
-                            if (e.key === 'Escape') setRenaming(null);
-                          }}
-                        />
-                      </div>
-                    );
-                  }
-
-                  const mark = item.nodes ? (
-                    <span className="s-glyph" aria-hidden="true">
-                      <ModelGlyph model="logos" size={14} />
-                    </span>
-                  ) : (
-                    <span className="s-gap" aria-hidden="true" />
-                  );
-                  const count = item.nodes ? <span className="n">{item.nodes}</span> : null;
-
-                  return (
-                    <div
-                      key={rowKey}
-                      className={`s-row${
-                        item.kind === 'chat' && item.id === activeId ? ' on' : ''
-                      }`}
-                    >
-                      {item.kind === 'logos' ? (
-                        <a
-                          className="s-open"
-                          href={`/chat?s=${encodeURIComponent(item.id)}`}
-                          // Opening one of these is a model switch as well as
-                          // a navigation: record it before leaving, or coming
-                          // back to /chat would land on whatever was active
-                          // before and contradict where they just were.
-                          onClick={() => chooseModel('logos')}
-                          // NO onDoubleClick HERE, deliberately. A Logos row
-                          // is a link, and a link navigates on the FIRST
-                          // click — by the time a second arrives the page is
-                          // already leaving, so double-click-to-rename could
-                          // never fire. Making it work would mean cancelling
-                          // every click and navigating on a timer, which buys
-                          // a nicety by putting a delay on every open. The
-                          // pencil beside the row renames both kinds and is
-                          // always there.
-                          title={`${item.title} — opens in Logos`}
-                        >
-                          {mark}
-                          <span className="t">{item.title}</span>
-                          {count}
-                        </a>
-                      ) : (
-                        <button
-                          type="button"
-                          className="s-open"
-                          onClick={() => {
-                            setActiveId(item.id);
-                            setProjectEntry(null);
-                            setSidebarOpen(false);
-                          }}
-                          onDoubleClick={startRename}
-                          title={item.title}
-                        >
-                          {mark}
-                          <span className="t">{item.title}</span>
-                          {count}
-                        </button>
-                      )}
-                      <span className="s-act">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            startRename();
-                          }}
-                          aria-label={`Rename ${item.title}`}
-                          title="Rename"
-                        >
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M12 20h9" />
-                            <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
-                          </svg>
-                        </button>
-                        {item.kind === 'chat' && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              deleteSession(item.id);
-                            }}
-                            aria-label={`Delete ${item.title}`}
-                            title="Delete"
-                          >
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                              <line x1="18" y1="6" x2="6" y2="18" />
-                              <line x1="6" y1="6" x2="18" y2="18" />
-                            </svg>
-                          </button>
-                        )}
-                      </span>
-                    </div>
-                  );
-                })
-                }
+                {items.map(renderRow)}
               </section>
             ))
           )}
@@ -2585,16 +2831,21 @@ export default function ChatPage() {
               const active = conversations.find((c) => c.id === activeId);
               const pid = active ? active.projectId ?? null : projectEntry?.id ?? null;
               if (!pid) return null;
-              const name = active ? projectNames[pid] ?? 'a Project' : projectEntry!.name;
+              const name = active ? projects.find((pr) => pr.id === pid)?.name : projectEntry!.name;
+              // A chat filed under a Project that no longer exists is simply
+              // unfiled; saying "In a Project" about it would be untrue.
+              if (!name) return null;
               return (
                 <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-ink/60" role="note">
                   <span className="font-serif italic">{active ? 'In' : 'Starting in'}</span>
-                  <a
-                    href={`/projects/${encodeURIComponent(pid)}`}
+                  <button
+                    type="button"
+                    onClick={() => setSheet(pid)}
                     className="rounded-full border border-ink/15 bg-white/70 px-2.5 py-0.5 text-ink/80 hover:border-ink/40"
+                    title="Project settings"
                   >
                     {name}
-                  </a>
+                  </button>
                   {model !== 'core-4' && (
                     <span className="text-ink/45">· Project memory applies on Core 4</span>
                   )}

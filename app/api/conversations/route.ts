@@ -11,6 +11,8 @@ import { sanitizeMemory, EMPTY_MEMORY } from '@/lib/socria-prompt';
 import { EMPTY_MAP, sanitizeMap, sanitizeByRef } from '@/lib/logos';
 import { sanitizeAttachments } from '@/lib/logos-attachments';
 import { sanitizeContexts } from '@/lib/logos-sources';
+import { MindStoreError, listProjects, loadGraph, persistGraph } from '@/lib/mind/store';
+import { adoptConversation, releaseConversation } from '@/lib/mind/projects';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -253,6 +255,12 @@ export async function PATCH(req: NextRequest) {
 
   const body = await req.json().catch(() => null);
   const id = body?.id;
+  // Filing a conversation under a Project (or taking it out of one) is its
+  // own operation, with its own consequences in the Mind Graph — see
+  // moveToProject below.
+  if (typeof id === 'string' && id && body && 'projectId' in body && body.title === undefined) {
+    return moveToProject(userId, id, body.projectId);
+  }
   const raw = body?.title;
   if (typeof id !== 'string' || !id || typeof raw !== 'string') {
     return NextResponse.json({ error: 'Invalid rename' }, { status: 400 });
@@ -284,6 +292,86 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ ok: true, title });
   } catch (e: any) {
     console.error('PATCH conversation threw:', e);
+    return NextResponse.json({ error: e?.message || 'Internal error' }, { status: 500 });
+  }
+}
+
+/**
+ * Move one conversation into a Project, out of one, or between two.
+ *
+ * Two writes, in the order that is safe to repeat. The conversation's
+ * project_id first — that is what the rail shows, and a move that fails
+ * after it can simply be done again. Then the graph: what the conversation
+ * taught is untied from the Project it left and tied to the one it joined
+ * (releaseConversation / adoptConversation in lib/mind/projects.ts). Moving
+ * a chat is filing, never forgetting — no memory is created or removed,
+ * only the ties that say which Project it was worked on in.
+ *
+ * `updated_at` is left alone for the same reason a rename leaves it: the rail
+ * is ordered by it, and filing is not thinking.
+ */
+async function moveToProject(userId: string, id: string, raw: unknown) {
+  const target = raw === null ? null : sanitizeProjectId(raw);
+  if (raw !== null && !target) return NextResponse.json({ error: 'Which Project?' }, { status: 400 });
+
+  try {
+    const db = supabaseAdmin();
+    const { data: row, error: readErr } = await db
+      .from('conversations').select('id, project_id').eq('id', id).eq('user_id', userId).maybeSingle();
+    if (readErr) {
+      if (missingColumn(readErr)) {
+        warnProjectColumn();
+        return NextResponse.json(
+          { error: 'Projects are not set up on this database yet — re-run supabase/schema.sql.' },
+          { status: 409 }
+        );
+      }
+      return NextResponse.json({ error: `Supabase: ${readErr.message}` }, { status: 500 });
+    }
+    if (!row) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    const from = sanitizeProjectId((row as { project_id?: unknown }).project_id);
+    if (from === target) return NextResponse.json({ ok: true, projectId: target });
+
+    // Both Projects must be this person's. Scoped reads: anybody else's id is
+    // simply absent from the list.
+    const projects = await listProjects(userId);
+    const to = target ? projects.find((p) => p.id === target) : null;
+    if (target && !to) return NextResponse.json({ error: 'No such Project.' }, { status: 404 });
+    const left = from ? projects.find((p) => p.id === from) : null;
+
+    const { error: upErr } = await db
+      .from('conversations').update({ project_id: target }).eq('id', id).eq('user_id', userId);
+    if (upErr) return NextResponse.json({ error: `Supabase: ${upErr.message}` }, { status: 500 });
+
+    const now = Date.now();
+    let seq = 0;
+    const nextId = () => `m_${now.toString(36)}_M${(seq++).toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+    const before = await loadGraph(userId);
+    let after = before;
+    let untied = 0;
+    let tied = 0;
+    if (left && after.nodes.some((n) => n.id === left.nodeId)) {
+      const r = releaseConversation(after, left.nodeId, id);
+      after = r.graph; untied = r.untied;
+    }
+    if (to && after.nodes.some((n) => n.id === to.nodeId)) {
+      const r = adoptConversation(after, to.nodeId, id, { now, nextId });
+      after = r.graph; tied = r.tied;
+    }
+    if (after !== before) {
+      const saved = await persistGraph(userId, before, after);
+      if (!saved.ok) {
+        // The conversation IS filed; its memories are not yet tied. Said,
+        // rather than reported as success: moving it again repairs it.
+        return NextResponse.json({ ok: true, projectId: target, graph: 'pending' });
+      }
+    }
+    return NextResponse.json({ ok: true, projectId: target, tied, untied });
+  } catch (e: any) {
+    if (e instanceof MindStoreError) {
+      return NextResponse.json({ error: 'Projects are not set up on this deployment yet.' }, { status: 503 });
+    }
+    console.error('PATCH conversation move threw:', e);
     return NextResponse.json({ error: e?.message || 'Internal error' }, { status: 500 });
   }
 }

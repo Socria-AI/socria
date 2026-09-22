@@ -620,3 +620,32 @@
   padding:9px 16px;border-radius:999px;border:0;background:var(--moss);color:var(--paper);
   font-size:13.5px;font-weight:500;cursor:pointer;transition:background .18s}
 .app-root .logos-offer .lo-go:hover{background:var(--moss-700)}
+
+/* ── Projects, as folders in the rail ────────────────────────────────
+   A Project is a folder of chats that also focuses Core 4's memory (see
+   lib/mind/projects.ts). It lives here, with the chats, rather than on a
+   page of its own. Folder rows reuse .s-row so they read as part of the
+   same list; their chats are indented beneath them. */
+.app-root .s-proj{margin:0 0 6px}
+.app-root .s-proj-h{display:flex;align-items:center;justify-content:space-between;margin:12px 4px 5px}
+.app-root .s-proj-h .s-when{margin:0}
+.app-root .s-proj-h button{font-size:15px;line-height:1;color:var(--ink-45);padding:0 4px;background:none;border:none;cursor:pointer}
+.app-root .s-proj-h button:hover{color:var(--moss-700)}
+.app-root .s-fold .s-glyph{color:var(--moss-600)}
+.app-root .s-fold .chev{flex:0 0 auto;width:9px;margin-top:1px;color:var(--ink-45);font-size:9px}
+.app-root .s-fold.drop{background:rgba(94,118,51,.14);outline:1px dashed var(--moss-600)}
+.app-root .s-kids{margin:0 0 4px 14px;padding-left:6px;border-left:1px solid var(--ink-12)}
+.app-root .s-kids .s-none{margin:6px 6px 8px;font-size:12px}
+.app-root .s-new-proj{margin:2px 0 6px}
+.app-root .s-arch{margin:6px 4px 0}
+.app-root .s-arch > summary{cursor:pointer;list-style:none;font-family:var(--font-sans);font-size:9.5px;font-weight:600;
+  letter-spacing:.16em;text-transform:uppercase;color:var(--ink-45)}
+.app-root .s-arch > summary::-webkit-details-marker{display:none}
+.app-root .s-arch .s-fold{opacity:.7}
+.app-root .s-move{margin:2px 0 6px 23px;padding:4px;border:1px solid var(--ink-12);border-radius:10px;background:#fff;
+  box-shadow:0 6px 20px rgba(31,31,31,.08)}
+.app-root .s-move p{margin:4px 6px;font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-45)}
+.app-root .s-move button{display:block;width:100%;text-align:left;font-size:13px;padding:6px 8px;border-radius:7px;color:var(--ink-70)}
+.app-root .s-move button:hover{background:rgba(31,31,31,.05);color:var(--ink)}
+.app-root .s-move button[aria-current="true"]{color:var(--moss-700)}
+.app-root .s-row[draggable="true"]{cursor:grab}

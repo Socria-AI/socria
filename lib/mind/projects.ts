@@ -42,6 +42,11 @@ export const MEMBERSHIP_RELATIONSHIPS = new Set<string>([
   'belongs_to', 'relevant_to', 'created_in', 'discussed_in',
 ]);
 
+/** One justification for a Project tie: which conversation, file, or hand. */
+function sourceKey(p: Pick<Provenance, 'conversationId' | 'sourceNodeId' | 'surface'>): string {
+  return p.conversationId ? `c:${p.conversationId}` : p.sourceNodeId ? `f:${p.sourceNodeId}` : `s:${p.surface}`;
+}
+
 /** What created a node's tie to a Project, from the apply() report. */
 export type TouchAction = 'created' | 'reinforced' | 'revised' | 'superseded' | 'conflicted';
 
@@ -94,9 +99,20 @@ export function associate(
     );
     if (existing >= 0) {
       const e = edges[existing];
+      // Record WHAT reinforced it, once per distinct source — a conversation,
+      // a file, or the person's own hand. A tie justified by several must
+      // survive one of them going away (see releaseConversation), and it can
+      // only do that if all of them are written down. The first version
+      // recorded only conversations, so a tie a chat created and a FILE then
+      // reinforced was deleted outright when the chat was moved out.
+      const key = sourceKey(opts.provenance);
+      const known = e.provenance.some((p) => sourceKey(p) === key);
       edges[existing] = {
         ...e,
         strength: Math.min(1, e.strength + 0.05),
+        provenance: known
+          ? e.provenance
+          : [...e.provenance, { ...opts.provenance, kind: 'calculated' as const, at: opts.now, note: 'came up again in this project' }].slice(-20),
         updatedAt: opts.now,
         lastReinforced: opts.now,
       };
@@ -133,6 +149,63 @@ export function associate(
   }
 
   return { graph: { ...graph, edges }, created, reinforced };
+}
+
+/**
+ * A conversation moved INTO a Project, after the fact.
+ *
+ * Everything learned in it is already in the graph — every node records the
+ * conversation it came from — so filing the conversation under a Project
+ * ties what it taught to that Project exactly as if it had been held there
+ * from the start. Something first learned in this conversation `belongs_to`
+ * the Project; something that existed before it is `relevant_to` it.
+ */
+export function adoptConversation(
+  graph: MindGraph,
+  anchorId: string,
+  conversationId: string,
+  opts: { now: number; nextId: () => string }
+): { graph: MindGraph; tied: number } {
+  const touched = graph.nodes
+    .filter((n) => n.id !== anchorId && n.provenance.some((p) => p.conversationId === conversationId))
+    .map((n) => ({
+      id: n.id,
+      action: (n.provenance[0]?.conversationId === conversationId ? 'created' : 'reinforced') as TouchAction,
+    }));
+  const out = associate(graph, anchorId, touched, {
+    now: opts.now, nextId: opts.nextId, provenance: { surface: 'core', conversationId },
+  });
+  return { graph: out.graph, tied: out.created + out.reinforced };
+}
+
+/**
+ * A conversation moved OUT of a Project.
+ *
+ * Unties exactly what that conversation tied, and nothing else. A membership
+ * edge that other conversations in the Project — or a file, or a goal the
+ * person typed — also justify stays, minus this conversation's entry. Only a
+ * tie that came from this conversation alone is removed.
+ *
+ * No tombstones and no memories touched. Moving a chat is filing, not
+ * forgetting: what it taught stays in the graph, simply no longer filed here.
+ */
+export function releaseConversation(
+  graph: MindGraph,
+  anchorId: string,
+  conversationId: string
+): { graph: MindGraph; untied: number } {
+  let untied = 0;
+  const edges: MindEdge[] = [];
+  for (const e of graph.edges) {
+    const touches = e.sourceId === anchorId || e.targetId === anchorId;
+    if (!touches || !MEMBERSHIP_RELATIONSHIPS.has(e.relationship)) { edges.push(e); continue; }
+    const mine = e.provenance.filter((p) => p.conversationId === conversationId);
+    if (!mine.length) { edges.push(e); continue; }
+    const rest = e.provenance.filter((p) => p.conversationId !== conversationId);
+    if (!rest.length) { untied++; continue; }
+    edges.push({ ...e, provenance: rest });
+  }
+  return { graph: { ...graph, edges }, untied };
 }
 
 /**
