@@ -77,9 +77,21 @@ export const OCCURRENCE_TYPES = new Set<string>([
   'Question', 'Uncertainty',
 ]);
 
-/** Does this type assert something durable about the person? */
+/**
+ * Does this type assert something durable about the person?
+ *
+ * Asked of NORMALISED names, because a fingerprint stores "project", not
+ * "Project", and a raw `Set.has` on the ontology's casing would have answered
+ * "generalising" for every occurrence type arriving from a tombstone. That is
+ * the same casing mismatch that killed typesCompatible silently, and it is
+ * worth closing here before a caller depends on it rather than after.
+ */
+const OCCURRENCE_NORMALIZED: ReadonlySet<string> = new Set(
+  [...OCCURRENCE_TYPES].map((t) => normalize(t))
+);
+
 export function isGeneralising(type: string): boolean {
-  return !OCCURRENCE_TYPES.has(type);
+  return !OCCURRENCE_NORMALIZED.has(normalize(type));
 }
 
 // ── status ──────────────────────────────────────────────────────────

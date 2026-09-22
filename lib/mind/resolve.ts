@@ -16,7 +16,8 @@
 // conflates is not, because nobody can see what was merged.
 
 import {
-  normalize, parseNodeTombstone, type MindGraph, type MindNode, type NodeType,
+  isGeneralising, normalize, parseNodeTombstone,
+  type MindGraph, type MindNode, type NodeType,
 } from './types';
 
 /** How much of a match counts as the same thing. */
@@ -64,6 +65,36 @@ export function typesCompatibleNormalized(a: string, b: string): boolean {
     if (v.some((t) => normalize(t) === bn)) return true;
   }
   return false;
+}
+
+/**
+ * Type compatibility as FORGETTING asks it — deliberately wider than
+ * resolution's, and for the same reason gate 2's list is inverted.
+ *
+ * COMPATIBLE is a closed allow-list, but `type` is an open string: the
+ * extractor may return Trait, Pattern, Tendency, Characteristic or a word
+ * nobody has written down yet. Used as a PRECONDITION on the tombstone check,
+ * a closed list means an unlisted type never reaches the label comparison at
+ * all — so deleting a Pattern and re-proposing the same claim as a Tendency
+ * put it straight back. Measured, before this changed: "stalls when scope is
+ * open" (Pattern) deleted, then "stalls with open scope" (Tendency)
+ * corroborated across two conversations — created, tombstone never consulted.
+ *
+ * So for forgetting only, two types that BOTH assert something about the
+ * person count as the same hat. The choice of word between them is the
+ * extractor's, not the person's, and the person deleted the claim, not the
+ * noun. Occurrence types keep the strict table: a Person must not inherit a
+ * Project's tombstone however alike the names.
+ *
+ * This widens REFUSAL, never resolution — resolveNode still uses the strict
+ * predicate, so nothing merges that did not merge before. The asymmetry is
+ * deliberate and stated above: re-learning something somebody deleted is the
+ * failure; refusing one honest re-proposal is cheap, and they can say it
+ * again.
+ */
+export function typesCompatibleForgotten(a: string, b: string): boolean {
+  if (typesCompatibleNormalized(a, b)) return true;
+  return isGeneralising(a) && isGeneralising(b);
 }
 
 /** Every type a label could plausibly come back as, including its own. */
@@ -206,14 +237,22 @@ export function matchesForgotten(
   for (const fp of tombstones) {
     const t = parseNodeTombstone(fp);
     if (!t) continue;
-    if (!typesCompatibleNormalized(c.type, t.type)) continue;
+    if (!typesCompatibleForgotten(c.type, t.type)) continue;
 
     const have = normalize(t.label);
     if (have === wanted) return true;
 
+    // Both sides need two words, not either side. With `||`, a ONE-word
+    // label was refused whenever it appeared anywhere inside a tombstoned
+    // one — delete "stalls when scope is open" and nothing called "scope"
+    // could ever be learned again, which is not forgetting a claim, it is
+    // blacklisting a word. An identical single-word label is already caught
+    // by the equality check above, so nothing that should be refused stops
+    // being refused. Widening the type test made this reach further, which
+    // is how it showed up.
     const haveWords = have.split(' ');
     if (
-      (wantedWords.length >= 2 || haveWords.length >= 2) &&
+      wantedWords.length >= 2 && haveWords.length >= 2 &&
       (containsSequence(haveWords, wantedWords) || containsSequence(wantedWords, haveWords))
     ) {
       return true;

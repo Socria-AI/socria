@@ -117,6 +117,78 @@ console.log('\n=== ...and it holds against REWORDING, which is the real case ===
      'otherwise the relationships return if the node is ever re-learned');
 }
 
+console.log('\n=== ...and against being RE-TYPED, which the earlier tests could not see ===');
+{
+  // Every test above picked Concept/Belief — one of the few pairs the
+  // COMPATIBLE table happens to list. matchesForgotten used that table as a
+  // PRECONDITION, so an unlisted type never reached the label comparison at
+  // all, and the suite passed while the check was unreachable for most of the
+  // ontology. `type` is an open string; a closed allow-list guarding it is
+  // the same mistake gate 2's inverted list exists to fix.
+  //
+  // Reproduced before this: delete "stalls when scope is open" (Pattern),
+  // propose "stalls with open scope" (Tendency) in two conversations — it was
+  // created, tombstone never consulted.
+  let g = EMPTY_GRAPH;
+  ({ graph: g } = apply(g, [C('Pattern', 'stalls when scope is open',
+    'Tends to stall when the scope of a task is left open-ended.')]));
+  ok('the Pattern landed to begin with', g.nodes.length === 1, JSON.stringify(g.nodes.map((n) => n.label)));
+  g = forgetNode(g, g.nodes[0].id, T0);
+
+  // Corroborated across two conversations, so it gets PAST gate 2 and
+  // actually reaches the forgetting gate. Without both sightings the refusal
+  // says 'generalisation-needs-second-sighting' and proves nothing.
+  const re = (type, label, content, conv) =>
+    apply(g, [C(type, label, content, 'inferred')], [], { provenance: { surface: 'core', conversationId: conv } });
+  for (const [type, label] of [
+    ['Tendency', 'stalls with open scope'],
+    ['Trait', 'stalls when scope is open'],
+    ['Trait', 'stalls on open scope'],
+    ['Pattern', 'stalls when the scope is open'],
+  ]) {
+    const content = 'Stalls whenever the scope of a task is left open-ended.';
+    ({ graph: g } = re(type, label, content, 'conv-1'));  // sighting one
+    const r = re(type, label, content, 'conv-2');         // sighting two: reaches gate 4
+    ok(`${type} "${label}" cannot resurrect it`,
+       !r.graph.nodes.length && r.report.refused.some((x) => x.reason === 'forgotten'),
+       JSON.stringify(r.report.refused));
+  }
+
+  // THE LIMIT, stated rather than asserted around. A tombstone keeps no
+  // content, so this is label-only, and a heavy rewording escapes it:
+  // "open scope makes them stall" shares two tokens of eight with the
+  // tombstone, under the 0.5 bar. Lowering that bar globally would start
+  // refusing unrelated claims, which is the worse failure, so the answer is
+  // not a looser matcher — it is that the reworded version still needs two
+  // conversations and can be deleted again, tombstoning itself.
+  const reworded = re('Characteristic', 'open scope makes them stall',
+    'Stalls whenever the scope of a task is left open-ended.', 'conv-3');
+  ok('a HEAVY rewording does escape the tombstone — known, and bounded',
+     reworded.report.refused.some((x) => x.reason === 'generalisation-needs-second-sighting'),
+     'it still needs corroboration; this documents the limit, it does not bless it');
+
+  // One word is not a name. Deleting a multi-word claim must not blacklist
+  // each word it contains.
+  const oneWord = apply(g, [C('Belief', 'scope', 'Scope, as a concept in project work, matters to them.')],
+    [], { provenance: { surface: 'core', conversationId: 'c8' } });
+  ok('a one-word label is not swallowed by a longer tombstone',
+     oneWord.graph.nodes.length === 1, JSON.stringify(oneWord.report.refused));
+
+  // The widening is for REFUSAL only and stops at the occurrence types: a
+  // Person must not inherit a Project's tombstone however alike the names.
+  let g2 = EMPTY_GRAPH;
+  ({ graph: g2 } = apply(g2, [C('Project', 'Hollis', 'A side project named after the street')]));
+  g2 = forgetNode(g2, g2.nodes[0].id, T0);
+  const person = apply(g2, [C('Person', 'Hollis', 'Their supervisor, who they see on Tuesdays')]);
+  ok('a Person still lands despite a Project tombstone of the same name',
+     person.graph.nodes.length === 1, JSON.stringify(person.report.refused));
+
+  // And an unrelated claim about the person still gets in normally.
+  const other = apply(g, [C('Preference', 'works in the morning',
+    'Prefers to do the hard thinking before ten.')], [], { provenance: { surface: 'core', conversationId: 'c9' } });
+  ok('an unrelated trait is unaffected', other.graph.nodes.length === 1, JSON.stringify(other.report.refused));
+}
+
 console.log('\n=== the bound holds when a chain of supersessions exists ===');
 {
   // The original fixture had no edges, so the partner pass never ran — and
