@@ -82,6 +82,18 @@ const TABLES = [
   ['mind_sources', 'uploaded files'],
 ];
 
+// Not the Mind Graph, but they landed in schema.sql in the same week and go
+// missing for the same reason — a database that predates both. Checked here
+// because a deployment missing one is almost always missing the other, and
+// finding that out two weeks later by trying to share a Logos room is worse
+// than a line of output now.
+const NEIGHBOURS = [
+  ['logos_rooms', 'Logos 2 rooms'],
+  ['logos_room_members', 'who is in a Logos 2 room'],
+  ['logos_room_events', 'what was said in one'],
+  ['lifecycle_emails', 'email preferences — an unsubscribe cannot be recorded without it'],
+];
+
 console.log(bold('\ntables'));
 let missing = 0;
 for (const [table, why] of TABLES) {
@@ -94,6 +106,19 @@ for (const [table, why] of TABLES) {
         gone
           ? `Apply supabase/schema.sql — ${table} is missing (${why}).`
           : `${table}: ${error.message}. If this says permission denied, the key is not the service role key.`);
+  } else {
+    say(true, table, `${count ?? 0} rows`);
+  }
+}
+
+console.log(bold('\nthe same era of schema.sql') + dim('  — missing for the same reason, if missing'));
+for (const [table, what] of NEIGHBOURS) {
+  const { error, count } = await db.from(table).select('*', { count: 'exact', head: true });
+  if (error) {
+    const code = (error.code || '').toLowerCase();
+    const gone = code === '42p01' || code === 'pgrst205' || /relation .* does not exist/i.test(error.message || '');
+    say(false, table, gone ? 'does not exist' : `${error.code || '?'}: ${error.message}`,
+        `Apply supabase/schema.sql — ${table} is missing (${what}).`);
   } else {
     say(true, table, `${count ?? 0} rows`);
   }
