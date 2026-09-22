@@ -48,6 +48,27 @@ export type Urgency = (typeof URGENCY)[number];
 export const ATTEMPT = ['none', 'wrong', 'partial', 'right'] as const;
 export type Attempt = (typeof ATTEMPT)[number];
 
+/**
+ * What the person's LATEST message did.
+ *
+ * The router needs this more than anything else in the state, and it was the
+ * one thing the state did not record. Without it, "want to be an
+ * entrepreneur long term" — which answers the question Socria just asked AND
+ * ties two things already on the table together — read as "no position yet",
+ * and "no position yet" routed to another question. Every answer became the
+ * occasion for the next question.
+ */
+export const LATEST = ['answer', 'information', 'question', 'attempt', 'reaction', 'request', 'other'] as const;
+export type Latest = (typeof LATEST)[number];
+
+/**
+ * When producing something themselves IS the learning — the operations
+ * retrieval-practice research is about. The one place where asking is not a
+ * way of continuing the conversation but the point of it.
+ */
+export const PRACTICE = ['none', 'retrieval', 'prediction', 'self-explanation', 'application'] as const;
+export type Practice = (typeof PRACTICE)[number];
+
 export interface RecentChange {
   what: string;
   from: string;
@@ -81,6 +102,25 @@ export interface CognitiveState {
   /** how their position moved during this conversation */
   recentChanges: RecentChange[];
 
+  /** what their latest message did — see LATEST */
+  latest: Latest;
+  /** did it resolve what Socria last asked? then the answer must be USED */
+  resolved: boolean;
+  /**
+   * A connection their latest message makes between things already on the
+   * table, as "A → how → B". This is the answer to "why does that matter to
+   * you", arriving; the move is to use it, not to ask for it again.
+   */
+  newRelation: string;
+  /**
+   * The one thing Socria genuinely cannot usefully proceed without, if there
+   * is one. Empty whenever something useful can be done with what is already
+   * here — which is most of the time. The strongest reason to ask.
+   */
+  blockingUnknown: string;
+  /** whether producing something themselves is the learning right now */
+  practice: Practice;
+
   urgency: Urgency;
   /**
    * The rung of Core 4's own ladder this conversation currently sits on:
@@ -103,6 +143,11 @@ export const EMPTY_STATE: CognitiveState = {
   constraints: [],
   openThreads: [],
   recentChanges: [],
+  latest: 'other',
+  resolved: false,
+  newRelation: '',
+  blockingUnknown: '',
+  practice: 'none',
   urgency: 'none',
   supportLevel: 'question',
 };
@@ -155,6 +200,13 @@ export function sanitizeState(raw: unknown): CognitiveState {
           .filter((c) => c.what)
           .slice(0, 4)
       : [],
+    // Unknown means "we do not know what it did", never "it answered": an
+    // answer changes what the router does, so it has to be read, not assumed.
+    latest: oneOf(r.latest, LATEST, 'other'),
+    resolved: r.resolved === true,
+    newRelation: line(r.newRelation),
+    blockingUnknown: line(r.blockingUnknown),
+    practice: oneOf(r.practice, PRACTICE, 'none'),
     urgency: oneOf(r.urgency, URGENCY, 'none'),
     supportLevel: oneOf(r.supportLevel, SUPPORT_LEVELS, 'question'),
   };
@@ -168,7 +220,9 @@ export function hasStateContent(s: CognitiveState): boolean {
     s.positions.length ||
     s.assumptions.length ||
     s.tensions.length ||
-    s.openThreads.length
+    s.openThreads.length ||
+    s.newRelation ||
+    s.blockingUnknown
   );
 }
 
@@ -198,6 +252,9 @@ export function renderState(s: CognitiveState): string {
   bullets('Pulling against each other', s.tensions);
   bullets('Bounded by', s.constraints);
   bullets('Still open', s.openThreads);
+  if (s.newRelation) parts.push(`They just connected: ${s.newRelation}`);
+  if (s.resolved) parts.push('Their last message answered what you asked. Use the answer.');
+  if (s.blockingUnknown) parts.push(`Cannot usefully proceed without: ${s.blockingUnknown}`);
   if (s.recentChanges.length) {
     parts.push(
       'Moved during this conversation:\n' +

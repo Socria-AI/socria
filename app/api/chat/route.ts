@@ -25,7 +25,7 @@ import {
 } from '@/lib/socria-prompt';
 import { recall, remember } from '@/lib/mind/pipeline';
 import { readState, guardDraft } from '@/lib/cognition/engine';
-import { route, renderMove, type Move } from '@/lib/cognition/router';
+import { route, renderMove, questionStreak, type Move } from '@/lib/cognition/router';
 import { renderState, type CognitiveState } from '@/lib/cognition/state';
 import { retryNote } from '@/lib/cognition/guard';
 import type { ActivatedSubgraph } from '@/lib/mind/activate';
@@ -269,6 +269,7 @@ export async function POST(req: NextRequest) {
     // state could shape the reply but never what was remembered for it.
     let cognitiveState: CognitiveState | null = null;
     let move: Move | null = null;
+    let questions = 0;
     if (socriaModel === 'core-4' && apiKey) {
       try {
         cognitiveState = await readState(
@@ -276,7 +277,11 @@ export async function POST(req: NextRequest) {
           clean.map((m) => `${m.role === 'user' ? 'Them' : 'Socria'}: ${m.content}`).join('\n\n').slice(-8000),
           null
         );
-        move = route(cognitiveState);
+        // The run of questions Socria has just asked, read from the
+        // transcript the person actually saw — every question in it raises
+        // the bar for the next one (lib/cognition/router.ts).
+        questions = questionStreak(clean);
+        move = route(cognitiveState, { questionStreak: questions });
       } catch (e) {
         console.error('[socria/chat] cognitive state unavailable; replying without a routed move', e);
       }
@@ -436,6 +441,9 @@ export async function POST(req: NextRequest) {
         // not a shrug about model judgement.
         intervention: move?.intervention ?? null,
         because: move?.because ?? null,
+        // How many questions in a row preceded this turn. If ASK keeps
+        // appearing with a high number here, the pressure is not working.
+        questionStreak: questions,
         guarded: !!move?.guard,
         taskKind: cognitiveState?.taskKind ?? null,
         attempt: cognitiveState?.attempt ?? null,

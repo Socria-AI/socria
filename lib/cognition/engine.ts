@@ -10,9 +10,11 @@ import 'server-only';
 // is chosen rather than incidental:
 //
 //   A failed state read yields an empty state. The router then sees a person
-//   who has shown nothing and attempted nothing, and asks rather than
-//   answers. Erring toward asking is the recoverable mistake; erring toward
-//   answering spends the thing the whole design protects.
+//   who has shown nothing and attempted nothing, and may ask rather than
+//   answer — but only if a question is earned against the recent run of
+//   questions, which the route measures from the transcript itself and so
+//   does not depend on this call succeeding. An outage here cannot start an
+//   interrogation loop.
 //
 //   A failed guard APPROVES. That is the uncomfortable one and it is
 //   deliberate: the alternative is that an outage means nobody gets a reply.
@@ -60,6 +62,36 @@ constraints   what bounds this: time, money, a person, a deadline
 openThreads   raised and not resolved
 recentChanges [{"what","from","to"}] — positions that MOVED during this
               conversation. Only real changes of position.
+
+latest        answer | information | question | attempt | reaction | request | other
+              What their LATEST message did. "answer" = it responds to what
+              Socria last asked. "information" = they volunteered something new.
+              "reaction" = a short acknowledgement ("yeah", "ok", "true").
+
+resolved      true | false
+              Does their latest message resolve what Socria last asked? True
+              when the answer to that question is now on the table, even if it
+              is short. A short answer is still an answer.
+
+newRelation   One line, "A → how → B": a connection their latest message makes
+              between things ALREADY in the conversation. Example — they said
+              McCombs has a strong startup scene, were asked why that matters,
+              and answered "want to be an entrepreneur long term":
+              "McCombs startup ecosystem → matters because of → their long-term
+              goal of being an entrepreneur". Empty if it connects nothing.
+
+blockingUnknown  The ONE thing Socria genuinely cannot usefully proceed
+              without — the error message it has not seen, which of two
+              meanings they intend when the two lead in opposite directions.
+              Leave EMPTY if Socria could say or do something useful with what
+              is already here. Wanting more context is not blocking. Something
+              interesting to explore next is not blocking. This field is
+              usually empty.
+
+practice      none | retrieval | prediction | self-explanation | application
+              Only for learning: is producing something themselves the learning
+              right now — recalling it, predicting before being told, explaining
+              it in their own words, applying it to a new case? "none" otherwise.
 
 urgency       none | some | high
               "high" means real time pressure in the world — a deadline

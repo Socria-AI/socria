@@ -108,10 +108,39 @@ export function givesThenAsks(text: string): boolean {
 /** How long a move is allowed to be before length itself is the violation. */
 const MAX_SENTENCES: Partial<Record<Move['intervention'], number>> = {
   LISTEN: 3,
+  OBSERVE: 3,
+  REFINE: 4,
   ASK: 4,
   HINT: 5,
   CHALLENGE: 6,
 };
+
+/** Sentences, keeping their punctuation, for trimming from the end. */
+function splitSentences(text: string): string[] {
+  return text.match(/[^.!?]+[.!?]+["'’”)]*\s*|[^.!?]+$/g)?.map((x) => x) ?? [text];
+}
+
+/**
+ * The draft with its closing question(s) taken off, or null if nothing would
+ * be left.
+ *
+ * This is the commonest way the question habit survives a router that has
+ * chosen not to ask: the reply makes its observation and then — by reflex —
+ * adds "How do you see that fitting your goals?". The observation was the
+ * reply. Removing the tail is safe and deterministic: it deletes a question,
+ * never content, and the move is still whole without it.
+ */
+export function withoutClosingQuestion(text: string): string | null {
+  const parts = splitSentences(text.trim());
+  while (parts.length && /\?["'’”)]*\s*$/.test(parts[parts.length - 1])) parts.pop();
+  const rest = parts.join('').trim();
+  return rest ? rest : null;
+}
+
+/** How many questions a draft puts to the person. */
+function questionCount(text: string): number {
+  return (text.match(/\?(\s|$|["'’”)])/g) ?? []).length;
+}
 
 /**
  * The decidable violations.
@@ -133,6 +162,26 @@ export function checkStructure(move: Move, draft: string): GuardResult | null {
     };
   }
 
+  // A move that does not hand the turn back must not end by handing it back.
+  // Trimmed rather than regenerated: the move itself is usually fine, only
+  // the reflexive question on the end is not, and a retry costs a whole
+  // second draft to remove one sentence.
+  if (!move.endsOpen && /\?["'’”)]*\s*$/.test(text)) {
+    const trimmed = withoutClosingQuestion(text);
+    return trimmed
+      ? {
+          verdict: 'revise',
+          reason: `The move was ${move.intervention}; it makes its point and stops. The closing question was removed.`,
+          revised: trimmed,
+          by: 'structure',
+        }
+      : {
+          verdict: 'regenerate',
+          reason: `The move was ${move.intervention} and the draft is only a question. Make the move itself — an observation, a connection, the point put precisely — and stop.`,
+          by: 'structure',
+        };
+  }
+
   const cap = MAX_SENTENCES[move.intervention];
   if (cap && sentences(text) > cap) {
     return {
@@ -149,6 +198,11 @@ export function checkStructure(move: Move, draft: string): GuardResult | null {
       }
       if (looksWorked(text)) {
         return { verdict: 'regenerate', reason: 'The draft works the problem and then asks about it. The question is decoration once the work is on the page.', by: 'structure' };
+      }
+      // One question. Two or three in a row is the interview this is meant
+      // not to be — and it lets the person answer the easiest one.
+      if (questionCount(text) > 1) {
+        return { verdict: 'regenerate', reason: `The move was ASK and the draft asks ${questionCount(text)} questions. Ask the one that matters.`, by: 'structure' };
       }
       break;
 

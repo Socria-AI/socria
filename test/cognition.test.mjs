@@ -150,8 +150,15 @@ console.log('\n=== structure catches the decidable failures ===');
   ok('a real ASK passes', checkStructure(ask, 'What have you tried so far?') === null);
 
   const listen = route(S({ taskKind: 'vent' }));
-  ok('a LISTEN that asks is rejected',
-     checkStructure(listen, 'That sounds exhausting. What will you do?')?.verdict === 'regenerate');
+  // Trimmed rather than regenerated now: the acknowledgement was right, only
+  // the question on the end was not, and a second draft to remove one
+  // sentence costs the person a wait for nothing. The contract is the same —
+  // a LISTEN never reaches them asking something.
+  const asked = checkStructure(listen, 'That sounds exhausting. What will you do?');
+  ok('a LISTEN that asks is never sent asking',
+     asked?.verdict === 'revise' && asked.revised === 'That sounds exhausting.', JSON.stringify(asked));
+  ok('a LISTEN with a question in the middle is rewritten',
+     checkStructure(listen, 'What a week? That sounds exhausting.')?.verdict === 'regenerate');
   ok('a real LISTEN passes', checkStructure(listen, 'That sounds genuinely exhausting.') === null);
 
   const hint = route(S({ taskKind: 'learn', attempt: 'partial' }));
