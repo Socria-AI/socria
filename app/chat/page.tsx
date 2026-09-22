@@ -18,6 +18,7 @@ import { OneFoot } from '@/components/OneMark';
 import { ModelGlyph } from '@/components/ModelGlyph';
 import { LogosApp } from '@/components/LogosApp';
 import { isValidOneKey } from '@/lib/socria-one';
+import { FEEDBACK_URL } from '@/lib/feedback';
 import { failureText } from '@/lib/upstream-error';
 import {
   MODEL_KEY,
@@ -2029,6 +2030,10 @@ export default function ChatPage() {
             </SignInButton>
             <p className="s-vow">Nothing here is sent anywhere. Your reasoning is yours.</p>
           </SignedOut>
+          {/* Signed in or not: anybody using it can tell us what is wrong. */}
+          <a className="s-feedback" href={FEEDBACK_URL} target="_blank" rel="noopener noreferrer">
+            Send feedback <span aria-hidden="true">↗</span>
+          </a>
         </div>
       </aside>
       </div>
