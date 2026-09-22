@@ -2821,6 +2821,14 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
 }
 .logos-root .lg-rail-item:hover .lg-rail-del { opacity: 1; }
 .logos-root .lg-rail-del:hover { color: var(--lg-tension); }
+.logos-root .lg-rail-feedback {
+  display: block;
+  margin-top: 6px;
+  font-style: normal;
+  color: var(--lg-primary);
+  text-decoration: none;
+}
+.logos-root .lg-rail-feedback:hover { text-decoration: underline; }
 .logos-root .lg-rail-foot {
   flex: 0 0 auto;
   padding: 10px 12px;

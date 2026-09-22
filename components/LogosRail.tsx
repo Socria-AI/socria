@@ -5,6 +5,7 @@
 // shape its reasoning took, not by reading a title.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { FEEDBACK_URL } from '@/lib/feedback';
 import { MapThumb } from './MapThumb';
 import { relTime, type LogosSession } from '@/lib/logos-sessions';
 import {
@@ -222,6 +223,9 @@ export function LogosRail({
 
           <p className="lg-rail-foot">
             {cloud ? 'Synced to your account' : 'Kept in this browser'}
+            <a className="lg-rail-feedback" href={FEEDBACK_URL} target="_blank" rel="noopener noreferrer">
+              Send feedback <span aria-hidden="true">↗</span>
+            </a>
           </p>
         </>
       )}
