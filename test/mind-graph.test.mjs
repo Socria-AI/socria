@@ -9,7 +9,7 @@
 //
 // The rest of this file is the machinery those three depend on.
 
-import { EMPTY_GRAPH, fingerprintNode, normalize, STATUS_WEIGHT, relWeight } from './.tmp/types.mjs';
+import { EMPTY_GRAPH, fingerprintNode, normalize, STATUS_WEIGHT, relWeight, classifyStoreError } from './.tmp/types.mjs';
 import { resolveNode, typesCompatible } from './.tmp/resolve.mjs';
 import { gate, rank, TURN_BUDGET } from './.tmp/gate.mjs';
 import { applyCandidates, forgetNode, forgetEdge, challengeNode } from './.tmp/apply.mjs';
@@ -187,6 +187,37 @@ console.log('\n=== ...and against being RE-TYPED, which the earlier tests could 
   const other = apply(g, [C('Preference', 'works in the morning',
     'Prefers to do the hard thinking before ten.')], [], { provenance: { surface: 'core', conversationId: 'c9' } });
   ok('an unrelated trait is unaffected', other.graph.nodes.length === 1, JSON.stringify(other.report.refused));
+}
+
+console.log('\n=== a failure is classified, because all three look like an empty page ===');
+{
+  // A missing table, a wrong key and a person with nothing yet produced the
+  // same blank Memory page, because loadGraph discarded every error. They now
+  // read differently, and this is the judgement that decides which — kept
+  // pure so it can be tested, since the previous version of it was wrong in a
+  // way nothing caught: it matched a bare "does not exist", which is also
+  // Postgres's phrasing for a missing column, function or type, so a failure
+  // against a LIVE table was forgiven as "not set up yet".
+  const c = classifyStoreError;
+  ok('42P01 is a missing table', c({ code: '42P01', message: 'relation "mind_nodes" does not exist' }) === 'missing-tables');
+  ok('PGRST205 is a missing table', c({ code: 'PGRST205', message: "Could not find the table 'public.mind_nodes'" }) === 'missing-tables');
+  ok('the relation phrasing alone is enough', c({ message: 'relation "mind_pending" does not exist' }) === 'missing-tables');
+  ok('42501 is a refusal, not a missing table', c({ code: '42501', message: 'permission denied for table mind_nodes' }) === 'denied');
+  ok('permission denied by wording too', c({ message: 'permission denied for table mind_edges' }) === 'denied');
+
+  // The ones that must NOT be read as "not set up yet". Each of these is a
+  // live table failing, and calling it missing would report success to
+  // somebody whose data did not move.
+  for (const [what, err] of [
+    ['a missing column', { code: '42703', message: 'column "activation" does not exist' }],
+    ['a missing function', { code: '42883', message: 'function foo(text) does not exist' }],
+    ['a missing type', { code: '42704', message: 'type "mind_status" does not exist' }],
+    ['a constraint violation', { code: '23505', message: 'duplicate key value violates unique constraint' }],
+    ['a timeout', { code: '57014', message: 'canceling statement due to statement timeout' }],
+    ['no code at all', { message: 'fetch failed' }],
+  ]) {
+    ok(`${what} is not mistaken for a missing table`, c(err) === 'unavailable', JSON.stringify(err));
+  }
 }
 
 console.log('\n=== the bound holds when a chain of supersessions exists ===');

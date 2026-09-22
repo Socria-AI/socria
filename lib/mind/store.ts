@@ -21,11 +21,42 @@ import 'server-only';
 
 import { supabaseAdmin } from '../supabase';
 import {
-  EMPTY_GRAPH,
-  type MindEdge, type MindGraph, type MindNode, type NodeStatus, type PendingClaim,
+  EMPTY_GRAPH, classifyStoreError,
+  type MindEdge, type MindGraph, type MindNode, type MindStoreFailure,
+  type NodeStatus, type PendingClaim,
 } from './types';
 
-/** A person's whole graph. Missing tables read as an empty graph. */
+/**
+ * Why the graph could not be read.
+ *
+ * It used to not say. Every query's `.error` was discarded — `data ?? []` —
+ * so a missing table, a wrong key and a person with no memory yet all
+ * produced the same empty graph, and the only symptom anywhere was a blank
+ * Memory page. Nothing above this file could tell the three apart because
+ * nothing below it had preserved the difference.
+ *
+ * That silence is correct for the CONVERSATION: recall() must never break a
+ * reply. It is wrong for the page whose entire job is to show what is stored,
+ * and wrong for anyone trying to find out why nothing is. So the failure is
+ * carried now, and each caller decides what to do with it.
+ *
+ * The classifier itself is pure and lives in types.ts, where a test can reach
+ * it — the last version of this judgement was wrong in a way no test caught.
+ */
+export class MindStoreError extends Error {
+  constructor(readonly reason: MindStoreFailure, message: string) {
+    super(message);
+    this.name = 'MindStoreError';
+  }
+}
+
+/**
+ * A person's whole graph.
+ *
+ * Throws MindStoreError when the store itself is the problem. It does NOT
+ * throw for a person who simply has nothing yet — that is an empty graph, and
+ * the difference is the whole point of the type above.
+ */
 export async function loadGraph(userId: string): Promise<MindGraph> {
   const db = supabaseAdmin();
   const [nodes, edges, tombs, pending] = await Promise.all([
@@ -34,6 +65,22 @@ export async function loadGraph(userId: string): Promise<MindGraph> {
     db.from('mind_tombstones').select('fingerprint').eq('user_id', userId),
     db.from('mind_pending').select('*').eq('user_id', userId),
   ]);
+
+  for (const [table, res] of [
+    ['mind_nodes', nodes], ['mind_edges', edges],
+    ['mind_tombstones', tombs], ['mind_pending', pending],
+  ] as const) {
+    if (!res.error) continue;
+    const reason = classifyStoreError(res.error);
+    // Logged HERE, once, with the table named. A caller that swallows this
+    // still leaves a line in the deployment log saying which table and why,
+    // which is the difference between "memory is broken" and a fix.
+    console.error(
+      `[socria/mind] cannot read ${table} (${reason}): ${res.error.message}` +
+        (reason === 'missing-tables' ? ' — has supabase/schema.sql been applied?' : '')
+    );
+    throw new MindStoreError(reason, `${table}: ${res.error.message}`);
+  }
 
   return {
     nodes: (nodes.data ?? []).map(rowToNode),
@@ -103,6 +150,20 @@ export async function persistGraph(
   const nextPendingFps = new Set(next.pending.map((p) => p.fingerprint));
   const gonePending = prev.pending.filter((p) => !nextPendingFps.has(p.fingerprint)).map((p) => p.fingerprint);
 
+  /**
+   * Named, logged, and returned. Until now a write failure was returned as a
+   * bare boolean the caller discarded — remember() maps it to
+   * `persisted: false` and nothing reads that — so a graph that never saved
+   * anything produced no log line at all.
+   */
+  const fail = (error: { message: string; code?: string }) => {
+    console.error(
+      `[socria/mind] write failed (${classifyStoreError(error)}): ${error.message}` +
+        (classifyStoreError(error) === 'missing-tables' ? ' — has supabase/schema.sql been applied?' : '')
+    );
+    return { ok: false as const, error: error.message };
+  };
+
   try {
     // Tombstones FIRST. If anything later fails, the record of a deletion is
     // the one thing that must already be durable — a half-written turn must
@@ -112,27 +173,27 @@ export async function persistGraph(
         freshTombs.map((fingerprint) => ({ user_id: userId, fingerprint, created_at: Date.now() })),
         { onConflict: 'user_id,fingerprint' }
       );
-      if (error) return { ok: false, error: error.message };
+      if (error) return fail(error);
     }
     if (goneEdges.length) {
       const { error } = await db.from('mind_edges').delete().eq('user_id', userId).in('id', goneEdges);
-      if (error) return { ok: false, error: error.message };
+      if (error) return fail(error);
     }
     if (goneNodes.length) {
       const { error } = await db.from('mind_nodes').delete().eq('user_id', userId).in('id', goneNodes);
-      if (error) return { ok: false, error: error.message };
+      if (error) return fail(error);
     }
     if (nodeUpserts.length) {
       const { error } = await db.from('mind_nodes').upsert(nodeUpserts, { onConflict: 'user_id,id' });
-      if (error) return { ok: false, error: error.message };
+      if (error) return fail(error);
     }
     if (edgeUpserts.length) {
       const { error } = await db.from('mind_edges').upsert(edgeUpserts, { onConflict: 'user_id,id' });
-      if (error) return { ok: false, error: error.message };
+      if (error) return fail(error);
     }
     if (pendingUpserts.length) {
       const { error } = await db.from('mind_pending').upsert(pendingUpserts, { onConflict: 'user_id,fingerprint' });
-      if (error) return { ok: false, error: error.message };
+      if (error) return fail(error);
     }
     if (gonePending.length) {
       await db.from('mind_pending').delete().eq('user_id', userId).in('fingerprint', gonePending);
@@ -312,3 +373,6 @@ function pendingToRow(userId: string, p: PendingClaim) {
 }
 
 export { EMPTY_GRAPH };
+// Re-exported so callers of the store do not need to know the classifier
+// lives in the pure module.
+export type { MindStoreFailure };

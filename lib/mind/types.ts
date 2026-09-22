@@ -94,6 +94,31 @@ export function isGeneralising(type: string): boolean {
   return !OCCURRENCE_NORMALIZED.has(normalize(type));
 }
 
+// ── why a read or write failed ──────────────────────────────────────
+
+/**
+ * Pure, and therefore testable, which is the point of it living here.
+ *
+ * An earlier version of this judgement matched a bare "does not exist" —
+ * Postgres's phrasing for a missing COLUMN, FUNCTION or TYPE as well as a
+ * missing table — so a live-table failure was forgiven as "not set up yet"
+ * and deletion reported success while the rows survived. Breadth in a
+ * classifier is not leniency; it is a wrong answer given confidently.
+ */
+export type MindStoreFailure = 'missing-tables' | 'denied' | 'unavailable';
+
+export function classifyStoreError(err: { code?: string; message?: string }): MindStoreFailure {
+  const code = (err.code ?? '').toLowerCase();
+  // 42P01 is undefined_table; PGRST205 is PostgREST's "could not find the
+  // table in the schema cache". Nothing else means the table is absent.
+  if (code === '42p01' || code === 'pgrst205') return 'missing-tables';
+  if (/relation ".*" does not exist/i.test(err.message ?? '')) return 'missing-tables';
+  // 42501 is insufficient_privilege. With RLS forced and no policies, this is
+  // what the anon key gets where the service role key was meant to be.
+  if (code === '42501' || /permission denied/i.test(err.message ?? '')) return 'denied';
+  return 'unavailable';
+}
+
 // ── status ──────────────────────────────────────────────────────────
 
 export const NODE_STATUSES = [

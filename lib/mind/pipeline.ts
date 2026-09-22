@@ -119,7 +119,12 @@ export async function recall(
       subgraph,
       graph,
     };
-  } catch {
+  } catch (e) {
+    // Still swallowed — a conversation must never break because memory did —
+    // but no longer SILENT. The store logs the specific table and reason; this
+    // records that a turn went out with no memory behind it, which is the
+    // line somebody reads when asking why Socria does not remember anything.
+    console.error('[socria/mind] recall failed; this turn has no memory', e);
     return empty;
   }
 }
@@ -193,8 +198,17 @@ export async function remember(
     );
 
     const saved = await persistGraph(userId, before, after);
+    if (!saved.ok) {
+      // persistGraph has already logged which write failed and why. This says
+      // what was lost, which is the part that matters when a whole session of
+      // conversation has apparently taught Socria nothing.
+      console.error(
+        `[socria/mind] nothing was saved from this turn: ${report.nodes.length} node change(s) dropped`
+      );
+    }
     return { report, persisted: saved.ok };
-  } catch {
+  } catch (e) {
+    console.error('[socria/mind] remember failed; the graph did not learn from this turn', e);
     return { report: null, persisted: false };
   }
 }

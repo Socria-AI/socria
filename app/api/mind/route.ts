@@ -11,7 +11,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { enforceRateLimit } from '@/lib/rate-limit';
-import { loadGraph, listSources } from '@/lib/mind/store';
+import { loadGraph, listSources, MindStoreError } from '@/lib/mind/store';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -22,9 +22,28 @@ export async function GET(req: NextRequest) {
   const limited = await enforceRateLimit(req, userId, 'aux');
   if (limited) return limited;
 
-  const [graph, sources] = await Promise.all([loadGraph(userId), listSources(userId)]);
+  // A page about memory that renders "Nothing yet" when the tables do not
+  // exist is telling somebody they have no memories when the truth is that
+  // nothing was ever able to store one. Those need different words, so the
+  // store's failure is carried here rather than flattened into an empty
+  // graph — which is what this route did until now, because loadGraph
+  // discarded the error before this code could ever see it.
+  let graph;
+  try {
+    graph = await loadGraph(userId);
+  } catch (e) {
+    if (e instanceof MindStoreError) {
+      return NextResponse.json({
+        nodes: [], edges: [], sources: [], pending: [], forgotten: 0,
+        storage: { ok: false, reason: e.reason },
+      });
+    }
+    throw e;
+  }
+  const sources = await listSources(userId);
 
   return NextResponse.json({
+    storage: { ok: true },
     nodes: graph.nodes,
     edges: graph.edges,
     sources,

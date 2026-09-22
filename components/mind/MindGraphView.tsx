@@ -66,6 +66,9 @@ const STATUS_ALPHA: Record<string, number> = {
 
 interface Placed extends Node { x: number; y: number; vx: number; vy: number }
 
+/** Mirrors MindStoreFailure in lib/mind/store.ts. */
+type StorageFault = 'missing-tables' | 'denied' | 'unavailable';
+
 export function MindGraphView() {
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
@@ -74,6 +77,8 @@ export function MindGraphView() {
   const [forgotten, setForgotten] = useState(0);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
+  /** Set when the STORE failed, as opposed to the person having nothing yet. */
+  const [storage, setStorage] = useState<StorageFault | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [view, setView] = useState<'graph' | 'list'>('graph');
   const [busy, setBusy] = useState(false);
@@ -89,6 +94,7 @@ export function MindGraphView() {
       const res = await fetch('/api/mind', { cache: 'no-store' });
       if (!res.ok) throw new Error('failed');
       const j = await res.json();
+      setStorage(j.storage?.ok === false ? (j.storage.reason as StorageFault) : null);
       setNodes(j.nodes ?? []);
       setEdges(j.edges ?? []);
       setPending(j.pending ?? []);
@@ -349,7 +355,23 @@ export function MindGraphView() {
 
       {note && <p className="mg-note" role="status">{note}</p>}
 
-      {!nodes.length ? (
+      {storage ? (
+        // NOT "nothing yet". Nothing yet is a fact about the person; this is a
+        // fact about the deployment, and showing the first when the second is
+        // true tells somebody they have no memories when the truth is that
+        // nothing was ever able to store one.
+        <p className="mg-quiet" role="alert">
+          <strong>Memory is not set up on this deployment.</strong>{' '}
+          {storage === 'missing-tables'
+            ? 'The tables it lives in do not exist yet — supabase/schema.sql has not been applied to this database.'
+            : storage === 'denied'
+              ? 'The database refused the read. This usually means the server is holding the anon key where the service role key belongs.'
+              : 'The database could not be reached just now.'}{' '}
+          Nothing you have said has been lost — none of it was ever stored.
+          Run <code>npm run doctor:mind</code> against this environment for the
+          specifics.
+        </p>
+      ) : !nodes.length ? (
         <p className="mg-quiet">
           Nothing yet. Talk to Core 4, or add a .txt file, and what it
           understands will appear here.

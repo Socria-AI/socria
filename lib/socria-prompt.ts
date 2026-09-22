@@ -1476,8 +1476,12 @@ export const SOCRIA_MODELS: Record<SocriaModel, ModelConfig> = {
     logosSurface: true,
     collab: true,
   },
-  // Core 4 — announced, not built. The picker shows it and will not let it be
-  // chosen; `soon` is the copy that says why.
+  // Core 4 — built, and selectable. It carried `soon` while it was an
+  // announcement, which made the picker grey it out; that flag came off when
+  // the prompt, the Mind Graph and the Cognitive State Engine landed behind
+  // it. The comment said otherwise for a while, which is its own small
+  // hazard: the next person reading this file to find out why Core 4 could
+  // not be chosen would have believed it.
   'core-4': {
     id: 'core-4',
     label: 'Socria Core 4',

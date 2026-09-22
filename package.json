@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "node test/run.mjs",
     "probe:mind": "node scripts/mind-probe.mjs",
+    "doctor:mind": "node scripts/mind-doctor.mjs",
     "verify": "npm run check:env && npm run typecheck && npm test && npm run build",
     "eval:core3": "node evals/core3-progression.mjs",
     "check:env": "node scripts/check-env.mjs"
