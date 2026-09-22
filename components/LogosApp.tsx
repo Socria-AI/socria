@@ -2307,6 +2307,11 @@ export function LogosApp({
         {/* ── Conversation ───────────────────────────────── */}
         <section className="lg-convo" aria-label="Conversation">
           <header className="lg-head">
+            {/* The header measures itself; this row is what it arranges. They
+                are two elements because a container query cannot restyle the
+                container — only what is inside it (globals.css, "the header,
+                when the conversation column is narrow"). */}
+            <div className="lg-head-row">
             {/* mobile: the rail lives behind this; on desktop the rail has
                 its own toggle and this button does not exist */}
             <button
@@ -2327,8 +2332,16 @@ export function LogosApp({
             {/* Logos hears "you've leaned on this before"; this is where it
                 came from, and where it can be forgotten — on every plan. */}
             {isSignedIn && (
-              <button type="button" className="lg-memory-btn" onClick={() => setMemoryOpen(true)}>
-                What Socria remembers
+              <button
+                type="button"
+                className="lg-memory-btn"
+                onClick={() => setMemoryOpen(true)}
+                aria-label="What Socria remembers"
+              >
+                {/* Two labels; the header's width chooses one (globals.css,
+                    "the header, when the conversation column is narrow"). */}
+                <span className="lg-lbl-long">What Socria remembers</span>
+                <span className="lg-lbl-short" aria-hidden="true">Memory</span>
               </button>
             )}
             <button
@@ -2399,12 +2412,14 @@ export function LogosApp({
                 whichever model is remembered, and that is still Logos — so a
                 bare href back to it re-rendered this and looked like a dead
                 button. Hand back the Core model they came from. */}
-            <button type="button" className="lg-back" onClick={leaveForChat}>
-              Socria chat <span aria-hidden="true">→</span>
+            <button type="button" className="lg-back" onClick={leaveForChat} aria-label="Back to Socria chat">
+              <span className="lg-lbl-long">Socria chat</span>
+              <span className="lg-lbl-short" aria-hidden="true">Chat</span> <span aria-hidden="true">→</span>
             </button>
             {isSignedIn && (
               <AccountControl onOpen={() => setAcctOpen(true)} isOne={one} />
             )}
+            </div>
           </header>
 
           <div className="lg-thread">

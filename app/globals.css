@@ -2895,6 +2895,12 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
   padding: 8px 40px 12px;
   scrollbar-width: thin;
 }
+/* Between the phone layout and a wide window the conversation column is
+   squeezed by the map, and 40px of side padding is a luxury it cannot
+   afford. */
+@media (min-width: 901px) and (max-width: 1400px) {
+  .logos-root .lg-head { padding-left: 26px; padding-right: 26px; }
+}
 @media (max-width: 900px) {
   .logos-root .lg-head { padding: 18px 22px 12px; }
   .logos-root .lg-thread { padding: 8px 22px 12px; }
@@ -8082,3 +8088,56 @@ html.anim-off .logos-root.is-firstmap-node .lg-node, html:not(.js) .logos-root.i
    (components/account/account-control.css); this only places it, after the
    trailing "Socria chat →" button. */
 .logos-root .lg-head .who-btn { margin-left: 10px; flex: 0 0 auto; }
+
+/* ── the header, when the conversation column is narrow ─────────────
+   The header sits in the CONVERSATION column, and the Thinking Map takes the
+   rest of the window — so on a 1280px laptop it has under 500px for eight
+   controls. It used to be a flex row with no rule for what gives way: the
+   text items shrank and wrapped ("Socria chat →" stacked three lines high,
+   the ? squeezed into an oval) while the account button, which cannot
+   shrink, was pushed out of the column and clipped by the map. Measured:
+   74px past the column at 1280px, 178px at 1000px.
+
+   So the header measures ITSELF (a container query, because the column's
+   width is what matters, not the window's), nothing in it may wrap or be
+   squeezed, and things give way in order of how much they matter:
+   the strapline first; then spacing, and two labels shorten; then the
+   account button becomes just its avatar. If even that is not enough, whole
+   controls move to a second row — never clipped, never under the map.
+
+   The header is the container and .lg-head-row holds the controls: a
+   container query cannot restyle the container itself, and the first
+   version of this set `gap` on the header inside its own query, where it
+   silently never applied. */
+.logos-root .lg-head {
+  container-type: inline-size;
+  container-name: lghead;
+}
+.logos-root .lg-head-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: 1;
+  min-width: 0;
+  flex-wrap: wrap;
+  row-gap: 8px;
+}
+.logos-root .lg-head-row > * { white-space: nowrap; flex-shrink: 0; }
+.logos-root .lg-head .lg-lbl-short { display: none; }
+
+@container lghead (max-width: 660px) {
+  .logos-root .lg-head .lg-head-note { display: none; }
+}
+@container lghead (max-width: 520px) {
+  .logos-root .lg-head-row { gap: 10px; }
+  .logos-root .lg-head .lg-lbl-long { display: none; }
+  .logos-root .lg-head .lg-lbl-short { display: inline; }
+  .logos-root .lg-head .lg-back { margin-left: 4px; }
+  .logos-root .lg-head .lg-memory-btn { margin-left: 2px; }
+  .logos-root .lg-head .who-btn { margin-left: 2px; }
+}
+@container lghead (max-width: 400px) {
+  .logos-root .lg-head-row { gap: 7px; }
+  .logos-root .lg-head .who-btn .who-nm { display: none; }
+}
+
