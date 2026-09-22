@@ -153,15 +153,24 @@ export async function touchNodes(
   touched: { id: string; activation: number; lastAccessed: number }[]
 ): Promise<void> {
   if (!touched.length) return;
-  const db = supabaseAdmin();
-  await Promise.all(
-    touched.map((t) =>
-      db.from('mind_nodes')
-        .update({ activation: t.activation, last_accessed: t.lastAccessed })
-        .eq('user_id', userId)
-        .eq('id', t.id)
-    )
-  ).catch(() => {});
+  // Everything, including supabaseAdmin() itself, which throws synchronously
+  // when the environment is not configured. This is called with `void`, so a
+  // throw here is an unhandled rejection — and an unhandled rejection in a
+  // serverless function can take the whole request with it, which would mean
+  // a bookkeeping write breaking a conversation.
+  try {
+    const db = supabaseAdmin();
+    await Promise.all(
+      touched.map((t) =>
+        db.from('mind_nodes')
+          .update({ activation: t.activation, last_accessed: t.lastAccessed })
+          .eq('user_id', userId)
+          .eq('id', t.id)
+      )
+    );
+  } catch {
+    // An activation level is stale. Nothing depends on it.
+  }
 }
 
 // ── uploaded files ──────────────────────────────────────────────────

@@ -11,7 +11,9 @@ import {
   buildSystemPrompt,
   resolveModel,
   resolveOpenAIModel,
+  fallbackOpenAIModel,
   CORE_4_MODEL,
+  CORE_3_FALLBACK_MODEL,
   CORE_4_PROMPT_VERSION,
 } from './.tmp/socria-prompt.mjs';
 import { rememberModel, lastCoreModel, readStoredModel } from './.tmp/socria-model-store.mjs';
@@ -95,6 +97,43 @@ console.log('\n=== the model underneath, and its override ===');
   ok('and does not move Core 3.1', resolveOpenAIModel('core-3') !== 'some-other-model');
   delete process.env.OPENAI_MODEL_CORE_4;
   ok('it is versioned separately', CORE_4_PROMPT_VERSION === 'core-4-v1');
+}
+
+console.log('\n=== it has the same safety net Core 3.1 has ===');
+{
+  // Core 4 was given Core 3.1's model id and none of its protection: the
+  // retry was gated on `model === 'core-3'`, so on a deployment where the id
+  // is rejected Core 3.1 quietly fell back and worked while Core 4 failed.
+  // The difference looked like Core 4 being broken.
+  ok('Core 4 has a fallback model', fallbackOpenAIModel('core-4') === CORE_3_FALLBACK_MODEL,
+     String(fallbackOpenAIModel('core-4')));
+  ok('so does Core 3.1', fallbackOpenAIModel('core-3') === CORE_3_FALLBACK_MODEL);
+  ok('Core 2 needs none', fallbackOpenAIModel('core-2') === null);
+  ok('and the fallback is not the primary', CORE_4_MODEL !== CORE_3_FALLBACK_MODEL,
+     'a fallback equal to the primary would retry the same rejected id forever');
+}
+
+console.log('\n=== its memory is the Mind Graph, and nothing else ===');
+{
+  // The flat person-memory store must not reach Core 4: its memory IS the
+  // graph, and a graph beside a top-k list of the same material is two
+  // memories free to disagree.
+  const entries = [
+    { id: 'e1', kind: 'value', text: 'They reason from first principles', firstSeen: 1, lastSeen: 1, seen: 3, confidence: 'stated' },
+  ];
+  const withFlat = buildSystemPrompt('core-4', 'balanced', null, null, null, entries).prompt;
+  const bare = buildSystemPrompt('core-4', 'balanced').prompt;
+  ok('flat entries never reach Core 4', withFlat === bare,
+     'Core 4 received the store the graph replaces');
+  ok('but they still reach Core 3.1',
+     buildSystemPrompt('core-3', 'balanced', null, null, null, entries).prompt !==
+       buildSystemPrompt('core-3', 'balanced').prompt);
+
+  // The graph block does reach it, last.
+  const withGraph = buildSystemPrompt('core-4', 'balanced', null, null, null, null, '\n=== MIND ===\nProject: Atlas').prompt;
+  ok('the Mind Graph block reaches Core 4', withGraph.includes('Project: Atlas'));
+  ok('and sits last, closest to the conversation', withGraph.trimEnd().endsWith('Project: Atlas'));
+  ok('Core 2 gets no graph', buildSystemPrompt('core-2', 'balanced', null, null, null, null, 'XX').prompt.includes('XX') === false);
 }
 
 console.log('\n=== it survives a round trip through storage ===');

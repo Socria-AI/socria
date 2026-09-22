@@ -18,6 +18,7 @@
 import { gate, rank, type Budget, type GateRefusal } from './gate';
 import { resolveNode, type Candidate } from './resolve';
 import {
+  GENERALISING_TYPES,
   MAX_ALIASES, MAX_CONTENT, MAX_LABEL, MAX_PENDING, PENDING_TTL_MS, UNKNOWN_SOURCE,
   boundProvenance,
   clamp01, clip, fingerprintEdge, fingerprintNode, isForgotten, normalize,
@@ -83,6 +84,17 @@ export function applyCandidates(
   const nodes = [...graph.nodes];
   const edges = [...graph.edges];
   let pending = [...graph.pending];
+  /**
+   * Labels held back this pass while a DIFFERENT node of the same name was
+   * reinforced.
+   *
+   * The cleanup below drops a pending entry once its claim has become a
+   * node — but a reinforcement is not that. Without this, the sighting was
+   * recorded and then immediately swept away by the node it had just failed
+   * to rewrite, so corroboration could never accumulate and the claim could
+   * never become believable however often it recurred.
+   */
+  const heldBack = new Set<string>();
   const report: ApplyReport = { nodes: [], edges: [], refused: [] };
   const working: MindGraph = { ...graph, nodes, edges };
 
@@ -101,7 +113,20 @@ export function applyCandidates(
   for (const c of rank(nodeCandidates)) {
     const label = clip(c.label, MAX_LABEL);
     const content = clip(c.content, MAX_CONTENT);
-    const match = resolveNode(working, { type: c.type, label, content });
+    let match = resolveNode(working, { type: c.type, label, content });
+
+    // A claim ABOUT THE PERSON must resolve by EXACT type, or not at all.
+    //
+    // The matcher treats Belief, Concept and Assumption as interchangeable,
+    // which is right for the same claim reworded and wrong here: "Deadlines"
+    // (a topic that came up) and "they resent deadlines" (a trait) are two
+    // different assertions that happen to share a name. Folding the second
+    // into the first let a trait inherit a stated node's standing and
+    // displace its words. A corroborated generalisation gets its own node
+    // and stands beside what was actually said.
+    if (match && GENERALISING_TYPES.has(c.type) && normalize(match.node.type) !== normalize(c.type)) {
+      match = null;
+    }
 
     // The node this candidate explicitly REPLACES or DISAGREES WITH, found
     // by the name the extractor gave, not by resemblance. A new position
@@ -180,8 +205,25 @@ export function applyCandidates(
 
       // Better words for the same claim: revise, and keep the old text where
       // it can still be read.
+      //
+      // Unless the gate withheld permission. An uncorroborated claim about
+      // the person may record that the subject came up again — that is
+      // honest — but it may not put its own wording in place of what
+      // somebody actually said. That was the bypass: not creation, which the
+      // gate refused, but REINFORCEMENT, which quietly overwrote a stated
+      // node with an inferred character claim and left it marked active.
       const sameWords = normalize(n.content) === normalize(content);
-      const revised = !sameWords && content.length > n.content.length * 1.15;
+      const revised =
+        verdict.mayRewrite && !sameWords && content.length > n.content.length * 1.15;
+      // A claim that was held back is still a SIGHTING, and it has to be
+      // recorded as one or corroboration can never accumulate for it: the
+      // reinforcement path would swallow every occurrence and the claim would
+      // never become believable however often it recurred.
+      if (!verdict.mayRewrite) {
+        pending = notePending(pending, c.type, label, content, opts.now, opts.provenance.conversationId);
+        report.refused.push({ label, reason: 'generalisation-needs-second-sighting' });
+        heldBack.add(normalize(label));
+      }
       nodes[i] = {
         ...n,
         content: revised ? content : n.content,
@@ -190,14 +232,17 @@ export function applyCandidates(
             ? n.aliases
             : [...new Set([...n.aliases, label])].slice(0, MAX_ALIASES),
         seen: n.seen + 1,
-        confidence: reinforceConfidence(n.confidence),
         importance: Math.max(n.importance, clamp01(c.importance ?? 0)),
         // A node that was tentative and has now been stated outright is no
-        // longer tentative. It never moves the other way here.
+        // longer tentative. It never moves the other way here — Socria
+        // guessing something does not make a stated fact uncertain.
         status:
           n.status === 'tentative' && (c.kind === 'stated' || c.kind === 'established')
             ? 'active'
             : n.status,
+        // Nor does an uncorroborated inference get to raise confidence in
+        // something it is not allowed to assert.
+        confidence: verdict.mayRewrite ? reinforceConfidence(n.confidence) : n.confidence,
         provenance: boundProvenance([
           ...n.provenance,
           prov(c.kind, revised ? { note: `was: ${n.content}` } : undefined),
@@ -255,7 +300,9 @@ export function applyCandidates(
   }
 
   // A claim that became a node is no longer pending.
-  const landed = new Set(report.nodes.map((n) => normalize(n.label)));
+  const landed = new Set(
+    report.nodes.map((n) => normalize(n.label)).filter((l) => !heldBack.has(l))
+  );
   pending = pending.filter(
     (p) => !landed.has(normalize(p.label)) && opts.now - p.lastAt < PENDING_TTL_MS
   );

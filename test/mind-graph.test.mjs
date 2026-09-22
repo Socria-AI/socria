@@ -281,6 +281,65 @@ console.log('\n=== ONE EVENT IS ONE EVENT ===');
   ok('a stated preference goes straight in', g2.nodes.length === 1, `${g2.nodes.length}`);
 }
 
+console.log('\n=== a compatible neighbour does not authorise a generalisation ===');
+{
+  // The hole every earlier test missed, because they all started from an
+  // EMPTY graph. `matchedSeen >= 1` short-circuited gate 2 — and since every
+  // node is born with seen = 1, that read as "any compatible neighbour
+  // authorises this". Belief, Concept and Assumption all resolve to one
+  // another, so the rule got weaker the more the graph knew.
+  let g = EMPTY_GRAPH;
+  const SAME = { provenance: { surface: 'core', conversationId: 'c1' } };
+
+  // One stated remark about a topic.
+  ({ graph: g } = apply(g, [C('Concept', 'Deadlines', 'Deadlines came up at work')], [], SAME));
+  const stated = g.nodes[0].content;
+  ok('the stated topic is recorded', g.nodes.length === 1);
+
+  // Then, in the SAME conversation, an inferred character claim wearing a
+  // label the matcher treats as the same thing.
+  const trait = C('Belief', 'Deadlines',
+    'They resent deadlines and resent whoever sets them; it is a fixed part of how they work',
+    'inferred');
+  const r = apply(g, [trait], [], SAME);
+  g = r.graph;
+  ok('it creates no new node', g.nodes.length === 1, `${g.nodes.length}`);
+  ok('and it does NOT rewrite what was said', g.nodes[0].content === stated,
+     `content became: ${g.nodes[0].content.slice(0, 70)}`);
+  ok('nor does it raise confidence', g.nodes[0].confidence === 0.8, `${g.nodes[0].confidence}`);
+  ok('the refusal is reported', r.report.refused.some((x) => x.reason === 'generalisation-needs-second-sighting'),
+     JSON.stringify(r.report.refused));
+  ok('but the sighting IS recorded', g.pending.length === 1,
+     'otherwise reinforcement swallows every occurrence and it can never be corroborated');
+
+  // Repeating it in the same conversation still changes nothing.
+  ({ graph: g } = apply(g, [trait], [], SAME));
+  ({ graph: g } = apply(g, [trait], [], SAME));
+  ok('repetition in one conversation changes nothing', g.nodes[0].content === stated);
+
+  // A DIFFERENT conversation corroborates it — and then it may be believed,
+  // as its own node rather than by overwriting somebody's words.
+  const other = apply(g, [trait], [], { provenance: { surface: 'core', conversationId: 'c2' } });
+  ok('a second conversation lets it in', other.graph.nodes.length >= 1);
+  ok('and the stated remark is still intact',
+     other.graph.nodes.some((n) => n.content === stated),
+     'corroboration must not be a licence to overwrite');
+}
+
+console.log('\n=== a hypothesis cannot harden a stated node ===');
+{
+  let g = EMPTY_GRAPH;
+  const SAME = { provenance: { surface: 'core', conversationId: 'c1' } };
+  ({ graph: g } = apply(g, [C('Concept', 'The lease', 'The lease runs to June')], [], SAME));
+  const before = { ...g.nodes[0] };
+  ({ graph: g } = apply(g, [
+    C('Assumption', 'The lease', 'They are probably trapped by the lease and cannot move at all', 'hypothesis'),
+  ], [], SAME));
+  ok('the stated words survive', g.nodes[0].content === before.content, g.nodes[0].content);
+  ok('the status is unchanged', g.nodes[0].status === before.status);
+  ok('and Socria guessing did not make it surer', g.nodes[0].confidence === before.confidence);
+}
+
 console.log('\n=== isolation fails CLOSED without a conversation id ===');
 {
   // The bug this pins: notePending stored a missing id as '?' while the gate

@@ -94,7 +94,21 @@ export interface GateInput {
 }
 
 export type GateVerdict =
-  | { pass: true; status: 'active' | 'tentative' | 'uncertain' }
+  | {
+      pass: true;
+      status: 'active' | 'tentative' | 'uncertain';
+      /**
+       * Whether this candidate may REPLACE the words of a node it matched.
+       *
+       * False for an uncorroborated claim about the person. Such a claim may
+       * still record that the subject came up again — that is honest — but it
+       * may not put its own wording in place of what somebody actually said.
+       * Without this the corroboration rule was bypassable by reinforcement
+       * rather than by creation: a single inferred remark rewrote a stated
+       * node and the graph then asserted it as settled.
+       */
+      mayRewrite: boolean;
+    }
   | { pass: false; reason: GateRefusal };
 
 export type GateRefusal =
@@ -117,17 +131,34 @@ export function gate(input: GateInput): GateVerdict {
     return { pass: false, reason: 'type-not-allowed-for-register' };
   }
 
-  // 2. Generalisation. A Belief, Preference or Assumption arrived at by
-  //    INFERENCE is held back until a second, independent extraction
-  //    proposes it again — at which point the matched node's `seen` is
-  //    already 1 and it passes. A STATED preference goes straight in:
-  //    somebody saying "I prefer to reason from first principles" is not an
-  //    inference, it is a report.
-  if (
+  // 2. Generalisation. A claim ABOUT THE PERSON arrived at by INFERENCE is
+  //    held back until a DIFFERENT conversation proposes it too. A stated
+  //    preference goes straight in: somebody saying "I prefer to reason from
+  //    first principles" is not an inference, it is a report.
+  //
+  //    `matchedSeen` used to short-circuit this, and the reasoning was wrong.
+  //    The comment here said a second sighting would find the matched node's
+  //    `seen` already at 1 and pass — but a FIRST inferred generalisation
+  //    creates no node at all; it is refused into `pending`. So the only way
+  //    matchedSeen could be set for an uncorroborated claim was that some
+  //    OTHER register had created a node the fuzzy matcher treats as the same
+  //    thing. Since every node is born with seen = 1, the clause read as
+  //    "any compatible neighbour authorises this" — and because Belief,
+  //    Concept and Assumption all resolve to one another, gate 2 got WEAKER
+  //    the more the graph knew, which is exactly backwards.
+  //
+  //    Reproduced before the fix, inside one conversation: a stated Concept
+  //    "Deadlines" let an inferred Belief rewrite it into "they resent
+  //    deadlines... a fixed part of how they work", still typed Concept,
+  //    still marked active, and therefore rendered into every later prompt as
+  //    settled context with no status marker on it.
+  //
+  //    Corroboration now comes from the pending ledger and nowhere else.
+  const generalising =
     GENERALISING_TYPES.has(input.type) &&
-    (input.kind === 'inferred' || input.kind === 'hypothesis') &&
-    !(input.matchedSeen && input.matchedSeen >= 1)
-  ) {
+    (input.kind === 'inferred' || input.kind === 'hypothesis');
+  let mayRewrite = true;
+  if (generalising) {
     // Corroborated by an earlier sighting held in `pending`? Then it may be
     // believed now. Otherwise it is refused and the caller records it, so
     // the NEXT sighting can find it here.
@@ -142,15 +173,24 @@ export function gate(input: GateInput): GateVerdict {
     // one. A rule that depends on every caller remembering is not a rule.
     const here = input.conversationId;
     if (!here) {
-      return { pass: false, reason: 'generalisation-needs-second-sighting' };
+      if (!input.matched) {
+        return { pass: false, reason: 'generalisation-needs-second-sighting' };
+      }
+      mayRewrite = false;
     }
     const fp = fingerprintNode(input.type, input.label);
-    const seenBefore = input.graph.pending.find((p) => p.fingerprint === fp);
+    const seenBefore = here ? input.graph.pending.find((p) => p.fingerprint === fp) : undefined;
     const elsewhere = seenBefore
       ? seenBefore.sources.filter((sid) => sid && sid !== UNKNOWN_SOURCE && sid !== here).length
       : 0;
     if (elsewhere < 1) {
-      return { pass: false, reason: 'generalisation-needs-second-sighting' };
+      // Uncorroborated. It may not be CREATED — the caller records the
+      // sighting instead — and if it matched something that already exists it
+      // may not rewrite it either.
+      if (!input.matched) {
+        return { pass: false, reason: 'generalisation-needs-second-sighting' };
+      }
+      mayRewrite = false;
     }
   }
 
@@ -188,7 +228,7 @@ export function gate(input: GateInput): GateVerdict {
     return { pass: false, reason: 'forgotten' };
   }
 
-  return { pass: true, status: rule.status ?? 'active' };
+  return { pass: true, status: rule.status ?? 'active', mayRewrite };
 }
 
 // ── how much may land in one turn ───────────────────────────────────

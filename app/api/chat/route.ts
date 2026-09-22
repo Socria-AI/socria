@@ -13,11 +13,8 @@ import {
   SOCRIA_PROMPT_VERSION,
   CORE_3_FALLBACK_MODEL,
   CORE_4_PROMPT_VERSION,
+  fallbackOpenAIModel,
   resolveModel,
-} from '@/lib/socria-prompt';
-import { recall, remember } from '@/lib/mind/pipeline';
-import type { ActivatedSubgraph } from '@/lib/mind/activate';
-import {
   sanitizeUserUnderstanding,
   hasJourneyContent,
   renderJourneyBrief,
@@ -26,6 +23,8 @@ import {
   renderTranscriptForState,
   type ConversationState,
 } from '@/lib/socria-prompt';
+import { recall, remember } from '@/lib/mind/pipeline';
+import type { ActivatedSubgraph } from '@/lib/mind/activate';
 import {
   computeGuidance,
   renderTurnDirective,
@@ -240,13 +239,30 @@ export async function POST(req: NextRequest) {
     let mindBlock: string | null = null;
     let mindSubgraph: ActivatedSubgraph | null = null;
     if (socriaModel === 'core-4' && userId) {
-      const r = await recall(userId, last.content, {
-        now: Date.now(),
-        plan: await resolvePlanForRequest(req, userId),
-        surface: 'core',
-      });
-      mindBlock = r.block || null;
-      mindSubgraph = r.subgraph;
+      // WRAPPED HERE, not only inside recall().
+      //
+      // recall() swallows its own failures, and I relied on that — but the
+      // `plan` argument was an await evaluated BEFORE recall was entered, so
+      // anything it threw sailed past that guarantee and out to the handler's
+      // catch, where it became "Something went wrong on our side." A promise
+      // that memory can never break a conversation has to be made at the
+      // point the conversation calls it, not inside the thing being called.
+      try {
+        const r = await recall(userId, last.content, {
+          now: Date.now(),
+          // Reuse the plan already resolved above rather than resolving it a
+          // second time: one fewer call, and one fewer thing that can fail.
+          plan,
+          surface: 'core',
+        });
+        mindBlock = r.block || null;
+        mindSubgraph = r.subgraph;
+      } catch (e) {
+        // No memory this turn. Said out loud in the log, because a graph
+        // that silently never loads looks exactly like a graph with nothing
+        // in it, and those need telling apart.
+        console.error('[socria/chat] mind graph recall failed; continuing without it', e);
+      }
     }
 
     const { prompt: basePrompt, model, depth } = buildSystemPrompt(
@@ -388,13 +404,19 @@ export async function POST(req: NextRequest) {
         status === 404 ||
         /model/i.test(e?.code || '') ||
         /model|not found|does not exist|unknown/i.test(e?.message || '');
-      if (model === 'core-3' && isModelError && openaiModel !== CORE_3_FALLBACK_MODEL) {
-        if (process.env.NODE_ENV !== 'production') {
-          console.warn(
-            `[socria/chat] model "${openaiModel}" rejected (${e?.message || status}); falling back to ${CORE_3_FALLBACK_MODEL}`
-          );
-        }
-        completion = await makeCompletion(CORE_3_FALLBACK_MODEL);
+      // Registry-driven, not `model === 'core-3'`. Written that way, Core 4
+      // inherited the same model id and none of the protection — so a
+      // deployment where Core 3.1 silently fell back and worked would fail on
+      // Core 4 and look like Core 4 was broken.
+      const fallback = fallbackOpenAIModel(model);
+      if (fallback && isModelError && openaiModel !== fallback) {
+        // Logged in production too. A model quietly answering as something
+        // other than what the person picked is worth knowing about, and the
+        // dev-only warning meant nobody found out for weeks.
+        console.warn(
+          `[socria/chat] model "${openaiModel}" rejected for ${model} (${e?.message || status}); falling back to ${fallback}`
+        );
+        completion = await makeCompletion(fallback);
       } else {
         throw e;
       }
@@ -430,6 +452,7 @@ export async function POST(req: NextRequest) {
           // Both halves go in. A conversation is what was said AND what
           // Socria said back, and half of it is the half that contains the
           // question somebody was answering.
+          try {
           if (socriaModel === 'core-4' && userId && apiKey) {
             void remember(userId, `User: ${last.content}\n\nSocria: ${reply}`, {
               now: Date.now(),
@@ -442,7 +465,15 @@ export async function POST(req: NextRequest) {
               // inside a `finally` after the stream has closed is the kind of
               // thing that shows up as a mystery 500 with no stack pointing
               // anywhere useful.
-            }).catch(() => {});
+            }).catch((err: unknown) => {
+              console.error('[socria/chat] mind graph remember failed', err);
+            });
+          }
+          } catch (e) {
+            // The stream is already closed by the time this runs, so a throw
+            // here cannot reach the person — it can only become an unhandled
+            // rejection that takes the process with it.
+            console.error('[socria/chat] mind graph remember threw', e);
           }
         }
       },

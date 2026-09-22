@@ -1410,6 +1410,22 @@ export const CORE_3_FALLBACK_MODEL = 'gpt-4o';
 // depends on. OPENAI_MODEL_CORE_4 overrides it with no redeploy.
 export const CORE_4_MODEL = CORE_3_MODEL;
 
+/**
+ * What to try when a model id is rejected.
+ *
+ * Core 3.1 has had this since it was pointed at an id OpenAI might not
+ * recognise, and the chat route retried with it. Core 4 was given the same
+ * id and no fallback, which made it the one model with no safety net: the
+ * same deployment where Core 3.1 quietly worked would fail on Core 4 with
+ * "the model is unavailable to this deployment", and the difference would
+ * look like Core 4 being broken rather than a missing line.
+ *
+ * Driven by the registry so the next Core cannot be forgotten the same way.
+ */
+export function fallbackOpenAIModel(model: SocriaModel): string | null {
+  return model === 'core-3' || model === 'core-4' ? CORE_3_FALLBACK_MODEL : null;
+}
+
 export const SOCRIA_MODELS: Record<SocriaModel, ModelConfig> = {
   'core-2': {
     id: 'core-2',
