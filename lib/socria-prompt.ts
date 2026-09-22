@@ -2165,7 +2165,13 @@ export function buildSystemPrompt(
    * module knows nothing about how memory is stored, which is what lets the
    * graph belong to Socria rather than to any one prompt.
    */
-  mindGraph?: string | null
+  mindGraph?: string | null,
+  /**
+   * The cognitive state and the chosen move, already rendered
+   * (lib/cognition/*). Strings rather than objects for the same reason the
+   * Mind Graph is: this module knows nothing about how either is produced.
+   */
+  cognition?: { state?: string | null; move?: string | null } | null
 ): { prompt: string; model: SocriaModel; depth: ThinkingDepth } {
   const model = resolveModel(modelInput);
   const depth = resolveDepth(depthInput);
@@ -2209,6 +2215,11 @@ export function buildSystemPrompt(
     // richest of these and the one a model should still have in view when it
     // starts reading what was actually said.
     if (mindGraph) out += mindGraph;
+    // Where the conversation stands, then the move. Last, and in that order:
+    // the state is the reading, the move is what to do about it, and the move
+    // should be the final thing in view before the transcript.
+    if (cognition?.state) out += cognition.state;
+    if (cognition?.move) out += cognition.move;
     return out;
   };
 

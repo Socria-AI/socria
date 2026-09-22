@@ -24,6 +24,10 @@ import {
   type ConversationState,
 } from '@/lib/socria-prompt';
 import { recall, remember } from '@/lib/mind/pipeline';
+import { readState, guardDraft } from '@/lib/cognition/engine';
+import { route, renderMove, type Move } from '@/lib/cognition/router';
+import { renderState, type CognitiveState } from '@/lib/cognition/state';
+import { retryNote } from '@/lib/cognition/guard';
 import type { ActivatedSubgraph } from '@/lib/mind/activate';
 import {
   computeGuidance,
@@ -224,6 +228,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Clean / clip the message history
+    const clean = messages
+      .filter(
+        (m: any) =>
+          m &&
+          (m.role === 'user' || m.role === 'assistant') &&
+          typeof m.content === 'string'
+      )
+      .slice(-MAX_HISTORY)
+      .map((m: any) => ({ role: m.role, content: m.content }));
+
     // ── the Mind Graph ────────────────────────────────────────────
     //
     // Core 4's persistent memory. Activated by what they just said — a region
@@ -265,6 +280,31 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // ── the Cognitive State Engine ────────────────────────────────
+    //
+    // The Mind Graph is what Socria understands about this person; this is
+    // what is happening in this conversation, this minute. Read first, then
+    // the move is ROUTED from it deterministically — so the choice cannot be
+    // argued out of by a message that sounds urgent or impatient, and so
+    // there is a reason with a name when Socria asks instead of answering.
+    //
+    // Same failure posture as the graph: an empty state routes toward asking,
+    // which is the recoverable mistake.
+    let cognitiveState: CognitiveState | null = null;
+    let move: Move | null = null;
+    if (socriaModel === 'core-4' && apiKey) {
+      try {
+        cognitiveState = await readState(
+          apiKey,
+          clean.map((m) => `${m.role === 'user' ? 'Them' : 'Socria'}: ${m.content}`).join('\n\n').slice(-8000),
+          null
+        );
+        move = route(cognitiveState);
+      } catch (e) {
+        console.error('[socria/chat] cognitive state unavailable; replying without a routed move', e);
+      }
+    }
+
     const { prompt: basePrompt, model, depth } = buildSystemPrompt(
       body?.model,
       body?.depth,
@@ -272,19 +312,12 @@ export async function POST(req: NextRequest) {
       typeof body?.profile === 'string' ? body.profile : null,
       journey,
       personMemory,
-      mindBlock
+      mindBlock,
+      move && cognitiveState
+        ? { state: renderState(cognitiveState), move: renderMove(move) }
+        : null
     );
 
-    // Clean / clip the message history
-    const clean = messages
-      .filter(
-        (m: any) =>
-          m &&
-          (m.role === 'user' || m.role === 'assistant') &&
-          typeof m.content === 'string'
-      )
-      .slice(-MAX_HISTORY)
-      .map((m: any) => ({ role: m.role, content: m.content }));
 
     // Core 3.1 per-turn conversation controller: compute compact guidance from
     // the thread (what changed this turn, anti-loop "do not" list) and append
@@ -366,6 +399,15 @@ export async function POST(req: NextRequest) {
         journeyInjected: model !== 'core-2' && !!journey,
         mindNodes: mindSubgraph?.nodes.length ?? 0,
         mindEdges: mindSubgraph?.edges.length ?? 0,
+        // Which move was chosen, and why. The reason is the point: when
+        // Socria asks instead of answering there should be a nameable cause,
+        // not a shrug about model judgement.
+        intervention: move?.intervention ?? null,
+        because: move?.because ?? null,
+        guarded: !!move?.guard,
+        taskKind: cognitiveState?.taskKind ?? null,
+        attempt: cognitiveState?.attempt ?? null,
+        shown: cognitiveState?.demonstratedUnderstanding ?? null,
         userTurns,
         assistantTurns,
         stage: guidance?.stage ?? null,
@@ -423,6 +465,21 @@ export async function POST(req: NextRequest) {
     }
 
     const encoder = new TextEncoder();
+
+    // ── the Answer Guard ──────────────────────────────────────────
+    //
+    // A guarded move CANNOT STREAM. The guard's whole value is that the
+    // person does not see the leaked work — checking it after they have read
+    // it would be theatre. So the draft is collected, read, and only then
+    // emitted.
+    //
+    // The latency that costs is small and lands where it is cheapest: the
+    // moves that need guarding are the ones Core 4's own Response Discipline
+    // keeps short — a question, a nudge, an acknowledgement. The long replies,
+    // where streaming actually matters, are the ones where the work is
+    // legitimately ours and there is nothing to withhold.
+    const guarded = !!move?.guard;
+
     const stream = new ReadableStream({
       async start(controller) {
         let reply = '';
@@ -431,11 +488,48 @@ export async function POST(req: NextRequest) {
             const delta = chunk.choices?.[0]?.delta?.content ?? '';
             if (delta) {
               reply += delta;
-              controller.enqueue(encoder.encode(delta));
+              // Held back when the move withholds something. Nothing reaches
+              // the person until the guard has read it.
+              if (!guarded) controller.enqueue(encoder.encode(delta));
             }
+          }
+
+          if (guarded && move && apiKey) {
+            let verdict = await guardDraft(apiKey, move, last.content, reply);
+
+            if (verdict.verdict === 'regenerate') {
+              // One retry, told exactly what went wrong. Not a loop: a second
+              // failure means the draft is sent anyway rather than the person
+              // waiting on a machine arguing with itself.
+              console.warn(`[socria/chat] answer guard rejected a ${move.intervention} draft (${verdict.by}): ${verdict.reason}`);
+              try {
+                const second = await openai.chat.completions.create({
+                  model: openaiModel,
+                  messages: [
+                    { role: 'system', content: systemPrompt + retryNote(verdict, move) },
+                    ...(clean as { role: 'user' | 'assistant'; content: string }[]),
+                  ],
+                  temperature: 0.7,
+                  max_tokens: 500,
+                });
+                const retry = second.choices[0]?.message?.content ?? '';
+                if (retry.trim()) reply = retry;
+              } catch (e) {
+                console.error('[socria/chat] guard retry failed; sending the first draft', e);
+              }
+            } else if (verdict.verdict === 'revise' && verdict.revised) {
+              console.warn(`[socria/chat] answer guard revised a ${move.intervention} draft: ${verdict.reason}`);
+              reply = verdict.revised;
+            }
+
+            controller.enqueue(encoder.encode(reply));
           }
         } catch (e) {
           console.error('stream error:', e);
+          // On a guarded turn nothing has been sent yet, so whatever was
+          // collected before the failure goes out with the notice rather
+          // than being lost entirely.
+          if (guarded && reply.trim()) controller.enqueue(encoder.encode(reply));
           controller.enqueue(
             encoder.encode('\n\n[Connection interrupted. Please try again.]')
           );
