@@ -38,6 +38,34 @@ export function windowFor(plan: 'free' | 'one'): RecallWindow {
   return plan === 'one' ? ONE_WINDOW : FREE_WINDOW;
 }
 
+/**
+ * How long a reply will wait for memory before going without it.
+ *
+ * recall() sits on the hot path of every Core 4 turn and reads a whole
+ * graph. A failure it already survives; SLOWNESS it did not — a database
+ * having a bad minute would have held every reply for as long as the
+ * connection took to give up, which is the same outage from the person's
+ * side and harder to diagnose. Two seconds, then the turn goes on without
+ * memory, which is how Socria worked until recently.
+ */
+export const RECALL_TIMEOUT_MS = 2_000;
+
+function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return new Promise<T>((resolve) => {
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      console.warn(`[socria/mind] recall exceeded ${ms}ms; replying without memory`);
+      resolve(fallback);
+    }, ms);
+    p.then(
+      (v) => { if (!settled) { settled = true; clearTimeout(timer); resolve(v); } },
+      () => { if (!settled) { settled = true; clearTimeout(timer); resolve(fallback); } }
+    );
+  });
+}
+
 export interface RecallResult {
   /** the block for the system prompt; '' when nothing was activated */
   block: string;
@@ -68,7 +96,9 @@ export async function recall(
     graph: { nodes: [], edges: [], tombstones: [], pending: [] },
   };
   try {
-    const graph = await loadGraph(userId);
+    const graph = await withTimeout(loadGraph(userId), RECALL_TIMEOUT_MS, {
+      nodes: [], edges: [], tombstones: [], pending: [],
+    });
     if (!graph.nodes.length) return { ...empty, graph };
 
     const win = windowFor(opts.plan);
@@ -149,7 +179,14 @@ export async function remember(
         budget: opts.budget ?? TURN_BUDGET,
         provenance: {
           surface: opts.surface,
-          conversationId: opts.conversationId,
+          // Bounded like any other field off a request body. It is the key
+          // the isolation rule counts distinct conversations by, so an
+          // unbounded string would sit in the pending ledger for ever and a
+          // varying one would let a single conversation pose as many.
+          conversationId:
+            typeof opts.conversationId === 'string' && opts.conversationId.trim()
+              ? opts.conversationId.trim().slice(0, 120)
+              : undefined,
           sourceNodeId: opts.sourceNodeId,
         },
       }

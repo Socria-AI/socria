@@ -18,7 +18,8 @@
 import { gate, rank, type Budget, type GateRefusal } from './gate';
 import { resolveNode, type Candidate } from './resolve';
 import {
-  GENERALISING_TYPES,
+  isGeneralising,
+  fingerprintClaim,
   MAX_ALIASES, MAX_CONTENT, MAX_LABEL, MAX_PENDING, PENDING_TTL_MS, UNKNOWN_SOURCE,
   boundProvenance,
   clamp01, clip, fingerprintEdge, fingerprintNode, isForgotten, normalize,
@@ -124,7 +125,7 @@ export function applyCandidates(
     // into the first let a trait inherit a stated node's standing and
     // displace its words. A corroborated generalisation gets its own node
     // and stands beside what was actually said.
-    if (match && GENERALISING_TYPES.has(c.type) && normalize(match.node.type) !== normalize(c.type)) {
+    if (match && isGeneralising(c.type) && normalize(match.node.type) !== normalize(c.type)) {
       match = null;
     }
 
@@ -315,19 +316,65 @@ function notePending(
   pending: PendingClaim[], type: NodeType, label: string, content: string,
   now: number, conversationId?: string
 ): PendingClaim[] {
-  const fp = fingerprintNode(type, label);
+  // Keyed on the claim, not the type — see fingerprintClaim.
+  const fp = fingerprintClaim(label);
   const sid = conversationId ?? UNKNOWN_SOURCE;
   const i = pending.findIndex((p) => p.fingerprint === fp);
   if (i >= 0) {
     const next = [...pending];
     // The same conversation saying it again adds nothing: it is the same
     // evidence, and counting it would let one afternoon corroborate itself.
-    const sources = next[i].sources.includes(sid) ? next[i].sources : [...next[i].sources, sid];
-    next[i] = { ...next[i], sources, lastAt: now, content };
+    const known = next[i].sources.includes(sid);
+    const sources = known ? next[i].sources : [...next[i].sources, sid];
+    next[i] = {
+      ...next[i],
+      sources,
+      // And it does not restart the clock either. A claim repeated all day in
+      // one conversation would otherwise never expire, sitting in the ledger
+      // for ever waiting for a second conversation that may never come. Only
+      // NEW evidence buys it more time.
+      lastAt: known ? next[i].lastAt : now,
+      content,
+    };
     return next;
   }
+  // Expired entries go first, and then the ledger is protected from any one
+  // conversation filling it.
+  //
+  // Evicting the oldest by arrival was the wrong rule: a single uploaded file
+  // produces dozens of sightings in one pass, and oldest-first meant that
+  // pass threw out everything every OTHER conversation had been waiting on.
+  // One document could erase the standing evidence of a season. So when the
+  // ledger is full, the conversation occupying the most of it loses its
+  // newest entries — a flood crowds out its own, not everybody else's.
+  const alive = pending.filter((p) => now - p.lastAt < PENDING_TTL_MS);
+  let room = alive;
+  if (alive.length >= MAX_PENDING) {
+    const kept = [...alive];
+    while (kept.length >= MAX_PENDING) {
+      const counts = new Map<string, number>();
+      for (const p of kept) {
+        const k = p.sources[p.sources.length - 1] ?? UNKNOWN_SOURCE;
+        counts.set(k, (counts.get(k) ?? 0) + 1);
+      }
+      let worst = UNKNOWN_SOURCE;
+      let most = -1;
+      for (const [k, v] of counts) if (v > most) { worst = k; most = v; }
+      // Newest first within the offending conversation: the ones it has just
+      // added, rather than the ones that have been waiting.
+      let victim = -1;
+      let victimAt = -Infinity;
+      for (let i = 0; i < kept.length; i++) {
+        const k = kept[i].sources[kept[i].sources.length - 1] ?? UNKNOWN_SOURCE;
+        if (k === worst && kept[i].lastAt > victimAt) { victim = i; victimAt = kept[i].lastAt; }
+      }
+      if (victim < 0) break;
+      kept.splice(victim, 1);
+    }
+    room = kept;
+  }
   return [
-    ...pending.slice(-(MAX_PENDING - 1)),
+    ...room,
     { fingerprint: fp, type, label, content, sources: [sid], firstAt: now, lastAt: now },
   ];
 }
@@ -412,7 +459,7 @@ export function forgetNode(graph: MindGraph, id: string, at: number, reason?: st
     edges: graph.edges.filter((e) => e.sourceId !== id && e.targetId !== id),
     tombstones,
     // A forgotten claim must not sit in pending waiting to be re-proposed.
-    pending: graph.pending.filter((p) => p.fingerprint !== fp),
+    pending: graph.pending.filter((p) => p.fingerprint !== fingerprintClaim(node.label)),
   };
 }
 

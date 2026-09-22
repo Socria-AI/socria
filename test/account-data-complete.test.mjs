@@ -53,6 +53,23 @@ ok('every read records an error', (exp.match(/error: \w+Err/g) || []).length >= 
    `${(exp.match(/error: \w+Err/g) || []).length} of 9 reads checked`);
 ok('and an incomplete export says so', /out\.incomplete\b/.test(exp));
 
+console.log('=== a live-table error is NOT mistaken for a missing table ===');
+{
+  // Forgiving the wrong error is silent data loss: the loop steps over the
+  // table, the route reports ok and lists it as deleted, and rows keyed to
+  // somebody who asked to be forgotten survive with no way left to reach
+  // them. The check used to match a bare "does not exist" — which Postgres
+  // also says about columns, functions and types.
+  const fn = del.match(/function tableMissing[\s\S]*?\n\}/);
+  ok('tableMissing exists', !!fn);
+  const body = fn ? fn[0] : '';
+  ok('it matches the exact undefined-table code', /42p01/.test(body));
+  ok('and PostgREST\'s schema-cache code', /pgrst205/.test(body));
+  ok('it requires the relation phrasing, not a bare "does not exist"',
+     /relation .*does not exist/.test(body) && !/includes\('does not exist'\)/.test(body),
+     'a missing COLUMN on a live table would otherwise be forgiven');
+}
+
 console.log('=== the grant cookie does not outlive the account ===');
 ok('deletion clears the unlock cookie', /ACCESS_COOKIE/.test(del) && /maxAge: 0/.test(del));
 

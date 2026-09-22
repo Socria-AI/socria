@@ -67,9 +67,29 @@ const LATE_TABLES = new Set<string>([
   'logos_rooms',
 ]);
 
+/**
+ * Is this error "that table was never created", and nothing else?
+ *
+ * The bar is high because forgiving the wrong error is silent data loss: the
+ * loop steps over the table, the route reports ok and names it in `deleted`,
+ * and rows keyed to somebody who asked to be forgotten survive for ever with
+ * no way left to reach them — the account that could delete them no longer
+ * exists.
+ *
+ * It used to match a bare "does not exist" anywhere in code or message. That
+ * phrase is Postgres's for a missing COLUMN, function, type or schema too,
+ * and any of those on a live table means the delete failed while looking
+ * like an absent migration. Now: the exact codes, or the exact phrasing
+ * Postgres and PostgREST use for a missing relation.
+ */
 function tableMissing(error: { code?: string; message?: string }): boolean {
-  const m = `${error.code ?? ''} ${error.message ?? ''}`.toLowerCase();
-  return m.includes('42p01') || m.includes('does not exist') || m.includes('could not find') || m.includes('schema cache');
+  const code = (error.code ?? '').toLowerCase();
+  if (code === '42p01' || code === 'pgrst205') return true;
+  const m = (error.message ?? '').toLowerCase();
+  return (
+    /relation "?[\w.]+"? does not exist/.test(m) ||
+    /could not find the table/.test(m)
+  );
 }
 
 export async function DELETE(req: NextRequest) {

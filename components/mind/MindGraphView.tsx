@@ -426,10 +426,24 @@ export function MindGraphView() {
             become memory if a <em>different</em> conversation suggests the
             same thing. One afternoon is not a pattern.
           </p>
+          <p className="mg-pending-note">
+            Saying <em>no</em> to one clears it and stops it being suggested
+            again.
+          </p>
           <ul>
             {pending.map((p) => (
               <li key={p.fingerprint ?? p.label}>
-                <span className="mg-li-type">{p.type}</span> {p.label} — {p.content}
+                <span>
+                  <span className="mg-li-type">{p.type}</span> {p.label} — {p.content}
+                </span>
+                <button
+                  type="button"
+                  disabled={busy || !p.fingerprint}
+                  onClick={() => p.fingerprint && void mutate({ id: p.fingerprint, kind: 'pending' }, 'DELETE')}
+                  aria-label={`Dismiss: ${p.label}`}
+                >
+                  no
+                </button>
               </li>
             ))}
           </ul>

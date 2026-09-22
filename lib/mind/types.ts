@@ -52,14 +52,35 @@ export function isKnownType(t: string): t is KnownNodeType {
 }
 
 /**
- * Types that make a claim ABOUT THE PERSON rather than recording something
- * that happened. These are the ones the gate holds back until a second
- * sighting: one stressful afternoon is an Event, not evidence of a
- * personality.
+ * Types that record something that HAPPENED, or name something in the world.
+ *
+ * The list is inverted on purpose, and this is the important part: `type` is
+ * an open string, so a list of what DOES generalise can be stepped over by
+ * inventing a word. Measured, before this changed: Belief, Preference and
+ * Assumption were held back, while the identical claim typed Trait, Pattern,
+ * Tendency, Characteristic, Insight or Concept was believed on one
+ * conversation's evidence. The gate's central rule was one synonym from
+ * being optional.
+ *
+ * So anything NOT here — including every type nobody has thought of yet — is
+ * treated as a claim about the person and needs corroboration. An unfamiliar
+ * word now fails toward caution instead of toward belief.
+ *
+ * What is exempt: things that happened (Event, Experience, Conversation),
+ * things that exist (Person, Organization, Place, Project, Source,
+ * Evidence), and things explicitly open rather than asserted (Question,
+ * Uncertainty). None of those says anything durable about who somebody is.
  */
-export const GENERALISING_TYPES = new Set<string>([
-  'Belief', 'Preference', 'Assumption',
+export const OCCURRENCE_TYPES = new Set<string>([
+  'Event', 'Experience', 'Conversation',
+  'Person', 'Organization', 'Place', 'Project', 'Source', 'Evidence',
+  'Question', 'Uncertainty',
 ]);
+
+/** Does this type assert something durable about the person? */
+export function isGeneralising(type: string): boolean {
+  return !OCCURRENCE_TYPES.has(type);
+}
 
 // ── status ──────────────────────────────────────────────────────────
 
@@ -306,6 +327,43 @@ export function normalize(s: unknown): string {
  */
 export function fingerprintNode(type: string, label: string): string {
   return `n:${normalize(type)}|${normalize(label)}`;
+}
+
+/**
+ * The key a not-yet-believed claim is held under.
+ *
+ * TYPE-AGNOSTIC, unlike a node fingerprint, and for a reason that is the
+ * mirror of why node tombstones include the type: the same claim arriving as
+ * a Belief, then a Preference, then an Assumption is the SAME sighting seen
+ * twice, and keying on the type meant it never accumulated — a genuine
+ * pattern could recur across a dozen conversations and stay permanently
+ * unbelievable because the extractor kept picking a different word for it.
+ *
+ * Conflation is handled at corroboration instead, by comparing what the two
+ * sightings actually said (see claimsAgree). Putting content in the key
+ * would be worse: wording varies between extractions, so the key would
+ * almost never match and nothing would ever corroborate at all.
+ */
+export function fingerprintClaim(label: string): string {
+  return `g:${normalize(label)}`;
+}
+
+/**
+ * Are two sightings the same claim, or two claims that share a name?
+ *
+ * Token overlap, deliberately loose. "They avoid conflict" and "They tend to
+ * avoid disagreeing openly" should count as one claim seen twice; "Deadlines
+ * are slipping" and "They resent deadlines" should not.
+ */
+export function claimsAgree(a: string, b: string): boolean {
+  const toks = (t: string) =>
+    new Set(normalize(t).split(' ').filter((w) => w.length > 3));
+  const x = toks(a);
+  const y = toks(b);
+  if (!x.size || !y.size) return true; // nothing to disagree about
+  let shared = 0;
+  for (const t of x) if (y.has(t)) shared++;
+  return shared / Math.min(x.size, y.size) >= 0.34;
 }
 
 export function fingerprintEdge(

@@ -160,13 +160,22 @@ export async function touchNodes(
   // a bookkeeping write breaking a conversation.
   try {
     const db = supabaseAdmin();
-    await Promise.all(
-      touched.map((t) =>
-        db.from('mind_nodes')
-          .update({ activation: t.activation, last_accessed: t.lastAccessed })
-          .eq('user_id', userId)
-          .eq('id', t.id)
-      )
+    // ONE round trip, not one per node. This fired a separate UPDATE for
+    // every activated node, so a large window meant dozens of concurrent
+    // writes per turn for bookkeeping nobody reads synchronously — and an
+    // over-large subgraph would have turned that into thousands. An upsert
+    // of the changed columns does the same job in a single statement.
+    //
+    // The rows already exist, so this is an update in upsert's clothing;
+    // the other columns are left alone because only these two moved.
+    await db.from('mind_nodes').upsert(
+      touched.map((t) => ({
+        user_id: userId,
+        id: t.id,
+        activation: t.activation,
+        last_accessed: t.lastAccessed,
+      })),
+      { onConflict: 'user_id,id' }
     );
   } catch {
     // An activation level is stale. Nothing depends on it.

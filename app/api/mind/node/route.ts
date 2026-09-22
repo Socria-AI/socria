@@ -10,7 +10,7 @@ import { auth } from '@clerk/nextjs/server';
 import { enforceRateLimit } from '@/lib/rate-limit';
 import { loadGraph, persistGraph } from '@/lib/mind/store';
 import { challengeNode, forgetEdge, forgetNode } from '@/lib/mind/apply';
-import { NODE_STATUSES, MAX_CONTENT, MAX_LABEL, clip, type NodeStatus } from '@/lib/mind/types';
+import { NODE_STATUSES, MAX_CONTENT, MAX_LABEL, clip, fingerprintNode, type NodeStatus } from '@/lib/mind/types';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -84,10 +84,34 @@ export async function DELETE(req: NextRequest) {
 
   const body = await req.json().catch(() => null);
   const id = typeof body?.id === 'string' ? body.id : '';
-  const kind = body?.kind === 'edge' ? 'edge' : 'node';
+  const kind = body?.kind === 'edge' ? 'edge' : body?.kind === 'pending' ? 'pending' : 'node';
   if (!id) return NextResponse.json({ error: 'Which one?' }, { status: 400 });
 
   const before = await loadGraph(userId);
+
+  // A claim noticed once and not yet believed. It is shown on the Memory
+  // page, so it has to be dismissible there — a page that displays something
+  // Socria is holding about somebody and gives them no way to say "no" is
+  // showing them a thing they cannot act on.
+  //
+  // Dismissing writes a tombstone as well as clearing the sighting, because
+  // otherwise the next conversation proposes it again and they dismiss it
+  // again, for ever.
+  if (kind === 'pending') {
+    const claim = before.pending.find((p) => p.fingerprint === id);
+    if (!claim) return NextResponse.json({ error: 'No such claim.' }, { status: 404 });
+    const fp = fingerprintNode(claim.type, claim.label);
+    const after = {
+      ...before,
+      pending: before.pending.filter((p) => p.fingerprint !== id),
+      tombstones: before.tombstones.includes(fp)
+        ? before.tombstones
+        : [...before.tombstones, fp],
+    };
+    const saved = await persistGraph(userId, before, after);
+    if (!saved.ok) return NextResponse.json({ error: 'Could not save that.' }, { status: 500 });
+    return NextResponse.json({ ok: true, forgotten: true });
+  }
   // Both write a tombstone. Without one, deletion is theatre: the next
   // extraction notices the same thing and puts it back, and the person
   // concludes — correctly — that deleting does not work here.

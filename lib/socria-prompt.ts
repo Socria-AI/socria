@@ -1403,12 +1403,15 @@ Optimize for what remains with the human after the interaction ends.`;
 export const CORE_3_MODEL = 'gpt-5.6-luna';
 export const CORE_3_FALLBACK_MODEL = 'gpt-4o';
 
-// Core 4 starts on the same model Core 3.1 runs on, through its own constant
-// rather than by sharing Core 3's. Nothing about Core 4 is decided yet except
-// its prompt, and the first thing anyone will want to try is a different
-// model underneath it — which should not mean editing the line Core 3.1
-// depends on. OPENAI_MODEL_CORE_4 overrides it with no redeploy.
-export const CORE_4_MODEL = CORE_3_MODEL;
+// Core 4 runs on GPT 5.6 Sol, not on Core 3.1's Luna.
+//
+// Its own constant rather than a shared one, so the two move independently:
+// Core 4's prompt asks for a different thing from the model than Core 3.1's
+// does — judging what to withhold, rather than noticing language — and the
+// model underneath it should be free to change on that basis alone.
+// OPENAI_MODEL_CORE_4 overrides it with no redeploy, and a rejected id falls
+// back through fallbackOpenAIModel() like Core 3.1's does.
+export const CORE_4_MODEL = 'gpt-5.6-sol';
 
 /**
  * What to try when a model id is rejected.

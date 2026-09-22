@@ -134,3 +134,16 @@
 .mg-sources button { margin-left: auto; appearance: none; border: 0; background: transparent; cursor: pointer; font-size: 11px; color: var(--ink-45, rgba(35,36,31,.45)) }
 .mg-sources button:hover { color: var(--vermilion, #D8402F) }
 .mg-sources p { font-family: var(--font-sans); font-size: 12.5px; color: var(--ink-60, rgba(35,36,31,.6)); margin: .6rem 0 0; max-width: 46em }
+
+/* A pending claim is something Socria is holding about somebody. Showing it
+   without a way to refuse it would be showing them a thing they cannot act
+   on, so each carries its own dismissal. */
+.mg-pending li { display: flex; align-items: baseline; gap: .6rem }
+.mg-pending li button {
+  margin-left: auto; appearance: none; border: 1px solid var(--ink-16, rgba(35,36,31,.16));
+  background: transparent; cursor: pointer; border-radius: 999px;
+  font-family: var(--font-sans); font-size: 11px; padding: .1em .75em;
+  color: var(--ink-60, rgba(35,36,31,.6)); flex: 0 0 auto;
+}
+.mg-pending li button:hover { border-color: var(--vermilion, #D8402F); color: var(--vermilion, #D8402F) }
+.mg-pending-note { margin-top: .5rem }

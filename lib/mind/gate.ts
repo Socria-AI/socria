@@ -29,7 +29,7 @@
 import { matchesForgotten } from './resolve';
 import { UNKNOWN_SOURCE } from './types';
 import {
-  GENERALISING_TYPES, fingerprintNode, normalize,
+  isGeneralising, claimsAgree, fingerprintClaim, fingerprintNode, normalize,
   type MindGraph, type NodeType, type ProvenanceKind,
 } from './types';
 
@@ -155,7 +155,7 @@ export function gate(input: GateInput): GateVerdict {
   //
   //    Corroboration now comes from the pending ledger and nowhere else.
   const generalising =
-    GENERALISING_TYPES.has(input.type) &&
+    isGeneralising(input.type) &&
     (input.kind === 'inferred' || input.kind === 'hypothesis');
   let mayRewrite = true;
   if (generalising) {
@@ -178,8 +178,12 @@ export function gate(input: GateInput): GateVerdict {
       }
       mayRewrite = false;
     }
-    const fp = fingerprintNode(input.type, input.label);
-    const seenBefore = here ? input.graph.pending.find((p) => p.fingerprint === fp) : undefined;
+    const fp = fingerprintClaim(input.label);
+    const prior = here ? input.graph.pending.find((p) => p.fingerprint === fp) : undefined;
+    // A sighting only corroborates if it is the same CLAIM, not merely the
+    // same name. Two different things called "Deadlines" must not vouch for
+    // each other.
+    const seenBefore = prior && claimsAgree(prior.content, input.content) ? prior : undefined;
     const elsewhere = seenBefore
       ? seenBefore.sources.filter((sid) => sid && sid !== UNKNOWN_SOURCE && sid !== here).length
       : 0;

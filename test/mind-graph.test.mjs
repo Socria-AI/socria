@@ -281,6 +281,84 @@ console.log('\n=== ONE EVENT IS ONE EVENT ===');
   ok('a stated preference goes straight in', g2.nodes.length === 1, `${g2.nodes.length}`);
 }
 
+console.log('\n=== a synonym does not get past the gate ===');
+{
+  // `type` is an open string, so a list of what DOES generalise was one word
+  // from being optional. Measured before the list was inverted: Belief,
+  // Preference and Assumption were held back while the identical claim typed
+  // Trait, Pattern, Tendency, Characteristic, Insight or Concept was believed
+  // on one conversation's evidence.
+  const claim = (t) => C(t, 'Avoids conflict', 'They consistently avoid disagreeing with anyone', 'inferred');
+  for (const t of ['Belief', 'Preference', 'Assumption', 'Trait', 'Pattern',
+                   'Tendency', 'Characteristic', 'Insight', 'Concept', 'Disposition']) {
+    const r = apply(EMPTY_GRAPH, [claim(t)]);
+    ok(`"${t}" needs corroboration`, r.graph.nodes.length === 0,
+       `believed on one sighting as ${t}`);
+  }
+  // Things that HAPPENED are still recorded on one sighting.
+  for (const t of ['Event', 'Experience', 'Conversation', 'Person', 'Organization',
+                   'Place', 'Project', 'Source', 'Evidence', 'Question', 'Uncertainty']) {
+    const r = apply(EMPTY_GRAPH, [C(t, 'The Tuesday meeting', 'A difficult conversation about the deadline', 'inferred')]);
+    ok(`"${t}" is recorded as it happens`, r.graph.nodes.length === 1, JSON.stringify(r.report.refused));
+  }
+}
+
+console.log('\n=== the ledger holds the CLAIM, not the type ===');
+{
+  const SAME = (id) => ({ provenance: { surface: 'core', conversationId: id } });
+  // The same claim arriving under different words is one sighting seen twice.
+  let g = EMPTY_GRAPH;
+  ({ graph: g } = apply(g, [C('Belief', 'Avoids conflict', 'They avoid disagreeing with people', 'inferred')], [], SAME('c1')));
+  ok('the first sighting is held', g.nodes.length === 0 && g.pending.length === 1);
+  const second = apply(g, [C('Preference', 'Avoids conflict', 'They tend to avoid disagreeing openly', 'inferred')], [], SAME('c2'));
+  ok('a different type in a different conversation corroborates it',
+     second.graph.nodes.length === 1,
+     'keyed on the type, a genuine pattern could recur for ever and stay unbelievable');
+
+  // Two DIFFERENT claims sharing a name must not vouch for each other.
+  let g2 = EMPTY_GRAPH;
+  ({ graph: g2 } = apply(g2, [C('Belief', 'Deadlines', 'Deadlines are slipping on the project', 'inferred')], [], SAME('c1')));
+  const unrelated = apply(g2, [C('Belief', 'Deadlines', 'They resent whoever sets a deadline', 'inferred')], [], SAME('c2'));
+  ok('but two different claims with one name do not', unrelated.graph.nodes.length === 0,
+     JSON.stringify(unrelated.graph.pending.map((p) => p.content)));
+}
+
+console.log('\n=== the ledger evicts by evidence, not by arrival ===');
+{
+  const SAME = (id) => ({ provenance: { surface: 'core', conversationId: id } });
+  let g = EMPTY_GRAPH;
+  // Sightings from several ordinary conversations, each waiting for a second.
+  for (let i = 0; i < 5; i++) {
+    ({ graph: g } = apply(g, [C('Belief', `Standing ${i}`, `Something inferred about them number ${i}`, 'inferred')], [], SAME(`conv${i}`)));
+  }
+  ok('they are waiting', g.pending.length === 5, `${g.pending.length}`);
+
+  // Then one uploaded file, producing hundreds of sightings in a single pass.
+  for (let i = 0; i < 300; i++) {
+    ({ graph: g } = apply(g, [C('Belief', `Flood ${i}`, `Some inferred claim number ${i} about them`, 'inferred')], [], SAME('the-file')));
+  }
+  ok('the ledger stays bounded', g.pending.length <= 200, `${g.pending.length}`);
+  const survivors = g.pending.filter((p) => p.label.startsWith('Standing')).length;
+  ok('and the file did not erase what other conversations were waiting on',
+     survivors === 5,
+     `${survivors} of 5 survived — one document must not wipe a season of standing evidence`);
+  ok('the flood crowded out its own instead',
+     g.pending.filter((p) => p.label.startsWith('Flood')).length < 300);
+}
+
+console.log('\n=== a lone sighting does not refresh its own clock ===');
+{
+  const SAME = { provenance: { surface: 'core', conversationId: 'c1' } };
+  const claim = C('Belief', 'Dislikes meetings', 'They seem to dislike meetings', 'inferred');
+  let g = EMPTY_GRAPH;
+  ({ graph: g } = apply(g, [claim], [], SAME));
+  const first = g.pending[0].lastAt;
+  ({ graph: g } = apply(g, [claim], [], { ...SAME, now: T0 + 1_000_000 }));
+  ok('repeating it in the same conversation does not extend its life',
+     g.pending[0].lastAt === first,
+     'it would otherwise sit in the ledger for ever waiting for a second conversation');
+}
+
 console.log('\n=== a compatible neighbour does not authorise a generalisation ===');
 {
   // The hole every earlier test missed, because they all started from an
