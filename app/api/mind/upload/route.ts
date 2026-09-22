@@ -8,7 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { enforceRateLimit } from '@/lib/rate-limit';
 import { ingestTextFile, MAX_FILE_BYTES } from '@/lib/mind/ingest-text';
-import { listSources } from '@/lib/mind/store';
+import { deleteSource, listSources } from '@/lib/mind/store';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -55,4 +55,34 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'That file could not be read.' }, { status: 500 });
   }
   return NextResponse.json({ ok: true, ...result });
+}
+
+/**
+ * Remove an uploaded file.
+ *
+ * What it deliberately does NOT remove is what was learned from it. A claim
+ * can be true independently of where it was read, and the `derived_from`
+ * edge records the provenance either way — so the nodes stay, each still
+ * deletable on its own from the Memory page. Taking them silently would mean
+ * tidying a file list quietly erased part of what Socria understands.
+ *
+ * This route did not exist, which made deleteSource dead code and the 409
+ * above an instruction to do something impossible.
+ */
+export async function DELETE(req: NextRequest) {
+  const { userId } = auth();
+  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const limited = await enforceRateLimit(req, userId, 'aux');
+  if (limited) return limited;
+
+  const body = await req.json().catch(() => null);
+  const id = typeof body?.id === 'string' ? body.id : '';
+  if (!id) return NextResponse.json({ error: 'Which file?' }, { status: 400 });
+
+  const ok = await deleteSource(userId, id);
+  if (!ok) return NextResponse.json({ error: 'Could not remove that file.' }, { status: 500 });
+  return NextResponse.json({
+    ok: true,
+    note: 'The file is gone. What Socria learned from it stays, and each of those can be removed from Memory on its own.',
+  });
 }

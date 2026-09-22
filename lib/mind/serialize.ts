@@ -17,6 +17,10 @@
 import type { ActivatedSubgraph } from './activate';
 import type { MindEdge, MindNode } from './types';
 
+/** How many relationships one node may show. A hub is not more relevant
+ *  for having more edges, and one unbounded block defeats the ceiling. */
+export const MAX_RELATIONSHIPS_PER_NODE = 12;
+
 /** Roughly four characters to the token. */
 export function approxTokens(s: string): number {
   return Math.ceil(s.length / 4);
@@ -65,23 +69,37 @@ export function serializeSubgraph(
     const lines: string[] = [];
     lines.push(`${n.type}${statusNote(n, opts.now)}: ${n.label} — ${n.content}`);
 
+    let shown = 0;
     for (const e of sub.edges) {
+      // A node with hundreds of edges would otherwise produce one enormous
+      // block that the whole-block trim cannot reduce.
+      if (shown >= MAX_RELATIONSHIPS_PER_NODE) break;
       if (e.sourceId === n.id) {
         const t = byId.get(e.targetId);
-        if (t) lines.push(`  ${e.relationship} -> ${t.label}${edgeNote(e)}`);
+        if (t) { lines.push(`  ${e.relationship} -> ${t.label}${edgeNote(e)}`); shown++; }
       } else if (e.targetId === n.id) {
         const s = byId.get(e.sourceId);
-        if (s) lines.push(`  ${e.relationship} <- ${s.label}${edgeNote(e)}`);
+        if (s) { lines.push(`  ${e.relationship} <- ${s.label}${edgeNote(e)}`); shown++; }
       }
     }
     blocks.push(lines.join('\n'));
   }
 
   // Trim from the bottom — the least relevant — until it fits.
+  //
+  // A single block is bounded too. Trimming whole blocks cannot go below one,
+  // and one block is a node plus every relationship it has: a hub node alone
+  // could blow the ceiling by an order of magnitude and the loop would exit
+  // reporting success. So a block's relationship lines are capped first.
   let body = blocks.join('\n');
   while (blocks.length > 1 && approxTokens(body) > opts.maxTokens) {
     blocks.pop();
     body = blocks.join('\n');
+  }
+  if (approxTokens(body) > opts.maxTokens) {
+    const lines = body.split('\n');
+    const room = Math.max(1, Math.floor((opts.maxTokens * 4) / 60));
+    body = lines.slice(0, room).join('\n');
   }
 
   return body;

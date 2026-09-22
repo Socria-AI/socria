@@ -82,6 +82,88 @@ console.log('\n=== FORGETTING HOLDS ===');
   ok('and the refusal says why', refused.some((r) => r.reason === 'forgotten'), JSON.stringify(refused));
 }
 
+console.log('\n=== ...and it holds against REWORDING, which is the real case ===');
+{
+  // The original test only re-proposed the IDENTICAL label, which is the one
+  // case an exact fingerprint catches. Resolution is fuzzy, so forgetting had
+  // to be fuzzy too — "the Berlin offer" and "Berlin job offer" both walked
+  // straight past a tombstone for "Berlin offer".
+  let g = EMPTY_GRAPH;
+  ({ graph: g } = apply(g, [C('Concept', 'Berlin offer', 'A job offer in Berlin at twice the salary')]));
+  g = forgetNode(g, g.nodes[0].id, T0);
+  for (const [label, content] of [
+    ['the Berlin offer', 'The offer from Berlin again'],
+    ['Berlin job offer', 'A job offer in Berlin'],
+    ['Berlin  offer', 'A job offer in Berlin'],
+    ['BERLIN OFFER', 'that offer in Berlin'],
+  ]) {
+    const r = apply(g, [C('Concept', label, content)]);
+    ok(`"${label}" cannot resurrect it`, r.graph.nodes.length === 0,
+       `created: ${r.graph.nodes.map((n) => n.label).join(', ')}`);
+  }
+  // A genuinely different thing still gets in.
+  const other = apply(g, [C('Concept', 'Munich offer', 'A different job offer, in Munich')]);
+  ok('but an unrelated claim still lands', other.graph.nodes.length === 1, JSON.stringify(other.report.refused));
+
+  // Relationships go too, and stay gone.
+  let g2 = EMPTY_GRAPH;
+  ({ graph: g2 } = apply(g2, [
+    C('Project', 'Core 4', 'The model being built'),
+    C('Concept', 'Prompt Limit', 'The instruction ceiling they ran into'),
+  ], [{ sourceLabel: 'Core 4', targetLabel: 'Prompt Limit', relationship: 'constrained_by', kind: 'stated' }]));
+  const pl = g2.nodes.find((n) => n.label === 'Prompt Limit');
+  g2 = forgetNode(g2, pl.id, T0);
+  ok('forgetting a node tombstones its edges', g2.tombstones.some((t) => t.startsWith('e:')),
+     'otherwise the relationships return if the node is ever re-learned');
+}
+
+console.log('\n=== the bound holds when a chain of supersessions exists ===');
+{
+  // The original fixture had no edges, so the partner pass never ran — and
+  // the partner pass was what broke the bound: it tested membership against
+  // the set it was adding to, so each partner made its own partner eligible
+  // and a 200-node chain came back whole for limit=15.
+  let g = EMPTY_GRAPH;
+  const nodes = [], edges = [];
+  for (let i = 0; i < 60; i++) nodes.push(C('Belief', `Belief ${i}`, `A position number ${i} they once held`));
+  for (let i = 0; i < 59; i++) edges.push({ sourceLabel: `Belief ${i}`, targetLabel: `Belief ${i + 1}`, relationship: 'superseded_by', kind: 'stated' });
+  ({ graph: g } = apply(g, nodes, edges, { budget: { nodes: 200, edges: 200 } }));
+  ok('the chain exists', g.nodes.length === 60 && g.edges.length === 59, `${g.nodes.length}/${g.edges.length}`);
+
+  const sub = activate(g, 'Belief 0', { now: T0, limit: 15 });
+  ok('the window is not blown open by it', sub.nodes.length <= 15 + Math.ceil(15 / 3),
+     `${sub.nodes.length} returned for limit=15`);
+  ok('and a partner still comes along', sub.nodes.length > 1);
+
+  const text = serializeSubgraph(sub, { now: T0, maxTokens: 300 });
+  ok('the token ceiling actually bites', text.length / 4 <= 320, `${Math.ceil(text.length / 4)} tokens`);
+}
+
+console.log('\n=== a short label is reachable by name ===');
+{
+  let g = EMPTY_GRAPH;
+  ({ graph: g } = apply(g, [C('Concept', 'GPT', 'The model family they build against')]));
+  const sub = activate(g, 'what about GPT', { now: T0, limit: 10 });
+  ok('a three-letter label can be recalled', sub.nodes.length === 1,
+     'anything at or under three characters used to be permanently unreachable');
+}
+
+console.log('\n=== a challenge survives being reinforced ===');
+{
+  let g = EMPTY_GRAPH;
+  ({ graph: g } = apply(g, [C('Belief', 'Prefers async', 'They prefer asynchronous work')]));
+  g = challengeNode(g, g.nodes[0].id, T0, 'No, I never said that');
+  // Twenty-five ordinary sightings, each appending provenance.
+  for (let i = 0; i < 25; i++) {
+    ({ graph: g } = apply(g, [C('Belief', 'Prefers async', 'They prefer asynchronous work')]));
+  }
+  const n = g.nodes[0];
+  ok('the provenance stays bounded', n.provenance.length <= 26, `${n.provenance.length}`);
+  ok('and the challenge is still in it', n.provenance.some((p) => p.note === 'No, I never said that'),
+     'a blind tail slice dropped the reason somebody disagreed');
+  ok('so is where it originally came from', n.provenance[0].at === T0);
+}
+
 console.log('\n=== NOTHING IS OVERWRITTEN ===');
 {
   let g = EMPTY_GRAPH;

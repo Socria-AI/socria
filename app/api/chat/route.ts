@@ -182,12 +182,16 @@ export async function POST(req: NextRequest) {
           .join('\n')
           .slice(0, 2_000)
       : '';
-    const personMemory = understanding
-      ? selectRelevant(visibleEntries(understanding.entries, plan, now), contextText, {
-          now,
-          n: caps.injectCore,
-        })
-      : null;
+    // Not computed for Core 4 at all. Its memory is the Mind Graph; selecting
+    // top-k flat entries for it would be the replaced architecture running
+    // alongside the new one, and paying for it.
+    const personMemory =
+      understanding && resolveModel(body?.model) !== 'core-4'
+        ? selectRelevant(visibleEntries(understanding.entries, plan, now), contextText, {
+            now,
+            n: caps.injectCore,
+          })
+        : null;
     const journey =
       understanding && hasJourneyContent(understanding)
         ? {

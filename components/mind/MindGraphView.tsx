@@ -280,6 +280,24 @@ export function MindGraphView() {
     setBusy(false);
   }
 
+  async function removeSource(id: string) {
+    setBusy(true); setNote(null);
+    try {
+      const res = await fetch('/api/mind/upload', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
+      const j = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(j?.error || 'failed');
+      await load();
+      setNote(j?.note ?? 'File removed.');
+    } catch {
+      setNote('That file could not be removed.');
+    }
+    setBusy(false);
+  }
+
   async function upload(file: File) {
     setBusy(true); setNote(null);
     try {
@@ -373,6 +391,31 @@ export function MindGraphView() {
         onForgetEdge={(id) => void mutate({ id, kind: 'edge' }, 'DELETE')}
         onSelect={setSelected}
       />}
+
+      {sources.length > 0 && (
+        <section className="mg-sources">
+          <h2>Files you added</h2>
+          <ul>
+            {sources.map((sf) => (
+              <li key={sf.id}>
+                <span>{sf.name}</span>
+                <span className="mg-src-size">{Math.round(sf.bytes / 1024)} KB</span>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void removeSource(sf.id)}
+                >
+                  remove
+                </button>
+              </li>
+            ))}
+          </ul>
+          <p>
+            Removing a file leaves what Socria learned from it. Those are in
+            the graph above and each can be removed on its own.
+          </p>
+        </section>
+      )}
 
       {pending.length > 0 && (
         <section className="mg-pending">

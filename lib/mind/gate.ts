@@ -26,10 +26,10 @@
 // systematically misreads register, this holds the line at "fewer wrong
 // nodes", not "none". Which is why the Memory page exists.
 
-import { compatibleTypes } from './resolve';
+import { matchesForgotten } from './resolve';
 import { UNKNOWN_SOURCE } from './types';
 import {
-  GENERALISING_TYPES, fingerprintNode, isForgotten, normalize,
+  GENERALISING_TYPES, fingerprintNode, normalize,
   type MindGraph, type NodeType, type ProvenanceKind,
 } from './types';
 
@@ -176,10 +176,16 @@ export function gate(input: GateInput): GateVerdict {
   //    Otherwise forgetting "Prompt Limit" as a Concept is undone by the next
   //    extraction calling it a Belief — the two already resolve to one
   //    another, so that would be the same node arriving under a new hat.
-  for (const t of compatibleTypes(input.type)) {
-    if (isForgotten(input.graph, fingerprintNode(t, input.label))) {
-      return { pass: false, reason: 'forgotten' };
-    }
+  //    Asked the way RESOLUTION asks it, not by exact fingerprint. The exact
+  //    check catches only an identical re-proposal; anything the matcher
+  //    would have merged with the forgotten node has to be refused too, or
+  //    "the Berlin offer" walks straight past a tombstone for "Berlin offer".
+  if (matchesForgotten(input.graph.tombstones, {
+    type: input.type,
+    label: input.label,
+    content: input.content,
+  })) {
+    return { pass: false, reason: 'forgotten' };
   }
 
   return { pass: true, status: rule.status ?? 'active' };

@@ -122,3 +122,15 @@
 
 /* The canvas is a picture of a thing the list already says. Print the list. */
 @media print { .mg-canvas, .mg-views, .mg-upload { display: none } }
+
+/* Uploaded files. Removing one leaves what was learned from it — a claim can
+   be true independently of where it was read — so the copy says so rather
+   than letting somebody discover it. */
+.mg-sources { margin-top: 2rem; padding-top: 1.2rem; border-top: 1px solid var(--ink-12, rgba(35,36,31,.12)) }
+.mg-sources h2 { font-family: var(--font-serif); font-size: 17px; margin: 0 0 .5rem }
+.mg-sources ul { list-style: none; margin: 0; padding: 0 }
+.mg-sources li { display: flex; align-items: baseline; gap: .6rem; font-family: var(--font-sans); font-size: 13px; padding: .2em 0 }
+.mg-src-size { color: var(--ink-45, rgba(35,36,31,.45)); font-size: 11.5px }
+.mg-sources button { margin-left: auto; appearance: none; border: 0; background: transparent; cursor: pointer; font-size: 11px; color: var(--ink-45, rgba(35,36,31,.45)) }
+.mg-sources button:hover { color: var(--vermilion, #D8402F) }
+.mg-sources p { font-family: var(--font-sans); font-size: 12.5px; color: var(--ink-60, rgba(35,36,31,.6)); margin: .6rem 0 0; max-width: 46em }

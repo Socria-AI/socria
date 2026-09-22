@@ -320,6 +320,14 @@ export function isForgotten(graph: MindGraph, fingerprint: string): boolean {
   return graph.tombstones.includes(fingerprint);
 }
 
+/** Read a node tombstone back into the type and label it was made from. */
+export function parseNodeTombstone(fp: string): { type: string; label: string } | null {
+  if (!fp.startsWith('n:')) return null;
+  const bar = fp.indexOf('|', 2);
+  if (bar < 0) return null;
+  return { type: fp.slice(2, bar), label: fp.slice(bar + 1) };
+}
+
 // ── limits ──────────────────────────────────────────────────────────
 
 export const MAX_LABEL = 80;
@@ -332,6 +340,30 @@ export const MAX_EDGES = 20_000;
 export function clamp01(n: unknown): number {
   const v = typeof n === 'number' && Number.isFinite(n) ? n : 0;
   return v < 0 ? 0 : v > 1 ? 1 : v;
+}
+
+/**
+ * Keep a provenance list bounded WITHOUT losing what matters in it.
+ *
+ * A blind tail slice was wrong: the entries that carry a `note` are the
+ * record of a supersession, a correction or a challenge — the history the
+ * whole design exists to preserve — and twenty ordinary reinforcements would
+ * push the reason somebody disagreed off the front, leaving a node marked
+ * `contradicted` with nothing saying why. The first entry goes too, because
+ * where a claim originally came from is not replaceable by a later sighting.
+ */
+export const MAX_PROVENANCE = 20;
+
+export function boundProvenance(list: Provenance[]): Provenance[] {
+  if (list.length <= MAX_PROVENANCE) return list;
+  const first = list[0];
+  const noted = list.filter((p) => p.note && p !== first);
+  const plain = list.filter((p) => !p.note && p !== first);
+  const room = Math.max(0, MAX_PROVENANCE - 1 - noted.length);
+  // Notes are never dropped; ordinary sightings are, oldest first.
+  const kept = [first, ...plain.slice(-room), ...noted];
+  // Back into the order they happened in, so the record still reads forward.
+  return kept.sort((a, b) => a.at - b.at).slice(-Math.max(MAX_PROVENANCE, noted.length + 1));
 }
 
 export function clip(s: unknown, n: number): string {

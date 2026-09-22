@@ -16,7 +16,7 @@
 // conflates is not, because nobody can see what was merged.
 
 import {
-  normalize, type MindGraph, type MindNode, type NodeType,
+  normalize, parseNodeTombstone, type MindGraph, type MindNode, type NodeType,
 } from './types';
 
 /** How much of a match counts as the same thing. */
@@ -45,6 +45,25 @@ const COMPATIBLE: Record<string, string[]> = {
 export function typesCompatible(a: NodeType, b: NodeType): boolean {
   if (a === b) return true;
   return (COMPATIBLE[a] ?? []).includes(b);
+}
+
+/**
+ * The same question, asked of names that have been through normalize().
+ *
+ * A fingerprint stores a NORMALISED type — "concept", not "Concept" — so
+ * comparing one against the live ontology's casing silently answered "not
+ * compatible" for every tombstone, and the whole fuzzy check was dead on
+ * arrival while looking correct.
+ */
+export function typesCompatibleNormalized(a: string, b: string): boolean {
+  const an = normalize(a);
+  const bn = normalize(b);
+  if (an === bn) return true;
+  for (const [k, v] of Object.entries(COMPATIBLE)) {
+    if (normalize(k) !== an) continue;
+    if (v.some((t) => normalize(t) === bn)) return true;
+  }
+  return false;
 }
 
 /** Every type a label could plausibly come back as, including its own. */
@@ -158,6 +177,54 @@ export function resolveNode(graph: MindGraph, c: Candidate): Match | null {
     }
   }
   return best;
+}
+
+/**
+ * Would this candidate have RESOLVED to a node that was forgotten?
+ *
+ * The tombstone stores a type and a normalised label, and the exact
+ * fingerprint catches only an identical re-proposal. But resolution is fuzzy:
+ * "the Berlin offer" and "Berlin job offer" both resolve to "Berlin offer"
+ * while fingerprinting differently — so forgetting held against the one case
+ * the tests exercised and failed against the ordinary case of somebody
+ * saying the same thing in different words.
+ *
+ * The fix is to ask the SAME question of a tombstone that is asked of a live
+ * node: would these have been treated as the same thing? Anything the
+ * matcher would have merged is refused.
+ */
+export function matchesForgotten(
+  tombstones: readonly string[],
+  c: Candidate
+): boolean {
+  const wanted = normalize(c.label);
+  if (!wanted) return false;
+  const wantedWords = wanted.split(' ');
+  const ct = tokens(c.content);
+  const cl = labelTokens(c.label);
+
+  for (const fp of tombstones) {
+    const t = parseNodeTombstone(fp);
+    if (!t) continue;
+    if (!typesCompatibleNormalized(c.type, t.type)) continue;
+
+    const have = normalize(t.label);
+    if (have === wanted) return true;
+
+    const haveWords = have.split(' ');
+    if (
+      (wantedWords.length >= 2 || haveWords.length >= 2) &&
+      (containsSequence(haveWords, wantedWords) || containsSequence(wantedWords, haveWords))
+    ) {
+      return true;
+    }
+
+    // A tombstone keeps no content, so this is label-only — stricter than the
+    // live matcher, which is the right way round: refusing to re-learn
+    // something somebody deleted is cheap, and re-learning it is the failure.
+    if (overlap(cl, labelTokens(t.label)) >= 0.5 && ct.size > 0) return true;
+  }
+  return false;
 }
 
 /**

@@ -1484,6 +1484,11 @@ export default function ChatPage() {
       // receive context from Socria's memory system, and buildSystemPrompt
       // duly hands it any that exists — so without extraction it would be
       // told to expect something nothing ever writes.
+      // Thread memory (the conversation's own goals/constraints) still runs
+      // for both. The FLAT person-memory store does not run for Core 4 — its
+      // durable memory is the Mind Graph, written by /api/chat's remember()
+      // after the turn. Writing both would put the same material in two
+      // shapes and let them drift.
       if (canUseCore3 && (model === 'core-3' || model === 'core-4')) {
         void extractAndPersistMemory(workingId!, updated);
       }

@@ -19,6 +19,7 @@ import { gate, rank, type Budget, type GateRefusal } from './gate';
 import { resolveNode, type Candidate } from './resolve';
 import {
   MAX_ALIASES, MAX_CONTENT, MAX_LABEL, MAX_PENDING, PENDING_TTL_MS, UNKNOWN_SOURCE,
+  boundProvenance,
   clamp01, clip, fingerprintEdge, fingerprintNode, isForgotten, normalize,
   type MindEdge, type MindGraph, type MindNode, type NodeType,
   type PendingClaim, type Provenance, type Relationship,
@@ -197,10 +198,10 @@ export function applyCandidates(
           n.status === 'tentative' && (c.kind === 'stated' || c.kind === 'established')
             ? 'active'
             : n.status,
-        provenance: [
+        provenance: boundProvenance([
           ...n.provenance,
           prov(c.kind, revised ? { note: `was: ${n.content}` } : undefined),
-        ].slice(-20),
+        ]),
         updatedAt: opts.now,
         lastAccessed: opts.now,
       };
@@ -241,7 +242,7 @@ export function applyCandidates(
         ...existing,
         strength: clamp01(existing.strength + 0.1),
         confidence: reinforceConfidence(existing.confidence),
-        provenance: [...existing.provenance, prov(e.kind)].slice(-20),
+        provenance: boundProvenance([...existing.provenance, prov(e.kind)]),
         updatedAt: opts.now,
         lastReinforced: opts.now,
       };
@@ -340,11 +341,29 @@ export function forgetNode(graph: MindGraph, id: string, at: number, reason?: st
   const node = graph.nodes.find((n) => n.id === id);
   if (!node) return graph;
   const fp = fingerprintNode(node.type, node.label);
+
+  // The node's RELATIONSHIPS are forgotten too, each with its own tombstone.
+  // Dropping the edges and tombstoning only the node meant that if the node
+  // was ever learned again — under any wording the matcher accepts — every
+  // relationship it used to have came back with it, because nothing had
+  // recorded that those were deleted.
+  const touching = graph.edges.filter((e) => e.sourceId === id || e.targetId === id);
+  const edgeStones: string[] = [];
+  for (const e of touching) {
+    const src = graph.nodes.find((n) => n.id === e.sourceId);
+    const tgt = graph.nodes.find((n) => n.id === e.targetId);
+    if (!src || !tgt) continue;
+    edgeStones.push(fingerprintEdge(src.type, src.label, e.relationship, tgt.type, tgt.label));
+  }
+
+  const tombstones = [...graph.tombstones];
+  for (const t of [fp, ...edgeStones]) if (!tombstones.includes(t)) tombstones.push(t);
+
   return {
     ...graph,
     nodes: graph.nodes.filter((n) => n.id !== id),
     edges: graph.edges.filter((e) => e.sourceId !== id && e.targetId !== id),
-    tombstones: graph.tombstones.includes(fp) ? graph.tombstones : [...graph.tombstones, fp],
+    tombstones,
     // A forgotten claim must not sit in pending waiting to be re-proposed.
     pending: graph.pending.filter((p) => p.fingerprint !== fp),
   };
@@ -383,10 +402,10 @@ export function challengeNode(
             ...n,
             status: 'contradicted' as const,
             confidence: clamp01(n.confidence * 0.4),
-            provenance: [
+            provenance: boundProvenance([
               ...n.provenance,
               { kind: 'stated' as const, surface: 'user' as const, at, note: clip(note, 300) },
-            ].slice(-20),
+            ]),
             updatedAt: at,
           }
         : n

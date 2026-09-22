@@ -2163,7 +2163,7 @@ export function buildSystemPrompt(
    * exactly this order, and a second copy is how one of them quietly stops
    * receiving the journey.
    */
-  const withContext = (base: string): string => {
+  const withContext = (base: string, opts?: { flatMemory?: boolean }): string => {
     let out = base;
     if (memory && hasMemoryContent(memory)) {
       out += MEMORY_INSTRUCTION + renderMemoryForPrompt(memory);
@@ -2179,7 +2179,14 @@ export function buildSystemPrompt(
         journey.limits ?? FREE_JOURNEY_LIMITS
       );
     }
-    if (personMemory && personMemory.length) {
+    // The flat person-memory store, for the Cores that still use it.
+    //
+    // Core 4 does NOT, and passing it there would be the whole architecture
+    // failing quietly: its persistent memory is the Mind Graph, and a graph
+    // sitting beside a top-k list of the same material is two memories
+    // disagreeing about what is remembered. The graph replaces exactly this
+    // layer — see lib/mind/types.ts.
+    if (opts?.flatMemory !== false && personMemory && personMemory.length) {
       out += renderPersonMemory(personMemory, 'core');
     }
     // Last, so it sits closest to the conversation. The Mind Graph is the
@@ -2197,7 +2204,7 @@ export function buildSystemPrompt(
   // imported profile, the journey — because its own Semantic Continuity
   // section says to expect them.
   if (model === 'core-4') {
-    return { prompt: withContext(CORE_4_PROMPT), model, depth };
+    return { prompt: withContext(CORE_4_PROMPT, { flatMemory: false }), model, depth };
   }
 
   const depthLabel = THINKING_DEPTHS.find((d) => d.id === depth)!.label;

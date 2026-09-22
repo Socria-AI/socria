@@ -65,8 +65,12 @@ function terms(text: string): string[] {
   const out: string[] = [];
   for (let i = 0; i < all.length - 1; i++) out.push(`${all[i]} ${all[i + 1]}`);
   for (let i = 0; i < all.length - 2; i++) out.push(`${all[i]} ${all[i + 1]} ${all[i + 2]}`);
-  // Single words still have to earn their place, or "the" matches everything.
-  for (const w of all) if (w.length > 3 && !stop.has(w)) out.push(w);
+  // Single words still have to earn their place, or "the" matches everything
+  // — but the bar was length > 3, which made any node whose whole label is
+  // three characters or fewer ("GPT", "Ada", "ML") permanently unreachable by
+  // name. A short word that is not a stopword is exactly the kind of label
+  // that matters.
+  for (const w of all) if (w.length >= 2 && !stop.has(w)) out.push(w);
   return out;
 }
 
@@ -176,15 +180,31 @@ export function activate(
       .map(([id]) => id)
   );
 
-  // A belief shown without the belief it replaced is misleading, so a
-  // partner comes along even if it scored below the line.
+  // A belief shown without the belief it replaced is misleading, so a partner
+  // comes along even if it scored below the line.
+  //
+  // ONE HOP, AND BOUNDED. This used to test membership against the set it was
+  // adding to, so each partner made ITS partner eligible on a later edge and
+  // a chain of superseded beliefs dragged in the whole graph — measured:
+  // limit=15 returned all 200 nodes of a supersession chain, and the token
+  // ceiling downstream could not save it because it trims whole blocks. The
+  // scored set is snapshotted, and the number of partners is capped in
+  // proportion to the window: showing what a belief replaced is worth a
+  // little of the budget and not all of it.
+  const scored = new Set(chosen);
+  const partnerCap = Math.max(3, Math.ceil(opts.limit / 3));
+  let added = 0;
   for (const e of graph.edges) {
+    if (added >= partnerCap) break;
     if (!PARTNER_RELATIONSHIPS.has(e.relationship)) continue;
-    const s = chosen.has(e.sourceId);
-    const t = chosen.has(e.targetId);
+    const s = scored.has(e.sourceId);
+    const t = scored.has(e.targetId);
     if (s === t) continue;
     const missing = s ? e.targetId : e.sourceId;
-    if (allowed.has(missing)) chosen.add(missing);
+    if (allowed.has(missing) && !chosen.has(missing)) {
+      chosen.add(missing);
+      added++;
+    }
   }
 
   const nodes = visible.filter((n) => chosen.has(n.id));
