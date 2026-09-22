@@ -42,9 +42,21 @@ synced across every device.
 ### 3. Set up Supabase
 1. https://supabase.com → create a project. Save the database password.
 2. SQL Editor → paste the contents of `supabase/schema.sql` → Run.
-3. Project Settings → API → copy your **Project URL** and
+3. SQL Editor → paste the contents of `supabase/rls.sql` → Run. This is a
+   separate step because adding a table and adding its wall are two acts,
+   and only one of them breaks anything if you skip it. Skip it and every
+   table is readable by anyone who gets hold of the anon key.
+4. Project Settings → API → copy your **Project URL** and
    **service_role** key. (The service role key is server-only — never
    ship it to the browser.)
+
+**Re-run both files after pulling changes that add tables.** Every
+statement in them is `if not exists` or `create or replace`, so running
+them against a database that is already set up adds only what is
+missing and touches nothing else. A deployment whose database predates a
+feature does not error — it silently behaves as though nobody has ever
+used that feature, which is a much harder thing to notice. `npm run
+doctor:mind` reports which tables are actually there.
 
 ### 4. Set up Sanity (CMS for the journal)
 1. https://www.sanity.io/manage → create a project. Pick the
@@ -107,8 +119,12 @@ synced across every device.
   OpenAI usage. Set a tight monthly limit on OpenAI. `gpt-4o-mini`
   keeps costs low (~$0.001 per conversation).
 - **The Supabase service role key bypasses RLS.** It lives only on the
-  server (Vercel env var, used inside `/api/conversations`). The schema
-  in `supabase/schema.sql` does not enable RLS — all access is gated by
-  the Next.js API checking the Clerk session.
+  server (Vercel env var). What keeps one person out of another's rows
+  is the `user_id` filter on every query, not the policies — the service
+  role does not see them. `supabase/rls.sql` is the second wall: RLS on,
+  no policies, grants revoked, so a leaked anon key reads zero rows
+  instead of the whole table. (This note used to say the schema did not
+  enable RLS. It did not, then; rls.sql now does, and it is a separate
+  step you have to actually run.)
 - **No abuse protection.** Someone could script `/api/chat` to burn
   your OpenAI credit. The OpenAI monthly limit is your real protection.

@@ -6,17 +6,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { listSources } from '@/lib/logos-connect';
 import { SOURCE_META } from '@/lib/logos-sources';
-import { isValidAccessKey } from '@/lib/socria-prompt';
+import { unauthorized } from '@/lib/route-guard';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
   const { userId } = auth();
-  const keyUnlocked = isValidAccessKey(req.headers.get('x-socria-key'));
-  if (!userId && !keyUnlocked) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  // No unlock path here: this route reads a person's connected accounts
+  // (or fetches a URL on their behalf), so it needs a real account.
+  if (!userId) return unauthorized();
   const sources = (await listSources({ userId })).map((s) => ({
     ...s,
     label: SOURCE_META[s.kind].label,

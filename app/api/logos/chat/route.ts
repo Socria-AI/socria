@@ -1,9 +1,13 @@
 // app/api/logos/chat/route.ts
 // POST /api/logos/chat  → streaming plain-text conversational reply.
 //
-// Gated like Core 3.1: a Clerk session OR the typed access key (sent as
-// x-socria-key), so it stays demoable on preview URLs where sign-in is
-// unavailable. Rate limited either way.
+// Gated like Core 3.1: a Clerk session OR a verified unlock grant — an
+// httpOnly cookie this server signed after checking a typed code against its
+// environment (lib/access-codes-server.ts). It used to be a constant compared
+// against an `x-socria-key` header, and that constant shipped in the browser
+// bundle, so the gate was open to anyone who read the JS. With no code
+// configured — the default — this route simply requires an account. Rate
+// limited either way.
 
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
@@ -16,6 +20,7 @@ import {
   buildFocusPrompt,
 } from '@/lib/logos';
 import { renderMessageForModel, sanitizeAttachments } from '@/lib/logos-attachments';
+import { collabBlock, type Seat } from '@/lib/collab';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { boundaryNote, limitOf } from '@/lib/entitlements';
 import { reportUpstream } from '@/lib/upstream-error';
@@ -31,7 +36,6 @@ import { guidanceBlock, resolveDepth, resolveGuard } from '@/lib/logos-guidance'
 import { styleBlock } from '@/lib/logos-style';
 import { personalityBlock, personalityMaxTokens } from '@/lib/logos-personality';
 import {
-  isValidAccessKey,
   hasJourneyContent,
   renderJourneyBrief,
   sanitizeUserUnderstanding,
@@ -47,6 +51,7 @@ import {
   selectRelevant,
   visibleEntries,
 } from '@/lib/person-memory';
+import { mayUse } from '@/lib/route-guard';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -65,7 +70,7 @@ export async function POST(req: NextRequest) {
 
     const { userId } = auth();
     // Same gate as Core 3.1: a Clerk session or the typed access key.
-    const keyUnlocked = isValidAccessKey(req.headers.get('x-socria-key'));
+    const keyUnlocked = mayUse(req, userId);
     if (!userId && !keyUnlocked) {
       return NextResponse.json(
         { error: 'Logos requires an access key.', requiresKey: true },
@@ -78,6 +83,27 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json().catch(() => null);
     const messages = body?.messages;
+
+    // The two people in a shared room, if this is one. Names only — never who
+    // is signed in, never an id — and cleaned to shape like every other field
+    // that arrives from a browser.
+    const collabPeopleFrom = (raw: unknown): { name: string; seat: Seat }[] => {
+      if (!raw || typeof raw !== 'object') return [];
+      const people = (raw as { people?: unknown }).people;
+      if (!Array.isArray(people)) return [];
+      return people
+        .filter((p): p is Record<string, unknown> => !!p && typeof p === 'object')
+        .map((p) => ({
+          name: typeof p.name === 'string' ? p.name.replace(/\s+/g, ' ').trim().slice(0, 40) : '',
+          seat: (p.seat === 'host' || p.seat === 'guest' ? p.seat : 'guest') as Seat,
+        }))
+        .filter((p) => p.name)
+        .slice(0, 2);
+    };
+    const nameOf = (by: unknown): string =>
+      by && typeof by === 'object' && typeof (by as { name?: unknown }).name === 'string'
+        ? (by as { name: string }).name.replace(/\s+/g, ' ').trim().slice(0, 40)
+        : '';
 
     // ── "Can you?" ───────────────────────────────────────────────────
     //
@@ -127,16 +153,27 @@ export async function POST(req: NextRequest) {
       )
       .slice(-MAX_HISTORY);
 
+    // Two people, or one? A shared Logos 2 room passes `collab.people` — the
+    // two display names — and each human turn carries a `by`. When both are
+    // present, every human line is prefixed with its author's name so the
+    // model always knows who said what; alone, nothing changes.
+    const collabPeople = collabPeopleFrom(body?.collab);
+    const twoPeople = collabPeople.length >= 2;
+
     // Attachments are flattened into the text the model reads. Only the turn
     // being answered carries a long note in full.
     const clean = kept
-      .map((m: any, i: number) => ({
-        role: m.role as 'user' | 'assistant',
-        content: renderMessageForModel(
+      .map((m: any, i: number) => {
+        const rendered = renderMessageForModel(
           { role: m.role, content: m.content, attachments: sanitizeAttachments(m.attachments) },
           i === kept.length - 1
-        ),
-      }))
+        );
+        const name = twoPeople && m.role === 'user' ? nameOf(m.by) : '';
+        return {
+          role: m.role as 'user' | 'assistant',
+          content: name && rendered ? `${name}: ${rendered}` : rendered,
+        };
+      })
       .filter((m) => m.content.trim());
 
     if (!clean.length) {
@@ -299,7 +336,12 @@ export async function POST(req: NextRequest) {
         body?.viz ? sanitizeViz(body.viz) : null,
         body?.vizValues && typeof body.vizValues === 'object' ? body.vizValues : undefined
       ) +
-      memoryBlock;
+      memoryBlock +
+      // Logos 2: when two people are in the room, Socria becomes the layer
+      // between them. See lib/collab.ts collabBlock — it names both, confines
+      // the model to surfacing connections/disagreements/assumptions/questions
+      // between what each said, and forbids taking a side or concluding.
+      (twoPeople ? collabBlock(collabPeople) : '');
 
     const openai = new OpenAI({ apiKey });
     const configured = process.env.OPENAI_MODEL_LOGOS || LOGOS_MODEL;

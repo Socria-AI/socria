@@ -208,3 +208,307 @@ $$;
 -- The grouping above walks conversations by person and first date.
 create index if not exists conversations_user_created_idx
   on conversations (user_id, created_at);
+
+-- ── Logos 2: shared rooms ───────────────────────────────────────────
+--
+-- What these three tables replace, and why.
+--
+-- Logos 2 first shipped with collaboration running browser-to-browser over a
+-- Supabase Realtime channel named after a six-character code. That channel was
+-- not private, so Supabase applied no policy to it: anyone holding the public
+-- anon key and the code received every message and every map edit in the room,
+-- invisibly, and the two-person cap was client-side state that stopped nobody.
+-- And because only the host wrote to the database, the guest's words were
+-- stored under the HOST's user_id — so the guest could neither export nor
+-- delete what they had written.
+--
+-- Both problems have the same root: there was no server in the loop. These
+-- tables put one there. Every subscribe, every send and every membership
+-- decision now passes through a Next.js route that checks a Clerk session
+-- against `logos_room_members` before it does anything, and every event row
+-- carries the id of the person who WROTE it.
+--
+-- The browser no longer talks to Supabase at all, which is why Logos 2 no
+-- longer needs NEXT_PUBLIC_SUPABASE_ANON_KEY.
+
+create table if not exists logos_rooms (
+  id text primary key,
+  -- The share code, normalised upper-case. Unique while the room is open; a
+  -- closed room keeps its code so the history stays addressable.
+  code text not null,
+  -- Nullable ON PURPOSE. When the host deletes their account the room does
+  -- not vanish from under the other participant — the host reference is
+  -- cleared and the room is closed. See the deletion note below.
+  host_user_id text,
+  -- The line of thinking the host opened the room around, captured ONCE at
+  -- creation and never again.
+  --
+  -- It lives on the room rather than inside a `hello` event for two reasons.
+  -- A guest may only read the event log from where they sat down (see
+  -- joined_seq), so a session sent as the first event would be invisible to
+  -- everyone who arrived after it. And a `hello` re-sent later would carry
+  -- the MERGED session — both people's words — into a row attributed to
+  -- whoever sent it, which is the exact defect this table exists to remove.
+  -- Written at creation, when the room is empty and every word in it is
+  -- necessarily the host's own.
+  seed_session jsonb,
+  created_at bigint not null,
+  closed_at bigint
+);
+
+-- One open room per code. A closed room may share a code with a newer open
+-- one, so the constraint is partial rather than a plain unique.
+create unique index if not exists logos_rooms_open_code_idx
+  on logos_rooms (code) where closed_at is null;
+
+create table if not exists logos_room_members (
+  room_id text not null references logos_rooms(id) on delete cascade,
+  user_id text not null,
+  seat text not null check (seat in ('host', 'guest')),
+  display_name text not null,
+  joined_at bigint not null,
+  -- Where the room was when this person sat down. A member may read the log
+  -- from here forward and no further back: without it, a guest could ask for
+  -- everything since seq 0 and replay the host's session from before they
+  -- were invited, including anything a PREVIOUS guest said.
+  joined_seq bigint not null default 0,
+  left_at bigint,
+  primary key (room_id, user_id)
+);
+
+-- Two people, enforced by the database rather than by counting.
+--
+-- Capacity used to be: insert, count, and delete your own row again if the
+-- count came out over two. That is a compensating action, not a constraint —
+-- a rejected joiner held a gate-passing membership row for two round-trips
+-- and could read and write in that window, two joiners racing could evict
+-- each other and lose the seat entirely, and a single failed clean-up left a
+-- permanent third member. There are exactly two seats and each is unique, so
+-- the constraint says exactly that: a third person finds no seat to take and
+-- the INSERT itself fails.
+create unique index if not exists logos_room_members_seat_idx
+  on logos_room_members (room_id, seat) where left_at is null;
+
+create index if not exists logos_room_members_user_idx
+  on logos_room_members (user_id);
+
+-- The shared record. `user_id` is the AUTHOR, not the owner of the room —
+-- that single column is what makes export and deletion coherent for two
+-- people sharing one conversation: each person's export is the rows they
+-- wrote, and deleting their account removes those rows and leaves the other
+-- participant's intact.
+create table if not exists logos_room_events (
+  id text not null,
+  room_id text not null references logos_rooms(id) on delete cascade,
+  seq bigserial,
+  user_id text not null,
+  kind text not null,
+  payload jsonb not null default '{}'::jsonb,
+  created_at bigint not null,
+  -- The event id is the client's idempotence key and is unique WITHIN a room,
+  -- not globally. As a bare global primary key it meant an id minted in one
+  -- room could collide with one in another — and because a duplicate insert
+  -- is deliberately reported as success (a client retrying on a flaky network
+  -- must not see an error), that collision would silently drop a message
+  -- instead of raising one.
+  primary key (room_id, id)
+);
+
+-- The poll is "everything in this room after cursor N", so this is the index
+-- the only hot query uses.
+create index if not exists logos_room_events_room_seq_idx
+  on logos_room_events (room_id, seq);
+
+-- Account deletion reads by author.
+create index if not exists logos_room_events_user_idx
+  on logos_room_events (user_id);
+
+-- DELETION SEMANTICS, stated here because they cannot be guessed from the
+-- columns and because a shared room is the one place in Socria where "delete
+-- everything about me" cannot mean "delete this row and all it touches":
+--
+--   * A person's own events are deleted. Their words go.
+--   * Their membership row is deleted.
+--   * The OTHER participant's events stay. They are that person's words, that
+--     person's to export and to delete; removing them because somebody else
+--     left would be deleting a third party's data on a stranger's say-so.
+--   * A room whose host deleted their account has host_user_id set to null
+--     and is closed. It is not dropped, because the remaining participant's
+--     events still hang off it.
+--   * A room with no members left is deleted outright, and the cascade takes
+--     any events with it.
+--
+-- The consequence worth saying out loud: after one person leaves, the other's
+-- copy of the conversation has gaps where the first person spoke. That is the
+-- honest outcome of two people owning their own words, and it is preferable
+-- to either alternative — one person holding the other's words permanently,
+-- or one person's departure destroying the other's record.
+
+-- ── The Mind Graph ──────────────────────────────────────────────────
+--
+-- Core 4's persistent memory. Not a store that a graph is drawn FROM — the
+-- graph IS the store. A row in mind_nodes is a memory; retrieval walks
+-- mind_edges; the Memory page reads these same rows. If a node is not here,
+-- Core does not know it.
+--
+-- Rows rather than a jsonb blob on user_profiles, which is where the flat
+-- memory it replaces lives. One array per user means every read pulls the
+-- whole thing, nothing can be indexed, two-hop traversal happens in
+-- application memory, and the Memory page would load a person's entire
+-- history to draw anything. Rows are the difference between a graph and a
+-- list that mentions relationships.
+--
+-- Postgres rather than a graph database: a realistic graph is hundreds to
+-- low thousands of nodes per person, which two- and three-hop traversal
+-- handles comfortably here — and staying in Postgres means account deletion
+-- and export already reach it by the rules this codebase enforces.
+
+create table if not exists mind_nodes (
+  user_id text not null,
+  id text not null,
+  -- A STRING, not an enum. The ontology is meant to grow, and an enum makes
+  -- that a migration every time. Unknown types store and render; see
+  -- KNOWN_NODE_TYPES in lib/mind/types.ts for the ones with colours.
+  type text not null,
+  label text not null,
+  content text not null default '',
+  aliases jsonb not null default '[]'::jsonb,
+  status text not null default 'active',
+  -- Two axes on purpose. `confidence` is how sure SOCRIA is this is true;
+  -- `certainty` is how sure the PERSON seemed. Collapsing them loses the
+  -- difference between "they are sure" and "we are sure".
+  confidence real not null default 0.5,
+  certainty real not null default 0.5,
+  importance real not null default 0.4,
+  -- Decayed recall strength, written on access: recall strengthens memory
+  -- and unused regions fade.
+  activation real not null default 0.2,
+  seen integer not null default 1,
+  -- Never carried into Logos, whose map can be exported as an image.
+  private boolean not null default false,
+  -- An ARRAY because grounds accumulate: first inferred from a remark, later
+  -- stated outright, later supported by a file. That history is what
+  -- justifies a rising confidence.
+  provenance jsonb not null default '[]'::jsonb,
+  created_at bigint not null,
+  updated_at bigint not null,
+  last_accessed bigint not null,
+  primary key (user_id, id)
+);
+
+create index if not exists mind_nodes_user_type_idx on mind_nodes (user_id, type);
+create index if not exists mind_nodes_user_status_idx on mind_nodes (user_id, status);
+create index if not exists mind_nodes_user_seen_idx on mind_nodes (user_id, last_accessed desc);
+create index if not exists mind_nodes_label_idx on mind_nodes (user_id, lower(label));
+
+-- Edges are first-class rows with their own provenance and their own
+-- reinforcement history, not a column on a node.
+create table if not exists mind_edges (
+  user_id text not null,
+  id text not null,
+  source_id text not null,
+  target_id text not null,
+  relationship text not null,
+  confidence real not null default 0.6,
+  -- How strongly activation flows across it. Reinforced on each sighting.
+  strength real not null default 0.5,
+  provenance jsonb not null default '[]'::jsonb,
+  created_at bigint not null,
+  updated_at bigint not null,
+  last_reinforced bigint not null,
+  primary key (user_id, id)
+);
+
+-- Indexed BOTH ways: activation spreads in both directions, because a
+-- project reaches its goals and a goal reaches the project it belongs to.
+create index if not exists mind_edges_source_idx on mind_edges (user_id, source_id);
+create index if not exists mind_edges_target_idx on mind_edges (user_id, target_id);
+
+-- What has been forgotten. The one table here that only ever grows.
+--
+-- Without it, deleting a memory is theatre: the next extraction notices the
+-- same thing again and puts it back, the person deletes it a second time,
+-- and concludes — correctly — that deletion does not work. The fingerprint
+-- is type + normalised label rather than an id, because an id is regenerated
+-- on every extraction and an id-keyed tombstone would stop nothing.
+create table if not exists mind_tombstones (
+  user_id text not null,
+  fingerprint text not null,
+  created_at bigint not null,
+  primary key (user_id, fingerprint)
+);
+
+-- Claims about the person noticed once and not yet believed.
+--
+-- This is what makes "a generalisation needs a second sighting" possible
+-- rather than merely stated. Without somewhere to record a first sighting
+-- the rule blocks every sighting forever — nothing is created, so nothing
+-- can be matched, so a real pattern could never be learned. These are NOT
+-- nodes: retrieval cannot reach them and no prompt ever sees them.
+--
+-- `sources` holds distinct CONVERSATION ids, not a count. Ten turns of one
+-- conversation about one difficult meeting is one afternoon read ten times,
+-- not ten pieces of evidence.
+create table if not exists mind_pending (
+  user_id text not null,
+  fingerprint text not null,
+  type text not null,
+  label text not null,
+  content text not null default '',
+  sources jsonb not null default '[]'::jsonb,
+  first_at bigint not null,
+  last_at bigint not null,
+  primary key (user_id, fingerprint)
+);
+
+-- Uploaded files, kept so a character offset points at something. A claim
+-- derived from a file carries charStart/charEnd in its provenance, and the
+-- Memory page shows the sentence it came from — which needs the text.
+create table if not exists mind_sources (
+  user_id text not null,
+  id text not null,
+  name text not null,
+  bytes integer not null default 0,
+  text text not null default '',
+  created_at bigint not null,
+  primary key (user_id, id)
+);
+
+-- ── Projects ─────────────────────────────────────────────────────────
+--
+-- A Project is a focused REGION of the one Mind Graph, not a second store.
+-- Its presence in the graph is an ordinary `Project` row in mind_nodes (the
+-- anchor, node_id below) with ordinary edges running to it; everything a
+-- Project "contains" is reached through those edges. This table holds only
+-- the workspace: what it is called, what the person says it is for, how they
+-- want its conversations handled, and whether it is archived.
+--
+-- There is deliberately no project_id on mind_nodes or mind_edges. A memory
+-- is not owned by a Project; it is CONNECTED to one, and may be connected to
+-- several. See lib/mind/projects.ts.
+create table if not exists mind_projects (
+  user_id text not null,
+  id text not null,
+  node_id text not null,
+  name text not null,
+  description text not null default '',
+  instructions text not null default '',
+  archived boolean not null default false,
+  created_at bigint not null,
+  updated_at bigint not null,
+  primary key (user_id, id)
+);
+
+create index if not exists mind_projects_user_updated_idx on mind_projects (user_id, updated_at desc);
+create unique index if not exists mind_projects_user_name_idx on mind_projects (user_id, lower(name));
+
+-- Conversations and files are CONTAINERS, and those do belong to a Project.
+-- Nullable: most conversations are in no Project, and deleting a Project
+-- sets these back to null rather than deleting the conversation.
+alter table conversations
+  add column if not exists project_id text;
+create index if not exists conversations_user_project_idx on conversations (user_id, project_id);
+
+alter table mind_sources
+  add column if not exists project_id text;
+create index if not exists mind_sources_user_project_idx on mind_sources (user_id, project_id);

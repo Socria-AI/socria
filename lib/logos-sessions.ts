@@ -11,12 +11,15 @@
 import { EMPTY_MAP, type ThinkingMap } from './logos';
 import type { Attachment } from './logos-attachments';
 import { sanitizeContexts, type NodeContexts } from './logos-sources';
+import type { ByRef } from './logos';
 
 export interface LogosMsg {
   role: 'user' | 'assistant';
   content: string;
   /** notes and images brought into the conversation with this turn */
   attachments?: Attachment[];
+  /** who wrote it, when two people are thinking together — see lib/collab.ts */
+  by?: ByRef;
 }
 
 /** What the person actually wrote. Theirs — Logos never writes into it. */

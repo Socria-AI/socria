@@ -801,6 +801,17 @@ export function ThinkingMap({
                 <span className="lg-node-head">
                   <NodeGlyph type={p.node.type} />
                   <span className="lg-node-type">{p.node.type}</span>
+                  {/* Logos 2: whose idea this was, a small dot in their seat
+                      colour. Absent on a single-player map, where no node
+                      carries an author. */}
+                  {p.node.by && (
+                    <span
+                      className="lg-node-by"
+                      style={{ background: p.node.by.seat === 'guest' ? '#3A6EA5' : '#5e7633' }}
+                      title={`${p.node.by.name}'s idea`}
+                      aria-hidden="true"
+                    />
+                  )}
                   {p.node.status && p.node.status !== 'open' && (
                     <StatusMark status={p.node.status} />
                   )}

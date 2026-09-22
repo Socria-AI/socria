@@ -1,0 +1,353 @@
+/* components/mind/mind-graph.css
+   The Memory page, at /memory.
+
+   Ported from the Claude Design page of the same name. Three departures from
+   what came back, each deliberate:
+
+   - EVERY SELECTOR IS SCOPED under .mem-root. The design was a standalone
+     page, where .empty, .files, .panel and .confirm are perfectly good names.
+     A CSS file imported from a component in Next.js is a GLOBAL stylesheet,
+     so unscoped they would style four other surfaces the moment somebody
+     opened /memory. This repo has already had that bug once.
+   - var(--font-serif)/var(--font-sans) became var(--serif)/var(--sans). The
+     first pair are the raw next/font variables and carry no fallback stack;
+     the second are what the app defines on top of them, so a font that has
+     not loaded degrades to Georgia rather than to whatever the browser picks.
+   - .lg-node-glyph is sized here. The glyph ships no dimensions of its own
+     and app/globals.css sizes it only under .logos-root, so on this page —
+     editorial ground, not Logos — every glyph would render at zero.
+
+   The preview chrome from the mockup (state/width/density switches) is not
+   ported: it exists to show four states side by side, and the app has one
+   state at a time, which is the real one. */
+
+/* The glyph carries the type, so the canvas reads without a legend. */
+.mem-root .lg-node-glyph { width: 16px; height: 16px; display: block; }
+
+/* ===== /memory — what Socria remembers, and how to correct it =====
+   An account surface, on the journal's paper. The graph canvas is the one
+   scoped exception: a bordered plate with its own quieter line values. The two
+   token sets never mix across the page. */
+
+.mem-root{min-height:100vh;background:var(--paper);color:var(--ink);container-type:inline-size;container-name:mem}
+.mem-root.is-phone{max-width:390px;margin:0 auto;border-left:1px solid var(--ink-12);border-right:1px solid var(--ink-12)}
+
+/* ---------- the head ---------- */
+.mem-root .mem-head{padding:clamp(20px,3.4vh,38px) clamp(18px,4vw,56px) 0}
+.mem-root .mem-head h1{font-family:var(--serif);font-size:clamp(1.9rem,4vw,2.9rem);letter-spacing:-.025em;line-height:1;margin:9px 0 0}
+.mem-root .mem-head .deck{margin:11px 0 0;font-size:15px;line-height:1.62;color:var(--ink-70);max-width:56ch}
+.mem-root .mem-head .deck em{font-style:italic;color:var(--moss-700)}
+.mem-root .mem-head .back{font-size:12.5px;color:var(--ink-60);text-decoration:none;border-bottom:1px solid var(--ink-16);padding-bottom:1px}
+.mem-root .mem-head .back:hover{color:var(--ink);border-color:var(--ink)}
+.mem-root .mem-top{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;flex-wrap:wrap}
+
+/* the bar: counts, view, upload */
+.mem-root .mem-bar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+  margin:clamp(16px,2.6vh,26px) 0 0;padding:12px 0;border-top:1px solid var(--ink-12);border-bottom:1px solid var(--ink-12)}
+.mem-root .mem-counts{font-family:var(--serif);font-size:1.02rem;color:var(--ink-70);margin-right:auto}
+.mem-root .mem-counts b{font-weight:400;color:var(--ink)}
+.mem-root .mem-counts .sep{color:var(--ink-25);margin:0 .45em}
+.mem-root .seg{display:inline-flex;border:1px solid var(--ink-16);border-radius:999px;overflow:hidden;background:#fff}
+.mem-root .seg button{font-family:var(--sans);font-size:12.5px;padding:7px 16px;border:none;background:none;
+  color:var(--ink-60);cursor:pointer;transition:background .2s,color .2s}
+.mem-root .seg button:hover{color:var(--ink)}
+.mem-root .seg button[aria-pressed="true"]{background:var(--moss);color:var(--paper)}
+.mem-root .up-btn{display:inline-flex;align-items:center;gap:.5em;font-family:var(--sans);font-size:12.5px;
+  padding:7px 15px;border:1px solid var(--ink-16);border-radius:999px;background:#fff;color:var(--ink-70);
+  cursor:pointer;white-space:nowrap;flex:0 0 auto;transition:border-color .2s,color .2s}
+.mem-root .up-btn:hover{border-color:var(--ink);color:var(--ink)}
+
+/* ---------- the body ---------- */
+.mem-root .mem-body{display:grid;grid-template-columns:1fr;gap:0}
+.mem-root .mem-body.has-panel{grid-template-columns:1fr minmax(320px,388px)}
+@container mem (max-width:900px){.mem-root .mem-body.has-panel{grid-template-columns:1fr}}
+.mem-root .mem-main{padding:clamp(16px,2.6vh,26px) clamp(18px,4vw,56px) clamp(60px,9vh,110px);min-width:0}
+
+/* ---------- the graph plate (the scoped exception) ----------
+   Named .mem-plate, not .plate: app.css already owns .plate for the sign-in
+   card, and that rule was capping this canvas at 440px. */
+.mem-root .mem-plate{--pl-ink:rgba(32,32,27,.72);--pl-line:rgba(32,32,27,.18);--pl-ground:#F1EEE4;
+  position:relative;border:1px solid var(--border);background:var(--pl-ground);
+  background-image:radial-gradient(circle,rgba(53,70,32,.13) 1px,transparent 1px);background-size:26px 26px;
+  border-radius:3px;overflow:hidden}
+.mem-root .mem-plate .cap{position:absolute;left:13px;top:11px;z-index:3;display:flex;align-items:center;font-family:var(--sans);font-size:9.5px;
+  font-weight:600;letter-spacing:.24em;text-transform:uppercase;color:var(--ink-45)}
+.mem-root .mem-plate .settled{position:absolute;right:13px;top:11px;z-index:2;font-family:var(--serif);font-style:italic;
+  font-size:12.5px;color:var(--ink-45)}
+.mem-root .mem-plate .settled .reset{font:inherit;color:var(--moss-700);background:none;border:none;
+  border-bottom:1px solid var(--moss-700);padding:0 0 1px;cursor:pointer}
+/* what the cursor is over, read out in words under the plate */
+.mem-root .mem-plate .gr-read{position:absolute;left:13px;bottom:11px;right:13px;z-index:2;font-size:12.5px;color:var(--ink-70);
+  background:rgba(244,241,232,.94);border:1px solid var(--ink-12);border-radius:8px;padding:6px 11px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mem-root .mem-plate .gr-read b{font-family:var(--sans);font-size:9.5px;font-weight:600;letter-spacing:.18em;
+  text-transform:uppercase;color:var(--ink-45)}
+.mem-root .mem-plate .gr-read em{font-style:italic;color:var(--moss-700)}
+
+/* the same plate, small, inside the account sheet */
+.mem-root .mem-plate.is-mini{border-radius:10px;background-size:20px 20px}
+.mem-root .mem-mini{display:block;text-decoration:none;position:relative}
+.mem-root .mem-mini .mem-plate{pointer-events:none}
+.mem-root .mem-mini .go{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:9px}
+.mem-root .mem-mini .go .t{font-size:13.5px;color:var(--ink)}
+.mem-root .mem-mini .go .o{font-family:var(--serif);font-style:italic;font-size:12.5px;color:var(--moss-700);
+  border-bottom:1px solid var(--moss-700);padding-bottom:1px}
+.mem-root .mem-mini:hover .go .o{color:var(--moss)}
+.mem-root .mem-mini .cnt{font-size:11.5px;color:var(--ink-45);margin:7px 0 0}
+.mem-root .mem-plate svg{display:block;width:100%;height:auto}
+.mem-root .mem-plate.is-dense svg{min-height:min(74vh,720px)}
+/* the folders: a ring per type, its things branching off a hub inside it */
+.mem-root .gr-fold .hull{fill:rgba(32,32,27,.028);stroke:var(--ink-25);stroke-width:1;stroke-dasharray:3 4}
+.mem-root .gr-fold .branch{stroke:var(--pl-line);stroke-width:.8}
+.mem-root .gr-fold .hub{fill:var(--ink-40)}
+.mem-root .gr-fold.on .hull{fill:rgba(94,118,51,.07);stroke:var(--moss);stroke-dasharray:none}
+.mem-root .gr-fold.on .hub{fill:var(--moss)}
+.mem-root .gr-fold .fold-l{font-family:var(--sans);font-size:8.5px;font-weight:600;letter-spacing:.2em;fill:var(--ink-45)}
+.mem-root .gr-fold.on .fold-l{fill:var(--moss-700)}
+.mem-root .gr-fold{cursor:pointer}
+.mem-root .gr-fold:focus{outline:none}
+.mem-root .gr-fold:focus-visible .hull{stroke:var(--ink);stroke-dasharray:none}
+.mem-root .gr-fold .fold-open{font-family:var(--serif);font-style:italic;font-size:11px;fill:var(--moss-700)}
+.mem-root .fold-chip{fill:#fff;stroke:var(--ink-40);stroke-width:1.2;stroke-dasharray:3 3}
+.mem-root .fold-chip-t{font-family:var(--sans);font-size:11px;font-weight:600;fill:var(--ink-70)}
+.mem-root .mem-plate .cap .crumb{font-family:var(--sans);font-size:9.5px;font-weight:600;letter-spacing:.14em;
+  text-transform:none;color:var(--moss-700);background:none;border:none;border-bottom:1px solid var(--moss-700);
+  padding:0 0 1px;margin-right:11px;cursor:pointer}
+.mem-root .mem-plate .cap .crumb:hover{color:var(--moss)}
+.mem-root .mem-plate .cap .here{color:var(--ink)}
+.mem-root .gr-link{stroke:var(--ink-25);fill:none}
+.mem-root .gr-link.on{stroke:var(--moss)}
+.mem-root .mem-plate .cap .fold-t{font-family:var(--sans);font-size:9.5px;font-weight:600;letter-spacing:.14em;
+  text-transform:none;color:var(--moss-700);background:none;border:none;border-bottom:1px solid var(--moss-700);
+  padding:0 0 1px;margin-left:11px;cursor:pointer}
+.mem-root .mem-plate .cap .fold-t:hover{color:var(--moss)}
+.mem-root .gr-edge{stroke:var(--pl-line);stroke-width:1;fill:none}
+.mem-root .gr-edge.on{stroke:var(--moss);stroke-width:1.5}
+.mem-root .gr-elabel{font-family:var(--sans);font-size:7.5px;letter-spacing:.06em;fill:var(--ink-45)}
+.mem-root .gr-node{cursor:pointer}
+.mem-root .gr-node.grab{cursor:grab}
+.mem-root .gr-node.grab:active{cursor:grabbing}
+.mem-root .mem-plate svg.is-live{touch-action:none;cursor:grab}
+.mem-root .mem-plate svg.is-live:active{cursor:grabbing}
+.mem-root .gr-node .ring.hov{stroke:var(--ink-40);stroke-width:1.2}
+.mem-root .gr-node .dot{stroke-width:1.4;fill:#fff}
+.mem-root .gr-node .lbl{font-family:var(--sans);font-size:9px;fill:var(--pl-ink)}
+.mem-root .gr-node.sel .ring{fill:none;stroke:var(--ink);stroke-width:1.4}
+.mem-root .gr-node:focus{outline:none}
+.mem-root .gr-node:focus-visible .ring{fill:none;stroke:var(--ink);stroke-width:1.6;stroke-dasharray:3 2}
+
+/* the four-colour code, not a per-type palette */
+.mem-root .c-person{stroke:var(--moss)}
+.mem-root .c-evidence{stroke:#3A6EA5}
+.mem-root .c-question{stroke:#E8B62C}
+.mem-root .c-neutral{stroke:rgba(32,32,27,.5)}
+.mem-root .f-person{fill:var(--moss)}
+.mem-root .f-evidence{fill:#3A6EA5}
+.mem-root .f-question{fill:#E8B62C}
+.mem-root .f-neutral{fill:rgba(32,32,27,.5)}
+
+/* ---------- the list, as a file explorer ---------- */
+.mem-root .explorer{border-top:1px solid var(--ink-12)}
+.mem-root .ex-head, .mem-root .ex-row, .mem-root .ex-dir{display:grid;grid-template-columns:minmax(0,1fr) 112px 58px 62px 96px;align-items:center;gap:12px;
+  width:100%;text-align:left;background:none;border:none;border-bottom:1px solid var(--ink-12)}
+.mem-root .ex-head{padding:0 6px 7px;border-bottom-width:1.5px;border-bottom-color:var(--ink-25)}
+.mem-root .ex-head .c-name{display:flex;align-items:center;gap:14px}
+.mem-root .ex-head .sh, .mem-root .ex-head .gb{font-family:var(--sans);font-size:9.5px;font-weight:600;letter-spacing:.2em;
+  text-transform:uppercase;color:var(--ink-45);background:none;border:none;padding:4px 0;cursor:pointer;
+  text-align:left;display:inline-flex;align-items:center;gap:.5em;white-space:nowrap;transition:color .18s}
+.mem-root .ex-head .sh:hover, .mem-root .ex-head .gb:hover{color:var(--ink)}
+.mem-root .ex-head .sh.on{color:var(--moss-700)}
+.mem-root .ex-head .sh i{font-style:normal;font-size:11px}
+.mem-root .ex-head .gb{letter-spacing:.14em;text-transform:none;font-size:11.5px;font-weight:500;color:var(--ink-60);
+  border-right:1px solid var(--ink-12);padding-right:14px}
+.mem-root .ex-head .c-num, .mem-root .ex-head .c-date, .mem-root .ex-head .c-stat{justify-self:start}
+
+.mem-root .ex-dir{padding:9px 6px;cursor:pointer;background:rgba(32,32,27,.022)}
+.mem-root .ex-dir:hover{background:rgba(32,32,27,.045)}
+.mem-root .ex-dir .c-name{display:flex;align-items:center;gap:9px}
+.mem-root .ex-dir .tw{font-size:10px;color:var(--ink-45);width:9px}
+.mem-root .ex-dir .dn{font-family:var(--sans);font-size:12.5px;font-weight:600;letter-spacing:.06em;color:var(--ink)}
+.mem-root .ex-dir .ct{font-family:var(--sans);font-size:10.5px;color:var(--ink-45);
+  border:1px solid var(--ink-16);border-radius:999px;padding:1px 7px}
+
+.mem-root .ex-row{padding:9px 6px;cursor:pointer;transition:background .16s}
+.mem-root .ex-row:hover{background:#fff}
+.mem-root .ex-row[aria-current="true"]{background:#fff;box-shadow:inset 2px 0 0 var(--moss)}
+.mem-root .ex-row.nested .c-name{padding-left:19px}
+.mem-root .ex-row .c-name{display:flex;align-items:center;gap:10px;min-width:0}
+.mem-root .ex-row .g{width:17px;height:17px;flex:0 0 auto;display:grid;place-items:center;color:var(--ink-60)}
+.mem-root .ex-row .lb{font-size:14px;color:var(--ink);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mem-root .ex-row .c-num, .mem-root .ex-row .c-date{font-family:var(--sans);font-size:11.5px;color:var(--ink-60);
+  font-variant-numeric:tabular-nums}
+.mem-root .ex-row.faded .lb, .mem-root .ex-row.faded .g{opacity:.6}
+.mem-root .st-ok{font-family:var(--sans);font-size:9.5px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--ink-40)}
+@container mem (max-width:760px){
+  .mem-root .ex-head, .mem-root .ex-row, .mem-root .ex-dir{grid-template-columns:minmax(0,1fr) 104px}
+  .mem-root .ex-head .c-num, .mem-root .ex-head .c-date, .mem-root .ex-row .c-num, .mem-root .ex-row .c-date{display:none}
+  .mem-root .ex-head .gb{padding-right:10px}
+}
+
+/* status is never hidden */
+.mem-root .st-badge{font-family:var(--sans);font-size:9.5px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;
+  border-radius:999px;padding:3px 9px;white-space:nowrap;border:1px solid}
+.mem-root .st-active{display:none}
+.mem-root .st-tentative{color:#6b520b;background:rgba(232,182,44,.16);border-color:rgba(232,182,44,.5)}
+.mem-root .st-uncertain{color:#6b520b;background:rgba(232,182,44,.16);border-color:rgba(232,182,44,.5)}
+.mem-root .st-historical{color:var(--ink-60);background:rgba(32,32,27,.05);border-color:var(--ink-16)}
+.mem-root .st-superseded{color:var(--ink-60);background:rgba(32,32,27,.05);border-color:var(--ink-16)}
+.mem-root .st-contradicted{color:#6b520b;background:rgba(232,182,44,.22);border-color:rgba(232,182,44,.7)}
+.mem-root .st-archived{color:var(--ink-45);background:none;border-color:var(--ink-16)}
+.mem-root .priv{font-family:var(--serif);font-style:italic;font-size:11.5px;color:var(--ink-45)}
+.mem-root .row.faded .lb, .mem-root .row.faded .ty{opacity:.62}
+
+/* ---------- the detail panel ---------- */
+.mem-root .panel{border-left:1px solid var(--ink-12);background:var(--paper-2);min-width:0;
+  display:flex;flex-direction:column;max-height:100vh;position:sticky;top:0;align-self:start}
+/* Narrow: the detail moves above the list and pins there. A fixed sheet would
+   be laid out against the viewport rather than this column, which is wrong in
+   the phone preview and fragile everywhere else. */
+@container mem (max-width:900px){
+  .mem-root .panel{position:sticky;top:0;order:-1;z-index:40;max-height:64vh;border-left:none;
+    border-bottom:1px solid var(--ink-16);border-radius:0;box-shadow:0 26px 44px -34px rgba(26,36,16,.45)}
+  .mem-root .panel .ph{padding-top:13px}
+}
+.mem-root .panel .ph{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;
+  padding:16px 20px 13px;border-bottom:1px solid var(--ink-12)}
+.mem-root .panel .ph .ty{font-family:var(--sans);font-size:9.5px;font-weight:600;letter-spacing:.24em;
+  text-transform:uppercase;color:var(--ink-45)}
+.mem-root .panel .ph h2{font-family:var(--serif);font-size:1.32rem;line-height:1.1;margin:6px 0 0;letter-spacing:-.015em}
+.mem-root .panel .x{font-size:1.3rem;line-height:1;color:var(--ink-45);background:none;border:none;cursor:pointer;padding:0 2px}
+.mem-root .panel .x:hover{color:var(--ink)}
+.mem-root .panel .pscroll{overflow-y:auto;padding:0 20px 18px}
+.mem-root .pg{padding:15px 0;border-bottom:1px solid var(--ink-12)}
+.mem-root .pg > .l{display:block;font-family:var(--sans);font-size:9.5px;font-weight:600;letter-spacing:.24em;
+  text-transform:uppercase;color:var(--ink-45);margin-bottom:9px}
+.mem-root .pg textarea{width:100%;font-family:var(--sans);font-size:14px;line-height:1.6;color:var(--ink);
+  background:#fff;border:1px solid var(--ink-16);border-radius:10px;padding:11px 13px;resize:vertical;min-height:84px;outline:none}
+.mem-root .pg textarea:focus{border-color:var(--moss)}
+.mem-root .pg .saverow{display:flex;align-items:center;gap:11px;margin-top:9px}
+.mem-root .pg .saved{font-family:var(--serif);font-style:italic;font-size:12.5px;color:var(--moss-700)}
+
+/* status picker — every state visible, none behind a filter */
+.mem-root .st-pick{display:flex;gap:6px;flex-wrap:wrap}
+.mem-root .st-pick button{font-family:var(--sans);font-size:11.5px;padding:6px 12px;border-radius:999px;
+  border:1px solid var(--ink-16);background:#fff;color:var(--ink-60);cursor:pointer;transition:all .18s}
+.mem-root .st-pick button:hover{border-color:var(--ink);color:var(--ink)}
+.mem-root .st-pick button[aria-pressed="true"]{background:var(--moss);border-color:var(--moss);color:var(--paper)}
+
+/* the two certainties, kept apart */
+.mem-root .sure{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.mem-root .sure .one{border:1px solid var(--ink-12);border-radius:10px;padding:11px 13px;background:#fff}
+.mem-root .sure .k{display:block;font-size:11.5px;line-height:1.35;color:var(--ink-60);min-height:2.7em}
+.mem-root .sure .v{display:block;font-family:var(--serif);font-size:1.7rem;line-height:1;margin-top:7px;
+  font-variant-numeric:tabular-nums}
+.mem-root .sure .machine .v{color:var(--ink)}
+.mem-root .sure .you .v{color:var(--moss-700)}
+/* display:block, which the design did not set. .meter is a <span>, so an
+   inline box ignores height and collapses with no content in it: measured
+   at 0x0, meaning the two bars never rendered at all at any size. The
+   numbers alone still read, which is why a screenshot did not show it. */
+.mem-root .sure .meter{display:block;height:2px;background:var(--ink-12);margin-top:9px;position:relative;overflow:hidden}
+.mem-root .sure .meter i{position:absolute;inset:0 auto 0 0;display:block}
+.mem-root .sure .machine .meter i{background:var(--ink)}
+.mem-root .sure .you .meter i{background:var(--moss)}
+.mem-root .sure-note{margin:10px 0 0;font-family:var(--serif);font-style:italic;font-size:12.5px;color:var(--ink-45);line-height:1.4}
+
+.mem-root .facts{display:flex;flex-direction:column;gap:7px}
+.mem-root .facts div{display:flex;justify-content:space-between;gap:12px;font-size:13px}
+.mem-root .facts .k{color:var(--ink-60)}
+.mem-root .facts .v{color:var(--ink);font-variant-numeric:tabular-nums}
+
+/* connections */
+.mem-root .conns{display:flex;flex-direction:column;gap:8px}
+.mem-root .conn{display:flex;align-items:center;gap:9px}
+.mem-root .conn .rel{font-family:var(--sans);font-size:9.5px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--ink-45);flex:0 0 auto}
+.mem-root .conn .to{font-size:13px;color:var(--moss-700);background:none;border:none;border-bottom:1px solid var(--ink-16);
+  padding:0 0 1px;cursor:pointer;text-align:left;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mem-root .conn .to:hover{border-color:var(--moss-700)}
+.mem-root .conn .rm{font-size:14px;line-height:1;color:var(--ink-45);background:none;border:none;cursor:pointer;flex:0 0 auto;padding:0 2px}
+.mem-root .conn .rm:hover{color:var(--ink)}
+
+/* provenance — grounds accumulate */
+.mem-root .grounds{display:flex;flex-direction:column;gap:0}
+.mem-root .ground{display:flex;gap:11px;padding:9px 0;border-top:1px solid var(--ink-12)}
+.mem-root .ground:first-child{border-top:none}
+.mem-root .ground .kind{font-family:var(--sans);font-size:9.5px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--moss-700);flex:0 0 76px;padding-top:2px}
+.mem-root .ground .where{font-size:12.5px;line-height:1.5;color:var(--ink-70)}
+.mem-root .ground .when{display:block;font-size:11.5px;color:var(--ink-45);margin-top:2px}
+
+/* challenge — one step, reversible, quiet */
+.mem-root .chal input{width:100%;font-family:var(--sans);font-size:13.5px;color:var(--ink);background:#fff;
+  border:1px solid var(--ink-16);border-radius:10px;padding:10px 13px;outline:none}
+.mem-root .chal input:focus{border-color:var(--moss)}
+.mem-root .chal .row2{display:flex;align-items:center;gap:11px;margin-top:9px}
+.mem-root .chal .note{font-family:var(--serif);font-style:italic;font-size:12.5px;color:var(--ink-45);line-height:1.4;margin:9px 0 0}
+.mem-root .chal-mark{display:flex;align-items:flex-start;gap:9px;padding:11px 13px;border-radius:10px;
+  background:rgba(232,182,44,.13);border:1px solid rgba(232,182,44,.45)}
+.mem-root .chal-mark p{margin:0;font-size:13px;line-height:1.5;color:#5c4708}
+.mem-root .chal-mark .undo{font-family:var(--sans);font-size:11.5px;color:#6b520b;background:none;border:none;
+  border-bottom:1px solid rgba(232,182,44,.7);cursor:pointer;padding:0 0 1px;flex:0 0 auto;margin-left:auto}
+
+/* forget — two steps, final, and it looks nothing like a challenge */
+.mem-root .forget{padding:15px 0 4px}
+.mem-root .forget .start{font-family:var(--sans);font-size:11.5px;letter-spacing:.06em;color:var(--ink-60);
+  background:none;border:none;border-bottom:1px solid var(--ink-16);padding:0 0 2px;cursor:pointer}
+.mem-root .forget .start:hover{color:var(--ink);border-color:var(--ink)}
+.mem-root .confirm{border:1.5px solid var(--ink);border-radius:10px;padding:14px 15px;background:#fff}
+.mem-root .confirm h4{font-family:var(--serif);font-size:1.08rem;margin:0;line-height:1.2}
+.mem-root .confirm p{margin:7px 0 0;font-size:12.5px;line-height:1.55;color:var(--ink-70)}
+.mem-root .confirm .acts2{display:flex;align-items:center;gap:11px;margin-top:13px}
+.mem-root .confirm .go{font-family:var(--sans);font-size:12.5px;font-weight:500;padding:8px 16px;border-radius:999px;
+  background:var(--ink);color:var(--paper);border:none;cursor:pointer;transition:transform .2s}
+.mem-root .confirm .go:hover{transform:translateY(-2px)}
+.mem-root .confirm .no{font-family:var(--sans);font-size:12.5px;color:var(--ink-60);background:none;border:none;cursor:pointer}
+.mem-root .confirm .no:hover{color:var(--ink)}
+
+/* ---------- noticed once ---------- */
+.mem-root .noticed{margin-top:clamp(30px,5vh,52px);padding-top:clamp(18px,3vh,26px);border-top:1px solid var(--ink-12)}
+.mem-root .noticed h2{font-family:var(--serif);font-size:1.5rem;letter-spacing:-.015em;margin:8px 0 0;line-height:1.1}
+.mem-root .noticed .deck{margin:9px 0 0;font-size:13.5px;line-height:1.62;color:var(--ink-70);max-width:62ch}
+.mem-root .noticed .deck em{font-style:italic;color:var(--moss-700)}
+.mem-root .nlist{margin-top:16px;display:flex;flex-direction:column;gap:0}
+.mem-root .nrow{display:flex;align-items:center;gap:13px;padding:11px 0;border-top:1px solid var(--ink-12)}
+.mem-root .nrow p{margin:0;flex:1;min-width:0;font-size:13.5px;line-height:1.5;color:var(--ink-70)}
+.mem-root .nrow .src{font-family:var(--serif);font-style:italic;font-size:11.5px;color:var(--ink-45);flex:0 0 auto}
+.mem-root .nrow .no{font-family:var(--sans);font-size:11.5px;color:var(--ink-60);background:none;border:none;
+  border-bottom:1px solid var(--ink-16);padding:0 0 1px;cursor:pointer;flex:0 0 auto}
+.mem-root .nrow .no:hover{color:var(--ink);border-color:var(--ink)}
+
+/* ---------- files ---------- */
+.mem-root .files{margin-top:clamp(26px,4vh,44px);padding-top:clamp(16px,2.6vh,24px);border-top:1px solid var(--ink-12)}
+.mem-root .files h2{font-family:var(--serif);font-size:1.3rem;margin:8px 0 0;line-height:1.1}
+.mem-root .frow{display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--ink-12);margin-top:12px}
+.mem-root .frow:first-of-type{margin-top:14px}
+.mem-root .frow .fn{font-size:13.5px;color:var(--ink);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mem-root .frow .fm{font-size:11.5px;color:var(--ink-45);font-variant-numeric:tabular-nums;flex:0 0 auto}
+.mem-root .frow .rm{font-family:var(--sans);font-size:11.5px;color:var(--ink-60);background:none;border:none;
+  border-bottom:1px solid var(--ink-16);padding:0 0 1px;cursor:pointer;flex:0 0 auto}
+.mem-root .frow .rm:hover{color:var(--ink);border-color:var(--ink)}
+
+/* ---------- empty states ---------- */
+.mem-root .empty{padding:clamp(48px,11vh,110px) clamp(18px,4vw,56px);max-width:62ch}
+.mem-root .empty h2{font-family:var(--serif);font-size:clamp(1.6rem,3.4vw,2.3rem);letter-spacing:-.02em;line-height:1.1;margin:10px 0 0}
+.mem-root .empty p{margin:13px 0 0;font-size:15px;line-height:1.66;color:var(--ink-70)}
+.mem-root .empty p em{font-style:italic;color:var(--moss-700)}
+.mem-root .empty .acts3{margin-top:20px;display:flex;gap:13px;align-items:center;flex-wrap:wrap}
+.mem-root .empty.fault h2{color:var(--ink)}
+.mem-root .empty.fault .code{display:inline-block;margin-top:14px;font-family:var(--sans);font-size:11.5px;
+  letter-spacing:.06em;color:var(--ink-60);border:1px solid var(--ink-16);border-radius:6px;padding:7px 11px;background:#fff}
+
+/* loading — settles and stops */
+.mem-root .load-rows{margin-top:22px;display:flex;flex-direction:column;gap:0;max-width:640px}
+.mem-root .load-rows i{display:block;height:13px;border-radius:3px;background:var(--ink-12);margin:13px 0;
+  animation:ld 1.5s var(--ease-standard) infinite alternate}
+.mem-root .load-rows i:nth-child(2){width:78%;animation-delay:.12s}
+.mem-root .load-rows i:nth-child(3){width:54%;animation-delay:.24s}
+.mem-root .load-rows i:nth-child(4){width:66%;animation-delay:.36s}
+@keyframes ld{to{opacity:.4}}
+@media(prefers-reduced-motion:reduce){.mem-root .load-rows i{animation:none;opacity:.7}}
+
+/* ---------- the preview bar (this page only) ---------- */
