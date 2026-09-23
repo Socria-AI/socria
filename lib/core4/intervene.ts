@@ -59,9 +59,15 @@ export function noveltyGated(type: InterventionType, mode: string, considered: n
   return PERSPECTIVE_MOVES.has(type) || (type === 'ANSWER' && THINKING_MODES.has(mode) && considered > 0);
 }
 
+// Ceilings, not targets: the prompt asks for the length the moment
+// deserves. Run 4 (held-out): every decision and expert loss was "the
+// baseline contributed more", on budgets of 900 (ANSWER) and 450
+// (CHALLENGE) against the baseline's 1200. A substantive move now gets the
+// same ceiling as the strongest prompt; the moves that are short by nature
+// stay short.
 const TOKENS: Partial<Record<InterventionType, number>> = {
-  ANSWER: 900, EXPLAIN: 1000, EXECUTE: 1200, CALCULATE: 700, CORRECT: 800, VERIFY: 600, CRITIQUE: 800,
-  SYNTHESIZE: 700, RETRIEVE: 700, CONTRIBUTE: 600, CHALLENGE: 450, CONNECT: 450, HINT: 250, QUESTION: 200,
+  ANSWER: 1200, EXPLAIN: 1200, EXECUTE: 1200, CALCULATE: 900, CORRECT: 1200, VERIFY: 800, CRITIQUE: 1200,
+  SYNTHESIZE: 1200, RETRIEVE: 900, CONTRIBUTE: 1200, CHALLENGE: 1200, CONNECT: 1200, HINT: 250, QUESTION: 200,
   CLARIFY: 250, REFLECT: 200, GET_OUT_OF_THE_WAY: 120,
 };
 

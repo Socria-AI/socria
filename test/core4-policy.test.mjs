@@ -344,6 +344,14 @@ console.log('\n=== when producing it IS the learning, one question may stay ==='
   ok('  with an analogous worked example or the next step', /analogous example|next step outright/.test(stuck.decision.objective));
 }
 
+console.log('\n=== run 4: a substantive move has the baseline\'s ceiling ===');
+{
+  const judged = decide(S({ work: 'judgment', taskKind: 'decide', latest: 'request' }), { said: 'Here is my plan and my numbers — what am I missing?' });
+  ok('a judgement reply may run as long as the strongest prompt\'s', judged.decision.maxTokens >= 1200, `${judged.decision.type} ${judged.decision.maxTokens}`);
+  const tension = decide(S({ work: 'judgment', latest: 'information', tensions: ['wants speed and certainty'] }));
+  ok('so may a challenge', tension.decision.maxTokens >= 1200 || tension.decision.type !== 'CHALLENGE', `${tension.decision.type} ${tension.decision.maxTokens}`);
+}
+
 console.log('\n=== run 4: missed "find it myself" phrasings ===');
 {
   for (const said of ['I want to get there myself — no rewritten query, please.', 'Do not tell me the trick, do not name it, and do not write SQL. I want to have found it.', "So for this one, don't hand me the answer.", "I can take it from here — don't finish it for me."]) {

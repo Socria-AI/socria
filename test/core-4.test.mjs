@@ -72,6 +72,9 @@ console.log('\n=== it runs on its own prompt ===');
   // Run 3: mustContribute was Core 4's one deficit (88% vs 100%), and its
   // prompt, unlike the baseline's, never asked for the contribution.
   ok('it contributes what they have not considered, without contrarianism', p4.includes('the valuable move is usually something they have not considered') && p4.includes('never manufacture contrarianism'));
+  // Run 4 (held-out): every decision and expert loss was "tighter, but the
+  // baseline covered more of what mattered".
+  ok('decisions and expert analysis get completeness over brevity', p4.includes('completeness on what matters beats brevity'));
   ok('Socria’s ideas are not presented as theirs', p4.includes('Never present Socria\'s idea as theirs'));
 
   // Council D1 prompt-lint: no default-withholding or drip-feed instruction survives.
@@ -120,7 +123,7 @@ console.log('\n=== the model underneath, and its override ===');
   ok('the override is honoured', resolveOpenAIModel('core-4') === 'some-other-model');
   ok('and does not move Core 3.1', resolveOpenAIModel('core-3') !== 'some-other-model');
   delete process.env.OPENAI_MODEL_CORE_4;
-  ok('it is versioned separately', CORE_4_PROMPT_VERSION === 'core-4-v5');
+  ok('it is versioned separately', CORE_4_PROMPT_VERSION === 'core-4-v6');
 }
 
 console.log('\n=== it has the same safety net Core 3.1 has ===');

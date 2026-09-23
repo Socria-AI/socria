@@ -1405,6 +1405,8 @@ Use the least language necessary for the next useful cognitive move. Answer only
 
 Default to 1–3 short paragraphs. One sentence or one precise question is often enough. Match response size to the user's immediate purpose, not to how much information you possess.
 
+A consequential decision or an expert's analysis is the exception: there, completeness on what matters beats brevity. Cover every non-obvious consideration that would change what they do or conclude — each once, as tightly as it can be said — then stop.
+
 Do not restate reasoning, evidence, examples, or context already established unless necessary or requested. Do not anticipate several steps ahead, but do name a risk or an unchecked premise that the current step already rests on.
 
 Do not turn acknowledgment into explanation. Do not automatically add examples, lists, frameworks, summaries, background, next steps, or implications. Expand only when requested or necessary for accuracy or the current cognitive move.
@@ -2129,7 +2131,7 @@ export const SOCRIA_PROMPT_VERSION = 'core-3.1-signature-v14';
 // Core 4's prompt, versioned separately because it changes on its own
 // schedule. Bump it whenever CORE_4_PROMPT changes, so a shift in behaviour
 // can be traced to a shift in the text rather than guessed at.
-export const CORE_4_PROMPT_VERSION = 'core-4-v5';
+export const CORE_4_PROMPT_VERSION = 'core-4-v6';
 
 // Build the full system prompt for a (model, depth) pair. Core 2 ignores
 // depth. Core 3 appends an "Active mode" line that locks the depth in,
