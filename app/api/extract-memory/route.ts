@@ -1,7 +1,8 @@
 // app/api/extract-memory/route.ts
 // POST /api/extract-memory
-// Body: { messages: [{role, content}, ...], currentMemory: ConversationMemory }
-// Returns: { memory: ConversationMemory }
+// Body: { messages: [{role, content}, ...], currentMemory: ConversationMemory, titleOnly?: boolean }
+// Returns: { memory: ConversationMemory, suggestedTitle: string | null }
+// With titleOnly (Core 4), only a title is produced and memory comes back unchanged.
 //
 // Uses a cheap model (gpt-4o-mini regardless of the user's chat model) to
 // distill the most recent exchange into an updated thread memory. Only
@@ -76,6 +77,42 @@ export async function POST(req: NextRequest) {
       frozen: true,
       limit: caps.threadTurns,
     });
+  }
+
+  // Core 4 asks for a TITLE only. Its continuity is the Cognitive State and
+  // the Reasoning Ledger, written server-side each turn, and it no longer
+  // reads the thread memory — extracting one anyway would be a fourth
+  // memory of the same conversation, unread, that the person could still
+  // see and correct as though it mattered (docs/CORE-4-COGNITIVE-DESIGN.md,
+  // D14). The title is the only thing this call still does for it.
+  if (body?.titleOnly === true) {
+    const opening = validMessages
+      .slice(0, 6)
+      .map((m: any) => `${m.role === 'user' ? 'User' : 'Socria'}: ${String(m.content).slice(0, 800)}`)
+      .join('\n\n');
+    try {
+      const openai = new OpenAI({ apiKey });
+      const completion = await openai.chat.completions.create({
+        model: process.env.OPENAI_MEMORY_MODEL || 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content:
+              'Give this conversation a short, specific title (3–7 words) naming what it is about, in the person\'s terms. ' +
+              'No quotes, no trailing punctuation, never generic ("New chat", "Discussion"). Return JSON: {"suggestedTitle":"..."}',
+          },
+          { role: 'user', content: opening },
+        ],
+        temperature: 0.2,
+        max_tokens: 40,
+        response_format: { type: 'json_object' },
+      });
+      const parsed = JSON.parse(completion.choices?.[0]?.message?.content || '{}');
+      return NextResponse.json({ memory: currentMemory, suggestedTitle: sanitizeSuggestedTitle(parsed?.suggestedTitle) });
+    } catch (e) {
+      console.error('extract-memory (title) error:', e);
+      return NextResponse.json({ memory: currentMemory, suggestedTitle: null });
+    }
   }
 
   // Format the most recent turns for the extractor.

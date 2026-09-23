@@ -48,6 +48,14 @@ export function stepwiseClient(runDir) {
     calls.push({ role: req.role, key, cached: existsSync(hit) });
     if (existsSync(hit)) return { key, text: readFileSync(hit, 'utf8') };
     const file = join(pendingDir, `${key}.json`);
+    // Only the FIRST missing completion of a replay is real. Anything the
+    // pipeline asks for after it was computed from a fallback (a state read
+    // that "failed" because it was pending), so its request would change once
+    // the first is answered — writing it would only waste an answer.
+    if (pending.length) {
+      calls[calls.length - 1].blocked = true;
+      throw new PendingModelCall(key, null);
+    }
     if (!existsSync(file)) {
       writeFileSync(
         file,

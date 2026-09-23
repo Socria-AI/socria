@@ -41,7 +41,7 @@ const swap = {
     b.onResolve({ filter: /^next\/(server|headers)$/ }, (a) => ({ path: `${a.path}.js`, external: true }));
   },
 };
-for (const [entry, out] of [['app/api/chat/route.ts', 'chat.mjs'], ['app/api/account/memory/route.ts', 'memory.mjs']]) {
+for (const [entry, out] of [['app/api/chat/route.ts', 'chat.mjs'], ['app/api/account/memory/route.ts', 'memory.mjs'], ['app/api/core4/route.ts', 'core4.mjs']]) {
   await build({
     entryPoints: [join(root, entry)], bundle: true, format: 'esm', platform: 'node',
     outfile: join(OUT, out), tsconfig: join(root, 'tsconfig.json'), plugins: [swap],
@@ -63,6 +63,7 @@ process.env.RATE_LIMIT_DISABLED = '1';
 
 const chatRoute = await import(pathToFileURL(join(OUT, 'chat.mjs')).href);
 const memoryRoute = await import(pathToFileURL(join(OUT, 'memory.mjs')).href);
+const core4Route = await import(pathToFileURL(join(OUT, 'core4.mjs')).href);
 const { db } = await import(pathToFileURL(FAKE_DB).href);
 const { NextRequest } = await import('next/server.js');
 
@@ -264,6 +265,57 @@ const t11 = await turn('fact', [U('when did the business school at UT Austin tak
 });
 ok('ANSWER, unbuffered (no guard model call)', t11.move === 'ANSWER' && t11.guardCalls === 0, `${t11.move} ${t11.guardCalls}`);
 ok('the opener and the offer never went out', t11.received.trim() === 'It took the McCombs name in 2000.', JSON.stringify(t11.received));
+
+console.log('\n=== the person can see and correct all of it ===');
+{
+  const call = async (method, { body, query = '' } = {}) => {
+    const r = await core4Route[method](new NextRequest(`http://localhost/api/core4${query}`, { method, headers: { 'content-type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) }));
+    return { status: r.status, json: await r.json() };
+  };
+  const g = await call('GET');
+  ok('GET returns the ledger, the states and the capability evidence', g.status === 200 && g.json.entries.length > 0 && g.json.states.length > 0 && Array.isArray(g.json.capability));
+  const st = g.json.states.find((x) => x.conversationId === c1);
+  ok('a state separates what they said from what was inferred', st && st.said.some((f) => f.field === 'learningGoal') && Array.isArray(st.inferred), JSON.stringify(st));
+  ok('the ledger comes back as a Logos graph too', Array.isArray(g.json.graph.nodes) && g.json.graph.nodes.every((n) => 'owner' in n));
+
+  const mine = g.json.entries.find((e) => e.text === 'launch in March');
+  const d1 = await call('PATCH', { body: { entryId: mine.id, action: 'disown' } });
+  ok('"not mine": ownership leaves them', d1.status === 200 && d1.json.entry.owner === 'unknown' && d1.json.entry.quote === '');
+  ok('  recorded as their correction', d1.json.entry.revisions.at(-1).by === 'user' && d1.json.entry.revisions.at(-1).change === 'owner');
+  const unk = g.json.entries.find((e) => e.text === 'They are anxious about the budget');
+  const e1 = await call('PATCH', { body: { entryId: unk.id, action: 'edit', text: 'the budget constrains the launch date' } });
+  ok('"this is mine, in my words": theirs, quoted', e1.json.entry.owner === 'user' && e1.json.entry.basis === 'quoted' && e1.json.entry.text === 'the budget constrains the launch date');
+  const r1 = await call('PATCH', { body: { entryId: unk.id, action: 'retract' } });
+  ok('retract keeps it as history, out of use', r1.json.entry.status === 'retracted');
+  const view = rows('reasoning_entries').find((x) => x.id === unk.id);
+  ok('  and it is persisted', view.status === 'retracted');
+  ok('a bad action is refused', (await call('PATCH', { body: { entryId: unk.id, action: 'promote' } })).status === 400);
+  ok('an unknown entry is 404', (await call('PATCH', { body: { entryId: 'nope', action: 'retract' } })).status === 404);
+
+  const s1 = await call('PATCH', { body: { conversationId: c1, field: 'expertise', value: 'expert' } });
+  ok('an inferred field can be SET by them — explicit from then on', s1.status === 200 && s1.json.state.said.some((f) => f.field === 'expertise' && f.value === 'expert'), JSON.stringify(s1.json));
+  const s2 = await call('PATCH', { body: { conversationId: c1, field: 'learningGoal', value: null } });
+  ok('or reset to "not known"', s2.json.state.said.every((f) => f.field !== 'learningGoal'));
+  ok('directness cannot be set from here', (await call('PATCH', { body: { conversationId: c1, field: 'directness', value: 'answer' } })).status === 400);
+  ok('nor a value the field cannot take', (await call('PATCH', { body: { conversationId: c1, field: 'expertise', value: 'genius' } })).status === 400);
+
+  const next = await turn(c1, [m1, a1, m2, a2, m3, A(t3.received), U('next one: x^3 cos x')], {
+    state: { taskKind: 'learn', work: 'practice', latest: 'question', currentFocus: 'x^3 cos x' },
+    replies: ['Differentiate x^3 cos x with the product rule: 3x^2 cos x − x^3 sin x.'],
+  });
+  ok('with the learning goal reset, the next turn no longer withholds on it', next.t?.allocation.withhold === null, JSON.stringify(next.t?.allocation));
+  ok('and the expertise they set is what the turn used', next.t?.state.expertise.value === 'expert' && next.t.state.expertise.source === 'explicit');
+
+  const del = await call('DELETE', { query: `?entryId=${encodeURIComponent(mine.id)}` });
+  ok('delete removes an entry', del.status === 200 && !rows('reasoning_entries').some((x) => x.id === mine.id));
+  ok('and every link touching it', !rows('reasoning_links').some((l) => l.from_id === mine.id || l.to_id === mine.id));
+  const ds = await call('DELETE', { query: `?conversationId=${c2}` });
+  ok('a conversation\'s state can be forgotten', ds.status === 200 && !rows('core4_state').some((x) => x.conversation_id === c2));
+  ok('nothing to delete → 400', (await call('DELETE')).status === 400);
+  globalThis.__uid = null;
+  ok('signed out → 401', (await call('GET')).status === 401);
+  globalThis.__uid = 'u1';
+}
 
 console.log('\n=== "forget what Socria worked out" reaches every Core 4 table ===');
 {

@@ -210,5 +210,71 @@ export async function listCapability(userId: string): Promise<CapabilityEvidence
   }
 }
 
+// ── what the Memory page reads and corrects ──────────────────────────
+
+/** Every conversation's state, newest first (for the Memory page). */
+export async function listStates(userId: string, limit = 30): Promise<{ conversationId: string; state: CognitiveState; updatedAt: number }[]> {
+  try {
+    const { data, error } = await supabaseAdmin()
+      .from('core4_state').select('conversation_id, state, updated_at').eq('user_id', userId)
+      .order('updated_at', { ascending: false }).limit(limit);
+    if (error) return fail('core4_state', error), [];
+    return (data ?? []).map((r) => {
+      const x = r as { conversation_id: string; state: CognitiveState; updated_at: number };
+      return { conversationId: x.conversation_id, state: x.state, updatedAt: Number(x.updated_at) };
+    });
+  } catch (e) {
+    fail('core4_state', e);
+    return [];
+  }
+}
+
+export async function getEntry(userId: string, id: string): Promise<LedgerEntry | null> {
+  const { data, error } = await supabaseAdmin().from('reasoning_entries').select('*').eq('user_id', userId).eq('id', id).maybeSingle();
+  if (error) throw error;
+  return data ? rowToEntry(data as Record<string, unknown>) : null;
+}
+
+/** Correct one entry. Throws on failure: a correction that silently did not happen is worse than an error. */
+export async function putEntry(userId: string, e: LedgerEntry): Promise<void> {
+  const { error } = await supabaseAdmin().from('reasoning_entries').upsert(entryToRow(userId, e), { onConflict: 'user_id,id' });
+  if (error) throw error;
+}
+
+/** Delete an entry and every link touching it. */
+export async function deleteEntry(userId: string, id: string): Promise<void> {
+  const db = supabaseAdmin();
+  const a = await db.from('reasoning_links').delete().eq('user_id', userId).eq('from_id', id);
+  if (a.error) throw a.error;
+  const b = await db.from('reasoning_links').delete().eq('user_id', userId).eq('to_id', id);
+  if (b.error) throw b.error;
+  const c = await db.from('reasoning_entries').delete().eq('user_id', userId).eq('id', id);
+  if (c.error) throw c.error;
+}
+
+export async function getState(userId: string, conversationId: string): Promise<CognitiveState | null> {
+  const { data, error } = await supabaseAdmin().from('core4_state').select('state').eq('user_id', userId).eq('conversation_id', conversationId).maybeSingle();
+  if (error) throw error;
+  return (data?.state as CognitiveState) ?? null;
+}
+
+export async function putState(userId: string, conversationId: string, state: CognitiveState, now: number): Promise<void> {
+  const { error } = await supabaseAdmin()
+    .from('core4_state').upsert({ user_id: userId, conversation_id: conversationId, state, updated_at: now }, { onConflict: 'user_id,conversation_id' });
+  if (error) throw error;
+}
+
+/** Forget one conversation's state entirely: the next turn starts from what they say. */
+export async function deleteState(userId: string, conversationId: string): Promise<void> {
+  const { error } = await supabaseAdmin().from('core4_state').delete().eq('user_id', userId).eq('conversation_id', conversationId);
+  if (error) throw error;
+}
+
+/** Forget the capability evidence for one concept. */
+export async function deleteCapability(userId: string, concept: string): Promise<void> {
+  const { error } = await supabaseAdmin().from('capability_evidence').delete().eq('user_id', userId).eq('concept', concept);
+  if (error) throw error;
+}
+
 /** Every Core 4 table, for account deletion, export and "forget what Socria worked out". */
 export const CORE4_TABLES = ['core4_state', 'reasoning_entries', 'reasoning_links', 'core4_turns', 'capability_evidence'] as const;

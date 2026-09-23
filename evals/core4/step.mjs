@@ -35,6 +35,15 @@ const quiet = (orig) => (...a) => {
 };
 console.error = quiet(console.error.bind(console));
 console.warn = quiet(console.warn.bind(console));
+// The route's dev log and the expected "pending" stream errors are noise
+// here; the one JSON line on stdout is the interface.
+console.log = () => {};
+const realError = console.error;
+console.error = (...a) => {
+  const first = typeof a[0] === 'string' ? a[0] : '';
+  if (first.startsWith('stream error') || first.startsWith('[socria')) return;
+  realError(...a);
+};
 const say = (o) => process.stdout.write(JSON.stringify(o) + '\n');
 
 try {

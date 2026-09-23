@@ -1,0 +1,48 @@
+/* components/mind/core4-record.css
+   The Core 4 half of /memory. Every selector is scoped under .c4-root: a CSS
+   file imported from a component is a GLOBAL stylesheet in Next.js, and this
+   repo has already had one leak. Same paper and ink tokens as mind-graph.css. */
+
+.c4-root{background:var(--paper);color:var(--ink);padding:clamp(22px,4vh,44px) clamp(16px,4vw,56px) clamp(40px,8vh,90px);border-top:1px solid var(--ink-12)}
+.c4-root .c4-head{max-width:72ch}
+.c4-root .c4-kicker{font-family:var(--sans);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-60)}
+.c4-root h2{font-family:var(--serif);font-weight:400;font-size:clamp(1.5rem,3vw,2.1rem);letter-spacing:-.02em;line-height:1.1;margin:8px 0 0}
+.c4-root .c4-deck{margin:10px 0 0;font-size:15px;line-height:1.62;color:var(--ink-70)}
+.c4-root .c4-deck em{font-style:italic;color:var(--moss-700)}
+.c4-root .c4-err{margin:12px 0 0;color:#8a2a1f;font-size:14px}
+.c4-root .c4-empty{margin:18px 0 0;color:var(--ink-60);font-size:14.5px}
+
+.c4-root .c4-sec{margin-top:clamp(22px,3.4vh,34px);max-width:80ch}
+.c4-root .c4-sec h3{font-family:var(--serif);font-weight:400;font-size:1.2rem;margin:0;padding-bottom:8px;border-bottom:1px solid var(--ink-12)}
+.c4-root .c4-sec h3 .n{font-family:var(--sans);font-size:12px;color:var(--ink-60);margin-left:.4em}
+.c4-root .c4-note{font-size:13.5px;line-height:1.55;color:var(--ink-60);margin:8px 0 0}
+
+.c4-root .c4-list{list-style:none;margin:0;padding:0}
+.c4-root .c4-item{padding:12px 0;border-bottom:1px solid var(--ink-12);display:grid;gap:6px}
+.c4-root .c4-item.s-retracted .c4-text,.c4-root .c4-item.s-disputed .c4-text{color:var(--ink-60);text-decoration:line-through;text-decoration-color:var(--ink-25)}
+.c4-root .c4-kind{font-family:var(--sans);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-60)}
+.c4-root .c4-text{margin:0;font-size:15px;line-height:1.55;overflow-wrap:anywhere}
+.c4-root .c4-stance{font-style:italic;color:var(--moss-700)}
+.c4-root .c4-why{color:var(--ink-70)}
+.c4-root .c4-meta{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;color:var(--ink-60)}
+.c4-root .c4-meta .ok{color:var(--moss-700)}
+
+.c4-root .c4-acts{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.c4-root .c4-acts button,.c4-root .c4-acts select,.c4-root .c4-more{font-family:var(--sans);font-size:12.5px;padding:5px 12px;border:1px solid var(--ink-16);border-radius:999px;background:#fff;color:var(--ink-70);cursor:pointer}
+.c4-root .c4-acts button:hover,.c4-root .c4-more:hover{border-color:var(--ink);color:var(--ink)}
+.c4-root .c4-acts button:disabled{opacity:.5;cursor:default}
+.c4-root .c4-acts .del{color:#8a2a1f}
+.c4-root .c4-more{margin-top:10px}
+
+.c4-root .c4-edit{display:grid;gap:8px}
+.c4-root .c4-edit textarea{width:100%;box-sizing:border-box;font:inherit;font-size:15px;padding:8px 10px;border:1px solid var(--ink-16);border-radius:8px;background:#fff;color:var(--ink);resize:vertical}
+
+.c4-root .c4-fields{display:grid;gap:6px}
+.c4-root .c4-field{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:baseline;font-size:13.5px}
+.c4-root .c4-field .k{color:var(--ink-70);min-width:14em}
+.c4-root .c4-field .v{font-weight:600}
+.c4-root .c4-field .src{color:var(--ink-60);font-size:12.5px;overflow-wrap:anywhere}
+.c4-root .c4-field.inferred .v{font-weight:400;font-style:italic}
+
+@media (max-width:520px){.c4-root .c4-field .k{min-width:0;width:100%}}
+@media print{.c4-root .c4-acts,.c4-root .c4-more{display:none}}

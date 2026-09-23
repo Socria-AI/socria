@@ -50,3 +50,18 @@ export async function buildRoute(outDir) {
   });
   return join(outDir, 'chat.mjs');
 }
+
+/** The pure text utilities the grader uses — the SAME code the guard uses, so "a question" means one thing. */
+export async function buildGraderLib(outDir) {
+  mkdirSync(outDir, { recursive: true });
+  await build({
+    entryPoints: { questions: join(ROOT, 'lib/core4/questions.ts'), considered: join(ROOT, 'lib/core4/considered.ts') },
+    bundle: true,
+    format: 'esm',
+    platform: 'node',
+    outdir: outDir,
+    outExtension: { '.js': '.mjs' },
+    logLevel: 'error',
+  });
+  return { questions: join(outDir, 'questions.mjs'), considered: join(outDir, 'considered.mjs') };
+}

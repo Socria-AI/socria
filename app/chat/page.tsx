@@ -969,9 +969,13 @@ export default function ChatPage() {
   // patch the conversation with it, and persist to cloud/local. Core 3 only.
   async function extractAndPersistMemory(
     convoId: string,
-    convo: Conversation
+    convo: Conversation,
+    opts: { titleOnly?: boolean } = {}
   ) {
     try {
+      // Core 4 already has a title by its second turn; after that there is
+      // nothing for this call to do for it.
+      if (opts.titleOnly && convo.messages.filter((m) => m.role === 'user').length > 2) return;
       const res = await fetch('/api/extract-memory', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...keyHeaders() },
@@ -979,6 +983,7 @@ export default function ChatPage() {
           // Words, with attachments named — a whole PDF is not thread memory.
           messages: wordsOnly(convo.messages),
           currentMemory: convo.memory ?? EMPTY_MEMORY,
+          ...(opts.titleOnly ? { titleOnly: true } : {}),
         }),
       });
       if (!res.ok) return;
@@ -1079,7 +1084,8 @@ export default function ChatPage() {
       const journeyTurns = convo.messages.filter(
         (m) => m.role === 'user'
       ).length;
-      if (journeyTurns >= JOURNEY_EVERY_TURNS && journeyTurns % JOURNEY_EVERY_TURNS === 0) {
+      // Not for Core 4: it does not read the journey (see the call site).
+      if (!opts.titleOnly && journeyTurns >= JOURNEY_EVERY_TURNS && journeyTurns % JOURNEY_EVERY_TURNS === 0) {
         try {
           const jr = await fetch('/api/update-understanding', {
             method: 'POST',
@@ -1574,17 +1580,16 @@ export default function ChatPage() {
       // whatever is in the conversation's memory field. If this fails the
       // conversation still works — memory just does not update.
       //
-      // Core 4 gets this too. Its prompt says in as many words that it may
-      // receive context from Socria's memory system, and buildSystemPrompt
-      // duly hands it any that exists — so without extraction it would be
-      // told to expect something nothing ever writes.
-      // Thread memory (the conversation's own goals/constraints) still runs
-      // for both. The FLAT person-memory store does not run for Core 4 — its
-      // durable memory is the Mind Graph, written by /api/chat's remember()
-      // after the turn. Writing both would put the same material in two
-      // shapes and let them drift.
-      if (canUseCore3 && (model === 'core-3' || model === 'core-4')) {
+      // Core 4 takes a TITLE only. Its continuity is the Cognitive State and
+      // the Reasoning Ledger, written by /api/chat every turn, and its
+      // durable memory is the Mind Graph; buildSystemPrompt no longer hands
+      // it the thread memory or the Thinking Journey. Extracting them anyway
+      // would keep two more memories of the same conversation, unread, that
+      // the person could still see and correct as though they mattered.
+      if (canUseCore3 && model === 'core-3') {
         void extractAndPersistMemory(workingId!, updated);
+      } else if (canUseCore3 && model === 'core-4') {
+        void extractAndPersistMemory(workingId!, updated, { titleOnly: true });
       }
       // Insight Cards and auto-synthesis stay Core 3.1's. They are surfaces
       // of their own rather than things the prompt asks for, and Core 4 is
