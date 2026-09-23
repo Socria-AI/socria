@@ -79,7 +79,7 @@ to the forced arm at p<0.05 on ≥100 expert/decision turns") still stands.
 
 ## D1. Turn loop order, the authority of select() over the frontier generator, and prompt/allocator consistency
 
-**Implementation status: PARTIAL.** Done: prompt purge (v3) with prompt-lint test; reader timeout 2 s with prior-state carry-forward; safety gate; buffering only on withhold. Not yet: the envelope/forced split in thinking modes (select() still forces the move — the council's minority position is implemented as experiment E1, not yet as default); gap check after long absences; promptManifest; decisionDelta logging; C4_EVAL ablation switches; speculative parallel checker; the fast path. Deviation: on reader failure an EXPLICIT withhold is kept (the council text says withhold forced null); an explicit request does not depend on the reader.
+**Implementation status: PARTIAL.** Done: prompt purge (v3, now v5) with prompt-lint test; reader timeout 2 s with prior-state carry-forward; safety gate; buffering only on withhold; the envelope/forced split (the council's minority position, now the default after run 1, see the D1 reversal below): a move is imposed only on explicit or verified evidence; gap check after long absences. Not yet: promptManifest; decisionDelta logging; C4_EVAL ablation switches; speculative parallel checker; the fast path. Deviation: on reader failure an EXPLICIT withhold is kept (the council text says withhold forced null); an explicit request does not depend on the reader.
 
 ### Competing proposals
 
