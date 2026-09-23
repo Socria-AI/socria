@@ -367,6 +367,35 @@ console.log('\n=== a sensitive conversation stays in its conversation (council D
   ok('and never appear in another conversation', !/wait a year before selling/.test(other.prompt.split('Already on the table')[1] ?? ''), (other.prompt.split('Already on the table')[1] ?? '').slice(0, 200));
 }
 
+console.log('\n=== continuity across conversations (council D14 reversal; run 2 expert-010) ===');
+{
+  const said = 'Cohort design: pre-treatment weight history exists for only about 60% of patients, so the weight-loss exclusion is partial.';
+  await turn('cohort-s1', [U(said)], {
+    state: { taskKind: 'decide', work: 'judgment', latest: 'information', currentFocus: 'cohort design',
+      consideredNow: [{ kind: 'constraint', text: 'weight history exists for only about 60% of patients', quote: 'pre-treatment weight history exists for only about 60% of patients', stance: 'asserts', reason: '' }] },
+    replies: ['Then the exclusion removes cachexia only where it can be seen; the rest stays in.'],
+  });
+  const s2 = await turn('cohort-s2', [U('Results are in: HR 0.71 for BMI ≥30. Help me structure the discussion; I want to lead with mechanism.')], {
+    state: { taskKind: 'create', work: 'creation', latest: 'request', currentFocus: 'discussion structure' },
+    replies: ['Lead with the association, then the mechanism.'],
+  });
+  ok('a new conversation starts with their own words from the last one', /From their last conversation/.test(s2.prompt) && /weight history exists for only about 60%/.test(s2.prompt), s2.prompt.slice(-600));
+  const later = await turn('cohort-s2', [U('Results are in: HR 0.71 for BMI ≥30.'), A('Lead with the association.'), U('ok'), A('…'), U('and the limitations section?')], {
+    state: { taskKind: 'create', work: 'creation', latest: 'request', currentFocus: 'limitations' }, replies: ['…'],
+  });
+  ok('only at the start of a conversation, not every turn', !/From their last conversation/.test(later.prompt));
+}
+
+console.log('\n=== a value they wrote is never hidden (run 2, direct-answer-012) ===');
+{
+  const r = await turn('aoc', [U("Don't tell me what's wrong with my code, finding it is the point. Is the expected answer for the example definitely 7? I get 6.")], {
+    state: { taskKind: 'learn', work: 'verification', latest: 'attempt', attempt: 'wrong', currentFocus: 'count increases' },
+    check: { verdict: 'incorrect', location: 'the loop bound', errorType: 'off by one', expected: '7', confidence: 0.95 },
+    replies: ['Yes, 7 is definitely the expected answer for the example; the puzzle states it. Your approach is the right idea.'],
+  });
+  ok('the sentence confirming their own 7 reaches them', /7 is definitely the expected answer/.test(r.received), r.received);
+}
+
 console.log('\n=== deleting a conversation deletes what Core 4 kept about it ===');
 {
   const cid = 'launch';

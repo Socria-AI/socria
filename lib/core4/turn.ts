@@ -31,7 +31,7 @@ import { mergeState, recordTurn, gapCheck } from './merge';
 import { allocate } from './allocation';
 import { diminishingReturns, questionBudget, familyOf } from './budget';
 import { selectIntervention, renderDecision } from './intervene';
-import { guardStructure, type GuardInput } from './guard2';
+import { guardStructure, leaksHidden, type GuardInput } from './guard2';
 import { exactCheck, renderCheck, hiddenValues, computeAsked, type CheckResult, CHECK_FLOOR } from './verify';
 import { consideredView, entriesFromPerson, entriesFromSocria, mergeEntries, disputeTurn, raisable } from './ledger';
 import { evidenceFromTurn } from './capability';
@@ -171,7 +171,10 @@ export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
       }
     }
   }
-  const hidden = allocation.withhold ? hiddenValues(verify) : [];
+  // Nothing the person wrote themselves is a secret (run 2, direct-answer-012:
+  // they asked "is the answer definitely 7?" and the sentence saying yes was
+  // deleted because 7 was the checker's expected value).
+  const hidden = allocation.withhold ? hiddenValues(verify).filter((v) => leaksHidden(input.lastUserText, [v]).length === 0) : [];
 
   const verifyBlock = allocation.withhold
     ? renderCheck(verify)
@@ -221,9 +224,33 @@ export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
     disputed,
     verify,
     hidden,
-    blocks: { state: renderStateBlock(state), verify: verifyBlock + computed, move },
+    blocks: { state: renderStateBlock(state) + lastTime(ledger, input, state.turn), verify: verifyBlock + computed, move },
     ms,
   };
+}
+
+/**
+ * "From their last conversation": at the start of a conversation, their own
+ * standing entries from their most recent OTHER conversation in the same
+ * scope (same Project, or both outside Projects), within 30 days — never
+ * private ones. Council D14's reversal condition, triggered by runs 1 and 2:
+ * cross-session continuity from relevance-ranked recall alone fell below a
+ * baseline given the plain earlier transcript (expert-010: a decisive
+ * caveat from session 1 never reached session 2).
+ */
+function lastTime(ledger: LedgerEntry[], input: TurnInput, turn: number): string {
+  if (turn > 1 || !input.conversationId) return '';
+  const cutoff = input.now - 30 * 86_400_000;
+  const others = ledger.filter(
+    (e) => e.conversationId !== input.conversationId && e.owner === 'user' && !e.private &&
+      e.status !== 'disputed' && e.status !== 'retracted' && (e.projectId ?? null) === (input.projectId ?? null) && e.updatedAt >= cutoff
+  );
+  if (!others.length) return '';
+  const latest = others.reduce((a, b) => (b.updatedAt > a.updatedAt ? b : a));
+  const same = others.filter((e) => e.conversationId === latest.conversationId).sort((a, b) => a.turn - b.turn).slice(0, 8);
+  const when = new Date(latest.updatedAt).toISOString().slice(0, 10);
+  const word: Record<string, string> = { asserts: 'held', entertains: 'raised the possibility', asks: 'asked', rejects: 'ruled out', accepts: 'accepted', resolved: 'settled' };
+  return `\n=== From their last conversation (${when}) — their own words; use what matters now, attributed to them ===\n${same.map((e) => `  - they ${word[e.stance] ?? 'raised'}: ${e.text}${e.reason ? ` (because: ${e.reason})` : ''}`).join('\n')}\n`;
 }
 
 // renderState is imported lazily to keep the dependency direction clean.
