@@ -32,7 +32,8 @@ const ev = (kind, by, extra) => ({ id: eventId(++t, () => 0.5), at: t, by: byOf(
   ok('validates', isShareCode(code));
   ok('rejects the wrong length', !isShareCode('ABC'));
   ok('rejects a bad letter', !isShareCode('ABCDE0'));
-  ok('lower case is fine', normalizeCode('abcdef'.replace(/[^a-z]/g, 'k')) !== null || true);
+  // Was `... !== null || true`, which could not fail (caught by the test-lint in core4-p0-reproduce).
+  ok('lower case is fine', normalizeCode(CODE_ALPHABET.slice(0, CODE_LEN).toLowerCase()) === CODE_ALPHABET.slice(0, CODE_LEN));
   ok('spaces and dashes are what people add', normalizeCode(' abcd-efgh ') === 'ABCDEFGH');
   ok('a real one round-trips', normalizeCode(code.toLowerCase()) === code);
   ok('one room per code', roomFor('ABCDEF') === 'logos2:ABCDEF');

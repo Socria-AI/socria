@@ -30,9 +30,26 @@ for (const taskKind of ['debug', 'decide', 'create', 'explore']) {
 }
 {
   // The same wrong attempt from somebody who has SAID they are practising is
-  // the one case where holding the answer back is the point.
-  const m = route(S({ taskKind: 'learn', attempt: 'wrong', latest: 'attempt', practice: 'application' }), H(0));
-  ok('a learner practising on purpose may still be left to find the fix', m.intervention !== 'EXPLAIN' || withholds(m) || true);
+  // the one case where holding the answer back is the point. (This used to
+  // be `|| true` — an assertion that could not fail. Council D16.)
+  const said = { value: 'yes', source: 'explicit', confidence: 1, evidence: 'I want to work it out myself' };
+  const m = route(S({ taskKind: 'learn', work: 'verification', attempt: 'wrong', latest: 'attempt', learningGoal: said }), H(0));
+  ok('a learner who SAID they are practising keeps the redo: VERIFY, corrected answer withheld as practice_goal',
+     m.intervention === 'VERIFY' && m.allocation?.withhold?.reason === 'practice_goal', `${m.intervention} ${JSON.stringify(m.allocation?.withhold)}`);
+  const guessed = { value: 'yes', source: 'inferred', confidence: 0.95, evidence: 'looks like homework' };
+  const g = route(S({ taskKind: 'learn', work: 'verification', attempt: 'wrong', latest: 'attempt', learningGoal: guessed }), H(0));
+  ok('the same attempt with only a GUESSED learning goal gets the correction', !withholds(g) && g.intervention === 'CORRECT', g.intervention);
+}
+
+console.log('\n=== test-lint: no assertion that cannot fail ===');
+{
+  const { readdirSync, readFileSync } = await import('node:fs');
+  const { dirname, join } = await import('node:path');
+  const { fileURLToPath } = await import('node:url');
+  const dir = dirname(fileURLToPath(import.meta.url));
+  const TAUTOLOGY = new RegExp(['\\|\\|', '\\s*true\\s*\\)'].join(''));
+  const offenders = readdirSync(dir).filter((f) => f.endsWith('.test.mjs')).filter((f) => TAUTOLOGY.test(readFileSync(join(dir, f), 'utf8').replace(/\/\/.*$/gm, '')));
+  ok('no test file ORs an assertion with true', offenders.length === 0, offenders.join(', '));
 }
 
 console.log('\n=== debugging is not, by itself, a reason to withhold the fix ===');
