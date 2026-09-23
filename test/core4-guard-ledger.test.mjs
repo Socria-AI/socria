@@ -14,7 +14,7 @@
 import { guardStructure, sanitizeGuard2, buildGuard2Input, looksWorked, givesThenAsks, leaksHidden, coherent } from './.tmp/guard2.mjs';
 import { SentenceGate } from './.tmp/stream-gate.mjs';
 import { classify, similarity, gateCandidates } from './.tmp/considered.mjs';
-import { scrubPII, grounding, entriesFromPerson, entriesFromSocria, mergeEntries, disputeTurn, linksForTurn, consideredView, toLogosGraph } from './.tmp/ledger.mjs';
+import { scrubPII, grounding, entriesFromPerson, entriesFromSocria, mergeEntries, disputeTurn, supersedeRestated, linksForTurn, consideredView, toLogosGraph } from './.tmp/ledger.mjs';
 import { summarize, evidenceFromTurn, assistanceOf } from './.tmp/capability.mjs';
 import { buildTrace } from './.tmp/trace.mjs';
 import { exactCheck, sanitizeCheck, renderCheck, hiddenValues, computeAsked } from './.tmp/verify.mjs';
@@ -345,6 +345,38 @@ console.log('\n=== Verify Mode ===');
   ok('a checker location that gives the answer away is scrubbed', c.location === '' && c.errorType === 'sign', JSON.stringify(c));
   ok('a low-confidence checker verdict is not claimed', renderCheck({ ...c, confidence: 0.4 }) === '');
   ok('an unknown verdict is not claimed', renderCheck({ ...c, verdict: 'unknown' }) === '');
+}
+
+console.log('\n=== run 4: a restated position replaces the one they held (learning-012) ===');
+{
+  const c = { conversationId: 'cpi', projectId: null, turn: 1, now: 100 };
+  const said1 = 'The GDP deflator is nominal GDP divided by real GDP, times 100, so it covers every good produced in the economy, including imports. The CPI tends to understate inflation because people substitute toward goods that got relatively cheaper. Both are price indices, so they usually move together.';
+  const turn1 = entriesFromPerson([
+    { kind: 'claim', text: 'The GDP deflator is nominal over real GDP times 100 and covers all goods produced, including imports', quote: 'so it covers every good produced in the economy, including imports', stance: 'asserts', reason: '' },
+    { kind: 'claim', text: 'CPI understates inflation because of substitution toward relatively cheaper goods', quote: 'The CPI tends to understate inflation because people substitute toward goods that got relatively cheaper.', stance: 'asserts', reason: '' },
+    { kind: 'claim', text: 'Both are price indices so they usually move together', quote: 'Both are price indices, so they usually move together.', stance: 'asserts', reason: '' },
+  ], said1, c);
+  const ledger = mergeEntries([], turn1, 100).entries;
+  const now2 = [
+    { kind: 'claim', text: 'The GDP deflator covers all domestic final output including capital goods and government purchases but not imports, with a basket that changes yearly', quote: '', stance: 'asserts', reason: '' },
+    { kind: 'claim', text: 'The fixed CPI basket overstates inflation when consumers substitute toward cheaper goods', quote: '', stance: 'asserts', reason: '' },
+  ];
+  const gone = supersedeRestated(ledger, now2, 'cpi', 2, 200);
+  ok('both corrected positions are superseded', gone.length === 2 && gone.every((e) => e.status === 'superseded'), gone.map((e) => e.text).join(' | '));
+  ok('  with the restatement recorded as the reason', gone.every((e) => e.revisions.at(-1).reason.startsWith('restated:')));
+  const view = consideredView(ledger, { focus: 'CPI GDP deflator', conversationId: 'cpi', projectId: null });
+  ok('  and no longer shown as held', !view.lines.some((l) => /including imports|understates/.test(l)), view.lines.join(' | '));
+  ok('  the untouched position still is', view.lines.some((l) => /move together/.test(l)));
+  ok('a later turn only: nothing supersedes itself', supersedeRestated(ledger, now2, 'cpi', 1, 300).length === 0);
+  ok('another conversation is never touched', supersedeRestated(mergeEntries([], turn1.map((e) => ({ ...e, status: 'active' })), 1).entries, now2, 'other', 2, 300).length === 0);
+  // The same position restated: the newest wording is kept, not the old one.
+  const same = entriesFromPerson([{ kind: 'claim', text: 'Churn is driven by onboarding', quote: 'churn is driven by onboarding', stance: 'asserts', reason: '' }], 'I think churn is driven by onboarding.', c);
+  const flipped = entriesFromPerson([{ kind: 'claim', text: 'Churn is driven by pricing, not onboarding', quote: 'churn is driven by pricing, not onboarding', stance: 'asserts', reason: '' }], 'Actually churn is driven by pricing, not onboarding.', { ...c, turn: 2, now: 200 });
+  const m = mergeEntries(mergeEntries([], same, 100).entries, flipped, 200);
+  ok('an opposite-polarity restatement is not merged into the old position', m.created.length === 1, JSON.stringify(m.entries.map((e) => e.text)));
+  const reworded = entriesFromPerson([{ kind: 'claim', text: 'Churn is mostly driven by onboarding', quote: 'churn is mostly driven by onboarding', stance: 'asserts', reason: '' }], 'Churn is mostly driven by onboarding.', { ...c, turn: 2, now: 200 });
+  const m2 = mergeEntries(mergeEntries([], same, 100).entries, reworded, 200);
+  ok('the same position reworded keeps their newest wording', m2.created.length === 0 && m2.entries[0].text === 'Churn is mostly driven by onboarding', m2.entries[0].text);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

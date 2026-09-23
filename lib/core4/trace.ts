@@ -49,7 +49,7 @@ export interface TurnTrace {
   guard: { action: string; codes: string[]; by: string; regenerated: boolean };
   verify: { method: string; verdict: string } | null;
   sent: { questions: number; chars: number };
-  ledger: { user: number; socria: number; unknown: number; disputed: number };
+  ledger: { user: number; socria: number; unknown: number; disputed: number; superseded?: number };
   considered: number;
   ms: Record<string, number>;
   models: { reply: string | null; cognition: string | null };
@@ -71,7 +71,7 @@ export function buildTrace(x: {
   verify: CheckResult | null;
   sentQuestions: number;
   sentChars: number;
-  ledger: { user: number; socria: number; unknown: number; disputed: number };
+  ledger: { user: number; socria: number; unknown: number; disputed: number; superseded?: number };
   considered: number;
   ms: Record<string, number>;
   models: { reply: string | null; cognition: string | null };

@@ -33,7 +33,7 @@ import { diminishingReturns, questionBudget, familyOf } from './budget';
 import { selectIntervention, renderDecision } from './intervene';
 import { guardStructure, leaksHidden, type GuardInput } from './guard2';
 import { exactCheck, renderCheck, hiddenValues, computeAsked, type CheckResult, CHECK_FLOOR } from './verify';
-import { consideredView, entriesFromPerson, entriesFromSocria, mergeEntries, disputeTurn, raisable, echoesSocria, grounding } from './ledger';
+import { consideredView, entriesFromPerson, entriesFromSocria, mergeEntries, disputeTurn, supersedeRestated, raisable, echoesSocria, grounding } from './ledger';
 import { evidenceFromTurn } from './capability';
 import { buildTrace } from './trace';
 import { questionLoad, stripInterrogatives, deleteSentences } from './questions';
@@ -82,6 +82,8 @@ export interface PreparedTurn {
   ledger: LedgerEntry[];
   considered: { lines: string[]; items: string[] };
   disputed: LedgerEntry[];
+  /** their earlier positions this turn's restatement replaced */
+  superseded: LedgerEntry[];
   verify: CheckResult | null;
   hidden: string[];
   /** the prompt blocks, in order: state, verify, move */
@@ -132,6 +134,11 @@ export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
     ? disputeTurn(ledger, input.conversationId, prior.turn, input.now, signals.evidence.join('; '))
     : [];
 
+  // A position they restate replaces the one they held (run 4, learning-012).
+  const superseded = input.conversationId
+    ? supersedeRestated(ledger, state.consideredNow.filter((c) => grounding(c, input.lastUserText) !== 'inferred' || echoesSocria(c, lastSocria(input))), input.conversationId, state.turn, input.now)
+    : [];
+
   // The considered record, with this turn's own contributions from the
   // person included (they raised them a moment ago).
   const considered = consideredView(ledger, { focus: `${state.currentFocus} ${input.lastUserText}`, conversationId: input.conversationId ?? '', projectId: input.projectId });
@@ -141,7 +148,14 @@ export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
   // Only what is grounded in THEIR words, and is not an echo of Socria's last
   // reply, is shown as "they raised just now" (council D10; run 3).
   const groundedNow = state.consideredNow.filter((c) => !echoesSocria(c, lastSocria(input)) && grounding(c, input.lastUserText) !== 'inferred');
-  const allLines = [...new Set([...groundedNow.map((c) => `they ${c.stance === 'rejects' ? 'ruled out' : 'raised'} just now: ${c.text}${c.reason ? ` (because: ${c.reason})` : ''}`), ...considered.lines])];
+  // An echo of Socria is acceptance of Socria's point, never their own idea
+  // (council D10) — but it is where they now stand, so it is shown as that.
+  const acceptedNow = state.consideredNow.filter((c) => echoesSocria(c, lastSocria(input)) && c.stance !== 'rejects');
+  const allLines = [...new Set([
+    ...groundedNow.map((c) => `they ${c.stance === 'rejects' ? 'ruled out' : 'raised'} just now: ${c.text}${c.reason ? ` (because: ${c.reason})` : ''}`),
+    ...acceptedNow.map((c) => `they accepted Socria's point just now: ${c.text}`),
+    ...considered.lines,
+  ])];
 
   const diminishing = diminishingReturns(state, signals, input.brief);
   const budget = questionBudget(state, signals, input.brief, diminishing);
@@ -229,6 +243,7 @@ export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
     ledger,
     considered: { lines: allLines, items: gateItems },
     disputed,
+    superseded,
     verify,
     hidden,
     blocks: { state: renderStateBlock(state) + lastTime(ledger, input, state.turn), verify: verifyBlock + computed, move },
@@ -426,6 +441,7 @@ export async function finishTurn(
       socria: merged.created.filter((e) => e.owner === 'socria').length,
       unknown: merged.created.filter((e) => e.owner === 'unknown').length,
       disputed: p.disputed.length,
+      superseded: p.superseded.length,
     },
     considered: p.considered.items.length,
     ms: p.ms,
@@ -439,7 +455,7 @@ export async function finishTurn(
   const offRecord = state.persistPolicy === 'none';
   const writes: Promise<unknown>[] = [
     store.saveState(input.userId, input.conversationId, offRecord ? withoutText(next) : next, input.now),
-    offRecord ? Promise.resolve() : store.saveLedger(input.userId, [...merged.created, ...merged.touched, ...p.disputed], links),
+    offRecord ? Promise.resolve() : store.saveLedger(input.userId, [...merged.created, ...merged.touched, ...p.disputed, ...p.superseded], links),
     store.insertTurn(input.userId, input.conversationId, trace, input.now),
     offRecord || privateHere ? Promise.resolve() : store.insertCapability(input.userId, evidence),
   ];

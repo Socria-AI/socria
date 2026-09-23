@@ -217,9 +217,15 @@ export function mergeEntries(existing: LedgerEntry[], incoming: LedgerEntry[], n
   const touched: LedgerEntry[] = [];
   for (const e of incoming) {
     const twin = entries.find(
-      (x) => x.owner === e.owner && x.status !== 'retracted' && x.kind === e.kind && similarity(x.text, e.text) >= 0.8
+      (x) => x.owner === e.owner && x.status !== 'retracted' && x.kind === e.kind && similarity(x.text, e.text) >= 0.8 && samePolarity(x.text, e.text)
     );
     if (twin) {
+      // The same position restated: their latest wording is the one they hold.
+      if (e.owner === 'user' && e.basis !== 'inferred' && e.text !== twin.text) {
+        twin.revisions.push({ at: now, by: 'user', change: 'text', from: twin.text.slice(0, 200), to: e.text.slice(0, 200) });
+        twin.text = e.text;
+        if (e.quote) twin.quote = e.quote;
+      }
       twin.updatedAt = now;
       twin.confidence = Math.min(0.95, twin.confidence + 0.05);
       if (e.stance !== twin.stance && e.owner === 'user' && e.basis !== 'inferred') {
@@ -250,6 +256,42 @@ export function disputeTurn(entries: LedgerEntry[], conversationId: string, turn
       e.updatedAt = now;
       changed.push(e);
     }
+  }
+  return changed;
+}
+
+/**
+ * A position they restate replaces the one they held before (run 4,
+ * learning-012: after a student rewrote "the deflator includes imports" as
+ * "…but not imports", the move block still said they HELD the old version).
+ * Their earlier positions in this conversation that something they said this
+ * turn restates on the same point (similar, but not the same wording, or of
+ * opposite polarity) are marked SUPERSEDED, kept as history, and no longer
+ * shown as held. A restatement that echoes Socria's correction counts: the
+ * old version is still no longer theirs.
+ */
+const POSITIONS = new Set<LedgerKind>(['claim', 'assumption', 'hypothesis', 'decision', 'conclusion']);
+export function supersedeRestated(
+  entries: LedgerEntry[],
+  now: readonly { kind: LedgerKind; text: string }[],
+  conversationId: string,
+  turn: number,
+  at: number
+): LedgerEntry[] {
+  const changed: LedgerEntry[] = [];
+  const fresh = now.filter((n) => POSITIONS.has(n.kind));
+  if (!fresh.length) return changed;
+  for (const e of entries) {
+    if (e.owner !== 'user' || e.conversationId !== conversationId || e.turn >= turn || e.status !== 'active' || !POSITIONS.has(e.kind)) continue;
+    const by = fresh.find((n) => {
+      const sim = similarity(e.text, n.text);
+      return sim >= 0.5 && (sim < 0.8 || !samePolarity(e.text, n.text));
+    });
+    if (!by) continue;
+    e.revisions.push({ at, by: 'user', change: 'status', from: 'active', to: 'superseded', reason: `restated: ${by.text}`.slice(0, 200) });
+    e.status = 'superseded';
+    e.updatedAt = at;
+    changed.push(e);
   }
   return changed;
 }
@@ -297,7 +339,7 @@ export function consideredView(
 ): { lines: string[]; items: string[]; gate: string[] } {
   // Private entries (a sensitive or conversation-only conversation) are
   // never shown outside their own conversation (council D14/D15).
-  const live = entries.filter((e) => e.status !== 'retracted' && e.status !== 'disputed' && (!e.private || e.conversationId === opts.conversationId));
+  const live = entries.filter((e) => e.status !== 'retracted' && e.status !== 'disputed' && e.status !== 'superseded' && (!e.private || e.conversationId === opts.conversationId));
   const scored = live
     .map((e) => {
       const here = e.conversationId === opts.conversationId ? 0.5 : 0;
