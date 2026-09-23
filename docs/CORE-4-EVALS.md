@@ -38,7 +38,8 @@ After the implementation, the same file passes 24/24. It stays in the suite.
 | `core4-signals-questions` | explicit-signal reading (with negation, and the phrasings the pilot missed), the interrogative counter | 61 |
 | `core4-policy` | merge precedence, budget, diminishing returns, allocation (incl. 144 inferred-only states: zero withholds), the engine, every decision well-formed | 87 |
 | `core4-guard-ledger` | Guard 2.0 both sides, stream gate, novelty gate, ledger attribution, corrections, capability counting, content-free trace, Verify Mode, markdown-safe deletion | 99 |
-| `core4-turn-e2e` | multi-turn through the real route: persistence, outcomes, guard retry re-checked, fallback, private verify value, ledger owners, correction API, forget-all | 78 |
+| `core4-turn-e2e` | multi-turn through the real route: persistence, outcomes, guard retry re-checked, fallback, private verify value, ledger owners, correction API, off the record, conversation-delete cascade, forget-all | 94 |
+| `core4-data-inventory` | every stored column is documented (council D15) | 57 |
 | `core4-questions-e2e` | the McCombs conversation through the route | 28 |
 | `core-4` | the prompt v2 contract | 66 |
 

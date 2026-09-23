@@ -186,7 +186,16 @@ export interface Allocation {
    * their words now, their words earlier in this conversation, or their
    * Project's standing instructions. An inference never withholds.
    */
-  withhold: { what: string; reason: WithholdReason; evidence: string; source: 'message' | 'conversation' | 'project' } | null;
+  withhold: {
+    what: string;
+    reason: WithholdReason;
+    evidence: string;
+    source: 'message' | 'conversation' | 'project';
+    /** their words the withhold rests on — required (council D6) */
+    quote: string;
+    /** what they can have instead, and how to get the rest — required, non-empty (council D6) */
+    alternative: string;
+  } | null;
   /** first time something is held back in this conversation: say so, and how to get it */
   announce: boolean;
   /** machine-readable */
@@ -216,17 +225,14 @@ export const INTERVENTIONS_V2 = [
   'RETRIEVE',           // bring back what was said/decided before
   'REFLECT',            // say back, precisely; acknowledge
   'GET_OUT_OF_THE_WAY', // a brief acknowledgement; let them carry on
-  // Declared so the interfaces exist; NOT selectable until a tool backs them.
-  'RESEARCH',
-  'MODEL',
-  'VISUALIZE',
+  // RESEARCH, MODEL and VISUALIZE were removed (council D7): there are no
+  // tools in this path, and a move nothing can perform is dead code. Their
+  // privacy contract, for when tools exist, is in tools-contract.ts.
 ] as const;
 export type InterventionType = (typeof INTERVENTIONS_V2)[number];
 
 /** Interventions the engine may choose today. */
-export const SELECTABLE = new Set<InterventionType>(
-  INTERVENTIONS_V2.filter((i) => i !== 'RESEARCH' && i !== 'MODEL' && i !== 'VISUALIZE')
-);
+export const SELECTABLE = new Set<InterventionType>(INTERVENTIONS_V2);
 
 export interface QuestionBudget {
   /** Socria's most recent replies in a row that put interrogative work to the person */

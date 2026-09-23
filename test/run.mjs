@@ -34,7 +34,9 @@ let failed = 0;
 const lines = [];
 
 for (const s of suites) {
-  const r = spawnSync(process.execPath, [join(here, s)], { encoding: 'utf8' });
+  // CORE4_STRICT: a Core 4 withhold without the person's quote throws
+  // (council D6), so a test that produces one fails instead of passing.
+  const r = spawnSync(process.execPath, [join(here, s)], { encoding: 'utf8', env: { ...process.env, CORE4_STRICT: '1' } });
   const out = `${r.stdout}${r.stderr}`.trim();
   // Each suite's last line is its own tally.
   const tally = out.split('\n').filter(Boolean).pop() ?? '(no output)';

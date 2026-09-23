@@ -74,7 +74,9 @@ Modes: `AI_EXECUTES`, `AI_EXPLAINS`, `AI_VERIFIES`, `SHARED_REASONING`,
 A **safety gate** comes first: harm now (an emergency, a poisoning, money
 being taken) suspends every contract and gets immediate direct
 instructions. Explicit directness is evaluated before "being heard".
-**Withholding requires an explicit source** — the message, earlier in the
+**Withholding requires an explicit source** and carries the person's quote
+and what they can have instead (both required; a withhold without a quote
+throws in tests and degrades to helping in production) — the message, earlier in the
 conversation, or the Project — and one of five reasons: `practice_goal`,
 `requested_no_answer`, `authorship`, `assessment_integrity`,
 `agency_boundary`. An inference never withholds anything (tested
@@ -95,10 +97,11 @@ ahead". "Which would you pick?" gets a pick, marked as a view, with the
 value that would flip it.
 
 ### Intervention Engine — `lib/core4/intervene.ts`
-Selectable moves: ANSWER, EXPLAIN, CORRECT, VERIFY, CRITIQUE, CHALLENGE,
-CONTRIBUTE, CONNECT, SYNTHESIZE, QUESTION, CLARIFY, HINT, EXECUTE, CALCULATE,
-RETRIEVE, REFLECT, GET_OUT_OF_THE_WAY. RESEARCH, MODEL and VISUALIZE are in
-the type only: there are no tools in this path, and the prompt says so.
+Moves: ANSWER, EXPLAIN, CORRECT, VERIFY, CRITIQUE, CHALLENGE, CONTRIBUTE,
+CONNECT, SYNTHESIZE, QUESTION, CLARIFY, HINT, EXECUTE, CALCULATE, RETRIEVE,
+REFLECT, GET_OUT_OF_THE_WAY. RESEARCH, MODEL and VISUALIZE were removed
+(council D7): there are no tools in this path. Their privacy contract, for
+when tools exist, is written down in `lib/core4/tools-contract.ts`.
 Defaults are CONTRIBUTE (thinking together) or ANSWER (asked), never ASK.
 QUESTION and CLARIFY cannot be selected when the budget is spent. CLARIFY for
 a genuine blocker says what can already be said first. Diminishing returns
@@ -256,6 +259,19 @@ title-only extractor path (`app/api/extract-memory`, `titleOnly`).
   (`supabase/rls.sql`, checked by `test/rls-covers-schema`).
 - **No training reuse.** None of it is used to train models; any research use
   would require explicit consent and a policy that does not exist yet.
+
+### Data inventory
+
+Every column of every Core 4 table (council D15). `test/core4-data-inventory`
+fails if a column in `supabase/schema.sql` is missing here.
+
+| Store | Columns | Holds text from the person? | Purpose | Retention | Read by | Their control |
+|---|---|---|---|---|---|---|
+| `core4_state` | `user_id`, `conversation_id`, `state`, `updated_at` | yes, in `state` (goal, focus, positions, quotes of what they raised; evidence for inferred fields) — emptied when off the record | carry where a conversation stands to its next turn | until the conversation or account is deleted | the Core 4 turn for that conversation only | view/set/reset fields and forget the state on the Memory page; delete with the conversation; forget-all; export |
+| `reasoning_entries` | `user_id`, `id`, `kind`, `text`, `owner`, `stance`, `basis`, `quote`, `reason`, `status`, `confidence`, `conversation_id`, `project_id`, `turn`, `revisions`, `created_at`, `updated_at` | yes (`text`, `quote`, `reason`; identifiers scrubbed) — not written when off the record | the already-considered record; attribution; RETRIEVE | until deleted | the same conversation, the same Project, or recent relevant entries, in Core 4 prompts; the Memory page | edit, not mine, retract, restore, delete; delete with the conversation; forget-all; export |
+| `reasoning_links` | `user_id`, `id`, `from_id`, `to_id`, `rel`, `owner`, `reason`, `created_at` | `reason` only | relations between entries (none are drawn automatically) | until an endpoint is deleted | the Memory page (Logos export) | deleted with either entry; forget-all; export |
+| `core4_turns` | `user_id`, `conversation_id`, `turn`, `created_at`, `trace`, `outcome_label`, `outcome_confidence`, `outcome_source` | **no** — enums, counts, codes, timings only | measure which moves help, and cost/latency | 180 days, purged at write time | aggregate evaluation only | delete with the conversation; forget-all; export |
+| `capability_evidence` | `user_id`, `id`, `concept`, `event`, `assistance`, `conversation_id`, `turn`, `confidence`, `at` | `concept` is a few key words from what they worked on | count what they have shown they can do, only on a real verdict | until deleted | the Memory page; evaluation | delete per concept; delete with the conversation; forget-all; export |
 
 ## 5. Latency and cost
 

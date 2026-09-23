@@ -53,14 +53,29 @@ function alloc(
   confidence: number,
   humanWork: string[],
   aiWork: string[],
-  withhold: Hold | null,
+  withhold: Omit<Hold, 'quote' | 'alternative'> & { quote?: string; alternative?: string } | null,
   s: CognitiveState
 ): Allocation {
   // The first time anything is held back in a conversation, the reply says so
   // and says how to get it. Silent withholding cannot be overridden by
   // someone who does not know it is happening.
-  const announce = !!withhold && !s.history.some((h) => h.withheld);
-  return { mode, reasonCode, rationale, confidence: Math.round(Math.min(1, confidence) * 100) / 100, humanWork, aiWork, withhold, announce };
+  const w: Hold | null = withhold
+    ? {
+        ...withhold,
+        quote: (withhold.quote ?? withhold.evidence ?? '').slice(0, 200),
+        alternative: withhold.alternative ?? 'everything around it — the method, where their attempt goes wrong, an analogous worked example — and the full answer the moment they ask for it',
+      }
+    : null;
+  let hold = w;
+  // Council D6: a withhold must rest on their words and offer an
+  // alternative. Without a quote it is not a withhold at all — in tests that
+  // is a bug to fail loudly on; in production it degrades to helping.
+  if (hold && !hold.quote.trim()) {
+    if (process.env.NODE_ENV === 'test' || process.env.CORE4_STRICT === '1') throw new Error(`withhold without a quote: ${reasonCode}`);
+    hold = null;
+  }
+  const announce = !!hold && !s.history.some((h) => h.withheld);
+  return { mode, reasonCode, rationale, confidence: Math.round(Math.min(1, confidence) * 100) / 100, humanWork, aiWork, withhold: hold, announce };
 }
 
 export function allocate({ state: s, signals, contract }: Ctx): Allocation {
