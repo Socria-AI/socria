@@ -254,7 +254,71 @@ set, but zero is not automatically right: the corpus does not yet mark
 turns where a question was *needed*, so under-asking is only visible in the
 judged properties below.
 
-**Blind judgments:** in progress.
+**Blind judgments — Core 4 lost to both baselines.**
+
+| | Core 4 preferred | Baseline preferred | Tie | n |
+|---|---|---|---|---|
+| vs A1 (strong prompt) — scenarios | 5 | **13** | 6 | 24 |
+| vs A1 — turns | 15 | **27** | 19 | 61 |
+| vs B+ (primary comparator) — scenarios | 5 | **15** | 4 | 24 |
+| vs B+ — turns | 12 | **25** | 24 | 61 |
+
+Per property (judge, Core 4 vs A1): `mustAnswer` 29/29 vs 29/29;
+`mustChallenge` 9/10 vs 10/10; `alreadyConsidered` 15/17 vs 15/17;
+**`mustContribute` 18/24 (75%) vs 24/24 (100%)**; **`mustReference` 7/9 (78%)
+vs 9/9 (100%)**; `stance` 48/49 vs 44/49; paternalistic 0/61 vs 2/61;
+overreach 1/61 vs 0/61; underhelp 1/61 vs 0/61. Mean scores (1–5):
+helpfulness **4.25 vs 4.79**, agency 4.75 vs 4.83, peer 4.79 vs 4.75,
+friction 1.79 vs 1.88. Against B+ the pattern is the same (helpfulness 4.33
+vs 4.75; `mustContribute` 88% vs 100%).
+
+Core 4 won `changing-goals-004`, `debugging-005`, `direct-answer-009`,
+`reflective-005` and, against A1, `expert-013` (and, against B+,
+`learning-007`). It was never paternalistic, and its stance was judged
+right more often. **On the two things it exists to do better — contribute
+something new, and carry earlier context forward — it did worse than the
+same model with a good prompt and a plain transcript.** That falsifies the
+claim that Core 4 as measured is better, and per the pre-registered rule
+(E0, and council D16) its components must now justify themselves or go.
+
+**Why it lost — from Core 4's own traces, not guessed.**
+1. **Code imposed a narrower move than the model would have chosen, on an
+   inferred reading of the person** — the failure the council's minority
+   (Agent 1) predicted. A guessed "reflection" produced four turns of
+   acknowledgement for someone who wanted a plan (`repeated-questioning-004`;
+   also `longitudinal-006`). A reader-flagged tension forced CHALLENGE with
+   "do not resolve it for them" and left someone stuck where the baseline
+   gave the experiment that settled it (`decision-009`). A creative idea was
+   routed to CORRECT, "say what is wrong and give the correct version"
+   (`creative-002`).
+2. **The already-considered framing suppressed continuity.** The block said
+   "already on the table — do not raise any of these", which also covered
+   facts the person had established; Core 4 then failed to bring back an
+   earlier caveat that mattered (`expert-010`) and lost on `mustReference`.
+3. **Signals missed an explicit boundary**: "tell me how to look, not what
+   to change" (`debugging-002`) — the practice move said "say exactly where
+   it goes wrong".
+4. **A mid-reply deletion** left a broken fragment (`adversarial-001`; fixed
+   after the run, see finding 7 above).
+5. **Content errors by the player model** that the architecture neither
+   caused nor caught: an inverted Lee-bounds assumption (`research-009`), a
+   wrong first inference (`already-considered-004`).
+
+**What changed because of it** (`e29bb4c`): a move is now imposed only on
+explicit or verified evidence — the person's words, a contract, safety, a
+computed or confidently checked verdict. Otherwise the model receives
+constraints (the question budget, what they have established — to *use* —,
+what has been raised — not to re-raise —, and "help fully") and chooses the
+move itself. Being heard only when they say so; creative work gets
+critique; a challenge includes Socria's read of how it resolves. This is
+council D1's minority position, now the default because the data favoured
+it; experiment E1 is reframed accordingly (`CORE-4-EXPERIMENTS.md`).
+
+### Run 2 — the envelope model (in progress)
+
+Same 24 scenarios; only the Core 4 arm is regenerated (the baseline arms do
+not depend on Core 4's code, so their run 1 transcripts are reused
+unchanged); fresh players; per-arm cache; new blind judges.
 
 ### Full corpus
 

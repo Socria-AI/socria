@@ -39,6 +39,20 @@ correct formula in `direct-answer-006`, the key computation in `expert-008`
 — crossed the threshold pre-registered for E5, and the reversal was applied
 before the judge's ruling arrived.
 
+## A decision reversed by evidence: D1's minority position is now the default
+
+Run 1 (24 scenarios, blind judges; `CORE-4-EVALS.md`) had Core 4 losing to
+the strong-prompt baseline 5–13–6 and to B+ 5–15–4, and Core 4's own traces
+showed why: moves imposed on an **inferred** reading of the person — a
+guessed "reflection", a reader-flagged tension, a creative idea routed to
+CORRECT — narrowed what a stronger model would have done. That is exactly
+the Cognitive Architect's (Agent 1) minority argument in D1, and it
+violates the council's own global invariant. So as of `e29bb4c`, a move is
+**imposed only on explicit or verified evidence**; otherwise the model
+receives an envelope of constraints and chooses the move. The judge's D1
+reversal condition ("reinstate forced selection if the envelope arm loses
+to the forced arm at p<0.05 on ≥100 expert/decision turns") still stands.
+
 ## Implementation status at a glance
 
 | Decision | Status |
