@@ -109,10 +109,16 @@ blocker earns one back below a streak of three.
 The already-considered record is a **view over the Reasoning Ledger**, not
 a separate store: what the person raised, ruled out (and why), settled — and
 what Socria already said — ranked by conversation, Project and relevance.
-The move block lists it; the guard enforces it. Matching is lexical (stems,
-synonyms, a damped overlap score): ≥0.6 REDUNDANT (sentence removed, or a
-regeneration past it when everything is redundant), ≥0.34 UNCERTAIN (the
-cheap model judges; it can only name sentences to delete). Sentences that
+The move block lists it; the guard enforces it. Only things that can be *raised* are gated —
+objections, alternatives, questions, assumptions, hypotheses, uncertainties
+(and Socria's own objections and questions); facts and decisions they hold
+are shown as context but never grounds for deletion. Matching is lexical
+(stems, synonyms, a damped overlap score) as a **filter**: ≥0.6 on a
+re-asked *question* deletes it; any other overlap ≥0.34 goes to the cheap
+model, which may only name sentences to delete and is told that using,
+applying or contrasting a considered item is not raising it. (Lexical
+deletion of statements was removed after the pilot — see
+`CORE-4-EVALS.md`, findings 2 and 4.) Sentences that
 explicitly build past a covered item ("you've already ruled out X; …") are
 not candidates. Gated: perspective moves always; ANSWER when thinking
 together and there is a record; pure information answers never.

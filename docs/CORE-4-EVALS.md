@@ -35,10 +35,10 @@ After the implementation, the same file passes 24/24. It stays in the suite.
 | Suite | What it proves | Checks |
 |---|---|---|
 | `core4-p0-reproduce` | the Phase 0 failures stay fixed | 24 |
-| `core4-signals-questions` | explicit-signal reading (with negation), the interrogative counter | 53 |
+| `core4-signals-questions` | explicit-signal reading (with negation, and the phrasings the pilot missed), the interrogative counter | 61 |
 | `core4-policy` | merge precedence, budget, diminishing returns, allocation (incl. 144 inferred-only states: zero withholds), the engine, every decision well-formed | 87 |
-| `core4-guard-ledger` | Guard 2.0 both sides, stream gate, novelty gate, ledger attribution, corrections, capability counting, content-free trace, Verify Mode, markdown-safe deletion | 98 |
-| `core4-turn-e2e` | multi-turn through the real route: persistence, outcomes, guard retry re-checked, fallback, private verify value, ledger owners, correction API, forget-all | 77 |
+| `core4-guard-ledger` | Guard 2.0 both sides, stream gate, novelty gate, ledger attribution, corrections, capability counting, content-free trace, Verify Mode, markdown-safe deletion | 99 |
+| `core4-turn-e2e` | multi-turn through the real route: persistence, outcomes, guard retry re-checked, fallback, private verify value, ledger owners, correction API, forget-all | 78 |
 | `core4-questions-e2e` | the McCombs conversation through the route | 28 |
 | `core-4` | the prompt v2 contract | 66 |
 
@@ -131,6 +131,30 @@ defects, both now fixed with regression tests:
    stated facts. Using a fact is not re-raising it; the gate now deletes
    only for repeating what can be raised (objections, alternatives,
    questions, assumptions, hypotheses, uncertainties).
+
+3. **An explicit "don't tell me" was missed** (`learning-020`, turn 1):
+   "I'd rather work out the pattern than memorise a table, so nudge me,
+   don't tell me" read as no signal, so Core 4 corrected in full instead of
+   holding the ending back. The signal reader now recognises bare "don't
+   tell me" (only where the clause ends), "I'd rather work it out", "on my
+   own", "nudge me", "point me in the right direction" — and still not
+   "don't tell me how to…". This is the recall risk E4 names.
+4. **The novelty gate broke a correct answer** (`direct-answer-006`): the
+   person had ruled out `NETWORKDAYS`; the answer was `NETWORKDAYS.INTL`;
+   the gate matched on the shared word and deleted the start of the
+   formula. With finding 2 that is two harmful deletions in about twenty
+   gated turns — past E5's pre-registered 3% threshold — so **E5's reversal
+   was applied**: word overlap may now delete only a re-asked *question*;
+   an overlapping *statement* goes to the model check, which is told that
+   using, applying, quantifying or contrasting a considered item is not
+   raising it, and to leave a sentence alone when unsure.
+
+The pattern across all four: every one came from **code deciding something
+semantic on surface evidence** (a word overlap, a regex, a sentence
+boundary). The counting and enforcement parts held up; the parts that
+pretend to understand text are where Core 4 breaks. That is the council's
+Agent 1 critique showing up in data, and it points the next changes at
+moving semantic calls to the model (bounded by code), not at more rules.
 
 The pilot's win/loss numbers will be recorded here when both arms and the
 blind judging are complete — whatever they show.

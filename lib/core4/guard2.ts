@@ -145,7 +145,16 @@ export function guardStructure(input: GuardInput): GuardOutcome & { needsModel: 
     // A contribution or a thinking-together answer: every sentence is a
     // candidate. Anything else: its questions and perspective sentences.
     const whole = dec.type === 'CONTRIBUTE' || (dec.type === 'ANSWER' && THINKING_MODES.has(a.mode));
-    novelty = gateCandidates(draft, whole).map((s) => classify(s, considered));
+    // Word overlap may DELETE only a re-asked question. A statement that
+    // overlaps a considered item is sent to the model check instead: in the
+    // pilot, lexical deletion removed the correct formula because it named
+    // the function the person had ruled out, and the key computation of a
+    // reply because it used their own figures (docs/CORE-4-EVALS.md, pilot
+    // findings 2 and 4; CORE-4-EXPERIMENTS.md E5, reversal applied).
+    novelty = gateCandidates(draft, whole).map((s) => {
+      const v = classify(s, considered);
+      return v.verdict === 'REDUNDANT' && !/\?["'’”)\]]*\s*$/.test(s.trim()) ? { ...v, verdict: 'UNCERTAIN' as const } : v;
+    });
     const redundant = novelty.filter((v) => v.verdict === 'REDUNDANT');
     if (redundant.length) {
       findings.push({
@@ -223,7 +232,7 @@ OVERREACH: the reply performs cognitive work the person should do themselves in 
 
 UNDERHELP: the reply withholds, deflects or creates friction where direct help was the right move — questions they did not need, "it depends" without saying on what, a hint to someone who needed the answer.
 
-REDUNDANCY: a sentence raises, as if new, something listed under ALREADY CONSIDERED (the same idea, even in different words). A sentence that explicitly builds past a considered item ("you've already covered X; the part that's still open is Y") is NOT redundant.
+REDUNDANCY: a sentence PROPOSES, as if new, something listed under ALREADY CONSIDERED — the same suggestion, objection, alternative or question, even in different words. A sentence is NOT redundant if it uses, applies, quantifies, contrasts with or builds past a considered item ("you ruled out NETWORKDAYS; NETWORKDAYS.INTL takes the weekend as an argument", "against your $40M pledge that leaves $12M"). Mentioning a considered thing is not raising it. If you are not sure a sentence is redundant, do not list it: deleting a useful sentence is worse than keeping a repeated one.
 
 Return JSON only:
 {"action":"ALLOW"|"MODIFY_FOR_MORE_AGENCY"|"MODIFY_FOR_MORE_HELP"|"OVERRIDE_WITH_DIRECT_ANSWER"|"REQUEST_CLARIFICATION",

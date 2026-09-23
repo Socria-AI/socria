@@ -88,7 +88,9 @@ console.log('\n=== NOVELTY: already considered is not new ===');
   ok('the re-raised objection is caught', g.findings.some((f) => f.side === 'novelty'), JSON.stringify(g.findings));
   ok('  and removed; the new point survives', !/hiring another engineer/.test(g.revised ?? '') && /pilot customer churning/.test(g.revised ?? ''), g.revised);
   const all = guardStructure({ decision: dec('CONTRIBUTE'), allocation: alloc('SHARED_REASONING'), draft: 'Hiring a second engineer would slow down your launch.', considered });
-  ok('when EVERYTHING is redundant, regenerate past it', !!all.retryNote && /already considered/.test(all.retryNote));
+  ok('a statement that overlaps is NOT deleted on word overlap alone — the model judges it', !all.retryNote && all.needsModel && all.novelty.some((v) => v.verdict === 'UNCERTAIN'), JSON.stringify(all));
+  const formula = guardStructure({ decision: dec('ANSWER'), allocation: alloc('AI_ASSISTS'), draft: 'Use NETWORKDAYS.INTL, which takes the weekend as an argument: `=NETWORKDAYS.INTL(A2,B2,7,Holidays!$A$2:$A$40)`.', considered: ['NETWORKDAYS assumes a Saturday–Sunday weekend'] });
+  ok('pilot finding 4: the correct formula is never deleted for naming the ruled-out function', !formula.revised && !formula.retryNote, JSON.stringify(formula));
   ok('lexical matching sees through inflection', classify('Hiring more engineers slows the launch', ['hiring a second engineer would slow the launch']).verdict === 'REDUNDANT');
   ok('an unrelated point is NOVEL', classify('Onboarding time is the constraint', considered).verdict === 'NOVEL');
   ok('a partial overlap is UNCERTAIN (for the model to judge)', classify('The launch date matters more than pricing', considered).verdict !== 'REDUNDANT');
@@ -96,7 +98,7 @@ console.log('\n=== NOVELTY: already considered is not new ===');
   ok('questions and perspective sentences are candidates', gateCandidates('One risk is churn. It is sunny. What about pricing?').length === 2);
   ok('building past what they covered is not a re-raise', gateCandidates('You already ruled out raising prices. The remaining lever is support load.', true).length === 1);
   const ans = guardStructure({ decision: dec('ANSWER'), allocation: alloc('HUMAN_LEADS'), draft: 'Raising prices before the pilot ends would hurt trust. Separately, the support load in launch week is unplanned.', considered: ['they ruled out: raising prices before the pilot ends'] });
-  ok('an answer given while thinking together is gated too', ans.revised === 'Separately, the support load in launch week is unplanned.', JSON.stringify(ans));
+  ok('an answer given while thinking together is gated too (sent to the model check)', ans.needsModel && ans.novelty.some((v) => v.verdict === 'UNCERTAIN'), JSON.stringify(ans));
   const fact = guardStructure({ decision: dec('ANSWER'), allocation: alloc('AI_EXECUTES'), draft: 'Raising prices before the pilot ends would breach the pilot contract.', considered: ['they ruled out: raising prices before the pilot ends'] });
   ok('an information answer is not', fact.action === 'ALLOW');
 }
@@ -129,7 +131,7 @@ console.log('\n=== the novelty gate deletes only what can be RAISED (pilot findi
   ok('but the gate only holds what can be raised', v.gate.length === 1 && /retail/.test(v.gate[0]), JSON.stringify(v.gate));
   const g = guardStructure({ decision: dec('ANSWER'), allocation: alloc('HUMAN_LEADS'), draft: 'Exempting commercial traffic takes a quarter of gross, which leaves less than the $40M a year pledged to the bus frequency program. Retail diverts to suburban malls, too.', considered: v.gate });
   ok('using their fact in an argument survives', /\$40M/.test(g.revised ?? 'Exempting commercial traffic takes a quarter of gross, which leaves less than the $40M a year pledged to the bus frequency program.'), JSON.stringify(g));
-  ok('re-raising their objection does not', !/suburban malls/.test(g.revised ?? ''), JSON.stringify(g));
+  ok('re-raising their objection is sent to the model check', g.needsModel && g.novelty.some((v) => v.verdict !== 'NOVEL' && /suburban/.test(v.sentence)), JSON.stringify(g));
 }
 
 console.log('\n=== the stream gate ===');

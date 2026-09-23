@@ -242,7 +242,10 @@ const l2 = U('what else should I worry about?');
 const t9 = await turn(c5, [l1, A(t8.received), l2], {
   state: { taskKind: 'decide', work: 'judgment', latest: 'question', currentFocus: 'launch timing risks' },
   replies: ['Raising prices before the pilot ends would hurt trust. Separately, the support load in launch week is unplanned.'],
+  // Word overlap alone no longer deletes a statement; the model check names it.
+  guard: { action: 'MODIFY_FOR_MORE_HELP', findings: [{ side: 'novelty', detail: 'repeats a ruled-out option' }], redundant: ['Raising prices before the pilot ends would hurt trust.'] },
 });
+ok('an overlapping statement is sent to the model check, not deleted on overlap', t9.guardCalls === 1, String(t9.guardCalls));
 ok('next turn, what they already covered is in front of the model', /they ruled out: raising prices before the pilot ends/.test(t9.prompt), t9.prompt.slice(-900));
 ok('what Socria already said is marked as Socria\'s', /Socria already said: .*demo is stable/.test(t9.prompt));
 ok('the re-raised point never reached them', !/Raising prices/.test(t9.received), t9.received);
