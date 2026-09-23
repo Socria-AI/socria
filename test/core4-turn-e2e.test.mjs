@@ -439,5 +439,17 @@ console.log('\n=== run 4: "they answered what Socria asked" only if Socria asked
   ok('and kept when it did ask', r2.prompt.includes('answered what Socria asked'));
 }
 
+console.log('\n=== run 5: their own question is never "they accepted Socria\'s point" ===');
+{
+  const conv = 'accept-q-' + Date.now();
+  const said = [U('Here is my rewritten ending for the story.'), A('The new ending lands the reversal, but it may be too flat after the build-up.'), U('Is the new ending too flat after the build-up?')];
+  const r = await turn(conv, said, { state: { work: 'creation', latest: 'question', currentFocus: 'ending', consideredNow: [{ kind: 'question', text: 'Is the new ending too flat after the build-up', quote: 'Is the new ending too flat after the build-up?', stance: 'asks', reason: '' }] } });
+  ok('a question that echoes Socria is not shown as accepting its point', !r.prompt.includes("accepted Socria's point") && !r.prompt.includes('they said just now: Is the new ending'), r.prompt.slice(-700));
+  // Their own conclusion, in their words, that overlaps what Socria said: shown as what they said, credited to nobody.
+  const said2 = [U('Two groups: subsidy and non-subsidy counties.'), A('The effect is the change in the subsidy counties minus the change in the others.'), U('So the effect is the change in the subsidy counties minus the change in the others, 2.1 points.')];
+  const r2 = await turn(conv + '-b', said2, { state: { work: 'verification', latest: 'attempt', currentFocus: 'difference in differences', consideredNow: [{ kind: 'claim', text: 'The effect is the change in the subsidy counties minus the change in the others', quote: 'the effect is the change in the subsidy counties minus the change in the others', stance: 'asserts', reason: '' }] } });
+  ok('their echoing conclusion is "they said just now", never credited to Socria', r2.prompt.includes('they said just now: The effect is the change') && !r2.prompt.includes("Socria's point"), r2.prompt.slice(-700));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

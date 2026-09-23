@@ -25,7 +25,8 @@ import {
 } from '@/lib/socria-prompt';
 import { recall, remember } from '@/lib/mind/pipeline';
 import { getProject } from '@/lib/mind/store';
-import type { ActivatedSubgraph } from '@/lib/mind/activate';
+import { extractionContext, type ActivatedSubgraph } from '@/lib/mind/activate';
+import type { MindNode } from '@/lib/mind/types';
 import { prepareTurn, guardReply, fallbackReply, finishTurn, SentenceGate, type PreparedTurn } from '@/lib/core4/turn';
 import { modelClient, collect, type ChatTurn } from '@/lib/core4/model';
 import type { GuardOutcome, NoveltyVerdict } from '@/lib/core4/types';
@@ -293,6 +294,7 @@ export async function POST(req: NextRequest) {
     let prepared: PreparedTurn | null = null;
     let mindBlock: string | null = null;
     let mindSubgraph: ActivatedSubgraph | null = null;
+    let mindGraphNodes: { nodes: MindNode[] } | null = null;
     let projectBlock: string | null = null;
     let inProject = false;
     const conversationId =
@@ -338,6 +340,7 @@ export async function POST(req: NextRequest) {
       if (recalled) {
         mindBlock = recalled.block || null;
         mindSubgraph = recalled.subgraph;
+        mindGraphNodes = recalled.graph;
         projectBlock = recalled.projectBlock || null;
         inProject = !!recalled.project;
       }
@@ -489,7 +492,9 @@ export async function POST(req: NextRequest) {
               apiKey,
               surface: 'core',
               conversationId: conversationId ?? undefined,
-              existing: mindSubgraph,
+              // Everything this conversation already wrote, not only what
+              // recall ranked for the reply (extractionContext).
+              existing: extractionContext(mindSubgraph, mindGraphNodes, conversationId),
               projectId,
               // A sensitive conversation's memories are private (council D14).
               ...(prepared?.state.persistPolicy === 'conversation_only' ? { private: true } : {}),

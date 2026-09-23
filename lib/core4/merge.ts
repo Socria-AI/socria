@@ -20,6 +20,7 @@
 //
 // Pure.
 
+import { similarity } from './considered';
 import { EMPTY_STATE, type CognitiveState, type TurnMemo } from '../cognition/state';
 import type { Directness, ExplicitSignals, Inferred, OutcomeReading } from './types';
 
@@ -183,7 +184,11 @@ export function mergeState({ prior, read, signals, contract, readOk }: MergeInpu
 
   // Mastery shown earlier in the conversation is not forgotten because the
   // reader's window moved.
-  const masteryEvidence = [...new Set([...base.masteryEvidence, ...p.masteryEvidence])].slice(0, 6);
+  // Near-duplicates collapse (run 5, learning-008: the same mastery restated
+  // each turn filled the list).
+  const masteryEvidence = [...base.masteryEvidence, ...p.masteryEvidence]
+    .filter((m, i, all) => all.findIndex((x) => x === m || similarity(x, m) >= 0.8) === i)
+    .slice(0, 6);
 
   const merged: CognitiveState = {
     ...base,

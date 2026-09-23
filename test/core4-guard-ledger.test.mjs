@@ -379,5 +379,15 @@ console.log('\n=== run 4: a restated position replaces the one they held (learni
   ok('the same position reworded keeps their newest wording', m2.created.length === 0 && m2.entries[0].text === 'Churn is mostly driven by onboarding', m2.entries[0].text);
 }
 
+console.log('\n=== run 5: an uncertainty is what they were unsure of, not what they hold ===');
+{
+  const c = { conversationId: 'spec', projectId: null, turn: 1, now: 100 };
+  const es = entriesFromPerson([
+    { kind: 'uncertainty', text: 'They do not know what specificity refers to', quote: "I don't know what specificity refers to", stance: 'asserts', reason: '' },
+  ], "Honestly I don't know what specificity refers to.", c);
+  const view = consideredView(mergeEntries([], es, 100).entries, { focus: 'specificity', conversationId: 'spec', projectId: null });
+  ok('rendered as "they were unsure", never "they hold"', view.lines.some((l) => l.startsWith('they were unsure:')) && !view.lines.some((l) => l.startsWith('they hold:')), view.lines.join(' | '));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

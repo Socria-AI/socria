@@ -168,9 +168,24 @@ export function applyCandidates(
         report.refused.push({ label, reason: 'over-budget' });
         continue;
       }
-      nodeBudget--;
       const i = nodes.indexOf(replaced);
       nodes[i] = { ...replaced, status: 'superseded', updatedAt: opts.now };
+      // The new position may already be a live node under this very label
+      // (the extractor reused it, as it is told to). Then THAT node carries
+      // the new position — a second live node with the same name is the
+      // duplicate run 5's players saw (learning-002).
+      const same = byLabel(label);
+      if (same && same !== replaced && same.status !== 'superseded' && same.status !== 'archived') {
+        const j = nodes.indexOf(same);
+        nodes[j] = { ...same, content, status: 'active', updatedAt: opts.now, provenance: boundProvenance([...same.provenance, prov(c.kind)]) };
+        edges.push(
+          makeEdge(replaced.id, same.id, 'superseded_by', opts,
+            prov(c.kind, { note: `changed from: ${replaced.content}` }))
+        );
+        report.nodes.push({ label, action: 'superseded', id: same.id });
+        continue;
+      }
+      nodeBudget--;
       const fresh = makeNode(c, label, content, verdict.status, opts, prov(c.kind));
       nodes.push(fresh);
       edges.push(

@@ -148,12 +148,15 @@ export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
   // Only what is grounded in THEIR words, and is not an echo of Socria's last
   // reply, is shown as "they raised just now" (council D10; run 3).
   const groundedNow = state.consideredNow.filter((c) => !echoesSocria(c, lastSocria(input)) && grounding(c, input.lastUserText) !== 'inferred');
-  // An echo of Socria is acceptance of Socria's point, never their own idea
-  // (council D10) — but it is where they now stand, so it is shown as that.
-  const acceptedNow = state.consideredNow.filter((c) => echoesSocria(c, lastSocria(input)) && c.stance !== 'rejects');
+  // An echo of Socria is never recorded as their own idea (council D10). But
+  // it is where they now stand, so a position they state in their own words
+  // is shown — as what they SAID, with no claim about whose idea it was:
+  // lexical echo detection is too loose to credit Socria either (run 5 found
+  // their own conclusions and questions labelled "accepted Socria's point").
+  const acceptedNow = state.consideredNow.filter((c) => (c.stance === 'asserts' || c.stance === 'accepts') && c.kind !== 'question' && c.kind !== 'uncertainty' && echoesSocria(c, lastSocria(input)) && grounding(c, input.lastUserText) !== 'inferred');
   const allLines = [...new Set([
     ...groundedNow.map((c) => `they ${c.stance === 'rejects' ? 'ruled out' : 'raised'} just now: ${c.text}${c.reason ? ` (because: ${c.reason})` : ''}`),
-    ...acceptedNow.map((c) => `they accepted Socria's point just now: ${c.text}`),
+    ...acceptedNow.map((c) => `they said just now: ${c.text}`),
     ...considered.lines,
   ])];
 

@@ -13,7 +13,7 @@ import { EMPTY_GRAPH, fingerprintNode, normalize, STATUS_WEIGHT, relWeight, clas
 import { resolveNode, typesCompatible } from './.tmp/resolve.mjs';
 import { gate, rank, TURN_BUDGET } from './.tmp/gate.mjs';
 import { applyCandidates, forgetNode, forgetEdge, challengeNode } from './.tmp/apply.mjs';
-import { activate, seedActivation, scoreNode } from './.tmp/activate.mjs';
+import { activate, seedActivation, scoreNode, extractionContext } from './.tmp/activate.mjs';
 import { serializeSubgraph, renderMindGraph } from './.tmp/serialize.mjs';
 
 let pass = 0, fail = 0;
@@ -701,6 +701,48 @@ console.log('\n=== what this conversation wrote is recalled on its next turn (Co
   const sub = activate(g, 'Angry, mostly.', { now: T0, limit: 10, conversationId: 'conv-1' });
   ok('with it, this conversation\'s node comes back', sub.nodes.some((n) => n.id === 'n-marcus'), JSON.stringify(sub.nodes.map((n) => n.id)));
   ok('and another conversation\'s does not', !sub.nodes.some((n) => n.id === 'n-other'));
+}
+
+console.log('\n=== run 5: a replacement under a label already in use is not a second live node ===');
+{
+  let g = EMPTY_GRAPH;
+  ({ graph: g } = apply(g, [
+    C('Concept', 'meaning of specificity', 'Specificity is the chance a positive is right'),
+    C('Concept', 'specificity applies to the healthy group', 'Specificity is measured on people without the disease'),
+  ]));
+  ({ graph: g } = apply(g, [C('Concept', 'specificity applies to the healthy group', 'Specificity: the share of healthy people the test correctly calls negative', 'stated', { replaces: 'meaning of specificity' })]));
+  const live = g.nodes.filter((n) => normalize(n.label) === normalize('specificity applies to the healthy group') && n.status !== 'superseded');
+  ok('one live node under that label', live.length === 1, JSON.stringify(g.nodes.map((n) => [n.label, n.status])));
+  ok('  carrying the new content', live[0]?.content.startsWith('Specificity: the share of healthy people'));
+  ok('  the replaced node superseded, linked to it', g.nodes.find((n) => n.label === 'meaning of specificity')?.status === 'superseded' && g.edges.some((e) => e.relationship === 'superseded_by' && e.targetId === live[0]?.id), JSON.stringify(g.edges.map((e) => [e.relationship, e.sourceId, e.targetId])));
+}
+
+console.log('\n=== run 5: the extractor sees what this conversation already wrote ===');
+{
+  let g = EMPTY_GRAPH;
+  const FACTS = [
+    ['Office lease', 'The office lease renews in March at a higher rent'],
+    ['Series A timing', 'They plan to raise a Series A after the next product launch'],
+    ['Churn in SMB', 'Small-business customers churn at four percent a month'],
+    ['Pricing page test', 'An experiment moved annual plans to the top of the pricing page'],
+    ['On-call rota', 'Three engineers share the on-call rota every week'],
+    ['Data warehouse migration', 'Analytics is moving from Redshift to BigQuery this quarter'],
+    ['Board meeting', 'The next board meeting is on the ninth of October'],
+    ['Hiring plan', 'Two backend engineers are budgeted for the second half'],
+    ['Security audit', 'A SOC 2 readiness review found gaps in access logging'],
+    ['Mobile release', 'The iOS release is blocked on App Store review'],
+  ];
+  ({ graph: g } = apply(g, FACTS.map(([l, c]) => C('Concept', l, c)), [], { provenance: { surface: 'core', conversationId: 'conv-x' }, budget: { ...TURN_BUDGET, nodes: 20 } }));
+  ({ graph: g } = apply(g, [C('Concept', 'Hiring freeze', 'The company froze hiring for the rest of the fiscal year')], [], { provenance: { surface: 'core', conversationId: 'conv-y' } }));
+  const mine = g.nodes.filter((n) => n.provenance.some((p) => p.conversationId === 'conv-x'));
+  const narrow = { nodes: mine.slice(0, 1), edges: [], seeds: [], scores: {} };
+  ok('the fixture wrote this conversation\'s nodes', mine.length >= 8, String(mine.length));
+  const ctx = extractionContext(narrow, g, 'conv-x');
+  ok('every live node of this conversation is listed', mine.every((n) => ctx.nodes.some((m) => m.id === n.id)), String(ctx.nodes.length));
+  ok('  nothing added from another conversation', !ctx.nodes.some((n) => n.label === 'Hiring freeze'));
+  ok('  and the recalled ones are not duplicated', new Set(ctx.nodes.map((n) => n.id)).size === ctx.nodes.length);
+  ok('  capped', extractionContext(narrow, g, 'conv-x', 5).nodes.length === 5);
+  ok('no conversation, no change', extractionContext(narrow, g, null) === narrow);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

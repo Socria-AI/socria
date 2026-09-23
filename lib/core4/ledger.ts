@@ -351,7 +351,11 @@ export function consideredView(
     .sort((a, b) => b.score - a.score || b.e.updatedAt - a.e.updatedAt)
     .slice(0, opts.limit ?? 16);
   const lines = scored.map(({ e }) => {
-    const who = e.owner === 'user' ? `they ${STANCE_WORD[e.stance]}` : e.owner === 'socria' ? 'Socria already said' : 'already on the table';
+    // "They hold: they do not know X" read as a standing position long after
+    // X was explained (run 5, learning-002): an uncertainty or a question is
+    // what they were unsure of or asked, not something they hold.
+    const theirs = e.kind === 'uncertainty' ? 'they were unsure' : e.kind === 'question' && e.stance === 'asserts' ? 'they asked' : `they ${STANCE_WORD[e.stance]}`;
+    const who = e.owner === 'user' ? theirs : e.owner === 'socria' ? 'Socria already said' : 'already on the table';
     const why = e.reason ? ` (because: ${e.reason})` : '';
     return `${who}: ${e.text}${why}`;
   });

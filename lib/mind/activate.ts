@@ -364,3 +364,29 @@ export function touch(sub: ActivatedSubgraph, now: number): { id: string; activa
     lastAccessed: now,
   }));
 }
+
+/**
+ * What the extractor is shown as "already in the graph": the recalled
+ * subgraph plus every live node this conversation has already written.
+ * Recall is ranked for the REPLY and capped, so a conversation that wrote
+ * eighteen nodes showed the extractor five, and it minted near-duplicates of
+ * the rest (reported by players in runs 3, 4 and 5). The extractor's job is
+ * reuse, so it sees the conversation's own nodes whether or not they are
+ * relevant to this message.
+ */
+export function extractionContext(
+  sub: ActivatedSubgraph | null,
+  graph: { nodes: MindNode[] } | null,
+  conversationId: string | null | undefined,
+  limit = 40
+): ActivatedSubgraph | null {
+  if (!graph || !conversationId) return sub;
+  const base: ActivatedSubgraph = sub ?? { nodes: [], edges: [], seeds: [], scores: {} };
+  const have = new Set(base.nodes.map((n) => n.id));
+  const own = graph.nodes
+    .filter((n) => !have.has(n.id) && (n.status === 'active' || n.status === 'tentative' || n.status === 'uncertain'))
+    .filter((n) => n.provenance.some((p) => p.conversationId === conversationId));
+  if (!own.length) return sub;
+  const room = Math.max(0, limit - base.nodes.length);
+  return { ...base, nodes: [...base.nodes, ...own.slice(-room)] };
+}

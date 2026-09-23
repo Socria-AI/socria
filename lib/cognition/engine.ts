@@ -126,7 +126,7 @@ export async function readState(apiKey: string, ctx: ReadContext): Promise<{ sta
   const parts: string[] = [];
   if (ctx.instructions?.trim()) parts.push(`Their standing instructions for this Project:\n${ctx.instructions.trim().slice(0, 1200)}`);
   if (ctx.prior) parts.push(`Where it stood last turn:\n${JSON.stringify(compactPrior(ctx.prior))}`);
-  if (ctx.considered?.length) parts.push(`Already recorded as considered by them:\n${ctx.considered.slice(0, 20).map((c) => `- ${c}`).join('\n')}`);
+  if (ctx.considered?.length) parts.push(`Already on the table (each line says whose it is — Socria's lines are NOT theirs):\n${ctx.considered.slice(0, 20).map((c) => `- ${c}`).join('\n')}`);
   parts.push(`The conversation:\n${ctx.transcript}`);
   try {
     const res = await modelClient(apiKey).complete({
