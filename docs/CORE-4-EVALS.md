@@ -438,6 +438,98 @@ quiz contract survives inferred fatigue) and the Mind Graph recall fix
 (`61c0934`) landed after run 3's frozen bundle, so run 3 does not measure
 them.
 
+### Run 4 — held-out: Core 4 loses to the strong prompt
+
+Runs 1–3 tuned Core 4 on the same 26 scenarios, which made them a
+development set. Run 4 is the first **held-out** test: 50 scenarios never
+used before, chosen by hash (40% of each category's unused scenarios, blind
+to content) after the corpus critic's fixes. **All three arms were
+regenerated** from one frozen bundle at `873c8a2` (prompt v5 and the D6
+ladder fix), with 15 fresh players and 8 fresh blind judges (4 per
+comparison), 124 turns per arm.
+
+| | Core 4 | Baseline | Tie | n | sign test (decided) |
+|---|---|---|---|---|---|
+| vs A1 — scenarios | **15** | **26** | 9 | 50 | p = 0.12 |
+| vs A1 — turns | 42 | 42 | 40 | 124 | |
+| vs B+ — scenarios | **16** | **20** | 14 | 50 | p = 0.62 |
+| vs B+ — turns | 31 | 34 | 59 | 124 | |
+
+Margins: against A1, the baseline's 26 wins were 25 at margin 1 and 1 at
+margin 2; Core 4's 15 were 11 at margin 1 and 4 at margin 2. Against B+:
+19 + 1 against 14 + 2.
+
+**E0 fails** (`CORE-4-EXPERIMENTS.md`). Core 4 is preferred in fewer than
+half the decided scenarios against both baselines, and it loses the one
+category with n ≥ 5 that decides it, **decision, 0–5 against both** (p =
+0.06 each). Expert went 0–4 (3 ties) against A1 and 1–3 against B+.
+Neither overall gap is significant at n = 50. The direction is consistent,
+though, and nothing here supports calling Core 4 better than a strong
+prompt. It is not ready to be the default.
+
+Judged properties, Core 4 vs A1 (vs B+): paternalistic **0/124** vs 3/124
+(4/124); underhelp 0 vs 1 (0); overreach **3/124 vs 2** (4 vs 1);
+`alreadyConsidered` **97% vs 89%** (92% vs 95%); `mustReference` 93% vs
+86% (93% vs 93%); `mustContribute` 96% vs 96% (98% vs 98%); `stance` 95% vs
+97% (97% vs 95%). Helpfulness 4.64 vs 4.76 (4.76 vs 4.80); peer 4.84 vs
+4.74; friction 1.62 vs 1.82 (1.62 vs 1.76). Deterministic: 0.02 questions
+per reply vs 0.20; 2% of replies ask anything vs 11%; one withheld-answer
+leak by A1, none by Core 4; 260 vs 293 words per reply.
+
+**Why it lost.**
+1. **Coverage on decisions and expert work** (every decision and expert
+   loss, all margin 1). The judges' reasons are nearly word for word the
+   same: both strong, Core 4 "tighter", the baseline "contributed more
+   non-obvious material" (a vesting cliff, a regulatory tailwind, a
+   tu quoque cost). Core 4 wrote those turns under lower ceilings than the
+   arm it was judged against: 900 tokens for ANSWER and 450 for CHALLENGE,
+   against the baseline's 1200. Its prompt also defaults to "1–3 short
+   paragraphs". Run 3's fix (the contribution instruction) made
+   `mustContribute` equal, 96% vs 96%, so it did not fail to contribute.
+   It contributed less.
+2. **Overreach when they asked to find it themselves** (all of Core 4's
+   overreach flags: learning-015, math-004, no-answer-request-003 vs B+,
+   changing-goals-003 vs A1, learning-001 vs B+). There were two causes.
+   Signals were missed ("I want to get there myself — no rewritten query",
+   "don't tell me the trick… I want to have found it", "don't hand me the
+   answer"), so no withhold was in place. And the withhold was too narrow:
+   under "hints only" only "the corrected final answer" was held, while
+   VERIFY asked for where it goes wrong "clearly enough that they can fix
+   it", which for a setup question is the solution.
+
+**Where it won** (both comparisons): reflective (it stayed a listener where
+the baseline drifted into advice), creative (reading her data more
+carefully), direct answers and high-stakes (the same substance, faster), a
+switch of goal mid-conversation (changing-goals-003 vs B+), and several
+learning scenarios where the baseline added homework nobody asked for. Its
+paternalism was 0 in both comparisons.
+
+**What changed because of it** (after the frozen bundle, so run 4 does not
+measure any of it):
+- `d17dcf3`: every substantive move gets the baseline's 1200-token ceiling.
+  Prompt v6 says a consequential decision or an expert's analysis gets
+  completeness on what matters, over brevity.
+- `f0e5a3b`: the missed phrasings, with near-miss negatives. Under a
+  withhold the corrected step, code or setup is held too. VERIFY gives a
+  pointer, not the repair, and under "hints only" one hint.
+- Found by run 4's players:
+  - `8ded455`: a restated position supersedes the one they held.
+    learning-012 told the model a student still held two positions they
+    had just corrected.
+  - `75c809a`: a quoted draft is not Socria asking them (expert-017).
+    "They answered what Socria asked" only when it asked
+    (direct-answer-003).
+
+**Deviations.** A usage limit interrupted the run halfway; players were
+restarted and resumed from the cache, and no answer was rewritten. Several
+players stepped every scenario at the start (queuing requests early), and
+three reopened already-answered request files to compare system prompts.
+One skimmed the unchanging opening of later system prompts. Three players
+reported errors in their own answers, left as written (a Minkowski-sign
+remark, a significant-figures remark, "expected by chance" for 0.6 of 12).
+No judge reported a deviation. There were no human raters. The instrument
+is still model judges at n = 50.
+
 ### Full corpus
 
 Not yet run.
