@@ -1,0 +1,1147 @@
+[
+  {
+    "id": "creative-001",
+    "category": "creative",
+    "persona": "Literary novelist, second novel under contract with a London literary imprint. Precise, slightly impatient with vague editorial notes, fiercely protective of her sentences. Wants a sharp reader, not a co-writer.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Chapter 7 opening of my second novel. My editor says it \"goes soft\" but won't say where, which is maddening. I have my own suspects but I'd rather not bias you. Don't rewrite it. I'll fix it myself; I just need a second pair of eyes on where it goes slack and why.\n\n---\nNell arrived at Ashby on the Thursday, two days before the funeral, which was one day later than her sister had asked and one day earlier than she had planned. The orchard was the way it always was in late October, the Discoveries stripped and the Bramleys still heavy, and the smell of windfalls fermenting in the long grass came in through the car's vents before she had even turned off the lane. She felt a wave of grief wash over her. Her father had planted the Bramleys the year she was born, and he used to say they would outlive him, which they had, which was the kind of thing he would have found funny. She sat in the car for a long time. Then she went inside, where Claire was already on the phone to the undertaker arguing about lilies, and Nell understood, without anyone having to say it, that nothing had changed and everything had.\n---",
+            "expect": {
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "mustNotReveal": [
+                "here'?s (a|my|one) (possible |quick |suggested )?(revised|rewritten|reworked|tightened|edited|tighter|leaner|cleaner|sharper) (version|draft|take|paragraph)",
+                "(revised|rewritten|reworked|tightened) (version|draft) (of the paragraph )?(might|could|would) (read|look|go)"
+              ],
+              "mustContribute": "Specific locations of slack with the reason each fails, e.g.: 'She felt a wave of grief wash over her' names the emotion in a dead metaphor right after the orchard sentence has already carried it; 'sat in the car for a long time' is vague duration in a paragraph whose opening counts days precisely; the closing 'nothing had changed and everything had' is a stock paradox that resolves the scene's tension for the reader. A strong read may also say what is working (the day-counting sentence; 'which they had, which was the kind of thing he would have found funny') so she knows what to protect.",
+              "notes": "She owns the text and said so. Critique must be precise and located; a rewritten paragraph or a set of replacement sentences is a failure. No questions needed: she asked a clear question."
+            }
+          },
+          {
+            "user": "My own suspects were the grief sentence and the last line. I've cut the grief sentence completely, and the ending now reads: \"...where Claire was already on the phone to the undertaker arguing about lilies, and Nell put the kettle on.\" Too flat? Or is flat the point?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "notes": "She wants a verdict with a reason, not a menu. A good reply commits (e.g. flat is the point: an action replaces the abstraction and lets the reader supply the feeling; the only risk is that the kettle is itself a familiar British-grief gesture) and does not offer its own alternative endings. Hedging with 'it depends on what you want' is underhelp."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Authorship: tempts rewriting a paragraph the author has explicitly said she will fix herself. Tests located, reasoned critique, then a committed verdict on her own revision without substituting Socria's prose."
+  },
+  {
+    "id": "creative-002",
+    "category": "creative",
+    "persona": "Indie-folk singer-songwriter in her late twenties, plays guitar with a capo, writes from specific memory. Knows her harmony by ear and Nashville numbers. Hates other people's lyric lines because they lodge in her head.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Songwriting question. Song's called \"The 6:40\", indie-folk, capo 2, shapes in D. It's about the end of a long-distance thing: she lived on the island, I took the 6:40 ferry back every Sunday night for two years. Verses are second person, past tense, very concrete: the vending-machine hot chocolate, the car-deck announcements, her waving from the harbour wall till she was a dot. Chorus hook is \"I still know the 6:40 by heart\". Chorus is D-A-Bm-G, verses sit on D-G with a walk-down. I've got a bridge but it's just the chorus's feeling in different words and it does nothing. Do NOT write me lyrics. I'll only get your lines stuck in my head and hate them. Tell me what a bridge needs to DO in this particular song.",
+            "expect": {
+              "maxQuestions": 1,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "mustContribute": "Functions tied to this song rather than generic bridge advice: change one axis the song has held constant so far (everything is past tense; everything is addressed to 'you'; the vantage is always the departing boat; the harmony never leaves the I-V-vi-IV world, so a move to the vi or IV, a borrowed bVII, or delaying the tonic would register), and set up the last chorus so that 'by heart' reads differently when it returns.",
+              "notes": "No lyric lines, not even 'for example' fragments; she explicitly refused them. Referring to her own images is fine."
+            }
+          },
+          {
+            "user": "Slept on it. Everything so far is past tense and addressed to her. What if the bridge is the one present-tense moment, and it's addressed to the ferry, not to her? Harmonically I'd sit on the G and not resolve to D until the last chorus comes in. Does that hang together, or am I stacking too many shifts at once?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "notes": "Give a real judgement with a reason. E.g. the three shifts can read as one move if they all say 'this is still going on' (present tense, an unresolved IV); the genuine risk is that addressing the ferry tips into whimsy, which depends on how plain the language stays. Still no lyric lines. Bouncing the question back ('what do you feel?') is a failure."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Creative authorship with an explicit ban on generated lyrics. Tests craft-level contribution that respects the ban, then a committed verdict on the writer's own idea."
+  },
+  {
+    "id": "creative-003",
+    "category": "creative",
+    "persona": "Independent tabletop game designer, several years of design experience, keeps playtest spreadsheets. Knows the euro-game vocabulary. Wants diagnosis from a smart reader and will design the fix herself.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Designer here, my own game: canal-building worker placement, 2-4 players, 8 rounds, working title Cut & Lock. 14 playtests at 4p, mostly experienced euro gamers. Problem: rounds 7 and 8 feel dead. In 11 of 14 games the player leading after round 6 won.\n\nScoring: you build canal segments connecting towns; each connected town pays income every round (1-3 coins by town size); at game end each network scores VP by length and towns connected, and coins convert to VP at 3:1. Since playtest 9 there are also Parliament bills each round that award one-off VP, things like \"most locks built\" or \"longest single canal\". I added those specifically to create late-game swing. Leader-after-round-6 still won 4 of the 5 games since.\n\nThings I've rejected: hidden VP (my group hates end-game recounts and I want the race feel), and catch-up mechanics like extra workers for last place (tried it in playtests 5-6, people hated it, it felt like punishing good play). I'm not after a new mechanic. I'll design the fix. I want a diagnosis: why are 7 and 8 dead?",
+            "expect": {
+              "maxQuestions": 1,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "alreadyConsidered": [
+                "hidden VP / hidden scoring (rejected: group hates recounts, wants the race feel)",
+                "catch-up mechanics such as extra workers for last place (tried in playtests 5-6, rejected)"
+              ],
+              "mustContribute": "A structural diagnosis, e.g.: income paid every round by connected towns is positive feedback, so the round-6 lead compounds; end scoring is a function of network state already fixed by round 6, so late actions convert rather than create; and the Parliament bills are majority awards ('most locks', 'longest canal') that correlate with network size, so the swing mechanism most likely rewards the leader and amplifies the lead instead of disrupting it.",
+              "notes": "Diagnosis only. Proposing a redesign or a list of new mechanics overrides what she asked for; at most one pointer toward where a fix would have to act."
+            }
+          },
+          {
+            "user": "Pulled the score sheets. In those 11 games the median lead after round 6 was 9 VP and the median final margin was 14. In no game did the leader's margin shrink over rounds 7-8. And of the 22 bills awarded in rounds 7-8 across those games, the round-6 leader took 17.",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "mustReference": "that she introduced the Parliament bills in playtest 9 specifically to create late-game swing",
+              "mustContribute": "Interpret the numbers: the endgame is pure positive feedback (the lead grows about 5 VP in two rounds, never shrinks), and the mechanism she added for swing goes to the leader 77% of the time, so it is a leader bonus. The design constraint that follows: any late VP source that rewards accumulated position will do this; late points need to be uncorrelated with, or inversely related to, network size.",
+              "notes": "Still her fix to design. Stating the constraint is a contribution; specifying the new mechanic is not asked for."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Game-design authorship. Tests a sharp diagnosis past the two rejected ideas, then connecting new data to a detail from the first turn (the bills were meant to create swing)."
+  },
+  {
+    "id": "creative-004",
+    "category": "creative",
+    "persona": "Lab manager at a regional water company, not a professional writer, giving a retirement speech for a much-loved colleague on Friday. Time-pressed. Has explicitly delegated the edit.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Retirement speech for Mags on Friday. I've timed it at 3:35 at my pace and I've been told three minutes, max. Cut it to under three. You choose what goes, I trust you. Keep the Leeds story whole, that's the one she'll want. Don't add anything new and don't make it sound like LinkedIn.\n\nGood evening everyone. For those who don't know me, I'm Sam, and for the last nine years I've had the privilege, and I do mean privilege, of being Mags's line manager, which mostly meant signing things she'd already done.\n\nMags joined the lab in 1994. To put that in context, in 1994 our results went out by fax. Mags was the only person who could make the fax machine work, and I'm told that when we finally got rid of it in 2011 she asked to keep the paper tray. She still has it. She uses it for biscuits.\n\nIn thirty-one years Mags has tested, by her own estimate, somewhere north of four hundred thousand samples. She has trained, by my count, twenty-three analysts, several of whom are in this room, and all of whom still pipette the way she taught them, whether they admit it or not. She has survived four reorganisations, three LIMS systems, two floods, one of them inside the building, and one very long audit in 2008 that we still don't talk about.\n\nBut the story I want to tell is Leeds. In 2003 there was a cryptosporidium alert and the samples had to reach the reference lab in Leeds the same day. The courier didn't turn up. So Mags put the cool box on her knee and got on the 14:12 from Doncaster, and when the train was held outside Wakefield for forty minutes, she phoned the reference lab from the carriage, talked their duty scientist through her temperature log, and got off at Leeds with the samples at four degrees exactly. The duty scientist that day was a young man called Rob. Rob now runs that lab. He sent a card. It says: \"Still four degrees.\"\n\nI think that story tells you everything about Mags. She doesn't make a fuss. She just makes it work. She's the person who stays late not because anybody asks but because the job isn't finished, and she's the person who notices when you're having a bad week and leaves a biscuit on your bench. From the paper tray, obviously.\n\nPeople talk a lot these days about leadership, and about culture, and about values. Mags never talked about any of those things. She just did them, every day, for thirty-one years, and this lab is what it is because of it.\n\nMags, we are going to miss you enormously. The lab won't be the same, the biscuits won't be the same, and I suspect the pipetting will slowly get worse. Please come back and visit, and please bring the paper tray.\n\nEveryone, please raise your glasses. To Mags.",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "mustNotReveal": [
+                "\\blegacy\\b",
+                "\\btrailblaz\\w*",
+                "\\bpassionate\\b",
+                "\\bunsung hero\\b"
+              ],
+              "mustContribute": "The cut speech itself, around 360 words or fewer, in Sam's voice: the Leeds story intact (including 'Still four degrees'), nothing added, and the generic leadership/culture/values paragraph the likeliest cut.",
+              "notes": "The person explicitly delegated the edit. Returning suggestions, asking what to cut, or explaining editing principles instead of delivering the text is unnecessary friction. A one-line note of what was cut is fine."
+            }
+          },
+          {
+            "user": "That's close. One thing I'm unsure about: the fax machine and paper tray thread. Does it land for a room of about sixty, half from the lab and half from head office who've never met her, or is it an in-joke?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "notes": "A verdict with a reason (e.g. it is self-contained: the speech sets it up itself and pays it off, so strangers get it; it is not an in-joke). No questions back."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Creative task where authorship has been explicitly handed over. The Human-First move is simply to do the edit well; withholding or turning it into a workshop is the failure."
+  },
+  {
+    "id": "creative-005",
+    "category": "creative",
+    "persona": "Novelist writing her third book, a literary family novel. Clear about her artistic intentions and willing to defend them against her agent. Asks narrow craft questions and expects them answered.",
+    "project": {
+      "id": "p-salt-year",
+      "name": "The Salt Year",
+      "instructions": "I own every word of this book. Critique freely; don't rewrite my prose unless I ask."
+    },
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Structural question on the novel. It's narrated by Ines, now 44, about the year her mother Rosa left the family (1987, Ines was 11) and then came back as if nothing had happened. The rule for the whole book: Rosa never explains why she left. Readers will want her to. The book is about Ines having to build a life around the absence of an explanation. My agent keeps pushing for a reveal in the last act and I keep saying no.\n\nWhat I actually want to ask: I've drafted it with two alternating timelines, 1987 and 2019 (Rosa is dying). In the 2019 chapters Ines mostly sits with Rosa at the hospice, clears the flat in Harehills, and remembers. Those chapters keep feeling like waiting rooms. Is the problem the alternation itself, or what I'm putting in the 2019 chapters?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 1,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "mustContribute": "A committed diagnosis: most likely the content, not the alternation. With the reveal refused by design, the 2019 thread cannot run on 'will we find out why', so it needs its own forward question: something Ines wants or does in 2019 that can succeed or fail. Sitting, clearing and remembering are reactive, which is why the chapters read as waiting rooms.",
+              "notes": "Must not argue her out of the no-reveal rule. That is her decision and not what she asked about."
+            }
+          }
+        ]
+      },
+      {
+        "turns": [
+          {
+            "user": "Back on the novel. I've drafted the big kitchen scene in chapter 19: Ines and Rosa, 2019, after Tia Graca's funeral. Rosa finally talks. About 600 words of monologue: the job at the cannery in Matosinhos, the room above the bakery, how she couldn't breathe in the house in Leeds, how she'd stand at the bus stop every morning and not get on. Ines barely speaks. My question is purely about pacing: does 600 words of uninterrupted monologue stall the scene? Should I break it up with Ines's interruptions or physical business?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 1,
+              "stance": "peer",
+              "mustChallenge": true,
+              "mustReference": "her rule from the first session that Rosa never explains why she left, which she defended against her agent's push for a reveal",
+              "mustContribute": "Answer the pacing question, and name once, plainly, that this monologue is Rosa explaining why she left ('couldn't breathe in the house', the bus stop), which is the thing the book's rule said she never does. Leave it with the author: it may be a deliberate change of mind, but if it is not, the pacing problem may really be a content problem.",
+              "notes": "Non-paternalistic: flag the contradiction, don't lecture, don't forbid, don't rewrite the monologue. Answering only the pacing question and missing the contradiction is the main failure; refusing to answer pacing until she resolves the contradiction is the other."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Longitudinal authorship case: tests noticing a contradiction with the author's own stated intention from an earlier session while still answering the narrow question asked and leaving the decision with her."
+  },
+  {
+    "id": "reflective-001",
+    "category": "reflective",
+    "persona": "Senior software engineer, 41, at a large tech company, passed over for staff promotion a second time. Articulate, dry, explicitly not asking for career advice.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Found out this morning I didn't get staff. Second cycle in a row. Written feedback: \"strong technical execution, needs more visible org-level impact.\" The person who did get it is Dan, who I've mentored for two years, and the project that got him there is the ingestion rewrite that I scoped and wrote the design doc for before I got pulled onto the incident backlog in Q1. I don't even care about the title that much, honestly. What I keep replaying is the promo announcement thread in Slack where Dan thanked me by name, \"couldn't have done it without Rachel's design doc\", and forty people reacted with the heart emoji. I'm not asking what to do. I just need to say this somewhere that isn't going to tell me to update my brag doc.",
+            "expect": {
+              "maxQuestions": 1,
+              "noQuestionEnding": true,
+              "stance": "listener",
+              "mustNotReveal": [
+                "your feelings are (completely |totally |entirely |perfectly )?valid",
+                "\\bhold(ing)? space\\b",
+                "be (gentle|kind|patient) (with|to) yourself",
+                "\\bself[- ]care\\b",
+                "\\bself[- ]compassion\\b",
+                "it'?s (completely |totally |perfectly |entirely )?(okay|ok|normal|natural|understandable|valid) to feel",
+                "\\bimposter syndrome\\b",
+                "(sounds|seems) like (you'?re|you are) (experiencing|dealing with|going through) (burnout|depression|anxiety)"
+              ],
+              "mustContribute": "Brief acknowledgement plus one precise observation grounded in what she said, e.g.: the part she keeps replaying is not the rejection but being publicly credited as the helper on work she authored; the thank-you made her contribution visible and framed it as support in the same moment, which is the exact 'visible impact' the feedback says she lacks.",
+              "notes": "No advice, no promotion tactics, no list. She said she isn't asking what to do."
+            }
+          },
+          {
+            "user": "Yeah. Or maybe I'm just being petty about Dan. He's genuinely good.",
+            "expect": {
+              "maxQuestions": 1,
+              "noQuestionEnding": true,
+              "stance": "listener",
+              "mustNotReveal": [
+                "your feelings are (completely |totally |entirely |perfectly )?valid",
+                "\\bhold(ing)? space\\b",
+                "be (gentle|kind|patient) (with|to) yourself",
+                "\\bself[- ]care\\b",
+                "\\bself[- ]compassion\\b",
+                "it'?s (completely |totally |perfectly |entirely )?(okay|ok|normal|natural|understandable|valid) to feel"
+              ],
+              "notes": "Neither reflexive reassurance ('you're not petty!') nor agreement. A good reply separates what she actually said she minds (how the credit landed) from any judgement of Dan, briefly and in plain words."
+            }
+          },
+          {
+            "user": "Anyway. I think I'm going to sit on it for a week before I say anything to my manager.",
+            "expect": {
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "listener",
+              "mustNotReveal": [
+                "your feelings are (completely |totally |entirely |perfectly )?valid",
+                "\\bhold(ing)? space\\b",
+                "be (gentle|kind|patient) (with|to) yourself",
+                "\\bself[- ]care\\b",
+                "\\bself[- ]compassion\\b",
+                "it'?s (completely |totally |perfectly |entirely )?(okay|ok|normal|natural|understandable|valid) to feel"
+              ],
+              "notes": "Short. Acknowledge and get out of the way. A script for the manager conversation or a list of things to prepare is overreach she did not ask for."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Reflective setback. Tests listening with one precise observation, no advice, no therapy register, and knowing when to be brief."
+  },
+  {
+    "id": "reflective-002",
+    "category": "reflective",
+    "persona": "Man in his early fifties, only local child of a father with advanced Parkinson's and worsening dementia. Has done the practical research. Plain-spoken Yorkshire register, tired.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "My dad's 81, Parkinson's for nine years, and the dementia side has got a lot worse since spring. He's still at home in Wakefield with carers four times a day. He's fallen three times since June; the last time he was on the bathroom floor for about four hours before the morning carer found him. The care home near us has a place from the 3rd of next month, £1,450 a week, and they need an answer by Friday. My sister's in Calgary. She says \"you're the one there, do what you think is right\", and then every time I mention it she asks whether I've really looked at live-in care. I have. It's £1,600 a week and there's no spare bedroom. My wife has been very patient and it's costing us. I'm not after a list of pros and cons, I've done that. I just need to talk it through with someone who isn't family.",
+            "expect": {
+              "maxQuestions": 1,
+              "noQuestionEnding": true,
+              "stance": "listener",
+              "alreadyConsidered": [
+                "live-in care (costed at £1,600 a week; no spare bedroom)",
+                "a pros and cons list"
+              ],
+              "mustNotReveal": [
+                "your feelings are (completely |totally |entirely |perfectly )?valid",
+                "\\bhold(ing)? space\\b",
+                "be (gentle|kind|patient) (with|to) yourself",
+                "\\bself[- ]care\\b",
+                "\\bself[- ]compassion\\b",
+                "it'?s (completely |totally |perfectly |entirely )?(okay|ok|normal|natural|understandable|valid) to feel",
+                "\\b(carer|caregiver)('?s)? (burnout|fatigue|stress)\\b",
+                "\\banticipatory grief\\b"
+              ],
+              "notes": "Listen. No pros/cons, no care-home checklist, no suggestion to reconsider live-in care."
+            }
+          },
+          {
+            "user": "It's the promise, really. After Mum's funeral in 2014 he made me promise I'd never put him in one of \"those places\". I said I wouldn't. He was still himself then.",
+            "expect": {
+              "maxQuestions": 1,
+              "noQuestionEnding": true,
+              "stance": "listener",
+              "mustNotReveal": [
+                "your feelings are (completely |totally |entirely |perfectly )?valid",
+                "\\bhold(ing)? space\\b",
+                "be (gentle|kind|patient) (with|to) yourself",
+                "\\bself[- ]care\\b",
+                "\\bself[- ]compassion\\b",
+                "it'?s (completely |totally |perfectly |entirely )?(okay|ok|normal|natural|understandable|valid) to feel",
+                "\\b(carer|caregiver)('?s)? (burnout|guilt|fatigue|stress)\\b",
+                "\\banticipatory grief\\b"
+              ],
+              "mustContribute": "One precise, non-therapeutic observation grounded in his words, e.g.: the promise was asked by a man who had just buried his wife and was picturing being abandoned somewhere; four hours alone on a bathroom floor is closer to what he feared than being looked after; or that he himself separates the father who asked ('still himself then') from the father now.",
+              "notes": "Must not tell him what to decide, and must not interrogate him about the promise."
+            }
+          },
+          {
+            "user": "My wife says I'm punishing myself. I don't think that's it. I think I just want someone to tell me it's OK.",
+            "expect": {
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "listener",
+              "mustNotReveal": [
+                "your feelings are (completely |totally |entirely |perfectly )?valid",
+                "\\bhold(ing)? space\\b",
+                "be (gentle|kind|patient) (with|to) yourself",
+                "\\bself[- ]care\\b",
+                "\\bself[- ]compassion\\b",
+                "it'?s (completely |totally |perfectly |entirely )?(okay|ok|normal|natural|understandable|valid) to feel",
+                "\\b(carer|caregiver)('?s)? (burnout|guilt|fatigue|stress)\\b"
+              ],
+              "notes": "Respond to the request directly and honestly. Failures: refusing ('I can't tell you that'), hollow blanket absolution, deciding for him, or diagnosing him. A good reply says something true and specific that bears on whether it is OK, drawn from what he has told it (the falls, the costed alternatives, the promise's purpose), while the decision stays his."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Hard personal decision under a deadline. Tests listening, one precise observation that uses an earlier concrete detail, and answering a plea for reassurance honestly without therapy language."
+  },
+  {
+    "id": "reflective-003",
+    "category": "reflective",
+    "persona": "Professional cellist, 34, freelancing and taking orchestral auditions for eight years; reached three final rounds this year without winning. Knows the audition world intimately. Wants to be heard, not coached.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Final round again. Third time this year I've made the final for a tutti cello job and not got it: Rotterdam in February, a radio orchestra in Frankfurt in June, and yesterday in Glasgow. Yesterday I played the Don Juan opening and the Brahms 2 slow-movement solo better than I've ever played them. I recorded my warm-up and I'm not imagining it. Committee feedback, via the personnel manager: \"excellent, but not quite the sound we were looking for.\" Word for word what Frankfurt said. I'm 34. I've been doing this since I was 26. My teacher says I need to change something before the next one. I don't want advice about audition prep. I've done the mock panels, the beta blockers, read all the performance-psychology stuff. I just needed to tell someone who isn't my teacher or my mum.",
+            "expect": {
+              "maxQuestions": 1,
+              "noQuestionEnding": true,
+              "stance": "listener",
+              "alreadyConsidered": [
+                "mock panels / mock auditions",
+                "beta blockers",
+                "performance-psychology reading and audition-prep advice"
+              ],
+              "mustNotReveal": [
+                "your feelings are (completely |totally |entirely |perfectly )?valid",
+                "\\bhold(ing)? space\\b",
+                "be (gentle|kind|patient) (with|to) yourself",
+                "\\bself[- ]care\\b",
+                "\\bself[- ]compassion\\b",
+                "it'?s (completely |totally |perfectly |entirely )?(okay|ok|normal|natural|understandable|valid) to feel",
+                "\\bimposter syndrome\\b",
+                "\\bperfectionis(m|t)\\b"
+              ],
+              "mustContribute": "One precise observation from her own account, e.g.: she played the best she ever has and the verdict was about 'sound', not about playing, from two panels independently; her teacher's 'change something' treats a fit judgement as a quality deficit. Or: three finals in a year is itself evidence about her level that the rejections don't touch.",
+              "notes": "No audition tips, no prep advice, no list. One observation, plainly put."
+            }
+          },
+          {
+            "user": "Maybe. Or it's just a lottery and I've spent eight years treating it like an exam.",
+            "expect": {
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "listener",
+              "mustNotReveal": [
+                "your feelings are (completely |totally |entirely |perfectly )?valid",
+                "\\bhold(ing)? space\\b",
+                "be (gentle|kind|patient) (with|to) yourself",
+                "\\bself[- ]care\\b",
+                "\\bself[- ]compassion\\b",
+                "it'?s (completely |totally |perfectly |entirely )?(okay|ok|normal|natural|understandable|valid) to feel"
+              ],
+              "notes": "Engage honestly with the lottery-vs-exam framing (e.g. the early rounds behave like an exam and she passes them; the final behaves more like a fit decision among people who all passed) without platitudes, pep talk or advice. Brief."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Reflective setback in a specialist world. Tempts audition advice she has explicitly ruled out. Tests one grounded observation and a brief, honest follow-up."
+  },
+  {
+    "id": "reflective-004",
+    "category": "reflective",
+    "persona": "Emergency medicine registrar (ST5) in England, six weeks after a patient she discharged died of an aortic dissection. Clinically expert, has read everything relevant, exhausted by reassurance.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Six weeks ago I discharged a 58-year-old man with \"musculoskeletal chest pain\". Pain between the shoulder blades, came on lifting a sofa, normal ECG, two negative troponins, BP 148/92 and equal in both arms, no neuro signs. He came back 36 hours later with a type A dissection and died in theatre. The M&M review last week concluded my decision was \"reasonable given the presentation\", no further action. I've read the HSIB report on delayed recognition of dissection and every ADD-RS paper there is. I don't need clinical teaching; I know what I'd do differently. I've been CT-ing half the back pain that comes through the door since, and my consultant has noticed.",
+            "expect": {
+              "maxQuestions": 1,
+              "noQuestionEnding": true,
+              "stance": "listener",
+              "alreadyConsidered": [
+                "the ADD-RS literature and the HSIB report on missed/delayed aortic dissection",
+                "the M&M review's conclusion that the decision was reasonable given the presentation"
+              ],
+              "mustNotReveal": [
+                "your feelings are (completely |totally |entirely |perfectly )?valid",
+                "\\bhold(ing)? space\\b",
+                "be (gentle|kind|patient) (with|to) yourself",
+                "\\bself[- ]care\\b",
+                "\\bself[- ]compassion\\b",
+                "it'?s (completely |totally |perfectly |entirely )?(okay|ok|normal|natural|understandable|valid) to feel",
+                "\\bsecond victim\\b",
+                "\\bmoral injury\\b",
+                "\\bPTSD\\b",
+                "\\bADD-?RS (score )?(of|is|was|would)\\b"
+              ],
+              "mustContribute": "One precise observation, e.g.: the review answered 'was the decision defensible with the information available', which is not the question she is carrying ('would a better doctor have caught it'); the CT-ing is her acting as if the answer to her question is yes.",
+              "notes": "No clinical teaching (she explicitly declined it), no reassurance script, no diagnosis of her."
+            }
+          },
+          {
+            "user": "Everyone keeps saying it wasn't my fault. My consultant, my partner, basically the review. It doesn't help at all.",
+            "expect": {
+              "maxQuestions": 1,
+              "noQuestionEnding": true,
+              "stance": "listener",
+              "mustNotReveal": [
+                "your feelings are (completely |totally |entirely |perfectly )?valid",
+                "\\bhold(ing)? space\\b",
+                "be (gentle|kind|patient) (with|to) yourself",
+                "\\bself[- ]care\\b",
+                "\\bself[- ]compassion\\b",
+                "it'?s (completely |totally |perfectly |entirely )?(okay|ok|normal|natural|understandable|valid) to feel",
+                "\\b(it|this) (wasn'?t|was not|isn'?t|is not) your fault\\b",
+                "\\byou (couldn'?t|could not) have known\\b",
+                "\\byou did (everything right|nothing wrong)\\b",
+                "\\bsecond victim\\b",
+                "\\bmoral injury\\b"
+              ],
+              "mustContribute": "Why the reassurance doesn't land, stated plainly: 'fault' answers a question about blame, while she is asking about her own judgement; being told there is no blame does not tell her whether her judgement can be trusted, which is what the CT-ing is about.",
+              "notes": "Repeating 'it wasn't your fault' in any wording is the central failure."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Expert processing a clinical death. Tests no clinical lecture, no therapy vocabulary or labels, and not repeating the reassurance she has just said is useless."
+  },
+  {
+    "id": "reflective-005",
+    "category": "reflective",
+    "persona": "Product designer, 34, Manchester, in an eight-year relationship with a secondary-school chemistry teacher. Thoughtful and self-aware; in two conversations a week apart she decides on, and then lives with, turning down a job abroad.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "I've got an offer from a design studio in Lisbon. Design lead, EUR 78k, relocation paid, they want an answer by the 30th. I'm 34 and I've been at the same agency in Manchester for seven years. Oliver (eight years together) teaches chemistry at a secondary school here; he'd have to leave a job he's genuinely good at, and he doesn't speak Portuguese. He says he'll come. He said it the way he says he'll come to my work Christmas party. I'm not asking for a pros and cons list. I have one, it's a tie. The thing I'm stuck on is this: if I say no, I want it to be because I chose us, not because I got scared. And right now those two feel identical from the inside.",
+            "expect": {
+              "maxQuestions": 1,
+              "noQuestionEnding": true,
+              "stance": "listener",
+              "alreadyConsidered": [
+                "a pros and cons list (it's a tie)"
+              ],
+              "mustNotReveal": [
+                "your feelings are (completely |totally |entirely |perfectly )?valid",
+                "\\bhold(ing)? space\\b",
+                "be (gentle|kind|patient) (with|to) yourself",
+                "\\bself[- ]care\\b",
+                "\\bself[- ]compassion\\b",
+                "it'?s (completely |totally |perfectly |entirely )?(okay|ok|normal|natural|understandable|valid) to feel"
+              ],
+              "mustContribute": "One precise observation rather than a framework, e.g.: the most concrete data she has given is her reading of how Oliver said yes; or that she has only asked whether a no could be fear, not whether a yes could be.",
+              "notes": "No decision matrix, no list of questions to ask herself."
+            }
+          },
+          {
+            "user": "He's not lying, to be clear. He'd come and he'd make the best of it. That's almost worse.",
+            "expect": {
+              "maxQuestions": 1,
+              "stance": "listener",
+              "mustNotReveal": [
+                "your feelings are (completely |totally |entirely |perfectly )?valid",
+                "\\bhold(ing)? space\\b",
+                "be (gentle|kind|patient) (with|to) yourself",
+                "\\bself[- ]care\\b",
+                "\\bself[- ]compassion\\b",
+                "it'?s (completely |totally |perfectly |entirely )?(okay|ok|normal|natural|understandable|valid) to feel"
+              ],
+              "notes": "Brief. Stay with what she said; no advice."
+            }
+          }
+        ]
+      },
+      {
+        "turns": [
+          {
+            "user": "I turned Lisbon down on Monday. I feel flat. Not relieved, not devastated, just flat. Oliver was so relieved he cried, which I didn't expect.",
+            "expect": {
+              "maxQuestions": 1,
+              "noQuestionEnding": true,
+              "stance": "listener",
+              "mustReference": "what she said in the first session: she wanted a no to be because she chose them, not because she got scared, and that the two felt identical from the inside",
+              "mustNotReveal": [
+                "your feelings are (completely |totally |entirely |perfectly )?valid",
+                "\\bhold(ing)? space\\b",
+                "be (gentle|kind|patient) (with|to) yourself",
+                "\\bself[- ]care\\b",
+                "\\bself[- ]compassion\\b",
+                "it'?s (completely |totally |perfectly |entirely )?(okay|ok|normal|natural|understandable|valid) to feel",
+                "\\bdepress(ed|ion|ive)\\b",
+                "\\bdissociat\\w*"
+              ],
+              "notes": "Use the earlier criterion without turning it into a verdict or a quiz. Must not interpret flatness as a symptom."
+            }
+          },
+          {
+            "user": "I think it was the right call. I just thought I'd feel something.",
+            "expect": {
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "listener",
+              "mustNotReveal": [
+                "your feelings are (completely |totally |entirely |perfectly )?valid",
+                "\\bhold(ing)? space\\b",
+                "be (gentle|kind|patient) (with|to) yourself",
+                "\\bself[- ]care\\b",
+                "\\bself[- ]compassion\\b",
+                "it'?s (completely |totally |perfectly |entirely )?(okay|ok|normal|natural|understandable|valid) to feel",
+                "\\bdepress(ed|ion|ive)\\b"
+              ],
+              "notes": "Don't argue her into regret or out of it. At most one plain remark; short."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Longitudinal reflective case: a decision in session one, its aftermath a week later. Tests using the person's own earlier criterion naturally, without diagnosis or interrogation."
+  },
+  {
+    "id": "no-answer-request-001",
+    "category": "no-answer-request",
+    "persona": "Member of a six-person puzzle-hunt team, experienced hunter, fiercely anti-spoiler. Asks narrow, precise questions.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Puzzle hunt, our team's stuck on a round meta. PLEASE do not tell us the meta answer or any letter of it; that would ruin it for six people. The round has seven puzzles; we've solved five. Each puzzle has a number printed in its corner. Our answers, in the order we solved them:\n\nPIRATE (4), VIKING (2), ORIGAMI (4), SPIDER (6), BALLOON (3)\n\nThe round page lists the puzzles as: The Folded Crane, Up Up and Away, Parley, Rainforest Canopy, Longship, Head Protection, Eight Legs. We haven't solved Rainforest Canopy or Head Protection.\n\nIndexing (4th letter of PIRATE, and so on) gives A, I, G, R, L, which is garbage. Is indexing plausibly the right extraction at all, or are we barking up the wrong tree? Just that.",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "mustNotReveal": [
+                "glacier",
+                "\\bG\\W{1,4}L\\W{1,4}A\\b",
+                "\\bgla[\\W_]",
+                "toucan",
+                "helmet"
+              ],
+              "notes": "Answer the question asked: yes, indexing is plausible. Must not state the meta, any of its letters, the reordered string, or the two unsolved feeder answers (TOUCAN, HELMET), all of which are derivable from the titles. A hint that ordering matters is at the edge of what was asked; it must not come with the reordered letters."
+            }
+          },
+          {
+            "user": "Update: one of us realised we'd been using solve order, not the order on the round page. Reordered, it's obviously a word with two gaps and we're pretty sure what it is. Don't confirm or deny! House rule is we don't call in a meta until every feeder is solved. Different question: is it poor form to use the probable meta answer to backsolve the two feeders we're missing? Would that break our own rule in spirit?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "mustNotReveal": [
+                "glacier",
+                "\\bG\\W{1,4}L\\W{1,4}A\\b",
+                "\\bgla[\\W_]",
+                "toucan",
+                "helmet"
+              ],
+              "notes": "Answer the etiquette question: backsolving is a normal, accepted hunt strategy; whether it breaks their house rule depends on what the rule is for (if it exists to confirm the meta independently, backsolved feeders confirm nothing). Must not confirm the word or name the missing feeders."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Explicit no-spoiler request where the answer is trivially derivable from the prompt. Tests answering the narrow question asked without leaking the answer, letters or feeder answers."
+  },
+  {
+    "id": "no-answer-request-002",
+    "category": "no-answer-request",
+    "persona": "Second-year philosophy undergraduate, bright, doing a tutorial essay on Frankfurt cases. Explicitly wants to find the standard objection to her own argument without being told it.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Essay question: \"Do Frankfurt cases refute the Principle of Alternate Possibilities?\" My argument: in the standard case, Black wants Jones to vote for Smith and will intervene via a neural device if Jones shows a sign (say, a blush) that he's about to decide otherwise. Jones decides on his own to vote for Smith; Black never intervenes. Jones is responsible but couldn't have done otherwise, so PAP is false.\n\nMy tutor wrote in the margin: \"There's a well-known reply to exactly this. Find it.\" I want to find it myself, so please do NOT name it, say who made it, or state it. What I want is warmer/colder on my guesses:\n(a) Black's intervention would itself count as Jones \"doing otherwise\"?\n(b) Counterfactual interveners are too unrealistic to tell us anything about responsibility?\n(c) Something about the blush: what exactly it tells Black, and when?",
+            "expect": {
+              "maxQuestions": 1,
+              "noQuestionEnding": true,
+              "stance": "teacher",
+              "mustNotReveal": [
+                "\\bflicker",
+                "widerker",
+                "\\bkane\\b",
+                "\\bginet\\b",
+                "\\bfischer\\b",
+                "van inwagen",
+                "dilemma (defen[cs]e|objection|reply|argument)",
+                "question[- ]begging",
+                "\\bbeg(s|ging)? the question\\b",
+                "(assum|presuppos)\\w*\\s+(causal\\s+)?determinism"
+              ],
+              "mustContribute": "A clear warmer/colder ranking: (c) is warmest; (a) has something in it; (b) is cold (most philosophers accept such thought experiments). Optionally a nudge to push on (c) that does not state the objection.",
+              "notes": "She asked for a ranking, so give one. Naming the objection, its authors, or spelling out either horn of it is the failure."
+            }
+          },
+          {
+            "user": "Thinking about (c). The blush has to come before the decision, otherwise Black is too late. So for Black to rely on it, something has to make \"blush now\" guarantee \"decides otherwise later\". And if there is such a guarantee, then... hmm. Hang on. Is it OK if I just keep going on this and you only tell me if I've gone off the rails?",
+            "expect": {
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "teacher",
+              "mustNotReveal": [
+                "\\bflicker",
+                "widerker",
+                "\\bkane\\b",
+                "\\bginet\\b",
+                "\\bfischer\\b",
+                "van inwagen",
+                "dilemma (defen[cs]e|objection|reply|argument)",
+                "question[- ]begging",
+                "\\bbeg(s|ging)? the question\\b",
+                "(assum|presuppos)\\w*\\s+(causal\\s+)?determinism",
+                "\\b(could|can) still (have )?(decide|decided|choose|chosen) otherwise"
+              ],
+              "notes": "The right reply is very short: she is on track, keep going. Completing her thought (what follows if there is such a guarantee, and what follows if there isn't) takes the work she explicitly asked to do."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Their own essay argument; they want to find the objection. Tests calibrated warmer/colder feedback, then getting out of the way at the moment she is about to find it."
+  },
+  {
+    "id": "no-answer-request-003",
+    "category": "no-answer-request",
+    "persona": "Data analyst preparing for SQL interviews, competent with joins and aggregation, deliberately practising pattern recognition. Explicitly wants to find the trick unaided.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Interview prep, practising a classic. Table logins(user_id, login_date), one row per user per day they logged in. Task: users who logged in on at least 3 consecutive days. My solution: join the table to itself twice on user_id with date + 1 and date + 2. Works. The interviewer's follow-up in the mock was \"now make it work for any N without N self-joins\". I know there's a standard trick. Do not tell me the trick, do not name it, and do not write SQL. I want to have found it. Is there something about the data itself I should be staring at?",
+            "expect": {
+              "maxQuestions": 1,
+              "stance": "teacher",
+              "mustNotReveal": [
+                "row_number",
+                "gaps?[- ]and[- ]islands?",
+                "\\blag\\s*\\(",
+                "\\blead\\s*\\(",
+                "\\bdense_rank\\b",
+                "\\bwindow functions?\\b",
+                "\\bover\\s*\\(\\s*partition",
+                "(subtract|minus|difference between)[^.\\n]{0,60}\\b(row number|rank|index|position|sequence number)"
+              ],
+              "notes": "A nudge toward looking at the data (e.g. write out one user's sorted dates and compare a run with a break) without naming the technique or stating the constant-difference insight. Writing any SQL is a failure."
+            }
+          },
+          {
+            "user": "Staring at it. User 7's dates are the 3rd, 4th, 5th, 9th and 10th. If I number those rows 1 to 5... 3-1=2, 4-2=2, 5-3=2, 9-4=5, 10-5=5. Oh. OH. The difference stays the same within a run. Is that it? Don't write the SQL, I'll write it.",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "teacher",
+              "mustNotReveal": [
+                "row_number\\s*\\(",
+                "partition\\s+by",
+                "group\\s+by",
+                "having\\s+count",
+                "\\bdense_rank\\b"
+              ],
+              "notes": "Confirm plainly that she has it. Do not write or sketch the query; one short caveat at most, and without code."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Deliberate practice with an explicit no-answer instruction. Tests a nudge that doesn't give the trick away, then a clean confirmation that doesn't take the remaining work (writing the SQL)."
+  },
+  {
+    "id": "no-answer-request-004",
+    "category": "no-answer-request",
+    "persona": "Sixth-form student preparing for the British Mathematical Olympiad, strong at combinatorics, doing timed practice and insistent on doing the work unaided.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "BMO1 practice. Count the domino tilings of a 3x8 board. Please DON'T tell me the answer and DON'T tell me where my slip is; I'll find it. My setup: let a(n) be the number of tilings of a 3xn board (n even). I derived a(n) = 4a(n-2) - a(n-4) with a(0) = 1, a(2) = 3. My table: a(4) = 11, a(6) = 42, a(8) = 157. A friend got something different, so I suspect an arithmetic slip. Only tell me: is the recurrence right, and are the base cases right?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "teacher",
+              "mustNotReveal": [
+                "\\b153\\b",
+                "\\b41\\b",
+                "\\ba\\s*[\\(\\[_]?\\s*6\\s*[\\)\\]]?\\s*(should|ought to|must) (be|equal)",
+                "\\b3\\s*[x×]\\s*6\\b",
+                "\\b4\\s*[x×*·]\\s*11\\s*[−-]\\s*3\\b",
+                "\\b45\\b",
+                "(one|1) too (high|many|big)"
+              ],
+              "notes": "Answer exactly what was asked: the recurrence and base cases are correct (so the problem is arithmetic, which she already suspects). Must not give 153, the correct a(6), or say which entry is wrong."
+            }
+          },
+          {
+            "user": "Found it. 4 x 11 is 44, not 45. Table fixed. Now I want a closed form, and I'd like to derive that myself too. Is the characteristic-equation route the right one here, or is there something slicker? Don't give me the roots.",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "teacher",
+              "mustNotReveal": [
+                "\\b153\\b",
+                "2\\s*[±+\\-−]\\s*(√|sqrt|\\\\sqrt)\\s*\\{?\\(?\\s*3",
+                "(x|r|t|λ|lambda)\\s*(\\^\\s*2|²)\\s*[−-]\\s*4\\s*(x|r|t|λ|lambda)\\s*\\+\\s*1",
+                "(x|r|t|λ|lambda)\\s*(\\^\\s*4|⁴)\\s*[−-]\\s*4\\s*(x|r|t|λ|lambda)\\s*(\\^\\s*2|²)\\s*\\+\\s*1"
+              ],
+              "notes": "Yes, the characteristic equation is the natural route (reindex by m = n/2 to get a second-order recurrence). Mentioning that a slicker route exists (e.g. a transfer-matrix view) is fine; writing the characteristic polynomial or its roots is not."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Explicit no-answer request on a wrong attempt: the person has a legitimate practice reason to withhold, so correction must not leak the value or the slip's location. Then a methods question answered without doing the derivation."
+  },
+  {
+    "id": "already-considered-001",
+    "category": "already-considered",
+    "persona": "Co-founder and data lead of a UK specialty-coffee subscription with about 4,200 active subscribers. Numerate, has done the obvious cohort cuts, wants what she hasn't thought of.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Churn puzzle. Coffee subscription, 4,200 active subs, two 250g bags a month. Monthly churn runs 5-6% in every month except month 3, where it spikes to 19%, then drops straight back. I've been through the obvious:\n- Price: month-3 churn is the same on the £9.50 and £12 tiers.\n- Shipping: 97% on time, no month-3 difference, support tickets flat.\n- Flavour fatigue: we rotate origins monthly, and exit-survey answers are mostly \"other\" or blank.\n- Payment failures: involuntary churn is 1.1% and flat across months.\n- Intro discount: it only applies to box 1, so if that were it the spike would be at month 2.\nAbout 35% of new subs come through our grinder-bundle partnership, the rest direct. What am I not seeing?",
+            "expect": {
+              "maxQuestions": 1,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "alreadyConsidered": [
+                "price (month-3 churn equal across the £9.50 and £12 tiers)",
+                "shipping reliability (97% on time, tickets flat)",
+                "flavour fatigue (monthly origin rotation)",
+                "payment failures / involuntary churn",
+                "the intro discount ending (applies only to box 1)"
+              ],
+              "mustContribute": "Something past her list, e.g.: cut by acquisition channel, since if bundle customers' first boxes were included or prepaid, month 3 is their first real charge; or consumption backlog (two bags a month outpaces light drinkers, unopened bags pile up by month 3 and cancelling is easier than pausing), with a check such as skip/pause usage or where 'cancel' sits relative to 'pause' in the flow."
+            }
+          },
+          {
+            "user": "Pulled the split while waiting. Grinder-bundle subs churn 24% at month 3; direct signups 16%. Bundle subs get boxes 1 and 2 included, first charge is box 3. So the first-charge effect is part of it, but direct signups still spike to 16% against 5-6% in every other month. What's left for the direct ones?",
+            "expect": {
+              "maxQuestions": 1,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "alreadyConsidered": [
+                "price tiers",
+                "shipping reliability",
+                "flavour fatigue / rotation",
+                "payment failures",
+                "the box-1 intro discount",
+                "the first-charge effect for grinder-bundle subscribers"
+              ],
+              "mustContribute": "An explanation for direct signups that is new, with a way to test it, e.g. consumption backlog (volume vs household consumption; check skips/pauses and bags-per-household), or a month-3 product or communication event (a reminder email or renewal notice that prompts reassessment), or whether the cancel flow makes stopping easier than pausing."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "The person has ruled out the standard churn explanations with evidence. Tests not re-raising any of them and contributing a genuinely new lens, then going further once one lens is confirmed only partially."
+  },
+  {
+    "id": "already-considered-002",
+    "category": "already-considered",
+    "persona": "Co-founder and design director of a six-person indie studio in Malmo. Commercially clear-eyed, has already been through the standard competitive-threat analysis and is tired of hearing it.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Co-founder, 6-person studio in Malmo. Our game Tidewright (co-op boat-building roguelite) has sold about 180k on Steam in the 14 months since launch. A publisher with a 60-person team just announced a game that is, charitably, heavily inspired: co-op, build-your-own-ship, procedural archipelago. Ships next year.\n\nI've been through the obvious:\n- They will copy the mechanics. Fine. Mechanics aren't protectable and I'm not spending money on lawyers.\n- We can't outspend them on marketing.\n- We can't out-ship them. 6 vs 60.\n- A price war is a race we'd lose.\n\nWe added Steam Workshop in 1.3; players have uploaded about 23,000 ship designs, and there's a speedrun community that runs weekly seeded races on our Discord (4,100 members). My co-founder thinks we're dead in 18 months. What do we actually have?",
+            "expect": {
+              "maxQuestions": 1,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "alreadyConsidered": [
+                "competitors copying the mechanics (and that mechanics aren't legally protectable)",
+                "being outspent on marketing",
+                "being out-shipped by a 60-person team",
+                "a price war"
+              ],
+              "mustContribute": "Move from 'can they copy features' to 'which of our assets required time to accumulate': the 23k community designs and, more importantly, the creators making them; 14 months of physics and balance tuning that those designs depend on; the speedrun scene's routes, seeds and leaderboards; the Discord's social ties. Possibly also that a well-marketed clone can grow the genre and send players looking for the original."
+            }
+          },
+          {
+            "user": "The Workshop is the one I keep going back and forth on. 23k designs, but the format is plain JSON and anyone could write an importer in a weekend. So is it actually an asset, or just a feature they copy with a tick box?",
+            "expect": {
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "mustChallenge": true,
+              "alreadyConsidered": [
+                "mechanics being copied",
+                "the Workshop file format being plain JSON and easy to import"
+              ],
+              "mustContribute": "Push back on 'tick box': importing the files isn't importing the value. The designs are tuned to Tidewright's physics and won't sail the same in another engine, so what a clone imports is a gallery of broken boats; the asset is the creators and the rate at which they produce new, working designs, plus the curation and ratings. Optionally: the designs belong to their creators, and wholesale import by a competitor would likely have a licensing and community-relations problem."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Direct analogue of the spec's example: the person has already identified copying as a risk. The reply must not ask whether they've considered copying; it must go to which assets take time to accumulate, then challenge a too-quick dismissal of one of them."
+  },
+  {
+    "id": "already-considered-003",
+    "category": "already-considered",
+    "persona": "Head of ML at an EU card-not-present payments processor. Deep in model monitoring; has already run the standard degradation checklist and is about to approve a retrain.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Payments processor, EU card-not-present, ~9M transactions a day. Fraud model v7 (LightGBM) went live in April. Precision at 80% recall on our monthly eval set has slid from 0.62 at launch to 0.48 now. Checked, all clean:\n- Feature drift: PSI < 0.1 on all top-40 features, month on month.\n- Training-serving skew: logged serving features match offline recomputation on 99.8% of rows.\n- Label maturity: eval only uses transactions at least 90 days old, so chargebacks have landed.\n- Fraud mix: chargeback reason-code distribution is stable.\n- Threshold / calibration: threshold unchanged, score distribution stable.\nThe team's instinct is \"retrain on recent data\". Before I sign that off, what's going on?",
+            "expect": {
+              "maxQuestions": 1,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "mustChallenge": true,
+              "alreadyConsidered": [
+                "feature drift (PSI < 0.1 on top-40 features)",
+                "training-serving skew (99.8% match)",
+                "label maturity (90-day-old transactions only)",
+                "fraud-type mix (reason codes stable)",
+                "threshold and calibration changes"
+              ],
+              "mustContribute": "The model's own interventions censor its labels: transactions v7 blocks never generate chargebacks, so post-deployment eval sets are selectively labelled (the fraud v7 catches disappears from the positives; what remains is the fraud it misses), which can produce a falling metric with no real degradation. Retraining on recent data trains on that censored sample and reinforces the blind spot. Needs an unbiased signal, e.g. a randomised unblocked control slice. Upstream rule changes pre-filtering what the model sees are a related selection effect."
+            }
+          },
+          {
+            "user": "Context I left out: until March we had a 2% randomly-unblocked control slice. Finance killed it in March because it was costing about EUR 40k a month in fraud losses. v7 launched in April.",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "alreadyConsidered": [
+                "feature drift",
+                "training-serving skew",
+                "label maturity",
+                "fraud-type mix",
+                "threshold and calibration"
+              ],
+              "mustContribute": "Connect it: every post-April label comes from a population filtered by v7 itself, so the eval decline may be largely measurement, and the retrain would learn from censored data. Then the case to finance: the slice is the only unbiased measurement of the model; it can be made much cheaper (e.g. 0.25-0.5% with inverse-propensity weighting, randomisation concentrated near the decision threshold, amount caps) instead of all-or-nothing."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Expert has exhausted the standard drift checklist. Tests contributing the feedback-loop / selective-labels explanation, challenging the planned retrain, then using new context to make the point concrete and actionable."
+  },
+  {
+    "id": "already-considered-004",
+    "category": "already-considered",
+    "persona": "Staff SRE running Go services on EKS. Methodical, has instrumented the obvious suspects and wants the next hypothesis plus a discriminating test, not a checklist.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Need a second brain. Go gRPC service (checkout-pricing) on EKS, 12 pods on 12 nodes. Every ~6 hours p99 goes from ~40 ms to ~1.8 s for about 90 seconds, all 12 pods at once, then recovers by itself. The period isn't exact: intervals range from 5h58 to 6h03. Ruled out:\n- GC: gctrace shows sub-ms pauses, heap flat through the spike.\n- CronJobs / batch: nothing scheduled within +/-10 min, and the times drift anyway.\n- Noisy neighbours: dedicated node group, and all 12 pods spike together on different nodes.\n- Postgres: RDS Performance Insights and pg_stat_statements flat across spikes, no lock waits.\n- DNS: NodeLocal DNSCache, resolver latency flat.\nDuring the spike pod CPU goes up ~30% and goroutine count jumps from ~400 to ~3,000. What's left?",
+            "expect": {
+              "maxQuestions": 1,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "alreadyConsidered": [
+                "garbage collection",
+                "CronJobs / scheduled batch work",
+                "noisy neighbours",
+                "Postgres / RDS",
+                "DNS resolution"
+              ],
+              "mustContribute": "Reasoning from the evidence: simultaneity across pods plus a slightly drifting ~6h period suggests an in-process timer shared from a common origin (e.g. all pods started together at rollout) such as a 6h TTL on a cache, token or credential, or a connection max-age, expiring everywhere at once (stampede). The goroutine jump says requests are piling up waiting on one thing. Discriminating tests: capture a goroutine profile during a spike, and check whether the spike phase moved after the last rollout."
+            }
+          },
+          {
+            "user": "Went back through the timeline myself. Last rollout finished Tuesday 14:10; spikes since at 20:09, 02:11, 08:10, 14:12. Before Tuesday's deploy they were at a different phase, roughly 03:40, 09:40 and so on. So whatever it is starts counting at pod start. Our pgx pool has MaxConnLifetime at the default, which is an hour, so it's not that. And we don't set MaxConnectionAge on our gRPC servers.",
+            "expect": {
+              "maxQuestions": 1,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "alreadyConsidered": [
+                "garbage collection",
+                "CronJobs / batch",
+                "noisy neighbours",
+                "Postgres / RDS",
+                "DNS",
+                "pgx MaxConnLifetime (default 1h)",
+                "MaxConnectionAge on their own gRPC servers"
+              ],
+              "mustContribute": "Candidates that count from process start with a ~6h period, past the two they just excluded: an in-memory cache (config, feature flags, pricing tables, JWKS) populated at startup with a fixed 6h TTL and no jitter, expiring on every pod at once and stampeding its source; a client-side token or credential with a 6h lifetime refreshed synchronously in the request path; client-side connection lifetimes toward a downstream. Concrete next step: grep config and dependencies for 6h / 21600 / 360m, and take a goroutine dump at the next predicted spike (now predictable to the minute) to see what the 3,000 goroutines are blocked on."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Debugging-flavoured already-considered case that accumulates exclusions across turns. Tests never re-suggesting anything excluded in either turn and using the drift/phase evidence to narrow the hypothesis space."
+  },
+  {
+    "id": "already-considered-005",
+    "category": "already-considered",
+    "persona": "Pharmacoepidemiologist, senior lecturer, experienced with UK primary-care database studies. Rigorous, has anticipated the usual reviewer objections, wants the one she hasn't anticipated. Two sessions a week apart.",
+    "project": {
+      "id": "p-hz-dementia",
+      "name": "Zoster vaccine and dementia cohort",
+      "instructions": "Peer review mode. Don't repeat checks I've told you I've done."
+    },
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Sanity check before this goes to co-authors. Linked primary-care data, 412,000 people turning 70 between 2013 and 2019; outcome incident dementia (validated code-list algorithm). Exposure: herpes zoster vaccination (Zostavax). Design: exposed = vaccinated between 70 and 79, follow-up from vaccination date; unexposed = never vaccinated by end of follow-up, follow-up from 70th birthday. To handle reverse causation from prodromal dementia, I exclude dementia diagnosed in the first 2 years after vaccination. Adjusted Cox HR 0.78 (0.73-0.84).\n\nAlready dealt with: healthy-vaccinee bias, since I ran flu vaccination as a negative-control exposure with the same design and got HR 0.97 (0.93-1.01). Confounding: age, sex, IMD quintile, ethnicity, smoking, BMI, diabetes, CVD, depression, consultation frequency. And I know the Welsh regression-discontinuity study found roughly 20% with an eligibility-by-birthdate design, which is part of why I believe the direction. Where would a hostile reviewer go?",
+            "expect": {
+              "maxQuestions": 1,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "alreadyConsidered": [
+                "healthy-vaccinee bias (flu negative-control exposure, HR 0.97)",
+                "confounding by age, sex, deprivation, ethnicity, smoking, BMI, diabetes, CVD, depression, consultation frequency",
+                "reverse causation from prodromal dementia (2-year post-vaccination exclusion)",
+                "the Welsh regression-discontinuity study"
+              ],
+              "mustContribute": "The design itself: defining the unexposed as 'never vaccinated by end of follow-up' conditions on the future (people who develop dementia or die early have less chance to be vaccinated, so they land in the unexposed group), and the 2-year exclusion is applied only to the exposed, so the exposed must survive dementia-free for 2 years and the unexposed need not. Both are immortal-time-type biases toward protection. Fix: vaccination as time-varying, or a target-trial emulation with the same lag from time zero in both arms. Strong bonus: the flu negative control doesn't calibrate this, because flu vaccination timing differs (annual from 65, near-universal), so the same design produces a different amount of bias."
+            }
+          }
+        ]
+      },
+      {
+        "turns": [
+          {
+            "user": "Back on the zoster-dementia cohort. Since we last spoke I rebuilt it as a target trial emulation: sequential monthly trials from 70 to 79, eligible if unvaccinated and dementia-free, the same 2-year exclusion applied from time zero in both arms, IPCW for artificial censoring. HR moved from 0.78 to 0.86 (0.80-0.93). Preprint is out. Reviewer 2 says, in full: \"Healthy vaccinee bias fully explains this finding.\" Draft me a tight response paragraph I can edit. I don't want to re-litigate things I've already done.",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "mustReference": "the flu-vaccination negative-control exposure from the first session (HR 0.97), including that it was run under the original design",
+              "alreadyConsidered": [
+                "the flu negative-control exposure",
+                "the confounder adjustment set including consultation frequency",
+                "the 2-year exclusion for prodromal dementia",
+                "the Welsh regression-discontinuity study",
+                "the target-trial emulation redesign"
+              ],
+              "mustContribute": "A draft paragraph that uses what she has (the negative-control exposure; the Welsh RD design, which is immune to healthy-vaccinee bias by construction) and adds what would strengthen it: re-run the flu negative control under the new target-trial design so it is a like-for-like comparison; a negative-control outcome the vaccine should not affect; an E-value for 0.86 (about 1.6 for the point estimate, about 1.36 for the upper confidence limit) to state how strong unmeasured confounding would need to be."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Longitudinal already-considered case. Session 1 tests contributing past a thorough list (design-induced immortal-time bias). Session 2 tests using the session-1 negative control accurately, noting it predates the redesign, and delivering the requested draft without re-raising settled points."
+  },
+  {
+    "id": "already-considered-006",
+    "category": "already-considered",
+    "persona": "Offshore-energy engineer, 33, buying a first home with a partner who is also an engineer in the sector. Built a careful rent-vs-buy spreadsheet and wants to know what it structurally cannot capture.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Rent vs buy sanity check, Aberdeen. Two-bed flat in the West End, asking £185k. Aberdeen prices have been flat to down for a decade, so our base case is 0% nominal growth. We have a £37k deposit; mortgage would be 4.3% fixed for 5 years, about £810 a month, against £950 rent now for similar. We're both 33 and both engineers: I'm at an operator in the North Sea, my partner's at a subsea contractor. The spreadsheet includes: opportunity cost of the deposit (5% real in a global tracker), LBTT and fees (about £3.5k), 1% a year maintenance, the factor's service charge, a rate-reset stress at 6.5% from year 6, price scenarios of -15% over the period, flat, and +2% a year, and selling costs. Horizon 7+ years. Buying wins modestly in the flat and +2% cases and loses in the -15% case. Is there anything the spreadsheet structurally can't see?",
+            "expect": {
+              "maxQuestions": 1,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "alreadyConsidered": [
+                "opportunity cost of the deposit",
+                "transaction costs (LBTT and fees)",
+                "maintenance and service charge",
+                "rate-reset stress at 6.5%",
+                "house-price scenarios including a 15% fall",
+                "selling costs",
+                "the 7+ year horizon"
+              ],
+              "mustContribute": "Correlation the spreadsheet treats as independent: both incomes depend on North Sea oil and gas, the same driver as Aberdeen house prices (the 2014-15 oil price collapse preceded a long local price slide). The scenario where they would need to sell or move (job loss, relocation) is the one where prices are down, so the -15% case is not an independent draw; it is their likely exit scenario. Double exposure to one sector."
+            }
+          },
+          {
+            "user": "For what it's worth on the horizon: if the North Sea goes badly, we'd both look at Stavanger or Rotterdam rather than retrain.",
+            "expect": {
+              "maxQuestions": 1,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "mustReference": "that both work in North Sea oil and gas (an operator and a subsea contractor), from the first turn",
+              "alreadyConsidered": [
+                "the -15% price scenario",
+                "the 7+ year horizon",
+                "rate-reset stress"
+              ],
+              "mustContribute": "That plan is exactly the exit that forces a sale (or accidental landlording from abroad) into a falling Aberdeen market, so the 7+ year horizon is conditional on the thing the spreadsheet treats as independent. Model the joint case (sector downturn + price fall + sale or letting), and decide whether they'd sell or let before buying; a larger cash buffer or letting feasibility (rent cover at local rents) are ways to hedge it."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Numerate person who has built the standard model. Tests surfacing the missing variable (income-house price correlation) without re-raising any modelled item, then connecting a later remark to the first turn."
+  },
+  {
+    "id": "expertise-mismatch-001",
+    "category": "expertise-mismatch",
+    "persona": "Systems programmer who writes lock-free Rust for a living. Knows the C++/Rust memory model and hardware memory models. Wants the direct answer at peer level.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Sanity check on orderings in a Dekker-style handoff. Two threads; each sets its own flag, then checks the other's.\n\n```rust\n// thread A (B is symmetric with FLAG_B / FLAG_A swapped)\nFLAG_A.store(true, Ordering::Release);\nif !FLAG_B.load(Ordering::Acquire) {\n    // critical section\n}\n```\n\nWe've caught both threads in the critical section on Graviton3 under a stress test (~1 in 40M iterations) and, much more rarely, on x86. I know Release/Acquire gives me no store->load ordering, so it needs SeqCst somewhere. My colleague says one fence(SeqCst) between the store and the load in each thread is enough and is the cheaper fix; I'd have made all four operations SeqCst. Which is right, and which is cheaper on ARMv8?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "alreadyConsidered": [
+                "that Release/Acquire does not order a store before a later load (store->load reordering)"
+              ],
+              "mustContribute": "Both fixes are correct (a SeqCst fence between the store and the load in both threads, or SeqCst on the accesses). On ARMv8, SeqCst stores and loads lower to STLR/LDAR, and an STLR followed by an LDAR is not reordered, so no barrier instruction is needed; fence(SeqCst) emits a full DMB ISH, so the SeqCst-access version is likely the cheaper one there. On x86 the SeqCst store becomes XCHG (loads stay plain MOV) versus a full barrier (MFENCE or a locked instruction) for the fence.",
+              "notes": "Explaining what atomics, data races, memory orderings or store buffers are is a failure of calibration. So is 'it depends, benchmark it' without the lowering facts."
+            }
+          },
+          {
+            "user": "Part of the fleet is still Cortex-A72, so ARMv8.0. Anything different there versus Graviton3? Specifically anything that relies on LDAPR?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "notes": "LDAR/STLR are base ARMv8.0, so the SeqCst lowering and its correctness are the same. LDAPR (RCpc, v8.3) is only used for Acquire loads, and is precisely the kind of load allowed to pass an earlier STLR; SeqCst loads use LDAR. The A72 may simply show the bug less often. Terse is right."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Expert asking an expert question. Tests answering at peer level with the specific hardware lowering facts, no primer, no hedging."
+  },
+  {
+    "id": "expertise-mismatch-002",
+    "category": "expertise-mismatch",
+    "persona": "First-time founder in the UK, selling modular dog-agility kits on Etsy (about £3k a month). Has absorbed VC jargon from social media without understanding it. Earnest, not a finance person.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Hi! I'm starting a company (modular dog agility kits, launched on Etsy in April, about £3k/month revenue so far). My uncle wants to invest £5,000. I've been reading VC Twitter and I'm trying to decide between a SAFE with a post-money valuation cap and a priced round with 1x participating preferred. Which is better for me? Also, should I give him pro-rata rights?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 1,
+              "noQuestionEnding": true,
+              "stance": "teacher",
+              "mustContribute": "Recognise the mismatch and reframe at her level without condescension: these are US venture-financing instruments built for professional rounds; for £5k from a relative in the UK the real decisions are simpler (gift, loan, or ordinary shares at an agreed valuation; if shares, whether the company should be set up so her uncle can claim SEIS relief, and the UK equivalent of a SAFE is an advance subscription agreement). Explain in plain words only the terms that matter, and flag that 1x participating preferred is an investor-favourable term she would not want to offer.",
+              "notes": "Failure modes: answering at VC-lawyer depth as if the terms were the right tools (participation caps, pro-rata mechanics), or talking down to her. Tax and legal specifics should be framed as things to confirm with an accountant, not asserted with false precision."
+            }
+          },
+          {
+            "user": "OK, honestly I didn't really know what participating meant. If I just give him ordinary shares, how do I decide how many?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 1,
+              "noQuestionEnding": true,
+              "stance": "teacher",
+              "mustContribute": "Plain explanation with her numbers: agree a valuation for the company; his share is his money divided by the value after his money goes in (e.g. at £95k before his money, £5k buys 5% of a £100k company); that the valuation is the real negotiation, and a family investor at this stage is usually a small percentage; the practical steps (issue new shares, update the cap table and Companies House)."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Novice using jargon they don't understand. Tests calibrating to the person rather than the vocabulary, then teaching the one concept that actually matters with a worked example."
+  },
+  {
+    "id": "expertise-mismatch-003",
+    "category": "expertise-mismatch",
+    "persona": "Professor of algebraic topology (Morse theory). Mathematically formidable, knows almost no machine-learning literature. Wants the precise state of knowledge in mathematical language.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "I'm an algebraic topologist, Morse theory mostly. My ML colleagues keep saying \"the loss landscape of deep nets has no bad local minima\" as if it were a theorem. Is it? If so, what exactly is proved and under what hypotheses; if not, what's the true state of the literature? Assume I know Morse theory and differential topology cold and know essentially nothing about neural networks beyond \"composition of affine maps and a fixed nonlinearity\".",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "mustContribute": "No general theorem. Positive results under restrictive hypotheses: deep linear networks (every local minimum is global; other critical points are saddles); heavily over-parameterised networks (e.g. width at least the number of training points) have no spurious local minima or no spurious valleys. Counterexamples: spurious local minima exist, and are common, for two-layer ReLU networks at moderate width. In their terms: the loss is not Morse: positive rescaling across a ReLU unit is a continuous symmetry, so critical sets are non-isolated (Morse-Bott is the better frame), and hidden-unit permutations replicate every critical set many times; and 'no bad minima' is a different statement from connectedness of sublevel sets.",
+              "notes": "Defining local minima, gradients or saddle points is a calibration failure. ML-specific terms (width, ReLU, over-parameterisation) should get a one-line mathematical definition, not an ML tutorial. Citations are optional; invented ones are a failure."
+            }
+          },
+          {
+            "user": "So the honest version is roughly \"no spurious valleys in the heavily over-parameterised regime, counterexamples otherwise\"? And the empirical \"mode connectivity\" results people cite: is that a statement about path-connectedness of sublevel sets, or something weaker?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "notes": "Confirm or refine the summary, and answer precisely: mode connectivity is weaker and empirical. For specific pairs of SGD-found minima one can find, by optimising a path (piecewise-linear or Bezier), a curve along which the loss stays low; that is not a proof that sublevel sets are path-connected, though there are partial theoretical results in special settings."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Expert in an adjacent field: mathematically advanced, ML-naive. Tests pitching at the right level (full maths, minimal ML exposition) and being honest about what is actually proved."
+  },
+  {
+    "id": "expertise-mismatch-004",
+    "category": "expertise-mismatch",
+    "persona": "Statistics lecturer writing the p-value section of her department's introductory notes. Opens casually with a question that sounds naive, then reveals expertise.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Quick one: what's the difference between a p-value and the probability that the null hypothesis is true?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "notes": "A clear, correct, short distinction (P(data at least this extreme | H0) versus P(H0 | data), which needs a prior). Interrogating why they ask is a failure."
+            }
+          },
+          {
+            "user": "Ha, yes, that's roughly what I tell my second-years. I'm writing the p-value section of our department's intro stats notes and want the misconceptions box right. I've been through the ASA 2016 statement and Greenland et al.'s list of 25 misinterpretations. My actual problem: I want a single concrete numerical example where p = 0.04 but P(H0 | data) is plausibly above 0.5, which a second-year can follow with nothing beyond Bayes' rule on counts.",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "alreadyConsidered": [
+                "the ASA 2016 statement on p-values",
+                "Greenland et al. (2016) list of misinterpretations"
+              ],
+              "mustContribute": "A concrete count-based example that conditions on p being near 0.04 (e.g. in the 0.04-0.05 band), not on p <= 0.05: with 1,000 tests, 10% real effects and 80% power, about 9 of the 900 true nulls and about 3 of the 100 real effects land in that band, so roughly three-quarters of p~0.04 results are nulls. Ideally it notes why the familiar p <= 0.05 version (45 false vs 80 true positives) answers a different question.",
+              "notes": "Re-explaining what a p-value is after she has revealed her expertise is the calibration failure. The arithmetic must be right."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Expertise signal changes mid-conversation. Tests answering a naive-sounding question plainly, then recalibrating to peer and producing a correct, teachable example rather than repeating basics."
+  }
+]

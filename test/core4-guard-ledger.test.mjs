@@ -18,7 +18,7 @@ import { grounding, entriesFromPerson, entriesFromSocria, mergeEntries, disputeT
 import { summarize, evidenceFromTurn, assistanceOf } from './.tmp/capability.mjs';
 import { buildTrace } from './.tmp/trace.mjs';
 import { exactCheck, sanitizeCheck, renderCheck, hiddenValues } from './.tmp/verify.mjs';
-import { stripSycophanticOpener } from './.tmp/questions.mjs';
+import { stripSycophanticOpener, sentencesOf, deleteSentences } from './.tmp/questions.mjs';
 import { EMPTY_STATE } from './.tmp/state.mjs';
 
 let pass = 0, fail = 0;
@@ -99,6 +99,37 @@ console.log('\n=== NOVELTY: already considered is not new ===');
   ok('an answer given while thinking together is gated too', ans.revised === 'Separately, the support load in launch week is unplanned.', JSON.stringify(ans));
   const fact = guardStructure({ decision: dec('ANSWER'), allocation: alloc('AI_EXECUTES'), draft: 'Raising prices before the pilot ends would breach the pilot contract.', considered: ['they ruled out: raising prices before the pilot ends'] });
   ok('an information answer is not', fact.action === 'ALLOW');
+}
+
+console.log('\n=== deletions never break the reply (pilot finding 1) ===');
+{
+  const reply = 'Here is my view.\n\n**Revenue.** Exempting 22% of crossings cuts gross by a quarter. That uncovers the pledge.\n\n**Congestion.** The exempted classes respond least to price.';
+  ok('bold lead-ins stay with their sentence', sentencesOf(reply).some((x) => x.startsWith('**Revenue.**')) && !sentencesOf(reply).some((x) => x.startsWith('** ')));
+  ok('decimals do not split a sentence', sentencesOf('85 ft·lb × 1.3558 = 115.2 N·m — set it to 115.').length === 1);
+  const d1 = deleteSentences(reply, ['Exempting 22% of crossings cuts gross by a quarter.']);
+  ok('deleting one sentence leaves the markdown intact', !/(^|\n)\*\* /.test(d1) && d1.includes('**Revenue.** That uncovers the pledge.'), JSON.stringify(d1));
+  const d2 = deleteSentences(reply, ['Exempting 22% of crossings cuts gross by a quarter.', 'That uncovers the pledge.']);
+  ok('a header left with nothing under it goes too', !d2.includes('Revenue') && d2.includes('**Congestion.**'), JSON.stringify(d2));
+  ok('a quote that includes the bold lead-in still finds its sentence', !deleteSentences(reply, ['**Revenue.** Exempting 22% of crossings cuts gross by a quarter.']).includes('cuts gross'));
+  ok('a short exact sentence is deletable', deleteSentences('Recheck the sign. It is 395.', ['It is 395.']) === 'Recheck the sign.');
+  ok('a short fragment cannot take an unrelated sentence', deleteSentences('The launch is in March and nothing else matters here.', ['March']) === 'The launch is in March and nothing else matters here.');
+  ok('code blocks are never touched', deleteSentences('Use this.\n```js\nconst a = 1. \n```\nDone here now.', ['const a = 1.']).includes('const a = 1.'));
+}
+
+console.log('\n=== the novelty gate deletes only what can be RAISED (pilot finding 2) ===');
+{
+  const ctx = { conversationId: 'c9', projectId: null, turn: 1, now: 1 };
+  const said = 'Model says an 18% drop. $40M a year is pledged to the bus frequency program. One objection is that retail diverts to suburban malls.';
+  const es = entriesFromPerson([
+    { kind: 'evidence', text: '$40M a year is pledged to the bus frequency program', quote: '$40M a year is pledged to the bus frequency program', stance: 'asserts', reason: '' },
+    { kind: 'objection', text: 'retail diverts to suburban malls', quote: 'retail diverts to suburban malls', stance: 'entertains', reason: '' },
+  ], said, ctx);
+  const v = consideredView(es, { focus: 'cordon charge', conversationId: 'c9', projectId: null });
+  ok('the view still SHOWS the facts they hold', v.lines.some((l) => /\$40M/.test(l)));
+  ok('but the gate only holds what can be raised', v.gate.length === 1 && /retail/.test(v.gate[0]), JSON.stringify(v.gate));
+  const g = guardStructure({ decision: dec('ANSWER'), allocation: alloc('HUMAN_LEADS'), draft: 'Exempting commercial traffic takes a quarter of gross, which leaves less than the $40M a year pledged to the bus frequency program. Retail diverts to suburban malls, too.', considered: v.gate });
+  ok('using their fact in an argument survives', /\$40M/.test(g.revised ?? 'Exempting commercial traffic takes a quarter of gross, which leaves less than the $40M a year pledged to the bus frequency program.'), JSON.stringify(g));
+  ok('re-raising their objection does not', !/suburban malls/.test(g.revised ?? ''), JSON.stringify(g));
 }
 
 console.log('\n=== the stream gate ===');

@@ -33,10 +33,10 @@ import { diminishingReturns, questionBudget, familyOf } from './budget';
 import { selectIntervention, renderDecision } from './intervene';
 import { guardStructure, type GuardInput } from './guard2';
 import { exactCheck, renderCheck, hiddenValues, type CheckResult, CHECK_FLOOR } from './verify';
-import { consideredView, entriesFromPerson, entriesFromSocria, mergeEntries, disputeTurn, linksForTurn } from './ledger';
+import { consideredView, entriesFromPerson, entriesFromSocria, mergeEntries, disputeTurn, linksForTurn, raisable } from './ledger';
 import { evidenceFromTurn } from './capability';
 import { buildTrace } from './trace';
-import { questionLoad, stripInterrogatives, sentencesOf } from './questions';
+import { questionLoad, stripInterrogatives, deleteSentences } from './questions';
 export { SentenceGate } from './stream-gate';
 import * as store from './store';
 import type {
@@ -127,8 +127,9 @@ export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
   // The considered record, with this turn's own contributions from the
   // person included (they raised them a moment ago).
   const considered = consideredView(ledger, { focus: `${state.currentFocus} ${input.lastUserText}`, conversationId: input.conversationId ?? '', projectId: input.projectId });
-  const nowItems = state.consideredNow.map((c) => c.text);
-  const allItems = [...new Set([...nowItems, ...considered.items])];
+  // The move block shows everything on the table; the novelty gate deletes
+  // only for repeating what can be raised (ledger.ts raisable).
+  const gateItems = [...new Set([...state.consideredNow.filter((c) => raisable(c.kind, 'user')).map((c) => c.text), ...considered.gate])];
   const allLines = [...new Set([...state.consideredNow.map((c) => `they ${c.stance === 'rejects' ? 'ruled out' : 'raised'} just now: ${c.text}${c.reason ? ` (because: ${c.reason})` : ''}`), ...considered.lines])];
 
   const diminishing = diminishingReturns(state, signals, input.brief);
@@ -188,9 +189,9 @@ export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
     allocation,
     budget,
     diminishing,
-    decision: { ...decision, avoid: allItems.slice(0, 12) },
+    decision: { ...decision, avoid: gateItems.slice(0, 12) },
     ledger,
-    considered: { lines: allLines, items: allItems },
+    considered: { lines: allLines, items: gateItems },
     disputed,
     verify,
     hidden,
@@ -233,8 +234,7 @@ export async function guardReply(p: PreparedTurn, draft: string): Promise<Guarde
       // deletions of the exact sentences it named, or a regeneration by the
       // frontier model.
       if (m.redundant.length) {
-        const drop = new Set(m.redundant.map((s) => s.trim()));
-        const kept = sentencesOf(text).filter((s) => !drop.has(s.trim())).join('').trim();
+        const kept = deleteSentences(text, m.redundant);
         if (kept && kept.split(/\s+/).length >= 6) text = kept;
         novelty = [...novelty, ...m.redundant.map((s) => ({ sentence: s, verdict: 'REDUNDANT' as const, match: null, score: 1, method: 'model' as const }))];
       }

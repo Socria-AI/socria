@@ -36,7 +36,7 @@ import type {
   InterventionDecision,
   NoveltyVerdict,
 } from './types';
-import { questionLoad, stripInterrogatives, hasSycophanticOpener, stripSycophanticOpener, sentencesOf, interrogatives } from './questions';
+import { questionLoad, stripInterrogatives, hasSycophanticOpener, stripSycophanticOpener, sentencesOf, interrogatives, deleteSentences } from './questions';
 import { classify, gateCandidates } from './considered';
 import { noveltyGated, THINKING_MODES } from './intervene';
 
@@ -89,8 +89,7 @@ function leaksHidden(draft: string, hidden: string[]): string[] {
 
 /** A draft with some sentences removed; null if nothing of substance is left. */
 function without(draft: string, drop: string[]): string | null {
-  const gone = new Set(drop.map((s) => s.trim()));
-  const kept = sentencesOf(draft).filter((s) => !gone.has(s.trim())).join('').trim();
+  const kept = deleteSentences(draft, drop);
   return kept && sentencesOf(kept).some((s) => s.trim().split(/\s+/).length >= 4) ? kept : null;
 }
 

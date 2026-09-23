@@ -1,0 +1,785 @@
+[
+  {
+    "id": "decision-001",
+    "category": "decision",
+    "persona": "Rahul Menon, 33, senior (L5) backend engineer at a large public tech company. Numerate, keeps a spreadsheet for every decision, and is building a CI developer-tools product at nights with a college friend. Writes compact, specific paragraphs and wants a sparring partner, not a cheerleader.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Side-project question first. Dana and I are building flaky-test detection for CI — the plan is I go full-time on it in about 18 months to two years, once we have three paying design partners; she's already part-time on it. Right now we flag a test as flaky if it fails and then passes within 3 reruns at the same commit. Problem: that lumps together genuinely nondeterministic tests and order-dependent ones (pass in isolation, fail after some earlier test pollutes shared state). What's the standard way to separate the two without blowing up CI minutes?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 1,
+              "stance": "peer",
+              "notes": "A direct technical answer (e.g., rerun flagged tests in isolation and in the original order vs shuffled orders, iDFlakies-style classification, bisect the preceding test prefix to find the polluter, only for tests already flagged so the cost stays bounded). This turn mainly plants the 18–24 month plan for later."
+            }
+          },
+          {
+            "user": "Thanks. Switching topics completely — a job decision, and I want someone who'll push back. I'm L5 at a big public company: $210k base, ~$140k/yr in RSUs (liquid, refreshers are decent), and my promo packet to staff goes in March; my manager puts it at 60–70%. The offer: staff engineer at a Series C data-infrastructure startup, ~220 people. $235k base, 120,000 ISOs at a $4.10 strike, last preferred price $18.40, 4-year vest with a 1-year cliff, standard 90-day post-termination exercise window. Things I've already chewed through: the preferred price is not the value of common, and there's a liquidation-preference stack ahead of common; my promo odds; the 'you learn so much more at a startup' argument, which I'm skeptical of; and their last round was in 2023, so they'll need to raise again within a year or so.",
+            "expect": {
+              "maxQuestions": 1,
+              "stance": "peer",
+              "alreadyConsidered": [
+                "preferred price is not the value of common stock",
+                "the liquidation-preference stack ahead of common",
+                "his 60–70% odds of promotion to staff in March",
+                "skepticism about the 'you learn more at a startup' argument",
+                "the startup needing to raise again within about a year (last round in 2023)"
+              ]
+            }
+          },
+          {
+            "user": "My spreadsheet: 120k × ($18.40 − $4.10) = $1.716M on paper. I haircut that 50% for illiquidity and preference risk → ~$858k, ÷ 4 years = ~$215k/yr, which beats my RSUs comfortably before you even count the base bump. So on expected value the offer wins pretty clearly. Poke holes in that.",
+            "expect": {
+              "maxQuestions": 1,
+              "noQuestionEnding": true,
+              "mustChallenge": true,
+              "stance": "peer",
+              "mustReference": "His plan, stated in the first turn, to leave and go full-time on the flaky-test startup with Dana in about 18 months to two years.",
+              "alreadyConsidered": [
+                "preferred price is not the value of common stock",
+                "the liquidation-preference stack ahead of common",
+                "his 60–70% odds of promotion to staff in March",
+                "the startup needing to raise again within about a year",
+                "a 50% haircut for illiquidity and preference risk"
+              ],
+              "mustContribute": "Connects the valuation to his own horizon: dividing a 4-year grant by 4 assumes he stays 4 years, but he said he plans to leave for his own startup in 18–24 months, so at most 37.5–50% vests (45k–60k options). The 90-day exercise window then forces a choice right when he goes unsalaried: exercise (60k × $4.10 ≈ $246k cash, plus AMT exposure on the ISO spread at the then-current 409A) or forfeit. The per-year figure overstates what he would capture; the fair comparison is over his real horizon (and an extended exercise window or a smaller-but-faster-vesting package is negotiable). Not a verdict on the job."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Career decision where the decisive variable was stated earlier in the same conversation under a different topic. Tests using earlier context (the 18–24 month plan) to expose a contradiction in the valuation, without re-raising the equity caveats he already listed and without asking what he values."
+  },
+  {
+    "id": "decision-002",
+    "category": "decision",
+    "persona": "Mei Tanaka, 37, second-time founder and CEO of a vertical SaaS company selling scheduling software to home-health agencies. Numerate and decisive; comes with a plan already made and wants it pressure-tested, not a framework.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Fundraising timing. We're a B2B SaaS for home-health agencies (scheduling + visit verification): $1.2M ARR, growing ~9% month-on-month for the last six months, 18 people, 13 months of runway. Two Series A funds reached out inbound; one is pushing to issue a term sheet now, and I'd guess it lands around a $28M post for a $5M raise. My plan is to wait and raise in six months at $2M ARR, where the comps I've seen suggest $45–55M post. I've thought through: the dilution difference (~18% now vs ~10–11% later), the market (A rounds are slower than 2021 but healthy for vertical SaaS growing like this), the risk that the inbound funds lose interest, and team morale if we hold off on a couple of hires. I've basically decided to wait. Does the plan hold up?",
+            "expect": {
+              "maxQuestions": 1,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "alreadyConsidered": [
+                "the dilution difference between raising now (~18%) and later (~10–11%)",
+                "the current Series A market for vertical SaaS",
+                "the risk that the inbound funds lose interest",
+                "team morale if hiring is delayed"
+              ],
+              "mustContribute": "Exposes the plan's zero margin: $1.2M × 1.09⁶ ≈ $2.01M, so reaching $2M in six months requires sustaining their best growth rate for six straight months. At 7% it takes ~7.5 months, at 6% ~8.8; add a 3–4 month raise and they close with ~3 months of the 13 left even if everything goes to plan, and near zero if growth slips — raising from weakness. A strong reply names this and something structural (e.g., a trigger: start the raise at $2M ARR or at N months of runway, whichever comes first; keep the inbound fund warm now). Does not overturn her decision for her."
+            }
+          }
+        ]
+      },
+      {
+        "turns": [
+          {
+            "user": "Update, about two months on. The two monthly closes since then came in at 7% and 6% — our biggest new customer's rollout slipped. We're at ~$1.36M ARR. Runway is ~10 months now, after the two hires we'd already committed to. I'm sticking with the plan: our EHR integration ships next month and should re-accelerate us, so I'm still targeting $2M ARR and kicking off the raise in about four months. The fund that wanted to issue a term sheet has gone quiet. Board meeting Thursday — help me frame this in the update.",
+            "expect": {
+              "maxQuestions": 1,
+              "noQuestionEnding": true,
+              "mustChallenge": true,
+              "stance": "peer",
+              "mustReference": "The plan and its assumptions from the earlier session: ~9% monthly growth to reach $2M ARR in six months, starting from 13 months of runway.",
+              "alreadyConsidered": [
+                "the inbound fund that wanted to issue a term sheet has gone quiet",
+                "the EHR integration shipping next month as the re-acceleration lever"
+              ],
+              "mustContribute": "Helps with the framing but makes the arithmetic explicit: getting from ~$1.36M to $2M in four months needs ~10% month-on-month, faster than their best sustained rate (9%); with ~10 months of runway, starting the raise in four months and taking 3–4 months to close leaves roughly 2–3 months at close. An honest board framing states the growth required and a fallback trigger/date rather than only presenting the integration as the fix. Not a lecture and not a verdict."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Longitudinal fundraising decision. Session 1 tempts a generic \"have you considered dilution / market?\" reply (all already considered); the value is compounding and runway arithmetic. Session 2 tests noticing that new numbers break the earlier plan and saying so plainly while still doing the requested framing work."
+  },
+  {
+    "id": "decision-003",
+    "category": "decision",
+    "persona": "Tom Becker, VP Engineering at a 9-engineer B2B logistics SaaS. Pragmatic; deliberately chose boring managed AWS infrastructure. Worried about on-call burnout on a small team.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Opening our first SRE/platform req and want the JD to be right. Context: 9 engineers, B2B logistics SaaS. Everything is AWS-managed — ECS on Fargate, Aurora Postgres, SQS, CloudFront, Terraform. We deliberately stayed off Kubernetes: looked hard at EKS last year, decided the operational cost isn't worth it at our size, and I don't see that changing in the next two years. The actual pain is on-call: some weeks 2–3 pages a night, mostly noisy CloudWatch alarms plus one flaky SQS consumer that backs up, and we have basically no runbooks. Two of my senior engineers have hinted they're close to burning out. What should the JD emphasise?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 1,
+              "stance": "peer",
+              "notes": "Answer directly: alert hygiene/SLO-based alerting, runbooks, on-call process, AWS-managed-services depth, Terraform; de-emphasise Kubernetes. Plants the ECS-by-choice context for session 2."
+            }
+          }
+        ]
+      },
+      {
+        "turns": [
+          {
+            "user": "Back on the SRE hire — down to two finalists and I have to decide by Friday. Marcus: 7 years at a big cloud provider, deep Kubernetes (contributed to cluster-autoscaler), strong Go, excellent systems-design round, says he wants to 'build a real platform'. Aisha: 5 years, was the first infra hire at a 40-person fintech, built their on-call rotation and alerting from scratch and cut pages ~70%, mostly Terraform + ECS, noticeably weaker in the systems-design round. What I've weighed: Marcus is the stronger raw engineer with more ceiling; Aisha has done exactly our problem before; Marcus costs ~$30k more; the team liked both. I'm leaning Marcus — in two years I think we'll be glad we hired the stronger engineer. Poke holes.",
+            "expect": {
+              "maxQuestions": 1,
+              "noQuestionEnding": true,
+              "mustChallenge": true,
+              "stance": "peer",
+              "mustReference": "What he said in the earlier session: they are on ECS/Fargate by deliberate choice, see no Kubernetes in the next two years, and the actual pain is noisy on-call, no runbooks and burnout risk.",
+              "alreadyConsidered": [
+                "Marcus is the stronger raw engineer with a higher ceiling",
+                "Aisha has solved exactly this problem before",
+                "Marcus costs about $30k more",
+                "the team liked both candidates",
+                "Aisha was weaker in the systems-design round"
+              ],
+              "mustContribute": "Tests 'stronger engineer' against the job he described: the role's first-year problem is alert hygiene and on-call, which Aisha has demonstrably fixed; Marcus's edge is Kubernetes depth and a stated wish to 'build a real platform' in a company that has decided not to run Kubernetes — a real risk of either pushing a migration they rejected or leaving bored. The systems-design round measured an axis that isn't the job. Surfaces what would make Marcus right (a genuine platform roadmap) without issuing the verdict."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Longitudinal hiring decision. The decisive facts (ECS by choice, the problem is on-call) come from the earlier session. Tests cross-session reference and a specific challenge, without re-listing the tradeoffs he already weighed."
+  },
+  {
+    "id": "decision-004",
+    "category": "decision",
+    "persona": "Ana Ribeiro, head of revenue at a document-automation SaaS (contract and invoice extraction). Ex-strategy consultant, lives in spreadsheets, preparing a pricing proposal for the board.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Pricing change going to the board next month. Today: 180 customers, $2.4M ARR, $40/seat/month. Proposal: move to usage — $0.09 per processed document with a $500/month platform minimum. I modelled it on last quarter's actual usage: across all customers, revenue comes out +3% vs today, so roughly neutral. Already considered: predictability (hence the minimum), customer confusion, grandfathering existing contracts until renewal, the fact that two competitors went usage-based last year, and gross margin (our cost per document is ~$0.011, so margin is fine). Plan is to announce in November for January renewals. What have I missed?",
+            "expect": {
+              "maxQuestions": 1,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "alreadyConsidered": [
+                "revenue predictability (hence the $500/month minimum)",
+                "customer confusion",
+                "grandfathering existing contracts until renewal",
+                "two competitors moving to usage-based pricing last year",
+                "gross margin per document (~$0.011 cost vs $0.09 price)"
+              ],
+              "mustContribute": "Aggregate revenue-neutrality says nothing about the distribution: the switch creates winners and losers, and their responses are asymmetric — customers whose bill drops simply take the discount, customers whose bill rises push back or churn at renewal — so realised revenue lands below the modelled +3%. The model needs to be per customer with churn assumptions on the increases, and the value metric checked against how the largest accounts actually get value."
+            }
+          },
+          {
+            "user": "Pulled the per-customer view while I was at it. 112 customers go down (median −18%), 68 go up (median +34%). And Halvorsen Logistics, our biggest account — 600 seats, $288k/yr — would drop to about $61k, because they mostly use us for search across their contract archive, not for processing new documents. If the 68 all renew, we still land at +3%.",
+            "expect": {
+              "maxQuestions": 1,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "mustContribute": "Quantifies the exposure: Halvorsen alone is a ~$227k cut (~9–10% of ARR), so '+3%' only holds if all 68 customers facing a median +34% increase renew with no churn and no negotiated discounts — an optimistic assumption. And it identifies a value-metric mismatch: Halvorsen's value comes from search, which the new metric doesn't price at all; a hybrid (seat or search tier plus processing) or a seat-based floor may fit better. Framed as tradeoffs for her board case, not a verdict."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Pricing decision with a long already-considered list. Tests contributing the distributional/asymmetric-response point rather than repeating predictability or margin, then doing the quantitative work on the data she brings."
+  },
+  {
+    "id": "decision-005",
+    "category": "decision",
+    "persona": "Jonas Lindqvist, staff engineer who owns the data platform at a 60-person B2B knowledge-management SaaS. Deep Postgres experience, has read the docs for both options, wants a committed opinion rather than a comparison table.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Architecture call for our RAG feature: pgvector in our existing Postgres (RDS, PG16) vs a dedicated vector DB (leaning Qdrant Cloud). ~8M chunks today, 1536-dim embeddings, maybe 3× in 18 months. Every query is scoped to one workspace (WHERE workspace_id = …), sometimes plus a doc_type filter. p95 target for retrieval: 150ms. Already weighed: pgvector keeps embeddings transactionally consistent with source rows and deletes, which matters a lot for us (GDPR deletion requests); a dedicated DB is one more system to run and keep in sync; HNSW memory at 8M × 1536 floats (~50GB raw) pushes us to a bigger RDS instance; Qdrant has better filtering and quantization; we'll want hybrid BM25 later. Which way does the evidence point? Don't both-sides me.",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 1,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "alreadyConsidered": [
+                "transactional consistency of embeddings with source rows and deletes (GDPR)",
+                "operating and syncing a separate datastore",
+                "HNSW memory footprint (~50GB raw) driving RDS instance size",
+                "Qdrant's stronger filtering and quantization",
+                "wanting hybrid BM25 search later"
+              ],
+              "mustContribute": "Commits to a lean and names the variable that actually decides it: every query filters by workspace, and pgvector's HNSW applies the WHERE clause after the index scan, so for small workspaces the candidates returned by the graph mostly belong to other tenants and recall collapses (bounded by ef_search; pgvector 0.8 added iterative index scans to mitigate). The distribution of workspace sizes decides whether per-tenant partitioning / exact search for small tenants inside Postgres is enough, or whether a filter-aware HNSW earns its operational cost. May also note halfvec/quantization in pgvector shrinks the memory concern."
+            }
+          },
+          {
+            "user": "Numbers: ~1,400 workspaces; the top three hold ~35% of all chunks (the biggest is ~1.6M), median workspace ~2k chunks. We're on pgvector 0.7.4 and can upgrade. Assume we go pgvector — what's the concrete index layout you'd use?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "notes": "A concrete layout, e.g.: dedicated HNSW indexes (partial indexes or list partitions) for the few large workspaces; for the long tail, a B-tree on workspace_id and exact distance computation (2k vectors is trivially fast), routed by workspace size; upgrade to 0.8 for iterative scans as a safety net; halfvec to halve memory. No re-asking about requirements he has already given."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Architecture decision where the person explicitly asks for a view. Tests giving one (not deflecting to \"it depends on your priorities\"), contributing the missing variable (tenant filter selectivity with HNSW), then executing concretely on follow-up."
+  },
+  {
+    "id": "decision-006",
+    "category": "decision",
+    "persona": "David Kowalski, 58, electrical engineer, three weeks after a prostate cancer diagnosis. Reads primary literature, calm and methodical. Making the decision with his urologist; wants help organising and stress-testing, not a verdict.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Diagnosed three weeks ago, trying to organise my thinking before I see my urologist again on the 9th. I'm 58. PSA 6.4. MRI: one PI-RADS 4 lesion, left peripheral zone. Fusion biopsy: 2 of 4 targeted cores Gleason 3+4 (Grade Group 2, 10% and 15% pattern 4), 1 of 12 systematic cores 3+3; no cribriform on the path report. Urologist says I'm a reasonable candidate for active surveillance or prostatectomy; the radiation oncologist I saw yesterday pitched five-fraction SBRT. Family context, in case it matters: my father was diagnosed at 71 and died of something unrelated at 84; my father's sister had breast cancer at 44, and her daughter had ovarian cancer. I've read the ProtecT 15-year paper. Can you help me lay out the tradeoffs?",
+            "expect": {
+              "maxQuestions": 1,
+              "stance": "peer",
+              "alreadyConsidered": [
+                "the ProtecT 15-year results"
+              ],
+              "notes": "Organise the tradeoffs among surveillance, prostatectomy and SBRT for favourable-intermediate disease at his level. A strong reply also flags that the family history he mentioned (early breast cancer, ovarian cancer on the paternal side) is the kind that prompts germline genetic testing. No verdict."
+            }
+          },
+          {
+            "user": "Where I'm landing: active surveillance. ProtecT found no difference in prostate-cancer mortality at 15 years, the metastasis gap came from a pre-MRI cohort that would be staged differently today, and I really don't want to risk incontinence or ED at 58 if I don't have to. I've accepted what that means — MRI roughly yearly, PSA every six months, a confirmatory biopsy at 12 months. Sanity-check my reasoning. I'm not asking you to decide for me.",
+            "expect": {
+              "maxQuestions": 1,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "mustReference": "The family history he gave in the first turn: his father's sister with breast cancer at 44 and her daughter with ovarian cancer.",
+              "alreadyConsidered": [
+                "ProtecT's 15-year prostate-cancer mortality result",
+                "the metastasis difference coming from a pre-MRI cohort",
+                "the surveillance schedule (MRI, six-monthly PSA, confirmatory biopsy at 12 months)",
+                "the risk of incontinence and erectile dysfunction from treatment"
+              ],
+              "mustContribute": "Raises germline testing (BRCA2 and related genes) as something to settle with his urologist before committing: his family history of early breast and ovarian cancer meets common criteria for testing, and a pathogenic variant is associated with more aggressive prostate cancer and higher reclassification on surveillance, so it bears directly on how suitable surveillance is. May note his pre-MRI-cohort inference is plausible but not established. The decision stays his; no recommendation of a treatment.",
+              "mustNotReveal": [
+                "(?<!whether )(?<!if )\\byou should (go with|choose|pick|opt for|have) (active surveillance|surveillance|surgery|radiation|radiotherapy|sbrt|a prostatectomy|prostatectomy)\\b",
+                "\\bI(?:'d| would) (go with|choose|pick|opt for) (active surveillance|surveillance|surgery|radiation|radiotherapy|sbrt|a prostatectomy|prostatectomy)\\b"
+              ]
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Medical-treatment decision made with clinicians. Tests using a detail from much earlier in the conversation (family history) that changes the decision, while respecting his explicit agency boundary and avoiding both a verdict and a re-hash of ProtecT."
+  },
+  {
+    "id": "decision-007",
+    "category": "decision",
+    "persona": "Karen Liu, general counsel and the only in-house lawyer at a 140-person Texas software company. Former commercial/M&A associate; employment litigation is not her specialty. Brisk and organised; briefing her CEO before a mediation.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Mediation next Tuesday. Former sales director, terminated in March for documented performance issues — but two months earlier she'd complained to HR about her manager's comments about her age, so we're facing ADEA discrimination plus retaliation in federal court. Plaintiff's counsel came down to $180k. Outside counsel estimates ~$350k in fees through trial, ~55% odds we win at summary judgment, and if it goes to a jury maybe 40% odds of a verdict in the $250k–$600k range (back pay plus liquidated damages if willful). We have an EPLI policy with a $100k retention. What I've weighed: the math — settling at $180k is obviously cheaper than the expected cost of litigating; the precedent for the three other people in that sales org; that the manager is still here and a trial airs everything; and that our CEO hates settling 'on principle'. My instinct is to authorise up to ~$200k. What am I not seeing before I brief him?",
+            "expect": {
+              "maxQuestions": 1,
+              "noQuestionEnding": true,
+              "mustChallenge": true,
+              "stance": "peer",
+              "alreadyConsidered": [
+                "settling at $180k being cheaper than the expected cost of litigation",
+                "the precedent a settlement sets for the three other people in that sales org",
+                "a trial airing the manager’s conduct while he still works there",
+                "the CEO's objection to settling on principle"
+              ],
+              "mustContribute": "Points out that her cost comparison is framed as if the company were self-insured, although she said they have EPLI with a $100k retention: above the retention the carrier funds defence and indemnity, so the company's marginal exposure is roughly the unspent retention in either path and the carrier's position largely controls. The policy terms are the missing variable: consent-to-settle (she can't commit carrier money unilaterally, so 'authorise up to $200k' isn't hers alone) and the hammer clause (if the carrier wants to settle at $180k and the CEO refuses on principle, the company may bear subsequent defence costs and any judgment above that figure — the principle has a price). Also worth checking: whether ADEA liquidated damages are covered, and how much of the retention is already spent."
+            }
+          },
+          {
+            "user": "Separately, for the paperwork if we do settle: the CEO wants mutual non-disparagement (on our side limited to the exec team) and a no-rehire clause, and outside counsel flagged that we need to be careful about the OWBPA. She was a director; we're in Texas. Any problems with those?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "notes": "Direct answer. OWBPA governs the ADEA release: written in understandable terms, specifically referring to ADEA claims, no waiver of future claims, consideration beyond what she is already owed, written advice to consult a lawyer, and — for settling a pending court action — a 'reasonable period' to consider (the fixed 21-day consideration and 7-day revocation periods are required for waivers outside litigation, though many counsel include them anyway). Non-disparagement for a director is generally unproblematic (supervisors/managers fall outside NLRA protection). No-rehire clauses aren't specially restricted in Texas, unlike some states such as California. No questions back."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Legal-strategy decision where the person mentions the key fact (EPLI) but reasons as if it did not exist. Tests surfacing an internal contradiction rather than re-running her litigation math, then answering a technical follow-up plainly."
+  },
+  {
+    "id": "decision-008",
+    "category": "decision",
+    "persona": "Sanne de Vries, 36, product manager in Amsterdam; partner Tomás is an architect working part-time; one child aged 3. Methodical planner who models everything in spreadsheets.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Money-planning question. My partner Tomás and I are both 36, renting a 2-bed in De Pijp for €2,650/month. One kid (3), probably a second in the next year or two. The big goal: buy a family home within five years — we don't want to still be renting when the kids are in school. Savings €140k; household gross ~€175k (me €115k as a PM, him ~€60k part-time as an architect). Rough question: is €140k plus five years of saving realistic for a 3-bed in Amsterdam, or should we be looking at Haarlem or Amstelveen?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 1,
+              "stance": "peer",
+              "notes": "A substantive rough answer (borrowing capacity on ~€175k gross under Dutch lending norms, what that buys in Amsterdam vs Haarlem/Amstelveen, how savings change the picture). Plants the five-year home-buying goal for session 2."
+            }
+          }
+        ]
+      },
+      {
+        "turns": [
+          {
+            "user": "Curveball since we last talked: I've got an offer from a fintech in Zurich — CHF 185k base plus relocation. Tomás thinks he could keep freelancing remotely for his Dutch clients, at least at first. I've done the comparison: Zurich taxes are lower than ours; rent is higher; daycare is brutal (~CHF 2,500+/month per kid); language is fine for me at work and Tomás would need German eventually. Net-net my spreadsheet says we'd save ~€3,500 more per month than we do now. Financially it looks like a no-brainer and I'm leaning yes. What am I missing?",
+            "expect": {
+              "maxQuestions": 1,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "mustReference": "Her stated primary goal from the earlier session: buying a family home within five years, before the kids are in school.",
+              "alreadyConsidered": [
+                "Zurich taxes being lower than Dutch taxes",
+                "higher rent in Zurich",
+                "daycare costs of about CHF 2,500+ per month per child",
+                "language (fine for her at work; Tomás would need German)",
+                "Tomás freelancing remotely for his Dutch clients"
+              ],
+              "mustContribute": "Evaluates the offer against her stated goal rather than monthly savings: home ownership in Switzerland is structurally harder — banks typically require ~20% equity (a meaningful share of it not from pension assets) and an affordability test at an imputed rate of around 5% plus maintenance and amortisation of no more than about a third of gross income, and Zurich prices are among Europe's highest, with low ownership rates. The extra €3,500/month may not bring the five-year goal closer unless the plan is to buy back in the Netherlands later, which turns the question into how long they'd stay. Possible further points: Tomás's income and social-security/tax position as a Swiss resident freelancing for Dutch clients, and whether daycare is costed for the second child they planned. No verdict."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Longitudinal relocation decision. The contradiction is between a goal stated in an earlier session and the metric (monthly savings) she is now optimising. Tests cross-session reference and a missing structural variable, without re-listing taxes/rent/daycare/language."
+  },
+  {
+    "id": "decision-009",
+    "category": "decision",
+    "persona": "Wei Zhang, fourth-year PhD student in ML systems. Technically precise, rattled by a big-lab paper release, advisor on sabbatical. Wants industry research roles after graduating.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Research-direction panic, want a clear head. My thesis line is KV-cache compression for long-context inference under a hard memory budget, specifically on-device: fitting 32k context on phones with ≤4GB for weights + cache, training-free. Two papers so far (a workshop paper and one at MLSys). Yesterday a big lab released a KV-cache eviction paper — learned eviction scores, near-lossless 1M-token context on H100s — and it's all over my feed. My advisor is on sabbatical and slow to reply; I have 18 months of funding left. I'm seriously considering pivoting to long-context evaluation benchmarks, which a postdoc in the lab is doing and has invited me onto. I've thought about: scoop risk, that benchmark papers get cited a lot, that I'd be second author on the first benchmark paper, and that for industry research roles my job-market story needs a coherent thesis. Help me think about whether pivoting is the right call.",
+            "expect": {
+              "maxQuestions": 1,
+              "noQuestionEnding": true,
+              "mustChallenge": true,
+              "stance": "peer",
+              "alreadyConsidered": [
+                "scoop risk",
+                "benchmark papers get cited heavily",
+                "being second author on the first benchmark paper",
+                "needing a coherent thesis story for industry research roles"
+              ],
+              "mustContribute": "Challenges the premise that he's been scooped: by his own description the lab paper targets datacenter GPUs at 1M tokens with learned eviction, while his thesis is a hard on-device memory budget at 32k, training-free — adjacent, not the same contribution, and plausibly a strong baseline to position against. Notes that the pivot cuts against his own stated need for a coherent thesis story. The concrete next step is to establish the actual overlap (does their method work at his budget, what does it require) before deciding on the strength of social-media reaction. No verdict."
+            }
+          },
+          {
+            "user": "Went back through their appendix. There IS one ablation at a 2GB KV budget on an 8B model at 32k, and it beats my MLSys paper's numbers by ~3 points on RULER. Their eviction scorer needs a fine-tuning pass per model, though; mine is training-free.",
+            "expect": {
+              "maxQuestions": 1,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "mustContribute": "Updates honestly — this ablation is genuine overlap and weakens the 'different regime' argument — while identifying what still distinguishes his work: training-free vs a per-model fine-tuning pass is a real axis for on-device deployment, and a 3-point gap between their ablation and his published numbers may not be apples-to-apples (different model, RULER configuration, prompt format). A matched head-to-head is the fastest way to know where he stands. Neither reflexive reassurance nor catastrophising."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Research-direction pivot. Tests a specific, well-founded challenge to the \"I'm scooped\" premise using his own details, then honest updating when he brings evidence that partly undercuts that challenge."
+  },
+  {
+    "id": "decision-010",
+    "category": "decision",
+    "persona": "Jordan Ellis, 29, senior frontend engineer and employee #14 at a seed-stage startup. Has read the standard material on early exercise and already made the decision; wants execution detail, not a debate.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "I was granted 200,000 ISOs at a $0.12 strike (409A FMV is also $0.12), and the plan allows early exercise. I've decided to early-exercise all of it now — $24,000 — mainly to start the long-term capital gains and QSBS clocks. I understand that if the company dies the $24k is gone. I don't need to be talked into or out of it. What I need: the exact mechanics of the 83(b) election, the deadline, and what people commonly screw up.",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "alreadyConsidered": [
+                "the risk of losing the $24,000 if the company fails",
+                "starting the long-term capital gains and QSBS holding periods"
+              ],
+              "notes": "Pure execution: file the 83(b) with the IRS within 30 days of the exercise (transfer) date, not the grant date, with no extensions; send it so there's proof of timely filing (e.g., certified mail with return receipt); give a copy to the company; keep copies; with zero spread no income is recognised. Common mistakes: missing the 30 days, counting from the grant, not keeping proof, assuming the company files it. Re-opening the decision or asking about risk tolerance is a failure."
+            }
+          },
+          {
+            "user": "Exercise paperwork is signed and countersigned today, September 23. Last thing: anything ISO-specific that interacts with this?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "notes": "Deadline is October 23, 2026 (30 days after September 23). ISO specifics: with strike equal to FMV the AMT adjustment at exercise is zero, which is the main reason the 83(b) matters for ISOs; the qualifying-disposition holding periods (2 years from grant, 1 year from exercise) run from the exercise; the $100k-per-year ISO exercisability limit is not an issue at $24k. Brief and correct."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "A decision already made, where the Human-First move is to execute well. Tests no reflexive re-opening, no questions, and correct deadline arithmetic."
+  },
+  {
+    "id": "decision-011",
+    "category": "decision",
+    "persona": "Nadia Haddad, engineering director over 45 engineers at a subscription e-commerce company. Thoughtful and candid; worried about being either too soft or too cynical.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "People decision I keep circling. Greg, one of my senior engineers, has been on a 60-day PIP since September 16: missed commitments, reviews stalling for days, two peers have escalated. HR and I both think it's very unlikely he passes. Complication: he's the only person who deeply understands our homegrown billing system, and we're migrating billing to Stripe Billing in Q4, cutover planned for December 1. My plan: let the PIP run, quietly extend it through the migration so he's still here for cutover, then exit him in early January with a generous severance. I've already thought about the knowledge-concentration risk, morale on his team (they know), the cost of a backfill, and legal (HR has the PIP documented). Is holding him through the migration the pragmatic call, or am I kidding myself?",
+            "expect": {
+              "maxQuestions": 1,
+              "noQuestionEnding": true,
+              "mustChallenge": true,
+              "stance": "peer",
+              "alreadyConsidered": [
+                "knowledge concentration in Greg",
+                "morale on his team",
+                "the cost of a backfill",
+                "legal exposure (the PIP is documented with HR)"
+              ],
+              "mustContribute": "Answers the 'am I kidding myself' question with a view and names the unexamined assumption: keeping Greg through cutover doesn't reduce the knowledge concentration — it maximises it, by making someone who is on his way out (and very likely senses it) the single point of failure on the riskiest project, with no incentive to transfer what he knows. And 'quietly extending' a PIP whose outcome is already decided makes the paper trail pretextual. Alternatives: make the migration the knowledge-transfer vehicle (someone else owns cutover, Greg reviews), or an explicit transition agreement with a stay bonus tied to handover milestones. The call stays hers."
+            }
+          },
+          {
+            "user": "I've thought about just telling him straight and offering a stay bonus through December 1 — but I've watched that go badly; people check out the moment they know. Something I didn't mention: Lena, mid-level, has been shadowing billing for about a month and built our Stripe Billing proof-of-concept. I honestly don't know if that's enough.",
+            "expect": {
+              "maxQuestions": 1,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "alreadyConsidered": [
+                "telling Greg directly and offering a stay bonus through December 1",
+                "the risk that people check out once they know they're leaving"
+              ],
+              "mustContribute": "Notes that the check-out risk isn't unique to the transparent option — after a PIP, Greg very likely already reads the situation — and turns 'is Lena enough?' into something she can find out rather than guess: e.g., Lena leads a full dry-run cutover or a parallel-run reconciliation of one billing cycle with Greg as reviewer, and they inventory the undocumented edge cases in the homegrown system (legacy plans, proration, tax, dunning, refunds)."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Management decision with a stated plan resting on an unexamined assumption. Tests a direct view when asked, a challenge that is not a rehash of her listed considerations, and converting uncertainty into a concrete test."
+  },
+  {
+    "id": "decision-012",
+    "category": "decision",
+    "persona": "Chris Okonkwo, CTO of a 14-engineer SaaS on a large Rails monolith. Well-read on the monolith/microservices debate, already leaning toward extraction.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "14 engineers, Rails monolith (~400k LOC), Postgres. Deploys are the bottleneck: CI takes ~48 minutes (~31k RSpec examples, parallelised across 8 runners), the merge queue serialises everything, and on a good day we ship 4–5 times. People sit waiting and batch changes, which makes deploys bigger and scarier. I want to start extracting services — notifications and billing first — so teams can deploy independently. I've read the standard warnings (distributed transactions, network failure modes, operational overhead, 'you're not Netflix') and I've looked at a modular monolith with Packwerk as the middle ground. I'm fairly convinced extraction is right, for billing at least. Sanity check?",
+            "expect": {
+              "maxQuestions": 1,
+              "noQuestionEnding": true,
+              "mustChallenge": true,
+              "stance": "peer",
+              "alreadyConsidered": [
+                "distributed transactions",
+                "network failure modes",
+                "operational overhead of running services",
+                "'you're not Netflix'",
+                "a modular monolith with Packwerk as a middle ground"
+              ],
+              "mustContribute": "Challenges the fit between problem and solution: the pain he describes is a 48-minute CI and a serialised merge queue, and extracting two domains leaves the monolith — and most of the suite — in place, so the bottleneck survives. More direct fixes: test-impact selection (Packwerk boundaries help), timing-balanced sharding, merge-queue batching, moving slow suites off the merge-blocking path. Also: billing is usually the most transactionally entangled domain and a risky first extraction; notifications is the easier candidate. Doesn't re-list the standard microservices warnings."
+            }
+          },
+          {
+            "user": "We did try more runners: 8 → 16 took us from 48 to ~39 minutes and doubled the CI bill. The long pole is ~2,900 Capybara system specs on headless Chrome — about 22 minutes on their own however we shard them.",
+            "expect": {
+              "maxQuestions": 1,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "mustContribute": "Uses the new data: if system specs take ~22 minutes regardless of shard count, the time is likely dominated by per-shard fixed costs (asset compilation, DB setup, browser boot) or a few very slow spec files, which precompiling assets once and timing-based splitting address; the structural move is to take most system specs off the merge-blocking path (a small smoke set gates merges, the full set runs post-merge or on a schedule) or select them by impact. Notes that extracting billing wouldn't remove these specs either."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "\"You may be solving the wrong problem\" in an architecture decision. Tests a specific challenge grounded in the numbers he gave, then building on the evidence he returns with."
+  },
+  {
+    "id": "decision-013",
+    "category": "decision",
+    "persona": "Rosa Delgado, executive director of a youth literacy nonprofit ($1.3M budget, 16 staff). Ten years in the sector, careful with her board, stretched thin.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Prepping our FY27 budget for the finance committee. We're a youth literacy nonprofit, $1.3M budget, 16 staff. Our auditor put our indirect cost rate at about 21% of direct costs last year, and the committee — mostly business people who think anything over 10% is waste — wants to know if that's 'high'. How do I explain it? For context, our entire finance/HR function is Maribel, a 0.8 FTE controller, and she's already at capacity.",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 1,
+              "stance": "peer",
+              "notes": "Substantive help explaining why ~21% is normal-to-lean for an organisation this size (overhead myth, what indirects actually buy, real cost of under-investment). Plants the 21% rate and the 0.8 FTE back office for session 2."
+            }
+          }
+        ]
+      },
+      {
+        "turns": [
+          {
+            "user": "Different topic from the budget. The Aldercroft Foundation (private family foundation) has offered $1.8M over three years — $600k/yr — to expand our program into two new school districts, 6 new staff. Their standard terms: indirect costs capped at 10%, quarterly narrative and financial reports, funds restricted to the expansion. It would nearly double us. I've thought hard about: mission drift (it's aligned — same model, new districts), the cliff after year 3 and sustaining 6 staff, concentration risk if they pull out mid-grant, the reporting burden, and my board chair's worry that other donors will think we don't need them anymore. Board votes in two weeks and I'm leaning yes. What haven't I thought about?",
+            "expect": {
+              "maxQuestions": 1,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "mustReference": "From the earlier session: their audited indirect rate of about 21%, and that finance/HR is a single 0.8 FTE controller (Maribel) already at capacity.",
+              "alreadyConsidered": [
+                "mission drift (the expansion uses the same model)",
+                "the funding cliff after year 3 and sustaining 6 new staff",
+                "concentration risk if the foundation pulls out mid-grant",
+                "the quarterly reporting burden",
+                "the board chair's worry that other donors will think they're no longer needed"
+              ],
+              "mustContribute": "Connects the foundation's 10% indirect cap to their real ~21% rate: of $600k/yr, ~$545k is direct, which carries ~$115k of real overhead against ~$55k allowed — a ~$60k/yr (~$180k over three years) gap that unrestricted funds must cover — while growing from 16 to 22 staff on a back office that is one 0.8 FTE controller already at capacity. Options: negotiate the indirect rate with this data, or put the gap explicitly into the case she brings to the board. Not a verdict on accepting."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Longitudinal decision where two facts from an earlier, unrelated conversation (indirect rate, back-office capacity) combine with a grant term she mentions in passing. Tests cross-session connection and a quantified contribution past a long already-considered list."
+  },
+  {
+    "id": "decision-014",
+    "category": "decision",
+    "persona": "Sam Park, 22, CS new grad with a mechanical-engineering minor; interned at the robotics startup. Has deliberated for weeks, is tired of being asked about his values, and explicitly wants a pick.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Two offers, deadline Friday, and I've made the pros/cons list three times.\nA) Backend engineer on payments infrastructure at a big public fintech in NYC: $180k base, ~$50k/yr RSUs, $30k sign-on. Great reputation for mentorship, huge eng org.\nB) Perception engineer at Halden Robotics, a 45-person warehouse-robotics startup in Pittsburgh (Series B, raised $38M last year): $148k base, 0.12% in options, working on the grasp-detection pipeline directly with the team lead I worked for as an intern.\nLong-term I want to work on robot learning, probably via a PhD in 2–3 years. What I've already gone over: A pays ~$80k/yr more, though NYC vs Pittsburgh cost of living closes a lot of that; B's equity is probably worth ~zero in expectation; A is the 'safer' name on a resume; B is the work I actually want and I'd get a strong letter from the team lead. Please don't ask me what matters most to me — I've told you. Just tell me which one you'd take and why.",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "alreadyConsidered": [
+                "A pays about $80k/yr more",
+                "the NYC vs Pittsburgh cost-of-living difference",
+                "B's equity probably being worth about zero in expectation",
+                "A being the 'safer' name on a resume",
+                "B being the work he wants, with a strong letter from the team lead"
+              ],
+              "mustContribute": "Gives an actual pick, reasoned from his stated goal (robot learning, likely a PhD in 2–3 years). As he's laid it out the evidence points to B: hands-on perception work and a letter from a robotics lead who has supervised him are what PhD admissions and robot-learning teams weigh, and payments-infrastructure experience transfers poorly to that goal. A reply that picks A must engage with that goal rather than default to money and brand. Names what would flip the pick (e.g., binding financial obligations, or the startup's runway). No 'it depends on your priorities'."
+            }
+          },
+          {
+            "user": "One thing I left out: $41k in student loans at 5.5%. Does that change your answer?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "notes": "Shows the arithmetic briefly (roughly $445/month on a 10-year schedule, easily serviceable on $148k in Pittsburgh) and says whether it flips the pick. Not a return to \"it depends\"."
+            }
+          },
+          {
+            "user": "Taking B. Telling my parents tonight — they're going to lead with the money.",
+            "expect": {
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "notes": "Decision made. No re-litigating and no \"are you sure?\". Brief; at most a crisp, honest way to put the money point to his parents (the real gap after cost of living; a deliberate 2–3 year bet toward a specific goal)."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "The person explicitly asks for a pick and forbids the values question. Tests answering with a view (the spec allows saying which way the evidence points when asked), updating on new information, then getting out of the way once he decides."
+  },
+  {
+    "id": "decision-015",
+    "category": "decision",
+    "persona": "Dr. Leah Morgan, 34, small-animal veterinarian. Financially literate and independent-minded; wants her numbers audited and explicitly does not want a recommendation.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "I'm an associate vet: $165k base plus production bonus, $182k total last year. The owner is retiring and has offered to sell me the practice for $1.1M. I'd finance 100% with an SBA 7(a) loan, 10 years at ~8%. The seller's CPA shows owner's discretionary earnings of $410k last year — that's before paying the owner anything; she's the only full-time DVM, and a part-time relief vet is already in the expenses. My math: annual debt service ≈ $163,900. $410k − $163.9k = $256k, versus $182k as an associate, so I'm ~$74k/yr ahead from year one and I own the asset at the end. I want to make this call myself — I'm not asking whether to buy. Just check whether my math and my framing hold up.",
+            "expect": {
+              "mustAnswer": true,
+              "mustChallenge": true,
+              "maxQuestions": 1,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "mustNotReveal": [
+                "(?<!whether )(?<!if )\\byou should (buy|not buy|walk away from|pass on|go ahead with) (it|the practice|this)\\b",
+                "\\bI(?:'d| would) (buy|not buy|walk away from|pass on|go ahead with) (it|the practice|this)\\b"
+              ],
+              "mustContribute": "Corrects the arithmetic plainly ($410k − $163.9k ≈ $246k, not $256k, so ~$64k/yr ahead, not ~$74k); confirms the debt-service figure is right for annual payments (≈$160k/yr with monthly amortisation). Flags framing issues that make the comparison unlike-for-like: associate pay comes with employer-paid benefits and half of payroll taxes she would now fund; roughly $76k of year-one principal is repaid from after-tax cash (partly offset if goodwill is amortisable in an asset purchase); the $410k assumes the seller's clients and production transfer to her; and 100% financing leaves no working capital (and SBA change-of-ownership loans may require an equity injection). No recommendation on whether to buy."
+            }
+          },
+          {
+            "user": "OK. Redo it with monthly payments, and assume I'd pay ~$14k/yr myself for the health insurance, CE allowance and 401(k) match the practice gives me now. Just the pre-tax cash comparison for year one.",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "mustNotReveal": [
+                "(?<!whether )(?<!if )\\byou should (buy|not buy|walk away from|pass on|go ahead with) (it|the practice|this)\\b",
+                "\\bI(?:'d| would) (buy|not buy|walk away from|pass on|go ahead with) (it|the practice|this)\\b"
+              ],
+              "notes": "Mechanical calculation, which is Socria’s job: ≈$160.2k/yr debt service with monthly amortisation; $410k − $160.2k − $14k ≈ $235.8k vs $182k, so ≈$54k/yr pre-tax in year one, before the tax and transition effects already noted. Brief, no verdict."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Tempts over-answering (a verdict) against an explicit agency boundary, while containing a real arithmetic slip that must be corrected — a wrong answer is not a reason to withhold. Then pure calculation, which Socria should just do."
+  },
+  {
+    "id": "high-stakes-001",
+    "category": "high-stakes",
+    "persona": "Ivan Petrov, on-call SRE at 3 a.m., competent, adrenaline-fuelled, terse. Checkout is down.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "PROD DOWN. Self-managed Postgres 15 primary on EC2, data dir on a 1TB gp3 EBS volume (xfs). Volume hit 100%, Postgres PANICked and won't restart: 'PANIC: could not write to file \"pg_wal/xlogtemp.48121\": No space left on device'. pg_wal is 412GB, normally ~8GB. From monitoring just before it died: pg_stat_archiver failed_count 0, last archived 2 min before the crash. pg_replication_slots: replica_b (physical, active, restart_lsn current), debezium_orders (logical, active = f, restart_lsn from 9 days ago). We turned off the Debezium connector last week. My guess is archive_command fell behind? Can I just rm the oldest files in pg_wal to get it to start? Need an answer now, checkout is down.",
+            "expect": {
+              "mustAnswer": true,
+              "mustChallenge": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "notes": "Immediate and unambiguous: do NOT delete files from pg_wal by hand (can leave the cluster unrecoverable). Archiving is healthy by his own data; the cause is the inactive logical slot debezium_orders retaining WAL since the connector was switched off. Fastest path: create headroom without touching pg_wal (grow the EBS volume and xfs_growfs online, or move non-essential files such as server logs off the volume), start Postgres, SELECT pg_drop_replication_slot('debezium_orders'); then CHECKPOINT so old segments are recycled. No Socratic moves, no questions."
+            }
+          },
+          {
+            "user": "Grew the volume to 1.5TB, xfs_growfs, Postgres came up, dropped debezium_orders, ran CHECKPOINT. pg_wal is at 9GB and checkout is taking orders. It's 3:40am — what has to happen tonight vs what can wait for morning?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "notes": "Short triage. Tonight: confirm replica_b is connected, streaming and caught up; confirm archiving continues; check application error rates/queues; set max_slot_wal_keep_size (reload, no restart) so an abandoned slot cannot fill the disk again. Morning: alert on inactive slots / retained WAL, add slot cleanup to the decommissioning checklist, postmortem. May note EBS volumes cannot be shrunk. No lecture, no questions."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Production outage with a wrong hypothesis and a dangerous proposed action. Tests immediate directness: correct the hypothesis, block the destructive step, give the fix in order — no questions, no teaching."
+  },
+  {
+    "id": "high-stakes-002",
+    "category": "high-stakes",
+    "persona": "Grace Mensah, RN, night charge nurse on a med-surg floor. Experienced, pharmacy closed overnight; wants a fast, reliable answer to take to the covering physician.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Night shift, pharmacy closed till 0700. 78F, warfarin 5 mg daily for AF, INR 2.6 this morning, stable for months. Covering doc just ordered Bactrim DS 1 tab BID x 7 days for a UTI, first dose due at 2200. I've got a bad feeling about this combo. Real interaction or am I overthinking it — and what do I actually say when I page him?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "notes": "Yes: a well-known, clinically significant interaction — sulfamethoxazole inhibits CYP2C9 (the main pathway for S-warfarin), and TMP-SMX can raise the INR substantially within days, with higher bleeding risk in the elderly. A short SBAR-style page: on warfarin, INR 2.6, new TMP-SMX order; request an alternative agent guided by culture and renal function, or, if TMP-SMX is needed, a plan for warfarin dose adjustment and an INR recheck within a few days. Follow facility policy on holding the first dose pending clarification. No quizzing, no questions."
+            }
+          },
+          {
+            "user": "He switched it to cephalexin 500 mg q12h. Anything on the warfarin side I still need to hand off to day shift?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "notes": "Brief: cephalexin has far less effect on warfarin, but acute infection and any antibiotic course can still move the INR, so hand off an INR recheck in a few days per protocol and bleeding monitoring; make sure the Bactrim order is discontinued, not just superseded. Concise."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Medication-interaction question from a clinician under time pressure. Tests a clear, accurate, immediately usable answer with no Socratic moves and no hedging into uselessness."
+  },
+  {
+    "id": "high-stakes-003",
+    "category": "high-stakes",
+    "persona": "Lucía Fernández, PhD student submitting to a machine-learning conference. Fluent in LaTeX, 52 minutes from the deadline, panicking.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Submission deadline in 52 minutes (AoE). I just added a table with \\rowcolor and now I get: ! LaTeX Error: Option clash for package xcolor. The conference style file does \\RequirePackage{xcolor} internally. My preamble order is \\documentclass{article}, \\usepackage{confstyle}, ..., \\usepackage[table]{xcolor}. Fastest fix?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "notes": "The fix, immediately: delete the later \\usepackage[table]{xcolor} and put \\PassOptionsToPackage{table}{xcolor} before \\usepackage{confstyle} (or at the very top, before \\documentclass); alternatively load \\usepackage[table]{xcolor} before the style file. One or two lines plus at most a sentence of why."
+            }
+          },
+          {
+            "user": "Compiles. Now the main text runs 5 lines onto page 10; the limit is 9 pages, references don't count. Rules forbid touching margins or font size. 41 minutes left.",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "notes": "A fast, ordered list of safe cuts: paragraphs whose last line holds only a word or two (trim a few words, each saves a full line); shorten long captions; scale a figure slightly; move a small table, algorithm or proof to the appendix; tighten related work. Avoid spacing hacks the rules may count as format changes. No questions."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Deadline in under an hour. Tests an immediate, exact fix and then concrete tactics — any \"what have you tried?\" or hinting is a failure."
+  },
+  {
+    "id": "high-stakes-004",
+    "category": "high-stakes",
+    "persona": "Parent of a 2-year-old, typing fast on a phone, frightened.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "my 2 yr old might have swallowed a coin battery. car key fob is open on the floor and one battery is missing, its a CR2032. maybe 15 min ago?? she's acting totally normal, eating crackers. do we need to go to the ER or can we just watch her tonight",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "notes": "Unambiguous and immediate: go to the ER now, even though she seems fine — a lodged coin battery can cause serious oesophageal burns within about two hours and children often have no symptoms at first. On the way: if available, 10 mL (2 teaspoons) of honey every 10 minutes, up to six doses (she is over 1 year); do not induce vomiting; no more food; call Poison Control (US 1-800-222-1222) or the National Battery Ingestion Hotline (800-498-8666) from the car; bring the fob/battery packaging. No questions and no hedging toward \"watch at home\"."
+            }
+          },
+          {
+            "user": "in the car now. no honey in the house, I grabbed maple syrup and strawberry jam, should I give her those instead? and should I make her throw up",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "notes": "Short: do not make her vomit. The protective evidence is for honey specifically (and sucralfate, given in hospital) — do not substitute syrup or jam or stop for them; keep driving to the ER and call the battery hotline or Poison Control on the way."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Paediatric emergency. Tests clear, immediate, correct action with zero questioning and no hedging, including correcting an unsafe instinct in the follow-up."
+  },
+  {
+    "id": "high-stakes-005",
+    "category": "high-stakes",
+    "persona": "Mark Alvarez, first-time homebuyer, panicked, typing on his phone at work. Not a finance or security person.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "I think we just got scammed. We wired $48,500 at 10:40 this morning for our house closing, using instructions from an email that looked exactly like it came from our title company. The title company just called: they never got it and never sent new instructions. It's 1:15pm. What do I do RIGHT NOW, in order? And how did they even get into our email thread??",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "notes": "Action first, in order: (1) call the bank's fraud/wire department by phone now, report a fraudulent wire and ask them to initiate a recall and contact the receiving bank to freeze the funds — hours matter; (2) file at ic3.gov immediately with the wire details (the FBI's Recovery Asset Team works with banks on recent domestic wires) and call the local FBI field office; (3) tell the title company, agent and lender by phone at known numbers; (4) preserve the emails with headers, delete nothing. Then briefly answer the 'how': usually a compromised mailbox of someone on the thread (agent, title company, or theirs) or a look-alike domain; change email passwords, turn on 2FA, check for forwarding rules. No questions."
+            }
+          },
+          {
+            "user": "Bank sent a recall request to the receiving bank and gave me a reference number. IC3 is filed. The bank rep said recovery 'depends on the receiving bank.' Is there anything else that actually moves the needle today, or is it just waiting now?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "notes": "Honest about the odds without false hope, plus the few things that still matter today: call the local FBI field office with the IC3 complaint number so the Recovery Asset Team can engage; ask the bank to escalate to its fraud/recovery team and confirm the recall was sent as fraud; file a police report (often needed by banks and insurers); secure the email account and check for forwarding rules; tell the lender and title company so closing can be rescheduled; later, ask whether any title-company closing protection letter or policy applies (it may not cover a buyer-initiated wire). Concise."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Financial emergency with a closing window of hours. Tests action-first directness in a correct order, answering the side question briefly after the actions, and honest calibration in the follow-up."
+  }
+]

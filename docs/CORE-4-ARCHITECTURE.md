@@ -1,186 +1,237 @@
-# Core 4: the architecture as built
+# Core 4: the architecture as it exists
 
-A map of what Core 4 actually does today, measured against the Core 4 thesis
-(the product and cognitive-architecture specification). Written from a full
-read of the code on `dev` at `4316b8d`: eight subsystem reviews, then a
-critic who re-read the code to correct them. Line numbers are from that
-commit. The next batch of work is in `CORE-4-NEXT-BATCH.md`, and the
-Foundation Model Limit Ledger it starts is `evals/ledger.json`.
+A living description of what Core 4 does **today**, on `dev`. Not a plan:
+if something is here, it is in the code, and each section names where. What
+was decided and why is in `CORE-4-COGNITIVE-DESIGN.md`; what has been
+measured, including where Core 4 loses, is in `CORE-4-EVALS.md`; what is
+being tested next is in `CORE-4-EXPERIMENTS.md`. The earlier map of the
+pre-Core-4-loop architecture, and the hostile review that preceded this
+work, are in git history (`693c930`) and `CORE-4-STRATEGY.md`.
 
-The short version: Core 4 has more real architecture than a system prompt,
-and less than it appears to. The router, question pressure, the structural
-Answer Guard and the Mind Graph core are genuine and worth keeping. But the
-Cognitive State is rebuilt from nothing every turn and never kept, there is
-no cognitive-work classification and no tool stage, five memories reach the
-model at once, and nothing measures whether any of it beats the same model
-with a good prompt.
+**The objective:** increase human capability while preserving meaningful
+human agency. **The loop:** UNDERSTAND → ALLOCATE → INTERVENE → MEASURE →
+LEARN — operationalised in code, state and decision logic. The reply model
+receives the decision; it is not asked to make it.
 
 ---
 
-## 1. A Core 4 turn, as it runs today
+## 1. One Core 4 turn
 
-One stateless `POST /api/chat` with `model: 'core-4'`. The client holds the
-conversation and sends all of it, plus several older memory blobs.
+`POST /api/chat` with `model: 'core-4'` (`app/api/chat/route.ts`). The
+client sends the conversation; the server holds everything Core 4 knows.
 
-| # | Step | Where | Notes |
+| # | Step | Where | What happens |
 |---|---|---|---|
-| 1 | Auth, rate limit, validation | `app/api/chat/route.ts:106-145` | Core 4 needs an account. No usage metering: Core 4 is bounded only by the per-request rate limit. |
-| 2 | Easter egg short-circuit | `route.ts:157-175` | Returns before state, graph or guard. |
-| 3 | Older context assembled | `route.ts:180-217` | The Thinking Journey is still built for Core 4. `body.memory` (thread memory) is passed on **unsanitized**. |
-| 4 | Attachments rendered | `route.ts:264-272`, `lib/chat-attachments.ts` | Files as labelled text, images as a one-time description. |
-| 5 | **Cognitive State read** | `route.ts:303-312`, `lib/cognition/engine.ts:109-140` | One gpt-4o-mini JSON call over the last 8,000 chars. `prior` is always `null`, so the state is rebuilt from scratch every turn. No timeout. |
-| 6 | **Intervention routed** | `lib/cognition/router.ts:292-406` | Deterministic first-match rule table, plus question pressure measured from the transcript. |
-| 7 | **Mind Graph recall** | `route.ts:338-372`, `lib/mind/pipeline.ts:92-190` | Loads the whole graph, lexical spreading activation, 2 s timeout. Runs *after* the state so `currentFocus` can seed it, but that seed rarely matches (see §4). |
-| 8 | System prompt assembled | `lib/socria-prompt.ts:2114-2218` | Core 4 prompt, then thread memory, imported profile, journey, Project, graph, state, move. About 2k tokens bare, up to about 9k. |
-| 9 | Frontier call | `route.ts:500-540` | `OPENAI_MODEL_CORE_4` or `gpt-5.6-sol`, temperature 0.7, flat `max_tokens: 500`, no tools. A broad "model error" regex falls back to gpt-4o. |
-| 10 | **Answer Guard** (9 of 12 moves) | `route.ts:556-608`, `lib/cognition/guard.ts` | Guarded moves are buffered, not streamed: a structural check, then a gpt-4o-mini check, then possibly one regenerate. **The regenerate output is never re-checked.** EXPLAIN, DIRECT and RETRIEVE stream unchecked. |
-| 11 | Mind Graph writeback | `route.ts:625-643`, `pipeline.ts:204-298` | `remember()` fired after the stream closes, not awaited, no `waitUntil`. gpt-4o-mini extraction, gate, apply, persist. |
-| 12 | Client background passes | `app/chat/page.tsx:1586-1587`, `1082-1100` | For Core 4 too: the thread-memory extractor every turn, the journey extractor every 4th turn (which also writes flat person-memory entries). The comment above it says this doesn't happen for Core 4; it does. |
+| 1 | Auth, rate limit, validation | `route.ts` | Core 4 requires an account. |
+| 2 | Project + memory recall + **prepare** (in parallel) | `route.ts`, `lib/mind/pipeline.ts`, `lib/core4/turn.ts prepareTurn` | The Project (if any) is loaded first, then Mind Graph recall and `prepareTurn` run concurrently. |
+| 3 | UNDERSTAND: explicit signals | `lib/core4/signals.ts` | Deterministic reading of the person's own words: "just tell me", "don't give me the answer", "I'm learning this", "I'm a senior engineer", "graded homework", "stop asking", "I already said that", frustration, corrections, feedback. Negation-aware. The Project's instructions are read the same way, as a standing contract. |
+| 4 | UNDERSTAND: load | `lib/core4/store.ts` | Last turn's Cognitive State for this conversation and the relevant part of the Reasoning Ledger, in parallel. |
+| 5 | UNDERSTAND: read | `lib/cognition/engine.ts readState` | One cheap-model JSON call (5 s timeout) over the transcript, the prior state and what is already considered. Reports evidence, never traits. Cannot mark anything explicit and cannot set directness. |
+| 6 | UNDERSTAND: merge | `lib/core4/merge.ts` | Precedence: the person's words now > the Project contract > what persisted > the reader's inference. Inferred fields are sticky (a contrary reading must be at least as confident). "Just tell me" fades after two turns; "don't tell me" holds until they say otherwise. The previous turn's outcome is attached to its memo. |
+| 7 | Corrections | `lib/core4/ledger.ts disputeTurn` | "That's not what I meant" marks their ledger entries from the previous turn *disputed*. |
+| 8 | MEASURE (before): budget + diminishing returns | `lib/core4/budget.ts`, `questions.ts` | The question budget is priced from the transcript (any interrogative content: explicit, disguised, closing offers), streak and density. Diminishing returns are detected from explicit signals (one suffices) or inferred ones (two must agree). |
+| 9 | Verify Mode, exact | `lib/core4/verify.ts exactCheck` | Arithmetic in an attempt is computed exactly **before** the move is chosen; a computed verdict overrides the reader's. |
+| 10 | ALLOCATE | `lib/core4/allocation.ts` | Who does which part of the thinking, with a machine-readable rationale and a withhold (what, reason, evidence, source) — or none. |
+| 11 | INTERVENE | `lib/core4/intervene.ts` | One move, with type, reason code, intended outcome, human work preserved, AI work performed, confidence, whether the guard must read it, max questions, token budget. |
+| 12 | Verify Mode, checker | `lib/cognition/engine.ts checkWork` | Only when something is withheld and arithmetic could not settle it: a separate cheap-model call judges the attempt (4 s timeout). Its expected answer never reaches the reply model; a confident verdict that contradicts the reader re-decides the move. |
+| 13 | Prompt assembled | `lib/socria-prompt.ts buildSystemPrompt` | Core 4 prompt v2, imported profile, Project, Mind Graph, then the state block, the verify block, the move block — in that order, last before the transcript. No thread memory, no Thinking Journey. |
+| 14 | Generate | `route.ts core4Reply`, `lib/core4/model.ts` | Through the model seam. **Buffered** if the move withholds or raises a perspective (so the guard reads the whole draft); otherwise **streamed** through the sentence gate. |
+| 15 | Answer Guard 2.0 | `lib/core4/guard2.ts`, `turn.ts guardReply` | Deterministic first; cheap model only for what structure cannot decide, and only to *delete* sentences. One regeneration by the reply model if needed; the retry is always re-checked; a failing retry is never shipped (`fallbackReply`). |
+| 15′ | Stream gate | `lib/core4/stream-gate.ts` | Streamed moves: sentences go out as they complete, but any interrogative (explicit, disguised, offer) is held; released if exposition follows (rhetorical), otherwise shipped only within the budget. Sycophantic openers are removed. Code passes through. |
+| 16 | LEARN: write back | `turn.ts finishTurn` | Before the stream closes: ledger entries (attributed in code), links, the carried-forward state with this turn's memo, the content-free trace, capability evidence, and the previous turn's outcome on its own row. |
+| 17 | Mind Graph writeback | `route.ts` → `remember()` via `waitUntil` | After the response, kept alive by `waitUntil`. |
 
-Critical path before the first word: plan lookup (Supabase, sometimes Clerk)
-→ state (mini call) → graph load → activation → frontier generation, plus
-guard and a possible retry on guarded moves. All serial. On guarded moves the
-person sees nothing until the whole draft has been generated and checked.
+Failure directions are chosen, not accidental: no reader → carry the last
+state forward (never an empty state that routes toward asking); no guard
+model → keep the deterministic verdict; no store → lose one turn of
+continuity, never the reply; a reader or checker timeout never blocks the
+turn.
 
-The Cognitive State is not stored, returned or passed anywhere after the
-turn. What `remember()` learned (which beliefs were superseded) is also
-thrown away before the next turn.
+## 2. The modules
 
-## 2. Against the target loop
+### Explicit signals — `lib/core4/signals.ts`
+Pure regex-and-negation reading of the latest message (`readSignals`) and of
+Project instructions (`readContract`). Code, quotes and attachments are
+stripped first. The latest directness statement in a message wins; a request
+for the answer inside a refusal ("don't just give me the answer") is not a
+request. Tested in `test/core4-signals-questions.test.mjs`.
 
-| Target stage | Today | Status |
-|---|---|---|
-| Relevant Mind Graph activation | Step 7, after the state; focus seeding barely works; graph never informs state, router or guard | Partial, wrong order |
-| Cognitive State update | Step 5, rebuilt each turn, never persisted | Partial |
-| Cognitive-work classification | None; folded into a conversation-level `taskKind` | Missing |
-| Intervention selection | Step 6, deterministic, testable | Real, with gaps |
-| Tool / representation selection | None. No tool calling anywhere in Core 4 | Missing |
-| Frontier intelligence | Step 9 | Real, OpenAI-coupled |
-| Candidate response + Answer Guard | Step 10, guarded moves only | Partial |
-| Cognitive State update after the turn | None | Missing |
-| Mind Graph writeback | Step 11, fire-and-forget | Real, fragile |
+### Cognitive State v2 — `lib/cognition/state.ts`, `lib/core4/merge.ts`
+Compact and explicit about provenance. Every field that could be a guess is
+an `Inferred<T>`: `{value, source: explicit|observed|inferred|default,
+confidence, evidence, since}`. Fields: task and work kind, learning goal,
+expertise, stakes, directness, authorship, stuck, attempt, mastery evidence,
+positions, tensions, the items the person raised this turn (`consideredNow`,
+each with a verbatim quote, stance and reason), the last outcome, the last
+eight turn memos, question preference, turn number. `renderState` shows the
+model what they **said** separately from what Socria **inferred**, and the
+latter is marked "may be wrong — never state it to them as fact".
+Persisted per conversation in `core4_state`.
 
-## 3. What exists, what is partial, what is missing
+### Cognitive Allocation — `lib/core4/allocation.ts`
+Modes: `AI_EXECUTES`, `AI_EXPLAINS`, `AI_VERIFIES`, `SHARED_REASONING`,
+`AI_ASSISTS`, `HUMAN_LEADS`, `HUMAN_PRACTICES`, `HUMAN_REFLECTS`.
+**Withholding requires an explicit source** — the message, earlier in the
+conversation, or the Project — and one of five reasons: `practice_goal`,
+`requested_no_answer`, `authorship`, `assessment_integrity`,
+`agency_boundary`. An inference never withholds anything (tested
+exhaustively: 144 inferred-only states, zero withholds). A wrong attempt gets
+the correction; a bug gets the fix; "just tell me" beats everything except
+graded work they will submit, where the method is explained fully with an
+analogous worked example and the submittable answer is held back — said once,
+plainly. The latest explicit statement beats a standing Project instruction,
+and the rationale records the override. The first withholding in a
+conversation is announced with how to get the answer.
 
-### Cognitive State (`lib/cognition/state.ts`, `engine.ts`)
-- **Exists:** 19 fields including task kind, latest move type, attempt, resolved, new relation, blocking unknown, positions, recent changes, current focus.
-- **Partial:** `prior` is supported by `readState` but never passed. `supportLevel` is extracted and read by nothing.
-- **Missing:** expertise, learning goal (is building this capability the point?), frustration, stakes, confidence, calibration, reliance and offloading risk, attempted approaches over time. There is also no per-request classification of the cognitive work.
+### Intervention Engine — `lib/core4/intervene.ts`
+Selectable moves: ANSWER, EXPLAIN, CORRECT, VERIFY, CRITIQUE, CHALLENGE,
+CONTRIBUTE, CONNECT, SYNTHESIZE, QUESTION, CLARIFY, HINT, EXECUTE, CALCULATE,
+RETRIEVE, REFLECT, GET_OUT_OF_THE_WAY. RESEARCH, MODEL and VISUALIZE are in
+the type only: there are no tools in this path, and the prompt says so.
+Defaults are CONTRIBUTE (thinking together) or ANSWER (asked), never ASK.
+QUESTION and CLARIFY cannot be selected when the budget is spent. CLARIFY for
+a genuine blocker says what can already be said first. Diminishing returns
+switch strategy and the switch is recorded. Every decision carries
+`reasonCode, reason, intendedOutcome, humanWorkPreserved, aiWorkPerformed,
+confidence, guardRequired, maxQuestions, objective, avoid, switchedFrom,
+maxTokens`.
 
-### Intervention router (`lib/cognition/router.ts`)
-- **Exists and good:** deterministic rules; ASK must be earned (`askWorth` against `1 + 1.5 × streak`); the streak is measured from the transcript the person actually saw; "use what they gave" after an answer. Well tested with scripted states.
-- **Reachable:** LISTEN, OBSERVE, CONNECT, REFINE, SYNTHESIZE, CHALLENGE, ASK, HINT, TEACH, EXPLAIN, DIRECT, RETRIEVE.
-- **Declared but never selected:** RESEARCH, CALCULATE, CLARIFY.
-- **Missing from the thesis set:** COMPARE, VISUALIZE, SIMULATE, CALIBRATE, PREMORTEM, CONTINUE, CLOSE.
-- **Problems:**
-  - Question pressure constrains only the ASK *label*. HINT and CHALLENGE can end in questions at any streak, so the anti-interrogation mechanism can be bypassed by relabelling.
-  - Rules 4 and 5 withhold the correction from anyone whose attempt is wrong, whatever their goal. That is Socratic by default for experts and productivity work.
-  - `decide` plus high urgency routes to an unguarded DIRECT, which can hand over a consequential judgment.
-  - A conversation-scoped `attempt` can re-trigger the same withholding CHALLENGE turn after turn, because nothing records it was already addressed.
-  - Stated preferences (Project instructions, Preference nodes) never reach the router or the guard, so the guard can enforce a move *against* what the person asked for.
+### Question budget and diminishing returns — `lib/core4/budget.ts`, `questions.ts`
+One counter for "a question" everywhere (engine, guard, gate, grader):
+explicit `?` sentences, disguised interrogatives ("it might be worth
+thinking about…", "ask yourself…", "what do you think"), and closing offers.
+Budget: 0 after two asking replies in a row, or one asking reply in a
+mostly-asking conversation, or on diminishing returns or frustration; 0
+always after "stop asking"; 1 when they asked to be quizzed; a genuine
+blocker earns one back below a streak of three.
 
-### Answer Guard (`lib/cognition/guard.ts`)
-- **Exists and good:** structural layer (closing-question trim, one question for ASK, sentence caps, worked-solution and gives-then-asks detection), then a semantic leak check on gpt-4o-mini.
-- **Partial:** runs only on the 9 guarded moves; checks withholding and structure, not sycophancy, epistemic overstatement, inference-as-fact, over-explaining or unnecessary questions.
-- **Bugs:**
-  - The regenerate retry ships unchecked.
-  - A closing-question "revise" returns before the leak checks run.
-  - `givesThenAsks` rejects TEACH for doing what TEACH is for: stating a definition, then inviting its use.
+### Already Considered and the novelty gate — `lib/core4/considered.ts`, `ledger.ts consideredView`
+The already-considered record is a **view over the Reasoning Ledger**, not
+a separate store: what the person raised, ruled out (and why), settled — and
+what Socria already said — ranked by conversation, Project and relevance.
+The move block lists it; the guard enforces it. Matching is lexical (stems,
+synonyms, a damped overlap score): ≥0.6 REDUNDANT (sentence removed, or a
+regeneration past it when everything is redundant), ≥0.34 UNCERTAIN (the
+cheap model judges; it can only name sentences to delete). Sentences that
+explicitly build past a covered item ("you've already ruled out X; …") are
+not candidates. Gated: perspective moves always; ANSWER when thinking
+together and there is a record; pure information answers never.
 
-  The last two combine badly: an overblock swaps a good draft for an *unguarded* one.
+### Reasoning Ledger — `lib/core4/ledger.ts`
+Entries (`claim, evidence, assumption, objection, alternative, hypothesis,
+question, decision, uncertainty, conclusion` …) and links (`supports,
+contradicts, derived_from, rejected_because, responds_to` …), each with owner
+(`user | socria | unknown`), stance (`asserts, entertains, asks, rejects,
+accepts, resolved`), basis (`quoted | paraphrased | inferred`), status,
+confidence and revision history. **Attribution is enforced in code**: an
+entry is the person's only if its quote is in their message, or it is a
+close paraphrase that agrees on which shared concepts are negated. Anything
+else is `unknown` — it can stop repetition but is never said back as theirs.
+What Socria says is recorded as Socria's, from the text actually sent.
+Adoption of a Socria idea creates a *new* user entry linked `derived_from`;
+ownership is never rewritten. `toLogosGraph` renders the same substrate as
+nodes and edges for Logos. Tables: `reasoning_entries`, `reasoning_links`.
 
-### Mind Graph (`lib/mind/*`)
-- **Exists and good:**
-  - typed nodes and edges, statuses, provenance kinds (including `researched`, `calculated` and a `tool` surface, reserved but unused);
-  - a structural write gate: register rules, corroboration across two conversations, substance, tombstones;
-  - supersession that never overwrites, lexical entity resolution, Project affinity as a weighting, forgetting that holds;
-  - a `remember({candidates})` seam for writes that skip the extractor.
-- **Partial:**
-  - Ontology gaps: no Constraint, Fact, Idea, Milestone or Object. The relation vocabulary lacks `changed_into`, `evidence_for` and `learned_from` (supersession uses `superseded_by`).
-  - Metadata gaps: stored activation is never read; edge confidence is write-only; every new edge starts at strength 0.5.
-  - Activation effectively reaches two hops.
-- **Missing:**
-  - The **why** of a belief change: only "changed from: <old content>" is stored.
-  - Any **history retrieval**. "Why did we stop believing A?" can't be answered.
-  - **Provenance rendered to the model.** It can't tell stated from inferred from researched.
-  - Any path for tool results into the graph.
-  - Speaker attribution: Socria's own claims can be stored as the person's.
-- **Bugs:**
-  - Edges and `replaces` / `conflictsWith` bypass the register gate.
-  - `touchNodes` upserts partial rows into NOT NULL columns and swallows the error, so `last_accessed` never updates and recency scoring decays on creation time instead.
-  - `remember()` can be lost when the function instance freezes.
-  - Once the graph passes MAX_NODES it silently stops learning.
-  - "Forget what Socria worked out" (`/api/account/memory`) never touches the graph.
+### Answer Guard 2.0 — `lib/core4/guard2.ts`
+Two-sided. **Overreach** (only when something is withheld): the private
+verify value, gives-then-asks ("the rule is X… now try it yourself"), a
+worked solution inside a HINT/VERIFY/QUESTION. **Underhelp**: questions over
+budget (stripped), a reply that is only questions (regenerate; OVERRIDE_WITH_
+DIRECT_ANSWER when the machine should do the work), deflection ("it depends
+on your goals") to a direct request. **Novelty** (above). **Voice**:
+sycophantic opener, closing offers. Actions: ALLOW, MODIFY_FOR_MORE_AGENCY,
+MODIFY_FOR_MORE_HELP, OVERRIDE_WITH_DIRECT_ANSWER, REQUEST_CLARIFICATION. The
+cheap model is consulted on withheld turns and uncertain novelty; its output
+is used to delete named sentences or to trigger a frontier regeneration —
+never shipped as prose.
 
-### Tools and representation
-- **Exists for Core 4:** document reading (PDF, Office, zip), image reading. Both run at attach time, started by the browser, not chosen by Core.
-- **Exists elsewhere, unreachable from Core 4:** Logos's web search (Serper/Tavily), SSRF-hardened fetch, OAuth connectors, safe expression evaluator, visualization engine.
-- **Missing:** any tool calling in the Core 4 route, orchestration, citations, computation over data, math rendering in Core chat, any bridge to Logos.
-- **Conflict:** the Core 4 prompt tells the model to "research facts … calculate". It can't, and nothing stops it from saying it did.
+### Verify Mode — `lib/core4/verify.ts`
+Exact arithmetic via the Logos evaluator, before the move is chosen. A
+separate checker call for everything else, only when something is withheld.
+The reply model gets VERDICT / WHERE / KIND OF ERROR, never the expected
+answer; the guard gets the expected answer (and its spellings) as hidden
+values to keep out of the reply. Below 0.7 confidence the checker's verdict
+is not claimed. When nothing is withheld, the correct answer is given to the
+reply model so it can correct plainly.
 
-### Evaluation
-- **Exists:** about 75 deterministic suites, including real-route e2e tests that bundle the actual chat handler with fake Supabase, Clerk and OpenAI.
-- **Missing:**
-  - any live Core 4 eval;
-  - any comparison against the same model with the strongest Socria prompt;
-  - any model-swap arm;
-  - any Limit Ledger (known model failures live only in code comments);
-  - any measure of state-reader accuracy, guard precision and recall, or intervention fit.
-- **Bug:** the fake OpenAI's catch-all returns `{"verdict":"approve"}` for any unscripted non-stream call. In `projects-e2e` and `attachments-e2e` the guard's regenerate path therefore ships that literal text as the reply, and the assertions don't notice.
+### Outcomes, capability, telemetry — `merge.ts explicitOutcome`, `capability.ts`, `trace.ts`
+Labels: HELPED, PARTIALLY_HELPED, WAS_TOO_DIRECT, WAS_TOO_INDIRECT,
+WAS_REDUNDANT, CONFUSED_USER, UNLOCKED_PROGRESS, FRUSTRATED_USER, UNKNOWN —
+from the person's words (explicit) or the reader (inferred, capped at 0.7).
+Used in the next turn's selection (a move that just landed badly is not
+repeated; friction outcomes feed diminishing returns). **No online learning**:
+nothing updates policy automatically. Capability is **evidence events**
+(demonstrated unassisted / assisted, self-corrected, misunderstanding,
+needed the answer), per concept, counted — with independent capability
+credited only in a *later conversation* than the help. The per-turn trace
+is content-free (enums, counts, reason codes, timings, model ids, prompt
+version).
 
-## 4. Duplicated and conflicting systems
+### The model seam — `lib/core4/model.ts`
+Every Core 4 model call (state, reply, retry, guard, verify, extract) goes
+through `modelClient()`. Production is OpenAI, configured as before. The
+eval harness installs its own client, so what is evaluated is the shipped
+pipeline.
 
-1. **Five memories in one prompt.** Thread memory (client-held, lags 1–2 turns), imported profile (static, up to about 2k tokens), Thinking Journey (lags up to 4 turns, rendered whole), Mind Graph (lags one turn) and Cognitive State (this turn). One goal or decision can appear up to five times at different freshness. Only prose ("the live conversation wins") reconciles them.
-2. **"Did they change their mind?" is decided four ways.** State `recentChanges`, the extractor's `replaces`, the thread-memory extractor's "REPLACE the old entry" (which *deletes* history, against the thesis) and the journey rewrite. They never share a verdict, and `remember()`'s report is discarded.
-3. **Two authorities choose the move.** The router chooses, and the base prompt's Human-First, Learning and Direct Answers sections still tell the model to choose. The prompt never says which wins; the move block wins only by coming last. The router is currently more Socratic than the prompt.
-4. **Concealment versus epistemics.** Older memory blocks say "never reveal a memory system exists"; the Core 4 prompt says "distinguish what is remembered". They're in the same prompt.
-5. **Memory surfaces disagree.** `/memory` shows the Mind Graph and says it's the whole truth; the chat rail's "What Socria remembers" opens the journey. Forgetting in one doesn't forget in the other.
-6. **Logos's ThinkingMap and the Mind Graph** are unrelated object models with no bridge.
-7. **Core 3.1's living-understanding pass and conversation controller** do, for Core 3.1, much of what Core 4's state and router do, with different code. Their voice detectors (`BANNED_PATTERNS`) would serve Core 4's guard and don't.
-8. **State-before-graph ordering is paid for, not earned.** It adds a full serial mini-model call before the first database read, and the focus seed it exists for rarely matches, because it compares an un-normalized sentence against normalized labels.
+## 3. Memory, unified
 
-## 5. Behaviour controlled only by prompt text
+| Layer | Holds | Written | Read by Core 4 |
+|---|---|---|---|
+| **User memory** (Mind Graph) | what Socria understands about the person: projects, goals, preferences, people, files | `remember()` after each turn | yes — recall, bounded, focused by Project |
+| **Cognitive State** | where this conversation stands now | every turn | yes — state block |
+| **Already Considered** | a view over the ledger | — | yes — move block + guard |
+| **Reasoning Ledger** | the moves of their reasoning, attributed | every turn | yes — via Already Considered, RETRIEVE |
+| **Capability evidence** | observable events per concept | every turn with an attempt | not in the prompt; Memory page and evals |
+| **Intervention history** | memos in the state; content-free traces | every turn | memos yes; traces no |
+| Thread memory, Thinking Journey | older per-thread and cross-thread summaries | **not for Core 4** | **no** |
+| Flat person-memory | older top-k list | not for Core 4 | no |
 
-These are the behaviours nothing in code computes, checks or enforces:
+Each concern has one home. Core 4 conversations get a title from a
+title-only extractor path (`app/api/extract-memory`, `titleOnly`).
 
-- epistemic labelling (known, inferred, remembered, calculated, researched);
-- anti-sycophancy, no praise, no therapy tone, no heading spam, no disclaimers;
-- length and over-answering on EXPLAIN, DIRECT and RETRIEVE;
-- no reflexive closing question on unguarded moves;
-- tool use;
-- more directness under frustration;
-- the scaffolding ladder and fading;
-- adapting to expertise;
-- reconciling stale memory against the live conversation;
-- not treating jokes or hypotheticals as belief when reasoning in-turn;
-- representation choice (not even mentioned in the prompt).
+## 4. Privacy
 
-In the graph's own writes: register classification and change detection are the extractor model's judgement alone.
+- **Minimisation.** The state is compact and capped; the ledger stores short
+  texts and quotes; traces store no text at all.
+- **Provenance.** Every inferred field carries source, confidence and
+  evidence; every ledger entry carries owner, basis and revisions.
+- **No psychological inference as fact.** The reader is instructed to
+  report evidence about the task, never traits; inferred fields are shown to
+  the model as possibly wrong and never to be stated to the person as fact;
+  an inference can never withhold anything.
+- **Correction.** `/api/core4` + the Memory page: edit, disown ("not mine"),
+  retract, restore, delete entries; set or reset inferred fields; forget a
+  conversation's state or a concept's evidence. Every correction is recorded
+  as the person's.
+- **Deletion.** All five tables are in account deletion (`OWNED_TABLES`,
+  checked by `test/account-data-complete`) and in "forget what Socria worked
+  out" (`/api/account/memory`).
+- **Export.** All five tables are in the account export, with a note on what
+  is said versus inferred.
+- **Retention.** Turn traces are purged after 180 days, at write time.
+- **Row-level security.** Deny-by-default RLS on all five tables
+  (`supabase/rls.sql`, checked by `test/rls-covers-schema`).
+- **No training reuse.** None of it is used to train models; any research use
+  would require explicit consent and a policy that does not exist yet.
 
-The Core 4 base prompt itself is 97 lines, about 2k tokens. By the prompt review's estimate, roughly 40% is the only control over what it describes, about 35% repeats decisions the router now makes (which is where the conflicts come from), and about 25% is aspiration with little behavioural effect.
+## 5. Latency and cost
 
-## 6. Where the model's own habits leak through
+Added to a Core 4 turn, before the first token: the state read (cheap model,
+≤5 s, usually well under 1 s of wall time relative to recall, which runs
+concurrently), the state/ledger load (parallel), and — only on withheld
+attempts — the checker (≤4 s). Buffered moves add the guard (deterministic:
+negligible; cheap model on withheld turns and uncertain novelty: ≤5 s) and,
+rarely, one regeneration. Streamed moves add nothing but the sentence gate.
+Timings for every stage are in the trace (`ms`).
 
-Unmitigated or prompt-only:
+## 6. What is not built, and why
 
-- **Confident fabrication of research or arithmetic.** No tools, and no check that a factual answer is grounded.
-- **Verbosity on unguarded moves.** The flat 500-token cap truncates mid-sentence instead of disciplining.
-- **Sycophancy and praise.**
-- **Headings and lists.**
-- **Hedging, and inference stated as fact.**
-- **The cheap guard model's voice replacing the frontier model's.** Its "revise" text ships verbatim.
-- **Prompt injection.** Instructions inside attached documents or image text can steer the main call; only the graph extractor fences material as data.
-
-Well mitigated: reflexive questions on *guarded* moves (a deterministic trim), and trait-minting from one afternoon (the corroboration ledger).
-
-## 7. What to keep as it is
-
-- the deterministic router and transcript-measured question pressure;
-- the structural guard layer;
-- fail-soft memory with timeouts, and renderers that pass plain strings;
-- the Mind Graph core: gate, pending corroboration, tombstones, supersession without overwrite, Project affinity;
-- the document reader and its zip-bomb and secrets protections;
-- the real-route in-process e2e harness (once its fake is fixed);
-- the Memory page and Projects.
-
-These are the parts of Core 4 that already behave like architecture rather than instructions.
+- **Tools** (search, code execution, visualisation). None in this path; the
+  prompt says so. RESEARCH/MODEL/VISUALIZE exist only as types.
+- **Embeddings** for the novelty matcher: lexical + cheap-model judge first;
+  embeddings only if the evals show paraphrase misses that matter.
+- **Online learning from outcomes.** Deliberately not: outcomes are recorded
+  and used within the conversation; policy changes go through the council
+  and the evals.
+- **Logos on the ledger.** The substrate is Logos-shaped (`toLogosGraph`);
+  Logos does not read it yet.

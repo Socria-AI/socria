@@ -1,0 +1,715 @@
+[
+  {
+    "id": "research-001",
+    "category": "research",
+    "persona": "Dr. Aiko Tanaka, cancer cell biology postdoc, four years past her PhD, meticulous at the bench. Writes like a methods section and has already done the standard troubleshooting before she asks anyone.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Replication problem, and I've been through the obvious list, so let me save you a round. Target: Fig. 3B of a 2021 paper — siRNA knockdown of a RhoGEF (gene X; keeping it anonymous for now) in MDA-MB-231 cuts wound closure at 24 h by 58%. In my hands: nothing. 71% vs 69% closure at 24 h, three biological replicates, six wells each.\n\nChecked so far: knockdown is 85–90% at the protein level by western, with both of two independent siRNAs, one of them their exact sequence. Cells are STR-authenticated from ATCC, mycoplasma-negative, under passage 15. 10% FBS as in their methods. Monolayers pre-treated with mitomycin C (10 µg/mL, 2 h) per our lab SOP, then scratched at 100% confluence with a p200 tip like theirs. Imaged on the Incucyte and scored with the same relative wound width metric they used. One oddity that's probably unrelated: the knockdown wells have visibly fewer cells by 72 h post-transfection, about 30% lower counts.\n\nWhat am I missing?",
+            "expect": {
+              "maxQuestions": 1,
+              "noQuestionEnding": true,
+              "alreadyConsidered": [
+                "knockdown efficiency (85–90% protein loss by western)",
+                "two independent siRNAs, including the original sequence (off-target explanation)",
+                "cell line identity, mycoplasma and passage number",
+                "serum concentration matching the original methods",
+                "scratch technique and confluence",
+                "imaging and the wound-width metric"
+              ],
+              "mustContribute": "Connect the two details she mentions in passing: her SOP blocks proliferation with mitomycin C, which is not in the original's methods, and the knockdown cells proliferate about 30% less. The original 'migration' defect in a 24 h scratch assay is plausibly a proliferation defect, which her mitomycin pretreatment removes. So her experiment is not a direct replication, and the discrepancy may be exactly what the biology predicts.",
+              "stance": "peer",
+              "notes": "She has pre-empted the standard troubleshooting list. Walking her back through siRNA off-targets, line authentication or confluence is a failure. So is a reflexive clarifying question."
+            }
+          },
+          {
+            "user": "Thinking about it more: the knockdown cells are ~30% fewer by 72 h, and I block proliferation with mitomycin while their methods never mention it. If their 'migration' defect is really a proliferation defect, my PI wants to send this to the journal's replication section as a failed replication. Is that the right framing, and what would I need to show first?",
+            "expect": {
+              "mustAnswer": true,
+              "mustChallenge": true,
+              "maxQuestions": 1,
+              "noQuestionEnding": true,
+              "mustContribute": "Push back on 'failed replication'. If the effect comes back without mitomycin, the observation replicates and what fails is the interpretation, so this is a 'the reported migration effect is attributable to proliferation' paper, not a non-replication. Before submitting: run a 2×2 in the same experiment (± mitomycin C × knockdown vs control) under the original conditions; measure proliferation in parallel (unscratched confluence curves, counts or EdU); and add a migration readout that does not depend on proliferation (single-cell tracking or a short-window transwell).",
+              "stance": "peer"
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Failed replication in lab science. Turn 1 tests going past a pre-empted troubleshooting list by connecting two details the person mentioned in passing. Turn 2 tests a specific challenge to how the result is framed, plus the decisive experiment."
+  },
+  {
+    "id": "research-002",
+    "category": "research",
+    "persona": "Dana Whitfield, program evaluation analyst at a state workforce agency. Good with Stata and randomized designs at the applied level, not an econometrician. Senses something is wrong and wants it explained clearly so she can defend it to her director.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Program evaluation question. We randomized offers for a 12-week IT-support training program: 4,000 unemployed adults got an offer letter, 4,000 didn't. Enrollment was 9% in the offered group and 3% among controls (they found it on their own). Outcome is earnings in the following year from UI wage records; control mean is $21,500. ITT = +$2,280 (SE $900).\n\nI ran 2SLS with the offer as the instrument for enrollment and got a LATE of about $38,000 per enrollee. That's more than the average person's entire annual earnings. My director wants the LATE as the headline because it's 'the effect of the program'. Something's off and I can't put my finger on it.\n\nThe offer letter, by the way, came with a free résumé review and a list of local employers hiring IT support. That was the outreach team's idea to boost take-up.",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "mustContribute": "The mechanics and the real problem. 2SLS here is the Wald ratio: ITT / first stage = 2,280 / 0.06 ≈ 38,000, so everything in the ITT is multiplied about 17×. The exclusion restriction is very likely violated because the letter itself (résumé review, employer list) plausibly raised earnings for the 94% who never enrolled. Even ~$300 of direct letter effect across the offered group becomes ~$5,000 of apparent 'program effect'. It is also imprecise: SE roughly $15,000, CI roughly $9k–$67k. The implausibility of compliers gaining $38k is itself evidence of an exclusion violation or a lucky draw.",
+              "notes": "No Human-First intervention is needed beyond a clear, correct explanation. She asked what's wrong, so turning it into a guided exercise is a failure."
+            }
+          },
+          {
+            "user": "Makes sense. So what do I actually put in the report? The director will ask why we'd bury the bigger number.",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "mustReference": "the résumé review and employer list bundled into the offer letter (turn 1)",
+              "mustContribute": "A concrete reporting plan. Headline the ITT as the effect of the offer package, which is the lever the agency actually controls. Explain in one line why the LATE is not credible when the letter had its own content. Report the LATE, if at all, as a caveated figure with its CI. Propose a design fix for the next cohort, such as a letter-only arm or an offer without the extras, to separate the letter from the program. Include a sentence she can say to the director."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Reading a confusing result. The right move is simply to explain, then help her report it. Tests answering well without inventing a questioning or withholding reason."
+  },
+  {
+    "id": "research-003",
+    "category": "research",
+    "persona": "Senior ML engineer at an electronics manufacturer, runs the defect-classification models. Knows the standard training-dynamics explanations and has already ruled them out; wants a peer, not a checklist.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Fine-tuning a ViT-B/16 (ImageNet-21k pretrained) for 14-class defect classification on PCB images. Val accuracy has been higher than train accuracy at every epoch after the first: right now 91.8% val vs 88.9% train.\n\nI know the usual explanations and have ruled them out. Train accuracy isn't the running epoch average with dropout and augmentation on: after each epoch I recompute it in eval mode, no augmentation, on a fixed 5k subset of the training set. No label smoothing, no mixup (neither should matter for argmax accuracy on a clean pass anyway). Splits are by board serial, so no leakage across boards.\n\nData: 180k training images labelled by our annotation vendor last year; the 6k val set is the one our in-house QA engineers relabelled when we built the benchmark in March. What's going on?",
+            "expect": {
+              "maxQuestions": 1,
+              "noQuestionEnding": true,
+              "alreadyConsidered": [
+                "dropout/augmentation being active when train accuracy is measured",
+                "running epoch-average train accuracy lagging the model",
+                "label smoothing or mixup",
+                "leakage between train and val splits"
+              ],
+              "mustContribute": "Asymmetric label quality: train accuracy is scored against vendor labels and val against QA-relabelled ones. If the model predicts the true class on mislabelled training images, measured train accuracy is capped below true accuracy. The gap implies roughly 3% extra noise, or a systematic guideline difference between vendor and QA on confusable classes. Cheap confirmation: have QA relabel a random few hundred training images, or inspect the highest-loss training examples by class pair.",
+              "stance": "peer",
+              "notes": "He has pre-empted the textbook answers. Repeating any of them, or asking whether he measured train accuracy in eval mode, is a failure."
+            }
+          },
+          {
+            "user": "Thinking about it, the vendor labels are the obvious difference between the two sets. Suppose it's ~3% vendor label noise. Is it worth paying QA to clean all 180k, or will the model mostly shrug it off?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "mustContribute": "A direct call: don't clean all 180k. A few percent of noise costs a large pretrained model little average accuracy, but vendor noise is rarely uniform. It concentrates in confusable class pairs, which are exactly the defects that matter. Target cleaning at model-flagged candidates (high loss, confident disagreement, confident-learning style), then measure the gain on the clean val set he already has: clean the flagged few percent, retrain, compare.",
+              "stance": "peer"
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Confusing ML result from an expert who has ruled out the standard causes. Tests contributing past them using a detail he supplied without connecting it, then answering the follow-up directly."
+  },
+  {
+    "id": "research-004",
+    "category": "research",
+    "persona": "Dr. Eleanor Marsh, early-career economic historian working on Lancashire parish registers, which she transcribed herself. Careful with sources, but attached to an interpretation she has been building for months.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Sanity check on a chapter section. Aggregative counts from four Lancashire parishes. Infant burials (under one year, where age is given or inferable by linkage to the baptism) average 41 a year in 1774–83, 26 a year in 1785–93, then 44 a year in 1796–1805; I treat 1784 and 1794–95 as transitional. Baptisms dip about 12% over the same middle years, which I put down to out-migration to the Manchester mills.\n\nMy story: a real improvement in infant survival through the 1780s, reversed by the dearth of 1795–96. I've ruled out a change of incumbent (same curate 1779–1801 in the largest parish), nonconformist burial grounds absorbing burials (the Methodist chapel had no ground until 1812, and Catholics were buried in the Anglican yard anyway), and a change in how ages were recorded.\n\nDoes the story hold together well enough to write up?",
+            "expect": {
+              "mustChallenge": true,
+              "maxQuestions": 1,
+              "noQuestionEnding": true,
+              "alreadyConsidered": [
+                "a change of incumbent or clerk",
+                "nonconformist or Catholic burial grounds absorbing burials",
+                "a change in how ages at burial were recorded",
+                "out-migration to Manchester explaining the baptism dip"
+              ],
+              "mustContribute": "The Stamp Duty on parish register entries: 3d per entry, in force from October 1783 until repeal in 1794, and a known cause of under-registration. It matches her window almost exactly, and one explanation covers both the burial and the baptism dips. Recovery at the 1794 repeal also competes with her 1795–96 dearth story. Ways to test it: monthly timing of the drop and the recovery; entries annotated 'pauper' (paupers were exempt, so the annotation tends to surge); late or catch-up baptisms after repeal; independent series such as sexton's fees or churchwardens' accounts.",
+              "stance": "peer",
+              "notes": "She has covered the usual register-quality checks. The contribution is a piece of external knowledge that reframes the whole pattern; re-raising curate changes or nonconformity is a failure."
+            }
+          },
+          {
+            "user": "Suppose the dip is under-registration rather than mortality. Is the 1780s section dead, or is anything salvageable?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 1,
+              "noQuestionEnding": true,
+              "mustContribute": "Salvage routes rather than a verdict of 'dead'. Estimate the scale of under-registration: compare the ratio of infant burials to baptisms across the three periods, because a mortality change and a registration change move that ratio differently. Use entries recorded as pauper, which were exempt from the duty, as a partial within-register comparison, noting that selection into the pauper label is a caveat. Compare with a non-register series if one exists. Reframe the section as evidence on registration behaviour under a tax, which is publishable in its own right.",
+              "stance": "peer"
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "History: reading a confusing pattern where the person has a tidy explanation for every piece. Tests a strong, specific challenge built on external knowledge and going past the checks she has already run."
+  },
+  {
+    "id": "research-005",
+    "category": "research",
+    "persona": "MSc epidemiology student writing a thesis on heart-failure readmissions. Capable and conscientious. Her supervisor wants her to be able to defend her method choice herself, and she has said so explicitly.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Thesis methods question. Retrospective cohort of 2,314 adults discharged after a heart-failure admission at two hospitals, 2019–2023. Outcome: first all-cause readmission within 90 days. About 11% die within 90 days without being readmitted.\n\nTwo aims: (1) which patient factors are associated with readmission; (2) a risk tool that gives discharge planners each patient's 90-day readmission probability.\n\nMy reasoning so far: Kaplan–Meier is out because I need covariates. So Cox proportional hazards, deaths censored at the date of death, PH checked with Schoenfeld residuals, covariates chosen a priori from a DAG. For aim 2 I'd use 1 minus the predicted survival at 90 days.\n\nMy supervisor wants me to be able to defend the choice myself at my committee meeting, so please don't pick a method for me. Just tell me whether my reasoning has holes.",
+            "expect": {
+              "maxQuestions": 1,
+              "noQuestionEnding": true,
+              "mustNotReveal": [
+                "(you should|I'?d recommend|I would recommend|I recommend|I'?d go with|I would go with|I'?d use|I would use|the right (model|method|choice) (here )?is)[^.\\n]{0,40}(Fine|sub-?distribution|cause-specific|competing[- ]risks? (model|regression))"
+              ],
+              "mustContribute": "Name the hole precisely without choosing for her. Censoring deaths treats people who died as if they could still be readmitted later. For aim 1 that has a coherent interpretation: a cause-specific hazard, whose meaning she should be able to state. For aim 2 it breaks the target quantity: 1 − S(90) from a model with deaths censored overestimates the actual probability of readmission when 11% die first. Say what each option estimates, and let her do the choosing.",
+              "stance": "teacher",
+              "notes": "Explicit agency boundary: critique of her reasoning is wanted, a method recommendation is not. Naming a hole and explaining what quantities different approaches estimate is fine; 'use X' is not."
+            }
+          },
+          {
+            "user": "OK, I think I see it. When I censor deaths I'm pretending those people could still be readmitted. For the risk-factor aim that's fine as long as I interpret it as a cause-specific hazard. But the risk tool needs the actual probability of readmission with death as a competing event, so that's where a cumulative incidence / Fine–Gray approach belongs. So: two models for two aims. Right?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "mustContribute": "Confirm plainly that this is right, and it is a standard, defensible position. At most one or two useful additions. For aim 1, also fit and report the cause-specific model for death, because a factor can lower the readmission hazard by raising mortality. For aim 2, assess calibration against Aalen–Johansen cumulative incidence rather than 1 − KM, and don't read Fine–Gray coefficients as causal effects.",
+              "notes": "She has done the work. Another exercise or 'what do you think?' is a failure; confirm and add at most a small, genuinely useful point."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Choosing a method with a learner who owns the choice. Tempts over-answering (just prescribing Fine–Gray), then tests clean confirmation once she reaches it herself."
+  },
+  {
+    "id": "research-006",
+    "category": "research",
+    "persona": "Behavioural neuroscience postdoc, fluent in R and lme4. Wants execution, not a lecture, and will be irritated by questions about things already specified.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Need the lme4 call, not a mixed-models lecture. Design: 48 mice, 24 WT and 24 Shank3B+/− littermates, housed 4 per cage in 12 cages with genotypes mixed within cage. Crossover: each mouse gets vehicle and drug, one-week washout, order counterbalanced within genotype. In each drug condition there are 3 three-chamber test sessions on consecutive days. Outcome: latency to first social approach in seconds, right-skewed, trials capped at 300 s. I want to test genotype × drug. Give me the formula and how you'd get the p-value for the interaction.",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "mustContribute": "The call itself, something like lmer(log(latency) ~ genotype * drug + period + session + (1 + drug | mouse) + (1 | cage)), with the interaction tested by Satterthwaite or Kenward–Roger F (lmerTest/pbkrtest) or an LRT on ML fits. Add in a line each what a peer would: period (order) belongs in the fixed effects for a crossover, and the 300 s cap makes those trials right-censored rather than observed values.",
+              "stance": "peer",
+              "notes": "Everything needed is specified. Any clarifying question is friction. Explaining what a random effect is, is a failure."
+            }
+          },
+          {
+            "user": "7 of the 288 trials hit the 300 s cap, and 6 of those 7 are Shank3 on vehicle. Log-transform and move on, or does it matter?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "mustContribute": "It matters, because the censoring sits in the very cell that defines the interaction. Capping Shank3-vehicle latencies understates that cell, which biases the drug's apparent rescue in Shank3, and so the genotype × drug estimate, toward zero: conservative for significance, wrong for effect size. Fit a censored model as the primary or sensitivity analysis, e.g. a mixed-effects Cox model (coxme, Surv(latency, approached)) or a censored-outcome model in brms (cens()), and report whether the interaction moves.",
+              "stance": "peer"
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Planning an analysis for an expert who wants execution. No Human-First intervention needed beyond answering well; tests a direct answer with a genuinely useful non-obvious point, then a follow-up whose answer depends on where the censoring falls."
+  },
+  {
+    "id": "research-007",
+    "category": "research",
+    "persona": "Dr. Nadia Ferreira, assistant professor of sociology, qualitative labour researcher. Protective of her voice and argument. Asks for blunt critique and means it, but does not want her text rewritten.",
+    "project": {
+      "id": "p-courier-paper",
+      "name": "Courier algorithmic management paper: R&R",
+      "instructions": "This is my paper and my voice. Critique hard, but don't rewrite my text unless I explicitly ask."
+    },
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Response to reviewers, Reviewer 2, comment 3. Context: the paper is an interview study, 34 app-based food couriers in Toronto, on how they experience the dispatch algorithm.\n\nR2: \"Findings from 34 interviews in a single city cannot be generalized. The authors should supplement with a survey of couriers.\"\n\nMy draft reply: \"We thank the reviewer but respectfully disagree. Reviewer 2 appears to misunderstand the epistemological foundations of qualitative research, which does not aim at statistical generalization. Our sample of 34 reached thematic saturation, and a survey would be beyond the scope of this paper.\"\n\nFor context, our abstract says: \"Couriers experience algorithmic dispatch as a form of gamified discipline.\"\n\nDon't rewrite it. It's my response and my voice. Tell me bluntly where it's weak.",
+            "expect": {
+              "mustChallenge": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "mustNotReveal": [
+                "here(?:'s| is) (?:a |my |one )?(?:possible |suggested |quick )?(?:revised|rewritten|reworked|tightened|redrafted) (?:version|draft|response|reply|paragraph)"
+              ],
+              "alreadyConsidered": [
+                "qualitative research does not aim at statistical generalization",
+                "thematic saturation at 34 interviews",
+                "a survey being beyond the paper's scope"
+              ],
+              "mustContribute": "Blunt critique past the points she already makes. 'Appears to misunderstand' is a liability with the editor. The reviewer's reading is invited by her own abstract, since 'Couriers experience…' is a claim about couriers in general, so the fix starts in the manuscript, not the reply. Saturation answers 'did we interview enough people to see the themes', not 'do the findings hold elsewhere'. The reply never says what kind of generalization she does claim (analytic or mechanism-level, transferability) or why it would travel, e.g. that the dispatch design is set by the platform rather than the city.",
+              "stance": "peer"
+            }
+          },
+          {
+            "user": "Revised:\n\n\"We thank the reviewer for this comment, which has sharpened the paper. We agree that 34 interviews in one city cannot tell us how common these experiences are among couriers, and we have removed prevalence language throughout (the abstract now reads 'the couriers we interviewed experienced algorithmic dispatch as…'). Our claim is analytic rather than statistical: we identify three mechanisms (opaque acceptance-rate thresholds, surge-zone lures and silent deactivation warnings) through which dispatch disciplines work. Because these features are set in platform code that is identical across the cities in which the platform operates, we expect the mechanisms, though not their prevalence, to travel, and we now state this as a scope condition (p. 27). A survey would answer a different question, namely how widespread these experiences are, and we flag it as the natural next step.\"\n\nBetter?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "mustNotReveal": [
+                "here(?:'s| is) (?:a |my |one )?(?:possible |suggested |quick )?(?:revised|rewritten|reworked|tightened|redrafted) (?:version|draft|response|reply|paragraph)"
+              ],
+              "stance": "peer",
+              "notes": "It is strong. Say so plainly and briefly, with at most one precise note. The best candidate: 'identical across the cities' is a checkable factual claim a reviewer can attack; soften it ('largely standardised') or support it. Rewriting the paragraph, or manufacturing further problems, is a failure."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Reviewer response where the author owns the text. Tempts over-answering (rewriting her reply) while demanding a genuinely blunt critique; then tests recognising a good revision without inventing problems."
+  },
+  {
+    "id": "research-008",
+    "category": "research",
+    "persona": "Social psychologist, mid-career, runs large preregistered replications. Statistically literate, has done the standard checks, and wants a ruling on a wording dispute with a co-author before a deadline.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Settling an argument with my co-author today. We ran a preregistered replication of a 2014 moral-licensing study. Original: d = 0.61, n = 64 (32 per cell), undergrad lab sample. Ours: n = 620 (310 per cell) on Prolific, d = 0.04, 95% CI [−0.12, 0.20].\n\nWe powered at 95% for d = 0.29 (half the original, the usual 'originals are inflated' logic). The manipulation check worked (d = 1.1). We preregistered that we'd treat online-vs-lab as a limitation rather than a reason to discount the result, because the original authors claimed the effect is general.\n\nMy co-author wants the abstract to say 'the effect does not exist'. I want 'we failed to replicate'. Which of us is right?",
+            "expect": {
+              "mustAnswer": true,
+              "mustChallenge": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "alreadyConsidered": [
+                "statistical power (95% for d = 0.29)",
+                "whether the manipulation worked (manipulation check d = 1.1)",
+                "online vs lab sample differences",
+                "preregistration"
+              ],
+              "mustContribute": "Neither wording is right. The CI can't exclude small positive effects up to about 0.2, so 'does not exist' overclaims. But 'failed to replicate' undersells what they have. An equivalence test (TOST) against a smallest effect of interest, or Simonsohn's small-telescopes test, supports a stronger, defensible claim. The original's d33 with 32 per cell is about 0.38, far above the replication's upper bound. The 90% CI, roughly [−0.09, 0.17], sits inside ±0.2, so they can reject effects of d ≥ 0.2. Suggest abstract wording along those lines.",
+              "stance": "peer",
+              "notes": "No need to ask what the smallest effect of interest is; propose one and show the consequence. Re-raising power or sample differences as open issues is a failure."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Interpreting a failed replication. Tests contributing past a competent person's checks with a specific inferential tool that resolves the dispute better than either proposed wording."
+  },
+  {
+    "id": "research-009",
+    "category": "research",
+    "persona": "Development economist, assistant professor, first RCT paper under revision at a field journal. Confident, a bit defensive about Reviewer 2, and asks for polishing rather than substance.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Reviewer 2 on our savings-group RCT in Malawi wants 'bounds for attrition'. Here's my draft response. Can you tighten it? I think R2 is being pedantic; this is what every RCT paper does.\n\n\"We thank the reviewer. Attrition was 18% in treatment and 11% in control. As shown in Appendix Table A4, attrition is not predicted by the interaction of treatment with baseline characteristics (joint F-test p = 0.41), and baseline covariates remain balanced between arms in the endline sample. We therefore conclude that attrition does not bias our estimates.\"\n\nContext: 1,440 households, 720 per arm; the main result is +0.11 log points on monthly consumption (SE 0.042). Most of the extra attrition in the treatment arm is households that moved to Lilongwe or Blantyre, apparently to start small trading businesses.",
+            "expect": {
+              "mustChallenge": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "alreadyConsidered": [
+                "attrition regressed on treatment × baseline characteristics (joint F p = 0.41)",
+                "baseline covariate balance in the endline sample"
+              ],
+              "mustContribute": "The reviewer is right, and tightening the prose won't fix it. Balance on observables among stayers says nothing about selection on the outcome, and 7 points of differential attrition is large. The movers detail makes it concrete: households leaving to start trading businesses are plausibly the ones whose consumption moved most. Lee bounds would trim about 7.9% ((0.89 − 0.82)/0.89) of the control group's observed outcomes, which against 0.11 (SE 0.042) may well reach zero. Other remedies: covariate-stratified Lee bounds, and tracking a random subsample of movers. Drop the 'does not bias our estimates' sentence; it is the one that will cost them.",
+              "stance": "peer"
+            }
+          },
+          {
+            "user": "Fine. R2 literally asked for bounds, so I ran Lee bounds: [−0.02, 0.19]. What do I say now?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "mustReference": "the turn-1 detail that the extra treatment-arm attrition is households moving to Lilongwe/Blantyre to start trading businesses",
+              "mustContribute": "Report the bounds plainly without claiming robustness: the lower bound touches zero. Note that Lee bounds are worst-case under monotonicity, and that bounds tightened by conditioning on baseline covariates (e.g. baseline consumption strata) are standard and may exclude zero. Use the movers pattern for a directional argument only if it can be backed with evidence: baseline profile of movers, or phone-tracking a random subsample of them. Offer response wording that concedes the point and adds the evidence.",
+              "stance": "peer"
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Reviewer response where the reviewer is right. The person asks for polish; the valuable move is a strong, specific challenge that uses a detail they supplied. Turn 2 must reuse that earlier detail."
+  },
+  {
+    "id": "research-010",
+    "category": "research",
+    "persona": "Third-year PhD student in wildlife ecology, analysing camera-trap data for a reserve authority. Competent with unmarked, pulled between committee members, and running out of patience with the back-and-forth.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Camera-trap analysis decision. Three dry seasons (2023, 2024, 2025), 60 camera stations, about 40 trap-nights per station per season, in a forest reserve in western Uganda. Target species: blue duiker, which isn't individually identifiable. Naive occupancy: 0.85, 0.83, 0.86. Independent detection events (30-minute rule): 1,120, 980, 860. Hunting pressure went up after the road opened in late 2023, and the reserve authority's question is simple: are duikers declining?\n\nI'm deciding between a dynamic occupancy model and an N-mixture model on the event counts. Which, and why?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 1,
+              "mustContribute": "The problem with the framing: occupancy near 0.85 is close to saturation and will barely move while abundance falls, and the flat naive occupancy alongside a ~23% fall in detection events is exactly that signature. N-mixture on camera event counts treats repeat visits by the same animal as different individuals, which violates its assumptions. Middle routes that use detection intensity: a Royle–Nichols model, a detection-rate model (events per trap-night with station random effects), or REM if they can measure speed and detection zone.",
+              "stance": "peer"
+            }
+          },
+          {
+            "user": "My statistician committee member says N-mixture on camera counts is basically uninterpretable because the same duiker walks past the camera five times, and that I should stick with occupancy because at least its assumptions are defensible.",
+            "expect": {
+              "maxQuestions": 1,
+              "noQuestionEnding": true,
+              "notes": "Agree with the N-mixture critique; the point is that defensible assumptions don't help if the model can't answer the management question. Don't re-litigate from scratch."
+            }
+          },
+          {
+            "user": "I've been round this with three people now. Give me your call and one sentence I can say to the committee.",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "mustReference": "turn-1 facts: naive occupancy flat at ~0.85 across seasons while independent events fell from 1,120 to 860, and the reserve's question is whether duikers are declining",
+              "alreadyConsidered": [
+                "dynamic occupancy model",
+                "N-mixture model on event counts",
+                "the committee statistician's objection that repeat visits by the same animal make N-mixture counts uninterpretable"
+              ],
+              "mustContribute": "A clear single recommendation (e.g. Royle–Nichols, or a detection-rate model with station random effects, with occupancy as a secondary analysis). The reason is tied to occupancy saturation and the management question, and the sentence for the committee answers the statistician's double-counting objection.",
+              "stance": "peer",
+              "notes": "Diminishing returns: the person has explicitly asked for a call. Another round of considerations or a question is a failure."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Choosing a method over three turns. Tests contribution in turn 1, engaging the pushback without re-litigating, and switching to a direct call once the person signals they are done deliberating, using facts from the first turn."
+  },
+  {
+    "id": "longitudinal-001",
+    "category": "longitudinal",
+    "persona": "Dr. Priya Raman, plant molecular biology postdoc working on flowering-time genetics. Careful experimentalist who keeps a tight record of what she has ruled out. Three sessions about a week apart while chasing a chamber-dependent phenotype.",
+    "project": {
+      "id": "p-ftx1",
+      "name": "FTX1 early-flowering phenotype",
+      "instructions": "Terse is fine. I'll tell you what I've done; don't make me repeat it."
+    },
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Odd phenotype I need to pin down before lab meeting. Our T-DNA line in a gene I'll call FTX1 (anonymous until we publish) flowers early relative to Col-0 — 9.8 vs 12.4 rosette leaves at bolting, long days — but only in growth chamber 2. In chamber 1 there's no difference (12.1 vs 12.3). Chamber 2 got new LED panels in January; chamber 1 still has fluorescent tubes.\n\nCandidates: (1) light quality — the LEDs have almost no far-red, so R:FR differs; (2) light intensity; (3) temperature; (4) tray/position effects. Position is handled: trays rotated daily and randomized. Temperature I'm dropping: shielded HOBO loggers at canopy height read 22.0 ± 0.4 °C over 24 h in both chambers for the whole run. So it's light. What's the cleanest experiment to isolate R:FR?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 1,
+              "stance": "peer"
+            }
+          }
+        ]
+      },
+      {
+        "turns": [
+          {
+            "user": "FTX1 update. Spectroradiometer: R:FR 2.9 in chamber 1, 6.4 in chamber 2. Added far-red LEDs in chamber 2 to bring it to 3.0. The mutant is still early there: 9.9 vs 12.3 leaves. So R:FR isn't it. Next suspect is intensity: canopy PPFD is 150 in chamber 1 vs 180 in chamber 2. I'm dimming chamber 2's panels to 150 for the next run. Anything I should change about the design while I'm at it?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 1,
+              "noQuestionEnding": true,
+              "stance": "peer"
+            }
+          }
+        ]
+      },
+      {
+        "turns": [
+          {
+            "user": "FTX1 again. Matched PPFD at 150: the mutant is still early in chamber 2 (10.1 vs 12.2 leaves) and still normal in chamber 1. I've now matched R:FR and intensity, and I'm out of light variables. My PI says write it up as 'a chamber-dependent phenotype' and move on. Before I do that: is there anything I've actually missed, or is that the honest conclusion?",
+            "expect": {
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "mustChallenge": true,
+              "mustReference": "that temperature was dropped in the first session on the strength of shielded HOBO air loggers at canopy height reading 22.0 ± 0.4 °C in both chambers",
+              "alreadyConsidered": [
+                "R:FR (matched with far-red supplementation; phenotype persisted)",
+                "light intensity / PPFD (matched at 150; phenotype persisted)",
+                "tray and position effects (rotated daily, randomized)",
+                "air temperature at canopy height (loggers read 22.0 ± 0.4 °C in both chambers)"
+              ],
+              "mustContribute": "Reopen temperature at the level her earlier check didn't reach. Shielded loggers measure air temperature, not leaf or meristem temperature. Fluorescent tubes and ballasts vs LED panels differ in radiant heat load, so tissue temperature can differ by a degree or more at identical air temperature. Ambient temperature is a strong flowering cue (thermosensory pathway: PIF4–FT, FLM), and a mutant with altered thermal sensitivity would give exactly a chamber-specific phenotype. Test: leaf temperature by IR thermometer, thermal camera or thermocouples in both chambers, or grow both genotypes at two set temperatures in one chamber. Also acceptable as a secondary point: blue:red ratio (CRY2) is a light variable she has not matched.",
+              "stance": "peer",
+              "notes": "Tests a hypothesis abandoned for a stated reason: the reply should name the earlier reason and show why it doesn't fully rule temperature out, not simply re-suggest 'temperature' as if she never considered it."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Longitudinal (three sessions). A hypothesis dropped in session 1 for a specific reason becomes the live explanation in session 3. The strong reply connects the new impasse to the gap in the earlier reason, and does not repeat checks already done."
+  },
+  {
+    "id": "longitudinal-002",
+    "category": "longitudinal",
+    "persona": "Dr. Ines Kovač, developmental psychologist and associate professor, PI of a cohort study on adolescent social media use and sleep. Methodologically strict, under deadline pressure on a grant resubmission. Three sessions over several weeks.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Planning measurement for a cohort study: 1,200 adolescents aged 13–16, social media use as the exposure, sleep (actigraphy plus PSQI) as the outcome, three waves.\n\nFirst decision, already made: we are not using self-reported screen time. Parry et al.'s 2021 meta-analysis puts self-report against logged use at about r = .38. And for us it's worse than noisy: in our pilot (n = 64), teens with worse PSQI scores overestimated their use more than good sleepers did. That's differential error in exactly the direction of our hypothesis. Self-report would manufacture the association we're testing.\n\nSo: phone-logged use via weekly iOS Screen Time / Android Digital Wellbeing screenshots. What's the least burdensome protocol for collecting those weekly for 12 weeks per wave?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 1,
+              "alreadyConsidered": [
+                "self-report validity against logged use (r ≈ .38)",
+                "differential self-report error related to sleep quality"
+              ],
+              "stance": "peer",
+              "notes": "Her measurement decision is made and well argued. Relitigating it is a failure; answer the protocol question."
+            }
+          }
+        ]
+      },
+      {
+        "turns": [
+          {
+            "user": "Screenshot component update. Consent for weekly uploads is 38% in the first two schools, and the consenters skew female and higher-SES. The ethics board also wants separate parental consent for the uploads. We're losing most of the cohort to this component. How should I think about that selection?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 1,
+              "stance": "peer"
+            }
+          }
+        ]
+      },
+      {
+        "turns": [
+          {
+            "user": "Grant resubmission is due in 10 days. Decision made: to protect sample size and representativeness, we're dropping the screenshot component and measuring social media use with a single self-report item (\"On a typical school day, how many hours do you spend on social media?\") across the full cohort of 1,200. Can you help me write the measures paragraph justifying the self-report item? Reviewers liked the sample size last time, so lead with that.",
+            "expect": {
+              "mustChallenge": true,
+              "maxQuestions": 1,
+              "mustReference": "her own session-1 reasons for ruling out self-report: r ≈ .38 with logged use (Parry et al. 2021) and, decisively, pilot evidence that poor sleepers over-report more, i.e. differential error in the direction of the hypothesis; plus the session-2 consent figures (38%, skewing female and higher-SES)",
+              "mustContribute": "A way to keep both goals. Use self-report in the full cohort, and keep screenshots in a validation subsample (the consenters, or a randomly invited subsample) to model and correct the measurement error (regression calibration or multiple imputation for measurement error) and to test whether the differential error persists. Because consenters are non-random, the calibration model has to condition on sex, SES and sleep. Framed this way, the weakness becomes a design strength in the paragraph.",
+              "stance": "peer",
+              "notes": "It is her decision, and she may have good reasons. Flag the contradiction with her own stated reason once, clearly and specifically, then help. Lecturing, refusing, or writing the paragraph as though self-report were unproblematic are all failures."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Longitudinal (three sessions). A position reversed without noticing: in session 3 she adopts the measure she ruled out in session 1, for a reason that still applies to her hypothesis. Tests noticing the contradiction across time and offering a way through."
+  },
+  {
+    "id": "longitudinal-003",
+    "category": "longitudinal",
+    "persona": "Callum Reid, second-year PhD student in moral psychology, comfortable with R and jsPsych, preparing his first preregistration. Three sessions about a week apart.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Designing my first-year project: does time pressure increase deontological responding to sacrificial dilemmas? Plan: 20 dilemmas under a 4-second response deadline and 20 self-paced, within-subjects, block order counterbalanced. I went within-subjects deliberately: the meta-analytic effect for time pressure is around d = 0.28, a between-subjects design would need about 200 per cell for 80% power, and I'll be lucky to get 45 undergrads through the lab this term.\n\nQuestion: how should I handle trials where people miss the 4-second deadline? Exclude them, or code them as missing and model it?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 1,
+              "alreadyConsidered": [
+                "between-subjects vs within-subjects (chose within for power given ~45 participants)"
+              ],
+              "stance": "peer"
+            }
+          }
+        ]
+      },
+      {
+        "turns": [
+          {
+            "user": "Good news and a jsPsych question. The department gave me £2,000 of Prolific credit, so I'm moving the study online: after fees that's roughly 500 participants at 15 minutes. The question: trial_duration ends the trial at 4 s, but I want to show a 'Too slow!' message and still record that they timed out. What's the cleanest way to do that?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "notes": "A direct technical answer (e.g. response === null in on_finish to flag the timeout, then a conditional feedback trial). Noting that ~500 participants changes the within-subjects rationale is a bonus, not required."
+            }
+          }
+        ]
+      },
+      {
+        "turns": [
+          {
+            "user": "Piloted the online version, n = 32, block order counterbalanced. Problem: order matters a lot. When the time-pressure block comes second, utilitarian responding under pressure is 14 points higher than when it comes first. People seem to carry their reflective answers over. How should I model this in the preregistration: block order as a covariate, or an order × condition interaction?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "mustReference": "his session-1 reason for choosing within-subjects (d ≈ 0.28 needs ~200 per cell; only ~45 lab participants available) and the session-2 news that Prolific credit now buys roughly 500 participants",
+              "mustContribute": "Answer the modelling question: an order × condition interaction describes asymmetric carryover but does not remove the bias, and under asymmetric carryover the standard unbiased comparison is the first block only, which is a between-subjects comparison. Then the bigger point: the constraint that justified within-subjects is gone. About 500 online participants covers ~200 per cell, so a between-subjects design, or preregistering the first-block comparison as primary, removes the carryover problem instead of modelling around it.",
+              "stance": "peer"
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Longitudinal (three sessions). A design decision made for a stated reason in session 1; the reason quietly disappears in session 2; in session 3 the person asks a narrow technical question whose best answer is that the original rationale no longer holds."
+  },
+  {
+    "id": "longitudinal-004",
+    "category": "longitudinal",
+    "persona": "Marisol Reyes, cofounder and CEO of Tallyvet, B2B inventory and ordering software for independent veterinary clinics; former operations lead at a regional vet group. Numbers-first, allergic to generic startup advice. Three sessions over several weeks before a seed-extension raise.",
+    "project": {
+      "id": "p-tallyvet-raise",
+      "name": "Tallyvet seed extension",
+      "instructions": "Be blunt. Numbers over adjectives."
+    },
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Pricing question, but first some context so you don't spend a reply on it. Yes, the big practice-management (PIMS) vendors could build inventory forecasting. I've thought about this a lot. (1) Their roadmaps are driven by corporate groups, their biggest accounts, not independents. (2) We integrate with six PIMS, so we're the layer across them; a clinic that switches PIMS keeps us. (3) They've had ten years to build decent inventory tooling and haven't. It's a module they bundle, not a product anyone owns.\n\nActual question: 140 paying clinics at a flat $249/month. Our 6+ vet clinics get the most value (they order about 4× the SKUs) and pay the same as a solo practice. Move to per-DVM pricing, per-location tiers, or leave it?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 1,
+              "noQuestionEnding": true,
+              "alreadyConsidered": [
+                "incumbent PIMS vendors building or bundling inventory forecasting (answered: corporate-group roadmaps, integration across six PIMS, ten years without building it)"
+              ],
+              "stance": "peer"
+            }
+          }
+        ]
+      },
+      {
+        "turns": [
+          {
+            "user": "New development. In June we signed a referral partnership with Hartwell Supply, a regional distributor: they push us to their clinic accounts and send us their order data nightly, which makes our forecasts much better. 51 of our 85 new clinics in Q3 came through them. Now they want exclusivity: we'd only integrate ordering with Hartwell, in exchange for a $120k co-marketing budget. Take it?",
+            "expect": {
+              "mustChallenge": true,
+              "maxQuestions": 1,
+              "noQuestionEnding": true,
+              "mustReference": "her session-1 argument that Tallyvet's defensibility comes from being the neutral layer across systems (integrates with six PIMS; a clinic that switches keeps them)",
+              "mustContribute": "Exclusivity turns the neutral layer into a Hartwell feature, cutting against her own moat argument. Clinics commonly buy from more than one distributor, so exclusivity degrades the product for them. It also deepens a concentration that is already 60% of new signups (51 of 85). Counter-offers: non-exclusive co-marketing, time-limited or territory-limited exclusivity, or exclusivity on co-marketing only.",
+              "stance": "peer"
+            }
+          }
+        ]
+      },
+      {
+        "turns": [
+          {
+            "user": "Update: we turned down exclusivity, and Hartwell stayed on non-exclusive terms. Seed-extension pitch Thursday with three partners. Red-team me: the three hardest questions they'll ask, and where my answer is weakest. Be concrete.",
+            "expect": {
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "alreadyConsidered": [
+                "incumbent PIMS vendors building or bundling inventory forecasting, and her three-part answer (corporate-group roadmaps, integration across six PIMS, ten years without building it)",
+                "Hartwell exclusivity (declined)"
+              ],
+              "mustReference": "facts from earlier sessions: 140 clinics at a flat $249/month, and the Hartwell dependence (51 of 85 Q3 new clinics through one distributor, now non-exclusive)",
+              "mustContribute": "Hard questions she has not already answered. Strongest: her own answer (1) cuts both ways. If incumbents ignore independents because corporate groups are where the money is, then consolidation of independent practices by corporate groups shrinks her segment, since acquired clinics move onto group-standard systems. That makes market ceiling a harder question than copying. Also: channel concentration on Hartwell (what happens to growth if Hartwell builds its own tool or deprioritises them), and retention and expansion economics at $249 flat with ~$420k ARR.",
+              "stance": "peer",
+              "notes": "Listing 'what if the incumbents copy you' as one of the three questions without going beyond her session-1 answer is a failure. It is fine to mention investors will still ask it only if the reply adds the part her answer doesn't cover."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Longitudinal (three sessions). An objection the founder fully addressed in session 1 must not come back as new in the session-3 red-team, and the red-team should use session-2 facts. The best contribution turns one of her own session-1 answers into the risk she hasn't seen."
+  },
+  {
+    "id": "longitudinal-005",
+    "category": "longitudinal",
+    "persona": "Dr. Hannah Okafor, health economist and assistant professor, working on a staggered-policy paper with a co-author. Knows the modern DiD literature and wants short, exact answers. Two sessions a week apart.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Paper on municipal paid sick leave ordinances and ED visits for influenza-like illness. 104 cities adopting between 2012 and 2020, city-month panel, outcome is ILI ED visits per 10k. I know plain TWFE is dead with staggered timing (negative weights, Goodman-Bacon). Which estimator do referees expect to see these days? Just name it with a one-line reason; I'll read the paper.",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "alreadyConsidered": [
+                "TWFE bias under staggered timing (negative weights, Goodman-Bacon decomposition)"
+              ],
+              "stance": "peer"
+            }
+          },
+          {
+            "user": "Callaway–Sant'Anna and Sun–Abraham are out for us, and I should have said this up front: 31 of the 104 ordinances were later struck down in court or preempted by state law, so treatment switches off. Estimators built for absorbing treatment don't fit. I'm going with de Chaisemartin–D'Haultfœuille (did_multiplegt_dyn), which handles switchers in both directions. Gotchas?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "mustContribute": "Gotchas specific to her case. By default the estimator targets effects of the first switch, so later repeals get folded into the dynamic effects of adoption unless she chooses the estimand deliberately (switchers-in vs switchers-out). Preemption and court repeals are state-level political events likely correlated with other state policies, so repeal timing is not as good as random; cluster accordingly and consider state-by-time controls. Repealed ordinances may leave employer policies in place, so 'off' is not a return to baseline.",
+              "stance": "peer"
+            }
+          }
+        ]
+      },
+      {
+        "turns": [
+          {
+            "user": "Tomás, my co-author, read the draft over the weekend and emailed: \"Why didn't we just use Callaway–Sant'Anna like everyone else? I thought you wanted CS originally and got talked out of it.\" I honestly don't remember the exact sequence from last week. What actually happened? I want to answer him accurately.",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "mustReference": "the actual session-1 sequence: she asked which estimator referees expect; the assistant named the estimator (typically Callaway–Sant'Anna), so that suggestion was the assistant's, not hers; she rejected it in her next message because 31 of the 104 ordinances were struck down or preempted (non-absorbing treatment), and chose de Chaisemartin–D'Haultfœuille for switchers in both directions",
+              "notes": "Tests attribution. Saying she originally wanted or proposed CS, or that she was 'talked out of it', is a failure: CS came from the assistant and she ruled it out herself. If the session-1 reply named a different estimator first, the reply should report that accurately rather than conform to Tomás's version."
+            }
+          },
+          {
+            "user": "Good. Two sentences for the methods section on why not CS. Referee-proof, no hedging.",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "mustReference": "31 of 104 ordinances struck down or preempted, so treatment is not absorbing",
+              "stance": "peer"
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Longitudinal (two sessions). An assistant suggestion that the person explicitly rejected in session 1 must not later be attributed to her, even when a third party asserts it. Also tests using her session-1 reason precisely in text she will publish."
+  },
+  {
+    "id": "longitudinal-006",
+    "category": "longitudinal",
+    "persona": "Dr. Kwame Asante, epidemiologist at a county health department who runs syndromic surveillance. Experienced and exact about the difference between what has been confirmed and what is only suspected. Two sessions a week apart.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Pediatric ED visits for asthma (ages 5–17) are up sharply: 412 in the last three weeks vs a mean of 307 for the same weeks in 2022–2025, so +34%. First check was whether it's an artifact of the new triage and coding system that went live in August at two of our six hospitals. It isn't: the increase is +31% at the four hospitals without the new system and +38% at the two with it. Total pediatric ED visits are up only 4%, so it's not a denominator effect. It's real. What's the fastest way to figure out what's driving it?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 1,
+              "alreadyConsidered": [
+                "a coding/triage artifact from the new system (ruled out by comparing hospitals with and without it)",
+                "a denominator effect (total pediatric ED visits up only 4%)"
+              ],
+              "stance": "peer"
+            }
+          },
+          {
+            "user": "One thing I hadn't factored in: school started August 26 this year, about a week earlier than in most of the baseline years, so part of this may just be the usual September asthma peak arriving early. That shouldn't produce +34% on its own, though. There was wildfire smoke drifting in last week and I half-suspect that, but to be clear, I haven't pulled the AQI or PM2.5 data yet, so that's a hunch, nothing more. I haven't looked at the rhinovirus/enterovirus lab data either.",
+            "expect": {
+              "maxQuestions": 1,
+              "noQuestionEnding": true,
+              "stance": "peer"
+            }
+          }
+        ]
+      },
+      {
+        "turns": [
+          {
+            "user": "Monthly surveillance summary goes to the health officer this afternoon. Draft the paragraph on the pediatric asthma increase, about 120 words, based on where we got to last week. I haven't had time to do anything more on it since.",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "mustReference": "the session-1 facts with their actual status: +34% (412 vs 307); coding/triage artifact ruled out (+31% vs +38% at hospitals without/with the new system); total pediatric ED visits only +4%; the early school start (Aug 26) as a possible partial explanation; wildfire smoke only an unverified hunch (AQI/PM2.5 not yet pulled); viral lab data not yet reviewed",
+              "mustNotReveal": [
+                "\\b(is|was|are|were|likely|probably|largely|mostly) (being )?(driven by|due to|caused by|attributable to|explained by) (?:(?:the|recent|last week'?s|this|that) )*(?:wildfire )?smoke"
+              ],
+              "notes": "Tests provenance of confidence. What he confirmed (not an artifact, not denominator) should read as established. What he explicitly called a hunch (smoke) must stay a hypothesis under investigation, not become the stated cause. A clean draft with no questions is the right move."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Longitudinal (two sessions). An idea the person explicitly flagged as an untested hunch must not harden into an established finding when the assistant drafts from memory a week later, while the checks he did confirm must be carried over accurately."
+  }
+]

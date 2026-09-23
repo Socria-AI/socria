@@ -271,7 +271,7 @@ const STANCE_WORD: Record<Stance, string> = {
 export function consideredView(
   entries: LedgerEntry[],
   opts: { focus: string; conversationId: string; projectId: string | null; limit?: number }
-): { lines: string[]; items: string[] } {
+): { lines: string[]; items: string[]; gate: string[] } {
   const live = entries.filter((e) => e.status !== 'retracted' && e.status !== 'disputed');
   const scored = live
     .map((e) => {
@@ -288,7 +288,27 @@ export function consideredView(
     const why = e.reason ? ` (because: ${e.reason})` : '';
     return `${who}: ${e.text}${why}`;
   });
-  return { lines, items: scored.map(({ e }) => e.text) };
+  return {
+    lines,
+    items: scored.map(({ e }) => e.text),
+    gate: scored.filter(({ e }) => raisable(e.kind, e.owner)).map(({ e }) => e.text),
+  };
+}
+
+/**
+ * What the novelty gate may delete a sentence for repeating: things that
+ * can be RAISED — objections, alternatives, questions, assumptions,
+ * hypotheses, uncertainties (theirs, or Socria's own objections and
+ * questions). A claim, a piece of evidence or a decision they hold is
+ * context: a reply that USES "$40M is pledged to buses" to compute
+ * something is not re-raising it, and the pilot showed a gate that treated
+ * it so deleting the most valuable sentence of the reply
+ * (docs/CORE-4-EVALS.md, pilot finding 2).
+ */
+const RAISABLE = new Set<LedgerKind>(['objection', 'alternative', 'question', 'assumption', 'hypothesis', 'uncertainty']);
+export function raisable(kind: LedgerKind, owner: Owner): boolean {
+  if (owner === 'socria') return kind === 'objection' || kind === 'question';
+  return RAISABLE.has(kind);
 }
 
 /** The same substrate as Logos would render it: nodes and edges, attribution intact. */

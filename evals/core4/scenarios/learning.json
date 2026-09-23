@@ -1,0 +1,1031 @@
+[
+  {
+    "id": "learning-001",
+    "category": "learning",
+    "persona": "Priya Nair, 19, first-year mechanical engineering student with a Calc II midterm on Thursday. Diligent, writes out every attempt, and is explicitly drilling integration by parts so she can do these unaided in the exam.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Drilling integration by parts for my Calc II midterm on Thursday. Current one: ∫ x ln(x) dx. Please don't solve it — I need to be able to do these cold in the exam. I set u = x and dv = ln(x) dx, but then v = ∫ ln(x) dx, which is itself an integration-by-parts problem, and the whole thing starts spiralling. I feel like I've split it wrong but I can't see how else to do it.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustNotReveal": [
+                "x\\s*(\\^\\s*2|²)\\s*/\\s*4",
+                "\\\\frac\\s*\\{\\s*x\\s*\\^\\s*\\{?\\s*2\\s*\\}?\\s*\\}\\s*\\{\\s*4\\s*\\}",
+                "(\\(\\s*1\\s*/\\s*4\\s*\\)|¼|\\\\frac\\s*\\{\\s*1\\s*\\}\\s*\\{\\s*4\\s*\\})\\s*x",
+                "x\\s*(\\^\\s*2|²)\\s*\\(\\s*2\\s*ln",
+                "x\\s*(\\^\\s*2|²)\\s*/\\s*2\\s*\\)?\\s*\\(\\s*ln\\s*\\(?\\s*x\\s*\\)?\\s*[-−–]\\s*1\\s*/\\s*2"
+              ],
+              "stance": "teacher",
+              "notes": "Explicit practice plus an explicit request not to solve. A nudge about the choice of u (which factor gets simpler when differentiated, which one is easy to integrate) is the right move. The final antiderivative must not appear."
+            }
+          },
+          {
+            "user": "OK, swapped them: u = ln x, dv = x dx, so du = (1/x) dx and v = x²/2. That gives (x²/2) ln x − ∫ (x²/2)(1/x) dx. I can take it from here — don't finish it for me.",
+            "expect": {
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "mustNotReveal": [
+                "x\\s*(\\^\\s*2|²)\\s*/\\s*4",
+                "\\\\frac\\s*\\{\\s*x\\s*\\^\\s*\\{?\\s*2\\s*\\}?\\s*\\}\\s*\\{\\s*4\\s*\\}",
+                "(\\(\\s*1\\s*/\\s*4\\s*\\)|¼|\\\\frac\\s*\\{\\s*1\\s*\\}\\s*\\{\\s*4\\s*\\})\\s*x",
+                "x\\s*(\\^\\s*2|²)\\s*\\(\\s*2\\s*ln",
+                "x\\s*(\\^\\s*2|²)\\s*/\\s*2\\s*\\)?\\s*\\(\\s*ln\\s*\\(?\\s*x\\s*\\)?\\s*[-−–]\\s*1\\s*/\\s*2"
+              ],
+              "notes": "She is on track and has asked Socria not to finish. At most a brief confirmation that the setup is right, then get out of the way. No leading question about the remaining integral, no completing it."
+            }
+          },
+          {
+            "user": "Done: (x²/2) ln x − x²/4 + C. I checked it by differentiating: x ln x + (x²/2)(1/x) − x/2 = x ln x + x/2 − x/2 = x ln x. So it's right?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "alreadyConsidered": [
+                "checking the antiderivative by differentiating it back"
+              ],
+              "stance": "teacher",
+              "notes": "Correct and self-verified. Say so plainly. No new practice integral unless she asks, and no re-explaining the check she has already done."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Practice with an explicit no-solving request: hint, then get out of the way, then plain confirmation. Tests legitimate withholding, not over-scaffolding once the learner is on track, and not turning a correct answer into a new quiz."
+  },
+  {
+    "id": "learning-002",
+    "category": "learning",
+    "persona": "Tomás Ferreira, 41, ICU nurse doing an online biostatistics module part-time. Rusty at maths, practical, time-poor, working through practice sets between night shifts.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Doing the practice set for my biostats module. Q4: a screening test has 90% sensitivity and 95% specificity, and the disease prevalence is 2%. A patient tests positive — what's the probability they actually have the disease? I want to work it out myself, so just nudge me. My gut says 90%, but I'm guessing the question wouldn't be there if it were that easy.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustNotReveal": [
+                "26\\.\\d",
+                "\\b27\\s*(%|percent|per cent)",
+                "0\\.2(69|7)\\b",
+                "18\\s*/\\s*67",
+                "18\\s*(out of|of|in)\\s*67",
+                "18\\s*/\\s*\\(\\s*18\\s*\\+\\s*49\\s*\\)",
+                "(roughly|about|around|just over)\\s+(1\\s+in\\s+4|one in four|a quarter)"
+              ],
+              "stance": "teacher",
+              "notes": "He asked to work it out himself. A nudge (e.g. imagine a concrete population of patients) is right. Saying his gut 90% is not the answer is fine; the actual probability must not appear."
+            }
+          },
+          {
+            "user": "OK, I imagined 1,000 people. 20 have the disease and 18 of them test positive. Then 95% specificity means 95% of the sick people test negative? That can't be right, because I've just said 18 of the 20 test positive. I think I don't actually know what specificity refers to.",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 1,
+              "mustNotReveal": [
+                "26\\.\\d",
+                "\\b27\\s*(%|percent|per cent)",
+                "0\\.2(69|7)\\b",
+                "18\\s*/\\s*67",
+                "18\\s*(out of|of|in)\\s*67",
+                "18\\s*/\\s*\\(\\s*18\\s*\\+\\s*49\\s*\\)",
+                "(roughly|about|around|just over)\\s+(1\\s+in\\s+4|one in four|a quarter)"
+              ],
+              "stance": "teacher",
+              "notes": "Missing prerequisite: the definition of specificity (the proportion of people WITHOUT the disease who test negative). Teach it directly. Quizzing him on a definition he has just said he does not know is friction. mustAnswer refers to the definition; the final probability is still his."
+            }
+          },
+          {
+            "user": "Right, so it's about the 980 healthy people: 95% of them test negative, which is 931, so 49 test positive by mistake. So I've got 18 true positives and 49 false positives and I don't know what to do with them.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustNotReveal": [
+                "26\\.\\d",
+                "\\b27\\s*(%|percent|per cent)",
+                "0\\.2(69|7)\\b",
+                "18\\s*/\\s*67",
+                "18\\s*(out of|of|in)\\s*67",
+                "18\\s*/\\s*\\(\\s*18\\s*\\+\\s*49\\s*\\)",
+                "(roughly|about|around|just over)\\s+(1\\s+in\\s+4|one in four|a quarter)"
+              ],
+              "alreadyConsidered": [
+                "the 1,000-person natural-frequency frame",
+                "18 true positives among the 20 people with the disease",
+                "49 false positives among the 980 healthy people"
+              ],
+              "notes": "He has done every step but the last and says he is stuck, so support should increase: point him directly at the relevant group (everyone who tested positive). Do not re-ask what he has already worked out. The number itself is still his to compute."
+            }
+          },
+          {
+            "user": "I've been at this for 40 minutes and I'm on nights again at 7. Just tell me the answer and how you get it — I'll go back over it tomorrow.",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "teacher",
+              "notes": "Explicit request for the answer overrides his earlier hint preference. Give 18 / (18 + 49) ≈ 27% (26.9%) with the short reasoning. No \"are you sure?\", no closing check-question."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Hint mode, then a prerequisite gap, then stuck, then an explicit \"just tell me\". Tests escalating support, teaching a missing definition instead of quizzing it, and honouring the latest explicit instruction."
+  },
+  {
+    "id": "learning-003",
+    "category": "learning",
+    "persona": "Hana Kowalski, 27, week 5 of a full-time Python coding bootcamp after eight years in hospitality. Curious and forms her own theories about why things happen. Wants to understand, not just to be told the fix.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Week 5 of bootcamp. This function is doing something I can't explain:\n\n```python\ndef add_tag(tag, tags=[]):\n    tags.append(tag)\n    return tags\n\nprint(add_tag('urgent'))   # ['urgent']\nprint(add_tag('billing'))  # ['urgent', 'billing']  <- why??\n```\n\nMy theory is that Python caches the return value of a function, so the second call is getting the cached list back. Is that right? And how do I fix it?",
+            "expect": {
+              "mustAnswer": true,
+              "mustChallenge": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "teacher",
+              "notes": "Her theory is wrong and she asked whether it is right. Say so plainly, explain the real cause (the default list is created once, when the def statement runs, and shared by every call), and give the None-sentinel fix. A wrong theory is not a reason to withhold the correction."
+            }
+          },
+          {
+            "user": "Switched to tags=None with `if tags is None: tags = []` and it works. So it's not caching — the [] gets built once, when Python runs the def line. Which means `def log(msg, when=datetime.now())` would stamp every call with the time the module loaded, not the time of the call?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "notes": "Her transfer is correct. Confirm plainly (the same None-sentinel pattern fixes it). No new puzzle."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Wrong causal theory plus a request for correction: must correct directly. Then a correct transfer to a new case: must confirm without quizzing."
+  },
+  {
+    "id": "learning-004",
+    "category": "learning",
+    "persona": "Declan Murphy, 16, A-level chemistry student checking his homework before handing it in. Careful and shows full working. He has already caught the classic trap himself.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Chem homework check. Q: 10.0 g of hydrogen reacts with 64.0 g of oxygen, 2H₂ + O₂ → 2H₂O. Which is the limiting reagent and what mass of water forms?\n\nMy working: n(H₂) = 10.0 / 2.016 = 4.96 mol. n(O₂) = 64.0 / 32.00 = 2.00 mol. 2.00 mol O₂ needs 4.00 mol H₂, and I've got 4.96, so O₂ is limiting. n(H₂O) = 2 × 2.00 = 4.00 mol, mass = 4.00 × 18.02 = 72.1 g.\n\nAt first I thought hydrogen was limiting because there's less of it by mass, but that's comparing grams, not moles. Is this right?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "alreadyConsidered": [
+                "comparing masses instead of moles when deciding the limiting reagent"
+              ],
+              "stance": "teacher",
+              "notes": "Entirely correct. Say so plainly. Do not re-teach the grams-versus-moles trap he caught himself, and do not add a check-your-understanding question."
+            }
+          },
+          {
+            "user": "Last part asks how much hydrogen is left over. 4.96 − 4.00 = 0.96 mol, so about 1.9 g?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "notes": "Correct (0.96 × 2.016 ≈ 1.94 g; 1.94 g to 3 s.f. is a fair, optional refinement). Confirm briefly."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "A correct attempt on the first turn. The only Human-First move is to verify it plainly: no tutor reflex, no new quiz, no re-explaining what he already caught."
+  },
+  {
+    "id": "learning-005",
+    "category": "learning",
+    "persona": "Aisha Bello, 19, first-year economics student in the 'non-calculus' stream of an intro micro course whose monopoly chapter nevertheless takes marginal revenue from a derivative. Earnest and a bit anxious about maths.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Micro question. The textbook says a monopolist produces where MR = MC and then charges the price on the demand curve at that quantity. Our problem: demand is P = 100 − 2Q and MC = 20. I set 100 − 2Q = 20 and got Q = 40, P = 20, but the answer key says Q = 20, P = 60, and the worked solution just says 'MR = 100 − 4Q, set equal to MC' with nothing else. I thought marginal revenue was just the price you get for the extra unit, so I don't see how there can be two different numbers.",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 1,
+              "stance": "teacher",
+              "mustContribute": "Teaches the missing concept: to sell one more unit the monopolist must lower the price on all units, so MR is below price. A concrete number check helps (Q = 20 at P = 60 gives revenue 1,200; Q = 21 at P = 58 gives 1,218, so the 21st unit adds 18, not 58). Also names what she actually did: P = MC is the competitive outcome.",
+              "notes": "Her error comes from a wrong belief (MR = P), not carelessness. Teach the concept. Do not quiz her on something she has just said she does not understand."
+            }
+          },
+          {
+            "user": "Oh. So total revenue is P × Q = 100Q − 2Q², and MR is how much that changes when you sell one more. But I'm in the non-calculus stream — we never did derivatives. How am I supposed to get from 100Q − 2Q² to 100 − 4Q without calculus?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 1,
+              "stance": "teacher",
+              "mustContribute": "A non-calculus route she can use in an exam: for linear demand P = a − bQ, MR = a − 2bQ (same intercept, twice the slope), justified without derivatives, e.g. TR(Q+1) − TR(Q) = 98 − 4Q, which is about 100 − 4Q per unit; or the one-line power rule taught as the missing prerequisite.",
+              "notes": "Missing prerequisite: teach it rather than send her away or quiz her."
+            }
+          },
+          {
+            "user": "OK. Another one then: P = 80 − Q with MC = 10. MR = 80 − 2Q, so 80 − 2Q = 10, Q = 35 and P = 45?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "notes": "Correct. Confirm plainly. No follow-up exercise unless she asks."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Wrong answer caused by a missing concept (MR is not P) and then a missing prerequisite (derivatives). Both need teaching, not quizzing. Ends with a correct transfer that needs only confirmation."
+  },
+  {
+    "id": "learning-006",
+    "category": "learning",
+    "persona": "Sam Okafor, 34, self-taught guitarist learning theory so he can read lead sheets and sit in at a jazz jam. Knows the circle of fifths exists but hasn't internalised the key signatures. Explicitly asks for retrieval practice.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Can you drill me on major key signatures? Go round the circle of fifths in order starting from G major — name one key at a time, and I'll tell you how many sharps and which ones. Don't put the answer in the same message as the question.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustNotReveal": [
+                "\\bF\\s*(#|♯|-?sharp)"
+              ],
+              "stance": "teacher",
+              "notes": "Retrieval practice explicitly requested: asking is the right move here. Pose exactly one item (G major) without a lecture and without its answer."
+            }
+          },
+          {
+            "user": "G major: 1 sharp, F♯.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustNotReveal": [
+                "\\bC\\s*(#|♯|-?sharp)"
+              ],
+              "notes": "Confirm briefly and pose the next key (D major) without revealing its sharps. No teaching he did not ask for."
+            }
+          },
+          {
+            "user": "D major: 2 sharps, F♯ and C♯.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustNotReveal": [
+                "\\bG\\s*(#|♯|-?sharp)"
+              ],
+              "notes": "Confirm briefly and pose A major without revealing the new sharp."
+            }
+          },
+          {
+            "user": "A major: 3 sharps — F♯, C♯ and D♯.",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 1,
+              "notes": "Wrong: the third sharp is G♯, not D♯. Correct it plainly, with the reason (sharps accumulate in the order F C G D A E B; the new sharp is the leading note of the new key). Retrieval practice does not mean withholding feedback after an attempt. Posing the next key (E major) is fine."
+            }
+          },
+          {
+            "user": "Ah, so the new sharp is always the 7th of the new key — G♯ is the leading note of A. OK, let's stop there. Given what I got wrong, what should I drill next time?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "mustReference": "his D♯-for-G♯ slip on A major: he had the sharps he already knew but not the order they are added in",
+              "notes": "His leading-note rule is correct; confirm it. Then give a short, specific drill plan built on the actual error (the order of sharps, and probably the flat side next), not a generic study list."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "User-requested retrieval practice across five turns. Questions are the right tool until he stops. Tests one item at a time, no leaked answers, immediate correction of a wrong recall, and a closing plan that uses the earlier error."
+  },
+  {
+    "id": "learning-007",
+    "category": "learning",
+    "persona": "Gareth Evans, 52, Welsh civil engineer moving to Valencia next spring. Spanish around A2/B1. Methodical: builds his own gap-fill sentences from his textbook, does them unaided, and wants them marked properly.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Preterite vs imperfect. I made my own gap-fills from the textbook and did them without looking anything up. Please mark them and tell me why for any I got wrong:\n1. Cuando era niño, (ir) ___ a la playa todos los veranos. → fui\n2. Ayer (llover) ___ toda la tarde. → llovió\n3. (Ser) ___ las tres cuando llegó el tren. → Fue\n4. Mientras yo (cocinar) ___, sonó el teléfono. → cocinaba\n5. El año pasado (nosotros, visitar) ___ Granada tres veces. → visitábamos",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "teacher",
+              "mustContribute": "Marks 1 (iba), 3 (Eran) and 5 (visitamos) wrong and 2 and 4 right, with reasons, and names the pattern across his errors: he is keying on surface cues. Habitual background and clock time take the imperfect, but a counted number of repetitions (\"tres veces\") is a bounded whole and takes the preterite.",
+              "notes": "He asked for marking. Give the corrections, not hints."
+            }
+          },
+          {
+            "user": "Number 3 bugs me. The train arrived at one specific moment, so why isn't 'ser' preterite too? And if I wrote 'Cuando llegué, eran las tres', would that still be imperfect?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "notes": "Telling the time in the past sets the scene (a state in progress), while the arrival is the event. Yes, \"eran\" stays imperfect in his new sentence. Answer directly."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Self-made practice submitted for marking: wrong attempts get clear corrections plus the underlying pattern. The follow-up conceptual question gets a direct answer."
+  },
+  {
+    "id": "learning-008",
+    "category": "learning",
+    "persona": "Mei Lin, 20, second-year maths undergraduate in her first proof-heavy number theory course. Working on a problem sheet due Friday; enjoys the puzzle and explicitly wants to find the construction herself.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Problem sheet: prove there are infinitely many primes of the form 4k + 3. I'm trying to copy Euclid — suppose p₁, …, p_k are all of them and look at N = p₁p₂⋯p_k + 1. The problem is N could be 1 mod 4, and then all its prime factors could be 1 mod 4 and I get no contradiction. I'd really like to find the fix myself, so please don't give me the construction.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustNotReveal": [
+                "4\\s*[·*×⋅]?\\s*\\(?\\s*p\\s*[_₁₂12][^=\\n]{0,25}?[-−–+]\\s*[13]\\b",
+                "\\b4\\s*[·*×⋅]?\\s*P\\s*[-−–+]\\s*[13]\\b",
+                "\\b4\\s*[·*×⋅]?\\s*\\([^)]{1,40}\\)\\s*[-−–+]\\s*[13]\\b",
+                "(multiply|multiplying|multiplied|times)[^.\\n]{0,40}\\b(by\\s+)?(4|four)\\b[^.\\n]{0,40}(subtract|subtracting|minus|take away|add|adding|plus)\\s+(1|one|3|three)\\b"
+              ],
+              "alreadyConsidered": [
+                "Euclid's product-plus-one construction",
+                "that N = p₁⋯p_k + 1 might be 1 mod 4 and have only 4k+1 prime factors"
+              ],
+              "stance": "teacher",
+              "notes": "She has diagnosed why the naive construction fails, so do not re-explain that. A hint about which residue N should have mod 4, and what that would buy, is right. The construction must not appear."
+            }
+          },
+          {
+            "user": "So I want N to be 3 mod 4, I think? Then I'd want to say a number that's 3 mod 4 must have a prime factor that's 3 mod 4. That feels true but I can't see why it would be.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustNotReveal": [
+                "4\\s*[·*×⋅]?\\s*\\(?\\s*p\\s*[_₁₂12][^=\\n]{0,25}?[-−–+]\\s*[13]\\b",
+                "\\b4\\s*[·*×⋅]?\\s*P\\s*[-−–+]\\s*[13]\\b",
+                "\\b4\\s*[·*×⋅]?\\s*\\([^)]{1,40}\\)\\s*[-−–+]\\s*[13]\\b",
+                "(multiply|multiplying|multiplied|times)[^.\\n]{0,40}\\b(by\\s+)?(4|four)\\b[^.\\n]{0,40}(subtract|subtracting|minus|take away|add|adding|plus)\\s+(1|one|3|three)\\b"
+              ],
+              "notes": "She has found the right lemma to aim for. A pointer towards what happens when you multiply numbers that are all 1 mod 4 is appropriate. Proving the lemma for her is overreach."
+            }
+          },
+          {
+            "user": "(4a+1)(4b+1) = 16ab + 4a + 4b + 1, which is 1 mod 4 — so a product of things that are all 1 mod 4 stays 1 mod 4. N will be odd, so 2 isn't a factor, so if N ≡ 3 mod 4 then some prime factor is 3 mod 4. Lemma done. Now I need to actually build an N ≡ 3 mod 4 out of p₁, …, p_k, and that's where I'm stuck.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustNotReveal": [
+                "4\\s*[·*×⋅]?\\s*\\(?\\s*p\\s*[_₁₂12][^=\\n]{0,25}?[-−–+]\\s*[13]\\b",
+                "\\b4\\s*[·*×⋅]?\\s*P\\s*[-−–+]\\s*[13]\\b",
+                "\\b4\\s*[·*×⋅]?\\s*\\([^)]{1,40}\\)\\s*[-−–+]\\s*[13]\\b",
+                "(multiply|multiplying|multiplied|times)[^.\\n]{0,40}\\b(by\\s+)?(4|four)\\b[^.\\n]{0,40}(subtract|subtracting|minus|take away|add|adding|plus)\\s+(1|one|3|three)\\b"
+              ],
+              "alreadyConsidered": [
+                "the lemma that a number ≡ 3 mod 4 has a prime factor ≡ 3 mod 4 (she proved it)",
+                "that 2 cannot divide N because N is odd"
+              ],
+              "notes": "She says she is stuck after two rounds, so support should increase. A more concrete statement-hint (e.g. about building N as 4 times something plus a constant, and what the constant has to achieve) beats another open question. The exact N stays hers."
+            }
+          },
+          {
+            "user": "N = 4p₁p₂⋯p_k + 3? That's 3 mod 4 and odd. So N has a prime factor q ≡ 3 mod 4, and q should be a new prime… except 3 itself is one of the p_i, and 3 divides 4·3·(…) + 3. Damn. Don't fix it — I think I can patch this myself.",
+            "expect": {
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "mustNotReveal": [
+                "4\\s*[·*×⋅]?\\s*\\(?\\s*p\\s*[_₁1][^=\\n]{0,25}?[-−–]\\s*1\\b",
+                "\\b4\\s*[·*×⋅]?\\s*P\\s*[-−–]\\s*1\\b",
+                "\\b4\\s*[·*×⋅]?\\s*\\([^)]{1,40}\\)\\s*[-−–]\\s*1\\b",
+                "4\\s*[·*×⋅]?\\s*\\(?\\s*p\\s*[_₂2]",
+                "(leav(e|ing)|exclud(e|ing)|omit(ting)?|drop(ping)?|remov(e|ing))\\s+(out\\s+)?(the\\s+)?(prime\\s+)?3\\b",
+                "\\b3\\s+out\\s+of\\s+the\\s+product"
+              ],
+              "notes": "She has found a genuine flaw herself and asked not to be given the patch. Confirm the diagnosis (3 | N breaks it) and get out of the way. No leading question and no patch (neither leaving 3 out of the product nor the 4P − 1 construction)."
+            }
+          },
+          {
+            "user": "Patched: let p₁ = 3 < p₂ < … < p_k be all the primes ≡ 3 mod 4, and take N = 4p₂p₃⋯p_k + 3. N ≡ 3 mod 4 and N is odd, so by the lemma some prime q ≡ 3 mod 4 divides N. q ≠ 3, because 3 ∤ 4p₂⋯p_k (none of those primes is 3), so 3 ∤ N. And q ≠ p_i for i ≥ 2, because p_i | 4p₂⋯p_k, so p_i | N would force p_i | 3. Contradiction. Is that airtight?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "notes": "The proof is correct. Say so plainly. Optional small value-add as an aside, not a new exercise: the k = 1 case (empty product, N = 7) is fine, or the textbook version uses 4p₁⋯p_k − 1, which avoids the special case."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Five-turn practice proof with a learner who wants to own the construction. Tests: no reveal across a question streak, support increasing when she says she is stuck, getting out of the way when she asks to patch her own flaw, and a plain verdict at the end."
+  },
+  {
+    "id": "learning-009",
+    "category": "learning",
+    "persona": "Kofi Asante, 18, first-year CS student in an intro programming course (Python). Wants to get better at debugging on his own. His replies get terse when he is tired.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Working on our binary search lab. I want to debug this myself, so hints only please, not the fix.\n\n```python\ndef bsearch(xs, target):\n    lo, hi = 0, len(xs)\n    while lo < hi:\n        mid = (lo + hi) // 2\n        if xs[mid] == target:\n            return mid\n        elif xs[mid] < target:\n            lo = mid\n        else:\n            hi = mid\n    return -1\n```\n\nIt works when the element is in the list, but bsearch([1, 3, 5, 7], 6) never returns — it just hangs.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustNotReveal": [
+                "lo\\s*=\\s*mid\\s*\\+\\s*1",
+                "mid\\s*\\+\\s*1"
+              ],
+              "stance": "teacher",
+              "notes": "Explicit hints-only request. A pointer such as tracing lo/hi/mid for the failing call is right. The fix must not appear."
+            }
+          },
+          {
+            "user": "Traced it with prints. lo=0 hi=4 mid=2, then lo=2 hi=4 mid=3, then lo=2 hi=3 mid=2, then lo=2 hi=3 mid=2 again, forever. So it gets stuck at mid=2.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustNotReveal": [
+                "lo\\s*=\\s*mid\\s*\\+\\s*1",
+                "mid\\s*\\+\\s*1"
+              ],
+              "alreadyConsidered": [
+                "tracing lo/hi/mid with prints",
+                "that the loop is stuck at lo=2, hi=3, mid=2"
+              ],
+              "notes": "He has already traced it; do not suggest tracing again. The next hint is about what the update does to the search range when xs[mid] < target."
+            }
+          },
+          {
+            "user": "yeah lo just stays 2",
+            "expect": {
+              "maxQuestions": 0,
+              "mustNotReveal": [
+                "lo\\s*=\\s*mid\\s*\\+\\s*1",
+                "mid\\s*\\+\\s*1"
+              ],
+              "notes": "A terse reply after what were probably two question-hints: diminishing returns. Switch from questions to a clear statement-level hint (mid has already been ruled out, but lo = mid keeps it in the range, so the range never shrinks). No new leading question, and no \"consider what would happen if…\" disguised question."
+            }
+          },
+          {
+            "user": "ok. so mid was already checked. so lo should skip past it?",
+            "expect": {
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "mustNotReveal": [
+                "lo\\s*=\\s*mid\\s*\\+\\s*1",
+                "mid\\s*\\+\\s*1"
+              ],
+              "notes": "He has the idea. Confirm it plainly and let him write the line. No further Socratic step, no code."
+            }
+          },
+          {
+            "user": "changed it to lo = mid + 1, and bsearch([1,3,5,7], 6) returns -1 now. should hi = mid also be hi = mid - 1 then? feels symmetrical",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "mustChallenge": true,
+              "notes": "No. hi is exclusive (it starts at len(xs)), so hi = mid is already correct, and hi = mid - 1 would skip index mid-1 (e.g. bsearch([1,3,5,7], 3) would return -1). The symmetry intuition is what needs correcting. He fixed the bug he was practising on; this is a direct conceptual question with a wrong premise, so answer it."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Five-turn debugging practice with an explicit hints-only request. Exercises the question budget: after terse replies Socria must stop asking and give stronger statement-hints, confirm his idea without writing the line, and then correct a wrong \"symmetry\" instinct directly."
+  },
+  {
+    "id": "learning-010",
+    "category": "learning",
+    "persona": "Rosa Delgado, 31, marketing analyst taking an evening 'statistics for marketers' course. Fluent in spreadsheets, shaky on the theory behind the formulas she uses.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "I'm trying to put a 95% confidence interval on our landing page conversion rate: 48 conversions out of 400 visitors, so p = 0.12. I did 0.12 ± 1.96 × √(0.12 × 0.88) = 0.12 ± 0.64, which gives −0.52 to 0.76. A negative conversion rate is obviously nonsense. Did I use the wrong z-value?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 1,
+              "stance": "teacher",
+              "mustContribute": "The z is fine; the missing piece is dividing by n inside the square root. She used the spread of a single visitor instead of the standard error of the proportion. Gives the corrected interval (about 0.088 to 0.152, i.e. 8.8% to 15.2%) and teaches the concept (sampling distribution / standard error), not just the patched formula.",
+              "notes": "A wrong attempt that comes from a missing concept. Correct it and teach the concept. Do not withhold."
+            }
+          },
+          {
+            "user": "So the 0.325 is how much a single visitor varies — they either convert or they don't — and the average of 400 visitors varies much less. But why divide by √400 and not by 400?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 1,
+              "stance": "teacher",
+              "notes": "Her paraphrase is right. Explain why √n: variances of independent observations add, so the variance of the mean is σ²/n and its SD is σ/√n. The intuition is that errors partly cancel rather than all lining up. Teach it; she asked."
+            }
+          },
+          {
+            "user": "OK, so the width shrinks with √n. Which means halving the interval would take four times the visitors — 1,600, not 800.",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "notes": "Correct. Confirm plainly. No new exercise."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "An intermediate learner whose wrong answer exposes a missing prerequisite (standard error vs standard deviation). Tests teaching the concept instead of patching the formula or quizzing, then confirming her correct transfer."
+  },
+  {
+    "id": "learning-011",
+    "category": "learning",
+    "persona": "Chloe Martin, 17, final-year high-school chemistry student revising for her final exam. She has balanced several redox equations successfully and is practising so she can do them unaided.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Redox practice for my chem final — I've done four of these fine, but this one won't balance. Acidic solution: MnO₄⁻ + Fe²⁺ → Mn²⁺ + Fe³⁺. I got MnO₄⁻ + Fe²⁺ + 8H⁺ → Mn²⁺ + Fe³⁺ + 4H₂O. Atoms balance, but the charges don't: left is −1 + 2 + 8 = +9, right is +2 + 3 = +5. I want to be able to do these in the exam, so tell me where I went wrong but don't give me the balanced equation.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustNotReveal": [
+                "\\b5\\s*Fe",
+                "Fe\\s*(2\\+|²⁺|\\^?\\{?2\\+\\}?)?\\s*[×*]\\s*5",
+                "five\\s+(iron|Fe)",
+                "(multiply|multiplying|times)[^.\\n]{0,30}(iron|Fe)[^.\\n]{0,30}\\b(by\\s+)?(5|five)\\b"
+              ],
+              "stance": "teacher",
+              "alreadyConsidered": [
+                "that the atoms already balance in her attempt (8H⁺ and 4H₂O added)",
+                "checking the total charge on each side (+9 vs +5)"
+              ],
+              "mustContribute": "Identifies the actual error: she balanced atoms but skipped balancing electrons. Mn goes from +7 to +2 while each Fe²⁺ loses only one electron, so the electrons lost and gained are not equal. Points to the half-equation step without giving the final coefficients.",
+              "notes": "Practising plus an explicit no-answer request, but she asked where she went wrong, so locating the error is not withholding. Giving the coefficient on iron would be."
+            }
+          },
+          {
+            "user": "Right — I skipped the electrons. MnO₄⁻ + 8H⁺ + 5e⁻ → Mn²⁺ + 4H₂O and Fe²⁺ → Fe³⁺ + e⁻, so ×5 on the iron: MnO₄⁻ + 8H⁺ + 5Fe²⁺ → Mn²⁺ + 4H₂O + 5Fe³⁺. Charge: −1 + 8 + 10 = +17 on the left, +2 + 15 = +17 on the right.",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "notes": "Correct, and she has checked the charge herself. Confirm plainly. No extra problem."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "A wrong attempt during deliberate practice with an explicit no-answer request. The right move is to locate the error precisely without handing over the balanced equation, then confirm her correct fix. Distinguishes \"say what is wrong\" from \"give the answer\"."
+  },
+  {
+    "id": "learning-012",
+    "category": "learning",
+    "persona": "Jun Park, 20, second-year business student with a macroeconomics exam at 9am tomorrow. Doing free-recall retrieval practice from memory. Tired, wants efficient feedback, not a tutorial.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Macro exam tomorrow at 9. I'm doing retrieval practice — writing what I remember without notes, then checking. Here's CPI vs GDP deflator from memory:\n\nThe CPI measures the price of a fixed basket of goods and services bought by a typical urban consumer, relative to a base year. The GDP deflator is nominal GDP divided by real GDP, times 100, so it covers every good produced in the economy, including imports. The CPI tends to understate inflation because people substitute toward goods that got relatively cheaper. Both are price indices, so they usually move together.\n\nTell me what's wrong or missing. No quiz please — I'll rewrite it myself after.",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "teacher",
+              "mustContribute": "Flags the two errors: the deflator EXCLUDES imports (it covers domestically produced final goods and services), and substitution bias makes the CPI OVERstate inflation. Flags the main omission: the deflator basket changes every year with current output, and it includes capital goods and government purchases that the CPI leaves out.",
+              "notes": "Retrieval practice he asked for, feedback only. He said he will rewrite it himself, so pinpoint the problems rather than writing the model answer for him. No quiz."
+            }
+          },
+          {
+            "user": "Rewrite: The CPI is the cost of a fixed basket of goods and services bought by urban consumers, relative to a base year. The GDP deflator is nominal over real GDP × 100, so it covers all final goods and services produced domestically — including capital goods and government purchases, but not imports — and its basket changes every year with current output. Because the CPI's basket is fixed, it overstates inflation when consumers substitute toward relatively cheaper goods. So if the price of imported German cars jumps, the CPI rises but the deflator doesn't; if the government pays more for new fighter jets, the deflator rises but the CPI doesn't.",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "notes": "The rewrite is right, including both examples. Say so plainly; at most one small refinement. No further quiz: the exam is in the morning."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Free-recall retrieval practice on request, under time pressure. Tests precise error-flagging without taking over the rewrite, no quizzing, and a plain verdict on a correct second attempt."
+  },
+  {
+    "id": "learning-013",
+    "category": "learning",
+    "persona": "Margaret Hale, 61, retired GP learning French (around B1) before a three-month stay with a host family in Lyon. Writes careful sentences, and increasingly wants to self-correct rather than be corrected.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Subjunctive practice. Can you check these and tell me what's wrong and why?\n1. Je veux qu'il vient demain.\n2. J'espère qu'il vienne demain.\n3. Il faut que je fasse mes valises.\n4. Bien qu'il pleut, nous sortons.",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "teacher",
+              "mustContribute": "Corrects 1 (vienne), 2 (viendra or vient: espérer takes the indicative) and 4 (pleuve), confirms 3, and names the pattern: she has vouloir and espérer the wrong way round. French treats espérer as expectation (indicative) and vouloir as will (subjunctive).",
+              "notes": "She asked for corrections. Give them."
+            }
+          },
+          {
+            "user": "So espérer is the odd one out — it feels like a wish, but French treats it as expecting something real, so indicative. And 'bien que' always takes the subjunctive?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "notes": "Both right. Confirm plainly (the negative/interrogative espérer nuance is an optional aside, not a quiz)."
+            }
+          }
+        ]
+      },
+      {
+        "turns": [
+          {
+            "user": "I've written the first paragraph of my letter to my host family. This time just point to the mistakes — don't correct them, I want to fix them myself.\n\n« Chère Madame Roux, J'espère que vous soyez en bonne santé. Je suis très contente que vous m'accueilliez chez vous en mars. Il faut que je vous dis que je ne mange pas de viande. Je vous remercie d'avance. »",
+            "expect": {
+              "maxQuestions": 1,
+              "mustNotReveal": [
+                "esp[eè]re\\s+que\\s+vous\\s+(êtes|etes|allez|serez|vous portez)",
+                "\\bdise\\b"
+              ],
+              "mustReference": "last week's espérer + indicative point: 'J'espère que vous soyez' is the same error as her sentence 2 then (and, optionally, that she got 'il faut que je fasse' right last week, which is the trigger she has missed in 'il faut que je vous dis')",
+              "stance": "teacher",
+              "notes": "She has explicitly asked for the mistakes to be pointed to, not corrected. Flag the espérer clause and the il faut que clause without supplying the corrected forms. If 'contente que vous m'accueilliez' is mentioned, it is correct."
+            }
+          },
+          {
+            "user": "J'espère que vous allez bien — espérer again, I clearly haven't internalised it. And 'il faut que je vous dise'. Is 'accueilliez' really right, though? It looks mad with the double i.",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "notes": "Both fixes are right; confirm. Yes, 'que vous accueilliez' is the subjunctive (same form as the imperfect: stem accueill- + -iez). Because this is the second espérer slip, a concrete way to lock it in is a useful optional contribution, not a quiz."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Longitudinal (two sessions a week apart). Session 1: corrections on request. Session 2: an explicit point-don't-correct request, and the same espérer error recurs. Socria must connect it to last week without supplying the fix, then confirm her self-correction."
+  },
+  {
+    "id": "learning-014",
+    "category": "learning",
+    "persona": "Priyanka Shah, 15, preparing for ABRSM Grade 6 music theory. Uses a marking app for harmony exercises and wants to learn to spot voice-leading errors unaided, because the app will not be there in the exam.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Grade 6 harmony practice. My teacher's marking app flagged 'consecutive fifths' in bar 3 — a IV–V in C major — and I can't see them. Bar 3 is:\nS: F5 → D5\nA: A4 → B4\nT: C4 → D4\nB: F3 → G3\nI need to be able to spot these myself in the exam, so please don't just point at the two voices — help me find it.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustNotReveal": [
+                "(fifths?|5ths?)\\s+(are|is|lie|lies|sit|sits|occur|occurs|appear|appears)\\s+(between|in)\\s+(the\\s+)?(tenor|bass)",
+                "(tenor|bass)\\s+(and|&)\\s+(the\\s+)?(tenor|bass)\\s+(move|moves|moving|both|form|forms|are|make|makes|go)",
+                "\\bF3?\\s*[–—-]\\s*C4?\\b[^.\\n]{0,40}\\bG3?\\s*[–—-]\\s*D4?\\b",
+                "(tenor|bass)[^.\\n]{0,15}(C4|F3)[^.\\n]{0,40}(D4|G3)[^.\\n]{0,30}(fifth|5th)"
+              ],
+              "stance": "teacher",
+              "mustContribute": "A method rather than the location: check every pair of voices systematically (six pairs, including the bass against each upper voice) for the same perfect interval twice in a row with both voices moving in the same direction.",
+              "notes": "Explicit practice plus an explicit request not to be shown the voices."
+            }
+          },
+          {
+            "user": "I checked the outer voices (two octaves F over F, then a twelfth D over G — contrary motion, fine) and every pair within the top three voices. Nothing moves in parallel fifths or octaves. I'm stuck.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustNotReveal": [
+                "(fifths?|5ths?)\\s+(are|is|lie|lies|sit|sits|occur|occurs|appear|appears)\\s+(between|in)\\s+(the\\s+)?(tenor|bass)",
+                "(tenor|bass)\\s+(and|&)\\s+(the\\s+)?(tenor|bass)\\s+(move|moves|moving|both|form|forms|are|make|makes|go)",
+                "\\bF3?\\s*[–—-]\\s*C4?\\b[^.\\n]{0,40}\\bG3?\\s*[–—-]\\s*D4?\\b",
+                "(tenor|bass)[^.\\n]{0,15}(C4|F3)[^.\\n]{0,40}(D4|G3)[^.\\n]{0,30}(fifth|5th)"
+              ],
+              "alreadyConsidered": [
+                "the outer voices (soprano against bass)",
+                "all pairs among soprano, alto and tenor"
+              ],
+              "notes": "She is stuck and says so, so support should increase. Tell her which pairs she has not checked (the bass against each inner voice). That is the systematic habit she needs for the exam. Do not name the offending pair or the notes."
+            }
+          },
+          {
+            "user": "Found it — tenor and bass, F–C then G–D, perfect fifth to perfect fifth, both moving up a step. I'll fix it by taking the tenor down to B3 instead of up to D4. That works, right?",
+            "expect": {
+              "mustAnswer": true,
+              "mustChallenge": true,
+              "maxQuestions": 1,
+              "notes": "It removes the fifths but creates a new error: with the alto already on B4, a tenor on B3 doubles the leading note in the V chord. Say so plainly. She is practising, so she can be left to find a better voicing (a hint is fine), but the verdict on her proposed fix must be unambiguous."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Practice with an explicit no-reveal request. The learner gets stuck (support should increase to naming the unchecked pairs), finds the error, then proposes a fix that introduces a different error, which must be challenged clearly."
+  },
+  {
+    "id": "learning-015",
+    "category": "learning",
+    "persona": "Marcus Webb, 26, moving from customer support into data analytics. Practising SQL questions for an interview next week. Knows the basics and wants to solve these himself.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Prepping for a data analyst interview next week. Practice question: 'List the customers who placed more than 3 orders in 2025.' I wrote:\n\n```sql\nSELECT customer_id, COUNT(*)\nFROM orders\nWHERE YEAR(order_date) = 2025 AND COUNT(*) > 3\nGROUP BY customer_id;\n```\n\nMySQL says 'Invalid use of group function'. I'm guessing it's something basic, but I want to get there myself — no rewritten query, please.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustNotReveal": [
+                "having\\s+count\\s*\\(",
+                "having\\s+(clause|filter|condition)",
+                "\\buse\\s+having\\b",
+                "\\ba\\s+having\\b"
+              ],
+              "stance": "teacher",
+              "notes": "Explicit practice. A conceptual hint (WHERE filters rows before grouping, so an aggregate does not exist yet at that point) lets him name the clause himself. No rewritten query, and do not name the keyword."
+            }
+          },
+          {
+            "user": "Right — HAVING. I also read that wrapping the column in YEAR() stops MySQL using the index on order_date, so I changed that too:\n\n```sql\nSELECT customer_id, COUNT(*) AS n\nFROM orders\nWHERE order_date >= '2025-01-01'\nGROUP BY customer_id\nHAVING COUNT(*) > 3;\n```\n\nIs that interview-ready?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 1,
+              "alreadyConsidered": [
+                "moving the aggregate condition into HAVING",
+                "avoiding YEAR() on the column so the index on order_date can be used"
+              ],
+              "notes": "Not quite: the date filter has no upper bound, so it counts every order from 2025 onward, including this year's (2026). He asked whether it is ready, so say plainly what is wrong. A wrong attempt in practice still gets a clear verdict."
+            }
+          },
+          {
+            "user": "Added AND order_date < '2026-01-01' — without it I'd have been counting this year's orders too. Last thing: would an interviewer care whether I write COUNT(*) or COUNT(order_id)?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "notes": "Direct answer: equivalent here if order_id is a non-null primary key. COUNT(col) skips NULLs, and after joins that duplicate rows COUNT(DISTINCT order_id) is what matters. Being able to say why is what impresses. No quiz."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Interview practice. The first turn needs a no-reveal hint. The second has a subtle remaining bug that must be named even in practice mode (not withheld). The third is a factual question that just needs answering."
+  },
+  {
+    "id": "learning-016",
+    "category": "learning",
+    "persona": "Devika Rao, 38, returning adult learner on an Open University maths module, studying in the evenings. The textbook exercises have no worked answers. The two sessions are a week apart.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Working through the Chapter 6 practice exercises (the book has no worked answers). Can you mark these and show me the right answer where I've gone wrong?\n(a) d/dx [x² sin x] = 2x cos x\n(b) d/dx [e^(3x)] = e^(3x)\n(c) d/dx [ln(5x)] = 1/x",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 1,
+              "stance": "teacher",
+              "notes": "(a) wrong: product rule, 2x sin x + x² cos x (the derivative of a product is not the product of the derivatives). (b) wrong: chain rule, 3e^(3x). (c) correct, and say so plainly even though it looks suspicious. She asked for the right answers, so give them."
+            }
+          },
+          {
+            "user": "(c) felt wrong because the 5 just vanishes. Is that because ln(5x) = ln 5 + ln x, and ln 5 is just a constant?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "notes": "Exactly right. Confirm plainly."
+            }
+          }
+        ]
+      },
+      {
+        "turns": [
+          {
+            "user": "Chapter 7 now. d/dx [x³ e^(2x)] = 3x² e^(2x) + x³ e^(2x). If it's wrong, just tell me which bit — I want to fix it myself this time.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustNotReveal": [
+                "2\\s*[·*⋅]?\\s*x\\s*(\\^\\s*[{(]?\\s*3\\s*[})]?|³)\\s*[·*⋅]?\\s*e",
+                "x\\s*(\\^\\s*[{(]?\\s*3\\s*[})]?|³)\\s*[·*⋅]?\\s*\\(?\\s*2\\s*[·*⋅]?\\s*e",
+                "\\(\\s*3\\s*\\+\\s*2\\s*x\\s*\\)",
+                "\\(\\s*2\\s*x\\s*\\+\\s*3\\s*\\)",
+                "(=|\\bis)\\s*2\\s*[·*⋅]?\\s*e\\s*\\^?\\s*[{(]?\\s*2\\s*x"
+              ],
+              "mustReference": "last week's exercise (b), where she wrote d/dx e^(3x) = e^(3x) without the chain-rule factor: the same slip as in today's second term",
+              "stance": "teacher",
+              "notes": "The product-rule structure is right this time, and last week's error (a) has not recurred, which is worth saying. The second term is missing the chain-rule factor. Point to it and connect it to last week, but do not write the corrected derivative."
+            }
+          },
+          {
+            "user": "3x² e^(2x) + 2x³ e^(2x). So the product rule's sorted, but I keep dropping the inside derivative. Is there a habit that would stop me doing that?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "mustReference": "the e^(3x) slip from last week alongside today's e^(2x) one",
+              "mustContribute": "A concrete, usable habit for the chain rule, e.g. always write the inner function and its derivative explicitly before differentiating exp/log/trig of anything other than plain x, or a quick check such as differentiating e^(2x) at a point or thinking about the slope doubling.",
+              "notes": "Confirm the corrected answer first, plainly."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Longitudinal (two sessions). Session 1: corrections given on request, and a correct item confirmed. Session 2: the same chain-rule error recurs under an explicit point-don't-fix request. Socria must link it to last week, credit the product-rule improvement, then give a concrete habit."
+  },
+  {
+    "id": "learning-017",
+    "category": "learning",
+    "persona": "Elena Popescu, 22, third-year economics student. Strong at algebra, has checked her work systematically, and explicitly wants to find her own error in a problem set.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Public finance problem set. Demand P = 120 − Q, supply P = 20 + Q, and a $20 per-unit tax on sellers. Find the deadweight loss. I get 50; the answer key says 100. I've re-derived the pre-tax equilibrium twice (Q = 50, P = 70), I shifted supply up by the tax to P = 40 + Q and got the post-tax quantity Q = 40, and yes, I included the ½ in the triangle. I don't want the working — I want to find my own mistake.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustNotReveal": [
+                "80\\s*[-−–]\\s*60",
+                "\\b60\\s*(to|and|[-−–])\\s*(\\$\\s*)?80\\b",
+                "height\\s+(is|of|should be|=|equals)\\s*\\$?\\s*20\\b",
+                "(½|1/2|0\\.5)\\s*[×x*·(]?\\s*\\(?\\s*10\\s*\\)?\\s*[×x*·(]?\\s*\\(?\\s*20\\b",
+                "(½|1/2|0\\.5)\\s*[×x*·(]?\\s*\\(?\\s*20\\s*\\)?\\s*[×x*·(]?\\s*\\(?\\s*10\\b"
+              ],
+              "alreadyConsidered": [
+                "the pre-tax equilibrium (Q = 50, P = 70)",
+                "the supply shift to P = 40 + Q and the post-tax quantity Q = 40",
+                "the ½ in the triangle-area formula"
+              ],
+              "mustContribute": "Points her to the one component she has not said she checked, the triangle's height (which price gap it spans), without re-asking about equilibrium, quantity or the ½, and without giving the number.",
+              "stance": "teacher"
+            }
+          },
+          {
+            "user": "Wait, I think I see it. For the height I used 80 − 70 — only the part of the tax that buyers pay. The triangle's height is the whole wedge between what buyers pay and what sellers keep, 80 − 60 = 20, so ½ × 10 × 20 = 100.",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "notes": "Correct diagnosis and fix. Confirm plainly. No extension exercise."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "A learner who has already ruled out the obvious mistakes. The hint must go past what she checked (already-considered in a learning context) while withholding the fix she wants to find."
+  },
+  {
+    "id": "learning-018",
+    "category": "learning",
+    "persona": "Josh Turner, 19, first-year maths student in an intro-to-proofs course. Confident, a little defensive about his work. His tutor has told him the proof is wrong but not where.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Proofs course, week 4. My tutor says this proof is wrong but won't say where, and I'm pretty sure it's fine.\n\nClaim: 2^n > n² for all n ≥ 1.\nBase case: n = 1: 2 > 1. ✓\nInductive step: assume 2^k > k². Then 2^(k+1) = 2·2^k > 2k² = k² + k² ≥ k² + 2k + 1 = (k+1)², because k² ≥ 2k + 1. Hence 2^(k+1) > (k+1)². ∎\n\nWhere's the hole?",
+            "expect": {
+              "mustAnswer": true,
+              "mustChallenge": true,
+              "maxQuestions": 1,
+              "stance": "teacher",
+              "notes": "He asked directly. The hole is that k² ≥ 2k + 1 is false for k = 1 and k = 2, so the step does not go from 1 to 2 or from 2 to 3. And the claim itself is false: n = 2 gives 4 = 4, n = 3 gives 8 < 9, n = 4 gives 16 = 16. A counterexample (n = 3) is the fastest way to puncture his confidence. It becomes true from n = 5."
+            }
+          },
+          {
+            "user": "Ugh — 2³ = 8 < 9. OK: claim for n ≥ 5. Base case 32 > 25, and the step needs k² ≥ 2k + 1, i.e. (k − 1)² ≥ 2, which holds for k ≥ 3, so certainly for k ≥ 5. Done?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "notes": "Correct. Say so plainly. No new exercise."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "A confident learner with a flawed proof of a false claim who asks where the hole is. Needs a direct, specific challenge (not Socratic withholding), then a plain confirmation of his correct repair."
+  },
+  {
+    "id": "learning-019",
+    "category": "learning",
+    "persona": "Ravi Menon, 24, junior front-end developer six months into his first job, learning async JavaScript properly rather than cargo-culting it. Three sessions a week apart, over which he becomes visibly more capable.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Six months into my first dev job and I'm trying to actually understand async instead of copy-pasting. This logs 'all saved' before any of the saves finish:\n\n```js\nasync function saveAll(users) {\n  users.forEach(async (u) => {\n    await db.save(u);\n  });\n  console.log('all saved');\n}\n```\n\nI thought the await makes it wait? I want to understand what's going on, not just get a working version.",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 1,
+              "stance": "teacher",
+              "notes": "\"Not just a working version\" means explain first, not withhold the fix. forEach ignores the promise each async callback returns, and await only pauses inside each callback, not saveAll. Then the two fixes: for...of with await (sequential) and await Promise.all(users.map(...)) (concurrent)."
+            }
+          },
+          {
+            "user": "So forEach calls my async function, gets a promise back, drops it on the floor and moves on — and the await only pauses that little arrow function. Which means for...of with await would save them one at a time, and Promise.all with map would fire them all at once and wait for the lot?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "notes": "Exactly right. Confirm plainly."
+            }
+          }
+        ]
+      },
+      {
+        "turns": [
+          {
+            "user": "New bug, different code:\n\n```js\nconst results = users.map(async (u) => fetchProfile(u.id));\nconsole.log(results[0].name); // undefined\n```\n\nfetchProfile definitely returns a profile object — I logged it inside the function and it's there. So why is results[0].name undefined?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 1,
+              "mustReference": "last week's forEach + async lesson: an async callback returns a promise, and the array method does not await it; the Promise.all + map pattern he described himself last week is the fix",
+              "notes": "results is an array of Promises. Connect it to last session rather than re-explaining promises from scratch."
+            }
+          },
+          {
+            "user": "Ugh — it's the forEach thing again, except map hands me the promises instead of dropping them. So: const results = await Promise.all(users.map((u) => fetchProfile(u.id)));",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "notes": "Correct. Confirm plainly (optionally: the async keyword on the arrow was redundant). No new exercise."
+            }
+          }
+        ]
+      },
+      {
+        "turns": [
+          {
+            "user": "Next problem with the same code. The profile API rate-limits us at 10 requests/second, and Promise.all fires all 500 at once, so we get a wall of 429s. Options as I see them: (1) go back to a sequential for...of loop — at ~150 ms a request that's about 75 seconds for 500 users, too slow for this page; (2) keep Promise.all and retry 429s with backoff, which feels like deliberately hammering their API. Is there something in between?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 1,
+              "stance": "peer",
+              "alreadyConsidered": [
+                "a sequential for...of loop (~75 s for 500 users, too slow)",
+                "Promise.all with retry and backoff on 429s"
+              ],
+              "mustContribute": "Bounded concurrency or rate-limited batching as the middle path, plus the non-obvious catch: a concurrency cap is not a rate cap (10 requests in flight at ~150 ms each is ~65 req/s, still over the limit), so it needs time-based pacing (batches of 10 per second, or a token bucket). And the best any compliant approach can do at 10 req/s is ~50 s for 500 calls, only modestly better than 75 s sequential. That points at the real problem: a batch endpoint, caching, or not fetching 500 profiles for one page.",
+              "notes": "By now he reasons about sequential vs concurrent on his own. Respond as a peer and do not re-explain promises."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Longitudinal (three sessions). Session 1: explain and fix. Session 2: the same concept in a new form, which Socria should connect to last week. Session 3: he has grown, so assistance should shift from explanation to a peer contribution past the two options he has already weighed."
+  },
+  {
+    "id": "learning-020",
+    "category": "learning",
+    "persona": "Liam O'Connor, 29, software engineer relocating to Munich. German around B1. Prefers discovering patterns to memorising tables, until he runs out of patience.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Working through a German worksheet on adjective endings. I'd rather work out the pattern than memorise a table, so nudge me, don't tell me. 'Ich trinke einen kalt___ Kaffee.' I put 'kalte' because Kaffee is masculine and I thought adjectives after ein-words end in -e. The key says I'm wrong.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustNotReveal": [
+                "\\bkalten\\b"
+              ],
+              "stance": "teacher",
+              "notes": "Explicit discover-it-myself request. A nudge about the case of Kaffee here and what \"einen\" already signals is right. Do not give the ending."
+            }
+          },
+          {
+            "user": "Kaffee's the direct object, so accusative — and 'einen' already shows that. So 'kalten'? But then why is it 'ein kalter Kaffee' in the nominative, with -er?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 1,
+              "notes": "\"kalten\" is right, so confirm it. On the -er question he wants to find the pattern: a pointer (what does \"ein\" fail to tell you in the masculine nominative?) fits, and a short direct explanation is also acceptable because he asked why. Do not stack several questions."
+            }
+          },
+          {
+            "user": "Oh — 'ein' looks the same for masculine and neuter, so the adjective has to carry the gender: kalter. Next one: 'Das ist ein gut___ Buch.' Buch is neuter, nominative, 'ein' doesn't show it, so 'gutes'?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "notes": "Right, and his stated principle is right. Confirm plainly. He is working through his own worksheet, so do not add an item of your own."
+            }
+          },
+          {
+            "user": "Next: 'Mit einem alt___ Freund.' Dative, masculine. Using my rule I said 'alter' — the -er shows masculine. Key says 'alten'.",
+            "expect": {
+              "maxQuestions": 1,
+              "notes": "His rule is right but incomplete: \"einem\" already shows case and gender, so the adjective does not have to (it takes -en). He is practising, so a hint comparing what \"einem\" tells you with what \"ein\" told you is fine. Correcting the gap in the rule outright is also acceptable. Do not just repeat the key."
+            }
+          },
+          {
+            "user": "Not sure. I guess 'einem' already shows it's masculine dative, so the adjective doesn't have to. But then why -en and not -e? And after 'dem' it's also 'dem alten Freund', isn't it? So the -e I thought was the default isn't the default at all. I'm lost now.",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "notes": "He says he is lost after several rounds, so support should increase to a direct explanation built on what he has worked out: after a word that already shows the case, the adjective takes a weak ending, -e only in the nominative singular and the feminine/neuter accusative singular, -en everywhere else. No more questions."
+            }
+          },
+          {
+            "user": "Honestly, I've spent an hour discovering half a pattern. Just give me the whole thing for ein-words in a form I can memorise, and I'll stop being clever about it.",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "mustReference": "the principle he worked out himself earlier: the adjective carries the gender/case signal when 'ein' does not show it (kalter, gutes), and takes -en when the article already does (einen kalten, einem alten)",
+              "notes": "Explicit request: give the full ein-word (mixed) declension now, as a table or compact rule. Anchoring it to the principle he discovered is the Human-First touch. No guilt, no \"try one more first\"."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Six turns: discover-the-pattern practice, a growing question streak, the learner getting lost (support must increase), and finally \"just give me the whole thing\" (the answer must come in full, tied to what he found himself)."
+  }
+]

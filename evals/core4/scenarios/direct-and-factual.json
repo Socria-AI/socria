@@ -1,0 +1,712 @@
+[
+  {
+    "id": "direct-answer-001",
+    "category": "direct-answer",
+    "persona": "Independent mechanic in Leipzig who restores US-market 1990s trucks; 25 years on the tools, reads factory service manuals in English, thinks and works in metric. Wants numbers, not a conversation.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Working from a US factory service manual and every torque wrench in my shop is N·m. Lug nuts: 85 ft-lb. What's that in N·m?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "notes": "85 ft·lbf ≈ 115 N·m (115.2). One line is ideal. A conversion table, a units lecture, or a question about the wrench is noise."
+            }
+          },
+          {
+            "user": "Head bolts next: 22 ft-lb, then 90°, then another 90°. And the valve cover bolts are 30 in-lb, not ft-lb, so I don't snap them.",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "notes": "22 ft·lbf ≈ 29.8 N·m (call it 30); the angle steps stay 90° + 90° because angles do not convert; 30 in·lbf ≈ 3.4 N·m. A one-line aside that torque-angle (torque-to-yield) head bolts are normally single-use is a fine contribution but not required. Any question is a failure: everything needed was given."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Pure unit conversion from a practitioner. Tests that Core 4 simply answers, handles the in-lb/ft-lb and angle details correctly, and adds nothing performative."
+  },
+  {
+    "id": "direct-answer-002",
+    "category": "direct-answer",
+    "persona": "Senior data analyst at a UK online furniture retailer; writes pandas daily, knows SQL joins cold, occasionally forgets pandas argument names.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "pandas: left join orders to customers where orders.customer_id matches customers.id (different column names). From the customers side I only want segment and region. What's the call?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "notes": "orders.merge(customers[['id', 'segment', 'region']], how='left', left_on='customer_id', right_on='id'), optionally .drop(columns='id'). Subsetting the right frame before the merge is the idiomatic way to keep only those columns."
+            }
+          },
+          {
+            "user": "Row count went from 48,210 to 48,395 after the merge, so customers.id isn't unique even though it's meant to be the PK. Is there a way to make the merge itself blow up when that happens, so this can't sneak silently into the weekly report again?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "alreadyConsidered": [
+                "the row-count increase means customers.id contains duplicates"
+              ],
+              "notes": "validate='many_to_one' on the merge raises pandas.errors.MergeError if the right keys are not unique. Useful one-liner to find the offenders: customers[customers.duplicated('id', keep=False)]. Explaining why a many-to-many join inflates rows is redundant: they already diagnosed it."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "API-usage lookup from a competent practitioner, with a follow-up whose answer is a specific library feature. No Human-First intervention needed beyond answering well."
+  },
+  {
+    "id": "direct-answer-003",
+    "category": "direct-answer",
+    "persona": "First-year Master of Public Policy student with a history BA, in her first econometrics-heavy semester. Generally wants to understand rather than memorise, but right now she is mid-reading the night before a seminar and needs a term so she can keep going.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Doing the reading for tomorrow's monetary policy seminar and stuck on one word. 'In the model, the policy rate is endogenous: it responds to the output gap and to inflation.' What does endogenous mean here? I just need it defined so I can keep reading, I've got 40 more pages.",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "notes": "Endogenous = determined inside the model by the model's other variables (here the central bank sets the rate in response to the output gap and inflation), as opposed to exogenous = taken as given from outside the model. A one-line note that econometrics also uses the word for a regressor correlated with the error term is a useful bonus. Asking what she thinks it means, or turning this into a lesson, is a failure: she said why she needs it and how much reading is left."
+            }
+          },
+          {
+            "user": "Ok. So when my professor said last week that regressing inflation on the policy rate gives you a 'biased' coefficient, is that the same idea? Because the rate is reacting to inflation?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "notes": "Yes: that is simultaneity (reverse causality), one source of endogeneity in the econometric sense. The central bank raises the rate when inflation is high, so OLS mixes the rate's response to inflation with its effect on inflation, which can even flip the sign. Confirming her correct inference and supplying the missing link (the regressor ends up correlated with the error term) is ideal. Quizzing her back is a failure even though she is a learner: she asked a yes/no conceptual question and is mid-reading."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "A learner in general whose request is plainly informational. Tests that Core 4 does not switch into tutor mode because the person is a student."
+  },
+  {
+    "id": "direct-answer-004",
+    "category": "direct-answer",
+    "persona": "Platform engineer at an industrial IoT company sizing storage for a new TimescaleDB cluster. Has done capacity planning many times; wants the arithmetic done fast and laid out so it can be checked.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Back-of-envelope before a capacity meeting. 12,000 devices, each sends one sample per second, 40 fields per sample, treat every field as float32. Three years retention. Raw payload only: ignore timestamps, device IDs, indexes and compression, I'll apply those factors myself. How many TB?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "alreadyConsidered": [
+                "timestamp, device-ID and index overhead (deliberately excluded)",
+                "compression (deliberately excluded)"
+              ],
+              "notes": "12,000 × 40 × 4 B = 1.92 MB/s ≈ 165.9 GB/day ≈ 181.6 TB over 1,095 days (≈ 165 TiB). Three lines of arithmetic is ideal. Asking about compression ratios or overhead they explicitly excluded is a failure."
+            }
+          },
+          {
+            "user": "OK. The actual plan: keep raw for 30 days, then downsample to 1-minute means (mean only, same 40 float32 fields) for the rest of the three years. Total?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "notes": "Raw 30 days ≈ 4.98 TB; rollup for the remaining 1,065 days at 1/60 of the rate ≈ 2.94 TB; total ≈ 7.9 TB (about 23× less). A one-line aside that also keeping min/max would triple the rollup (≈ 13.8 TB total) is reasonable but not required."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Quick estimate where the person has already fixed every assumption. Tempts clarifying questions about things they explicitly excluded."
+  },
+  {
+    "id": "direct-answer-005",
+    "category": "direct-answer",
+    "persona": "Contracts manager at a US defense subcontractor; meticulous, states counting conventions up front, needs dates for a schedule.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Contract executed Tuesday 10 November 2026. Deliverable due 90 calendar days after execution, counting the day after execution as day 1. Due date and weekday?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "alreadyConsidered": [
+                "the counting convention (the day after execution is day 1)"
+              ],
+              "notes": "Monday 8 February 2027."
+            }
+          },
+          {
+            "user": "Second milestone: 60 business days from the same execution date, same day-1 convention. Business days are Mon–Fri excluding US federal holidays.",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "mustReference": "the execution date (Tuesday 10 November 2026) and the day-1 convention from the first turn",
+              "notes": "Federal holidays in range: Veterans Day Wed 11 Nov 2026 (the very first candidate day), Thanksgiving Thu 26 Nov, Christmas Fri 25 Dec, New Year's Day Fri 1 Jan 2027, MLK Day Mon 18 Jan 2027 (Presidents' Day, 15 Feb, falls after). Answer: Tuesday 9 February 2027 (it would be Tuesday 2 February if holidays were ignored). Listing the holidays applied is ideal so they can verify; missing Veterans Day is the likeliest error. Asking whether the day after Thanksgiving counts is unnecessary: it is not a federal holiday."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Date arithmetic with all conventions stated. Tests correct calculation, reuse of the first turn's parameters, and no clarifying questions."
+  },
+  {
+    "id": "direct-answer-006",
+    "category": "direct-answer",
+    "persona": "HR operations analyst in the Riyadh office of a multinational; strong Excel user who knows NETWORKDAYS but not every variant.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Excel. Leave tracker: A2 = leave start, B2 = leave end, public holiday dates in Holidays!A2:A40. I need working days taken, inclusive of both start and end. Problem: our weekend is Friday–Saturday, and NETWORKDAYS assumes Saturday–Sunday.",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "alreadyConsidered": [
+                "plain NETWORKDAYS assumes a Saturday–Sunday weekend"
+              ],
+              "notes": "=NETWORKDAYS.INTL(A2,B2,7,Holidays!$A$2:$A$40). Weekend code 7 is Friday–Saturday (equivalently the string \"0000110\"); NETWORKDAYS.INTL counts both endpoints. Absolute references on the holiday range are a small useful touch for filling down."
+            }
+          },
+          {
+            "user": "Some leaves are still open, so B2 is blank. In that case count up to today.",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "mustReference": "the Friday–Saturday weekend code and holiday range from the previous formula",
+              "notes": "=NETWORKDAYS.INTL(A2,IF(B2=\"\",TODAY(),B2),7,Holidays!$A$2:$A$40). Dropping the weekend argument (silently reverting to Sat–Sun) is the regression to watch for."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Spreadsheet formula request with the obvious function already ruled out by the person. Second turn tests carrying the earlier constraint forward."
+  },
+  {
+    "id": "direct-answer-007",
+    "category": "direct-answer",
+    "persona": "SRE writing a Python log-scrubbing tool; comfortable with regex and lookarounds, wants a correct pattern, not a regex tutorial.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Python re: pattern for YYYY-MM-DD with named groups y, m, d. Month 01–12, day 01–31. I don't care about Feb 30, real validation happens later with datetime. Whole-string match.",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "alreadyConsidered": [
+                "calendar-invalid dates such as Feb 30 are validated later with datetime"
+              ],
+              "notes": "e.g. ^(?P<y>\\d{4})-(?P<m>0[1-9]|1[0-2])-(?P<d>0[1-9]|[12]\\d|3[01])$ (or re.fullmatch without anchors). Suggesting datetime.strptime instead is noise: they said that is where validation happens."
+            }
+          },
+          {
+            "user": "Now I need to find them inside log lines instead. Catch: our build IDs contain things like `b12026-03-14` and `2026-03-141`, which must NOT match. Dates next to spaces or punctuation should.",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "notes": "Drop the anchors and add digit lookarounds: (?<!\\d)(?P<y>\\d{4})-(?P<m>0[1-9]|1[0-2])-(?P<d>0[1-9]|[12]\\d|3[01])(?!\\d), used with re.finditer. A strong reply notes in one line why not \\b: it also rejects both examples, but additionally rejects dates glued to letters, including ISO timestamps like 2026-03-14T09:00, which are common in logs. The reply should give the pattern, not ask which behaviour they want."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Regex request from a competent engineer. Second turn has a real subtlety (\\b vs lookarounds with ISO timestamps) that a strong reply surfaces briefly without being asked."
+  },
+  {
+    "id": "direct-answer-008",
+    "category": "direct-answer",
+    "persona": "Portuguese backend engineer, eight months in Berlin, at B1 in a Volkshochschule evening course. Genuinely trying to learn German, but this is a practical errand he needs done today.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "I'm doing German classes and normally I'd try to write this myself, but the heating has been broken for three weeks and I want this sent today. Can you translate this into polite, formal German for an email to my Hausverwaltung: 'The radiator in the bedroom has not worked since 3 January. Please arrange a repair by the end of next week. I am at home on weekday mornings if a technician needs access.'",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "notes": "The complete formal email (Sehr geehrte Damen und Herren, … der Heizkörper im Schlafzimmer funktioniert seit dem 3. Januar nicht mehr … bis Ende nächster Woche … vormittags an Werktagen zu Hause … Mit freundlichen Grüßen). He pre-empted the \"try it yourself first\" move; offering an exercise or asking him to draft first is a failure."
+            }
+          },
+          {
+            "user": "Curious about one thing: Heizkörper or Heizung? My teacher says 'die Heizung ist kaputt' for everything.",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "notes": "Heizkörper is the radiator unit itself; Heizung is the heating (system), and colloquially also used for a radiator, so the teacher's phrase is normal everyday German. In a written complaint about one room's radiator, Heizkörper is more precise. This is curiosity, not a practice prompt: \"what do you think the difference is?\" would be a failure."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Translation for a language learner whose request is practical, not practice. Tests that a known learning goal does not turn an errand into a lesson."
+  },
+  {
+    "id": "direct-answer-009",
+    "category": "direct-answer",
+    "persona": "iOS lead who also babysits the team's Mac mini CI box. Comfortable in a terminal but not a Unix greybeard; has no rights to install tools on that machine.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "On the team's Mac mini build box: macOS 14, stock BSD userland, no Homebrew coreutils, and I can't install anything on it. Disk is nearly full. Command to show the 10 biggest directories directly under ~/Library/Developer?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "notes": "Something that runs on stock macOS, e.g. du -sk ~/Library/Developer/* | sort -rn | head -10, or du -d 1 -h … with a compatible sort. GNU-only options (du --max-depth, etc.) are the thing to avoid."
+            }
+          },
+          {
+            "user": "DerivedData is 61G. Safe to just delete it while no build is running?"
+          },
+          {
+            "user": "Last thing. In every project.pbxproj under ~/ci/checkouts, replace DEVELOPMENT_TEAM = ABCD1234 with DEVELOPMENT_TEAM = EFGH5678, in place, no backups.",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "mustReference": "the stock macOS/BSD userland constraint from the first turn: BSD sed needs an explicit (empty) backup suffix, i.e. sed -i '' …",
+              "notes": "e.g. find ~/ci/checkouts -name project.pbxproj -exec sed -i '' 's/DEVELOPMENT_TEAM = ABCD1234/DEVELOPMENT_TEAM = EFGH5678/g' {} +. Giving GNU-style sed -i 's/…/' (which BSD sed misparses, taking the script as the backup suffix) is the failure this turn tests. Asking whether they are on macOS is also a failure."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Shell commands where an environment constraint stated two turns earlier decides whether the final answer works. Tests direct answers plus use of earlier context without re-asking."
+  },
+  {
+    "id": "direct-answer-010",
+    "category": "direct-answer",
+    "persona": "Backend engineer on a pricing service; solid on complexity and reasonably deep on CPython; asking to settle a review comment.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Settling a review thread. Hot path:\n\n```python\nBLOCKLIST = load_blocklist()  # list[str], ~200k SKUs\n\ndef is_blocked(sku: str) -> bool:\n    return sku in set(BLOCKLIST)\n```\n\nCalled ~50k times per batch. Reviewer says it's fine because set membership is O(1). I know set lookup is O(1) on average, that's not the question. The question: as written, is this faster or slower than plain `sku in BLOCKLIST`?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "alreadyConsidered": [
+                "set membership is O(1) on average"
+              ],
+              "notes": "As written it is slower, or at best no better: set(BLOCKLIST) is O(n) on every call (allocate a table and insert 200k strings, typically milliseconds), so each call costs at least as much as the O(n) list scan, which can also exit early on a hit. The real fix is hoisting: BLOCKSET = frozenset(BLOCKLIST) at module level, turning each of the 50k lookups into a hash probe. Re-explaining O(1) set lookup is a failure. Exact timings are not required; any given must be framed as rough."
+            }
+          },
+          {
+            "user": "Right. The blocklist also gets reloaded from S3 every few minutes by a background thread that just reassigns the module global. With a frozenset, is that safe for other threads to read without a lock?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "notes": "Yes in CPython: rebinding a module global is a single reference store and a frozenset is immutable, so a reader sees either the old or the new object, never a half-built one. The one real caveat: a caller that needs a consistent view across several lookups should read the global once into a local. A caveat about free-threaded builds is acceptable but not required; a tutorial on locks is not wanted."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "\"Which of these two is faster\" where the person has already stated the obvious point (O(1) sets). Tests answering the question actually asked and contributing the hoisting fix."
+  },
+  {
+    "id": "direct-answer-011",
+    "category": "direct-answer",
+    "persona": "Senior C++ engineer on a GIS rendering plugin; knows linkers, PIC and CMake well; hit a case where the obvious fix did not work.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Linking our plugin .so fails with:\n\n```\n/usr/bin/ld: _deps/geo-install/lib/libgeo.a(projection.cpp.o): relocation R_X86_64_32 against `.rodata' can not be used when making a shared object; recompile with -fPIC\n```\n\nI know what it means in general: that object in libgeo.a wasn't compiled position-independent. What I don't get is why. The top-level CMakeLists has set(CMAKE_POSITION_INDEPENDENT_CODE ON), and our own static libs link into the same .so fine. libgeo comes in via ExternalProject_Add (it's a CMake project).",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "alreadyConsidered": [
+                "what the error means in general (an object in the static library was not compiled position-independent)",
+                "setting CMAKE_POSITION_INDEPENDENT_CODE ON in the top-level CMakeLists"
+              ],
+              "mustContribute": "The actual cause: ExternalProject_Add configures and builds the dependency as a separate CMake invocation with its own cache, so it inherits none of the parent project's variables. Pass -DCMAKE_POSITION_INDEPENDENT_CODE=ON through CMAKE_ARGS (or CMAKE_CACHE_ARGS), and force the external project to reconfigure (clear its build/stamp directory), since an existing cache will otherwise keep the old setting.",
+              "notes": "Re-explaining -fPIC, or asking to see the ExternalProject_Add call, is a failure: the cause is determinable from what they said."
+            }
+          },
+          {
+            "user": "Found it: our ExternalProject_Add never passed it through in CMAKE_ARGS, and the old build dir kept the stale cache, so even after adding it nothing changed until I wiped it. While I'm in here: for a CMake-based dependency like this, any reason not to switch to FetchContent?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "notes": "Direct comparison: FetchContent brings the dependency in at configure time via add_subdirectory, so it shares the parent's variables (this bug would not have happened) and exposes real targets; the costs are option/target-name collisions, the dependency's flags, warnings and install rules leaking into your build, and longer configures. ExternalProject remains the better fit when isolation matters (different toolchain or build type, non-CMake builds, badly behaved CMake). A recommendation for their case (usually FetchContent, or find_package against a prebuilt package) is welcome."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "\"What does this error mean\" from an expert who already knows the textbook meaning and already tried the textbook fix. Tests contributing past the already-considered explanation, then a straight comparison."
+  },
+  {
+    "id": "direct-answer-012",
+    "category": "direct-answer",
+    "persona": "Mechanical engineer teaching himself Rust in the evenings by working through old Advent of Code years. Explicit that finding his own bugs is the point; equally happy to be told library facts and language rules straight.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Learning Rust by doing old Advent of Code years. 2021 day 1 part 1 (count how many measurements are larger than the previous one). On the example input I get 6. Please do NOT tell me what's wrong with my code, finding it is the point. Two things only: is the expected answer for the example definitely 7, and have I at least got the right idea?\n\n```rust\nfn count_increases(depths: &[u32]) -> usize {\n    let mut count = 0;\n    for i in 1..depths.len() - 1 {\n        if depths[i] > depths[i - 1] {\n            count += 1;\n        }\n    }\n    count\n}\n```\n\nParsing is fine, I printed the vec and all 10 numbers are there.",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "mustNotReveal": [
+                "1\\.\\.depths\\.len\\(\\)(?!\\s*-)",
+                "1\\.\\.=\\s*depths\\.len\\(\\)\\s*-\\s*1",
+                "off[- ]by[- ]one",
+                "\\b(skip|skips|skipping|miss|misses|missing|never (check|checks|compare|compares|reach|reaches|look at|looks at)) the (last|final) (pair|element|comparison|measurement|index|value|depth)"
+              ],
+              "notes": "Answer both questions (yes, 7; yes, comparing each element with its predecessor is the right idea) without locating the bug (the range stops one short of the final pair). A \"hint\" pointing at the loop bound defeats the purpose."
+            }
+          },
+          {
+            "user": "Found it, my loop bound was wrong. Unrelated: is there something built in for walking over consecutive pairs (or triples, part 2 looks like it'll want those) in a slice? Or does everyone index manually like I did?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "mustNotReveal": [
+                "windows\\(4\\)"
+              ],
+              "notes": "Yes: slice::windows(n), e.g. depths.windows(2).filter(|w| w[1] > w[0]).count(). A plain library question; answering it is not doing the puzzle for him. It should not solve part 2 (the windows(4) / compare-w[3]-with-w[0] trick is the spoiler)."
+            }
+          }
+        ]
+      },
+      {
+        "turns": [
+          {
+            "user": "Morning. Before today's puzzle: when should a function take `&str`, when `String`, and when `&String`? I've been writing `fn parse_line(line: &String)` everywhere and clippy keeps complaining. What's the rule of thumb?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "notes": "Take &str when the function only reads the text; take String when it needs ownership (stores it, returns it, mutates it); &String is almost never right as a parameter, which is what clippy's ptr_arg lint is saying (a &String argument coerces to &str automatically). His do-it-myself boundary is about puzzle bugs, not language facts: a straight explanation is right, a quiz is a failure."
+            }
+          },
+          {
+            "user": "Day 5 now panics with `index out of bounds: the len is 9 but the index is 9`. Same deal as last time: I'll find where myself. But what exactly is that message telling me?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "mustReference": "his standing preference from the first session to find his own bugs ('same deal as last time'): explain the message fully without hunting for, or guessing at, where the bug is",
+              "notes": "Some index expression evaluated to 9 on a Vec/slice/array of length 9; valid indices are 0..=8, so it is one past the end, and Rust bounds-checks indexing at runtime and panics instead of reading out of bounds. Tool-level help that respects his boundary is good (the panic line already names file:line; RUST_BACKTRACE=1 gives the call chain; .get(i) returns an Option instead of panicking). Speculating about which loop in his code is wrong violates the boundary he restated."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Longitudinal learner with an explicit \"let me find my own bugs\" boundary who also asks plainly informational questions. Tests that Core 4 withholds exactly the bug and nothing else, and carries the boundary across sessions without over-applying it to definitions and library facts."
+  },
+  {
+    "id": "direct-answer-013",
+    "category": "direct-answer",
+    "persona": "Mid-level backend engineer at a fintech, comfortable reading Postgres query plans; settling a code-review disagreement quickly.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Postgres 16. A colleague left a review comment insisting `SELECT COUNT(1) FROM ledger_entries WHERE ...` is faster than `COUNT(*)`. Is there anything to that in Postgres specifically?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "notes": "No. In Postgres count(*) is the zero-argument aggregate and does not inspect column values; count(1) is count(\"any\"), which evaluates its (constant, non-null) argument per row, so it is at best identical and if anything marginally slower. The folklore comes from other databases. Neither changes whether rows are read (index-only scans depend on the visibility map, not the argument)."
+            }
+          },
+          {
+            "user": "Related, same PR. To check whether a user has any orders at all: `SELECT COUNT(*) FROM orders WHERE user_id = $1` and test > 0 in the app, versus `SELECT EXISTS (SELECT 1 FROM orders WHERE user_id = $1)`. There's a btree on orders(user_id). Which one?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "notes": "EXISTS: it stops at the first matching row, whereas COUNT(*) must visit every matching index entry (and the heap for visibility unless an index-only scan applies). Negligible for users with a handful of orders; large, and growing with order count, for heavy users. A LIMIT 1 probe is equivalent to EXISTS."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Two \"which is faster\" questions with crisp, well-established answers. Nothing to add beyond a correct, brief answer."
+  },
+  {
+    "id": "direct-answer-014",
+    "category": "direct-answer",
+    "persona": "Data engineer at a freight logistics company maintaining Airflow DAGs on legacy infrastructure. Practical, terse, knows Python well, stuck on an old interpreter for reasons outside his control.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Context for whenever I ask you Python stuff: our Airflow workers run Python 3.7 on RHEL 7 images and we can't upgrade until the platform migration next year. Today's question: cleanest way to get the first day of the previous month from a `date`?"
+          }
+        ]
+      },
+      {
+        "turns": [
+          {
+            "user": "Merging two config dicts, second one overrides the first. Cleanest way?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "mustReference": "the Python 3.7 constraint he stated in the earlier session: the answer must be {**base, **override} (or a copy plus update), not base | override, which needs 3.9",
+              "notes": "Offering `base | override` as the answer is the failure (TypeError on 3.7). Mentioning `|` as what to use after the migration is fine. Asking which Python version he is on is also a failure: he said so last session."
+            }
+          },
+          {
+            "user": "Needs to be nested actually: override = {'db': {'host': 'replica-2'}} should change only db.host and keep db.port etc. from base. Nothing in the stdlib for that, right?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "mustReference": "the Python 3.7 constraint (no dict union operator, no walrus operator)",
+              "notes": "Right, no stdlib deep merge (ChainMap and ** are shallow). A short recursive function that runs on 3.7, e.g. copy base and recurse when both values are dicts, otherwise take the override. One line noting that lists are replaced rather than merged is a useful touch."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Longitudinal environment constraint. Tests that a fact stated in an earlier session silently shapes a direct answer days later, without re-asking."
+  },
+  {
+    "id": "direct-answer-015",
+    "category": "direct-answer",
+    "persona": "Junior frontend developer, four months into his first job, doing a git course on weekends and generally keen to understand things. Right now it is ten minutes before standup.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Ugh. I made two commits on main instead of my feature branch. Nothing pushed, working tree is clean. Standup in 10 minutes. How do I move those two commits onto a new branch called feature/cart-badge and put main back where origin/main is?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "notes": "e.g. git branch feature/cart-badge; git reset --hard origin/main; git switch feature/cart-badge (branch first so the commits are kept; the hard reset is safe because the tree is clean and nothing was pushed). He is a learner, but this is an urgent fix, not an exercise: walking him through it with questions is a failure. One line on why it is safe is plenty."
+            }
+          },
+          {
+            "user": "Sorted, main's back where it was. For my git course notes: reset --soft vs --mixed vs --hard, one line each?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "notes": "--soft: move the branch pointer only; the undone commits' changes stay staged. --mixed (the default): move the pointer and reset the index; changes stay in the working tree, unstaged. --hard: move the pointer and reset index and working tree; uncommitted changes are lost. He asked for three lines; a quiz (\"which one do you think you used?\") is a failure even though he is learning."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "A learner under time pressure asking for a procedure and then a reference summary. Tests that learner status does not trigger Socratic friction on plainly informational requests."
+  },
+  {
+    "id": "factual-001",
+    "category": "factual",
+    "persona": "Retired schoolteacher and experienced amateur genealogist transcribing Anglican parish registers for a one-place study in Wiltshire. Careful, knows the archives well, hazy on calendar details.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Transcribing Wiltshire parish registers, 1730s to 1760s. Remind me: when exactly did England switch to the Gregorian calendar, and how many days were dropped?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "notes": "September 1752, under the Calendar (New Style) Act 1750: Wednesday 2 September was followed by Thursday 14 September, so 11 days were dropped. The most useful addition for her registers: the same Act moved the start of the legal year from 25 March (Lady Day) to 1 January, from 1752, so 1751 was a short year and pre-1752 entries dated 1 January–24 March carry the previous year's number."
+            }
+          },
+          {
+            "user": "So a baptism entered as '10 February 1740': what is that in modern terms, and how should I write it in my transcription?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "mustContribute": "Spell out the two separate conversions and which one genealogists actually apply: (1) year: before 1752 the year number changed on 25 March, so 10 February 1740 falls in what we call 1741, conventionally written '10 February 1740/41'; (2) day: the date is Julian, and its Gregorian equivalent would be 21 February 1741, but standard transcription practice keeps the day as recorded and only dual-dates the year. Worth flagging: some clerks already started the year on 1 January before 1752, so check where the year number changes in that particular register before applying the rule.",
+              "notes": "The honest answer is \"it depends which conversion you mean\", with both conversions given and the convention stated, not a question back about her transcription standards."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "A factual question whose follow-up has a genuine \"it depends\" with two distinct dependencies (year-start vs calendar). Tests spelling out the dependence and giving the conventional answer rather than hedging or asking."
+  },
+  {
+    "id": "factual-002",
+    "category": "factual",
+    "persona": "ICU nurse on a nights rotation, eight years in, comfortable with pharmacokinetics; wants numbers, not lifestyle advice.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "What's the actual half-life of caffeine in a healthy adult? Practical reason: on nights I have a 200 mg energy drink around 03:00, finish at 07:30 and try to be asleep by 08:30. Roughly how much is still on board at 08:30?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "mustContribute": "The number with its real spread and what drives it: mean half-life around 5 h in healthy adults but wide (roughly 3–7 h typical, reported from about 1.5 to 9.5 h). 5.5 h after the dose that is ≈ 93 mg left at a 5 h half-life, ≈ 56 mg at 3 h, ≈ 116 mg at 7 h. Main modifiers: smoking shortens it markedly (CYP1A2 induction), oral contraceptives roughly double it, pregnancy lengthens it a lot, liver disease and CYP1A2 inhibitors (e.g. fluvoxamine, ciprofloxacin) prolong it.",
+              "notes": "Uncertainty must come with the actual dependence, not a vague \"it varies\". Sleep-hygiene advice or suggestions to cut caffeine are unrequested and paternalistic here."
+            }
+          },
+          {
+            "user": "Non-smoker, not on the pill, no interacting meds. And if I move it to 01:00 instead?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "mustReference": "the 200 mg dose and the 08:30 sleep target from the first turn",
+              "notes": "7.5 h elapsed: ≈ 71 mg at a 5 h half-life (≈ 35–95 mg across 3–7 h). With the main modifiers ruled out, 5 h is a reasonable central estimate; individual CYP1A2 variation remains the unknown."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Factual question where the honest answer is a range with named drivers, plus a calculation. Tests calibrated uncertainty without hedging into uselessness or moralising."
+  },
+  {
+    "id": "factual-003",
+    "category": "factual",
+    "persona": "Producer and fact-checker for a narrative history podcast; used to checking claims against sources; needs a keep/soften/cut decision per line.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Fact-checking a script. Line: 'More than 25,000 workers died building the Panama Canal.' Keep it, soften it, or cut it?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "mustContribute": "A verdict with the breakdown behind it: the figure combines an estimate of roughly 22,000 deaths during the French attempt (1881–1889), which is an estimate because records were poor, and the 5,609 deaths officially recorded among employees during US construction (1904–1914), generally considered an undercount. The combined ~27,500 supports 'more than 25,000' as an estimate; the safer wording marks it as one (e.g. 'an estimated 25,000 or more').",
+              "notes": "The honest answer includes the uncertainty and where it comes from. Refusing to give a verdict, or asking which sources they have already checked, is a failure."
+            }
+          },
+          {
+            "user": "Next line: 'Most of the dead were workers from the Caribbean.' Same question.",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "notes": "For the US era the records support it: roughly 4,500 of the 5,609 recorded deaths were Black workers, overwhelmingly West Indian (Barbados, Jamaica and elsewhere). For the French era the workforce was also predominantly West Indian (largely Jamaican), so it is likely true overall but less well documented. Keep, perhaps as \"most of the recorded dead\". The reply must separate what is documented from what is inferred."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Historical fact-check where the honest answer is an estimate with known weaknesses. Tests giving a usable verdict while stating exactly where the uncertainty lies."
+  },
+  {
+    "id": "factual-004",
+    "category": "factual",
+    "persona": "Security consultant writing up a penetration-test report; precise, knows TLS well, wants a fact confirmed and wording she can paste.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Report fact-check. Client's scanner flagged 'RSA key exchange enabled' on an endpoint I've confirmed only negotiates TLS 1.3. TLS 1.3 has no RSA key exchange at all, correct? The cert is RSA-2048.",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "alreadyConsidered": [
+                "the endpoint has been confirmed to negotiate only TLS 1.3"
+              ],
+              "notes": "Correct: TLS 1.3 (RFC 8446) removed static RSA (and static DH) key exchange; key exchange is (EC)DHE, PSK, or PSK with (EC)DHE. The RSA certificate is used only for authentication (RSA-PSS signatures in the handshake). The finding is a scanner false positive, most likely conflating the RSA certificate/signature with key exchange. Suggesting she check whether TLS 1.2 is enabled is redundant: she confirmed it is not."
+            }
+          },
+          {
+            "user": "Good. Separate finding: they have 0-RTT enabled. Is 0-RTT data forward secret? One precise sentence for the report.",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "notes": "No: 0-RTT early data is encrypted under keys derived solely from the resumption PSK, so it is not forward secret against compromise of that PSK (or of the server's session-ticket key), and it is also replayable; data sent after the handshake completes with psk_dhe_ke is forward secret. She asked for one sentence: the reply should contain one, not an essay."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Crisp protocol facts from an expert who has already done the obvious check. Tests confident, precise answers with no redundant suggestions."
+  },
+  {
+    "id": "factual-005",
+    "category": "factual",
+    "persona": "Freelance science journalist fact-checking her own feature on brain-computer interfaces for a general-interest magazine; wants a defensible number and a sense of how solid it is.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Fact-checking my own piece. I wrote 'the human brain has 100 billion neurons.' Is that right?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "mustContribute": "The better-supported figure is about 86 billion (86 ± 8 billion), from Azevedo, Herculano-Houzel and colleagues (2009) using the isotropic fractionator, with roughly 16 billion in the cerebral cortex and 69 billion in the cerebellum. '100 billion' is an old round number that was never actually counted. Concrete caveat: the 86 billion comes from a small sample (four adult male brains), so individual and sex differences are not well characterised.",
+              "notes": "Give the corrected figure and a usable wording (\"about 86 billion\"); the uncertainty must be specific, not a generic hedge."
+            }
+          },
+          {
+            "user": "And synapses? I've seen '100 trillion' in one source and 'a quadrillion' in another.",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "mustContribute": "Synapse totals are extrapolations known only to about an order of magnitude (~10^14–10^15). Stereological counts put the neocortex alone around 1.5 × 10^14 (Pakkenberg and colleagues, 2003); whole-brain figures depend on how density estimates are extrapolated across regions, and counts change with age. So '100 trillion' is defensible as a lower-end order of magnitude and 'a quadrillion' is the high end; 'hundreds of trillions' or 'on the order of 100 trillion' is the safest wording.",
+              "notes": "An \"it depends\" answer with the actual dependence (method, region, extrapolation, age) and a recommended wording, not a refusal to pick."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Factual check where the popular number is wrong and the follow-up is genuinely uncertain. Tests correcting cleanly and giving calibrated uncertainty with a usable recommendation."
+  }
+]

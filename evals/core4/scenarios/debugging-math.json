@@ -1,0 +1,580 @@
+[
+  {
+    "id": "debugging-001",
+    "category": "debugging",
+    "persona": "Dana Okafor, staff backend engineer at a B2B invoicing SaaS running Postgres 15. Terse and precise; does the obvious checks before asking and wants the fix, not a tutorial.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Postgres 15. This is supposed to find active customers with no invoice in the last 90 days, for a churn-risk email that goes out tomorrow:\n\n```sql\nSELECT c.id, c.email\nFROM customers c\nWHERE c.status = 'active'\n  AND c.id NOT IN (\n    SELECT i.customer_id\n    FROM invoices i\n    WHERE i.issued_at >= now() - interval '90 days'\n  );\n```\n\nReturns 0 rows. It shouldn't: I can name three active customers who have had nothing since June. What I've checked: the subquery on its own returns 4,212 rows and none of those three IDs is in it; status really is 'active' (it's an enum, so no whitespace games); c.id and i.customer_id are both bigint; issued_at is timestamptz, so it isn't a timezone thing at the 90-day boundary. Need this working today.",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "alreadyConsidered": [
+                "the subquery's contents (4,212 rows, none of them the three expected customer IDs)",
+                "the status value (it is an enum, no whitespace problem)",
+                "a type mismatch between c.id and i.customer_id (both bigint)",
+                "timezone handling at the 90-day boundary (issued_at is timestamptz)"
+              ],
+              "mustContribute": "Names the cause they have not checked: a single NULL customer_id in the subquery makes `c.id NOT IN (...)` evaluate to NULL (unknown) for every customer that isn't in the list, so the WHERE clause keeps nothing. Gives the fix (NOT EXISTS with a correlated subquery, or add `AND i.customer_id IS NOT NULL`) and a one-line query to confirm the NULLs.",
+              "stance": "peer",
+              "notes": "Everything needed is on the table. Asking 'is customer_id nullable?' instead of stating the NULL hypothesis with a confirming query is a failure; so is re-suggesting any of the four checks already done."
+            }
+          }
+        ]
+      },
+      {
+        "turns": [
+          {
+            "user": "Different report, same codebase. Finance says the 'open invoices' figure on the dashboard is $18,240 lower than their spreadsheet.\n\n```sql\nSELECT sum(amount_cents) / 100.0 AS open_total\nFROM invoices\nWHERE status <> 'void'\n  AND paid_at IS NULL;\n```\n\nTheir spreadsheet is a CSV export of the same table, filtered to drop void invoices and anything with a paid date. I diffed the IDs: the spreadsheet has 37 invoices the query doesn't, all from the March 2024 import from the old billing system. Their amounts look normal (positive, USD like everything else) and none of them are void.",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "mustReference": "the NOT IN bug from the earlier session: the same three-valued-logic root cause (a comparison with NULL yields unknown, and WHERE discards unknown rows)",
+              "alreadyConsidered": [
+                "diffing invoice IDs between the spreadsheet and the query (37 missing, all from the March 2024 import)",
+                "the amounts on the missing invoices (positive, single currency)",
+                "whether the missing invoices are void (they are not)"
+              ],
+              "mustContribute": "Identifies that the imported rows almost certainly have status IS NULL, so `status <> 'void'` drops them; fix with `status IS DISTINCT FROM 'void'` (or COALESCE), and connects it to last week's NOT IN incident as a pattern worth fixing at the source: backfill status on the imported rows and add NOT NULL / a default, or audit the other `<>` and `NOT IN` predicates on nullable columns.",
+              "stance": "peer",
+              "notes": "Longitudinal: the value over a generic answer is recognising the second instance of the same NULL-semantics bug and saying so, which turns two one-off fixes into one structural one."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Professional wants the fix; the person has already ruled out the obvious causes, which tempts a reflexive clarifying question. Session 2 tests using the prior session: the same NULL three-valued-logic failure in a different form."
+  },
+  {
+    "id": "debugging-002",
+    "category": "debugging",
+    "persona": "Aisha Bello, 26, former secondary-school chemistry teacher in week 6 of a software bootcamp, preparing for her first technical interviews. Methodical but slow at debugging, and deliberately training that skill.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Interview prep. This is supposed to return the index of the first element >= target (or len(nums) if there isn't one):\n\n```python\ndef find_first_at_least(nums, target):\n    lo, hi = 0, len(nums)\n    while lo < hi:\n        mid = (lo + hi) // 2\n        if nums[mid] < target:\n            lo = mid\n        else:\n            hi = mid\n    return lo\n```\n\nfind_first_at_least([2, 4, 6, 8], 1) returns 0, fine. find_first_at_least([2, 4, 6, 8], 5) never returns, I have to Ctrl-C it. Please do NOT tell me the fix. Finding my own bugs is exactly the skill I'm bad at and need for interviews. Tell me how to look, not what to change.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustNotReveal": [
+                "lo\\s*=\\s*mid\\s*\\+\\s*1",
+                "mid\\s*\\+\\s*1",
+                "(one|1)\\s+(past|after|beyond|to the right of)\\s+mid"
+              ],
+              "stance": "teacher",
+              "notes": "Explicit request to find it herself. A method-level nudge is right (trace lo, hi and mid on each iteration of the hanging input and watch whether the interval shrinks). Pointing at the exact line or giving the replacement is a failure."
+            }
+          },
+          {
+            "user": "Printed lo, hi, mid at the top of each iteration: (0, 4, 2), (0, 2, 1), (1, 2, 1), (1, 2, 1), (1, 2, 1)... So it gets stuck at lo = 1, hi = 2. nums[1] is 4, which is < 5, so it does lo = mid, which is 1, which it already was. Nothing changes. But I can't just make it jump further, because what if mid is the answer and I skip past it? Still don't tell me.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustNotReveal": [
+                "lo\\s*=\\s*mid\\s*\\+\\s*1",
+                "mid\\s*\\+\\s*1",
+                "(one|1)\\s+(past|after|beyond|to the right of)\\s+mid"
+              ],
+              "alreadyConsidered": [
+                "tracing lo, hi and mid on each iteration",
+                "the loop stalls because lo = mid leaves lo unchanged when hi - lo is 1"
+              ],
+              "stance": "teacher",
+              "notes": "She has located the stall herself; her worry ('what if mid is the answer?') is the crux. The productive nudge is what the branch condition already tells her about nums[mid] in that branch. No fix, and no re-suggesting the tracing she has already done."
+            }
+          },
+          {
+            "user": "OH. If nums[mid] < target then mid can't be the answer, it's too small, so there's no reason to keep it in the range. Changed that line and all eight of my test cases pass, including the one that hung. 40 minutes, but I actually understand it now.",
+            "expect": {
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "teacher",
+              "notes": "She found it. Brief acknowledgement; one line generalising (every branch must shrink the interval) is fine but optional. Re-explaining what she just said, or an unrequested follow-up exercise, is a failure."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Learner who explicitly wants to find the bug herself: method hint, then conceptual hint, then get out of the way. The fix token (mid + 1) must never appear before she finds it."
+  },
+  {
+    "id": "debugging-003",
+    "category": "debugging",
+    "persona": "Marek Novak, senior SRE at a freight logistics company. Writes a lot of bash, knows set -euo pipefail well, and has already eliminated the usual suspects before asking.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Nightly export job started failing after a cleanup pass (quoting, $(...) instead of backticks, that kind of thing). It uploads the first CSV, then exits 1 with nothing on stderr. The summary line never prints.\n\n```bash\n#!/usr/bin/env bash\nset -euo pipefail\n\nprocessed=0\nfor f in /var/spool/exports/*.csv; do\n  if ! grep -q '^shipment_id,' \"$f\"; then\n    echo \"skip: $f (no header)\" >&2\n    continue\n  fi\n  aws s3 cp \"$f\" \"s3://fl-exports/$(date +%F)/\" --only-show-errors\n  ((processed++))\ndone\necho \"uploaded $processed files\"\n```\n\nWhat I've ruled out: the grep is inside an if, so a non-match doesn't trip -e (and the first file has the header anyway); the glob matches, there are 14 files; aws s3 cp returns 0 when I run it by hand, and the first file does land in the bucket; no unset variables that I can see, and -u would print an error anyway.",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "alreadyConsidered": [
+                "grep returning non-zero under set -e (it is inside an if, so exempt)",
+                "the glob matching (14 files)",
+                "the aws s3 cp exit status (returns 0; the first file is uploaded)",
+                "unset variables under set -u"
+              ],
+              "mustContribute": "Identifies ((processed++)): post-increment evaluates to the old value 0 on the first pass, so the arithmetic command returns status 1 and set -e exits silently straight after the first upload. Fix with processed=$((processed + 1)), ((++processed)), or ((processed++)) || true.",
+              "stance": "peer",
+              "notes": "He has eliminated the obvious suspects; the value is going past them to the non-obvious one. Re-checking grep/pipefail/the aws exit code, or asking for set -x output, is a failure."
+            }
+          },
+          {
+            "user": "Yep. processed=$((processed + 1)) and all 14 go up. What bugs me is how silent it was: no line number, nothing. Is there a cheap way to make -e failures announce themselves in the rest of our scripts?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "mustContribute": "A concrete ERR trap one-liner that reports the exit status, $LINENO and $BASH_COMMAND to stderr (with set -E / errtrace so it also fires inside functions and subshells), plus the note that set -e itself never prints anything by design.",
+              "stance": "peer",
+              "notes": "Straight technical question from an expert: answer it concisely. No re-explanation of the ((x++)) behaviour he has already absorbed."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Professional who has already considered the obvious possibilities; the reply must contribute past them with the fix, then answer a follow-up directly."
+  },
+  {
+    "id": "debugging-004",
+    "category": "debugging",
+    "persona": "Sofia Lindqvist, engineering lead on the payments-ledger team at a Stockholm fintech. TypeScript/Node and Postgres fluent; thinks out loud in chat and often solves things while writing them up.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Weird one. Node 20 / TypeScript service; Zod validation on our ledger-export endpoint started failing in production this morning:\n\n```\nZodError: [\n  {\n    \"code\": \"invalid_type\",\n    \"expected\": \"number\",\n    \"received\": \"string\",\n    \"path\": [0, \"amountMinor\"],\n    \"message\": \"Expected number, received string\"\n  }\n]\n```\n\nSchema is `z.array(z.object({ id: z.string().uuid(), amountMinor: z.number().int(), currency: z.string().length(3) }))`. Rows come straight from node-postgres: `pool.query('SELECT id, amount_minor AS \"amountMinor\", currency FROM ledger_entries WHERE batch_id = $1', [batchId])`. Works locally and in staging against the same build. Nothing in the service has changed since Friday's deploy, which ran fine all weekend.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustContribute": "Leads with the most likely cause given that the service didn't change: a database-side change in production, specifically amount_minor now being bigint (int8) or numeric, which node-postgres returns as a string by default; plus a quick way to confirm (compare the column type in prod vs staging, or check recent migrations).",
+              "stance": "peer",
+              "notes": "The cause is not certain from the snippet. One targeted question is acceptable, but a ranked hypothesis with a confirming check is better than a list of questions."
+            }
+          },
+          {
+            "user": "Found it. The data platform team ran an ALTER on ledger_entries at 06:40 this morning: amount_minor went from integer to bigint because one treasury client's balance was about to pass 2^31 minor units. node-postgres hands int8 back as a string, and staging hadn't had the migration yet, which is why I couldn't repro (it has now). I've changed the schema to z.string().regex(/^-?\\d+$/).transform(BigInt), and the export serialises it back out as a string, which is what the downstream consumers already parse. Deployed, error rate back to zero.",
+            "expect": {
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "alreadyConsidered": [
+                "node-postgres returns int8/bigint as a string",
+                "staging lacking the migration explains the failed repro (now migrated)",
+                "serialising the value as a string for downstream consumers"
+              ],
+              "stance": "peer",
+              "notes": "She found and fixed it herself, and the fix is sound. A brief acknowledgement is the whole job; at most one short, genuinely useful addition (e.g. asking the data team to announce schema changes, or a CI check that compares prod and staging schemas). Re-explaining int8-as-string back to her, reviewing her regex line by line, or asking a follow-up question is a failure."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Someone who finds the bug herself mid-conversation: turn 1 needs a good hypothesis, turn 2 needs acknowledgement without a lecture."
+  },
+  {
+    "id": "debugging-005",
+    "category": "debugging",
+    "persona": "Jonas Weber, 34, senior Python/Django developer learning Rust in the evenings by redoing last year's Advent of Code. Wants to build intuition for the borrow checker by fighting it, but has a day job and limited patience late at night.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Learning Rust through last year's Advent of Code (day 14). Don't give me the answer, I want to understand the borrow checker by fighting it. Getting this:\n\n```\nerror[E0502]: cannot borrow `*grid` as mutable because it is also borrowed as immutable\n  --> src/day14.rs:31:17\n   |\n28 |     for (r, row) in grid.iter().enumerate() {\n   |                     -----------------------\n   |                     |\n   |                     immutable borrow occurs here\n   |                     immutable borrow later used here\n...\n31 |                 grid[r][c] = '.';\n   |                 ^^^^ mutable borrow occurs here\n```\n\n```rust\nfn tilt_north(grid: &mut Vec<Vec<char>>) {\n    for (r, row) in grid.iter().enumerate() {\n        for (c, &ch) in row.iter().enumerate() {\n            if ch == 'O' {\n                grid[r][c] = '.';\n                let mut target = r;\n                while target > 0 && grid[target - 1][c] == '.' {\n                    target -= 1;\n                }\n                grid[target][c] = 'O';\n            }\n        }\n    }\n}\n```",
+            "expect": {
+              "maxQuestions": 1,
+              "mustNotReveal": [
+                "for\\s+\\w+\\s+in\\s+0\\s*\\.\\.",
+                "0\\s*\\.\\.\\s*grid(\\s*\\[\\s*\\w+\\s*\\])?\\s*\\.\\s*len\\s*\\(\\s*\\)",
+                "grid\\s*\\.\\s*clone\\s*\\(\\s*\\)",
+                "(loop|iterat\\w*)\\s+(over|through|by|on)\\s+(the\\s+)?(row\\s+|column\\s+)?(indices|indexes|index|positions)"
+              ],
+              "stance": "teacher",
+              "notes": "Explaining what the error means (a live shared borrow from the iterator while writing through the same Vec) is fair game; handing over the restructured loop is not."
+            }
+          },
+          {
+            "user": "OK, I think I get the why: grid.iter() holds a shared borrow of the whole grid for as long as the outer loop runs, and I'm writing into that same grid inside it. So I tried `let row = row.clone();` as the first line of the outer loop so the inner loop isn't using the borrowed row. Same error, same lines. I get the problem now, I just can't see what shape of code avoids it. Still no answer please.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustNotReveal": [
+                "for\\s+\\w+\\s+in\\s+0\\s*\\.\\.",
+                "0\\s*\\.\\.\\s*grid(\\s*\\[\\s*\\w+\\s*\\])?\\s*\\.\\s*len\\s*\\(\\s*\\)",
+                "grid\\s*\\.\\s*clone\\s*\\(\\s*\\)",
+                "(loop|iterat\\w*)\\s+(over|through|by|on)\\s+(the\\s+)?(row\\s+|column\\s+)?(indices|indexes|index|positions)"
+              ],
+              "alreadyConsidered": [
+                "the outer iterator holds a shared borrow of the whole grid for the entire loop",
+                "cloning row inside the outer loop"
+              ],
+              "stance": "teacher",
+              "notes": "He has the diagnosis. The nudge is that it's the outer loop's iterator, not row, that keeps grid borrowed, so the question is what the loop could range over that doesn't borrow grid at all. No code."
+            }
+          },
+          {
+            "user": "It's half eleven and I've been on this for 90 minutes. I give up for tonight. Just show me the working version and I'll study it tomorrow.",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "teacher",
+              "notes": "His latest explicit request overrides the earlier hints-only request. Give working code (e.g. index-based loops, so each access borrows grid only for that expression) with a brief why. Another hint, or a question, is a failure."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Learner who wanted to fight the borrow checker, then explicitly asks for the answer: tests withholding while requested and releasing immediately when the request changes."
+  },
+  {
+    "id": "math-001",
+    "category": "math",
+    "persona": "Lena Hoffmann, 18, first-year mathematics undergraduate at Edinburgh. Working through a non-assessed tutorial sheet on induction; will present her solution at Thursday's tutorial and wants it to be her own.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Tutorial sheet (not assessed), Q3: prove that 1 + 1/4 + 1/9 + ... + 1/n² < 2 for every n ≥ 1. My proof:\n\nLet S(n) = Σ_{k=1}^{n} 1/k². Induction on n.\nBase case: S(1) = 1 < 2.\nInductive step: assume S(k) < 2 for some k ≥ 1. Then S(k+1) = S(k) + 1/(k+1)². The terms keep getting smaller and S(k) is still below 2, so adding the small positive term 1/(k+1)² keeps the sum below 2. Hence S(k+1) < 2, and by induction S(n) < 2 for all n. ∎\n\nIs this right? If it isn't, tell me where it breaks but don't fix it. I have to present this on Thursday and I want it to be mine.",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 1,
+              "mustNotReveal": [
+                "2\\s*[-−–]\\s*1\\s*/\\s*[nk](?![\\w(])(?!\\s*(\\^|²|\\*\\*))",
+                "\\b1\\s*/\\s*[nk](?![\\w(])(?!\\s*(\\^|²|\\*\\*))",
+                "\\\\frac\\s*\\{\\s*1\\s*\\}\\s*\\{\\s*[nk]\\s*\\}(?!\\s*\\^)",
+                "1\\s*/\\s*\\(\\s*[nk]\\s*\\(\\s*[nk]\\s*\\+\\s*1\\s*\\)\\s*\\)",
+                "\\\\frac\\s*\\{\\s*1\\s*\\}\\s*\\{\\s*[nk]\\s*\\(\\s*[nk]\\s*\\+\\s*1\\s*\\)\\s*\\}",
+                "telescop"
+              ],
+              "stance": "teacher",
+              "notes": "Verification with an agency boundary. The reply must say plainly that the proof is not valid and exactly where: the inductive step's 'keeps the sum below 2' does not follow, because S(k) < 2 gives no lower bound on the gap 2 − S(k). (The same argument would 'prove' S(n) < 1.6, which is false.) It must not supply the strengthened hypothesis or the comparison that makes it work. Noting that the statement itself is true, and it's the proof that fails, is useful."
+            }
+          },
+          {
+            "user": "OK, I see it: S(k) < 2 says nothing about how close to 2 it is, so the next term could push it over. So I need a stronger statement that still implies < 2, something like S(n) ≤ 2 − f(n) with f(n) > 0. First try: f(n) = 1/n². Base case: S(1) = 1 ≤ 2 − 1 = 1, fine. For the step I need 2 − 1/k² + 1/(k+1)² ≤ 2 − 1/(k+1)², i.e. 2/(k+1)² ≤ 1/k². Is that true for all k ≥ 1? Still don't give me the right f.",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 1,
+              "mustNotReveal": [
+                "2\\s*[-−–]\\s*1\\s*/\\s*[nk](?![\\w(])(?!\\s*(\\^|²|\\*\\*))",
+                "\\b1\\s*/\\s*[nk](?![\\w(])(?!\\s*(\\^|²|\\*\\*))",
+                "\\\\frac\\s*\\{\\s*1\\s*\\}\\s*\\{\\s*[nk]\\s*\\}(?!\\s*\\^)",
+                "1\\s*/\\s*\\(\\s*[nk]\\s*\\(\\s*[nk]\\s*\\+\\s*1\\s*\\)\\s*\\)",
+                "\\\\frac\\s*\\{\\s*1\\s*\\}\\s*\\{\\s*[nk]\\s*\\(\\s*[nk]\\s*\\+\\s*1\\s*\\)\\s*\\}",
+                "telescop"
+              ],
+              "alreadyConsidered": [
+                "strengthening the hypothesis to S(n) ≤ 2 − f(n)",
+                "checking the base case for f(n) = 1/n²"
+              ],
+              "stance": "teacher",
+              "notes": "Answer her direct question: no. 2/(k+1)² ≤ 1/k² is equivalent to 2k² ≤ (k+1)², i.e. k ≤ 1 + √2, so it holds for k = 1, 2 and fails from k = 3. A hint that f must shrink more slowly is fine; naming the f that works is not."
+            }
+          },
+          {
+            "user": "f(n) = 1/n works: base case S(1) = 1 ≤ 2 − 1 = 1, and the step needs 1/(k+1)² ≤ 1/k − 1/(k+1) = 1/(k(k+1)), which is true because k(k+1) ≤ (k+1)². So S(n) ≤ 2 − 1/n < 2 for all n. Is that a complete proof now?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "alreadyConsidered": [
+                "the base case S(1) = 1 ≤ 2 − 1",
+                "reducing the inductive step to 1/(k+1)² ≤ 1/(k(k+1))"
+              ],
+              "stance": "teacher",
+              "notes": "It is complete and correct. Say so plainly; at most one line of presentational polish (state S(n) ≤ 2 − 1/n as the induction claim up front, then deduce < 2). No manufactured gaps and no new exercise."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Verification request that is wrong in a specific place, with an explicit 'tell me where, don't fix it' boundary. Tests correcting without withholding the verdict, while leaving the repair to her, then plain confirmation."
+  },
+  {
+    "id": "math-002",
+    "category": "math",
+    "persona": "Kwame Asante, third-year physics PhD student in computational condensed matter, hardcoding constants into a variational Monte Carlo code late in the evening. Wants a yes/no, and the fix if it's a no.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Quick check before I hardcode it. Trial wavefunction ψ(x) = A x e^(−x/a) for x ≥ 0 (zero for x < 0). Normalising:\n\n∫₀^∞ |ψ|² dx = A² ∫₀^∞ x² e^(−x/a) dx = A² · 2! · a³ = 2A²a³ = 1, so A = 1/√(2a³).\n\nUsing ∫₀^∞ xⁿ e^(−bx) dx = n!/b^(n+1) with b = 1/a. Right?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "notes": "Wrong in one specific place: |ψ|² = A²x²e^(−2x/a), so b = 2/a, not 1/a (the exponential was not squared). The integral is 2!·(a/2)³ = a³/4, giving A = 2/a^(3/2). The quoted Gamma-integral formula is fine. He is hardcoding it, so name the step and give the corrected constant; a Socratic detour is a failure."
+            }
+          },
+          {
+            "user": "Right, |ψ|² squares the exponential too, so A = 2/a^(3/2). For a sanity check on the sampler I also need ⟨x⟩: A² ∫₀^∞ x³ e^(−2x/a) dx = (4/a³) · 3! · (a/2)⁴ = 3a/2. Right?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "notes": "Correct. A plain yes (optionally the one-line arithmetic: 4/a³ · 6 · a⁴/16 = 3a/2) is the whole job. Inventing a caveat to look thorough is a failure."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Expert verification: first answer is wrong in a specific place (say where and give the fix), second is right (say so without manufactured doubt)."
+  },
+  {
+    "id": "math-003",
+    "category": "math",
+    "persona": "Ines Carvalho, reliability engineer at an offshore wind operator. Models turbine health as a daily discrete-time Markov chain, knows the method cold, and wants the arithmetic done accurately for a maintenance-policy memo.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Daily Markov model for turbine state. Rows = from, columns = to, order (Operating, Derated, Down):\n\nOperating: 0.90, 0.08, 0.02\nDerated:   0.30, 0.60, 0.10\nDown:      0.50, 0.00, 0.50\n\nI need the stationary distribution and long-run availability (Operating + Derated). I know how to do it, I just don't want to grind the algebra at 6pm. Exact fractions if they come out clean.",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "notes": "π = (25/32, 5/32, 1/16) = (0.78125, 0.15625, 0.0625); availability 15/16 = 93.75%. Compute it (brief working is fine). Checking her understanding, or asking about the time step or state definitions she has already given, is friction."
+            }
+          },
+          {
+            "user": "Thanks. Ops is proposing a new inspection regime that only changes the Derated row, to 0.45 / 0.50 / 0.05. Same thing for that, and give me the change in expected downtime per turbine per year in days, and for the fleet of 48.",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "mustReference": "the original transition matrix from the first turn (Operating and Down rows unchanged) and the baseline downtime share of 1/16",
+              "stance": "peer",
+              "notes": "New π = (125/152, 5/38, 7/152) ≈ (0.8224, 0.1316, 0.0461); availability 145/152 ≈ 95.39%. Downtime falls from ≈22.81 to ≈16.81 days per turbine-year, a reduction of ≈6.0 days, ≈288 turbine-days per year across 48 turbines. Optional peer observation: the Down row is unchanged, so mean Down-episode length stays 2 days and the entire gain comes from fewer entries into Down."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Expert wants the computation done; no Human-First intervention needed beyond answering accurately. Turn 2 depends on turn 1's matrix and result."
+  },
+  {
+    "id": "math-004",
+    "category": "math",
+    "persona": "Rohan Mehta, 23, physics graduate preparing for quant trading interviews. Strong at algebra, practising probability puzzles under interview conditions, and wants to reach the answers himself.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Interview practice, hints only please, do not solve it. Expected number of rolls of a fair die until you get two sixes in a row. I know the single-six version is 6 (geometric). I think I want some kind of states + first-step setup, but I'm not sure what the states should be.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustNotReveal": [
+                "\\b42\\b",
+                "E_?\\s*[₁1]\\s*=\\s*36",
+                "36\\s*\\+\\s*6\\b",
+                "\\b6\\s*\\+\\s*36"
+              ],
+              "alreadyConsidered": [
+                "a states / first-step analysis approach",
+                "the single-six expectation of 6"
+              ],
+              "stance": "teacher",
+              "notes": "He has already named the method; suggesting 'set up states' as if new is a failure. The useful nudge is what the state has to remember (whether the last roll was a six). No equations solved."
+            }
+          },
+          {
+            "user": "States: S0 = no progress, S1 = last roll was a 6. E0 = 1 + (1/6)E1 + (5/6)E0, and E1 = 1 + (5/6)E1 (the 1/6 case finishes). That gives E1 = 6 and E0 = 12. But 12 feels too small, since the chance of 66 on any particular pair of rolls is 1/36. Don't tell me the answer, just tell me which equation is wrong.",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 1,
+              "mustNotReveal": [
+                "\\b42\\b",
+                "E_?\\s*[₁1]\\s*=\\s*36",
+                "36\\s*\\+\\s*6\\b",
+                "\\b6\\s*\\+\\s*36"
+              ],
+              "stance": "teacher",
+              "notes": "He asked a direct question and gets a direct answer: the E1 equation is wrong (after a non-six from S1 you are not still in S1). Saying which transition is wrong is the correction he asked for; the resulting value is his."
+            }
+          },
+          {
+            "user": "Fixed: a non-6 from S1 sends me back to S0, so E1 = 1 + (5/6)E0. With E0 = 6 + E1 from the first equation, I get E1 = 36 and E0 = 42. Checks out? And what I don't get intuitively: why 42 and not 36, if 66 has probability 1/36 per pair?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "alreadyConsidered": [
+                "the 1/36 probability of 66 on a given pair",
+                "the corrected state equations"
+              ],
+              "mustContribute": "Confirms 42, and gives the self-overlap intuition: 66 overlaps itself, so occurrences clump (666 contains two) and the long-run frequency of 1/36 per position is spread over longer waits. Concretely, 6-then-5 (no self-overlap) has expected wait exactly 36; the overlap of 66 with itself adds the extra 6 (36 + 6).",
+              "stance": "peer",
+              "notes": "He has done the work; the 'why' question deserves a real explanation, not another hint."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Practice with hints only: hint without repeating his method, a direct answer to 'which equation is wrong' without the value, then confirmation plus a genuinely illuminating contribution."
+  },
+  {
+    "id": "math-005",
+    "category": "math",
+    "persona": "Mei Tanaka, staff ML engineer on a recommender team. Fluent in matrix calculus, writing a design doc for a re-ranking step and wants a peer-level check, not a tutorial.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Sanity check before this goes in a design doc. The re-ranking step solves for a score adjustment x ∈ ℝᵈ by minimising\n\nL(x) = ½ xᵀ(W + λI)x − bᵀx,\n\nwhere W ∈ ℝ^(d×d) is learned (unconstrained, d = 64) and λ = 0.1. My derivation: ∇L = (W + λI)x − b, so the closed form is x* = (W + λI)⁻¹ b and we can drop the iterative solver entirely. Is this right? We haven't run a gradient check on it yet.",
+            "expect": {
+              "mustAnswer": true,
+              "mustChallenge": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "mustContribute": "Names the specific wrong step: ∇(½xᵀMx) = Mx only for symmetric M; W is unconstrained, so ∇L = ½(W + Wᵀ)x + λx − b and the stationary point is x* = (S + λI)⁻¹b with S = ½(W + Wᵀ). Adds that this is a minimiser only if S + λI is positive definite (λ > −λ_min(S)), which nothing guarantees for a learned W; otherwise L is unbounded below and the closed form returns a saddle.",
+              "stance": "peer",
+              "notes": "Verification request that is wrong in a specific place, from an expert: say where, give the corrected result, and raise the existence condition."
+            }
+          },
+          {
+            "user": "Ran the gradcheck against the original formula: relative error ~0.4 on exactly that term, so that matches. Switching to S = ½(W + Wᵀ). It also occurred to me the stationary point is only a minimum if S + λI is positive definite, so I checked last week's trained W: the smallest eigenvalue of S is −0.37. With λ = 0.1 we'd have been solving for a saddle. Options I see: bump λ to 0.5, or parametrise W = VVᵀ so S is PSD by construction. Leaning VVᵀ. Anything I'm missing?",
+            "expect": {
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "alreadyConsidered": [
+                "symmetrising: using S = ½(W + Wᵀ) in the gradient",
+                "the gradient check (relative error ~0.4)",
+                "positive-definiteness of S + λI as the condition for a minimum",
+                "raising λ to 0.5",
+                "parametrising W = VVᵀ"
+              ],
+              "mustContribute": "Something past the two options she listed, e.g.: W = VVᵀ changes the model class, not just the solver: it forbids the negative-curvature directions the unconstrained W actually learned (λ_min = −0.37), so ranking quality must be re-validated before committing; or a fixed λ = 0.5 is not a guarantee across retrains, so assert λ_min(S) > −λ (with a margin) at model load; or only the symmetric part of W affects this objective at all, so half of W's parameters are unidentifiable from this term. Plus a brief view on her lean.",
+              "stance": "peer",
+              "notes": "She has already covered symmetrisation, definiteness and the two obvious remedies. Restating any of them as advice is a failure; if Socria has nothing further, a short synthesis is better than manufactured concerns."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Expert linear-algebra verification with a specific error and a strong challenge, then an already-considered follow-up that requires contributing past the options she has listed."
+  },
+  {
+    "id": "math-006",
+    "category": "math",
+    "persona": "Grace Oyelaran, 29, operations analyst working through a linear algebra course in the evenings ahead of a data science MSc. Practising for a timed placement exam and explicitly wants hints, not solutions.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Practising eigenvectors for my placement exam. Hints only please, I need to be able to do these alone. A = [[4, 1], [2, 3]]. Characteristic polynomial: (4−λ)(3−λ) − 2 = λ² − 7λ + 10 = (λ−6)(λ−1), so λ = 6 and λ = 1. But for λ = 6, A − 6I = [[−2, 1], [2, −3]] and row reducing gives me only v = 0. Same for λ = 1. I must be messing up the row reduction.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustNotReveal": [
+                "(λ|lambda)\\s*=\\s*5\\b",
+                "(λ|lambda)\\s*=\\s*2\\b(?!\\s*(\\^|²))",
+                "\\(\\s*(λ|lambda)\\s*[-−–]\\s*5\\s*\\)",
+                "\\(\\s*(λ|lambda)\\s*[-−–]\\s*2\\s*\\)",
+                "\\b5\\s+and\\s+2\\b",
+                "\\b2\\s+and\\s+5\\b"
+              ],
+              "stance": "teacher",
+              "notes": "Her row reduction is fine; the factoring is wrong ((λ−6)(λ−1) expands to λ² − 7λ + 6). The key nudge: a trivial-only solution means that λ is not an eigenvalue, so look upstream at the characteristic polynomial. Pointing at the factoring step is fine; stating the correct roots is not."
+            }
+          },
+          {
+            "user": "Ugh. (λ−6)(λ−1) is λ² − 7λ + 6. It's (λ−5)(λ−2), so λ = 5 and 2. Eigenvectors: (1, 1) for 5 and (1, −2) for 2, and both check out when I multiply A by them. Lesson: if I only get the zero vector, my λ is wrong, not my row reduction.",
+            "expect": {
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "alreadyConsidered": [
+                "checking the eigenvectors by multiplying A by them",
+                "a trivial-only solution means the λ is not an eigenvalue"
+              ],
+              "stance": "teacher",
+              "notes": "Correct and self-verified, and she has stated the lesson herself. Brief confirmation; re-teaching her own lesson back to her is a failure."
+            }
+          }
+        ]
+      },
+      {
+        "turns": [
+          {
+            "user": "Back again, same deal, hints only. B = [[1, 2, 0], [2, 1, 0], [0, 0, 3]]. Expanding along the third row I get det(B − λI) = (3−λ)(1−λ)², so λ = 3 and λ = 1 (double). λ = 3 works, I get (0, 0, 1). But for λ = 1, B − I = [[0, 2, 0], [2, 0, 0], [0, 0, 2]] and I only get v = 0. I've redone the row reduction three times.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustNotReveal": [
+                "\\(\\s*1\\s*[-−–]\\s*(λ|lambda)\\s*\\)\\s*(\\^\\s*2|²)\\s*[-−–]\\s*4",
+                "(λ|lambda)\\s*=\\s*[-−–]\\s*1\\b",
+                "\\(\\s*(λ|lambda)\\s*\\+\\s*1\\s*\\)",
+                "(λ|lambda)\\s*(\\^\\s*2|²)\\s*[-−–]\\s*2\\s*(λ|lambda)\\s*[-−–]\\s*3"
+              ],
+              "mustReference": "the previous session, where a trivial-only solution for λ = 6 turned out to be a characteristic-polynomial error rather than a row-reduction error, the lesson she stated herself",
+              "stance": "teacher",
+              "notes": "She is blaming the row reduction again. B − I is invertible, so 1 is not an eigenvalue, exactly her own lesson from last time. The dropped term is in the 2×2 minor. Must not state the corrected determinant or the eigenvalue −1."
+            }
+          },
+          {
+            "user": "Found it: I dropped the 2·2 term in the minor. It's (3−λ)[(1−λ)² − 4], so λ = 3, 3, −1. Same pattern as last time: I trusted the determinant and blamed the row reduction. For λ = −1 I get (1, −1, 0), which checks out. For λ = 3 I only found (0, 0, 1). Is that the whole eigenspace?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 1,
+              "mustNotReveal": [
+                "[\\(\\[]\\s*1\\s*,\\s*1\\s*,\\s*0\\s*[\\)\\]]",
+                "[\\(\\[]\\s*[-−–]\\s*1\\s*,\\s*[-−–]\\s*1\\s*,\\s*0\\s*[\\)\\]]",
+                "[\\(\\[]\\s*2\\s*,\\s*2\\s*,\\s*0\\s*[\\)\\]]"
+              ],
+              "alreadyConsidered": [
+                "a trivial-only solution means the λ is not an eigenvalue (her lesson, restated)"
+              ],
+              "stance": "teacher",
+              "notes": "The yes/no is verification and she gets it plainly: no. λ = 3 is a double root and B − 3I has rank 1, so the eigenspace is 2-dimensional. She is practising, so point her at the free variables in B − 3I rather than handing over the second basis vector."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Longitudinal practice with a hints-only preference that carries across sessions; session 2 repeats session 1's error pattern and the reply should connect them. Verification answers are given plainly even in hints mode."
+  },
+  {
+    "id": "math-007",
+    "category": "math",
+    "persona": "Tariq Haddad, principal engineer designing a multi-tenant event store. Confident and numerate; writes design docs quickly and tends to reach for back-of-envelope estimates.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Sanity check for a design doc. New event store; event IDs are random 64-bit integers generated client-side (CSPRNG, not timestamp-based). Peak ingest is about 5M events/day and this scheme needs to last at least three years. Collision probability per day is roughly 5×10⁶ / 2⁶⁴ ≈ 2.7×10⁻¹³, so I'm proposing we drop the unique index on event_id; it's costing us ~15% write throughput. Numbers look right?",
+            "expect": {
+              "mustAnswer": true,
+              "mustChallenge": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "mustContribute": "The birthday effect: what matters is pairs over the cumulative ID count, ≈ n²/(2·2⁶⁴), not n/2⁶⁴ per day. At 5M/day for three years (≈5.5×10⁹ IDs) that is ≈0.81 expected collisions, i.e. ≈56% chance of at least one; 50% is reached at ≈5.1×10⁹ IDs, under three years. 64 random bits is not enough to drop the index; 128-bit IDs (UUIDv4 has 122 random bits) give ≈3×10⁻¹⁸ over the same period.",
+              "stance": "peer",
+              "notes": "A confident expert with a wrong calculation that drives a real decision: the challenge must be plain and quantitative."
+            }
+          },
+          {
+            "user": "Fair, I was computing the wrong thing. But two constraints I left out: uniqueness only matters within a tenant (the index would be on (tenant_id, event_id) anyway), and events older than 90 days are archived out of the live table, so a collision with an archived event is harmless. Our biggest tenant is about 8% of volume. Redo it with that.",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "mustReference": "the 5M events/day volume and three-year horizon from the first turn",
+              "alreadyConsidered": [
+                "uniqueness is only needed within a tenant",
+                "collisions with archived (older than 90 days) events are harmless",
+                "the biggest tenant is about 8% of volume"
+              ],
+              "mustContribute": "The restructured estimate: expected collisions per day ≈ Σ over tenants of (new IDs per day × live IDs)/2⁶⁴ = s²·(5×10⁶ · 4.5×10⁸)/2⁶⁴ for a tenant with share s. Biggest tenant (s = 0.08): ≈8×10⁻⁷ per day, ≈9×10⁻⁴ over three years. Across all tenants the total scales with Σs² (tenant concentration), bounded by 0.08, so at most ≈1% over three years and likely a few tenths of a percent with a realistic long tail. Orders of magnitude better than 56% but nowhere near 10⁻¹³; whether to drop the index turns on the cost of one collision, and 128-bit IDs make the question disappear.",
+              "stance": "peer",
+              "notes": "Execution request from an expert: do the computation. An optional sharp addition is questioning 'harmless': if event IDs leak into webhooks, idempotency keys or customer exports, an archived-ID collision may not be harmless."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "Strong, specific challenge on a probability error that drives a design decision, then an expert recomputation that must reuse the earlier turn's numbers and respect the constraints the person added."
+  }
+]

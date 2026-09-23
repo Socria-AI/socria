@@ -21,10 +21,60 @@ function prose(text: string): string {
     .replace(/[“"][^”"\n]{0,300}[”"]/g, ' ');
 }
 
-/** Sentences, each with its trailing punctuation and whitespace, in order. */
+/**
+ * Sentences, each with its trailing punctuation and whitespace, in order.
+ *
+ * A sentence ends at terminal punctuation — with any closing quotes,
+ * brackets or markdown emphasis after it — followed by whitespace or the
+ * end; or at a newline. So "1.3558" and "e.g." mid-sentence do not split,
+ * and "**Revenue.** Exempting…" keeps its bold markers together (a deletion
+ * that split them left a stray "**" in front of the next sentence).
+ */
 export function sentencesOf(text: string): string[] {
-  const out = text.match(/[^.!?\n]+(?:[.!?]+["'’”)\]]*|\n+|$)\s*/g) ?? [];
+  const out = text.match(/(?:[^.!?\n]|[.!?](?![.!?]*["'’”)\]*_]*(?:\s|$)))+(?:[.!?]+["'’”)\]*_]*(?=\s|$)|\n+|$)\s*/g) ?? [];
   return out.filter((s) => s.trim());
+}
+
+/** A bare markdown header sentence: "**Revenue.**", "### Costs". */
+const HEADER = /^(?:\*\*[^*\n]{1,80}\*\*|__[^_\n]{1,80}__|#{1,6} [^\n]{1,80})\s*$/;
+
+/**
+ * The text with the named sentences removed — matched by containment in
+ * either direction, so a quote that includes or omits a bold lead-in still
+ * finds its sentence — and any header left with nothing under it removed
+ * too. Null if nothing is left. Code blocks are never touched.
+ */
+export function deleteSentences(text: string, drop: readonly string[]): string | null {
+  const targets = drop.map((d) => d.trim()).filter(Boolean);
+  if (!targets.length) return text.trim() || null;
+  const blocks: string[] = [];
+  const shielded = text.replace(/```[\s\S]*?```/g, (m) => {
+    blocks.push(m);
+    return `\u0000${blocks.length - 1}\u0000`;
+  });
+  const parts = sentencesOf(shielded);
+  const gone = parts.map((raw) => {
+    const t = raw.trim();
+    if (!t || t.includes('\u0000')) return false;
+    // Exact always; containment only between substantial texts, so a short
+    // fragment cannot take an unrelated sentence with it.
+    return targets.some((d) => d === t || (t.length >= 12 && d.length >= 12 && (d.includes(t) || t.includes(d))));
+  });
+  const kept: string[] = [];
+  parts.forEach((raw, i) => {
+    if (gone[i]) return;
+    // A header whose content was all deleted: the next surviving sentence is
+    // a new paragraph (or there is none), and the one after it was removed.
+    if (HEADER.test(raw.trim()) && gone[i + 1]) {
+      let j = i + 1;
+      while (j < parts.length && gone[j]) j++;
+      const nextStartsParagraph = j >= parts.length || /\n\s*$/.test(parts[j - 1]) || HEADER.test(parts[j].trim());
+      if (nextStartsParagraph) return;
+    }
+    kept.push(raw);
+  });
+  const out = kept.join('').replace(/\u0000(\d+)\u0000/g, (_, n) => blocks[Number(n)]).replace(/\n{3,}/g, '\n\n').trim();
+  return out || null;
 }
 
 const WH = String.raw`(?:whether|what|how|why|which|where|when|who|if)`;
