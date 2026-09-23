@@ -321,6 +321,8 @@ console.log('\n=== council D1/D6: safety, recommendations, the ladder ===');
   ok('  after saying whether the last answer was right', /whether their last answer was right/.test(qd.decision.objective));
   const enough = turn({ taskKind: 'learn', work: 'practice', latest: 'other' }, 'ok stop asking me questions', { prior: quiz });
   ok('  and "stop" ends it', decide(enough, { said: 'ok stop asking me questions' }).decision.type !== 'QUESTION');
+  const tired = { ...quiz, history: [1, 2, 3].map((t) => ({ turn: t, type: 'QUESTION', family: 'asking', questions: 1 })) };
+  ok('  run 3: inferred diminishing returns do not end a quiz contract', decide(tired, { said: 'E major: four sharps', streak: 3, density: 1, messages: [{ role: 'assistant', content: 'A?' }, { role: 'user', content: 'three' }, { role: 'assistant', content: 'E?' }, { role: 'user', content: 'four' }] }).decision.type === 'QUESTION');
   const there = turn({ taskKind: 'learn', work: 'practice', latest: 'question' }, "let's stop there — what should I practise next time?", { prior: quiz });
   ok('  run 2: "let\'s stop there" ends it too, without frustration', decide(there, { said: "let's stop there — what should I practise next time?" }).decision.type !== 'QUESTION' && there.questionsPreference === 'none' && there.stuck !== 'frustrated');
   const q = decide(S({ work: 'creation', latest: 'request' }), { said: 'write me 5 interview questions for a data engineer' });

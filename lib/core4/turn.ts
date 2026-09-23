@@ -33,7 +33,7 @@ import { diminishingReturns, questionBudget, familyOf } from './budget';
 import { selectIntervention, renderDecision } from './intervene';
 import { guardStructure, leaksHidden, type GuardInput } from './guard2';
 import { exactCheck, renderCheck, hiddenValues, computeAsked, type CheckResult, CHECK_FLOOR } from './verify';
-import { consideredView, entriesFromPerson, entriesFromSocria, mergeEntries, disputeTurn, raisable } from './ledger';
+import { consideredView, entriesFromPerson, entriesFromSocria, mergeEntries, disputeTurn, raisable, echoesSocria, grounding } from './ledger';
 import { evidenceFromTurn } from './capability';
 import { buildTrace } from './trace';
 import { questionLoad, stripInterrogatives, deleteSentences } from './questions';
@@ -134,7 +134,10 @@ export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
   // The move block shows everything on the table; the novelty gate deletes
   // only for repeating what can be raised (ledger.ts raisable).
   const gateItems = [...new Set([...state.consideredNow.filter((c) => raisable(c.kind, 'user')).map((c) => c.text), ...considered.gate])];
-  const allLines = [...new Set([...state.consideredNow.map((c) => `they ${c.stance === 'rejects' ? 'ruled out' : 'raised'} just now: ${c.text}${c.reason ? ` (because: ${c.reason})` : ''}`), ...considered.lines])];
+  // Only what is grounded in THEIR words, and is not an echo of Socria's last
+  // reply, is shown as "they raised just now" (council D10; run 3).
+  const groundedNow = state.consideredNow.filter((c) => !echoesSocria(c, lastSocria(input)) && grounding(c, input.lastUserText) !== 'inferred');
+  const allLines = [...new Set([...groundedNow.map((c) => `they ${c.stance === 'rejects' ? 'ruled out' : 'raised'} just now: ${c.text}${c.reason ? ` (because: ${c.reason})` : ''}`), ...considered.lines])];
 
   const diminishing = diminishingReturns(state, signals, input.brief);
   const budget = questionBudget(state, signals, input.brief, diminishing);
@@ -259,6 +262,12 @@ function renderStateBlock(s: CognitiveState): string {
   return renderState(s);
 }
 
+/** Socria's most recent reply in this conversation. */
+function lastSocria(input: TurnInput): string {
+  for (let i = input.brief.length - 1; i >= 0; i--) if (input.brief[i].role === 'assistant') return input.brief[i].content;
+  return '';
+}
+
 /** Their problem, in their words: the last few things they wrote. */
 function targetOf(p: PreparedTurn): string {
   return p.input.brief.filter((m) => m.role === 'user').slice(-3).map((m) => m.content).join('\n');
@@ -378,7 +387,7 @@ export async function finishTurn(
 
   // The ledger: the person's items attributed by grounding in their words;
   // Socria's from what was actually sent.
-  const fromPerson = entriesFromPerson(state.consideredNow, input.lastUserText, ctx);
+  const fromPerson = entriesFromPerson(state.consideredNow, input.lastUserText, ctx, lastSocria(input));
   const fromSocria = entriesFromSocria(sent, decision.type, ctx);
   const privateHere = state.persistPolicy === 'conversation_only';
   const merged = mergeEntries(p.ledger, [...fromPerson, ...fromSocria].map((e) => (privateHere ? { ...e, private: true } : e)), input.now);

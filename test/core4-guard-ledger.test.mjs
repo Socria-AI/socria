@@ -236,6 +236,12 @@ console.log('\n=== the ledger: attribution is enforced in code ===');
   ok('an ungrounded item cannot carry a stance it never showed', es[1].stance === 'entertains');
   ok('a rejection is recorded as ruled out', es[2].status === 'rejected');
 
+  // Run 3 (longitudinal-006): restating what Socria just said is accepting
+  // Socria's idea, never theirs (council D10).
+  const socriaSaid = 'The early school start this year could explain part of the rise: the usual back-to-school spike simply came earlier.';
+  const echo = entriesFromPerson([{ kind: 'hypothesis', text: 'the early school start explains part of the rise', quote: 'the early school start explains part of the rise', stance: 'asserts', reason: '' }],
+    'Right, so the early school start explains part of the rise.', ctx, socriaSaid);
+  ok('an echo of Socria is not recorded as theirs', echo[0].owner === 'unknown', echo[0].owner);
   const soc = entriesFromSocria('The conference timing only helps if the demo is stable. What would a slipped demo cost you?', 'CONTRIBUTE', ctx);
   ok('what Socria said is Socria\'s', soc.every((e) => e.owner === 'socria'));
   ok('its question and its claim are both recorded', soc.some((e) => e.kind === 'question') && soc.some((e) => e.kind === 'claim'));

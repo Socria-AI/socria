@@ -137,7 +137,9 @@ export function budgetFrom(
   }
   // They asked to be quizzed: questions ARE the help, and the budget does not
   // price them — but still one at a time.
-  if (state.questionsPreference === 'wanted' && !diminishing.detected) {
+  // A quiz contract ignores streak, density and INFERRED diminishing returns
+  // (council D4/D5); only their words end it (stop, just tell me, frustration).
+  if (state.questionsPreference === 'wanted' && signals.directness !== 'answer' && !signals.frustration && state.stuck !== 'frustrated') {
     return { streak, density, allowed: 1, reasons: ['they asked to be quizzed'] };
   }
   if (streak >= 2) {

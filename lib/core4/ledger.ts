@@ -122,10 +122,20 @@ export interface TurnContext {
 }
 
 /** Entries from what the person raised this turn — owner decided by grounding, not by the reader's say-so. */
-export function entriesFromPerson(items: ConsideredNow[], userText: string, ctx: TurnContext): LedgerEntry[] {
+/**
+ * Is this item an echo of what SOCRIA just said (council D10)? Then taking it
+ * up is accepting Socria's idea — it is never recorded or shown as theirs.
+ */
+export function echoesSocria(item: { text: string; quote: string }, socriaText: string): boolean {
+  if (!socriaText.trim()) return false;
+  return sentencesOf(socriaText).some((s) => similarity(item.quote || item.text, s) >= 0.6 || similarity(item.text, s) >= 0.6);
+}
+
+export function entriesFromPerson(items: ConsideredNow[], userText: string, ctx: TurnContext, socriaBefore = ''): LedgerEntry[] {
   const out: LedgerEntry[] = [];
   for (const it of items) {
-    const basis = grounding(it, userText);
+    const echo = echoesSocria(it, socriaBefore);
+    const basis = echo ? 'inferred' : grounding(it, userText);
     const owner: Owner = basis === 'inferred' ? 'unknown' : 'user';
     out.push({
       id: ledgerId('le', ctx.now),
