@@ -429,6 +429,19 @@ Spec: 'wrong answers alone are NOT a reason', 'debugging alone is NOT a reason',
 Auto-disable any reason code whose override rate exceeds 30% over ≥50 events pending review. If the consented undeclared-learner study (D16) shows CORRECT-by-default is worse by >0.2 SD on a 7-day unassisted post-test, add a non-blocking one-clause 'try the fix first?' offer for inferred learners, never a hard withhold. Lower the attempt cap to 1 if human raters judge ≥30% of rung-3 turns as unproductive struggle.
 
 
+### D6 reversal: the ladder does not bottom out under their explicit contract (run 5)
+
+The majority decision capped the ladder: after repeated failed attempts,
+the full worked solution, even under an explicit "don't tell me". Run 5's
+judges, reading as the person, marked that as overreach every time it
+fired under an explicit request (learning-002, and learning-009 at margin
+3 against both baselines). The baselines stayed inside the boundary. Core
+4 now takes the Agency Advocate's position. Under **their** explicit
+contract, repeated failure raises support to the strongest level inside it
+(an analogous worked example, or the next step outright), with the full
+answer offered the moment they ask. Without such a request, as when they
+are only learning, the cap stands.
+
 ## D7. Intervention set and selection granularity
 
 **Implementation status: PARTIAL.** Done: CALCULATE only when computeAsked() evaluated a posed expression and the value is injected; otherwise ANSWER. Not yet: collapsing EXPLAIN/EXECUTE into ANSWER forms, WORKED_EXAMPLE type, crux QUESTION, CONTRIBUTE kinds incl. nothing_to_add, ACKNOWLEDGE rename, removing RESEARCH/MODEL/VISUALIZE from the enum (they are not selectable, but still in the type), tools-contract.ts, realized-family telemetry.

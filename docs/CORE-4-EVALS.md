@@ -530,6 +530,79 @@ remark, a significant-figures remark, "expected by chance" for 0.6 of 12).
 No judge reported a deviation. There were no human raters. The instrument
 is still model judges at n = 50.
 
+### Run 5 — second held-out set: much closer, still behind
+
+42 more scenarios never used before (~53% of each category's remaining
+unused ones, chosen by hash). All three arms were regenerated from one
+frozen bundle at `bf92557`, which carries every fix from run 4: the
+1200-token ceilings, prompt v6, the missed phrasings, the wider withhold,
+supersede, and the quoted-draft and "resolved" fixes. There were 13 fresh
+players and 8 fresh blind judges; 111 turns per arm. The last ~34 unused
+scenarios are kept for a final confirmatory run.
+
+| | Core 4 | Baseline | Tie | n | sign test (decided) |
+|---|---|---|---|---|---|
+| vs A1 — scenarios (run 4 → 5) | 15 → **16** | 26 → **18** | 9 → **8** | 50 → 42 | p = 0.86 |
+| vs A1 — turns | **31** | **40** | 40 | 111 | |
+| vs B+ — scenarios (run 4 → 5) | 16 → **15** | 20 → **18** | 14 → **9** | 50 → 42 | p = 0.73 |
+| vs B+ — turns | **29** | **36** | 46 | 111 | |
+
+All 16 of Core 4's wins against A1, and all 15 against B+, were at
+margin 1. The baseline won 12 by margin 1, 5 by margin 2 and 1 by margin 3
+in each comparison. **Decisions moved from 0–5 to 1–2–1 against A1 and
+2–2 against B+; expert from 0–4 to 2–3–1 against A1 and 3–2–1 against
+B+.** The run 4 mechanism for those categories was the token ceilings and
+the brevity default, and it no longer shows up in the judges' reasons.
+E0 still fails: Core 4 is preferred in under half the decided scenarios,
+and against B+ it loses learning 1–4.
+
+Two things got **worse**. Overreach rose to 5/111 (from 3/124), three
+withheld answers leaked (none in run 4), and agency fell to 4.64 vs 4.88
+(A1) and 4.62 vs 4.93 (B+). Helpfulness was 4.52 vs 4.74 and 4.76 vs 4.86;
+friction 1.86 vs 1.67 and 1.76 vs 1.81. Deterministic: 0.01 questions per
+reply vs 0.09; 264 words per reply for both arms.
+
+**Why it lost** (every loss at margin 2 or more):
+1. **Bottoming out into the solution under an explicit "hints only"**
+   (learning-002, learning-009 margin 3, both judges). Council D6's ladder
+   forced the full worked solution after repeated failed attempts, so the
+   person who had asked to work it out got "the fix is lo = mid + 1". Two
+   turns later, when he asked a direct conceptual question, Core 4 hinted
+   instead of answering. The baseline stayed inside the boundary and then
+   answered. This is run 1's lesson again: a forced move beat the person's
+   stated wish.
+2. **More missed "find it myself" phrasings** ("I want to find my own
+   mistake", "I don't want the working", "please don't give me the
+   construction"; learning-017, learning-008).
+3. **A Project's "answers only, no explanations" was not read**
+   (adversarial-005, margin 2 against both): Core 4 kept explaining.
+4. **"I'm not asking what to do" was not read as wanting to be heard**
+   (reflective-001). Being heard also lasted only one message, so turn 3
+   drifted into advice.
+5. **Cross-session continuity on the second turn** (longitudinal-005,
+   debugging-001). The last-conversation block vanished after turn 1 and
+   never listed Socria's own earlier suggestions, so Core 4 could not own
+   one when asked.
+
+Where it won: math (2–0 against B+), factual (2–0 against B+), a mid-course
+change of goal, repeated questioning, and already-considered (2–0 against
+A1). Changes since, all after this run's frozen bundle:
+- `0beb9c0`: the D6 reversal below, plus the phrasings in item 2.
+- `871ce5d`: answers-only as a standing signal. Being heard holds until
+  they ask. The last conversation stays on later turns that touch it and
+  lists Socria's suggestions as Socria's.
+- `0517f8a` (found by run 5's players): the extractor sees the whole
+  conversation's nodes; `replaces` no longer duplicates a live label; the
+  "accepted Socria's point" line is neutral and never used for a question;
+  uncertainties are not "held".
+
+**Deviations.** One player created a stray empty file in the cache and
+deleted it at once; no answer was affected. One player wrote one extract
+after reading only part of the request, and several put helper scripts in
+the shared scratchpad. Four players reported errors in their own answers,
+left as written. No judge reported a deviation. There were still no human
+raters.
+
 ### Full corpus
 
 Not yet run.
