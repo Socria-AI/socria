@@ -84,6 +84,8 @@ export interface ExplicitSignals {
   tooDirect: boolean;
   /** "off the record", "don't remember this" */
   offRecord: boolean;
+  /** "you can remember this (again)", "back on the record" */
+  onRecord: boolean;
   /** the request is FOR questions (quiz items, interview questions, practice problems): they are content, not interrogation */
   requestsQuestions: boolean;
   /** "you do it", "write it for me" */

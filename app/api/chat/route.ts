@@ -480,6 +480,8 @@ export async function POST(req: NextRequest) {
         fallbackModel: fallbackOpenAIModel(model),
         after: (reply: string) => {
           if (!userId) return;
+          // Off the record (council D15): nothing from this conversation goes into the Mind Graph.
+          if (prepared?.state.persistPolicy === 'none') return;
           waitUntil(
             remember(userId, `User: ${lastTurn ? forMemory(lastTurn) : last.content}\n\nSocria: ${reply}`, {
               now: Date.now(),

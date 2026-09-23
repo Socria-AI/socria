@@ -276,5 +276,27 @@ export async function deleteCapability(userId: string, concept: string): Promise
   if (error) throw error;
 }
 
+/**
+ * A conversation was deleted: everything Core 4 kept about it goes too
+ * (council D10/D15 cascade) — its state, its turn traces, its capability
+ * evidence, its ledger entries and every link touching them.
+ */
+export async function deleteConversation(userId: string, conversationId: string): Promise<void> {
+  const db = supabaseAdmin();
+  const { data: ents, error: e0 } = await db.from('reasoning_entries').select('id').eq('user_id', userId).eq('conversation_id', conversationId);
+  if (e0) throw e0;
+  const ids = (ents ?? []).map((r) => (r as { id: string }).id);
+  if (ids.length) {
+    const a = await db.from('reasoning_links').delete().eq('user_id', userId).in('from_id', ids);
+    if (a.error) throw a.error;
+    const b = await db.from('reasoning_links').delete().eq('user_id', userId).in('to_id', ids);
+    if (b.error) throw b.error;
+  }
+  for (const table of ['reasoning_entries', 'core4_state', 'core4_turns', 'capability_evidence'] as const) {
+    const { error } = await db.from(table).delete().eq('user_id', userId).eq('conversation_id', conversationId);
+    if (error && !/42p01|pgrst205|relation .*does not exist/i.test(`${error.code ?? ''} ${error.message ?? ''}`)) throw error;
+  }
+}
+
 /** Every Core 4 table, for account deletion, export and "forget what Socria worked out". */
 export const CORE4_TABLES = ['core4_state', 'reasoning_entries', 'reasoning_links', 'core4_turns', 'capability_evidence'] as const;

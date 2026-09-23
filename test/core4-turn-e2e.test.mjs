@@ -41,7 +41,7 @@ const swap = {
     b.onResolve({ filter: /^next\/(server|headers)$/ }, (a) => ({ path: `${a.path}.js`, external: true }));
   },
 };
-for (const [entry, out] of [['app/api/chat/route.ts', 'chat.mjs'], ['app/api/account/memory/route.ts', 'memory.mjs'], ['app/api/core4/route.ts', 'core4.mjs']]) {
+for (const [entry, out] of [['app/api/chat/route.ts', 'chat.mjs'], ['app/api/account/memory/route.ts', 'memory.mjs'], ['app/api/core4/route.ts', 'core4.mjs'], ['app/api/conversations/[id]/route.ts', 'conv.mjs']]) {
   await build({
     entryPoints: [join(root, entry)], bundle: true, format: 'esm', platform: 'node',
     outfile: join(OUT, out), tsconfig: join(root, 'tsconfig.json'), plugins: [swap],
@@ -64,6 +64,7 @@ process.env.RATE_LIMIT_DISABLED = '1';
 const chatRoute = await import(pathToFileURL(join(OUT, 'chat.mjs')).href);
 const memoryRoute = await import(pathToFileURL(join(OUT, 'memory.mjs')).href);
 const core4Route = await import(pathToFileURL(join(OUT, 'core4.mjs')).href);
+const convRoute = await import(pathToFileURL(join(OUT, 'conv.mjs')).href);
 const { db } = await import(pathToFileURL(FAKE_DB).href);
 const { NextRequest } = await import('next/server.js');
 
@@ -322,6 +323,47 @@ console.log('\n=== the person can see and correct all of it ===');
   globalThis.__uid = null;
   ok('signed out → 401', (await call('GET')).status === 401);
   globalThis.__uid = 'u1';
+}
+
+console.log('\n=== off the record (council D15) ===');
+{
+  const cid = 'offrec';
+  const u1 = U("Off the record: I'm deciding whether to leave my co-founder, it's a mess. The equity split is 60/40.");
+  const r = await turn(cid, [u1], {
+    state: { taskKind: 'decide', work: 'judgment', latest: 'information', currentFocus: 'leaving my co-founder', currentGoal: 'decide about the co-founder',
+      consideredNow: [{ kind: 'claim', text: 'the equity split is 60/40', quote: 'The equity split is 60/40', stance: 'asserts', reason: '' }] },
+    replies: ['Understood — nothing from this conversation will be kept. The 60/40 split matters mostly for what the vesting schedule says about unvested shares.'],
+  });
+  ok('the reply is told to acknowledge it once', /off the record/.test(r.prompt) && /you can remember this/.test(r.prompt));
+  ok('no ledger entries are written', rows('reasoning_entries').filter((e) => e.conversation_id === cid).length === 0);
+  const st = rows('core4_state').find((x) => x.conversation_id === cid)?.state;
+  ok('the saved state holds no free text', st && st.currentFocus === '' && st.currentGoal === '' && st.consideredNow.length === 0 && st.persistPolicy === 'none', JSON.stringify(st && { f: st.currentFocus, g: st.currentGoal, p: st.persistPolicy }));
+  ok('the content-free trace is still written', rows('core4_turns').some((x) => x.conversation_id === cid));
+  ok('nothing went to the Mind Graph', !rows('mind_nodes').some((n) => /co-?founder|60\/40/i.test(`${n.label} ${n.content}`)));
+  const r2 = await turn(cid, [u1, A(r.received), U('ok, you can remember this again. What should I ask the lawyer?')], {
+    state: { taskKind: 'decide', work: 'judgment', latest: 'question', currentFocus: 'questions for the lawyer',
+      consideredNow: [{ kind: 'question', text: 'what to ask the lawyer', quote: 'What should I ask the lawyer', stance: 'asks', reason: '' }] },
+    replies: ['Ask how unvested shares are treated if you leave, and whether the vesting has an acceleration clause.'],
+  });
+  ok('"you can remember this" turns it back on', rows('core4_state').find((x) => x.conversation_id === cid)?.state.persistPolicy === 'full');
+  ok('and from then on the ledger is written again', rows('reasoning_entries').some((e) => e.conversation_id === cid));
+}
+
+console.log('\n=== deleting a conversation deletes what Core 4 kept about it ===');
+{
+  const cid = 'launch';
+  const before = ['core4_state', 'reasoning_entries', 'core4_turns'].map((t) => rows(t).filter((x) => x.conversation_id === cid).length);
+  ok('there was something kept', before.every((n) => n > 0), before.join(','));
+  const otherBefore = rows('core4_state').filter((x) => x.conversation_id !== cid).length;
+  const gone = new Set(rows('reasoning_entries').filter((e) => e.conversation_id === cid).map((e) => e.id));
+  db.rows('reasoning_links').push({ user_id: 'u1', id: 'l-test', from_id: [...gone][0], to_id: 'elsewhere', rel: 'supports', owner: 'user', reason: '', created_at: 1 });
+  const r = await convRoute.DELETE(new NextRequest(`http://localhost/api/conversations/${cid}`, { method: 'DELETE' }), { params: { id: cid } });
+  ok('the delete succeeded', r.status === 200, String(r.status));
+  for (const t of ['core4_state', 'reasoning_entries', 'core4_turns', 'capability_evidence']) {
+    ok(`${t}: nothing left for it`, rows(t).filter((x) => x.conversation_id === cid).length === 0);
+  }
+  ok('links touching its entries are gone', !rows('reasoning_links').some((l) => gone.has(l.from_id) || gone.has(l.to_id)));
+  ok('other conversations are untouched', rows('core4_state').filter((x) => x.conversation_id !== cid).length === otherBefore);
 }
 
 console.log('\n=== "forget what Socria worked out" reaches every Core 4 table ===');

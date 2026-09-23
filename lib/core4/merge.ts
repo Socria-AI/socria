@@ -136,6 +136,8 @@ export function mergeState({ prior, read, signals, contract, readOk }: MergeInpu
   // "idk" is being stuck, said plainly: support goes up (council D5/D6).
   const stuck = signals.frustration ? 'frustrated' : signals.dontKnow ? 'stalled' : base.stuck;
   const questionsPreference = signals.stopQuestions ? 'stop' : signals.wantsQuestions ? 'wanted' : p.questionsPreference;
+  // Off the record is sticky for the conversation until they say otherwise.
+  const persistPolicy = signals.onRecord ? 'full' : signals.offRecord ? 'none' : p.persistPolicy ?? 'full';
   const urgency = signals.urgent ? 'high' : base.urgency;
 
   const lastMemo = p.history[p.history.length - 1];
@@ -160,6 +162,7 @@ export function mergeState({ prior, read, signals, contract, readOk }: MergeInpu
     stuck,
     masteryEvidence,
     questionsPreference,
+    persistPolicy,
     lastOutcome,
     history,
     turn,

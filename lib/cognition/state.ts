@@ -224,6 +224,12 @@ export interface CognitiveState {
    * Explicit only, and it stands until they say otherwise.
    */
   questionsPreference: 'stop' | 'wanted' | 'none';
+  /**
+   * What may be kept from this conversation (council D15). 'none' after "off
+   * the record" until "you can remember this": no ledger, no capability
+   * evidence, no free text in the saved state, no Mind Graph write.
+   */
+  persistPolicy: 'full' | 'none';
   /** turns so far in this conversation */
   turn: number;
 }
@@ -262,6 +268,7 @@ export const EMPTY_STATE: CognitiveState = {
   lastOutcome: null,
   history: [],
   questionsPreference: 'none',
+  persistPolicy: 'full',
   turn: 0,
 };
 
@@ -390,6 +397,7 @@ export function sanitizeState(raw: unknown): CognitiveState {
     lastOutcome: outcomeOf(r.lastOutcome),
     history: [],
     questionsPreference: 'none',
+    persistPolicy: 'full',
     turn: 0,
   };
 }

@@ -47,7 +47,7 @@ console.log('\n=== test-lint: no assertion that cannot fail ===');
   const { dirname, join } = await import('node:path');
   const { fileURLToPath } = await import('node:url');
   const dir = dirname(fileURLToPath(import.meta.url));
-  const TAUTOLOGY = new RegExp(['\\|\\|', '\\s*true\\s*\\)'].join(''));
+  const TAUTOLOGY = new RegExp(['\\|\\|', '\\s*true\\s*\\)|&&', '\\s*false\\s*\\)'].join(''));
   const offenders = readdirSync(dir).filter((f) => f.endsWith('.test.mjs')).filter((f) => TAUTOLOGY.test(readFileSync(join(dir, f), 'utf8').replace(/\/\/.*$/gm, '')));
   ok('no test file ORs an assertion with true', offenders.length === 0, offenders.join(', '));
 }

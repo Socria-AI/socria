@@ -35,6 +35,19 @@ import { interrogatives, sentencesOf } from './questions';
 
 const MAX_TEXT = 280;
 
+/**
+ * Before anything reaches the ledger (council D10): emails, phone numbers,
+ * URLs with query strings and long digit runs are replaced. The ledger is
+ * about the shape of their reasoning, not their identifiers.
+ */
+export function scrubPII(text: string): string {
+  return text
+    .replace(/[\w.+-]+@[\w-]+\.[\w.-]+/g, '[email]')
+    .replace(/https?:\/\/\S+\?\S+/g, '[link]')
+    .replace(/\+?\d[\d\s().-]{8,}\d/g, (m) => (m.replace(/\D/g, '').length >= 9 ? '[number]' : m))
+    .replace(/\b\d{6,}\b/g, '[number]');
+}
+
 function norm(s: string): string {
   return s.toLowerCase().replace(/[’']/g, "'").replace(/[^a-z0-9' ]+/g, ' ').replace(/\s+/g, ' ').trim();
 }
@@ -117,13 +130,13 @@ export function entriesFromPerson(items: ConsideredNow[], userText: string, ctx:
     out.push({
       id: ledgerId('le', ctx.now),
       kind: it.kind,
-      text: it.text.slice(0, MAX_TEXT),
+      text: scrubPII(it.text).slice(0, MAX_TEXT),
       owner,
       // An ungrounded item cannot carry a stance it never showed.
       stance: owner === 'user' ? it.stance : 'entertains',
       basis,
-      quote: basis === 'quoted' ? it.quote.slice(0, 200) : '',
-      reason: it.reason.slice(0, 200),
+      quote: basis === 'quoted' ? scrubPII(it.quote).slice(0, 200) : '',
+      reason: scrubPII(it.reason).slice(0, 200),
       status: it.stance === 'rejects' ? 'rejected' : it.stance === 'resolved' ? 'resolved' : 'active',
       confidence: basis === 'quoted' ? 0.9 : basis === 'paraphrased' ? 0.7 : 0.4,
       conversationId: ctx.conversationId,
@@ -158,11 +171,11 @@ export function entriesFromSocria(sent: string, type: InterventionType, ctx: Tur
     out.push({
       id: ledgerId('ls', ctx.now),
       kind,
-      text: text.trim().slice(0, MAX_TEXT),
+      text: scrubPII(text.trim()).slice(0, MAX_TEXT),
       owner: 'socria',
       stance: kind === 'question' ? 'asks' : 'asserts',
       basis: 'quoted',
-      quote: text.trim().slice(0, 200),
+      quote: scrubPII(text.trim()).slice(0, 200),
       reason: '',
       status: 'active',
       confidence: 0.9,

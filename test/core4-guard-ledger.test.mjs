@@ -14,7 +14,7 @@
 import { guardStructure, sanitizeGuard2, buildGuard2Input, looksWorked, givesThenAsks, leaksHidden, coherent } from './.tmp/guard2.mjs';
 import { SentenceGate } from './.tmp/stream-gate.mjs';
 import { classify, similarity, gateCandidates } from './.tmp/considered.mjs';
-import { grounding, entriesFromPerson, entriesFromSocria, mergeEntries, disputeTurn, linksForTurn, consideredView, toLogosGraph } from './.tmp/ledger.mjs';
+import { scrubPII, grounding, entriesFromPerson, entriesFromSocria, mergeEntries, disputeTurn, linksForTurn, consideredView, toLogosGraph } from './.tmp/ledger.mjs';
 import { summarize, evidenceFromTurn, assistanceOf } from './.tmp/capability.mjs';
 import { buildTrace } from './.tmp/trace.mjs';
 import { exactCheck, sanitizeCheck, renderCheck, hiddenValues, computeAsked } from './.tmp/verify.mjs';
@@ -254,6 +254,13 @@ console.log('\n=== the ledger: attribution is enforced in code ===');
 
   const graph = toLogosGraph(fresh, links);
   ok('the ledger renders as a Logos graph with owners intact', graph.nodes.length === 3 && graph.nodes.every((n) => 'owner' in n && 'stance' in n) && Array.isArray(graph.edges));
+}
+
+console.log('\n=== council D10: identifiers never reach the ledger ===');
+{
+  const s = scrubPII('Email me at jane.doe@example.com or call +1 (415) 555-0199; invoice 20260914883; see https://x.io/a?token=abc');
+  ok('emails, phones, long numbers and query-string links are scrubbed', !/jane|555-0199|20260914883|token=/.test(s), s);
+  ok('ordinary numbers stay', scrubPII('The split is 60/40 and we raised $2.4M in 2024.') === 'The split is 60/40 and we raised $2.4M in 2024.');
 }
 
 console.log('\n=== capability: events, counted conservatively ===');

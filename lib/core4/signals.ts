@@ -38,6 +38,7 @@ export const NO_SIGNALS: ExplicitSignals = {
   dontKnow: false,
   tooDirect: false,
   offRecord: false,
+  onRecord: false,
   requestsQuestions: false,
   delegate: false,
   ownWork: false,
@@ -184,6 +185,8 @@ const TOO_DIRECT = /\b(don'?t just (?:give|tell) me the (?:answer|solution)|you 
 
 const OFF_RECORD = /\b(off the record|don'?t remember (?:this|that)|don'?t save (?:this|that)|forget (?:this|that) (?:conversation|chat)?)\b/i;
 
+const ON_RECORD = /\b(you can remember (?:this|that|again)|back on the record|ok to remember|remember this)\b/i;
+
 const REQUESTS_QUESTIONS = /\b((?:write|give|make|draft|generate|come up with|list|suggest)(?: me)? (?:\w+ ){0,3}(?:questions|quiz|exam items|practice problems|interview questions|test items|flashcards|faq)|quiz me|test me|drill me|interview questions)\b/i;
 
 interface Hit {
@@ -269,6 +272,7 @@ export function readSignals(message: string): ExplicitSignals {
     dontKnow: DONT_KNOW.test(text),
     tooDirect: !!note(lastIndex(TOO_DIRECT, text)),
     offRecord: !!note(lastIndex(OFF_RECORD, text)),
+    onRecord: !!note(lastIndex(ON_RECORD, text)),
     requestsQuestions: !!lastIndex(REQUESTS_QUESTIONS, text),
     expertise: expert ? 'expert' : novice ? 'novice' : null,
     assessment: !!note(lastIndex(ASSESSMENT, text)),

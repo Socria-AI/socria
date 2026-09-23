@@ -187,6 +187,9 @@ export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
   }
 
   let move = renderDecision({ ...decision, avoid: allLines.slice(0, 12) }, allocation);
+  if (signals.offRecord && !signals.onRecord) {
+    move += '\nThey asked for this to be off the record: say in one clause that Socria will not keep anything from this conversation from now on, and that "you can remember this" turns it back on. Then carry on.\n';
+  }
   if (allocation.announce) {
     move += '\nThis is the first time you are holding something back in this conversation: say so once, in a clause, and that they can have it by asking (e.g. "say the word and I\'ll give you the answer"). Do not repeat this in later turns.\n';
   }
@@ -305,6 +308,19 @@ export function fallbackReply(p: PreparedTurn, first: string, retry: string | nu
 
 // ── after the reply ─────────────────────────────────────────────────
 
+/** The state with every free-text field emptied: only enums, numbers and memos survive. */
+function withoutText(s: CognitiveState): CognitiveState {
+  const bare = <T>(f: { value: T; source: string; confidence: number }) => ({ ...f, evidence: '' });
+  return {
+    ...s,
+    currentGoal: '', currentFocus: '', confusions: [], positions: [], assumptions: [], tensions: [], constraints: [],
+    openThreads: [], recentChanges: [], newRelation: '', blockingUnknown: '', masteryEvidence: [], consideredNow: [],
+    learningGoal: bare(s.learningGoal), expertise: bare(s.expertise), stakes: bare(s.stakes), directness: bare(s.directness), authorship: bare(s.authorship),
+    lastOutcome: s.lastOutcome ? { ...s.lastOutcome, evidence: '' } : null,
+    history: s.history.map((h) => (h.outcome ? { ...h, outcome: { ...h.outcome, evidence: '' } } : h)),
+  } as CognitiveState;
+}
+
 export async function finishTurn(
   p: PreparedTurn,
   sent: string,
@@ -362,11 +378,14 @@ export async function finishTurn(
   });
 
   const evidence = evidenceFromTurn(state, p.prior, ctx, p.verify);
+  // Off the record (council D15): no ledger, no capability evidence, no free
+  // text in the saved state. The content-free trace is still written.
+  const offRecord = state.persistPolicy === 'none';
   const writes: Promise<unknown>[] = [
-    store.saveState(input.userId, input.conversationId, next, input.now),
-    store.saveLedger(input.userId, [...merged.created, ...merged.touched, ...p.disputed], links),
+    store.saveState(input.userId, input.conversationId, offRecord ? withoutText(next) : next, input.now),
+    offRecord ? Promise.resolve() : store.saveLedger(input.userId, [...merged.created, ...merged.touched, ...p.disputed], links),
     store.insertTurn(input.userId, input.conversationId, trace, input.now),
-    store.insertCapability(input.userId, evidence),
+    offRecord ? Promise.resolve() : store.insertCapability(input.userId, evidence),
   ];
   // How the PREVIOUS turn landed belongs on its own row.
   if (p.prior && state.lastOutcome) writes.push(store.recordOutcome(input.userId, input.conversationId, p.prior.turn, state.lastOutcome));
