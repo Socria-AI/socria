@@ -16,11 +16,11 @@ import {
   buildMemoryExtractorPrompt,
   sanitizeMemory,
   sanitizeSuggestedTitle,
+  isValidAccessKey,
 } from '@/lib/socria-prompt';
 import { enforceRateLimit } from '@/lib/rate-limit';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { memoryCaps, memoryFrozen } from '@/lib/person-memory';
-import { mayUse } from '@/lib/route-guard';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -28,7 +28,7 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
   const { userId } = auth();
-  const keyUnlocked = mayUse(req, userId);
+  const keyUnlocked = isValidAccessKey(req.headers.get('x-socria-key'));
   if (!userId && !keyUnlocked) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }

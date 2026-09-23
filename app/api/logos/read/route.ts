@@ -10,11 +10,11 @@ import OpenAI from 'openai';
 import { auth } from '@clerk/nextjs/server';
 import { LOGOS_MODEL, LOGOS_FALLBACK_MODEL } from '@/lib/logos';
 import { IMAGE_READ_PROMPT, MAX_READING_CHARS } from '@/lib/logos-attachments';
+import { isValidAccessKey } from '@/lib/socria-prompt';
 import { enforceRateLimit } from '@/lib/rate-limit';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { boundaryNote } from '@/lib/entitlements';
 import { spend } from '@/lib/usage';
-import { mayUse } from '@/lib/route-guard';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -26,7 +26,7 @@ const DATA_URL = /^data:image\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/=\s]+$/;
 
 export async function POST(req: NextRequest) {
   const { userId } = auth();
-  const keyUnlocked = mayUse(req, userId);
+  const keyUnlocked = isValidAccessKey(req.headers.get('x-socria-key'));
   if (!userId && !keyUnlocked) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }

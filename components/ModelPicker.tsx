@@ -38,15 +38,10 @@ import { OneLock } from './OneLock';
 // It stays .app-root-scoped, so nothing on /docs is touched by it.
 import '@/app/app-shell.css';
 
-// The Core answerers, and the Logos surfaces, split by the registry rather
-// than by a hard-coded id — a new model lands in the right column on its own.
-// A Logos surface (Logos, Logos 2) opens the split screen; everything else is
-// a "how it answers" register.
+/** Logos is listed apart: it is a surface, not a register of the same one. */
+const LOGOS: SocriaModel = 'logos';
 const ANSWERERS = (Object.keys(SOCRIA_MODELS) as SocriaModel[]).filter(
-  (id) => !SOCRIA_MODELS[id].logosSurface
-);
-const SURFACES = (Object.keys(SOCRIA_MODELS) as SocriaModel[]).filter(
-  (id) => SOCRIA_MODELS[id].logosSurface
+  (id) => id !== LOGOS
 );
 
 export function ModelPicker({
@@ -113,9 +108,6 @@ export function ModelPicker({
   const allDepths = plan ? PLANS[plan].allDepths : true;
 
   const pick = (id: SocriaModel) => {
-    // Announced but not built — the row is inert; the copy below the name
-    // already says why, so a press does nothing rather than lying.
-    if (SOCRIA_MODELS[id].soon) return;
     if (SOCRIA_MODELS[id].requiresAuth && !isSignedIn) {
       setNeeds(SOCRIA_MODELS[id].short);
       onLockedAttempt?.(id);
@@ -127,30 +119,24 @@ export function ModelPicker({
 
   const row = (id: SocriaModel) => {
     const m = SOCRIA_MODELS[id];
-    const surface = !!m.logosSurface;
-    const soon = !!m.soon;
-    const gated = !soon && m.requiresAuth && !isSignedIn;
+    const gated = m.requiresAuth && !isSignedIn;
     return (
       <button
         key={id}
         type="button"
         role="menuitemradio"
         aria-checked={value === id}
-        aria-disabled={soon || undefined}
-        className={`mp-row${value === id ? ' on' : ''}${gated || soon ? ' gated' : ''}${
-          surface ? ' logos' : ''
+        className={`mp-row${value === id ? ' on' : ''}${gated ? ' gated' : ''}${
+          id === LOGOS ? ' logos' : ''
         }`}
         onClick={() => pick(id)}
       >
         <span className="top">
           <span className="does">{m.description}</span>
-          {soon ? (
-            // The roadmap word — where a lock or a sign-in prompt would go.
-            <span className="need">{m.soon}</span>
-          ) : gated ? (
+          {gated ? (
             <span className="need">Sign in</span>
-          ) : surface ? (
-            <span className="tag">{m.collab ? 'think together' : 'a different surface'}</span>
+          ) : id === LOGOS ? (
+            <span className="tag">a different surface</span>
           ) : null}
         </span>
         {/* The headline says what it DOES; the name is the footnote. That
@@ -159,7 +145,7 @@ export function ModelPicker({
             here and nothing is said twice. */}
         <span className="meta">
           <span className="nm">{m.short}</span>
-          {!m.supportsDepth && !surface && !soon ? ' — no depth modes.' : ''}
+          {!m.supportsDepth && id !== LOGOS ? ' — no depth modes.' : ''}
         </span>
       </button>
     );
@@ -198,11 +184,10 @@ export function ModelPicker({
             <p className="mp-lbl">How it answers</p>
             {ANSWERERS.map(row)}
 
-            {/* The Logos surfaces below a rule, because picking one is not the
-                same kind of choice: the map opens beside the conversation.
-                Logos 2 is a second seat in that same room. */}
+            {/* Logos below a rule, because picking it is not the same kind of
+                choice: the map opens beside the conversation. */}
             <div className="mp-rule" />
-            {SURFACES.map(row)}
+            {row(LOGOS)}
 
             {needs && (
               <p className="mp-need">

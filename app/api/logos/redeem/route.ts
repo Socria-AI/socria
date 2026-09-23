@@ -9,7 +9,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { scopeForCode } from '@/lib/access-codes-server';
+import { isValidOneKey } from '@/lib/socria-one';
 import { grantComplimentary } from '@/lib/subscriptions';
 import { writeAccountGrant } from '@/lib/socria-one-grant';
 import { forgetPlanMemo } from '@/lib/socria-one-server';
@@ -26,9 +26,7 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json().catch(() => null);
   const code = typeof body?.code === 'string' ? body.code : '';
-  // Checked against the environment on the server, in constant time. The old
-  // check compared against a constant that shipped in the browser bundle.
-  if (scopeForCode(code) !== 'one') {
+  if (!isValidOneKey(code)) {
     return NextResponse.json({ ok: false }, { status: 400 });
   }
 

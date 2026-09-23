@@ -56,20 +56,31 @@ import { PLANS } from './entitlements';
 // two places disagrees with itself the first time it changes, and these are
 // meant to change as we learn what they should be.
 
-// The typed code that opens One without billing attached USED to be listed
-// here, in a module client components import — so it shipped in the browser
-// bundle, and lib/socria-one-server.ts honoured it as the `x-socria-one`
-// header. Reading the bundle was enough to hold a $15/month subscription for
-// free. The comment above it called it "a soft gate, not a secret", which was
-// true as written and was the problem: it was a secret being used as one
-// while being published.
+// Typed codes that open One without billing attached, mirroring the Core 3
+// access key already in the product. Soft gates, not secrets — like that key,
+// they ship in the client bundle. A signed-in redemption is ALSO written to
+// the account (see /api/logos/redeem) so it follows the person across devices.
 //
-// It now lives only in the environment (SOCRIA_ONE_CODE) and is compared on
-// the server in lib/access-codes-server.ts, which `import 'server-only'`
-// keeps out of every client bundle. A signed-in redemption is still written
-// to the account (see /api/logos/redeem) so it follows the person across
-// devices.
+// There used to be a second, shorter code here — 'ONE' — as a dev/test gate.
+// It came out for the paid launch: three letters, and the first three anyone
+// would try against a product called Socria One, handing over a $15/month
+// subscription to whoever guessed. A soft gate is one a determined person can
+// step over, not one nobody has to.
+export const SOCRIA_ONE_CODES = ['MAVERICKS26LONGHORNS27'];
 
+/**
+ * The code the client echoes in `x-socria-one` to assert it already holds One.
+ * Any accepted code satisfies the server; this is simply the one the bundle
+ * carries. NOT a secret and not a security boundary — see resolvePlanForRequest,
+ * where it is the last fallback behind Stripe and the account grant.
+ */
+export const SOCRIA_ONE_KEY = SOCRIA_ONE_CODES[0];
+
+export function isValidOneKey(key: unknown): boolean {
+  return (
+    typeof key === 'string' && SOCRIA_ONE_CODES.includes(key.trim().toUpperCase())
+  );
+}
 
 export function resolvePlan(input: unknown): Plan {
   return input === 'one' ? 'one' : 'free';

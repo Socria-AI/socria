@@ -20,7 +20,7 @@
 // "open on their best surface" becomes "override what they asked for", which
 // is worse than the bug.
 
-import { SOCRIA_MODELS, type SocriaModel } from './socria-prompt';
+import type { SocriaModel } from './socria-prompt';
 
 export const MODEL_KEY = 'socria.model.v1';
 const LAST_CORE_KEY = 'socria.model.lastCore.v1';
@@ -28,10 +28,7 @@ const LAST_CORE_KEY = 'socria.model.lastCore.v1';
 const MODEL_CHOSEN_KEY = 'socria.model.chosen.v1';
 
 function isModel(v: unknown): v is SocriaModel {
-  // From the registry, not a hand-kept list — a new model is added in one
-  // place. `soon` models (Core 4) are real ids but never selectable, so they
-  // are excluded here: nothing should ever store one as the active model.
-  return typeof v === 'string' && v in SOCRIA_MODELS && !SOCRIA_MODELS[v as SocriaModel].soon;
+  return v === 'core-2' || v === 'core-3' || v === 'logos';
 }
 
 /**
@@ -44,7 +41,7 @@ function isModel(v: unknown): v is SocriaModel {
 export function rememberModel(model: SocriaModel): void {
   try {
     localStorage.setItem(MODEL_KEY, model);
-    if (!SOCRIA_MODELS[model].logosSurface) localStorage.setItem(LAST_CORE_KEY, model);
+    if (model !== 'logos') localStorage.setItem(LAST_CORE_KEY, model);
   } catch {}
 }
 
@@ -105,18 +102,7 @@ export function autoModel(opts: { canUseCore3: boolean; isOne: boolean }): Socri
 export function lastCoreModel(): SocriaModel {
   try {
     const raw = localStorage.getItem(LAST_CORE_KEY);
-    // Any real, selectable, non-Logos model — not a hand-written pair. Named
-    // ids meant a Core added later was written to this key by rememberModel
-    // and then silently thrown away on the way back, dropping the person on
-    // Core 2 with no explanation.
-    if (
-      typeof raw === 'string' &&
-      raw in SOCRIA_MODELS &&
-      !SOCRIA_MODELS[raw as SocriaModel].soon &&
-      !SOCRIA_MODELS[raw as SocriaModel].logosSurface
-    ) {
-      return raw as SocriaModel;
-    }
+    if (raw === 'core-3' || raw === 'core-2') return raw;
   } catch {}
   return 'core-2';
 }

@@ -15,8 +15,6 @@
 
 import type { SourceKind } from './logos-sources';
 import { MAX_CONTEXT_TEXT, MAX_CONTEXT_TITLE } from './logos-sources';
-import { Agent } from 'undici';
-import { lookup as dnsLookup } from 'node:dns';
 
 export interface SourceStatus {
   kind: SourceKind;
@@ -503,15 +501,6 @@ function isForbiddenV4(a: number, b: number): boolean {
   if (a === 192 && b === 168) return true;
   if (a === 100 && b >= 64 && b <= 127) return true; // CGNAT
   if (a === 198 && (b === 18 || b === 19)) return true; // benchmarking
-  // Documentation ranges (RFC 5737). Not routable, so a name resolving to one
-  // is a misconfiguration or a probe, never a page somebody meant to read.
-  if (a === 192 && b === 0) return true; // 192.0.0.0/24 + 192.0.2.0/24
-  if (a === 198 && b === 51) return true; // 198.51.100.0/24
-  if (a === 203 && b === 0) return true; // 203.0.113.0/24
-  if (a === 192 && b === 88) return true; // 6to4 relay anycast
-  // Multicast and reserved: 224.0.0.0/4 and 240.0.0.0/4, which together are
-  // everything from 224 up — including the 255.255.255.255 broadcast.
-  if (a >= 224) return true;
   return false;
 }
 
@@ -533,24 +522,9 @@ export function isForbiddenIp(ip: string): boolean {
     }
   }
   if (s.includes(':')) {
-    // NAT64 (64:ff9b::/96 and the local 64:ff9b:1::/48) carries a v4 address
-    // in its low bits — on a NAT64 network that reaches the v4 internet,
-    // including the v4 addresses this function exists to keep us off. Pull
-    // the embedded address out and screen it like any other.
-    const nat64 = s.match(/^64:ff9b(?::1)?:(?::)?(?:.*:)?([0-9a-f]{1,4}):([0-9a-f]{1,4})$/i);
-    if (nat64) {
-      const hi = parseInt(nat64[1], 16);
-      const lo = parseInt(nat64[2], 16);
-      return isForbiddenV4((hi >> 8) & 255, hi & 255) || isForbiddenV4((lo >> 8) & 255, lo & 255);
-    }
-    if (/^64:ff9b:/i.test(s)) return true; // any other NAT64 form: refuse
-    // Genuine IPv6: block loopback, unspecified, unique-local, link-local,
-    // and the reserved/documentation ranges that have no business being a
-    // page somebody asked us to read.
+    // Genuine IPv6: block loopback and unique-local / link-local ranges.
     if (s === '::' || s === '::1') return true;
     if (/^(fc|fd|fe8|fe9|fea|feb)/.test(s)) return true;
-    if (/^(2001:db8|100::|2002:)/.test(s)) return true;
-    if (/^ff/.test(s)) return true; // multicast
     return false;
   }
   if (/^\d{1,3}(\.\d{1,3}){3}$/.test(s)) {
@@ -585,22 +559,12 @@ export function isForbiddenHost(hostname: string): boolean {
 }
 
 // A hostname can pass the literal screen and still resolve to an internal
-// address: `127.0.0.1.nip.io` is a perfectly ordinary public domain with an A
-// record for loopback, and one attacker-controlled DNS record generalises
-// that to any address at all. So the name is resolved and EVERY answer is
-// screened.
-//
-// This function existed before and was never called — the literal-hostname
-// check was the whole of the destination screening, and a name pointing at
-// 169.254.169.254 was fetched and its body handed back to the caller. It is
-// called now, from the one place that matters (fetchWeb), and the addresses
-// it approves are checked again on every redirect hop — and, crucially, the
-// address that is APPROVED is the address that is DIALLED. See safeAgent
-// below: screening a name and then letting fetch() resolve it a second time
-// is a rebinding hole, because the second answer need not match the first.
-async function resolvePublicAddresses(hostname: string): Promise<string[]> {
+// address (a public domain with an A record for 169.254.169.254). Resolve it
+// and screen every answer. TOCTOU/rebinding between this lookup and the fetch
+// remains out of scope for a prototype, and is the only residual gap.
+async function assertResolvesPublic(hostname: string): Promise<void> {
   // A literal IP needs no lookup — isForbiddenHost already screened it.
-  if (/^[0-9.]+$/.test(hostname) || hostname.includes(':')) return [];
+  if (/^[0-9.]+$/.test(hostname) || hostname.includes(':')) return;
   let addrs: { address: string }[];
   try {
     const dns = await import('node:dns');
@@ -611,20 +575,6 @@ async function resolvePublicAddresses(hostname: string): Promise<string[]> {
   if (!addrs.length || addrs.some((a) => isForbiddenIp(a.address))) {
     throw new ConnectError('That address is not allowed.', 400);
   }
-  return addrs.map((a) => a.address);
-}
-
-/**
- * Screen a destination completely: the literal host, then every address it
- * resolves to. Throws ConnectError on anything internal.
- */
-async function assertDestinationAllowed(url: URL): Promise<void> {
-  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-    throw new ConnectError('Only http(s) pages can be read.', 400);
-  }
-  if (url.username || url.password) throw new ConnectError('That URL is not allowed.', 400);
-  if (isForbiddenHost(url.hostname)) throw new ConnectError('That address is not allowed.', 400);
-  await resolvePublicAddresses(url.hostname);
 }
 
 const ENTITIES: Record<string, string> = {
@@ -672,102 +622,6 @@ export function htmlToText(html: string): { title: string; text: string } {
 
 const MAX_WEB_BYTES = 1_500_000;
 
-/**
- * The dispatcher every outbound page fetch uses.
- *
- * THE POINT: the screen runs inside the socket's own DNS lookup, so the
- * address that was approved is the address that is connected to. Resolving a
- * name to check it and then handing the NAME to fetch() leaves a window —
- * the classic DNS rebinding attack: answer with a public address for the
- * check, then with 127.0.0.1 a moment later for the connection. An attacker
- * who controls authoritative DNS for a name needs only to time a flip.
- *
- * Here there is no second resolution to poison. Every address the resolver
- * returns is screened, and if ANY of them is internal the connection is
- * refused outright rather than falling back to a sibling address — a name
- * that answers with both a public and a private address is not a name we
- * have any business fetching.
- */
-export type ResolvedAddress = { address: string; family: number };
-
-/**
- * The decision the socket's own lookup makes. Exported so it can be tested
- * directly: the security property is entirely in this function, and a test
- * that drives fetch() end to end cannot easily control what DNS says between
- * two calls.
- *
- * ALL-OR-NOTHING on purpose. A name that answers with both a public and a
- * private address is refused rather than connected to the public one: that
- * shape is the signature of a rebinding setup, and there is no legitimate
- * page that needs it.
- */
-export function screenResolved(addresses: unknown): ResolvedAddress[] | null {
-  const list = Array.isArray(addresses) ? (addresses as ResolvedAddress[]) : [];
-  if (!list.length) return null;
-  if (list.some((a) => !a || typeof a.address !== 'string')) return null;
-  if (list.some((a) => isForbiddenIp(a.address))) return null;
-  return list;
-}
-
-const safeAgent = new Agent({
-  connect: {
-    lookup(hostname, options, callback) {
-      dnsLookup(hostname, { ...options, all: true }, (err, addresses) => {
-        if (err) return callback(err, '', 4);
-        const safe = screenResolved(addresses);
-        if (!safe) return callback(new Error('blocked address'), '', 4);
-        // `all` was requested, so undici is handed the whole list — every
-        // entry of which has just been screened.
-        return (callback as unknown as (e: Error | null, a: ResolvedAddress[]) => void)(null, safe);
-      });
-    },
-  },
-  connectTimeout: 8_000,
-});
-
-/** How many hops a page may redirect through before we stop following. */
-const MAX_REDIRECTS = 5;
-
-/**
- * Read at most `max` bytes of a response body, stopping the moment the
- * ceiling is reached rather than after the whole thing has arrived.
- */
-async function readCapped(res: Response, max: number): Promise<string> {
-  const body = res.body;
-  if (!body) return '';
-  const reader = body.getReader();
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-  try {
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      if (!value) continue;
-      const room = max - total;
-      if (value.byteLength >= room) {
-        chunks.push(value.subarray(0, room));
-        total = max;
-        break;
-      }
-      chunks.push(value);
-      total += value.byteLength;
-    }
-  } finally {
-    try {
-      await reader.cancel();
-    } catch {
-      /* the peer went away; nothing to do */
-    }
-  }
-  const joined = new Uint8Array(total);
-  let at = 0;
-  for (const c of chunks) {
-    joined.set(c, at);
-    at += c.byteLength;
-  }
-  return new TextDecoder('utf-8', { fatal: false }).decode(joined);
-}
-
 export async function fetchWeb(rawUrl: string): Promise<FetchedContext> {
   let url: URL;
   try {
@@ -775,74 +629,46 @@ export async function fetchWeb(rawUrl: string): Promise<FetchedContext> {
   } catch {
     throw new ConnectError('That doesn’t look like a URL.', 400);
   }
-  await assertDestinationAllowed(url);
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    throw new ConnectError('Only http(s) pages can be read.', 400);
+  }
+  if (url.username || url.password) throw new ConnectError('That URL is not allowed.', 400);
+  if (isForbiddenHost(url.hostname)) throw new ConnectError('That address is not allowed.', 400);
 
-  // Redirects are followed BY HAND, one hop at a time, so every hop is
-  // screened before the request is made rather than after. `redirect:
-  // 'follow'` did the opposite: the internal request was issued and only the
-  // response body was withheld, which still reaches internal services, still
-  // has side effects, and still times differently depending on what is there.
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 12_000);
   let res: Response;
-  let current = url;
   try {
-    for (let hop = 0; ; hop++) {
-      if (hop > MAX_REDIRECTS) {
-        throw new ConnectError('That page redirected too many times.', 502);
-      }
-      // `dispatcher` is undici's, and Node's fetch IS undici — but the DOM
-      // RequestInit type does not know about it, so the cast is the honest
-      // way to say "this runs on Node". The pinned dispatcher is what makes
-      // the screened address the dialled one.
-      res = await fetch(current.toString(), {
-        dispatcher: safeAgent,
-        signal: ctrl.signal,
-        redirect: 'manual',
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; SocriaLogos/1.0)',
-          Accept: 'text/html,text/plain;q=0.9,*/*;q=0.5',
-        },
-        cache: 'no-store',
-      } as RequestInit & { dispatcher: unknown });
-      if (res.status < 300 || res.status > 399) break;
-      const loc = res.headers.get('location');
-      if (!loc) break;
-      let next: URL;
-      try {
-        next = new URL(loc, current);
-      } catch {
-        throw new ConnectError('That address is not allowed.', 400);
-      }
-      // The screen runs on the hop we are ABOUT to make.
-      await assertDestinationAllowed(next);
-      current = next;
-    }
-  } catch (e) {
-    clearTimeout(timer);
-    if (e instanceof ConnectError) throw e;
-    throw new ConnectError('That page could not be reached.', 502);
-  }
-
-  const ctype = res.headers.get('content-type') ?? '';
-  if (!/text\/html|text\/plain|application\/xhtml/.test(ctype)) {
-    clearTimeout(timer);
-    throw new ConnectError('That page isn’t readable text.', 422);
-  }
-
-  // Read with a ceiling instead of buffering the whole body and slicing
-  // afterwards: `arrayBuffer()` on a hostile endpoint that streams forever
-  // fills memory before the cap is ever applied. The abort timer stays armed
-  // until the body is done, for the same reason.
-  let html: string;
-  try {
-    html = await readCapped(res, MAX_WEB_BYTES);
-  } catch (e) {
-    if (e instanceof ConnectError) throw e;
+    res = await fetch(url.toString(), {
+      signal: ctrl.signal,
+      redirect: 'follow',
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; SocriaLogos/1.0)',
+        Accept: 'text/html,text/plain;q=0.9,*/*;q=0.5',
+      },
+      cache: 'no-store',
+    });
+  } catch {
     throw new ConnectError('That page could not be reached.', 502);
   } finally {
     clearTimeout(timer);
   }
+
+  // Redirects may have moved us somewhere the original check never saw.
+  try {
+    if (isForbiddenHost(new URL(res.url).hostname)) {
+      throw new ConnectError('That address is not allowed.', 400);
+    }
+  } catch (e) {
+    if (e instanceof ConnectError) throw e;
+  }
+
+  const ctype = res.headers.get('content-type') ?? '';
+  if (!/text\/html|text\/plain|application\/xhtml/.test(ctype)) {
+    throw new ConnectError('That page isn’t readable text.', 422);
+  }
+  const buf = await res.arrayBuffer();
+  const html = new TextDecoder('utf-8', { fatal: false }).decode(buf.slice(0, MAX_WEB_BYTES));
   const { title, text } = ctype.includes('text/plain')
     ? { title: '', text: html }
     : htmlToText(html);

@@ -11,7 +11,6 @@
 // button for something you did not know existed is not really a choice.
 
 import { useEffect, useState } from 'react';
-import { clearLocalMemory, clearSocriaLocalData } from '@/lib/local-data';
 
 type Busy = null | 'export' | 'memory' | 'account';
 
@@ -90,10 +89,9 @@ export function DataPrivacyPanel() {
       // The browser's own copy of the journey goes too. Left in place it
       // would be pushed back up on the next page load as the newest copy,
       // and the clearing would have lasted exactly one reload.
-      // The journey AND the imported profile: clearing only the first left
-      // `socria.importedProfile.v1` behind, and the next page load pushed it
-      // straight back to the server — so the button undid itself on reload.
-      clearLocalMemory();
+      try {
+        localStorage.removeItem('socria.journey.v1');
+      } catch {}
       setNote('Memory cleared. Socria starts fresh from here; your conversations are untouched.');
     } catch {
       setErr('Could not clear memory. Try again.');
@@ -111,12 +109,6 @@ export function DataPrivacyPanel() {
       });
       const json = await res.json().catch(() => null);
       if (!res.ok) throw new Error(json?.error || 'failed');
-      // The browser holds conversations, Logos sessions, the imported profile
-      // and the derived journey too. Leaving them meant the next person to
-      // sign in on a shared device inherited them — and the sync-on-load
-      // paths then pushed the deleted person's data up into that new account,
-      // undoing the deletion. Clear before leaving the page.
-      clearSocriaLocalData();
       window.location.href = '/';
     } catch (e) {
       setErr(

@@ -17,10 +17,10 @@ import {
 import { renderMessageForModel, sanitizeAttachments } from '@/lib/logos-attachments';
 import { renderContextsForMap, sanitizeContexts } from '@/lib/logos-sources';
 import { guidanceBlock, resolveDepth, resolveGuard } from '@/lib/logos-guidance';
+import { isValidAccessKey } from '@/lib/socria-prompt';
 import { capMapForFree, depthForPlan } from '@/lib/socria-one';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { enforceRateLimit } from '@/lib/rate-limit';
-import { mayUse } from '@/lib/route-guard';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -34,7 +34,7 @@ THIS TURN ONLY: omit "viz" entirely. The previous attempt ran out of room. Retur
 
 export async function POST(req: NextRequest) {
   const { userId } = auth();
-  const keyUnlocked = mayUse(req, userId);
+  const keyUnlocked = isValidAccessKey(req.headers.get('x-socria-key'));
   if (!userId && !keyUnlocked) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }

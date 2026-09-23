@@ -81,36 +81,18 @@ async function check(bucket: string, id: string, limit: number, windowSec: numbe
 
 function clientId(req: NextRequest, userId: string | null): { id: string; authed: boolean } {
   if (userId) return { id: `u:${userId}`, authed: true };
-  // The platform's own value FIRST. `x-forwarded-for` is a header, and a
-  // header is whatever the caller wrote unless something in front of the app
-  // overwrites it — so reading it before req.ip let an anonymous caller mint
-  // a fresh rate-limit bucket per request simply by varying a string. Vercel
-  // sets req.ip itself; the header is the fallback for deployments that do
-  // not, where it is the best available signal rather than a trusted one.
-  const platform = (req as unknown as { ip?: string }).ip;
   const fwd = (req.headers.get('x-forwarded-for') || '').split(',')[0].trim();
-  const ip = platform || fwd || req.headers.get('x-real-ip') || 'unknown';
+  const ip = fwd || (req as any).ip || req.headers.get('x-real-ip') || 'unknown';
   return { id: `ip:${ip}`, authed: false };
 }
 
 // Per-route-group budgets. 'chat' is the expensive main model; 'aux' covers
 // the cheap background gpt-4o-mini passes (memory/insight/synthesis/journey),
 // which fire automatically alongside chat so they get their own pool.
-// 'room' is the Logos 2 collaboration poll. It gets its own pool because it
-// is a cheap indexed read on a fixed cadence, and putting it in 'aux' meant
-// the two competed: a room polling every couple of seconds is ~30 requests a
-// minute on its own, against an 'aux' budget of 40 that the map, memory and
-// usage passes also draw on. The room would have throttled itself into
-// silence and taken the rest of Logos with it — a self-inflicted outage, not
-// a protection.
-type Kind = 'chat' | 'aux' | 'room';
+type Kind = 'chat' | 'aux';
 const LIMITS: Record<Kind, { authed: { minute: number; day: number }; anon: { minute: number; day: number } }> = {
   chat: { authed: { minute: 20, day: 400 }, anon: { minute: 8, day: 80 } },
   aux: { authed: { minute: 40, day: 1200 }, anon: { minute: 20, day: 300 } },
-  // Two people, two tabs each, with headroom for a retry; a signed-out
-  // caller has no room to poll, so the anon budget only has to cover the
-  // refusal itself.
-  room: { authed: { minute: 120, day: 20_000 }, anon: { minute: 5, day: 50 } },
 };
 
 function tooMany(r: RLResult): NextResponse {

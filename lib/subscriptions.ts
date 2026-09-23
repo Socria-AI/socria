@@ -67,49 +67,6 @@ export function entitles(
   return entitledBy(row.status, row.currentPeriodEnd);
 }
 
-/**
- * The same read, but able to say "I could not tell".
- *
- * getSubscription() collapses a failed query and an absent row into the same
- * `null`, which is fine where the answer is "show the free plan" and wrong
- * where the answer is "so there is nothing to cancel". Account deletion is
- * the second case: a database hiccup there meant the subscription was never
- * cancelled and the person kept being charged for an account that no longer
- * existed. Callers that must not guess use this.
- */
-export async function readSubscription(
-  userId: string
-): Promise<{ ok: true; row: SubscriptionRow | null } | { ok: false }> {
-  try {
-    const { data, error } = await supabaseAdmin()
-      .from('socria_subscriptions')
-      .select('user_id, stripe_customer_id, stripe_subscription_id, status, current_period_end, cancel_at_period_end')
-      .eq('user_id', userId)
-      .maybeSingle();
-    if (error) {
-      // A table that was never migrated genuinely holds nothing of theirs.
-      const m = `${error.code ?? ''} ${error.message ?? ''}`.toLowerCase();
-      const missing =
-        m.includes('42p01') || m.includes('does not exist') || m.includes('schema cache');
-      return missing ? { ok: true, row: null } : { ok: false };
-    }
-    if (!data) return { ok: true, row: null };
-    return {
-      ok: true,
-      row: {
-        userId: data.user_id,
-        customerId: data.stripe_customer_id,
-        subscriptionId: data.stripe_subscription_id ?? null,
-        status: data.status ?? 'incomplete',
-        currentPeriodEnd: data.current_period_end ?? null,
-        cancelAtPeriodEnd: !!data.cancel_at_period_end,
-      },
-    };
-  } catch {
-    return { ok: false };
-  }
-}
-
 export async function getSubscription(userId: string): Promise<SubscriptionRow | null> {
   try {
     const { data, error } = await supabaseAdmin()

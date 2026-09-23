@@ -8,11 +8,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { sanitizeMemory, EMPTY_MEMORY } from '@/lib/socria-prompt';
-import { EMPTY_MAP, sanitizeMap, sanitizeByRef } from '@/lib/logos';
+import { EMPTY_MAP, sanitizeMap } from '@/lib/logos';
 import { sanitizeAttachments } from '@/lib/logos-attachments';
 import { sanitizeContexts } from '@/lib/logos-sources';
-import { MindStoreError, listProjects, loadGraph, persistGraph } from '@/lib/mind/store';
-import { adoptConversation, releaseConversation } from '@/lib/mind/projects';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -39,16 +37,9 @@ function sanitizeMessages(raw: unknown): Msg[] {
     .slice(-MAX_MESSAGES_PER_CONVO)
     .map((m: any) => {
       const attachments = sanitizeAttachments(m.attachments);
-      // Who said it, when two people were thinking together (Logos 2). Kept
-      // so a shared session opened alone later still shows whose idea each
-      // one was; validated so a broken author reads as none, not as a crash.
-      const by = sanitizeByRef(m.by);
-      return {
-        role: m.role,
-        content: m.content,
-        ...(attachments.length ? { attachments } : {}),
-        ...(by ? { by } : {}),
-      };
+      return attachments.length
+        ? { role: m.role, content: m.content, attachments }
+        : { role: m.role, content: m.content };
     });
 }
 
@@ -92,37 +83,6 @@ interface Sidecar {
   map?: unknown;
   draft?: unknown;
   contexts?: unknown;
-  projectId?: unknown;
-}
-
-/**
- * Which Project a conversation is in, if any.
- *
- * An opaque id we generated, so anything else is refused rather than stored.
- * Not checked against the Project list: this is the person's own row, and a
- * Project id that is not theirs resolves to nothing everywhere it is read —
- * every Project lookup is scoped to the owner.
- */
-function sanitizeProjectId(raw: unknown): string | null {
-  return typeof raw === 'string' && /^[A-Za-z0-9_-]{1,80}$/.test(raw) ? raw : null;
-}
-
-// project_id is the NEWEST column here, and it must degrade on its own.
-//
-// The fallback below is all-or-nothing: one missing column sends the read to
-// a select that omits kind/map/draft/contexts entirely. Folding project_id
-// into that same select would have meant every deployment that had not yet
-// re-run schema.sql for Projects — which is every deployment, on the day
-// this shipped — lost its Logos maps from the list. So a missing project_id
-// is tried away first, and only then does the older fallback run.
-let warnedProject = false;
-function warnProjectColumn() {
-  if (warnedProject) return;
-  warnedProject = true;
-  console.error(
-    'conversations: this database has no project_id column, so conversations cannot be filed ' +
-      'under a Project yet. Everything else works. Re-run supabase/schema.sql (it is idempotent).'
-  );
 }
 
 /** One stored row → the shape the clients expect, whichever schema wrote it. */
@@ -146,7 +106,6 @@ function shape(c: any) {
     map: c.map ?? side.map ?? EMPTY_MAP,
     draft: c.draft ?? side.draft ?? null,
     contexts: c.contexts ?? side.contexts ?? null,
-    projectId: sanitizeProjectId(c.project_id ?? side.projectId),
     updatedAt: Number(c.updated_at),
   };
 }
@@ -188,19 +147,9 @@ export async function GET() {
     let error;
     ({ data, error } = await supabaseAdmin()
       .from('conversations')
-      .select('id, title, messages, memory, kind, map, draft, contexts, project_id, updated_at')
+      .select('id, title, messages, memory, kind, map, draft, contexts, updated_at')
       .eq('user_id', userId)
       .order('updated_at', { ascending: false }));
-
-    // Without project_id first — see warnProjectColumn.
-    if (error && missingColumn(error)) {
-      ({ data, error } = await supabaseAdmin()
-        .from('conversations')
-        .select('id, title, messages, memory, kind, map, draft, contexts, updated_at')
-        .eq('user_id', userId)
-        .order('updated_at', { ascending: false }));
-      if (!error) warnProjectColumn();
-    }
 
     // An old database: list what it does have, defaulting the rest, so
     // signing in still works while the migration is outstanding.
@@ -255,12 +204,6 @@ export async function PATCH(req: NextRequest) {
 
   const body = await req.json().catch(() => null);
   const id = body?.id;
-  // Filing a conversation under a Project (or taking it out of one) is its
-  // own operation, with its own consequences in the Mind Graph — see
-  // moveToProject below.
-  if (typeof id === 'string' && id && body && 'projectId' in body && body.title === undefined) {
-    return moveToProject(userId, id, body.projectId);
-  }
   const raw = body?.title;
   if (typeof id !== 'string' || !id || typeof raw !== 'string') {
     return NextResponse.json({ error: 'Invalid rename' }, { status: 400 });
@@ -292,86 +235,6 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ ok: true, title });
   } catch (e: any) {
     console.error('PATCH conversation threw:', e);
-    return NextResponse.json({ error: e?.message || 'Internal error' }, { status: 500 });
-  }
-}
-
-/**
- * Move one conversation into a Project, out of one, or between two.
- *
- * Two writes, in the order that is safe to repeat. The conversation's
- * project_id first — that is what the rail shows, and a move that fails
- * after it can simply be done again. Then the graph: what the conversation
- * taught is untied from the Project it left and tied to the one it joined
- * (releaseConversation / adoptConversation in lib/mind/projects.ts). Moving
- * a chat is filing, never forgetting — no memory is created or removed,
- * only the ties that say which Project it was worked on in.
- *
- * `updated_at` is left alone for the same reason a rename leaves it: the rail
- * is ordered by it, and filing is not thinking.
- */
-async function moveToProject(userId: string, id: string, raw: unknown) {
-  const target = raw === null ? null : sanitizeProjectId(raw);
-  if (raw !== null && !target) return NextResponse.json({ error: 'Which Project?' }, { status: 400 });
-
-  try {
-    const db = supabaseAdmin();
-    const { data: row, error: readErr } = await db
-      .from('conversations').select('id, project_id').eq('id', id).eq('user_id', userId).maybeSingle();
-    if (readErr) {
-      if (missingColumn(readErr)) {
-        warnProjectColumn();
-        return NextResponse.json(
-          { error: 'Projects are not set up on this database yet — re-run supabase/schema.sql.' },
-          { status: 409 }
-        );
-      }
-      return NextResponse.json({ error: `Supabase: ${readErr.message}` }, { status: 500 });
-    }
-    if (!row) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-    const from = sanitizeProjectId((row as { project_id?: unknown }).project_id);
-    if (from === target) return NextResponse.json({ ok: true, projectId: target });
-
-    // Both Projects must be this person's. Scoped reads: anybody else's id is
-    // simply absent from the list.
-    const projects = await listProjects(userId);
-    const to = target ? projects.find((p) => p.id === target) : null;
-    if (target && !to) return NextResponse.json({ error: 'No such Project.' }, { status: 404 });
-    const left = from ? projects.find((p) => p.id === from) : null;
-
-    const { error: upErr } = await db
-      .from('conversations').update({ project_id: target }).eq('id', id).eq('user_id', userId);
-    if (upErr) return NextResponse.json({ error: `Supabase: ${upErr.message}` }, { status: 500 });
-
-    const now = Date.now();
-    let seq = 0;
-    const nextId = () => `m_${now.toString(36)}_M${(seq++).toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
-    const before = await loadGraph(userId);
-    let after = before;
-    let untied = 0;
-    let tied = 0;
-    if (left && after.nodes.some((n) => n.id === left.nodeId)) {
-      const r = releaseConversation(after, left.nodeId, id);
-      after = r.graph; untied = r.untied;
-    }
-    if (to && after.nodes.some((n) => n.id === to.nodeId)) {
-      const r = adoptConversation(after, to.nodeId, id, { now, nextId });
-      after = r.graph; tied = r.tied;
-    }
-    if (after !== before) {
-      const saved = await persistGraph(userId, before, after);
-      if (!saved.ok) {
-        // The conversation IS filed; its memories are not yet tied. Said,
-        // rather than reported as success: moving it again repairs it.
-        return NextResponse.json({ ok: true, projectId: target, graph: 'pending' });
-      }
-    }
-    return NextResponse.json({ ok: true, projectId: target, tied, untied });
-  } catch (e: any) {
-    if (e instanceof MindStoreError) {
-      return NextResponse.json({ error: 'Projects are not set up on this deployment yet.' }, { status: 503 });
-    }
-    console.error('PATCH conversation move threw:', e);
     return NextResponse.json({ error: e?.message || 'Internal error' }, { status: 500 });
   }
 }
@@ -418,28 +281,11 @@ export async function PUT(req: NextRequest) {
     // is scoped to (id, user_id) so it can only ever touch your own row, and
     // if it matches nothing the insert either creates the row or fails on the
     // primary key because the id belongs to somebody else.
-    const projectId = sanitizeProjectId(c.projectId);
-    // Where the project id goes when its column is missing along with the
-    // older ones: into the sidecar, like them, so it is not dropped.
-    const sidecar = { ...extras, ...(projectId ? { projectId } : {}) };
-
     let { error, count } = await supabaseAdmin()
       .from('conversations')
-      .update({ ...base, ...extras, project_id: projectId }, { count: 'exact' })
+      .update({ ...base, ...extras }, { count: 'exact' })
       .eq('id', c.id)
       .eq('user_id', userId);
-
-    // Without project_id first, so a database that only lacks THAT column
-    // keeps kind/map/draft/contexts in their real columns.
-    let projectColumn = true;
-    if (error && missingColumn(error)) {
-      ({ error, count } = await supabaseAdmin()
-        .from('conversations')
-        .update({ ...base, ...extras }, { count: 'exact' })
-        .eq('id', c.id)
-        .eq('user_id', userId));
-      if (!error) { projectColumn = false; warnProjectColumn(); }
-    }
 
     let legacy = false;
     if (error && missingColumn(error)) {
@@ -447,7 +293,7 @@ export async function PUT(req: NextRequest) {
       legacy = true;
       ({ error, count } = await supabaseAdmin()
         .from('conversations')
-        .update({ ...base, memory: { ...base.memory, [SIDECAR]: sidecar } }, { count: 'exact' })
+        .update({ ...base, memory: { ...base.memory, [SIDECAR]: extras } }, { count: 'exact' })
         .eq('id', c.id)
         .eq('user_id', userId));
     }
@@ -455,19 +301,15 @@ export async function PUT(req: NextRequest) {
     if (!error && !count) {
       // Annotated, or the ternary infers a union the client's generics reject.
       const row: Record<string, unknown> = legacy
-        ? { ...base, memory: { ...base.memory, [SIDECAR]: sidecar } }
-        : { ...base, ...extras, ...(projectColumn ? { project_id: projectId } : {}) };
+        ? { ...base, memory: { ...base.memory, [SIDECAR]: extras } }
+        : { ...base, ...extras };
       ({ error } = await supabaseAdmin().from('conversations').insert(row));
 
-      if (error && missingColumn(error) && !legacy && projectColumn) {
-        ({ error } = await supabaseAdmin().from('conversations').insert({ ...base, ...extras }));
-        if (!error) warnProjectColumn();
-      }
       if (error && missingColumn(error)) {
         warnLegacy('PUT');
         ({ error } = await supabaseAdmin()
           .from('conversations')
-          .insert({ ...base, memory: { ...base.memory, [SIDECAR]: sidecar } }));
+          .insert({ ...base, memory: { ...base.memory, [SIDECAR]: extras } }));
       }
 
       // A primary-key collision here means the id exists and is not yours.
@@ -554,35 +396,10 @@ export async function POST(req: NextRequest) {
     // drop any id that already exists and does not belong to this account,
     // rather than letting it through and taking the row.
     const ids = rows.map((r) => r.id as string);
-
-    // An id is an opaque handle we generated; anything else is a probe. This
-    // also keeps PostgREST's `in()` list free of the characters that would
-    // otherwise change how it parses — a malformed id must not be able to
-    // turn the ownership query into an error.
-    if (ids.some((id) => !/^[A-Za-z0-9_-]{1,120}$/.test(id))) {
-      return NextResponse.json({ error: 'Bad conversation id.' }, { status: 400 });
-    }
-
-    const { data: existing, error: checkError } = await supabaseAdmin()
+    const { data: existing } = await supabaseAdmin()
       .from('conversations')
       .select('id, user_id')
       .in('id', ids);
-
-    // FAIL CLOSED. This query is the ONLY thing standing between a caller and
-    // another account's rows: `conversations.id` is the whole primary key, so
-    // an upsert carrying somebody else's id overwrites their row and takes
-    // ownership of it. The error used to be discarded — on any failure `data`
-    // came back null, `foreign` came out empty, nothing was filtered, and the
-    // upsert ran unguarded. A check that cannot be completed is a check that
-    // failed; nothing is imported.
-    if (checkError) {
-      console.error('POST conversations: ownership check failed', checkError);
-      return NextResponse.json(
-        { error: 'Could not import right now. Nothing was changed.' },
-        { status: 503 }
-      );
-    }
-
     const foreign = new Set(
       (existing ?? [])
         .filter((r: { user_id: string }) => r.user_id !== userId)

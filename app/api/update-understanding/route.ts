@@ -18,6 +18,7 @@ import {
   sanitizeUserUnderstanding,
   sanitizeMemory,
   renderMemoryForPrompt,
+  isValidAccessKey,
   type UserUnderstanding,
 } from '@/lib/socria-prompt';
 import { enforceRateLimit } from '@/lib/rate-limit';
@@ -31,7 +32,6 @@ import {
   scoreEntry,
   type MemoryEntry,
 } from '@/lib/person-memory';
-import { mayUse } from '@/lib/route-guard';
 
 /**
  * How many known entries the extractor is shown.
@@ -93,7 +93,7 @@ const MAX_RECENT_MESSAGES = 8;
 
 export async function POST(req: NextRequest) {
   const { userId } = auth();
-  const keyUnlocked = mayUse(req, userId);
+  const keyUnlocked = isValidAccessKey(req.headers.get('x-socria-key'));
   if (!userId && !keyUnlocked) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }

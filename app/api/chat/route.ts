@@ -12,9 +12,7 @@ import {
   SOCRIA_MODELS,
   SOCRIA_PROMPT_VERSION,
   CORE_3_FALLBACK_MODEL,
-  CORE_4_PROMPT_VERSION,
-  fallbackOpenAIModel,
-  resolveModel,
+  isValidAccessKey,
   sanitizeUserUnderstanding,
   hasJourneyContent,
   renderJourneyBrief,
@@ -23,12 +21,6 @@ import {
   renderTranscriptForState,
   type ConversationState,
 } from '@/lib/socria-prompt';
-import { recall, remember } from '@/lib/mind/pipeline';
-import { readState, guardDraft } from '@/lib/cognition/engine';
-import { route, renderMove, questionStreak, type Move } from '@/lib/cognition/router';
-import { renderState, type CognitiveState } from '@/lib/cognition/state';
-import { retryNote } from '@/lib/cognition/guard';
-import type { ActivatedSubgraph } from '@/lib/mind/activate';
 import {
   computeGuidance,
   renderTurnDirective,
@@ -39,7 +31,6 @@ import { eggFor } from '@/lib/easter-eggs';
 import { reportUpstream } from '@/lib/upstream-error';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { memoryCaps, selectRelevant, visibleEntries } from '@/lib/person-memory';
-import { mayUse } from '@/lib/route-guard';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -106,20 +97,19 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => null);
     const messages = body?.messages;
 
-    // Server-side gate: models flagged requiresAuth need a Clerk session OR a
-    // verified unlock grant. The grant is an httpOnly cookie this server
-    // signed (lib/access-codes-server.ts) after checking a typed code against
-    // the environment — not, as before, a constant the browser also carried,
-    // accepted from a header or from `body.accessKey`. Both of those inputs
-    // are caller-composed and are no longer read.
+    // Server-side gate: models flagged requiresAuth need a Clerk session OR
+    // a valid access key (typed by the user, sent via the x-socria-key
+    // header). Even if the client UI is bypassed, anon users without either
+    // can't hit Core 3.
     const { userId } = auth();
-    const keyUnlocked = mayUse(req, userId);
+    const keyUnlocked = isValidAccessKey(
+      req.headers.get('x-socria-key') ?? body?.accessKey
+    );
     const requestedModelId = body?.model;
-    // Read the config of the model actually asked for. Written as a ternary
-    // pair it silently answered "Core 2" for any Core added later — which
-    // meant a new model both skipped its own auth requirement and ran on the
-    // wrong prompt. resolveModel is the single place that decides.
-    const requestedConfig = SOCRIA_MODELS[resolveModel(requestedModelId)];
+    const requestedConfig =
+      requestedModelId === 'core-3'
+        ? SOCRIA_MODELS['core-3']
+        : SOCRIA_MODELS['core-2'];
     if (requestedConfig.requiresAuth && !userId && !keyUnlocked) {
       return NextResponse.json(
         {
@@ -185,16 +175,12 @@ export async function POST(req: NextRequest) {
           .join('\n')
           .slice(0, 2_000)
       : '';
-    // Not computed for Core 4 at all. Its memory is the Mind Graph; selecting
-    // top-k flat entries for it would be the replaced architecture running
-    // alongside the new one, and paying for it.
-    const personMemory =
-      understanding && resolveModel(body?.model) !== 'core-4'
-        ? selectRelevant(visibleEntries(understanding.entries, plan, now), contextText, {
-            now,
-            n: caps.injectCore,
-          })
-        : null;
+    const personMemory = understanding
+      ? selectRelevant(visibleEntries(understanding.entries, plan, now), contextText, {
+          now,
+          n: caps.injectCore,
+        })
+      : null;
     const journey =
       understanding && hasJourneyContent(understanding)
         ? {
@@ -204,7 +190,14 @@ export async function POST(req: NextRequest) {
           }
         : null;
 
-
+    const { prompt: basePrompt, model, depth } = buildSystemPrompt(
+      body?.model,
+      body?.depth,
+      body?.memory,
+      typeof body?.profile === 'string' ? body.profile : null,
+      journey,
+      personMemory
+    );
 
     if (!Array.isArray(messages) || messages.length === 0) {
       return NextResponse.json(
@@ -238,118 +231,6 @@ export async function POST(req: NextRequest) {
       )
       .slice(-MAX_HISTORY)
       .map((m: any) => ({ role: m.role, content: m.content }));
-
-    const socriaModel = resolveModel(body?.model);
-
-    // The Project this conversation is in, if any. Bounded like every other
-    // field off a request body; whether it is actually THEIR Project is
-    // settled inside recall() and remember(), where every lookup is scoped
-    // to the owner — an id that is not theirs reads as no Project at all.
-    const projectId =
-      typeof body?.projectId === 'string' && /^[A-Za-z0-9_-]{1,80}$/.test(body.projectId)
-        ? body.projectId
-        : null;
-
-    // ── the Cognitive State Engine ────────────────────────────────
-    //
-    // The Mind Graph is what Socria understands about this person; this is
-    // what is happening in this conversation, this minute. Read first, then
-    // the move is ROUTED from it deterministically — so the choice cannot be
-    // argued out of by a message that sounds urgent or impatient, and so
-    // there is a reason with a name when Socria asks instead of answering.
-    //
-    // Same failure posture as the graph: an empty state routes toward asking,
-    // which is the recoverable mistake.
-    //
-    // Read BEFORE the graph now, not after. Retrieval is meant to start from
-    // the query, the Project AND the Cognitive State — what the person is
-    // focused on right now is a better seed than the words of one message,
-    // and "we are still on the product rule" should light that region even
-    // when this message only says "ok, and then?". Run after recall, the
-    // state could shape the reply but never what was remembered for it.
-    let cognitiveState: CognitiveState | null = null;
-    let move: Move | null = null;
-    let questions = 0;
-    if (socriaModel === 'core-4' && apiKey) {
-      try {
-        cognitiveState = await readState(
-          apiKey,
-          clean.map((m) => `${m.role === 'user' ? 'Them' : 'Socria'}: ${m.content}`).join('\n\n').slice(-8000),
-          null
-        );
-        // The run of questions Socria has just asked, read from the
-        // transcript the person actually saw — every question in it raises
-        // the bar for the next one (lib/cognition/router.ts).
-        questions = questionStreak(clean);
-        move = route(cognitiveState, { questionStreak: questions });
-      } catch (e) {
-        console.error('[socria/chat] cognitive state unavailable; replying without a routed move', e);
-      }
-    }
-
-    // ── the Mind Graph ────────────────────────────────────────────
-    //
-    // Core 4's persistent memory. Activated by what they just said — a region
-    // of the graph reached through its edges, not a top-k list of snippets —
-    // and rendered into the system prompt.
-    //
-    // Never blocks and never throws. A graph that cannot be read means a
-    // conversation without memory, which is how this worked last week; a
-    // conversation that breaks BECAUSE of memory is a regression nobody
-    // accepts. recall() already swallows its own failures; this is the second
-    // reason it is called on its own line rather than inline.
-    let mindBlock: string | null = null;
-    let mindSubgraph: ActivatedSubgraph | null = null;
-    let projectBlock: string | null = null;
-    let inProject = false;
-    if (socriaModel === 'core-4' && userId) {
-      // WRAPPED HERE, not only inside recall().
-      //
-      // recall() swallows its own failures, and I relied on that — but the
-      // `plan` argument was an await evaluated BEFORE recall was entered, so
-      // anything it threw sailed past that guarantee and out to the handler's
-      // catch, where it became "Something went wrong on our side." A promise
-      // that memory can never break a conversation has to be made at the
-      // point the conversation calls it, not inside the thing being called.
-      try {
-        const r = await recall(userId, last.content, {
-          now: Date.now(),
-          // Reuse the plan already resolved above rather than resolving it a
-          // second time: one fewer call, and one fewer thing that can fail.
-          plan,
-          surface: 'core',
-          // What the Cognitive State says they are focused on, as extra
-          // seed terms. Empty when the state could not be read.
-          focus: cognitiveState?.currentFocus ? [cognitiveState.currentFocus] : undefined,
-          // A weighting, not a filter: see lib/mind/projects.ts.
-          projectId,
-        });
-        mindBlock = r.block || null;
-        mindSubgraph = r.subgraph;
-        projectBlock = r.projectBlock || null;
-        inProject = !!r.project;
-      } catch (e) {
-        // No memory this turn. Said out loud in the log, because a graph
-        // that silently never loads looks exactly like a graph with nothing
-        // in it, and those need telling apart.
-        console.error('[socria/chat] mind graph recall failed; continuing without it', e);
-      }
-    }
-
-    const { prompt: basePrompt, model, depth } = buildSystemPrompt(
-      body?.model,
-      body?.depth,
-      body?.memory,
-      typeof body?.profile === 'string' ? body.profile : null,
-      journey,
-      personMemory,
-      mindBlock,
-      move && cognitiveState
-        ? { state: renderState(cognitiveState), move: renderMove(move) }
-        : null,
-      projectBlock
-    );
-
 
     // Core 3.1 per-turn conversation controller: compute compact guidance from
     // the thread (what changed this turn, anti-loop "do not" list) and append
@@ -416,38 +297,12 @@ export async function POST(req: NextRequest) {
         socriaModel: model,
         openaiModel: resolveOpenAIModel(model),
         depth,
-        promptVersion:
-          model === 'core-3'
-            ? SOCRIA_PROMPT_VERSION
-            : model === 'core-4'
-              ? CORE_4_PROMPT_VERSION
-              : 'core-2',
+        promptVersion: model === 'core-3' ? SOCRIA_PROMPT_VERSION : 'core-2',
         promptChars: systemPrompt.length,
         approxPromptTokens: Math.round(systemPrompt.length / 4),
-        // Core 4 receives context too — its own prompt says to expect it —
-        // so these can no longer mean "Core 3.1 and nothing else".
-        memoryInjected: model !== 'core-2' && !!body?.memory,
-        profileInjected: model !== 'core-2' && !!body?.profile,
-        journeyInjected: model !== 'core-2' && !!journey,
-        mindNodes: mindSubgraph?.nodes.length ?? 0,
-        mindEdges: mindSubgraph?.edges.length ?? 0,
-        // Whether this turn was inside a Project, and how much came across
-        // from other Projects. The second number is the one to watch: if it
-        // is routinely high, cross-project retrieval is flooding.
-        inProject,
-        crossProject: Object.keys(mindSubgraph?.elsewhere ?? {}).length,
-        // Which move was chosen, and why. The reason is the point: when
-        // Socria asks instead of answering there should be a nameable cause,
-        // not a shrug about model judgement.
-        intervention: move?.intervention ?? null,
-        because: move?.because ?? null,
-        // How many questions in a row preceded this turn. If ASK keeps
-        // appearing with a high number here, the pressure is not working.
-        questionStreak: questions,
-        guarded: !!move?.guard,
-        taskKind: cognitiveState?.taskKind ?? null,
-        attempt: cognitiveState?.attempt ?? null,
-        shown: cognitiveState?.demonstratedUnderstanding ?? null,
+        memoryInjected: model === 'core-3' && !!body?.memory,
+        profileInjected: model === 'core-3' && !!body?.profile,
+        journeyInjected: model === 'core-3' && !!journey,
         userTurns,
         assistantTurns,
         stage: guidance?.stage ?? null,
@@ -486,133 +341,33 @@ export async function POST(req: NextRequest) {
         status === 404 ||
         /model/i.test(e?.code || '') ||
         /model|not found|does not exist|unknown/i.test(e?.message || '');
-      // Registry-driven, not `model === 'core-3'`. Written that way, Core 4
-      // inherited the same model id and none of the protection — so a
-      // deployment where Core 3.1 silently fell back and worked would fail on
-      // Core 4 and look like Core 4 was broken.
-      const fallback = fallbackOpenAIModel(model);
-      if (fallback && isModelError && openaiModel !== fallback) {
-        // Logged in production too. A model quietly answering as something
-        // other than what the person picked is worth knowing about, and the
-        // dev-only warning meant nobody found out for weeks.
-        console.warn(
-          `[socria/chat] model "${openaiModel}" rejected for ${model} (${e?.message || status}); falling back to ${fallback}`
-        );
-        completion = await makeCompletion(fallback);
+      if (model === 'core-3' && isModelError && openaiModel !== CORE_3_FALLBACK_MODEL) {
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn(
+            `[socria/chat] model "${openaiModel}" rejected (${e?.message || status}); falling back to ${CORE_3_FALLBACK_MODEL}`
+          );
+        }
+        completion = await makeCompletion(CORE_3_FALLBACK_MODEL);
       } else {
         throw e;
       }
     }
 
     const encoder = new TextEncoder();
-
-    // ── the Answer Guard ──────────────────────────────────────────
-    //
-    // A guarded move CANNOT STREAM. The guard's whole value is that the
-    // person does not see the leaked work — checking it after they have read
-    // it would be theatre. So the draft is collected, read, and only then
-    // emitted.
-    //
-    // The latency that costs is small and lands where it is cheapest: the
-    // moves that need guarding are the ones Core 4's own Response Discipline
-    // keeps short — a question, a nudge, an acknowledgement. The long replies,
-    // where streaming actually matters, are the ones where the work is
-    // legitimately ours and there is nothing to withhold.
-    const guarded = !!move?.guard;
-
     const stream = new ReadableStream({
       async start(controller) {
-        let reply = '';
         try {
           for await (const chunk of completion) {
             const delta = chunk.choices?.[0]?.delta?.content ?? '';
-            if (delta) {
-              reply += delta;
-              // Held back when the move withholds something. Nothing reaches
-              // the person until the guard has read it.
-              if (!guarded) controller.enqueue(encoder.encode(delta));
-            }
-          }
-
-          if (guarded && move && apiKey) {
-            let verdict = await guardDraft(apiKey, move, last.content, reply);
-
-            if (verdict.verdict === 'regenerate') {
-              // One retry, told exactly what went wrong. Not a loop: a second
-              // failure means the draft is sent anyway rather than the person
-              // waiting on a machine arguing with itself.
-              console.warn(`[socria/chat] answer guard rejected a ${move.intervention} draft (${verdict.by}): ${verdict.reason}`);
-              try {
-                const second = await openai.chat.completions.create({
-                  model: openaiModel,
-                  messages: [
-                    { role: 'system', content: systemPrompt + retryNote(verdict, move) },
-                    ...(clean as { role: 'user' | 'assistant'; content: string }[]),
-                  ],
-                  temperature: 0.7,
-                  max_tokens: 500,
-                });
-                const retry = second.choices[0]?.message?.content ?? '';
-                if (retry.trim()) reply = retry;
-              } catch (e) {
-                console.error('[socria/chat] guard retry failed; sending the first draft', e);
-              }
-            } else if (verdict.verdict === 'revise' && verdict.revised) {
-              console.warn(`[socria/chat] answer guard revised a ${move.intervention} draft: ${verdict.reason}`);
-              reply = verdict.revised;
-            }
-
-            controller.enqueue(encoder.encode(reply));
+            if (delta) controller.enqueue(encoder.encode(delta));
           }
         } catch (e) {
           console.error('stream error:', e);
-          // On a guarded turn nothing has been sent yet, so whatever was
-          // collected before the failure goes out with the notice rather
-          // than being lost entirely.
-          if (guarded && reply.trim()) controller.enqueue(encoder.encode(reply));
           controller.enqueue(
             encoder.encode('\n\n[Connection interrupted. Please try again.]')
           );
         } finally {
           controller.close();
-          // ── learn from the turn ────────────────────────────────
-          //
-          // After the reply is closed, never before: the person waits for
-          // words, not for a graph. Fire-and-forget, and remember() swallows
-          // its own failures — a turn the graph did not learn from is
-          // recoverable and invisible; a reply that failed because of the
-          // graph is neither.
-          //
-          // Both halves go in. A conversation is what was said AND what
-          // Socria said back, and half of it is the half that contains the
-          // question somebody was answering.
-          try {
-          if (socriaModel === 'core-4' && userId && apiKey) {
-            void remember(userId, `User: ${last.content}\n\nSocria: ${reply}`, {
-              now: Date.now(),
-              apiKey,
-              surface: 'core',
-              conversationId: typeof body?.conversationId === 'string' ? body.conversationId : undefined,
-              existing: mindSubgraph,
-              // The ONE graph learns exactly as it does outside a Project;
-              // this only ties what the turn touched to the Project it
-              // happened in.
-              projectId,
-              // remember() already swallows its own failures, so this only
-              // catches a rejection it could not — but an unhandled rejection
-              // inside a `finally` after the stream has closed is the kind of
-              // thing that shows up as a mystery 500 with no stack pointing
-              // anywhere useful.
-            }).catch((err: unknown) => {
-              console.error('[socria/chat] mind graph remember failed', err);
-            });
-          }
-          } catch (e) {
-            // The stream is already closed by the time this runs, so a throw
-            // here cannot reach the person — it can only become an unhandled
-            // rejection that takes the process with it.
-            console.error('[socria/chat] mind graph remember threw', e);
-          }
         }
       },
     });

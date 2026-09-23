@@ -25,7 +25,6 @@ import {
   groundOf, markOf, needsOne, sanitizePfp, type PfpConfig,
 } from '@/lib/pfp';
 import { PFP_CHANGED } from './AccountControl';
-import { EXPORT_SIZES, saveFile, toPng, toSvg } from './pictureFile';
 
 export function PictureComposer({ isOne = false }: { isOne?: boolean }) {
   const [cfg, setCfg] = useState<PfpConfig>(DEFAULT_PFP);
@@ -60,30 +59,6 @@ export function PictureComposer({ isOne = false }: { isOne?: boolean }) {
       setSaved(false);
     }
   }, [cfg]);
-
-  // Exporting, and which file is on its way. Downloads go ONE AT A TIME:
-  // browsers drop simultaneous ones, so six at once would arrive as one.
-  const [busy, setBusy] = useState('');
-
-  const downloadOne = useCallback(async () => {
-    saveFile(await toPng(cfg), 'socria-picture.png');
-  }, [cfg]);
-
-  const downloadAll = useCallback(async () => {
-    if (busy) return;
-    setBusy('Exporting…');
-    try {
-      const stem = `socria-picture-${cfg.mark}-${cfg.ground}`;
-      saveFile(`data:image/svg+xml;charset=utf-8,${encodeURIComponent(await toSvg(cfg))}`, `${stem}.svg`);
-      for (const s of EXPORT_SIZES) {
-        await new Promise((r) => setTimeout(r, 260));
-        setBusy(`${s}px…`);
-        saveFile(await toPng(cfg, s), `${stem}-${s}.png`);
-      }
-    } finally {
-      setBusy('');
-    }
-  }, [cfg, busy]);
 
   const locked = (one?: boolean) => !!one && !isOne;
 
@@ -354,15 +329,12 @@ export function PictureComposer({ isOne = false }: { isOne?: boolean }) {
           the right; without them `space-between` threw the buttons to
           opposite edges of the window. */}
       <div className="pfp-bar">
-        <p className="vow">Every file, yours: the vector master and 512 · 256 · 128 · 64 · 32px.</p>
+        <p className="vow">
+          It is a picture, not an identity. Change it whenever you like, and take the file with
+          you.
+        </p>
         <div className="acts">
-          {busy ? <span className="saved">{busy}</span> : saved && <span className="saved">Saved.</span>}
-          <button type="button" className="reset" onClick={() => void downloadOne()} disabled={!!busy}>
-            One PNG
-          </button>
-          <button type="button" className="reset" onClick={() => void downloadAll()} disabled={!!busy}>
-            Export every file
-          </button>
+          {saved && <span className="saved">Saved.</span>}
           <button
             type="button"
             className="reset"

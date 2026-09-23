@@ -6,17 +6,18 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { ConnectError, searchSource } from '@/lib/logos-connect';
 import { SOURCE_KINDS, type SourceKind } from '@/lib/logos-sources';
+import { isValidAccessKey } from '@/lib/socria-prompt';
 import { enforceRateLimit } from '@/lib/rate-limit';
-import { unauthorized } from '@/lib/route-guard';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
   const { userId } = auth();
-  // No unlock path here: this route reads a person's connected accounts
-  // (or fetches a URL on their behalf), so it needs a real account.
-  if (!userId) return unauthorized();
+  const keyUnlocked = isValidAccessKey(req.headers.get('x-socria-key'));
+  if (!userId && !keyUnlocked) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
   const limited = await enforceRateLimit(req, userId, 'aux');
   if (limited) return limited;
 

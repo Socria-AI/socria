@@ -20,6 +20,7 @@ import { renderContextsForNode, sanitizeNodeContextList } from '@/lib/logos-sour
 import { guidanceBlock, resolveDepth, resolveGuard } from '@/lib/logos-guidance';
 import { styleBlock } from '@/lib/logos-style';
 import { personalityBlock } from '@/lib/logos-personality';
+import { isValidAccessKey } from '@/lib/socria-prompt';
 import { depthForPlan } from '@/lib/socria-one';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { boundaryNote, type Counter } from '@/lib/entitlements';
@@ -38,7 +39,6 @@ import {
   searchConfigured,
   type NodeMode,
 } from '@/lib/logos-explore';
-import { mayUse } from '@/lib/route-guard';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -52,7 +52,7 @@ type Turn = { role: 'user' | 'assistant'; content: string };
 
 export async function POST(req: NextRequest) {
   const { userId } = auth();
-  const keyUnlocked = mayUse(req, userId);
+  const keyUnlocked = isValidAccessKey(req.headers.get('x-socria-key'));
   if (!userId && !keyUnlocked) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }

@@ -22,7 +22,6 @@ import { ChoiceChips } from '@/components/ChoiceChips';
 import type { ThinkingMap } from '@/lib/logos';
 import type { SocriaModel } from '@/lib/socria-prompt';
 import type { SynthesisData } from '@/lib/synthesis';
-import { SOCRIA_MODELS } from '@/lib/socria-prompt';
 
 /** The same framed figure the imported Logos demos use. */
 export function DocsFrame({
@@ -508,7 +507,7 @@ export function DemoModelPicker() {
         <p className="d-pickernote">
           {model === 'logos'
             ? 'In the app this swaps the whole surface into Logos, in place.'
-            : `Selected: ${SOCRIA_MODELS[model].label}.`}
+            : `Selected: Socria ${model === 'core-3' ? 'Core 3.1' : 'Core 2'}.`}
         </p>
       </div>
     </DocsFrame>

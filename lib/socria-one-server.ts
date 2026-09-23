@@ -12,9 +12,7 @@
 //      tier can be exercised on deployments with no billing configured.
 
 import type { NextRequest } from 'next/server';
-import { type Plan } from './socria-one';
-import { requestScope } from './route-guard';
-import { scopeSatisfies } from './access-codes-server';
+import { isValidOneKey, type Plan } from './socria-one';
 import { isSubscribed } from './subscriptions';
 import { hasAccountGrant } from './socria-one-grant';
 
@@ -68,13 +66,7 @@ export async function resolvePlanForRequest(
     .filter(Boolean);
   if (userId && allow.includes(userId)) return 'one';
 
-  // A verified unlock grant of scope 'one'. This replaces the old
-  // `x-socria-one` header, which compared a caller-supplied string against a
-  // constant that shipped in the browser bundle — so reading the bundle was
-  // enough to hold the paid plan for free. The grant is an httpOnly cookie
-  // this server signed after checking a typed code against SOCRIA_ONE_CODE,
-  // and it cannot be minted client-side.
-  if (scopeSatisfies(requestScope(req), 'one')) return 'one';
+  if (isValidOneKey(req.headers.get('x-socria-one'))) return 'one';
 
   return 'free';
 }

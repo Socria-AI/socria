@@ -24,15 +24,6 @@ alter table logos_connections    enable row level security;
 alter table socria_subscriptions enable row level security;
 alter table logos_usage          enable row level security;
 alter table lifecycle_emails     enable row level security;
-alter table logos_rooms         enable row level security;
-alter table logos_room_members  enable row level security;
-alter table logos_room_events   enable row level security;
-alter table mind_nodes          enable row level security;
-alter table mind_edges          enable row level security;
-alter table mind_tombstones     enable row level security;
-alter table mind_pending        enable row level security;
-alter table mind_sources        enable row level security;
-alter table mind_projects       enable row level security;
 
 -- Force it for the table owner too, so a future superuser-ish role does not
 -- silently slip past the policies it thinks are protecting it. The service
@@ -44,15 +35,6 @@ alter table logos_connections    force row level security;
 alter table socria_subscriptions force row level security;
 alter table logos_usage          force row level security;
 alter table lifecycle_emails     force row level security;
-alter table logos_rooms         force row level security;
-alter table logos_room_members  force row level security;
-alter table logos_room_events   force row level security;
-alter table mind_nodes          force row level security;
-alter table mind_edges          force row level security;
-alter table mind_tombstones     force row level security;
-alter table mind_pending        force row level security;
-alter table mind_sources        force row level security;
-alter table mind_projects       force row level security;
 
 -- Deliberately no policies. With RLS on and no policy granting access, anon
 -- and authenticated see nothing. If direct client access is ever added, add
@@ -67,32 +49,13 @@ revoke all on logos_connections    from anon, authenticated;
 revoke all on socria_subscriptions from anon, authenticated;
 revoke all on logos_usage          from anon, authenticated;
 revoke all on lifecycle_emails     from anon, authenticated;
-revoke all on logos_rooms         from anon, authenticated;
-revoke all on logos_room_members  from anon, authenticated;
-revoke all on logos_room_events   from anon, authenticated;
-revoke all on mind_nodes          from anon, authenticated;
-revoke all on mind_edges          from anon, authenticated;
-revoke all on mind_tombstones     from anon, authenticated;
-revoke all on mind_pending        from anon, authenticated;
-revoke all on mind_sources        from anon, authenticated;
-revoke all on mind_projects       from anon, authenticated;
 
 -- lifecycle_emails is the one table here that holds a STATED PREFERENCE
 -- rather than something the person made: the `unsubscribed` row is somebody
 -- saying "stop". Readable, it says who has opted out of email; writable, it
 -- is a switch on somebody else's inbox in either direction. It joined this
--- file late — it was the only table in schema.sql without RLS — because
--- adding a table and adding its wall are two separate acts and only one of
--- them breaks anything. test/rls-covers-schema now fails the build instead.
---
--- The three logos_room_* tables hold TWO people's words in one place, which
--- makes them the only tables here where "your rows" and "rows about you" are
--- different sets. Nothing reaches them but the service role, and every read
--- and write goes through a membership check in app/api/logos/room/*.
---
--- An earlier version of this note said the browser needed the Supabase anon
--- key for Logos 2, which made an un-walled table reachable by anyone who read
--- a script tag. That is no longer true: the browser holds no Supabase
--- credentials at all, and collaboration goes through our own authenticated
--- routes. The walls stay regardless — they are the second line, not the
--- first.
+-- file late — it was the only table in schema.sql without RLS — and Logos 2
+-- is what made that urgent: a shared room needs the anon key in the browser
+-- (NEXT_PUBLIC_SUPABASE_ANON_KEY), so from now on that key is public by
+-- design, and any table Supabase's auto-generated REST API can still reach
+-- is reachable by anyone who reads a script tag.
