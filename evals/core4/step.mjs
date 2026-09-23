@@ -69,7 +69,11 @@ try {
     writeFileSync(file, JSON.stringify({ scenario: scenario.id, arm, sessions: res.sessions, calls: step.calls.length }, null, 2));
     say({ status: 'done', result: file });
   } else {
-    say(res);
+    // Only status and the pending request. The run's sessions carry each
+    // turn's `expect`, and printing them here showed the model players what
+    // behaviour was wanted (pilot run, reported by a player agent). A player
+    // must see requests and nothing else.
+    say(res.status === 'pending' ? { status: 'pending', pending: res.pending } : { status: res.status, error: res.error });
   }
   process.exit(0);
 } catch (e) {
