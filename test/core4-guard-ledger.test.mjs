@@ -184,6 +184,11 @@ console.log('\n=== the stream gate ===');
   ok('but the substance in the same sentence does', e.sent.startsWith('The answer is 42.'), JSON.stringify(e.sent));
   const f = run(['Run this:\n```js\nconst ok = x?.y ?? z;\nconsole.log("why?");\n```\n', 'That fixes it.'], 0);
   ok('code passes through untouched, question marks and all', f.sent.includes('console.log("why?");') && f.sent.includes('x?.y'), JSON.stringify(f.sent));
+  // Run 1 (adversarial-001): advice that starts "If you want…" and an "e.g."
+  // inside it were split and half-deleted mid-reply.
+  const adv = run(['That sorts numerically. If you want something to suggest, a short comment like `// numeric, descending` or a test with mixed-digit scores (e.g. `[9, 100, 85]`) would lock the behaviour in. ', 'Nothing else needs changing.'], 0);
+  ok('run 1: advice starting "If you want…" and an "e.g." survive intact, mid-reply', adv.sent.includes('If you want something to suggest, a short comment like') && adv.sent.includes('(e.g. `[9, 100, 85]`) would lock the behaviour in.'), JSON.stringify(adv.sent));
+  ok('"e.g." does not end a sentence', sentencesOf('Use a test (e.g. mixed digits) to lock it in. Done.').length === 2);
   const g = run(['It works now. ', 'Let me know if you want me to add tests.'], 1);
   ok('a closing offer is dropped even with budget left', g.sent.trim() === 'It works now.', JSON.stringify(g.sent));
 }

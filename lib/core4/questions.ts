@@ -31,8 +31,12 @@ function prose(text: string): string {
  * that split them left a stray "**" in front of the next sentence).
  */
 export function sentencesOf(text: string): string[] {
-  const out = text.match(/(?:[^.!?\n]|[.!?](?![.!?]*["'’”)\]*_]*(?:\s|$)))+(?:[.!?]+["'’”)\]*_]*(?=\s|$)|\n+|$)\s*/g) ?? [];
-  return out.filter((s) => s.trim());
+  // Abbreviations never end a sentence (council D4): "e.g." was splitting
+  // a sentence in two, and half of it was then taken for a closing offer.
+  const ABBR = /\b(e\.g|i\.e|etc|vs|cf|et al|approx|Dr|Mr|Mrs|Ms|St|No|Fig|Eq|p|pp)\.(?=\s)/g;
+  const shielded = text.replace(ABBR, (m) => m.slice(0, -1) + '\u2024');
+  const out0 = shielded.match(/(?:[^.!?\n]|[.!?](?![.!?]*["'’”)\]*_]*(?:\s|$)))+(?:[.!?]+["'’”)\]*_]*(?=\s|$)|\n+|$)\s*/g) ?? [];
+  return out0.map((s) => s.replace(/\u2024/g, '.')).filter((s) => s.trim());
 }
 
 /** A bare markdown header sentence: "**Revenue.**", "### Costs". */
@@ -101,7 +105,11 @@ const DISGUISED = new RegExp(
 
 /** Closing offers: a request for more of the person's time, not a move. */
 // Closing offers, and comprehension checks that are always stripped (council D4).
-const OFFER = /^(?:let me know|feel free to|if you(?:'d| would) like|if you want|want me to|shall i|should i|would you like|happy to|i can also|do you want me to|does (?:that|this) (?:make sense|help)|make sense\?|any questions|is (?:that|this) clear|sound good|hope (?:this|that) helps)\b/i;
+// An offer has a first-person shape (council D4): "I can also…", "want me
+// to…", "let me know if…". A conditional that gives ADVICE ("If you want
+// something to suggest, a short comment would…") is not an offer — run 1
+// deleted one from the middle of a reply because it started "If you want".
+const OFFER = /^(?:let me know|feel free to (?:ask|reach|ping|let me)|if you(?:'d| would) like(?:,)? (?:i|me)\b|if you want(?:,)? (?:i|me)\b|if (?:that|this) helps,? (?:i|let me)\b|want me to|shall i|should i|would you like (?:me|to see|a|an|the)|happy to|i can also|do you want me to|does (?:that|this) (?:make sense|help)|make sense\?|any questions|is (?:that|this) clear|sound good|hope (?:this|that) helps)\b/i;
 
 const SYCOPHANCY = /^(?:great|excellent|good|fantastic|wonderful|interesting|fascinating) (?:question|point|thought|observation)[.!,]?|^(?:you(?:'re| are) (?:absolutely |completely |totally )?right)[.!,]|^(?:what a (?:great|good|fascinating) )|^(?:i love (?:this|that|how you))/i;
 

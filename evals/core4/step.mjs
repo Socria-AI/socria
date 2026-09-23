@@ -54,7 +54,7 @@ try {
   if (!existsSync(routePath)) await buildRoute(join(runDir, '.build'));
 
   const world = freezeWorld();
-  const step = stepwiseClient(runDir);
+  const step = stepwiseClient(runDir, arm);
   if (!live) globalThis.__socriaModelClient = step.client;
   const { db } = await import(pathToFileURL(FAKE_DB).href);
 

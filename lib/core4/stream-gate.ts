@@ -91,11 +91,17 @@ export class SentenceGate {
   }
 
   /** A question followed by more exposition was rhetorical: release it in order. */
+  /**
+   * More exposition followed what was held: it was rhetorical (a question) or
+   * mid-reply (an offer-shaped sentence), and goes out in order. Only
+   * TRAILING offers and over-budget questions are ever dropped (council D4)
+   * — nothing is removed from the middle of a reply.
+   */
   private flushHeldInline() {
     if (!this.held.length) return;
-    const rhetorical = this.held.filter((h) => !interrogatives(h).offers.length);
+    const held = this.held;
     this.held = [];
-    for (const h of rhetorical) this.send(h);
+    for (const h of held) this.send(h);
   }
 
   private send(s: string) {

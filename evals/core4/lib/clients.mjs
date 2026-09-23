@@ -28,13 +28,18 @@ export class PendingModelCall extends Error {
   }
 }
 
-export function requestKey(req) {
+export function requestKey(req, arm = '') {
   const h = createHash('sha256');
-  h.update(JSON.stringify({ role: req.role, system: req.system, messages: req.messages, json: !!req.json }));
-  return `${req.role}-${h.digest('hex').slice(0, 20)}`;
+  h.update(JSON.stringify({ arm, role: req.role, system: req.system, messages: req.messages, json: !!req.json }));
+  return `${arm ? `${arm}.` : ''}${req.role}-${h.digest('hex').slice(0, 20)}`;
 }
 
-export function stepwiseClient(runDir) {
+/**
+ * `arm` namespaces the cache (run 1 lesson): A1 and B+ send an identical
+ * first request, so without it two players answering the same key at once
+ * overwrote each other and some transcripts mixed turns from both.
+ */
+export function stepwiseClient(runDir, arm = '') {
   const cacheDir = join(runDir, 'cache');
   const pendingDir = join(runDir, 'pending');
   mkdirSync(cacheDir, { recursive: true });
@@ -43,7 +48,7 @@ export function stepwiseClient(runDir) {
   const calls = [];
 
   const lookup = (req) => {
-    const key = requestKey(req);
+    const key = requestKey(req, arm);
     const hit = join(cacheDir, `${key}.txt`);
     calls.push({ role: req.role, key, cached: existsSync(hit) });
     if (existsSync(hit)) return { key, text: readFileSync(hit, 'utf8') };
