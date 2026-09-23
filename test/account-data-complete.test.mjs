@@ -37,7 +37,7 @@ const SHARED = new Set(['logos_rooms', 'logos_room_members', 'logos_room_events'
 const ownedTables = (() => {
   const m = del.match(/const OWNED_TABLES = \[([\s\S]*?)\] as const;/);
   if (!m) return [];
-  return [...m[1].matchAll(/'([a-z_]+)'/g)].map((x) => x[1]);
+  return [...m[1].matchAll(/'([a-z0-9_]+)'/g)].map((x) => x[1]);
 })();
 
 // And the loop must actually iterate it and issue a scoped delete.

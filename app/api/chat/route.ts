@@ -24,11 +24,12 @@ import {
   type ConversationState,
 } from '@/lib/socria-prompt';
 import { recall, remember } from '@/lib/mind/pipeline';
-import { readState, guardDraft } from '@/lib/cognition/engine';
-import { route, renderMove, questionStreak, type Move } from '@/lib/cognition/router';
-import { renderState, type CognitiveState } from '@/lib/cognition/state';
-import { retryNote } from '@/lib/cognition/guard';
+import { getProject } from '@/lib/mind/store';
 import type { ActivatedSubgraph } from '@/lib/mind/activate';
+import { prepareTurn, guardReply, fallbackReply, finishTurn, SentenceGate, type PreparedTurn } from '@/lib/core4/turn';
+import { modelClient, collect, type ChatTurn } from '@/lib/core4/model';
+import type { GuardOutcome, NoveltyVerdict } from '@/lib/core4/types';
+import { waitUntil } from '@vercel/functions';
 import {
   computeGuidance,
   renderTurnDirective,
@@ -280,94 +281,64 @@ export async function POST(req: NextRequest) {
         ? body.projectId
         : null;
 
-    // ── the Cognitive State Engine ────────────────────────────────
+    // ── Core 4: understand, allocate, choose the move ──────────────
     //
-    // The Mind Graph is what Socria understands about this person; this is
-    // what is happening in this conversation, this minute. Read first, then
-    // the move is ROUTED from it deterministically — so the choice cannot be
-    // argued out of by a message that sounds urgent or impatient, and so
-    // there is a reason with a name when Socria asks instead of answering.
-    //
-    // Same failure posture as the graph: an empty state routes toward asking,
-    // which is the recoverable mistake.
-    //
-    // Read BEFORE the graph now, not after. Retrieval is meant to start from
-    // the query, the Project AND the Cognitive State — what the person is
-    // focused on right now is a better seed than the words of one message,
-    // and "we are still on the product rule" should light that region even
-    // when this message only says "ok, and then?". Run after recall, the
-    // state could shape the reply but never what was remembered for it.
-    let cognitiveState: CognitiveState | null = null;
-    let move: Move | null = null;
-    let questions = 0;
-    if (socriaModel === 'core-4' && apiKey) {
-      try {
-        cognitiveState = await readState(
-          apiKey,
-          (withFiles ?? clean)
-            .map((m) => `${m.role === 'user' ? 'Them' : 'Socria'}: ${withFiles ? briefly(m as ChatMsg) : m.content}`)
-            .join('\n\n')
-            .slice(-8000),
-          null
-        );
-        // The run of questions Socria has just asked, read from the
-        // transcript the person actually saw — every question in it raises
-        // the bar for the next one (lib/cognition/router.ts).
-        questions = questionStreak(clean);
-        move = route(cognitiveState, { questionStreak: questions });
-      } catch (e) {
-        console.error('[socria/chat] cognitive state unavailable; replying without a routed move', e);
-      }
-    }
-
-    // ── the Mind Graph ────────────────────────────────────────────
-    //
-    // Core 4's persistent memory. Activated by what they just said — a region
-    // of the graph reached through its edges, not a top-k list of snippets —
-    // and rendered into the system prompt.
-    //
-    // Never blocks and never throws. A graph that cannot be read means a
-    // conversation without memory, which is how this worked last week; a
-    // conversation that breaks BECAUSE of memory is a regression nobody
-    // accepts. recall() already swallows its own failures; this is the second
-    // reason it is called on its own line rather than inline.
+    // The Project is looked up first (its instructions are the person's
+    // standing agency contract). Then the Mind Graph recall and the Core 4
+    // turn preparation run IN PARALLEL: recall is seeded by what they said
+    // and what they handed over; the turn preparation reads their explicit
+    // words, carries the Cognitive State forward, reads the ledger, and
+    // chooses the move (lib/core4/turn.ts). Neither can break the reply: each
+    // fails soft on its own line.
+    let prepared: PreparedTurn | null = null;
     let mindBlock: string | null = null;
     let mindSubgraph: ActivatedSubgraph | null = null;
     let projectBlock: string | null = null;
     let inProject = false;
-    if (socriaModel === 'core-4' && userId) {
-      // WRAPPED HERE, not only inside recall().
-      //
-      // recall() swallows its own failures, and I relied on that — but the
-      // `plan` argument was an await evaluated BEFORE recall was entered, so
-      // anything it threw sailed past that guarantee and out to the handler's
-      // catch, where it became "Something went wrong on our side." A promise
-      // that memory can never break a conversation has to be made at the
-      // point the conversation calls it, not inside the thing being called.
-      try {
-        // Seeded by what they said AND what they handed over: a question
-        // that only says "what do you make of this?" is about the file.
-        const r = await recall(userId, lastTurn ? forMemory(lastTurn).slice(0, 2000) : last.content, {
-          now: Date.now(),
-          // Reuse the plan already resolved above rather than resolving it a
-          // second time: one fewer call, and one fewer thing that can fail.
-          plan,
-          surface: 'core',
-          // What the Cognitive State says they are focused on, as extra
-          // seed terms. Empty when the state could not be read.
-          focus: cognitiveState?.currentFocus ? [cognitiveState.currentFocus] : undefined,
-          // A weighting, not a filter: see lib/mind/projects.ts.
-          projectId,
-        });
-        mindBlock = r.block || null;
-        mindSubgraph = r.subgraph;
-        projectBlock = r.projectBlock || null;
-        inProject = !!r.project;
-      } catch (e) {
-        // No memory this turn. Said out loud in the log, because a graph
-        // that silently never loads looks exactly like a graph with nothing
-        // in it, and those need telling apart.
-        console.error('[socria/chat] mind graph recall failed; continuing without it', e);
+    const conversationId =
+      typeof body?.conversationId === 'string' && /^[A-Za-z0-9_-]{1,120}$/.test(body.conversationId)
+        ? body.conversationId
+        : null;
+    if (socriaModel === 'core-4') {
+      const project = userId && projectId ? await getProject(userId, projectId).catch(() => null) : null;
+      const brief = (withFiles ?? clean).map((m) => ({
+        role: m.role as 'user' | 'assistant',
+        content: withFiles ? briefly(m as ChatMsg) : m.content,
+      }));
+      const [recalled, prep] = await Promise.all([
+        userId
+          ? recall(userId, lastTurn ? forMemory(lastTurn).slice(0, 2000) : last.content, {
+              now: Date.now(),
+              plan,
+              surface: 'core',
+              projectId,
+            }).catch((e) => {
+              console.error('[socria/chat] mind graph recall failed; continuing without it', e);
+              return null;
+            })
+          : Promise.resolve(null),
+        apiKey
+          ? prepareTurn({
+              apiKey,
+              userId: userId ?? null,
+              conversationId,
+              projectId: project ? projectId : null,
+              brief,
+              lastUserText: last.content,
+              instructions: project?.instructions ?? '',
+              now: Date.now(),
+            }).catch((e) => {
+              console.error('[socria/chat] core 4 turn preparation failed; replying from the prompt alone', e);
+              return null;
+            })
+          : Promise.resolve(null),
+      ]);
+      prepared = prep;
+      if (recalled) {
+        mindBlock = recalled.block || null;
+        mindSubgraph = recalled.subgraph;
+        projectBlock = recalled.projectBlock || null;
+        inProject = !!recalled.project;
       }
     }
 
@@ -379,8 +350,8 @@ export async function POST(req: NextRequest) {
       journey,
       personMemory,
       mindBlock,
-      move && cognitiveState
-        ? { state: renderState(cognitiveState), move: renderMove(move) }
+      prepared
+        ? { state: prepared.blocks.state + prepared.blocks.verify, move: prepared.blocks.move }
         : null,
       projectBlock
     );
@@ -474,15 +445,17 @@ export async function POST(req: NextRequest) {
         // Which move was chosen, and why. The reason is the point: when
         // Socria asks instead of answering there should be a nameable cause,
         // not a shrug about model judgement.
-        intervention: move?.intervention ?? null,
-        because: move?.because ?? null,
-        // How many questions in a row preceded this turn. If ASK keeps
-        // appearing with a high number here, the pressure is not working.
-        questionStreak: questions,
-        guarded: !!move?.guard,
-        taskKind: cognitiveState?.taskKind ?? null,
-        attempt: cognitiveState?.attempt ?? null,
-        shown: cognitiveState?.demonstratedUnderstanding ?? null,
+        allocation: prepared?.allocation.mode ?? null,
+        allocationReason: prepared?.allocation.reasonCode ?? null,
+        withhold: prepared?.allocation.withhold?.reason ?? null,
+        intervention: prepared?.decision.type ?? null,
+        because: prepared?.decision.reasonCode ?? null,
+        questionBudget: prepared?.budget.allowed ?? null,
+        questionStreak: prepared?.budget.streak ?? null,
+        diminishing: prepared?.diminishing.detected ?? null,
+        guarded: prepared?.decision.guardRequired ?? null,
+        work: prepared?.state.work ?? null,
+        attempt: prepared?.state.attempt ?? null,
         userTurns,
         assistantTurns,
         stage: guidance?.stage ?? null,
@@ -496,6 +469,32 @@ export async function POST(req: NextRequest) {
     }
 
     const openaiModel = resolveOpenAIModel(model);
+
+    if (model === 'core-4') {
+      return core4Reply({
+        apiKey,
+        systemPrompt,
+        messages: modelMessages as ChatTurn[],
+        prepared,
+        openaiModel,
+        fallbackModel: fallbackOpenAIModel(model),
+        after: (reply: string) => {
+          if (!userId) return;
+          waitUntil(
+            remember(userId, `User: ${lastTurn ? forMemory(lastTurn) : last.content}\n\nSocria: ${reply}`, {
+              now: Date.now(),
+              apiKey,
+              surface: 'core',
+              conversationId: conversationId ?? undefined,
+              existing: mindSubgraph,
+              projectId,
+            }).catch((err: unknown) => {
+              console.error('[socria/chat] mind graph remember failed', err);
+            })
+          );
+        },
+      });
+    }
 
     const makeCompletion = (modelId: string) =>
       openai.chat.completions.create({
@@ -553,7 +552,8 @@ export async function POST(req: NextRequest) {
     // keeps short — a question, a nudge, an acknowledgement. The long replies,
     // where streaming actually matters, are the ones where the work is
     // legitimately ours and there is nothing to withhold.
-    const guarded = !!move?.guard;
+    // Core 4 has its own path (core4Reply); every other Core streams as is.
+    const guarded = false;
 
     const stream = new ReadableStream({
       async start(controller) {
@@ -569,36 +569,6 @@ export async function POST(req: NextRequest) {
             }
           }
 
-          if (guarded && move && apiKey) {
-            let verdict = await guardDraft(apiKey, move, lastBrief, reply);
-
-            if (verdict.verdict === 'regenerate') {
-              // One retry, told exactly what went wrong. Not a loop: a second
-              // failure means the draft is sent anyway rather than the person
-              // waiting on a machine arguing with itself.
-              console.warn(`[socria/chat] answer guard rejected a ${move.intervention} draft (${verdict.by}): ${verdict.reason}`);
-              try {
-                const second = await openai.chat.completions.create({
-                  model: openaiModel,
-                  messages: [
-                    { role: 'system', content: systemPrompt + retryNote(verdict, move) },
-                    ...(modelMessages as { role: 'user' | 'assistant'; content: string }[]),
-                  ],
-                  temperature: 0.7,
-                  max_tokens: 500,
-                });
-                const retry = second.choices[0]?.message?.content ?? '';
-                if (retry.trim()) reply = retry;
-              } catch (e) {
-                console.error('[socria/chat] guard retry failed; sending the first draft', e);
-              }
-            } else if (verdict.verdict === 'revise' && verdict.revised) {
-              console.warn(`[socria/chat] answer guard revised a ${move.intervention} draft: ${verdict.reason}`);
-              reply = verdict.revised;
-            }
-
-            controller.enqueue(encoder.encode(reply));
-          }
         } catch (e) {
           console.error('stream error:', e);
           // On a guarded turn nothing has been sent yet, so whatever was
@@ -610,44 +580,6 @@ export async function POST(req: NextRequest) {
           );
         } finally {
           controller.close();
-          // ── learn from the turn ────────────────────────────────
-          //
-          // After the reply is closed, never before: the person waits for
-          // words, not for a graph. Fire-and-forget, and remember() swallows
-          // its own failures — a turn the graph did not learn from is
-          // recoverable and invisible; a reply that failed because of the
-          // graph is neither.
-          //
-          // Both halves go in. A conversation is what was said AND what
-          // Socria said back, and half of it is the half that contains the
-          // question somebody was answering.
-          try {
-          if (socriaModel === 'core-4' && userId && apiKey) {
-            void remember(userId, `User: ${lastTurn ? forMemory(lastTurn) : last.content}\n\nSocria: ${reply}`, {
-              now: Date.now(),
-              apiKey,
-              surface: 'core',
-              conversationId: typeof body?.conversationId === 'string' ? body.conversationId : undefined,
-              existing: mindSubgraph,
-              // The ONE graph learns exactly as it does outside a Project;
-              // this only ties what the turn touched to the Project it
-              // happened in.
-              projectId,
-              // remember() already swallows its own failures, so this only
-              // catches a rejection it could not — but an unhandled rejection
-              // inside a `finally` after the stream has closed is the kind of
-              // thing that shows up as a mystery 500 with no stack pointing
-              // anywhere useful.
-            }).catch((err: unknown) => {
-              console.error('[socria/chat] mind graph remember failed', err);
-            });
-          }
-          } catch (e) {
-            // The stream is already closed by the time this runs, so a throw
-            // here cannot reach the person — it can only become an unhandled
-            // rejection that takes the process with it.
-            console.error('[socria/chat] mind graph remember threw', e);
-          }
         }
       },
     });
@@ -671,4 +603,169 @@ export async function POST(req: NextRequest) {
       { status: f.status }
     );
   }
+}
+
+// ── the Core 4 reply ────────────────────────────────────────────────────
+
+function isModelError(e: any): boolean {
+  const status = e?.status ?? e?.response?.status;
+  return status === 404 || e?.code === 'model_not_found' || /model_not_found|does not exist|unknown model/i.test(e?.message || '');
+}
+
+/**
+ * Generate, guard and send one Core 4 reply.
+ *
+ * Moves that must be read before anybody sees them (anything that holds
+ * something back, anything that raises a perspective) are generated whole,
+ * checked by Answer Guard 2.0, regenerated ONCE if needed — and the retry is
+ * checked again; a retry that still fails is never shipped as it stands (the
+ * deterministic fallback is). Every other move streams through the sentence
+ * gate, which holds back questions and a sycophantic opener until the end,
+ * where the question budget decides.
+ *
+ * Before the stream closes, the turn is written back (state, ledger,
+ * outcome, trace, capability evidence). The Mind Graph extraction runs after
+ * the response, kept alive by waitUntil.
+ */
+function core4Reply(x: {
+  apiKey: string;
+  systemPrompt: string;
+  messages: ChatTurn[];
+  prepared: PreparedTurn | null;
+  openaiModel: string;
+  fallbackModel: string | null;
+  after: (reply: string) => void;
+}): Response {
+  const encoder = new TextEncoder();
+  const client = modelClient(x.apiKey);
+  const p = x.prepared;
+  const maxTokens = p?.decision.maxTokens ?? 700;
+  const req = (modelId: string, system: string, role: 'reply' | 'retry' = 'reply') => ({
+    role,
+    model: modelId,
+    system,
+    messages: x.messages,
+    maxTokens,
+    temperature: 0.7,
+  });
+
+  const stream = new ReadableStream({
+    async start(controller) {
+      let reply = '';
+      let served: string | null = null;
+      let guard: GuardOutcome | null = null;
+      let novelty: NoveltyVerdict[] = [];
+      let regenerated = false;
+      const t0 = Date.now();
+      try {
+        const buffered = !p || p.decision.guardRequired;
+        // The first delta decides the model: a rejected model id falls back once.
+        const open = async (modelId: string) => {
+          const s = client.stream(req(modelId, x.systemPrompt));
+          const it = s.deltas[Symbol.asyncIterator]();
+          const first = await it.next();
+          return { s, it, first };
+        };
+        let opened;
+        try {
+          opened = await open(x.openaiModel);
+          served = x.openaiModel;
+        } catch (e) {
+          if (x.fallbackModel && x.fallbackModel !== x.openaiModel && isModelError(e)) {
+            console.warn(`[socria/chat] model "${x.openaiModel}" rejected for core-4; falling back to ${x.fallbackModel}`);
+            opened = await open(x.fallbackModel);
+            served = x.fallbackModel;
+          } else {
+            throw e;
+          }
+        }
+        const { s, it } = opened;
+        const deltas = (async function* () {
+          if (!opened.first.done) yield opened.first.value as string;
+          for (;;) {
+            const n = await it.next();
+            if (n.done) return;
+            yield n.value as string;
+          }
+        })();
+
+        if (buffered) {
+          for await (const d of deltas) reply += d;
+          const done = await s.done.catch(() => null);
+          served = done?.served ?? served;
+          if (p) {
+            if (p) p.ms.generate = Date.now() - t0;
+            const first = await guardReply(p, reply);
+            guard = first.outcome;
+            novelty = first.novelty;
+            reply = first.text;
+            if (first.retryNote) {
+              regenerated = true;
+              let retry: string | null = null;
+              try {
+                const note = `\n\n=== Your previous draft was rejected ===\nWHY: ${first.retryNote}\nWrite the reply again. Do not apologise, do not mention this instruction, and do not reference a previous attempt — the person has not seen one.\n`;
+                const c = await client.complete(req(served ?? x.openaiModel, x.systemPrompt + note, 'retry'));
+                retry = c.text?.trim() || null;
+              } catch (e) {
+                console.error('[socria/chat] guard retry failed', e);
+              }
+              // The retry is checked again. Nothing ships unchecked.
+              const second = retry ? await guardReply(p, retry) : null;
+              if (second && !second.retryNote) {
+                reply = second.text;
+                guard = { ...second.outcome, findings: [...(first.outcome.findings ?? []), ...second.outcome.findings] };
+                novelty = [...novelty, ...second.novelty];
+              } else {
+                const fb = fallbackReply(p, first.text, retry);
+                reply = fb.text;
+                guard = { ...first.outcome, findings: [...first.outcome.findings, ...fb.codes.map((c) => ({ side: 'underhelp' as const, code: c, detail: c }))] };
+              }
+            }
+          }
+          controller.enqueue(encoder.encode(reply));
+        } else {
+          const gate = new SentenceGate((chunk) => controller.enqueue(encoder.encode(chunk)));
+          for await (const d of deltas) gate.push(d);
+          const dropped = gate.finish(p!.decision.maxQuestions);
+          reply = gate.out;
+          const done = await s.done.catch(() => null);
+          served = done?.served ?? served;
+          if (dropped.length) {
+            guard = { action: 'MODIFY_FOR_MORE_HELP', findings: dropped.map(() => ({ side: 'underhelp' as const, code: 'stream_gate', detail: 'held-back question dropped' })), by: 'structure' };
+          }
+          if (p) p.ms.generate = Date.now() - t0;
+        }
+      } catch (e) {
+        console.error('stream error:', e);
+        if (reply.trim() && (!p || p.decision.guardRequired)) {
+          // Nothing has been sent on a buffered turn; send only what the
+          // deterministic guard accepts, never the raw draft.
+          const safe = p ? fallbackReply(p, reply, null).text : reply;
+          controller.enqueue(encoder.encode(safe));
+          reply = safe;
+        }
+        controller.enqueue(encoder.encode('\n\n[Connection interrupted. Please try again.]'));
+      } finally {
+        try {
+          if (p) await finishTurn(p, reply, guard, regenerated, novelty, served, CORE_4_PROMPT_VERSION);
+        } catch (e) {
+          console.error('[socria/chat] core 4 writeback failed', e);
+        }
+        controller.close();
+        try {
+          if (reply.trim()) x.after(reply);
+        } catch (e) {
+          console.error('[socria/chat] mind graph remember threw', e);
+        }
+      }
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      'Content-Type': 'text/plain; charset=utf-8',
+      'Cache-Control': 'no-cache, no-transform',
+      'X-Content-Type-Options': 'nosniff',
+    },
+  });
 }

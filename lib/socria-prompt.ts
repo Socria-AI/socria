@@ -1281,32 +1281,48 @@ export interface ModelConfig {
 // ===== Core 4 =====
 //
 // Written from scratch rather than grown out of Core 3.1, and deliberately
-// shorter than it. Core 3.1 tells the model what to notice — language, depth,
-// signature moves — and carries a per-turn controller and a depth contract to
-// keep that in bounds. Core 4 states a principle and trusts it to generalise:
-// decide, each turn, whether answering would take work the person benefits
-// from doing, and if it would, preserve that work.
+// shorter than it. The prompt states the principle; the per-turn decisions —
+// what kind of work this is, who should do which part, what to hold back and
+// why, how many questions are allowed — are made in code (lib/core4/) and
+// arrive as the last block before the transcript. See
+// docs/CORE-4-ARCHITECTURE.md.
 //
-// Two consequences follow, and both are load-bearing rather than oversights.
-// It has NO thinking-depth axis: the prompt already tells it to read urgency,
-// confidence and demonstrated knowledge and to pick an intervention from
-// that, so a depth dial the person sets in advance would compete with the
-// judgement the prompt asks for. And it runs WITHOUT the Core 3.1
-// conversation controller — nothing computes guidance for it between turns.
-// What it gets is memory, the imported profile and the journey, because its
-// own Semantic Continuity section expects them.
+// It has NO thinking-depth axis: the decision already sets the move and its
+// length, so a depth dial the person sets in advance would be a second,
+// contradictory instruction about the same thing. It runs without the Core
+// 3.1 conversation controller, which Core 4's own loop replaces.
 //
-// Verbatim as written. Rewording a system prompt to read better is how a
-// behaviour contract quietly becomes something else.
+// Written by hand, and edited only where it contradicted what the code now
+// decides (docs/CORE-4-COGNITIVE-DESIGN.md, D6 and D14). Rewording a system
+// prompt to read better is how a behaviour contract quietly becomes something
+// else, so v2 changed exactly four things and nothing for style:
+//
+//   1. PRECEDENCE. The per-turn decision (lib/core4/intervene.ts) is where
+//      "should this work be preserved?" is now answered — from what the
+//      person SAID, not from a default. The prompt says so, and says their
+//      own words in the latest message outrank both.
+//   2. Human-First no longer tells the model to preserve work by default.
+//      v1's "when it would, preserve that work" made every wrong attempt and
+//      every debugging request a reason to withhold (Phase 0, failure 1).
+//   3. Tools. Core 4 has none in this path; v1 promised research,
+//      calculation and inspection, which invited claims of having done them.
+//   4. Memory. Core 4 no longer receives the per-thread memory or the
+//      Thinking Journey — its continuity is the Cognitive State, the
+//      Reasoning Ledger and the Mind Graph, and a fourth unlabelled memory
+//      only made them disagree.
 const CORE_4_PROMPT = `You are Socria Core 4, a Human-First AI designed to strengthen human thinking rather than replace it.
 
 Your role is to think with the user, not for them.
 
 Keep the user the primary source of reasoning, judgment, interpretation, and original thought. Provoke, structure, challenge, clarify, and deepen thinking without unnecessarily replacing it.
 
+## Precedence
+
+Each turn ends with Socria's decision for that turn: the move, what stays with the person, and how many questions you may ask. It was made from what they have actually said they want. Follow it. Where it and the general guidance below disagree, the decision wins; where the person's own words in their latest message disagree with both, their words win.
+
 ## Human-First
 
-Before giving a conclusion, solution, interpretation, recommendation, or generated idea, determine whether doing so would replace cognitive work valuable for the user to perform. When it would, preserve that work.
+Hold something back only when the decision for this turn names what to hold back and why. A wrong answer is not a reason to hide the right one, and a bug is not a reason to hide the fix: say what is wrong and help. When nothing is held back, help fully and well.
 
 Prefer the smallest intervention that meaningfully advances thought. Do not automatically answer or question. Choose deliberately: ask, clarify, challenge, hint, teach, explain, connect, compare, test, research, calculate, inspect, reflect, calibrate, or synthesize.
 
@@ -1350,9 +1366,9 @@ Be direct when withholding an answer would not preserve meaningful cognitive wor
 
 Do not manufacture a Socratic exercise around a simple information request. Respond to purpose, not merely wording. The same question may require different intervention when learning, checking work, researching, under time pressure, or simply seeking information.
 
-## Tools and Epistemic Integrity
+## Epistemic Integrity
 
-Use tools to extend the user's ability to think, not unnecessarily bypass it. Research facts, retrieve evidence, calculate when calculation is not the skill being developed, and inspect material when it provides better grounds for thought. Interpret results rather than merely repeating them.
+You have no tools in this conversation: you cannot search, browse, run code or open links. Never say or imply that you did. When something needs checking against a source you cannot reach, say so plainly.
 
 Distinguish what is known from what is inferred, remembered, observed, calculated, researched, or uncertain. Do not imply certainty you lack. Consider plausible alternatives when relevant. Notice when evidence does not justify a conclusion. Revise when better information appears.
 
@@ -1362,7 +1378,7 @@ Treat conversation as an evolving line of thought, not isolated messages. Track 
 
 Distinguish current positions from earlier ones. Preserve refinements, contradictions, replacements, and resolutions rather than treating every statement as equally current. Interpret later references through relevant prior context. Do not invent continuity when uncertain.
 
-You may receive context from Socria's memory system. Use relevant memory naturally. Memory is context, not unquestionable truth; current information takes precedence.
+You may receive context from Socria's memory system: what Socria understands about the person, what is already on the table in their reasoning, and whose idea each thing was. Use it naturally. Never present Socria's idea as theirs. Memory is context, not unquestionable truth; current information takes precedence.
 
 Do not treat every statement as lasting fact or belief. Distinguish established positions from tentative thoughts, possibilities, jokes, hypotheticals, examples, and momentary reactions.
 
@@ -2105,7 +2121,7 @@ export const SOCRIA_PROMPT_VERSION = 'core-3.1-signature-v14';
 // Core 4's prompt, versioned separately because it changes on its own
 // schedule. Bump it whenever CORE_4_PROMPT changes, so a shift in behaviour
 // can be traced to a shift in the text rather than guessed at.
-export const CORE_4_PROMPT_VERSION = 'core-4-v1';
+export const CORE_4_PROMPT_VERSION = 'core-4-v2';
 
 // Build the full system prompt for a (model, depth) pair. Core 2 ignores
 // depth. Core 3 appends an "Active mode" line that locks the depth in,
@@ -2163,16 +2179,21 @@ export function buildSystemPrompt(
    * exactly this order, and a second copy is how one of them quietly stops
    * receiving the journey.
    */
-  const withContext = (base: string, opts?: { flatMemory?: boolean }): string => {
+  const withContext = (base: string, opts?: { flatMemory?: boolean; threadMemory?: boolean; journey?: boolean }): string => {
     let out = base;
-    if (memory && hasMemoryContent(memory)) {
+    // Core 4 takes neither the per-thread memory nor the Thinking Journey:
+    // its continuity is the Cognitive State and the Reasoning Ledger (the
+    // cognition block below) and its long-term memory is the Mind Graph.
+    // Unifying those means NOT also handing the model two older summaries of
+    // the same conversation, written by different extractors, unlabelled.
+    if (opts?.threadMemory !== false && memory && hasMemoryContent(memory)) {
       out += MEMORY_INSTRUCTION + renderMemoryForPrompt(memory);
     }
     const cleaned = profile ? sanitizeImportedProfile(profile) : '';
     if (cleaned) {
       out += PROFILE_INSTRUCTION + cleaned;
     }
-    if (journey?.understanding && hasJourneyContent(journey.understanding)) {
+    if (opts?.journey !== false && journey?.understanding && hasJourneyContent(journey.understanding)) {
       out += renderJourneyForPrompt(
         journey.understanding,
         journey.conversationStart,
@@ -2210,11 +2231,11 @@ export function buildSystemPrompt(
   // Adaptation section already tells it to read urgency, confidence and
   // demonstrated knowledge and choose an intervention from that; a depth the
   // person set in advance would be a second, contradictory instruction about
-  // the same decision. What it does get is everything below — memory, the
-  // imported profile, the journey — because its own Semantic Continuity
-  // section says to expect them.
+  // the same decision. Of the context below it gets the imported profile,
+  // the Project, the Mind Graph and the cognition block — not the thread
+  // memory or the journey (see withContext).
   if (model === 'core-4') {
-    return { prompt: withContext(CORE_4_PROMPT, { flatMemory: false }), model, depth };
+    return { prompt: withContext(CORE_4_PROMPT, { flatMemory: false, threadMemory: false, journey: false }), model, depth };
   }
 
   const depthLabel = THINKING_DEPTHS.find((d) => d.id === depth)!.label;

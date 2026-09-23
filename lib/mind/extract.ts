@@ -25,7 +25,7 @@ import 'server-only';
 // for that reason. Swapping the frontier model changes the wording here and
 // nothing about what is stored or how it is retrieved.
 
-import OpenAI from 'openai';
+import { modelClient } from '../core4/model';
 import { SAVED_VOICE_RULE } from '../memory-voice';
 import { KNOWN_NODE_TYPES, KNOWN_RELATIONSHIPS, PROVENANCE_KINDS } from './types';
 import type { EdgeCandidate, NodeCandidate } from './apply';
@@ -190,13 +190,13 @@ export async function extract(
   existing: ActivatedSubgraph | null
 ): Promise<ExtractResult> {
   try {
-    const openai = new OpenAI({ apiKey });
-    const res = await openai.chat.completions.create({
+    const res = await modelClient(apiKey).complete({
+      role: 'extract',
       model: EXTRACTOR_MODEL,
       temperature: 0,
-      response_format: { type: 'json_object' },
+      json: true,
+      system: SYSTEM,
       messages: [
-        { role: 'system', content: SYSTEM },
         {
           role: 'user',
           // Delimited, and the delimiter stripped from the content so it
@@ -207,9 +207,9 @@ export async function extract(
           content: `${existingBlock(existing)}\n\n<material>\n${fence(text)}\n</material>`,
         },
       ],
-      max_tokens: 2000,
+      maxTokens: 2000,
     });
-    const body = res.choices[0]?.message?.content ?? '{}';
+    const body = res.text || '{}';
     return sanitizeExtraction(JSON.parse(body));
   } catch {
     // A turn the graph did not learn from is recoverable. A turn that broke

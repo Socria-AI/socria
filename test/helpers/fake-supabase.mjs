@@ -1,7 +1,7 @@
 // An in-memory stand-in for the Supabase client, for end-to-end route tests.
 //
 // It implements the slice of PostgREST the app actually uses — select with a
-// column list or *, eq / in / not-is-null filters, order, limit, maybeSingle,
+// column list or *, eq / in / lt / not-is-null filters, order, limit, maybeSingle,
 // head counts, insert / upsert / update / delete with exact counts — and it
 // enforces the constraints that matter to the code under test: primary keys,
 // the unique Project name per person, and (when a test asks for it) a table
@@ -17,6 +17,11 @@ const PK = {
   mind_pending: ['user_id', 'fingerprint'],
   mind_sources: ['user_id', 'id'],
   mind_projects: ['user_id', 'id'],
+  core4_state: ['user_id', 'conversation_id'],
+  reasoning_entries: ['user_id', 'id'],
+  reasoning_links: ['user_id', 'id'],
+  core4_turns: ['user_id', 'conversation_id', 'turn'],
+  capability_evidence: ['user_id', 'id'],
 };
 
 export const db = {
@@ -62,6 +67,7 @@ class Query {
   delete(opts = {}) { this.op = 'delete'; this.opts = opts; return this; }
   eq(c, v) { this.filters.push((r) => r[c] === v); this._cols = [...(this._cols ?? []), c]; return this; }
   in(c, vs) { this.filters.push((r) => vs.includes(r[c])); this._cols = [...(this._cols ?? []), c]; return this; }
+  lt(c, v) { this.filters.push((r) => r[c] < v); this._cols = [...(this._cols ?? []), c]; return this; }
   not(c, op, v) {
     if (op === 'is' && v === null) this.filters.push((r) => r[c] !== null && r[c] !== undefined);
     this._cols = [...(this._cols ?? []), c];

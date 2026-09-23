@@ -53,13 +53,23 @@ console.log('\n=== it runs on its own prompt ===');
 
   console.log('\n  -- the prompt arrives whole --');
   for (const heading of [
-    '## Human-First', '## Cognitive Work', '## Learning',
+    '## Precedence', '## Human-First', '## Cognitive Work', '## Learning',
     '## Judgment, Analysis, and Creation', '## Direct Answers',
-    '## Tools and Epistemic Integrity', '## Semantic Continuity and Memory',
+    '## Epistemic Integrity', '## Semantic Continuity and Memory',
     '## Adaptation', '## Response Discipline', '## Objective',
   ]) ok(`${heading}`, p4.includes(heading));
   ok('the support ladder survived', p4.includes('question → hint → stronger hint'));
   ok('and the closing line', p4.trimEnd().endsWith('Optimize for what remains with the human after the interaction ends.'));
+
+  console.log('\n  -- v2: what the code now decides, the prompt no longer contradicts --');
+  // Phase 0, failure 1: v1 told the model to preserve work by default, so a
+  // wrong attempt or a bug report became a reason to withhold.
+  ok('no default preservation', !p4.includes('When it would, preserve that work'));
+  ok('holding back needs a stated reason', p4.includes('Hold something back only when the decision for this turn names what to hold back and why'));
+  ok('a wrong answer is not a reason to hide the right one', p4.includes('A wrong answer is not a reason to hide the right one'));
+  ok('the decision wins over the general guidance, their words over both', /the decision wins; where the person's own words in their latest message disagree with both, their words win/.test(p4));
+  ok('no tools are promised', !/Research facts, retrieve evidence/.test(p4) && p4.includes('You have no tools in this conversation'));
+  ok('Socria’s ideas are not presented as theirs', p4.includes('Never present Socria\'s idea as theirs'));
 }
 
 console.log('\n=== no depth contract is appended ===');
@@ -75,12 +85,17 @@ console.log('\n=== no depth contract is appended ===');
   ok('and Core 3.1 still varies by depth', P('core-3', 'quick') !== P('core-3', 'abstract'));
 }
 
-console.log('\n=== but the context its prompt expects does arrive ===');
+console.log('\n=== the context it takes, and the memories it no longer does ===');
 {
+  // Core 4's continuity is the Cognitive State, the Reasoning Ledger and the
+  // Mind Graph. The per-thread memory and the Thinking Journey are two older
+  // summaries of the same conversation by different extractors; handing
+  // them over too made four memories that could disagree (council D14).
   const memory = { goals: ['ship Core 4'], values: [], constraints: [], decisions: [], uncertainties: [] };
   const withMem = buildSystemPrompt('core-4', 'balanced', memory).prompt;
-  ok('memory is injected', withMem.length > P('core-4').length && withMem.includes('ship Core 4'),
-     'its own Semantic Continuity section says to expect it');
+  ok('the thread memory is NOT injected', withMem === P('core-4') && !withMem.includes('ship Core 4'));
+  const withCognition = buildSystemPrompt('core-4', 'balanced', null, null, null, null, null, { state: '\n=== STATE ===', move: '\n=== MOVE ===' }).prompt;
+  ok('the cognition block is, state then move, last', withCognition.endsWith('\n=== STATE ===\n=== MOVE ==='));
   const withProfile = buildSystemPrompt('core-4', 'balanced', null, 'Works on a reasoning product.').prompt;
   ok('an imported profile is injected', withProfile.includes('reasoning product'));
   ok('memory still reaches Core 3.1', buildSystemPrompt('core-3', 'balanced', memory).prompt.includes('ship Core 4'));
@@ -96,7 +111,7 @@ console.log('\n=== the model underneath, and its override ===');
   ok('the override is honoured', resolveOpenAIModel('core-4') === 'some-other-model');
   ok('and does not move Core 3.1', resolveOpenAIModel('core-3') !== 'some-other-model');
   delete process.env.OPENAI_MODEL_CORE_4;
-  ok('it is versioned separately', CORE_4_PROMPT_VERSION === 'core-4-v1');
+  ok('it is versioned separately', CORE_4_PROMPT_VERSION === 'core-4-v2');
 }
 
 console.log('\n=== it has the same safety net Core 3.1 has ===');

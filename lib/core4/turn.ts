@@ -1,0 +1,368 @@
+import 'server-only';
+// lib/core4/turn.ts
+//
+// One Core 4 turn: UNDERSTAND → ALLOCATE → INTERVENE → MEASURE → LEARN.
+//
+//   prepareTurn()  before the reply. Reads the person's explicit words,
+//                  loads last turn's state and the ledger (in parallel), runs
+//                  the state reader (one cheap call, with a timeout), merges,
+//                  applies corrections, allocates the work, prices questions,
+//                  detects diminishing returns, chooses the move, and — when
+//                  their attempt needs checking and the answer must stay
+//                  private — runs Verify Mode. Returns the blocks the reply
+//                  model reads.
+//
+//   guardReply()   after the draft. Answer Guard 2.0: deterministic first,
+//                  the cheap model only for what structure cannot decide.
+//
+//   finishTurn()   after the reply is sent. Writes the ledger (attributed in
+//                  code), the carried-forward state, the previous turn's
+//                  outcome, this turn's content-free trace and any capability
+//                  evidence.
+//
+// Everything here fails soft. The failure directions are chosen: no state →
+// carry the last one forward; no guard model → keep the deterministic
+// verdict; no store → lose one turn of continuity, never the reply.
+
+import { EMPTY_STATE, type CognitiveState } from '../cognition/state';
+import { readState, guardModel, checkWork, COGNITION_MODEL } from '../cognition/engine';
+import { readSignals, readContract } from './signals';
+import { mergeState, recordTurn } from './merge';
+import { allocate } from './allocation';
+import { diminishingReturns, questionBudget, familyOf } from './budget';
+import { selectIntervention, renderDecision } from './intervene';
+import { guardStructure, type GuardInput } from './guard2';
+import { exactCheck, renderCheck, hiddenValues, type CheckResult, CHECK_FLOOR } from './verify';
+import { consideredView, entriesFromPerson, entriesFromSocria, mergeEntries, disputeTurn, linksForTurn } from './ledger';
+import { evidenceFromTurn } from './capability';
+import { buildTrace } from './trace';
+import { questionLoad, stripInterrogatives, sentencesOf } from './questions';
+export { SentenceGate } from './stream-gate';
+import * as store from './store';
+import type {
+  Allocation,
+  Diminishing,
+  ExplicitSignals,
+  GuardOutcome,
+  InterventionDecision,
+  LedgerEntry,
+  NoveltyVerdict,
+  QuestionBudget,
+} from './types';
+
+const STATE_TIMEOUT_MS = 5000;
+
+export interface TurnInput {
+  apiKey: string;
+  userId: string | null;
+  conversationId: string | null;
+  projectId: string | null;
+  /** the transcript, words only (attachments named, not included) */
+  brief: { role: 'user' | 'assistant'; content: string }[];
+  /** the latest user message, words only */
+  lastUserText: string;
+  /** the Project's standing instructions, if any */
+  instructions: string;
+  now: number;
+}
+
+export interface PreparedTurn {
+  input: TurnInput;
+  prior: CognitiveState | null;
+  state: CognitiveState;
+  readOk: boolean;
+  signals: ExplicitSignals;
+  contract: ExplicitSignals;
+  allocation: Allocation;
+  budget: QuestionBudget;
+  diminishing: Diminishing;
+  decision: InterventionDecision;
+  ledger: LedgerEntry[];
+  considered: { lines: string[]; items: string[] };
+  disputed: LedgerEntry[];
+  verify: CheckResult | null;
+  hidden: string[];
+  /** the prompt blocks, in order: state, verify, move */
+  blocks: { state: string; verify: string; move: string };
+  ms: Record<string, number>;
+}
+
+async function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return Promise.race([p, new Promise<T>((r) => setTimeout(() => r(fallback), ms))]);
+}
+
+export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
+  const t0 = Date.now();
+  const ms: Record<string, number> = {};
+  const signals = readSignals(input.lastUserText);
+  const contract = readContract(input.instructions);
+
+  // Last turn's state and the ledger, together.
+  const canStore = !!(input.userId && input.conversationId);
+  const [prior, ledger] = await Promise.all([
+    canStore ? store.loadState(input.userId!, input.conversationId!) : Promise.resolve(null),
+    input.userId ? store.loadLedger(input.userId, { conversationId: input.conversationId ?? '', projectId: input.projectId }) : Promise.resolve([] as LedgerEntry[]),
+  ]);
+  ms.load = Date.now() - t0;
+
+  const focus = `${prior?.currentFocus ?? ''} ${input.lastUserText}`.slice(0, 600);
+  const preView = consideredView(ledger, { focus, conversationId: input.conversationId ?? '', projectId: input.projectId });
+
+  const t1 = Date.now();
+  const transcript = input.brief.map((m) => `${m.role === 'user' ? 'Them' : 'Socria'}: ${m.content}`).join('\n\n').slice(-8000);
+  const read = await withTimeout(
+    readState(input.apiKey, { transcript, prior, considered: preView.lines, instructions: input.instructions }),
+    STATE_TIMEOUT_MS,
+    { state: EMPTY_STATE, ok: false }
+  );
+  ms.state = Date.now() - t1;
+
+  const state = mergeState({ prior, read: read.state, signals, contract, readOk: read.ok });
+
+  // "That's not what I meant": what was recorded as theirs last turn is disputed.
+  const disputed = signals.correction && prior && input.conversationId
+    ? disputeTurn(ledger, input.conversationId, prior.turn, input.now, signals.evidence.join('; '))
+    : [];
+
+  // The considered record, with this turn's own contributions from the
+  // person included (they raised them a moment ago).
+  const considered = consideredView(ledger, { focus: `${state.currentFocus} ${input.lastUserText}`, conversationId: input.conversationId ?? '', projectId: input.projectId });
+  const nowItems = state.consideredNow.map((c) => c.text);
+  const allItems = [...new Set([...nowItems, ...considered.items])];
+  const allLines = [...new Set([...state.consideredNow.map((c) => `they ${c.stance === 'rejects' ? 'ruled out' : 'raised'} just now: ${c.text}${c.reason ? ` (because: ${c.reason})` : ''}`), ...considered.lines])];
+
+  const diminishing = diminishingReturns(state, signals, input.brief);
+  const budget = questionBudget(state, signals, input.brief, diminishing);
+
+  // Verify Mode, part one: arithmetic in their attempt is checked EXACTLY,
+  // before anything is decided — a computed verdict outranks the reader's
+  // opinion of whether they got it right, and the move depends on it.
+  const attempting = state.latest === 'attempt' || state.attempt !== 'none' || state.work === 'verification';
+  const problem = input.brief.slice(0, -1).slice(-4).map((m) => m.content).join('\n');
+  let verify: CheckResult | null = attempting ? exactCheck(problem, input.lastUserText) : null;
+  if (verify) state.attempt = verify.verdict === 'correct' ? 'right' : 'wrong';
+
+  const decide = () => {
+    const a = allocate({ state, signals, contract });
+    return { allocation: a, decision: selectIntervention({ state, allocation: a, budget, diminishing, signals, considered: allLines.slice(0, 12) }) };
+  };
+  let { allocation, decision } = decide();
+
+  // Verify Mode, part two: when the answer must stay theirs and arithmetic
+  // could not settle it, a SEPARATE checker call judges the attempt. Its
+  // solution never reaches the reply model (renderCheck, hiddenValues). A
+  // confident verdict that contradicts the reader re-decides the move.
+  if (!verify && allocation.withhold && state.attempt !== 'none') {
+    const t2 = Date.now();
+    verify = await withTimeout(checkWork(input.apiKey, problem, input.lastUserText), 4000, null);
+    ms.verify = Date.now() - t2;
+    if (verify && verify.confidence >= CHECK_FLOOR && verify.verdict !== 'unknown') {
+      const judged = verify.verdict === 'correct' ? 'right' : verify.verdict === 'partial' ? 'partial' : 'wrong';
+      if (judged !== state.attempt) {
+        state.attempt = judged;
+        ({ allocation, decision } = decide());
+      }
+    }
+  }
+  const hidden = allocation.withhold ? hiddenValues(verify) : [];
+
+  const verifyBlock = allocation.withhold
+    ? renderCheck(verify)
+    : verify && verify.confidence >= CHECK_FLOOR && verify.verdict !== 'unknown'
+      ? `\n=== Their attempt was checked ===\nVERDICT: ${verify.verdict}${verify.method === 'exact' ? ' (computed exactly)' : ''}${verify.expected ? `\nCORRECT ANSWER: ${verify.expected}` : ''}\n`
+      : '';
+
+  let move = renderDecision({ ...decision, avoid: allLines.slice(0, 12) }, allocation);
+  if (allocation.announce) {
+    move += '\nThis is the first time you are holding something back in this conversation: say so once, in a clause, and that they can have it by asking (e.g. "say the word and I\'ll give you the answer"). Do not repeat this in later turns.\n';
+  }
+
+  ms.prepare = Date.now() - t0;
+  return {
+    input,
+    prior,
+    state,
+    readOk: read.ok,
+    signals,
+    contract,
+    allocation,
+    budget,
+    diminishing,
+    decision: { ...decision, avoid: allItems.slice(0, 12) },
+    ledger,
+    considered: { lines: allLines, items: allItems },
+    disputed,
+    verify,
+    hidden,
+    blocks: { state: renderStateBlock(state), verify: verifyBlock, move },
+    ms,
+  };
+}
+
+// renderState is imported lazily to keep the dependency direction clean.
+import { renderState } from '../cognition/state';
+function renderStateBlock(s: CognitiveState): string {
+  return renderState(s);
+}
+
+export interface GuardedReply {
+  text: string;
+  outcome: GuardOutcome;
+  novelty: NoveltyVerdict[];
+  /** a regeneration is needed with this note (the caller runs the frontier model once more) */
+  retryNote?: string;
+}
+
+/** Answer Guard 2.0 on a complete draft. */
+export async function guardReply(p: PreparedTurn, draft: string): Promise<GuardedReply> {
+  const input: GuardInput = { decision: p.decision, allocation: p.allocation, draft, considered: p.considered.items, hidden: p.hidden };
+  const g = guardStructure(input);
+  let text = g.revised ?? draft;
+  let outcome: GuardOutcome = { action: g.action, findings: g.findings, by: g.by, ...(g.revised ? { revised: g.revised } : {}), ...(g.retryNote ? { retryNote: g.retryNote } : {}) };
+  let novelty = g.novelty;
+  if (g.retryNote) return { text, outcome, novelty, retryNote: g.retryNote };
+
+  if (g.needsModel && p.input.apiKey) {
+    const t = Date.now();
+    const m = await withTimeout(guardModel(p.input.apiKey, { ...input, draft: text }, p.input.lastUserText), 5000, null);
+    p.ms.guardModel = Date.now() - t;
+    if (m) {
+      // Coerce: without anything withheld there is no overreach to fix.
+      const action = !p.allocation.withhold && m.action === 'MODIFY_FOR_MORE_AGENCY' ? 'ALLOW' : m.action;
+      // The cheap model's prose never ships (Council D8). Its fixes are
+      // deletions of the exact sentences it named, or a regeneration by the
+      // frontier model.
+      if (m.redundant.length) {
+        const drop = new Set(m.redundant.map((s) => s.trim()));
+        const kept = sentencesOf(text).filter((s) => !drop.has(s.trim())).join('').trim();
+        if (kept && kept.split(/\s+/).length >= 6) text = kept;
+        novelty = [...novelty, ...m.redundant.map((s) => ({ sentence: s, verdict: 'REDUNDANT' as const, match: null, score: 1, method: 'model' as const }))];
+      }
+      const needsRetry = action !== 'ALLOW' && !m.redundant.length;
+      outcome = {
+        action: action === 'ALLOW' && text !== draft ? 'MODIFY_FOR_MORE_HELP' : action,
+        findings: [...g.findings, ...m.findings],
+        by: 'model',
+        ...(needsRetry
+          ? { retryNote: `A check found: ${m.findings.map((f) => f.detail).join(' ') || action}. Fix exactly that and nothing else.` }
+          : {}),
+      };
+      if (needsRetry) return { text, outcome, novelty, retryNote: outcome.retryNote };
+    }
+  }
+  return { text, outcome, novelty };
+}
+
+/**
+ * A retry that STILL fails the deterministic guard is never shipped as is.
+ * The fallback is the safest version available: the retry with questions
+ * stripped; if even that leaks a hidden value or is empty, a minimal reply
+ * built from the verify verdict.
+ */
+export function fallbackReply(p: PreparedTurn, first: string, retry: string | null): { text: string; codes: string[] } {
+  const codes: string[] = [];
+  for (const candidate of [retry, first]) {
+    if (!candidate) continue;
+    const g = guardStructure({ decision: p.decision, allocation: p.allocation, draft: candidate, considered: p.considered.items, hidden: p.hidden });
+    const text = g.revised ?? candidate;
+    if (!g.retryNote) return { text, codes: [...codes, 'fallback:passed'] };
+    const leaks = g.findings.some((f) => f.side === 'overreach');
+    if (!leaks) {
+      const stripped = stripInterrogatives(text, p.decision.maxQuestions).text;
+      if (stripped) return { text: stripped, codes: [...codes, 'fallback:stripped'] };
+    }
+    codes.push(`fallback:rejected:${g.findings.map((f) => f.code).join(',')}`);
+  }
+  const v = p.verify;
+  const where = v?.location ? ` Look again at ${v.location}.` : '';
+  const kind = v?.errorType ? ` The problem is ${v.errorType.replace(/^the /, '')}.` : '';
+  const text = v && v.verdict === 'correct'
+    ? 'That is right.'
+    : v
+      ? `Not quite yet.${where}${kind}`
+      : 'Take the next step from where you are, and send it over — I will tell you exactly where it goes wrong, if it does.';
+  return { text, codes: [...codes, 'fallback:minimal'] };
+}
+
+// ── after the reply ─────────────────────────────────────────────────
+
+export async function finishTurn(
+  p: PreparedTurn,
+  sent: string,
+  guard: GuardOutcome | null,
+  regenerated: boolean,
+  novelty: NoveltyVerdict[],
+  served: string | null,
+  promptVersion: string
+): Promise<void> {
+  const { input, state, allocation, decision } = p;
+  if (!input.userId || !input.conversationId) return;
+  const ctx = { conversationId: input.conversationId, projectId: input.projectId, turn: state.turn, now: input.now };
+
+  // The ledger: the person's items attributed by grounding in their words;
+  // Socria's from what was actually sent.
+  const fromPerson = entriesFromPerson(state.consideredNow, input.lastUserText, ctx);
+  const fromSocria = entriesFromSocria(sent, decision.type, ctx);
+  const merged = mergeEntries(p.ledger, [...fromPerson, ...fromSocria], input.now);
+  const previousSocria = p.ledger.filter((e) => e.owner === 'socria' && e.conversationId === input.conversationId && p.prior && e.turn === p.prior.turn);
+  const links = linksForTurn(merged.created, previousSocria, input.now);
+
+  const next = recordTurn(state, {
+    type: decision.type,
+    family: familyOf(decision.type),
+    questions: questionLoad(sent),
+    withheld: !!allocation.withhold,
+  });
+
+  const trace = buildTrace({
+    state,
+    readOk: p.readOk,
+    allocation,
+    decision,
+    budget: p.budget,
+    diminishing: p.diminishing,
+    novelty,
+    guard,
+    regenerated,
+    verify: p.verify,
+    sentQuestions: questionLoad(sent),
+    sentChars: sent.length,
+    ledger: {
+      user: merged.created.filter((e) => e.owner === 'user').length,
+      socria: merged.created.filter((e) => e.owner === 'socria').length,
+      unknown: merged.created.filter((e) => e.owner === 'unknown').length,
+      disputed: p.disputed.length,
+    },
+    considered: p.considered.items.length,
+    ms: p.ms,
+    models: { reply: served, cognition: COGNITION_MODEL },
+    promptVersion,
+  });
+
+  const evidence = evidenceFromTurn(state, p.prior, ctx);
+  const writes: Promise<unknown>[] = [
+    store.saveState(input.userId, input.conversationId, next, input.now),
+    store.saveLedger(input.userId, [...merged.created, ...merged.touched, ...p.disputed], links),
+    store.insertTurn(input.userId, input.conversationId, trace, input.now),
+    store.insertCapability(input.userId, evidence),
+  ];
+  // How the PREVIOUS turn landed belongs on its own row.
+  if (p.prior && state.lastOutcome) writes.push(store.recordOutcome(input.userId, input.conversationId, p.prior.turn, state.lastOutcome));
+  await Promise.all(writes);
+
+  // For evaluation harnesses only: the decision path, observable without a database.
+  const sink = (globalThis as { __socriaTrace?: unknown[] }).__socriaTrace;
+  if (Array.isArray(sink)) {
+    sink.push({
+      trace,
+      allocation,
+      decision: { ...decision, objective: decision.objective },
+      state: { work: state.work, taskKind: state.taskKind, learningGoal: state.learningGoal, expertise: state.expertise, directness: state.directness, consideredNow: state.consideredNow, lastOutcome: state.lastOutcome },
+      budget: p.budget,
+      diminishing: p.diminishing,
+      considered: p.considered.lines,
+      guard,
+      verify: p.verify ? { method: p.verify.method, verdict: p.verify.verdict, location: p.verify.location } : null,
+    });
+  }
+}

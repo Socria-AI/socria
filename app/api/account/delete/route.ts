@@ -48,6 +48,14 @@ const OWNED_TABLES = [
   // Project containers. Their anchors are in mind_nodes above, so a flat
   // delete of both leaves nothing behind.
   'mind_projects',
+  // Core 4's reasoning state: the per-conversation Cognitive State, the
+  // Reasoning Ledger and its links, the content-free turn traces and the
+  // capability evidence (lib/core4/store.ts CORE4_TABLES).
+  'core4_state',
+  'reasoning_entries',
+  'reasoning_links',
+  'core4_turns',
+  'capability_evidence',
 ] as const;
 
 /**
@@ -69,6 +77,11 @@ const LATE_TABLES = new Set<string>([
   'logos_room_events',
   'logos_room_members',
   'logos_rooms',
+  'core4_state',
+  'reasoning_entries',
+  'reasoning_links',
+  'core4_turns',
+  'capability_evidence',
 ]);
 
 /**

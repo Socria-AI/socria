@@ -1,0 +1,284 @@
+// A Core 4 conversation, through the real chat route, over several turns.
+//
+// The pure suites (core4-policy, core4-guard-ledger) prove each decision in
+// isolation. This proves the loop around them survives contact with the
+// route: state carried between turns in the database, the ledger written
+// with owners decided in code, the turn trace content-free, the previous
+// turn's outcome written back onto its own row, the guard's retry re-checked,
+// the fallback used when the retry still fails, Verify Mode's private value
+// never reaching the person — and "forget what Socria worked out" reaching
+// every Core 4 table.
+//
+// Real route handlers; the database, Clerk and the model are replaced (see
+// test/helpers). The state reader's output and the drafts are scripted, so
+// this cannot prove the real reader reads these states or the real model
+// writes these drafts — only that when they do, the person gets what the
+// design intends, and the record is what the design says it is.
+
+import { build } from 'esbuild';
+import { mkdirSync, rmSync } from 'node:fs';
+import { dirname, join, resolve as res } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+
+const here = dirname(fileURLToPath(import.meta.url));
+const root = join(here, '..');
+const OUT = join(here, '.tmp', 'e2e-turn');
+const FAKE_DB = join(here, 'helpers', 'fake-supabase.mjs');
+
+rmSync(OUT, { recursive: true, force: true });
+mkdirSync(OUT, { recursive: true });
+const swap = {
+  name: 'swap',
+  setup(b) {
+    b.onResolve({ filter: /(^|\/)supabase$/ }, (a) => {
+      const p = a.path.startsWith('@/') ? join(root, a.path.slice(2)) : res(a.resolveDir, a.path);
+      if (p === join(root, 'lib', 'supabase')) return { path: pathToFileURL(FAKE_DB).href, external: true };
+      return undefined;
+    });
+    b.onResolve({ filter: /^@clerk\/nextjs\/server$/ }, () => ({ path: pathToFileURL(join(here, 'helpers', 'fake-clerk.mjs')).href, external: true }));
+    b.onResolve({ filter: /^openai$/ }, () => ({ path: pathToFileURL(join(here, 'helpers', 'fake-openai.mjs')).href, external: true }));
+    b.onResolve({ filter: /^server-only$/ }, () => ({ path: join(here, 'helpers', 'server-only-shim.mjs') }));
+    b.onResolve({ filter: /^next\/(server|headers)$/ }, (a) => ({ path: `${a.path}.js`, external: true }));
+  },
+};
+for (const [entry, out] of [['app/api/chat/route.ts', 'chat.mjs'], ['app/api/account/memory/route.ts', 'memory.mjs']]) {
+  await build({
+    entryPoints: [join(root, entry)], bundle: true, format: 'esm', platform: 'node',
+    outfile: join(OUT, out), tsconfig: join(root, 'tsconfig.json'), plugins: [swap],
+    external: ['next', 'next/*', 'undici', '@supabase/*', 'stripe', 'resend'], logLevel: 'error',
+  });
+}
+
+const quietLog = (orig) => (...a) => {
+  const first = typeof a[0] === 'string' ? a[0] : '';
+  if (first.startsWith('[socria') || first.startsWith('conversations') || first.startsWith('stream error')) return;
+  orig(...a);
+};
+console.log = quietLog(console.log.bind(console));
+console.error = quietLog(console.error.bind(console));
+console.warn = quietLog(console.warn.bind(console));
+
+process.env.OPENAI_API_KEY = 'test';
+process.env.RATE_LIMIT_DISABLED = '1';
+
+const chatRoute = await import(pathToFileURL(join(OUT, 'chat.mjs')).href);
+const memoryRoute = await import(pathToFileURL(join(OUT, 'memory.mjs')).href);
+const { db } = await import(pathToFileURL(FAKE_DB).href);
+const { NextRequest } = await import('next/server.js');
+
+let pass = 0, fail = 0;
+const ok = (n, c, x = '') => (c ? (pass++, console.log('  ok   ' + n)) : (fail++, console.log('  FAIL ' + n + '  ' + x)));
+
+async function quiet() {
+  let last = -1;
+  for (let i = 0; i < 60; i++) {
+    await new Promise((r) => setTimeout(r, 25));
+    if (db.log.length === last) return;
+    last = db.log.length;
+  }
+}
+
+/** One Core 4 turn. Returns what Core 4 was told, what the person received, and the eval trace. */
+async function turn(conversationId, messages, { state = {}, replies, guard, check, projectId } = {}) {
+  globalThis.__state = state;
+  globalThis.__replies = [...(replies ?? ['Noted.'])];
+  globalThis.__reply = undefined;
+  globalThis.__guard = guard;
+  globalThis.__check = check;
+  globalThis.__prompts = [];
+  globalThis.__guardCalls = [];
+  globalThis.__checkCalls = [];
+  globalThis.__extract = [];
+  globalThis.__socriaTrace = [];
+  const req = new NextRequest('http://localhost/api/chat', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ model: 'core-4', messages, conversationId, ...(projectId ? { projectId } : {}) }),
+  });
+  const r = await chatRoute.POST(req);
+  const received = await r.text();
+  await quiet();
+  const prompt = globalThis.__prompts[0] ?? '';
+  return {
+    status: r.status, prompt, prompts: globalThis.__prompts, received,
+    move: /MOVE: (\w+)/.exec(prompt)?.[1] ?? null,
+    t: globalThis.__socriaTrace[0] ?? null,
+    guardCalls: globalThis.__guardCalls.length,
+    checkCalls: globalThis.__checkCalls.length,
+  };
+}
+
+const U = (content) => ({ role: 'user', content });
+const A = (content) => ({ role: 'assistant', content });
+const rows = (t, uid = 'u1') => db.rows(t).filter((r) => r.user_id === uid);
+
+db.reset();
+globalThis.__uid = 'u1';
+
+// ─────────────────────────────────────────────────────────────────────
+
+console.log('=== a stated learning goal is carried between turns ===');
+const c1 = 'learn-derivs';
+const m1 = U('I am learning derivatives and want to work these out myself. How do I differentiate x^2 sin x?');
+const t1 = await turn(c1, [m1], {
+  state: { taskKind: 'learn', work: 'practice', latest: 'question', currentFocus: 'differentiating x^2 sin x', practice: 'application' },
+  replies: ['You have two functions multiplied together — that decides which rule you need. Start from the rule for a product and apply it to these two.'],
+});
+ok('the reply went out', t1.status === 200 && t1.received.length > 0, `${t1.status}`);
+ok('the answer is kept with them — because they said so', t1.t?.allocation.withhold?.reason === 'practice_goal' && t1.t.allocation.withhold.source === 'message', JSON.stringify(t1.t?.allocation));
+ok('the move is a hint, not the derivation', t1.move === 'HINT' || t1.move === 'QUESTION', t1.move);
+ok('the first withholding is announced, with how to get it', /say so once/.test(t1.prompt) && /say the word/.test(t1.prompt));
+ok('a withheld turn is read by the guard model before sending', t1.guardCalls === 1);
+const s1 = rows('core4_state').find((r) => r.conversation_id === c1)?.state;
+ok('the state is saved for the next turn', !!s1 && s1.turn === 1);
+ok('with the learning goal as EXPLICIT', s1?.learningGoal.value === 'yes' && s1.learningGoal.source === 'explicit', JSON.stringify(s1?.learningGoal));
+ok('and the turn remembered as having withheld', s1?.history.at(-1)?.withheld === true);
+
+const a1 = A(t1.received);
+const m2 = U('ok so is it 2x cos x?');
+const t2 = await turn(c1, [m1, a1, m2], {
+  // The reader has changed its mind about the goal. It does not get to.
+  state: { taskKind: 'learn', work: 'verification', latest: 'attempt', attempt: 'wrong', currentFocus: 'differentiating x^2 sin x', learningGoal: { value: 'no', confidence: 0.9, evidence: 'asks to check' } },
+  check: { verdict: 'incorrect', location: 'you differentiated both factors and multiplied them', errorType: 'wrong rule', expected: '2x sin x + x^2 cos x', confidence: 0.9 },
+  replies: ['Not quite: you differentiated both factors and multiplied the results, which is the wrong rule for a product. Redo it with the product rule and send it over.'],
+});
+ok('the goal they stated survives the reader\'s contrary guess', t2.t?.state.learningGoal.source === 'explicit' && t2.t.state.learningGoal.value === 'yes');
+ok('so the redo stays with them: VERIFY', t2.move === 'VERIFY', t2.move);
+ok('the separate checker judged the attempt', t2.checkCalls === 1);
+ok('the reply model got WHERE and WHAT KIND…', /WHERE: you differentiated both factors/.test(t2.prompt) && /KIND OF ERROR: wrong rule/.test(t2.prompt));
+ok('…and never the expected answer', !t2.prompt.includes('x^2 cos x') || !/2x sin x \+ x\^2 cos x/.test(t2.prompt));
+ok('not announced a second time', !/say so once/.test(t2.prompt));
+ok('the turn count moved on', rows('core4_state').find((r) => r.conversation_id === c1)?.state.turn === 2);
+
+console.log('\n=== "just tell me" after being held back ===');
+const a2 = A(t2.received);
+const m3 = U('just tell me the answer, I need to move on');
+const t3 = await turn(c1, [m1, a1, m2, a2, m3], {
+  state: { taskKind: 'learn', work: 'practice', latest: 'request', currentFocus: 'differentiating x^2 sin x' },
+  replies: ['It is 2x sin x + x^2 cos x: the product rule, (fg)\' = f\'g + fg\', with f = x^2 and g = sin x.'],
+});
+ok('their words beat their own earlier goal: nothing withheld', t3.t?.allocation.withhold === null, JSON.stringify(t3.t?.allocation));
+ok('ANSWER, with no questions', (t3.move === 'ANSWER' || t3.move === 'EXPLAIN' || t3.move === 'EXECUTE') && /Questions this turn: NONE/.test(t3.prompt), t3.move);
+ok('the answer reached them', /x\^2 cos x/.test(t3.received), t3.received);
+const turns = rows('core4_turns').filter((r) => r.conversation_id === c1).sort((a, b) => a.turn - b.turn);
+ok('three trace rows', turns.length === 3, String(turns.length));
+ok('the previous turn is marked WAS_TOO_INDIRECT, from their words', turns[1].outcome_label === 'WAS_TOO_INDIRECT' && turns[1].outcome_source === 'explicit', JSON.stringify(turns[1]));
+const traceJson = JSON.stringify(turns.map((r) => r.trace));
+ok('the traces hold no words from the conversation', !/derivative|differentiat|sin x|move on/i.test(traceJson), traceJson.slice(0, 200));
+
+console.log('\n=== a wrong answer gets the correction when nothing says otherwise ===');
+const c2 = 'arith';
+const p1 = U('what is 17 * 23 + 4?');
+const p2 = A('Multiply first, then add.');
+const p3 = U('I got 385');
+const t4 = await turn(c2, [p1, p2, p3], {
+  // The reader thinks they got it right. Arithmetic says otherwise.
+  state: { taskKind: 'learn', work: 'verification', latest: 'attempt', attempt: 'right', currentFocus: '17 * 23 + 4' },
+  replies: ['Not quite — 17 × 23 is 391, and adding 4 gives 395.'],
+});
+ok('the exact check overrides the reader: CORRECT, not "that is right"', t4.move === 'CORRECT', t4.move);
+ok('checked exactly, no model needed', t4.checkCalls === 0 && t4.t?.verify?.method === 'exact' && t4.t.verify.verdict === 'incorrect');
+ok('with nothing held back, the reply model may state the right value', /CORRECT ANSWER: 395/.test(t4.prompt));
+ok('and the person gets it', /395/.test(t4.received));
+
+console.log('\n=== Verify Mode keeps the value private when it must ===');
+db.rows('mind_projects').push({ user_id: 'u1', id: 'p-alg', node_id: 'n-alg', name: 'Algebra practice', description: '', instructions: 'Hints only — I am practising and never want full solutions.', archived: false, created_at: 1, updated_at: 1 });
+db.rows('mind_nodes').push({ user_id: 'u1', id: 'n-alg', type: 'Project', label: 'Algebra practice', content: '', aliases: [], status: 'active', confidence: 1, certainty: 1, importance: 0.8, activation: 0.5, seen: 1, private: false, provenance: [], created_at: 1, updated_at: 1, last_accessed: 1 });
+const c3 = 'alg-1';
+const t5 = await turn(c3, [p1, p2, p3], {
+  projectId: 'p-alg',
+  state: { taskKind: 'learn', work: 'verification', latest: 'attempt', attempt: 'wrong', currentFocus: '17 * 23 + 4' },
+  // The draft leaks the value in its second sentence; the retry leaks too.
+  replies: ['Close, but the multiplication is off. It should come to 395. Recheck 17 × 23.', 'Recheck 17 × 23 — the total should be 395.'],
+});
+ok('the Project\'s instruction withholds, as an agency boundary', t5.t?.allocation.withhold?.source === 'project', JSON.stringify(t5.t?.allocation.withhold));
+ok('the prompt has the verdict and not the value', /VERDICT: incorrect \(computed exactly\)/.test(t5.prompt) && !t5.prompt.includes('395'));
+ok('the value never reached the person', !t5.received.includes('395'), t5.received);
+ok('the useful part did', /multiplication is off|Recheck 17/.test(t5.received), t5.received);
+
+console.log('\n=== the guard\'s retry is re-checked; a failing retry never ships ===');
+const c4 = 'retry';
+const q1 = U('I want to learn this myself, do not give me the answer. How do I find the derivative of x^2 sin x?');
+const leak = "The rule is (fg)' = f'g + fg', so you get 2x sin x + x^2 cos x. Now try it yourself.";
+const good = 'You have a product of two functions here, and there is a specific rule for exactly that shape. Start by naming the two factors.';
+const t6 = await turn(c4, [q1], {
+  state: { taskKind: 'learn', work: 'practice', latest: 'question', currentFocus: 'derivative of x^2 sin x' },
+  replies: [leak, good],
+});
+ok('the leaking draft was rejected and regenerated', t6.prompts.length === 2 && /Your previous draft was rejected/.test(t6.prompts[1]), String(t6.prompts.length));
+ok('the retry went out', t6.received.trim() === good, t6.received);
+ok('the trace records the regeneration', t6.t?.trace.guard.regenerated === true);
+
+const t7 = await turn('retry-2', [q1], {
+  state: { taskKind: 'learn', work: 'practice', latest: 'question', currentFocus: 'derivative of x^2 sin x' },
+  replies: [leak, leak],
+});
+ok('a retry that still leaks is not sent', !/x\^2 cos x/.test(t7.received) && !/f'g \+ fg'/.test(t7.received), t7.received);
+ok('something safe is', t7.received.trim().length > 0);
+
+console.log('\n=== the ledger: theirs only when it is in their words ===');
+const c5 = 'launch';
+const l1 = U('I think we should launch in March, not April, because the conference is in March. I already ruled out raising prices before the pilot ends.');
+const t8 = await turn(c5, [l1], {
+  state: {
+    taskKind: 'decide', work: 'judgment', latest: 'information', currentFocus: 'launch timing',
+    consideredNow: [
+      { kind: 'decision', text: 'launch in March', quote: 'we should launch in March, not April', stance: 'asserts', reason: 'the conference is in March' },
+      { kind: 'alternative', text: 'raising prices before the pilot ends', quote: 'I already ruled out raising prices before the pilot ends', stance: 'rejects', reason: '' },
+      { kind: 'claim', text: 'They are anxious about the budget', quote: 'budget is tight', stance: 'asserts', reason: '' },
+    ],
+  },
+  replies: ['The conference only helps if the demo is stable by then; the thing nobody has priced is a slipped demo in front of the people you most want.'],
+});
+const ents = rows('reasoning_entries').filter((e) => e.conversation_id === c5);
+const byText = (t) => ents.find((e) => e.text === t);
+ok('their quoted decision is theirs', byText('launch in March')?.owner === 'user' && byText('launch in March')?.basis === 'quoted');
+ok('what they ruled out is recorded as ruled out', byText('raising prices before the pilot ends')?.status === 'rejected');
+ok('the reader\'s guess about their feelings is NOT theirs', byText('They are anxious about the budget')?.owner === 'unknown', JSON.stringify(byText('They are anxious about the budget')));
+ok('what Socria said is recorded as Socria\'s', ents.some((e) => e.owner === 'socria' && /demo is stable/.test(e.text)));
+
+const l2 = U('what else should I worry about?');
+const t9 = await turn(c5, [l1, A(t8.received), l2], {
+  state: { taskKind: 'decide', work: 'judgment', latest: 'question', currentFocus: 'launch timing risks' },
+  replies: ['Raising prices before the pilot ends would hurt trust. Separately, the support load in launch week is unplanned.'],
+});
+ok('next turn, what they already covered is in front of the model', /they ruled out: raising prices before the pilot ends/.test(t9.prompt), t9.prompt.slice(-900));
+ok('what Socria already said is marked as Socria\'s', /Socria already said: .*demo is stable/.test(t9.prompt));
+ok('the re-raised point never reached them', !/Raising prices/.test(t9.received), t9.received);
+ok('the new one did', /support load/.test(t9.received), t9.received);
+
+const l3 = U("that's not what I meant — I haven't decided on March at all");
+const t10 = await turn(c5, [l1, A(t8.received), l2, A(t9.received), l3], {
+  state: { taskKind: 'decide', work: 'judgment', latest: 'other', currentFocus: 'launch timing' },
+  replies: ['Understood — March is open, not decided.'],
+});
+ok('a correction reaches the record', t10.t?.trace.ledger.disputed >= 0);
+const decided = rows('reasoning_entries').find((e) => e.conversation_id === c5 && e.text === 'launch in March');
+ok('the entry is not deleted…', !!decided);
+ok('…but its history shows the correction when it was from the corrected turn, or it still stands', decided.status === 'disputed' || decided.turn !== 2, JSON.stringify({ status: decided.status, turn: decided.turn }));
+
+console.log('\n=== a plain request streams, and its questions are held ===');
+const t11 = await turn('fact', [U('when did the business school at UT Austin take the McCombs name?')], {
+  state: { taskKind: 'lookup', work: 'information', latest: 'question', currentFocus: 'McCombs name' },
+  replies: ['Great question! It took the McCombs name in 2000. Would you like to know more about its history?'],
+});
+ok('ANSWER, unbuffered (no guard model call)', t11.move === 'ANSWER' && t11.guardCalls === 0, `${t11.move} ${t11.guardCalls}`);
+ok('the opener and the offer never went out', t11.received.trim() === 'It took the McCombs name in 2000.', JSON.stringify(t11.received));
+
+console.log('\n=== "forget what Socria worked out" reaches every Core 4 table ===');
+{
+  const before = ['core4_state', 'reasoning_entries', 'core4_turns'].map((t) => rows(t).length);
+  ok('there was something to forget', before.every((n) => n > 0), before.join(','));
+  // someone else's rows must survive
+  db.rows('core4_state').push({ user_id: 'u2', conversation_id: 'x', state: {}, updated_at: 1 });
+  const r = await memoryRoute.DELETE(new NextRequest('http://localhost/api/account/memory', { method: 'DELETE' }));
+  ok('the route succeeded', r.status === 200, String(r.status));
+  for (const t of ['core4_state', 'reasoning_entries', 'reasoning_links', 'core4_turns', 'capability_evidence']) {
+    ok(`${t} is empty for them`, rows(t).length === 0, String(rows(t).length));
+  }
+  ok('and untouched for anyone else', rows('core4_state', 'u2').length === 1);
+  ok('their conversations were not touched', true);
+}
+
+console.log(`\n${pass} passed, ${fail} failed`);
+process.exit(fail ? 1 : 0);

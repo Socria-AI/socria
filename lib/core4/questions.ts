@@ -1,0 +1,175 @@
+// lib/core4/questions.ts
+//
+// Interrogative work in what Socria actually SAYS, whatever the move is called.
+//
+// The old question limit priced only the move labelled ASK. A HINT that was
+// two questions, or a CHALLENGE ending "what would happen if…?", cost nothing
+// — so once asking was priced out, the questions moved into other labels and
+// the person kept getting interviewed. The fix is to measure the thing the
+// person experiences: sentences that hand them thinking to do. That includes
+// the disguised forms — "consider whether…", "ask yourself…", "it might be
+// worth thinking about…" — which are questions with the question mark taken
+// off, and which perform exactly the same function.
+//
+// Pure. Deterministic.
+
+/** Code and quotations are set aside: a question inside them is not put to the person. */
+function prose(text: string): string {
+  return text
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/`[^`\n]*`/g, ' ')
+    .replace(/[“"][^”"\n]{0,300}[”"]/g, ' ');
+}
+
+/** Sentences, each with its trailing punctuation and whitespace, in order. */
+export function sentencesOf(text: string): string[] {
+  const out = text.match(/[^.!?\n]+(?:[.!?]+["'’”)\]]*|\n+|$)\s*/g) ?? [];
+  return out.filter((s) => s.trim());
+}
+
+const WH = String.raw`(?:whether|what|how|why|which|where|when|who|if)`;
+
+/**
+ * Directing the person to do the thinking, without a question mark.
+ * Each needs a wh-clause (or an explicit "yourself") after the verb, so
+ * "Consider the case x = 0: …" — which SUPPLIES content — is not counted.
+ */
+const DISGUISED = new RegExp(
+  [
+    String.raw`^(?:so,?\s+|now,?\s+|maybe\s+|perhaps\s+|first,?\s+|next,?\s+)?(?:think about|consider|reflect on|ponder|notice|figure out|work out)\s+${WH}\b`,
+    String.raw`^(?:so,?\s+|now,?\s+)?ask yourself\b`,
+    String.raw`^(?:so,?\s+|now,?\s+)?(?:try to|see if you can)\s+(?:figure|work|think|spot|find|notice)\b`,
+    String.raw`\b(?:i(?:'d| would)|let me) (?:encourage|invite|challenge|urge) you to (?:think|consider|reflect|ask)\b`,
+    String.raw`\bit (?:might|may|could|would) be worth (?:thinking|considering|asking yourself|reflecting)\b`,
+    String.raw`\bworth (?:thinking|asking yourself) (?:about )?${WH}\b`,
+    String.raw`^(?:so,?\s+)?what do you think\b`,
+    String.raw`^i wonder ${WH}\b`,
+    String.raw`^(?:so,?\s+)?how (?:might|would|could) you\b`,
+  ].join('|'),
+  'i'
+);
+
+/** Closing offers: a request for more of the person's time, not a move. */
+const OFFER = /^(?:let me know|feel free to|if you(?:'d| would) like|if you want|want me to|shall i|should i|would you like|happy to|i can also|do you want me to)\b/i;
+
+const SYCOPHANCY = /^(?:great|excellent|good|fantastic|wonderful|interesting|fascinating) (?:question|point|thought|observation)[.!,]?|^(?:you(?:'re| are) (?:absolutely |completely |totally )?right)[.!,]|^(?:what a (?:great|good|fascinating) )|^(?:i love (?:this|that|how you))/i;
+
+export interface Interrogatives {
+  explicit: string[];
+  disguised: string[];
+  offers: string[];
+}
+
+export function interrogatives(text: string): Interrogatives {
+  const out: Interrogatives = { explicit: [], disguised: [], offers: [] };
+  for (const raw of sentencesOf(prose(text))) {
+    const s = raw.trim().replace(/^[-*•\d.)\s]+/, '');
+    if (!s) continue;
+    if (OFFER.test(s)) out.offers.push(raw.trim());
+    else if (/\?["'’”)\]]*\s*$/.test(s)) out.explicit.push(raw.trim());
+    else if (DISGUISED.test(s)) out.disguised.push(raw.trim());
+  }
+  return out;
+}
+
+/** How much interrogative work a reply puts to the person. Offers are not counted here. */
+export function questionLoad(text: string): number {
+  const q = interrogatives(text);
+  return q.explicit.length + q.disguised.length;
+}
+
+export function asksAnything(text: string): boolean {
+  return questionLoad(text) > 0;
+}
+
+/**
+ * How many of Socria's most recent replies in a row put interrogative work to
+ * the person, and the share of the last `window` replies that did.
+ * Read from the transcript the person saw — the move labels do not matter.
+ */
+export function questionPressure(
+  messages: readonly { role: string; content: string }[],
+  window = 6
+): { streak: number; density: number } {
+  const replies = messages.filter((m) => m.role === 'assistant');
+  let streak = 0;
+  for (let i = replies.length - 1; i >= 0; i--) {
+    if (!asksAnything(replies[i].content)) break;
+    streak++;
+  }
+  const recent = replies.slice(-window);
+  const density = recent.length ? recent.filter((m) => asksAnything(m.content)).length / recent.length : 0;
+  return { streak, density };
+}
+
+/**
+ * The reply with interrogative work beyond `keep` removed, closing offers
+ * removed, and a sycophantic opener removed. Returns null if nothing of
+ * substance would remain — the caller must then regenerate rather than send
+ * an empty or gutted reply.
+ *
+ * Deterministic and conservative: it deletes sentences, never rewrites them.
+ */
+export function stripInterrogatives(text: string, keep: 0 | 1 = 0): { text: string | null; removed: string[] } {
+  const removed: string[] = [];
+  // Work on the reply with code blocks protected: sentences inside code are
+  // never removed.
+  const blocks: string[] = [];
+  const shielded = text.replace(/```[\s\S]*?```/g, (m) => {
+    blocks.push(m);
+    return `\u0000${blocks.length - 1}\u0000`;
+  });
+  const parts = sentencesOf(shielded);
+  let kept = 0;
+  const out: string[] = [];
+  parts.forEach((raw, i) => {
+    const s = raw.trim().replace(/^[-*•\d.)\s]+/, '');
+    if (s.includes('\u0000')) {
+      out.push(raw);
+      return;
+    }
+    if (i === 0 && SYCOPHANCY.test(s)) {
+      const rest = raw.replace(SYCOPHANCY, '').replace(/^[\s,.!-]+/, '');
+      removed.push(raw.trim());
+      if (rest.trim()) out.push(rest.charAt(0).toUpperCase() + rest.slice(1));
+      return;
+    }
+    if (OFFER.test(s)) {
+      removed.push(raw.trim());
+      return;
+    }
+    const isQ = /\?["'’”)\]]*\s*$/.test(s) || DISGUISED.test(s);
+    if (isQ) {
+      if (kept < keep) {
+        kept++;
+        out.push(raw);
+      } else {
+        removed.push(raw.trim());
+      }
+      return;
+    }
+    out.push(raw);
+  });
+  const joined = out
+    .join('')
+    .replace(/\u0000(\d+)\u0000/g, (_, n) => blocks[Number(n)])
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+  // Substance: at least one non-trivial sentence left.
+  const substantive = sentencesOf(prose(joined)).some((s) => s.trim().split(/\s+/).length >= 4) || /```/.test(joined);
+  return { text: substantive ? joined : null, removed };
+}
+
+export function hasSycophanticOpener(text: string): boolean {
+  const first = sentencesOf(text.trim())[0]?.trim() ?? '';
+  return SYCOPHANCY.test(first);
+}
+
+/** The reply without its sycophantic opener (and nothing else changed); null if nothing is left. */
+export function stripSycophanticOpener(text: string): string | null {
+  const t = text.trim();
+  if (!hasSycophanticOpener(t)) return t;
+  const rest = t.replace(SYCOPHANCY, '').replace(/^[\s,.!—-]+/, '');
+  return rest.trim() ? rest.charAt(0).toUpperCase() + rest.slice(1) : null;
+}

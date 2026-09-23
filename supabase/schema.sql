@@ -512,3 +512,108 @@ create index if not exists conversations_user_project_idx on conversations (user
 alter table mind_sources
   add column if not exists project_id text;
 create index if not exists mind_sources_user_project_idx on mind_sources (user_id, project_id);
+
+-- ── Core 4: the per-person reasoning state ───────────────────────────
+--
+-- Five tables, one responsibility each (lib/core4/store.ts;
+-- docs/CORE-4-COGNITIVE-DESIGN.md, D10, D14, D15). All keyed to one person,
+-- all deleted with the account, all in the export, all cleared by "forget
+-- what Socria worked out" (app/api/account/memory). Timestamps are epoch ms,
+-- like the Mind Graph's.
+
+-- The Cognitive State of ONE conversation: what is happening now — the kind
+-- of work, what the person has said they want (explicit) and what Socria has
+-- inferred (with confidence and evidence, never shown to them as fact), and
+-- a short history of the moves made. Small by construction (lib/cognition/
+-- state.ts caps every list); replaced whole each turn.
+create table if not exists core4_state (
+  user_id text not null,
+  conversation_id text not null,
+  state jsonb not null,
+  updated_at bigint not null,
+  primary key (user_id, conversation_id)
+);
+
+-- The Reasoning Ledger: the claims, objections, alternatives, questions and
+-- decisions of the person's THINKING, and what Socria contributed — each
+-- attributed. `owner` is 'user' only when `basis` is quoted or paraphrased
+-- from their own message (lib/core4/ledger.ts grounding); an idea Socria
+-- raised is 'socria' for ever, and adoption is a separate user entry linked
+-- derived_from it. `status` 'disputed' is what a correction leaves behind.
+create table if not exists reasoning_entries (
+  user_id text not null,
+  id text not null,
+  kind text not null,
+  text text not null,
+  owner text not null default 'unknown',
+  stance text not null default 'entertains',
+  basis text not null default 'inferred',
+  quote text not null default '',
+  reason text not null default '',
+  status text not null default 'active',
+  confidence real not null default 0.5,
+  conversation_id text not null,
+  project_id text,
+  turn integer not null default 0,
+  revisions jsonb not null default '[]'::jsonb,
+  created_at bigint not null,
+  updated_at bigint not null,
+  primary key (user_id, id)
+);
+
+create index if not exists reasoning_entries_user_updated_idx on reasoning_entries (user_id, updated_at desc);
+create index if not exists reasoning_entries_user_conv_idx on reasoning_entries (user_id, conversation_id);
+create index if not exists reasoning_entries_user_project_idx on reasoning_entries (user_id, project_id);
+
+create table if not exists reasoning_links (
+  user_id text not null,
+  id text not null,
+  from_id text not null,
+  to_id text not null,
+  rel text not null,
+  owner text not null default 'unknown',
+  reason text not null default '',
+  created_at bigint not null,
+  primary key (user_id, id)
+);
+
+create index if not exists reasoning_links_from_idx on reasoning_links (user_id, from_id);
+create index if not exists reasoning_links_to_idx on reasoning_links (user_id, to_id);
+
+-- Intervention history and outcomes: one row per Core 4 turn. `trace` is
+-- CONTENT-FREE — enums, counts and reason codes (lib/core4/trace.ts), never
+-- text from the person or from Socria. The outcome columns are written onto
+-- a turn's row once the person has replied to it. Kept 180 days, purged at
+-- write time (lib/core4/store.ts TRACE_RETENTION_MS).
+create table if not exists core4_turns (
+  user_id text not null,
+  conversation_id text not null,
+  turn integer not null,
+  created_at bigint not null,
+  trace jsonb not null,
+  outcome_label text,
+  outcome_confidence real,
+  outcome_source text,
+  primary key (user_id, conversation_id, turn)
+);
+
+create index if not exists core4_turns_user_created_idx on core4_turns (user_id, created_at);
+
+-- Capability EVIDENCE, not a capability score: observable events ("right,
+-- unassisted", "needed the answer given", "caught their own error"), each
+-- tied to a concept and a turn, each deletable. Conclusions are drawn only
+-- by counting them (lib/core4/capability.ts summarize).
+create table if not exists capability_evidence (
+  user_id text not null,
+  id text not null,
+  concept text not null,
+  event text not null,
+  assistance smallint not null default 0,
+  conversation_id text not null,
+  turn integer not null default 0,
+  confidence real not null default 0.5,
+  at bigint not null,
+  primary key (user_id, id)
+);
+
+create index if not exists capability_evidence_user_concept_idx on capability_evidence (user_id, concept);

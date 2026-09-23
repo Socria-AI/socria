@@ -1,0 +1,262 @@
+// What stands between a draft and the person, and what Core 4 remembers.
+//
+//   Answer Guard 2.0     overreach AND underhelp, novelty, voice
+//   the stream gate      questions held until the budget decides
+//   the novelty gate     already-considered matching
+//   the Reasoning Ledger attribution enforced in code; corrections; Logos shape
+//   capability evidence  events, counted; independence only across conversations
+//   the turn trace       content-free
+//   Verify Mode          exact arithmetic; the expected answer never shown
+//
+// Pure modules only. The same paths through the real route are in
+// core4-turn-e2e.test.mjs.
+
+import { guardStructure, sanitizeGuard2, buildGuard2Input, looksWorked, givesThenAsks } from './.tmp/guard2.mjs';
+import { SentenceGate } from './.tmp/stream-gate.mjs';
+import { classify, similarity, gateCandidates } from './.tmp/considered.mjs';
+import { grounding, entriesFromPerson, entriesFromSocria, mergeEntries, disputeTurn, linksForTurn, consideredView, toLogosGraph } from './.tmp/ledger.mjs';
+import { summarize, evidenceFromTurn, assistanceOf } from './.tmp/capability.mjs';
+import { buildTrace } from './.tmp/trace.mjs';
+import { exactCheck, sanitizeCheck, renderCheck, hiddenValues } from './.tmp/verify.mjs';
+import { stripSycophanticOpener } from './.tmp/questions.mjs';
+import { EMPTY_STATE } from './.tmp/state.mjs';
+
+let pass = 0, fail = 0;
+const ok = (n, c, x = '') => (c ? (pass++, console.log('  ok   ' + n)) : (fail++, console.log('  FAIL ' + n + '  ' + x)));
+
+const dec = (type, maxQuestions = 0, extra = {}) => ({
+  type, reasonCode: 'test', reason: 'test', intendedOutcome: '', humanWorkPreserved: null, aiWorkPerformed: '', confidence: 0.8,
+  guardRequired: true, maxQuestions, objective: '', avoid: [], switchedFrom: null, maxTokens: 600, ...extra,
+});
+const alloc = (mode, withhold = null) => ({ mode, humanWork: [], aiWork: [], withhold, announce: false, reasonCode: 'test', rationale: 'test', confidence: 0.8 });
+const PRACTICE = { what: 'the answer', reason: 'practice_goal', evidence: 'I want to learn this', source: 'message' };
+
+console.log('=== OVERREACH is policed only when something is held back ===');
+{
+  const leak = "Remember that (fg)' = f'g + fg'. So with f = x^2 and g = sin x you get 2x·sin x + x^2·cos x. Now try it yourself.";
+  const g = guardStructure({ decision: dec('HINT'), allocation: alloc('HUMAN_PRACTICES', PRACTICE), draft: leak, considered: [] });
+  ok('THE PRODUCT RULE: gives-then-asks is caught', g.findings.some((f) => f.code === 'gives_then_asks'), JSON.stringify(g.findings));
+  ok('  and sent back for regeneration, more agency', !!g.retryNote && g.action === 'MODIFY_FOR_MORE_AGENCY');
+  const free = guardStructure({ decision: dec('EXPLAIN'), allocation: alloc('AI_EXPLAINS'), draft: leak.replace(' Now try it yourself.', ''), considered: [] });
+  ok('the same content, with nothing held back, passes', free.action === 'ALLOW', JSON.stringify(free));
+  const worked = '1. Differentiate x^2.\n2. Differentiate sin x.\n3. Combine them with the product rule.';
+  ok('a HINT that works the problem is caught', guardStructure({ decision: dec('HINT'), allocation: alloc('HUMAN_PRACTICES', PRACTICE), draft: worked, considered: [] }).findings.some((f) => f.code === 'worked_solution'));
+  ok('the same steps in an EXPLAIN with nothing withheld pass', guardStructure({ decision: dec('EXPLAIN'), allocation: alloc('AI_EXPLAINS'), draft: worked, considered: [] }).action === 'ALLOW');
+
+  const hidden = guardStructure({
+    decision: dec('VERIFY'), allocation: alloc('AI_VERIFIES', { ...PRACTICE, what: 'the corrected final answer' }),
+    draft: 'Not quite — the sign flips in your second line. The answer should be 42. Recheck that step and you will get there.',
+    considered: [], hidden: ['42'],
+  });
+  ok('Verify Mode\'s private value is removed if it leaks', hidden.findings.some((f) => f.code === 'hidden_value') && !/42/.test(hidden.revised ?? ''), JSON.stringify(hidden));
+  ok('  and the rest of the feedback kept', /sign flips/.test(hidden.revised ?? ''));
+  ok('a withheld turn still consults the model for what structure cannot see',
+     guardStructure({ decision: dec('HINT'), allocation: alloc('HUMAN_PRACTICES', PRACTICE), draft: 'Look at which two functions are multiplied together here.', considered: [] }).needsModel === true);
+  ok('a free turn with nothing uncertain does not', guardStructure({ decision: dec('ANSWER'), allocation: alloc('AI_EXECUTES'), draft: 'It was founded in 1922 and renamed in 2000.', considered: [] }).needsModel === false);
+}
+
+console.log('\n=== UNDERHELP ===');
+{
+  const g = guardStructure({ decision: dec('CONTRIBUTE', 0), allocation: alloc('SHARED_REASONING'), draft: 'The funding gap is the variable that matters most here. What do you think?', considered: [] });
+  ok('a question over budget is removed, the substance kept', g.revised === 'The funding gap is the variable that matters most here.', JSON.stringify(g));
+  ok('  as MODIFY_FOR_MORE_HELP', g.action === 'MODIFY_FOR_MORE_HELP');
+  const only = guardStructure({ decision: dec('ANSWER', 0), allocation: alloc('AI_EXECUTES'), draft: 'What have you tried? What do you think the answer is?', considered: [] });
+  ok('a reply that is only questions, when the machine should answer → OVERRIDE_WITH_DIRECT_ANSWER', only.action === 'OVERRIDE_WITH_DIRECT_ANSWER' && !!only.retryNote);
+  const defl = guardStructure({ decision: dec('ANSWER', 0), allocation: alloc('AI_EXECUTES'), draft: 'It really depends on your goals and what you value most in a school.', considered: [] });
+  ok('"it depends on your goals" to a direct request → OVERRIDE_WITH_DIRECT_ANSWER', defl.action === 'OVERRIDE_WITH_DIRECT_ANSWER', JSON.stringify(defl));
+  const offer = guardStructure({ decision: dec('ANSWER', 0), allocation: alloc('AI_EXECUTES'), draft: 'It was renamed McCombs in 2000. Let me know if you want more detail on its history.', considered: [] });
+  ok('a closing offer is removed', offer.revised === 'It was renamed McCombs in 2000.', JSON.stringify(offer));
+  const one = guardStructure({ decision: dec('CLARIFY', 1), allocation: alloc('AI_EXECUTES'), draft: 'Exit code 1 only says the build failed. What is the first red line above it?', considered: [] });
+  ok('one allowed question passes untouched', one.action === 'ALLOW', JSON.stringify(one));
+  const disg = guardStructure({ decision: dec('CONTRIBUTE', 0), allocation: alloc('SHARED_REASONING'), draft: 'The funding gap is the real constraint here. It might be worth thinking about what investors in Austin actually fund.', considered: [] });
+  ok('a disguised question counts against the budget', disg.findings.some((f) => f.code === 'over_budget'), JSON.stringify(disg.findings));
+}
+
+console.log('\n=== VOICE ===');
+{
+  const g = guardStructure({ decision: dec('ANSWER'), allocation: alloc('AI_EXECUTES'), draft: 'Great question! The school took the McCombs name in 2000.', considered: [] });
+  ok('a sycophantic opener is removed, the answer kept', g.revised === 'The school took the McCombs name in 2000.', JSON.stringify(g));
+  ok('stripSycophanticOpener keeps the rest of the sentence', stripSycophanticOpener('Great question — the answer is 42.') === 'The answer is 42.', stripSycophanticOpener('Great question — the answer is 42.'));
+  ok('and leaves ordinary openers alone', stripSycophanticOpener('Good morning to the rest of it.') === 'Good morning to the rest of it.');
+}
+
+console.log('\n=== NOVELTY: already considered is not new ===');
+{
+  const considered = ['they raised: hiring a second engineer would slow the launch', 'they ruled out: raising prices before the pilot ends'];
+  const draft = 'Have you considered that hiring another engineer could slow down the launch? The part nobody has priced is the pilot customer churning if onboarding slips.';
+  const g = guardStructure({ decision: dec('CONTRIBUTE'), allocation: alloc('SHARED_REASONING'), draft, considered });
+  ok('the re-raised objection is caught', g.findings.some((f) => f.side === 'novelty'), JSON.stringify(g.findings));
+  ok('  and removed; the new point survives', !/hiring another engineer/.test(g.revised ?? '') && /pilot customer churning/.test(g.revised ?? ''), g.revised);
+  const all = guardStructure({ decision: dec('CONTRIBUTE'), allocation: alloc('SHARED_REASONING'), draft: 'Hiring a second engineer would slow down your launch.', considered });
+  ok('when EVERYTHING is redundant, regenerate past it', !!all.retryNote && /already considered/.test(all.retryNote));
+  ok('lexical matching sees through inflection', classify('Hiring more engineers slows the launch', ['hiring a second engineer would slow the launch']).verdict === 'REDUNDANT');
+  ok('an unrelated point is NOVEL', classify('Onboarding time is the constraint', considered).verdict === 'NOVEL');
+  ok('a partial overlap is UNCERTAIN (for the model to judge)', classify('The launch date matters more than pricing', considered).verdict !== 'REDUNDANT');
+  ok('similarity is symmetric-ish and bounded', similarity('a b c', '') === 0 && similarity('launch pricing pilot', 'launch pricing pilot') > 0.9);
+  ok('questions and perspective sentences are candidates', gateCandidates('One risk is churn. It is sunny. What about pricing?').length === 2);
+  ok('building past what they covered is not a re-raise', gateCandidates('You already ruled out raising prices. The remaining lever is support load.', true).length === 1);
+  const ans = guardStructure({ decision: dec('ANSWER'), allocation: alloc('HUMAN_LEADS'), draft: 'Raising prices before the pilot ends would hurt trust. Separately, the support load in launch week is unplanned.', considered: ['they ruled out: raising prices before the pilot ends'] });
+  ok('an answer given while thinking together is gated too', ans.revised === 'Separately, the support load in launch week is unplanned.', JSON.stringify(ans));
+  const fact = guardStructure({ decision: dec('ANSWER'), allocation: alloc('AI_EXECUTES'), draft: 'Raising prices before the pilot ends would breach the pilot contract.', considered: ['they ruled out: raising prices before the pilot ends'] });
+  ok('an information answer is not', fact.action === 'ALLOW');
+}
+
+console.log('\n=== the stream gate ===');
+{
+  const run = (chunks, maxQ) => {
+    let sent = '';
+    const g = new SentenceGate((s) => { sent += s; });
+    for (const c of chunks) g.push(c);
+    const dropped = g.finish(maxQ);
+    return { sent, dropped, out: g.out };
+  };
+  const a = run(['The funding gap is real. ', 'What do you think about ', 'Austin?'], 0);
+  ok('a trailing question beyond the budget never reaches them', a.sent.trim() === 'The funding gap is real.' && a.dropped.length === 1, JSON.stringify(a));
+  const b = run(['The funding gap is real. What is the first red line?'], 1);
+  ok('within the budget it does', /first red line\?$/.test(b.sent.trim()));
+  const c = run(['Why does this matter? ', 'Because investors cluster where exits happened. ', 'That is the mechanism.'], 0);
+  ok('a rhetorical question followed by exposition is released in order', c.sent.startsWith('Why does this matter?') && /mechanism\.$/.test(c.sent.trim()), JSON.stringify(c.sent));
+  const d = run(['Great question! ', 'It was renamed in 2000.'], 0);
+  ok('a sycophantic opener never goes out', d.sent.trim() === 'It was renamed in 2000.', JSON.stringify(d.sent));
+  const e = run(['Great question — the answer is 42. ', 'That is all.'], 0);
+  ok('but the substance in the same sentence does', e.sent.startsWith('The answer is 42.'), JSON.stringify(e.sent));
+  const f = run(['Run this:\n```js\nconst ok = x?.y ?? z;\nconsole.log("why?");\n```\n', 'That fixes it.'], 0);
+  ok('code passes through untouched, question marks and all', f.sent.includes('console.log("why?");') && f.sent.includes('x?.y'), JSON.stringify(f.sent));
+  const g = run(['It works now. ', 'Let me know if you want me to add tests.'], 1);
+  ok('a closing offer is dropped even with budget left', g.sent.trim() === 'It works now.', JSON.stringify(g.sent));
+}
+
+console.log('\n=== the guard model is used to delete, never to write ===');
+{
+  const draft = 'You already weighed cost. The real risk is churn.';
+  const m = sanitizeGuard2({ action: 'MODIFY_FOR_MORE_HELP', findings: [{ side: 'novelty', detail: 'x' }], redundant: ['You already weighed cost.', 'A sentence that is not in the draft.'], revised: 'An entirely new reply written by the cheap model.' }, draft);
+  ok('only sentences actually in the draft can be named', m.redundant.length === 1 && m.redundant[0] === 'You already weighed cost.');
+  ok('no revised prose is accepted', !('revised' in m));
+  ok('garbage → ALLOW, marked as no model', sanitizeGuard2(null, draft).action === 'ALLOW' && sanitizeGuard2(null, draft).by === 'none');
+  ok('an unknown action → ALLOW', sanitizeGuard2({ action: 'DESTROY' }, draft).action === 'ALLOW');
+  const input = buildGuard2Input({ decision: dec('HINT'), allocation: alloc('HUMAN_PRACTICES', PRACTICE), draft: 'x', considered: ['a'] }, 'their words');
+  ok('the guard model is told what is kept with them and why', /KEEP WITH THEM: the answer \(practice_goal\)/.test(input));
+  ok('looksWorked: a derivation chain', looksWorked('So we get A, therefore B, which gives C, hence D.'));
+  ok('looksWorked: not ordinary prose', !looksWorked('You could look at which rule applies here.'));
+  ok('givesThenAsks: identity then invitation', givesThenAsks('The rule is (fg)\' = f\'g + fg\'. Now try it yourself.'));
+  ok('givesThenAsks: a bare invitation is fine', !givesThenAsks('Now try it yourself.'));
+}
+
+console.log('\n=== the ledger: attribution is enforced in code ===');
+{
+  const said = 'I think we should launch in March, not April, because the conference is in March. I already ruled out a price increase.';
+  ok('a verbatim quote is QUOTED', grounding({ text: 'launch in March', quote: 'we should launch in March, not April' }, said) === 'quoted');
+  ok('a close paraphrase is PARAPHRASED', grounding({ text: 'Launch in March because of the conference', quote: '' }, said) === 'paraphrased');
+  ok('a flipped negation is NOT a paraphrase', grounding({ text: 'They should not launch in March because of the conference', quote: '' }, said) === 'inferred');
+  ok('something they never said is INFERRED', grounding({ text: 'They are worried about the budget', quote: 'budget is tight' }, said) === 'inferred');
+
+  const ctx = { conversationId: 'c1', projectId: null, turn: 3, now: 1000 };
+  const items = [
+    { kind: 'decision', text: 'launch in March', quote: 'we should launch in March, not April', stance: 'asserts', reason: 'the conference is in March' },
+    { kind: 'claim', text: 'They are worried about the budget', quote: 'budget is tight', stance: 'asserts', reason: '' },
+    { kind: 'alternative', text: 'price increase', quote: 'I already ruled out a price increase', stance: 'rejects', reason: '' },
+  ];
+  const es = entriesFromPerson(items, said, ctx);
+  ok('grounded → owner user', es[0].owner === 'user' && es[0].basis === 'quoted');
+  ok('ungrounded → owner unknown, never theirs', es[1].owner === 'unknown' && es[1].quote === '');
+  ok('an ungrounded item cannot carry a stance it never showed', es[1].stance === 'entertains');
+  ok('a rejection is recorded as ruled out', es[2].status === 'rejected');
+
+  const soc = entriesFromSocria('The conference timing only helps if the demo is stable. What would a slipped demo cost you?', 'CONTRIBUTE', ctx);
+  ok('what Socria said is Socria\'s', soc.every((e) => e.owner === 'socria'));
+  ok('its question and its claim are both recorded', soc.some((e) => e.kind === 'question') && soc.some((e) => e.kind === 'claim'));
+
+  // Adoption: they take up Socria's idea in their own words next turn.
+  const ctx4 = { ...ctx, turn: 4, now: 2000 };
+  const adopted = entriesFromPerson([{ kind: 'claim', text: 'the conference timing only helps if the demo is stable', quote: 'the conference timing only helps if the demo is stable', stance: 'accepts', reason: '' }],
+    'Fair — the conference timing only helps if the demo is stable.', ctx4);
+  const links = linksForTurn(adopted, soc, 2000);
+  ok('adoption is a NEW user entry, linked derived_from Socria\'s', adopted[0].owner === 'user' && links.some((l) => l.rel === 'derived_from' && soc.some((s) => s.id === l.to)), JSON.stringify(links));
+  ok('Socria\'s entry still belongs to Socria', soc.every((e) => e.owner === 'socria'));
+
+  const merged = mergeEntries(es, entriesFromPerson([items[0]], said, { ...ctx, turn: 5, now: 3000 }), 3000);
+  ok('saying the same thing again reinforces, not duplicates', merged.created.length === 0 && merged.touched.length === 1);
+
+  const all = [...es, ...soc];
+  const disputed = disputeTurn(all, 'c1', 3, 4000, "that's not what I meant");
+  ok('a correction disputes their entries from that turn', disputed.length === 2 && disputed.every((e) => e.status === 'disputed'));
+  ok('  with the correction in the revision history', disputed[0].revisions.at(-1).change === 'corrected');
+  const view = consideredView(all, { focus: 'launch timing', conversationId: 'c1', projectId: null });
+  ok('disputed entries are never rendered as theirs again', !view.lines.some((l) => /launch in March/.test(l)), JSON.stringify(view.lines));
+  ok('Socria\'s own contributions are rendered as Socria\'s', view.lines.some((l) => l.startsWith('Socria already said')));
+
+  const fresh = entriesFromPerson(items, said, { ...ctx, turn: 6, now: 5000 });
+  const v2 = consideredView(fresh, { focus: 'launch', conversationId: 'c1', projectId: null });
+  ok('stance is rendered: raised vs ruled out', v2.lines.some((l) => /^they ruled out: price increase/.test(l)), JSON.stringify(v2.lines));
+  ok('reasons are carried', v2.lines.some((l) => /because: the conference is in March/.test(l)));
+
+  const graph = toLogosGraph(fresh, links);
+  ok('the ledger renders as a Logos graph with owners intact', graph.nodes.length === 3 && graph.nodes.every((n) => 'owner' in n && 'stance' in n) && Array.isArray(graph.edges));
+}
+
+console.log('\n=== capability: events, counted conservatively ===');
+{
+  const ev = (concept, event, assistance, conversationId, at) => ({ id: `${at}`, concept, event, assistance, conversationId, turn: 1, confidence: 0.7, at });
+  const s1 = summarize([
+    ev('chain rule', 'misunderstanding', 0, 'c1', 1),
+    ev('chain rule', 'demonstrated_assisted', 1, 'c1', 2),
+    ev('chain rule', 'demonstrated_unassisted', 0, 'c1', 3),
+  ]);
+  ok('right-after-help in the SAME conversation is performance, not independence', s1[0].independentAfterHelp === false);
+  const s2 = summarize([
+    ev('chain rule', 'misunderstanding', 0, 'c1', 1),
+    ev('chain rule', 'demonstrated_assisted', 1, 'c1', 2),
+    ev('chain rule', 'demonstrated_unassisted', 0, 'c2', 10),
+  ]);
+  ok('unassisted success in a LATER conversation is', s2[0].independentAfterHelp === true);
+  ok('counts are kept separately', s2[0].assisted === 1 && s2[0].unassisted === 1 && s2[0].misunderstandings === 1);
+  ok('assistance is read from the previous move', assistanceOf({ type: 'HINT' }) === 1 && assistanceOf({ type: 'ANSWER' }) === 3 && assistanceOf(undefined) === 0);
+  const st = { ...EMPTY_STATE, currentFocus: 'chain rule derivative', latest: 'attempt', attempt: 'right', history: [], turn: 2 };
+  const e = evidenceFromTurn(st, null, { conversationId: 'c1', turn: 2, now: 99 });
+  ok('a right attempt with no help before it is demonstrated_unassisted', e.length === 1 && e[0].event === 'demonstrated_unassisted');
+  ok('a model opinion of their understanding alone produces nothing', evidenceFromTurn({ ...EMPTY_STATE, currentFocus: 'chain rule', demonstratedUnderstanding: 'solid', turn: 2 }, null, { conversationId: 'c1', turn: 2, now: 1 }).length === 0);
+}
+
+console.log('\n=== the trace is content-free ===');
+{
+  const secret = 'MY-PRIVATE-SENTENCE about my divorce';
+  const state = { ...EMPTY_STATE, currentGoal: secret, currentFocus: secret, positions: [secret], consideredNow: [{ kind: 'claim', text: secret, quote: secret, stance: 'asserts', reason: secret }], turn: 4 };
+  const t = buildTrace({
+    state, readOk: true,
+    allocation: { ...alloc('SHARED_REASONING'), rationale: secret, withhold: { what: secret, reason: 'authorship', evidence: secret, source: 'message' } },
+    decision: dec('CONTRIBUTE', 0, { objective: secret, reason: secret, avoid: [secret] }),
+    budget: { streak: 1, density: 0.333333, allowed: 0, reasons: [secret] },
+    diminishing: { detected: true, signals: [secret], from: 'asking' },
+    novelty: [{ sentence: secret, verdict: 'REDUNDANT', match: secret, score: 0.8, method: 'lexical' }],
+    guard: { action: 'MODIFY_FOR_MORE_HELP', findings: [{ side: 'novelty', code: 'already_considered', detail: secret }], by: 'structure' },
+    regenerated: false, verify: null, sentQuestions: 0, sentChars: 120,
+    ledger: { user: 1, socria: 1, unknown: 0, disputed: 0 }, considered: 3, ms: { state: 10 },
+    models: { reply: 'm', cognition: 'c' }, promptVersion: 'core-4-v2',
+  });
+  const json = JSON.stringify(t);
+  ok('no text from the person or from Socria survives into the trace', !json.includes('PRIVATE') && !json.includes('divorce'), json.slice(0, 300));
+  ok('reason CODES do', t.guard.codes[0] === 'novelty:already_considered' && t.allocation.withhold === 'authorship');
+  ok('numbers are rounded', t.budget.density === 0.33);
+}
+
+console.log('\n=== Verify Mode ===');
+{
+  const r = exactCheck('What is 17 * 23 + 4?', 'I got 395');
+  ok('arithmetic is checked exactly', r?.verdict === 'correct' && r.method === 'exact', JSON.stringify(r));
+  const w = exactCheck('What is 17 * 23 + 4?', 'I got 385');
+  ok('a wrong value is caught exactly', w?.verdict === 'incorrect' && w.expected === '395');
+  ok('no number in the attempt → no claim', exactCheck('What is 17 * 23 + 4?', 'I think you multiply first') === null);
+  ok('no arithmetic in the problem → no claim', exactCheck('Prove that the square root of two is irrational', 'by contradiction') === null);
+  const block = renderCheck(w);
+  ok('the reply model is told the verdict…', /VERDICT: incorrect \(computed exactly\)/.test(block));
+  ok('…and never the expected answer', !block.includes('395'));
+  ok('the guard is told to keep it out', hiddenValues(w).includes('395'));
+  ok('big numbers are hidden in both spellings', hiddenValues({ expected: '12000' }).includes('12,000'));
+  const c = sanitizeCheck({ verdict: 'incorrect', location: 'your last line, which should read x = 7', errorType: 'sign', expected: 'x = 7', confidence: 0.9 });
+  ok('a checker location that gives the answer away is scrubbed', c.location === '' && c.errorType === 'sign', JSON.stringify(c));
+  ok('a low-confidence checker verdict is not claimed', renderCheck({ ...c, confidence: 0.4 }) === '');
+  ok('an unknown verdict is not claimed', renderCheck({ ...c, verdict: 'unknown' }) === '');
+}
+
+console.log(`\n${pass} passed, ${fail} failed`);
+process.exit(fail ? 1 : 0);

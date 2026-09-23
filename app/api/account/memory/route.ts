@@ -4,13 +4,16 @@
 // The distinction matters and is the reason this is its own endpoint. Your
 // conversations are yours and stay. What goes is the layer Socria built ON TOP
 // of them: the per-thread memory (goals, values, constraints, decisions) and
-// the cross-conversation Thinking Journey. Someone who wants to be forgotten
+// the cross-conversation Thinking Journey, and everything Core 4 worked out
+// (its Cognitive State, Reasoning Ledger, turn traces and capability
+// evidence). Someone who wants to be forgotten
 // but keep their notes has, until now, had no way to say so.
 
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { enforceRateLimit } from '@/lib/rate-limit';
+import { CORE4_TABLES } from '@/lib/core4/store';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -66,6 +69,19 @@ export async function DELETE(req: NextRequest) {
       // would then be pushed straight back up, undoing the clearing.
       .update({ profile: '', understanding: { updatedAt: Date.now() }, updated_at: Date.now() })
       .eq('user_id', userId);
+
+    // Core 4's reasoning state is all Socria's reading, so all of it goes:
+    // the per-conversation Cognitive State, the Reasoning Ledger, the turn
+    // traces and the capability evidence. A table not yet created is
+    // nothing to clear; any other failure is reported, not swallowed.
+    const failed: string[] = [];
+    for (const table of CORE4_TABLES) {
+      const { error } = await db.from(table).delete().eq('user_id', userId);
+      if (error && !/42p01|pgrst205|relation .*does not exist/i.test(`${error.code ?? ''} ${error.message ?? ''}`)) failed.push(table);
+    }
+    if (failed.length) {
+      return NextResponse.json({ error: 'Could not clear all of Core 4\'s memory.', failed }, { status: 500 });
+    }
 
     return NextResponse.json({ ok: true, clearedThreads });
   } catch (e) {

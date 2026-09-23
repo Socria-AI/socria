@@ -1,12 +1,14 @@
 // The interrogation loop, through the real chat route.
 //
-// question-pressure.test.mjs proves the router's policy against states built
-// by hand. This proves the wiring around it, where the old loop could still
-// survive a correct router:
+// question-pressure.test.mjs proves the budget and the engine against states
+// built by hand. This proves the wiring around them, where the old loop could
+// still survive a correct policy:
 //
 //   - the question streak is measured from the transcript the client sends,
 //     so pressure does not depend on the state reader getting anything right;
-//   - the move the router chose is the one Core 4 is actually handed;
+//   - the move the engine chose is the one Core 4 is actually handed;
+//   - a generic coaching question on a move that allows none is removed
+//     before the person sees it (Phase 0: ASK was the default);
 //   - a reflexive question on the end of a move that should stop is removed
 //     before the person sees it;
 //   - and when an answer connects two things already in the Mind Graph, the
@@ -100,7 +102,7 @@ async function turn(messages, { state, draft, extract }) {
   const received = await r.text();
   await quiet();
   const prompt = globalThis.__prompts[0] ?? '';
-  const move = /INTERVENTION: (\w+)/.exec(prompt)?.[1] ?? null;
+  const move = /MOVE: (\w+)/.exec(prompt)?.[1] ?? null;
   return { status: r.status, prompt, move, received };
 }
 
@@ -117,7 +119,7 @@ const u1 = U('McCombs has a strong startup scene compared to other colleges.');
 const a1 = A('A vibrant startup scene can offer great networking and learning opportunities. How do you see that contributing to your goals or career path?');
 const u2 = U('want to be an entrepreneur longterm');
 
-console.log('=== turn 1: a first question is defensible ===');
+console.log('=== turn 1: a statement gets a contribution, not a coaching question ===');
 const t1 = await turn([u1], {
   state: { taskKind: 'decide', latest: 'information', currentGoal: 'choosing where to study' },
   draft: a1.content,
@@ -130,8 +132,12 @@ const t1 = await turn([u1], {
   },
 });
 ok('the reply went out', t1.status === 200, String(t1.status));
-ok('nothing had been asked yet, so a question could be earned', t1.move === 'ASK', t1.move);
-ok('and the question reached them intact', t1.received === a1.content, t1.received);
+// v1 of this test asserted ASK here. That default was Phase 0's failure 3:
+// an open statement is not a reason to interview someone.
+ok('Core 4 was told to contribute', t1.move === 'CONTRIBUTE', t1.move);
+ok('with no questions', /Questions this turn: NONE/.test(t1.prompt));
+ok('the generic question was removed, the substance kept',
+   t1.received.trim() === 'A vibrant startup scene can offer great networking and learning opportunities.', t1.received);
 
 console.log('\n=== turn 2: the answer is USED ===');
 const reflexive =
@@ -160,10 +166,10 @@ ok('it was told to CONNECT', t2.move === 'CONNECT', t2.move);
 ok('with the connection they made', /OBJECTIVE:[^\n]*McCombs startup ecosystem[^\n]*entrepreneur/.test(t2.prompt));
 ok('told not to ask them to elaborate', /Do not ask them to elaborate/.test(t2.prompt));
 ok('told to stop when the move is made', /End when the move is made/.test(t2.prompt));
-ok('the state it read says they just connected it', /They just connected: McCombs startup ecosystem/.test(t2.prompt));
+ok('the state it read says they just connected it', /McCombs startup ecosystem → matters because of/.test(t2.prompt));
 ok('the reflexive question never reached them', !/\?/.test(t2.received), t2.received);
 ok('the observation did, word for word',
-   t2.received === 'Then it isn’t just a general advantage of McCombs. You’re looking for an environment where building companies is part of the ecosystem around you — directly connected to what you want to do long term.',
+   t2.received.trim() === 'Then it isn’t just a general advantage of McCombs. You’re looking for an environment where building companies is part of the ecosystem around you — directly connected to what you want to do long term.',
    t2.received);
 
 console.log('\n=== the answer\'s relationship, in the Mind Graph ===');
@@ -189,7 +195,7 @@ const t3 = await turn([u1, a1, u2, a2, u3], {
   },
   draft: 'That’s a stronger comparison. You’re not saying UTA has nothing for startups; you’re identifying a specific ceiling you’ve actually hit: access to funding and investors.',
 });
-ok('the streak reset after a reply that asked nothing — and still no question', t3.move !== 'ASK', t3.move);
+ok('no question move after new evidence', !['QUESTION', 'CLARIFY'].includes(t3.move), t3.move);
 ok('the new evidence is connected to the reason', t3.move === 'CONNECT' && /funding/.test(t3.prompt));
 ok('the reply reached them unchanged, with no question', !/\?/.test(t3.received) && /specific ceiling/.test(t3.received));
 
@@ -200,7 +206,8 @@ console.log('\n=== pressure is measured from the transcript, not the state reade
   // third time. This one reads the transcript.
   const asked = [U('thinking about grad school'), A('What draws you to it?'), U('not sure'), A('What would you want to study?'), U('something with data')];
   const t = await turn(asked, { state: { taskKind: 'explore' }, draft: 'Data as the subject, not just the tool — that narrows it more than it sounds.' });
-  ok('a third question in a row is not chosen on weak grounds', t.move !== 'ASK', t.move);
+  ok('a third question in a row is not chosen', !['QUESTION', 'CLARIFY'].includes(t.move), t.move);
+  ok('and none is allowed', /Questions this turn: NONE/.test(t.prompt));
   ok('the reply is an observation that stops', !/\?/.test(t.received), t.received);
 }
 
@@ -211,8 +218,9 @@ console.log('\n=== a necessary question still goes through ===');
     state: { taskKind: 'debug', latest: 'answer', resolved: true, blockingUnknown: 'the first error line above "exit code 1" in the build log' },
     draft: 'Scroll up from "exit code 1" — what is the first line in red?',
   });
-  ok('asked again, right after a question', t.move === 'ASK', t.move);
+  ok('asked again, right after a question', t.move === 'CLARIFY', t.move);
   ok('for exactly the unknown', /first error line/.test(t.prompt));
+  ok('after saying what can already be said', /First give everything you CAN already say/.test(t.prompt));
   ok('and the question reached them', /\?$/.test(t.received.trim()), t.received);
 }
 
@@ -222,8 +230,9 @@ console.log('\n=== a plain request is answered ===');
     state: { taskKind: 'lookup', latest: 'request' },
     draft: 'The business school dates to 1922; it took the McCombs name in 2000.',
   });
-  ok('RETRIEVE, not a question back', t.move === 'RETRIEVE', t.move);
-  ok('the move says so', /no question back/.test(t.prompt));
+  ok('ANSWER, not a question back', t.move === 'ANSWER', t.move);
+  ok('the move says so', /no question back/i.test(t.prompt));
+  ok('and the answer reached them', /1922/.test(t.received), t.received);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

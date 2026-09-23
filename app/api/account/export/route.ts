@@ -140,6 +140,39 @@ export async function GET(req: NextRequest) {
     .eq('user_id', userId);
   out.mindProjects = mindProjects ?? [];
 
+  // ── Core 4: the reasoning state ─────────────────────────────────────
+  //
+  // What Core 4 worked out while thinking with this person: each
+  // conversation's Cognitive State (what they said they want, kept apart
+  // from what Socria inferred), the Reasoning Ledger with who raised each
+  // idea, the per-turn traces (content-free: which move, why, how it
+  // landed) and the capability evidence. Whole, like the Mind Graph.
+  const { data: core4State, error: core4StateErr } = await db
+    .from('core4_state').select('conversation_id, state, updated_at').eq('user_id', userId);
+  out.core4State = core4State ?? [];
+
+  const { data: reasoningEntries, error: reasoningEntriesErr } = await db
+    .from('reasoning_entries').select('*').eq('user_id', userId);
+  out.reasoningLedger = reasoningEntries ?? [];
+
+  const { data: reasoningLinks, error: reasoningLinksErr } = await db
+    .from('reasoning_links').select('*').eq('user_id', userId);
+  out.reasoningLinks = reasoningLinks ?? [];
+
+  const { data: core4Turns, error: core4TurnsErr } = await db
+    .from('core4_turns').select('conversation_id, turn, created_at, trace, outcome_label, outcome_confidence, outcome_source').eq('user_id', userId);
+  out.core4Turns = core4Turns ?? [];
+
+  const { data: capability, error: capabilityErr } = await db
+    .from('capability_evidence').select('*').eq('user_id', userId);
+  out.capabilityEvidence = capability ?? [];
+
+  out.core4Note =
+    'core4State and reasoningLedger separate what you said from what Socria inferred: an ' +
+    'inferred field carries its confidence and the evidence it rests on, and a ledger entry ' +
+    'is marked as yours only when it is grounded in your own words. core4Turns hold no text ' +
+    'at all. None of this is used to train models.';
+
   // ── Logos 2: shared rooms ───────────────────────────────────────────
   //
   // A shared room is the one place in Socria where an export cannot simply
@@ -201,6 +234,11 @@ export async function GET(req: NextRequest) {
     ['mindPending', mindPendingErr],
     ['mindSources', mindSourcesErr],
     ['mindProjects', mindProjectsErr],
+    ['core4State', core4StateErr],
+    ['reasoningLedger', reasoningEntriesErr],
+    ['reasoningLinks', reasoningLinksErr],
+    ['core4Turns', core4TurnsErr],
+    ['capabilityEvidence', capabilityErr],
   ]
     .filter(([, e]) => !!e)
     .map(([name]) => name as string);

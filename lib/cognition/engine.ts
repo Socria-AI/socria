@@ -1,176 +1,184 @@
 import 'server-only';
 // lib/cognition/engine.ts
 //
-// The two model calls the Cognitive State Engine needs, and nothing else.
+// The cheap-model calls Core 4's cognition needs, and nothing else:
 //
-// readState() runs before the reply and produces the state the router reads.
-// guardDraft() runs after the draft and before anybody sees it.
+//   readState()   before the reply — the state reader (one call carries the
+//                 inferred state, what the person just raised, and how
+//                 Socria's last move landed, so the already-considered record
+//                 and the outcome loop cost no extra call)
+//   guardModel()  after the draft, ONLY when deterministic checks leave a
+//                 question open (a semantic leak, a paraphrased redundancy)
+//   checkWork()   Verify Mode's private checker — its solution never reaches
+//                 the model that writes the reply
 //
-// Both are cheap-model calls, both fail SOFT, and the direction each fails in
-// is chosen rather than incidental:
-//
-//   A failed state read yields an empty state. The router then sees a person
-//   who has shown nothing and attempted nothing, and may ask rather than
-//   answer — but only if a question is earned against the recent run of
-//   questions, which the route measures from the transcript itself and so
-//   does not depend on this call succeeding. An outage here cannot start an
-//   interrogation loop.
-//
-//   A failed guard APPROVES. That is the uncomfortable one and it is
-//   deliberate: the alternative is that an outage means nobody gets a reply.
-//   A guard that blocks when it cannot think is a guard that takes the
-//   product down, and the failure it prevents — one leaked answer — is
-//   smaller than that. It is logged every time.
+// All fail SOFT, in chosen directions: a failed state read carries last
+// turn's state forward (never an empty state that routes to asking); a failed
+// guard model call keeps the deterministic verdict; a failed check means no
+// verdict is claimed.
 
-import OpenAI from 'openai';
+import { modelClient } from '../core4/model';
 import { sanitizeState, type CognitiveState } from './state';
-import { buildGuardInput, checkStructure, sanitizeGuard, APPROVED, GUARD_SYSTEM, type GuardResult } from './guard';
-import type { Move } from './router';
+import { GUARD2_SYSTEM, buildGuard2Input, sanitizeGuard2, type GuardInput } from '../core4/guard2';
+import { CHECK_SYSTEM, buildCheckInput, sanitizeCheck, type CheckResult } from '../core4/verify';
+import type { GuardOutcome } from '../core4/types';
 
 /** Cheap, and separate from whatever the conversation is running on. */
 export const COGNITION_MODEL = process.env.OPENAI_MODEL_COGNITION || 'gpt-4o-mini';
 
-const STATE_SYSTEM = `You read a conversation and report where it stands. You do not reply to it.
+export const STATE_SYSTEM = `You read a conversation and report where it stands. You do not reply to it. You report EVIDENCE about the person's current task and reasoning — never traits, personality, intelligence or mental health.
 
 Return JSON with exactly these fields:
 
 currentGoal   what the person is ultimately trying to do, one line
 currentFocus  what is on the table this minute, one line
 taskKind      learn | decide | create | lookup | debug | explore | vent
-              learn  = building a skill; independence is the point
-              decide = weighing something; their judgement is the point
-              create = making something; their authorship is the point
-              lookup = they want a fact
-              debug  = something is broken
-              explore= thinking out loud, no destination yet
-              vent   = they want to be heard, not helped
+work          what THEIR LATEST MESSAGE asks for, as a cognitive operation:
+              information  a fact, a definition, what something means
+              execution    do/compute/convert/write/run something
+              explanation  how or why something works
+              practice     they are producing it themselves and that is the point
+              verification check my work / is this right
+              diagnosis    why is this broken
+              judgment     weigh this / decide
+              creation     make or improve something
+              research     find out / gather evidence
+              reflection   thinking out loud or wanting to be heard
+              conversation acknowledgement, small talk, a reaction
 
-demonstratedUnderstanding  none | partial | solid
-              What they have SHOWN, not what they claim and not what they
-              were told. Being told something clearly is not understanding it.
+learningGoal  {"value":"yes|no|unknown","confidence":0-1,"evidence":"<their words>"}
+              Is building THIS capability the point for them? "yes" only on real
+              evidence (they said so, or they are clearly doing practice problems
+              for a course). Asking a question is NOT evidence of wanting to learn.
+expertise     {"value":"novice|intermediate|expert|unknown","confidence":0-1,"evidence":"..."}
+              In what is on the table, from what they have SHOWN (vocabulary used
+              correctly, the objections they anticipate, what they take for granted).
+stakes        {"value":"low|medium|high","confidence":0-1,"evidence":"..."}
+authorship    {"value":"theirs|shared|none","confidence":0-1,"evidence":"..."}
+              "theirs" when the product must remain their own work (their essay,
+              their thesis argument, their decision).
 
-attempt       none | wrong | partial | right
-              Did they try it themselves in this conversation, and how did it
-              go? "none" if they only asked. Judge the attempt they made, not
-              whether they seem capable.
-
-confusions    the specific things they are stuck on, in their words
-positions     what they have committed to — claims, choices, stances
-assumptions   what they are taking for granted without having said so
+demonstratedUnderstanding  none | partial | solid   (what they have SHOWN)
+attempt       none | wrong | partial | right        (their attempt in the LATEST message only)
+stuck         no | stalled | looping | frustrated
+masteryEvidence  short observations of what they have shown they can do
+confusions    specific things they are stuck on, in their words
+positions     what they have committed to
+assumptions   what they take for granted without saying so
 tensions      where their own statements pull against each other
-constraints   what bounds this: time, money, a person, a deadline
+constraints   what bounds this
 openThreads   raised and not resolved
-recentChanges [{"what","from","to"}] — positions that MOVED during this
-              conversation. Only real changes of position.
-
+recentChanges [{"what","from","to"}] — positions that MOVED
 latest        answer | information | question | attempt | reaction | request | other
-              What their LATEST message did. "answer" = it responds to what
-              Socria last asked. "information" = they volunteered something new.
-              "reaction" = a short acknowledgement ("yeah", "ok", "true").
-
-resolved      true | false
-              Does their latest message resolve what Socria last asked? True
-              when the answer to that question is now on the table, even if it
-              is short. A short answer is still an answer.
-
-newRelation   One line, "A → how → B": a connection their latest message makes
-              between things ALREADY in the conversation. Example — they said
-              McCombs has a strong startup scene, were asked why that matters,
-              and answered "want to be an entrepreneur long term":
-              "McCombs startup ecosystem → matters because of → their long-term
-              goal of being an entrepreneur". Empty if it connects nothing.
-
-blockingUnknown  The ONE thing Socria genuinely cannot usefully proceed
-              without — the error message it has not seen, which of two
-              meanings they intend when the two lead in opposite directions.
-              Leave EMPTY if Socria could say or do something useful with what
-              is already here. Wanting more context is not blocking. Something
-              interesting to explore next is not blocking. This field is
-              usually empty.
-
+resolved      true | false — does their latest message resolve what Socria last asked?
+newRelation   "A → how → B": a connection their latest message makes between things already on the table, or ""
+blockingUnknown  the ONE thing that genuinely blocks any useful reply, or "" (usually "")
 practice      none | retrieval | prediction | self-explanation | application
-              Only for learning: is producing something themselves the learning
-              right now — recalling it, predicting before being told, explaining
-              it in their own words, applying it to a new case? "none" otherwise.
-
-urgency       none | some | high
-              "high" means real time pressure in the world — a deadline
-              today, something broken in production. Not impatience, not a
-              short message, not exclamation marks.
-
+urgency       none | some | high   ("high" = real time pressure in the world)
 supportLevel  listen | question | hint | partial | explain | demonstrate
-              How much help this conversation currently warrants, given what
-              they have shown. Move it up when they repeatedly fail or lack a
-              prerequisite; move it down as they demonstrate more.
 
-Be conservative. An empty list is a fine answer, and so is "none". You are
-not being asked to find something in every field.`;
+consideredNow [{"kind":"question|objection|assumption|alternative|claim|hypothesis|evidence|decision|uncertainty|conclusion","text":"<tight paraphrase>","quote":"<their EXACT words from their latest message, copied verbatim>","stance":"asserts|entertains|asks|rejects|accepts|resolved","reason":"<why, if they rejected or changed it>"}]
+              Considerations THE PERSON raised IN THEIR LATEST MESSAGE: questions
+              they asked themselves, objections they anticipated, alternatives
+              they named, assumptions they examined, checks they ran, approaches
+              they rejected (and why). "quote" must be copied character for
+              character from their latest message — an item without one is not
+              recorded as theirs. stance: "asserts" only if they plainly hold
+              it; raising or wondering is "entertains"; asking is "asks";
+              ruling it out is "rejects". NEVER include anything Socria said.
+              Empty if none.
 
-export async function readState(
-  apiKey: string,
-  transcript: string,
-  prior: CognitiveState | null
-): Promise<CognitiveState> {
+lastOutcome   {"label":"HELPED|PARTIALLY_HELPED|WAS_REDUNDANT|CONFUSED_USER|FRUSTRATED_USER|WAS_TOO_DIRECT|WAS_TOO_INDIRECT|UNLOCKED_PROGRESS|REVEALED_MASTERY|REVEALED_MISUNDERSTANDING|UNKNOWN","confidence":0-1,"evidence":"..."}
+              How Socria's PREVIOUS reply landed, judged ONLY from their latest
+              message. One turn is weak evidence: keep confidence modest unless
+              they said so outright. UNKNOWN when there was no previous reply or
+              no signal.
+
+Be conservative. Empty lists and "unknown" are good answers.`;
+
+export interface ReadContext {
+  transcript: string;
+  prior: CognitiveState | null;
+  /** what the person has already considered, from the ledger, for continuity */
+  considered?: string[];
+  /** the person's standing instructions (Project) */
+  instructions?: string;
+}
+
+function compactPrior(p: CognitiveState): Record<string, unknown> {
+  return {
+    currentGoal: p.currentGoal,
+    currentFocus: p.currentFocus,
+    taskKind: p.taskKind,
+    learningGoal: p.learningGoal,
+    expertise: p.expertise,
+    stakes: p.stakes,
+    authorship: p.authorship,
+    demonstratedUnderstanding: p.demonstratedUnderstanding,
+    positions: p.positions,
+    tensions: p.tensions,
+    openThreads: p.openThreads,
+    masteryEvidence: p.masteryEvidence,
+  };
+}
+
+export async function readState(apiKey: string, ctx: ReadContext): Promise<{ state: CognitiveState; ok: boolean }> {
+  const parts: string[] = [];
+  if (ctx.instructions?.trim()) parts.push(`Their standing instructions for this Project:\n${ctx.instructions.trim().slice(0, 1200)}`);
+  if (ctx.prior) parts.push(`Where it stood last turn:\n${JSON.stringify(compactPrior(ctx.prior))}`);
+  if (ctx.considered?.length) parts.push(`Already recorded as considered by them:\n${ctx.considered.slice(0, 20).map((c) => `- ${c}`).join('\n')}`);
+  parts.push(`The conversation:\n${ctx.transcript}`);
   try {
-    const openai = new OpenAI({ apiKey });
-    const res = await openai.chat.completions.create({
+    const res = await modelClient(apiKey).complete({
+      role: 'state',
       model: COGNITION_MODEL,
       temperature: 0,
-      response_format: { type: 'json_object' },
-      messages: [
-        { role: 'system', content: STATE_SYSTEM },
-        {
-          role: 'user',
-          content: prior
-            ? `Where it stood last turn:\n${JSON.stringify(prior)}\n\nThe conversation:\n${transcript}`
-            : `The conversation:\n${transcript}`,
-        },
-      ],
-      max_tokens: 900,
+      json: true,
+      system: STATE_SYSTEM,
+      messages: [{ role: 'user', content: parts.join('\n\n') }],
+      maxTokens: 1100,
     });
-    return sanitizeState(JSON.parse(res.choices[0]?.message?.content ?? '{}'));
+    return { state: sanitizeState(JSON.parse(res.text || '{}')), ok: true };
   } catch (e) {
-    // An empty state routes toward asking. See the header. Logged because a
-    // state that silently never reads looks exactly like a conversation where
-    // nothing has been shown — the safe direction, but an invisible one, and
-    // those need telling apart.
-    console.error('[socria/cognition] state read failed; routing from an empty state', e);
-    return sanitizeState(null);
+    console.error('[socria/cognition] state read failed; carrying the prior state forward', e);
+    return { state: sanitizeState(null), ok: false };
   }
 }
 
-/**
- * Read a draft before the person does.
- *
- * Structure decides first and for free; the model only sees what structure
- * had no opinion about.
- */
-export async function guardDraft(
-  apiKey: string,
-  move: Move,
-  userMessage: string,
-  draft: string
-): Promise<GuardResult> {
-  if (!move.guard) return APPROVED;
-
-  const structural = checkStructure(move, draft);
-  if (structural) return structural;
-
+/** The cheap-model half of Answer Guard 2.0. */
+export async function guardModel(apiKey: string, input: GuardInput, userMessage: string): Promise<(GuardOutcome & { redundant: string[] }) | null> {
   try {
-    const openai = new OpenAI({ apiKey });
-    const res = await openai.chat.completions.create({
+    const res = await modelClient(apiKey).complete({
+      role: 'guard',
       model: COGNITION_MODEL,
       temperature: 0,
-      response_format: { type: 'json_object' },
-      messages: [
-        { role: 'system', content: GUARD_SYSTEM },
-        { role: 'user', content: buildGuardInput(move, userMessage, draft) },
-      ],
-      max_tokens: 1400,
+      json: true,
+      system: GUARD2_SYSTEM,
+      messages: [{ role: 'user', content: buildGuard2Input(input, userMessage) }],
+      maxTokens: 1400,
     });
-    return sanitizeGuard(JSON.parse(res.choices[0]?.message?.content ?? '{}'));
+    return sanitizeGuard2(JSON.parse(res.text || '{}'), input.draft);
   } catch (e) {
-    console.error('[socria/cognition] answer guard unavailable; approving', e);
-    return APPROVED;
+    console.error('[socria/cognition] guard model unavailable; keeping the deterministic verdict', e);
+    return null;
+  }
+}
+
+/** Verify Mode's private checker. Its reasoning never reaches the reply model. */
+export async function checkWork(apiKey: string, problem: string, attempt: string): Promise<CheckResult | null> {
+  try {
+    const res = await modelClient(apiKey).complete({
+      role: 'verify',
+      model: COGNITION_MODEL,
+      temperature: 0,
+      json: true,
+      system: CHECK_SYSTEM,
+      messages: [{ role: 'user', content: buildCheckInput(problem, attempt) }],
+      maxTokens: 900,
+    });
+    return sanitizeCheck(JSON.parse(res.text || '{}'));
+  } catch (e) {
+    console.error('[socria/cognition] verify checker unavailable', e);
+    return null;
   }
 }
