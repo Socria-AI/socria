@@ -314,11 +314,40 @@ critique; a challenge includes Socria's read of how it resolves. This is
 council D1's minority position, now the default because the data favoured
 it; experiment E1 is reframed accordingly (`CORE-4-EXPERIMENTS.md`).
 
-### Run 2 — the envelope model (in progress)
+### Run 2 — the envelope model: closer, still behind
 
-Same 24 scenarios; only the Core 4 arm is regenerated (the baseline arms do
-not depend on Core 4's code, so their run 1 transcripts are reused
-unchanged); fresh players; per-arm cache; new blind judges.
+All 26 scenarios (no exclusions: no player edited an answer); only the
+Core 4 arm regenerated (code at `e29bb4c`), against the **unchanged** run 1
+A1 and B+ transcripts; fresh players; per-arm cache; new blind judges and
+new blinding keys.
+
+| | Core 4 | Baseline | Tie | n |
+|---|---|---|---|---|
+| vs A1 — scenarios (run 1 → run 2) | 5 → **11** | 13 → **13** | 6 → 2 | 26 |
+| vs A1 — turns | **18** | **24** | 26 | 68 |
+| vs B+ — scenarios (run 1 → run 2) | 5 → **8** | 15 → **14** | 4 → 4 | 26 |
+| vs B+ — turns | **17** | **28** | 23 | 68 |
+
+Judged properties vs A1 (run 1 → run 2, Core 4): `mustContribute` 75% →
+92% (A1 96%); `mustReference` 78% → 82% (A1 100%); `alreadyConsidered` 88%
+→ 94% (A1 88%); paternalistic 0%; underhelp 3% (A1 0%). Helpfulness 4.25 →
+4.58 (A1 4.73); agency 4.88 (4.92); peer 4.81 (4.81); friction 1.92 (1.77).
+Against B+: helpfulness 4.42 vs 4.77, peer 4.77 vs 4.96.
+
+**Reading it honestly.** Core 4 is still behind both baselines. Against A1,
+11–13 is within noise at n=26 (a sign test cannot distinguish it from
+even); against B+, 8–14 is not good. Almost every loss is by the narrowest
+margin. **Three losses — including both of Core 4's clear, margin-2 ones —
+came from defects run 2's own players found and that were fixed only
+after the run:** the next drill item deleted as a "re-asked question"
+(`learning-006`), the person's own "7" hidden as the checker's value
+(`direct-answer-012`), and a session-1 caveat never reaching session 2
+(`expert-010`). The rest are content differences between two strong
+replies (a slightly leaner cut list, a more complete set of drivers).
+Nothing here shows Core 4 is better than a strong prompt; run 3 measures
+whether those three fixes change that, instead of assuming they do.
+
+### Run 3 — current code (in progress)
 
 ### Full corpus
 
