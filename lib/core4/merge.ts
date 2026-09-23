@@ -203,6 +203,11 @@ export function mergeState({ prior, read, signals, contract, readOk }: MergeInpu
     questionsPreference,
     persistPolicy,
     flagOnly: signals.directness === 'answer' ? false : signals.flagOnly || !!p.flagOnly,
+    answersOnly: signals.answersOnly || contract.answersOnly || !!p.answersOnly,
+    // Being heard is not a one-message wish: turn 3 of run 5's reflective-001
+    // drifted into advice for someone who had said "I'm not asking what to
+    // do". It holds until they ask something or ask for advice.
+    heardOnly: signals.vent || (!!p.heardOnly && !(base.latest === 'question' || base.latest === 'request' || signals.directness === 'answer' || signals.recommendationRequested || signals.delegate)),
     lastOutcome,
     history,
     turn,

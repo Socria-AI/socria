@@ -92,6 +92,10 @@ export interface ExplicitSignals {
    * (council D2 feedbackPreference = flag_only). Implies a refusal of the fix.
    */
   flagOnly: boolean;
+  /** "answers only, no explanations", "just the command": the answer and nothing around it (run 5, adversarial-005) */
+  answersOnly: boolean;
+  /** "why", "explain", "walk me through": this turn they want the reasoning, whatever they said before */
+  explainAsked: boolean;
   /** "from now on", "always", "in general", "stop being Socratic": makes a loosening directness STANDING (council D2) */
   horizon: boolean;
   /** "got it, thanks" with nothing new: a short close (council D5 DONE) */

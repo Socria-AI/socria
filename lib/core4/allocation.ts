@@ -135,7 +135,7 @@ export function allocate({ state: s, signals, contract }: Ctx): Allocation {
   // ── being heard — only when they SAID so (run 1: an inferred "reflection"
   // gave four turns of acknowledgement to someone who wanted a plan; the
   // baseline simply helped). An inference never narrows help.
-  if (signals.vent && directness !== 'no_answer' && directness !== 'guidance') {
+  if ((signals.vent || s.heardOnly) && directness !== 'no_answer' && directness !== 'guidance') {
     return alloc('HUMAN_REFLECTS', 'reflect.heard', 'They are thinking out loud or want to be heard; Socria follows.', 0.7,
       ['their own processing'], ['precise acknowledgement', 'at most one observation'], null, s);
   }

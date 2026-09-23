@@ -47,6 +47,8 @@ export const NO_SIGNALS: ExplicitSignals = {
   done: false,
   requestedTokens: 0,
   flagOnly: false,
+  answersOnly: false,
+  explainAsked: false,
   requestsQuestions: false,
   delegate: false,
   ownWork: false,
@@ -234,7 +236,11 @@ function requestedTokensOf(text: string): number {
   return 0;
 }
 
-const VENT = /\b(i (?:just )?(?:need|want) to vent|(?:i )?(?:don'?t|do not) want (?:any )?advice|not looking for (?:advice|solutions)|(?:please )?just listen|i don'?t need (?:you to )?(?:fix|solve) (?:it|this|anything)|(?:just )?need to get (?:this|it) off my chest)\b/i;
+const VENT = /\b(i (?:just )?(?:need|want) to vent|(?:i )?(?:don'?t|do not) want (?:any )?advice|not looking for (?:advice|solutions)|(?:please )?just listen|i don'?t need (?:you to )?(?:fix|solve) (?:it|this|anything)|(?:just )?need to get (?:this|it) off my chest|i'?m not asking (?:what to do|for advice|you to (?:fix|solve) (?:it|this|anything))|not asking for advice|i just need to (?:say|tell) (?:this|it|someone)|i just need to say (?:this|it) (?:somewhere|to someone))\b/i;
+
+// Run 5 (adversarial-005): a Project said "answers only, no explanations".
+const ANSWERS_ONLY = /\b(answers? only|only (?:the )?answers?|no explanations?|without (?:any )?explanations?|just the (?:command|code|query|answer|number|value|snippet)s?(?: please)?[.!]?$|no commentary|skip the explanation)\b/i;
+const EXPLAIN_ASK = /\b(why(?: does| is| would| did|\?)|explain|walk me through|how come|what'?s the reasoning)\b/i;
 
 const END_QUIZ = /\b(let'?s stop (?:there|here|for (?:now|today))|that'?s enough(?: for (?:now|today))?|enough for today|i(?:'m| am) done for (?:now|today))\b/i;
 const REVISION = /\b(i was (?:computing|calculating|doing|asking|solving|answering) the wrong (?:thing|question)|i was wrong(?: about| on| there)?|scratch that|i(?:'ve| have) changed my mind|ignore (?:what|that) i (?:just )?said|forget what i (?:just )?said)\b/i;
@@ -332,6 +338,8 @@ export function readSignals(message: string): ExplicitSignals {
     endQuiz: END_QUIZ.test(text),
     revision: !!note(lastIndex(REVISION, text)),
     vent: VENT.test(text),
+    answersOnly: !!note(lastIndex(ANSWERS_ONLY, text)),
+    explainAsked: EXPLAIN_ASK.test(text),
     horizon: HORIZON.test(text),
     done: DONE.test(text) && text.length < 80,
     requestedTokens: requestedTokensOf(text),
@@ -369,6 +377,7 @@ export function readContract(instructions: string | null | undefined): ExplicitS
     assessment: s.assessment,
     delegate: s.delegate,
     ownWork: s.ownWork,
+    answersOnly: s.answersOnly,
     evidence: s.evidence,
   };
 }

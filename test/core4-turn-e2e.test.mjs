@@ -383,7 +383,13 @@ console.log('\n=== continuity across conversations (council D14 reversal; run 2 
   const later = await turn('cohort-s2', [U('Results are in: HR 0.71 for BMI ≥30.'), A('Lead with the association.'), U('ok'), A('…'), U('and the limitations section?')], {
     state: { taskKind: 'create', work: 'creation', latest: 'request', currentFocus: 'limitations' }, replies: ['…'],
   });
-  ok('only at the start of a conversation, not every turn', !/From their last conversation/.test(later.prompt));
+  ok('on later turns, not when what they say does not touch it', !/From their last conversation/.test(later.prompt));
+  // Run 5 (longitudinal-005, debugging-001): the connection was lost on
+  // session two's SECOND turn, after the block had gone.
+  const touches = await turn('cohort-s2', [U('Results are in: HR 0.71 for BMI ≥30.'), A('Lead with the association.'), U('Wait — does the partial weight history for patients change how I word the exclusion?')], {
+    state: { taskKind: 'create', work: 'creation', latest: 'question', currentFocus: 'exclusion wording' }, replies: ['…'],
+  });
+  ok('  but kept on a later turn that touches it', /From their last conversation/.test(touches.prompt) && /weight history exists for only about 60%/.test(touches.prompt), touches.prompt.slice(-500));
 }
 
 console.log('\n=== a value they wrote is never hidden (run 2, direct-answer-012) ===');

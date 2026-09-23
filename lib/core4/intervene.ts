@@ -141,6 +141,17 @@ export function selectIntervention(input: SelectInput): InterventionDecision {
   };
   // A length they asked for sets the budget (council D17).
   if (input.signals.requestedTokens) dec = { ...dec, maxTokens: Math.min(4000, Math.max(dec.maxTokens, input.signals.requestedTokens)) };
+  // "Answers only, no explanations" (their words or the Project), unless this
+  // turn they ask why (run 5, adversarial-005: margin-2 losses to both
+  // baselines for explanations a stated preference ruled out).
+  if ((input.signals.answersOnly || input.state.answersOnly) && !input.signals.explainAsked && !input.signals.safety && dec.type !== 'GET_OUT_OF_THE_WAY') {
+    dec = {
+      ...dec,
+      forced: true,
+      maxTokens: Math.min(dec.maxTokens, 400),
+      objective: `${dec.objective} They asked for answers only: give the answer — the command, value, line or verdict — and nothing around it. No explanation, rationale or background; one short caveat only if the answer would be wrong or unsafe without it.`,
+    };
+  }
   // Questions they ASKED FOR (interview questions, a quiz, practice problems)
   // are the content of the reply, not interrogation: the budget does not
   // price them and the guard does not strip them (council D4).

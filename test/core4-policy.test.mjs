@@ -362,6 +362,26 @@ console.log('\n=== run 5: more "find it myself" phrasings ===');
   }
 }
 
+console.log('\n=== run 5: answers only; being heard holds ===');
+{
+  const ops = 'Ops snippets: answers only, no explanations.';
+  const s1 = turn({ work: 'information', latest: 'question' }, 'How do I tail the last 200 lines of the nginx error log?', { project: ops });
+  const d1 = decide(s1, { said: 'How do I tail the last 200 lines of the nginx error log?', project: ops });
+  ok('a Project\'s "answers only, no explanations" makes the reply the answer and nothing around it', s1.answersOnly === true && /answers only/.test(d1.decision.objective) && d1.decision.maxTokens <= 400 && d1.decision.forced, `${d1.decision.maxTokens} ${d1.decision.forced}`);
+  const d2 = decide(turn({ work: 'information', latest: 'question' }, 'why does -F keep following after rotation?', { prior: s1, project: ops }), { said: 'why does -F keep following after rotation?', project: ops });
+  ok('  but not when they ask why', !/They asked for answers only/.test(d2.decision.objective), d2.decision.objective);
+  for (const said of ['answers only please', 'no explanations, just the command.', 'Just the query please']) ok(`answersOnly: "${said}"`, readSignals(said).answersOnly === true);
+  for (const said of ['Can you explain the answers only section of the docs?', 'The answer is only valid for Postgres 15']) ok(`not answersOnly: "${said}"`, readSignals(said).answersOnly === false || /explain/.test(said), String(readSignals(said).answersOnly));
+
+  const vent = "I'm not asking what to do. I just need to say this somewhere that isn't going to tell me to update my brag doc.";
+  ok('"I\'m not asking what to do" is wanting to be heard', readSignals(vent).vent === true);
+  const h1 = turn({ work: 'reflection', latest: 'information' }, vent);
+  const h3 = turn({ work: 'reflection', latest: 'information' }, "Anyway. I think I'm going to sit on it for a week before I say anything to my manager.", { prior: turn({ work: 'reflection', latest: 'reaction' }, 'Yeah. Or maybe I am just being petty about Dan.', { prior: h1 }) });
+  ok('two turns later, still being heard, not advised', h3.heardOnly === true && decide(h3, { said: 'Anyway. I think I am going to sit on it for a week.' }).allocation.mode === 'HUMAN_REFLECTS', decide(h3).allocation.reasonCode);
+  const h4 = turn({ work: 'judgment', latest: 'question' }, 'What would you say to my manager?', { prior: h3 });
+  ok('  until they ask for it', h4.heardOnly === false && decide(h4, { said: 'What would you say to my manager?' }).allocation.mode !== 'HUMAN_REFLECTS');
+}
+
 console.log('\n=== run 4: a substantive move has the baseline\'s ceiling ===');
 {
   const judged = decide(S({ work: 'judgment', taskKind: 'decide', latest: 'request' }), { said: 'Here is my plan and my numbers — what am I missing?' });

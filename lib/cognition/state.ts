@@ -232,6 +232,10 @@ export interface CognitiveState {
   persistPolicy: 'full' | 'conversation_only' | 'none';
   /** they asked for verdicts only ("only tell me if I've gone off the rails"); sticky until they ask for the answer */
   flagOnly: boolean;
+  /** "answers only, no explanations" — from their words or the Project; sticky for the conversation */
+  answersOnly?: boolean;
+  /** they said they want to be heard, not advised; holds until they ask a question or for advice (run 5, reflective-001) */
+  heardOnly?: boolean;
   /** when this state was last written (epoch ms), for the gap check */
   lastAt?: number;
   /** turns so far in this conversation */

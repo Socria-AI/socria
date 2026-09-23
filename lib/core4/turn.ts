@@ -39,6 +39,7 @@ import { buildTrace } from './trace';
 import { questionLoad, stripInterrogatives, deleteSentences } from './questions';
 export { SentenceGate } from './stream-gate';
 import * as store from './store';
+import { similarity } from './considered';
 import type {
   Allocation,
   Diminishing,
@@ -264,18 +265,30 @@ export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
  * caveat from session 1 never reached session 2).
  */
 function lastTime(ledger: LedgerEntry[], input: TurnInput, turn: number): string {
-  if (turn > 1 || !input.conversationId) return '';
+  if (!input.conversationId) return '';
   const cutoff = input.now - 30 * 86_400_000;
-  const others = ledger.filter(
-    (e) => e.conversationId !== input.conversationId && e.owner === 'user' && !e.private &&
-      e.status !== 'disputed' && e.status !== 'retracted' && (e.projectId ?? null) === (input.projectId ?? null) && e.updatedAt >= cutoff
+  const earlier = ledger.filter(
+    (e) => e.conversationId !== input.conversationId && (e.owner === 'user' || e.owner === 'socria') && !e.private &&
+      e.status !== 'disputed' && e.status !== 'retracted' && e.status !== 'superseded' && (e.projectId ?? null) === (input.projectId ?? null) && e.updatedAt >= cutoff
   );
-  if (!others.length) return '';
-  const latest = others.reduce((a, b) => (b.updatedAt > a.updatedAt ? b : a));
-  const same = others.filter((e) => e.conversationId === latest.conversationId).sort((a, b) => a.turn - b.turn).slice(0, 8);
+  const theirs = earlier.filter((e) => e.owner === 'user');
+  if (!theirs.length) return '';
+  const latest = theirs.reduce((a, b) => (b.updatedAt > a.updatedAt ? b : a));
+  const same = earlier.filter((e) => e.conversationId === latest.conversationId).sort((a, b) => a.turn - b.turn);
+  // On the first turn it opens the conversation. Later it stays only while
+  // what they are saying touches it — run 5 (longitudinal-005,
+  // debugging-001) lost the cross-session connection on session two's
+  // SECOND turn, after the block had gone.
+  if (turn > 1 && !same.some((e) => similarity(e.text, input.lastUserText) >= 0.34)) return '';
   const when = new Date(latest.updatedAt).toISOString().slice(0, 10);
   const word: Record<string, string> = { asserts: 'held', entertains: 'raised the possibility', asks: 'asked', rejects: 'ruled out', accepts: 'accepted', resolved: 'settled' };
-  return `\n=== From their last conversation (${when}) — their own words; use what matters now, attributed to them ===\n${same.map((e) => `  - they ${word[e.stance] ?? 'raised'}: ${e.text}${e.reason ? ` (because: ${e.reason})` : ''}`).join('\n')}\n`;
+  const lines = [
+    ...same.filter((e) => e.owner === 'user').slice(0, 8).map((e) => `  - they ${word[e.stance] ?? 'raised'}: ${e.text}${e.reason ? ` (because: ${e.reason})` : ''}`),
+    // Socria's own suggestions, as Socria's: so it can own them when asked
+    // ("was that your idea or mine?") instead of evading (longitudinal-005).
+    ...same.filter((e) => e.owner === 'socria' && e.kind !== 'question').slice(0, 4).map((e) => `  - Socria suggested: ${e.text}`),
+  ];
+  return `\n=== From their last conversation (${when}) — attributed as recorded; use what matters now ===\n${lines.join('\n')}\n`;
 }
 
 // renderState is imported lazily to keep the dependency direction clean.
