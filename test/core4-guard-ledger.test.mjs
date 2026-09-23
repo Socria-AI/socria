@@ -11,13 +11,13 @@
 // Pure modules only. The same paths through the real route are in
 // core4-turn-e2e.test.mjs.
 
-import { guardStructure, sanitizeGuard2, buildGuard2Input, looksWorked, givesThenAsks } from './.tmp/guard2.mjs';
+import { guardStructure, sanitizeGuard2, buildGuard2Input, looksWorked, givesThenAsks, leaksHidden, coherent } from './.tmp/guard2.mjs';
 import { SentenceGate } from './.tmp/stream-gate.mjs';
 import { classify, similarity, gateCandidates } from './.tmp/considered.mjs';
 import { grounding, entriesFromPerson, entriesFromSocria, mergeEntries, disputeTurn, linksForTurn, consideredView, toLogosGraph } from './.tmp/ledger.mjs';
 import { summarize, evidenceFromTurn, assistanceOf } from './.tmp/capability.mjs';
 import { buildTrace } from './.tmp/trace.mjs';
-import { exactCheck, sanitizeCheck, renderCheck, hiddenValues } from './.tmp/verify.mjs';
+import { exactCheck, sanitizeCheck, renderCheck, hiddenValues, computeAsked } from './.tmp/verify.mjs';
 import { stripSycophanticOpener, sentencesOf, deleteSentences } from './.tmp/questions.mjs';
 import { EMPTY_STATE } from './.tmp/state.mjs';
 
@@ -134,6 +134,35 @@ console.log('\n=== the novelty gate deletes only what can be RAISED (pilot findi
   ok('re-raising their objection is sent to the model check', g.needsModel && g.novelty.some((v) => v.verdict !== 'NOVEL' && /suburban/.test(v.sentence)), JSON.stringify(g));
 }
 
+console.log('\n=== council D8: what the guard may and may not do ===');
+{
+  ok('a hidden 4.2 is not found in 14.2 or 4.25', leaksHidden('The effect is 14.2 points, or 4.25 on the log scale.', ['4.2']).length === 0);
+  ok('but is found as a value', leaksHidden('Your estimate should be 4.2 points.', ['4.2']).length === 1);
+  ok('and 395 matches 395 but not 3950', leaksHidden('It is 3950 in total.', ['395']).length === 0 && leaksHidden('It is 395.', ['395']).length === 1);
+  const tool = guardStructure({ decision: dec('ANSWER'), allocation: alloc('AI_EXECUTES'), draft: 'I searched the docs to confirm this. The default TTL for a Redis key is no expiry: keys persist until deleted or evicted.', considered: [] });
+  ok('an unbacked "I searched" is removed, the answer kept', tool.revised && !/searched/.test(tool.revised) && /no expiry/.test(tool.revised), JSON.stringify(tool));
+  const trait = guardStructure({ decision: dec('ANSWER'), allocation: alloc('AI_EXECUTES'), draft: "You're clearly a beginner, so let's keep it simple. A list is ordered and a set is not, and set lookups are constant time on average.", considered: [] });
+  ok('an inference stated as fact about the person is removed', trait.revised && !/beginner/.test(trait.revised), JSON.stringify(trait));
+  ok('a reply that would lose over a quarter of its substance is not shipped edited', !coherent('A long first sentence with most of the substance in it here. Short.', 'Short.'));
+  ok('trailing-question removal is not blocked by the size floor', coherent('Short point here. What do you think?', 'Short point here.', false));
+  const comp = guardStructure({ decision: dec('EXPLAIN'), allocation: alloc('AI_EXPLAINS'), draft: 'Set lookups are constant time on average because they hash. Does that make sense?', considered: [] });
+  ok('"Does that make sense?" is always stripped', comp.revised === 'Set lookups are constant time on average because they hash.', JSON.stringify(comp));
+  const nv = guardStructure({ decision: dec('VERIFY'), allocation: alloc('AI_VERIFIES'), draft: 'Look at the second line again and compare the signs.', considered: [] });
+  ok('a VERIFY with no verdict is sent back', nv.findings.some((f) => f.code === 'no_verdict') && !!nv.retryNote);
+}
+
+console.log('\n=== council D13: Verify Mode only checks what the person posed ===');
+{
+  ok('an expression from the person, after "what is"', exactCheck('What is 17 * 23 + 4?', 'I got 395')?.verdict === 'correct');
+  ok('the FINAL stated value is compared, not any number', exactCheck('What is 17 * 23 + 4?', 'I did 17*23 = 391 then + 4 so the answer is 395')?.verdict === 'correct');
+  ok('a date is not arithmetic', exactCheck('What is 2026-03-14 minus 7 days?', 'March 7') === null);
+  ok('a version is not arithmetic', exactCheck('What is the diff between 1.2.3 and 1.2.10?', 'the second is newer') === null);
+  ok('a dose is not arithmetic', exactCheck('What is 5 mg x 3 per day?', '15 mg') === null);
+  ok('an unanchored number in the prose is not a problem', exactCheck('We ran 3 trials of 20 each, the harmonic sum was 1 + 1/2 + 1/3.', 'my proof holds') === null);
+  ok('computeAsked evaluates what they asked', computeAsked('Compute 17*23.')?.value === '391');
+  ok('and nothing when nothing was posed', computeAsked('How do I compute a moving average in pandas?') === null);
+}
+
 console.log('\n=== the stream gate ===');
 {
   const run = (chunks, maxQ) => {
@@ -245,8 +274,10 @@ console.log('\n=== capability: events, counted conservatively ===');
   ok('counts are kept separately', s2[0].assisted === 1 && s2[0].unassisted === 1 && s2[0].misunderstandings === 1);
   ok('assistance is read from the previous move', assistanceOf({ type: 'HINT' }) === 1 && assistanceOf({ type: 'ANSWER' }) === 3 && assistanceOf(undefined) === 0);
   const st = { ...EMPTY_STATE, currentFocus: 'chain rule derivative', latest: 'attempt', attempt: 'right', history: [], turn: 2 };
-  const e = evidenceFromTurn(st, null, { conversationId: 'c1', turn: 2, now: 99 });
+  const e = evidenceFromTurn(st, null, { conversationId: 'c1', turn: 2, now: 99 }, { verdict: 'correct', location: '', errorType: '', expected: '', confidence: 1, method: 'exact' });
   ok('a right attempt with no help before it is demonstrated_unassisted', e.length === 1 && e[0].event === 'demonstrated_unassisted');
+  ok('council D12: the reader\'s opinion alone records nothing — a verdict is required', evidenceFromTurn(st, null, { conversationId: 'c1', turn: 2, now: 99 }).length === 0);
+  ok('  nor does a checker below 0.85', evidenceFromTurn(st, null, { conversationId: 'c1', turn: 2, now: 99 }, { verdict: 'correct', location: '', errorType: '', expected: '', confidence: 0.8, method: 'checker' }).length === 0);
   ok('a model opinion of their understanding alone produces nothing', evidenceFromTurn({ ...EMPTY_STATE, currentFocus: 'chain rule', demonstratedUnderstanding: 'solid', turn: 2 }, null, { conversationId: 'c1', turn: 2, now: 1 }).length === 0);
 }
 

@@ -88,14 +88,17 @@ function d(
     humanWorkPreserved: o.alloc.withhold?.what ?? (o.alloc.humanWork[0] ?? null),
     aiWorkPerformed: o.alloc.aiWork.join(', ') || 'none',
     confidence: Math.round(Math.min(o.confidence ?? o.alloc.confidence, 1) * 100) / 100,
-    // Buffered and read before sending: anything that withholds, and any move
-    // whose content raises a perspective (the novelty gate needs the whole of it).
-    guardRequired: !!o.alloc.withhold || noveltyGated(type, o.alloc.mode, o.avoid.length),
+    // Buffered and read whole before sending ONLY when something is held
+    // back (council D8): buffering every perspective move put the latency on
+    // exactly the expert turns. Everything else streams through the sentence
+    // gate, which holds questions (and drops re-asked ones) until the end.
+    guardRequired: !!o.alloc.withhold,
     maxQuestions,
     objective: o.objective,
     avoid: o.avoid.slice(0, 12),
     switchedFrom: o.switchedFrom ?? null,
     maxTokens: TOKENS[type] ?? 600,
+    questionsAreContent: false,
   };
 }
 
@@ -111,6 +114,14 @@ function recentlyChallenged(s: CognitiveState): boolean {
 }
 
 export function selectIntervention(input: SelectInput): InterventionDecision {
+  const dec = selectMove(input);
+  // Questions they ASKED FOR (interview questions, a quiz, practice problems)
+  // are the content of the reply, not interrogation: the budget does not
+  // price them and the guard does not strip them (council D4).
+  return input.signals.requestsQuestions ? { ...dec, questionsAreContent: true } : dec;
+}
+
+function selectMove(input: SelectInput): InterventionDecision {
   const { state: s, allocation: a, budget, diminishing, considered } = input;
   const avoid = considered;
   const can = budget.allowed;
@@ -130,16 +141,46 @@ export function selectIntervention(input: SelectInput): InterventionDecision {
     });
   }
 
-  // Blocked on something only THEY can supply — the error line, the file,
-  // the constraint — when Socria is meant to do the work. Doing it anyway
-  // means guessing; asking for exactly the missing piece is the help. Still
-  // priced by the budget, and never twice in a row if it did not land.
-  if ((a.mode === 'AI_EXECUTES' || a.mode === 'AI_EXPLAINS') && s.blockingUnknown && can === 1 && !landedBadly(s, 'CLARIFY')) {
-    return d('CLARIFY', {
-      reasonCode: 'blocking_unknown.execute', reason: `The work needs something only they have: ${s.blockingUnknown}.`,
-      intended: 'The one missing piece arrives, and they already have everything that could be said without it.',
-      objective: `First give everything you CAN already say or do with what is here — concretely, not a preamble. Then ask for exactly this, and nothing else: ${s.blockingUnknown}. One question, last.`,
-      alloc: a, avoid, maxQuestions: 1,
+  // Harm now: direct, immediate, complete (council D1 safety gate).
+  if (a.reasonCode === 'safety') {
+    return d('ANSWER', {
+      reasonCode: 'safety', reason: a.rationale,
+      intended: 'They know exactly what to do right now.',
+      objective: 'Lead with the immediate action, in plain imperative sentences, numbered if there is a sequence. Say when to call emergency services and which number. No questions, no caveats before the action, no teaching.',
+      alloc: a, avoid,
+    });
+  }
+
+  // The ladder bottomed out: work it, name the principle, hand the next one back (council D6).
+  if (a.reasonCode === 'practice.bottom_out') {
+    return d('EXPLAIN', {
+      reasonCode: 'practice.bottom_out', reason: a.rationale,
+      intended: 'They see the whole solution once, with the principle labelled, and can do the next one.',
+      objective: 'Work this item fully, step by step, and name the principle each step uses. Then state (do not ask) one similar item they can try next. No questions.',
+      alloc: a, avoid,
+    });
+  }
+
+  // "Let me try it first" with nothing tried yet: get out of the way (council D6).
+  if (a.withhold && s.attempt === 'none' && s.latest !== 'question' && input.signals.evidence.some((e) => /let me try/i.test(e))) {
+    return d('GET_OUT_OF_THE_WAY', {
+      reasonCode: 'practice.let_me_try', reason: 'They asked to try it first.',
+      intended: 'They try it.',
+      objective: 'Say "Go ahead" or equivalent in a few words. No hint, no question.',
+      alloc: a, avoid,
+    });
+  }
+
+  // Blocked on something only THEY can supply, while Socria does the work:
+  // proceed under a stated assumption rather than stopping to ask (council
+  // D4 removed the re-grant of a question for blockers). Telling them what
+  // to send next is an instruction, not a question.
+  if ((a.mode === 'AI_EXECUTES' || a.mode === 'AI_EXPLAINS') && s.blockingUnknown) {
+    return d(a.mode === 'AI_EXECUTES' ? 'EXECUTE' : 'EXPLAIN', {
+      reasonCode: 'blocking_unknown.assume', reason: `Missing: ${s.blockingUnknown}. Proceeding under a stated assumption.`,
+      intended: 'They get everything that can be said now, and know exactly what would settle the rest.',
+      objective: `Give everything you can with what is here, concretely. Where it depends on ${s.blockingUnknown}, state the most likely case as an explicit assumption ("Assuming X, …; if instead Y, …"). If one thing from them would settle it, say what to send as an instruction ("Paste the first red line above the error."), not as a question.`,
+      alloc: a, avoid,
     });
   }
 
@@ -183,7 +224,9 @@ export function selectIntervention(input: SelectInput): InterventionDecision {
     }
 
     case 'AI_VERIFIES': {
-      const practice = a.withhold?.reason === 'practice_goal';
+      // Anything withheld on a wrong attempt keeps the redo with them —
+      // whether they said "I'm practising" or "don't tell me".
+      const practice = !!a.withhold;
       if (s.attempt === 'right') {
         return d('VERIFY', {
           reasonCode: 'verify.right', reason: 'Their attempt is correct.',
@@ -234,6 +277,14 @@ export function selectIntervention(input: SelectInput): InterventionDecision {
             reasonCode: 'creation.critique', reason: a.rationale,
             intended: 'Their work gets better and stays theirs.',
             objective: 'Specific, useful critique of THEIR material: what works, what does not, and why — concrete enough to act on. Options where useful. Do not rewrite it for them.',
+            alloc: a, avoid,
+          });
+        }
+        if (input.signals.recommendationRequested) {
+          return d('ANSWER', {
+            reasonCode: 'recommendation.requested', reason: 'They asked for Socria’s pick.',
+            intended: 'They have a clear recommendation, marked as Socria’s view, and the one value that would flip it.',
+            objective: `Give your pick in the first two sentences, marked as your view, with the reasons that decide it. Then the value hinge: "if X matters more to you than Y, the other one". The decision is theirs; do not withhold the view.${consideredNote} No questions.`,
             alloc: a, avoid,
           });
         }

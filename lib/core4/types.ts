@@ -67,6 +67,25 @@ export interface ExplicitSignals {
   correction: boolean;
   /** "that helped" / "not useful" */
   feedback: 'positive' | 'negative' | null;
+  /**
+   * STRONG practice intent — the only learning evidence that can back a
+   * practice_goal withhold (council D2): "I want to work it out myself",
+   * "let me try it first", "I need to be able to do these cold". "I'm
+   * studying X" or "help me understand" is context, not intent (learningGoal).
+   */
+  practiceIntent: boolean;
+  /** an emergency or safety-relevant harm now: overrides every contract (council D1 safety gate) */
+  safety: boolean;
+  /** "what would you do", "which should I pick", "your pick" */
+  recommendationRequested: boolean;
+  /** "idk", "no idea", "I don't know" — anchored at the start of a short message */
+  dontKnow: boolean;
+  /** "you gave it away", "I wanted to figure that out", "spoiler" */
+  tooDirect: boolean;
+  /** "off the record", "don't remember this" */
+  offRecord: boolean;
+  /** the request is FOR questions (quiz items, interview questions, practice problems): they are content, not interrogation */
+  requestsQuestions: boolean;
   /** "you do it", "write it for me" */
   delegate: boolean;
   /** "don't rewrite it", "I want to write it myself", "don't tell me what to conclude" */
@@ -243,6 +262,8 @@ export interface InterventionDecision {
   switchedFrom: string | null;
   /** generation budget for this move */
   maxTokens: number;
+  /** the person asked FOR questions (a quiz, interview questions): they are content, not interrogation */
+  questionsAreContent: boolean;
 }
 
 // ── the already-considered record & the reasoning ledger ─────────────

@@ -24,6 +24,7 @@ import type { CognitiveState, TurnMemo } from '../cognition/state';
 import type { CapabilityEvent, CapabilityEvidence } from './types';
 import { conceptTerms } from './considered';
 import { ledgerId } from './ledger';
+import type { CheckResult } from './verify';
 
 /** A stable, task-scoped key for "what they were working on": a few concept terms. */
 export function conceptKey(focus: string): string {
@@ -59,8 +60,13 @@ export function assistanceOf(prev: TurnMemo | undefined): 0 | 1 | 2 | 3 {
 export function evidenceFromTurn(
   s: CognitiveState,
   prior: CognitiveState | null,
-  ctx: { conversationId: string; turn: number; now: number }
+  ctx: { conversationId: string; turn: number; now: number },
+  verify: CheckResult | null = null
 ): CapabilityEvidence[] {
+  // Council D12: an event is recorded only on a real VERDICT — computed
+  // exactly, or a checker at ≥0.85 — never the reader's opinion of their
+  // attempt, and never their own say-so.
+  if (!verify || verify.verdict === 'unknown' || (verify.method === 'checker' && verify.confidence < 0.85)) return [];
   const concept = conceptKey(s.currentFocus || s.currentGoal);
   if (!concept) return [];
   const prev = s.history[s.history.length - 1];
@@ -69,17 +75,16 @@ export function evidenceFromTurn(
   const add = (event: CapabilityEvent, confidence: number, a: 0 | 1 | 2 | 3 = assistance) =>
     out.push({ id: ledgerId('cap', ctx.now), concept, event, assistance: a, conversationId: ctx.conversationId, turn: ctx.turn, confidence, at: ctx.now });
 
-  if (s.latest === 'attempt' || s.attempt !== 'none') {
-    if (s.attempt === 'right') {
+  {
+    if (verify.verdict === 'correct') {
       if (prior?.attempt === 'wrong' && prev?.type === 'VERIFY') add('self_corrected', 0.7, 2);
       else add(assistance === 0 ? 'demonstrated_unassisted' : 'demonstrated_assisted', 0.7);
-    } else if (s.attempt === 'wrong') {
+    } else {
       add('misunderstanding', 0.6, 0);
     }
   }
-  if (s.directness.source === 'explicit' && s.directness.value === 'answer' && prev && assistance <= 1 && s.directness.since === s.turn) {
-    add('needed_answer', 0.6, 3);
-  }
+  // "needed_answer" was removed (council D12): asking for the answer is a
+  // preference, not a deficit, and recording it as one is a privacy harm.
   return out;
 }
 

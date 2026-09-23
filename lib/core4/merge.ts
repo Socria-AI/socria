@@ -65,7 +65,7 @@ export function explicitOutcome(signals: ExplicitSignals, last: TurnMemo | undef
   if (signals.stopQuestions) return { label: 'FRUSTRATED_USER', confidence: 0.95, source: 'explicit', evidence: e };
   if (signals.directness === 'answer' && (asked || last.withheld || ['HINT', 'QUESTION', 'CHALLENGE', 'CLARIFY'].includes(last.type)))
     return { label: 'WAS_TOO_INDIRECT', confidence: 0.9, source: 'explicit', evidence: e };
-  if ((signals.directness === 'no_answer' || signals.directness === 'guidance') && ['ANSWER', 'EXPLAIN', 'EXECUTE', 'CORRECT'].includes(last.type))
+  if ((signals.tooDirect || signals.directness === 'no_answer' || signals.directness === 'guidance') && ['ANSWER', 'EXPLAIN', 'EXECUTE', 'CORRECT', 'CALCULATE'].includes(last.type))
     return { label: 'WAS_TOO_DIRECT', confidence: 0.85, source: 'explicit', evidence: e };
   if (signals.frustration) return { label: 'FRUSTRATED_USER', confidence: 0.85, source: 'explicit', evidence: e };
   if (signals.correction) return { label: 'CONFUSED_USER', confidence: 0.6, source: 'explicit', evidence: e };
@@ -98,9 +98,20 @@ export function mergeState({ prior, read, signals, contract, readOk }: MergeInpu
   }
 
   // ── learning goal ──
+  // Only STRONG practice intent ("I want to work it out myself", "let me try
+  // it first", "hints only") — or a Project's standing learning contract —
+  // makes the learning goal EXPLICIT, and only an explicit goal can back a
+  // practice_goal withhold. "I'm studying X" or "help me understand" is
+  // context: an inference at 0.7, which can shape delivery and nothing more
+  // (council D2; "I'm studying the effect of statins" is not a request to be
+  // quizzed).
   let learningGoal = sticky(p.learningGoal, base.learningGoal);
   if (contract.learningGoal !== null) learningGoal = explicit(contract.learningGoal ? 'yes' : 'no', `Project: ${contract.evidence.join('; ')}`);
-  if (signals.learningGoal !== null) learningGoal = explicit(signals.learningGoal ? 'yes' : 'no', signals.evidence.join('; '));
+  if (signals.learningGoal === false) learningGoal = explicit('no', signals.evidence.join('; '));
+  else if (signals.practiceIntent) learningGoal = explicit('yes', signals.evidence.join('; '));
+  else if (signals.learningGoal === true && learningGoal.source !== 'explicit') {
+    learningGoal = sticky(learningGoal, { value: 'yes', source: 'inferred', confidence: 0.7, evidence: signals.evidence.join('; ').slice(0, 120) });
+  }
   // Asking for the answer outright is evidence they are not practising THIS,
   // but not that they stopped wanting to learn — so it lowers an inferred
   // goal and leaves an explicit one alone (allocation weighs the request).
@@ -122,7 +133,8 @@ export function mergeState({ prior, read, signals, contract, readOk }: MergeInpu
   // Asking Socria to write it hands authorship over, explicitly.
   if (signals.delegate) authorship = explicit('shared', signals.evidence.join('; '));
 
-  const stuck = signals.frustration ? 'frustrated' : base.stuck;
+  // "idk" is being stuck, said plainly: support goes up (council D5/D6).
+  const stuck = signals.frustration ? 'frustrated' : signals.dontKnow ? 'stalled' : base.stuck;
   const questionsPreference = signals.stopQuestions ? 'stop' : signals.wantsQuestions ? 'wanted' : p.questionsPreference;
   const urgency = signals.urgent ? 'high' : base.urgency;
 

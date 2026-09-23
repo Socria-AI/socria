@@ -724,9 +724,9 @@ function core4Reply(x: {
           }
           controller.enqueue(encoder.encode(reply));
         } else {
-          const gate = new SentenceGate((chunk) => controller.enqueue(encoder.encode(chunk)));
+          const gate = new SentenceGate((chunk) => controller.enqueue(encoder.encode(chunk)), { passQuestions: p?.decision.questionsAreContent });
           for await (const d of deltas) gate.push(d);
-          const dropped = gate.finish(p!.decision.maxQuestions);
+          const dropped = gate.finish(p!.decision.maxQuestions, p!.considered.items);
           reply = gate.out;
           const done = await s.done.catch(() => null);
           served = done?.served ?? served;

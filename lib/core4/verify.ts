@@ -58,12 +58,43 @@ function numbersIn(s: string): number[] {
   return (s.replace(/,(?=\d{3}\b)/g, '').match(/-?\d+(?:\.\d+)?/g) ?? []).map(Number).filter(Number.isFinite);
 }
 
+/** Not arithmetic, even though it looks like it: dates, page and time ranges, versions, doses, money. */
+const NOT_ARITHMETIC = /\d{4}-\d{2}-\d{2}|\bpp?\.\s*\d+-\d+|\d+\s*-\s*\d+\s*(?:%|min|minutes|hours?|days?|years?)|v?\d+\.\d+\.\d+|\d\s*(?:mg|mcg|kg|ml|%|\$)|\$\s*\d/i;
+
+/** The expression the PERSON posed: after compute / evaluate / calculate / what is / find, or before "= ?". */
+function posedExpressions(problem: string): string[] {
+  const out: string[] = [];
+  const anchored = /\b(?:compute|evaluate|calculate|what(?:'s| is)|find|work out)\b\s*:?\s*([^?\n]{1,120})|([^\n=]{1,120})=\s*\?/gi;
+  let m: RegExpExecArray | null;
+  while ((m = anchored.exec(problem))) {
+    const seg = (m[1] ?? m[2] ?? '').trim();
+    if (!seg || NOT_ARITHMETIC.test(seg)) continue;
+    for (const e of seg.match(EXPR) ?? []) out.push(e);
+  }
+  return out;
+}
+
+/** The value they ANSWERED with: after the last "=", "is", "got", "get" or "answer"; else their last number. */
+function finalValue(attempt: string): number | null {
+  const t = attempt.replace(/,(?=\d{3}\b)/g, '');
+  let cut = -1;
+  for (const m of t.matchAll(/=|\bis\b|\bgot\b|\bget\b|\banswer\b/gi)) cut = Math.max(cut, (m.index ?? 0) + m[0].length);
+  const tail = cut >= 0 ? t.slice(cut) : t;
+  const nums = (tail.match(/-?\d+(?:\.\d+)?/g) ?? []).map(Number).filter(Number.isFinite);
+  if (nums.length) return nums[0];
+  const all = numbersIn(t);
+  return all.length ? all[all.length - 1] : null;
+}
+
 /**
- * The exact path: if the problem contains an arithmetic expression the
- * evaluator can compute, and the attempt states a number, compare them.
+ * The exact path (council D13): only an arithmetic expression the PERSON
+ * posed — never one from Socria's replies (a pilot run marked a correct
+ * proof "incorrect (computed exactly)" against a number from Socria's own
+ * counterexample) — and never dates, ranges, versions, doses or money. Their
+ * FINAL stated value is compared, not any number in the message.
  */
 export function exactCheck(problem: string, attempt: string): CheckResult | null {
-  const candidates = (problem.match(EXPR) ?? [])
+  const candidates = posedExpressions(problem)
     .map(cleanExpr)
     .filter((e) => /\d/.test(e) && /[-+*/^]|sqrt|sin|cos|tan|log|ln|exp/.test(e))
     .sort((a, b) => b.length - a.length);
@@ -72,10 +103,10 @@ export function exactCheck(problem: string, attempt: string): CheckResult | null
     if (!c || c.vars.length) continue;
     const value = c.eval({});
     if (!Number.isFinite(value)) continue;
-    const given = numbersIn(attempt);
-    if (!given.length) return null;
+    const given = finalValue(attempt);
+    if (given === null) return null;
     const tol = Math.max(1e-6, Math.abs(value) * 1e-4);
-    const right = given.some((g) => Math.abs(g - value) <= tol);
+    const right = Math.abs(given - value) <= tol;
     const shown = Number.isInteger(value) ? String(value) : String(Math.round(value * 1e6) / 1e6);
     return {
       verdict: right ? 'correct' : 'incorrect',
@@ -119,8 +150,24 @@ export function sanitizeCheck(raw: unknown): CheckResult | null {
   return { verdict, location: scrub(r.location), errorType: scrub(r.errorType), expected, confidence, method: 'checker' };
 }
 
-/** Below this the checker's verdict is not claimed. */
-export const CHECK_FLOOR = 0.7;
+/**
+ * A calculation the person asked for, evaluated exactly (council D7:
+ * CALCULATE only when the value was actually computed and is injected).
+ */
+export function computeAsked(text: string): { expr: string; value: string } | null {
+  for (const raw of posedExpressions(text).map(cleanExpr).sort((a, b) => b.length - a.length)) {
+    if (!/\d/.test(raw) || !/[-+*/^]|sqrt|sin|cos|tan|log|ln|exp/.test(raw)) continue;
+    const c = compileExpr(raw, []);
+    if (!c || c.vars.length) continue;
+    const v = c.eval({});
+    if (!Number.isFinite(v)) continue;
+    return { expr: raw, value: Number.isInteger(v) ? String(v) : String(Math.round(v * 1e9) / 1e9) };
+  }
+  return null;
+}
+
+/** Below this the checker's verdict of "incorrect" is not claimed (council D13). */
+export const CHECK_FLOOR = 0.85;
 
 /** What the reply model is told — never the expected answer. */
 export function renderCheck(c: CheckResult | null): string {

@@ -126,7 +126,8 @@ export function budgetFrom(
   signals: ExplicitSignals,
   streak: number,
   density: number,
-  diminishing: Diminishing
+  diminishing: Diminishing,
+  recent = 0
 ): QuestionBudget {
   const reasons: string[] = [];
   let allowed: 0 | 1 = 1;
@@ -154,12 +155,19 @@ export function budgetFrom(
     allowed = 0;
     reasons.push('they are frustrated');
   }
-  // A genuine blocker can still be asked about — once, and only if they have
-  // not asked Socria to stop and are not frustrated.
-  if (allowed === 0 && state.blockingUnknown && streak < 3 && !signals.frustration && state.stuck !== 'frustrated') {
-    allowed = 1;
-    reasons.push(`one question allowed for a genuine blocker: ${state.blockingUnknown}`);
+  if (signals.directness === 'answer') {
+    allowed = 0;
+    reasons.push('they asked for the answer');
   }
+  // Outside practice, at most one question-bearing reply in any four.
+  const practising = state.learningGoal.source === 'explicit' && state.learningGoal.value === 'yes';
+  if (!practising && recent >= 1 && allowed === 1) {
+    allowed = 0;
+    reasons.push('a recent reply already asked something');
+  }
+  // No blocker re-grant (council D4): a missing piece is handled by
+  // proceeding under a stated assumption, never by another question after
+  // the budget is spent — the re-grant overrode frustration and redundancy.
   if (!reasons.length) reasons.push('no recent questioning pressure');
   return { streak, density, allowed, reasons };
 }
@@ -170,6 +178,6 @@ export function questionBudget(
   messages: readonly { role: string; content: string }[],
   diminishing: Diminishing
 ): QuestionBudget {
-  const { streak, density } = questionPressure(messages);
-  return budgetFrom(state, signals, streak, density, diminishing);
+  const { streak, density, recent } = questionPressure(messages);
+  return budgetFrom(state, signals, streak, density, diminishing, recent);
 }

@@ -80,11 +80,42 @@ function norm(v: string): string {
   return v.toLowerCase().replace(/\s+/g, '').replace(/[,]/g, '');
 }
 
-/** Sentences containing any hidden value. */
-function leaksHidden(draft: string, hidden: string[]): string[] {
-  const vals = hidden.map(norm).filter((v) => v.length >= 2);
+/**
+ * Sentences containing any hidden value — matched as a VALUE, not a
+ * substring (council D8): a hidden 4.2 is not in 14.2 or 4.25, and a hidden
+ * word must stand as a whole word.
+ */
+export function leaksHidden(draft: string, hidden: string[]): string[] {
+  const vals = hidden.map((v) => v.trim()).filter((v) => v.length >= 1);
   if (!vals.length) return [];
-  return sentencesOf(draft).filter((s) => vals.some((v) => norm(s).includes(v)));
+  const matchers = vals.map((v) => {
+    const n = Number(v.replace(/,/g, ''));
+    if (Number.isFinite(n) && /^-?[\d,]*\.?\d+$/.test(v.replace(/\s/g, ''))) {
+      return (s: string) =>
+        (s.replace(/(\d),(?=\d{3}\b)/g, '$1').match(/-?\d+(?:\.\d+)?/g) ?? []).some((x) => Math.abs(Number(x) - n) <= Math.max(1e-9, Math.abs(n) * 1e-9));
+    }
+    if (v.length < 3) return () => false;
+    const nv = norm(v);
+    return (s: string) => norm(s).includes(nv) && new RegExp(`(^|[^a-z0-9])${v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s*')}($|[^a-z0-9])`, 'i').test(s);
+  });
+  return sentencesOf(draft).filter((s) => matchers.some((m) => m(s)));
+}
+
+/** Claims of tools Socria does not have in this path (council D7/D8). */
+const TOOL_CLAIM = /\bi (?:just )?(?:searched|googled|looked (?:it |this |that )?up|ran (?:the|your|this|that) (?:code|script|query|numbers)|browsed|checked (?:online|the web|the internet))\b/i;
+
+/** An inference about the person stated as fact (council D8). */
+const TRAIT_AS_FACT = /\byou(?:'re| are) (?:clearly |obviously )?(?:a beginner|an expert|anxious|insecure|defensive|overwhelmed)\b|\byou tend to\b|\byou seem (?:anxious|stressed|upset|frustrated|overwhelmed)\b/i;
+
+/** Coherence floor (council D8): an edit that guts the reply is not shipped. */
+export function coherent(original: string, edited: string, sizeMatters = true): boolean {
+  if (!edited.trim()) return false;
+  if (sizeMatters && edited.length < original.length * 0.75) return false;
+  if (/(^|\n)\s*(?:\d+[.)]|[-*•])\s*$/m.test(edited)) return false;
+  const first = (sentencesOf(edited)[0] ?? '').trim();
+  if (/^(?:here are|the following|the (?:two|three|four|five)\b)/i.test(first) && sentencesOf(edited).length < 2) return false;
+  if (/^(?:because|so|that|this|which|and|but)\b/i.test(first) && !/^(?:because|so|that|this|which|and|but)\b/i.test((sentencesOf(original)[0] ?? '').trim())) return false;
+  return true;
 }
 
 /** A draft with some sentences removed; null if nothing of substance is left. */
@@ -107,6 +138,10 @@ export function guardStructure(input: GuardInput): GuardOutcome & { needsModel: 
   let action: GuardAction = 'ALLOW';
   let retryNote: string | undefined;
   let changed = false;
+  // Did an edit remove SUBSTANCE (a statement), rather than a trailing
+  // question, an offer, an opener or a withheld value? Only then does the
+  // 25% size floor apply (council D4/D8).
+  let substantive = false;
 
   if (!draft) {
     return { action: 'MODIFY_FOR_MORE_HELP', findings: [{ side: 'underhelp', code: 'empty', detail: 'The draft is empty.' }], retryNote: 'Write the reply.', by: 'structure', needsModel: false, novelty: [] };
@@ -166,6 +201,7 @@ export function guardStructure(input: GuardInput): GuardOutcome & { needsModel: 
       if (rest && !retryNote) {
         draft = rest;
         changed = true;
+        substantive = substantive || redundant.some((r) => !/\?["'’”)\]]*\s*$/.test(r.sentence.trim()));
         if (action === 'ALLOW') action = 'MODIFY_FOR_MORE_HELP';
       } else if (!retryNote) {
         action = 'MODIFY_FOR_MORE_HELP';
@@ -192,7 +228,10 @@ export function guardStructure(input: GuardInput): GuardOutcome & { needsModel: 
         : 'The draft was only questions. Make the move as statements: say the thing, do not ask it.';
     }
   }
-  if (!retryNote && MACHINE_DOES.has(a.mode) && DEFLECT.test(draft) && (dec.type === 'ANSWER' || dec.type === 'EXPLAIN' || dec.type === 'EXECUTE' || dec.type === 'CALCULATE')) {
+  // Deflection only when NO sentence commits to anything (council D8): "it
+  // depends on X; for your case, A" is an answer.
+  const commits = sentencesOf(draft).some((s) => !DEFLECT.test(s) && !/\?\s*$/.test(s.trim()) && s.trim().split(/\s+/).length >= 6);
+  if (!retryNote && !commits && MACHINE_DOES.has(a.mode) && DEFLECT.test(draft) && (dec.type === 'ANSWER' || dec.type === 'EXPLAIN' || dec.type === 'EXECUTE' || dec.type === 'CALCULATE')) {
     findings.push({ side: 'underhelp', code: 'deflection', detail: 'The draft deflects instead of answering.' });
     action = 'OVERRIDE_WITH_DIRECT_ANSWER';
     retryNote = 'They need the answer, not a discussion of how it depends. Give the answer directly; state the one condition that changes it, if any.';
@@ -206,6 +245,34 @@ export function guardStructure(input: GuardInput): GuardOutcome & { needsModel: 
       draft = rest;
       changed = true;
     }
+  }
+
+  // ── no verdict where one is owed (council D8) ──
+  if (!retryNote && (dec.type === 'CORRECT' || dec.type === 'VERIFY') && !/\b(right|correct|wrong|incorrect|not quite|mistake|error|exactly|yes|no,|slip|off|close|almost|nearly|isn'?t|doesn'?t (?:hold|work))\b/i.test(draft)) {
+    findings.push({ side: 'underhelp', code: 'no_verdict', detail: 'A check with no verdict.' });
+    action = 'MODIFY_FOR_MORE_HELP';
+    retryNote = 'Say plainly, in the first sentence, whether their attempt is right.';
+  }
+
+  // ── claims Socria cannot back; inferences about them stated as fact ──
+  const unbacked = sentencesOf(draft).filter((s) => TOOL_CLAIM.test(s) || TRAIT_AS_FACT.test(s));
+  if (unbacked.length && !retryNote) {
+    const rest = deleteSentences(draft, unbacked.map((s) => s.trim()));
+    findings.push({ side: 'voice', code: 'unbacked_claim', detail: 'A tool claim or a trait stated as fact.' });
+    if (rest) {
+      // A voice strip (council D8's always-strip list), not lost substance.
+      draft = rest;
+      changed = true;
+    }
+  }
+
+  // ── the coherence floor: never ship an edit that guts the reply ──
+  if (changed && !retryNote && !coherent(input.draft.trim(), draft, substantive)) {
+    findings.push({ side: 'underhelp', code: 'coherence_floor', detail: 'Edits would remove too much or leave the reply dangling.' });
+    action = 'MODIFY_FOR_MORE_HELP';
+    retryNote = 'Rewrite the reply so it keeps all its substance and contains no questions beyond what is allowed; state claims instead of asking them.';
+    draft = input.draft.trim();
+    changed = false;
   }
 
   // The model is consulted only for what structure cannot decide.

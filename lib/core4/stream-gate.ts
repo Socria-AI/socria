@@ -15,6 +15,7 @@
 // Pure.
 
 import { interrogatives, hasSycophanticOpener, stripSycophanticOpener } from './questions';
+import { classify } from './considered';
 
 /**
  * For unbuffered moves: emit text as complete sentences, but HOLD back any
@@ -28,7 +29,12 @@ export class SentenceGate {
   private first = true;
   out = '';
 
-  constructor(private emit: (s: string) => void) {}
+  /**
+   * passQuestions: the person asked FOR questions (a quiz, interview
+   * questions), so interrogatives are content and pass straight through;
+   * closing offers are still held.
+   */
+  constructor(private emit: (s: string) => void, private opts: { passQuestions?: boolean } = {}) {}
 
   push(delta: string) {
     this.buf += delta;
@@ -75,7 +81,8 @@ export class SentenceGate {
       }
     }
     const q = interrogatives(sentence);
-    if (q.explicit.length || q.disguised.length || q.offers.length) {
+    const holdQuestion = !this.opts.passQuestions && (q.explicit.length || q.disguised.length);
+    if (holdQuestion || q.offers.length) {
       this.held.push(sentence);
       return;
     }
@@ -96,15 +103,21 @@ export class SentenceGate {
     this.emit(s);
   }
 
-  /** End of stream: the trailing held sentences ship only within the budget. Returns what was dropped. */
-  finish(maxQuestions: 0 | 1): string[] {
+  /**
+   * End of stream: the trailing held sentences ship only within the budget,
+   * and never a question that re-asks something already considered (the
+   * one deletion word overlap may make on its own — council D9).
+   * Returns what was dropped.
+   */
+  finish(maxQuestions: 0 | 1, considered: readonly string[] = []): string[] {
     if (this.buf.trim()) this.consider(this.buf);
     this.buf = '';
     const dropped: string[] = [];
     let allowed = maxQuestions;
     for (const h of this.held) {
       const q = interrogatives(h);
-      if (!q.offers.length && allowed > 0) {
+      const reasked = considered.length > 0 && classify(h.trim(), considered).verdict === 'REDUNDANT';
+      if (!q.offers.length && !reasked && allowed > 0) {
         allowed--;
         this.send(h);
       } else dropped.push(h.trim());

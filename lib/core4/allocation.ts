@@ -72,13 +72,17 @@ export function allocate({ state: s, signals, contract }: Ctx): Allocation {
   const frustrated = s.stuck === 'frustrated' || s.stuck === 'looping';
   const attemptingProblem = s.latest === 'attempt' || s.attempt !== 'none' || s.work === 'practice' || s.work === 'verification';
 
-  // ── being heard is not a request for help ──
-  if (s.taskKind === 'vent' || s.work === 'reflection') {
-    return alloc('HUMAN_REFLECTS', 'reflect.heard', 'They are thinking out loud or want to be heard; Socria follows.', 0.7,
-      ['their own processing'], ['precise acknowledgement', 'at most one observation'], null, s);
+  // ── the safety gate: harm now overrides every contract, and only ever
+  // produces MORE help (council D1). A hints-only Project does not apply to
+  // "my 2-year-old swallowed a button battery".
+  if (signals.safety) {
+    return alloc('AI_EXECUTES', 'safety', 'Possible harm now: clear, immediate, direct instructions; every contract is suspended for this.', 1,
+      [], ['immediate direct instructions', 'when to call emergency services'], null, s);
   }
 
-  // ── an explicit request for the answer / for the work ──
+  // ── an explicit request for the answer / for the work ── (evaluated before
+  // "being heard": "just tell me" in a venting message is still a request —
+  // council D2)
   if (directness === 'answer' || signals.delegate) {
     if (signals.assessment || contract.assessment) {
       return alloc('AI_EXPLAINS', 'answer.requested.assessment',
@@ -95,10 +99,45 @@ export function allocate({ state: s, signals, contract }: Ctx): Allocation {
       1, [], ['the answer / the work', 'the reasoning that matters for using it'], null, s);
   }
 
+  // ── being heard is not a request for help ──
+  if ((s.taskKind === 'vent' || s.work === 'reflection') && directness !== 'no_answer' && directness !== 'guidance') {
+    return alloc('HUMAN_REFLECTS', 'reflect.heard', 'They are thinking out loud or want to be heard; Socria follows.', 0.7,
+      ['their own processing'], ['precise acknowledgement', 'at most one observation'], null, s);
+  }
+
+  // How many of their attempts in a row, under a withhold, have failed —
+  // counting this one. The practice ladder bottoms out after two: a full
+  // worked solution with the principle labelled, then the next item is
+  // theirs again (council D6). Endless hints are not help.
+  const wrongNow = s.attempt === 'wrong' || s.attempt === 'partial';
+  let failedRun = wrongNow ? 1 : 0;
+  for (let i = s.history.length - 1; i >= 0 && wrongNow; i--) {
+    const h = s.history[i];
+    if (h.withheld && h.failed) failedRun++;
+    else break;
+  }
+  const bottomOut = failedRun >= 3 || (failedRun >= 2 && (signals.dontKnow || frustrated));
+  const withholdable = !bottomOut;
+
   // ── an explicit request NOT to be given the answer (now, earlier, or Project) ──
-  if (directness === 'no_answer' || directness === 'guidance') {
+  // Scoped to working a problem: a standing "don't tell me" never covers a
+  // plain fact, a definition or mechanical work they ask for (council D6).
+  const plainAsk = (s.work === 'information' || s.work === 'execution') && !directnessNow;
+  if ((directness === 'no_answer' || directness === 'guidance') && !plainAsk) {
     const source = sourceOf(s.directness, directnessNow);
     const reason: WithholdReason = source === 'project' ? 'agency_boundary' : 'requested_no_answer';
+    if (!withholdable) {
+      return alloc('AI_EXPLAINS', 'practice.bottom_out',
+        'Several attempts on this item have not landed: work it fully, with the principle named, and give the next item back to them.', 1,
+        ['the next item'], ['the worked solution'], null, s);
+    }
+    // Verification first: an attempt under "hints only" still hears whether it is right.
+    if (s.latest === 'attempt' || s.attempt !== 'none') {
+      return alloc('AI_VERIFIES', s.attempt === 'right' ? 'verify.confirm' : 'verify.practice',
+        s.attempt === 'right' ? 'Their attempt is right: say so first and why.' : 'They asked not to be told: say whether it is right and exactly where and what kind of error; the redo is theirs.',
+        1, s.attempt === 'right' ? [] : ['the corrected answer'], ['the verdict', 'where and what kind of error'],
+        s.attempt === 'right' ? null : { what: 'the corrected final answer', reason, evidence: s.directness.evidence ?? '', source }, s);
+    }
     return alloc('HUMAN_PRACTICES', frustrated ? `${reason}.stuck` : reason,
       frustrated
         ? 'They asked not to be told, and they are stuck: much stronger support inside that boundary.'
@@ -111,7 +150,7 @@ export function allocate({ state: s, signals, contract }: Ctx): Allocation {
   if (s.work === 'verification' || (s.latest === 'attempt' && s.attempt !== 'none')) {
     // Practising on purpose — said so, explicitly — keeps the redo. Everyone
     // else gets the correction. Frustration ends the holding back.
-    if (learningExplicit && s.attempt !== 'right' && !frustrated) {
+    if (learningExplicit && s.attempt !== 'right' && !frustrated && withholdable) {
       return alloc('AI_VERIFIES', 'verify.practice',
         'They said they are learning this: Socria says whether it is right and exactly where it goes wrong, and leaves the redo to them.',
         1, ['the corrected answer'], ['the verdict', 'where and what kind of error'],
@@ -126,7 +165,7 @@ export function allocate({ state: s, signals, contract }: Ctx): Allocation {
 
   // ── they are practising, said so, and are working a problem ──
   if (learningExplicit && attemptingProblem && s.work === 'practice') {
-    if (frustrated) {
+    if (frustrated || !withholdable) {
       return alloc('AI_EXPLAINS', 'practice.stuck', 'They are learning but stuck and frustrated: explain this one; practice resumes on the next problem.',
         1, ['applying it to the next problem'], ['the explanation'], null, s);
     }

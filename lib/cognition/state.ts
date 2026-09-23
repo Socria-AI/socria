@@ -126,6 +126,8 @@ export interface TurnMemo {
   questions: number;
   /** was something deliberately held back this turn */
   withheld?: boolean;
+  /** their attempt this turn was wrong or partial (for the practice ladder's bottom-out, council D6) */
+  failed?: boolean;
   outcome?: OutcomeReading;
 }
 
@@ -426,10 +428,21 @@ export function renderState(s: CognitiveState): string {
     if (!text) return;
     if (f.source === 'explicit') said.push(text + (f.evidence && !f.evidence.startsWith('Project:') ? '' : f.evidence ? ' (their Project instructions)' : ''));
     else if (f.source === 'observed') said.push(`${text} (shown in this conversation)`);
-    else if (f.source === 'inferred' && f.confidence >= INFERENCE_FLOOR) read.push(`${label}: ${f.value} (${Math.round(f.confidence * 100)}%)`);
+    else if (f.source === 'inferred' && f.confidence >= INFERENCE_FLOOR) read.push(`${label}: ${show(f.value)} (${Math.round(f.confidence * 100)}%)`);
   };
-  place('learning goal', s.learningGoal, (v) => (v === 'yes' ? 'they are learning this and want to build the skill' : v === 'no' ? 'they do not need to learn this, they need it done' : null));
-  place('expertise', s.expertise, (v) => (v === 'unknown' ? null : `their expertise here: ${v}`));
+  // Behavioural directions only, never labels for the person (council D3):
+  // "novice", "expert", "frustrated" leak into replies as condescension or
+  // therapy tone, and they are guesses presented as facts.
+  place('learning', s.learningGoal, (v) =>
+    v === 'yes'
+      ? 'building this skill themselves is the point for them — this shapes how to explain, and is never on its own a reason to hold anything back'
+      : v === 'no' ? 'they need it done, not taught' : null
+  );
+  place('register', s.expertise, (v) =>
+    v === 'expert' ? 'terse and technical: skip the basics, use precise terms, go straight to what is non-obvious'
+      : v === 'novice' ? 'scaffolded: define terms the first time, concrete before general'
+        : v === 'intermediate' ? 'standard: explain the non-obvious steps only' : null
+  );
   place('directness', s.directness, (v) =>
     v === 'answer' ? 'they asked for the answer directly' : v === 'no_answer' ? 'they asked NOT to be given the answer' : v === 'guidance' ? 'they asked for hints, not the answer' : null
   );
@@ -442,13 +455,14 @@ export function renderState(s: CognitiveState): string {
 
   parts.push(`Kind of work: ${s.work}${s.taskKind ? ` (${s.taskKind})` : ''}`);
   if (s.attempt !== 'none') parts.push(`Their latest attempt: ${s.attempt}`);
-  if (s.stuck !== 'no') parts.push(`Stuck: ${s.stuck}`);
+  if (s.stuck === 'frustrated') parts.push('Support: go straight to the most useful help — the answer or a worked step — with no questions.');
+  else if (s.stuck !== 'no') parts.push('Support: more than last time — a concrete next step or a worked example, not another pointer.');
   if (s.urgency !== 'none') parts.push(`Urgency: ${s.urgency}`);
   const bullets = (label: string, xs: string[]) =>
     xs.length ? parts.push(`${label}:\n${xs.map((x) => `  - ${x}`).join('\n')}`) : undefined;
   bullets('They have shown they can', s.masteryEvidence);
-  bullets('Stuck on', s.confusions);
-  bullets('They hold (do not hand these back as new)', s.positions);
+  bullets('Where they got stuck', s.confusions);
+  bullets('Positions as Socria read them (may be wrong; do not hand back as new)', s.positions);
   bullets('Pulling against each other', s.tensions);
   bullets('Bounded by', s.constraints);
   bullets('Still open', s.openThreads);

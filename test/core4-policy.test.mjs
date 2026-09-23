@@ -118,8 +118,12 @@ console.log('\n=== the question budget counts questions, not labels ===');
   ok('one, in a conversation that is mostly questions → none', budgetFrom(S(), NO_SIGNALS, 1, 0.5, NO_DIM).allowed === 0);
   ok('"stop asking" → none, whatever else', budgetFrom(S({ blockingUnknown: 'x' }), readSignals('stop asking me questions'), 0, 0, NO_DIM).allowed === 0);
   ok('"quiz me" → one, even under pressure', budgetFrom(S({ questionsPreference: 'wanted' }), NO_SIGNALS, 3, 1, NO_DIM).allowed === 1);
-  ok('a genuine blocker earns one back', budgetFrom(S({ blockingUnknown: 'the error line' }), NO_SIGNALS, 2, 1, NO_DIM).allowed === 1);
-  ok('but not a fourth in a row', budgetFrom(S({ blockingUnknown: 'the error line' }), NO_SIGNALS, 3, 1, NO_DIM).allowed === 0);
+  // Council D4 removed the blocker re-grant: it overrode frustration and
+  // explicit redundancy. A missing piece is handled by proceeding under a
+  // stated assumption instead.
+  ok('a blocker does NOT earn a question back once the budget is spent', budgetFrom(S({ blockingUnknown: 'the error line' }), NO_SIGNALS, 2, 1, NO_DIM).allowed === 0);
+  ok('"just tell me" leaves no room for a question', budgetFrom(S(), readSignals('just tell me'), 0, 0, NO_DIM).allowed === 0);
+  ok('outside practice, one question-bearing reply in the last three spends it', budgetFrom(S(), NO_SIGNALS, 0, 0.2, NO_DIM, 1).allowed === 0);
   ok('and not to someone frustrated', budgetFrom(S({ blockingUnknown: 'x', stuck: 'frustrated' }), NO_SIGNALS, 2, 1, NO_DIM).allowed === 0);
   ok('every budget says why', budgetFrom(S(), NO_SIGNALS, 2, 1, NO_DIM).reasons.length > 0);
 }
@@ -253,15 +257,38 @@ console.log('\n=== the McCombs conversation ===');
   ok('asked for a view: ANSWER, marked as a view, decision theirs', asked.decision.type === 'ANSWER' && /marked as your view/.test(asked.decision.objective));
 }
 
-console.log('\n=== a necessary question still gets asked ===');
+console.log('\n=== a missing piece: proceed under a stated assumption (council D4) ===');
 {
   const s = S({ taskKind: 'debug', work: 'diagnosis', latest: 'answer', blockingUnknown: 'the first error line above "exit code 1"' });
   const d = decide(s, { streak: 1, density: 1 });
-  ok('CLARIFY, for exactly the unknown', d.decision.type === 'CLARIFY' && /first error line/.test(d.decision.objective), d.decision.type);
-  ok('after saying what can be said', /First give everything you CAN already say/.test(d.decision.objective));
-  ok('one question', d.decision.maxQuestions === 1);
-  const again = { ...s, history: [{ turn: 1, type: 'CLARIFY', family: 'asking', questions: 1, outcome: { label: 'FRUSTRATED_USER', confidence: 0.9, source: 'explicit', evidence: '' } }] };
-  ok('not again if the last one frustrated them', decide(again, { streak: 1, density: 1 }).decision.type !== 'CLARIFY');
+  ok('not a question: the work, under a stated assumption', (d.decision.type === 'EXPLAIN' || d.decision.type === 'EXECUTE') && d.decision.reasonCode === 'blocking_unknown.assume', `${d.decision.type} ${d.decision.reasonCode}`);
+  ok('naming exactly what is missing', /first error line/.test(d.decision.objective) && /assumption/i.test(d.decision.objective));
+  ok('and what to send asked for as an instruction, not a question', /as an instruction/.test(d.decision.objective) && d.decision.maxQuestions === 0);
+}
+
+console.log('\n=== council D1/D6: safety, recommendations, the ladder ===');
+{
+  const hints = 'Hints only. Never give me full solutions.';
+  const e = turn({ taskKind: 'learn', work: 'information' }, 'my 2-year-old swallowed a button battery, what do I do', { project: hints });
+  const ed = decide(e, { said: 'my 2-year-old swallowed a button battery, what do I do', project: hints });
+  ok('the safety gate overrides a hints-only Project', ed.allocation.withhold === null && ed.allocation.reasonCode === 'safety' && ed.decision.maxQuestions === 0);
+  ok('  with immediate action first', /immediate action/.test(ed.decision.objective));
+  const r = decide(S({ work: 'judgment', latest: 'question' }), { said: 'A or B — which would you pick?' });
+  ok('"which would you pick?" gets a pick in the first two sentences, marked as a view', r.decision.reasonCode === 'recommendation.requested' && /first two sentences/.test(r.decision.objective));
+  const standing = { value: 'no_answer', source: 'explicit', confidence: 1, evidence: "don't tell me" };
+  const fact = decide(S({ work: 'information', latest: 'question', directness: standing }));
+  ok('a standing "don\'t tell me" does not cover a plain fact', fact.allocation.withhold === null, JSON.stringify(fact.allocation.withhold));
+  const right = decide(S({ work: 'practice', latest: 'attempt', attempt: 'right', directness: standing }));
+  ok('under "don\'t tell me", a right attempt hears it is right (verification first)', right.decision.type === 'VERIFY' && right.allocation.withhold === null);
+  const wrong = decide(S({ work: 'practice', latest: 'attempt', attempt: 'wrong', directness: standing }));
+  ok('a wrong one hears where and what kind, the redo stays theirs', wrong.decision.type === 'VERIFY' && wrong.allocation.withhold?.what === 'the corrected final answer');
+  const failed = (n) => Array.from({ length: n }, (_, i) => ({ turn: i + 1, type: 'VERIFY', family: 'telling', questions: 0, withheld: true, failed: true }));
+  const third = decide(S({ work: 'practice', latest: 'attempt', attempt: 'wrong', directness: standing, history: failed(2) }));
+  ok('the third failed attempt bottoms out: a full worked solution', third.allocation.reasonCode === 'practice.bottom_out' && third.allocation.withhold === null && third.decision.type === 'EXPLAIN');
+  const idk = decide(S({ work: 'practice', latest: 'attempt', attempt: 'wrong', directness: standing, history: failed(1) }), { said: 'idk' });
+  ok('"idk" after a failed attempt bottoms out sooner', idk.allocation.reasonCode === 'practice.bottom_out', idk.allocation.reasonCode);
+  const q = decide(S({ work: 'creation', latest: 'request' }), { said: 'write me 5 interview questions for a data engineer' });
+  ok('questions they asked FOR are content, not interrogation', q.decision.questionsAreContent === true);
 }
 
 console.log('\n=== when producing it IS the learning, one question may stay ===');
@@ -310,7 +337,8 @@ console.log('\n=== every decision is well-formed ===');
     const d = selectIntervention({ state: s, allocation: a, budget: { streak: 0, density: 0, allowed, reasons: [] }, diminishing: NO_DIM, signals: NO_SIGNALS, considered: [] });
     seen.add(d.type);
     const complete = d.reasonCode && d.reason && d.intendedOutcome && d.objective && d.aiWorkPerformed !== undefined && typeof d.confidence === 'number' && d.maxTokens > 0;
-    const guardOk = d.guardRequired === (!!a.withhold || noveltyGated(d.type, a.mode, 0));
+    // Council D8: buffered (guard reads the whole draft) ONLY when something is withheld.
+    const guardOk = d.guardRequired === !!a.withhold;
     if (!complete || !guardOk) bad++;
   }
   ok('every decision carries type, reason, intended outcome, work split, confidence', bad === 0, `${bad} malformed`);

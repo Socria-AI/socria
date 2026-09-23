@@ -245,10 +245,14 @@ const t9 = await turn(c5, [l1, A(t8.received), l2], {
   // Word overlap alone no longer deletes a statement; the model check names it.
   guard: { action: 'MODIFY_FOR_MORE_HELP', findings: [{ side: 'novelty', detail: 'repeats a ruled-out option' }], redundant: ['Raising prices before the pilot ends would hurt trust.'] },
 });
-ok('an overlapping statement is sent to the model check, not deleted on overlap', t9.guardCalls === 1, String(t9.guardCalls));
+// Council D8/D9: nothing is withheld here, so the reply streams; prevention
+// (the avoid list in the prompt) is primary and the stream gate deletes only
+// re-asked questions. A re-raised STATEMENT on a streamed turn is not caught
+// — a known limit, measured by E5.
+ok('streamed, not buffered: no guard model call', t9.guardCalls === 0, String(t9.guardCalls));
 ok('next turn, what they already covered is in front of the model', /they ruled out: raising prices before the pilot ends/.test(t9.prompt), t9.prompt.slice(-900));
 ok('what Socria already said is marked as Socria\'s', /Socria already said: .*demo is stable/.test(t9.prompt));
-ok('the re-raised point never reached them', !/Raising prices/.test(t9.received), t9.received);
+ok('known limit: a re-raised statement on a streamed turn is not deleted', /Raising prices/.test(t9.received), t9.received);
 ok('the new one did', /support load/.test(t9.received), t9.received);
 
 const l3 = U("that's not what I meant — I haven't decided on March at all");

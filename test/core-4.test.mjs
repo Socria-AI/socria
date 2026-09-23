@@ -70,6 +70,12 @@ console.log('\n=== it runs on its own prompt ===');
   ok('the decision wins over the general guidance, their words over both', /the decision wins; where the person's own words in their latest message disagree with both, their words win/.test(p4));
   ok('no tools are promised', !/Research facts, retrieve evidence/.test(p4) && p4.includes('You have no tools in this conversation'));
   ok('Socria’s ideas are not presented as theirs', p4.includes('Never present Socria\'s idea as theirs'));
+
+  // Council D1 prompt-lint: no default-withholding or drip-feed instruction survives.
+  for (const banned of ['let them generate before you reveal', 'first elicit enough of their thinking', 'request for directness with surrendering', 'Advance one meaningful step at a time', 'develop through turns, not exhaustive single responses', 'When uncertain whether to say more, stop']) {
+    ok(`prompt-lint: "${banned}" is gone`, !p4.includes(banned));
+  }
+  ok('without a KEEP WITH THEM line, nothing is withheld', p4.includes('If it has no KEEP WITH THEM line, withhold nothing and complete the move in this reply.'));
 }
 
 console.log('\n=== no depth contract is appended ===');
@@ -111,7 +117,7 @@ console.log('\n=== the model underneath, and its override ===');
   ok('the override is honoured', resolveOpenAIModel('core-4') === 'some-other-model');
   ok('and does not move Core 3.1', resolveOpenAIModel('core-3') !== 'some-other-model');
   delete process.env.OPENAI_MODEL_CORE_4;
-  ok('it is versioned separately', CORE_4_PROMPT_VERSION === 'core-4-v2');
+  ok('it is versioned separately', CORE_4_PROMPT_VERSION === 'core-4-v3');
 }
 
 console.log('\n=== it has the same safety net Core 3.1 has ===');

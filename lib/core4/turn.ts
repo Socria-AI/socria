@@ -32,8 +32,8 @@ import { allocate } from './allocation';
 import { diminishingReturns, questionBudget, familyOf } from './budget';
 import { selectIntervention, renderDecision } from './intervene';
 import { guardStructure, type GuardInput } from './guard2';
-import { exactCheck, renderCheck, hiddenValues, type CheckResult, CHECK_FLOOR } from './verify';
-import { consideredView, entriesFromPerson, entriesFromSocria, mergeEntries, disputeTurn, linksForTurn, raisable } from './ledger';
+import { exactCheck, renderCheck, hiddenValues, computeAsked, type CheckResult, CHECK_FLOOR } from './verify';
+import { consideredView, entriesFromPerson, entriesFromSocria, mergeEntries, disputeTurn, raisable } from './ledger';
 import { evidenceFromTurn } from './capability';
 import { buildTrace } from './trace';
 import { questionLoad, stripInterrogatives, deleteSentences } from './questions';
@@ -46,11 +46,13 @@ import type {
   GuardOutcome,
   InterventionDecision,
   LedgerEntry,
+  LedgerLink,
   NoveltyVerdict,
   QuestionBudget,
 } from './types';
 
-const STATE_TIMEOUT_MS = 5000;
+// Council D17: the reader has 2 s; on timeout the prior state carries forward.
+const STATE_TIMEOUT_MS = 2000;
 
 export interface TurnInput {
   apiKey: string;
@@ -139,7 +141,9 @@ export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
   // before anything is decided — a computed verdict outranks the reader's
   // opinion of whether they got it right, and the move depends on it.
   const attempting = state.latest === 'attempt' || state.attempt !== 'none' || state.work === 'verification';
-  const problem = input.brief.slice(0, -1).slice(-4).map((m) => m.content).join('\n');
+  // The PERSON's words only (council D13): an expression in one of Socria's
+  // replies is never "the problem".
+  const problem = input.brief.filter((m) => m.role === 'user').slice(-3).map((m) => m.content).join('\n');
   let verify: CheckResult | null = attempting ? exactCheck(problem, input.lastUserText) : null;
   if (verify) state.attempt = verify.verdict === 'correct' ? 'right' : 'wrong';
 
@@ -155,7 +159,7 @@ export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
   // confident verdict that contradicts the reader re-decides the move.
   if (!verify && allocation.withhold && state.attempt !== 'none') {
     const t2 = Date.now();
-    verify = await withTimeout(checkWork(input.apiKey, problem, input.lastUserText), 4000, null);
+    verify = await withTimeout(checkWork(input.apiKey, input.brief.slice(-5).map((m) => `${m.role === 'user' ? 'Them' : 'Socria'}: ${m.content}`).join('\n'), input.lastUserText), 1500, null);
     ms.verify = Date.now() - t2;
     if (verify && verify.confidence >= CHECK_FLOOR && verify.verdict !== 'unknown') {
       const judged = verify.verdict === 'correct' ? 'right' : verify.verdict === 'partial' ? 'partial' : 'wrong';
@@ -172,6 +176,15 @@ export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
     : verify && verify.confidence >= CHECK_FLOOR && verify.verdict !== 'unknown'
       ? `\n=== Their attempt was checked ===\nVERDICT: ${verify.verdict}${verify.method === 'exact' ? ' (computed exactly)' : ''}${verify.expected ? `\nCORRECT ANSWER: ${verify.expected}` : ''}\n`
       : '';
+
+  // CALCULATE only when the value was actually computed (council D7);
+  // otherwise it is an ANSWER, which may not claim to have calculated.
+  let computed = '';
+  if (decision.type === 'CALCULATE') {
+    const c = computeAsked(input.lastUserText);
+    if (c) computed = `\n=== Computed exactly (use this value) ===\n${c.expr} = ${c.value}\n`;
+    else decision = { ...decision, type: 'ANSWER', reasonCode: `${decision.reasonCode}.not_computed` };
+  }
 
   let move = renderDecision({ ...decision, avoid: allLines.slice(0, 12) }, allocation);
   if (allocation.announce) {
@@ -195,7 +208,7 @@ export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
     disputed,
     verify,
     hidden,
-    blocks: { state: renderStateBlock(state), verify: verifyBlock, move },
+    blocks: { state: renderStateBlock(state), verify: verifyBlock + computed, move },
     ms,
   };
 }
@@ -225,7 +238,7 @@ export async function guardReply(p: PreparedTurn, draft: string): Promise<Guarde
 
   if (g.needsModel && p.input.apiKey) {
     const t = Date.now();
-    const m = await withTimeout(guardModel(p.input.apiKey, { ...input, draft: text }, p.input.lastUserText), 5000, null);
+    const m = await withTimeout(guardModel(p.input.apiKey, { ...input, draft: text }, p.input.lastUserText), 1500, null);
     p.ms.guardModel = Date.now() - t;
     if (m) {
       // Coerce: without anything withheld there is no overreach to fix.
@@ -273,6 +286,12 @@ export function fallbackReply(p: PreparedTurn, first: string, retry: string | nu
     }
     codes.push(`fallback:rejected:${g.findings.map((f) => f.code).join(',')}`);
   }
+  // Nothing is held back: never canned text. Ship the draft with only its
+  // over-budget questions removed (council D8).
+  if (!p.allocation.withhold) {
+    const base = retry ?? first;
+    return { text: stripInterrogatives(base, p.decision.maxQuestions).text ?? base, codes: [...codes, 'fallback:original'] };
+  }
   const v = p.verify;
   const where = v?.location ? ` Look again at ${v.location}.` : '';
   const kind = v?.errorType ? ` The problem is ${v.errorType.replace(/^the /, '')}.` : '';
@@ -304,14 +323,17 @@ export async function finishTurn(
   const fromPerson = entriesFromPerson(state.consideredNow, input.lastUserText, ctx);
   const fromSocria = entriesFromSocria(sent, decision.type, ctx);
   const merged = mergeEntries(p.ledger, [...fromPerson, ...fromSocria], input.now);
-  const previousSocria = p.ledger.filter((e) => e.owner === 'socria' && e.conversationId === input.conversationId && p.prior && e.turn === p.prior.turn);
-  const links = linksForTurn(merged.created, previousSocria, input.now);
+  // No lexical auto-links (council D10): a link drawn from word overlap is
+  // structure presented as the person's reasoning that they never stated.
+  // Links will come only from relations they state or the reader cites.
+  const links: LedgerLink[] = [];
 
   const next = recordTurn(state, {
     type: decision.type,
     family: familyOf(decision.type),
     questions: questionLoad(sent),
     withheld: !!allocation.withhold,
+    failed: state.attempt === 'wrong' || state.attempt === 'partial',
   });
 
   const trace = buildTrace({
@@ -339,7 +361,7 @@ export async function finishTurn(
     promptVersion,
   });
 
-  const evidence = evidenceFromTurn(state, p.prior, ctx);
+  const evidence = evidenceFromTurn(state, p.prior, ctx, p.verify);
   const writes: Promise<unknown>[] = [
     store.saveState(input.userId, input.conversationId, next, input.now),
     store.saveLedger(input.userId, [...merged.created, ...merged.touched, ...p.disputed], links),
@@ -351,7 +373,8 @@ export async function finishTurn(
   await Promise.all(writes);
 
   // For evaluation harnesses only: the decision path, observable without a database.
-  const sink = (globalThis as { __socriaTrace?: unknown[] }).__socriaTrace;
+  // Eval hooks do nothing in production (council D15).
+  const sink = process.env.NODE_ENV === 'production' ? undefined : (globalThis as { __socriaTrace?: unknown[] }).__socriaTrace;
   if (Array.isArray(sink)) {
     sink.push({
       trace,

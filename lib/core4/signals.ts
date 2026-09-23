@@ -32,6 +32,13 @@ export const NO_SIGNALS: ExplicitSignals = {
   wantsQuestions: false,
   correction: false,
   feedback: null,
+  practiceIntent: false,
+  safety: false,
+  recommendationRequested: false,
+  dontKnow: false,
+  tooDirect: false,
+  offRecord: false,
+  requestsQuestions: false,
   delegate: false,
   ownWork: false,
   urgent: false,
@@ -72,17 +79,18 @@ const ANSWER = new RegExp(
 // Asking NOT to be given the answer.
 const NO_ANSWER = new RegExp(
   [
-    String.raw`\b(?:do not|don'?t|please don'?t)(?: just)? (tell|give|show)(?: me)? (?:the |an? )?(answer|solution|fix|result)\b`,
-    String.raw`\bwithout (?:telling me|giving (?:me )?|revealing )(?:the |it)?(?:answer|solution|away)?\b`,
+    String.raw`\b(?:do not|don'?t|please don'?t) (tell|give|show)(?: me)? (?:the |an? )?(answer|answers|solution|fix|result)\b`,
+    String.raw`\bwithout (?:telling me|giving (?:me )?|revealing )(?:the (?:answer|solution)|it away)\b`,
     String.raw`\bno (spoilers|answers|solutions)\b`,
     String.raw`\bi want to (figure|work) (it|this|that) out(?: myself| on my own| for myself)?\b`,
     String.raw`\blet me (figure|work) (it|this) out\b`,
-    String.raw`\blet me try(?: it)?(?: first| myself| on my own)?\b`,
+    String.raw`\blet me try(?: it| this| the problem)? (?:first|myself|on my own)\b`,
+    String.raw`\beven if i ask\b`,
     String.raw`\bdon'?t solve it\b`,
     String.raw`\bdon'?t give (it|the answer|anything) away\b`,
     // Bare "don't tell me" — only when the clause ends there ("nudge me,
     // don't tell me."), so "don't tell me how to…" is not a refusal.
-    String.raw`\b(?:do not|don'?t)(?: just)? (?:tell|give|show) me(?: (?:it|the (?:ending|rule|pattern|answer)))?(?=\s*(?:[.,;:!)\]—–-]|$))`,
+    String.raw`\b(?:do not|don'?t) (?:tell|give|show) me(?: (?:it|the (?:ending|rule|pattern|answer)))?(?=\s*(?:[.,;:!)\]—–-]|$))`,
     String.raw`\bi(?:'d| would) (?:rather|prefer to|like to) (?:work|figure|find) (?:it |this |that |the \w+ )?out\b`,
     String.raw`\b(?:work|figure|find) (?:it|this|that) out (?:myself|on my own|for myself)\b`,
     String.raw`\bi(?:'d| would) rather (?:discover|find|solve|derive) (?:it|this|that|the \w+)\b`,
@@ -109,16 +117,16 @@ const NOT_LEARNING = /\b(i (?:don'?t|do not) (?:need|want|care) to (?:learn|unde
 
 const EXPERT = new RegExp(
   [
-    String.raw`\b(?:i'?m|i am) (?:a |an )?(?:senior |staff |principal |tenured |practicing |practising )?(?:\w+ )?(professor|statistician|biostatistician|mathematician|physicist|chemist|economist|engineer|researcher|scientist|physician|clinician|doctor|surgeon|lawyer|attorney|litigator|quant|developer|programmer|epidemiologist|philosopher|historian)\b`,
+    String.raw`\b(?:i'?m|i am) (?:a |an )?(?:senior |staff |principal |tenured |practicing |practising )?(?!(?:bad|junior|aspiring|former|student|wannabe|new|beginner|terrible|mediocre|self-taught)\b)(?:\w+ )?(professor|statistician|biostatistician|mathematician|physicist|chemist|economist|engineer|researcher|scientist|physician|clinician|doctor|surgeon|lawyer|attorney|litigator|quant|developer|programmer|epidemiologist|philosopher|historian|founder|cto|ceo|analyst|consultant|designer|novelist|editor|investor|accountant|nurse|pharmacist|sre)\b(?! student)`,
     String.raw`\bi (teach|taught|have taught) (?:\w+ ){0,3}(?:at|for|to)\b`,
     String.raw`\bi(?:'ve| have) been (?:doing|working|writing|coding|practi[cs]ing|researching)\b[^.]{0,40}\bfor (?:\d+|over \d+|many|ten|twenty) years\b`,
-    String.raw`\bmy (phd|dissertation|lab|research group)\b`,
+    String.raw`\bmy (phd|dissertation|research group)\b`,
   ].join('|'),
   'i'
 );
 const NOVICE = /\b(?:i'?m|i am) (?:new to|a (?:complete |total )?beginner|just starting|not (?:very )?(?:good|familiar) with)\b|\b(beginner question|eli5|never (?:learned|studied|done) (?:this|it|\w+) before)\b/i;
 
-const ASSESSMENT = /\b(graded|for (?:a |my )?grade|(?:take-?home|open-?book) (?:exam|test)|(?:assignment|problem set|homework|essay|paper) (?:that )?(?:i|i'?ll|i will|i need to|to) (?:submit|hand in|turn in)|submit (?:it|this) (?:as|for) (?:my|a) (?:grade|assignment)|academic integrity)\b/i;
+const ASSESSMENT = /\b((?:this|it) (?:is|will be) graded|my graded (?:homework|problem set|assignment|essay|lab)|for (?:a |my )?grade\b|(?:take-?home|open-?book) (?:exam|test)|(?:assignment|problem set|homework|essay) (?:that )?(?:i|i'?ll|i will|i need to|i have to) (?:submit|hand in|turn in)|i(?:'ll| will| have to|'m going to) (?:submit|hand in|turn in) (?:it|this)(?: for (?:a |my )?(?:grade|class|course))?)\b/i;
 
 const REDUNDANT = new RegExp(
   [
@@ -128,8 +136,7 @@ const REDUNDANT = new RegExp(
     String.raw`\bthat'?s (?:obvious|what i (?:said|just said))\b`,
     String.raw`\bwe (?:already )?covered (?:that|this)\b`,
     String.raw`\byou (?:already )?asked (?:me )?(?:that|this)\b`,
-    String.raw`\bi know(?: that|,| this|\.|!| already)`,
-    String.raw`\bobviously\b`,
+    String.raw`^i know(?: that|,| this|\.|!| already)`,
   ].join('|'),
   'i'
 );
@@ -150,6 +157,34 @@ const DELEGATE = /\b(you (?:do|write|handle|take care of|draft) it|do it for me|
 const OWN_WORK = /\b(don'?t (?:re)?write (?:it|this|my \w+)(?: for me)?|i want to write (?:it|this) myself|(?:it|this) (?:has|needs) to be (?:my|in my) own (?:words|work)|don'?t tell me what to (?:conclude|decide|think)|i(?:'ll| will) (?:decide|make the call)(?: myself)?|keep (?:it|this) in my (?:voice|words))\b/i;
 
 const URGENT = /\b((?:prod(?:uction)?|the site|our site|the app|checkout|the api) is (?:down|broken|failing)|outage|(?:due|deadline|submission|meeting|presentation|demo) (?:is )?(?:in|within) (?:an? |the next )?(?:hour|\d+\s?(?:min(?:ute)?s?|hours?))|urgent(?:ly)?|asap|emergency|customers? (?:are|is) (?:affected|blocked|down))\b/i;
+
+// STRONG practice intent (council D2): the person says producing it is the point.
+const PRACTICE = new RegExp(
+  [
+    String.raw`\bi want to (?:work|figure|solve) (?:it|this|these|that) out(?: myself| on my own| for myself)?\b`,
+    String.raw`\b(?:work|figure|solve) (?:it|this|that|these) out (?:myself|on my own|for myself)\b`,
+    String.raw`\blet me try(?: it| this| the problem)? (?:first|myself|on my own)\b`,
+    String.raw`\bi(?:'d| would) rather (?:work|figure) (?:it |this |that |the \w+ )?out\b`,
+    String.raw`\b(?:i need|i want|i have) to be able to do (?:these|this|it|them) (?:cold|myself|on my own|without help|in the exam)\b`,
+    String.raw`\b(?:drilling|practi[cs]ing) (?:these|this|problems|questions)\b[^.?!]{0,60}\b(?:myself|on my own|don'?t (?:solve|tell|give))`,
+    String.raw`\bhints only\b`,
+    String.raw`\b(?:do|solve|work) (?:these|this|it|them) (?:myself|on my own)\b`,
+  ].join('|'),
+  'i'
+);
+
+// Harm now: the safety gate (council D1). Only ever produces MORE help.
+const SAFETY = /\b(swallowed (?:a |an |some )?(?:button )?(?:battery|batteries|magnet|bleach|pills?|poison)|overdos\w*|poison(?:ed|ing)\b|chest pain|can'?t breathe|not breathing|unconscious|seizure|anaphyla\w*|severe allergic|bleeding (?:heavily|a lot|won'?t stop)|suicid\w*|kill (?:myself|himself|herself)|self-?harm|stroke symptoms|call (?:911|999|112)|emergency room|money (?:is )?being (?:stolen|taken) (?:right )?now|wire (?:the )?money (?:today|now) (?:or|before)|court deadline (?:is )?(?:today|tomorrow))/i;
+
+const RECOMMEND = /\b(what would you (?:do|pick|choose|go with)|which (?:one )?(?:should|would) (?:i|you) (?:pick|choose|take|go with)|(?:give me |what'?s )?your (?:pick|recommendation|call|vote)|if you were me|which would you (?:pick|choose))\b/i;
+
+const DONT_KNOW = /^(?:\s*(?:idk|i (?:really )?don'?t know|i do not know|no idea|no clue|not sure|dunno|i have no idea))\b[\s\S]{0,40}$/i;
+
+const TOO_DIRECT = /\b(don'?t just (?:give|tell) me the (?:answer|solution)|you gave (?:it|the answer) away|i wanted to (?:figure|work) (?:that|it) out|spoiler|don'?t give (?:me )?so much|that was too much)\b/i;
+
+const OFF_RECORD = /\b(off the record|don'?t remember (?:this|that)|don'?t save (?:this|that)|forget (?:this|that) (?:conversation|chat)?)\b/i;
+
+const REQUESTS_QUESTIONS = /\b((?:write|give|make|draft|generate|come up with|list|suggest)(?: me)? (?:\w+ ){0,3}(?:questions|quiz|exam items|practice problems|interview questions|test items|flashcards|faq)|quiz me|test me|drill me|interview questions)\b/i;
 
 interface Hit {
   at: number;
@@ -177,7 +212,7 @@ function lastIndex(re: RegExp, text: string): Hit | null {
 function negated(h: Hit, refusals: Hit[], text: string): boolean {
   if (refusals.some((r) => h.at < r.end && h.end > r.at)) return true;
   const before = text.slice(Math.max(0, h.at - 16), h.at).toLowerCase();
-  return /(?:don'?t|do not|never|not|without)(?:\s+just)?\s*$/.test(before);
+  return /\b(?:don'?t|do not|never|not|without)(?:\s+just)?\s*$/.test(before);
 }
 
 /**
@@ -223,9 +258,18 @@ export function readSignals(message: string): ExplicitSignals {
   const negative = note(lastIndex(NEGATIVE, text));
   const positive = negative ? null : note(lastIndex(POSITIVE, text));
 
+  const practice = notLearning ? null : note(lastIndex(PRACTICE, text));
+
   return {
     directness,
-    learningGoal: notLearning ? false : learning ? true : null,
+    learningGoal: notLearning ? false : learning || practice ? true : null,
+    practiceIntent: !!practice || directness === 'no_answer' || directness === 'guidance',
+    safety: !!note(lastIndex(SAFETY, text)),
+    recommendationRequested: !!note(lastIndex(RECOMMEND, text)),
+    dontKnow: DONT_KNOW.test(text),
+    tooDirect: !!note(lastIndex(TOO_DIRECT, text)),
+    offRecord: !!note(lastIndex(OFF_RECORD, text)),
+    requestsQuestions: !!lastIndex(REQUESTS_QUESTIONS, text),
     expertise: expert ? 'expert' : novice ? 'novice' : null,
     assessment: !!note(lastIndex(ASSESSMENT, text)),
     redundancy: !!note(lastIndex(REDUNDANT, text)),
@@ -253,6 +297,7 @@ export function readContract(instructions: string | null | undefined): ExplicitS
     ...NO_SIGNALS,
     directness: s.directness,
     learningGoal: s.learningGoal,
+    practiceIntent: s.practiceIntent,
     expertise: s.expertise,
     assessment: s.assessment,
     delegate: s.delegate,

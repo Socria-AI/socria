@@ -128,7 +128,9 @@ declare global {
 }
 
 export function modelClient(apiKey: string): ModelClient {
-  return globalThis.__socriaModelClient ?? openAIClient(apiKey);
+  // An installed client is honoured only outside production (council D15).
+  if (process.env.NODE_ENV !== 'production' && globalThis.__socriaModelClient) return globalThis.__socriaModelClient;
+  return openAIClient(apiKey);
 }
 
 /** Read the whole of a stream into one Completion (for callers that need the full draft). */

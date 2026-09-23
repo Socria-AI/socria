@@ -218,10 +218,12 @@ console.log('\n=== a necessary question still goes through ===');
     state: { taskKind: 'debug', latest: 'answer', resolved: true, blockingUnknown: 'the first error line above "exit code 1" in the build log' },
     draft: 'Scroll up from "exit code 1" — what is the first line in red?',
   });
-  ok('asked again, right after a question', t.move === 'CLARIFY', t.move);
-  ok('for exactly the unknown', /first error line/.test(t.prompt));
-  ok('after saying what can already be said', /First give everything you CAN already say/.test(t.prompt));
-  ok('and the question reached them', /\?$/.test(t.received.trim()), t.received);
+  // Council D4: no question re-granted for a blocker. Proceed under a stated
+  // assumption; say what to send as an instruction.
+  ok('not another question: the work, under a stated assumption', t.move === 'EXPLAIN' || t.move === 'EXECUTE', t.move);
+  ok('naming exactly the unknown', /first error line/.test(t.prompt));
+  ok('asking for it as an instruction, not a question', /as an instruction/.test(t.prompt) && /Questions this turn: NONE/.test(t.prompt));
+  ok('and no question reached them', !/\?\s*$/.test(t.received.trim()), t.received);
 }
 
 console.log('\n=== a plain request is answered ===');

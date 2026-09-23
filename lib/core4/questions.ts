@@ -100,7 +100,8 @@ const DISGUISED = new RegExp(
 );
 
 /** Closing offers: a request for more of the person's time, not a move. */
-const OFFER = /^(?:let me know|feel free to|if you(?:'d| would) like|if you want|want me to|shall i|should i|would you like|happy to|i can also|do you want me to)\b/i;
+// Closing offers, and comprehension checks that are always stripped (council D4).
+const OFFER = /^(?:let me know|feel free to|if you(?:'d| would) like|if you want|want me to|shall i|should i|would you like|happy to|i can also|do you want me to|does (?:that|this) (?:make sense|help)|make sense\?|any questions|is (?:that|this) clear|sound good|hope (?:this|that) helps)\b/i;
 
 const SYCOPHANCY = /^(?:great|excellent|good|fantastic|wonderful|interesting|fascinating) (?:question|point|thought|observation)[.!,]?|^(?:you(?:'re| are) (?:absolutely |completely |totally )?right)[.!,]|^(?:what a (?:great|good|fascinating) )|^(?:i love (?:this|that|how you))/i;
 
@@ -140,7 +141,7 @@ export function asksAnything(text: string): boolean {
 export function questionPressure(
   messages: readonly { role: string; content: string }[],
   window = 6
-): { streak: number; density: number } {
+): { streak: number; density: number; recent: number } {
   const replies = messages.filter((m) => m.role === 'assistant');
   let streak = 0;
   for (let i = replies.length - 1; i >= 0; i--) {
@@ -149,7 +150,10 @@ export function questionPressure(
   }
   const recent = replies.slice(-window);
   const density = recent.length ? recent.filter((m) => asksAnything(m.content)).length / recent.length : 0;
-  return { streak, density };
+  // Question-bearing replies among the last three (council D4: at most one
+  // in any four consecutive replies outside practice).
+  const last3 = replies.slice(-3).filter((m) => asksAnything(m.content)).length;
+  return { streak, density, recent: last3 };
 }
 
 /**

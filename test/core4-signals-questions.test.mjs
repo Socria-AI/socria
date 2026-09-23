@@ -15,7 +15,10 @@ console.log('=== directness ===');
 ok('"just tell me" asks for the answer', S('Honestly just tell me which test to use').directness === 'answer');
 ok('"give me the fix" asks for the answer', S('give me the fix, I have a demo in ten minutes').directness === 'answer');
 ok('"don\'t tell me the answer" asks not to', S("don't tell me the answer, I want to get there").directness === 'no_answer');
-ok('"don\'t just give me the answer" is NOT a request for it', S("please don't just give me the answer").directness === 'no_answer', S("please don't just give me the answer").directness);
+// Council D2: "don't just give me the answer, explain why" asks for MORE
+// (the reasoning), not for the answer to be withheld.
+ok('"don\'t just give me the answer" is neither a request for it nor a refusal', S("please don't just give me the answer").directness === 'none', S("please don't just give me the answer").directness);
+ok('  it reads as "too direct": explain, not only answer', S("don't just give me the answer, explain why it works").tooDirect === true);
 ok('"let me try first" is no_answer', S('ok let me try first').directness === 'no_answer');
 ok('"hints only" is guidance', S('hints only please').directness === 'guidance');
 ok('a mind changed mid-message: the later instruction wins', S("I wanted to work it out myself but honestly just tell me").directness === 'answer');
@@ -94,6 +97,26 @@ console.log('\n=== recall on real phrasings (pilot finding 3: learning-020) ==='
   ok('"point me in the right direction" is guidance', readSignals('can you point me in the right direction?').directness === 'guidance');
   ok('"nudge me" is guidance', readSignals('just nudge me').directness === 'guidance');
   ok('and "just tell me" later in the same message still wins', readSignals("I said don't tell me. Actually, just tell me the answer.").directness === 'answer');
+}
+
+console.log('\n=== council D2: verified false positives stay false ===');
+{
+  const none = (t) => { const x = S(t); return x.directness === 'none' && !x.practiceIntent; };
+  ok('"let me try to explain" is not practice intent', none('Let me try to explain what I mean: the cache serves stale rows after each deploy.'));
+  ok('"I\'m studying the effect of statins" is context, not practice intent', !S("I'm studying the effect of statins on LDL in a cohort; what's the right model?").practiceIntent);
+  ok('"a paper to submit to NeurIPS" is not graded work', !S('I have a paper to submit to NeurIPS next week, can you check the related work?').assessment);
+  ok('"my graded problem set" is', S('this is my graded problem set, due Friday').assessment);
+  ok('"I\'m a bad programmer" is not an expert claim', S("I'm a bad programmer, sorry if this is obvious").expertise !== 'expert');
+  ok('"I\'m a senior engineer" is', S("I'm a senior engineer at a fintech").expertise === 'expert');
+  ok('"my lab report is due" is not an expertise claim', S('My lab report is due tomorrow').expertise === null);
+  ok('"obviously" alone is not redundancy feedback', !S('Obviously the cache is the problem, but which layer?').redundancy);
+  ok('"without revealing" a plot point is not a refusal', S('How do I foreshadow the betrayal without revealing it too early?').directness === 'none');
+  ok('"I want to work it out myself" is practice intent', S('I want to work it out myself').practiceIntent);
+  ok('"hints only" is practice intent', S('hints only please').practiceIntent);
+  ok('"my 2-year-old swallowed a button battery" trips the safety gate', S('my 2-year-old swallowed a button battery, what do I do').safety);
+  ok('"which would you pick?" asks for a recommendation', S('A or B — which would you pick?').recommendationRequested);
+  ok('"idk" is not knowing', S('idk').dontKnow && S('no idea tbh').dontKnow && !S("I don't know why the cache misses on every deploy, here are the logs and the config").dontKnow);
+  ok('"write me 5 interview questions" asks FOR questions', S('write me 5 interview questions for a data engineer').requestsQuestions);
 }
 
 console.log('\n=== stripping ===');
