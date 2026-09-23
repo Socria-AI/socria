@@ -164,7 +164,7 @@ export function allocate({ state: s, signals, contract }: Ctx): Allocation {
       return alloc('AI_VERIFIES', s.attempt === 'right' ? 'verify.confirm' : 'verify.practice',
         s.attempt === 'right' ? 'Their attempt is right: say so first and why.' : 'They asked not to be told: say whether it is right and exactly where and what kind of error; the redo is theirs.',
         1, s.attempt === 'right' ? [] : ['the corrected answer'], ['the verdict', 'where and what kind of error'],
-        s.attempt === 'right' ? null : { what: 'the corrected final answer', reason, evidence: s.directness.evidence ?? '', source }, s);
+        s.attempt === 'right' ? null : { what: 'the corrected answer, and the corrected step, code or setup that produces it', reason, evidence: s.directness.evidence ?? '', source }, s);
     }
     return alloc('HUMAN_PRACTICES', frustrated ? `${reason}.stuck` : reason,
       frustrated

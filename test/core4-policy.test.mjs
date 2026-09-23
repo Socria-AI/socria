@@ -300,7 +300,12 @@ console.log('\n=== council D1/D6: safety, recommendations, the ladder ===');
   const right = decide(S({ work: 'practice', latest: 'attempt', attempt: 'right', directness: standing }));
   ok('under "don\'t tell me", a right attempt hears it is right (verification first)', right.decision.type === 'VERIFY' && right.allocation.withhold === null);
   const wrong = decide(S({ work: 'practice', latest: 'attempt', attempt: 'wrong', directness: standing }));
-  ok('a wrong one hears where and what kind, the redo stays theirs', wrong.decision.type === 'VERIFY' && wrong.allocation.withhold?.what === 'the corrected final answer');
+  ok('a wrong one hears where and what kind, the redo stays theirs', wrong.decision.type === 'VERIFY' && /corrected answer/.test(wrong.allocation.withhold?.what ?? ''));
+  // Run 4 (math-004, learning-015): the repair is theirs too, not only the final answer.
+  ok('  the withhold covers the corrected step, code or setup', /corrected step, code or setup/.test(wrong.allocation.withhold?.what ?? ''));
+  ok('  and the objective is a pointer, not the repair', /a pointer they can act on, not the repair/.test(wrong.decision.objective));
+  const hintsOnly = decide(S({ work: 'practice', latest: 'attempt', attempt: 'partial', directness: { value: 'guidance', source: 'explicit', confidence: 1, evidence: 'hints only' } }));
+  ok('under "hints only" a half-formed attempt gets ONE hint, never the written-out setup', hintsOnly.decision.type === 'VERIFY' && /ONE hint/.test(hintsOnly.decision.objective) && /Do not write out the setup/.test(hintsOnly.decision.objective), hintsOnly.decision.objective);
   const failed = (n) => Array.from({ length: n }, (_, i) => ({ turn: i + 1, type: 'VERIFY', family: 'telling', questions: 0, withheld: true, failed: true }));
   const third = decide(S({ work: 'practice', latest: 'attempt', attempt: 'wrong', directness: standing, history: failed(2) }));
   ok('the third failed attempt bottoms out: a full worked solution', third.allocation.reasonCode === 'practice.bottom_out' && third.allocation.withhold === null && third.decision.type === 'EXPLAIN');
@@ -337,6 +342,16 @@ console.log('\n=== when producing it IS the learning, one question may stay ==='
   const stuck = decide({ ...s, stuck: 'stuck' });
   ok('stuck → support goes up (HINT, stated, no question)', stuck.decision.type === 'HINT' && stuck.decision.maxQuestions === 0);
   ok('  with an analogous worked example or the next step', /analogous example|next step outright/.test(stuck.decision.objective));
+}
+
+console.log('\n=== run 4: missed "find it myself" phrasings ===');
+{
+  for (const said of ['I want to get there myself — no rewritten query, please.', 'Do not tell me the trick, do not name it, and do not write SQL. I want to have found it.', "So for this one, don't hand me the answer.", "I can take it from here — don't finish it for me."]) {
+    ok(`no_answer: "${said.slice(0, 50)}"`, readSignals(said).directness === 'no_answer', readSignals(said).directness);
+  }
+  for (const said of ['I want to get there by 5pm', 'How do I get there from the station?', 'Can you find it for me?', 'She said she wanted to crack it herself']) {
+    ok(`not a refusal: "${said}"`, readSignals(said).directness === 'none', readSignals(said).directness);
+  }
 }
 
 console.log('\n=== run 3: an analogous worked example only once they are stuck (D6 ladder) ===');

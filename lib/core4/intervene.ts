@@ -288,7 +288,11 @@ function selectMove(input: SelectInput): InterventionDecision {
         objective: input.signals.flagOnly || s.flagOnly
           ? 'They asked for a verdict only: say plainly whether it is right or not, and answer any factual question they asked. Do NOT say where it goes wrong or what kind of error, and never what to change — finding it is theirs. If they asked HOW to look, give a method for finding it (what to print, what to compare), never its location. No questions.'
           : practice
-            ? 'Say whether it is right. If not, say exactly WHERE it goes wrong and what KIND of error it is (sign, step, assumption, arithmetic), clearly enough that they can fix it. Do not give the corrected final answer — they are practising and redoing it is theirs. No questions.'
+            ? s.directness.value === 'guidance'
+              // Run 4 (math-004): "hints only" plus a half-formed setup got
+              // the full state set spelled out as "where it goes wrong".
+              ? 'Say whether their direction is right. Then give ONE hint: the smallest pointer toward the next step. Do not write out the setup, the equations, the corrected step or anything they could copy in place of their own work — they asked for hints only. No questions.'
+              : 'Say whether it is right. If not, say WHERE it goes wrong and what KIND of error it is (sign, step, assumption, arithmetic) — a pointer they can act on, not the repair: do not write the corrected step, the rewritten code or the fixed setup, and do not name a technique they said they want to find. Do not give the corrected final answer — redoing it is theirs. No questions.'
             : 'Say clearly whether it is right. If it is wrong: what is wrong and where, then the correct version and why. If it is actually right, say so plainly and add only what is genuinely useful — never invent a problem. No questions back.',
         alloc: a, avoid,
       });

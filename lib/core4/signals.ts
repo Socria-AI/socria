@@ -88,7 +88,14 @@ const ANSWER = new RegExp(
 // Asking NOT to be given the answer.
 const NO_ANSWER = new RegExp(
   [
-    String.raw`\b(?:do not|don'?t|please don'?t) (tell|give|show)(?: me)? (?:the |an? )?(answer|answers|solution|fix|result)\b`,
+    String.raw`\b(?:do not|don'?t|please don'?t) (tell|give|show|hand)(?: me)? (?:the |an? )?(answer|answers|solution|fix|result|trick|technique)\b`,
+    // Run 4 (learning-015, no-answer-request-003, learning-001): "I want to
+    // get there myself", "I want to have found it", "no rewritten query",
+    // "don't finish it for me".
+    String.raw`\bi want to (?:have found it\b|get there(?:\s+(?:myself|on my own|for myself)\b|(?=\s*(?:[.,;:!)\]—–-]|$))))`,
+    String.raw`\b(?:get there|find it|solve it|spot it|crack it) (?:myself|on my own|for myself)\b`,
+    String.raw`\bno (?:rewritten|corrected|fixed) (?:query|code|version|solution|function)\b`,
+    String.raw`\b(?:do not|don'?t) (?:finish|solve|do) it for me\b`,
     String.raw`\bwithout (?:telling me|giving (?:me )?|revealing )(?:the (?:answer|solution)|it away)\b`,
     String.raw`\bno (spoilers|answers|solutions)\b`,
     String.raw`\bi want to (figure|work) (it|this|that) out(?: myself| on my own| for myself)?\b`,
