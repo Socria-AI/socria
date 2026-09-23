@@ -50,8 +50,6 @@ import { sanitizeUserUnderstanding, type UserUnderstanding } from '@/lib/socria-
 import { OneLock } from '@/components/OneLock';
 import {
   FREE_DEPTH,
-  SOCRIA_ONE_KEY,
-  isValidOneKey,
   meaningfulNodes,
   type OneFeature,
   type Plan,
@@ -120,7 +118,6 @@ import {
   type LogosMsg as Msg,
   type LogosSession,
 } from '@/lib/logos-sessions';
-import { CORE3_ACCESS_KEY, isValidAccessKey } from '@/lib/socria-prompt';
 
 // Shared with Core 3.1 — unlocking once covers both.
 const KEY_STORAGE = 'socria.core3AccessKey.v1';
@@ -920,9 +917,7 @@ export function LogosApp({
 
   const keyHeaders = useCallback(
     (): Record<string, string> => ({
-      ...(unlocked && !isSignedIn ? { 'x-socria-key': CORE3_ACCESS_KEY } : {}),
       // What the client believes it holds. The routes check for themselves.
-      ...(plan === 'one' ? { 'x-socria-one': SOCRIA_ONE_KEY } : {}),
     }),
     [unlocked, isSignedIn, plan]
   );
@@ -1064,7 +1059,17 @@ export function LogosApp({
    */
   async function takeOne(typed: string): Promise<boolean> {
     if (typed) {
-      if (!isValidOneKey(typed)) return false;
+      // No local judgement: /api/logos/redeem checks the code against the
+      // server's environment and is the only thing that can grant One.
+      const ok = await fetch('/api/access/unlock', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: typed }),
+      })
+        .then((r) => (r.ok ? r.json().catch(() => null) : null))
+        .then((j) => j?.ok === true && j?.scope === 'one')
+        .catch(() => false);
+      if (!ok) return false;
       // One code, whole product: the same key also opens the Core 3 / Logos
       // access gate, so nobody unlocks One and then hits a second door.
       setUnlocked(true);
@@ -1409,9 +1414,24 @@ export function LogosApp({
     }
   }
 
-  function submitKey() {
+  // The gate is judged by the server, not here. Comparing a typed code
+  // against a constant in this file is what put both codes in the public
+  // bundle; the page now forwards what was typed and keeps only the answer.
+  async function submitKey() {
     const typed = keyInput.trim();
-    if (!isValidAccessKey(typed)) {
+    let scope: 'core' | 'one' | null = null;
+    try {
+      const res = await fetch('/api/access/unlock', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: typed }),
+      });
+      const json = res.ok ? await res.json().catch(() => null) : null;
+      if (json?.ok) scope = json.scope === 'one' ? 'one' : 'core';
+    } catch {
+      /* offline, or the gate is not configured — treated as a wrong code */
+    }
+    if (!scope) {
       setKeyError(true);
       return;
     }
@@ -1420,9 +1440,9 @@ export function LogosApp({
     try {
       localStorage.setItem(KEY_STORAGE, '1');
     } catch {}
-    // The One code is a master key — at this gate it opens everything at
-    // once, and a signed-in redemption is written to the account.
-    if (isValidOneKey(typed)) void takeOne(typed);
+    // The One code opens everything at once, and a signed-in redemption is
+    // written to the account so it follows them.
+    if (scope === 'one') void takeOne(typed);
   }
 
   // ── map ────────────────────────────────────────────────────────────

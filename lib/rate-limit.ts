@@ -81,8 +81,15 @@ async function check(bucket: string, id: string, limit: number, windowSec: numbe
 
 function clientId(req: NextRequest, userId: string | null): { id: string; authed: boolean } {
   if (userId) return { id: `u:${userId}`, authed: true };
+  // The platform's own value FIRST. `x-forwarded-for` is a header, and a
+  // header is whatever the caller wrote unless something in front of the app
+  // overwrites it — so reading it before req.ip let an anonymous caller mint
+  // a fresh rate-limit bucket per request simply by varying a string. Vercel
+  // sets req.ip itself; the header is the fallback for deployments that do
+  // not, where it is the best available signal rather than a trusted one.
+  const platform = (req as unknown as { ip?: string }).ip;
   const fwd = (req.headers.get('x-forwarded-for') || '').split(',')[0].trim();
-  const ip = fwd || (req as any).ip || req.headers.get('x-real-ip') || 'unknown';
+  const ip = platform || fwd || req.headers.get('x-real-ip') || 'unknown';
   return { id: `ip:${ip}`, authed: false };
 }
 

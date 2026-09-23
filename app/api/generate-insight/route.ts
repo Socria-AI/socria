@@ -16,10 +16,10 @@ import {
   INSIGHT_HEADER_LABELS,
   buildInsightPrompt,
   sanitizeMemory,
-  isValidAccessKey,
   type Insight,
 } from '@/lib/socria-prompt';
 import { enforceRateLimit } from '@/lib/rate-limit';
+import { mayUse } from '@/lib/route-guard';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -28,7 +28,7 @@ const MAX_MESSAGES = 30;
 
 export async function POST(req: NextRequest) {
   const { userId } = auth();
-  const keyUnlocked = isValidAccessKey(req.headers.get('x-socria-key'));
+  const keyUnlocked = mayUse(req, userId);
   if (!userId && !keyUnlocked) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }

@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
   }
 
   // Conversations carry their own messages, memory, map, draft and contexts.
-  const { data: convos } = await db
+  const { data: convos, error: convosErr } = await db
     .from('conversations')
     .select('*')
     .eq('user_id', userId)
@@ -52,7 +52,7 @@ export async function GET(req: NextRequest) {
   out.conversations = convos ?? [];
 
   // The cross-conversation profile and Thinking Journey.
-  const { data: profile } = await db
+  const { data: profile, error: profileErr } = await db
     .from('user_profiles')
     .select('*')
     .eq('user_id', userId)
@@ -61,7 +61,7 @@ export async function GET(req: NextRequest) {
 
   // Subscription state — the projection of Stripe, not the billing details
   // themselves, which never reach us.
-  const { data: sub } = await db
+  const { data: sub, error: subErr } = await db
     .from('socria_subscriptions')
     .select('user_id, status, price_id, current_period_end, cancel_at_period_end, created_at')
     .eq('user_id', userId)
@@ -69,7 +69,7 @@ export async function GET(req: NextRequest) {
   out.subscription = sub ?? null;
 
   // Connected accounts: report THAT one exists, never the token itself.
-  const { data: conns } = await db
+  const { data: conns, error: connsErr } = await db
     .from('logos_connections')
     .select('provider, account, updated_at')
     .eq('user_id', userId);
@@ -77,11 +77,44 @@ export async function GET(req: NextRequest) {
 
   // Lifecycle email: which notes have gone, and whether they said stop. Ids
   // and timestamps only — the ledger never held an address or a subject.
-  const { data: lifecycle } = await db
+  const { data: lifecycle, error: lifecycleErr } = await db
     .from('lifecycle_emails')
     .select('kind, created_at, due_at, sent_at')
     .eq('user_id', userId);
   out.lifecycleEmails = lifecycle ?? [];
+
+  // Usage counters. Not content, but it is a record keyed to this person and
+  // it was absent from this file for several releases — an export that omits
+  // a table is a quieter failure than a deletion that does, because nobody
+  // can tell from the outside what is missing.
+  const { data: usage, error: usageErr } = await db
+    .from('logos_usage')
+    .select('scope, counter, n, updated_at')
+    .eq('user_id', userId);
+  out.logosUsage = usage ?? [];
+
+  // An export that silently ships an empty section is worse than one that
+  // fails: the file looks complete and nobody can tell from the outside what
+  // is missing. Every read above records its error; if any failed, the file
+  // says so at the top rather than quietly under-reporting.
+  const problems = [
+    ['conversations', convosErr],
+    ['profile', profileErr],
+    ['subscription', subErr],
+    ['connections', connsErr],
+    ['lifecycleEmails', lifecycleErr],
+    ['logosUsage', usageErr],
+  ]
+    .filter(([, e]) => !!e)
+    .map(([name]) => name as string);
+
+  if (problems.length) {
+    out.incomplete = problems;
+    out.incompleteNote =
+      'Some sections could not be read and are empty or partial in this file: ' +
+      problems.join(', ') +
+      '. This export is NOT complete. Please try again, or email hellosocria@gmail.com.';
+  }
 
   const stamp = new Date().toISOString().slice(0, 10);
   return new NextResponse(JSON.stringify(out, null, 2), {

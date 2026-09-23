@@ -396,10 +396,35 @@ export async function POST(req: NextRequest) {
     // drop any id that already exists and does not belong to this account,
     // rather than letting it through and taking the row.
     const ids = rows.map((r) => r.id as string);
-    const { data: existing } = await supabaseAdmin()
+
+    // An id is an opaque handle we generated; anything else is a probe. This
+    // also keeps PostgREST's `in()` list free of the characters that would
+    // otherwise change how it parses — a malformed id must not be able to
+    // turn the ownership query into an error.
+    if (ids.some((id) => !/^[A-Za-z0-9_-]{1,120}$/.test(id))) {
+      return NextResponse.json({ error: 'Bad conversation id.' }, { status: 400 });
+    }
+
+    const { data: existing, error: checkError } = await supabaseAdmin()
       .from('conversations')
       .select('id, user_id')
       .in('id', ids);
+
+    // FAIL CLOSED. This query is the ONLY thing standing between a caller and
+    // another account's rows: `conversations.id` is the whole primary key, so
+    // an upsert carrying somebody else's id overwrites their row and takes
+    // ownership of it. The error used to be discarded — on any failure `data`
+    // came back null, `foreign` came out empty, nothing was filtered, and the
+    // upsert ran unguarded. A check that cannot be completed is a check that
+    // failed; nothing is imported.
+    if (checkError) {
+      console.error('POST conversations: ownership check failed', checkError);
+      return NextResponse.json(
+        { error: 'Could not import right now. Nothing was changed.' },
+        { status: 503 }
+      );
+    }
+
     const foreign = new Set(
       (existing ?? [])
         .filter((r: { user_id: string }) => r.user_id !== userId)

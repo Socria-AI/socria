@@ -17,7 +17,6 @@ import { usePlan } from '@/components/usePlan';
 import { OneFoot } from '@/components/OneMark';
 import { ModelGlyph } from '@/components/ModelGlyph';
 import { LogosApp } from '@/components/LogosApp';
-import { isValidOneKey } from '@/lib/socria-one';
 import { FEEDBACK_URL } from '@/lib/feedback';
 import { failureText } from '@/lib/upstream-error';
 import {
@@ -86,8 +85,6 @@ const JOURNEY_EVERY_TURNS = 4;
 import {
   SOCRIA_MODELS,
   EMPTY_MEMORY,
-  CORE3_ACCESS_KEY,
-  isValidAccessKey,
 
   type SocriaModel,
   type ThinkingDepth,
@@ -338,8 +335,11 @@ export default function ChatPage() {
 
   // Header sent to gated API routes when the user unlocked via access key
   // instead of signing in. Harmless (and omitted) for signed-in users.
-  const keyHeaders = (): Record<string, string> =>
-    smartUnlocked && !isSignedIn ? { 'x-socria-key': CORE3_ACCESS_KEY } : {};
+  // An unlock now travels as the httpOnly cookie the server set when it
+  // accepted the typed code; the browser attaches it on its own. The page
+  // holds no code to send, which is the point. Kept as a function so the
+  // dozen call sites that spread it need no change.
+  const keyHeaders = (): Record<string, string> => ({});
 
   // Load conversations whenever auth state resolves or flips.
   useEffect(() => {
@@ -619,16 +619,33 @@ export default function ChatPage() {
     chooseModel(next);
   }
 
-  // Validate + persist a typed access key. Returns true when accepted.
-  // The Socria One code is a master key: typed here, it unlocks Core 3 AND
-  // switches One on (Logos reads the same storage), and a signed-in
-  // redemption is written to the account so it follows them.
-  function handleUnlockKey(key: string): boolean {
-    if (!isValidAccessKey(key)) return false;
+  // Validate + persist a typed access key. Resolves true when accepted.
+  //
+  // The page cannot answer this itself any more, and should never have been
+  // able to: judging a code locally meant the code was IN the page, and so in
+  // every visitor's browser. It now asks the server, which compares against
+  // its environment and — on success — sets an httpOnly grant cookie. The
+  // localStorage flag below is only so the UI remembers; the cookie is the
+  // authority, and a forged flag unlocks nothing the server will honour.
+  async function handleUnlockKey(key: string): Promise<boolean> {
+    let scope: 'core' | 'one' | null = null;
+    try {
+      const res = await fetch('/api/access/unlock', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: key }),
+      });
+      if (!res.ok) return false;
+      const json = await res.json().catch(() => null);
+      if (!json?.ok) return false;
+      scope = json.scope === 'one' ? 'one' : 'core';
+    } catch {
+      return false;
+    }
     setSmartUnlocked(true);
     try {
       localStorage.setItem(SMART_KEY_STORAGE, '1');
-      if (isValidOneKey(key)) {
+      if (scope === 'one') {
         localStorage.setItem('socria.one.v1', '1');
         void fetch('/api/logos/redeem', {
           method: 'POST',
@@ -689,8 +706,8 @@ export default function ChatPage() {
   }
 
   // A valid access key opens the whole product, so it goes straight to Logos.
-  function handleLogosModalUnlock(key: string): boolean {
-    if (!handleUnlockKey(key)) return false;
+  async function handleLogosModalUnlock(key: string): Promise<boolean> {
+    if (!(await handleUnlockKey(key))) return false;
     try {
       localStorage.setItem(LOGOS_INTRO_DISMISS_KEY, '1');
     } catch {}

@@ -17,7 +17,11 @@
 //
 // Env:
 //   BASE_URL          default http://localhost:3000
-//   SOCRIA_ACCESS_KEY default "SMART" (x-socria-key, skips auth)
+//   SOCRIA_EVAL_COOKIE  optional: a socria_access grant cookie value, when the
+//                       target server has an access code configured. Without it
+//                       the eval must run against a signed-in session or a
+//                       server with no auth gate. There is no default: a key
+//                       with a default is a key everybody has.
 //   OPENAI_API_KEY    optional; adds gpt-4o-mini judge for semantic checks
 //   JUDGE_MODEL       default gpt-4o-mini
 //   LIMIT             cap scenarios (default all)
@@ -31,7 +35,7 @@
 // (it honors the x-socria-no-controller header only in dev).
 
 const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
-const ACCESS_KEY = process.env.SOCRIA_ACCESS_KEY || 'SMART';
+const ACCESS_COOKIE = (process.env.SOCRIA_EVAL_COOKIE || '').trim();
 const JUDGE_MODEL = process.env.JUDGE_MODEL || 'gpt-4o-mini';
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 const VARIANTS = (process.env.VARIANTS || 'controller,baseline').split(',').map((s) => s.trim());
@@ -113,7 +117,7 @@ async function judge(thread, reply) {
 }
 
 async function ask(messages, { controller = true, state = true, depth = 'balanced' } = {}) {
-  const headers = { 'Content-Type': 'application/json', 'x-socria-key': ACCESS_KEY };
+  const headers = { 'Content-Type': 'application/json', ...(ACCESS_COOKIE ? { cookie: `socria_access=${ACCESS_COOKIE}` } : {}) };
   if (!controller) headers['x-socria-no-controller'] = '1';
   if (!state) headers['x-socria-no-state'] = '1';
   const res = await fetch(`${BASE_URL}/api/chat`, { method: 'POST', headers, body: JSON.stringify({ messages, model: 'core-3', depth }) });

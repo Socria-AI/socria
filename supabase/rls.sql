@@ -54,8 +54,6 @@ revoke all on lifecycle_emails     from anon, authenticated;
 -- rather than something the person made: the `unsubscribed` row is somebody
 -- saying "stop". Readable, it says who has opted out of email; writable, it
 -- is a switch on somebody else's inbox in either direction. It joined this
--- file late — it was the only table in schema.sql without RLS — and Logos 2
--- is what made that urgent: a shared room needs the anon key in the browser
--- (NEXT_PUBLIC_SUPABASE_ANON_KEY), so from now on that key is public by
--- design, and any table Supabase's auto-generated REST API can still reach
--- is reachable by anyone who reads a script tag.
+-- file late — it was the only table in schema.sql without RLS — because
+-- adding a table and adding its wall are two separate acts and only one of
+-- them breaks anything.

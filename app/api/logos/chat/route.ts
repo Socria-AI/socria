@@ -1,9 +1,13 @@
 // app/api/logos/chat/route.ts
 // POST /api/logos/chat  → streaming plain-text conversational reply.
 //
-// Gated like Core 3.1: a Clerk session OR the typed access key (sent as
-// x-socria-key), so it stays demoable on preview URLs where sign-in is
-// unavailable. Rate limited either way.
+// Gated like Core 3.1: a Clerk session OR a verified unlock grant — an
+// httpOnly cookie this server signed after checking a typed code against its
+// environment (lib/access-codes-server.ts). It used to be a constant compared
+// against an `x-socria-key` header, and that constant shipped in the browser
+// bundle, so the gate was open to anyone who read the JS. With no code
+// configured — the default — this route simply requires an account. Rate
+// limited either way.
 
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
@@ -31,7 +35,6 @@ import { guidanceBlock, resolveDepth, resolveGuard } from '@/lib/logos-guidance'
 import { styleBlock } from '@/lib/logos-style';
 import { personalityBlock, personalityMaxTokens } from '@/lib/logos-personality';
 import {
-  isValidAccessKey,
   hasJourneyContent,
   renderJourneyBrief,
   sanitizeUserUnderstanding,
@@ -47,6 +50,7 @@ import {
   selectRelevant,
   visibleEntries,
 } from '@/lib/person-memory';
+import { mayUse } from '@/lib/route-guard';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -65,7 +69,7 @@ export async function POST(req: NextRequest) {
 
     const { userId } = auth();
     // Same gate as Core 3.1: a Clerk session or the typed access key.
-    const keyUnlocked = isValidAccessKey(req.headers.get('x-socria-key'));
+    const keyUnlocked = mayUse(req, userId);
     if (!userId && !keyUnlocked) {
       return NextResponse.json(
         { error: 'Logos requires an access key.', requiresKey: true },

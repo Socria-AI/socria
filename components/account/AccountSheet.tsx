@@ -28,6 +28,7 @@ import { resetSeen } from '@/lib/hints';
 import { HINTS_CHANGED } from '@/components/Hint';
 import { StudentAccess } from '@/components/StudentAccess';
 import type { PlanState } from '@/components/usePlan';
+import { clearSocriaLocalData } from '@/lib/local-data';
 
 export function AccountSheet({
   open,
@@ -207,7 +208,12 @@ export function AccountSheet({
                   <span className="t">Show hints again</span>
                   <span className="d">The one-line notes beside new things</span>
                 </button>
-                <button type="button" className="act" onClick={() => void signOut()}>
+                <button type="button" className="act" onClick={() => {
+                    // A shared device must not hand the next person this
+                    // one's conversations, sessions or derived memory.
+                    clearSocriaLocalData();
+                    void signOut();
+                  }}>
                   <span className="t">Sign out</span>
                   <span className="d">Your maps wait on the others</span>
                 </button>
