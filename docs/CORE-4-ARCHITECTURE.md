@@ -308,7 +308,9 @@ Timings for every stage are in the trace (`ms`).
 ## 6. What is not built, and why
 
 - **Tools** (search, code execution, visualisation). None in this path; the
-  prompt says so. RESEARCH/MODEL/VISUALIZE exist only as types.
+  prompt says so. The RESEARCH/MODEL/VISUALIZE move types were removed
+  (council D7); `lib/core4/tools-contract.ts` holds the privacy contract a
+  future tool must meet.
 - **Embeddings** for the novelty matcher: lexical + cheap-model judge first;
   embeddings only if the evals show paraphrase misses that matter.
 - **Online learning from outcomes.** Deliberately not: outcomes are recorded
