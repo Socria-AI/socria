@@ -81,6 +81,7 @@ const MODULES = [
   'lib/person-memory.ts',
   'lib/file-kinds.ts',
   'lib/file-extract.ts',
+  'lib/asl-fingerspell.ts',
   'lib/first-session.ts',
   'components/MapPoster.tsx',
   'lib/lifecycle.ts',
