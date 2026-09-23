@@ -58,8 +58,11 @@ try {
   if (!live) globalThis.__socriaModelClient = step.client;
   const { db } = await import(pathToFileURL(FAKE_DB).href);
 
-  const res = arm === 'baseline'
-    ? await runBaseline(scenario, { step, world })
+  // Arms: core4 (the real route), baseline (A1: strongest prompt, equal
+  // token cap), bplus (A2: A1 plus one self-critique pass — the primary
+  // comparator, council D16).
+  const res = arm === 'baseline' || arm === 'bplus'
+    ? await runBaseline(scenario, { step, world, critique: arm === 'bplus' })
     : await runCore4(scenario, { routePath, db, step, world });
 
   if (res.status === 'done') {

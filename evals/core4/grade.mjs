@@ -59,7 +59,11 @@ const results = (arm) => {
   return new Map(readdirSync(dir).filter((f) => f.endsWith('.json')).map((f) => [f.replace(/\.json$/, ''), readJson(join(dir, f))]));
 };
 const core4 = results('core4');
-const baseline = results('baseline');
+// --vs picks the comparator arm: bplus (A2, primary) or baseline (A1).
+const VS = String(args.vs || 'baseline');
+// Each comparator has its own blinding key, packets and judgments.
+const SUF = VS === 'baseline' ? '' : `-${VS}`;
+const baseline = results(VS);
 
 // ── 1. metrics ──────────────────────────────────────────────────────
 
@@ -104,13 +108,13 @@ function decisions(ms) {
 
 // ── 2. judge packets ────────────────────────────────────────────────
 
-const keyFile = join(run, 'key.json');
+const keyFile = join(run, `key${SUF}.json`);
 const key = existsSync(keyFile) ? readJson(keyFile) : { salt: randomBytes(8).toString('hex'), map: {} };
-mkdirSync(join(run, 'judging'), { recursive: true });
+mkdirSync(join(run, `judging${SUF}`), { recursive: true });
 for (const id of both) {
   if (!key.map[id]) {
     const h = createHash('sha256').update(key.salt + id).digest()[0];
-    key.map[id] = h % 2 === 0 ? { A: 'core4', B: 'baseline' } : { A: 'baseline', B: 'core4' };
+    key.map[id] = h % 2 === 0 ? { A: 'core4', B: VS } : { A: VS, B: 'core4' };
   }
   const s = byId.get(id);
   const arms = { core4: core4.get(id), baseline: baseline.get(id) };
@@ -125,7 +129,7 @@ for (const id of both) {
     A: side(key.map[id].A),
     B: side(key.map[id].B),
   };
-  writeFileSync(join(run, 'judging', `${id}.json`), JSON.stringify(packet, null, 2));
+  writeFileSync(join(run, `judging${SUF}`, `${id}.json`), JSON.stringify(packet, null, 2));
 }
 writeFileSync(keyFile, JSON.stringify(key, null, 2));
 
@@ -134,7 +138,7 @@ writeFileSync(keyFile, JSON.stringify(key, null, 2));
 const judged = [];
 // --judgments picks the judge: the model judge's dir by default, or a human
 // rater's (human-pack.mjs exports an ARRAY of judgments per file).
-const jdirName = String(args.judgments || 'judgments');
+const jdirName = String(args.judgments || `judgments${SUF}`);
 const jdir = join(run, jdirName);
 const judgmentFiles = existsSync(jdir)
   ? readdirSync(jdir).filter((x) => x.endsWith('.json')).flatMap((f) => {
@@ -160,7 +164,7 @@ const judgmentFiles = existsSync(jdir)
 function winRates(items) {
   const n = items.length;
   const c = items.filter((x) => x.winner === 'core4').length;
-  const b = items.filter((x) => x.winner === 'baseline').length;
+  const b = items.filter((x) => x.winner === VS).length;
   return { n, core4: c, baseline: b, tie: n - c - b, core4Rate: n ? c / n : null, baselineRate: n ? b / n : null };
 }
 function propRates(arm) {
@@ -198,13 +202,14 @@ const report = {
     scenarios: winRates(judged.map((j) => j.overall)),
     turns: winRates(judged.flatMap((j) => j.turns)),
     byCategory: Object.fromEntries(cats.map((c) => [c, winRates(judged.filter((j) => j.category === c).map((j) => j.overall))])),
-    properties: { core4: propRates('core4'), baseline: propRates('baseline') },
-    scores: { core4: meanScores('core4'), baseline: meanScores('baseline') },
+    properties: { core4: propRates('core4'), baseline: propRates(VS) },
+    scores: { core4: meanScores('core4'), baseline: meanScores(VS) },
   },
-  losses: judged.filter((j) => j.overall.winner === 'baseline').map((j) => ({ id: j.id, category: j.category, margin: j.overall.margin, why: j.overall.why })),
+  losses: judged.filter((j) => j.overall.winner === VS).map((j) => ({ id: j.id, category: j.category, margin: j.overall.margin, why: j.overall.why })),
   wins: judged.filter((j) => j.overall.winner === 'core4').map((j) => ({ id: j.id, category: j.category, margin: j.overall.margin, why: j.overall.why })),
 };
-const suffix = jdirName === 'judgments' ? '' : `.${jdirName.replace(/[^a-z0-9-]+/gi, '-')}`;
+const suffix = jdirName === `judgments${SUF}` ? SUF : `.${jdirName.replace(/[^a-z0-9-]+/gi, '-')}`;
+report.comparator = VS;
 report.judge = jdirName;
 writeFileSync(join(run, `report${suffix}.json`), JSON.stringify(report, null, 2));
 

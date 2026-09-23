@@ -98,7 +98,26 @@ export async function runCore4(scenario, { routePath, db, step, world }) {
   return { status: 'done', sessions: out };
 }
 
-export async function runBaseline(scenario, { step, world, model = 'eval-model' }) {
+/**
+ * The B+ critique pass (council D16: the PRIMARY comparator). The same model
+ * reviews its own draft once against the same Human-First rubric and
+ * returns the revised reply — the strongest thing a prompt-only system can
+ * do for the price of one extra call, which is what Core 4's extra calls
+ * are competing with.
+ */
+const CRITIQUE_PROMPT = `You are reviewing your own draft reply before the person sees it. Check it against these rules and return ONLY the final reply text (revised if needed, unchanged if it already complies):
+- If they asked for the answer, a fix, a calculation or information, it gives it directly and first.
+- It holds back an answer only if they said they want to work it out themselves; even then it says whether their attempt is right and where it goes wrong.
+- At most one question, and only if genuinely needed; no "does that make sense?", no closing offers, no question just to keep things going.
+- It does not raise, as new, anything they already considered; it adds something they have not.
+- No praise, no filler, no claim to have searched or run anything.
+Do not mention this review.`;
+
+// Equal token ceilings for every arm (council D16): Core 4's largest move
+// budget, so no arm wins or loses on length allowance.
+export const ARM_MAX_TOKENS = 1200;
+
+export async function runBaseline(scenario, { step, world, model = 'eval-model', critique = false }) {
   const client = globalThis.__socriaModelClient;
   const out = [];
   const history = [];
@@ -127,10 +146,21 @@ export async function runBaseline(scenario, { step, world, model = 'eval-model' 
           model,
           system: BASELINE_PROMPT + project + memory,
           messages,
-          maxTokens: 900,
+          maxTokens: ARM_MAX_TOKENS,
           temperature: 0.7,
         });
         reply = c.text;
+        if (critique) {
+          const r = await client.complete({
+            role: 'baseline',
+            model,
+            system: CRITIQUE_PROMPT,
+            messages: [...messages, { role: 'assistant', content: reply }, { role: 'user', content: '[Review the draft above per your instructions and return only the final reply.]' }],
+            maxTokens: ARM_MAX_TOKENS,
+            temperature: 0.3,
+          });
+          reply = r.text;
+        }
       } catch (e) {
         if (step.pending.length) return { status: 'pending', sessions: out, pending: [...new Set(step.pending)] };
         return { status: 'error', sessions: out, error: String(e?.stack || e) };
