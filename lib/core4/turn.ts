@@ -119,7 +119,11 @@ export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
   );
   ms.state = Date.now() - t1;
 
-  const state = mergeState({ prior: prior ? gapCheck(prior, input.now) : null, read: read.state, signals, contract, readOk: read.ok });
+  const merged = mergeState({ prior: prior ? gapCheck(prior, input.now) : null, read: read.state, signals, contract, readOk: read.ok });
+  // "Their last message answered what Socria asked" only when Socria asked
+  // something: the reader's word alone told the model to use an answer to a
+  // question nobody put (run 4, direct-answer-003).
+  const state = merged.resolved && questionLoad(lastSocria(input)) === 0 ? { ...merged, resolved: false } : merged;
 
   // "That's not what I meant": what was recorded as theirs last turn is disputed.
   // A correction of Socria, or their own revision ("I was computing the wrong

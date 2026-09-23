@@ -127,6 +127,15 @@ console.log('\n=== council D2: verified false positives stay false ===');
   ok('"just tell me the answer" after it still wins', S("only tell me if I've gone off the rails. actually no, just tell me the answer").directness === 'answer');
 }
 
+console.log('\n=== run 4: a quoted draft is not Socria asking them (expert-017) ===');
+{
+  const draft = 'Here is a version you can send:\n\n> Thanks for the preprint. Could we add a finite-size scaling analysis?\n> Also, are the dipolar sums done with Ewald summation?\n\nThe second question is the one that matters.';
+  ok('questions inside a blockquote are not counted', questionLoad(draft) === 0, JSON.stringify(interrogatives(draft)));
+  ok('and are never stripped from the draft', stripInterrogatives(draft).text?.includes('Ewald summation?'), stripInterrogatives(draft).text);
+  ok('a question outside the quote still counts', questionLoad(draft + '\n\nWhich journal is it for?') === 1);
+  ok('a sentence that opens a quote line (as the stream gate sees it) is not a question', questionLoad('> Could we add a finite-size scaling analysis?') === 0);
+}
+
 console.log('\n=== stripping ===');
 {
   const r = stripInterrogatives('Great question! The sign flips because the derivative of cos is -sin. What do you think happens at pi? Let me know if you want more.');

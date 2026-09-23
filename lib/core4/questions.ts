@@ -17,6 +17,9 @@
 function prose(text: string): string {
   return text
     .replace(/```[\s\S]*?```/g, ' ')
+    // A blockquote is text Socria wrote FOR them — a draft email, a quoted
+    // passage — not something it asks them (run 4, expert-017).
+    .replace(/^[ \t]*>.*$/gm, ' ')
     .replace(/`[^`\n]*`/g, ' ')
     .replace(/[“"][^”"\n]{0,300}[”"]/g, ' ');
 }
@@ -122,6 +125,9 @@ export interface Interrogatives {
 export function interrogatives(text: string): Interrogatives {
   const out: Interrogatives = { explicit: [], disguised: [], offers: [] };
   for (const raw of sentencesOf(prose(text))) {
+    // A sentence that opens a blockquote line (the stream gate sees sentences
+    // without their line) is quoted material, not a question to them.
+    if (/^\s*>/.test(raw)) continue;
     const s = raw.trim().replace(/^[-*•\d.)\s]+/, '');
     if (!s) continue;
     if (OFFER.test(s)) out.offers.push(raw.trim());
@@ -174,10 +180,10 @@ export function questionPressure(
  */
 export function stripInterrogatives(text: string, keep: 0 | 1 = 0): { text: string | null; removed: string[] } {
   const removed: string[] = [];
-  // Work on the reply with code blocks protected: sentences inside code are
-  // never removed.
+  // Work on the reply with code blocks and blockquotes protected: sentences
+  // inside code, or inside a draft written for them, are never removed.
   const blocks: string[] = [];
-  const shielded = text.replace(/```[\s\S]*?```/g, (m) => {
+  const shielded = text.replace(/```[\s\S]*?```|^[ \t]*>.*$/gm, (m) => {
     blocks.push(m);
     return `\u0000${blocks.length - 1}\u0000`;
   });

@@ -428,5 +428,16 @@ console.log('\n=== "forget what Socria worked out" reaches every Core 4 table ==
   ok('their conversations were not touched', true);
 }
 
+console.log('\n=== run 4: "they answered what Socria asked" only if Socria asked (direct-answer-003) ===');
+{
+  const conv = 'resolved-' + Date.now();
+  const said = [U('What does ENOSPC mean from inotify on Linux?'), A('It means the inotify watch limit is exhausted, not the disk. Raise fs.inotify.max_user_watches.'), U('Right, it was at 8192. Raising it to 524288 now.')];
+  const r = await turn(conv, said, { state: { work: 'information', latest: 'information', resolved: true, currentFocus: 'inotify watch limit' } });
+  ok('the reader\'s "resolved" is ignored when the last reply asked nothing', !r.prompt.includes('answered what Socria asked'), r.prompt.slice(-600));
+  const asked = [U('What does ENOSPC mean from inotify on Linux?'), A('It is usually the watch limit. What is fs.inotify.max_user_watches set to?'), U('8192.')];
+  const r2 = await turn(conv + '-b', asked, { state: { work: 'information', latest: 'answer', resolved: true, currentFocus: 'inotify watch limit' } });
+  ok('and kept when it did ask', r2.prompt.includes('answered what Socria asked'));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
