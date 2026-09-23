@@ -93,7 +93,12 @@ const NO_ANSWER = new RegExp(
     // get there myself", "I want to have found it", "no rewritten query",
     // "don't finish it for me".
     String.raw`\bi want to (?:have found it\b|get there(?:\s+(?:myself|on my own|for myself)\b|(?=\s*(?:[.,;:!)\]—–-]|$))))`,
-    String.raw`\b(?:get there|find it|solve it|spot it|crack it) (?:myself|on my own|for myself)\b`,
+    String.raw`\b(?:get there|find|solve|spot|crack|fix|derive|prove|work out|figure out) (?:it|this|that|the \w+|my own \w+) (?:myself|on my own|for myself)\b`,
+    // Run 5 (learning-017, learning-008): "I want to find my own mistake",
+    // "I don't want the working", "please don't give me the construction".
+    String.raw`\bi want to (?:find|spot|fix) my own (?:mistake|error|bug|slip)\b`,
+    String.raw`\bi don'?t want the (?:working|answer|solution|fix|construction|derivation)\b`,
+    String.raw`\b(?:do not|don'?t|please don'?t) (?:give|show|tell)(?: me)? the (?:construction|working|derivation|proof)\b`,
     String.raw`\bno (?:rewritten|corrected|fixed) (?:query|code|version|solution|function)\b`,
     String.raw`\b(?:do not|don'?t) (?:finish|solve|do) it for me\b`,
     String.raw`\bwithout (?:telling me|giving (?:me )?|revealing )(?:the (?:answer|solution)|it away)\b`,

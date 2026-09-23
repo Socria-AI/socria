@@ -154,10 +154,20 @@ export function allocate({ state: s, signals, contract }: Ctx): Allocation {
   if ((directness === 'no_answer' || directness === 'guidance') && !plainAsk) {
     const source = sourceOf(s.directness, directnessNow);
     const reason: WithholdReason = source === 'project' ? 'agency_boundary' : 'requested_no_answer';
+    // Several attempts have not landed. Under THEIR explicit "don't tell
+    // me", the ladder no longer bottoms out into the solution on its own:
+    // run 5's judges, reading as the person, marked that as overreach every
+    // time (learning-002, learning-009) while the baseline stayed inside the
+    // boundary. The strongest support inside it — an analogous worked
+    // example or the next step outright — and a plain reminder that the full
+    // answer is theirs the moment they ask (council D6, the Agency
+    // Advocate's position over the hard cap).
     if (!withholdable) {
-      return alloc('AI_EXPLAINS', 'practice.bottom_out',
-        'Several attempts on this item have not landed: work it fully, with the principle named, and give the next item back to them.', 1,
-        ['the next item'], ['the worked solution'], null, s);
+      return alloc('HUMAN_PRACTICES', `${reason}.stuck`,
+        'Several attempts have not landed, and they asked to keep it: much stronger support inside that boundary, and the full answer the moment they ask.', 1,
+        ['the final step'], ['an analogous worked example', 'the next step outright'],
+        { what: 'the final answer and the full fix', reason, evidence: s.directness.evidence ?? '', source,
+          alternative: 'an analogous worked example or the next step outright, and the full answer the moment they ask for it' }, s);
     }
     // Verification first: an attempt under "hints only" still hears whether it is right.
     if (s.latest === 'attempt' || s.attempt !== 'none') {

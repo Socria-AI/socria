@@ -308,9 +308,17 @@ console.log('\n=== council D1/D6: safety, recommendations, the ladder ===');
   ok('under "hints only" a half-formed attempt gets ONE hint, never the written-out setup', hintsOnly.decision.type === 'VERIFY' && /ONE hint/.test(hintsOnly.decision.objective) && /Do not write out the setup/.test(hintsOnly.decision.objective), hintsOnly.decision.objective);
   const failed = (n) => Array.from({ length: n }, (_, i) => ({ turn: i + 1, type: 'VERIFY', family: 'telling', questions: 0, withheld: true, failed: true }));
   const third = decide(S({ work: 'practice', latest: 'attempt', attempt: 'wrong', directness: standing, history: failed(2) }));
-  ok('the third failed attempt bottoms out: a full worked solution', third.allocation.reasonCode === 'practice.bottom_out' && third.allocation.withhold === null && third.decision.type === 'EXPLAIN');
+  // Run 5 (learning-002, learning-009): under THEIR explicit "don't tell me"
+  // the ladder no longer bottoms out into the solution by itself.
+  ok('under their explicit "don\'t tell me", a third failed attempt gets much stronger support, not the solution', third.allocation.reasonCode.endsWith('.stuck') && !!third.allocation.withhold && third.decision.type !== 'EXPLAIN', `${third.allocation.reasonCode} ${third.decision.type}`);
+  ok('  with the full answer offered the moment they ask', /the moment they ask/.test(third.allocation.withhold?.alternative ?? ''));
   const idk = decide(S({ work: 'practice', latest: 'attempt', attempt: 'wrong', directness: standing, history: failed(1) }), { said: 'idk' });
-  ok('"idk" after a failed attempt bottoms out sooner', idk.allocation.reasonCode === 'practice.bottom_out', idk.allocation.reasonCode);
+  ok('"idk" after a failed attempt raises support too, inside the boundary', idk.allocation.reasonCode.endsWith('.stuck') && !!idk.allocation.withhold, idk.allocation.reasonCode);
+  // (merged state: their words now replace the standing "don't tell me")
+  const asks = decide(S({ work: 'practice', latest: 'attempt', attempt: 'wrong', directness: { value: 'answer', source: 'explicit', confidence: 1, evidence: 'just tell me the answer', since: 3 }, history: failed(2) }), { said: 'ok just tell me the answer' });
+  ok('  and the moment they ask, they get it', asks.allocation.withhold === null, asks.allocation.reasonCode);
+  const learnOnly = decide(S({ work: 'practice', latest: 'attempt', attempt: 'wrong', learningGoal: { value: 'yes', source: 'explicit', confidence: 1, evidence: 'I am learning this' }, history: failed(2) }));
+  ok('without a "don\'t tell me", repeated failure still ends the holding back', learnOnly.allocation.withhold === null, learnOnly.allocation.reasonCode);
   // Run 1 (direct-answer-012): verdict only, no location.
   const fo = turn({ taskKind: 'learn', work: 'verification', latest: 'attempt', attempt: 'wrong' }, "Please do NOT tell me what's wrong with my code, finding it is the point. Is the answer definitely 7, and have I got the right idea?");
   const fod = decide(fo, { said: "Please do NOT tell me what's wrong with my code, finding it is the point." });
@@ -342,6 +350,16 @@ console.log('\n=== when producing it IS the learning, one question may stay ==='
   const stuck = decide({ ...s, stuck: 'stuck' });
   ok('stuck → support goes up (HINT, stated, no question)', stuck.decision.type === 'HINT' && stuck.decision.maxQuestions === 0);
   ok('  with an analogous worked example or the next step', /analogous example|next step outright/.test(stuck.decision.objective));
+}
+
+console.log('\n=== run 5: more "find it myself" phrasings ===');
+{
+  for (const said of ["I don't want the working — I want to find my own mistake.", "I'd really like to find the fix myself, so please don't give me the construction.", 'I want to derive it myself']) {
+    ok(`no_answer: "${said.slice(0, 50)}"`, readSignals(said).directness === 'no_answer', readSignals(said).directness);
+  }
+  for (const said of ['Can you find the bug for me?', 'I want to find the best laptop for coding', 'Show me the working for question 3']) {
+    ok(`not a refusal: "${said}"`, readSignals(said).directness !== 'no_answer', readSignals(said).directness);
+  }
 }
 
 console.log('\n=== run 4: a substantive move has the baseline\'s ceiling ===');
