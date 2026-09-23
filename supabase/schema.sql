@@ -554,6 +554,8 @@ create table if not exists reasoning_entries (
   confidence real not null default 0.5,
   conversation_id text not null,
   project_id text,
+  -- From a sensitive / conversation-only conversation: never used outside it.
+  private boolean not null default false,
   turn integer not null default 0,
   revisions jsonb not null default '[]'::jsonb,
   created_at bigint not null,

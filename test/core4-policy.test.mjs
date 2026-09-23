@@ -287,6 +287,13 @@ console.log('\n=== council D1/D6: safety, recommendations, the ladder ===');
   ok('the third failed attempt bottoms out: a full worked solution', third.allocation.reasonCode === 'practice.bottom_out' && third.allocation.withhold === null && third.decision.type === 'EXPLAIN');
   const idk = decide(S({ work: 'practice', latest: 'attempt', attempt: 'wrong', directness: standing, history: failed(1) }), { said: 'idk' });
   ok('"idk" after a failed attempt bottoms out sooner', idk.allocation.reasonCode === 'practice.bottom_out', idk.allocation.reasonCode);
+  // Pilot finding 8 (learning-006): a requested drill must get one item per turn.
+  const quiz = turn({ taskKind: 'learn', work: 'practice', latest: 'attempt', attempt: 'right' }, 'drill me on key signatures, one at a time');
+  const qd = decide(quiz, { said: 'drill me on key signatures, one at a time', streak: 3, density: 1 });
+  ok('a quiz contract: one item per turn, even after a streak', qd.decision.type === 'QUESTION' && qd.decision.maxQuestions === 1 && qd.decision.reasonCode === 'quiz.contract', `${qd.decision.type} ${qd.decision.reasonCode}`);
+  ok('  after saying whether the last answer was right', /whether their last answer was right/.test(qd.decision.objective));
+  const enough = turn({ taskKind: 'learn', work: 'practice', latest: 'other' }, 'ok stop asking me questions', { prior: quiz });
+  ok('  and "stop" ends it', decide(enough, { said: 'ok stop asking me questions' }).decision.type !== 'QUESTION');
   const q = decide(S({ work: 'creation', latest: 'request' }), { said: 'write me 5 interview questions for a data engineer' });
   ok('questions they asked FOR are content, not interrogation', q.decision.questionsAreContent === true);
 }

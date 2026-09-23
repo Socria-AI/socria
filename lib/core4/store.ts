@@ -77,6 +77,7 @@ function rowToEntry(r: Record<string, unknown>): LedgerEntry {
     createdAt: Number(r.created_at ?? 0),
     updatedAt: Number(r.updated_at ?? 0),
     revisions: Array.isArray(r.revisions) ? (r.revisions as LedgerEntry['revisions']) : [],
+    private: r.private === true,
   };
 }
 
@@ -84,7 +85,7 @@ function entryToRow(userId: string, e: LedgerEntry) {
   return {
     user_id: userId, id: e.id, kind: e.kind, text: e.text, owner: e.owner, stance: e.stance, basis: e.basis,
     quote: e.quote, reason: e.reason, status: e.status, confidence: e.confidence, conversation_id: e.conversationId,
-    project_id: e.projectId, turn: e.turn, created_at: e.createdAt, updated_at: e.updatedAt, revisions: e.revisions,
+    project_id: e.projectId, private: !!e.private, turn: e.turn, created_at: e.createdAt, updated_at: e.updatedAt, revisions: e.revisions,
   };
 }
 

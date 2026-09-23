@@ -349,6 +349,24 @@ console.log('\n=== off the record (council D15) ===');
   ok('and from then on the ledger is written again', rows('reasoning_entries').some((e) => e.conversation_id === cid));
 }
 
+console.log('\n=== a sensitive conversation stays in its conversation (council D14) ===');
+{
+  const said = 'My dad passed away last month and I have to decide whether to sell his house now or wait a year.';
+  const r = await turn('grief', [U(said)], {
+    state: { taskKind: 'decide', work: 'judgment', latest: 'information', currentFocus: 'sell the house now or wait',
+      consideredNow: [{ kind: 'alternative', text: 'wait a year before selling', quote: 'wait a year', stance: 'entertains', reason: '' }] },
+    replies: ['I am sorry about your dad. Waiting a year mostly buys you time to decide without pressure; the cost is carrying the house.'],
+  });
+  ok('the conversation becomes conversation-only', rows('core4_state').find((x) => x.conversation_id === 'grief')?.state.persistPolicy === 'conversation_only');
+  const ents = rows('reasoning_entries').filter((e) => e.conversation_id === 'grief');
+  ok('its ledger entries are private', ents.length > 0 && ents.every((e) => e.private === true));
+  const other = await turn('other-house', [U('Should I wait a year before selling my rental property?')], {
+    state: { taskKind: 'decide', work: 'judgment', latest: 'question', currentFocus: 'wait a year before selling the rental' },
+    replies: ['Mostly a tax and rates question: …'],
+  });
+  ok('and never appear in another conversation', !/wait a year before selling/.test(other.prompt.split('Already on the table')[1] ?? ''), (other.prompt.split('Already on the table')[1] ?? '').slice(0, 200));
+}
+
 console.log('\n=== deleting a conversation deletes what Core 4 kept about it ===');
 {
   const cid = 'launch';

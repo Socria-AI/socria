@@ -137,7 +137,12 @@ export function mergeState({ prior, read, signals, contract, readOk }: MergeInpu
   const stuck = signals.frustration ? 'frustrated' : signals.dontKnow ? 'stalled' : base.stuck;
   const questionsPreference = signals.stopQuestions ? 'stop' : signals.wantsQuestions ? 'wanted' : p.questionsPreference;
   // Off the record is sticky for the conversation until they say otherwise.
-  const persistPolicy = signals.onRecord ? 'full' : signals.offRecord ? 'none' : p.persistPolicy ?? 'full';
+  // A sensitive subject makes the conversation conversation-only, and that
+  // is sticky (council D14): what is said here is not used elsewhere.
+  const prev = p.persistPolicy ?? 'full';
+  const persistPolicy: CognitiveState['persistPolicy'] = signals.offRecord ? 'none'
+    : signals.onRecord ? (prev === 'none' ? (p.persistPolicy === 'none' && signals.sensitive ? 'conversation_only' : 'full') : prev)
+    : prev === 'full' && signals.sensitive ? 'conversation_only' : prev;
   const urgency = signals.urgent ? 'high' : base.urgency;
 
   const lastMemo = p.history[p.history.length - 1];

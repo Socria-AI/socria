@@ -490,6 +490,8 @@ export async function POST(req: NextRequest) {
               conversationId: conversationId ?? undefined,
               existing: mindSubgraph,
               projectId,
+              // A sensitive conversation's memories are private (council D14).
+              ...(prepared?.state.persistPolicy === 'conversation_only' ? { private: true } : {}),
             }).catch((err: unknown) => {
               console.error('[socria/chat] mind graph remember failed', err);
             })

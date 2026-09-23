@@ -285,7 +285,9 @@ export function consideredView(
   entries: LedgerEntry[],
   opts: { focus: string; conversationId: string; projectId: string | null; limit?: number }
 ): { lines: string[]; items: string[]; gate: string[] } {
-  const live = entries.filter((e) => e.status !== 'retracted' && e.status !== 'disputed');
+  // Private entries (a sensitive or conversation-only conversation) are
+  // never shown outside their own conversation (council D14/D15).
+  const live = entries.filter((e) => e.status !== 'retracted' && e.status !== 'disputed' && (!e.private || e.conversationId === opts.conversationId));
   const scored = live
     .map((e) => {
       const here = e.conversationId === opts.conversationId ? 0.5 : 0;

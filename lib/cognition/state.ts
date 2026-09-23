@@ -229,7 +229,7 @@ export interface CognitiveState {
    * the record" until "you can remember this": no ledger, no capability
    * evidence, no free text in the saved state, no Mind Graph write.
    */
-  persistPolicy: 'full' | 'none';
+  persistPolicy: 'full' | 'conversation_only' | 'none';
   /** turns so far in this conversation */
   turn: number;
 }

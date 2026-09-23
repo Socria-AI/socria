@@ -338,7 +338,8 @@ export async function finishTurn(
   // Socria's from what was actually sent.
   const fromPerson = entriesFromPerson(state.consideredNow, input.lastUserText, ctx);
   const fromSocria = entriesFromSocria(sent, decision.type, ctx);
-  const merged = mergeEntries(p.ledger, [...fromPerson, ...fromSocria], input.now);
+  const privateHere = state.persistPolicy === 'conversation_only';
+  const merged = mergeEntries(p.ledger, [...fromPerson, ...fromSocria].map((e) => (privateHere ? { ...e, private: true } : e)), input.now);
   // No lexical auto-links (council D10): a link drawn from word overlap is
   // structure presented as the person's reasoning that they never stated.
   // Links will come only from relations they state or the reader cites.
@@ -385,7 +386,7 @@ export async function finishTurn(
     store.saveState(input.userId, input.conversationId, offRecord ? withoutText(next) : next, input.now),
     offRecord ? Promise.resolve() : store.saveLedger(input.userId, [...merged.created, ...merged.touched, ...p.disputed], links),
     store.insertTurn(input.userId, input.conversationId, trace, input.now),
-    offRecord ? Promise.resolve() : store.insertCapability(input.userId, evidence),
+    offRecord || privateHere ? Promise.resolve() : store.insertCapability(input.userId, evidence),
   ];
   // How the PREVIOUS turn landed belongs on its own row.
   if (p.prior && state.lastOutcome) writes.push(store.recordOutcome(input.userId, input.conversationId, p.prior.turn, state.lastOutcome));

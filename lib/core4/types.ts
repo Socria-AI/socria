@@ -86,6 +86,8 @@ export interface ExplicitSignals {
   offRecord: boolean;
   /** "you can remember this (again)", "back on the record" */
   onRecord: boolean;
+  /** a sensitive subject (health, grief, divorce, immigration, debt, …): council D14 */
+  sensitive: boolean;
   /** the request is FOR questions (quiz items, interview questions, practice problems): they are content, not interrogation */
   requestsQuestions: boolean;
   /** "you do it", "write it for me" */
@@ -335,6 +337,8 @@ export interface LedgerEntry {
   createdAt: number;
   updatedAt: number;
   revisions: LedgerRevision[];
+  /** from a sensitive or conversation-only conversation: never shown outside it (council D14/D15) */
+  private?: boolean;
 }
 
 export interface LedgerLink {

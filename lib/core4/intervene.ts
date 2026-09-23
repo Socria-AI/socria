@@ -161,6 +161,23 @@ function selectMove(input: SelectInput): InterventionDecision {
     });
   }
 
+  // A quiz or drill they asked for (council D4 contract): exactly one item
+  // per turn, after saying whether their last answer was right. Streak and
+  // density do not apply; "stop", "enough", "just tell me" or frustration
+  // end it (the budget already returns 0 then). Pilot finding 8: without
+  // this, a requested drill got an explanation with no next item.
+  if (s.questionsPreference === 'wanted' && budget.allowed === 1 && a.reasonCode !== 'practice.bottom_out' && !input.signals.stopQuestions && input.signals.directness !== 'answer') {
+    const answered = s.latest === 'attempt' || s.attempt !== 'none' || s.latest === 'answer';
+    return d('QUESTION', {
+      reasonCode: 'quiz.contract', reason: 'They asked to be quizzed.',
+      intended: 'They retrieve the next item themselves.',
+      objective: answered
+        ? 'First say plainly whether their last answer was right, and if not, what the right answer is and why (one or two sentences). Then pose the next item — exactly one, and nothing that answers it.'
+        : 'Pose the first item — exactly one, and nothing that answers it.',
+      alloc: a, avoid, maxQuestions: 1,
+    });
+  }
+
   // "Let me try it first" with nothing tried yet: get out of the way (council D6).
   if (a.withhold && s.attempt === 'none' && s.latest !== 'question' && input.signals.evidence.some((e) => /let me try/i.test(e))) {
     return d('GET_OUT_OF_THE_WAY', {
