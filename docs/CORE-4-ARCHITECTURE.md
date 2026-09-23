@@ -11,7 +11,11 @@ work, are in git history (`693c930`) and `CORE-4-STRATEGY.md`.
 **The objective:** increase human capability while preserving meaningful
 human agency. **The loop:** UNDERSTAND → ALLOCATE → INTERVENE → MEASURE →
 LEARN — operationalised in code, state and decision logic. The reply model
-receives the decision; it is not asked to make it.
+receives the decision: always the constraints (question budget, anything
+held back and why, what the person has established and already raised),
+and a specific move **only when the person asked for it or a verified fact
+settles it**. Otherwise the stronger model chooses the move itself — run 1
+showed a cheap reader's guesses narrowing it (`CORE-4-EVALS.md`).
 
 ---
 
@@ -32,7 +36,7 @@ client sends the conversation; the server holds everything Core 4 knows.
 | 8 | MEASURE (before): budget + diminishing returns | `lib/core4/budget.ts`, `questions.ts` | The question budget is priced from the transcript (any interrogative content: explicit, disguised, closing offers), streak and density. Diminishing returns are detected from explicit signals (one suffices) or inferred ones (two must agree). |
 | 9 | Verify Mode, exact | `lib/core4/verify.ts exactCheck` | Arithmetic in an attempt is computed exactly **before** the move is chosen; a computed verdict overrides the reader's. |
 | 10 | ALLOCATE | `lib/core4/allocation.ts` | Who does which part of the thinking, with a machine-readable rationale and a withhold (what, reason, evidence, source) — or none. |
-| 11 | INTERVENE | `lib/core4/intervene.ts` | One move, with type, reason code, intended outcome, human work preserved, AI work performed, confidence, whether the guard must read it, max questions, token budget. |
+| 11 | INTERVENE | `lib/core4/intervene.ts` | One move, with type, reason code, intended outcome, human work preserved, AI work performed, confidence, whether the guard must read it, max questions, token budget — and whether it is **forced**. Forced only on explicit or verified evidence (their words, a contract, safety, a computed/checked verdict, an injected calculation); otherwise the move block renders constraints only ("No move is imposed"). |
 | 12 | Verify Mode, checker | `lib/cognition/engine.ts checkWork` | Only when something is withheld and arithmetic could not settle it: a separate cheap-model call judges the attempt (1.5 s timeout). Its expected answer never reaches the reply model; a confident verdict that contradicts the reader re-decides the move. |
 | 13 | Prompt assembled | `lib/socria-prompt.ts buildSystemPrompt` | Core 4 prompt v3, imported profile, Project, Mind Graph, then the state block, the verify block, the move block — in that order, last before the transcript. No thread memory, no Thinking Journey. |
 | 14 | Generate | `route.ts core4Reply`, `lib/core4/model.ts` | Through the model seam. **Buffered** only if something is withheld (so the guard reads the whole draft before anything is sent); otherwise **streamed** through the sentence gate (council D8 — buffering every perspective move put the latency on expert turns). |
@@ -68,6 +72,21 @@ model what they **said** separately from what Socria **inferred**, and the
 latter is marked "may be wrong — never state it to them as fact".
 Persisted per conversation in `core4_state`.
 
+### Standing requests, absences, privacy modes — `merge.ts`, `signals.ts`
+"From now on, just give me answers" is standing; a bare "just tell me" fades
+after two turns. "Only tell me if I've gone off the rails" / "don't tell me
+what's wrong, finding it is the point" / "tell me how to look, not what to
+change" set a sticky verdict-only preference. A requested quiz or drill is a
+contract: exactly one item per turn, after saying whether the last answer
+was right. After six hours away momentary state resets (stuck, urgency, a
+momentary "just tell me", the last outcome); after two weeks inferred
+readings lose half their confidence. "Off the record" stops everything
+from being kept (no ledger, no capability evidence, no free text in the
+saved state, no Mind Graph write) until "you can remember this"; a
+sensitive subject (health, grief, divorce, immigration, debt…) makes the
+conversation conversation-only — its ledger entries are private to it, no
+capability evidence is kept, its Mind Graph memories are written private.
+
 ### Cognitive Allocation — `lib/core4/allocation.ts`
 Modes: `AI_EXECUTES`, `AI_EXPLAINS`, `AI_VERIFIES`, `SHARED_REASONING`,
 `AI_ASSISTS`, `HUMAN_LEADS`, `HUMAN_PRACTICES`, `HUMAN_REFLECTS`.
@@ -85,7 +104,10 @@ the correction; a bug gets the fix; "just tell me" beats everything except
 graded work they will submit, where the method is explained fully with an
 analogous worked example and the submittable answer is held back — said once,
 plainly. The latest explicit statement beats a standing Project instruction,
-and the rationale records the override. The first withholding in a
+and the rationale records the override. Being heard (acknowledgement only)
+happens only when they say so ("I just need to vent", "don't want
+advice") — an inferred "reflection" never narrows help. Creative work and
+judgement are critiqued, never "corrected". The first withholding in a
 conversation is announced with how to get the answer. A standing "don't
 tell me" never covers a plain fact, a definition or mechanical work.
 **Verification first**: an attempt under "hints only" still hears whether
