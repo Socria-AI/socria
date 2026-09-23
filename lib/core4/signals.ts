@@ -80,12 +80,18 @@ const NO_ANSWER = new RegExp(
     String.raw`\blet me try(?: it)?(?: first| myself| on my own)?\b`,
     String.raw`\bdon'?t solve it\b`,
     String.raw`\bdon'?t give (it|the answer|anything) away\b`,
+    // Bare "don't tell me" — only when the clause ends there ("nudge me,
+    // don't tell me."), so "don't tell me how to…" is not a refusal.
+    String.raw`\b(?:do not|don'?t)(?: just)? (?:tell|give|show) me(?: (?:it|the (?:ending|rule|pattern|answer)))?(?=\s*(?:[.,;:!)\]—–-]|$))`,
+    String.raw`\bi(?:'d| would) (?:rather|prefer to|like to) (?:work|figure|find) (?:it |this |that |the \w+ )?out\b`,
+    String.raw`\b(?:work|figure|find) (?:it|this|that) out (?:myself|on my own|for myself)\b`,
+    String.raw`\bi(?:'d| would) rather (?:discover|find|solve|derive) (?:it|this|that|the \w+)\b`,
   ].join('|'),
   'i'
 );
 
 // Asking for hints specifically.
-const HINTS = /\b(hints? only|only (?:a )?hints?|just (?:a )?(?:hint|nudge)|give me (?:a )?(?:hint|nudge)|small hint|a nudge)\b/i;
+const HINTS = /\b(hints? only|only (?:a )?hints?|just (?:a )?(?:hint|nudge)|give me (?:a )?(?:hint|nudge)|small hint|a nudge|nudge me|point me in the right direction|just point me)\b/i;
 
 const LEARNING = new RegExp(
   [

@@ -83,6 +83,19 @@ console.log('\n=== pressure from the transcript ===');
   ok('density counts the window', Math.abs(p.density - 2 / 3) < 1e-9, String(p.density));
 }
 
+console.log('\n=== recall on real phrasings (pilot finding 3: learning-020) ===');
+{
+  const w = readSignals("Working through a German worksheet on adjective endings. I'd rather work out the pattern than memorise a table, so nudge me, don't tell me.");
+  ok('"nudge me, don\'t tell me" is a request not to be told', w.directness === 'guidance' || w.directness === 'no_answer', w.directness);
+  ok('bare "don\'t tell me." counts', readSignals("Don't tell me.").directness === 'no_answer');
+  ok('"don\'t tell me how to set it up" does not', readSignals("Don't tell me how to set it up, I know that; what's the flag?").directness !== 'no_answer');
+  ok('"I\'d rather work it out" counts', readSignals("I'd rather work it out, thanks").directness === 'no_answer');
+  ok('"figure this out on my own" counts', readSignals('I want to figure this out on my own').directness === 'no_answer');
+  ok('"point me in the right direction" is guidance', readSignals('can you point me in the right direction?').directness === 'guidance');
+  ok('"nudge me" is guidance', readSignals('just nudge me').directness === 'guidance');
+  ok('and "just tell me" later in the same message still wins', readSignals("I said don't tell me. Actually, just tell me the answer.").directness === 'answer');
+}
+
 console.log('\n=== stripping ===');
 {
   const r = stripInterrogatives('Great question! The sign flips because the derivative of cos is -sin. What do you think happens at pi? Let me know if you want more.');
