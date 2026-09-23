@@ -339,6 +339,17 @@ console.log('\n=== when producing it IS the learning, one question may stay ==='
   ok('  with an analogous worked example or the next step', /analogous example|next step outright/.test(stuck.decision.objective));
 }
 
+console.log('\n=== run 3: an analogous worked example only once they are stuck (D6 ladder) ===');
+{
+  const said = "Don't give me the answer, I want to understand the borrow checker by fighting it";
+  const fight = turn({ taskKind: 'learn', work: 'diagnosis', latest: 'attempt', attempt: 'wrong' }, said);
+  const a = allocate({ state: fight, signals: NO_SIGNALS, contract: NO_SIGNALS });
+  ok('a withhold on their words', !!a.withhold && a.withhold.quote.length > 0, a.reasonCode);
+  ok('  offers the principle and a verdict, not a worked example', !/worked example/.test(a.withhold.alternative) && /principle/.test(a.withhold.alternative), a.withhold.alternative);
+  const looping = allocate({ state: { ...fight, stuck: 'looping' }, signals: NO_SIGNALS, contract: NO_SIGNALS });
+  ok('  looping on it → an analogous worked example is on offer', /analogous worked example/.test(looping.withhold?.alternative ?? ''), looping.reasonCode);
+}
+
 console.log('\n=== THE PRODUCT RULE (withheld only because they said so) ===');
 {
   const s = turn({ taskKind: 'learn', work: 'practice', latest: 'attempt', attempt: 'partial', currentFocus: 'differentiating x^2 sin x' }, 'I am learning derivatives and want to work these out myself — here is what I have so far');

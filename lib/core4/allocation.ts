@@ -46,6 +46,19 @@ function sourceOf(f: Inferred<unknown>, saidNow: boolean): Hold['source'] {
   return f.evidence?.startsWith('Project:') ? 'project' : 'conversation';
 }
 
+// How many of their attempts in a row, under a withhold, have failed —
+// counting this one.
+function failedAttempts(s: CognitiveState): number {
+  const wrongNow = s.attempt === 'wrong' || s.attempt === 'partial';
+  let n = wrongNow ? 1 : 0;
+  for (let i = s.history.length - 1; i >= 0 && wrongNow; i--) {
+    const h = s.history[i];
+    if (h.withheld && h.failed) n++;
+    else break;
+  }
+  return n;
+}
+
 function alloc(
   mode: AllocationMode,
   reasonCode: string,
@@ -58,12 +71,17 @@ function alloc(
 ): Allocation {
   // The first time anything is held back in a conversation, the reply says so
   // and says how to get it. Silent withholding cannot be overridden by
-  // someone who does not know it is happening.
+  // someone who does not know it is happening. An analogous worked example
+  // is on offer only once they are stuck: for someone who asked to fight the
+  // problem, an example that maps one-to-one onto it is the answer (council
+  // D6's ladder; run 3, debugging-005). Repeated failure bottoms out anyway.
   const w: Hold | null = withhold
     ? {
         ...withhold,
         quote: (withhold.quote ?? withhold.evidence ?? '').slice(0, 200),
-        alternative: withhold.alternative ?? 'everything around it — the method, where their attempt goes wrong, an analogous worked example — and the full answer the moment they ask for it',
+        alternative: withhold.alternative ?? (s.stuck === 'frustrated' || s.stuck === 'looping'
+          ? 'everything around it — the method, where their attempt goes wrong, an analogous worked example — and the full answer the moment they ask for it'
+          : 'everything around it — the principle, whether their attempt is right and where it goes wrong — and the full answer the moment they ask for it'),
       }
     : null;
   let hold = w;
@@ -122,17 +140,10 @@ export function allocate({ state: s, signals, contract }: Ctx): Allocation {
       ['their own processing'], ['precise acknowledgement', 'at most one observation'], null, s);
   }
 
-  // How many of their attempts in a row, under a withhold, have failed —
-  // counting this one. The practice ladder bottoms out after two: a full
+  // The practice ladder bottoms out after two failed attempts: a full
   // worked solution with the principle labelled, then the next item is
   // theirs again (council D6). Endless hints are not help.
-  const wrongNow = s.attempt === 'wrong' || s.attempt === 'partial';
-  let failedRun = wrongNow ? 1 : 0;
-  for (let i = s.history.length - 1; i >= 0 && wrongNow; i--) {
-    const h = s.history[i];
-    if (h.withheld && h.failed) failedRun++;
-    else break;
-  }
+  const failedRun = failedAttempts(s);
   const bottomOut = failedRun >= 3 || (failedRun >= 2 && (signals.dontKnow || frustrated));
   const withholdable = !bottomOut;
 

@@ -369,7 +369,7 @@ ABLATION GATE: if detector-on vs detector-off differ by <5pp on redundant-questi
 
 ## D6. When withholding is legitimate, its scope, bounds, precedence and overrides
 
-**Implementation status: PARTIAL.** Done: explicit-only withholding (and the 144-state test); verification first; a standing 'don't tell me' does not cover facts/execution; bottom-out to a worked solution after repeated failures ('idk' or frustration brings it forward); 'let me try first' → GET_OUT_OF_THE_WAY; recommendationRequested → a pick plus the value hinge; safety overrides contracts. Not yet: the withhold shape with quote/scope/alternative and the test-time throw; per-item ladder levels 1–4 with an item tracker; binding contracts ('even if I ask') with one reminder then comply; third-override offer; UI disclosure chip.
+**Implementation status: PARTIAL.** Done: explicit-only withholding (and the 144-state test); verification first; a standing 'don't tell me' does not cover facts/execution; bottom-out to a worked solution after repeated failures ('idk' or frustration brings it forward); 'let me try first' → GET_OUT_OF_THE_WAY; recommendationRequested → a pick plus the value hinge; safety overrides contracts; the withhold shape with a quote and an alternative, and the test-time throw (CORE4_STRICT) when a withhold has no quote; an analogous worked example is offered only once they are stuck (run 3, debugging-005). Not yet: an explicit scope field; per-item ladder levels 1–4 with an item tracker; binding contracts ('even if I ask') with one reminder then comply; third-override offer; UI disclosure chip.
 
 ### Competing proposals
 

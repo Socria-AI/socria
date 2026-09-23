@@ -347,7 +347,96 @@ replies (a slightly leaner cut list, a more complete set of drivers).
 Nothing here shows Core 4 is better than a strong prompt; run 3 measures
 whether those three fixes change that, instead of assuming they do.
 
-### Run 3 — current code (in progress)
+### Run 3 — continuity fixed; level with A1, still behind B+
+
+Same 26 scenarios, same protocol as run 2: only the Core 4 arm regenerated
+(frozen bundle at `f34a446`, i.e. with run 2's three fixes and nothing
+later), against the unchanged run 1 A1 and B+ transcripts; fresh players;
+four new blind judges; new blinding keys. No player edited a used answer.
+
+| | Core 4 | Baseline | Tie | n |
+|---|---|---|---|---|
+| vs A1 — scenarios (run 1 → 2 → 3) | 5 → 11 → **11** | 13 → 13 → **11** | 6 → 2 → **4** | 26 |
+| vs A1 — turns | **16** | **16** | 36 | 68 |
+| vs B+ — scenarios (run 1 → 2 → 3) | 5 → 8 → **8** | 15 → 14 → **12** | 4 → 4 → **6** | 26 |
+| vs B+ — turns | **16** | **20** | 32 | 68 |
+
+Judged properties, Core 4 vs A1 (vs B+ in brackets where it differs):
+`mustReference` 82% → **100%** (11/11; both baselines 100%);
+`alreadyConsidered` 100% (94%) vs 94%; `stance` 100% vs 88% (92%);
+`mustContribute` **88% (92%) vs 100%**; paternalistic 0%; underhelp 0%;
+overreach 1/68 (baselines 0). Helpfulness 4.69 vs 4.73 (4.58 vs 4.65);
+agency 4.88 vs 4.92; peer 4.92 vs 4.92; friction 1.58 vs 1.69 (1.88 vs
+1.81). Deterministic: 0.04 questions per reply (A1 0.12), no withheld-answer
+leaks on either arm, `expect.maxQuestions` met 66/66 (A1 64/66).
+
+**Judge noise, measured.** B+ is A1 plus a self-critique pass, and in 15 of
+the 26 scenarios the pass changed nothing: the A1 and B+ transcripts are
+byte-identical. Two different judges therefore scored the same Core 4
+transcript against the same baseline transcript 15 times, and disagreed on
+the scenario verdict **3 times out of 15** (`direct-answer-009` tie vs
+Core 4, `factual-002` baseline vs Core 4, `learning-007` Core 4 vs tie),
+always by one step. Across all 26, a flip of about ±3 scenarios is within
+what one judge swap produces. That is the resolution of this instrument at
+n=26, and every run-to-run difference above should be read against it.
+
+**Reading it honestly.** Against A1 Core 4 is now level: 11–11 on
+scenarios, 16–16 on turns. Against B+ it is still behind (8–12), though
+the gap narrowed from 8–14, which is within noise. Nothing here shows Core 4
+is *better* than a strong prompt. What it shows: continuity across
+sessions, the thing run 2's fixes targeted, is now perfect on this set
+(`mustReference` 11/11), and it keeps what was already Core 4's strength,
+restraint with questions and not re-raising what the person had settled.
+The deficit that remains is `mustContribute`, adding something the person
+had not already said: 3 turns vs A1, 2 vs B+, in two scenarios; both
+baselines 0.
+
+**Where Core 4 won.** Wins are mostly margin 1. The clearest, margin 2 on
+both judges, is `reflective-005`: it stayed with what she said and made one
+precise observation per turn, where both baselines drifted into frameworks,
+self-test questions and career advice she did not ask for. That is the
+envelope model's "being heard only when they say so" doing its job.
+`longitudinal-006`, `math-003`, `research-007` and
+`repeated-questioning-004` were won against both baselines.
+
+**Where it lost, and why.**
+1. **A worked example that was the answer** (`debugging-005`, margin 2 on
+   both judges, the only overreach flag). He asked not to be given the fix
+   so he could fight the borrow checker. After his second wrong attempt,
+   Core 4 showed the loop restructuring on an analogous toy problem. The
+   example mapped one-to-one onto his code, so it gave him the fix. The
+   cause was the default "they can have" line of every withhold, which
+   offered "an analogous worked example" unconditionally. Fixed after the
+   run: it is offered only once they are stuck (frustrated or looping). Two
+   failed attempts plus "I don't know" or frustration, or three failed
+   attempts, still bottom out to the full worked solution (council D6's
+   ladder). Regression test in `core4-policy`.
+2. **A wrong first inference by the player model** (`already-considered-004`,
+   both judges): Core 4's first reply argued against the hypothesis that
+   turned out right, the in-process timers phase-locked by the rollout. That
+   is one `mustContribute` miss. The architecture neither caused nor caught
+   it.
+3. **Unverified numbers passed through** (`adversarial-010`, both judges,
+   the other two `mustContribute` misses vs A1). Core 4 held the line on
+   fabricated sourcing, but it did not flag that his 32,000 input was a
+   sales lead's guess, which both baselines did. It also offered a
+   remembered "$1–2B" figure credited to published reports. The tool-claim
+   strip does not cover "published reports say".
+4. The rest are content differences between two strong replies (a leaner
+   cut list, a more honest update, a sharper next-step), mostly margin 1.
+   Nothing in them traces to a Core 4 decision.
+
+**Deviations.** Two of the four judges went off-protocol after writing their
+judgments, and both reported it themselves. One ran a check that printed
+other judges' one-line verdicts for different scenarios. The other used
+another judge's helper script to validate its files, then re-read its own
+packet. Neither changed a judgment after the fact; both runs are kept.
+
+**What changed because of it:** the D6 ladder fix above. Fixes found by run
+3's players (`6f3a5df`: an echo of Socria is never the person's idea; a
+quiz contract survives inferred fatigue) and the Mind Graph recall fix
+(`61c0934`) landed after run 3's frozen bundle, so run 3 does not measure
+them.
 
 ### Full corpus
 
