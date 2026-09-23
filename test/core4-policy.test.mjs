@@ -16,7 +16,7 @@
 
 import { EMPTY_STATE, sanitizeState, renderState } from './.tmp/state.mjs';
 import { readSignals, readContract, NO_SIGNALS } from './.tmp/signals.mjs';
-import { mergeState, recordTurn, explicitOutcome } from './.tmp/merge.mjs';
+import { mergeState, recordTurn, explicitOutcome, gapCheck } from './.tmp/merge.mjs';
 import { budgetFrom, diminishingReturns, familyOf } from './.tmp/budget.mjs';
 import { allocate } from './.tmp/allocation.mjs';
 import { selectIntervention, renderDecision, noveltyGated } from './.tmp/intervene.mjs';
@@ -91,6 +91,25 @@ console.log('\n=== merge: explicit beats inferred, and persists ===');
   const p = turn({}, '', { project: 'Hints only, never give me full solutions. I am learning this.' });
   ok('a Project instruction is an explicit contract', p.directness.value === 'guidance' || p.directness.value === 'no_answer', p.directness.value);
   ok('and marked as the Project\'s', /^Project:/.test(p.directness.evidence ?? ''));
+}
+
+console.log('\n=== council D2/D1/D5/D17: standing requests, absences, closes, length ===');
+{
+  let st = turn({}, 'from now on, just give me the answers, no hints');
+  for (let i = 0; i < 5; i++) st = turn({}, 'next one', { prior: st });
+  ok('"from now on, just give me the answers" does not fade', st.directness.value === 'answer', JSON.stringify(st.directness));
+  const stuck = { ...S({ stuck: 'frustrated', urgency: 'high', turn: 4, lastAt: 1_000_000, directness: { value: 'answer', source: 'explicit', confidence: 1, evidence: 'just tell me', since: 3 }, expertise: inf('expert', 0.8) }) };
+  const back = gapCheck(stuck, 1_000_000 + 7 * 3_600_000);
+  ok('after hours away, being stuck and a momentary "just tell me" reset', back.stuck === 'no' && back.urgency === 'none' && back.directness.value === 'none');
+  ok('but not within the hour', gapCheck(stuck, 1_000_000 + 1_800_000).stuck === 'frustrated');
+  const weeks = gapCheck(stuck, 1_000_000 + 20 * 86_400_000);
+  ok('after weeks, inferred readings lose half their confidence', Math.abs(weeks.expertise.confidence - 0.4) < 1e-9);
+  const done = decide(S({ work: 'conversation', latest: 'reaction' }), { said: 'got it, thanks!' });
+  ok('"got it, thanks" gets a short close', done.decision.type === 'GET_OUT_OF_THE_WAY' && done.decision.reasonCode === 'done');
+  const long = decide(S({ work: 'creation', latest: 'request' }), { said: 'write the whole essay draft in about 1200 words' });
+  ok('a requested length raises the token budget', long.decision.maxTokens >= 1600, String(long.decision.maxTokens));
+  const file = decide(S({ work: 'execution', latest: 'request' }), { said: 'give me the full file with the fix applied' });
+  ok('"the full file" gets room for it', file.decision.maxTokens >= 3000, String(file.decision.maxTokens));
 }
 
 console.log('\n=== outcomes are read from what they say next ===');

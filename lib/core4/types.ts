@@ -92,6 +92,12 @@ export interface ExplicitSignals {
    * (council D2 feedbackPreference = flag_only). Implies a refusal of the fix.
    */
   flagOnly: boolean;
+  /** "from now on", "always", "in general", "stop being Socratic": makes a loosening directness STANDING (council D2) */
+  horizon: boolean;
+  /** "got it, thanks" with nothing new: a short close (council D5 DONE) */
+  done: boolean;
+  /** a requested length in tokens ("in 300 words" ≈ 420; "the full file" = 3000), or 0 (council D17) */
+  requestedTokens: number;
   /** a sensitive subject (health, grief, divorce, immigration, debt, …): council D14 */
   sensitive: boolean;
   /** the request is FOR questions (quiz items, interview questions, practice problems): they are content, not interrogation */

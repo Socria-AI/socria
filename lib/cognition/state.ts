@@ -232,6 +232,8 @@ export interface CognitiveState {
   persistPolicy: 'full' | 'conversation_only' | 'none';
   /** they asked for verdicts only ("only tell me if I've gone off the rails"); sticky until they ask for the answer */
   flagOnly: boolean;
+  /** when this state was last written (epoch ms), for the gap check */
+  lastAt?: number;
   /** turns so far in this conversation */
   turn: number;
 }

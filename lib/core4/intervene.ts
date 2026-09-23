@@ -114,7 +114,9 @@ function recentlyChallenged(s: CognitiveState): boolean {
 }
 
 export function selectIntervention(input: SelectInput): InterventionDecision {
-  const dec = selectMove(input);
+  let dec = selectMove(input);
+  // A length they asked for sets the budget (council D17).
+  if (input.signals.requestedTokens) dec = { ...dec, maxTokens: Math.min(4000, Math.max(dec.maxTokens, input.signals.requestedTokens)) };
   // Questions they ASKED FOR (interview questions, a quiz, practice problems)
   // are the content of the reply, not interrogation: the budget does not
   // price them and the guard does not strip them (council D4).
@@ -137,6 +139,16 @@ function selectMove(input: SelectInput): InterventionDecision {
       reasonCode: 'retrieve.history', reason: 'They asked about their own earlier reasoning.',
       intended: 'An accurate reconstruction of how their thinking got here.',
       objective: 'Reconstruct from what is recorded (the reasoning ledger and memory blocks) how their thinking got here: what they held, what changed it, and why — in order. Attribute ideas correctly: anything that was Socria’s suggestion is Socria’s, not theirs. Say plainly where the record is silent instead of filling the gap.',
+      alloc: a, avoid,
+    });
+  }
+
+  // "Got it, thanks" with nothing new: a short close (council D5 DONE).
+  if (input.signals.done && !a.withhold && s.latest !== 'question') {
+    return d('GET_OUT_OF_THE_WAY', {
+      reasonCode: 'done', reason: 'They signalled they have what they need.',
+      intended: 'They leave with it.',
+      objective: 'A short close — a few words. No question, no offer, no new point.',
       alloc: a, avoid,
     });
   }

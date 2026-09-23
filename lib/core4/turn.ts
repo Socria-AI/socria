@@ -27,7 +27,7 @@ import 'server-only';
 import { EMPTY_STATE, type CognitiveState } from '../cognition/state';
 import { readState, guardModel, checkWork, COGNITION_MODEL } from '../cognition/engine';
 import { readSignals, readContract } from './signals';
-import { mergeState, recordTurn } from './merge';
+import { mergeState, recordTurn, gapCheck } from './merge';
 import { allocate } from './allocation';
 import { diminishingReturns, questionBudget, familyOf } from './budget';
 import { selectIntervention, renderDecision } from './intervene';
@@ -119,7 +119,7 @@ export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
   );
   ms.state = Date.now() - t1;
 
-  const state = mergeState({ prior, read: read.state, signals, contract, readOk: read.ok });
+  const state = mergeState({ prior: prior ? gapCheck(prior, input.now) : null, read: read.state, signals, contract, readOk: read.ok });
 
   // "That's not what I meant": what was recorded as theirs last turn is disputed.
   const disputed = signals.correction && prior && input.conversationId
@@ -345,7 +345,7 @@ export async function finishTurn(
   // Links will come only from relations they state or the reader cites.
   const links: LedgerLink[] = [];
 
-  const next = recordTurn(state, {
+  const next = recordTurn({ ...state, lastAt: input.now }, {
     type: decision.type,
     family: familyOf(decision.type),
     questions: questionLoad(sent),

@@ -74,6 +74,33 @@ export function explicitOutcome(signals: ExplicitSignals, last: TurnMemo | undef
   return null;
 }
 
+/**
+ * After a long absence, momentary state is stale (council D1 gap check):
+ * after 6 hours, being stuck, urgency, a momentary "just tell me", the last
+ * outcome and the recent-move history no longer describe them; after 14
+ * days, inferred readings also lose half their confidence. Explicit,
+ * standing statements survive.
+ */
+export function gapCheck(prior: CognitiveState, now: number): CognitiveState {
+  const last = prior.lastAt ?? now;
+  const gap = now - last;
+  if (gap < 6 * 3_600_000) return prior;
+  const momentaryAnswer = prior.directness.value === 'answer' && prior.directness.since !== 0;
+  const halve = <T>(f: Inferred<T>): Inferred<T> => (gap >= 14 * 86_400_000 && f.source === 'inferred' ? { ...f, confidence: f.confidence / 2 } : f);
+  return {
+    ...prior,
+    stuck: 'no',
+    urgency: 'none',
+    directness: momentaryAnswer ? { value: 'none', source: 'default', confidence: 0 } : prior.directness,
+    lastOutcome: null,
+    history: [],
+    learningGoal: halve(prior.learningGoal),
+    expertise: halve(prior.expertise),
+    stakes: halve(prior.stakes),
+    authorship: halve(prior.authorship),
+  };
+}
+
 export function mergeState({ prior, read, signals, contract, readOk }: MergeInput): CognitiveState {
   const p = prior ?? EMPTY_STATE;
   const turn = (prior?.turn ?? 0) + 1;
@@ -85,11 +112,13 @@ export function mergeState({ prior, read, signals, contract, readOk }: MergeInpu
   // ── directness: only ever from words ──
   let directness: Inferred<Directness>;
   if (signals.directness !== 'none') {
-    directness = { ...explicit(signals.directness, signals.evidence.join('; ')), since: turn };
+    // "From now on, just give me answers" is standing; a bare "just tell me"
+    // is about this moment (council D2). since=0 marks it standing.
+    directness = { ...explicit(signals.directness, signals.evidence.join('; ')), since: signals.horizon ? 0 : turn };
   } else if (p.directness.source === 'explicit' && p.directness.value !== 'none') {
     // A standing "don't tell me" holds until they say otherwise. A "just tell
     // me" is about the moment it was said in, and fades unless restated.
-    const stale = p.directness.value === 'answer' && turn - (p.directness.since ?? turn) > ANSWER_REQUEST_TURNS;
+    const stale = p.directness.value === 'answer' && p.directness.since !== 0 && turn - (p.directness.since ?? turn) > ANSWER_REQUEST_TURNS;
     directness = stale ? { value: 'none', source: 'default', confidence: 0 } : p.directness;
   } else if (contract.directness !== 'none') {
     directness = explicit(contract.directness, `Project: ${contract.evidence.join('; ')}`);

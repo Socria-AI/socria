@@ -40,6 +40,9 @@ export const NO_SIGNALS: ExplicitSignals = {
   offRecord: false,
   onRecord: false,
   sensitive: false,
+  horizon: false,
+  done: false,
+  requestedTokens: 0,
   flagOnly: false,
   requestsQuestions: false,
   delegate: false,
@@ -204,6 +207,17 @@ const FLAG_ONLY = new RegExp(
   'i'
 );
 
+const HORIZON = /\b(from now on|going forward|always|in general|every time|stop being socratic|for the rest of (?:this|the) (?:chat|conversation))\b/i;
+const DONE = /^\s*(?:ok(?:ay)?|great|perfect|cool|nice|got it|makes sense|thanks|thank you|cheers|brilliant)[\s,.!]*(?:(?:got it|thanks|thank you|that'?s (?:it|all|everything|what i needed)|that helps|makes sense|cheers)[\s,.!]*)*$/i;
+
+/** A length they asked for, in tokens (council D17). */
+function requestedTokensOf(text: string): number {
+  const words = /\b(?:in|about|around|under|max(?:imum)?|at most|~)\s*(\d{2,4})\s*words\b/i.exec(text);
+  if (words) return Math.min(4000, Math.round(Number(words[1]) * 1.4));
+  if (/\b(?:the )?(?:full|whole|entire|complete) (?:file|script|program|module|section|derivation|proof|essay|draft|code|listing)\b/i.test(text)) return 3000;
+  return 0;
+}
+
 const REQUESTS_QUESTIONS = /\b((?:write|give|make|draft|generate|come up with|list|suggest)(?: me)? (?:\w+ ){0,3}(?:questions|quiz|exam items|practice problems|interview questions|test items|flashcards|faq)|quiz me|test me|drill me|interview questions)\b/i;
 
 interface Hit {
@@ -294,6 +308,9 @@ export function readSignals(message: string): ExplicitSignals {
     offRecord: !!note(lastIndex(OFF_RECORD, text)),
     onRecord: !!note(lastIndex(ON_RECORD, text)),
     sensitive: SENSITIVE.test(text),
+    horizon: HORIZON.test(text),
+    done: DONE.test(text) && text.length < 80,
+    requestedTokens: requestedTokensOf(text),
     flagOnly: !!note(lastIndex(FLAG_ONLY, text)),
     requestsQuestions: !!lastIndex(REQUESTS_QUESTIONS, text),
     expertise: expert ? 'expert' : novice ? 'novice' : null,
