@@ -110,7 +110,10 @@ export function ImportProfileModal({
           <div className="import-step">
             <div className="import-step-head">
               <span className="import-step-n">2</span>
-              <span>Paste the profile it produces here.</span>
+              <span>
+                Paste the profile it writes here. Read it over first, and delete
+                anything you&rsquo;d rather Socria didn&rsquo;t know.
+              </span>
             </div>
             <textarea
               className="import-textarea"

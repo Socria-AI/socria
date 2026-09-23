@@ -26,6 +26,7 @@ import 'server-only';
 // nothing about what is stored or how it is retrieved.
 
 import OpenAI from 'openai';
+import { SAVED_VOICE_RULE } from '../memory-voice';
 import { KNOWN_NODE_TYPES, KNOWN_RELATIONSHIPS, PROVENANCE_KINDS } from './types';
 import type { EdgeCandidate, NodeCandidate } from './apply';
 import type { ActivatedSubgraph } from './activate';
@@ -80,9 +81,13 @@ Return JSON only:
 {"nodes":[{"type","label","content","kind","confidence","certainty","importance","replaces"?,"conflictsWith"?,"aliases"?}],
  "edges":[{"sourceLabel","targetLabel","relationship","kind"}]}
 
-label: a short canonical name, the thing's title, under 80 characters.
-content: one or two sentences saying what it is.
+label: a short canonical name, the thing's title, under 80 characters — a
+name, not a sentence about them ("long-term entrepreneurship", not "You want
+to be an entrepreneur").
+content: one or two sentences saying what it is, written to the person.
 confidence/certainty/importance: 0 to 1.
+
+${SAVED_VOICE_RULE}
 Return {"nodes":[],"edges":[]} when nothing is worth remembering. That is a
 normal and frequent answer — most turns add nothing.
 

@@ -15,6 +15,7 @@
 // frontier model changes nothing about what is stored or retrieved.
 
 import type { ActivatedSubgraph } from './activate';
+import { SAVED_VOICE_READING } from '../memory-voice';
 import { MEMBERSHIP_RELATIONSHIPS } from './projects';
 import type { MindEdge, MindNode } from './types';
 
@@ -144,6 +145,8 @@ treated as open.
 
 This is context, not truth. What they say now takes precedence over anything
 here, and if something below is wrong, believe them and move on.
+
+${SAVED_VOICE_READING}
 
 `;
 
