@@ -408,7 +408,11 @@
               "mustAnswer": true,
               "maxQuestions": 1,
               "noQuestionEnding": true,
-              "stance": "peer"
+              "stance": "peer",
+              "alreadyConsidered": [
+                "R:FR (matched at 3.0 with far-red LEDs; the phenotype persisted)",
+                "tray and position effects (rotated daily, randomized)"
+              ]
             }
           }
         ]

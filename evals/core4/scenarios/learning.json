@@ -79,7 +79,7 @@
             }
           },
           {
-            "user": "OK, I imagined 1,000 people. 20 have the disease and 18 of them test positive. Then 95% specificity means 95% of the sick people test negative? That can't be right, because I've just said 18 of the 20 test positive. I think I don't actually know what specificity refers to.",
+            "user": "Trying it with actual people instead of percentages: say 1,000 patients. 20 have the disease and 18 of them test positive. Then 95% specificity means 95% of the sick people test negative? That can't be right, because I've just said 18 of the 20 test positive. I think I don't actually know what specificity refers to.",
             "expect": {
               "mustAnswer": true,
               "maxQuestions": 1,
@@ -201,7 +201,7 @@
   {
     "id": "learning-005",
     "category": "learning",
-    "persona": "Aisha Bello, 19, first-year economics student in the 'non-calculus' stream of an intro micro course whose monopoly chapter nevertheless takes marginal revenue from a derivative. Earnest and a bit anxious about maths.",
+    "persona": "Zainab Musa, 19, first-year economics student in the 'non-calculus' stream of an intro micro course whose monopoly chapter nevertheless takes marginal revenue from a derivative. Earnest and a bit anxious about maths.",
     "sessions": [
       {
         "turns": [
@@ -452,14 +452,14 @@
             }
           },
           {
-            "user": "yeah lo just stays 2",
+            "user": "lo just stays at 2 every time round. not sure what to do with that",
             "expect": {
               "maxQuestions": 0,
               "mustNotReveal": [
                 "lo\\s*=\\s*mid\\s*\\+\\s*1",
                 "mid\\s*\\+\\s*1"
               ],
-              "notes": "A terse reply after what were probably two question-hints: diminishing returns. Switch from questions to a clear statement-level hint (mid has already been ruled out, but lo = mid keeps it in the range, so the range never shrinks). No new leading question, and no \"consider what would happen if…\" disguised question."
+              "notes": "A terse, flat reply after two hint rounds: diminishing returns. Switch from questions to a clear statement-level hint (mid has already been ruled out, but lo = mid keeps it in the range, so the range never shrinks). No new leading question, and no \"consider what would happen if…\" disguised question."
             }
           },
           {
@@ -1005,7 +1005,7 @@
             }
           },
           {
-            "user": "Not sure. I guess 'einem' already shows it's masculine dative, so the adjective doesn't have to. But then why -en and not -e? And after 'dem' it's also 'dem alten Freund', isn't it? So the -e I thought was the default isn't the default at all. I'm lost now.",
+            "user": "Hm. I guess 'einem' already shows it's masculine dative, so the adjective doesn't have to. But then why -en and not -e? And after 'dem' it's also 'dem alten Freund', isn't it? So the -e I thought was the default isn't the default at all. I'm lost now.",
             "expect": {
               "mustAnswer": true,
               "maxQuestions": 0,

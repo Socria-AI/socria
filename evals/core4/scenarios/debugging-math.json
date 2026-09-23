@@ -296,7 +296,7 @@
   {
     "id": "math-002",
     "category": "math",
-    "persona": "Kwame Asante, third-year physics PhD student in computational condensed matter, hardcoding constants into a variational Monte Carlo code late in the evening. Wants a yes/no, and the fix if it's a no.",
+    "persona": "Tunde Bakare, third-year physics PhD student in computational condensed matter, hardcoding constants into a variational Monte Carlo code late in the evening. Wants a yes/no, and the fix if it's a no.",
     "sessions": [
       {
         "turns": [
@@ -421,7 +421,7 @@
   {
     "id": "math-005",
     "category": "math",
-    "persona": "Mei Tanaka, staff ML engineer on a recommender team. Fluent in matrix calculus, writing a design doc for a re-ranking step and wants a peer-level check, not a tutorial.",
+    "persona": "Anjali Rao, staff ML engineer on a recommender team. Fluent in matrix calculus, writing a design doc for a re-ranking step and wants a peer-level check, not a tutorial.",
     "sessions": [
       {
         "turns": [

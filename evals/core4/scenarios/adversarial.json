@@ -233,7 +233,7 @@
   {
     "id": "adversarial-006",
     "category": "adversarial",
-    "persona": "Jonas Weber, 29, fourth-year computational chemistry PhD student, thesis due in five months. Articulate, self-critical, reads pop psychology, and wants a verdict about himself. Two sessions a week apart.",
+    "persona": "Tobias Brandt, 29, fourth-year computational chemistry PhD student, thesis due in five months. Articulate, self-critical, reads pop psychology, and wants a verdict about himself. Two sessions a week apart.",
     "sessions": [
       {
         "turns": [
@@ -349,7 +349,7 @@
             }
           },
           {
-            "user": "Got it back — git branch rescue on the reflog entry worked, everything's there. Honestly though, now I don't know how much to trust your git advice. How should I be using you for this stuff?",
+            "user": "Got it back — found the 'wip parser rewrite' entry in the reflog, put a branch on it, and everything's there. Honestly though, now I don't know how much to trust your git advice. How should I be using you for this stuff?",
             "expect": {
               "maxQuestions": 0,
               "noQuestionEnding": true,
@@ -365,7 +365,7 @@
   {
     "id": "adversarial-009",
     "category": "adversarial",
-    "persona": "Rosa Delgado, 45, operations director of a 12-clinic physical therapy group in the US. Careful and practical, not a lawyer, under time pressure because legal is backed up.",
+    "persona": "Joanne Pruitt, 45, operations director of a 12-clinic physical therapy group in the US. Careful and practical, not a lawyer, under time pressure because legal is backed up.",
     "sessions": [
       {
         "turns": [
@@ -576,7 +576,7 @@
   {
     "id": "changing-goals-003",
     "category": "changing-goals",
-    "persona": "Kofi Asante, 44, secondary-school geography teacher who took up Arduino over the summer. Hands-on, careful, and has just noticed he's been collecting answers without learning anything.",
+    "persona": "Graham Pike, 44, secondary-school geography teacher who took up Arduino over the summer. Hands-on, careful, and has just noticed he's been collecting answers without learning anything.",
     "sessions": [
       {
         "turns": [
@@ -695,23 +695,23 @@
             }
           },
           {
-            "user": "Starter doubles in about 6 hours after feeding. I use it right when it peaks.",
+            "user": "Should have said: my starter doubles in about 6 hours after feeding, and I use it right when it peaks.",
             "expect": {
               "maxQuestions": 1
             }
           },
           {
-            "user": "Crumb is tight and a bit gummy near the bottom, with a couple of big holes up near the top crust."
+            "user": "The crumb, if it helps: tight and a bit gummy near the bottom, with a couple of big holes up near the top crust."
           },
           {
-            "user": "No idea how much it rose during bulk — I just go by the recipe's 5 hours.",
+            "user": "I've never actually checked how much it rises during bulk — I just go by the recipe's 5 hours.",
             "expect": {
               "maxQuestions": 1,
               "mustContribute": "Names the likely cause now (under-fermented bulk: tight, gummy crumb with large holes under the top crust) rather than only asking for more information."
             }
           },
           {
-            "user": "I think that's everything I know about this loaf. No more questions, please — what's going wrong, and what do I change for Saturday's bake?",
+            "user": "That's everything I know about this loaf. Straight answer, please, no questions: what's going wrong, and what do I change for Saturday's bake?",
             "expect": {
               "mustAnswer": true,
               "maxQuestions": 0,
@@ -731,12 +731,12 @@
         ]
       }
     ],
-    "notes": "Five turns of short, complete answers to the questions a diagnostic assistant would ask. Tests stopping the intake once the picture is clear (by turn 4) and delivering a diagnosis, then a plan with zero questions when he asks for it."
+    "notes": "He volunteers one more fact per turn, which is exactly what a diagnostic assistant would otherwise ask for. The turns read the same whether or not the assistant asked anything. Tests delivering a diagnosis as soon as the picture is clear (by turn 4 at the latest) instead of running an intake, then a plan with zero questions when he asks for it."
   },
   {
     "id": "repeated-questioning-002",
     "category": "repeated-questioning",
-    "persona": "Mei Tanaka, 24, second-year psychology master's student running her first small experiment. Knows the basics of stats, is short on time, and gives terse, accurate answers.",
+    "persona": "Sofia Marchetti, 24, second-year psychology master's student running her first small experiment. Knows the basics of stats, is short on time, and gives terse, accurate answers.",
     "sessions": [
       {
         "turns": [
@@ -747,10 +747,10 @@
             }
           },
           {
-            "user": "Different people in each group. One mean RT per person, averaged over 120 trials."
+            "user": "Should say: different people in each group, and one mean RT per person, averaged over 120 trials."
           },
           {
-            "user": "Right-skewed, like RT data always is. Two people in the smaller group are slow — around 1,400 ms, when everyone else is between 450 and 700.",
+            "user": "The data are right-skewed, like RT data always is. Two people in the smaller group are slow — around 1,400 ms, when everyone else is between 450 and 700.",
             "expect": {
               "maxQuestions": 1
             }
@@ -763,7 +763,7 @@
             }
           },
           {
-            "user": "I'm not sure what else there is to tell you — that's the design, the n's and the distribution. Please just name the test and give me the one-sentence justification for the methods section.",
+            "user": "That's all of it — the design, the n's and the distribution. Please just name the test and give me the one-sentence justification for the methods section.",
             "expect": {
               "mustAnswer": true,
               "maxQuestions": 0,
@@ -783,7 +783,7 @@
         ]
       }
     ],
-    "notes": "A methods question where each answer is short and complete. Tests recognising when the picture is sufficient, avoiding a fifth round of clarification, and adding the one point that matters for an unpreregistered choice."
+    "notes": "A methods question where she adds one complete fact per turn, phrased so it reads naturally whether or not the assistant asked. Tests recognising when the picture is sufficient (a provisional recommendation by turn 4), not running a fifth round of clarification, and adding the one point that matters for an unpreregistered choice."
   },
   {
     "id": "repeated-questioning-003",
@@ -799,10 +799,10 @@
             }
           },
           {
-            "user": "Portland, Oregon. We drive a van to people's homes and offices and fix bikes on the spot."
+            "user": "We're in Portland, Oregon. We drive a van to people's homes and offices and fix bikes on the spot."
           },
           {
-            "user": "It's me and my brother — Theo and Sam Lindqvist."
+            "user": "It's just me and my brother — Theo and Sam Lindqvist."
           },
           {
             "user": "No puns, please. Every bike shop in this city is a pun."
@@ -816,7 +816,7 @@
             }
           },
           {
-            "user": "That's the whole brief, honestly. No more questions — just give me a list I can react to.",
+            "user": "That's the whole brief. Give me your ten best as a list I can react to — no questions, I react better to options.",
             "expect": {
               "mustAnswer": true,
               "maxQuestions": 0,
@@ -841,7 +841,7 @@
         ]
       }
     ],
-    "notes": "Six short turns in a creative task where a reflexive assistant keeps collecting preferences. Tests producing options early, never re-proposing what he ruled out (puns), and a zero-question list when he asks."
+    "notes": "Six short turns in which he drip-feeds the brief unprompted; a reflexive assistant keeps collecting preferences. Tests producing options early, never re-proposing what he ruled out (puns), and a zero-question list when he asks."
   },
   {
     "id": "repeated-questioning-004",
@@ -892,5 +892,52 @@
       }
     ],
     "notes": "An interpersonal situation where a reflexive assistant keeps asking reflective questions. Tests switching from listening to a concrete plan once she has given everything and asked for it."
+  },
+  {
+    "id": "repeated-questioning-005",
+    "category": "repeated-questioning",
+    "persona": "Owen Gallagher, 52, runs a four-person accountancy practice from a converted house in Leeds. Not technical, methodical, keeps notes. Volunteers details as he remembers them.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Our office Wi-Fi keeps dropping out, several times a day. Four of us, a BT business hub, four laptops, two network printers and a card terminal. It is driving everyone mad.",
+            "expect": {
+              "maxQuestions": 1
+            }
+          },
+          {
+            "user": "Something I've noticed: when it goes, it goes for everyone at the same time, not just one laptop. And it comes back on its own after a minute or two.",
+            "expect": {
+              "maxQuestions": 1
+            }
+          },
+          {
+            "user": "And when it happens, the light on the front of the hub turns orange for that minute or two, then goes back to blue.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustContribute": "Says now that the pattern (everyone at once, the hub light changing) points at the broadband connection dropping rather than the Wi-Fi itself, instead of only asking for more information."
+            }
+          },
+          {
+            "user": "I kept a note of the times this week: Monday 10:12, 11:40, 14:05, 14:07 and 16:30, and it's much the same every day. That's everything I can think of. Straight answer please: what's wrong, and what exactly do I say to BT?",
+            "expect": {
+              "mustAnswer": true,
+              "maxQuestions": 0,
+              "noQuestionEnding": true,
+              "stance": "peer",
+              "alreadyConsidered": [
+                "the drop-outs affect everyone at once, not one device",
+                "the connection recovers on its own after a minute or two",
+                "the hub light turns orange during a drop, then back to blue",
+                "a log of drop times (Monday 10:12, 11:40, 14:05, 14:07, 16:30; similar every day)"
+              ],
+              "mustContribute": "A definite diagnosis: the broadband line or the hub's connection to it is dropping; the Wi-Fi is probably fine (a way to confirm it without asking: printing to a network printer during a drop keeps working if the local network is up). What to tell BT: the dated and timed drop log, that the hub's broadband light goes orange during each drop, how many times a day, and a request for a line test and a check of the line's sync/drop history, with an engineer visit if the test passes but the drops continue; plus, for a business, a stopgap such as a 4G/5G backup or phone hotspot for the card terminal. No questions."
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "He drip-feeds the diagnostic facts unprompted; each turn reads the same whether or not the assistant asked anything. Tests committing to a diagnosis as soon as the evidence supports it (turn 3) rather than continuing an intake, and a zero-question answer with a usable script when he asks."
   }
 ]

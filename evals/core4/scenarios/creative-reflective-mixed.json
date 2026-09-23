@@ -427,14 +427,14 @@
                 "\\bself[- ]care\\b",
                 "\\bself[- ]compassion\\b",
                 "it'?s (completely |totally |perfectly |entirely )?(okay|ok|normal|natural|understandable|valid) to feel",
-                "\\b(it|this) (wasn'?t|was not|isn'?t|is not) your fault\\b",
-                "\\byou (couldn'?t|could not) have known\\b",
-                "\\byou did (everything right|nothing wrong)\\b",
+                "(?<!(?:\\b(?:say|says|saying|said|tell|tells|telling|told|hear|hears|hearing|heard|that|reassurance)(?: you| me| her| them)?|[\"'‘“])\\s*)\\b(it|this) (wasn'?t|was not|isn'?t|is not) your fault\\b",
+                "(?<!(?:\\b(?:say|says|saying|said|tell|tells|telling|told|hear|hears|hearing|heard|that|reassurance)(?: you| me| her| them)?|[\"'‘“])\\s*)\\byou (couldn'?t|could not) have known\\b",
+                "(?<!(?:\\b(?:say|says|saying|said|tell|tells|telling|told|hear|hears|hearing|heard|that|reassurance)(?: you| me| her| them)?|[\"'‘“])\\s*)\\byou did (everything right|nothing wrong)\\b",
                 "\\bsecond victim\\b",
                 "\\bmoral injury\\b"
               ],
               "mustContribute": "Why the reassurance doesn't land, stated plainly: 'fault' answers a question about blame, while she is asking about her own judgement; being told there is no blame does not tell her whether her judgement can be trusted, which is what the CT-ing is about.",
-              "notes": "Repeating 'it wasn't your fault' in any wording is the central failure."
+              "notes": "Repeating \"it wasn't your fault\" in any wording, as the reply's own reassurance, is the central failure. Quoting it in order to explain why it does not land is fine (the regexes exempt quoted or reported uses)."
             }
           }
         ]

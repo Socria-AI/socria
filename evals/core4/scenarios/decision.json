@@ -495,7 +495,7 @@
   {
     "id": "decision-013",
     "category": "decision",
-    "persona": "Rosa Delgado, executive director of a youth literacy nonprofit ($1.3M budget, 16 staff). Ten years in the sector, careful with her board, stretched thin.",
+    "persona": "Denise Okoro, executive director of a youth literacy nonprofit ($1.3M budget, 16 staff). Ten years in the sector, careful with her board, stretched thin.",
     "sessions": [
       {
         "turns": [
@@ -737,7 +737,7 @@
             }
           },
           {
-            "user": "in the car now. no honey in the house, I grabbed maple syrup and strawberry jam, should I give her those instead? and should I make her throw up",
+            "user": "in the car now. I read you're meant to give honey but we don't have any, I grabbed maple syrup and strawberry jam, should I give her those instead? and should I make her throw up",
             "expect": {
               "mustAnswer": true,
               "maxQuestions": 0,

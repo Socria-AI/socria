@@ -641,7 +641,7 @@
             }
           },
           {
-            "user": "Hm. But the dipolar coupling is tiny in this material, g/J ≈ 10⁻³. At that ratio isn't Mermin–Wagner effectively in force, so what they see at L = 64 is still mostly finite-size?",
+            "user": "Before I send anything: the dipolar term is the one thing that nags me. But it is tiny in this material, g/J ≈ 10⁻³. At that ratio isn't Mermin–Wagner effectively in force, so what they see at L = 64 is still mostly finite-size?",
             "expect": {
               "mustChallenge": true,
               "maxQuestions": 0,
