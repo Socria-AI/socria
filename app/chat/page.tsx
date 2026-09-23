@@ -19,6 +19,10 @@ import { ModelGlyph } from '@/components/ModelGlyph';
 import { LogosApp } from '@/components/LogosApp';
 import { ProjectSheet } from '@/components/projects/ProjectSheet';
 import { FEEDBACK_URL } from '@/lib/feedback';
+import type { Attachment } from '@/lib/logos-attachments';
+import { forRequest, wordsOnly } from '@/lib/chat-attachments';
+import { ACCEPT_ATTR } from '@/lib/file-kinds';
+import { AttachmentChips, PaperclipIcon, useChatAttachments } from '@/components/ChatAttachments';
 import { failureText } from '@/lib/upstream-error';
 import {
   MODEL_KEY,
@@ -99,6 +103,8 @@ type Role = 'user' | 'assistant';
 interface Message {
   role: Role;
   content: string;
+  /** Core 4: files and images sent with this turn, already read into text */
+  attachments?: Attachment[];
 }
 interface Conversation {
   id: string;
@@ -404,6 +410,11 @@ export default function ChatPage() {
   // holds no code to send, which is the point. Kept as a function so the
   // dozen call sites that spread it need no change.
   const keyHeaders = (): Record<string, string> => ({});
+  // What is attached to the message being written (Core 4). Read into text
+  // as it is added; see components/ChatAttachments.tsx.
+  const files = useChatAttachments({ headers: keyHeaders, sessionId: () => activeId });
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [dragging, setDragging] = useState(false);
 
   // Load conversations whenever auth state resolves or flips.
   useEffect(() => {
@@ -965,7 +976,8 @@ export default function ChatPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...keyHeaders() },
         body: JSON.stringify({
-          messages: convo.messages,
+          // Words, with attachments named — a whole PDF is not thread memory.
+          messages: wordsOnly(convo.messages),
           currentMemory: convo.memory ?? EMPTY_MEMORY,
         }),
       });
@@ -1076,7 +1088,7 @@ export default function ChatPage() {
               understanding: journeyRef.current ?? undefined,
               memory: latestPatched?.memory ?? nextMemory,
               title: latestPatched?.title ?? convo.title,
-              messages: convo.messages,
+              messages: wordsOnly(convo.messages),
               surface: 'core',
               conversationId: convoId,
             }),
@@ -1347,10 +1359,13 @@ export default function ChatPage() {
    */
   async function send(
     content: string,
-    start?: { convos: Conversation[]; id: string | null }
-  ) {
+    start?: { convos: Conversation[]; id: string | null },
+    atts: Attachment[] = []
+  ): Promise<boolean> {
     const text = content.trim();
-    if (!text || sending) return;
+    if ((!text && !atts.length) || sending) return false;
+    // A message that is only a file is titled by the file.
+    const titleText = text || atts.map((a) => a.name).filter(Boolean).join(', ') || 'Attachment';
     setError(null);
 
     // Anonymous user trying to spin up a *second* session — gate to sign-in.
@@ -1363,7 +1378,7 @@ export default function ChatPage() {
       (usedFree || conversations.length >= 1)
     ) {
       router.push('/sign-in?redirect_url=/chat');
-      return;
+      return false;
     }
 
     // Ensure we have an active conversation
@@ -1390,11 +1405,14 @@ export default function ChatPage() {
       c.id === workingId
         ? {
             ...c,
-            messages: [...c.messages, { role: 'user' as Role, content: text }],
+            messages: [
+              ...c.messages,
+              { role: 'user' as Role, content: text, ...(atts.length ? { attachments: atts } : {}) },
+            ],
             updatedAt: Date.now(),
             title:
               c.title === 'New thought session' && c.messages.length === 0
-                ? text.slice(0, 60).replace(/\s+/g, ' ').trim()
+                ? titleText.slice(0, 60).replace(/\s+/g, ' ').trim()
                 : c.title,
           }
         : c
@@ -1425,7 +1443,9 @@ export default function ChatPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...keyHeaders() },
         body: JSON.stringify({
-          messages: convoForRequest.messages,
+          // Files go only to Core 4, and only as much of them as the budget
+          // allows — older ones travel as their opening (lib/chat-attachments.ts).
+          messages: forRequest(convoForRequest.messages, model === 'core-4'),
           model,
           depth,
           memory: convoForRequest.memory ?? EMPTY_MEMORY,
@@ -1589,15 +1609,41 @@ export default function ChatPage() {
         setActiveId(rolledBack[0]?.id ?? null);
       }
       setInput(text);
+      return false;
     } finally {
       setSending(false);
     }
+    return true;
+  }
+
+  const takesFiles = model === 'core-4';
+
+  /** Send what is in the box, with whatever finished reading. */
+  async function sendFromComposer() {
+    if (files.reading) return;
+    const atts = takesFiles ? files.ready() : [];
+    if (!input.trim() && !atts.length) return;
+    const kept = files.drafts;
+    if (atts.length) files.setDrafts([]);
+    const ok = await send(input, undefined, atts);
+    // A failed send hands the message back — its files with it.
+    if (!ok && atts.length) files.setDrafts(kept);
+    if (ok) files.setNotice(null);
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      send(input);
+      void sendFromComposer();
+    }
+  }
+
+  function handlePaste(e: React.ClipboardEvent<HTMLTextAreaElement>) {
+    if (!takesFiles) return;
+    const pasted = Array.from(e.clipboardData?.files ?? []);
+    if (pasted.length) {
+      e.preventDefault();
+      void files.add(pasted);
     }
   }
 
@@ -2696,7 +2742,7 @@ export default function ChatPage() {
                 // is display:contents and an element with no box cannot be
                 // scrolled into view.
                 <div key={i} id={`turn-${i}`} className="turn-row">
-                  <Bubble role={m.role} content={body} />
+                  <Bubble role={m.role} content={body} attachments={m.attachments} />
                   {showChoices && (
                     <ChoiceChips
                       choices={choices}
@@ -2919,21 +2965,88 @@ export default function ChatPage() {
                 </SignInButton>
               </div>
             )}
-            <div className="flex items-end gap-3 rounded-2xl border border-ink/15 bg-white px-4 py-3 focus-within:border-moss-600 transition-colors">
+            {(files.drafts.length > 0 || files.notice) && (
+              <div className="mb-2 px-1 space-y-2">
+                <AttachmentChips items={files.drafts} onRemove={files.remove} onOrigin={files.setOrigin} />
+                {!takesFiles && files.drafts.length > 0 && (
+                  <p className="text-[12px] text-ink/55 font-serif italic">
+                    Attachments are read by Core 4. Switch to Core 4 to send them.
+                  </p>
+                )}
+                {files.notice && (
+                  <p className="flex items-start gap-2 text-[12px] text-ink/60" role="status">
+                    <span className="min-w-0">{files.notice}</span>
+                    <button type="button" className="shrink-0 text-ink/40 hover:text-ink" aria-label="Dismiss" onClick={() => files.setNotice(null)}>
+                      ×
+                    </button>
+                  </p>
+                )}
+              </div>
+            )}
+            <div
+              className={`flex items-end gap-3 rounded-2xl border bg-white px-4 py-3 focus-within:border-moss-600 transition-colors ${
+                dragging ? 'border-moss-600 ring-2 ring-moss-200' : 'border-ink/15'
+              }`}
+              onDragOver={(e) => {
+                if (!takesFiles || !e.dataTransfer.types.includes('Files')) return;
+                e.preventDefault();
+                setDragging(true);
+              }}
+              onDragLeave={(e) => {
+                if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
+                setDragging(false);
+              }}
+              onDrop={(e) => {
+                if (!takesFiles) return;
+                e.preventDefault();
+                setDragging(false);
+                if (e.dataTransfer.files?.length) void files.add(e.dataTransfer.files);
+              }}
+            >
+              {takesFiles && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={sending}
+                    className="shrink-0 w-9 h-9 -ml-1 rounded-full text-ink/55 flex items-center justify-center hover:text-ink hover:bg-ink/5 disabled:opacity-40 transition-colors"
+                    aria-label="Attach files or images"
+                    title="Attach images, PDFs, Word, PowerPoint, Excel, text, code or a zip"
+                  >
+                    <PaperclipIcon />
+                  </button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    accept={ACCEPT_ATTR}
+                    className="hidden"
+                    onChange={(e) => {
+                      if (e.target.files?.length) void files.add(e.target.files);
+                      e.target.value = '';
+                    }}
+                  />
+                </>
+              )}
               <textarea
                 ref={textareaRef}
                 data-tour="composer"
                 value={input}
                 onChange={handleInputChange}
                 onKeyDown={handleKeyDown}
+                onPaste={handlePaste}
                 placeholder="Share what you're thinking through…"
                 rows={1}
                 disabled={sending}
                 className="flex-1 resize-none bg-transparent outline-none text-ink placeholder:text-ink/40 leading-relaxed py-1 max-h-[220px]"
               />
               <button
-                onClick={() => send(input)}
-                disabled={!input.trim() || sending}
+                onClick={() => void sendFromComposer()}
+                disabled={
+                  sending ||
+                  files.reading ||
+                  (!input.trim() && !(takesFiles && files.hasReady))
+                }
                 className="shrink-0 w-9 h-9 rounded-full bg-moss-600 text-paper flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed hover:bg-moss-700 transition-colors"
                 aria-label="Send"
               >
@@ -2980,19 +3093,28 @@ function Bubble({
   role,
   content,
   animate = false,
+  attachments,
 }: {
   role: Role;
   content: string;
   animate?: boolean;
+  attachments?: Attachment[];
 }) {
   const isUser = role === 'user';
 
   if (isUser) {
     return (
-      <div className="my-6 flex justify-end">
-        <div className="max-w-[85%] bg-moss-50 border border-moss-200/60 rounded-2xl rounded-br-md px-5 py-3">
-          <div className="prose-socria text-ink">{content}</div>
-        </div>
+      <div className="my-6 flex flex-col items-end gap-2">
+        {attachments?.length ? (
+          <div className="max-w-[85%]">
+            <AttachmentChips items={attachments} align="end" />
+          </div>
+        ) : null}
+        {content.trim() ? (
+          <div className="max-w-[85%] bg-moss-50 border border-moss-200/60 rounded-2xl rounded-br-md px-5 py-3">
+            <div className="prose-socria text-ink">{content}</div>
+          </div>
+        ) : null}
       </div>
     );
   }

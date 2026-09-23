@@ -79,6 +79,8 @@ const MODULES = [
   'lib/collab-transport.ts',
   'lib/checkout-attribution.ts',
   'lib/person-memory.ts',
+  'lib/file-kinds.ts',
+  'lib/file-extract.ts',
   'lib/first-session.ts',
   'components/MapPoster.tsx',
   'lib/lifecycle.ts',
@@ -119,7 +121,7 @@ export async function buildAll() {
         // Both use dynamic require() internally, which does not survive
         // being bundled into ESM. They are real dependencies at runtime, so
         // Node resolves them there.
-        external: ['undici', 'openai'],
+        external: ['undici', 'openai', 'unpdf'],
         logLevel: 'error',
       })
     )

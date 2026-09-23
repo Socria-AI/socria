@@ -10,6 +10,7 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { sanitizeMemory, EMPTY_MEMORY } from '@/lib/socria-prompt';
 import { EMPTY_MAP, sanitizeMap, sanitizeByRef } from '@/lib/logos';
 import { sanitizeAttachments } from '@/lib/logos-attachments';
+import { MAX_FILE_TEXT } from '@/lib/file-kinds';
 import { sanitizeContexts } from '@/lib/logos-sources';
 import { MindStoreError, listProjects, loadGraph, persistGraph } from '@/lib/mind/store';
 import { adoptConversation, releaseConversation } from '@/lib/mind/projects';
@@ -38,7 +39,9 @@ function sanitizeMessages(raw: unknown): Msg[] {
     )
     .slice(-MAX_MESSAGES_PER_CONVO)
     .map((m: any) => {
-      const attachments = sanitizeAttachments(m.attachments);
+      // Core 4's files are whole documents, so the stored ceiling is the
+      // larger of the two; a Logos note is capped smaller where it is made.
+      const attachments = sanitizeAttachments(m.attachments, MAX_FILE_TEXT);
       // Who said it, when two people were thinking together (Logos 2). Kept
       // so a shared session opened alone later still shows whose idea each
       // one was; validated so a broken author reads as none, not as a crash.

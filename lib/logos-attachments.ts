@@ -41,6 +41,12 @@ export interface Attachment {
   reading?: string;
   /** image: a small preview, the only part of an image that is persisted */
   thumb?: string;
+  /** image: the larger picture a Core 4 conversation shows and opens (lib/logos-upload.ts) */
+  preview?: string;
+  /** note: the source was longer than the text kept (a long document) */
+  truncated?: boolean;
+  /** note: only the opening travels with this request (lib/chat-attachments.ts forRequest) */
+  opening?: boolean;
 }
 
 export const MAX_ATTACHMENTS = 6;
@@ -48,6 +54,8 @@ export const MAX_NOTE_CHARS = 24_000;
 export const MAX_READING_CHARS = 1_600;
 // ~45KB of base64 — enough for a 220px preview, small enough to sit in a row.
 export const MAX_THUMB_CHARS = 62_000;
+// A 960px JPEG, stepped down until it fits: ~150KB of image at most.
+export const MAX_PREVIEW_CHARS = 200_000;
 export const MAX_NAME = 80;
 
 /** Paste anything longer than this and it becomes a note instead of filling the box. */
@@ -81,21 +89,35 @@ export function guessOrigin(text: string): AttachmentOrigin {
   return first / words > 0.025 ? 'mine' : 'source';
 }
 
-/** Trust nothing from the client: shape, size and count are all enforced here. */
-export function sanitizeAttachments(raw: unknown): Attachment[] {
+/**
+ * Trust nothing from the client: shape, size and count are all enforced here.
+ *
+ * `maxNoteChars` is Logos's note size by default. Core 4 passes a larger one
+ * (lib/file-kinds.ts MAX_FILE_TEXT) because its notes are whole documents
+ * attached to be worked with, not pasted fragments of thinking.
+ */
+export function sanitizeAttachments(raw: unknown, maxNoteChars: number = MAX_NOTE_CHARS): Attachment[] {
   if (!Array.isArray(raw)) return [];
   const out: Attachment[] = [];
   for (const a of raw) {
     if (!a || typeof a !== 'object') continue;
     if (a.kind === 'note') {
-      const text = clip(a.text, MAX_NOTE_CHARS).trim();
+      const text = clip(a.text, maxNoteChars).trim();
       if (!text) continue;
       out.push({
         kind: 'note',
         name: clip(a.name, MAX_NAME) || undefined,
         origin: ORIGINS.includes(a.origin) ? (a.origin as AttachmentOrigin) : guessOrigin(text),
         text,
-        words: wordCount(text),
+        // A note sent as its opening keeps the count of the whole document.
+        words:
+          a.opening === true && typeof a.words === 'number' && Number.isFinite(a.words)
+            ? Math.max(0, Math.floor(a.words))
+            : wordCount(text),
+        ...(a.truncated === true || (typeof a.text === 'string' && a.text.length > maxNoteChars)
+          ? { truncated: true }
+          : {}),
+        ...(a.opening === true ? { opening: true } : {}),
       });
     } else if (a.kind === 'image') {
       const thumb = clip(a.thumb, MAX_THUMB_CHARS);
@@ -107,6 +129,11 @@ export function sanitizeAttachments(raw: unknown): Attachment[] {
         reading: reading || undefined,
         // Only ever a data: image — never a remote URL we'd then fetch.
         thumb: /^data:image\/(png|jpeg|webp);base64,/.test(thumb) ? thumb : undefined,
+        ...(typeof a.preview === 'string' &&
+        a.preview.length <= MAX_PREVIEW_CHARS &&
+        /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(a.preview)
+          ? { preview: a.preview }
+          : {}),
       });
     }
     if (out.length >= MAX_ATTACHMENTS) break;

@@ -9,6 +9,10 @@
 
 export const READ_MAX_EDGE = 1400;
 export const THUMB_MAX_EDGE = 220;
+/** The picture as shown in a conversation — big enough to look at, small enough to keep. */
+export const PREVIEW_MAX_EDGE = 960;
+/** Kept in step with lib/logos-attachments.ts MAX_PREVIEW_CHARS. */
+const PREVIEW_MAX_CHARS = 200_000;
 export const MAX_FILE_BYTES = 12 * 1024 * 1024;
 
 export const ACCEPTED_IMAGE = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
@@ -62,6 +66,11 @@ export interface PreparedImage {
   full: string;
   /** small version, the only part that survives the session */
   thumb: string;
+  /**
+   * The version a conversation SHOWS (Core 4): a real preview, not a chip.
+   * Stepped down in quality until it fits what is stored with the message.
+   */
+  preview: string;
   name: string;
 }
 
@@ -70,9 +79,15 @@ export async function prepareImage(file: File): Promise<PreparedImage> {
     throw new Error('That image is too large — 12MB is the limit.');
   }
   const img = await loadImage(await readAsDataURL(file));
+  let preview = '';
+  for (const [edge, q] of [[PREVIEW_MAX_EDGE, 0.78], [PREVIEW_MAX_EDGE, 0.6], [720, 0.6], [560, 0.55]] as const) {
+    preview = resize(img, edge, q);
+    if (preview.length <= PREVIEW_MAX_CHARS) break;
+  }
   return {
     full: resize(img, READ_MAX_EDGE, 0.82),
     thumb: resize(img, THUMB_MAX_EDGE, 0.62),
+    preview: preview.length <= PREVIEW_MAX_CHARS ? preview : '',
     name: file.name || 'image',
   };
 }

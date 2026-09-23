@@ -40,6 +40,14 @@ import { reportUpstream } from '@/lib/upstream-error';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { memoryCaps, selectRelevant, visibleEntries } from '@/lib/person-memory';
 import { mayUse } from '@/lib/route-guard';
+import {
+  briefly,
+  forMemory,
+  hasSubstance,
+  renderForModel,
+  sanitizeChatMessages,
+  type ChatMsg,
+} from '@/lib/chat-attachments';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -149,7 +157,11 @@ export async function POST(req: NextRequest) {
     const lastUser = Array.isArray(messages)
       ? [...messages].reverse().find((m: { role?: string }) => m?.role === 'user')
       : null;
-    const egg = eggFor((lastUser as { content?: unknown } | undefined)?.content);
+    // Not when something is attached: "can you?" over a PDF is a real question.
+    const attachedToLast =
+      Array.isArray((lastUser as { attachments?: unknown } | undefined)?.attachments) &&
+      ((lastUser as { attachments: unknown[] }).attachments.length > 0);
+    const egg = attachedToLast ? null : eggFor((lastUser as { content?: unknown } | undefined)?.content);
     if (egg) {
       // The same content type the streamed replies use, so every client reads
       // it the way it reads any other turn — one chunk instead of many.
@@ -241,6 +253,24 @@ export async function POST(req: NextRequest) {
 
     const socriaModel = resolveModel(body?.model);
 
+    // ── attachments (Core 4) ──────────────────────────────────────
+    //
+    // Files and images arrive already reduced to text (lib/file-extract.ts,
+    // /api/logos/read). They ride on the user turns they were attached to;
+    // `clean` above keeps only the words, for everything that must not be
+    // swamped by a 40-page PDF — the state reader, the question count. What
+    // the model itself receives is `modelMessages`, where the files are.
+    // Other Cores do not take attachments, and their requests are unchanged.
+    const withFiles: ChatMsg[] | null =
+      socriaModel === 'core-4' ? sanitizeChatMessages(messages).slice(-MAX_HISTORY) : null;
+    const lastTurn = withFiles && withFiles.length ? withFiles[withFiles.length - 1] : null;
+    if (!last.content.trim() && !(lastTurn && hasSubstance(lastTurn))) {
+      return NextResponse.json({ error: 'Say something, or attach something.' }, { status: 400 });
+    }
+    const modelMessages = withFiles ? renderForModel(withFiles) : clean;
+    /** The latest turn as one line — words plus the names of what came with it. */
+    const lastBrief = lastTurn ? briefly(lastTurn) : last.content;
+
     // The Project this conversation is in, if any. Bounded like every other
     // field off a request body; whether it is actually THEIR Project is
     // settled inside recall() and remember(), where every lookup is scoped
@@ -274,7 +304,10 @@ export async function POST(req: NextRequest) {
       try {
         cognitiveState = await readState(
           apiKey,
-          clean.map((m) => `${m.role === 'user' ? 'Them' : 'Socria'}: ${m.content}`).join('\n\n').slice(-8000),
+          (withFiles ?? clean)
+            .map((m) => `${m.role === 'user' ? 'Them' : 'Socria'}: ${withFiles ? briefly(m as ChatMsg) : m.content}`)
+            .join('\n\n')
+            .slice(-8000),
           null
         );
         // The run of questions Socria has just asked, read from the
@@ -312,7 +345,9 @@ export async function POST(req: NextRequest) {
       // that memory can never break a conversation has to be made at the
       // point the conversation calls it, not inside the thing being called.
       try {
-        const r = await recall(userId, last.content, {
+        // Seeded by what they said AND what they handed over: a question
+        // that only says "what do you make of this?" is about the file.
+        const r = await recall(userId, lastTurn ? forMemory(lastTurn).slice(0, 2000) : last.content, {
           now: Date.now(),
           // Reuse the plan already resolved above rather than resolving it a
           // second time: one fewer call, and one fewer thing that can fail.
@@ -467,7 +502,7 @@ export async function POST(req: NextRequest) {
         model: modelId,
         messages: [
           { role: 'system', content: systemPrompt },
-          ...clean,
+          ...modelMessages,
         ],
         temperature: 0.7,
         max_tokens: 500,
@@ -535,7 +570,7 @@ export async function POST(req: NextRequest) {
           }
 
           if (guarded && move && apiKey) {
-            let verdict = await guardDraft(apiKey, move, last.content, reply);
+            let verdict = await guardDraft(apiKey, move, lastBrief, reply);
 
             if (verdict.verdict === 'regenerate') {
               // One retry, told exactly what went wrong. Not a loop: a second
@@ -547,7 +582,7 @@ export async function POST(req: NextRequest) {
                   model: openaiModel,
                   messages: [
                     { role: 'system', content: systemPrompt + retryNote(verdict, move) },
-                    ...(clean as { role: 'user' | 'assistant'; content: string }[]),
+                    ...(modelMessages as { role: 'user' | 'assistant'; content: string }[]),
                   ],
                   temperature: 0.7,
                   max_tokens: 500,
@@ -588,7 +623,7 @@ export async function POST(req: NextRequest) {
           // question somebody was answering.
           try {
           if (socriaModel === 'core-4' && userId && apiKey) {
-            void remember(userId, `User: ${last.content}\n\nSocria: ${reply}`, {
+            void remember(userId, `User: ${lastTurn ? forMemory(lastTurn) : last.content}\n\nSocria: ${reply}`, {
               now: Date.now(),
               apiKey,
               surface: 'core',
