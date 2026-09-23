@@ -114,8 +114,10 @@ export function allocate({ state: s, signals, contract }: Ctx): Allocation {
       1, [], ['the answer / the work', 'the reasoning that matters for using it'], null, s);
   }
 
-  // ── being heard is not a request for help ──
-  if ((s.taskKind === 'vent' || s.work === 'reflection') && directness !== 'no_answer' && directness !== 'guidance') {
+  // ── being heard — only when they SAID so (run 1: an inferred "reflection"
+  // gave four turns of acknowledgement to someone who wanted a plan; the
+  // baseline simply helped). An inference never narrows help.
+  if (signals.vent && directness !== 'no_answer' && directness !== 'guidance') {
     return alloc('HUMAN_REFLECTS', 'reflect.heard', 'They are thinking out loud or want to be heard; Socria follows.', 0.7,
       ['their own processing'], ['precise acknowledgement', 'at most one observation'], null, s);
   }
@@ -161,8 +163,10 @@ export function allocate({ state: s, signals, contract }: Ctx): Allocation {
       { what: 'the answer', reason, evidence: s.directness.evidence ?? '', source }, s);
   }
 
-  // ── they did it; check it ──
-  if (s.work === 'verification' || (s.latest === 'attempt' && s.attempt !== 'none')) {
+  // ── they did it; check it ── (not for creative work or judgement, which
+  // gets critique, never "the correct version" — run 1, creative-002)
+  const openWork = s.work === 'creation' || s.work === 'judgment' || s.taskKind === 'create' || s.taskKind === 'decide';
+  if (!openWork && (s.work === 'verification' || (s.latest === 'attempt' && s.attempt !== 'none'))) {
     // Practising on purpose — said so, explicitly — keeps the redo. Everyone
     // else gets the correction. Frustration ends the holding back.
     if (learningExplicit && s.attempt !== 'right' && !frustrated && withholdable) {

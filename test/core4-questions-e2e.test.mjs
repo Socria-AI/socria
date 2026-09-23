@@ -93,6 +93,7 @@ async function turn(messages, { state, draft, extract }) {
   globalThis.__reply = draft;
   globalThis.__prompts = [];
   globalThis.__extract = extract ? [extract] : [];
+  globalThis.__socriaTrace = [];
   const req = new NextRequest('http://localhost/api/chat', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -102,8 +103,11 @@ async function turn(messages, { state, draft, extract }) {
   const received = await r.text();
   await quiet();
   const prompt = globalThis.__prompts[0] ?? '';
-  const move = /MOVE: (\w+)/.exec(prompt)?.[1] ?? null;
-  return { status: r.status, prompt, move, received };
+  // The decision, from the eval trace: an unforced move is not named in the
+  // prompt (council D1 envelope), so the prompt is checked for constraints.
+  const dec = globalThis.__socriaTrace[0]?.decision ?? null;
+  const move = dec?.type ?? null;
+  return { status: r.status, prompt, move, objective: dec?.objective ?? '', forced: !!dec?.forced, received };
 }
 
 const U = (content) => ({ role: 'user', content });
@@ -136,6 +140,7 @@ ok('the reply went out', t1.status === 200, String(t1.status));
 // an open statement is not a reason to interview someone.
 ok('Core 4 was told to contribute', t1.move === 'CONTRIBUTE', t1.move);
 ok('with no questions', /Questions this turn: NONE/.test(t1.prompt));
+ok('and, resting on an inference, not imposed: constraints only', !t1.forced && /No move is imposed/.test(t1.prompt));
 ok('the generic question was removed, the substance kept',
    t1.received.trim() === 'A vibrant startup scene can offer great networking and learning opportunities.', t1.received);
 
@@ -163,9 +168,8 @@ const t2 = await turn([u1, a1, u2], {
 });
 ok('Core 4 was not told to ask', t2.move !== 'ASK', t2.move);
 ok('it was told to CONNECT', t2.move === 'CONNECT', t2.move);
-ok('with the connection they made', /OBJECTIVE:[^\n]*McCombs startup ecosystem[^\n]*entrepreneur/.test(t2.prompt));
-ok('told not to ask them to elaborate', /Do not ask them to elaborate/.test(t2.prompt));
-ok('told to stop when the move is made', /End when the move is made/.test(t2.prompt));
+ok('with the connection they made', /McCombs startup ecosystem[^\n]*entrepreneur/.test(t2.objective));
+ok('and no question allowed', /Questions this turn: NONE/.test(t2.prompt));
 ok('the state it read says they just connected it', /McCombs startup ecosystem → matters because of/.test(t2.prompt));
 ok('the reflexive question never reached them', !/\?/.test(t2.received), t2.received);
 ok('the observation did, word for word',
@@ -196,7 +200,7 @@ const t3 = await turn([u1, a1, u2, a2, u3], {
   draft: 'That’s a stronger comparison. You’re not saying UTA has nothing for startups; you’re identifying a specific ceiling you’ve actually hit: access to funding and investors.',
 });
 ok('no question move after new evidence', !['QUESTION', 'CLARIFY'].includes(t3.move), t3.move);
-ok('the new evidence is connected to the reason', t3.move === 'CONNECT' && /funding/.test(t3.prompt));
+ok('the new evidence is connected to the reason', t3.move === 'CONNECT' && /funding/.test(t3.objective));
 ok('the reply reached them unchanged, with no question', !/\?/.test(t3.received) && /specific ceiling/.test(t3.received));
 
 console.log('\n=== pressure is measured from the transcript, not the state reader ===');
@@ -221,8 +225,8 @@ console.log('\n=== a necessary question still goes through ===');
   // Council D4: no question re-granted for a blocker. Proceed under a stated
   // assumption; say what to send as an instruction.
   ok('not another question: the work, under a stated assumption', t.move === 'EXPLAIN' || t.move === 'EXECUTE', t.move);
-  ok('naming exactly the unknown', /first error line/.test(t.prompt));
-  ok('asking for it as an instruction, not a question', /as an instruction/.test(t.prompt) && /Questions this turn: NONE/.test(t.prompt));
+  ok('naming exactly the unknown', /first error line/.test(t.objective));
+  ok('asking for it as an instruction, not a question', /as an instruction/.test(t.objective) && /Questions this turn: NONE/.test(t.prompt));
   ok('and no question reached them', !/\?\s*$/.test(t.received.trim()), t.received);
 }
 
@@ -233,7 +237,7 @@ console.log('\n=== a plain request is answered ===');
     draft: 'The business school dates to 1922; it took the McCombs name in 2000.',
   });
   ok('ANSWER, not a question back', t.move === 'ANSWER', t.move);
-  ok('the move says so', /no question back/i.test(t.prompt));
+  ok('the move says so', /no question back/i.test(t.objective));
   ok('and the answer reached them', /1922/.test(t.received), t.received);
 }
 

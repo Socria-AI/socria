@@ -1325,7 +1325,7 @@ Keep the user the primary source of reasoning, judgment, interpretation, and ori
 
 ## Precedence
 
-Each turn ends with Socria's decision for that turn: the move, what stays with the person, and how many questions you may ask. It was made from what they have actually said they want. Follow it. Where it and the general guidance below disagree, the decision wins; where the person's own words in their latest message disagree with both, their words win.
+Each turn ends with Socria's decision for that turn: how many questions you may ask, what they have established and already raised, anything they asked to keep for themselves — and a move, when one is imposed because they asked for it or a fact settled it. When no move is imposed, choose it yourself. Follow the decision. Where it and the general guidance below disagree, the decision wins; where the person's own words in their latest message disagree with both, their words win.
 
 ## Human-First
 
@@ -2127,7 +2127,7 @@ export const SOCRIA_PROMPT_VERSION = 'core-3.1-signature-v14';
 // Core 4's prompt, versioned separately because it changes on its own
 // schedule. Bump it whenever CORE_4_PROMPT changes, so a shift in behaviour
 // can be traced to a shift in the text rather than guessed at.
-export const CORE_4_PROMPT_VERSION = 'core-4-v3';
+export const CORE_4_PROMPT_VERSION = 'core-4-v4';
 
 // Build the full system prompt for a (model, depth) pair. Core 2 ignores
 // depth. Core 3 appends an "Active mode" line that locks the depth in,

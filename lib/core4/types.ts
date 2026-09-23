@@ -98,6 +98,8 @@ export interface ExplicitSignals {
   done: boolean;
   /** a requested length in tokens ("in 300 words" ≈ 420; "the full file" = 3000), or 0 (council D17) */
   requestedTokens: number;
+  /** "I just need to vent", "I don't want advice", "just listen": being heard, said explicitly (run 1: an INFERRED "reflection" withheld practical help) */
+  vent: boolean;
   /** a sensitive subject (health, grief, divorce, immigration, debt, …): council D14 */
   sensitive: boolean;
   /** the request is FOR questions (quiz items, interview questions, practice problems): they are content, not interrogation */
@@ -286,6 +288,14 @@ export interface InterventionDecision {
   maxTokens: number;
   /** the person asked FOR questions (a quiz, interview questions): they are content, not interrogation */
   questionsAreContent: boolean;
+  /**
+   * Is the move IMPOSED? Only on explicit or verified evidence (council D1;
+   * run 1): a withhold, the person's own request, a contract, safety, a
+   * computed or checked verdict. Otherwise the model receives constraints
+   * (budget, what is already raised, what they established) and chooses the
+   * move itself — a cheap reader's guess must not narrow a stronger model.
+   */
+  forced: boolean;
 }
 
 // ── the already-considered record & the reasoning ledger ─────────────

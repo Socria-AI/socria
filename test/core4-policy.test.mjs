@@ -348,8 +348,16 @@ console.log('\n=== THE PRODUCT RULE (withheld only because they said so) ===');
 
 console.log('\n=== vent, and a plain request ===');
 {
-  const v = decide(S({ taskKind: 'vent', work: 'reflection', latest: 'information' }));
-  ok('being heard: REFLECT, no questions, nothing to fix', v.decision.type === 'REFLECT' && v.decision.maxQuestions === 0);
+  const v = decide(S({ taskKind: 'vent', work: 'reflection', latest: 'information' }), { said: "I just need to vent, I don't want advice" });
+  ok('being heard, when they SAID so: REFLECT, no questions, nothing to fix', v.decision.type === 'REFLECT' && v.decision.maxQuestions === 0);
+  // Run 1 (repeated-questioning-004, longitudinal-006): an INFERRED
+  // "reflection" gave acknowledgement to people who wanted help.
+  const g = decide(S({ taskKind: 'vent', work: 'reflection', latest: 'information' }));
+  ok('a GUESSED "reflection" does not narrow help to acknowledgement', g.decision.type !== 'REFLECT' && g.decision.type !== 'GET_OUT_OF_THE_WAY', g.decision.type);
+  const cre = decide(S({ taskKind: 'create', work: 'creation', latest: 'attempt', attempt: 'partial' }));
+  ok('run 1 (creative-002): creative work is critiqued, never "corrected"', cre.decision.type !== 'CORRECT', cre.decision.type);
+  ok('council D1: an inference-driven move is not imposed', decide(S({ work: 'judgment', latest: 'information' })).decision.forced === false);
+  ok('  the person\'s own request is', decide(S({ work: 'information', latest: 'question' }), { said: 'just tell me' }).decision.forced === true);
   const l = decide(S({ taskKind: 'lookup', work: 'information', latest: 'question', currentFocus: 'when was McCombs named' }));
   ok('a fact: ANSWER', l.decision.type === 'ANSWER');
   const c = decide(S({ work: 'information', latest: 'question', currentFocus: 'how much is 15% of 2400' }));

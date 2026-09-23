@@ -40,6 +40,7 @@ export const NO_SIGNALS: ExplicitSignals = {
   offRecord: false,
   onRecord: false,
   sensitive: false,
+  vent: false,
   horizon: false,
   done: false,
   requestedTokens: 0,
@@ -203,6 +204,7 @@ const FLAG_ONLY = new RegExp(
     String.raw`\b(?:you )?only tell me (?:if|whether|when) i(?:'ve| have)? (?:gone off the rails|gone wrong|gone off track|made a mistake|got it wrong|am wrong|'m wrong)`,
     String.raw`\bjust (?:tell me|flag|say) (?:if|whether) i(?:'m| am) (?:wrong|off|on the right track)\b`,
     String.raw`\bwarmer (?:or|\/) colder\b`,
+    String.raw`\btell me how to (?:look|find it|debug|search|approach it)\b[^.?!]{0,30}\bnot (?:what|where)\b`,
   ].join('|'),
   'i'
 );
@@ -217,6 +219,8 @@ function requestedTokensOf(text: string): number {
   if (/\b(?:the )?(?:full|whole|entire|complete) (?:file|script|program|module|section|derivation|proof|essay|draft|code|listing)\b/i.test(text)) return 3000;
   return 0;
 }
+
+const VENT = /\b(i (?:just )?(?:need|want) to vent|(?:i )?(?:don'?t|do not) want (?:any )?advice|not looking for (?:advice|solutions)|(?:please )?just listen|i don'?t need (?:you to )?(?:fix|solve) (?:it|this|anything)|(?:just )?need to get (?:this|it) off my chest)\b/i;
 
 const REQUESTS_QUESTIONS = /\b((?:write|give|make|draft|generate|come up with|list|suggest)(?: me)? (?:\w+ ){0,3}(?:questions|quiz|exam items|practice problems|interview questions|test items|flashcards|faq)|quiz me|test me|drill me|interview questions)\b/i;
 
@@ -308,6 +312,7 @@ export function readSignals(message: string): ExplicitSignals {
     offRecord: !!note(lastIndex(OFF_RECORD, text)),
     onRecord: !!note(lastIndex(ON_RECORD, text)),
     sensitive: SENSITIVE.test(text),
+    vent: VENT.test(text),
     horizon: HORIZON.test(text),
     done: DONE.test(text) && text.length < 80,
     requestedTokens: requestedTokensOf(text),

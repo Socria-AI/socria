@@ -99,6 +99,7 @@ function d(
     switchedFrom: o.switchedFrom ?? null,
     maxTokens: TOKENS[type] ?? 600,
     questionsAreContent: false,
+    forced: false,
   };
 }
 
@@ -113,8 +114,25 @@ function recentlyChallenged(s: CognitiveState): boolean {
   return s.history.slice(-2).some((h) => h.type === 'CHALLENGE' || h.type === 'CRITIQUE');
 }
 
+/** Moves imposed because the PERSON or a verified fact asked for them (council D1). */
+const FORCING = new Set(['safety', 'practice.bottom_out', 'practice.let_me_try', 'quiz.contract', 'done', 'recommendation.requested', 'retrieve.history', 'reflect.heard', 'reflect.minimal']);
+
 export function selectIntervention(input: SelectInput): InterventionDecision {
   let dec = selectMove(input);
+  const a = input.allocation;
+  dec = {
+    ...dec,
+    forced:
+      !!a.withhold ||
+      FORCING.has(dec.reasonCode) ||
+      a.reasonCode.startsWith('answer.requested') ||
+      a.reasonCode === 'safety' ||
+      input.signals.flagOnly || input.state.flagOnly ||
+      input.signals.stopQuestions ||
+      // Their words about how to be helped, now or standing, impose the move.
+      input.signals.directness !== 'none' ||
+      (input.state.directness.source === 'explicit' && input.state.directness.value !== 'none'),
+  };
   // A length they asked for sets the budget (council D17).
   if (input.signals.requestedTokens) dec = { ...dec, maxTokens: Math.min(4000, Math.max(dec.maxTokens, input.signals.requestedTokens)) };
   // Questions they ASKED FOR (interview questions, a quiz, practice problems)
@@ -268,7 +286,7 @@ function selectMove(input: SelectInput): InterventionDecision {
         reasonCode: practice ? 'verify.practice' : 'verify.correct', reason: a.rationale,
         intended: practice ? 'They can find and fix the error themselves.' : 'They have the correct version and know why theirs was wrong.',
         objective: input.signals.flagOnly || s.flagOnly
-          ? 'They asked for a verdict only: say plainly whether it is right or not, and answer any factual question they asked. Do NOT say where it goes wrong or what kind of error — finding it is theirs. No hints unless they ask. No questions.'
+          ? 'They asked for a verdict only: say plainly whether it is right or not, and answer any factual question they asked. Do NOT say where it goes wrong or what kind of error, and never what to change — finding it is theirs. If they asked HOW to look, give a method for finding it (what to print, what to compare), never its location. No questions.'
           : practice
             ? 'Say whether it is right. If not, say exactly WHERE it goes wrong and what KIND of error it is (sign, step, assumption, arithmetic), clearly enough that they can fix it. Do not give the corrected final answer — they are practising and redoing it is theirs. No questions.'
             : 'Say clearly whether it is right. If it is wrong: what is wrong and where, then the correct version and why. If it is actually right, say so plainly and add only what is genuinely useful — never invent a problem. No questions back.',
@@ -334,7 +352,7 @@ function selectMove(input: SelectInput): InterventionDecision {
         return d('CHALLENGE', {
           reasonCode: 'tension', reason: 'Their own statements pull against each other.',
           intended: 'They resolve a real inconsistency themselves.',
-          objective: `Name the tension plainly — ${s.tensions[0]} — and why it matters here. State it; do not phrase it as a question. Do not resolve it for them.${consideredNote}`,
+          objective: `Name the tension plainly — ${s.tensions[0]} — and why it matters here. Then give your own read of how it resolves and what evidence or test would settle it; the decision stays theirs, but do not withhold your view (run 1: "do not resolve it" left someone stuck). State it; do not phrase it as a question.${consideredNote}`,
           alloc: a, avoid, maxQuestions: 0,
         });
       }
@@ -416,7 +434,47 @@ function selectMove(input: SelectInput): InterventionDecision {
 
 // ── the block the model receives ──────────────────────────────────────
 
+/** Split the considered lines: what they established (use it) vs what was raised (don't re-raise). */
+function splitConsidered(lines: string[]): { established: string[]; raised: string[] } {
+  const established: string[] = [];
+  const raised: string[] = [];
+  for (const l of lines) (/^they (?:hold|accepted|settled)\b/.test(l) ? established : raised).push(l);
+  return { established, raised };
+}
+
 export function renderDecision(dec: InterventionDecision, a: Allocation): string {
+  const { established, raised } = splitConsidered(dec.avoid);
+  const context: string[] = [];
+  // Run 1: "do not raise any of these" also discouraged using what they had
+  // established — the earlier caveat that mattered went unused. What they
+  // established is to be USED; only what was raised is not to be re-raised.
+  if (established.length) {
+    context.push('', 'What they have established — use it where it matters, and attribute it to them:');
+    for (const x of established) context.push(`  - ${x}`);
+  }
+  if (raised.length) {
+    context.push('', 'Already raised — do not raise any of these as new (building on one, answering it, or contrasting with it is fine):');
+    for (const x of raised) context.push(`  - ${x}`);
+  }
+  const questions =
+    dec.questionsAreContent
+      ? 'They asked FOR questions: those are the content. No other questions, no closing offers.'
+      : dec.maxQuestions === 0
+        ? 'Questions this turn: NONE. Not as a question, not disguised as a hint or a challenge ("consider whether…", "ask yourself…"), not as a closing offer.'
+        : 'Questions this turn: at most ONE, and only if it is genuinely needed. No closing offers.';
+
+  // Not forced: constraints only; the model chooses the move (council D1).
+  if (!dec.forced) {
+    return [
+      '\n=== This turn ===',
+      'No move is imposed. Reply to what they actually said, as a strong peer would, and help fully: answer what they asked, correct what is wrong, and where you can, add the one thing they have not considered — never manufacture it.',
+      ...context,
+      '',
+      questions,
+      'Do not narrate what you are doing or why.',
+    ].join('\n') + '\n';
+  }
+
   const lines = [
     '\n=== Your move this turn ===',
     `MOVE: ${dec.type}`,
@@ -432,15 +490,10 @@ export function renderDecision(dec: InterventionDecision, a: Allocation): string
       'a hint, or a "for instance". Everything else you can give, give.'
     );
   }
-  if (dec.avoid.length) {
-    lines.push('', 'Already on the table (theirs) — do not raise any of these as new, and do not ask about them:');
-    for (const x of dec.avoid) lines.push(`  - ${x}`);
-  }
   lines.push(
+    ...context,
     '',
-    dec.maxQuestions === 0
-      ? 'Questions this turn: NONE. Not as a question, not disguised as a hint or a challenge ("consider whether…", "ask yourself…"), not as a closing offer. End when the move is made.'
-      : 'Questions this turn: at most ONE, and only the one the objective calls for. No closing offers.',
+    questions + (dec.maxQuestions === 0 && !dec.questionsAreContent ? ' End when the move is made.' : ''),
     '',
     'This choice is made. Do not narrate it, name it, or explain why you are doing it.',
     'Reply as the move, in Socria’s voice, at the length the moment deserves.'

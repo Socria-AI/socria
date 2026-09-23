@@ -177,12 +177,20 @@ export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
       ? `\n=== Their attempt was checked ===\nVERDICT: ${verify.verdict}${verify.method === 'exact' ? ' (computed exactly)' : ''}${verify.expected ? `\nCORRECT ANSWER: ${verify.expected}` : ''}\n`
       : '';
 
+  // A verdict that was COMPUTED or confidently CHECKED is a fact, not a
+  // guess: a correction or confirmation resting on it is imposed (council D1).
+  if ((decision.type === 'CORRECT' || decision.type === 'VERIFY') && verify && verify.verdict !== 'unknown' && (verify.method === 'exact' || verify.confidence >= CHECK_FLOOR)) {
+    decision = { ...decision, forced: true };
+  }
   // CALCULATE only when the value was actually computed (council D7);
   // otherwise it is an ANSWER, which may not claim to have calculated.
   let computed = '';
   if (decision.type === 'CALCULATE') {
     const c = computeAsked(input.lastUserText);
-    if (c) computed = `\n=== Computed exactly (use this value) ===\n${c.expr} = ${c.value}\n`;
+    if (c) {
+      computed = `\n=== Computed exactly (use this value) ===\n${c.expr} = ${c.value}\n`;
+      decision = { ...decision, forced: true };
+    }
     else decision = { ...decision, type: 'ANSWER', reasonCode: `${decision.reasonCode}.not_computed` };
   }
 

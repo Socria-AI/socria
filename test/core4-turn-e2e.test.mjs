@@ -103,7 +103,7 @@ async function turn(conversationId, messages, { state = {}, replies, guard, chec
   const prompt = globalThis.__prompts[0] ?? '';
   return {
     status: r.status, prompt, prompts: globalThis.__prompts, received,
-    move: /MOVE: (\w+)/.exec(prompt)?.[1] ?? null,
+    move: globalThis.__socriaTrace[0]?.decision?.type ?? null,
     t: globalThis.__socriaTrace[0] ?? null,
     guardCalls: globalThis.__guardCalls.length,
     checkCalls: globalThis.__checkCalls.length,
