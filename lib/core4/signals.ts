@@ -40,6 +40,7 @@ export const NO_SIGNALS: ExplicitSignals = {
   offRecord: false,
   onRecord: false,
   sensitive: false,
+  flagOnly: false,
   requestsQuestions: false,
   delegate: false,
   ownWork: false,
@@ -192,6 +193,17 @@ const ON_RECORD = /\b(you can remember (?:this|that|again)|back on the record|ok
 // ever REDUCES what is kept (conversation-only), never what is said.
 const SENSITIVE = /\b(diagnos(?:is|ed)|my (?:therapist|psychiatrist)|depress(?:ion|ed)|anxiety disorder|panic attacks?|bipolar|adhd|ptsd|eating disorder|chemo(?:therapy)?|cancer|hiv|miscarriage|pregnan(?:t|cy)|abortion|medication|antidepressants?|grief|griev(?:e|ing)|passed away|funeral|divorce|custody|separat(?:ed|ion) from my|my (?:ex|abuser)|abus(?:e|ive)|sexuality|coming out|gay|lesbian|trans(?:gender)?|religio(?:n|us)|faith|immigration status|visa (?:status|overstay)|undocumented|asylum|deport\w*|arrest(?:ed)?|criminal record|lawsuit against me|bankrupt\w*|debt collectors?|in debt|can'?t pay (?:rent|my))\b/i;
 
+const FLAG_ONLY = new RegExp(
+  [
+    String.raw`\b(?:do not|don'?t) (?:tell|show) me (?:what'?s|what is|where(?:'s| it)?|which (?:line|part)) (?:wrong|broken|the (?:bug|error|mistake|problem))`,
+    String.raw`\bfinding (?:it|the (?:bug|error|mistake|problem)) (?:myself )?is the (?:point|whole point)\b`,
+    String.raw`\b(?:you )?only tell me (?:if|whether|when) i(?:'ve| have)? (?:gone off the rails|gone wrong|gone off track|made a mistake|got it wrong|am wrong|'m wrong)`,
+    String.raw`\bjust (?:tell me|flag|say) (?:if|whether) i(?:'m| am) (?:wrong|off|on the right track)\b`,
+    String.raw`\bwarmer (?:or|\/) colder\b`,
+  ].join('|'),
+  'i'
+);
+
 const REQUESTS_QUESTIONS = /\b((?:write|give|make|draft|generate|come up with|list|suggest)(?: me)? (?:\w+ ){0,3}(?:questions|quiz|exam items|practice problems|interview questions|test items|flashcards|faq)|quiz me|test me|drill me|interview questions)\b/i;
 
 interface Hit {
@@ -267,6 +279,9 @@ export function readSignals(message: string): ExplicitSignals {
   const positive = negative ? null : note(lastIndex(POSITIVE, text));
 
   const practice = notLearning ? null : note(lastIndex(PRACTICE, text));
+  // "Only tell me if I've gone off the rails" refuses the fix as surely as
+  // "don't tell me the answer" does — unless a later "just tell me" wins.
+  if (directness === 'none' && FLAG_ONLY.test(text)) directness = 'no_answer';
 
   return {
     directness,
@@ -279,6 +294,7 @@ export function readSignals(message: string): ExplicitSignals {
     offRecord: !!note(lastIndex(OFF_RECORD, text)),
     onRecord: !!note(lastIndex(ON_RECORD, text)),
     sensitive: SENSITIVE.test(text),
+    flagOnly: !!note(lastIndex(FLAG_ONLY, text)),
     requestsQuestions: !!lastIndex(REQUESTS_QUESTIONS, text),
     expertise: expert ? 'expert' : novice ? 'novice' : null,
     assessment: !!note(lastIndex(ASSESSMENT, text)),

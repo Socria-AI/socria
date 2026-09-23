@@ -168,6 +168,7 @@ export function mergeState({ prior, read, signals, contract, readOk }: MergeInpu
     masteryEvidence,
     questionsPreference,
     persistPolicy,
+    flagOnly: signals.directness === 'answer' ? false : signals.flagOnly || !!p.flagOnly,
     lastOutcome,
     history,
     turn,

@@ -230,6 +230,8 @@ export interface CognitiveState {
    * evidence, no free text in the saved state, no Mind Graph write.
    */
   persistPolicy: 'full' | 'conversation_only' | 'none';
+  /** they asked for verdicts only ("only tell me if I've gone off the rails"); sticky until they ask for the answer */
+  flagOnly: boolean;
   /** turns so far in this conversation */
   turn: number;
 }
@@ -269,6 +271,7 @@ export const EMPTY_STATE: CognitiveState = {
   history: [],
   questionsPreference: 'none',
   persistPolicy: 'full',
+  flagOnly: false,
   turn: 0,
 };
 
@@ -398,6 +401,7 @@ export function sanitizeState(raw: unknown): CognitiveState {
     history: [],
     questionsPreference: 'none',
     persistPolicy: 'full',
+    flagOnly: false,
     turn: 0,
   };
 }

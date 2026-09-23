@@ -117,6 +117,12 @@ console.log('\n=== council D2: verified false positives stay false ===');
   ok('"which would you pick?" asks for a recommendation', S('A or B — which would you pick?').recommendationRequested);
   ok('"idk" is not knowing', S('idk').dontKnow && S('no idea tbh').dontKnow && !S("I don't know why the cache misses on every deploy, here are the logs and the config").dontKnow);
   ok('"write me 5 interview questions" asks FOR questions', S('write me 5 interview questions for a data engineer').requestsQuestions);
+  // Run 1 findings (direct-answer-012, no-answer-request-002).
+  const bug = S("Please do NOT tell me what's wrong with my code, finding it is the point. Is the expected answer 7?");
+  ok('"do NOT tell me what\'s wrong… finding it is the point" is verdict-only and a refusal', bug.flagOnly && bug.directness === 'no_answer', JSON.stringify({ f: bug.flagOnly, d: bug.directness }));
+  const rails = S("Is it OK if I just keep going on this and you only tell me if I've gone off the rails?");
+  ok('"only tell me if I\'ve gone off the rails" is verdict-only', rails.flagOnly && rails.directness === 'no_answer');
+  ok('"just tell me the answer" after it still wins', S("only tell me if I've gone off the rails. actually no, just tell me the answer").directness === 'answer');
 }
 
 console.log('\n=== stripping ===');

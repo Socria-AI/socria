@@ -86,6 +86,12 @@ export interface ExplicitSignals {
   offRecord: boolean;
   /** "you can remember this (again)", "back on the record" */
   onRecord: boolean;
+  /**
+   * "only tell me if I've gone off the rails", "do NOT tell me what's wrong,
+   * finding it is the point": a verdict only — not where, not what kind
+   * (council D2 feedbackPreference = flag_only). Implies a refusal of the fix.
+   */
+  flagOnly: boolean;
   /** a sensitive subject (health, grief, divorce, immigration, debt, …): council D14 */
   sensitive: boolean;
   /** the request is FOR questions (quiz items, interview questions, practice problems): they are content, not interrogation */

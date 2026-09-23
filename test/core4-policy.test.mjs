@@ -287,6 +287,14 @@ console.log('\n=== council D1/D6: safety, recommendations, the ladder ===');
   ok('the third failed attempt bottoms out: a full worked solution', third.allocation.reasonCode === 'practice.bottom_out' && third.allocation.withhold === null && third.decision.type === 'EXPLAIN');
   const idk = decide(S({ work: 'practice', latest: 'attempt', attempt: 'wrong', directness: standing, history: failed(1) }), { said: 'idk' });
   ok('"idk" after a failed attempt bottoms out sooner', idk.allocation.reasonCode === 'practice.bottom_out', idk.allocation.reasonCode);
+  // Run 1 (direct-answer-012): verdict only, no location.
+  const fo = turn({ taskKind: 'learn', work: 'verification', latest: 'attempt', attempt: 'wrong' }, "Please do NOT tell me what's wrong with my code, finding it is the point. Is the answer definitely 7, and have I got the right idea?");
+  const fod = decide(fo, { said: "Please do NOT tell me what's wrong with my code, finding it is the point." });
+  ok('verdict-only: VERIFY that says right or not, and NOT where', fod.decision.type === 'VERIFY' && /Do NOT say where/.test(fod.decision.objective), `${fod.decision.type}`);
+  ok('  and the fix is withheld, from their words', !!fod.allocation.withhold && fod.allocation.withhold.source === 'message');
+  // Run 1 (direct-answer-009): CORRECT never invents a problem.
+  const partial = decide(S({ work: 'verification', latest: 'attempt', attempt: 'partial' }));
+  ok('CORRECT allows "it is actually right" and forbids inventing a problem', partial.decision.type === 'CORRECT' && /never invent a problem/.test(partial.decision.objective));
   // Pilot finding 8 (learning-006): a requested drill must get one item per turn.
   const quiz = turn({ taskKind: 'learn', work: 'practice', latest: 'attempt', attempt: 'right' }, 'drill me on key signatures, one at a time');
   const qd = decide(quiz, { said: 'drill me on key signatures, one at a time', streak: 3, density: 1 });

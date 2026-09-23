@@ -255,9 +255,11 @@ function selectMove(input: SelectInput): InterventionDecision {
       return d(practice ? 'VERIFY' : 'CORRECT', {
         reasonCode: practice ? 'verify.practice' : 'verify.correct', reason: a.rationale,
         intended: practice ? 'They can find and fix the error themselves.' : 'They have the correct version and know why theirs was wrong.',
-        objective: practice
-          ? 'Say whether it is right. If not, say exactly WHERE it goes wrong and what KIND of error it is (sign, step, assumption, arithmetic), clearly enough that they can fix it. Do not give the corrected final answer — they are practising and redoing it is theirs. No questions.'
-          : 'Say clearly what is wrong and where, then give the correct version and why. Direct and specific. No questions back.',
+        objective: input.signals.flagOnly || s.flagOnly
+          ? 'They asked for a verdict only: say plainly whether it is right or not, and answer any factual question they asked. Do NOT say where it goes wrong or what kind of error — finding it is theirs. No hints unless they ask. No questions.'
+          : practice
+            ? 'Say whether it is right. If not, say exactly WHERE it goes wrong and what KIND of error it is (sign, step, assumption, arithmetic), clearly enough that they can fix it. Do not give the corrected final answer — they are practising and redoing it is theirs. No questions.'
+            : 'Say clearly whether it is right. If it is wrong: what is wrong and where, then the correct version and why. If it is actually right, say so plainly and add only what is genuinely useful — never invent a problem. No questions back.',
         alloc: a, avoid,
       });
     }
