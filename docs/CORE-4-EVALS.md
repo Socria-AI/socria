@@ -118,8 +118,8 @@ LLM judge alone:
 
 A stratified pilot of 14 scenarios (~40 turns, both arms) is being run to
 shake out the harness before the full corpus. It has already paid for
-itself: reading the first generated Core 4 transcripts found two real
-defects, both now fixed with regression tests:
+itself: reading the first generated Core 4 transcripts found four real
+defects, all now fixed with regression tests:
 
 1. **A guard deletion broke the reply's markdown** (`expert-008`, session 2):
    the sentence splitter split "**Revenue.**" from its sentence, so deleting
