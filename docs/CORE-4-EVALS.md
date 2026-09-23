@@ -114,10 +114,24 @@ LLM judge alone:
 
 ## 4. Results
 
-### Pilot (in progress)
+### Pilot — a development run, not evidence
 
-A stratified pilot of 14 scenarios (~40 turns, both arms) is being run to
-shake out the harness before the full corpus. It has already paid for
+A stratified pilot of 14 scenarios (~40 turns, Core 4 and the A1 baseline)
+was run to shake out the harness. **It is not a measurement**, for three
+reasons, all stated here rather than buried:
+
+- **Blinding broke.** When a scenario's first session finished, `step.mjs`
+  printed the finished sessions — including each turn's `expect` block — so
+  model players on both arms saw the grading criteria mid-scenario
+  (`expert-008` and `changing-goals-001` from their second session on). The
+  players reported it themselves. Fixed: step output is now status and the
+  pending request only.
+- **The code under test changed** during and after it (the fixes below and
+  the council's first batch), so its transcripts describe a Core 4 that no
+  longer exists.
+- It never had the council's primary comparator (B+).
+
+What it was good for was finding defects by reading real transcripts. It has already paid for
 itself: reading the first generated Core 4 transcripts found four real
 defects, all now fixed with regression tests:
 
@@ -149,6 +163,21 @@ defects, all now fixed with regression tests:
    using, applying, quantifying or contrasting a considered item is not
    raising it, and to leave a sentence alone when unsure.
 
+5. **Verify Mode checked the wrong problem** (`math-001`): the exact path took
+   an arithmetic expression from one of *Socria's* earlier replies (its own
+   counterexample), computed it, and told the reply model the person's
+   correct proof was "incorrect (computed exactly)". The player noticed and
+   declined to invent a correction. Fixed per council D13: only expressions
+   the person posed, never dates/versions/doses/money, final stated value
+   compared.
+6. **A control character disabled negation.** A scripted edit had turned a
+   regex `\b` into a literal backspace in the signal reader's negation check,
+   so "don't just give me the answer" could read as a request for it. Found
+   while implementing D2; a scan found no other instance.
+7. **A decimal became a sentence boundary** (`changing-goals-001`): "take that
+   out of the 6.7." reached the person as "7." — the same splitter defect as
+   finding 1, in the old bundle.
+
 The pattern across all four: every one came from **code deciding something
 semantic on surface evidence** (a word overlap, a regex, a sentence
 boundary). The counting and enforcement parts held up; the parts that
@@ -156,8 +185,27 @@ pretend to understand text are where Core 4 breaks. That is the council's
 Agent 1 critique showing up in data, and it points the next changes at
 moving semantic calls to the model (bounded by code), not at more rules.
 
-The pilot's win/loss numbers will be recorded here when both arms and the
-blind judging are complete — whatever they show.
+**One directional observation from the pilot's deterministic metrics**
+(development data, contaminated — reported because it is informative, not
+because it is evidence): Core 4 and the A1 baseline were nearly identical on
+every friction metric — 0.02 questions per reply each, 2% of replies with
+any question, 0% ending in a question, one `mustNotReveal` leak each, all
+`maxQuestions` expectations met by both. **The strong prompt alone already
+avoids interrogation.** Whatever Core 4 adds, it is not visible in question
+counts against a strong baseline; if it exists it has to show up in the
+judged properties (contribution, correctness, withholding done right,
+continuity) — which is what the measured run below is for.
+
+### Run 1 — measured (in progress)
+
+26 scenarios, stratified across all 18 categories, disjoint from the pilot
+where possible; three arms — Core 4 (current code, after council batch 1),
+A1 (strongest prompt, equal token cap) and **B+** (A1 plus one self-critique
+pass, the council's primary comparator); fresh player agents per arm, none
+seeing another arm's prompts; fixed step output. Grading: deterministic
+metrics, then blind pairwise judge agents per comparator (A/B assignment by
+salted hash, key never shown), then the human-rating page. Results will be
+recorded here as they are — including losses.
 
 ### Full corpus
 
