@@ -24,20 +24,20 @@ client sends the conversation; the server holds everything Core 4 knows.
 |---|---|---|---|
 | 1 | Auth, rate limit, validation | `route.ts` | Core 4 requires an account. |
 | 2 | Project + memory recall + **prepare** (in parallel) | `route.ts`, `lib/mind/pipeline.ts`, `lib/core4/turn.ts prepareTurn` | The Project (if any) is loaded first, then Mind Graph recall and `prepareTurn` run concurrently. |
-| 3 | UNDERSTAND: explicit signals | `lib/core4/signals.ts` | Deterministic reading of the person's own words: "just tell me", "don't give me the answer", "I'm learning this", "I'm a senior engineer", "graded homework", "stop asking", "I already said that", frustration, corrections, feedback. Negation-aware. The Project's instructions are read the same way, as a standing contract. |
+| 3 | UNDERSTAND: explicit signals | `lib/core4/signals.ts` | Deterministic reading of the person's own words, in tiers (council D2): only STRONG phrasing ("I want to work it out myself", "don't tell me the answer", "hints only", "let me try it first", graded work they will submit) can lead to anything being withheld; "I'm studying X", "help me understand" are context. Also: "just tell me", "stop asking", "I already said that", "idk", "which would you pick?", "you gave it away", emergencies (the safety signal), requests FOR questions, corrections, feedback. Negation-aware; code, quotes and attachments are not read. The Project's instructions are read the same way, as a standing contract. |
 | 4 | UNDERSTAND: load | `lib/core4/store.ts` | Last turn's Cognitive State for this conversation and the relevant part of the Reasoning Ledger, in parallel. |
-| 5 | UNDERSTAND: read | `lib/cognition/engine.ts readState` | One cheap-model JSON call (5 s timeout) over the transcript, the prior state and what is already considered. Reports evidence, never traits. Cannot mark anything explicit and cannot set directness. |
+| 5 | UNDERSTAND: read | `lib/cognition/engine.ts readState` | One cheap-model JSON call (2 s timeout) over the transcript, the prior state and what is already considered. Reports evidence, never traits. Cannot mark anything explicit and cannot set directness. |
 | 6 | UNDERSTAND: merge | `lib/core4/merge.ts` | Precedence: the person's words now > the Project contract > what persisted > the reader's inference. Inferred fields are sticky (a contrary reading must be at least as confident). "Just tell me" fades after two turns; "don't tell me" holds until they say otherwise. The previous turn's outcome is attached to its memo. |
 | 7 | Corrections | `lib/core4/ledger.ts disputeTurn` | "That's not what I meant" marks their ledger entries from the previous turn *disputed*. |
 | 8 | MEASURE (before): budget + diminishing returns | `lib/core4/budget.ts`, `questions.ts` | The question budget is priced from the transcript (any interrogative content: explicit, disguised, closing offers), streak and density. Diminishing returns are detected from explicit signals (one suffices) or inferred ones (two must agree). |
 | 9 | Verify Mode, exact | `lib/core4/verify.ts exactCheck` | Arithmetic in an attempt is computed exactly **before** the move is chosen; a computed verdict overrides the reader's. |
 | 10 | ALLOCATE | `lib/core4/allocation.ts` | Who does which part of the thinking, with a machine-readable rationale and a withhold (what, reason, evidence, source) — or none. |
 | 11 | INTERVENE | `lib/core4/intervene.ts` | One move, with type, reason code, intended outcome, human work preserved, AI work performed, confidence, whether the guard must read it, max questions, token budget. |
-| 12 | Verify Mode, checker | `lib/cognition/engine.ts checkWork` | Only when something is withheld and arithmetic could not settle it: a separate cheap-model call judges the attempt (4 s timeout). Its expected answer never reaches the reply model; a confident verdict that contradicts the reader re-decides the move. |
-| 13 | Prompt assembled | `lib/socria-prompt.ts buildSystemPrompt` | Core 4 prompt v2, imported profile, Project, Mind Graph, then the state block, the verify block, the move block — in that order, last before the transcript. No thread memory, no Thinking Journey. |
-| 14 | Generate | `route.ts core4Reply`, `lib/core4/model.ts` | Through the model seam. **Buffered** if the move withholds or raises a perspective (so the guard reads the whole draft); otherwise **streamed** through the sentence gate. |
+| 12 | Verify Mode, checker | `lib/cognition/engine.ts checkWork` | Only when something is withheld and arithmetic could not settle it: a separate cheap-model call judges the attempt (1.5 s timeout). Its expected answer never reaches the reply model; a confident verdict that contradicts the reader re-decides the move. |
+| 13 | Prompt assembled | `lib/socria-prompt.ts buildSystemPrompt` | Core 4 prompt v3, imported profile, Project, Mind Graph, then the state block, the verify block, the move block — in that order, last before the transcript. No thread memory, no Thinking Journey. |
+| 14 | Generate | `route.ts core4Reply`, `lib/core4/model.ts` | Through the model seam. **Buffered** only if something is withheld (so the guard reads the whole draft before anything is sent); otherwise **streamed** through the sentence gate (council D8 — buffering every perspective move put the latency on expert turns). |
 | 15 | Answer Guard 2.0 | `lib/core4/guard2.ts`, `turn.ts guardReply` | Deterministic first; cheap model only for what structure cannot decide, and only to *delete* sentences. One regeneration by the reply model if needed; the retry is always re-checked; a failing retry is never shipped (`fallbackReply`). |
-| 15′ | Stream gate | `lib/core4/stream-gate.ts` | Streamed moves: sentences go out as they complete, but any interrogative (explicit, disguised, offer) is held; released if exposition follows (rhetorical), otherwise shipped only within the budget. Sycophantic openers are removed. Code passes through. |
+| 15′ | Stream gate | `lib/core4/stream-gate.ts` | Streamed moves: sentences go out as they complete, but any interrogative (explicit, disguised, offer, comprehension check) is held; released if exposition follows (rhetorical), otherwise shipped only within the budget, and never if it re-asks something already considered. Questions the person asked FOR pass straight through. Sycophantic openers are removed. Code passes through. |
 | 16 | LEARN: write back | `turn.ts finishTurn` | Before the stream closes: ledger entries (attributed in code), links, the carried-forward state with this turn's memo, the content-free trace, capability evidence, and the previous turn's outcome on its own row. |
 | 17 | Mind Graph writeback | `route.ts` → `remember()` via `waitUntil` | After the response, kept alive by `waitUntil`. |
 
@@ -71,6 +71,9 @@ Persisted per conversation in `core4_state`.
 ### Cognitive Allocation — `lib/core4/allocation.ts`
 Modes: `AI_EXECUTES`, `AI_EXPLAINS`, `AI_VERIFIES`, `SHARED_REASONING`,
 `AI_ASSISTS`, `HUMAN_LEADS`, `HUMAN_PRACTICES`, `HUMAN_REFLECTS`.
+A **safety gate** comes first: harm now (an emergency, a poisoning, money
+being taken) suspends every contract and gets immediate direct
+instructions. Explicit directness is evaluated before "being heard".
 **Withholding requires an explicit source** — the message, earlier in the
 conversation, or the Project — and one of five reasons: `practice_goal`,
 `requested_no_answer`, `authorship`, `assessment_integrity`,
@@ -81,7 +84,15 @@ graded work they will submit, where the method is explained fully with an
 analogous worked example and the submittable answer is held back — said once,
 plainly. The latest explicit statement beats a standing Project instruction,
 and the rationale records the override. The first withholding in a
-conversation is announced with how to get the answer.
+conversation is announced with how to get the answer. A standing "don't
+tell me" never covers a plain fact, a definition or mechanical work.
+**Verification first**: an attempt under "hints only" still hears whether
+it is right (and a right one hears it first). **The ladder bottoms out**:
+after repeated failed attempts on an item (sooner after "idk" or
+frustration) Socria works it fully with the principle named, and the next
+item is theirs again. "Let me try it first" with nothing tried gets "go
+ahead". "Which would you pick?" gets a pick, marked as a view, with the
+value that would flip it.
 
 ### Intervention Engine — `lib/core4/intervene.ts`
 Selectable moves: ANSWER, EXPLAIN, CORRECT, VERIFY, CRITIQUE, CHALLENGE,
@@ -100,16 +111,21 @@ maxTokens`.
 One counter for "a question" everywhere (engine, guard, gate, grader):
 explicit `?` sentences, disguised interrogatives ("it might be worth
 thinking about…", "ask yourself…", "what do you think"), and closing offers.
-Budget: 0 after two asking replies in a row, or one asking reply in a
-mostly-asking conversation, or on diminishing returns or frustration; 0
-always after "stop asking"; 1 when they asked to be quizzed; a genuine
-blocker earns one back below a streak of three.
+Budget (council D4): 0 after two asking replies in a row, or when a
+question-bearing reply is among the last three outside practice (at most
+one in four), or after "just tell me", or on diminishing returns or
+frustration; 0 always after "stop asking"; 1 when they asked to be quizzed.
+There is **no question re-granted for a blocker**: when something only they
+can supply is missing, Socria proceeds under a stated assumption and says
+what to send as an instruction, not a question. Comprehension checks ("Does
+that make sense?") are always stripped.
 
 ### Already Considered and the novelty gate — `lib/core4/considered.ts`, `ledger.ts consideredView`
 The already-considered record is a **view over the Reasoning Ledger**, not
 a separate store: what the person raised, ruled out (and why), settled — and
 what Socria already said — ranked by conversation, Project and relevance.
-The move block lists it; the guard enforces it. Only things that can be *raised* are gated —
+**Prevention is primary**: the move block lists it, stance and all, and
+tells the model not to raise any of it as new. Detection is a backstop. Only things that can be *raised* are gated —
 objections, alternatives, questions, assumptions, hypotheses, uncertainties
 (and Socria's own objections and questions); facts and decisions they hold
 are shown as context but never grounds for deletion. Matching is lexical
@@ -120,8 +136,10 @@ applying or contrasting a considered item is not raising it. (Lexical
 deletion of statements was removed after the pilot — see
 `CORE-4-EVALS.md`, findings 2 and 4.) Sentences that
 explicitly build past a covered item ("you've already ruled out X; …") are
-not candidates. Gated: perspective moves always; ANSWER when thinking
-together and there is a record; pure information answers never.
+not candidates. On streamed turns (nothing withheld) only a re-asked
+*question* can be dropped, by the stream gate; the model check of
+statements runs only on buffered turns. A re-raised statement on a streamed
+turn is therefore not caught — a known limit, measured by E5.
 
 ### Reasoning Ledger — `lib/core4/ledger.ts`
 Entries (`claim, evidence, assumption, objection, alternative, hypothesis,
@@ -135,28 +153,44 @@ close paraphrase that agrees on which shared concepts are negated. Anything
 else is `unknown` — it can stop repetition but is never said back as theirs.
 What Socria says is recorded as Socria's, from the text actually sent.
 Adoption of a Socria idea creates a *new* user entry linked `derived_from`;
-ownership is never rewritten. `toLogosGraph` renders the same substrate as
-nodes and edges for Logos. Tables: `reasoning_entries`, `reasoning_links`.
+ownership is never rewritten. There are no lexical auto-links (council D10): a link drawn from word
+overlap would be structure presented as reasoning the person never stated.
+`toLogosGraph` renders the same substrate as nodes and edges for Logos. Tables: `reasoning_entries`, `reasoning_links`.
 
 ### Answer Guard 2.0 — `lib/core4/guard2.ts`
-Two-sided. **Overreach** (only when something is withheld): the private
+Runs on the whole draft only when something is withheld; on streamed turns
+its questions-and-openers part is done by the stream gate. Two-sided. **Overreach** (only when something is withheld): the private
 verify value, gives-then-asks ("the rule is X… now try it yourself"), a
 worked solution inside a HINT/VERIFY/QUESTION. **Underhelp**: questions over
 budget (stripped), a reply that is only questions (regenerate; OVERRIDE_WITH_
 DIRECT_ANSWER when the machine should do the work), deflection ("it depends
 on your goals") to a direct request. **Novelty** (above). **Voice**:
-sycophantic opener, closing offers. Actions: ALLOW, MODIFY_FOR_MORE_AGENCY,
+sycophantic opener, closing offers, comprehension checks, claims of tools
+Socria does not have ("I searched…"), inferences about the person stated as
+fact. **Verdict**: a CORRECT/VERIFY with no verdict is sent back. Hidden
+values are matched as values (a hidden 4.2 is not in 14.2). A **coherence
+floor** stops any edit that would leave the reply dangling, or remove more
+than a quarter of its substance; the draft is regenerated instead. When
+nothing is withheld, a reply that cannot be fixed ships as it was, minus
+over-budget questions — never canned text. Actions: ALLOW, MODIFY_FOR_MORE_AGENCY,
 MODIFY_FOR_MORE_HELP, OVERRIDE_WITH_DIRECT_ANSWER, REQUEST_CLARIFICATION. The
 cheap model is consulted on withheld turns and uncertain novelty; its output
 is used to delete named sentences or to trigger a frontier regeneration —
 never shipped as prose.
 
 ### Verify Mode — `lib/core4/verify.ts`
-Exact arithmetic via the Logos evaluator, before the move is chosen. A
+Exact arithmetic via the Logos evaluator, before the move is chosen — only
+on an expression **the person posed** (after "compute", "what is", "= ?"),
+never one from Socria's replies, never dates, ranges, versions, doses or
+money, comparing their **final stated value** (council D13; a pilot run had
+marked a correct proof wrong against a number from Socria's own reply).
+CALCULATE is only chosen when the value was actually computed and is given
+to the model; otherwise the move is ANSWER, which may not claim to have
+calculated. A
 separate checker call for everything else, only when something is withheld.
 The reply model gets VERDICT / WHERE / KIND OF ERROR, never the expected
 answer; the guard gets the expected answer (and its spellings) as hidden
-values to keep out of the reply. Below 0.7 confidence the checker's verdict
+values to keep out of the reply. Below 0.85 confidence the checker's "incorrect"
 is not claimed. When nothing is withheld, the correct answer is given to the
 reply model so it can correct plainly.
 
@@ -167,8 +201,10 @@ from the person's words (explicit) or the reader (inferred, capped at 0.7).
 Used in the next turn's selection (a move that just landed badly is not
 repeated; friction outcomes feed diminishing returns). **No online learning**:
 nothing updates policy automatically. Capability is **evidence events**
-(demonstrated unassisted / assisted, self-corrected, misunderstanding,
-needed the answer), per concept, counted — with independent capability
+(demonstrated unassisted / assisted, self-corrected, misunderstanding),
+recorded only on a real verdict (computed, or a checker at ≥0.85) — never
+the reader's opinion, and never "needed the answer", which recorded a
+preference as a deficit — per concept, counted — with independent capability
 credited only in a *later conversation* than the help. The per-turn trace
 is content-free (enums, counts, reason codes, timings, model ids, prompt
 version).
@@ -177,7 +213,8 @@ version).
 Every Core 4 model call (state, reply, retry, guard, verify, extract) goes
 through `modelClient()`. Production is OpenAI, configured as before. The
 eval harness installs its own client, so what is evaluated is the shipped
-pipeline.
+pipeline; installed clients and the trace sink are ignored when
+NODE_ENV=production.
 
 ## 3. Memory, unified
 
@@ -223,10 +260,10 @@ title-only extractor path (`app/api/extract-memory`, `titleOnly`).
 ## 5. Latency and cost
 
 Added to a Core 4 turn, before the first token: the state read (cheap model,
-≤5 s, usually well under 1 s of wall time relative to recall, which runs
+≤2 s, usually well under 1 s of wall time relative to recall, which runs
 concurrently), the state/ledger load (parallel), and — only on withheld
-attempts — the checker (≤4 s). Buffered moves add the guard (deterministic:
-negligible; cheap model on withheld turns and uncertain novelty: ≤5 s) and,
+attempts — the checker (≤1.5 s). Buffered (withheld) moves add the guard (deterministic:
+negligible; cheap model: ≤1.5 s) and,
 rarely, one regeneration. Streamed moves add nothing but the sentence gate.
 Timings for every stage are in the trace (`ms`).
 
