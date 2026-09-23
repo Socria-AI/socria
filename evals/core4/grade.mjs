@@ -81,7 +81,10 @@ function metricsFor(resMap) {
 }
 const mC = metricsFor(core4);
 const mB = metricsFor(baseline);
-const both = [...core4.keys()].filter((id) => baseline.has(id));
+// --exclude a,b: scenarios left out of the comparison, with the reason
+// recorded in docs/CORE-4-EVALS.md (e.g. a player edited replies after use).
+const EXCLUDE = new Set(String(args.exclude || '').split(',').map((x) => x.trim()).filter(Boolean));
+const both = [...core4.keys()].filter((id) => baseline.has(id) && !EXCLUDE.has(id));
 const inBoth = (ms) => ms.filter((x) => both.includes(x.id));
 
 function byCategory(ms) {
@@ -117,7 +120,7 @@ for (const id of both) {
     key.map[id] = h % 2 === 0 ? { A: 'core4', B: VS } : { A: VS, B: 'core4' };
   }
   const s = byId.get(id);
-  const arms = { core4: core4.get(id), baseline: baseline.get(id) };
+  const arms = { core4: core4.get(id), [VS]: baseline.get(id) };
   const side = (arm) => arms[arm].sessions.map((sess) => sess.turns.map((t) => ({ user: t.user, reply: t.reply })));
   const packet = {
     scenario: id,
@@ -191,7 +194,7 @@ const cats = [...new Set(judged.map((j) => j.category))].sort();
 const report = {
   run,
   generatedAt: new Date().toISOString(),
-  completed: { core4: core4.size, baseline: baseline.size, both: both.length, judged: judged.length, corpus: corpus.length },
+  completed: { core4: core4.size, baseline: baseline.size, both: both.length, judged: judged.length, corpus: corpus.length, excluded: [...EXCLUDE] },
   metrics: {
     core4: aggregate(inBoth(mC).map((x) => x.m)),
     baseline: aggregate(inBoth(mB).map((x) => x.m)),

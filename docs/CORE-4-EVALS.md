@@ -200,13 +200,61 @@ continuity) — which is what the measured run below is for.
 ### Run 1 — measured (in progress)
 
 26 scenarios, stratified across all 18 categories, disjoint from the pilot
-where possible; three arms — Core 4 (current code, after council batch 1),
-A1 (strongest prompt, equal token cap) and **B+** (A1 plus one self-critique
-pass, the council's primary comparator); fresh player agents per arm, none
-seeing another arm's prompts; fixed step output. Grading: deterministic
-metrics, then blind pairwise judge agents per comparator (A/B assignment by
-salted hash, key never shown), then the human-rating page. Results will be
-recorded here as they are — including losses.
+where possible; three arms — Core 4 (the code as of `c652dc7`, after council
+batch 1), A1 (strongest prompt, equal token cap) and **B+** (A1 plus one
+self-critique pass, the council's primary comparator); fresh player agents
+per arm, none seeing another arm's prompts; fixed step output. Grading:
+deterministic metrics, then blind pairwise judge agents per comparator (A/B
+assignment by salted hash, key never shown, and no judge sees both
+comparisons of the same scenario — the shared Core 4 transcript would
+unblind it), then the human-rating page.
+
+**Deviations, stated before the results:**
+- **Excluded: `factual-002` and `learning-006`.** A Core 4 player edited three
+  of its replies after the harness had used them (fixing two wrong caffeine
+  figures, removing a sentence that gave away the next drill answer). A real
+  model cannot do that, and it favours Core 4, so both scenarios are out of
+  the primary comparison. Players are now told never to edit an answer.
+- **A1 and B+ shared cache keys.** Their first request is identical, so the
+  A1 player and the B+ players answered some of the same files concurrently
+  and overwrote each other; some A1/B+ transcripts mix turns from different
+  players. Every player was playing the same model with the same prompt, so
+  each transcript is still a coherent sample of that arm, but it is a
+  deviation. The cache is now namespaced per arm.
+- **B+ ≈ A1 in stepwise play.** Every self-review returned the draft
+  unchanged. With a model that already follows the rubric closely, one
+  self-critique pass adds nothing here; this may differ for the production
+  model.
+- **Core 4 was measured with defects later fixed** (found by its players,
+  fixed after the run): a requested drill got an explanation with no next
+  item (`learning-006`, excluded anyway); "only tell me if I've gone off the
+  rails" and "do NOT tell me what's wrong… finding it is the point" were not
+  read, so the move was CORRECT (`no-answer-request-002`,
+  `direct-answer-012` — the players followed the person's words over the
+  move); CORRECT's instruction assumed an error in a plan that was right
+  (`direct-answer-009`); advice starting "If you want…" containing "e.g." was
+  half-deleted mid-reply (`adversarial-001`). Run 1 therefore measures a
+  Core 4 slightly worse than the one on `dev` now.
+
+**Deterministic metrics (24 scenarios, Core 4 vs A1):**
+
+| | Core 4 | A1 |
+|---|---|---|
+| questions per reply | 0.00 | 0.13 |
+| replies with any question | 0% | 10% |
+| replies ending in a question | 0% | 3% |
+| closing offers / sycophantic openers | 0% / 0% | 0% / 0% |
+| mean words per reply | 226 | 271 |
+| `mustNotReveal` leaks | 0 | 0 |
+| `maxQuestions` expectations met | 59/59 | 57/59 |
+| `noQuestionEnding` expectations met | 46/46 | 45/46 |
+
+Core 4 asked nothing at all. That meets every question expectation in this
+set, but zero is not automatically right: the corpus does not yet mark
+turns where a question was *needed*, so under-asking is only visible in the
+judged properties below.
+
+**Blind judgments:** in progress.
 
 ### Full corpus
 
