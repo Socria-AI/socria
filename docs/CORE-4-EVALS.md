@@ -455,5 +455,14 @@ Not yet run.
 - **Lexical novelty matching** misses paraphrase and can over-match short
   sentences; the cheap-model pass and the raisable-only gate reduce but do
   not remove this.
+- **Defects in the 26 dev scenarios (runs 1–3), found by the corpus critic
+  and left unedited so the runs stay comparable.** `repeated-questioning-004`
+  scripts answers to questions the assistant may never have asked, which
+  penalises an assistant that asked nothing. `longitudinal-006`'s
+  `mustNotReveal` regex fires on a correctly hedged sentence. The withhold in
+  `direct-answer-012` covers the part-2 trick, which he never asked to keep.
+  `direct-answer-009` turn 2 and `decision-001` turn 2 measure little. Runs
+  from 4 on use held-out scenarios, and the critic fixed this defect class in
+  them.
 - **The latency cost** of the state read and buffered moves has not been
   measured against a live model.
