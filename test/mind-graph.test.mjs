@@ -692,5 +692,16 @@ console.log('\n=== the prompt block ===');
   ok('an empty subgraph renders nothing', renderMindGraph({ nodes: [], edges: [], seeds: [], scores: {} }, { now: T0, maxTokens: 800 }) === '');
 }
 
+console.log('\n=== what this conversation wrote is recalled on its next turn (Core 4 eval finding) ===');
+{
+  const person = { id: 'n-marcus', type: 'Person', label: 'Marcus', content: 'colleague who presented their analysis as his', aliases: [], status: 'active', confidence: 0.8, certainty: 0.8, importance: 0.7, activation: 0.2, seen: 1, private: false, provenance: [{ kind: 'stated', surface: 'core', at: T0, conversationId: 'conv-1' }], createdAt: T0, updatedAt: T0, lastAccessed: T0 };
+  const other = { ...person, id: 'n-other', label: 'Lisbon', content: 'a city', provenance: [{ kind: 'stated', surface: 'core', at: T0, conversationId: 'conv-9' }] };
+  const g = { ...EMPTY_GRAPH, nodes: [person, other], edges: [] };
+  ok('a message sharing no words with it recalls nothing without the conversation', activate(g, 'Angry, mostly.', { now: T0, limit: 10 }).nodes.length === 0);
+  const sub = activate(g, 'Angry, mostly.', { now: T0, limit: 10, conversationId: 'conv-1' });
+  ok('with it, this conversation\'s node comes back', sub.nodes.some((n) => n.id === 'n-marcus'), JSON.stringify(sub.nodes.map((n) => n.id)));
+  ok('and another conversation\'s does not', !sub.nodes.some((n) => n.id === 'n-other'));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

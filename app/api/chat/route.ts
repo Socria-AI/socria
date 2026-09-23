@@ -312,6 +312,7 @@ export async function POST(req: NextRequest) {
               plan,
               surface: 'core',
               projectId,
+              conversationId: conversationId ?? undefined,
             }).catch((e) => {
               console.error('[socria/chat] mind graph recall failed; continuing without it', e);
               return null;

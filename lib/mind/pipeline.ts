@@ -97,6 +97,8 @@ export async function recall(
     plan: 'free' | 'one';
     surface: ProvenanceSurface;
     focus?: string[];
+    /** the conversation, so what it already wrote is recalled on its next turn */
+    conversationId?: string;
     /**
      * The Project the conversation is in. A WEIGHTING on retrieval, never a
      * filter: see lib/mind/projects.ts. An id that is not this person's —
@@ -157,6 +159,7 @@ export async function recall(
       // image and shown to someone.
       excludePrivate: opts.surface === 'logos',
       focus: opts.focus,
+      conversationId: opts.conversationId,
       project: anchors.size ? { current, anchors } : undefined,
     });
 

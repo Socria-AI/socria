@@ -307,6 +307,8 @@ export interface InterventionDecision {
 export const LEDGER_KINDS = [
   'claim', 'assumption', 'evidence', 'question', 'hypothesis',
   'alternative', 'objection', 'decision', 'uncertainty', 'conclusion',
+  // council D10
+  'constraint', 'option',
 ] as const;
 export type LedgerKind = (typeof LEDGER_KINDS)[number];
 

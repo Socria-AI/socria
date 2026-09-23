@@ -123,7 +123,7 @@ export function leaksHidden(draft: string, hidden: string[]): string[] {
 }
 
 /** Claims of tools Socria does not have in this path (council D7/D8). */
-const TOOL_CLAIM = /\bi (?:just )?(?:searched|googled|looked (?:it |this |that )?up|ran (?:the|your|this|that) (?:code|script|query|numbers)|browsed|checked (?:online|the web|the internet))\b/i;
+const TOOL_CLAIM = /\bi(?:'ve| have)? (?:just )?(?:searched|googled|looked (?:it |this |that )?up|ran (?:the|your|this|that) (?:code|script|query|numbers)|browsed|checked (?:online|the web|the internet|(?:it|this|that) numerically|(?:it|this|that) in (?:python|code|a script)))\b/i;
 
 /** An inference about the person stated as fact (council D8). */
 const TRAIT_AS_FACT = /\byou(?:'re| are) (?:clearly |obviously )?(?:a beginner|an expert|anxious|insecure|defensive|overwhelmed)\b|\byou tend to\b|\byou seem (?:anxious|stressed|upset|frustrated|overwhelmed)\b/i;

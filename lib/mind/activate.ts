@@ -51,6 +51,14 @@ export interface ActivateOptions {
   /** extra terms beyond the message — the Cognitive State's currentFocus */
   focus?: string[];
   /**
+   * The conversation this turn belongs to. What THIS conversation has already
+   * written is relevant to its next turn even when the next message shares no
+   * words with it ("Angry, mostly." after naming a colleague) — without it,
+   * recall came back empty and the extractor, told nothing was there, could
+   * mint duplicates (found by the Core 4 eval players).
+   */
+  conversationId?: string;
+  /**
    * The Project this conversation is in, and every Project anchor there is.
    *
    * A WEIGHTING, never a filter. Being in the current Project raises a
@@ -163,6 +171,13 @@ export function activate(
   const byId = new Map(visible.map((n) => [n.id, n]));
 
   const seeds = seedActivation({ ...graph, nodes: visible }, message, opts.focus ?? []);
+  if (opts.conversationId) {
+    const mine = visible
+      .filter((n) => n.provenance.some((p) => p.conversationId === opts.conversationId))
+      .sort((a, b) => b.updatedAt - a.updatedAt)
+      .slice(0, 6);
+    for (const n of mine) seeds.set(n.id, Math.max(seeds.get(n.id) ?? 0, 0.5 * (0.4 + 0.6 * n.importance)));
+  }
 
   const anchors: ReadonlySet<string> = opts.project?.anchors ?? new Set();
   const current = opts.project?.current && allowed.has(opts.project.current) ? opts.project.current : null;
