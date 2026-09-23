@@ -48,6 +48,8 @@ export interface GuardInput {
   considered: string[];
   /** values verify mode computed privately; none may appear in the reply */
   hidden?: string[];
+  /** the person's own problem text: a worked solution is overreach only if it works THIS problem (council D8) */
+  target?: string;
 }
 
 /** Deflection: talking about the question instead of answering it. */
@@ -61,6 +63,25 @@ export function looksWorked(text: string): boolean {
   if (displays >= 2) return true;
   const chain = (text.match(/\b(therefore|so we get|which gives|hence|thus|substituting)\b/gi) ?? []).length;
   return chain >= 3;
+}
+
+/**
+ * Does a worked draft work THEIR problem (council D8, target-aware)? Only if
+ * it reuses at least half of the problem's specific givens — its numbers
+ * and code identifiers. An analogous worked example, or a general method
+ * ("print lo, hi and mid each iteration"), is not their problem worked.
+ * Without a target, assume it is (the old, stricter behaviour).
+ */
+export function worksTarget(draft: string, target?: string): boolean {
+  if (!target) return true;
+  const givens = new Set<string>([
+    ...(target.match(/\b\d+(?:\.\d+)?\b/g) ?? []).filter((n) => n.length >= 2 || Number(n) > 1),
+    ...(target.match(/\b[A-Za-z_][A-Za-z0-9_]*(?=\()|\b[a-z]+_[a-z0-9_]+\b|\b[a-z]+[A-Z][A-Za-z0-9]*\b/g) ?? []),
+  ]);
+  if (givens.size < 2) return true;
+  let used = 0;
+  for (const g of givens) if (new RegExp(`(^|[^A-Za-z0-9_.])${g.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|[^A-Za-z0-9_])`).test(draft)) used++;
+  return used / givens.size >= 0.5;
 }
 
 /** Hand the thing over, then invite them to produce it. */
@@ -167,7 +188,7 @@ export function guardStructure(input: GuardInput): GuardOutcome & { needsModel: 
       action = 'MODIFY_FOR_MORE_AGENCY';
       retryNote = `The draft supplied ${a.withhold.what} and then invited them to produce it. Remove it; keep everything else useful.`;
     }
-    if (!retryNote && (dec.type === 'HINT' || dec.type === 'VERIFY' || dec.type === 'QUESTION') && looksWorked(draft)) {
+    if (!retryNote && (dec.type === 'HINT' || dec.type === 'VERIFY' || dec.type === 'QUESTION') && looksWorked(draft) && worksTarget(draft, input.target)) {
       findings.push({ side: 'overreach', code: 'worked_solution', detail: `A ${dec.type} that contains a worked solution.` });
       action = 'MODIFY_FOR_MORE_AGENCY';
       retryNote = `This was a ${dec.type}; the draft works the problem. Point at the step, do not perform it.`;

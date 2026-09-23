@@ -41,6 +41,13 @@ console.log('=== OVERREACH is policed only when something is held back ===');
   ok('the same content, with nothing held back, passes', free.action === 'ALLOW', JSON.stringify(free));
   const worked = '1. Differentiate x^2.\n2. Differentiate sin x.\n3. Combine them with the product rule.';
   ok('a HINT that works the problem is caught', guardStructure({ decision: dec('HINT'), allocation: alloc('HUMAN_PRACTICES', PRACTICE), draft: worked, considered: [] }).findings.some((f) => f.code === 'worked_solution'));
+  // Run 2 (debugging-005, debugging-002): an analogous worked example, or a
+  // general method, is not their problem worked (council D8, target-aware).
+  const target = 'def find_first_at_least(nums, target):\n    lo, hi = 0, len(nums)\n    while lo < hi:\n        mid = (lo + hi) // 2\n        if nums[mid] < target: lo = mid\n        else: hi = mid\n    return lo\nfor [1, 4, 4, 7, 9] and target 5 it loops';
+  const analog = '1. Take a tiny list like [2, 3] and a target of 3.\n2. Print lo, hi and mid at the top of each iteration.\n3. Look for a state that repeats.';
+  ok('an analogous worked method under a withhold passes', !guardStructure({ decision: dec('VERIFY'), allocation: alloc('AI_VERIFIES', PRACTICE), draft: analog, considered: [], target }).findings.some((f) => f.code === 'worked_solution'));
+  const theirs = '1. With nums = [1, 4, 4, 7, 9] and target 5, find_first_at_least starts lo=0, hi=5.\n2. mid=2, nums[2]=4 < 5, so lo = mid = 2.\n3. Change lo = mid to lo = mid + 1 and it returns 3.';
+  ok('working THEIR problem under a withhold is still caught', guardStructure({ decision: dec('VERIFY'), allocation: alloc('AI_VERIFIES', PRACTICE), draft: theirs, considered: [], target }).findings.some((f) => f.code === 'worked_solution'));
   ok('the same steps in an EXPLAIN with nothing withheld pass', guardStructure({ decision: dec('EXPLAIN'), allocation: alloc('AI_EXPLAINS'), draft: worked, considered: [] }).action === 'ALLOW');
 
   const hidden = guardStructure({

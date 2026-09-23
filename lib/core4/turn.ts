@@ -259,6 +259,11 @@ function renderStateBlock(s: CognitiveState): string {
   return renderState(s);
 }
 
+/** Their problem, in their words: the last few things they wrote. */
+function targetOf(p: PreparedTurn): string {
+  return p.input.brief.filter((m) => m.role === 'user').slice(-3).map((m) => m.content).join('\n');
+}
+
 export interface GuardedReply {
   text: string;
   outcome: GuardOutcome;
@@ -269,7 +274,7 @@ export interface GuardedReply {
 
 /** Answer Guard 2.0 on a complete draft. */
 export async function guardReply(p: PreparedTurn, draft: string): Promise<GuardedReply> {
-  const input: GuardInput = { decision: p.decision, allocation: p.allocation, draft, considered: p.considered.items, hidden: p.hidden };
+  const input: GuardInput = { decision: p.decision, allocation: p.allocation, draft, considered: p.considered.items, hidden: p.hidden, target: targetOf(p) };
   const g = guardStructure(input);
   let text = g.revised ?? draft;
   let outcome: GuardOutcome = { action: g.action, findings: g.findings, by: g.by, ...(g.revised ? { revised: g.revised } : {}), ...(g.retryNote ? { retryNote: g.retryNote } : {}) };
@@ -316,7 +321,7 @@ export function fallbackReply(p: PreparedTurn, first: string, retry: string | nu
   const codes: string[] = [];
   for (const candidate of [retry, first]) {
     if (!candidate) continue;
-    const g = guardStructure({ decision: p.decision, allocation: p.allocation, draft: candidate, considered: p.considered.items, hidden: p.hidden });
+    const g = guardStructure({ decision: p.decision, allocation: p.allocation, draft: candidate, considered: p.considered.items, hidden: p.hidden, target: targetOf(p) });
     const text = g.revised ?? candidate;
     if (!g.retryNote) return { text, codes: [...codes, 'fallback:passed'] };
     const leaks = g.findings.some((f) => f.side === 'overreach');
