@@ -164,7 +164,7 @@ export function mergeState({ prior, read, signals, contract, readOk }: MergeInpu
 
   // "idk" is being stuck, said plainly: support goes up (council D5/D6).
   const stuck = signals.frustration ? 'frustrated' : signals.dontKnow ? 'stalled' : base.stuck;
-  const questionsPreference = signals.stopQuestions ? 'stop' : signals.wantsQuestions ? 'wanted' : p.questionsPreference;
+  const questionsPreference = signals.stopQuestions ? 'stop' : signals.wantsQuestions ? 'wanted' : signals.endQuiz ? 'none' : p.questionsPreference;
   // Off the record is sticky for the conversation until they say otherwise.
   // A sensitive subject makes the conversation conversation-only, and that
   // is sticky (council D14): what is said here is not used elsewhere.

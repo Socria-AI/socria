@@ -122,7 +122,9 @@ export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
   const state = mergeState({ prior: prior ? gapCheck(prior, input.now) : null, read: read.state, signals, contract, readOk: read.ok });
 
   // "That's not what I meant": what was recorded as theirs last turn is disputed.
-  const disputed = signals.correction && prior && input.conversationId
+  // A correction of Socria, or their own revision ("I was computing the wrong
+  // thing"): what was recorded as theirs last turn no longer stands.
+  const disputed = (signals.correction || signals.revision) && prior && input.conversationId
     ? disputeTurn(ledger, input.conversationId, prior.turn, input.now, signals.evidence.join('; '))
     : [];
 

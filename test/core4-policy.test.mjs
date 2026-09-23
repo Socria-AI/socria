@@ -321,6 +321,8 @@ console.log('\n=== council D1/D6: safety, recommendations, the ladder ===');
   ok('  after saying whether the last answer was right', /whether their last answer was right/.test(qd.decision.objective));
   const enough = turn({ taskKind: 'learn', work: 'practice', latest: 'other' }, 'ok stop asking me questions', { prior: quiz });
   ok('  and "stop" ends it', decide(enough, { said: 'ok stop asking me questions' }).decision.type !== 'QUESTION');
+  const there = turn({ taskKind: 'learn', work: 'practice', latest: 'question' }, "let's stop there — what should I practise next time?", { prior: quiz });
+  ok('  run 2: "let\'s stop there" ends it too, without frustration', decide(there, { said: "let's stop there — what should I practise next time?" }).decision.type !== 'QUESTION' && there.questionsPreference === 'none' && there.stuck !== 'frustrated');
   const q = decide(S({ work: 'creation', latest: 'request' }), { said: 'write me 5 interview questions for a data engineer' });
   ok('questions they asked FOR are content, not interrogation', q.decision.questionsAreContent === true);
 }

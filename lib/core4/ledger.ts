@@ -269,7 +269,7 @@ export function linksForTurn(created: LedgerEntry[], previousSocria: LedgerEntry
 
 const STANCE_WORD: Record<Stance, string> = {
   asserts: 'hold',
-  entertains: 'raised',
+  entertains: 'raised the possibility',
   asks: 'asked',
   rejects: 'ruled out',
   accepts: 'accepted',

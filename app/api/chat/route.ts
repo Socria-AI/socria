@@ -730,7 +730,9 @@ function core4Reply(x: {
         } else {
           const gate = new SentenceGate((chunk) => controller.enqueue(encoder.encode(chunk)), { passQuestions: p?.decision.questionsAreContent });
           for await (const d of deltas) gate.push(d);
-          const dropped = gate.finish(p!.decision.maxQuestions, p!.considered.items);
+          // Quiz items are the content: never dropped as "re-asked" (run 2,
+          // learning-006 — the next drill item was deleted as a repeat).
+          const dropped = gate.finish(p!.decision.maxQuestions, p!.decision.reasonCode === 'quiz.contract' ? [] : p!.considered.items);
           reply = gate.out;
           const done = await s.done.catch(() => null);
           served = done?.served ?? served;

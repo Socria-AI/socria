@@ -40,6 +40,8 @@ export const NO_SIGNALS: ExplicitSignals = {
   offRecord: false,
   onRecord: false,
   sensitive: false,
+  endQuiz: false,
+  revision: false,
   vent: false,
   horizon: false,
   done: false,
@@ -222,6 +224,9 @@ function requestedTokensOf(text: string): number {
 
 const VENT = /\b(i (?:just )?(?:need|want) to vent|(?:i )?(?:don'?t|do not) want (?:any )?advice|not looking for (?:advice|solutions)|(?:please )?just listen|i don'?t need (?:you to )?(?:fix|solve) (?:it|this|anything)|(?:just )?need to get (?:this|it) off my chest)\b/i;
 
+const END_QUIZ = /\b(let'?s stop (?:there|here|for (?:now|today))|that'?s enough(?: for (?:now|today))?|enough for today|i(?:'m| am) done for (?:now|today))\b/i;
+const REVISION = /\b(i was (?:computing|calculating|doing|asking|solving|answering) the wrong (?:thing|question)|i was wrong(?: about| on| there)?|scratch that|i(?:'ve| have) changed my mind|ignore (?:what|that) i (?:just )?said|forget what i (?:just )?said)\b/i;
+
 const REQUESTS_QUESTIONS = /\b((?:write|give|make|draft|generate|come up with|list|suggest)(?: me)? (?:\w+ ){0,3}(?:questions|quiz|exam items|practice problems|interview questions|test items|flashcards|faq)|quiz me|test me|drill me|interview questions)\b/i;
 
 interface Hit {
@@ -312,6 +317,8 @@ export function readSignals(message: string): ExplicitSignals {
     offRecord: !!note(lastIndex(OFF_RECORD, text)),
     onRecord: !!note(lastIndex(ON_RECORD, text)),
     sensitive: SENSITIVE.test(text),
+    endQuiz: END_QUIZ.test(text),
+    revision: !!note(lastIndex(REVISION, text)),
     vent: VENT.test(text),
     horizon: HORIZON.test(text),
     done: DONE.test(text) && text.length < 80,

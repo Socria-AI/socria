@@ -100,6 +100,10 @@ export interface ExplicitSignals {
   requestedTokens: number;
   /** "I just need to vent", "I don't want advice", "just listen": being heard, said explicitly (run 1: an INFERRED "reflection" withheld practical help) */
   vent: boolean;
+  /** "let's stop there", "that's enough for today": ends a quiz without being frustration */
+  endQuiz: boolean;
+  /** "I was computing the wrong thing", "scratch that", "I've changed my mind": they withdraw what they just held */
+  revision: boolean;
   /** a sensitive subject (health, grief, divorce, immigration, debt, …): council D14 */
   sensitive: boolean;
   /** the request is FOR questions (quiz items, interview questions, practice problems): they are content, not interrogation */

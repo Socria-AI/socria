@@ -122,6 +122,8 @@ console.log('\n=== council D2: verified false positives stay false ===');
   ok('"do NOT tell me what\'s wrong… finding it is the point" is verdict-only and a refusal', bug.flagOnly && bug.directness === 'no_answer', JSON.stringify({ f: bug.flagOnly, d: bug.directness }));
   const rails = S("Is it OK if I just keep going on this and you only tell me if I've gone off the rails?");
   ok('"only tell me if I\'ve gone off the rails" is verdict-only', rails.flagOnly && rails.directness === 'no_answer');
+  ok('run 2: "let\'s stop there" ends a quiz, and is not frustration', S("ok, let's stop there. What should I practise next time?").endQuiz && !S("ok, let's stop there.").frustration);
+  ok('run 2: "I was computing the wrong thing" is a revision', S("Ah — I was computing the wrong thing.").revision);
   ok('"just tell me the answer" after it still wins', S("only tell me if I've gone off the rails. actually no, just tell me the answer").directness === 'answer');
 }
 
