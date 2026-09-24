@@ -56,8 +56,24 @@ import { COGNITION_MODEL } from '../cognition/engine';
 /** Below this the ablation told us nothing and is dropped, not reported. */
 export const CF_FLOOR = 0.55;
 
-/** How many premises are worth the calls. Four is two seconds of parallel work. */
-export const MAX_ABLATIONS = 4;
+/**
+ * How many premises are worth the calls.
+ *
+ * SIX, BECAUSE FOUR WAS MEASURED AND WAS NOT ENOUGH. On the 24-item E17
+ * ground-truth set, a cap of 4 reached only 61.7% of the genuinely
+ * load-bearing premises — nearly four in ten were never put to a call, and a
+ * premise that is never probed is indistinguishable in the output from one
+ * that was probed and cleared. The sweep:
+ *
+ *     cap 4  ->  61.7% reachable,  3.9 calls/turn
+ *     cap 5  ->  93.6% reachable,  4.5 calls/turn
+ *     cap 6  ->   100% reachable,  4.6 calls/turn
+ *     cap 8  ->   100% reachable,  4.6 calls/turn
+ *
+ * Seven tenths of one extra call for thirty-eight points of coverage, and
+ * nothing above 6 buys anything because the items run out of premises first.
+ */
+export const MAX_ABLATIONS = 6;
 
 export type Dependence = 'load_bearing' | 'robust' | 'unclear';
 
@@ -88,6 +104,10 @@ const SYSTEM = `You test whether a conclusion still follows when one of its prem
 You are given a CONCLUSION someone has reached, the PREMISES they are working from, and ONE premise to REMOVE.
 
 Reason only from the premises that remain. Do not supply outside facts, do not repair the gap with your own knowledge, and do not judge whether the conclusion is wise — only whether it still FOLLOWS.
+
+STILL PLAUSIBLE IS NOT STILL FOLLOWS. This is the distinction the whole question turns on, and it is the one that is easy to get wrong. A conclusion can remain believable, likely, or directionally right while no longer being SUPPORTED by what remains. Believable is not the test. Supported is.
+
+In particular, when the conclusion states or rests on a QUANTITY, a THRESHOLD or a COMPARISON, and the removed premise supplied one of the numbers that computation needs, the conclusion does NOT still follow — however reasonable it still sounds. Without the input the comparison cannot be made at all, and "it is probably still true" is exactly the answer this question is not asking for.
 
 Return JSON with exactly these fields:
 
@@ -138,7 +158,7 @@ export function targetOf(p: ProblemModel): ProblemItem | null {
  * edge is cheap and disconfirming one is valuable. Everything else is
  * background the person is unlikely to thank us for testing.
  */
-export function candidates(p: ProblemModel, target: ProblemItem): ProblemItem[] {
+export function candidates(p: ProblemModel, target: ProblemItem, limit: number = MAX_ABLATIONS): ProblemItem[] {
   const pool = p.live.filter(
     (i) => i.id !== target.id && i.text.trim().length > 12 && i.kind !== 'question' && i.kind !== 'uncertainty'
   );
@@ -162,7 +182,7 @@ export function candidates(p: ProblemModel, target: ProblemItem): ProblemItem[] 
   return pool
     .map((i) => ({ i, r: rank(i) }))
     .sort((a, b) => b.r - a.r || b.i.turn - a.i.turn)
-    .slice(0, MAX_ABLATIONS)
+    .slice(0, limit)
     .map((x) => x.i);
 }
 

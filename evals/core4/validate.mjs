@@ -172,14 +172,18 @@ async function ablation() {
     }
   }
 
-  // Stability: across REPEATS, how often does a premise get the same verdict?
-  let stable = 0, unstable = 0;
-  for (const { item, runs } of rows) {
-    for (const prem of item.premises) {
-      const vs = runs.map((r) => r[prem.id]);
-      (new Set(vs).size === 1 ? (stable += 1) : (unstable += 1));
-    }
-  }
+  // STABILITY IS NOT MEASURABLE HERE, and reporting it would be a lie.
+  //
+  // The stand-in's answers are cached by a hash of the request, so repeating
+  // an IDENTICAL input returns the identical cached answer by construction —
+  // 219 distinct answers served 441 calls in the first run, and "stability
+  // 100%" was an artifact of that, not a property of the mechanism.
+  //
+  // It also happens not to be the interesting question: the ablation runs at
+  // temperature 0, so run-to-run variance on identical input is near zero by
+  // design. The robustness that DOES matter is whether the verdict survives
+  // the same content being worded differently, which the paraphrase set
+  // measures against genuinely different requests.
 
   // Wording sensitivity: same meaning, different words, same verdict?
   let same = 0, flipped = 0;
@@ -225,7 +229,7 @@ async function ablation() {
     recall: pct(tp, tp + fn),
     falsePositiveRate: pct(fp, fp + tn),
     selection: { probedPerItem: Math.round((selectable / rows.length) * 10) / 10, loadBearingReachable: pct(selectedLB, totalLB), totalLoadBearing: totalLB },
-    stability: { stable, unstable, rate: pct(stable, stable + unstable), repeats: REPEATS },
+    stability: 'not measured — see the note in validate.mjs; identical inputs are cache-identical here, and the mechanism runs at temperature 0',
     wording: { same, flipped, stableRate: pct(same, same + flipped) },
     misses: misses.slice(0, 20),
     flips: flips.slice(0, 20),

@@ -1,0 +1,1183 @@
+[
+  {
+    "id": "long-reversal-001",
+    "category": "longitudinal",
+    "persona": "Kwame Adjei, 41, VP Engineering at Meridian Claims, a 180-person healthcare claims processor in Columbus. States positions as principles and defends them hard, then changes his mind quietly without ever marking the change. Estimates by counting the work he can see, and explains every overrun individually.",
+    "notes": "COVERS THREE OF THE REQUIRED PHENOMENA. (a) A BELIEF REVERSED BY SESSION 4: in session 1 he declares, as a two-year-old principle, that they must build the rules engine because vendor engines model rules as flat decision tables and cannot express MSP ordering, which is state. In session 4 turn 1 he reverses to buy — entirely on cost. The reversal leaves the original premise untouched and nobody notices. A reply that only weighs $340k against engineer-weeks has missed it. (b) A REASONING PATTERN HE REPEATS WITHOUT NOTICING: three estimates realise at 6->13, 6->13 and 4->9, roughly 2.2x each time. He explains each overrun separately and twice rejects the generic 'engineers underestimate' point with a reason, so that point is already-considered; what he has never done is read his own three data points as a series. The payoff is session 5 turn 3, where he asks whether he can commit six weeks to the board. Nothing in that message hints at anything: the transpiler is written, the runbook is done, the rollback is a DNS change. The only route to 'your own realised multiplier says eleven' is having kept the three pairs. (c) A MEMORY HE CORRECTS: in session 3 turn 2 he corrects the headcount premise — 30 is the CFO's ask, not his commitment; what he committed to is holding the claims team at twelve. Session 6 turn 1 then depends on the corrected number: seven of twelve is over half the team, whereas seven against a cap of thirty is unremarkable. A system still holding 30 will wave it through.",
+    "sessions": [
+      {
+        "gapDays": 0,
+        "turns": [
+          {
+            "user": "We are rebuilding claims adjudication and I want my position on the record before we start, because I have held it for two years and I would rather have it attacked now than in month four. We build the rules engine ourselves. Every vendor engine I have evaluated — Drools, InRule, the Sapiens product — models rules as flat decision tables, and our coordination-of-benefits logic is not flat. Medicare Secondary Payer rules depend on the order the other payers adjudicated, which is state, not a condition. Three engineers, six weeks for the core. Where is that estimate soft?",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true,
+              "stance": "peer"
+            }
+          },
+          {
+            "user": "Test data is the soft part, agreed. We have 4,000 historical claims with known-correct outcomes but only 60 of them exercise the MSP ordering path, and those 60 are all Ohio. On people: the CFO wants all of engineering capped at 30 through next year. We are at 34. So the three come off the platform team and nothing new gets hired for this one.",
+            "expect": {
+              "maxQuestions": 1
+            }
+          },
+          {
+            "user": "For calibration, the comparison I keep coming back to. We built the eligibility service in-house last year. I estimated six weeks and it took thirteen. But it works, we own it, and when CMS changed the enrollment file format in March we shipped the fix in two days instead of filing a vendor ticket and waiting a quarter. I would make that trade again without thinking about it.",
+            "expect": {
+              "maxQuestions": 0
+            }
+          },
+          {
+            "user": "Sequencing. Core engine first, then the COB module, then migrating the 1,900 active rules out of the legacy Java. Migration last because it is mechanical — a transpiler plus review, four weeks, one engineer. The argument for migration-last is that the transpiler gets a stable target. The argument against is that we learn nothing about what the real rules actually do until the very end. Which way would you run it?",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true
+            }
+          }
+        ]
+      },
+      {
+        "gapDays": 24,
+        "turns": [
+          {
+            "user": "Three and a half weeks in. The rule evaluation loop is done and it is clean. The state machine for payer ordering took twice as long as I scoped, because the legacy Java has four undocumented special cases for Ohio Medicaid and we only found them by diffing against the 4,000 fixtures — which is the one thing I got right in the plan. Still calling six weeks, maybe seven.",
+            "expect": {
+              "maxQuestions": 1
+            }
+          },
+          {
+            "user": "Revising that. Nine weeks, not six. The Ohio cases mean a per-state override layer and nobody scoped one. I am not rattled by it: the alternative is a vendor engine that also cannot express those cases without a paid custom extension, so the work exists either way, it just shows up on a different line of the budget.",
+            "expect": {
+              "maxQuestions": 1
+            }
+          },
+          {
+            "user": "Design question on the override layer. I want state overrides to be data — a table of (state, rule_id, override_expression) evaluated at load time — not code. The alternative is a subclass per state, which is what the legacy system does and is exactly why nobody can read it. The risk I can see is that an expression language is a language, and we end up maintaining a parser forever. Where does the data approach actually bite us?",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true,
+              "stance": "peer"
+            }
+          }
+        ]
+      },
+      {
+        "gapDays": 70,
+        "turns": [
+          {
+            "user": "Engine is done. Thirteen weeks against the nine I revised to. 3,980 of the 4,000 fixtures pass and I have read all twenty failures: in every one the legacy system is wrong and we are right, including two where it pays as primary on a claim where Medicare is primary. I am going to write that up separately because it is probably real money and it is certainly a compliance conversation.",
+            "expect": {
+              "maxQuestions": 1
+            }
+          },
+          {
+            "user": "One correction before we go further, because I think I muddied this and it will matter for staffing. The 30 headcount number is the CFO's ask. I never agreed to it and I am not going to. What I actually committed to is holding the claims team at twelve and arguing for everything else in the Q2 planning round. Please do not build anything on a cap I did not accept.",
+            "expect": {
+              "maxQuestions": 0,
+              "mustReference": "the headcount figure from session 1, which he stated as the CFO's ask rather than his own commitment — and that the commitment he is now putting on record is holding the claims team at twelve"
+            }
+          },
+          {
+            "user": "COB module next. Two engineers, four weeks. This is the piece that justified the whole build — the MSP ordering, the thing a vendor would have charged six figures for as a custom extension. Scope is the ordering state machine, the Ohio overrides, and the 60 existing fixtures plus whatever we have to synthesise on top.",
+            "expect": {
+              "maxQuestions": 1
+            }
+          },
+          {
+            "user": "On the four weeks: I am saying four and I mean it this time. Both overruns so far had the same cause, which is undiscovered legacy behaviour, and we now have the fixture harness, so unknowns get discovered in week one instead of week six. The estimate is different in kind from the last two, not just smaller than them.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true
+            }
+          }
+        ]
+      },
+      {
+        "gapDays": 16,
+        "turns": [
+          {
+            "user": "Changed my mind. We should buy. COB has not started — both engineers went to the eligibility incident for a fortnight — and in the meantime Sapiens came back at $340k a year all-in, including the custom COB extension. That is one and a half engineers at our loaded cost of $218k. Maintaining our own rules engine is not a one-and-a-half-engineer job; it is the three who built it, forever, because they are the only people alive who understand that state machine. I want to kill the COB build and sign. Argue me out of it or agree.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true,
+              "mustChallenge": true,
+              "mustContribute": "That the reason he gave for building, in session 1, was not cost at all: it was that vendor engines model rules as flat decision tables and cannot express MSP ordering, which is state. He is reversing on cost a decision he made on expressiveness, and nothing in the cost case touches the original reason. Two further things follow from having kept it: the 'custom COB extension' inside the quote is precisely the paid extension he predicted would be needed, and thirteen weeks of actually building the ordering state machine is the first real evidence anyone has about whether the expressiveness objection was correct — evidence he has not looked at. Connecting the reversal to the premise it leaves standing is the contribution.",
+              "alreadyConsidered": [
+                "that $340k is about one and a half engineers at their loaded cost",
+                "that the three engineers who built the engine would own it forever",
+                "that the COB build has not started yet"
+              ]
+            }
+          },
+          {
+            "user": "The expressiveness point is fair and I had half forgotten I made it that hard. Two things have genuinely changed though: the extension is inside their quote rather than a change order, and they have shipped MSP ordering for two other Medicaid plans. So it is derisked in a way it was not when I made the argument. That is an update, not a rationalisation.",
+            "expect": {
+              "maxQuestions": 1
+            }
+          },
+          {
+            "user": "Let me do the cash properly. Sunk is sunk — the thirty-nine engineer-weeks on the engine are spent whichever way this goes. Remaining build is the COB module, eight engineer-weeks, $33.6k. Maintenance, call it two engineers, $437k a year. Three years is $1.35m. Vendor is $340k then $290k then $290k, so $920k, plus we still need one engineer owning the integration, $655k, so $1.575m. Build wins by about $230k over three years.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true
+            }
+          },
+          {
+            "user": "So I have argued both sides inside one conversation and landed back where I started. I want to know which argument actually moved, because I do not want to be deciding a seven-figure question on whichever spreadsheet I happened to have open most recently.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true,
+              "mustContribute": "That exactly one input differs between his two cases and it is the only input in either with no source: how many engineers it takes to maintain the engine. He used three in the buy case and two in the build case, and that single change is worth one engineer for three years, $655k, which is nearly three times the $230k margin the decision now rests on. The quote, the loaded cost and the engineer-weeks are all documented; the maintenance headcount is the one number he invented, and it is the number the answer is most sensitive to. Second, one genuinely new fact did arrive in this session — the vendor has shipped MSP ordering for two other Medicaid plans — and it points toward buying, so the thing he half-dismissed as a rationalisation is the only part of the session that should have moved him at all.",
+              "alreadyConsidered": [
+                "that sunk cost should be excluded from the comparison",
+                "that the vendor quote is flat and the build's maintenance tail is not"
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "gapDays": 70,
+        "turns": [
+          {
+            "user": "COB module is done. Nine weeks against the four. The cause was that synthesising MSP fixtures is its own project — we needed 40 new ones and each takes an afternoon with a claims examiner to certify against the regulation. I am not going to relitigate that estimate; the work was real and the module is right. All 100 MSP fixtures pass, including the four Ohio overrides.",
+            "expect": {
+              "maxQuestions": 1
+            }
+          },
+          {
+            "user": "Migration next, the 1,900 legacy rules. The transpiler is written and it handles 1,640 of them automatically. The remaining 260 are the ones with embedded SQL and they go by hand. One engineer, five weeks: four weeks for the hand work at roughly thirteen rules a day, one week for the diff review against the fixture set.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true
+            }
+          },
+          {
+            "user": "Board is Thursday and they want a date. I want to commit to the legacy adjudicator being switched off six weeks from Monday — five for the migration, one for parallel run. The engineer starts Monday, the transpiler is written, the cutover runbook is done and the rollback is a DNS change. Can I put six weeks in front of the board?",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true,
+              "mustChallenge": true,
+              "mustContribute": "That his three estimates on this programme have each realised at roughly 2.2x — eligibility six weeks against thirteen, the engine six against thirteen, the COB module four against nine — and that applying his own realised multiplier to five weeks gives about eleven, not six, with a board commitment sitting on the difference. The specific point is not that engineers underestimate, which he has already rejected twice with a reason; it is that he has three of his own data points, all from this programme, all explained individually, and has never once read them as a series or applied them to a new number. The migration is also the item he called mechanical and estimated at four weeks in session 1, so the estimate has grown with knowledge of the work but not with knowledge of his own record.",
+              "alreadyConsidered": [
+                "that each overrun had a specific, identifiable cause discovered after the estimate was given",
+                "that the fixture harness makes unknowns surface in week one rather than week six",
+                "that he does not want individual estimates relitigated",
+                "that the migration work is mechanical"
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "gapDays": 45,
+        "turns": [
+          {
+            "user": "Cutover is behind us and I need a permanent shape for the team. Three engineers on the engine, one on the COB module, one owning the transpiler and future migrations — five — plus the two already doing platform integration. Seven in total. Does that hold up, or am I building a standing team around something that ought to be maintenance?",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true,
+              "mustReference": "his session 3 correction — that thirty is the CFO's ask and not his commitment, and that what he committed to is holding the claims team at twelve",
+              "mustContribute": "That seven is not a number to check against the CFO's thirty, because he corrected that premise himself: seven is seven of the twelve he committed to holding, so this puts more than half the claims team permanently on a rules engine he originally justified as a six-week build. And that the maintenance headcount is being set here, by org chart, at five on the rules stack — while the three-year business case he wrote in session 4 turned on that number being two, a difference he priced himself at $655k. The same figure is being decided twice by two different processes that are not talking to each other.",
+              "alreadyConsidered": [
+                "that a standing team around a maintenance-mode system is a risk — he raises it himself"
+              ]
+            }
+          },
+          {
+            "user": "That is the bind, yes. I can fold the transpiler role into COB and run the rules stack at four, which leaves eight for everything else. Tell me whether four is honest or whether I am shaving the number to make the org chart fit a business case I already wrote and already circulated.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true,
+              "mustChallenge": true,
+              "stance": "peer"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "long-rejected-002",
+    "category": "longitudinal",
+    "persona": "Ingrid Solberg, 53, principal transport planner for a northern European city of 260,000. Twenty years in the department, writes the committee papers herself, and is careful about what is legally possible long before she is interested in what is desirable. Attributes ideas precisely because she has to defend them in public.",
+    "notes": "COVERS TWO REQUIRED PHENOMENA. (a) AN IDEA REJECTED EARLY THAT RESURFACES AND MUST BE RECOGNISED AS REJECTED: in session 1 turn 1 she rules out road pricing and states the rule that does it — any charge levied on a vehicle for entering or using a road, whatever it is called, needs a national ministerial order, and the last three applications took four to six years against her eighteen-month window. In session 6 turn 2 the finance department hands her a 'district access charge', GBP 2 per non-resident entry, ANPR-enforced, and she is inclined to take it. The last message alone reads as a funding solution arriving. The label is defensible by logical form rather than judgement: she stated the antecedent, and a charge for entering the cell satisfies it exactly. The right contribution is that the rejection was on a legal-timeline ground the rebranding does not touch — not a re-derivation of whether road pricing works, which she never disputed. (b) ATTRIBUTION, SOCRIA-ORIGINATED VERSUS PERSON-ORIGINATED: in session 2 turn 2 she credits the assistant outright with the school-run-as-separate-peak framing; in session 3 turn 1 she introduces staggered start times herself and asks for it to be recorded as hers because she will have to stand behind it. In session 5 turn 2 she has them exactly the wrong way round, in writing, for a committee paper. Both attributions are explicit in her own words at the time, so the ground truth is checkable rather than judged. A reply that accepts the misattribution, or that vaguely disclaims credit for everything, fails; the correct move is to swap them back, which is precisely what she asked for.",
+    "sessions": [
+      {
+        "gapDays": 0,
+        "turns": [
+          {
+            "user": "Elvegata low-traffic neighbourhood. Eighteen-month window, because the scheme has to be built inside the sewer replacement that starts in April and the street is open anyway. Six modal filters, my placement: Elvegata/Torggata, Elvegata/Nedre, and four on the side streets so the residential cells stay permeable for bikes. Before you get there — road pricing is off the table. Any charge levied on a vehicle for entering or using a road, whatever it is called, needs a national ministerial order, and the last three applications took four to six years. So: no pricing, and I would rather not spend a turn on it.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true,
+              "stance": "peer"
+            }
+          },
+          {
+            "user": "What I actually need help with is displacement. The ring road takes whatever we push out and it is at 0.86 volume-to-capacity in the AM peak already. Elvegata carries 4,100 vehicles through the cordon between 07:45 and 08:45. If half of that displaces rather than evaporates, the ring road goes over capacity and the scheme dies at the first committee. What does the evidence actually say about evaporation rates for filtered permeability at this sort of scale?",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true
+            }
+          },
+          {
+            "user": "Useful. Our own precedent is the Sandgata scheme in 2019 — 2,200 vehicles filtered, the ring road took about 40% of it and the rest was gone inside a year. But Sandgata had a parallel bus frequency improvement landing the same month and Elvegata has nothing like that in the programme, so I do not think I can lean on 60% evaporation in front of a committee that remembers Sandgata.",
+            "expect": {
+              "maxQuestions": 1
+            }
+          },
+          {
+            "user": "Political shape, so you know what I am writing into. The councillor for Elvegata is for it, the councillor for the ring-road wards is against, and the deciding votes are three independents who campaign on the primary schools. There are four primary schools inside the cordon. I have not looked at the school traffic separately from the commuter flow at all — it has all been one number to me.",
+            "expect": {
+              "maxQuestions": 1
+            }
+          }
+        ]
+      },
+      {
+        "gapDays": 19,
+        "turns": [
+          {
+            "user": "Cordon counts came back with plates matched to the vehicle register, so we can infer trip purpose by proxy. Of the 4,100 in the AM peak, 1,180 are trips that terminate within 300 metres of one of the four schools and do not continue — 28.8% — and they are concentrated between 08:10 and 08:40. That is a different animal from commuter through-traffic and I had been treating it as one lump.",
+            "expect": {
+              "maxQuestions": 1
+            }
+          },
+          {
+            "user": "Your framing — treat the school run as a separate demand peak rather than as a slice of commuter flow — is the thing I was missing, and I want to say so plainly, because it changes what the scheme is for. A filter scheme aimed at through-traffic barely touches 1,180 trips that start and end inside the cordon. They are not passing through. They are the neighbourhood driving itself to school.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true
+            }
+          },
+          {
+            "user": "Which splits the displacement question in two. Through-traffic, 2,920 vehicles, either displaces onto the ring road or evaporates. School trips, 1,180, do neither — they re-route inside the cell, or change mode, or change time. Modelling them as ring-road displacement is exactly what our consultant did, and it is why their number is frightening and why I have never believed it.",
+            "expect": {
+              "maxQuestions": 1
+            }
+          }
+        ]
+      },
+      {
+        "gapDays": 26,
+        "turns": [
+          {
+            "user": "I have a proposal and it is mine, so I want it recorded as mine, because I will have to stand behind it in a room full of head teachers. Staggered start times across the four schools: 08:15, 08:25, 08:35, 08:45. It is not a transport intervention, it is a school-governance one, which means a different committee, a different set of objections, and at least one head teacher who will take it personally.",
+            "expect": {
+              "maxQuestions": 1
+            }
+          },
+          {
+            "user": "The arithmetic. 1,180 school trips currently land in a 60-minute window, so 19.7 a minute. Stagger to an 80-minute spread and the same trips run at 14.75 a minute, so the busiest 60 minutes carries 885 instead of 1,180. That is 295 vehicles out of the peak hour, 7.2% of the cordon total, for the price of four letters to head teachers and no capital at all.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true,
+              "stance": "peer"
+            }
+          },
+          {
+            "user": "Risk I can see. If the stagger spreads the trips but the filters make the inside-cell routes longer, I could add vehicle-kilometres inside the neighbourhood while reducing the peak count, which is worse on air quality at the school gates and is precisely what the opposition will say. I have no way to measure that before committee and I am not going to pretend otherwise in the paper.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true
+            }
+          }
+        ]
+      },
+      {
+        "gapDays": 31,
+        "turns": [
+          {
+            "user": "Consultation closed. 1,340 responses, which is enormous for us — Sandgata got 210. 61% support the filters, 38% oppose, and the opposition is geographically concentrated in two streets on the ring-road side, which is real: those two streets take the displacement. Free-text analysis says the single most common word in the objections is 'access', not 'traffic'.",
+            "expect": {
+              "maxQuestions": 1
+            }
+          },
+          {
+            "user": "The access objections are mostly carers and deliveries and both are answerable — permit exemptions for registered carers, a loading window before 10:00. What I cannot answer is the two streets that genuinely get more traffic. 340 vehicles a day more on Nedre Bakkegate by our own model, on a street with a nursery halfway along it.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true
+            }
+          },
+          {
+            "user": "So I have to decide whether to mitigate Nedre Bakkegate inside this scheme, or say honestly in the paper that it gets worse and that we will come back to it in the next programme. Mitigating costs us two of the six filters and probably half the benefit. Being honest costs us the ward councillor and possibly two of the three independents. Which of those survives contact with a committee?",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true,
+              "stance": "peer"
+            }
+          }
+        ]
+      },
+      {
+        "gapDays": 23,
+        "turns": [
+          {
+            "user": "Writing the committee paper. Structure is problem, evidence, scheme, displacement, mitigation, recommendation. The staggered starts go in as a companion recommendation to the education committee rather than inside the transport scheme, because if they sit inside the scheme the whole thing fails the moment a head teacher refuses.",
+            "expect": {
+              "maxQuestions": 1
+            }
+          },
+          {
+            "user": "One thing I want to get right in the paper, because provenance matters the moment a councillor asks where an idea came from. The staggered start times were yours — you suggested them when we were looking at the school peak — and the school-peak framing was mine, out of the cordon counts. I would rather credit that properly in the acknowledgements than have it come out awkwardly at committee.",
+            "expect": {
+              "maxQuestions": 0,
+              "mustAnswer": true,
+              "mustChallenge": true,
+              "mustContribute": "That she has the two attributions the wrong way round, and that her own words at the time settle both. In session 2 she said outright that the school-run-as-separate-peak framing came from here and was the thing she had been missing; in session 3 she introduced staggered start times herself and explicitly asked for them to be recorded as hers because she would have to stand behind them. The data was hers throughout — she ran the cordon counts. Swapping them back, specifically and without hedging, is the contribution and is exactly what she asked for; accepting the misattribution, or disclaiming credit for both, fails."
+            }
+          },
+          {
+            "user": "Then the acknowledgement reads the other way round and I need to be careful with it, because a councillor who hears that the staggering came out of a conversation with a machine will use it. I will write it as: the school-peak analysis is departmental, the staggering proposal is mine, and the paper stands on the cordon data regardless of who said what first.",
+            "expect": {
+              "maxQuestions": 1
+            }
+          },
+          {
+            "user": "Funding. The scheme is GBP 1.9m — 1.1m for the filters and public realm, 480k for the ring-road junction mitigation, 320k contingency. The sewer programme carries the excavation so we are not paying to dig. Capital is approved. What is not approved is the 140k a year of revenue cost: ANPR cameras on the filters, and the back office to process contraventions.",
+            "expect": {
+              "maxQuestions": 1
+            }
+          }
+        ]
+      },
+      {
+        "gapDays": 34,
+        "turns": [
+          {
+            "user": "Enforcement funding has fallen over. Finance will not carry 140k a year of revenue cost against a capital scheme, and the cameras are not negotiable, because a filter nobody enforces is a filter everybody drives through. Sandgata taught us that — 22% contravention in month one, before the cameras went live, down to 3% in month two after.",
+            "expect": {
+              "maxQuestions": 1
+            }
+          },
+          {
+            "user": "Finance have come back with something that solves it. A district access charge: non-residents pay GBP 2 to enter the Elvegata cell between 07:00 and 10:00, enforced on the same ANPR cameras, residents and blue badge exempt. Their modelling says 1,100 chargeable entries a day, so about 570k a year gross, which covers enforcement and funds the junction mitigation with room over. They want it in the paper as the funding mechanism. It is elegant and I am inclined to take it.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true,
+              "mustChallenge": true,
+              "mustContribute": "That this is the thing she ruled out in session 1, by the test she set herself: any charge levied on a vehicle for entering or using a road, whatever it is called, requires a national ministerial order, and the last three applications ran four to six years against an eighteen-month window fixed by the sewer programme. A GBP 2 charge for entering the cell satisfies that description exactly; the rebranding from 'road pricing' to 'access charge' changes the name and not the instrument. The contribution is naming the rejection and the ground it stood on, and pointing the question at whether the two are the same instrument in law — not re-arguing whether road pricing is a good idea, which she never disputed, and not listing generic risks of charging schemes.",
+              "alreadyConsidered": [
+                "that road pricing would work on the merits — she said so explicitly when she ruled it out",
+                "that enforcement cameras are non-negotiable",
+                "that Sandgata showed 22% contravention before cameras went live"
+              ]
+            }
+          },
+          {
+            "user": "Then the paper needs a fallback funding line that does not depend on anybody in a ministry, and it needs one by the 14th. The options I can see are funding enforcement from the parking account, which is legally clean but politically reads as a raid on a ring-fenced pot, or running year one on warning notices only, which is cheap and toothless and hands the opposition a year of evidence that filters do not work.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true,
+              "stance": "peer"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "long-stale-003",
+    "category": "longitudinal",
+    "persona": "Rafi Chaudhry, 36, founder and CTO of Pallas Instruments, 22 people, handheld Raman spectrometers for pharmaceutical incoming-goods inspection. Physicist by training, owns the BOM personally, and reasons from the mechanism downward. Files things he considers important and then plans off the older number anyway.",
+    "notes": "COVERS TWO REQUIRED PHENOMENA. (a) EVIDENCE IN SESSION 4 THAT OVERTURNS A CONCLUSION FROM SESSION 2: in session 2 he attributes a 1.2 wavenumber fleet spread to detector temperature, on an r = 0.71 correlation with ambient, and rules out the laser explicitly on its 0.02nm datasheet figure — a reasonable inference from what he had. He funds a second TEC stage, $84 a unit and a new chassis casting. In session 4 turn 1 he reports instrumentation results as a green light for releasing the tooling: the existing single-stage TEC already holds the detector inside 0.3C, and the laser moves 0.08nm over the ramp. Nothing in that message says 'this contradicts me'; it ends with him releasing the tooling. The arithmetic is the label and it is checkable: 0.08nm at 785nm is 1.3 wavenumbers against a 1.2 spread, and a detector held to 0.3C cannot be producing it. A reply that treats the laser number as an interesting aside has missed it. (b) AN ASSUMPTION REASONABLE IN SESSION 1 AND STALE BY SESSION 5: the fourteen-week lead time on a sole-sourced $340 laser diode. In session 3 he records, in his own words, that the supplier was acquired and that their part is a low-volume specialty line inside a telecom-diode business, and worries about portfolio rationalisation. In session 5 turn 3 the entire production ramp is derived from fourteen weeks, with two weeks of slack against a customer qualification window, and he asks whether the sequence survives contact with reality. The claim is not that the lead time has changed; it is that the schedule's most sensitive input has not been re-confirmed since an ownership change he himself flagged, and re-confirming it costs an email. Session 6 turn 1 then pays it off in the other direction: the Hamamatsu part he rejected in session 1 on a stability spec was rejected for a reason the session 4 fix removed.",
+    "sessions": [
+      {
+        "gapDays": 0,
+        "turns": [
+          {
+            "user": "Production plan for the PX-2. BOM is $2,140 at 500 units and the single largest line is the 785nm laser diode at $340, sole-sourced from Shibaura Optoelectronics. Fourteen-week lead time, which sets everything: order in week 0, build in week 16, ship in week 20. There is no second source qualified because the wavelength stability spec is 0.02nm over 0 to 40C and nobody else publishes a number that tight. Tell me where I am exposed.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true,
+              "stance": "peer"
+            }
+          },
+          {
+            "user": "Yes, sole-source is the exposure and I have taken it consciously. The alternatives are a Hamamatsu part at 0.4nm, which fails our spec by an order of magnitude, or a Thorlabs module at $1,180, which triples the BOM line and kills the price point. We hold eight weeks of buffer stock. What I actually want a second opinion on is pricing: $8,900 a unit against Metrohm's $16,000 benchtop, and our value case is that it lives on the goods-in dock instead of in the QC lab.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true
+            }
+          },
+          {
+            "user": "Regulatory, so it is on the record: the customer needs this for identity testing under USP <1858> and Ph. Eur. 2.2.48, which means a documented qualification package and a method transfer story. That part is done — we have IQ/OQ/PQ templates and two pharma sites have run them end to end. It is genuinely not the bottleneck and I do not want to spend time on it.",
+            "expect": {
+              "maxQuestions": 0
+            }
+          },
+          {
+            "user": "The real problem is unit-to-unit variance. Across the 30 engineering units the same reference sample gives peak positions that differ by up to 1.2 wavenumbers between instruments, and our identity algorithm uses a 2-wavenumber match window, so we are eating most of the budget on hardware variance before the sample is even in front of the thing. I need that under 0.4.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true
+            }
+          }
+        ]
+      },
+      {
+        "gapDays": 21,
+        "turns": [
+          {
+            "user": "Variance work. We logged all 30 units against ambient for a fortnight in the environmental chamber. Peak position correlates with ambient temperature at r = 0.71 across the fleet, and the units that drift most are the ones with the thinnest thermal path from the detector to the case. That is a detector story: CCD dark current and readout gain both move with temperature and both shift apparent peak position.",
+            "expect": {
+              "maxQuestions": 1
+            }
+          },
+          {
+            "user": "Conclusion I am acting on: detector thermal management. Before you raise the laser — it is wavelength-locked with a volume Bragg grating, 0.02nm over 0 to 40C, which is 0.3 wavenumbers at 785 and inside my 0.4 budget. That is exactly why I specified a $340 part instead of a $60 one. So the temperature sensitivity is not coming from the source. The fix is a second TEC stage on the CCD plus a copper strap to the chassis, holding the detector at 15C plus or minus 0.5 regardless of ambient. Adds $84 to the BOM and 1.1W.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true
+            }
+          },
+          {
+            "user": "$84 at 500 units is $42k, and the battery hit takes us from nine hours to about seven and a half, which is still a full shift with a margin. I am signing it off. The mechanical side is a new chassis casting for the strap, twelve weeks of tooling, so it has to go in at the same time as the production order or it does not go in at all.",
+            "expect": {
+              "maxQuestions": 1
+            }
+          }
+        ]
+      },
+      {
+        "gapDays": 28,
+        "turns": [
+          {
+            "user": "Supplier news, filing it here because it is the kind of thing I forget. Shibaura has been acquired by Nihon Koden Holdings. The distributor says nothing changes and the press release says the usual things about portfolio rationalisation. Our part is a low-volume specialty line sitting inside a company that mostly sells high-volume telecom diodes, which is not a comfortable place for it to be.",
+            "expect": {
+              "maxQuestions": 1
+            }
+          },
+          {
+            "user": "Separately, the first two pharma pilots. Site A ran 40 identity tests against their HPLC reference and got 40 out of 40. Site B got 37 out of 40, and the three failures are all the same excipient — microcrystalline cellulose from a supplier they had just switched. So arguably the instrument was right and their reference standard is stale, but that is not a sentence I can say to a customer in month one.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true
+            }
+          },
+          {
+            "user": "The commercial question is pilot-to-order conversion. Site A wants six units. Site B wants to extend the pilot by a quarter, which at our burn is a real cost — we spend about $310k a quarter and we have $2.1m, so call it six and a half quarters of runway, and I would rather not spend one of them proving a point about somebody else's reference standard.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true,
+              "stance": "peer"
+            }
+          }
+        ]
+      },
+      {
+        "gapDays": 25,
+        "turns": [
+          {
+            "user": "Chassis tooling is at first article and we instrumented six units to validate the thermal design before committing. Thermistor bonded to the CCD package, wavemeter on the laser output, both logged at 1Hz through a 5 to 40C ramp. Good news is that the existing single-stage TEC holds the detector inside plus or minus 0.3C across the whole ramp. Separately the wavemeter shows the laser centre wavelength moving 0.08nm over the same ramp. Chassis passes, so I am releasing the tooling this afternoon.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true,
+              "mustChallenge": true,
+              "mustContribute": "That this retires the session 2 conclusion rather than confirming the design. He attributed the 1.2 wavenumber fleet spread to detector temperature on an r = 0.71 correlation with ambient, and ruled the laser out explicitly on its 0.02nm datasheet figure. The new data says the single-stage TEC already holds the detector to 0.3C across the full ramp — so detector temperature cannot be producing a 1.2 wavenumber spread — while the laser moves 0.08nm, four times its spec, which at 785nm is about 1.3 wavenumbers and accounts for essentially the entire spread on its own. The correlation with ambient was real and the mechanism was the other one. It follows that the $84 second TEC stage and the chassis casting he is about to release address nothing, and the release should stop before it goes out this afternoon. A reply that files the laser number as an additional interesting finding has missed the point of the session.",
+              "alreadyConsidered": [
+                "that peak position correlates with ambient temperature",
+                "that thin thermal paths to the case were the visible pattern across the fleet"
+              ]
+            }
+          },
+          {
+            "user": "Right. 0.08nm at 785 is 1.3 wavenumbers and the spread I have been chasing is 1.2, so it is not a contributing factor, it is the whole budget. I have stopped the casting release. The datasheet number was 0.02 and we are seeing four times it, which either means the Bragg grating is not doing what it claims or the part we are getting is not the part on the datasheet.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true
+            }
+          },
+          {
+            "user": "Options on the laser. One: characterise the drift per unit at production test and correct in software from a wavemeter reading, which means a wavemeter in every instrument and I do not know what that costs at volume. Two: put an internal reference in the optical path — a sealed cyclohexane cell, or a silicon wafer — and recalibrate the wavenumber axis from a known peak on every single measurement. Two is what the benchtop instruments do and it is nearly free in hardware.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true,
+              "stance": "peer"
+            }
+          },
+          {
+            "user": "Going with the internal silicon reference at 520.7 wavenumbers. It costs one extra acquisition per measurement, about 1.5 seconds, and it corrects source drift, detector gain drift and grating thermal expansion in a single step, which the TEC would never have done for any of them. The $84 and the 1.1W come straight back out of the BOM.",
+            "expect": {
+              "maxQuestions": 1
+            }
+          }
+        ]
+      },
+      {
+        "gapDays": 33,
+        "turns": [
+          {
+            "user": "Silicon reference is in and validated. Fleet spread on the reference sample is 0.18 wavenumbers across 30 units, against 1.2 before and a target of 0.4. Site B re-ran their 40 and got 40 out of 40 including the three microcrystalline cellulose samples, so the instrument was right and their reference was stale after all. They have converted — eleven units, and they want the qualification package for a second site.",
+            "expect": {
+              "maxQuestions": 1
+            }
+          },
+          {
+            "user": "So the order book is Site A six, Site B eleven, plus four from the Basel pilot: twenty-one units. And I want to build 500, because that is what gets the BOM to $2,140. It is aggressive, but the alternative is building 100 at $2,760 and never reaching a price where the dock-level value case works against a benchtop that is already in the building.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true,
+              "stance": "peer"
+            }
+          },
+          {
+            "user": "Ramp plan for the board on the 9th. Purchase order for 500 laser diodes goes out on the 3rd of next month. Fourteen weeks lead, so they land in week 14, build weeks 16 to 19 at 130 units a week on the new line, first customer shipments week 20. The Basel site's qualification window is weeks 22 to 24, so we are inside it with two weeks to spare. Anything in that sequence that will not survive contact with reality?",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true,
+              "mustChallenge": true,
+              "mustContribute": "That fourteen weeks is a session 1 number and the world moved underneath it: in session 3 he recorded that Shibaura had been acquired by Nihon Koden, that their part is a low-volume specialty line inside a telecom-diode business, and that portfolio rationalisation was on his mind. Nothing has re-confirmed the lead time since. Every date in the ramp is derived from it — build start, first shipment, and the two weeks of slack against the Basel window — on a part that is sole-sourced, has no qualified second source, and is covered by eight weeks of buffer, which is less than any slip worth worrying about. The point is not that the lead time has changed; it is that the schedule's most sensitive input is also its least recently verified, and a written lead-time and stock confirmation costs one email before the board paper goes out.",
+              "alreadyConsidered": [
+                "that the part is sole-sourced, and that he accepted the exposure deliberately",
+                "that the Hamamatsu and Thorlabs alternatives fail on spec and on price respectively",
+                "that they hold eight weeks of buffer stock"
+              ]
+            }
+          },
+          {
+            "user": "Fair. I will get written lead-time and stock confirmation before the paper goes out, and I will price what a slip actually costs. A six-week slip puts first shipments at week 26 and the Basel window closes at week 24, so a slip of that size does not cost us margin, it costs us the site and the second-site qualification behind it.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true
+            }
+          }
+        ]
+      },
+      {
+        "gapDays": 40,
+        "turns": [
+          {
+            "user": "Lead time came back at 26 weeks, not 14, with a note that the 785nm line is under review for 2028. Options as I see them: buy eighteen months of coverage now, which is 900 diodes at $340, so $306k of inventory against $2.1m of cash; re-open the second-source qualification; or design the Thorlabs module into a high-end SKU and let the volume product wait. None of them is good and I have to pick one this week.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true,
+              "stance": "peer",
+              "mustContribute": "That the second-source option is not the same option it was in session 1. He rejected the Hamamatsu part on a 0.4nm stability spec against a 0.4 wavenumber error budget — a hardware-spec rejection, correct at the time. In session 4 he shipped an internal silicon reference at 520.7 wavenumbers that recalibrates the wavenumber axis on every acquisition, and said himself that it corrects source drift. That is exactly what turns absolute source stability from a specification the part must meet into an error the instrument corrects, and it is why the fleet spread is now 0.18 with a laser drifting four times its own datasheet. The part he ruled out is now the cheapest way out of the sole-source problem, and the reason it was ruled out was removed by his own fix two sessions ago.",
+              "alreadyConsidered": [
+                "that sole-sourcing is the exposure",
+                "that the Thorlabs module triples the BOM line"
+              ]
+            }
+          },
+          {
+            "user": "Then the decision is how much of the $306k I actually need. If Hamamatsu qualifies I need bridge stock to cover the qualification, not eighteen months — call it 300 units, $102k — and I want the qualification protocol to be the fleet spread test we already run, thirty units on the reference sample with a 0.4 wavenumber target, rather than a datasheet review. Datasheet review is what got us here.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true,
+              "stance": "peer"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "long-openloop-004",
+    "category": "longitudinal",
+    "persona": "Adaeze Nwosu, 34, senior data scientist at Kestrel Credit, a UK consumer lender. Builds the models and writes the model risk documentation herself. Fast, unusually honest about her own uncertainties out loud, and then moves past them before anyone closes them.",
+    "notes": "COVERS TWO REQUIRED PHENOMENA. (a) AN UNRESOLVED QUESTION FROM SESSION 1 THAT NOBODY CLOSED, RETURNING IN SESSION 5: in session 1 turn 2 she flags that she does not know whether months_at_address is snapshotted at application or overwritten on every warehouse refresh, says she will ask Dami, and moves on. It is the second most important feature in the model at 0.11, and she opened session 1 by calling the Gini jump suspicious. In session 4 turn 2 Dami leaves and the lineage questions go into a hole — she says this without connecting it to anything. In session 5 turn 3 she asks for the shape of a data contract for a monthly re-score. Nothing in that message mentions leakage, months_at_address, or session 1; it reads as a routine engineering request. The unanswered question is the contract's central case in both directions, and it is the only thing in the conversation that has been load-bearing since turn 2 of session 1. (b) A CONTRADICTION BETWEEN SESSION 2 AND SESSION 5 THAT NEITHER MESSAGE ALONE REVEALS: session 2 states that scoring happens once per customer and that three separate claims in section 4 of the model risk memo rest on it. Session 5 turn 1 relays a product request for a monthly re-score on refreshed features. Each message is unremarkable on its own; together they say the memo already sent to model risk is false. The scenario is answerable and interesting without memory — it is a real modelling conversation throughout — which is the point.",
+    "sessions": [
+      {
+        "gapDays": 0,
+        "turns": [
+          {
+            "user": "Rebuilding the application scorecard. The incumbent is a 2019 logistic regression at Gini 0.41 on recent out-of-time. The new one is gradient boosted, 180 candidate features from the bureau file plus our own application data, 340,000 applications from 2021 to 2024 with 24-month outcome windows. First cut is Gini 0.58, which is a suspiciously large jump for the same population, so my working assumption is that something is leaking and I have not found it yet.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true,
+              "stance": "peer"
+            }
+          },
+          {
+            "user": "Checked the obvious ones. No post-decision fields, no repayment behaviour, no collections flags, and the bureau pull is the one taken at application rather than a later refresh. One I have not checked and should: months_at_address. I do not know whether the warehouse snapshots it at application or overwrites it on every refresh. If it is overwritten then every row carries today's value rather than the application-date value, and for anyone who has since moved that is future information. I will ask Dami in data engineering.",
+            "expect": {
+              "maxQuestions": 1
+            }
+          },
+          {
+            "user": "Feature importance for context. Top five are bureau_score at 0.19, months_at_address at 0.11, affordability_ratio at 0.09, number_of_searches_3m at 0.08, and application_channel at 0.06. The channel one is interesting in its own right — broker applications default at nearly twice the direct rate and that is not in the current model at all, which is quietly embarrassing for a 2019 scorecard.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true
+            }
+          },
+          {
+            "user": "Fairness constraint from compliance: we cannot use postcode or anything that proxies it above a threshold they have not yet defined. I have run the obvious proxy check, mutual information between each feature and postcode district, and the worst offender is application_channel at 0.09 nats, which is low. Bureau score is 0.04. I think we are clean, but I would rather be told now what that test is not testing for.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true
+            }
+          }
+        ]
+      },
+      {
+        "gapDays": 17,
+        "turns": [
+          {
+            "user": "Validation design for the model risk memo. Out-of-time on 2024 applications held out entirely, plus a 2023 out-of-sample slice for stability. The thing that makes this tractable is that scoring happens once: the model runs at application and nothing is ever re-scored. One scoring event per customer, so the validation population and the production population are the same shape, and PSI monitoring is on the application distribution only.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true
+            }
+          },
+          {
+            "user": "That single-scoring-event property is load-bearing for more than the validation design. It is why adverse action reasons are computed once and stored, why the challenger comparison is a straight A/B on applications, and why I never have to model feature drift within a customer's life, only across cohorts. All three of those are written into section 4 of the memo as stated assumptions.",
+            "expect": {
+              "maxQuestions": 1
+            }
+          },
+          {
+            "user": "Gini settled at 0.55 out-of-time after dropping four features that were unstable across cohorts. At the current cutoff, approval goes from 61% to 64% at the same expected loss, or we hold approval flat and take expected loss from 3.9% to 3.4%. Product will want the approval rate, risk will want the loss, and the board will ask which one the model was built for. The honest answer is neither — it was built to rank.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true,
+              "stance": "peer"
+            }
+          }
+        ]
+      },
+      {
+        "gapDays": 22,
+        "turns": [
+          {
+            "user": "Compliance came back on proxies with a threshold and a method I do not love. They want demographic parity ratio above 0.8 across four protected groups, measured on approval rate at the production cutoff. Our new model is at 0.74 on one of the four. The 2019 model is at 0.79. So the new model is worse on their measure and better on everything else, which is going to be a fun paragraph to write.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true
+            }
+          },
+          {
+            "user": "I can get to 0.81 by reweighting the training data, which costs about 0.01 Gini, or by group-specific cutoffs, which I think is legally worse rather than better. Reweighting is the boring answer and I will probably take it. What I want is to be able to say in the memo, defensibly, why parity ratio on approvals is a strange thing to constrain when the model is a ranking function and the cutoff is a business choice made downstream of it.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true,
+              "stance": "peer"
+            }
+          },
+          {
+            "user": "Deployment has slipped to March because the decision engine upgrade is ahead of us in the queue. Annoying, but it gives me time to do the stability work properly. The reweighted model is at 0.54 Gini and 0.81 parity ratio, and I have refit the whole pipeline from raw so the numbers are reproducible end to end rather than reproducible from a pickle.",
+            "expect": {
+              "maxQuestions": 0
+            }
+          }
+        ]
+      },
+      {
+        "gapDays": 26,
+        "turns": [
+          {
+            "user": "Monitoring design. Monthly PSI on the score distribution and on the top ten features, alert at 0.1, investigate at 0.25. Quarterly Gini on a 12-month lagged cohort, which means the first real performance read lands a year after go-live. Everyone finds that uncomfortable and nobody has offered a better answer that does not involve pretending a 6-month proxy outcome is the outcome.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true
+            }
+          },
+          {
+            "user": "Dami has left. I found out because my access request for the warehouse lineage tooling bounced to an unmonitored mailbox. Not a crisis — the replacement starts in three weeks — but it does mean the lineage questions I had queued go into a hole for a month and I will have to re-raise them with someone who has never seen this pipeline.",
+            "expect": {
+              "maxQuestions": 1
+            }
+          },
+          {
+            "user": "Memo is at 41 pages and I have sent section 4 to model risk for early comment. The thing they will push on is the 24-month outcome window against a 12-month lagged monitoring read, because those two do not line up and I have not yet written a sentence that makes them line up honestly rather than rhetorically.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true,
+              "stance": "peer"
+            }
+          }
+        ]
+      },
+      {
+        "gapDays": 30,
+        "turns": [
+          {
+            "user": "Product have asked for something and I want to think about it properly rather than say no reflexively. They want a behavioural re-score at month six for line management — same model, same features, refreshed values from the current bureau file and the current application record — and then an automatic limit increase for anyone scoring above the top-decile threshold. It would run monthly against the whole approved book.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true,
+              "mustChallenge": true,
+              "mustContribute": "That this breaks the property she made load-bearing in session 2 — one scoring event per customer — and that she wrote three specific claims into section 4 of the memo on the strength of it: that the validation population and the production population are the same shape, that adverse action reasons are computed once and stored, and that feature drift within a customer's life never has to be modelled. A monthly re-score on refreshed features violates all three at once, and section 4 has already gone to model risk. The population is also not the validated one in a second way: approved-and-six-months-seasoned is a survivor population, so the score distribution the top-decile threshold would be applied to is not the distribution the cutoff was calibrated on. The contribution is connecting the request to the assumption three sessions back, not listing generic risks of reusing a model.",
+              "alreadyConsidered": [
+                "that the model is a ranking function and the cutoff is a downstream business choice",
+                "that PSI monitoring is currently on the application distribution only"
+              ]
+            }
+          },
+          {
+            "user": "That is the connection I had not made, and it is worse than it looks because section 4 is already out. The re-score population is approved and six months seasoned, which is a survivor population — everyone who defaulted in the first six months is gone — so the score distribution it would be applied to is not the one the cutoff was calibrated on at all.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true
+            }
+          },
+          {
+            "user": "Practical question on the refresh. If we re-score monthly, the features come from wherever the decision engine reads them at run time rather than from the application snapshot. I need to write the data contract for that this week — which fields the re-score reads, at what latency, what happens when a field is null, and who owns each one. Give me the shape of that contract.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true,
+              "mustContribute": "That the question she raised in session 1 and never closed is this contract's central case. She said she did not know whether months_at_address is snapshotted at application or overwritten on every warehouse refresh, said she would ask Dami, and in session 4 Dami left and the lineage questions went into a hole. months_at_address is the second most important feature in the model at 0.11, and the answer determines the contract in both directions: if it is overwritten, the training data has been carrying today's value on every historical row all along, which is a live candidate for the suspiciously large Gini jump she flagged in session 1 turn 1; if it is snapshotted, then the re-score is the first thing that will ever read a refreshed value, so the feature means one thing in training and a different thing at inference. The contract cannot be written correctly without the answer, and the answer has now been outstanding across five sessions and is blocking two workstreams instead of one.",
+              "alreadyConsidered": [
+                "that post-decision fields, repayment behaviour and collections flags were checked and excluded",
+                "that the bureau pull is the application-time one",
+                "that the re-score population is a survivor population"
+              ]
+            }
+          },
+          {
+            "user": "Right. I am holding the re-score until the lineage answer lands, and I will write the memo sentence as: the model is validated for a single scoring event at application, and any reuse on a seasoned population is out of scope for this validation and requires its own. That is honest, it is defensible in front of model risk, and it also kills the product request politely enough that nobody has to lose.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true,
+              "stance": "peer"
+            }
+          }
+        ]
+      },
+      {
+        "gapDays": 28,
+        "turns": [
+          {
+            "user": "Lineage came back. months_at_address is snapshotted at application, so no leak there, the Gini is real and the training data is what I thought it was. The new person also volunteered something I did not ask about: affordability_ratio is not snapshotted. It is recomputed nightly from the current income field, and the current income field is updated whenever a customer rings in to tell us their income has changed.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true,
+              "mustChallenge": true,
+              "mustContribute": "That the leak she went looking for in session 1 is in the third feature rather than the second, and that it has exactly the signature she described then. A feature recomputed nightly from a field customers update after application means every historical training row carries a post-application value for that field — which is future information relative to the decision, by the same argument she applied to months_at_address. affordability_ratio is 0.09 importance. So the good news does not close the question she opened in session 1 turn 1: the suspicious Gini jump still has an unexplained candidate, and this is it. Naming that the original suspicion survives the clean answer, rather than treating the lineage result as the end of the thread, is the contribution.",
+              "alreadyConsidered": [
+                "that months_at_address is now confirmed clean",
+                "that the bureau pull is the application-time one"
+              ]
+            }
+          },
+          {
+            "user": "Yes. Which means the refit has to rebuild affordability_ratio from application income, and I do not have application income as a stored field — I have the ratio. I may have to reconstruct it from the application PDF archive, which is 340,000 documents, and the extraction accuracy on a scanned payslip figure is not going to be 100%.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true
+            }
+          },
+          {
+            "user": "Before I spend three weeks on document extraction I want a cheap bound on how much it matters. Refit without affordability_ratio at all and see what out-of-time Gini does. If it drops from 0.54 to 0.52 the feature is not worth reconstructing and I drop it. If it drops to 0.44 then the feature was doing real work, and I need to know whether the work was legitimate signal or the leak doing the lifting.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true,
+              "stance": "peer"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "long-apprentice-005",
+    "category": "longitudinal",
+    "persona": "Marnie Okonkwo-Hale, 27, a secondary-school physics teacher until eight months ago, now running her family's eleven-person bakery in Hull after her father's stroke. Quantitative by training and completely new to trade, so she learns fast, checks her own reasoning out loud, and is blunt about what she does not know yet.",
+    "notes": "COVERS THE EXPERTISE-GROWTH REQUIREMENT, and carries the corpus's withheld-answer case. Session 1 is a genuine novice: she asks what gross margin is actually measuring and whether it is just price minus ingredients. Session 2 she derives per-unit numbers and then asks the sharp question a good learner asks — whether allocating salaried labour per loaf invents a number. Session 3 she finds the constraint herself and computes contribution per deck-hour. By session 6 she is reasoning in contribution per unit of a named constraint, has run a two-Tuesday quasi-experiment, and pre-empts her own causal objection. A system still explaining what contribution margin is in session 6 has failed, and the alreadyConsidered list on the final turn makes that a gradeable rather than a vibe. THE PAYOFF, session 6 turn 1: she costs a laminated pastry range at about GBP 1,000 per deck-hour against GBP 165 for the white tin and asks what she is missing before buying equipment. The last message alone gives no reason to doubt it and the arithmetic in it is correct. The reachable-only-with-memory point is that her denominator is wrong for this product class: she built the deck-hour ranking in session 3 when deck hours bound at 17.5 of 18, and in session 5 turn 3 she established herself that the real binding resource is skilled early-shift labour, with deck loads already sitting idle at 11:00 for want of hands. Laminated pastry is the most labour- and proving-space-intensive thing a bakery makes and barely touches the deck, which is exactly why it scores so well on the one resource it does not consume. Session 3 turn 3 also carries mustNotReveal: she asks for her method to be checked and explicitly says not to give her the break-even number, which is 2,500.",
+    "sessions": [
+      {
+        "gapDays": 0,
+        "turns": [
+          {
+            "user": "I have taken over my dad's bakery and I am trying to work out why we are losing money. Turnover last year was GBP 612,000 and the accountant says we made a loss of GBP 18,000. The sourdough sells out every single day by eleven o'clock, and my dad's view was always that anything that sells out is doing well. I do not have any way to check whether that is true. Where does a person actually start with this?",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true,
+              "stance": "teacher"
+            }
+          },
+          {
+            "user": "The accountant keeps saying gross margin and I am not certain I understand what it is measuring. Is it just the selling price minus what the ingredients cost? Because if it is, the sourdough looks fine — it sells at GBP 4.20 and the flour, water, salt and starter come to about GBP 0.61. But that cannot be the whole story, because we are losing money overall and the sourdough is the thing we make most of.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true,
+              "stance": "teacher"
+            }
+          },
+          {
+            "user": "So labour is the bit I am missing. The sourdough is a three-day process — mix, bulk ferment, shape, retard overnight, bake — and one person is on it for a good chunk of two shifts. What I cannot see is how to split one baker's wages across four different products that are all being made at the same time by the same person. That feels like the actual question rather than the one I asked.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true,
+              "stance": "teacher"
+            }
+          },
+          {
+            "user": "Our numbers, so you have them. Eleven staff: five in production, four front of house, one driver, me. Payroll is GBP 21,400 a month. Rent and rates GBP 4,100. Energy was GBP 3,900 a month last winter, up from GBP 1,600 two years ago. We have two deck ovens and one convection, and the decks are full from four in the morning until about one in the afternoon.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true
+            }
+          }
+        ]
+      },
+      {
+        "gapDays": 34,
+        "turns": [
+          {
+            "user": "I have done the exercise for our six main lines. Per unit: sourdough sells at GBP 4.20, ingredients GBP 0.61, and if I put labour in at the actual minutes it takes that is GBP 1.94, so GBP 1.65 left. The white tin sells at GBP 2.40, ingredients GBP 0.34, labour GBP 0.31, so GBP 1.75 left. The white tin makes more per loaf than the sourdough does and I would never have guessed that in a hundred years.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true
+            }
+          },
+          {
+            "user": "But I am not sure I am allowed to put labour in like that. The bakers are salaried. If I stop making sourdough tomorrow I do not save GBP 1.94 a loaf, I have exactly the same five people standing in the same room. So is the GBP 1.65 a real number, or have I invented one by treating a fixed cost as though it varied with volume?",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true,
+              "stance": "teacher"
+            }
+          },
+          {
+            "user": "Then the honest version is ingredients only, which puts sourdough at GBP 3.59 and the white tin at GBP 2.06, and the sourdough wins easily. But that cannot be right either, because the sourdough is eating the thing we actually have a limited amount of, which is bakers and oven space. I can feel that there is a proper way to do this and I do not know what it is called.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true,
+              "stance": "teacher"
+            }
+          }
+        ]
+      },
+      {
+        "gapDays": 41,
+        "turns": [
+          {
+            "user": "Constraint work. The binding one is deck-oven hours. Two decks running 04:00 to 13:00 is eighteen deck-hours a day and we use 17.5 of them. Sourdough is 45 minutes at 240 and we bake 120 a day in six loads of twenty, so 4.5 hours. White tin is 30 minutes, 200 a day in five loads of forty, 2.5 hours. Seeded and rye take 3, morning goods 6, and the Saturday specials average 1.5. That is why we turn away every wholesale enquiry that comes in.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true
+            }
+          },
+          {
+            "user": "Contribution per deck-hour then. Sourdough: 120 loaves times GBP 3.59 is GBP 431, over 4.5 hours, so GBP 96 an hour. White tin: 200 times GBP 2.06 is GBP 412, over 2.5 hours, so GBP 165 an hour. The white tin is worth about 1.7 times as much per hour of the thing we are actually short of. That is the number my dad never had and it is the opposite of what everyone in the building believes.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true,
+              "stance": "peer"
+            }
+          },
+          {
+            "user": "New decision. A cafe group wants 2,000 wholesale loaves a month at GBP 2.60. Variable cost is GBP 1.32 including the better bag rate on flour at that volume. It needs a part-time baker and a van lease, which together are GBP 3,200 a month and would not exist otherwise. I want to work out the break-even volume myself, so do not give me the number. Tell me whether my method is right: fixed costs of the line divided by contribution per loaf, where contribution is price minus variable cost.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true,
+              "stance": "teacher",
+              "mustNotReveal": [
+                "\\b2,?500\\b"
+              ]
+            }
+          },
+          {
+            "user": "2,500, so the 2,000 they are offering does not cover the line and I would run it about GBP 640 a month down. And there is a second thing I nearly missed: those are white tins, so 2,000 a month is about 77 a day, which is two extra deck loads, an hour a day of the constraint, earning GBP 1.28 a loaf where the retail tin earns GBP 2.06 in the same oven. I think the answer is no unless they take 3,000 and pay GBP 2.95.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true,
+              "stance": "peer"
+            }
+          }
+        ]
+      },
+      {
+        "gapDays": 38,
+        "turns": [
+          {
+            "user": "I put the deck-hour ranking to the team and it went badly, which I should have predicted. Ranking the sourdough last is not a numbers argument to them, it is an argument about what this bakery is. So I have split the question in two: what the numbers say we should make more of, and what we keep because it is why people walk through the door. I want the second list to be short and deliberate rather than quietly becoming everything.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true,
+              "stance": "peer"
+            }
+          },
+          {
+            "user": "Evidence for the anchor argument, because I did not want to accept it on feeling. Till data for twelve Saturdays: baskets containing a sourdough average GBP 14.80, baskets without average GBP 7.10, and 41% of Saturday baskets contain one. If even a third of that difference is the sourdough pulling the rest of the basket along rather than simply marking out a bigger customer, it pays for its deck time several times over.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true,
+              "stance": "peer"
+            }
+          },
+          {
+            "user": "I know the causal direction is not established by that. What I can do cheaply is not bake sourdough on two Tuesdays and compare against matched Tuesdays, which is a real experiment on a low-stakes day. It only bounds the effect rather than measuring the one I care about, because Tuesday baskets are not Saturday baskets and the Tuesday customer is not the Saturday customer.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true,
+              "stance": "peer",
+              "alreadyConsidered": [
+                "that the basket difference is correlational and does not establish that the sourdough causes the larger basket",
+                "that a Tuesday test does not transfer directly to Saturday"
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "gapDays": 45,
+        "turns": [
+          {
+            "user": "Tuesday test ran twice. Baskets on the no-sourdough Tuesdays averaged GBP 6.90 against GBP 7.40 on matched Tuesdays, and footfall was down 8%. So there is an anchor effect and it is small on a Tuesday — about 7% of basket value plus some traffic. I am treating that as a lower bound on the Saturday effect rather than an estimate of it, and I am writing it down that way so I do not quietly start believing it is the estimate.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true,
+              "stance": "peer"
+            }
+          },
+          {
+            "user": "Energy contract renews in March and the broker has quoted 24.1p a kilowatt-hour fixed for two years against the 31p we are on. The decks are 11kW each and run nine hours, so 198 kilowatt-hours a day, which at 260 trading days is about GBP 3,600 a year of difference. It shifts the deck-hour ranking slightly but it does not change the order of anything.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true
+            }
+          },
+          {
+            "user": "Staffing. The part-time baker I costed for the wholesale line I now want anyway, and for a different reason. The binding thing at 17.5 of 18 deck-hours is not really the ovens, it is that nobody can start a second shape-up while the first batch is proving. If I add four hours of skilled labour at 05:00 I unlock two deck loads that currently sit idle at 11:00 purely because there is no one free to fill them.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true,
+              "stance": "peer"
+            }
+          }
+        ]
+      },
+      {
+        "gapDays": 40,
+        "turns": [
+          {
+            "user": "New line I want to cost: a laminated pastry range, croissant, pain au chocolat and a seasonal danish. Contribution per deck-hour is enormous. They bake in twelve minutes at 190 and we can run forty on a tray and three trays in a deck, so 300 a day is two and a half loads, half an hour of deck time, and at GBP 1.68 contribution that is GBP 504 over half an hour — about GBP 1,000 an hour of deck time against GBP 165 for the white tin. On the ranking I have used since March this is the best thing in the building by a factor of six. What am I missing before I commit to the equipment?",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true,
+              "mustChallenge": true,
+              "stance": "peer",
+              "mustContribute": "That the denominator is wrong for this product class, and that she has already measured the resource it actually consumes. She built the contribution-per-deck-hour ranking in session 3, when deck hours bound at 17.5 of 18. In session 5 turn 3 she established herself that the real binding resource is now skilled early-shift labour — a second shape-up cannot start while the first proves, and deck loads already sit idle at 11:00 for want of a pair of hands. Laminated pastry is the most labour-intensive and proving-space-intensive thing a bakery makes and it barely touches the deck at all, which is precisely why it scores so spectacularly on the one resource it does not consume. Ranking a product on the constraint it does not use is the error, and the fix is to compute contribution per skilled early-shift hour and per retarder shelf-night before buying anything. A reply that re-checks her arithmetic, which is correct, or raises sheeter cost and training, has missed it.",
+              "alreadyConsidered": [
+                "what contribution margin is and how it is computed",
+                "that salaried labour should not be allocated per unit as though it varied",
+                "that contribution per deck-hour is the right tool when deck hours are the binding constraint",
+                "that the sourdough earns its place through the Saturday basket rather than through its own margin"
+              ]
+            }
+          },
+          {
+            "user": "Right, so the numbers I need are contribution per skilled early-shift hour and per retarder shelf-night, and I have neither. The retarder has fourteen shelves and the sourdough retard already takes eight of them overnight, so the pastry is competing with the thing I decided to protect for basket reasons, not with the white tin at all. I have been comparing it against the wrong product as well as on the wrong denominator.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true,
+              "stance": "peer"
+            }
+          },
+          {
+            "user": "Which makes this a three-way rather than a ranking. Sourdough holds eight retarder shelves and buys me Saturday footfall. Pastry wants those same shelves and probably pays better per shelf-night. The white tin pays best per deck-hour and needs neither shelves nor a skilled early pair of hands. I think the real conclusion is that I have been running one ranking for a shop that has three different constraints, and I need three numbers, not one league table.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true,
+              "stance": "peer"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "long-echo-006",
+    "category": "longitudinal",
+    "persona": "Devi Ramanathan, 39, VP Engineering at Arcadia Freight, a 340-person freight brokerage in Rotterdam. She is also project-managing the renovation of her late mother's house in Coimbatore from six thousand kilometres away, and she brings both here because this is the only place she thinks in writing. Writes constraints down so they cannot be renegotiated quietly.",
+    "notes": "COVERS THE FALSE-POSITIVE TRAP, plus a genuine long-range recall payoff so the scenario is not a pure negative test. THE TRAP, session 5 turn 1: 'Phase two is blocked on the survey again' — the surveyor's quote expired on day ninety-six, a 22% requote against a six-week alternative, monsoon in mid-June. In session 2 turn 3 the word 'survey' was planted in the work thread with hard specifics: the network survey of 1,900 dispatcher workstations, 340 of them on the old VPN client. The two threads share vocabulary — survey, phase two, requote, weeks of delay, a hard seasonal deadline — and share no entities, numbers or constraints. A system that reaches for the earlier context here produces a false statement about a house in Tamil Nadu. The turn is a fair test rather than a gotcha because the house thread is introduced explicitly in session 1 turn 4 and updated in session 3 turn 2, so the referent is recoverable; the failure being measured is over-eager recall, not ignorance. mustNotReveal on that turn is deliberately narrow — VPN and workstations — so that a reply which merely disambiguates carefully is not penalised. THE GENUINE RECALL, session 6 turn 1: she proposes a second model head trained on realised gross profit per load. In session 1 turn 1 she wrote the constraint in herself — the model never sees the broker's margin, a rate-fixing exposure, counsel unambiguous — explicitly so it could not be renegotiated later. Realised gross profit per load is the broker's margin, by the standard definition in the trade, so the label follows from the terms rather than from judgement; and a shared trunk carries it into the service ranking as well, so the breach is wider than the second score. Nothing in the last message flags any of it: it reads as a routine multi-task modelling question and ends with 'what breaks?'.",
+    "sessions": [
+      {
+        "gapDays": 0,
+        "turns": [
+          {
+            "user": "Carrier scorecard, second attempt. The first one died because dispatchers ignored it. The model ranks 11,000 carriers lane by lane on on-time delivery and claims risk, refreshed weekly, and the output is a ranked shortlist inside the dispatch tool. One hard constraint from legal that I want written into the design now and not negotiated later: the model never sees the broker's margin on a load. Using our own profit to rank carriers is a rate-fixing exposure and counsel was unambiguous about it. Where does a design like this usually go wrong?",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true,
+              "stance": "peer"
+            }
+          },
+          {
+            "user": "Features are on-time percentage, claims per thousand loads, tender acceptance rate, equipment type match, and a lane familiarity count. Labels are on-time delivery inside the appointment window. Current AUC is 0.62, which is not impressive, but the baseline is a dispatcher's memory of who answered the phone last time, so the bar is on the floor. Training data is 2.4 million loads over three years.",
+            "expect": {
+              "maxQuestions": 1
+            }
+          },
+          {
+            "user": "The failure mode I am most worried about is the silent one. A bad carrier recommendation does not page anybody — the load moves, it is four hours late, the customer grumbles at the quarterly review, and nothing in our telemetry distinguishes that from ordinary variance. So whatever we ship needs a shadow compare against what the dispatcher would have chosen, running for at least a quarter before the model is allowed to touch a decision.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true
+            }
+          },
+          {
+            "user": "Unrelated, but it is on my mind and I have nowhere else to put it. I am renovating my mother's house in Coimbatore and the contractor has asked for a 30% stage payment before the roof is even off, which is not what we agreed. I am six thousand kilometres away and my cousin is the only person who ever sees the site. What is the sane way to structure payments when you cannot inspect the work yourself?",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true
+            }
+          }
+        ]
+      },
+      {
+        "gapDays": 20,
+        "turns": [
+          {
+            "user": "Shadow compare has been running six weeks. Dispatchers override the model's top recommendation 41% of the time, which sounds like failure and is not. On lanes with fewer than twenty historical loads — 61% of lanes but only 18% of volume — the dispatcher's choice beat the model's on on-time delivery, 64% to 51%. On thick lanes the model wins 71% to 63%. So the override rate is telling us where the model has no business having an opinion.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true,
+              "stance": "peer"
+            }
+          },
+          {
+            "user": "So the design changes. Suppress the score entirely below twenty historical loads on the lane and show the dispatcher nothing rather than something weak. That is a better answer than training dispatchers to trust the number, which is what the first attempt tried to do and is exactly why it died.",
+            "expect": {
+              "maxQuestions": 1
+            }
+          },
+          {
+            "user": "The network survey came back too, which is the other blocker. Of the 1,900 dispatcher workstations, 340 are still on the old VPN client and the new dispatch tool will not authenticate through it. Desktop say six weeks to remediate if they can do it remotely and four months if anybody has to physically touch a machine.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true
+            }
+          }
+        ]
+      },
+      {
+        "gapDays": 24,
+        "turns": [
+          {
+            "user": "Thin-lane suppression is in and the override rate on the lanes where we do show a score has dropped to 19%. Dispatchers are using it. The unexpected cost is that suppression covers 61% of lanes, so for most of a dispatcher's day the panel is blank, and blank reads as broken. I need something in that space that is honest about uncertainty without being a number they will treat as a number.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true,
+              "stance": "peer"
+            }
+          },
+          {
+            "user": "Coimbatore update, since it is going the same way as everything else. The roof is off and the beams underneath are worse than anyone said — two of the six are gone at the wall plate — and the contractor wants another 4.2 lakh. My cousin has sent photographs and they are genuinely rotten, so this is not an invention. I have told him to proceed. What I want is a way to stop this shape of thing happening again on the next phase.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true
+            }
+          },
+          {
+            "user": "Back to work. AUC is 0.66 on thick lanes after adding a carrier-level recency feature, and claims prediction is the weak half at 0.58, because claims are rare and the label is noisy. I am inclined to split it into two models rather than have one head trying to do both, and to be honest with dispatchers that the claims number is a weak signal rather than dressing it up.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true,
+              "stance": "peer"
+            }
+          }
+        ]
+      },
+      {
+        "gapDays": 29,
+        "turns": [
+          {
+            "user": "We went live to 40% of dispatchers on Monday. Adoption is fine and the blank-state work helped. There is one real problem: three of our largest carriers have complained that their rank dropped, and one has asked in writing what the ranking is based on. Commercial want to give them the feature list. I do not want to give them the feature list.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true,
+              "stance": "peer"
+            }
+          },
+          {
+            "user": "My position is that we publish the categories — service, safety, capacity, fit — and the fact that it is lane-specific, and we offer each carrier their own numbers back, but never the model. A carrier who knows the exact features will optimise the features rather than the thing. Tender acceptance rate in particular is trivially gameable by declining nothing and then falling over on the loads you should have declined.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true
+            }
+          },
+          {
+            "user": "The complaint I take more seriously is that two of the three are carriers we have used for eleven years, and the model has downgraded them on a recency feature that penalises exactly the pattern of a steady long-term partner who does not chase volume. That is the feature doing precisely what I asked it to do, and it is still wrong.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true,
+              "stance": "peer"
+            }
+          }
+        ]
+      },
+      {
+        "gapDays": 26,
+        "turns": [
+          {
+            "user": "Phase two is blocked on the survey again. The surveyor's quote was valid for ninety days and we are on day ninety-six, so he wants to requote at the current rate, which is 22% higher. The alternative is the second surveyor, who was 15% cheaper originally but wanted six weeks. The plaster has to be on before the monsoon, which is mid-June, and my cousin can only get to the site at weekends. Which risk do I take?",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true,
+              "mustContribute": "A straight answer about the house: the 22% requote weighed against a six-week delay, measured against the mid-June plaster deadline and against the fact that the only person who can let a surveyor in is available at weekends.",
+              "mustNotReveal": [
+                "\\bVPN\\b",
+                "\\bworkstations?\\b"
+              ],
+              "notes": "FALSE-POSITIVE TRAP. This is the Coimbatore house, introduced in session 1 turn 4 and updated in session 3 turn 2. It shares vocabulary with the work thread — survey, phase two, requote, weeks of delay, a hard deadline — and shares no entities, numbers or constraints with it. The session 2 network survey of 1,900 workstations is irrelevant here, and importing it produces a false statement. Correct behaviour is to answer the renovation question on its own terms. A reply that connects this to the dispatch rollout, the VPN remediation or the carrier scorecard is wrong, however fluently it does it."
+            }
+          },
+          {
+            "user": "Taking the requote. Six weeks past mid-June is not a schedule risk, it is a year, and 22% of 1.8 lakh is not worth a monsoon. Meanwhile, at work: the recency feature. I have capped its contribution rather than removed it, because removing it made the model worse on genuinely deteriorating carriers, which is the case the feature was there for in the first place.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true
+            }
+          },
+          {
+            "user": "Rollout to 100% next month. The last thing on the list is what we do about carriers who ask to see their own numbers. I want a quarterly carrier scorecard document: their own metrics, their rank band, no features and no comparison to named competitors. Legal are content with it as long as we do not publish anything that could read as a price signal to the market.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true
+            }
+          },
+          {
+            "user": "Commercial have been asking for the model to reflect commercial outcomes and not only operational ones, and I have been putting them off with 'next quarter' for two quarters. I think there is a real point buried inside a bad request, and I would rather shape it myself than have it arrive as a mandate from the CCO with a deadline attached to it.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true,
+              "stance": "peer"
+            }
+          }
+        ]
+      },
+      {
+        "gapDays": 31,
+        "turns": [
+          {
+            "user": "Model v2 scope. I am adding a second label alongside on-time delivery: realised gross profit per load, normalised by lane and equipment type, as a regression head with the two heads sharing a trunk. The idea is that ranking becomes explicitly two-objective and dispatchers get a service score and a value score rather than one number pretending to have settled the trade-off for them. Training data is the same 2.4 million loads and the finance join already exists. What breaks?",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true,
+              "mustChallenge": true,
+              "mustContribute": "That realised gross profit per load is the broker's margin on a load, and that in session 1 she wrote 'the model never sees the broker's margin' into the design as a hard constraint from counsel, on a rate-fixing exposure, specifically so that it could not be renegotiated quietly later. This is that renegotiation, arriving under a different name and from the direction she predicted in the previous session. The shared trunk makes it worse rather than better: even though only one head reads the margin label, the shared representation carries margin information into the service ranking too, so the constraint is breached by the carrier ranking itself and not merely by the second score. Naming the constraint and where the architecture breaches it is the contribution; a reply that discusses multi-task learning, label noise, head weighting or normalisation has missed the only thing in this turn that matters.",
+              "alreadyConsidered": [
+                "that a single number cannot settle a two-objective ranking",
+                "that the finance join already exists",
+                "that dispatchers override the model where it has no business having an opinion"
+              ]
+            }
+          },
+          {
+            "user": "That is the answer and I did not want it. So the question becomes what commercial's real objective is, given that it cannot be margin. Candidates: carriers who require the most dispatcher intervention per load, carriers whose invoices need correcting, carriers who accept tenders at the posted rate instead of renegotiating every single one. All of those are cost to us, all of them are observable, and none of them is the rate.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true,
+              "stance": "peer"
+            }
+          },
+          {
+            "user": "Coimbatore is finished, incidentally. Eleven months and 38% over the original estimate, which my cousin assures me is good for the area. The thing I would do differently is the same thing this project taught me: I paid for progress I could not verify, and in both cases the fix was a cheap independent read — photographs on a schedule, and a shadow compare — rather than a better contract or a stricter rule.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true,
+              "stance": "peer"
+            }
+          }
+        ]
+      }
+    ]
+  }
+]
