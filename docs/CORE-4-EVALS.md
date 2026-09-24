@@ -603,6 +603,90 @@ the shared scratchpad. Four players reported errors in their own answers,
 left as written. No judge reported a deviation. There were still no human
 raters.
 
+### Run 6 — the last held-out set: level with A1, ahead of B+
+
+The last 34 unused scenarios, 82 turns. All three arms were regenerated
+from one frozen bundle at `8f3db9d`: every fix from run 5, plus the
+pre-run review's fixes to the new signals. There were 12 fresh players and
+8 fresh blind judges.
+
+| | Core 4 | Baseline | Tie | n | sign test (decided) |
+|---|---|---|---|---|---|
+| vs A1 — scenarios (run 4 → 5 → 6) | 15 → 16 → **16** | 26 → 18 → **16** | 9 → 8 → **2** | 34 | p = 1.0 |
+| vs A1 — turns | **34** | **24** | 24 | 82 | |
+| vs B+ — scenarios (run 4 → 5 → 6) | 16 → 15 → **18** | 20 → 18 → **10** | 14 → 9 → **6** | 34 | p = 0.19 |
+| vs B+ — turns | **35** | **24** | 23 | 82 | |
+
+This is the first run where Core 4 is not behind. It is level with A1 on
+scenarios and ahead on turns (34–24), and ahead of B+ on both, though not
+significantly (p = 0.19). Margins against A1 were 15 + 1 for Core 4 and
+14 + 2 for the baseline; against B+, 15 + 3 and 10 + 0. **Overreach 0/82**
+in both comparisons, down from 5/111 in run 5, and no withheld-answer
+leaks. Paternalism was 1/82 (A1 0, B+ 2). Helpfulness 4.59 vs 4.68 (A1),
+**4.76 vs 4.56** (B+); agency 4.85 vs 4.94 and 4.79 vs 4.71. Deterministic:
+0.05 questions per reply vs 0.18 (A1); 1% of replies ask anything, vs 10%.
+
+**E0 still fails, now only on its category rule.** Against A1, Core 4 is
+preferred in exactly half the decided scenarios (16/32), which does not
+trip the "<50%" clause. But it loses **expert 1–4** against A1 and
+**learning 1–3–1** against B+, both categories with n = 5, by more than
+20 points.
+
+**Why it still lost where it lost** (all margin 1, except two at 2):
+1. **An explicit sentence count was ignored.** In expert-004 ("one
+   sentence") and expert-009 ("two sentences", against both baselines),
+   Core 4 padded past the spec.
+2. **"I'm lost now."** under hints-only got another discovery exercise
+   (learning-020, margin 2 against A1).
+3. **"I don't want advice about audition prep … I just needed to tell
+   someone"** fell just outside the clause-final forms the pre-run review
+   imposed, so being heard was not read (reflective-003, margin 2 against
+   A1).
+4. **Expert coverage**: the baseline added one more number or catch
+   (expert-007, expert-018), all at margin 1.
+5. **Arithmetic** (decision-015): neither Core 4 nor either baseline caught
+   a slip in money arithmetic the person had asked to have checked.
+
+Fixed since, after this run's bundle: `c9c00af` (items 1–3) and `425b494`
+(item 5: arithmetic they wrote out, money included, is computed exactly).
+Also found by run 6's players: `b6cb744`, where the withhold notice was
+stripped as a "disguised question" and "more than last time" appeared on a
+first turn.
+
+**Deviations.** Two players sent an answer and the next step as parallel
+calls on their first request; the write landed first both times. One player
+created and deleted a stray empty file. One B+ player opened a baseline
+arm's pending file while picking "the latest file"; that scenario was not
+in its set, so none of its answers depended on it. One judge wrote a helper
+file to the scratchpad root and moved it. No judge reported reading
+another judge's output. There were still no human raters.
+
+### Across the three held-out runs
+
+Each run measured a different version of Core 4: every run's fixes landed
+before the next. So pooling them does not measure one system. Read as a
+trajectory, on scenarios never used to tune it:
+
+| | run 4 | run 5 | run 6 |
+|---|---|---|---|
+| vs A1 (Core 4 – baseline – tie) | 15–26–9 | 16–18–8 | 16–16–2 |
+| vs B+ | 16–20–14 | 15–18–9 | 18–10–6 |
+| Core 4 overreach (turns) | 3/124 | 5/111 | 0/82 |
+| decision (vs A1) | 0–5 | 1–2–1 | 1–3 |
+| expert (vs A1) | 0–4–3 | 2–3–1 | 1–4 |
+
+**The honest answer to "is Core 4 better than a strong prompt on the same
+model?"** Not demonstrated. By run 6 it is level with the strongest prompt
+and ahead of the same prompt with a self-critique pass, but not
+significantly. It keeps losing expert work narrowly, and nothing here has
+been rated by a human. What it does reliably and measurably: it asks
+almost no unneeded questions (1–2% of replies vs 5–11%), and it does not
+re-raise what the person has already settled. Once its signal and ceiling
+defects were fixed, it held the line on withheld answers without
+overreaching. The next evidence has to come from human raters
+(`evals/core4/human-pack.mjs`) and from new scenarios. Every scenario in
+this corpus has now been used.
+
 ### Full corpus
 
 Not yet run.
