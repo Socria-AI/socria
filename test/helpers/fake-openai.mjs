@@ -24,6 +24,9 @@ export default class OpenAI {
           // Answer Guard 2.0's model pass (lib/core4/guard2.ts GUARD2_SYSTEM).
           if (sys.startsWith('You check one reply before a person sees it')) {
             (g.__guardCalls ??= []).push(p);
+            // A guard that fails mid-turn, to prove a reply already collected
+            // is not lost to it.
+            if (g.__guard?.__throw) throw Object.assign(new Error('guard exploded'), { status: 500 });
             return { choices: [{ message: { content: JSON.stringify(g.__guard ?? { action: 'ALLOW', findings: [], redundant: [] }) } }] };
           }
           // Verify Mode's separate checker (lib/core4/verify.ts CHECK_SYSTEM).

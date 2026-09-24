@@ -747,19 +747,37 @@ function core4Reply(x: {
         if (reply.trim() && buffered) {
           // Nothing has been sent on a buffered turn; send only what the
           // deterministic guard accepts, never the raw draft.
-          const safe = p ? fallbackReply(p, reply, null).text : reply;
-          controller.enqueue(encoder.encode(safe));
-          reply = safe;
-          sent = !!safe.trim();
+          //
+          // Wrapped because this runs while already handling a failure, and
+          // the guard is the part most likely to have been the failure. A
+          // reply the person could have read must not be lost to a second
+          // throw inside the handler for the first — the visible result of
+          // that is a turn that produces nothing at all.
+          try {
+            const safe = p ? fallbackReply(p, reply, null).text : reply;
+            controller.enqueue(encoder.encode(safe));
+            reply = safe;
+            sent = !!safe.trim();
+          } catch (inner) {
+            console.error('[socria/chat] core 4 fallback reply threw', inner);
+          }
         }
-        controller.enqueue(encoder.encode(streamFailureNotice('core 4 stream', e, sent)));
+        try {
+          controller.enqueue(encoder.encode(streamFailureNotice('core 4 stream', e, sent)));
+        } catch (inner) {
+          console.error('[socria/chat] core 4 failure notice threw', inner);
+        }
       } finally {
         try {
           if (p) await finishTurn(p, reply, guard, regenerated, novelty, served, CORE_4_PROMPT_VERSION);
         } catch (e) {
           console.error('[socria/chat] core 4 writeback failed', e);
         }
-        controller.close();
+        try {
+          controller.close();
+        } catch (e) {
+          console.error('[socria/chat] core 4 stream close threw', e);
+        }
         try {
           if (reply.trim()) x.after(reply);
         } catch (e) {

@@ -491,6 +491,17 @@ console.log('\n=== only Core 4 was broken on dev: one rule, written twice, drift
   const auth = await turn('model-401', [U('hi')], { state: { work: 'conversation', latest: 'other' }, streamError: { status: 401, message: 'Incorrect API key provided' } });
   ok('a rejected key is not retried on another model', /authenticate/.test(auth.received), auth.received);
   globalThis.__streamError = undefined;
+  // A guarded turn whose guard itself throws must still deliver the words it
+  // collected: losing them to a second failure inside the handler for the
+  // first is how a turn ends up producing nothing at all.
+  const g = await turn('guard-throws', [U('I am learning derivatives and want to work these out myself. Is d/dx(x^2 sin x) = 2x cos x?')], {
+    state: { taskKind: 'learn', work: 'verification', latest: 'attempt', attempt: 'wrong', currentFocus: 'differentiating x^2 sin x',
+      learningGoal: { value: 'yes', source: 'explicit', confidence: 1, evidence: 'want to work these out myself' } },
+    replies: ['Not quite — look again at the product rule.'],
+    guard: { __throw: true },
+  });
+  ok('a guard that throws does not swallow the reply', /product rule|ref /.test(g.received), g.received);
+  ok('  and the turn still closes cleanly', g.status === 200, String(g.status));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
