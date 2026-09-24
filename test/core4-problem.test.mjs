@@ -157,7 +157,10 @@ console.log('\n=== the gate: already said, and not worth an expert\'s time ===')
      JSON.stringify(gateContributions(found, [], 'novice').map((f) => f.novelty)));
   const rendered = renderMissing(gateContributions(found, [], 'novice'));
   ok('the move block gets at most two, with the instruction to raise one', /Raise at most ONE/.test(rendered) && rendered.split('\n  - ').length - 1 <= 2, rendered);
-  ok('  and never as a list to the person', /never as a list/.test(rendered));
+  ok('  and never as a list to the person', /Never as a list/i.test(rendered), rendered);
+  // A run-8 reply opened "The thing the model structurally cannot see" — the
+  // block's own framing leaking into the voice.
+  ok('  and never described as structure or as what a model can see', /never describe it as structure/.test(rendered) && /say the thing itself/.test(rendered), rendered);
   ok('nothing missing renders nothing', renderMissing([]) === '');
   // The gate must not read a finding as already-said just because it quotes
   // the thing it is about (found by the end-to-end test).

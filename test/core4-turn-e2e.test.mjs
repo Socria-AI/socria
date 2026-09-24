@@ -534,7 +534,7 @@ console.log('\n=== the structure reaches the prompt the reply is written from ==
   ok('the prompt says what the decision rests on', /rests on "Monthly churn is 4\.1%"/.test(r.prompt), r.prompt.slice(-900));
   ok('  and marks the scoping choice as assumed', /assumed/.test(r.prompt), r.prompt.slice(-900));
   ok('the reply is handed the thing nobody said out loud', /Noticed in the structure/.test(r.prompt) && /excludes annual contracts/.test(r.prompt), r.prompt.slice(-900));
-  ok('  told to raise at most one, in its own words', /Raise at most ONE/.test(r.prompt) && /never as a list/.test(r.prompt));
+  ok('  told to raise at most one, in its own words', /Raise at most ONE/.test(r.prompt) && /Never as a list/i.test(r.prompt), r.prompt.slice(-400));
   ok('the trace records what was found', r.t?.trace?.missing?.found?.includes('HIDDEN_ASSUMPTION'), JSON.stringify(r.t?.trace?.missing));
   // A first turn with nothing accumulated must add nothing at all.
   const fresh = await turn('fresh-' + Date.now(), [U('What is the default isolation level in Postgres?')], {

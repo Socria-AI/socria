@@ -330,5 +330,5 @@ export function renderMissing(found: readonly MissingContribution[]): string {
   const top = found.slice(0, 2);
   if (!top.length) return '';
   const lines = top.map((c) => `  - ${c.what} (${c.whyItMatters})`);
-  return `\n=== Noticed in the structure of their problem, across turns ===\n${lines.join('\n')}\nRaise at most ONE of these, only if it genuinely matters here, in your own words and woven into the reply — never as a list, never as "have you considered". If it does not fit what they asked for, leave it.\n`;
+  return `\n=== Noticed across their turns ===\n${lines.join('\n')}\nRaise at most ONE of these, only if it genuinely matters here, and only as something you noticed about THEIR problem — in your own words, woven into the reply where it belongs. Never as a list, never as "have you considered", and never describe it as structure, analysis, or something a model can or cannot see: say the thing itself. If it does not fit what they asked for, leave it out entirely.\n`;
 }
