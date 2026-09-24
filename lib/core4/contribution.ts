@@ -32,16 +32,47 @@ import { classify, conceptTerms } from './considered';
 import { ofKind, restsOn, type ProblemItem, type ProblemModel } from './problem';
 import type { CognitiveState } from '../cognition/state';
 
+/**
+ * WHAT WAS DELETED, AND WHY (after the differentiation audit).
+ *
+ * Three detectors were removed rather than kept "in case": MISSING_EVIDENCE,
+ * FALSE_BINARY and UNDERWEIGHTED_UNCERTAINTY, along with UNVERIFIED_FACT as a
+ * separate label. Each failed the same test, which is the test this whole
+ * file now has to pass:
+ *
+ *   A DETECTOR THAT ONLY RE-PACKAGES WHAT THE CHEAP READER ALREADY SAID IS
+ *   NOT A DETECTOR. The reader is a 2-second gpt-4o-mini pass over a smaller
+ *   window than the reply model already holds. Asking it for a relation and
+ *   then announcing that relation as a finding adds nothing a frontier model
+ *   reading the same transcript would not do better.
+ *
+ * MISSING_EVIDENCE and UNDERWEIGHTED_UNCERTAINTY both keyed on `dependedOnBy`
+ * / `supportedBy` — reader-asserted edges. FALSE_BINARY required the reader to
+ * emit exactly two items of kind `alternative` or `option`, which it does not
+ * reliably do: it never fired once in run 8, including on
+ * `power-binary-007`, the scenario written specifically for it. Twenty-two
+ * turns, zero fires, on its own test case. That is not a corpus problem.
+ *
+ * What is left is of two kinds only. Structural facts the reader cannot get
+ * wrong because they are arithmetic over the record (REPEATED_LOOP: a
+ * question open N turns; MISSING_DECISION_CRITERIA: a decision with nothing
+ * bounding it; STALE_BELIEF: a belief resting on something dropped), and
+ * HIDDEN_ASSUMPTION, which survives on notice but is SUPERSEDED at run time by
+ * `counterfactual.ts` wherever the ablation ran — a measured dependency beats
+ * an asserted one, so the assertion is not shown alongside it.
+ *
+ * CONTRADICTION also stays here, but its real work has moved:
+ * `counterfactual.ts testContradictions` puts candidate pairs to a direct
+ * test ("can both hold under the same reading?") instead of trusting a
+ * `contradicts` edge, and it finds pairs from the structure that the reader
+ * never flagged.
+ */
 export const MISSING_KINDS = [
   'HIDDEN_ASSUMPTION',
-  'MISSING_EVIDENCE',
-  'UNVERIFIED_FACT',
   'CONTRADICTION',
   'STALE_BELIEF',
   'MISSING_DECISION_CRITERIA',
-  'FALSE_BINARY',
   'REPEATED_LOOP',
-  'UNDERWEIGHTED_UNCERTAINTY',
 ] as const;
 export type MissingKind = (typeof MISSING_KINDS)[number];
 
@@ -84,7 +115,7 @@ function hiddenAssumption(p: ProblemModel): MissingContribution[] {
       const shaky = base.epistemic === 'assumed' || base.epistemic === 'needs_verification';
       if (!shaky || base.supportedBy.length) continue;
       out.push({
-        kind: base.epistemic === 'assumed' ? 'HIDDEN_ASSUMPTION' : 'UNVERIFIED_FACT',
+        kind: 'HIDDEN_ASSUMPTION',
         ids: [d.id, base.id],
         subjects: [d.text, base.text],
         what: `"${d.text}" rests on "${base.text}", which is ${base.epistemic === 'assumed' ? 'assumed' : 'unchecked'} and nothing supports.`,
@@ -98,26 +129,6 @@ function hiddenAssumption(p: ProblemModel): MissingContribution[] {
   return out;
 }
 
-/** A claim a decision leans on, with no evidence of any kind behind it. */
-function missingEvidence(p: ProblemModel): MissingContribution[] {
-  const evidence = ofKind(p, 'evidence');
-  const out: MissingContribution[] = [];
-  for (const c of ofKind(p, 'claim')) {
-    if (c.supportedBy.length || !c.dependedOnBy.length) continue;
-    if (!c.dependedOnBy.some((id) => DECIDING.has(p.items.find((i) => i.id === id)?.kind ?? ''))) continue;
-    out.push({
-      kind: 'MISSING_EVIDENCE',
-      ids: [c.id],
-      subjects: [c.text],
-      what: `"${c.text}" is carrying a decision and has nothing behind it${evidence.length ? '' : ' (no evidence has been put on the table at all)'}.`,
-      whyItMatters: 'It is the load-bearing claim, so it is the one worth checking first.',
-      confidence: 0.6,
-      novelty: 'UNCERTAIN',
-      risk: 'medium',
-    });
-  }
-  return out;
-}
 
 /**
  * Two live items that contradict each other, from DIFFERENT turns.
@@ -194,22 +205,6 @@ function missingCriteria(p: ProblemModel, state: Pick<CognitiveState, 'taskKind'
   }];
 }
 
-/** Exactly two options on the table, and a decision pending between them. */
-function falseBinary(p: ProblemModel, state: Pick<CognitiveState, 'taskKind' | 'work'>): MissingContribution[] {
-  if (state.taskKind !== 'decide' && state.work !== 'judgment') return [];
-  const options = ofKind(p, 'alternative', 'option');
-  if (options.length !== 2) return [];
-  return [{
-    kind: 'FALSE_BINARY',
-    ids: options.map((o) => o.id),
-    subjects: options.map((o) => o.text),
-    what: `The choice is being treated as "${options[0].text}" or "${options[1].text}" and no third path has been put on the table.`,
-    whyItMatters: 'Two-option framings are usually inherited from how the question was first asked, not from the problem.',
-    confidence: 0.45,
-    novelty: 'UNCERTAIN',
-    risk: 'low',
-  }];
-}
 
 /** The same open question, still open, several turns later. */
 function repeatedLoop(p: ProblemModel): MissingContribution[] {
@@ -231,22 +226,6 @@ function repeatedLoop(p: ProblemModel): MissingContribution[] {
   return out;
 }
 
-/** An uncertainty nothing has answered, while a decision is being made anyway. */
-function underweightedUncertainty(p: ProblemModel): MissingContribution[] {
-  const open = ofKind(p, 'uncertainty').filter((u) => !u.supportedBy.length && !u.dependedOnBy.length);
-  const decisions = ofKind(p, 'decision');
-  if (!open.length || !decisions.length) return [];
-  return [{
-    kind: 'UNDERWEIGHTED_UNCERTAINTY',
-    ids: [open[0].id, decisions[0].id],
-    subjects: [open[0].text, decisions[0].text],
-    what: `"${open[0].text}" is unresolved and the decision is proceeding around it rather than through it.`,
-    whyItMatters: 'It is the part of the problem with the widest range, so it dominates the outcome.',
-    confidence: 0.5,
-    novelty: 'UNCERTAIN',
-    risk: 'low',
-  }];
-}
 
 /**
  * Everything absent that the structure can see, best first.
@@ -263,11 +242,8 @@ export function detectMissing(
     ...hiddenAssumption(p),
     ...contradiction(p),
     ...staleBelief(p),
-    ...missingEvidence(p),
     ...missingCriteria(p, state),
-    ...falseBinary(p, state),
     ...repeatedLoop(p),
-    ...underweightedUncertainty(p),
   ];
   // One per kind: three variations of "something is assumed" is one point.
   const best = new Map<MissingKind, MissingContribution>();

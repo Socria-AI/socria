@@ -1,0 +1,421 @@
+{
+  "set": "E17-ablation",
+  "mechanism": "lib/core4/counterfactual.ts",
+  "labelSemantics": "loadBearing=true means: with this premise removed, the conclusion NO LONGER FOLLOWS from the remaining premises alone (mechanism should return dependence='load_bearing'). loadBearing=false means: the conclusion STILL FOLLOWS from the remaining premises alone (mechanism should return 'robust'). Labels are judged under the mechanism's own instruction to reason only from what remains and to supply no outside facts.",
+  "items": [
+    {
+      "id": "abl-001",
+      "domain": "finance",
+      "conclusion": "We can fund an 18-month runway extension out of cash on hand without raising.",
+      "premises": [
+        {"id": "p1", "text": "Cash on hand is $15.2M.", "loadBearing": true,
+         "why": "The claim is 15.2 >= 18 x 0.8 = 14.4. Remove the cash figure and there is no left-hand side; nothing follows about whether cash covers 18 months."},
+        {"id": "p2", "text": "Net burn is $800K per month.", "loadBearing": true,
+         "why": "18 months of runway costs 18 x 0.8 = $14.4M. Without the burn rate the requirement is uncomputable, so no comparison to $15.2M can be made."},
+        {"id": "p3", "text": "Burn rose from $610K a month after the Berlin office opened last April.", "loadBearing": false,
+         "why": "This explains WHY burn is $800K. Removing the explanation does not remove the fact: p2 still states burn is $800K, and 15.2 >= 14.4 still holds."},
+        {"id": "p4", "text": "The last round closed at a $92M post-money valuation.", "loadBearing": false,
+         "why": "Valuation is topical to 'without raising' but enters no step of the cash-versus-requirement comparison. 15.2 >= 14.4 is unaffected."}
+      ],
+      "note": "Arithmetic load-bearing, indisputable. Both distractors are finance-native and sit next to the numbers: p3 is a causal explanation of a load-bearing figure, p4 is a number attached to the word 'raising' in the conclusion."
+    },
+    {
+      "id": "abl-002",
+      "domain": "engineering",
+      "conclusion": "A single c6i.4xlarge instance is enough to serve today's peak traffic; we do not need a second one.",
+      "premises": [
+        {"id": "p1", "text": "Today's peak traffic is 3,200 requests per second.", "loadBearing": true,
+         "why": "The claim is 3,200 <= 5,000. Remove the demand figure and there is nothing to compare against capacity."},
+        {"id": "p2", "text": "One instance sustained 5,000 requests per second in the load test.", "loadBearing": true,
+         "why": "Remove the capacity figure and the comparison has no right-hand side; sufficiency of one instance cannot be derived."},
+        {"id": "p3", "text": "The load test used the production TLS configuration and the same JSON payload size distribution.", "loadBearing": false,
+         "why": "This is a reason to TRUST the 5,000 rps figure, not the figure itself. p2 still asserts 5,000 rps, so 3,200 <= 5,000 still follows."},
+        {"id": "p4", "text": "Peak traffic falls between 19:00 and 21:00 UTC on weekdays.", "loadBearing": false,
+         "why": "When the peak occurs does not change that its magnitude is under capacity. The inequality is time-agnostic."},
+        {"id": "p5", "text": "Last year's peak was 2,100 requests per second, so traffic is up 52% year over year.", "loadBearing": false,
+         "why": "The conclusion is explicitly about today's peak. Historical level and growth rate support a different conclusion (about future capacity), not this one."}
+      ],
+      "note": "Arithmetic. p5 is the sharpest distractor: a growth rate that invites a capacity-planning verdict the conclusion did not make."
+    },
+    {
+      "id": "abl-003",
+      "domain": "clinical",
+      "conclusion": "This patient should be switched from enoxaparin to unfractionated heparin.",
+      "premises": [
+        {"id": "p1", "text": "The product label requires switching to unfractionated heparin when creatinine clearance falls below 30 mL/min.", "loadBearing": true,
+         "why": "This is the rule that licenses the switch. Remove it and a clearance of 22 mL/min implies nothing about which anticoagulant to use."},
+        {"id": "p2", "text": "Her measured creatinine clearance today is 22 mL/min.", "loadBearing": true,
+         "why": "This is the fact that satisfies the rule's antecedent, 22 < 30. Remove it and the rule has nothing to fire on."},
+        {"id": "p3", "text": "Her creatinine clearance was 48 mL/min on admission four days ago.", "loadBearing": false,
+         "why": "The rule is evaluated against the current value. The trend is clinically interesting but the switch follows from 22 < 30 regardless of where it came from."},
+        {"id": "p4", "text": "She weighs 61 kg.", "loadBearing": false,
+         "why": "Weight determines the DOSE of either agent, not the choice between agents. The switch decision does not consume it."}
+      ],
+      "note": "Threshold comparison, label beyond dispute. p3 is the strong distractor: a second clearance number in the same units that a model may treat as part of the computation."
+    },
+    {
+      "id": "abl-004",
+      "domain": "operations",
+      "conclusion": "The Tuesday release must be postponed.",
+      "premises": [
+        {"id": "p1", "text": "The release checklist requires a signed-off load test before ship, and no load test has been run.", "loadBearing": false,
+         "why": "Overdetermined: p2, p3 and p4 each independently force postponement, so the conclusion survives without p1."},
+        {"id": "p2", "text": "The only engineer with production deploy access is on leave until Thursday.", "loadBearing": false,
+         "why": "Overdetermined: p1, p3 and p4 each independently force postponement."},
+        {"id": "p3", "text": "Legal has not cleared the new data-retention copy, and the release cannot ship without that clearance.", "loadBearing": false,
+         "why": "Overdetermined: p1, p2 and p4 each independently force postponement."},
+        {"id": "p4", "text": "The change freeze for the payment migration runs through Wednesday and blocks all production releases.", "loadBearing": false,
+         "why": "Overdetermined: p1, p2 and p3 each independently force postponement."}
+      ],
+      "note": "NO load-bearing premise. Four independently sufficient blockers. Catches a mechanism that must always find something; any 'load_bearing' verdict here is a false positive."
+    },
+    {
+      "id": "abl-005",
+      "domain": "legal",
+      "conclusion": "We can terminate the vendor contract on 30 days' notice without paying a penalty.",
+      "premises": [
+        {"id": "p1", "text": "Section 9.2 permits termination for convenience on 30 days' written notice.", "loadBearing": true,
+         "why": "This is the entire basis for the right to terminate at all. Without it nothing establishes that 30 days' notice ends the contract."},
+        {"id": "p2", "text": "Section 9.4 applies the early-termination fee only to terminations during the initial 12-month term.", "loadBearing": true,
+         "why": "Subtle. Without 9.4, being 26 months in says nothing about fees; the 'without penalty' half of the conclusion loses its ground even though the sentence still reads as true."},
+        {"id": "p3", "text": "The contract has run 26 months and is in its second renewal term.", "loadBearing": true,
+         "why": "This is the fact that puts us outside 9.4's initial term. Remove it and we cannot place ourselves outside the fee window."},
+        {"id": "p4", "text": "Vendor uptime has averaged 99.2% against a 99.5% commitment.", "loadBearing": false,
+         "why": "An SLA shortfall supports a DIFFERENT conclusion (termination for cause, or service credits). The convenience route under 9.2 plus 9.4 does not use it."},
+        {"id": "p5", "text": "Procurement has already selected a replacement vendor.", "loadBearing": false,
+         "why": "Operational readiness to leave is not contractual entitlement to leave. The conclusion is about what the contract permits."}
+      ],
+      "note": "Subtle load-bearing (p2) plus a different-conclusion distractor (p4). Tests whether removing the fee carve-out is detected when the conclusion still sounds right."
+    },
+    {
+      "id": "abl-006",
+      "domain": "science",
+      "conclusion": "The primary effect is not significant at the pre-registered threshold, so we should not report it as a finding.",
+      "premises": [
+        {"id": "p1", "text": "The p-value for the primary comparison is 0.11.", "loadBearing": true,
+         "why": "The claim is 0.11 > 0.05. Remove the p-value and the comparison has no left-hand side."},
+        {"id": "p2", "text": "The pre-registered significance threshold is alpha = 0.05.", "loadBearing": true,
+         "why": "Remove the threshold and 0.11 is not large or small relative to anything; no significance verdict follows."},
+        {"id": "p3", "text": "The study enrolled 340 participants, 170 per arm.", "loadBearing": false,
+         "why": "Sample size is already absorbed into the p-value. 0.11 > 0.05 is unchanged by knowing n."},
+        {"id": "p4", "text": "The observed between-arm difference was 2.4 points on a 50-point scale.", "loadBearing": false,
+         "why": "Effect size is a separate question from significance. The verdict follows from p versus alpha alone."},
+        {"id": "p5", "text": "The protocol ran at two sites and site was included as a covariate in the primary model.", "loadBearing": false,
+         "why": "An analysis detail that supports the validity of the reported p-value; the p-value itself is still stated by p1."}
+      ],
+      "note": "Arithmetic/threshold. Three distractors that are all statistical and all tempting: n, effect size and model specification sit around the p-value without entering the comparison."
+    },
+    {
+      "id": "abl-007",
+      "domain": "finance",
+      "conclusion": "On total cash out over the ten-year horizon, buying the building beats renewing the lease.",
+      "premises": [
+        {"id": "p1", "text": "The purchase price is $6.2M all-in.", "loadBearing": true,
+         "why": "The claim is 6.2 + 0.4 = 6.6 < 7.8. Remove the purchase price and the buy side of the comparison cannot be totalled."},
+        {"id": "p2", "text": "Lease renewal costs $780K per year for ten years.", "loadBearing": true,
+         "why": "10 x 0.78 = $7.8M is the lease side of the comparison. Remove it and there is nothing to beat."},
+        {"id": "p3", "text": "Ownership adds about $40K a year in maintenance and property tax that the lease currently covers.", "loadBearing": false,
+         "why": "Tempting because it is a genuine cash item on the buy side, but removing it only lowers the buy total: 6.2 < 7.8 still holds, so the conclusion survives."},
+        {"id": "p4", "text": "The landlord has offered to waive the 3% annual escalator in exchange for a 12-year term.", "loadBearing": false,
+         "why": "A different option over a different horizon; it supports a different conclusion and is not part of the ten-year buy-versus-renew totals."},
+        {"id": "p5", "text": "Comparable buildings on the same street sold for $6.6M and $6.9M last year.", "loadBearing": false,
+         "why": "Comparables argue the price is fair; they do not enter the cash-out arithmetic, which uses the actual $6.2M."}
+      ],
+      "note": "Arithmetic with a deliberately safe margin so no discounting argument can flip it. p3 is the designed trap: a real cost that changes the total without changing the ordering."
+    },
+    {
+      "id": "abl-008",
+      "domain": "engineering",
+      "conclusion": "The outage was caused by the 14:02 config change, not by the morning database upgrade.",
+      "premises": [
+        {"id": "p1", "text": "Error rates went from 0.1% to 41% within sixty seconds of the 14:02 config deploy.", "loadBearing": true,
+         "why": "This is the only premise linking the config change to the failure. Remove it and nothing attributes the outage to the config deploy."},
+        {"id": "p2", "text": "The database upgrade completed at 09:40 and error rates held at 0.1% for the four and a half hours from 09:40 to 14:02.", "loadBearing": true,
+         "why": "Subtle. This is what excludes the upgrade. Without it the 'not the database upgrade' half of the conclusion has no support, even though the sentence still reads plausibly."},
+        {"id": "p3", "text": "The config change lowered the connection-pool maximum from 200 to 20.", "loadBearing": false,
+         "why": "This explains WHY the config change would cause an error spike. Removing the mechanism does not remove the timing evidence in p1, which already carries the attribution."},
+        {"id": "p4", "text": "The database upgrade had been on the change calendar for six weeks.", "loadBearing": false,
+         "why": "Scheduling history carries no exculpatory or inculpatory force. The attribution rests on p1 and p2."},
+        {"id": "p5", "text": "On-call was paged at 14:05 and the incident was declared at 14:09.", "loadBearing": false,
+         "why": "Response timeline, downstream of the failure. It does not bear on which change caused it."}
+      ],
+      "note": "Subtle load-bearing (p2, the alibi for the rival cause) alongside a 'why it is true' distractor (p3). Tests whether an exclusionary premise is recognised as load-bearing."
+    },
+    {
+      "id": "abl-009",
+      "domain": "clinical",
+      "conclusion": "This patient is not a candidate for thrombolysis.",
+      "premises": [
+        {"id": "p1", "text": "Symptom onset was nine hours ago, outside the 4.5-hour treatment window.", "loadBearing": false,
+         "why": "Overdetermined: p2, p3 and p4 are each independently disqualifying, so the conclusion still follows without p1."},
+        {"id": "p2", "text": "Non-contrast CT shows intracranial haemorrhage, an absolute contraindication.", "loadBearing": false,
+         "why": "Overdetermined: p1, p3 and p4 each independently disqualify."},
+        {"id": "p3", "text": "The patient took apixaban six hours ago, an absolute contraindication.", "loadBearing": false,
+         "why": "Overdetermined: p1, p2 and p4 each independently disqualify."},
+        {"id": "p4", "text": "Platelet count is 48,000, below the 100,000 minimum the protocol requires.", "loadBearing": false,
+         "why": "Overdetermined: p1, p2 and p3 each independently disqualify."}
+      ],
+      "note": "NO load-bearing premise. Four independent absolute contraindications. A 'load_bearing' verdict on any of these is a false positive."
+    },
+    {
+      "id": "abl-010",
+      "domain": "operations",
+      "conclusion": "Two pickers cannot clear Friday's backlog inside the shift; we need a third.",
+      "premises": [
+        {"id": "p1", "text": "Friday's backlog is 1,840 units.", "loadBearing": true,
+         "why": "The claim is 2 x 110 x 8 = 1,760 < 1,840 <= 3 x 110 x 8 = 2,640. Remove the backlog and neither inequality can be evaluated."},
+        {"id": "p2", "text": "A trained picker clears 110 units an hour, breaks included.", "loadBearing": true,
+         "why": "Remove the rate and picker-hours cannot be converted into units; the capacity side of both inequalities disappears."},
+        {"id": "p3", "text": "The shift is 8 hours.", "loadBearing": true,
+         "why": "Remove the shift length and 110 units an hour yields no shift capacity; 1,760 cannot be computed."},
+        {"id": "p4", "text": "Friday backlogs have run 20-30% above the weekday average all quarter.", "loadBearing": false,
+         "why": "This explains why Friday's backlog is large. The figure 1,840 is still stated by p1, so both inequalities are unchanged."},
+        {"id": "p5", "text": "A third picker can be pulled from the returns desk without incurring overtime.", "loadBearing": false,
+         "why": "Feasibility of the remedy, not the arithmetic that establishes the need. 1,760 < 1,840 holds either way."}
+      ],
+      "note": "Three arithmetic inputs all load-bearing, with a causal-explanation distractor and a feasibility distractor. Tests a mechanism's ability to say 'robust' three times in a row on an item where three other premises are genuinely load-bearing."
+    },
+    {
+      "id": "abl-011",
+      "domain": "legal",
+      "conclusion": "The claim is time-barred, so we should move to dismiss on limitation grounds.",
+      "premises": [
+        {"id": "p1", "text": "The applicable limitation period is three years from the date of injury.", "loadBearing": true,
+         "why": "Remove the period and the gap between March 2021 and August 2025 is not long or short relative to anything."},
+        {"id": "p2", "text": "The injury occurred on 4 March 2021 and the complaint was filed on 19 August 2025.", "loadBearing": true,
+         "why": "The claim is that 4 March 2021 + 3 years = 4 March 2024 precedes 19 August 2025. Remove the dates and the comparison cannot be made."},
+        {"id": "p3", "text": "The plaintiff retained counsel in January 2024.", "loadBearing": false,
+         "why": "Retaining counsel is not a filing and has no effect on the running of the period. The date falls inside the window, which is exactly what makes it tempting."},
+        {"id": "p4", "text": "The same plaintiff filed a separate, unrelated claim against our subsidiary in 2023.", "loadBearing": false,
+         "why": "An unrelated matter contributes nothing to the limitation computation for this claim."},
+        {"id": "p5", "text": "Our insurer has reserved $400,000 against this matter.", "loadBearing": false,
+         "why": "A reserve supports a different conclusion about settlement posture; it does not bear on whether the claim is time-barred."}
+      ],
+      "note": "Date arithmetic. p3 is the designed trap: a date inside the limitation window that a model may read as tolling-relevant."
+    },
+    {
+      "id": "abl-012",
+      "domain": "science",
+      "conclusion": "The yield increase is attributable to the new cultivar, not to the fertiliser change.",
+      "premises": [
+        {"id": "p1", "text": "Plots were randomly assigned to cultivar and the fertiliser regime was identical across every plot.", "loadBearing": true,
+         "why": "Subtle. This is the only premise that severs fertiliser from cultivar. Without it the 18% difference is confounded and the attribution does not follow, though the sentence still reads as true."},
+        {"id": "p2", "text": "Plots planted with the new cultivar yielded 18% more than control plots.", "loadBearing": true,
+         "why": "This is the effect being attributed. Remove it and there is no yield increase to assign to anything."},
+        {"id": "p3", "text": "The new cultivar was bred for the rust strain present at this site.", "loadBearing": false,
+         "why": "This explains WHY the cultivar would outperform. The attribution already follows from randomisation plus the observed difference; a mechanism story is not required for it."},
+        {"id": "p4", "text": "The fertiliser supplier changed formulation midway through the season.", "loadBearing": false,
+         "why": "The strongest distractor: it names the rival cause in the conclusion. But p1 makes the change uniform across arms, so it cannot produce a between-arm difference. Removing it leaves the attribution intact."}
+      ],
+      "note": "Subtle load-bearing (p1, the design premise). p4 is the mirror image: the rival cause the conclusion explicitly denies, yet removing it changes nothing."
+    },
+    {
+      "id": "abl-013",
+      "domain": "finance",
+      "conclusion": "We will breach the net-leverage covenant at the December test.",
+      "premises": [
+        {"id": "p1", "text": "Net debt at 31 December is projected at $186M.", "loadBearing": true,
+         "why": "The claim is 186 / 58 = 3.21 > 3.0. Remove the numerator and the ratio cannot be formed."},
+        {"id": "p2", "text": "Trailing-twelve-month EBITDA at 31 December is projected at $58M.", "loadBearing": true,
+         "why": "Remove the denominator and the ratio cannot be formed."},
+        {"id": "p3", "text": "The covenant caps net leverage at 3.0x and is tested quarterly.", "loadBearing": true,
+         "why": "Remove the cap and 3.21x is not a breach of anything; the comparison has no threshold."},
+        {"id": "p4", "text": "The September test came in at 2.84x.", "loadBearing": false,
+         "why": "A prior period's ratio is not an input to the December computation. 186/58 > 3.0 is unaffected."},
+        {"id": "p5", "text": "EBITDA guidance was cut in August after the Nordics contract slipped.", "loadBearing": false,
+         "why": "This explains why projected EBITDA is $58M. Removing the explanation leaves p2's figure standing, so the ratio is unchanged."},
+        {"id": "p6", "text": "The facility carries a 250bp margin over SOFR.", "loadBearing": false,
+         "why": "Pricing has no role in a leverage ratio test."}
+      ],
+      "note": "Six premises, three arithmetic load-bearing. p4 is the sharp distractor: a prior-quarter leverage ratio in the same units, which a model may treat as part of the trend argument."
+    },
+    {
+      "id": "abl-014",
+      "domain": "engineering",
+      "conclusion": "This girder design fails the code check and must be revised before issue.",
+      "premises": [
+        {"id": "p1", "text": "The factored bending moment is 1,420 kNm against a design capacity of 1,180 kNm.", "loadBearing": false,
+         "why": "Overdetermined: p2, p3 and p4 are each independently a code failure, so the conclusion still follows without p1."},
+        {"id": "p2", "text": "Computed mid-span deflection under service load is L/220 against a code limit of L/360.", "loadBearing": false,
+         "why": "Overdetermined: p1, p3 and p4 each independently fail the check."},
+        {"id": "p3", "text": "Shear stud spacing is specified at 900 mm against a code maximum of 600 mm.", "loadBearing": false,
+         "why": "Overdetermined: p1, p2 and p4 each independently fail the check."},
+        {"id": "p4", "text": "Lateral-torsional buckling resistance is 960 kNm, below the 1,420 kNm applied moment.", "loadBearing": false,
+         "why": "Overdetermined: p1, p2 and p3 each independently fail the check."}
+      ],
+      "note": "NO load-bearing premise, and every premise is arithmetic. Hardest of the overdetermined items because each one looks like a computation the conclusion depends on."
+    },
+    {
+      "id": "abl-015",
+      "domain": "clinical",
+      "conclusion": "The ward will run out of this biologic before the next delivery arrives.",
+      "premises": [
+        {"id": "p1", "text": "Forty-two vials remain in stock.", "loadBearing": true,
+         "why": "The claim is 42 / 7 = 6 days of cover, and 6 < 9. Remove the stock count and days of cover cannot be computed."},
+        {"id": "p2", "text": "The ward uses seven vials a day.", "loadBearing": true,
+         "why": "Remove the usage rate and 42 vials converts to no number of days; the comparison to 9 fails."},
+        {"id": "p3", "text": "The next delivery arrives in nine days.", "loadBearing": true,
+         "why": "Remove the delivery date and 6 days of cover is not short of anything; 'before the next delivery' has no referent."},
+        {"id": "p4", "text": "The lot expires in fourteen days.", "loadBearing": false,
+         "why": "A competing depletion mechanism, but it binds at day 14 and stock-out occurs at day 6. The earlier event still determines the conclusion, so it survives removal."},
+        {"id": "p5", "text": "Usage rose from five to seven vials a day when the second infusion chair opened.", "loadBearing": false,
+         "why": "This explains why usage is seven. p2 still states seven, so 42/7 = 6 < 9 is unchanged."}
+      ],
+      "note": "Arithmetic. p4 is the designed trap: a second deadline in the same units that never binds because it falls after the stock-out."
+    },
+    {
+      "id": "abl-016",
+      "domain": "operations",
+      "conclusion": "The 6% short-ship rate originates with the vendor, not in our warehouse.",
+      "premises": [
+        {"id": "p1", "text": "Our receiving team counts every pallet against the packing slip at the dock, and those counts match the slips.", "loadBearing": true,
+         "why": "Subtle. This is the only premise clearing our own side of the handoff. Without it the discrepancy could arise after receipt, and the 'not in our warehouse' half no longer follows."},
+        {"id": "p2", "text": "The packing slips themselves show 6% fewer units than the purchase orders.", "loadBearing": true,
+         "why": "This places the shortfall upstream of the dock. Remove it and nothing locates the 6% at the vendor."},
+        {"id": "p3", "text": "The vendor switched to a new co-packer in March.", "loadBearing": false,
+         "why": "This explains why the vendor might be short-shipping. The attribution already follows from p1 and p2 without any account of the vendor's internal change."},
+        {"id": "p4", "text": "Short-ship rates from our other three vendors are under 0.4%.", "loadBearing": false,
+         "why": "Comparative context that points the same way but is not needed: p1 and p2 locate this vendor's shortfall directly."},
+        {"id": "p5", "text": "Our warehouse had 11% staff turnover last quarter.", "loadBearing": false,
+         "why": "The strongest distractor: it points at the very party the conclusion exonerates. But p1 clears the warehouse empirically, so removing the turnover figure leaves the conclusion untouched."}
+      ],
+      "note": "Subtle load-bearing (p1, the exculpating control) with a distractor (p5) that argues against the conclusion. Removing a premise that opposes a conclusion should never make the conclusion stop following."
+    },
+    {
+      "id": "abl-017",
+      "domain": "legal",
+      "conclusion": "The NDA does not prevent us from hiring their engineer.",
+      "premises": [
+        {"id": "p1", "text": "The agreement contains a confidentiality clause but no non-solicitation and no non-competition provision.", "loadBearing": true,
+         "why": "This is the whole basis of the conclusion. Without it nothing establishes that the NDA lacks a hiring restriction."},
+        {"id": "p2", "text": "The engineer approached us; we did not contact her.", "loadBearing": false,
+         "why": "Who approached whom matters only if a non-solicit exists, and p1 says none does. The conclusion follows from p1 alone, so this survives removal despite reading like the decisive fact."},
+        {"id": "p3", "text": "We would still be bound not to use their confidential information.", "loadBearing": false,
+         "why": "A separate obligation that is compatible with hiring and places no condition on it."}
+      ],
+      "note": "Three premises. p2 is the centrepiece distractor: the fact a lawyer would instinctively call load-bearing, made inert by p1."
+    },
+    {
+      "id": "abl-018",
+      "domain": "science",
+      "conclusion": "At least 12% of the injected tracer is unaccounted for and must be leaving by an unmonitored path.",
+      "premises": [
+        {"id": "p1", "text": "180 kg of tracer was injected.", "loadBearing": true,
+         "why": "The claim is (180 - 158) / 180 = 12.2% >= 12%. Remove the injected mass and neither the deficit nor the percentage can be computed."},
+        {"id": "p2", "text": "Monitored outlets recovered 158 kg.", "loadBearing": true,
+         "why": "Remove the recovered mass and the 22 kg deficit cannot be formed."},
+        {"id": "p3", "text": "Recovery was measured over 30 days, by which point outlet concentrations had returned to background.", "loadBearing": true,
+         "why": "Subtle. Without it the missing 22 kg could still be in transit, so 'must be leaving by an unmonitored path' does not follow. The percentage is unaffected; the causal claim is not."},
+        {"id": "p4", "text": "The tracer is conservative and does not degrade under these conditions.", "loadBearing": true,
+         "why": "Subtle. Without it the deficit could be degradation rather than an unmonitored path, so the second half of the conclusion fails even though the arithmetic still holds."},
+        {"id": "p5", "text": "Injection was carried out over six hours at a constant rate.", "loadBearing": false,
+         "why": "Injection profile does not enter a cumulative mass balance. 180 - 158 = 22 regardless."},
+        {"id": "p6", "text": "The analytical method has a detection limit of 0.2 mg/L.", "loadBearing": false,
+         "why": "This supports confidence in the recovered figure rather than supplying it. p2 still states 158 kg."}
+      ],
+      "note": "Two arithmetic load-bearing premises plus two subtle ones (p3, p4) that carry only the causal half of a two-part conclusion. Designed to catch false negatives: the arithmetic survives their removal, the conclusion does not."
+    },
+    {
+      "id": "abl-019",
+      "domain": "finance",
+      "conclusion": "Treasury policy requires us to keep the euro hedge in place through the October payment.",
+      "premises": [
+        {"id": "p1", "text": "We owe EUR 4.0M in October.", "loadBearing": true,
+         "why": "Remove the payment amount and there is no exposure to compare with the EUR 1M policy threshold."},
+        {"id": "p2", "text": "Treasury policy requires any single FX exposure above EUR 1M to be hedged.", "loadBearing": true,
+         "why": "Remove the policy and a EUR 4.0M exposure obliges nothing; the conclusion is explicitly a policy requirement."},
+        {"id": "p3", "text": "We have no euro receipts in the period, so the exposure is the full EUR 4.0M gross.", "loadBearing": true,
+         "why": "Subtle. Without it the exposure could net down below the EUR 1M threshold and the policy would not bite. The conclusion still sounds right but no longer follows."},
+        {"id": "p4", "text": "The forward is currently about 40bp in our favour against spot.", "loadBearing": false,
+         "why": "An economic argument for keeping the hedge, but the policy in p2 already compels it. Removing the mark leaves the requirement intact."},
+        {"id": "p5", "text": "Unwinding the forward early would cost roughly EUR 18,000 in bank fees.", "loadBearing": false,
+         "why": "Cost of the alternative action, pointing the same way but not needed for a requirement that follows from p1, p2 and p3."}
+      ],
+      "note": "Subtle load-bearing (p3, the netting premise). Both distractors argue FOR the conclusion, which is the harder direction: a mechanism may mistake supporting evidence for necessary evidence."
+    },
+    {
+      "id": "abl-020",
+      "domain": "engineering",
+      "conclusion": "The existing feeder is undersized for the new load and must be uprated.",
+      "premises": [
+        {"id": "p1", "text": "The existing connected load draws 310 A continuous.", "loadBearing": true,
+         "why": "The claim is 310 + 140 = 450 > 400. Remove either addend and the total current cannot be formed."},
+        {"id": "p2", "text": "The new production line adds 140 A continuous.", "loadBearing": true,
+         "why": "Remove it and the combined draw is 310 A, which does not exceed 400 A; the conclusion reverses."},
+        {"id": "p3", "text": "The feeder is rated 400 A.", "loadBearing": true,
+         "why": "Remove the rating and 450 A exceeds nothing; 'undersized' has no referent."},
+        {"id": "p4", "text": "The feeder run is 85 m of aluminium conductor.", "loadBearing": false,
+         "why": "Length and material bear on voltage drop, a different check. The ampacity comparison 450 > 400 is unchanged."},
+        {"id": "p5", "text": "The upstream transformer is rated 750 kVA, comfortably above the combined draw.", "loadBearing": false,
+         "why": "Headroom elsewhere in the system supports a different conclusion (the transformer is adequate). It does not relieve the feeder."}
+      ],
+      "note": "Arithmetic, with p2 chosen so that its removal actively reverses the conclusion, the clearest possible load-bearing case. p5 is the trap: adequacy of an adjacent component."
+    },
+    {
+      "id": "abl-021",
+      "domain": "clinical",
+      "conclusion": "A positive result on this screen is more likely a false positive than a true case.",
+      "premises": [
+        {"id": "p1", "text": "Prevalence in the screened population is 1 in 1,000.", "loadBearing": true,
+         "why": "Per 100,000 screened: 100 cases yield 99 true positives, 99,900 non-cases yield 4,995 false positives. Remove prevalence and neither count can be formed."},
+        {"id": "p2", "text": "The false-positive rate is 5%.", "loadBearing": true,
+         "why": "Remove it and the 4,995 false positives cannot be computed, so the comparison with true positives is impossible."},
+        {"id": "p3", "text": "Sensitivity is 99%.", "loadBearing": true,
+         "why": "Remove it and the 99 true positives cannot be computed; the ratio 4,995 to 99 has no denominator."},
+        {"id": "p4", "text": "The assay costs $18 and runs on the analyser we already own.", "loadBearing": false,
+         "why": "Cost supports a different conclusion about programme economics and enters no step of the posterior calculation."},
+        {"id": "p5", "text": "The programme screens 40,000 people a year.", "loadBearing": false,
+         "why": "The strongest distractor: a large, relevant-looking count. But the comparison is a ratio and is scale-invariant, so the throughput figure changes nothing."},
+        {"id": "p6", "text": "Confirmatory testing takes four to six weeks.", "loadBearing": false,
+         "why": "Downstream logistics; it does not bear on which kind of positive is more likely."}
+      ],
+      "note": "Six premises, base-rate arithmetic with three indisputable load-bearing inputs. p5 tests whether a mechanism confuses a scale parameter with a rate parameter."
+    },
+    {
+      "id": "abl-022",
+      "domain": "operations",
+      "conclusion": "We cannot ship this order to Brazil this week.",
+      "premises": [
+        {"id": "p1", "text": "The customs broker requires the commercial invoice five business days ahead and it was only submitted yesterday.", "loadBearing": false,
+         "why": "Overdetermined: p2 and p3 each independently prevent shipment this week."},
+        {"id": "p2", "text": "The only sailing this week departed Monday and the cargo is still in the yard.", "loadBearing": false,
+         "why": "Overdetermined: p1 and p3 each independently prevent shipment this week."},
+        {"id": "p3", "text": "The product's Brazilian registration lapsed in June and has not been renewed, so it cannot clear customs at all.", "loadBearing": false,
+         "why": "Overdetermined: p1 and p2 each independently prevent shipment this week."}
+      ],
+      "note": "NO load-bearing premise on the shortest item. Only three premises, so the pressure to name one as load-bearing is highest here."
+    },
+    {
+      "id": "abl-023",
+      "domain": "legal",
+      "conclusion": "The indemnity cap does not apply to this claim, so our exposure on it is uncapped.",
+      "premises": [
+        {"id": "p1", "text": "Section 11.4 excludes claims arising from a breach of confidentiality from the indemnity cap in Section 11.3.", "loadBearing": true,
+         "why": "This carve-out is the sole basis for disapplying the cap. Without it the claim falls under the general cap and the conclusion reverses."},
+        {"id": "p2", "text": "This claim arises from disclosure of the customer list, which Section 6 defines as confidential information.", "loadBearing": true,
+         "why": "This is the fact that brings the claim inside 11.4's exclusion. Remove it and the carve-out has nothing to attach to."},
+        {"id": "p3", "text": "Fees paid in the prior twelve months were $240,000, which is what the Section 11.3 cap would otherwise be.", "loadBearing": false,
+         "why": "The cap's magnitude is irrelevant to whether it applies. A number that looks computational but enters no step."},
+        {"id": "p4", "text": "The counterparty gave notice of the claim within the 30-day window required by Section 11.6.", "loadBearing": false,
+         "why": "Procedural validity of the claim is a separate question from whether the cap applies to it."},
+        {"id": "p5", "text": "Our insurance tower attaches at $1M.", "loadBearing": false,
+         "why": "Insurance affects net exposure, a different conclusion. Contractual capping is unchanged."}
+      ],
+      "note": "Contract-construction item. p3 is the trap: the only dollar figure present, and it is inert."
+    },
+    {
+      "id": "abl-024",
+      "domain": "science",
+      "conclusion": "The catalyst is not being poisoned by sulphur.",
+      "premises": [
+        {"id": "p1", "text": "Feed sulphur has read below 0.2 ppm at every hourly measurement this campaign, against a poisoning threshold of 5 ppm.", "loadBearing": true,
+         "why": "This is the only premise bearing on sulphur exposure, and the comparison 0.2 < 5 is the whole inference. Remove it and nothing rules sulphur out."},
+        {"id": "p2", "text": "Activity loss this campaign tracks the sintering curve measured at the same bed temperature.", "loadBearing": false,
+         "why": "An alternative explanation for deactivation. It supports a different conclusion (that the cause is sintering); the negative claim about sulphur follows from p1 alone."},
+        {"id": "p3", "text": "The guard bed was replaced at the start of the campaign.", "loadBearing": false,
+         "why": "This explains WHY feed sulphur is low. The measurements in p1 stand on their own, so the conclusion survives."}
+      ],
+      "note": "Shortest item with a single load-bearing premise. Both distractors are the two classic false-positive shapes: a rival explanation and a cause of a load-bearing fact."
+    }
+  ]
+}

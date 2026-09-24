@@ -256,3 +256,153 @@ export function renderCounterfactual(cf: Counterfactual | null): string {
     `Never describe the test, the removal, or that anything was run: they want the finding, not the method.\n`
   );
 }
+
+// ── MEASURED CONTRADICTION ──────────────────────────────────────────
+//
+// The audit's sharpest finding about the detector family: `contradiction()`
+// in contribution.ts fires only from a `contradicts` edge, and that edge
+// exists only when the 2-second cheap reader already spotted the
+// contradiction itself. So the "detector" re-packages the reader's finding
+// and adds nothing — and a frontier model reading the same transcript does
+// the hard part better. It is a weaker model's assertion wearing a
+// measurement's clothes.
+//
+// This replaces the assertion with a test, and it does two things the
+// asserted version could not:
+//
+//   1. It CONFIRMS. Asked directly whether two statements can both hold under
+//      the same reading, a model refutes most candidate pairs — people
+//      qualify, rescope and change their minds, and almost none of that is a
+//      contradiction. The asserted edge had no such filter.
+//   2. It FINDS PAIRS THE READER MISSED. Candidates come from the structure
+//      too, not only from reader edges: two live statements from different
+//      turns, about the same subject, carrying different numbers. That is
+//      exactly the shape the reader is worst at, because the two statements
+//      are far apart in a long transcript.
+//
+// Cost is gated like every other measurement here: at most 3 pairs, only on a
+// turn where the answer could change the reply.
+
+export interface ContradictionTest {
+  aId: string;
+  bId: string;
+  a: string;
+  b: string;
+  /** turns apart — the whole value is in pairs nobody put side by side */
+  distance: number;
+  conflict: string;
+  confidence: number;
+  /** did the reader already claim this pair, or did the structure find it? */
+  source: 'reader' | 'structure';
+}
+
+const CONTRA_SYSTEM = `You are given two statements a person made at different points in one conversation.
+
+Decide whether they can BOTH be true at the same time, under the same reading of the words.
+
+Be strict about what counts as a contradiction:
+- A person REFINING, RESCOPING or CHANGING THEIR MIND is not a contradiction. "Churn is 4%" then "churn is 3.6% after the rebuild" is an update, not a conflict.
+- Two claims about DIFFERENT things, different time periods, different populations or different conditions are not a contradiction, even when the words are similar.
+- Vagueness is not contradiction. If one statement is loose enough to be compatible, they are compatible.
+- It IS a contradiction when both are presented as currently true and one being true makes the other false.
+
+Return JSON with exactly these fields:
+
+compatible   true | false | "unclear"
+conflict     one line: the precise thing that cannot hold both ways. "" when compatible.
+confidence   0-1
+
+Default to compatible. Calling an update or a rescoping a contradiction is the failure that matters here: it tells the person they contradicted themselves when they did not.`;
+
+const contraAsk = (a: string, aTurn: number, b: string, bTurn: number) =>
+  `STATEMENT A (turn ${aTurn}):\n${a}\n\nSTATEMENT B (turn ${bTurn}):\n${b}`;
+
+const NUM = /-?\d+(?:\.\d+)?/g;
+const STOPISH = new Set(['the', 'and', 'that', 'this', 'with', 'from', 'about', 'into', 'over', 'than', 'then', 'they', 'them', 'what', 'when', 'will', 'would', 'have', 'has', 'was', 'are', 'for', 'our', 'their']);
+const topic = (t: string): Set<string> =>
+  new Set(t.toLowerCase().split(/[^a-z]+/).filter((w) => w.length > 3 && !STOPISH.has(w)));
+
+/**
+ * Pairs worth the call: reader-claimed ones first, then the ones the reader is
+ * structurally worst at — same subject, different numbers, turns apart.
+ */
+export function contradictionCandidates(p: ProblemModel): { a: ProblemItem; b: ProblemItem; source: 'reader' | 'structure' }[] {
+  const live = p.live.filter((i) => i.kind !== 'question' && i.kind !== 'uncertainty' && i.text.trim().length > 15);
+  const seen = new Set<string>();
+  const out: { a: ProblemItem; b: ProblemItem; source: 'reader' | 'structure' }[] = [];
+  const key = (a: ProblemItem, b: ProblemItem) => [a.id, b.id].sort().join('|');
+
+  for (const a of live) {
+    for (const id of a.contradicts) {
+      const b = p.items.find((i) => i.id === id);
+      if (!b || b.settled || seen.has(key(a, b))) continue;
+      seen.add(key(a, b));
+      out.push({ a, b, source: 'reader' });
+    }
+  }
+  for (let i = 0; i < live.length; i++) {
+    for (let j = i + 1; j < live.length; j++) {
+      const a = live[i];
+      const b = live[j];
+      if (seen.has(key(a, b)) || Math.abs(a.turn - b.turn) < 2) continue;
+      const ta = topic(a.text);
+      const tb = topic(b.text);
+      let shared = 0;
+      for (const w of ta) if (tb.has(w)) shared += 1;
+      if (shared < 2) continue;
+      const na = a.text.match(NUM) ?? [];
+      const nb = b.text.match(NUM) ?? [];
+      // Different numbers about the same subject is the shape worth a call.
+      if (!na.length || !nb.length || na.join() === nb.join()) continue;
+      seen.add(key(a, b));
+      out.push({ a, b, source: 'structure' });
+    }
+  }
+  return out.sort((x, y) => Math.abs(y.a.turn - y.b.turn) - Math.abs(x.a.turn - x.b.turn)).slice(0, 3);
+}
+
+/** Test the candidate pairs, keep only what came back as a real conflict. */
+export async function testContradictions(
+  apiKey: string,
+  p: ProblemModel,
+  client?: ModelClient
+): Promise<ContradictionTest[]> {
+  const pairs = contradictionCandidates(p);
+  if (!pairs.length) return [];
+  const c = client ?? modelClient(apiKey);
+  const runs = await Promise.all(
+    pairs.map(async ({ a, b, source }): Promise<ContradictionTest | null> => {
+      try {
+        const res = await c.complete({
+          role: 'verify',
+          model: COGNITION_MODEL,
+          temperature: 0,
+          json: true,
+          system: CONTRA_SYSTEM,
+          messages: [{ role: 'user', content: contraAsk(a.text, a.turn, b.text, b.turn) }],
+          maxTokens: 250,
+        });
+        const o = JSON.parse(res.text || '{}') as Record<string, unknown>;
+        const conf = typeof o.confidence === 'number' && Number.isFinite(o.confidence) ? Math.min(1, Math.max(0, o.confidence)) : 0;
+        const conflict = typeof o.conflict === 'string' ? o.conflict.trim().slice(0, 300) : '';
+        if (o.compatible !== false || conf < CF_FLOOR || !conflict) return null;
+        return { aId: a.id, bId: b.id, a: a.text, b: b.text, distance: Math.abs(a.turn - b.turn), conflict, confidence: conf, source };
+      } catch {
+        return null;
+      }
+    })
+  );
+  return runs.filter((r): r is ContradictionTest => r !== null);
+}
+
+export function renderContradictions(found: readonly ContradictionTest[]): string {
+  if (!found.length) return '';
+  const top = found.slice(0, 2);
+  const lines = top.map((f) => `  - "${f.a}" and "${f.b}" (${f.distance} turns apart): ${f.conflict}`);
+  return (
+    `\n=== Checked, and they do conflict ===\n${lines.join('\n')}\n` +
+    `Each pair was tested directly for whether both can hold, and each came back that they cannot — this is not a guess from how they worded it. ` +
+    `Raise at most one, where it bears on what they are deciding, in your own words. ` +
+    `Do not say it was checked, tested or noticed across turns: say what conflicts.\n`
+  );
+}

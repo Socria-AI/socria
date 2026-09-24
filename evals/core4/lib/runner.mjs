@@ -10,6 +10,16 @@
 // conversation itself, plus the full transcripts of earlier sessions. That
 // is a generous memory, stronger than most shipped assistants have: the
 // baseline is not allowed to lose because it forgot.
+//
+// TWO MEMORY CONDITIONS, because giving the baseline every prior transcript
+// answers the wrong question. That arm ("oracle") hands a prompt-only system
+// the one thing Socria's persistence exists to provide, so it can only ever
+// measure REASONING advantage with persistence neutralised — which is the
+// conservative bound, and useless for deciding whether persistence is worth
+// building. `memory: 'natural'` gives the baseline what a prompt-only product
+// actually has at the start of a new session: nothing but this session. The
+// difference between the two arms IS the persistence advantage, and running
+// both is the only way to separate it from reasoning quality.
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -117,7 +127,7 @@ Do not mention this review.`;
 // budget, so no arm wins or loses on length allowance.
 export const ARM_MAX_TOKENS = 1200;
 
-export async function runBaseline(scenario, { step, world, model = 'eval-model', critique = false }) {
+export async function runBaseline(scenario, { step, world, model = 'eval-model', critique = false, memory: memoryMode = 'oracle' }) {
   const client = globalThis.__socriaModelClient;
   const out = [];
   const history = [];
@@ -125,7 +135,7 @@ export async function runBaseline(scenario, { step, world, model = 'eval-model',
     const session = scenario.sessions[si];
     const messages = [];
     const turns = [];
-    const memory = history.length
+    const memory = history.length && memoryMode !== 'natural'
       ? '\n\nMEMORY FROM EARLIER SESSIONS WITH THIS PERSON (verbatim transcripts):\n' +
         history
           .map((h, i) => `--- Session ${i + 1} ---\n` + h.map((m) => `${m.role === 'user' ? 'Person' : 'You'}: ${m.content}`).join('\n'))

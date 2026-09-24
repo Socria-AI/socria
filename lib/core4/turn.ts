@@ -26,7 +26,7 @@ import 'server-only';
 
 import { EMPTY_STATE, type CognitiveState } from '../cognition/state';
 import { readState, guardModel, checkWork, COGNITION_MODEL } from '../cognition/engine';
-import { testDependencies, renderCounterfactual, type Counterfactual } from './counterfactual';
+import { testDependencies, renderCounterfactual, testContradictions, renderContradictions, type Counterfactual, type ContradictionTest } from './counterfactual';
 import { calibrate as sampleClaim, renderCalibration, type Calibration } from './calibration';
 import { readSignals, readContract } from './signals';
 import { mergeState, recordTurn, gapCheck } from './merge';
@@ -100,6 +100,10 @@ export interface PreparedTurn {
   counterfactual: Counterfactual | null;
   /** what independent re-derivation said, when it disagreed with itself */
   calibration: Calibration | null;
+  /** candidate contradictions that survived a direct test */
+  contradictions: ContradictionTest[];
+  /** the findings actually rendered, after measured results superseded asserted ones */
+  missingShown: MissingContribution[];
   /**
    * The expertise BEFORE task calibration — what is persisted.
    *
@@ -293,14 +297,28 @@ export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
   // other optional stage takes.
   let counterfactual: Counterfactual | null = null;
   let calibration: Calibration | null = null;
+  let contradictions: ContradictionTest[] = [];
   if (decision.coverage === 'complete' && problem.live.length >= 2 && !allocation.withhold) {
     const t3 = Date.now();
-    [counterfactual, calibration] = await Promise.all([
+    [counterfactual, calibration, contradictions] = await Promise.all([
       withTimeout(testDependencies(input.apiKey, problem, state).catch(() => null), 2500, null),
       withTimeout(sampleClaim(input.apiKey, problem, transcript).catch(() => null), 2500, null),
+      withTimeout(testContradictions(input.apiKey, problem).catch(() => []), 2500, [] as ContradictionTest[]),
     ]);
     ms.measure = Date.now() - t3;
   }
+  // A MEASURED RELATION SUPERSEDES AN ASSERTED ONE. Where the ablation
+  // actually tested what a conclusion rests on, the reader's guess about the
+  // same thing is not also shown: two blocks making the same point, one of
+  // them weaker, is how a person learns to discount both. Same for a
+  // contradiction that was put to the test.
+  const measuredDependency = !!counterfactual?.ablations.some((a) => a.dependence === 'load_bearing');
+  const measuredContradiction = contradictions.length > 0;
+  const supersededKinds = new Set<string>([
+    ...(measuredDependency ? ['HIDDEN_ASSUMPTION'] : []),
+    ...(measuredContradiction ? ['CONTRADICTION'] : []),
+  ]);
+  const missingShown = supersededKinds.size ? missing.filter((m) => !supersededKinds.has(m.kind)) : missing;
 
   // Nothing the person wrote themselves is a secret (run 2, direct-answer-012:
   // they asked "is the answer definitely 7?" and the sentence saying yes was
@@ -340,7 +358,7 @@ export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
     decision = { ...decision, forced: true };
   }
 
-  let move = renderDecision({ ...decision, avoid: allLines.slice(0, 12) }, allocation) + renderMissing(missing);
+  let move = renderDecision({ ...decision, avoid: allLines.slice(0, 12) }, allocation) + renderMissing(missingShown);
   if (signals.offRecord && !signals.onRecord) {
     move += '\nThey asked for this to be off the record: say in one clause that Socria will not keep anything from this conversation from now on, and that "you can remember this" turns it back on. Then carry on.\n';
   }
@@ -369,11 +387,13 @@ export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
     structure: { relations: state.relations.length, edges: freshEdges.length, items: problem.live.length },
     counterfactual,
     calibration,
+    contradictions,
+    missingShown,
     disputed,
     superseded,
     verify,
     hidden,
-    blocks: { state: renderStateBlock(state) + renderProblem(problem) + renderCounterfactual(counterfactual) + renderCalibration(calibration) + lastTime(ledger, input, state.turn), verify: verifyBlock + computed, move },
+    blocks: { state: renderStateBlock(state) + renderProblem(problem) + renderCounterfactual(counterfactual) + renderContradictions(contradictions) + renderCalibration(calibration) + lastTime(ledger, input, state.turn), verify: verifyBlock + computed, move },
     ms,
   };
 }
@@ -623,6 +643,8 @@ export async function finishTurn(
     competence: p.competence,
     counterfactual: p.counterfactual,
     calibration: p.calibration,
+    contradictions: p.contradictions,
+    superseded: p.missing.length - p.missingShown.length,
     structure: p.structure,
     ms: p.ms,
     models: { reply: served, cognition: COGNITION_MODEL },

@@ -61,8 +61,10 @@ try {
   // Arms: core4 (the real route), baseline (A1: strongest prompt, equal
   // token cap), bplus (A2: A1 plus one self-critique pass — the primary
   // comparator, council D16).
-  const res = arm === 'baseline' || arm === 'bplus'
-    ? await runBaseline(scenario, { step, world, critique: arm === 'bplus' })
+  // Arms: core4 | baseline (A1, oracle memory) | bplus (A2) | natural (A1
+  // with only this session, which is what a prompt-only product really has).
+  const res = arm === 'baseline' || arm === 'bplus' || arm === 'natural'
+    ? await runBaseline(scenario, { step, world, critique: arm === 'bplus', memory: arm === 'natural' ? 'natural' : 'oracle' })
     : await runCore4(scenario, { routePath, db, step, world });
 
   if (res.status === 'done') {

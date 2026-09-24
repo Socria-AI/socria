@@ -55,7 +55,16 @@ export async function buildRoute(outDir) {
 export async function buildGraderLib(outDir) {
   mkdirSync(outDir, { recursive: true });
   await build({
-    entryPoints: { questions: join(ROOT, 'lib/core4/questions.ts'), considered: join(ROOT, 'lib/core4/considered.ts') },
+    // `problem`, `counterfactual` and `calibration` are here for
+    // evals/core4/validate.mjs (E17/E18), which drives the REAL functions
+    // against labelled ground truth rather than testing a copy of them.
+    entryPoints: {
+      questions: join(ROOT, 'lib/core4/questions.ts'),
+      considered: join(ROOT, 'lib/core4/considered.ts'),
+      problem: join(ROOT, 'lib/core4/problem.ts'),
+      counterfactual: join(ROOT, 'lib/core4/counterfactual.ts'),
+      calibration: join(ROOT, 'lib/core4/calibration.ts'),
+    },
     bundle: true,
     format: 'esm',
     platform: 'node',
@@ -63,5 +72,11 @@ export async function buildGraderLib(outDir) {
     outExtension: { '.js': '.mjs' },
     logLevel: 'error',
   });
-  return { questions: join(outDir, 'questions.mjs'), considered: join(outDir, 'considered.mjs') };
+  return {
+    questions: join(outDir, 'questions.mjs'),
+    considered: join(outDir, 'considered.mjs'),
+    problem: join(outDir, 'problem.mjs'),
+    counterfactual: join(outDir, 'counterfactual.mjs'),
+    calibration: join(outDir, 'calibration.mjs'),
+  };
 }

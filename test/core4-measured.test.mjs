@@ -16,6 +16,7 @@
 import { buildProblem } from './.tmp/problem.mjs';
 import {
   testDependencies, renderCounterfactual, targetOf, candidates, CF_FLOOR, MAX_ABLATIONS,
+  testContradictions, renderContradictions, contradictionCandidates,
 } from './.tmp/counterfactual.mjs';
 import {
   calibrate, renderCalibration, claimOf, cluster, sameAnswer, SAMPLES, SPLIT_AT,
@@ -216,6 +217,67 @@ console.log('\n=== calibration fails safe ===');
   const thin = await calibrate('k', p, 'ctx', canned(() => (++i <= 2 ? JSON.stringify({ answer: 'a real answer here' }) : 'broken')));
   ok('two samples is a coin on its edge, not a measurement', thin === null, JSON.stringify(thin));
   ok('nothing on the table means nothing to sample', (await calibrate('k', buildProblem([], [], ST), 'ctx', canned({ answer: 'x' }))) === null);
+}
+
+console.log('\n=== measured contradiction: the reader asserted it, now it gets tested ===');
+{
+  // The audit's sharpest finding: contribution.ts's CONTRADICTION fired only
+  // from a `contradicts` edge, which exists only when the 2-second reader
+  // already spotted the contradiction. That is a weaker model's assertion
+  // wearing a measurement's clothes.
+  const far = [
+    e({ id: 'a', kind: 'claim', text: 'Reads never cross replicas, that is the invariant', turn: 1 }),
+    e({ id: 'b', kind: 'claim', text: 'The staleness budget on balance reads is 200ms', turn: 7 }),
+  ];
+  const p = buildProblem(far, [{ from: 'a', to: 'b', rel: 'contradicts' }], { ...ST, turn: 8 });
+  const cands = contradictionCandidates(p);
+  ok('a reader-flagged pair is a candidate', cands.some((c) => c.source === 'reader'), JSON.stringify(cands.map((c) => c.source)));
+
+  const confirmed = await testContradictions('k', p, canned({ compatible: false, conflict: 'a 200ms budget permits exactly the cross-replica read the invariant forbids', confidence: 0.9 }));
+  ok('a pair that cannot both hold survives the test', confirmed.length === 1, JSON.stringify(confirmed));
+  const block = renderContradictions(confirmed);
+  ok('  and the block states the conflict, not the method', /do conflict/.test(block) && /permits exactly/.test(block));
+  ok('  and forbids saying it was checked', /Do not say it was checked/.test(block));
+  ok('  and says how far apart they were', /6 turns apart/.test(block), block);
+
+  // THE FAILURE THAT MATTERS. A person refining a number is not contradicting
+  // themselves, and telling them they did is worse than staying silent.
+  const update = await testContradictions('k', p, canned({ compatible: true, conflict: '', confidence: 0.9 }));
+  ok('an update the model judges compatible is dropped', update.length === 0);
+  const unsure = await testContradictions('k', p, canned({ compatible: 'unclear', conflict: 'maybe', confidence: 0.9 }));
+  ok('"unclear" is not a contradiction', unsure.length === 0);
+  const timid = await testContradictions('k', p, canned({ compatible: false, conflict: 'x', confidence: CF_FLOOR - 0.01 }));
+  ok('below the confidence floor it is dropped', timid.length === 0);
+  const empty = await testContradictions('k', p, canned({ compatible: false, conflict: '', confidence: 0.99 }));
+  ok('"they conflict" with nothing to say about what is a shrug', empty.length === 0);
+  ok('a malformed answer never throws', (await testContradictions('k', p, canned(() => 'nonsense'))).length === 0);
+  ok('nothing to compare means no calls', (await testContradictions('k', buildProblem([], [], ST), canned({ compatible: false }))).length === 0);
+}
+
+console.log('\n=== and it finds pairs the reader never flagged ===');
+{
+  // The point of measuring rather than repackaging: candidates come from the
+  // structure too — same subject, different numbers, turns apart — which is
+  // exactly the shape a reader misses in a long transcript.
+  const noEdge = [
+    e({ id: 'a', kind: 'claim', text: 'Monthly logo churn is running at 4.1 percent', turn: 1 }),
+    e({ id: 'b', kind: 'claim', text: 'Monthly logo churn has been 2.2 percent all year', turn: 6 }),
+    e({ id: 'c', kind: 'claim', text: 'The onboarding rebuild shipped in April', turn: 3 }),
+  ];
+  const p = buildProblem(noEdge, [], { ...ST, turn: 7 });
+  const cands = contradictionCandidates(p);
+  ok('same subject, different numbers, turns apart is a candidate',
+    cands.some((c) => c.source === 'structure' && [c.a.id, c.b.id].sort().join('') === 'ab'), JSON.stringify(cands.map((c) => c.a.id + c.b.id + ':' + c.source)));
+  ok('  with no reader edge anywhere', noEdge.every((x) => true) && cands.every((c) => c.source === 'structure'));
+  ok('an unrelated statement is not paired with them', !cands.some((c) => c.a.id === 'c' || c.b.id === 'c'), JSON.stringify(cands.map((c) => c.a.id + c.b.id)));
+  const adjacent = buildProblem([
+    e({ id: 'a', kind: 'claim', text: 'Monthly logo churn is running at 4.1 percent', turn: 5 }),
+    e({ id: 'b', kind: 'claim', text: 'Monthly logo churn has been 2.2 percent all year', turn: 5 }),
+  ], [], { ...ST, turn: 6 });
+  ok('two statements in the same breath are not a cross-turn contradiction', contradictionCandidates(adjacent).length === 0);
+  ok('at most three pairs are ever put to a call', contradictionCandidates(buildProblem(
+    Array.from({ length: 9 }, (_, i) => e({ id: 'x' + i, kind: 'claim', text: `Monthly logo churn measured ${i + 1}.5 percent in the window`, turn: i + 1 })),
+    [], { ...ST, turn: 12 })).length <= 3);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

@@ -16,7 +16,7 @@
 // that structure rather than a second opinion about the conversation.
 
 import { buildProblem, epistemicOf, ofKind, restsOn, renderProblem } from './.tmp/problem.mjs';
-import { detectMissing, gateContributions, renderMissing } from './.tmp/contribution.mjs';
+import { detectMissing, gateContributions, renderMissing, MISSING_KINDS } from './.tmp/contribution.mjs';
 import { linksFromRelations, entriesFromPerson, mergeEntries } from './.tmp/ledger.mjs';
 import { EMPTY_STATE } from './.tmp/state.mjs';
 import { taskCompetence, calibrate, conceptKey } from './.tmp/capability.mjs';
@@ -131,13 +131,26 @@ console.log('\n=== what the structure says is missing ===');
   const fresh = buildProblem([entry({ id: 'q', kind: 'question', text: 'Who owns the migration?', turn: 9 })], [], S({ turn: 9 }));
   ok('  but not one just asked', !detectMissing(fresh, S()).some((f) => f.kind === 'REPEATED_LOOP'));
 
-  // Two options and nothing else, while deciding.
+  // FALSE_BINARY, MISSING_EVIDENCE and UNDERWEIGHTED_UNCERTAINTY were DELETED
+  // after the differentiation audit, and this asserts they stay deleted.
+  //
+  // Each keyed on something the 2-second cheap reader has to emit — an edge,
+  // or exactly two items of kind `option`/`alternative` — and the reader does
+  // not reliably emit any of it. FALSE_BINARY is the clearest case: it never
+  // fired once across run 8's 22 turns, INCLUDING on power-binary-007, the
+  // scenario written specifically to trigger it. A detector that cannot fire
+  // on its own test case is not a detector, and re-announcing a weaker
+  // model's assertion was never differentiation in the first place.
   const binary = buildProblem(
     [entry({ id: 'o1', kind: 'option', text: 'Build it' }), entry({ id: 'o2', kind: 'option', text: 'Buy it' }), entry({ id: 'd', kind: 'decision', text: 'Build or buy' })],
     [], S({ taskKind: 'decide' })
   );
-  ok('a two-option framing is noticed while deciding', detectMissing(binary, S({ taskKind: 'decide' })).some((f) => f.kind === 'FALSE_BINARY'));
-  ok('  and not while doing something else', !detectMissing(binary, S({ taskKind: 'learn', work: 'practice' })).some((f) => f.kind === 'FALSE_BINARY'));
+  const gone = new Set(['FALSE_BINARY', 'MISSING_EVIDENCE', 'UNDERWEIGHTED_UNCERTAINTY', 'UNVERIFIED_FACT']);
+  ok('the deleted detectors stay deleted', !detectMissing(binary, S({ taskKind: 'decide' })).some((f) => gone.has(f.kind)),
+    detectMissing(binary, S({ taskKind: 'decide' })).map((f) => f.kind).join(','));
+  ok('  and the kinds they used are gone from the vocabulary', !MISSING_KINDS.some((k) => gone.has(k)), MISSING_KINDS.join(','));
+  ok('  while the structural ones that do fire are kept',
+    ['HIDDEN_ASSUMPTION', 'CONTRADICTION', 'STALE_BELIEF', 'MISSING_DECISION_CRITERIA', 'REPEATED_LOOP'].every((k) => MISSING_KINDS.includes(k)), MISSING_KINDS.join(','));
 
   ok('an empty problem says nothing is missing', detectMissing(buildProblem([], [], S()), S()).length === 0);
   ok('one finding per kind, not three wordings of one', new Set(found.map((f) => f.kind)).size === found.length);

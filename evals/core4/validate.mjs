@@ -1,0 +1,251 @@
+#!/usr/bin/env node
+// E17 / E18: do the two measuring stages actually measure anything?
+//
+//   node evals/core4/validate.mjs --which ablation --run <dir>
+//   node evals/core4/validate.mjs --which claims   --run <dir>
+//   node evals/core4/validate.mjs --which ablation --run <dir> --report
+//
+// WHY THIS EXISTS SEPARATELY FROM grade.mjs. grade.mjs asks "is the reply
+// better". This asks the prior question: "is the measurement CORRECT". A
+// mechanism that produces confident wrong findings is worse than one that
+// produces nothing, because a wrong finding carries the authority of a
+// measurement — "your conclusion rests on X" is not a suggestion, it is a
+// claim about their reasoning, and being wrong about it is expensive.
+//
+// So this runs the real functions (lib/core4/counterfactual.ts,
+// lib/core4/calibration.ts) against LABELLED items whose ground truth was
+// written and then adversarially reviewed, and reports confusion matrices
+// rather than win rates.
+//
+// STEPWISE, LIKE EVERY OTHER RUN. There is no API key here, so completions
+// come from outside the process (evals/core4/lib/clients.mjs). That has a
+// consequence worth stating loudly and repeating in the write-up:
+//
+//   THE STAND-IN IS FRONTIER-GRADE; PRODUCTION RUNS THESE ON gpt-4o-mini.
+//
+// Every number this produces is therefore an UPPER BOUND on the shipped
+// mechanism's accuracy. If it fails here it certainly fails in production;
+// if it passes here that is necessary and not sufficient.
+
+import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync } from 'node:fs';
+import { join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { buildGraderLib } from './lib/build.mjs';
+import { stepwiseClient } from './lib/clients.mjs';
+
+const args = Object.fromEntries(
+  process.argv.slice(2).reduce((a, x, i, all) => (x.startsWith('--') ? [...a, [x.slice(2), all[i + 1]?.startsWith('--') ? true : all[i + 1] ?? true]] : a), [])
+);
+const which = args.which || 'ablation';
+const runDir = resolve(args.run || `evals/core4/runs/validate-${which}`);
+const REPEATS = Number(args.repeats || 3);
+mkdirSync(runDir, { recursive: true });
+
+const here = new URL('.', import.meta.url).pathname;
+const labelled = (f) => JSON.parse(readFileSync(join(here, 'labelled', f), 'utf8'));
+
+// Build the modules under test the same way the grader builds its libs.
+const libs = await buildGraderLib(join(runDir, '.build'));
+const load = async (name) => import(pathToFileURL(join(runDir, '.build', `${name}.mjs`)).href);
+
+const step = stepwiseClient(runDir, which);
+globalThis.__socriaModelClient = step.client;
+
+const say = (o) => process.stdout.write(JSON.stringify(o) + '\n');
+const pct = (n, d) => (d ? Math.round((n / d) * 1000) / 10 : null);
+
+/** Wrap the stepwise client so one logical probe can be answered per item. */
+const client = step.client;
+
+// ── E17: counterfactual ablation ────────────────────────────────────
+//
+// For each labelled item, ablate EVERY premise and compare the mechanism's
+// verdict against the label. Then repeat the whole thing REPEATS times to
+// measure stability, and run the paraphrase variants to measure wording
+// sensitivity.
+async function ablation() {
+  const { buildProblem } = await load('problem');
+  const cf = await load('counterfactual');
+  const set = labelled('ablation.json');
+  const items = set.items ?? set;
+  const paraSet = existsSync(join(here, 'labelled', 'ablation-paraphrase.json'))
+    ? (labelled('ablation-paraphrase.json').variants ?? [])
+    : [];
+
+  const ST = { currentGoal: '', currentFocus: '', blockingUnknown: '', turn: 5 };
+  const entry = (id, kind, text, turn) => ({
+    id, conversationId: 'c1', projectId: null, userId: 'u', turn, kind, text,
+    owner: 'user', stance: 'asserts', basis: 'quoted', quote: text, status: 'active',
+    private: false, createdAt: 1, updatedAt: 1, revisions: [], confidence: 0.8, reason: '',
+  });
+
+  /** One item -> the mechanism's verdict per premise, by premise id. */
+  const verdictsFor = async (item, tag) => {
+    const entries = [
+      entry('concl', 'decision', item.conclusion, 1),
+      ...item.premises.map((p, i) => entry(p.id, 'claim', p.text, i + 2)),
+    ];
+    const p = buildProblem(entries, [], { ...ST, turn: item.premises.length + 2 }, { conversationId: 'c1', projectId: null });
+    // Drive the real function, but force every premise to be probed rather
+    // than letting `candidates()` pick — this measures VERDICT accuracy, not
+    // candidate selection, which is measured separately below.
+    const got = {};
+    for (const prem of item.premises) {
+      const one = await cf.testDependencies(
+        'k',
+        { ...p, live: p.live.filter((x) => x.id === 'concl' || x.id === prem.id) },
+        ST,
+        client
+      );
+      const a = one?.ablations?.[0];
+      got[prem.id] = a ? a.dependence : 'unclear';
+    }
+    return got;
+  };
+
+  const rows = [];
+  for (const item of items) {
+    const runs = [];
+    for (let r = 0; r < REPEATS; r++) runs.push(await verdictsFor(item, `${item.id}#${r}`));
+    rows.push({ id: item.id, item, runs });
+  }
+
+  // Confusion, on the FIRST run (the one a user would get).
+  let tp = 0, fp = 0, tn = 0, fn = 0, abstain = 0;
+  const misses = [];
+  for (const { item, runs } of rows) {
+    for (const prem of item.premises) {
+      const v = runs[0][prem.id];
+      if (v === 'unclear') { abstain += 1; continue; }
+      const said = v === 'load_bearing';
+      if (said && prem.loadBearing) tp += 1;
+      else if (said && !prem.loadBearing) { fp += 1; misses.push({ id: item.id, premise: prem.id, kind: 'false positive', text: prem.text, why: prem.why }); }
+      else if (!said && prem.loadBearing) { fn += 1; misses.push({ id: item.id, premise: prem.id, kind: 'false negative', text: prem.text, why: prem.why }); }
+      else tn += 1;
+    }
+  }
+
+  // Stability: across REPEATS, how often does a premise get the same verdict?
+  let stable = 0, unstable = 0;
+  for (const { item, runs } of rows) {
+    for (const prem of item.premises) {
+      const vs = runs.map((r) => r[prem.id]);
+      (new Set(vs).size === 1 ? (stable += 1) : (unstable += 1));
+    }
+  }
+
+  // Wording sensitivity: same meaning, different words, same verdict?
+  let same = 0, flipped = 0;
+  const flips = [];
+  for (const v of paraSet) {
+    const base = rows.find((r) => r.id === v.of);
+    if (!base) continue;
+    const got = await verdictsFor({ ...base.item, conclusion: v.conclusion, premises: v.premises.map((x) => ({ ...x, loadBearing: base.item.premises.find((q) => q.id === x.id)?.loadBearing })) }, `${v.of}#para`);
+    for (const prem of v.premises) {
+      if (got[prem.id] === base.runs[0][prem.id]) same += 1;
+      else { flipped += 1; flips.push({ of: v.of, premise: prem.id, was: base.runs[0][prem.id], now: got[prem.id] }); }
+    }
+  }
+
+  const decided = tp + fp + tn + fn;
+  const report = {
+    which: 'E17 ablation',
+    items: items.length,
+    premisesJudged: decided + abstain,
+    abstained: abstain,
+    abstainRate: pct(abstain, decided + abstain),
+    confusion: { tp, fp, tn, fn },
+    precision: pct(tp, tp + fp),
+    recall: pct(tp, tp + fn),
+    falsePositiveRate: pct(fp, fp + tn),
+    stability: { stable, unstable, rate: pct(stable, stable + unstable), repeats: REPEATS },
+    wording: { same, flipped, stableRate: pct(same, same + flipped) },
+    misses: misses.slice(0, 20),
+    flips: flips.slice(0, 20),
+    calls: step.calls.length,
+    note: 'Stand-in model is frontier-grade; production runs gpt-4o-mini. These are UPPER BOUNDS.',
+  };
+  writeFileSync(join(runDir, 'report.json'), JSON.stringify(report, null, 2));
+  return report;
+}
+
+// ── E18: sampled disagreement ───────────────────────────────────────
+//
+// The question is NOT "does it split". It is whether splitting tracks genuine
+// contestedness rather than sampling noise. So: settled claims must not
+// split (manufactured doubt is the failure that matters) and contested ones
+// should.
+async function claims() {
+  const { buildProblem } = await load('problem');
+  const cal = await load('calibration');
+  const set = labelled('claims.json');
+  const items = set.items ?? set;
+  const ST = { currentGoal: '', currentFocus: '', blockingUnknown: '', turn: 2 };
+  const entry = (text) => ({
+    id: 'c1', conversationId: 'c1', projectId: null, userId: 'u', turn: 1, kind: 'conclusion',
+    text, owner: 'user', stance: 'asserts', basis: 'quoted', quote: text, status: 'active',
+    private: false, createdAt: 1, updatedAt: 1, revisions: [], confidence: 0.8, reason: '',
+  });
+
+  const rows = [];
+  for (const it of items) {
+    const p = buildProblem([entry(it.claim)], [], ST, { conversationId: 'c1', projectId: null });
+    const runs = [];
+    for (let r = 0; r < REPEATS; r++) {
+      const got = await cal.calibrate('k', p, it.context ?? '', client);
+      runs.push(got ? { split: got.split, agreement: got.agreement, clusters: got.clusters.length } : null);
+    }
+    rows.push({ id: it.id, truth: it.truth, runs });
+  }
+
+  let tp = 0, fp = 0, tn = 0, fn = 0, nulls = 0;
+  const wrong = [];
+  for (const r of rows) {
+    const first = r.runs[0];
+    if (!first) { nulls += 1; continue; }
+    const contested = r.truth === 'contested';
+    if (first.split && contested) tp += 1;
+    else if (first.split && !contested) { fp += 1; wrong.push({ id: r.id, kind: 'manufactured doubt', agreement: first.agreement }); }
+    else if (!first.split && contested) { fn += 1; wrong.push({ id: r.id, kind: 'missed contest', agreement: first.agreement }); }
+    else tn += 1;
+  }
+
+  let stable = 0, unstable = 0;
+  for (const r of rows) {
+    const vs = r.runs.filter(Boolean).map((x) => x.split);
+    if (!vs.length) continue;
+    (new Set(vs).size === 1 ? (stable += 1) : (unstable += 1));
+  }
+
+  const mean = (xs) => (xs.length ? Math.round((xs.reduce((a, b) => a + b, 0) / xs.length) * 100) / 100 : null);
+  const agreeSettled = mean(rows.filter((r) => r.truth === 'settled' && r.runs[0]).map((r) => r.runs[0].agreement));
+  const agreeContested = mean(rows.filter((r) => r.truth === 'contested' && r.runs[0]).map((r) => r.runs[0].agreement));
+
+  const report = {
+    which: 'E18 sampled disagreement',
+    items: items.length,
+    unanswered: nulls,
+    confusion: { tp, fp, tn, fn },
+    falseSplitRate: pct(fp, fp + tn),
+    contestedDetection: pct(tp, tp + fn),
+    separation: { meanAgreementSettled: agreeSettled, meanAgreementContested: agreeContested },
+    stability: { stable, unstable, rate: pct(stable, stable + unstable), repeats: REPEATS },
+    wrong: wrong.slice(0, 20),
+    calls: step.calls.length,
+    note: 'Stand-in model is frontier-grade; production runs gpt-4o-mini. These are UPPER BOUNDS.',
+  };
+  writeFileSync(join(runDir, 'report.json'), JSON.stringify(report, null, 2));
+  return report;
+}
+
+try {
+  const report = which === 'claims' ? await claims() : await ablation();
+  say({ status: 'done', report: join(runDir, 'report.json'), ...report });
+} catch (e) {
+  if (step.pending.length) {
+    say({ status: 'pending', pending: [...new Set(step.pending)].slice(0, 40), total: new Set(step.pending).size });
+  } else {
+    say({ status: 'error', error: String(e && e.stack ? e.stack : e) });
+    process.exit(1);
+  }
+}

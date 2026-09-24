@@ -63,6 +63,12 @@ export interface TurnTrace {
     samples: number;
     agreement: number | null;
     split: boolean;
+    /** candidate pairs that survived a direct "can both hold?" test */
+    contradictions: number;
+    /** of those, how many the reader never flagged — the ones it found itself */
+    contradictionsFoundByStructure: number;
+    /** asserted findings suppressed because a measurement covered the same ground */
+    superseded: number;
   };
   /**
    * What the structure said was absent, and whether the reply was given it.
@@ -113,6 +119,8 @@ export function buildTrace(x: {
   // that has not been updated must degrade to a thinner trace, never throw.
   counterfactual?: { ablations: readonly { dependence: string }[] } | null;
   calibration?: { samples: number; agreement: number; split: boolean } | null;
+  contradictions?: readonly { source: string }[];
+  superseded?: number;
   missing?: readonly { kind: string }[];
   competence?: { value: string };
   structure?: { relations: number; edges: number; items: number };
@@ -178,6 +186,9 @@ export function buildTrace(x: {
       samples: x.calibration?.samples ?? 0,
       agreement: x.calibration ? Math.round(x.calibration.agreement * 100) / 100 : null,
       split: x.calibration?.split ?? false,
+      contradictions: x.contradictions?.length ?? 0,
+      contradictionsFoundByStructure: x.contradictions?.filter((c) => c.source === 'structure').length ?? 0,
+      superseded: x.superseded ?? 0,
     },
     missing: { found: (x.missing ?? []).map((m) => m.kind), raised: (x.missing ?? []).length ? 1 : 0 },
     structure: x.structure ?? { relations: 0, edges: 0, items: 0 },
