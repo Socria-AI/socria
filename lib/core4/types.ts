@@ -224,6 +224,26 @@ export interface Allocation {
   } | null;
   /** first time something is held back in this conversation: say so, and how to get it */
   announce: boolean;
+  /**
+   * For a turn that asks Socria to PRODUCE something, how much of the work
+   * producing it would take over. Null on every turn that is not a generative
+   * ask, which is most of them.
+   *
+   *   'delegated'  they said the output is what they want. Make it.
+   *   'scoped'     the ask determines the artifact — subject plus a purpose, an
+   *                audience, a length, a count, or material to work from. Make
+   *                it.
+   *   'unscoped'   a bare imperative with nothing that decides what the thing
+   *                should be. Generating a whole artifact here is not help,
+   *                it is a guess at somebody's intent delivered as a finished
+   *                product — and the guessing was the work.
+   *   'developing' they asked to develop, think through or brainstorm it. The
+   *                authorship is the activity; do not hand back the artifact.
+   *
+   * NOT A WITHHOLD, deliberately (council D6): nothing is held back and
+   * nothing is refused. It decides the SIZE of the first move.
+   */
+  generation: 'delegated' | 'scoped' | 'unscoped' | 'developing' | null;
   /** machine-readable */
   reasonCode: string;
   /** one line a person could read */

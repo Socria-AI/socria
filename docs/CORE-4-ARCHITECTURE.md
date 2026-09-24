@@ -123,6 +123,40 @@ item is theirs again. "Let me try it first" with nothing tried gets "go
 ahead". "Which would you pick?" gets a pick, marked as a view, with the
 value that would flip it.
 
+**How much producing it would take over** (`generationRead`, added after a
+regression). "Write me a story" came back as a long generic story, and every
+layer had behaved as designed: nothing was withheld (correct — an inference
+must never withhold), the move was ANSWER (correct — they asked), and the
+ceiling was the full one (a request, and requests are exempt from the length
+policy). The gap was that no layer asked the question Human-First exists to
+ask — *would producing this take over the work that was the point?*
+
+It is a READ, not a withhold and not a refusal: nothing is held back and every
+outcome still contains real work. On a turn that asks Socria to make something,
+`allocation.generation` is one of four:
+
+| | |
+|---|---|
+| `delegated` | they said the output is what they want ("just need the finished thing", "you decide", or a standing "just tell me" / "stop asking me questions") → make it, full ceiling |
+| `scoped` | the ask determines the artifact — a subject plus a purpose, audience, length, count or material, or a transformation of something they supplied → make it, full ceiling |
+| `unscoped` | a bare imperative with nothing that decides what the thing should be → a small real piece of it FIRST, then the one question that settles the rest (420 tokens, at most one question, none when the budget is spent) |
+| `developing` | they asked to develop, think through or brainstorm it, and named an artifact → two or three concrete directions to develop WITH, never the piece itself (600 tokens) |
+
+The gate is narrow in both directions, because the opposite failure is on
+record from runs 4–6: an expert asking for a thing and getting an interview.
+Diagnosis, verification, practice and any turn carrying an attempt are excluded
+outright, `build` is not a production verb (it is usually a noun here), and
+`developing` needs an artifact noun as well as the "help me think" opening —
+"help me figure out why this build keeps failing" is a debugging turn wearing
+the same clothes.
+
+**It renders as a SCOPE clause**, above LENGTH and COVERAGE. An unforced turn
+never prints its objective (council D1 — the model picks the move), so a scope
+decision left in the objective would have reached nobody. `proportionFor`
+defers to it: the length policy cannot shrink a reply below the work the
+allocator assigned, which is the priority order — instructions, then
+allocation, then completion, then style — expressed as code.
+
 ### Intervention Engine — `lib/core4/intervene.ts`
 Moves: ANSWER, EXPLAIN, CORRECT, VERIFY, CRITIQUE, CHALLENGE, CONTRIBUTE,
 CONNECT, SYNTHESIZE, QUESTION, CLARIFY, HINT, EXECUTE, CALCULATE, RETRIEVE,

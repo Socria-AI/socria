@@ -269,7 +269,7 @@ export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
   if (verify) state.attempt = verify.verdict === 'correct' ? 'right' : 'wrong';
 
   const decide = () => {
-    const a = allocate({ state, signals, contract });
+    const a = allocate({ state, signals, contract, lastUserText: input.lastUserText });
     return { allocation: a, decision: selectIntervention({ state, allocation: a, budget, diminishing, signals, considered: allLines.slice(0, 12), lastUserText: input.lastUserText, prefs: input.prefs }) };
   };
   let { allocation, decision } = decide();

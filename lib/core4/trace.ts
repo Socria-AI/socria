@@ -41,7 +41,16 @@ export interface TurnTrace {
     questionsPreference: string;
     readOk: boolean;
   };
-  allocation: { mode: string; reasonCode: string; withhold: string | null; withholdSource: string | null; confidence: number };
+  allocation: {
+    mode: string; reasonCode: string; withhold: string | null; withholdSource: string | null; confidence: number;
+    /**
+     * How much of the work producing the artifact would have been, on a turn
+     * that asked Socria to make something. An enum and never the request, like
+     * every other field here — but the one to read first when somebody reports
+     * that a reply took over their work or refused to do any.
+     */
+    generation: string | null;
+  };
   intervention: { type: string; reasonCode: string; maxQuestions: number; switchedFrom: string | null; confidence: number; coverage: string; proportion: string };
   /** the register chosen for this turn — content-free, like every trace field */
   voice: { warmth: string; edge: string; play: string; density: string; because: string };
@@ -156,6 +165,7 @@ export function buildTrace(x: {
     allocation: {
       mode: x.allocation.mode,
       reasonCode: x.allocation.reasonCode,
+      generation: x.allocation.generation ?? null,
       withhold: x.allocation.withhold?.reason ?? null,
       withholdSource: x.allocation.withhold?.source ?? null,
       confidence: x.allocation.confidence,

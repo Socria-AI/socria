@@ -37,6 +37,18 @@ interface Ctx {
   state: CognitiveState;
   signals: ExplicitSignals;
   contract: ExplicitSignals;
+  /**
+   * Their actual words this turn.
+   *
+   * `state.currentFocus` is the cheap reader's one-line summary, and summaries
+   * are uniformly abstract: it renders "write me a story" and a four-paragraph
+   * brief with an audience, a deadline and a word count as similar short
+   * phrases. Deciding how much of somebody's work to take over on a paraphrase
+   * of what they said is exactly the wrong input. Optional, and it falls back
+   * to the summary, because a caller that cannot supply it should lose the
+   * distinction rather than the allocation.
+   */
+  lastUserText?: string;
 }
 
 type Hold = NonNullable<Allocation['withhold']>;
@@ -67,7 +79,8 @@ function alloc(
   humanWork: string[],
   aiWork: string[],
   withhold: Omit<Hold, 'quote' | 'alternative'> & { quote?: string; alternative?: string } | null,
-  s: CognitiveState
+  s: CognitiveState,
+  generation: Allocation['generation'] = null
 ): Allocation {
   // The first time anything is held back in a conversation, the reply says so
   // and says how to get it. Silent withholding cannot be overridden by
@@ -93,10 +106,130 @@ function alloc(
     hold = null;
   }
   const announce = !!hold && !s.history.some((h) => h.withheld);
-  return { mode, reasonCode, rationale, confidence: Math.round(Math.min(1, confidence) * 100) / 100, humanWork, aiWork, withhold: hold, announce };
+  return { mode, reasonCode, rationale, confidence: Math.round(Math.min(1, confidence) * 100) / 100, humanWork, aiWork, withhold: hold, announce, generation };
 }
 
-export function allocate({ state: s, signals, contract }: Ctx): Allocation {
+// ── IS THIS A REQUEST TO PRODUCE SOMETHING, AND DOES IT SAY WHAT? ────
+//
+// THE FAILURE THIS FIXES. "Write me a story" produced a long generic story.
+// Every layer behaved as designed: nothing was withheld (correct — council D6
+// withholds only on an explicit statement), the move was ANSWER (correct —
+// they asked), and the ceiling was 1200 (a request, and requests get the full
+// ceiling). The gap was that no layer asked the question Human-First exists to
+// ask: would producing this take over the work that was the point?
+//
+// It is NOT a withhold and NOT a refusal. Nothing is held back and nothing is
+// declined; the reply still contains real work. What changes is its SIZE:
+// enough to be useful immediately, not a finished artifact built on a guess
+// about what somebody wanted.
+//
+// AND IT MUST NOT BECOME A GATE ON EVERY GENERATIVE TURN. The failure on the
+// other side is on record from runs 4-6 — an expert asking for a thing and
+// getting an interview instead. So delegation is honoured, a request that
+// carries its own brief is honoured, and only a bare imperative with nothing
+// to determine the artifact gets the smaller first move.
+
+/** Asking Socria to PRODUCE an artifact, rather than to answer, fix or explain. */
+// NOT `build`: "why does this build keep failing" is a debugging turn, and a
+// verb that is more often a noun in this product's traffic costs more than it
+// earns. "Build me a X" still reaches this through `make`.
+const PRODUCE = /\b(?:write|draft|compose|create|generate|make|design|come up with|put together|produce|script|outline)\b/i;
+
+/**
+ * Transformations of material they already have. "Summarise this", "rewrite my
+ * intro", "translate it" — the artifact is determined by the thing in front of
+ * them, so there is nothing to be unscoped about.
+ */
+const TRANSFORM = /\b(?:summari[sz]e|rewrite|revise|edit|shorten|tighten|translate|reformat|convert|proofread|fix)\b/i;
+
+/**
+ * They said the OUTPUT is what they want. Deliberately narrow, and "for me"
+ * is deliberately NOT on it: "write an email for me" is the everyday phrasing
+ * of an ordinary ask, not a statement that they want no part in it.
+ */
+const DELEGATED = /\b(?:just (?:need|want|give|write|do|make)|i (?:just )?need (?:the )?(?:finished|final|full|complete|whole)|finished (?:thing|version|piece|draft)|final (?:version|draft|copy)|ready to (?:send|ship|post|publish)|don'?t ask|no questions|you (?:decide|choose|pick)|your (?:call|choice)|whatever you think|as you see fit|i don'?t (?:care|mind)|do it all)\b/i;
+
+/**
+ * The things people ask to have made. Needed because the verb alone is not
+ * enough in either direction: "help me figure out why this build fails" is a
+ * debugging turn that happens to start with "help me figure", and answering it
+ * with three directions instead of the fix would be the same failure in the
+ * opposite direction.
+ */
+const ARTIFACT = /\b(?:story|essay|email|e-?mail|post|article|letter|message|draft|script|poem|speech|pitch|proposal|outline|chapter|blurb|caption|copy|bio|r[ée]sum[ée]|resume|cv|cover letter|presentation|deck|slides?|paper|report|memo|ad|advert|tagline|headline|premise|idea|concept|angle|argument|analysis|case|newsletter|thread|plan|curriculum|syllabus|agenda|itinerary|recipe|song|lyrics?|novel|screenplay)\b/i;
+
+/** The authorship is the activity: they asked to work on it, not to receive it. */
+const DEVELOP = /\b(?:help me (?:develop|think|work|figure|brainstorm|plan|shape|structure|decide)|think (?:this |it )?through|brainstorm|work (?:this |it )?out with me|bounce|develop (?:my|this|the|a|an) (?:idea|thought|argument|concept|angle|premise)|what do you think (?:about|of) my)\b/i;
+
+/** Things that pin an artifact down: who it is for, how long, how many, about what. */
+const DETERMINERS = [
+  /\b(?:for|to) (?:my|our|a|an|the) [a-z]/i,           // an audience or a recipient
+  /\b(?:about|on|regarding|covering|re:) \w/i,          // a subject
+  /\b\d+\b|\b(?:two|three|four|five|six|ten)\b/i,       // a count or a length
+  /\b(?:words?|paragraphs?|pages?|sentences?|lines?|minutes?|slides?)\b/i,
+  /\b(?:because|so that|in order to|they need|we need|deadline|due)\b/i, // a purpose
+  /["“”']{1}[^"“”']{8,}["“”']{1}/,                       // material they quoted
+  /```|\n\s*[-*]\s+\w/,                                 // pasted material or a list of givens
+];
+
+/**
+ * How much of what determines the artifact is actually in the message.
+ *
+ * Exported because it is the whole judgement, and a judgement that decides how
+ * much of somebody's work Socria takes over should be readable on its own and
+ * testable without a model.
+ */
+export function generationRead(text: string, signals: ExplicitSignals, s: CognitiveState): Allocation['generation'] {
+  const t = (text ?? '').trim();
+  if (!t) return null;
+  // IS THIS EVEN A TURN ABOUT MAKING SOMETHING? Everything below is silent
+  // otherwise, which is what keeps this out of the way of the debugging,
+  // judgement, practice and information turns that are most of the product.
+  if (!PRODUCE.test(t) && !TRANSFORM.test(t) && !ARTIFACT.test(t)) return null;
+  // Work they are checking, practising or debugging is not a generative ask,
+  // whatever verb it happens to contain. The state knows; the words do not.
+  if (s.work === 'diagnosis' || s.taskKind === 'debug' || s.work === 'verification' || s.work === 'practice' || s.latest === 'attempt') return null;
+
+  // Their words first, always. "Just tell me", "stop asking me questions" and
+  // "I just need the finished thing" are instructions about this exact
+  // behaviour, and an instruction outranks any reading of the request.
+  if (DELEGATED.test(t) || signals.directness === 'answer' || signals.stopQuestions) return 'delegated';
+  // Developing needs an artifact in the sentence, not only the words "help me
+  // think": "help me figure out why this keeps failing" is a debugging turn
+  // wearing the same opening, and answering it with three directions instead
+  // of the fix is the same failure pointed the other way.
+  if (DEVELOP.test(t) && ARTIFACT.test(t)) return 'developing';
+  // A transformation of material they supplied is scoped by the material.
+  if (TRANSFORM.test(t)) return 'scoped';
+  if (!PRODUCE.test(t)) return null;
+  if (s.attempt !== 'none') return 'scoped';
+  const determiners = DETERMINERS.filter((re) => re.test(t)).length;
+  // A subject alone is thin but real ("write a competitive analysis of the EV
+  // market" is not the same ask as "write me a story"), so one determiner plus
+  // some length counts as scoped. Nothing at all does not.
+  const words = t.split(/\s+/).length;
+  if (determiners >= 2 || (determiners >= 1 && words >= 12)) return 'scoped';
+  return 'unscoped';
+}
+
+/**
+ * The read reaches every branch, not only the two that act on it.
+ *
+ * A generative ask does not always arrive classified as creation: "help me
+ * think through what this email should say" reads as conversation, and the
+ * branch that answers it would otherwise carry `generation: null` and the
+ * intervention engine would never know the turn was about making something.
+ * So the body decides, and anything it left unset takes the read.
+ */
+export function allocate(ctx: Ctx): Allocation {
+  const a = allocateFor(ctx);
+  if (a.generation !== null) return a;
+  const gen = generationRead(ctx.lastUserText ?? ctx.state.currentFocus ?? '', ctx.signals, ctx.state);
+  return gen === null ? a : { ...a, generation: gen };
+}
+
+function allocateFor({ state: s, signals, contract, lastUserText }: Ctx): Allocation {
+  const gen = generationRead(lastUserText ?? s.currentFocus ?? '', signals, s);
   const expertInferred = s.expertise.value === 'expert' && (s.expertise.source !== 'inferred' || s.expertise.confidence >= 0.6);
   const learningExplicit = s.learningGoal.source === 'explicit' && s.learningGoal.value === 'yes';
   const ownWorkExplicit = s.authorship.source === 'explicit' && s.authorship.value === 'theirs';
@@ -241,12 +374,27 @@ export function allocate({ state: s, signals, contract }: Ctx): Allocation {
 
   // ── creation: their work stays theirs when they have said so ──
   if (s.work === 'creation' || s.taskKind === 'create') {
-    return ownWorkExplicit
-      ? alloc('HUMAN_LEADS', 'creation.theirs', 'They said the work must stay theirs: specific critique and options, not a rewrite.',
-          1, ['the text itself'], ['critique', 'options', 'craft knowledge'],
-          { what: 'a replacement version of their work', reason: 'authorship', evidence: s.authorship.evidence ?? '', source: sourceOf(s.authorship, signals.ownWork) }, s)
-      : alloc('AI_ASSISTS', 'creation.shared', 'Making something: Socria drafts, develops or critiques as asked; they steer.', 0.6,
-          ['direction'], ['drafting', 'developing', 'critique'], null, s);
+    if (ownWorkExplicit) {
+      return alloc('HUMAN_LEADS', 'creation.theirs', 'They said the work must stay theirs: specific critique and options, not a rewrite.',
+        1, ['the text itself'], ['critique', 'options', 'craft knowledge'],
+        { what: 'a replacement version of their work', reason: 'authorship', evidence: s.authorship.evidence ?? '', source: sourceOf(s.authorship, signals.ownWork) }, s, 'developing');
+    }
+    // How much of the work would producing it be? See generationRead.
+    if (gen === 'delegated') {
+      return alloc('AI_EXECUTES', 'creation.delegated', 'They said the finished thing is what they want: make it.', 0.9,
+        [], ['the artifact itself'], null, s, 'delegated');
+    }
+    if (gen === 'developing') {
+      return alloc('AI_ASSISTS', 'creation.developing', 'They asked to develop it, not to receive it: build on what they have and give them something to push against.', 0.8,
+        ['the piece itself'], ['material to work with', 'options', 'craft knowledge'], null, s, 'developing');
+    }
+    if (gen === 'unscoped') {
+      return alloc('AI_ASSISTS', 'creation.unscoped',
+        'A request to make something, with nothing in it that decides what the thing should be: a small real start, and the one thing that would settle the rest.',
+        0.7, ['what it is for and what it must carry'], ['a small real piece of it', 'the question that decides the rest'], null, s, 'unscoped');
+    }
+    return alloc('AI_ASSISTS', 'creation.shared', 'Making something: Socria drafts, develops or critiques as asked; they steer.', 0.6,
+      ['direction'], ['drafting', 'developing', 'critique'], null, s, gen ?? 'scoped');
   }
 
   // ── the machinery ──
@@ -254,7 +402,16 @@ export function allocate({ state: s, signals, contract }: Ctx): Allocation {
     return alloc('AI_EXECUTES', 'information', 'Information: provide it.', 0.9, [], ['the information'], null, s);
   }
   if (s.work === 'execution') {
-    return alloc('AI_EXECUTES', 'execution', 'Mechanical work: do it.', 0.9, [], ['the work'], null, s);
+    // The same read applies here, because the reader does not always call a
+    // request to make something "creation": "write me a script", "make me a
+    // table" arrive as execution, and a bare imperative with nothing to
+    // determine the artifact is the same guess whatever the label on it.
+    if (gen === 'unscoped') {
+      return alloc('AI_ASSISTS', 'creation.unscoped',
+        'A request to make something, with nothing in it that decides what the thing should be: a small real start, and the one thing that would settle the rest.',
+        0.7, ['what it is for and what it must carry'], ['a small real piece of it', 'the question that decides the rest'], null, s, 'unscoped');
+    }
+    return alloc('AI_EXECUTES', 'execution', 'Mechanical work: do it.', 0.9, [], ['the work'], null, s, gen);
   }
   if (s.work === 'diagnosis' || s.taskKind === 'debug') {
     return alloc(expertInferred || s.urgency === 'high' ? 'AI_EXECUTES' : 'AI_EXPLAINS', 'diagnosis.fix',

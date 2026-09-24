@@ -98,6 +98,8 @@ function d(
     confidence?: number;
     switchedFrom?: string | null;
     avoid: string[];
+    /** a ceiling this move needs instead of its type's — see creation.unscoped */
+    maxTokens?: number;
   }
 ): InterventionDecision {
   const maxQuestions = o.maxQuestions ?? 0;
@@ -118,7 +120,7 @@ function d(
     objective: o.objective,
     avoid: o.avoid.slice(0, 12),
     switchedFrom: o.switchedFrom ?? null,
-    maxTokens: TOKENS[type] ?? 600,
+    maxTokens: o.maxTokens ?? TOKENS[type] ?? 600,
     coverage: 'normal',
     proportion: 'normal',
     questionsAreContent: false,
@@ -207,6 +209,17 @@ function concreteness(text: string): number {
 
 export function proportionFor(input: SelectInput, dec: InterventionDecision): Proportion {
   const { state: s, signals } = input;
+  // THE ALLOCATOR OUTRANKS THE LENGTH POLICY. Both of the generative reads it
+  // acts on have already been given a ceiling that fits what their objective
+  // asks for — a small real piece plus one question (unscoped, 420), or two or
+  // three concrete directions (developing, 600). Trimming either to two
+  // sentences would leave the reply unable to contain the part that makes it
+  // help rather than an interrogation.
+  //
+  // This is the priority order as code: allocation decides WHAT work Socria
+  // takes over, and the length policy shapes what is left. It must not be able
+  // to shrink a reply below the work the allocator assigned.
+  if (input.allocation.generation === 'unscoped' || input.allocation.generation === 'developing') return 'normal';
   // Their words win, in both directions: a length they asked for, or an
   // explicit ask for detail, is never overridden by our reading of the turn.
   if (signals.requestedTokens || signals.explainAsked || signals.sentences) return 'normal';
@@ -539,6 +552,47 @@ function selectMove(input: SelectInput): InterventionDecision {
       // They asked Socria something directly: answer it. Their judgement stays
       // theirs, but withholding a view they asked for is not agency, it is coyness.
       if (s.latest === 'question' || s.latest === 'request') {
+        // ── they asked Socria to MAKE something, and nothing in the ask says
+        // what the thing should be (allocation.ts generationRead).
+        //
+        // The smallest useful intervention, and every word of that matters:
+        // USEFUL — it contains a real piece of the thing, written, not an
+        // offer to write it and not a list of questions; SMALLEST — a piece,
+        // not the artifact, because the artifact would be built on a guess
+        // about what they wanted and the guessing was the work; INTERVENTION
+        // — it goes first and it is theirs to reject.
+        //
+        // The question is allowed only if the budget has one. When it does
+        // not, the reply says what it assumed instead, which is the same
+        // information without the interrogation.
+        if (a.generation === 'unscoped') {
+          const canAsk = budget.allowed === 1 && !input.signals.stopQuestions;
+          return d('ANSWER', {
+            reasonCode: 'creation.unscoped', reason: a.rationale,
+            intended: 'They get something real to react to, and the thing that decides the rest is settled by them rather than guessed.',
+            objective:
+              'Make a small, real piece of what they asked for — an opening, one option, a short draft, the first few lines — good enough to react to, and put it FIRST. Keep it short: this is a start, not the finished thing, and a finished thing here would be a guess about what they wanted delivered as a product. '
+              + (canAsk
+                ? 'Then ask the ONE thing that most decides what the rest should be — who it is for, what it is for, or what it must contain. One question, not a list, and never a menu of options they have to read before they can answer.'
+                : 'Then say in one clause what you assumed and what would change it. Do not ask a question.')
+              + ' Do not explain what you are doing, do not offer to write more, and do not apologise for the length.'
+              + consideredNote,
+            alloc: a, avoid, maxQuestions: canAsk ? 1 : 0, maxTokens: 420,
+          });
+        }
+        // ── they asked to DEVELOP it, not to receive it. The authorship is
+        // the activity, so the reply gives them material to develop WITH —
+        // and not the artifact, which would end the activity.
+        if (a.generation === 'developing' && !a.withhold) {
+          return d('ANSWER', {
+            reasonCode: 'creation.developing', reason: a.rationale,
+            intended: 'They have something concrete to push against, and the piece is still theirs to write.',
+            objective:
+              'Give them material to develop WITH: two or three concrete, specific directions — a premise, an angle, a structure, a line of argument — one or two lines each, different from each other in kind rather than in wording. Say which one you would follow and what makes it the strongest. Do NOT write the piece itself, and do not write a polished version of any option: a finished artifact would end the work they asked to do.'
+              + consideredNote,
+            alloc: a, avoid, maxTokens: 600,
+          });
+        }
         if (a.mode === 'HUMAN_LEADS' && s.work === 'creation' && a.withhold) {
           return d('CRITIQUE', {
             reasonCode: 'creation.critique', reason: a.rationale,
@@ -728,11 +782,35 @@ export function renderDecision(dec: InterventionDecision, a: Allocation): string
       ? 'COVERAGE: this is a consequential call and they work in this area. Completeness on what matters beats brevity here: cover every non-obvious consideration that would change what they do or conclude — each once, as tightly as it can be said — then stop. Nothing they already know: no primer on their own field, no definitions of terms they used correctly, no restating their setup back to them. Nothing you would concede in the same breath — a consideration you raise and then withdraw changes nothing and costs them the reading. Do not add a summary, and do not reach for extra considerations to fill the space; covering what matters is the instruction, and length is not. Where the objective above caps how much to add ("one sentence on it", "then stop"), this supersedes that cap; what kind of move this is, and the question limit, still stand.'
       : null;
 
+  // WHAT PRODUCING IT WOULD TAKE OVER.
+  //
+  // Rendered like LENGTH and COVERAGE, and for the same reason: an unforced
+  // turn never prints its objective (council D1 — the model chooses the move),
+  // so a scope decision made in the engine and left in the objective reaches
+  // nobody. This is the Human-First allocation, in the prompt, on the turns
+  // where it decided something.
+  //
+  // It sits ABOVE the length and coverage clauses, because it decides what
+  // work the reply contains and they only shape what is left of it.
+  const scope =
+    a.generation === 'unscoped'
+      ? 'SCOPE: they asked you to make something, and nothing in the ask decides what the thing should be — who it is for, what it is for, what it must contain. Writing the whole artifact here means guessing all of that and handing back the guess as a finished product, and the guessing was the part that mattered.\n' +
+        'So: make a SMALL, REAL piece of it — an opening, one option, the first few lines, a short draft — good enough to react to, and put it first. Not a description of what you would write, not an offer to write it, and not the finished thing.\n' +
+        (dec.maxQuestions === 1
+          ? 'Then ask the ONE thing that most decides the rest. One question, not a list, and not a menu of options they have to read before they can answer.'
+          : 'Then say in one clause what you assumed and what would change it. Do not ask a question.') +
+        '\nDo not explain what you are doing, do not apologise for the length, and do not close by offering to write more.'
+      : a.generation === 'developing'
+        ? 'SCOPE: they asked to DEVELOP this, not to receive it — the writing is the work they are doing, and handing back a finished piece would end it.\n' +
+          'Give them material to develop WITH: two or three concrete, specific directions — a premise, an angle, a structure, a line of argument — one or two lines each, different in kind rather than in wording. Say which one you would follow and what makes it strongest. Do not write the piece itself, and do not write a polished version of any option.'
+        : null;
+
   // Not forced: constraints only; the model chooses the move (council D1).
   if (!dec.forced) {
     return [
       '\n=== This turn ===',
       'No move is imposed. Reply to what they actually said, as a strong peer would, and help fully: answer what they asked, correct what is wrong, and where you can, add the one thing they have not considered — never manufacture it.',
+      ...(scope ? [scope] : []),
       ...(coverage ? [coverage] : []),
       ...(proportion ? [proportion] : []),
       ...context,
@@ -746,6 +824,7 @@ export function renderDecision(dec: InterventionDecision, a: Allocation): string
     '\n=== Your move this turn ===',
     `MOVE: ${dec.type}`,
     `OBJECTIVE: ${dec.objective}`,
+    ...(scope ? [scope] : []),
     ...(coverage ? [coverage] : []),
     ...(proportion ? [proportion] : []),
   ];

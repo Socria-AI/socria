@@ -80,7 +80,11 @@ export function route(
   const diminishing = diminishingReturns(s, signals, []);
   const density = h.density ?? (h.questionStreak > 0 ? Math.min(1, h.questionStreak / 3 + 0.34) : 0);
   const budget = budgetFrom(s, signals, h.questionStreak, density, diminishing);
-  const allocation = allocate({ state: s, signals, contract });
+  // This legacy entry point has only the reader's summary to offer; the
+  // allocator falls back to it and loses the scoped/unscoped distinction on
+  // a generative ask, which is the right degradation for a caller that does
+  // not carry the person's own words.
+  const allocation = allocate({ state: s, signals, contract, lastUserText: s.currentFocus });
   const decision = selectIntervention({ state: s, allocation, budget, diminishing, signals, considered });
   return toMove(decision, allocation);
 }
