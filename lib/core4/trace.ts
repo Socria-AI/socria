@@ -165,7 +165,7 @@ export function buildTrace(x: {
     allocation: {
       mode: x.allocation.mode,
       reasonCode: x.allocation.reasonCode,
-      generation: x.allocation.generation ?? null,
+      generation: x.allocation.ownership ?? null,
       withhold: x.allocation.withhold?.reason ?? null,
       withholdSource: x.allocation.withhold?.source ?? null,
       confidence: x.allocation.confidence,

@@ -252,7 +252,10 @@ export function standingProfile(
     return identity + kind + n.importance + Math.max(0, 0.5 - age * 0.1) + (STATUS_WEIGHT[n.status] ?? 0.5) * 0.3;
   };
   return usable
-    .filter((n) => isSelf(n) || (STANDING.has(String(n.type)) && n.importance >= 0.45))
+    // 0.4, not 0.45: apply.ts defaults a candidate's importance to exactly
+    // 0.4 when the extractor does not rate it, and a floor one hundredth above
+    // the default meant every unrated fact was saved and never seen again.
+    .filter((n) => isSelf(n) || (STANDING.has(String(n.type)) && n.importance >= 0.4))
     .sort((a, b) => score(b) - score(a))
     .slice(0, limit);
 }

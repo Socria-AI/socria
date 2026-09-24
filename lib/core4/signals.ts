@@ -176,9 +176,21 @@ const CORRECTION = /\b(that'?s not what i (?:meant|said)|you misunderstood|you(?
 const POSITIVE = /\b(that (?:helped|helps|was (?:really |very )?(?:helpful|useful)|makes sense now|clicked)|(?:very|really|super) helpful|that'?s (?:exactly|precisely) (?:it|what i needed)|oh,? i see|aha|got it,? thanks|perfect,? thanks)\b/i;
 const NEGATIVE = /\b(not (?:very |really )?(?:helpful|useful)|that didn'?t help|unhelpful|useless|that'?s not (?:helpful|useful|what i asked)|you'?re not helping|that doesn'?t answer)\b/i;
 
-const DELEGATE = /\b(you (?:do|write|handle|take care of|draft) it|do it for me|write it for me|just (?:do|handle|write|draft|implement) it|can you (?:just )?(?:write|draft|implement|code) (?:it|this|that)(?: for me)?)\b/i;
+const DELEGATE = /\b(you (?:do|write|handle|take care of|draft) it|do it for me|write it for me|just (?:do|handle|write|draft|implement) it|can you (?:just )?(?:write|draft|implement|code) (?:it|this|that)(?: for me)?(?=[\s.,!?]*$))\b/i;
 
-const OWN_WORK = /\b(don'?t (?:re)?write (?:it|this|my \w+)(?: for me)?|i want to write (?:it|this) myself|(?:it|this) (?:has|needs) to be (?:my|in my) own (?:words|work)|don'?t tell me what to (?:conclude|decide|think)|i(?:'ll| will) (?:decide|make the call)(?: myself)?|keep (?:it|this) in my (?:voice|words))\b/i;
+/**
+ * The answer to "yours, or mine?".
+ *
+ * Anchored and short, because these are replies to a question rather than
+ * sentences in their own right: "yours", "you do it", "go ahead" is the whole
+ * message. Without this the ownership question would be asked and its answer
+ * not heard, which is worse than never asking — so it lands in `delegate` and
+ * `ownWork`, the two signals the allocator already treats as contracts.
+ */
+const HANDS_IT_OVER = /^\s*(?:yours?|you(?:rs)?(?: do(?: it)?| please| can)?|go ahead|please do|sure,? go|you take it|all yours)\b[\s.!]*$/i;
+const KEEPS_IT = /^\s*(?:mine|me|i(?:'ll| will)(?: do| write| try)?(?: it)?|let me|my own|i want to(?: try| do| write)?(?: it)?)\b[\s.!]*$/i;
+
+const OWN_WORK = /\b(don'?t (?:re)?write (?:it|this|my \w+)(?: for me)?|don'?t do (?:it|this|that) for me|i(?:'ll| will| want to| would like to)? ?(?:write|do|draft|make) (?:it|this|that)(?: myself)?(?= |$|[.,!])|i want to write (?:it|this) myself|(?:it|this) (?:has|needs) to be (?:my|in my) own (?:words|work)|don'?t tell me what to (?:conclude|decide|think)|i(?:'ll| will) (?:decide|make the call)(?: myself)?|keep (?:it|this) in my (?:voice|words))\b/i;
 
 const URGENT = /\b((?:prod(?:uction)?|the site|our site|the app|checkout|the api) is (?:down|broken|failing)|outage|(?:due|deadline|submission|meeting|presentation|demo) (?:is )?(?:in|within) (?:an? |the next )?(?:hour|\d+\s?(?:min(?:ute)?s?|hours?))|urgent(?:ly)?|asap|emergency|customers? (?:are|is) (?:affected|blocked|down))\b/i;
 
@@ -351,6 +363,9 @@ export function readSignals(message: string): ExplicitSignals {
   // "don't tell me the answer" does — unless a later "just tell me" wins.
   if (directness === 'none' && FLAG_ONLY.test(text)) directness = 'no_answer';
 
+  const delegated = !!note(lastIndex(DELEGATE, text)) || (text.trim().length <= 24 && HANDS_IT_OVER.test(text.trim()));
+  const keepsIt = !!note(lastIndex(OWN_WORK, text)) || (text.trim().length <= 24 && KEEPS_IT.test(text.trim()));
+
   return {
     directness,
     learningGoal: notLearning ? false : learning || practice ? true : null,
@@ -381,8 +396,16 @@ export function readSignals(message: string): ExplicitSignals {
     wantsQuestions: !stopQuestions && !!note(lastIndex(WANTS_QUESTIONS, text)),
     correction: !!note(lastIndex(CORRECTION, text)),
     feedback: negative ? 'negative' : positive ? 'positive' : null,
-    delegate: !!note(lastIndex(DELEGATE, text)),
-    ownWork: !!note(lastIndex(OWN_WORK, text)),
+    // A one-word answer to the ownership question counts as the instruction
+    // it is: "yours" is a delegation, "mine" is a claim on the work.
+    //
+    // ownWork WINS when both fire, and one message makes that necessary:
+    // "don't do it for me" contains "do it for me", so the delegation pattern
+    // matches inside its own negation. A person who says both has said one
+    // thing — keep your hands off it — and the reading that preserves their
+    // work is the one that survives being wrong.
+    delegate: delegated && !keepsIt,
+    ownWork: keepsIt,
     urgent: !!note(lastIndex(URGENT, text)),
     evidence: [...new Set(evidence)].slice(0, 8),
   };

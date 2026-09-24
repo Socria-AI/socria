@@ -93,6 +93,35 @@ console.log('\n=== conversation two, three days later: the questions that failed
   ok('  without the graph piling in', unrelated.split('\n').filter((l) => l.startsWith('- ')).length <= 8, String(unrelated.split('\n').filter((l) => l.startsWith('- ')).length));
 }
 
+console.log('\n=== THE IDENTITY BLOCKER: the extractor naming them must not cost the alias ===');
+{
+  // The name candidate used to be SKIPPED when the extractor had already
+  // produced a node with the same label — so on exactly the turns where the
+  // model did its job, the self alias never existed, and the one hinge of
+  // cross-chat identity was silently missing. And even when both arrived, a
+  // reinforcement merged only the label, dropping the candidate's aliases.
+  const extractorFirst = apply({ ...EMPTY_GRAPH }, [
+    { type: 'Person', label: 'Pradeep', content: 'The person in this conversation.', kind: 'stated', importance: 0.7, confidence: 0.9, certainty: 0.9 },
+  ], 'conv-a', T1).graph;
+  const bothArrive = apply(extractorFirst, [nameCandidate('Pradeep')], 'conv-a', T1 + 1000).graph;
+  const node = bothArrive.nodes.find((n) => n.label === 'Pradeep');
+  ok('one node, not two', bothArrive.nodes.filter((n) => /pradeep/i.test(n.label)).length === 1, JSON.stringify(bothArrive.nodes.map((n) => n.label)));
+  ok('and it carries the self alias', node?.aliases.some((a) => a.toLowerCase() === 'me'), JSON.stringify(node?.aliases));
+
+  const prof = standingProfile(bothArrive, { now: T2 });
+  ok('so the profile still leads with them', prof[0]?.label === 'Pradeep', JSON.stringify(prof.map((n) => n.label)));
+
+  // And the floor: apply.ts defaults importance to exactly 0.4 when the
+  // extractor does not rate a candidate, so a floor above it hid every
+  // unrated fact.
+  const unrated = apply({ ...EMPTY_GRAPH }, [
+    { type: 'Goal', label: 'Ship in October', content: 'What they are working towards.', kind: 'stated' },
+  ], 'conv-b', T1).graph;
+  ok('an unrated fact still reaches the standing header',
+    standingProfile(unrated, { now: T1 }).some((n) => n.label === 'Ship in October'),
+    String(unrated.nodes[0]?.importance));
+}
+
 console.log('\n=== a topic mentioned once still works the old way ===');
 {
   const g = apply(after1, [

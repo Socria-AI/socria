@@ -225,25 +225,28 @@ export interface Allocation {
   /** first time something is held back in this conversation: say so, and how to get it */
   announce: boolean;
   /**
-   * For a turn that asks Socria to PRODUCE something, how much of the work
-   * producing it would take over. Null on every turn that is not a generative
-   * ask, which is most of them.
+   * WHOSE WORK IS THIS, on a turn where doing it would be substantial
+   * cognition — writing something, solving something, judging something.
+   * Null on every turn where it would not, which is most of them: nobody
+   * needs to be asked whether they meant to look up a date themselves.
    *
-   *   'delegated'  they said the output is what they want. Make it.
-   *   'scoped'     the ask determines the artifact — subject plus a purpose, an
-   *                audience, a length, a count, or material to work from. Make
-   *                it.
-   *   'unscoped'   a bare imperative with nothing that decides what the thing
-   *                should be. Generating a whole artifact here is not help,
-   *                it is a guess at somebody's intent delivered as a finished
-   *                product — and the guessing was the work.
-   *   'developing' they asked to develop, think through or brainstorm it. The
-   *                authorship is the activity; do not hand back the artifact.
+   *   'delegated'  they handed it over — in this message, or earlier, or in
+   *                their Project's standing instructions. Do it.
+   *   'scoped'     the ask carries its own brief, or works on material they
+   *                supplied. Commissioning something this specific is
+   *                delegation expressed as detail. Do it.
+   *   'theirs'     the doing is the point: they asked to develop, think
+   *                through or work on it. Scaffold; never hand back the thing
+   *                itself, which would end the activity they asked for.
+   *   'ambiguous'  genuinely unclear, on work substantial enough that getting
+   *                it wrong replaces cognition they wanted to exercise. One
+   *                short question settles it — see intervene.ts.
    *
-   * NOT A WITHHOLD, deliberately (council D6): nothing is held back and
-   * nothing is refused. It decides the SIZE of the first move.
+   * NOT A WITHHOLD and NOT A REFUSAL (council D6): nothing is held back, and
+   * 'ambiguous' resolves to doing the work whenever asking is not available.
+   * It decides who holds the pen, not whether help is given.
    */
-  generation: 'delegated' | 'scoped' | 'unscoped' | 'developing' | null;
+  ownership: 'delegated' | 'scoped' | 'theirs' | 'ambiguous' | null;
   /** machine-readable */
   reasonCode: string;
   /** one line a person could read */

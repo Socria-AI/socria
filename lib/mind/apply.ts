@@ -260,10 +260,19 @@ export function applyCandidates(
       nodes[i] = {
         ...n,
         content: revised ? content : n.content,
-        aliases:
-          normalize(n.label) === normalize(label)
-            ? n.aliases
-            : [...new Set([...n.aliases, label])].slice(0, MAX_ALIASES),
+        // The candidate's own aliases are merged, not only the label it
+        // arrived under. Without this a node the extractor created first could
+        // never acquire an alias later — which is exactly how the identity
+        // alias failed to attach when somebody's name was already in the graph
+        // as an ordinary Person node, leaving the one hinge of cross-chat
+        // identity unreachable.
+        aliases: [
+          ...new Set([
+            ...n.aliases,
+            ...(normalize(n.label) === normalize(label) ? [] : [label]),
+            ...(c.aliases ?? []).map((a) => clip(a, MAX_LABEL)).filter(Boolean),
+          ]),
+        ].slice(0, MAX_ALIASES),
         seen: n.seen + 1,
         importance: Math.max(n.importance, clamp01(c.importance ?? 0)),
         // A node that was tentative and has now been stated outright is no

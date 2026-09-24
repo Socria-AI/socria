@@ -98,7 +98,7 @@ function d(
     confidence?: number;
     switchedFrom?: string | null;
     avoid: string[];
-    /** a ceiling this move needs instead of its type's — see creation.unscoped */
+    /** a ceiling this move needs instead of its type's — see ownership.ask */
     maxTokens?: number;
   }
 ): InterventionDecision {
@@ -211,15 +211,15 @@ export function proportionFor(input: SelectInput, dec: InterventionDecision): Pr
   const { state: s, signals } = input;
   // THE ALLOCATOR OUTRANKS THE LENGTH POLICY. Both of the generative reads it
   // acts on have already been given a ceiling that fits what their objective
-  // asks for — a small real piece plus one question (unscoped, 420), or two or
-  // three concrete directions (developing, 600). Trimming either to two
+  // asks for — one short ownership question (90), a small started piece (200),
+  // or two or three concrete directions (600). Trimming any of them to two
   // sentences would leave the reply unable to contain the part that makes it
   // help rather than an interrogation.
   //
   // This is the priority order as code: allocation decides WHAT work Socria
   // takes over, and the length policy shapes what is left. It must not be able
   // to shrink a reply below the work the allocator assigned.
-  if (input.allocation.generation === 'unscoped' || input.allocation.generation === 'developing') return 'normal';
+  if (input.allocation.ownership === 'ambiguous' || input.allocation.ownership === 'theirs') return 'normal';
   // Their words win, in both directions: a length they asked for, or an
   // explicit ask for detail, is never overridden by our reading of the turn.
   if (signals.requestedTokens || signals.explainAsked || signals.sentences) return 'normal';
@@ -549,56 +549,80 @@ function selectMove(input: SelectInput): InterventionDecision {
     case 'HUMAN_LEADS':
     case 'SHARED_REASONING':
     case 'AI_ASSISTS': {
+      // ── WHOSE WORK IS THIS — ABOVE THE `latest` GATE, DELIBERATELY.
+      //
+      // This lived inside "they asked a question or made a request", and that
+      // was the live failure: the cheap reader labelled "make a story" as
+      // `information`, so the branch never ran, the turn fell through to
+      // CONTRIBUTE at the full ceiling with no ownership clause at all — and
+      // somebody got a whole story. Measured rather than guessed: with the
+      // same message, latest=request and latest=question reached it,
+      // latest=information and latest=other did not.
+      //
+      // Ownership does not depend on how a message got labelled. It depends on
+      // what was asked for, and the allocator has already decided it.
+      // ── they asked Socria to MAKE something, and nothing in the ask says
+      // what the thing should be (allocation.ts generationRead).
+      //
+      // The smallest useful intervention, and every word of that matters:
+      // USEFUL — it contains a real piece of the thing, written, not an
+      // offer to write it and not a list of questions; SMALLEST — a piece,
+      // not the artifact, because the artifact would be built on a guess
+      // about what they wanted and the guessing was the work; INTERVENTION
+      // — it goes first and it is theirs to reject.
+      //
+      // The question is allowed only if the budget has one. When it does
+      // not, the reply says what it assumed instead, which is the same
+      // information without the interrogation.
+      if (a.ownership === 'ambiguous') {
+        // ASKED ONCE, NEVER TWICE. A second ownership question in a row is
+        // the loop Core 4 exists to prevent, so the budget governs it like
+        // any other question and a conversation that has already had it
+        // takes the answer instead — their reply is an explicit statement,
+        // which allocation.ts reads on the next turn as a settled contract.
+        const askedAlready = s.history.slice(-3).some((h) => h.type === 'CLARIFY');
+        const canAsk = budget.allowed === 1 && !input.signals.stopQuestions && !askedAlready;
+        if (canAsk) {
+          return d('CLARIFY', {
+            reasonCode: 'ownership.ask', reason: a.rationale,
+            intended: 'They say whose work this is, in a word, and then get all of it.',
+            objective:
+              'ONE short line, and nothing else. Offer both readings of what they asked: that you do it for them, or that you work on it with them and it stays theirs. '
+              + 'Make it answerable in a word — the shape of "yours, or mine?" rather than a list of options or a form to fill in. '
+              + 'Do not begin the work in this reply, do not explain why you are asking, and do not use the words ownership, authorship, cognition or delegation at them. '
+              + 'Whatever they answer, the next turn does all of it.',
+            alloc: a, avoid, maxQuestions: 1, maxTokens: 90,
+          });
+        }
+        // NO QUESTION AVAILABLE, SO IT STARTS RATHER THAN STALLS. Doing work
+        // that was offered costs nothing; refusing to move because nobody
+        // clarified costs them the turn. Small, and it says what it took the
+        // job to be, so steering it back costs one sentence.
+        return d('ANSWER', {
+          reasonCode: 'ownership.start', reason: `${a.rationale} No question is available this turn.`,
+          intended: 'They get something real to react to, and correcting the direction costs them one sentence.',
+          objective:
+            'Start it. Write AT MOST FOUR SENTENCES of the actual thing — real sentences of it, put first, not a description of what you would write and not an offer to write it. '
+            + 'Then, in your own words, what you took the job to be, so they can redirect it in a sentence. Not a labelled "Assumption:" line. '
+            + 'Do not deliver the finished thing: they have not said whose this is, and a finished artifact decides that for them.'
+            + consideredNote,
+          alloc: a, avoid, maxQuestions: 0, maxTokens: 200,
+        });
+      }
+      if (a.ownership === 'theirs' && !a.withhold) {
+        return d('ANSWER', {
+          reasonCode: 'ownership.theirs', reason: a.rationale,
+          intended: 'They have something concrete to push against, and the piece is still theirs to write.',
+          objective:
+            'Give them material to develop WITH: two or three concrete, specific directions — a premise, an angle, a structure, a line of argument — one or two lines each, different from each other in kind rather than in wording. Say which one you would follow and what makes it the strongest. Do NOT write the piece itself, and do not write a polished version of any option: a finished artifact would end the work they asked to do.'
+            + consideredNote,
+          alloc: a, avoid, maxTokens: 600,
+        });
+      }
+
       // They asked Socria something directly: answer it. Their judgement stays
       // theirs, but withholding a view they asked for is not agency, it is coyness.
       if (s.latest === 'question' || s.latest === 'request') {
-        // ── they asked Socria to MAKE something, and nothing in the ask says
-        // what the thing should be (allocation.ts generationRead).
-        //
-        // The smallest useful intervention, and every word of that matters:
-        // USEFUL — it contains a real piece of the thing, written, not an
-        // offer to write it and not a list of questions; SMALLEST — a piece,
-        // not the artifact, because the artifact would be built on a guess
-        // about what they wanted and the guessing was the work; INTERVENTION
-        // — it goes first and it is theirs to reject.
-        //
-        // The question is allowed only if the budget has one. When it does
-        // not, the reply says what it assumed instead, which is the same
-        // information without the interrogation.
-        if (a.generation === 'unscoped') {
-          const canAsk = budget.allowed === 1 && !input.signals.stopQuestions;
-          return d('ANSWER', {
-            reasonCode: 'creation.unscoped', reason: a.rationale,
-            intended: 'They get something real to react to, and the thing that decides the rest is settled by them rather than guessed.',
-            objective:
-              'Make a small, real piece of what they asked for — an opening, one option, a short draft, the first few lines — good enough to react to, and put it FIRST. Keep it short: this is a start, not the finished thing, and a finished thing here would be a guess about what they wanted delivered as a product. '
-              + (canAsk
-                ? 'Then ask the ONE thing that most decides what the rest should be — who it is for, what it is for, or what it must contain. One question, not a list, and never a menu of options they have to read before they can answer.'
-                : 'Then say in one clause what you assumed and what would change it. Do not ask a question.')
-              + ' Do not explain what you are doing, do not offer to write more, and do not apologise for the length.'
-              + consideredNote,
-            // 200, NOT 420. The first ceiling did not bind: "make a story"
-            // came back as a complete four-paragraph story, and four
-            // paragraphs is about 300 tokens — comfortably inside 420. A
-            // ceiling that the failure fits inside is not a ceiling. 200 is
-            // roughly 150 words: an opening paragraph and a question fit, a
-            // finished artifact does not.
-            alloc: a, avoid, maxQuestions: canAsk ? 1 : 0, maxTokens: 200,
-          });
-        }
-        // ── they asked to DEVELOP it, not to receive it. The authorship is
-        // the activity, so the reply gives them material to develop WITH —
-        // and not the artifact, which would end the activity.
-        if (a.generation === 'developing' && !a.withhold) {
-          return d('ANSWER', {
-            reasonCode: 'creation.developing', reason: a.rationale,
-            intended: 'They have something concrete to push against, and the piece is still theirs to write.',
-            objective:
-              'Give them material to develop WITH: two or three concrete, specific directions — a premise, an angle, a structure, a line of argument — one or two lines each, different from each other in kind rather than in wording. Say which one you would follow and what makes it the strongest. Do NOT write the piece itself, and do not write a polished version of any option: a finished artifact would end the work they asked to do.'
-              + consideredNote,
-            alloc: a, avoid, maxTokens: 600,
-          });
-        }
         if (a.mode === 'HUMAN_LEADS' && s.work === 'creation' && a.withhold) {
           return d('CRITIQUE', {
             reasonCode: 'creation.critique', reason: a.rationale,
@@ -799,15 +823,16 @@ export function renderDecision(dec: InterventionDecision, a: Allocation): string
   // It sits ABOVE the length and coverage clauses, because it decides what
   // work the reply contains and they only shape what is left of it.
   const scope =
-    a.generation === 'unscoped'
-      ? 'SCOPE — THIS OVERRIDES THE LINE ABOVE ABOUT ANSWERING FULLY. They asked you to make something, and nothing in the ask decides what the thing should be: who it is for, what it is for, what it must contain, how long. Writing the whole artifact means guessing all of that and handing back the guess as a finished product — and the guessing was the part that mattered.\n' +
-        'Write AT MOST FOUR SENTENCES of the actual thing. Real sentences of it — the opening, one option, the first few lines — not a description of what you would write, not an outline, not an offer. Then stop; the rest is theirs to steer. Four sentences is a ceiling, not a target.\n' +
-        (dec.maxQuestions === 1
-          ? 'Then one question: the single thing that most decides the rest. Not a list, not a menu of options they have to read before they can answer.'
-          : 'Then, in the same breath and in your own words, what you took it to be — the way a person says "I went light and a bit wry; say if that is wrong". Not a labelled "Assumption:" line, and no question.') +
-        '\nDo not explain what you are doing, do not apologise for the length, and do not close by offering to write more.'
-      : a.generation === 'developing'
-        ? 'SCOPE: they asked to DEVELOP this, not to receive it — the writing is the work they are doing, and handing back a finished piece would end it.\n' +
+    a.ownership === 'ambiguous'
+      ? (dec.reasonCode === 'ownership.ask'
+          ? 'WHOSE WORK IS THIS — THIS OVERRIDES THE LINE ABOVE ABOUT ANSWERING FULLY. They asked for something substantial and nothing has said whether they are handing it over or doing it themselves. Both readings are ordinary and you cannot tell from the words.\n' +
+            'So: ONE short line offering both — you do it for them, or you work on it with them and it stays theirs. Answerable in a word. Do not begin the work, do not explain the question, do not name what you are doing. The next turn does all of whatever they choose.'
+          : 'WHOSE WORK IS THIS — THIS OVERRIDES THE LINE ABOVE ABOUT ANSWERING FULLY. They asked for something substantial, nothing has said whose it is, and no question is available this turn, so start it rather than stall.\n' +
+            'Write AT MOST FOUR SENTENCES of the actual thing. Real sentences of it — the opening, one option, the first few lines — not a description of what you would write, not an outline, not an offer. Four sentences is a ceiling, not a target.\n' +
+            'Then, in your own words, what you took the job to be — the way a person says "I went light and a bit wry; say if that is wrong". Not a labelled "Assumption:" line, and no question.\n' +
+            'Do not deliver the finished thing, do not apologise for the length, and do not close by offering to write more.')
+      : a.ownership === 'theirs'
+        ? 'WHOSE WORK IS THIS: theirs. They asked to work on it, not to receive it — the doing is the work they came for, and handing back a finished piece would end it.\n' +
           'Give them material to develop WITH: two or three concrete, specific directions — a premise, an angle, a structure, a line of argument — one or two lines each, different in kind rather than in wording. Say which one you would follow and what makes it strongest. Do not write the piece itself, and do not write a polished version of any option.'
         : null;
 
@@ -820,7 +845,7 @@ export function renderDecision(dec: InterventionDecision, a: Allocation): string
       // that produced a whole story. Where SCOPE fires it replaces the clause
       // rather than arguing with it three lines later.
       scope
-        ? 'No move is imposed. Reply to what they actually said, as a strong peer would: correct what is wrong, and where you can, add the one thing they have not considered — never manufacture it. How much of what they asked for to produce is settled by SCOPE below, which wins over any instinct to deliver the whole thing.'
+        ? 'No move is imposed. Reply to what they actually said, as a strong peer would: correct what is wrong, and where you can, add the one thing they have not considered — never manufacture it. Who does the work this turn is settled by the clause below, which wins over any instinct to deliver the whole thing.'
         : 'No move is imposed. Reply to what they actually said, as a strong peer would, and help fully: answer what they asked, correct what is wrong, and where you can, add the one thing they have not considered — never manufacture it.',
       ...(scope ? [scope] : []),
       ...(coverage ? [coverage] : []),

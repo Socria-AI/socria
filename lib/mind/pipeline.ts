@@ -284,8 +284,13 @@ export async function remember(
     const saidByThem = text.split(/\n\nSocria:/)[0];
     const name = nameFrom(saidByThem);
     if (name) {
-      const already = candidates.nodes.some((n) => n.label.trim().toLowerCase() === name.toLowerCase());
-      if (!already) candidates.nodes.unshift(nameCandidate(name));
+      // ALWAYS, even when the extractor named them too. Skipping it in that
+      // case was the bug: the extractor's node carries no self alias, so the
+      // one hinge of cross-chat identity silently failed to exist precisely
+      // when the model had done its job. Two candidates for the same person
+      // resolve to one node (resolve.ts), and the reinforcement now merges
+      // this one's aliases (apply.ts).
+      candidates.nodes.unshift(nameCandidate(name));
     }
 
     if (!candidates.nodes.length && !candidates.edges.length) {

@@ -499,22 +499,28 @@ export async function POST(req: NextRequest) {
           if (!userId) return;
           // Off the record (council D15): nothing from this conversation goes into the Mind Graph.
           if (prepared?.state.persistPolicy === 'none') return;
-          waitUntil(
+          // waitUntil keeps the function alive past the response on Vercel. On
+          // a runtime that has no request context it throws instead, and a
+          // thrown registration must not be the difference between having a
+          // memory and not having one — so the work is started either way.
+          const write = () =>
             remember(userId, `User: ${lastTurn ? forMemory(lastTurn) : last.content}\n\nSocria: ${reply}`, {
               now: Date.now(),
               apiKey,
               surface: 'core',
               conversationId: conversationId ?? undefined,
-              // Everything this conversation already wrote, not only what
-              // recall ranked for the reply (extractionContext).
               existing: extractionContext(mindSubgraph, mindGraphNodes, conversationId),
               projectId,
-              // A sensitive conversation's memories are private (council D14).
               ...(prepared?.state.persistPolicy === 'conversation_only' ? { private: true } : {}),
             }).catch((err: unknown) => {
               console.error('[socria/chat] mind graph remember failed', err);
-            })
-          );
+            });
+          try {
+            waitUntil(write());
+          } catch (e) {
+            console.error('[socria/chat] waitUntil unavailable; writing memory inline', e);
+            void write();
+          }
         },
       });
     }
@@ -801,15 +807,26 @@ function core4Reply(x: {
         } catch (e) {
           console.error('[socria/chat] core 4 writeback failed', e);
         }
-        try {
-          controller.close();
-        } catch (e) {
-          console.error('[socria/chat] core 4 stream close threw', e);
-        }
+        // BEFORE THE STREAM CLOSES, not after.
+        //
+        // `after` registers the Mind Graph write with waitUntil, and waitUntil
+        // needs the request context it is registered from. Called after
+        // controller.close() it is registered against a response that has
+        // already finished — on Vercel that is documented as unreliable, and
+        // an unreliable memory write is indistinguishable from no memory at
+        // all: the reply is perfect, the next conversation knows nothing, and
+        // nothing in the log says why. It returns immediately (it registers a
+        // promise; it does not await it), so nothing is held open by moving
+        // it.
         try {
           if (reply.trim()) x.after(reply);
         } catch (e) {
           console.error('[socria/chat] mind graph remember threw', e);
+        }
+        try {
+          controller.close();
+        } catch (e) {
+          console.error('[socria/chat] core 4 stream close threw', e);
         }
       }
     },
