@@ -1,0 +1,266 @@
+{
+  "set": "E17-ablation-paraphrase",
+  "of": "ablation.json",
+  "purpose": "Each variant restates one item's conclusion and premises with the meaning preserved exactly: different sentence order, different vocabulary, active/passive. Premise ids are aligned with the original, so the ground-truth loadBearing labels in ablation.json apply unchanged to every variant. A verdict that differs between an item and its variants is wording instability, not a disagreement about the label.",
+  "variants": [
+    {
+      "of": "abl-001", "variant": 1,
+      "conclusion": "An 18-month extension of runway can be financed out of existing cash, with no raise required.",
+      "premises": [
+        {"id": "p3", "text": "Monthly burn had been $610K until the Berlin office opened last April, after which it rose."},
+        {"id": "p2", "text": "Monthly net burn stands at $800K."},
+        {"id": "p4", "text": "A $92M post-money valuation was set at the last round."},
+        {"id": "p1", "text": "$15.2M in cash is currently held."}
+      ]
+    },
+    {
+      "of": "abl-001", "variant": 2,
+      "conclusion": "We have enough money in the bank to cover another year and a half of operations without going out to investors.",
+      "premises": [
+        {"id": "p1", "text": "The bank balance is $15.2 million."},
+        {"id": "p2", "text": "We spend $800 thousand more than we take in each month."},
+        {"id": "p3", "text": "That monthly figure climbed from $610 thousand once the Berlin office came online last April."},
+        {"id": "p4", "text": "Investors valued the company at $92 million post-money in the most recent financing."}
+      ]
+    },
+    {
+      "of": "abl-001", "variant": 3,
+      "conclusion": "No financing round is needed: cash on hand covers an 18-month runway extension.",
+      "premises": [
+        {"id": "p2", "text": "Net cash burn runs at $0.8M per month."},
+        {"id": "p1", "text": "The company holds $15.2M of cash."},
+        {"id": "p4", "text": "The most recent round priced the company at $92M post-money."},
+        {"id": "p3", "text": "Opening the Berlin office last April pushed net burn up from $0.61M per month."}
+      ]
+    },
+
+    {
+      "of": "abl-003", "variant": 1,
+      "conclusion": "Enoxaparin should be stopped for this patient and unfractionated heparin started in its place.",
+      "premises": [
+        {"id": "p1", "text": "Per the label, a switch to unfractionated heparin is mandated once creatinine clearance drops under 30 mL/min."},
+        {"id": "p2", "text": "Today's measurement puts her creatinine clearance at 22 mL/min."},
+        {"id": "p3", "text": "Four days ago, on admission, that same value was 48 mL/min."},
+        {"id": "p4", "text": "Her recorded body weight is 61 kg."}
+      ]
+    },
+    {
+      "of": "abl-003", "variant": 2,
+      "conclusion": "The right move is to take her off enoxaparin and put her on unfractionated heparin.",
+      "premises": [
+        {"id": "p4", "text": "She weighs sixty-one kilograms."},
+        {"id": "p3", "text": "On admission four days ago her creatinine clearance measured 48 mL/min."},
+        {"id": "p2", "text": "Her creatinine clearance measures 22 mL/min today."},
+        {"id": "p1", "text": "The label says to move a patient off enoxaparin and onto unfractionated heparin below a creatinine clearance of 30 mL/min."}
+      ]
+    },
+    {
+      "of": "abl-003", "variant": 3,
+      "conclusion": "A switch from enoxaparin to unfractionated heparin is indicated for this patient.",
+      "premises": [
+        {"id": "p2", "text": "A creatinine clearance of 22 mL/min was measured for her today."},
+        {"id": "p1", "text": "Unfractionated heparin is required by the label whenever creatinine clearance is below 30 mL/min."},
+        {"id": "p4", "text": "A body weight of 61 kg is recorded."},
+        {"id": "p3", "text": "A clearance of 48 mL/min was recorded at admission four days earlier."}
+      ]
+    },
+
+    {
+      "of": "abl-005", "variant": 1,
+      "conclusion": "Thirty days' notice is all we need to exit the vendor contract, and no penalty will be due.",
+      "premises": [
+        {"id": "p1", "text": "Termination for convenience is permitted by Section 9.2 on 30 days' written notice."},
+        {"id": "p2", "text": "Under Section 9.4 the early-termination fee is chargeable only where termination occurs within the initial 12-month term."},
+        {"id": "p3", "text": "We are 26 months into the contract, now in its second renewal term."},
+        {"id": "p4", "text": "Against a 99.5% commitment, the vendor has delivered 99.2% uptime on average."},
+        {"id": "p5", "text": "A replacement vendor has already been chosen by procurement."}
+      ]
+    },
+    {
+      "of": "abl-005", "variant": 2,
+      "conclusion": "We can walk away from the vendor on a month's notice and owe nothing extra.",
+      "premises": [
+        {"id": "p3", "text": "The contract is 26 months old and sitting in its second renewal term."},
+        {"id": "p5", "text": "Procurement has lined up a replacement supplier already."},
+        {"id": "p1", "text": "Section 9.2 lets us end the agreement for convenience with 30 days' written notice."},
+        {"id": "p4", "text": "The vendor promised 99.5% uptime and has averaged 99.2%."},
+        {"id": "p2", "text": "Section 9.4 limits the early-termination fee to terminations made inside the first 12-month term."}
+      ]
+    },
+    {
+      "of": "abl-005", "variant": 3,
+      "conclusion": "Exiting the vendor agreement costs us nothing beyond giving 30 days' notice.",
+      "premises": [
+        {"id": "p2", "text": "The early-termination fee described in Section 9.4 bites only during the original 12-month term."},
+        {"id": "p1", "text": "A convenience termination is available under Section 9.2 on 30 days' written notice."},
+        {"id": "p5", "text": "Procurement's selection of a replacement vendor is complete."},
+        {"id": "p3", "text": "Twenty-six months have elapsed and the contract is in renewal term two."},
+        {"id": "p4", "text": "Average vendor uptime has been 99.2%, short of the 99.5% committed."}
+      ]
+    },
+
+    {
+      "of": "abl-008", "variant": 1,
+      "conclusion": "The config change at 14:02 caused the outage; the morning database upgrade did not.",
+      "premises": [
+        {"id": "p1", "text": "Within a minute of the 14:02 config deploy, error rates climbed from 0.1% to 41%."},
+        {"id": "p2", "text": "Between the database upgrade's completion at 09:40 and 14:02, a span of four and a half hours, error rates stayed at 0.1%."},
+        {"id": "p3", "text": "That config change dropped the connection-pool maximum from 200 down to 20."},
+        {"id": "p4", "text": "The database upgrade had been sitting on the change calendar for six weeks."},
+        {"id": "p5", "text": "The page went out to on-call at 14:05 and the incident was declared at 14:09."}
+      ]
+    },
+    {
+      "of": "abl-008", "variant": 2,
+      "conclusion": "Responsibility for the outage lies with the 14:02 config change, not with the database upgrade carried out that morning.",
+      "premises": [
+        {"id": "p5", "text": "On-call was paged at 14:05, and the incident was declared four minutes later."},
+        {"id": "p2", "text": "Error rates were held at 0.1% throughout the four and a half hours between the 09:40 completion of the database upgrade and 14:02."},
+        {"id": "p4", "text": "Six weeks of notice had been given on the change calendar for the database upgrade."},
+        {"id": "p1", "text": "A jump in error rates from 0.1% to 41% was observed inside sixty seconds of the 14:02 config deploy."},
+        {"id": "p3", "text": "The connection-pool maximum was reduced from 200 to 20 by that config change."}
+      ]
+    },
+    {
+      "of": "abl-008", "variant": 3,
+      "conclusion": "It was the 14:02 config push that broke things, not the database upgrade from the morning.",
+      "premises": [
+        {"id": "p1", "text": "Errors went from 0.1% to 41% less than a minute after the config push at 14:02."},
+        {"id": "p3", "text": "The push cut the maximum connection-pool size from 200 to 20."},
+        {"id": "p2", "text": "The database upgrade finished at 09:40 and errors sat at 0.1% for the next four and a half hours, right up to 14:02."},
+        {"id": "p4", "text": "The upgrade had been scheduled on the change calendar six weeks earlier."},
+        {"id": "p5", "text": "On-call got paged at 14:05 and an incident was opened at 14:09."}
+      ]
+    },
+
+    {
+      "of": "abl-010", "variant": 1,
+      "conclusion": "Friday's backlog cannot be cleared by two pickers within the shift, so a third is needed.",
+      "premises": [
+        {"id": "p1", "text": "There are 1,840 units in Friday's backlog."},
+        {"id": "p2", "text": "Each trained picker gets through 110 units an hour, with breaks already accounted for."},
+        {"id": "p3", "text": "A shift runs eight hours."},
+        {"id": "p4", "text": "Throughout the quarter, Friday backlogs have sat 20-30% above the weekday average."},
+        {"id": "p5", "text": "The returns desk can release a third picker without any overtime."}
+      ]
+    },
+    {
+      "of": "abl-010", "variant": 2,
+      "conclusion": "A third picker is required, because Friday's backlog cannot be worked off by two pickers inside the shift.",
+      "premises": [
+        {"id": "p3", "text": "Shifts are eight hours long."},
+        {"id": "p5", "text": "A third picker could be drawn from the returns desk at no overtime cost."},
+        {"id": "p2", "text": "A rate of 110 units per hour is achieved by a trained picker, breaks included."},
+        {"id": "p1", "text": "Friday's backlog stands at 1,840 units."},
+        {"id": "p4", "text": "Friday backlogs have been running 20-30% above the weekday average for the whole quarter."}
+      ]
+    },
+    {
+      "of": "abl-010", "variant": 3,
+      "conclusion": "Two people cannot get through Friday's pile in one shift, so we need someone else on it.",
+      "premises": [
+        {"id": "p2", "text": "A trained picker does 110 units an hour once breaks are folded in."},
+        {"id": "p1", "text": "Friday's pile is 1,840 units."},
+        {"id": "p4", "text": "Fridays have been running 20 to 30 percent heavier than an average weekday all quarter."},
+        {"id": "p3", "text": "The shift lasts eight hours."},
+        {"id": "p5", "text": "We could take a third person off the returns desk without paying overtime."}
+      ]
+    },
+
+    {
+      "of": "abl-014", "variant": 1,
+      "conclusion": "This girder design does not pass the code check and has to be revised before issue.",
+      "premises": [
+        {"id": "p1", "text": "Design capacity is 1,180 kNm, below the factored bending moment of 1,420 kNm."},
+        {"id": "p2", "text": "Against a code limit of L/360, the computed mid-span deflection under service load is L/220."},
+        {"id": "p3", "text": "The code maximum for shear stud spacing is 600 mm; the drawing specifies 900 mm."},
+        {"id": "p4", "text": "The applied moment of 1,420 kNm exceeds the lateral-torsional buckling resistance of 960 kNm."}
+      ]
+    },
+    {
+      "of": "abl-014", "variant": 2,
+      "conclusion": "Revision is required before issue, because the code check is failed by this girder design.",
+      "premises": [
+        {"id": "p3", "text": "Shear studs are spaced at 900 mm, beyond the 600 mm code maximum."},
+        {"id": "p1", "text": "A factored bending moment of 1,420 kNm is carried against a design capacity of only 1,180 kNm."},
+        {"id": "p4", "text": "A lateral-torsional buckling resistance of 960 kNm is computed, under the 1,420 kNm applied moment."},
+        {"id": "p2", "text": "A mid-span service deflection of L/220 is computed where L/360 is permitted by code."}
+      ]
+    },
+    {
+      "of": "abl-014", "variant": 3,
+      "conclusion": "The girder as drawn fails code and needs reworking before we issue it.",
+      "premises": [
+        {"id": "p4", "text": "Buckling resistance works out at 960 kNm, less than the 1,420 kNm moment applied."},
+        {"id": "p2", "text": "Under service load the middle of the span deflects L/220, and code allows no more than L/360."},
+        {"id": "p1", "text": "The factored moment is 1,420 kNm and the section can only take 1,180 kNm."},
+        {"id": "p3", "text": "Studs are drawn at 900 mm centres when code caps them at 600 mm."}
+      ]
+    },
+
+    {
+      "of": "abl-021", "variant": 1,
+      "conclusion": "When this screen comes back positive, a false positive is the more likely explanation rather than a genuine case.",
+      "premises": [
+        {"id": "p1", "text": "One person in every thousand screened has the condition."},
+        {"id": "p2", "text": "Five percent of people without the condition test positive."},
+        {"id": "p3", "text": "Ninety-nine percent of people with the condition test positive."},
+        {"id": "p4", "text": "Each assay costs $18 and runs on an analyser we already own."},
+        {"id": "p5", "text": "Forty thousand people go through the programme each year."},
+        {"id": "p6", "text": "Confirmatory testing takes between four and six weeks."}
+      ]
+    },
+    {
+      "of": "abl-021", "variant": 2,
+      "conclusion": "A positive on this screen is more probably a false positive than a true case.",
+      "premises": [
+        {"id": "p5", "text": "Forty thousand people a year are screened by the programme."},
+        {"id": "p3", "text": "A sensitivity of 99% is achieved by the assay."},
+        {"id": "p6", "text": "Four to six weeks are needed for confirmatory testing."},
+        {"id": "p1", "text": "The condition is carried by 1 in 1,000 of those screened."},
+        {"id": "p4", "text": "Eighteen dollars is charged per assay, and the analyser already owned is used."},
+        {"id": "p2", "text": "A false-positive rate of 5% is observed."}
+      ]
+    },
+    {
+      "of": "abl-021", "variant": 3,
+      "conclusion": "For this screen, a positive result is more likely to be a false positive than a true case.",
+      "premises": [
+        {"id": "p2", "text": "The assay's false-positive rate is 5%."},
+        {"id": "p1", "text": "Prevalence among those screened is 0.1%."},
+        {"id": "p3", "text": "The assay's sensitivity is 99%."},
+        {"id": "p6", "text": "Confirmation of a positive requires a further four to six weeks."},
+        {"id": "p5", "text": "Annual programme throughput is 40,000 individuals."},
+        {"id": "p4", "text": "Per-assay cost is $18, and no new instrument is required."}
+      ]
+    },
+
+    {
+      "of": "abl-022", "variant": 1,
+      "conclusion": "Shipment of this order to Brazil is not possible this week.",
+      "premises": [
+        {"id": "p1", "text": "Five business days of lead time on the commercial invoice are required by the customs broker, and the invoice went in only yesterday."},
+        {"id": "p2", "text": "This week's only sailing left on Monday, and the cargo remains in the yard."},
+        {"id": "p3", "text": "Brazilian registration for the product lapsed in June and was never renewed, so customs clearance is impossible."}
+      ]
+    },
+    {
+      "of": "abl-022", "variant": 2,
+      "conclusion": "There is no way to get this order to Brazil this week.",
+      "premises": [
+        {"id": "p3", "text": "The product's registration in Brazil ran out in June and nobody renewed it, so it cannot clear customs at all."},
+        {"id": "p1", "text": "Our customs broker needs the commercial invoice five business days in advance, and we only sent it yesterday."},
+        {"id": "p2", "text": "The one sailing this week departed on Monday and the cargo is still sitting in the yard."}
+      ]
+    },
+    {
+      "of": "abl-022", "variant": 3,
+      "conclusion": "This week's shipment of the order to Brazil cannot proceed.",
+      "premises": [
+        {"id": "p2", "text": "The sole departure available this week occurred on Monday, and the cargo has not left the yard."},
+        {"id": "p3", "text": "The Brazilian product registration expired in June without renewal, precluding customs clearance entirely."},
+        {"id": "p1", "text": "The broker requires the commercial invoice five business days before dispatch, and submission occurred yesterday."}
+      ]
+    }
+  ]
+}
