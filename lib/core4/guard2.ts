@@ -152,10 +152,10 @@ export function coherent(original: string, edited: string, sizeMatters = true): 
  * regeneration or to fallbackReply instead, which is the behaviour the
  * withhold guarantee is supposed to have.
  */
-function without(draft: string, drop: string[]): string | null {
+function without(draft: string, drop: string[], recheck: string[] = drop): string | null {
   const kept = deleteSentences(draft, drop);
   if (!kept) return null;
-  if (leaksHidden(kept, drop).length) return null;
+  if (leaksHidden(kept, recheck).length) return null;
   return sentencesOf(kept).some((s) => s.trim().split(/\s+/).length >= 4) ? kept : null;
 }
 
@@ -187,7 +187,17 @@ export function guardStructure(input: GuardInput): GuardOutcome & { needsModel: 
     const leaked = leaksHidden(draft, input.hidden ?? []);
     if (leaked.length) {
       findings.push({ side: 'overreach', code: 'hidden_value', detail: 'The draft states the value verify mode kept private.' });
-      const rest = without(draft, leaked);
+      // Re-check against the VALUES, not against the sentences just deleted.
+      // `leaksHidden` returns sentences, so passing `leaked` asked "does the
+      // kept text still contain one of the sentences I removed?" — which is
+      // only equivalent to the question that matters while deletion leaves
+      // sentence boundaries untouched, an invariant nothing states or tests.
+      // Found by an adversarial audit. It could not be made to leak (the
+      // fenced case this function exists for is caught either way, because
+      // the shielded fence line is itself one of the leaked sentences), so
+      // this is correctness, not a fix for an observed failure — but a
+      // withhold guarantee should not rest on an accident of segmentation.
+      const rest = without(draft, leaked, input.hidden ?? []);
       if (rest) {
         draft = rest;
         changed = true;

@@ -415,5 +415,25 @@ console.log('\n=== a withheld value inside a code fence was detected and shipped
   ok('a leak in prose is still deleted in place', !!prose.revised && !prose.revised.includes('391') && prose.revised.includes('loop bound'), JSON.stringify({ revised: prose.revised, retry: prose.retryNote }));
 }
 
+console.log('\n=== what maxQuestions actually guarantees on a streamed turn ===');
+{
+  // Found by an adversarial audit and reproduced here so it stays true on
+  // purpose rather than by accident. The gate can only drop what it still
+  // HOLDS when the stream ends, and council D4 forbids cutting from the
+  // middle of a reply, so maxQuestions binds the tail, not the whole text.
+  const run = (chunks, maxQ) => {
+    let out = '';
+    const g = new SentenceGate((s) => { out += s; });
+    for (const c of chunks) g.push(c);
+    g.finish(maxQ, []);
+    return out;
+  };
+  const trailing = run(['The gap is real. ', 'What do you think? '], 0);
+  ok('a trailing question is dropped at maxQuestions 0', !/\?/.test(trailing), JSON.stringify(trailing));
+  const mid = run(['The gap is real. ', 'What do you think? ', 'Also consider the runway. '], 0);
+  ok('a question with exposition after it ships — it was rhetorical, and nothing is cut mid-reply', /What do you think\?/.test(mid), JSON.stringify(mid));
+  ok('  and the exposition after it is not lost', /Also consider the runway/.test(mid));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

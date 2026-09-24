@@ -359,6 +359,69 @@ intended one:
   id is rejected, so Core 4 answers on the fallback model. It is not in
   `.env.example`.
 
+## 5″. What the adversarial prompt-reproducibility audit found (2026-09-24)
+
+Twenty-six agents, read-only, over every subsystem. The question put to each:
+*could a single sufficiently good system prompt, given the same frontier model
+and the same raw transcript including earlier sessions, produce the same
+OBSERVABLE behaviour?* Default answer YES; a claimed remainder survives only
+if it is (a) a determinism a sampled model cannot give, (b) information
+genuinely not in the transcript, or (c) a guarantee about what is ABSENT.
+"More reliable", "more consistent", "cheaper" were ruled out in advance as
+engineering conveniences rather than capabilities. Every claimed remainder was
+then handed to a separate adversary told to refute it and to default to
+refuted.
+
+**19 remainders claimed. 16 refuted. 3 survived, all narrower than claimed.**
+
+Refuted — a prompt does these, and the code is kept (where it is kept) for
+token cost and enforceability, not because it adds a capability: the state
+reader, `mergeState`, explicit signals, allocation mode selection, move
+selection, the forced/envelope split, **`coverage`**, the question budget,
+`consideredView`, attribution, **the problem model**, **missing-contribution
+detection**, the guard's cheap-model pass, exact arithmetic, the private
+checker, and the cross-session recall block.
+
+Survived, in their narrowed form:
+1. **Out-of-band correction.** A Memory-page PATCH/DELETE is an event no
+   transcript records, so the next turn's prompt can differ on the strength of
+   something a transcript-only prompt cannot see. Narrowest true form: one
+   line moves between two lists, or disappears. It carries **no** guarantee
+   about the reply.
+2. **Explicitly corrected state fields.** `correctState` stamps
+   `source: 'explicit'`, and `mergeState`'s stickiness then outranks every
+   later model inference permanently. That is a value deliberately placed
+   outside anything the reply model can derive.
+3. **Mind Graph recall past the context window.** When the archive exceeds
+   what the product puts in context, the block carries a distilled
+   restatement of sessions whose text is absent. Conditional on the archive
+   overflowing — which across the whole 160-scenario corpus is **never**.
+
+**Read that honestly.** All three survivors are about *memory the person
+edits or that outgrew the window*. Not one of them is about the reasoning
+layers — the problem model, the detectors, the allocator, the intervention
+engine and `coverage` are all, on this analysis, things a strong prompt does
+too. The measured runs agree: on short conversations Core 4 and a strong
+prompt trade wins.
+
+**The defects it found, verified in code and fixed.**
+- `guard2.without()` re-checked the kept draft against the SENTENCES it had
+  just deleted rather than the withheld VALUES, so a withhold guarantee rested
+  on an unstated invariant about sentence re-segmentation. Could not be made
+  to leak — the fenced case the function exists for is caught either way — but
+  fixed.
+- `maxQuestions` is a hard cap on buffered turns and on the TAIL of streamed
+  ones only: a question with exposition after it is released by
+  `flushHeldInline`, because council D4 forbids cutting from the middle of a
+  reply. Now documented on the field and pinned by tests.
+- **`deleteCapability` did not delete the conclusion.** The calibrated
+  expertise (`source: 'observed'`) was persisted into `core4_state`, where
+  stickiness keeps it ahead of later inference — so removing the evidence
+  removed the Memory-page row and left the judgement running in every
+  conversation that had recorded it. The calibration is now computed per turn
+  and never written back; it recomputes from `capability_evidence`, so it
+  lasts exactly as long as the evidence the person controls.
+
 ## 6. What is not built, and why
 
 - **Tools** (search, code execution, visualisation). None in this path; the

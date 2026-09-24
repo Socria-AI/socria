@@ -94,6 +94,13 @@ export interface PreparedTurn {
   structure: { relations: number; edges: number; items: number };
   /** what they have shown on THIS concept, from verified events */
   competence: ReturnType<typeof taskCompetence>;
+  /**
+   * The expertise BEFORE task calibration — what is persisted.
+   *
+   * `state.expertise` is calibrated for this turn's decision and must not be
+   * written back: see the note at the `recordTurn` call in finishTurn.
+   */
+  baseExpertise: CognitiveState['expertise'];
   /** the problem as a connected structure, this turn */
   problem: ProblemModel;
   /** what the structure says is absent, novelty-gated and expertise-gated */
@@ -322,6 +329,7 @@ export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
     problem,
     missing,
     competence,
+    baseExpertise: settled.expertise,
     structure: { relations: state.relations.length, edges: freshEdges.length, items: problem.live.length },
     disputed,
     superseded,
@@ -529,7 +537,22 @@ export async function finishTurn(
   // an unchecked assumption (lib/core4/problem.ts).
   const links = linksFromRelations(state.relations, [...p.ledger, ...merged.created], input.now);
 
-  const next = recordTurn({ ...state, lastAt: input.now }, {
+  // THE CALIBRATED VALUE IS FOR THIS TURN AND IS NOT PERSISTED.
+  //
+  // `state.expertise` was calibrated at the top of prepareTurn from
+  // capability_evidence, with source 'observed'. Persisting that made the
+  // person's own deletion ineffective: deleteCapability drops the evidence
+  // rows and the Memory page stops showing the concept, but the conclusion
+  // drawn from them was already copied into core4_state — and mergeState's
+  // stickiness keeps an 'observed' value ahead of every later inference, in
+  // every conversation that recorded it, for as long as the row lives. A
+  // deletion that leaves the judgement running is not a deletion (council
+  // D15). Found by an adversarial audit of the capability path.
+  //
+  // Nothing is lost by dropping it: taskCompetence recomputes the calibration
+  // from capability_evidence on every turn, so the effect persists exactly as
+  // long as the evidence does, which is the behaviour the person controls.
+  const next = recordTurn({ ...state, expertise: p.baseExpertise, lastAt: input.now }, {
     type: decision.type,
     family: familyOf(decision.type),
     questions: questionLoad(sent),

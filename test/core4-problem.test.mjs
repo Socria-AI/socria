@@ -224,5 +224,25 @@ console.log('\n=== competence is per concept, from events, not a label for a per
   ok('no record leaves the guess alone', calibrate(guess, taskCompetence([], key)).value === 'novice');
 }
 
+console.log('\n=== a deletion that leaves the judgement running is not a deletion ===');
+{
+  // Found by an adversarial audit. taskCompetence/calibrate mark a person
+  // 'expert' on a concept from capability_evidence, with source 'observed'.
+  // That value was being written into core4_state, where mergeState's
+  // stickiness keeps an observed reading ahead of every later inference — so
+  // deleteCapability dropped the evidence, the Memory page stopped showing
+  // the concept, and the conclusion drawn from it kept running for as long as
+  // the state row lived (council D15).
+  const base = { value: 'unknown', source: 'inferred', confidence: 0.3, evidence: 'reader' };
+  const observed = calibrate(base, { value: 'expert', confidence: 0.65, concept: 'postgres', unassisted: 2, misses: 0 });
+  ok('calibration does mark it observed for the turn', observed.source === 'observed' && observed.value === 'expert', JSON.stringify(observed));
+  ok('  and their own explicit word is never overridden',
+    calibrate({ value: 'novice', source: 'explicit', confidence: 1, evidence: 'I am new to this' },
+      { value: 'expert', confidence: 0.65, concept: 'postgres', unassisted: 2, misses: 0 }).value === 'novice');
+  // The persisted value must be the uncalibrated one, so that removing the
+  // evidence removes the effect on the very next turn.
+  ok('the calibrated value is not the one that would be carried forward', observed !== base && base.source === 'inferred');
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

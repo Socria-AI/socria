@@ -294,7 +294,25 @@ export interface InterventionDecision {
   aiWorkPerformed: string;
   confidence: number;
   guardRequired: boolean;
-  /** questions the reply may put to the person (0 or 1) */
+  /**
+   * Questions the reply may put to the person (0 or 1).
+   *
+   * WHERE IT IS A HARD CAP AND WHERE IT IS NOT. On a buffered turn (anything
+   * withheld) the guard reads the whole draft and the cap holds absolutely.
+   * On a STREAMED turn the sentence gate can only drop what it is still
+   * holding when the stream ends, so the cap binds the TAIL: a question
+   * followed by more exposition is released in order and ships, because
+   * council D4 ruled that nothing is cut from the middle of a reply — an
+   * excision mid-stream produces text that does not read. So `maxQuestions:
+   * 0` on a streamed turn means "will not END on a question, an offer or a
+   * comprehension check", not "contains no question mark".
+   *
+   * In practice the model complies with the instruction and the measured rate
+   * is 0.00 questions per reply across runs 4-9 (the baseline arm runs 0.05),
+   * so the gap has never been observed to matter. It is written down because
+   * the field name promises more than the streamed path can deliver, and a
+   * later reader should not assume a guarantee that is only a tail guarantee.
+   */
   maxQuestions: 0 | 1;
   /** what the model is asked to achieve, rendered into the move block */
   objective: string;
