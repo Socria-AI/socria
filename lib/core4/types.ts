@@ -285,6 +285,12 @@ export interface Diminishing {
  */
 export type Coverage = 'minimal' | 'normal' | 'complete';
 
+/**
+ * brief  — they said something short and open; the shortest useful reply wins.
+ * normal — they gave enough to work with; length follows the move.
+ */
+export type Proportion = 'brief' | 'normal';
+
 export interface InterventionDecision {
   type: InterventionType;
   reasonCode: string;
@@ -343,6 +349,24 @@ export interface InterventionDecision {
    * "keep this from them" is a contradiction that invites a leak.
    */
   coverage: Coverage;
+  /**
+   * How much the person actually put on the table this turn.
+   *
+   * THE MIRROR OF `coverage`, AND THE MORE COMMON CASE. Coverage raises the
+   * ceiling when high stakes and demonstrated expertise earn it. This lowers
+   * it when the turn did not: "I'm worried about whether I'm doing enough for
+   * McCombs" was reaching CONTRIBUTE at maxTokens 1200 — the same ceiling as a
+   * full analytical answer — with an objective asking for "the overlooked
+   * assumption, the missing variable, the stronger counterargument". A person
+   * saying they are worried gets a paragraph of reassurance and generic advice,
+   * which is what a chatbot does and not what a person does.
+   *
+   * Length is NOT the signal, and this is the trap the obvious fix falls into:
+   * the worry above is ten words and "Here are my churn numbers and the raise
+   * timing, what breaks?" is eleven. The signal is what they gave you to work
+   * WITH — concrete material, and whether they posed something answerable.
+   */
+  proportion: Proportion;
   /** the person asked FOR questions (a quiz, interview questions): they are content, not interrogation */
   questionsAreContent: boolean;
   /**

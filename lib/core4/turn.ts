@@ -233,7 +233,7 @@ export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
 
   const decide = () => {
     const a = allocate({ state, signals, contract });
-    return { allocation: a, decision: selectIntervention({ state, allocation: a, budget, diminishing, signals, considered: allLines.slice(0, 12) }) };
+    return { allocation: a, decision: selectIntervention({ state, allocation: a, budget, diminishing, signals, considered: allLines.slice(0, 12), lastUserText: input.lastUserText }) };
   };
   let { allocation, decision } = decide();
 

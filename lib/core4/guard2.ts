@@ -36,7 +36,7 @@ import type {
   InterventionDecision,
   NoveltyVerdict,
 } from './types';
-import { questionLoad, stripInterrogatives, hasSycophanticOpener, stripSycophanticOpener, sentencesOf, interrogatives, deleteSentences } from './questions';
+import { questionLoad, stripInterrogatives, hasSycophanticOpener, stripSycophanticOpener, hasFillerOpener, stripFillerOpener, sentencesOf, interrogatives, deleteSentences } from './questions';
 import { classify, gateCandidates } from './considered';
 import { noveltyGated, THINKING_MODES } from './intervene';
 
@@ -289,6 +289,26 @@ export function guardStructure(input: GuardInput): GuardOutcome & { needsModel: 
     if (rest) {
       draft = rest;
       changed = true;
+    }
+  }
+
+  // Generic reassurance, on a turn that asked for one or two sentences.
+  //
+  // The move block already forbids it, and a prompt is a probability: someone
+  // who gets "it's completely natural to feel uncertain at this stage" is not
+  // consoled by the instruction having existed. Gated to `proportion === 'brief'`
+  // and to the OPENING sentence only — mid-reply the same words can be a real
+  // caveat, and council D4 forbids cutting from the middle of a reply anyway.
+  if (dec.proportion === 'brief' && hasFillerOpener(draft)) {
+    findings.push({ side: 'voice', code: 'filler', detail: 'Opens with generic reassurance or a hedge.' });
+    const rest = stripFillerOpener(draft);
+    if (rest) {
+      draft = rest;
+      changed = true;
+    } else {
+      // Nothing substantive survived it: the reply WAS the reassurance.
+      action = 'MODIFY_FOR_MORE_HELP';
+      retryNote = 'Drop the reassurance and the general advice. Say the one true, specific thing about their situation — or, if there is nothing yet, ask for the single piece of information that would change that.';
     }
   }
 

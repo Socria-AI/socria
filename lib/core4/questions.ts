@@ -123,6 +123,45 @@ const DISCLOSURE = /\b(?:say so|just ask|say the word|ask and i'?ll|ask for it a
 
 const SYCOPHANCY = /^(?:great|excellent|good|fantastic|wonderful|interesting|fascinating) (?:question|point|thought|observation)[.!,]?|^(?:you(?:'re| are) (?:absolutely |completely |totally )?right)[.!,]|^(?:what a (?:great|good|fascinating) )|^(?:i love (?:this|that|how you))/i;
 
+/**
+ * Generic reassurance and hedged advice: the sentences that make a reply read
+ * as a chatbot rather than a person.
+ *
+ * THESE ARE OBSERVED, NOT IMAGINED. Reported from a live reply to "I'm worried
+ * about whether I'm doing enough for McCombs": a line telling them the feeling
+ * was natural, then advice that would have fitted any applicant. The move block
+ * now forbids both, but a prompt is a probability and a person who gets the
+ * paragraph anyway is not consoled by the instruction having existed.
+ *
+ * ONLY EVER APPLIED TO THE OPENING SENTENCE, and only on a turn that was marked
+ * brief. Mid-reply the same words can be load-bearing — "it is worth noting
+ * that the migration is idempotent" is a real caveat — and council D4 forbids
+ * cutting from the middle of a reply regardless.
+ */
+const FILLER = /^(?:it(?:'s| is) (?:completely |perfectly |totally |entirely )?(?:natural|normal|understandable|common|okay|ok|fine|valid)\b|(?:that|this) (?:is|sounds like) a (?:completely |perfectly )?(?:natural|normal|understandable|common|valid)\b|(?:many|most|a lot of|plenty of) (?:people|students|founders|applicants|engineers)\b.{0,60}\b(?:feel|worry|wonder|struggle|experience)\b|(?:first(?:ly)?,? )?(?:let me|i want to) (?:acknowledge|validate|say)\b|(?:i (?:can )?(?:hear|sense|understand) (?:that|how|why|you))\b|(?:what you(?:'re| are) (?:feeling|describing|going through) is)\b)/i;
+
+/** Does the reply OPEN with generic reassurance or a hedge? */
+export function hasFillerOpener(text: string): boolean {
+  const first = sentencesOf(text.trim())[0]?.trim() ?? '';
+  return FILLER.test(first);
+}
+
+/**
+ * The reply without its filler opening sentence; null if nothing substantive
+ * is left, which sends the turn back to be written again rather than shipping
+ * a fragment.
+ */
+export function stripFillerOpener(text: string): string | null {
+  const t = text.trim();
+  if (!hasFillerOpener(t)) return t;
+  const parts = sentencesOf(t);
+  const rest = parts.slice(1).join('').trim();
+  if (!rest) return null;
+  // A remaining reply that is only a few words was carried by the sentence just
+  // removed; better to regenerate than to ship the remnant.
+  return rest.split(/\s+/).length >= 5 ? rest.charAt(0).toUpperCase() + rest.slice(1) : null;
+}
+
 export interface Interrogatives {
   explicit: string[];
   disguised: string[];

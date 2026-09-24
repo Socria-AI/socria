@@ -42,7 +42,7 @@ export interface TurnTrace {
     readOk: boolean;
   };
   allocation: { mode: string; reasonCode: string; withhold: string | null; withholdSource: string | null; confidence: number };
-  intervention: { type: string; reasonCode: string; maxQuestions: number; switchedFrom: string | null; confidence: number; coverage: string };
+  intervention: { type: string; reasonCode: string; maxQuestions: number; switchedFrom: string | null; confidence: number; coverage: string; proportion: string };
   budget: { streak: number; density: number; allowed: number };
   diminishing: { detected: boolean; count: number };
   novelty: { checked: number; redundant: number; uncertain: number; partial: number };
@@ -156,6 +156,7 @@ export function buildTrace(x: {
       switchedFrom: x.decision.switchedFrom,
       confidence: x.decision.confidence,
       coverage: x.decision.coverage ?? 'normal',
+      proportion: x.decision.proportion ?? 'normal',
     },
     budget: { streak: x.budget.streak, density: Math.round(x.budget.density * 100) / 100, allowed: x.budget.allowed },
     diminishing: { detected: x.diminishing.detected, count: x.diminishing.signals.length },

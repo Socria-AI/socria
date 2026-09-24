@@ -29,6 +29,7 @@ import type {
   Diminishing,
   ExplicitSignals,
   Coverage,
+  Proportion,
   InterventionDecision,
   InterventionType,
   QuestionBudget,
@@ -43,6 +44,16 @@ export interface SelectInput {
   signals: ExplicitSignals;
   /** what the person has already considered (their items, most relevant first) */
   considered: string[];
+  /**
+   * Their actual last message.
+   *
+   * `state.currentFocus` is the cheap reader's one-line summary, and summaries
+   * are uniformly abstract — it renders both "I'm worried about McCombs" and a
+   * message carrying five figures as a short abstract phrase, so it cannot tell
+   * a bare opening from a brief with material in it. `proportionFor` needs the
+   * words the person typed.
+   */
+  lastUserText?: string;
 }
 
 /** Moves whose content raises a perspective, a question or a challenge: the novelty gate reads them. */
@@ -106,6 +117,7 @@ function d(
     switchedFrom: o.switchedFrom ?? null,
     maxTokens: TOKENS[type] ?? 600,
     coverage: 'normal',
+    proportion: 'normal',
     questionsAreContent: false,
     forced: false,
   };
@@ -160,6 +172,77 @@ const BRIEF_BY_NATURE = new Set<InterventionType>([
  * that carries substance, and any explicit length the person gave wins
  * outright.
  */
+/**
+ * What did they actually give us to work with?
+ *
+ * NOT LENGTH. "I'm worried about whether I'm doing enough for McCombs" is ten
+ * words; "Here are my churn numbers and the raise timing, what breaks?" is
+ * eleven. A word count cannot tell them apart, and the first was reaching the
+ * same 1200-token ceiling as the second.
+ *
+ * What separates them is CONCRETE MATERIAL: figures, named things, units,
+ * artifacts — the stuff a reply can actually be about — and whether they posed
+ * something answerable. A turn with neither is an opening, not a brief, and the
+ * useful reply to an opening is one or two sentences that say something true,
+ * not a paragraph that covers the possibilities.
+ */
+const REQUESTY = /\?|\b(?:how do i|what should|which|walk me|talk me|explain|show me|help me (?:with|write|fix|plan)|give me|draft|write|fix|debug|calculate|compare|review)\b/i;
+
+/** Digits, units, capitalised names mid-sentence, code, paths — things with referents. */
+function concreteness(text: string): number {
+  const t = text.trim();
+  if (!t) return 0;
+  let n = 0;
+  n += (t.match(/\d/g) ?? []).length ? 2 : 0;
+  n += (t.match(/[%$£€]|\b(?:ms|kb|mb|gb|rps|qps|bps|days?|weeks?|months?|years?|hours?)\b/gi) ?? []).length ? 1 : 0;
+  // A capitalised word that is not sentence-initial and not "I" is usually a
+  // name: a table, a vendor, a school, a branch.
+  n += (t.match(/(?<=[a-z,;:]\s)[A-Z][a-zA-Z0-9_.-]{2,}/g) ?? []).length ? 1 : 0;
+  n += /`|```|\/\w+\/|\.\w{2,4}\b|\b[A-Za-z_]\w*\(\)/.test(t) ? 2 : 0;
+  return n;
+}
+
+export function proportionFor(input: SelectInput, dec: InterventionDecision): Proportion {
+  const { state: s, signals } = input;
+  // Their words win, in both directions: a length they asked for, or an
+  // explicit ask for detail, is never overridden by our reading of the turn.
+  if (signals.requestedTokens || signals.explainAsked || signals.sentences) return 'normal';
+  // NOT `answersOnly`. "Answers only, no explanations" means no prose AROUND
+  // the answer — it does not mean a short answer, and "the complete code, no
+  // explanations" is long and wanted (run 5). Capping tokens on it would
+  // truncate the very thing they asked for.
+  if (signals.done) return 'brief';
+  // Moves that are short by nature are already short; saying it twice would
+  // make a brief reply a curt one.
+  if (BRIEF_BY_NATURE.has(dec.type)) return 'normal';
+  // Real work they handed over is never trimmed on these grounds.
+  if (s.work === 'execution' || s.work === 'verification' || s.work === 'practice' || s.work === 'diagnosis') return 'normal';
+  if (s.attempt !== 'none' || s.blockingUnknown) return 'normal';
+
+  const text = (input.lastUserText ?? s.currentFocus ?? '').trim();
+  const words = text ? text.split(/\s+/).length : 0;
+  // NEVER TRIM ON ABSENT DATA. With no message text there is no evidence that
+  // this was a short open turn, and defaulting to brief made every caller that
+  // does not supply the text — including the policy tests — silently lose its
+  // ceiling. Missing evidence is not evidence.
+  if (!words) return 'normal';
+  const asked = REQUESTY.test(text);
+  const concrete = concreteness(text);
+
+  // A REQUEST IS ENOUGH ON ITS OWN. The first version also demanded concrete
+  // material and so trimmed "Here are my churn numbers and the raise timing,
+  // what breaks?" to 220 tokens — a real question about real material, gutted,
+  // which is the opposite failure and the worse one. Someone who asks for
+  // something gets a real answer; the length then follows the move.
+  if (asked) return 'normal';
+  // Material to work with, even unasked: they pasted an error, quoted a figure,
+  // named a system. That is a brief, not an opening.
+  if (concrete >= 2 || words > 40) return 'normal';
+  // Short, abstract, nothing named and nothing asked. An opening, not a brief —
+  // and the shape that was getting a paragraph of reassurance.
+  return words <= 30 ? 'brief' : 'normal';
+}
+
 export function coverageFor(input: SelectInput, dec: InterventionDecision): Coverage {
   const { state: s, allocation: a, signals } = input;
   // A length they named, a standing "answers only", a close: their words.
@@ -240,6 +323,15 @@ export function selectIntervention(input: SelectInput): InterventionDecision {
   // are the content of the reply, not interrogation: the budget does not
   // price them and the guard does not strip them (council D4).
   dec = { ...dec, coverage: coverageFor(input, dec) };
+  // Coverage wins where it fired: a high-stakes call for someone who works in
+  // the area has earned its length by a stronger signal than the shape of one
+  // message.
+  const prop = dec.coverage === 'complete' ? 'normal' : proportionFor(input, dec);
+  dec = {
+    ...dec,
+    proportion: prop,
+    maxTokens: prop === 'brief' ? Math.min(dec.maxTokens, 220) : dec.maxTokens,
+  };
   return input.signals.requestsQuestions ? { ...dec, questionsAreContent: true } : dec;
 }
 
@@ -598,6 +690,24 @@ export function renderDecision(dec: InterventionDecision, a: Allocation): string
   //   later. A consideration you immediately withdraw cannot change what they
   //   do, which is the test the first sentence already sets; it needed saying
   //   out loud.
+  // WHAT A SHORT, OPEN MESSAGE DESERVES.
+  //
+  // Named patterns rather than "be concise", because "be concise" is advice and
+  // these are the actual sentences that showed up. "I'm worried about whether
+  // I'm doing enough for McCombs" was producing a paragraph: a line of
+  // reassurance, a restatement of the worry, two pieces of advice that would
+  // fit any applicant, and a closing question. Every one of those is a move a
+  // person would not make.
+  //
+  // The instruction says what to DO, not only what to avoid, because "say less"
+  // with no target produces a hedge. The target is one true, specific thing.
+  const proportion =
+    dec.proportion === 'brief'
+      ? 'LENGTH: they said something short and open, so the shortest reply that genuinely advances this wins — one or two sentences. Say ONE true, specific thing about their actual situation, or say the honest thing nobody has said. Not a paragraph.\n' +
+        'Do not reassure them that a feeling is normal or understandable. Do not restate what they just said back to them. Do not offer advice that would fit anyone in their position — if it would fit anyone, it helps no one. Do not list options they did not ask for, and do not close by offering to help further.\n' +
+        'A plain observation is often better than a question, and this does not have to end in one. If the only honest reply is that you do not know enough yet, ask for the ONE thing that would change that — and nothing else.'
+      : null;
+
   const coverage =
     dec.coverage === 'complete'
       ? 'COVERAGE: this is a consequential call and they work in this area. Completeness on what matters beats brevity here: cover every non-obvious consideration that would change what they do or conclude — each once, as tightly as it can be said — then stop. Nothing they already know: no primer on their own field, no definitions of terms they used correctly, no restating their setup back to them. Nothing you would concede in the same breath — a consideration you raise and then withdraw changes nothing and costs them the reading. Do not add a summary, and do not reach for extra considerations to fill the space; covering what matters is the instruction, and length is not. Where the objective above caps how much to add ("one sentence on it", "then stop"), this supersedes that cap; what kind of move this is, and the question limit, still stand.'
@@ -609,6 +719,7 @@ export function renderDecision(dec: InterventionDecision, a: Allocation): string
       '\n=== This turn ===',
       'No move is imposed. Reply to what they actually said, as a strong peer would, and help fully: answer what they asked, correct what is wrong, and where you can, add the one thing they have not considered — never manufacture it.',
       ...(coverage ? [coverage] : []),
+      ...(proportion ? [proportion] : []),
       ...context,
       '',
       questions,
@@ -621,6 +732,7 @@ export function renderDecision(dec: InterventionDecision, a: Allocation): string
     `MOVE: ${dec.type}`,
     `OBJECTIVE: ${dec.objective}`,
     ...(coverage ? [coverage] : []),
+    ...(proportion ? [proportion] : []),
   ];
   if (a.withhold) {
     lines.push(
