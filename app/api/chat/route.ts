@@ -38,7 +38,7 @@ import {
 } from '@/lib/conversation-controller';
 import { enforceRateLimit } from '@/lib/rate-limit';
 import { eggFor } from '@/lib/easter-eggs';
-import { reportUpstream, streamFailureNotice } from '@/lib/upstream-error';
+import { isModelRejection, reportUpstream, streamFailureNotice } from '@/lib/upstream-error';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { memoryCaps, selectRelevant, visibleEntries } from '@/lib/person-memory';
 import { mayUse } from '@/lib/route-guard';
@@ -526,16 +526,14 @@ export async function POST(req: NextRequest) {
       completion = await makeCompletion(openaiModel);
     } catch (e: any) {
       const status = e?.status ?? e?.response?.status;
-      const isModelError =
-        status === 404 ||
-        /model/i.test(e?.code || '') ||
-        /model|not found|does not exist|unknown/i.test(e?.message || '');
       // Registry-driven, not `model === 'core-3'`. Written that way, Core 4
       // inherited the same model id and none of the protection — so a
       // deployment where Core 3.1 silently fell back and worked would fail on
-      // Core 4 and look like Core 4 was broken.
+      // Core 4 and look like Core 4 was broken. The rule itself now lives in
+      // one place for the same reason: written out twice, the two copies
+      // drifted and produced that failure a second time.
       const fallback = fallbackOpenAIModel(model);
-      if (fallback && isModelError && openaiModel !== fallback) {
+      if (fallback && isModelRejection(e) && openaiModel !== fallback) {
         // Logged in production too. A model quietly answering as something
         // other than what the person picked is worth knowing about, and the
         // dev-only warning meant nobody found out for weeks.
@@ -618,11 +616,6 @@ export async function POST(req: NextRequest) {
 
 // ── the Core 4 reply ────────────────────────────────────────────────────
 
-function isModelError(e: any): boolean {
-  const status = e?.status ?? e?.response?.status;
-  return status === 404 || e?.code === 'model_not_found' || /model_not_found|does not exist|unknown model/i.test(e?.message || '');
-}
-
 /**
  * Generate, guard and send one Core 4 reply.
  *
@@ -682,7 +675,7 @@ function core4Reply(x: {
           opened = await open(x.openaiModel);
           served = x.openaiModel;
         } catch (e) {
-          if (x.fallbackModel && x.fallbackModel !== x.openaiModel && isModelError(e)) {
+          if (x.fallbackModel && x.fallbackModel !== x.openaiModel && isModelRejection(e)) {
             console.warn(`[socria/chat] model "${x.openaiModel}" rejected for core-4; falling back to ${x.fallbackModel}`);
             opened = await open(x.fallbackModel);
             served = x.fallbackModel;

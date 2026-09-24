@@ -111,6 +111,7 @@ async function turn(conversationId, messages, { state = {}, replies, guard, chec
   };
 }
 
+const { CORE_4_MODEL, CORE_3_FALLBACK_MODEL } = await import(pathToFileURL(join(OUT, 'socria-prompt.mjs')).href).catch(() => ({ CORE_4_MODEL: 'gpt-5.6-sol', CORE_3_FALLBACK_MODEL: 'gpt-4o' }));
 const U = (content) => ({ role: 'user', content });
 const A = (content) => ({ role: 'assistant', content });
 const rows = (t, uid = 'u1') => db.rows(t).filter((r) => r.user_id === uid);
@@ -472,6 +473,24 @@ console.log('\n=== a provider failure says what happened (reported from dev) ===
   globalThis.__streamError = undefined;
   const fine = await turn('upstream-ok', [U('hi')], { state: { work: 'conversation', latest: 'other' }, replies: ['Hello.'] });
   ok('a healthy turn is untouched', fine.received.includes('Hello.') && !/ref /.test(fine.received), fine.received);
+}
+
+console.log('\n=== only Core 4 was broken on dev: one rule, written twice, drifted ===');
+{
+  // The provider rejects the configured reply model with a 400 that names a
+  // parameter, not a 404. Core 3.1's rule called that a model problem and
+  // fell back; Core 4's did not, and rethrew — same deployment, same key,
+  // only Core 4 dead.
+  const rejection = { status: 400, code: 'unsupported_parameter', message: "Unsupported parameter: 'max_tokens' is not supported with this model. Use 'max_completion_tokens' instead.", forModel: CORE_4_MODEL };
+  const r = await turn('model-400', [U('hi')], { state: { work: 'conversation', latest: 'other' }, replies: ['Hello.'], streamError: rejection });
+  ok('Core 4 falls back and the person gets their reply', r.received.includes('Hello.'), r.received);
+  ok('  and sees no failure notice at all', !/ref /.test(r.received), r.received);
+  ok('  served by the fallback model, recorded as such', JSON.stringify(r.t ?? {}).includes(CORE_3_FALLBACK_MODEL), JSON.stringify(r.t?.models ?? r.t ?? null).slice(0, 200));
+  // A bad key must NOT be retried on the fallback: same answer either way.
+  globalThis.__streamError = undefined;
+  const auth = await turn('model-401', [U('hi')], { state: { work: 'conversation', latest: 'other' }, streamError: { status: 401, message: 'Incorrect API key provided' } });
+  ok('a rejected key is not retried on another model', /authenticate/.test(auth.received), auth.received);
+  globalThis.__streamError = undefined;
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

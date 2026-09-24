@@ -14,7 +14,7 @@
 // somebody sees names something they can act on, and that nothing from the
 // upstream error object rides along with it.
 
-import { classifyUpstream, failureText, streamFailureNotice } from './.tmp/upstream-error.mjs';
+import { classifyUpstream, failureText, streamFailureNotice, isModelRejection } from './.tmp/upstream-error.mjs';
 import { probeModels, summarise, deployedCommit } from './.tmp/upstream-health.mjs';
 
 let pass = 0, fail = 0;
@@ -229,6 +229,23 @@ console.log('=== the deployment answering for itself ===');
   check('a host that does not say is not guessed at', deployedCommit({}) === null);
   const probed = await probeModels(client({ a: Object.assign(new Error('boom'), { status: 401, message: 'sk-live-abc is invalid' }) }), ['a']);
   check('no part of the error text survives', !/sk-live|boom/.test(JSON.stringify(probed)), JSON.stringify(probed));
+}
+
+// One deployment, one key, one conversation, and only Core 4 broken. The
+// rule "would another model have answered this?" was written out twice, and
+// the strict copy rethrew what the forgiving copy quietly recovered from.
+console.log('=== would another model have answered? ===');
+{
+  const param = err({ status: 400, code: 'unsupported_parameter', message: "Unsupported parameter: 'max_tokens' is not supported with this model. Use 'max_completion_tokens' instead." });
+  check('a parameter a newer model refuses is worth retrying elsewhere', isModelRejection(param));
+  check('  and it is no longer an unnamed failure', classifyUpstream(param).code === 'upstream_request', classifyUpstream(param).code);
+  check('a fixed temperature too', isModelRejection(err({ status: 400, message: "Unsupported value: 'temperature' does not support 0.7 with this model" })));
+  check('a model that does not exist', isModelRejection(err({ status: 404, code: 'model_not_found', message: 'The model `x` does not exist' })));
+  check('a bad key is NOT retried on another model', !isModelRejection(err({ status: 401, message: 'Incorrect API key provided' })));
+  check('nor is an exhausted quota, which would only make the limit worse', !isModelRejection(err({ status: 429, message: 'Rate limit reached for model gpt-x' })));
+  check('nor a forbidden account', !isModelRejection(err({ status: 403, message: 'You do not have access to model gpt-x' })));
+  check('a provider outage is not a model problem', !isModelRejection(err({ status: 503, message: 'The server is overloaded' })));
+  check('and neither is a bug of ours', !isModelRejection(new TypeError('Cannot read properties of null')));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

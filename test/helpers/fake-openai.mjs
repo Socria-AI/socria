@@ -36,12 +36,24 @@ export default class OpenAI {
             // __streamError makes the provider fail the way it really does:
             // create() resolves and the FIRST token throws, so the failure
             // lands inside the stream rather than in the route's outer catch.
-            const boom = g.__streamError;
+            // `forModel` fails only that model id, so a fallback can answer:
+            // the shape of the failure that left Core 4 dead on dev while
+            // Core 3.1, with a more forgiving rule, quietly recovered.
+            const boom = g.__streamError && (!g.__streamError.forModel || g.__streamError.forModel === p.model)
+              ? g.__streamError
+              : null;
+            // A call that throws consumes no scripted reply: the retry on the
+            // fallback model must get the reply the test wrote for the turn.
+            if (boom) {
+              return (async function* () {
+                const { forModel, ...rest } = boom;
+                throw Object.assign(new Error(boom.message ?? 'upstream'), rest);
+              })();
+            }
             // __replies scripts successive replies (first draft, retry, ...);
             // __reply is the same text every time.
             const text = (g.__replies ?? []).shift() ?? g.__reply ?? 'Noted.';
             return (async function* () {
-              if (boom) throw Object.assign(new Error(boom.message ?? 'upstream'), boom);
               yield { choices: [{ delta: { content: text } }] };
             })();
           }

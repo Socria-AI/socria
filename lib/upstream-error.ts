@@ -29,6 +29,7 @@ export type UpstreamCode =
   | 'upstream_model'
   | 'upstream_timeout'
   | 'upstream_unreachable'
+  | 'upstream_request'
   | 'upstream_unavailable'
   | 'internal';
 
@@ -62,6 +63,8 @@ const SAY: Record<UpstreamCode, string> = {
   upstream_timeout: 'The model took too long to answer. Nothing was counted — try again.',
   upstream_unreachable:
     'Socria could not reach the model provider at all — the request never arrived. This is our network or configuration, not anything you did.',
+  upstream_request:
+    'The model refused the shape of the request Socria sent. This is our configuration, not anything you did.',
   upstream_unavailable: 'The model provider is having trouble right now. Try again shortly.',
   internal: 'Something went wrong on our side.',
 };
@@ -86,14 +89,24 @@ function statusOf(e: unknown): number | null {
  * which matched nothing here and came out as "Something went wrong on our
  * side": the one sentence this file exists to stop.
  */
-function chain(err: unknown, depth = 4): Array<{ message: string; code: string; name: string }> {
-  const out: Array<{ message: string; code: string; name: string }> = [];
+function chain(err: unknown, depth = 4): Array<{ message: string; code: string; names: string[] }> {
+  const out: Array<{ message: string; code: string; names: string[] }> = [];
   let e = err as { message?: unknown; code?: unknown; name?: unknown; cause?: unknown } | null;
   for (let i = 0; e && typeof e === 'object' && i <= depth; i++) {
+    // The CONSTRUCTOR's name, not `.name`. The OpenAI SDK's error classes
+    // are empty subclasses that never set `name`, so every one of them —
+    // OpenAIError, APIConnectionError, APIUserAbortError — inherits "Error"
+    // and reported as a nameless failure. The constructor knows what it is.
+    const ctor = (e as { constructor?: { name?: unknown } }).constructor;
+    const cls = typeof ctor?.name === 'string' && ctor.name !== 'Object' ? ctor.name : '';
+    // BOTH: `name` is what an error calls itself (AbortError sets it and is
+    // not a subclass), the constructor is what it actually is (the SDK's
+    // subclasses set no name at all). Reading only one loses half of them.
+    const declared = typeof e.name === 'string' ? e.name : '';
     out.push({
       message: typeof e.message === 'string' ? e.message.toLowerCase() : '',
       code: typeof e.code === 'string' ? e.code.toLowerCase() : '',
-      name: typeof e.name === 'string' ? e.name : '',
+      names: [...new Set([declared, cls].filter(Boolean))],
     });
     e = e.cause as typeof e;
   }
@@ -114,7 +127,7 @@ export function classifyUpstream(err: unknown): UpstreamFailure {
   // Any link may hold the reason; a bare "fetch failed" never does.
   const msg = links.map((l) => l.message).join(' | ');
   const code = links.map((l) => l.code).join(' | ');
-  const names = links.map((l) => l.name);
+  const names = links.flatMap((l) => l.names);
   const status = statusOf(err);
   const ref = reference();
 
@@ -141,6 +154,7 @@ export function classifyUpstream(err: unknown): UpstreamFailure {
   if (
     names.includes('AbortError') ||
     names.includes('APIConnectionTimeoutError') ||
+    names.includes('HeadersTimeoutError') ||
     /timeout|timed out|etimedout|econnreset|socket hang up/.test(msg) ||
     /etimedout|econnreset|und_err_connect_timeout|und_err_headers_timeout/.test(code)
   ) {
@@ -159,8 +173,15 @@ export function classifyUpstream(err: unknown): UpstreamFailure {
   if (typeof status === 'number' && status >= 500) {
     return is('upstream_unavailable', 502);
   }
+  // A 400 or 422 is the provider saying our request was wrong — a parameter
+  // it does not take, a value it does not allow. Unclassified, it read as
+  // "Something went wrong on our side", which is true and says nothing.
+  if (status === 400 || status === 422) {
+    return is('upstream_request', 502);
+  }
   // Unclassified: say WHICH class of thing threw, so a bug in our code is not
   // reported in the same words as a provider problem.
+  // "Error" says nothing; anything else names the class that threw.
   const named = names.find((n) => n && n !== 'Error');
   return named ? { ...is('internal', 500), detail: named } : is('internal', 500);
 }
@@ -234,4 +255,42 @@ export function streamFailureNotice(where: string, err: unknown, sentSomething: 
   return sentSomething
     ? `\n\n[The reply stopped here. ${reason} (ref ${f.ref})]`
     : `\n\n[${reason} (ref ${f.ref})]`;
+}
+
+/**
+ * Would a different model have answered this?
+ *
+ * WHY THIS IS SHARED, AND WHY IT IS HERE. This test existed twice, written
+ * out by hand in two branches of one file, and the two drifted:
+ *
+ *   Core 3.1   404, or the code or message mentions a model
+ *   Core 4     404, or exactly model_not_found
+ *
+ * So a provider that answers 400 "'max_tokens' is not supported with this
+ * model" — a rejection any fallback model would not have made — sent Core 3.1
+ * quietly to the fallback and left Core 4 throwing. One deployment, one key,
+ * one conversation, and only Core 4 broken: reported from dev, and exactly
+ * what two copies of one rule produce. The note beside the older copy says
+ * the same thing happened the time before, when Core 4 inherited Core 3.1's
+ * model id and none of its protection. So: one rule, one place, both callers.
+ *
+ * DELIBERATELY NOT A MODEL PROBLEM: 401, 403 and 429. A bad key and an empty
+ * quota answer the same way whichever model is asked, so retrying on the
+ * fallback cannot help — and on 429 it makes the rate limit worse.
+ */
+export function isModelRejection(err: unknown): boolean {
+  const status = statusOf(err);
+  if (status === 401 || status === 403 || status === 429) return false;
+  const links = chain(err);
+  const msg = links.map((l) => l.message).join(' | ');
+  const code = links.map((l) => l.code).join(' | ');
+  return (
+    status === 404 ||
+    /model/.test(code) ||
+    /unsupported_parameter|unsupported_value|invalid_request_error/.test(code) ||
+    /model|not found|does not exist|unknown/.test(msg) ||
+    // The parameter rejections a newer model family makes and an older one
+    // does not: max_tokens vs max_completion_tokens, a fixed temperature.
+    /unsupported (?:parameter|value)|is not supported with|does not support|max_completion_tokens/.test(msg)
+  );
 }
