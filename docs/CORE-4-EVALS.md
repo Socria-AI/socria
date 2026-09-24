@@ -734,6 +734,34 @@ same baseline transcripts with both fixed.
 
 Not yet run.
 
+## 4′. The instrument cannot see what the architecture is for
+
+Measured across the corpus: **median 2 turns, maximum 6.** The power-user
+suite, written specifically to need cross-turn structure, runs 2–4 turns and
+75–132 user words per scenario.
+
+A frontier model reading a 1,500-word transcript holds all of it. Nothing in
+any of the eight runs asks it to remember something from beyond what it can
+comfortably attend to. So the premise the whole architecture rests on — that
+a conversation eventually exceeds what a transcript can carry, and that a
+structure built as it goes will then beat re-reading — **has never been
+tested here.** Every measured "Core 4 is level with a strong prompt" was
+taken on conversations where a strong prompt has every advantage and no
+disadvantage.
+
+This is a property of the corpus, not of the code, and it is the single most
+important limitation in this document. It also predicts the results: on short
+transcripts a structured model of the problem is redundant with reading the
+transcript, so the architecture should measure as neutral, which is what it
+measured as.
+
+What would actually test it: conversations of 15–40 turns, or 5+ sessions
+weeks apart, where the load-bearing premise is 20,000 words back. Until such
+scenarios exist, no run in this file — including runs 7 and 8 — can be read
+as evidence either for or against the architecture. They are evidence about
+behaviour on short conversations, which is a narrower claim than the one the
+runs have been used to make.
+
 ## 5. Known failures and open risks
 
 - **The controller can be less intelligent than the generator it
