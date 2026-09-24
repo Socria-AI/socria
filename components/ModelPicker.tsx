@@ -28,7 +28,7 @@
 // locked. The mock hard-coded all three, and a menu that disagrees with the
 // server about what you can pick is worse than no menu.
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import {
   SOCRIA_MODELS,
   THINKING_DEPTHS,
@@ -324,47 +324,22 @@ export function ModelPicker({
             {hasComm && (
               <>
                 <div className="mp-rule" />
-                {/* Two questions about the writing, never about the thinking.
-                    They are independent on purpose: Advanced + Concise and
-                    Simple + Detailed are both coherent, and a single dial
-                    would have forced one to imply the other. */}
-                <p className="mp-lbl">How it reads</p>
-                <div className="mp-depths one">
-                  {READABILITY_OPTIONS.map((r) => (
-                    <button
-                      key={r.id}
-                      type="button"
-                      role="menuitemradio"
-                      aria-checked={readability === r.id}
-                      className={`mp-d${readability === r.id ? ' on' : ''}`}
-                      // The sheet stays open: there are two settings here and
-                      // closing after the first would mean reopening to make
-                      // the second.
-                      onClick={() => onReadability?.(r.id)}
-                    >
-                      <span className="d">{r.label}</span>
-                      <span className="does">{r.description}</span>
-                    </button>
-                  ))}
-                </div>
+                {/* Two dials, and they are dials rather than two rows of
+                    buttons because that is what the thing IS: three ordered
+                    positions with a middle that is the default, where the ends
+                    are opposites. Six buttons made a person read six sentences
+                    to find that out; a track with a marked centre says it at a
+                    glance, and moving one is one gesture instead of a hunt.
 
-                <div className="mp-rule" />
-                <p className="mp-lbl">How much it says</p>
-                <div className="mp-depths one">
-                  {LENGTH_OPTIONS.map((l) => (
-                    <button
-                      key={l.id}
-                      type="button"
-                      role="menuitemradio"
-                      aria-checked={length === l.id}
-                      className={`mp-d${length === l.id ? ' on' : ''}`}
-                      onClick={() => onLength?.(l.id)}
-                    >
-                      <span className="d">{l.label}</span>
-                      <span className="does">{l.description}</span>
-                    </button>
-                  ))}
-                </div>
+                    Still independent, which is the reason there are two of
+                    them: Advanced + Concise and Simple + Detailed are both
+                    coherent settings, and a single dial would have forced one
+                    to imply the other. */}
+                <p className="mp-lbl">How it reads</p>
+                <Dial name="Readability" options={READABILITY_OPTIONS} value={readability!} onPick={(id) => onReadability?.(id)} />
+
+                <p className="mp-lbl mp-lbl-2">How much it says</p>
+                <Dial name="Length" options={LENGTH_OPTIONS} value={length!} onPick={(id) => onLength?.(id)} />
 
                 <p className="mp-note">
                   These change how the answer is written — never how hard it is
@@ -382,5 +357,76 @@ export function ModelPicker({
         )}
       </div>
     </span>
+  );
+}
+
+/**
+ * One dial: three ordered positions, the middle one the default.
+ *
+ * IT IS A REAL RANGE INPUT. Three buttons styled as a track would have needed
+ * arrow keys, Home/End, a focus ring and a value announcement written by hand,
+ * and would have got at least one of them wrong. `input[type=range]` arrives
+ * with all of it — drag, click, arrow keys, page keys, both ends — and CSS
+ * makes it look like the control it already behaves as. `aria-valuetext` is
+ * the one addition: without it a screen reader says "1 of 3", which is a
+ * position, not a setting.
+ *
+ * The stop labels under the track are a mouse affordance only, and are hidden
+ * from the accessibility tree: they duplicate the slider rather than adding
+ * anything to it, and two controls for one value read as two values.
+ */
+function Dial<T extends string>({
+  name,
+  options,
+  value,
+  onPick,
+}: {
+  name: string;
+  options: ReadonlyArray<{ id: T; label: string; description: string }>;
+  value: T;
+  onPick: (next: T) => void;
+}) {
+  const at = Math.max(0, options.findIndex((o) => o.id === value));
+  const now = options[at] ?? options[0];
+  const last = options.length - 1;
+  return (
+    <div className="mp-dial">
+      <input
+        type="range"
+        className="mp-range"
+        min={0}
+        max={last}
+        step={1}
+        value={at}
+        aria-label={name}
+        aria-valuetext={now.label}
+        // The fill stops under the knob rather than running the whole track:
+        // a dial whose left half is coloured at the middle position reads as
+        // "half way up", and the middle position is not half of anything —
+        // it is the default.
+        style={{ '--at': `${(at / last) * 100}%` } as CSSProperties}
+        // The sheet deliberately stays open. There are two dials here, and
+        // closing on the first move would mean reopening to make the second.
+        onChange={(e) => onPick(options[Number(e.target.value)]?.id ?? value)}
+      />
+      <div className="mp-stops" aria-hidden="true">
+        {options.map((o, i) => (
+          <button
+            key={o.id}
+            type="button"
+            tabIndex={-1}
+            className={`mp-stop${o.id === value ? ' on' : ''}`}
+            style={{ left: `${(i / last) * 100}%` }}
+            onClick={() => onPick(o.id)}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
+      {/* The sentence belongs to the position the dial is at, and changes with
+          it: a static list of all three would put the reader back to reading
+          three sentences, which is what the dial replaced. */}
+      <p className="mp-dial-does">{now.description}</p>
+    </div>
   );
 }

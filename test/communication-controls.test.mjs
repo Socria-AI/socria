@@ -66,10 +66,20 @@ console.log('\n=== the registry drives the menu, not a model id ===');
   ok('only Core 4 carries it', comm.length === 1 && comm[0].id === 'core-4', comm.map((m) => m.id).join(','));
 }
 
-console.log('\n=== the picker ===');
+console.log('\n=== the picker, as two dials ===');
 {
   const src = read('components/ModelPicker.tsx');
-  ok('it renders both tables', /READABILITY_OPTIONS\.map/.test(src) && /LENGTH_OPTIONS\.map/.test(src));
+  ok('both tables reach a dial',
+    /options=\{READABILITY_OPTIONS\}/.test(src) && /options=\{LENGTH_OPTIONS\}/.test(src));
+  // A real range input, so drag, click, arrow keys, Home and End all work
+  // without any of them being written here — the version of this control that
+  // is three styled buttons gets at least one of those wrong.
+  ok('the dial is a range input', /type="range"/.test(src));
+  ok('  with the position announced as a setting, not as "1 of 3"', /aria-valuetext=\{now\.label\}/.test(src));
+  ok('  and a label, since the heading above it is not one', /aria-label=\{name\}/.test(src));
+  ok('the stop labels are hidden from the accessibility tree', /className="mp-stops" aria-hidden="true"/.test(src));
+  ok('  and unreachable by tab, since the slider already is', /tabIndex=\{-1\}/.test(src));
+  ok('the sentence follows the position', /\{now\.description\}/.test(src));
   ok('gated on the registry flag', /current\.supportsCommunication/.test(src));
   // A component that names a model is a component that has to be edited when
   // the next one arrives.
@@ -78,8 +88,8 @@ console.log('\n=== the picker ===');
   // half-built control.
   ok('both settings are required together',
     /!!readability && !!onReadability && !!length && !!onLength/.test(src));
-  ok('the sheet does not close on a communication pick',
-    !/onReadability\?\.\([^)]*\);\s*\n\s*setOpen\(false\)/.test(src));
+  ok('the sheet does not close on a dial move',
+    !/onPick\([^)]*\);?\s*\n?\s*setOpen\(false\)/.test(src));
   ok('the note says these are about expression, not effort',
     /how the answer is written — never how hard it is\s*\n?\s*thought about/.test(src));
 }

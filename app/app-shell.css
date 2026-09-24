@@ -269,6 +269,41 @@
 .app-root .mp-row.logos .does::after{content:" \2192";color:var(--moss-700)}
 
 .app-root .mp-depths{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+/* ── the two communication dials ───────────────────────────────────
+   Three ordered positions, a marked centre, and a fill that stops under the
+   knob. The fill is --at, set inline from the position, because a track whose
+   left half is coloured at the middle reads as "half way up" and the middle
+   is the default, not half of anything. */
+.app-root .mp-dial{margin:2px 4px 0;padding-bottom:4px}
+.app-root .mp-range{-webkit-appearance:none;appearance:none;display:block;width:100%;height:18px;
+  background:transparent;cursor:pointer}
+.app-root .mp-range:focus{outline:none}
+.app-root .mp-range::-webkit-slider-runnable-track{height:3px;border-radius:2px;
+  background:linear-gradient(to right,var(--moss-600) 0,var(--moss-600) var(--at),var(--ink-16) var(--at),var(--ink-16) 100%)}
+.app-root .mp-range::-moz-range-track{height:3px;border-radius:2px;background:var(--ink-16)}
+.app-root .mp-range::-moz-range-progress{height:3px;border-radius:2px;background:var(--moss-600)}
+.app-root .mp-range::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:13px;height:13px;
+  margin-top:-5px;border-radius:50%;background:var(--paper);border:2px solid var(--moss-600);
+  box-shadow:0 1px 3px rgba(31,31,31,.28)}
+.app-root .mp-range::-moz-range-thumb{width:13px;height:13px;border-radius:50%;background:var(--paper);
+  border:2px solid var(--moss-600);box-shadow:0 1px 3px rgba(31,31,31,.28)}
+.app-root .mp-range:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 3px rgba(94,118,51,.28)}
+.app-root .mp-range:focus-visible::-moz-range-thumb{box-shadow:0 0 0 3px rgba(94,118,51,.28)}
+@media(prefers-reduced-motion:no-preference){
+  .app-root .mp-range::-webkit-slider-thumb{transition:box-shadow .18s}
+}
+/* The stop labels: a mouse target under each position, the outer two pulled
+   back inside the track so neither hangs off the edge of the sheet. */
+.app-root .mp-stops{position:relative;height:15px;margin-top:1px}
+.app-root .mp-stop{position:absolute;top:0;transform:translateX(-50%);white-space:nowrap;
+  font-family:var(--font-sans);font-size:10.5px;letter-spacing:.02em;color:var(--ink-60);padding:0 2px}
+.app-root .mp-stop:first-child{transform:none;left:0!important}
+.app-root .mp-stop:last-child{transform:translateX(-100%);left:100%!important}
+.app-root .mp-stop.on{color:var(--moss-700);font-weight:600}
+.app-root .mp-stop:hover{color:var(--ink)}
+.app-root .mp-dial-does{margin:7px 0 0;font-family:var(--font-serif);font-style:italic;font-size:11.5px;
+  line-height:1.4;color:var(--ink-60);min-height:2.8em}
+.app-root .mp-lbl-2{margin-top:12px}
 /* three options whose descriptions are sentences: a 340px sheet split three
    ways leaves ~105px a column, which wraps every one of them to four lines */
 .app-root .mp-depths.one{grid-template-columns:1fr}
