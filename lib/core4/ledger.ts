@@ -29,7 +29,7 @@
 // Pure.
 
 import type { ConsideredNow } from '../cognition/state';
-import type { Basis, InterventionType, LedgerEntry, LedgerKind, LedgerLink, Owner, Stance } from './types';
+import type { Basis, InterventionType, LedgerEntry, LedgerKind, LedgerLink, LedgerRelation, Owner, Stance } from './types';
 import { conceptTerms, similarity } from './considered';
 import { interrogatives, sentencesOf } from './questions';
 
@@ -397,4 +397,54 @@ export function toLogosGraph(entries: LedgerEntry[], links: LedgerLink[]) {
     })),
     edges: links.map((l) => ({ id: l.id, from: l.from, to: l.to, type: l.rel, owner: l.owner, note: l.reason })),
   };
+}
+
+/**
+ * The reader's relations, resolved to real edges.
+ *
+ * The reader names both ends by TEXT, because it cannot see ids. Matching is
+ * deterministic and deliberately strict: an end that does not clearly match
+ * something already recorded resolves to nothing, so a hallucinated pairing
+ * produces no edge rather than a wrong one. Later turns reason over these, so
+ * a wrong edge is worse than a missing one — a conclusion recorded as resting
+ * on something it does not rest on is exactly the false confidence this whole
+ * subsystem exists to catch.
+ */
+export function linksFromRelations(
+  relations: readonly { from: string; rel: LedgerRelation; to: string }[],
+  candidates: readonly LedgerEntry[],
+  now: number
+): LedgerLink[] {
+  const live = candidates.filter((e) => e.status !== 'retracted');
+  const find = (text: string): LedgerEntry | null => {
+    const t = text.trim();
+    if (t.length < 4) return null;
+    let best: { e: LedgerEntry; sc: number } | null = null;
+    for (const e of live) {
+      const sc = e.text.trim().toLowerCase() === t.toLowerCase() ? 1 : similarity(e.text, t);
+      if (!best || sc > best.sc) best = { e, sc };
+    }
+    return best && best.sc >= 0.6 ? best.e : null;
+  };
+  const out: LedgerLink[] = [];
+  const seen = new Set<string>();
+  for (const r of relations) {
+    const from = find(r.from);
+    const to = find(r.to);
+    if (!from || !to || from.id === to.id) continue;
+    const key = `${from.id}|${r.rel}|${to.id}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({
+      id: ledgerId('lr', now),
+      from: from.id,
+      to: to.id,
+      rel: r.rel,
+      // The edge is a reading of what was said, not a claim either party made.
+      owner: 'unknown',
+      reason: '',
+      createdAt: now,
+    });
+  }
+  return out;
 }

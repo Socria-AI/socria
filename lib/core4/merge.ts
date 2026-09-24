@@ -109,7 +109,7 @@ export function mergeState({ prior, read, signals, contract, readOk }: MergeInpu
   // With no reader this turn, the inferred parts of last turn's state are the
   // best available reading — far better than an empty state that routes
   // toward asking.
-  const base: CognitiveState = readOk ? read : { ...p, latest: 'other', resolved: false, newRelation: '', consideredNow: [], lastOutcome: null, work: p.work };
+  const base: CognitiveState = readOk ? read : { ...p, latest: 'other', resolved: false, newRelation: '', consideredNow: [], relations: [], lastOutcome: null, work: p.work };
 
   // ── directness: only ever from words ──
   let directness: Inferred<Directness>;

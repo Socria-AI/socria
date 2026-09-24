@@ -106,6 +106,43 @@ export async function loadLedger(userId: string, opts: { conversationId: string;
   }
 }
 
+/**
+ * The edges between ledger entries, for the turn that is about to happen.
+ *
+ * saveLedger has written links since the ledger existed and nothing ever read
+ * them back on the reply path — the graph view at /api/core4 was the only
+ * consumer. So the structure was being recorded and never used, which is a
+ * more expensive kind of dead code than an unused function: it costs a write
+ * every turn and pays nothing.
+ */
+export async function loadLinks(userId: string, limit = 400): Promise<LedgerLink[]> {
+  try {
+    const db = supabaseAdmin();
+    const { data, error } = await db
+      .from('reasoning_links')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    if (error) return fail('reasoning_links', error), [];
+    return (data ?? []).map((r) => {
+      const row = r as Record<string, unknown>;
+      return {
+        id: String(row.id),
+        from: String(row.from_id),
+        to: String(row.to_id),
+        rel: row.rel as LedgerLink['rel'],
+        owner: row.owner as LedgerLink['owner'],
+        reason: String(row.reason ?? ''),
+        createdAt: Number(row.created_at ?? 0),
+      };
+    });
+  } catch (e) {
+    fail('reasoning_links', e);
+    return [];
+  }
+}
+
 export async function saveLedger(userId: string, entries: LedgerEntry[], links: LedgerLink[]): Promise<void> {
   try {
     const db = supabaseAdmin();

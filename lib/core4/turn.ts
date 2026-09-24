@@ -33,8 +33,10 @@ import { diminishingReturns, questionBudget, familyOf } from './budget';
 import { selectIntervention, renderDecision } from './intervene';
 import { guardStructure, leaksHidden, type GuardInput } from './guard2';
 import { exactCheck, renderCheck, hiddenValues, computeAsked, statedSlips, type CheckResult, CHECK_FLOOR } from './verify';
-import { consideredView, entriesFromPerson, entriesFromSocria, mergeEntries, disputeTurn, supersedeRestated, raisable, echoesSocria, grounding } from './ledger';
+import { consideredView, entriesFromPerson, entriesFromSocria, mergeEntries, disputeTurn, supersedeRestated, raisable, echoesSocria, grounding, linksFromRelations } from './ledger';
 import { evidenceFromTurn } from './capability';
+import { buildProblem, renderProblem, type ProblemModel } from './problem';
+import { detectMissing, gateContributions, renderMissing, type MissingContribution } from './contribution';
 import { buildTrace } from './trace';
 import { questionLoad, stripInterrogatives, deleteSentences } from './questions';
 export { SentenceGate } from './stream-gate';
@@ -87,6 +89,10 @@ export interface PreparedTurn {
   superseded: LedgerEntry[];
   verify: CheckResult | null;
   hidden: string[];
+  /** the problem as a connected structure, this turn */
+  problem: ProblemModel;
+  /** what the structure says is absent, novelty-gated and expertise-gated */
+  missing: MissingContribution[];
   /** the prompt blocks, in order: state, verify, move */
   blocks: { state: string; verify: string; move: string };
   ms: Record<string, number>;
@@ -104,9 +110,10 @@ export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
 
   // Last turn's state and the ledger, together.
   const canStore = !!(input.userId && input.conversationId);
-  const [prior, ledger] = await Promise.all([
+  const [prior, ledger, priorLinks] = await Promise.all([
     canStore ? store.loadState(input.userId!, input.conversationId!) : Promise.resolve(null),
     input.userId ? store.loadLedger(input.userId, { conversationId: input.conversationId ?? '', projectId: input.projectId }) : Promise.resolve([] as LedgerEntry[]),
+    input.userId ? store.loadLinks(input.userId) : Promise.resolve([] as LedgerLink[]),
   ]);
   ms.load = Date.now() - t0;
 
@@ -161,6 +168,21 @@ export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
     ...considered.lines,
   ])];
 
+  // ── the problem, as a structure, and what the structure says is absent ──
+  //
+  // Built from the ledger plus the items of THIS message (provisional, since
+  // the real entries are written in finishTurn) — otherwise the detector is
+  // always a turn behind, and the commonest case, a conclusion stated now
+  // resting on an assumption made earlier, could never fire.
+  //
+  // Everything here is pure: no model call, no I/O, no added latency.
+  const provisional = input.conversationId
+    ? entriesFromPerson(state.consideredNow, input.lastUserText, { conversationId: input.conversationId, projectId: input.projectId, turn: state.turn, now: input.now }, lastSocria(input))
+    : [];
+  const problemEntries = [...ledger, ...provisional];
+  const problem = buildProblem(problemEntries, [...priorLinks, ...linksFromRelations(state.relations, problemEntries, input.now)], state);
+  const missing = gateContributions(detectMissing(problem, state), considered.items, state.expertise.value);
+
   const diminishing = diminishingReturns(state, signals, input.brief);
   const budget = questionBudget(state, signals, input.brief, diminishing);
 
@@ -170,8 +192,8 @@ export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
   const attempting = state.latest === 'attempt' || state.attempt !== 'none' || state.work === 'verification';
   // The PERSON's words only (council D13): an expression in one of Socria's
   // replies is never "the problem".
-  const problem = input.brief.filter((m) => m.role === 'user').slice(-3).map((m) => m.content).join('\n');
-  let verify: CheckResult | null = attempting ? exactCheck(problem, input.lastUserText) : null;
+  const posedText = input.brief.filter((m) => m.role === 'user').slice(-3).map((m) => m.content).join('\n');
+  let verify: CheckResult | null = attempting ? exactCheck(posedText, input.lastUserText) : null;
   if (verify) state.attempt = verify.verdict === 'correct' ? 'right' : 'wrong';
 
   const decide = () => {
@@ -234,7 +256,7 @@ export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
     decision = { ...decision, forced: true };
   }
 
-  let move = renderDecision({ ...decision, avoid: allLines.slice(0, 12) }, allocation);
+  let move = renderDecision({ ...decision, avoid: allLines.slice(0, 12) }, allocation) + renderMissing(missing);
   if (signals.offRecord && !signals.onRecord) {
     move += '\nThey asked for this to be off the record: say in one clause that Socria will not keep anything from this conversation from now on, and that "you can remember this" turns it back on. Then carry on.\n';
   }
@@ -256,11 +278,13 @@ export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
     decision: { ...decision, avoid: gateItems.slice(0, 12) },
     ledger,
     considered: { lines: allLines, items: gateItems },
+    problem,
+    missing,
     disputed,
     superseded,
     verify,
     hidden,
-    blocks: { state: renderStateBlock(state) + lastTime(ledger, input, state.turn), verify: verifyBlock + computed, move },
+    blocks: { state: renderStateBlock(state) + renderProblem(problem) + lastTime(ledger, input, state.turn), verify: verifyBlock + computed, move },
     ms,
   };
 }
@@ -438,8 +462,14 @@ export async function finishTurn(
   const merged = mergeEntries(p.ledger, [...fromPerson, ...fromSocria].map((e) => (privateHere ? { ...e, private: true } : e)), input.now);
   // No lexical auto-links (council D10): a link drawn from word overlap is
   // structure presented as the person's reasoning that they never stated.
-  // Links will come only from relations they state or the reader cites.
-  const links: LedgerLink[] = [];
+  // Links come only from relations they state or the reader cites — which is
+  // what this is. The reader names both ends by text and linksFromRelations
+  // matches them back to ids exactly or not at all, so the JUDGEMENT that two
+  // things stand in a relation is semantic and only the LOOKUP is lexical.
+  // Until now nothing filled this slot, so `depends_on` existed in the schema
+  // and never in the data, and nothing could notice a conclusion resting on
+  // an unchecked assumption (lib/core4/problem.ts).
+  const links = linksFromRelations(state.relations, [...p.ledger, ...merged.created], input.now);
 
   const next = recordTurn({ ...state, lastAt: input.now }, {
     type: decision.type,

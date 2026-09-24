@@ -71,6 +71,8 @@ const MODULES = [
   'lib/core4/allocation.ts',
   'lib/core4/intervene.ts',
   'lib/core4/considered.ts',
+  'lib/core4/problem.ts',
+  'lib/core4/contribution.ts',
   'lib/core4/guard2.ts',
   'lib/core4/verify.ts',
   'lib/core4/ledger.ts',

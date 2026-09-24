@@ -83,6 +83,7 @@ export type Practice = (typeof PRACTICE)[number];
 import {
   DIRECTNESS,
   LEDGER_KINDS,
+  LEDGER_RELATIONS,
   OUTCOME_LABELS,
   STUCK,
   STANCES,
@@ -91,6 +92,7 @@ import {
   type Directness,
   type Inferred,
   type LedgerKind,
+  type LedgerRelation,
   type OutcomeReading,
   type Stance,
   type Stuck,
@@ -115,6 +117,26 @@ export interface ConsideredNow {
   stance: Stance;
   /** why, when they rejected or changed it */
   reason: string;
+}
+
+/**
+ * How two things in the problem stand to each other.
+ *
+ * `LEDGER_RELATIONS` has named supports / contradicts / depends_on / assumes
+ * since the ledger was written, and nothing ever produced one: `linksForTurn`
+ * emits only derived_from, rejected_because and responds_to. So the schema
+ * could always say "this decision rests on that assumption" and the system
+ * never said it — which is why nothing could read it, and why Core 4 could
+ * not notice a conclusion standing on an unchecked number.
+ *
+ * `from` and `to` are the TEXT of the two items, matched back to ledger ids
+ * in turn.ts. Text because the reader cannot see ids; matched deterministically
+ * so a hallucinated pairing resolves to nothing rather than to the wrong edge.
+ */
+export interface ReadRelation {
+  from: string;
+  rel: LedgerRelation;
+  to: string;
 }
 
 /** One past turn, as the engine needs to remember it: what Socria did and how it landed. */
@@ -214,6 +236,8 @@ export interface CognitiveState {
   masteryEvidence: string[];
   /** considerations the person raised in their latest message */
   consideredNow: ConsideredNow[];
+  /** how items in the problem stand to each other, this turn (never carried forward: the edges persist, the reading does not) */
+  relations: ReadRelation[];
   /** how the previous Socria turn landed, read from their reply */
   lastOutcome: OutcomeReading | null;
   /** the last few turns: what Socria did, how much it asked, how it landed */
@@ -273,6 +297,7 @@ export const EMPTY_STATE: CognitiveState = {
   stuck: 'no',
   masteryEvidence: [],
   consideredNow: [],
+  relations: [],
   lastOutcome: null,
   history: [],
   questionsPreference: 'none',
@@ -328,6 +353,19 @@ function outcomeOf(v: unknown): OutcomeReading | null {
   const label = oneOf(r.label, OUTCOME_LABELS, 'UNKNOWN');
   if (label === 'UNKNOWN' && !r.label) return null;
   return { label, confidence: clamp01(r.confidence, 0.4), source: 'inferred', ...(line(r.evidence) ? { evidence: line(r.evidence) } : {}) };
+}
+
+function relationsOf(v: unknown): ReadRelation[] {
+  if (!Array.isArray(v)) return [];
+  return v
+    .filter((c): c is Record<string, unknown> => !!c && typeof c === 'object')
+    .map((c) => ({
+      from: line(c.from),
+      rel: oneOf(c.rel, LEDGER_RELATIONS, 'depends_on'),
+      to: line(c.to),
+    }))
+    .filter((c) => c.from && c.to && c.from !== c.to)
+    .slice(0, 12);
 }
 
 function consideredOf(v: unknown): ConsideredNow[] {
@@ -403,6 +441,7 @@ export function sanitizeState(raw: unknown): CognitiveState {
     stuck: oneOf(r.stuck, STUCK, 'no'),
     masteryEvidence: list(r.masteryEvidence),
     consideredNow: consideredOf(r.consideredNow),
+    relations: relationsOf(r.relations),
     lastOutcome: outcomeOf(r.lastOutcome),
     history: [],
     questionsPreference: 'none',

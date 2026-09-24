@@ -88,6 +88,21 @@ consideredNow [{"kind":"question|objection|assumption|alternative|claim|hypothes
               ruling it out is "rejects". NEVER include anything Socria said.
               Empty if none.
 
+relations     [{"from":"<text>","rel":"supports|contradicts|depends_on|assumes","to":"<text>"}]
+              How things in this problem stand to EACH OTHER. Use the exact
+              text of an item from consideredNow above, or from the "Already on
+              the table" list you were given. Both ends must be things that
+              have actually been said.
+                depends_on  the first cannot hold unless the second does — a
+                            conclusion resting on a number, a plan resting on a
+                            date. THIS IS THE IMPORTANT ONE.
+                assumes     the first takes the second for granted
+                supports    the second is evidence for the first
+                contradicts they cannot both be true
+              Only relations that are plainly there. An edge you are unsure of
+              is worse than no edge, because later turns reason over it.
+              Empty is a normal answer.
+
 lastOutcome   {"label":"HELPED|PARTIALLY_HELPED|WAS_REDUNDANT|CONFUSED_USER|FRUSTRATED_USER|WAS_TOO_DIRECT|WAS_TOO_INDIRECT|UNLOCKED_PROGRESS|REVEALED_MASTERY|REVEALED_MISUNDERSTANDING|UNKNOWN","confidence":0-1,"evidence":"..."}
               How Socria's PREVIOUS reply landed, judged ONLY from their latest
               message. One turn is weak evidence: keep confidence modest unless
