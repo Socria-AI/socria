@@ -511,6 +511,8 @@ export async function finishTurn(
       superseded: p.superseded.length,
     },
     considered: p.considered.items.length,
+    missing: p.missing,
+    competence: p.competence,
     ms: p.ms,
     models: { reply: served, cognition: COGNITION_MODEL },
     promptVersion,

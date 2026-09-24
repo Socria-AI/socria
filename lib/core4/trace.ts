@@ -51,6 +51,17 @@ export interface TurnTrace {
   sent: { questions: number; chars: number };
   ledger: { user: number; socria: number; unknown: number; disputed: number; superseded?: number };
   considered: number;
+  /**
+   * What the structure said was absent, and whether the reply was given it.
+   *
+   * Content-free: kinds and counts, never the finding's text — the text
+   * quotes the person. Without this the whole contribution stage would be
+   * invisible to the evals, and a stage nobody can measure is a stage nobody
+   * can tell is working.
+   */
+  missing: { found: string[]; raised: number };
+  /** task-scoped competence, as the source that decided it — never a trait */
+  competence: { value: string; source: string };
   ms: Record<string, number>;
   models: { reply: string | null; cognition: string | null };
   versions: { prompt: string; trace: number };
@@ -73,6 +84,10 @@ export function buildTrace(x: {
   sentChars: number;
   ledger: { user: number; socria: number; unknown: number; disputed: number; superseded?: number };
   considered: number;
+  // Optional: the trace is telemetry and runs beside the reply, so a caller
+  // that has not been updated must degrade to a thinner trace, never throw.
+  missing?: readonly { kind: string }[];
+  competence?: { value: string };
   ms: Record<string, number>;
   models: { reply: string | null; cognition: string | null };
   promptVersion: string;
@@ -127,6 +142,8 @@ export function buildTrace(x: {
     sent: { questions: x.sentQuestions, chars: x.sentChars },
     ledger: x.ledger,
     considered: x.considered,
+    missing: { found: (x.missing ?? []).map((m) => m.kind), raised: (x.missing ?? []).length ? 1 : 0 },
+    competence: { value: x.competence?.value ?? 'unknown', source: x.state.expertise.source },
     ms: x.ms,
     models: x.models,
     versions: { prompt: x.promptVersion, trace: TRACE_VERSION },
