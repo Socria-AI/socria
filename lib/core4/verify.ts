@@ -192,3 +192,51 @@ export function hiddenValues(c: CheckResult | null): string[] {
   }
   return [...out].filter((x) => x.length >= 2 || /\d/.test(x));
 }
+
+/**
+ * Arithmetic the person STATED, checked exactly: "A − B = C" lines in their
+ * own message, money and k/M/B suffixes included. Run 6 (decision-015): a
+ * vet asked to have her math checked, wrote "$410k − $163.9k = $256k" (it
+ * is $246.1k), and neither Core 4 nor either baseline caught it — the exact
+ * path above deliberately skips money and handles "problem, then answer",
+ * not an equation someone wrote out. A slip is reported only when the
+ * stated value misses by more than its own rounding.
+ */
+export interface StatedSlip { line: string; stated: string; actual: string }
+const AMOUNT = String.raw`\$?\s*\d[\d,]*(?:\.\d+)?\s*(?:k|K|m|M|bn|B)?`;
+const STATED = new RegExp(String.raw`(${AMOUNT})\s*([-−–+×x*/÷])\s*(${AMOUNT})(?:\s*([-−–+×x*/÷])\s*(${AMOUNT}))?\s*=\s*(${AMOUNT})`, 'g');
+function amount(raw: string): { value: number; unit: number; money: boolean } | null {
+  const m = raw.replace(/\s+/g, '').match(/^(\$?)([\d,]+(?:\.\d+)?)(k|K|m|M|bn|B)?$/);
+  if (!m) return null;
+  const unit = !m[3] ? 1 : /k/i.test(m[3]) ? 1e3 : /bn|B/.test(m[3]) ? 1e9 : 1e6;
+  // "m" without a "$" could be metres: only a money amount scales by it.
+  if (m[3] && /^m$/.test(m[3]) && !m[1]) return null;
+  const n = Number(m[2].replace(/,/g, ''));
+  return Number.isFinite(n) ? { value: n * unit, unit, money: !!m[1] } : null;
+}
+function apply(a: number, op: string, b: number): number {
+  if (op === '+') return a + b;
+  if (/[-−–]/.test(op)) return a - b;
+  if (/[×x*]/.test(op)) return a * b;
+  return a / b;
+}
+export function statedSlips(text: string): StatedSlip[] {
+  const out: StatedSlip[] = [];
+  for (const m of text.matchAll(STATED)) {
+    const [line, a, op1, b, op2, c, eq] = m;
+    const A = amount(a), B = amount(b), C = c ? amount(c) : null, E = amount(eq);
+    if (!A || !B || !E || (c && !C)) continue;
+    // Multiplying two money amounts is not arithmetic anyone states.
+    let v = apply(A.value, op1, B.value);
+    if (op2 && C) v = apply(v, op2, C.value);
+    if (!Number.isFinite(v)) continue;
+    const digits = (eq.match(/\.(\d+)/)?.[1].length ?? 0);
+    const rounding = (E.unit * Math.pow(10, -digits)) / 2;
+    const tol = Math.max(rounding * 1.01, Math.abs(v) * 0.002);
+    if (Math.abs(v - E.value) <= tol) continue;
+    const u = E.unit;
+    const shown = u > 1 ? `${Math.round((v / u) * 10) / 10}${u === 1e3 ? 'k' : u === 1e6 ? 'M' : 'bn'}` : String(Math.round(v * 100) / 100);
+    out.push({ line: line.trim(), stated: eq.trim(), actual: `${E.money ? '$' : ''}${shown}` });
+  }
+  return out;
+}

@@ -32,7 +32,7 @@ import { allocate } from './allocation';
 import { diminishingReturns, questionBudget, familyOf } from './budget';
 import { selectIntervention, renderDecision } from './intervene';
 import { guardStructure, leaksHidden, type GuardInput } from './guard2';
-import { exactCheck, renderCheck, hiddenValues, computeAsked, type CheckResult, CHECK_FLOOR } from './verify';
+import { exactCheck, renderCheck, hiddenValues, computeAsked, statedSlips, type CheckResult, CHECK_FLOOR } from './verify';
 import { consideredView, entriesFromPerson, entriesFromSocria, mergeEntries, disputeTurn, supersedeRestated, raisable, echoesSocria, grounding } from './ledger';
 import { evidenceFromTurn } from './capability';
 import { buildTrace } from './trace';
@@ -222,6 +222,16 @@ export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
       decision = { ...decision, forced: true };
     }
     else decision = { ...decision, type: 'ANSWER', reasonCode: `${decision.reasonCode}.not_computed` };
+  }
+
+  // Arithmetic they wrote out, checked exactly (run 6, decision-015). Under
+  // a withhold, only that the line does not compute — never the value.
+  const slips = statedSlips(input.lastUserText);
+  if (slips.length) {
+    computed += `\n=== Arithmetic in their message, computed exactly ===\n${slips
+      .map((s) => (allocation.withhold ? `${s.line} — does not compute (do not give the right value; say which line to recheck)` : `${s.line} — the right value is ${s.actual}, not ${s.stated}`))
+      .join('\n')}\nSay this plainly and early, and carry the corrected figure through anything that depends on it.\n`;
+    decision = { ...decision, forced: true };
   }
 
   let move = renderDecision({ ...decision, avoid: allLines.slice(0, 12) }, allocation);

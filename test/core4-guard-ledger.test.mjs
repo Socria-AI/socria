@@ -17,7 +17,7 @@ import { classify, similarity, gateCandidates } from './.tmp/considered.mjs';
 import { scrubPII, grounding, entriesFromPerson, entriesFromSocria, mergeEntries, disputeTurn, supersedeRestated, linksForTurn, consideredView, toLogosGraph } from './.tmp/ledger.mjs';
 import { summarize, evidenceFromTurn, assistanceOf } from './.tmp/capability.mjs';
 import { buildTrace } from './.tmp/trace.mjs';
-import { exactCheck, sanitizeCheck, renderCheck, hiddenValues, computeAsked } from './.tmp/verify.mjs';
+import { exactCheck, sanitizeCheck, renderCheck, hiddenValues, computeAsked, statedSlips } from './.tmp/verify.mjs';
 import { stripSycophanticOpener, sentencesOf, deleteSentences } from './.tmp/questions.mjs';
 import { EMPTY_STATE } from './.tmp/state.mjs';
 
@@ -387,6 +387,16 @@ console.log('\n=== run 5: an uncertainty is what they were unsure of, not what t
   ], "Honestly I don't know what specificity refers to.", c);
   const view = consideredView(mergeEntries([], es, 100).entries, { focus: 'specificity', conversationId: 'spec', projectId: null });
   ok('rendered as "they were unsure", never "they hold"', view.lines.some((l) => l.startsWith('they were unsure:')) && !view.lines.some((l) => l.startsWith('they hold:')), view.lines.join(' | '));
+}
+
+console.log('\n=== run 6: arithmetic they wrote out is checked exactly (decision-015) ===');
+{
+  const s = statedSlips('My math: annual debt service ≈ $163,900. $410k − $163.9k = $256k, versus $182k as an associate.');
+  ok('"$410k − $163.9k = $256k" is caught, with the right value', s.length === 1 && s[0].actual === '$246.1k' && s[0].stated === '$256k', JSON.stringify(s));
+  ok('a wrong product is caught', statedSlips('so 12 x 7 = 82').length === 1);
+  for (const fine of ['$410k − $163.9k = $246.1k', 'so 12 x 7 = 84 and 84 + 6 = 90', 'I get 3.5 + 2.25 = 5.75', '$1.2M / 12 = $100k per month', '2024-05-01 = launch date', 'I have 3 kids = chaos', '100 - 7 = 93 roughly']) {
+    ok(`no slip in "${fine}"`, statedSlips(fine).length === 0, JSON.stringify(statedSlips(fine)));
+  }
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
