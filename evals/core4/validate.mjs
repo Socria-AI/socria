@@ -39,6 +39,14 @@ const args = Object.fromEntries(
 const which = args.which || 'ablation';
 const runDir = resolve(args.run || `evals/core4/runs/validate-${which}`);
 const REPEATS = Number(args.repeats || 3);
+// --live runs the calls against the REAL provider on the model Core 4 ships
+// with, which is the only way to turn every number in this file from an upper
+// bound into a measurement. --limit takes the first N labelled items, so a
+// targeted production check costs a few dollars rather than a few hundred.
+const LIVE = !!args.live;
+const LIMIT = args.limit ? Number(args.limit) : null;
+const MODEL = args.model || null;
+const say = (o) => process.stdout.write(JSON.stringify(o) + '\n');
 mkdirSync(runDir, { recursive: true });
 
 const here = new URL('.', import.meta.url).pathname;
@@ -75,6 +83,8 @@ const keyOf = (req) =>
 
 const SAMPLES_WANTED = 5;
 const missing = new Set();
+let liveCalls = 0;
+let liveTokens = 0;
 let served = 0;
 // INDEPENDENT SAMPLES NEED INDEPENDENT ANSWERS.
 //
@@ -124,9 +134,38 @@ const step = {
   },
 };
 
+// LIVE MODE. Real provider, real model, no stand-in and no cache: the numbers
+// stop being an upper bound and start being the thing itself. Everything else
+// in this file is unchanged, so a live report is directly comparable with a
+// stepwise one.
+if (LIVE) {
+  if (!process.env.OPENAI_API_KEY) {
+    say({ status: 'error', error: 'live mode needs OPENAI_API_KEY in the environment' });
+    process.exit(1);
+  }
+  const { openAIClient } = await import(pathToFileURL(join(runDir, '.build', 'model.mjs')).href)
+    .catch(async () => import('../../lib/core4/model.ts').catch(() => null)) ?? {};
+  const OpenAI = (await import('openai')).default;
+  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  step.client = {
+    async complete(req) {
+      const model = MODEL || req.model;
+      const res = await openai.chat.completions.create({
+        model,
+        messages: [{ role: 'system', content: req.system }, ...req.messages],
+        max_completion_tokens: req.maxTokens,
+        temperature: req.temperature,
+        ...(req.json ? { response_format: { type: 'json_object' } } : {}),
+      });
+      liveCalls += 1;
+      liveTokens += res.usage?.total_tokens ?? 0;
+      return { text: res.choices?.[0]?.message?.content ?? '', served: res.model };
+    },
+    stream() { throw new Error('not used'); },
+  };
+}
 globalThis.__socriaModelClient = step.client;
 
-const say = (o) => process.stdout.write(JSON.stringify(o) + '\n');
 const pct = (n, d) => (d ? Math.round((n / d) * 1000) / 10 : null);
 
 /** Wrap the stepwise client so one logical probe can be answered per item. */
@@ -142,7 +181,7 @@ async function ablation() {
   const { buildProblem } = await load('problem');
   const cf = await load('counterfactual');
   const set = labelled('ablation.json');
-  const items = set.items ?? set;
+  const items = (LIMIT ? (set.items ?? set).slice(0, LIMIT) : (set.items ?? set));
   const paraSet = existsSync(join(here, 'labelled', 'ablation-paraphrase.json'))
     ? (labelled('ablation-paraphrase.json').variants ?? [])
     : [];
@@ -263,7 +302,10 @@ async function ablation() {
     misses: misses.slice(0, 20),
     flips: flips.slice(0, 20),
     calls: step.calls.length,
-    note: 'Stand-in model is frontier-grade; production runs gpt-4o-mini. These are UPPER BOUNDS.',
+    live: LIVE ? { calls: liveCalls, totalTokens: liveTokens, model: MODEL || 'per-call default (COGNITION_MODEL)' } : null,
+    note: LIVE
+      ? 'LIVE: real provider, real shipping model. These are measurements, not upper bounds.'
+      : 'Stand-in model is frontier-grade; production runs gpt-4o-mini. These are UPPER BOUNDS.',
   };
   writeFileSync(join(runDir, 'report.json'), JSON.stringify(report, null, 2));
   return report;
@@ -279,7 +321,7 @@ async function claims() {
   const { buildProblem } = await load('problem');
   const cal = await load('calibration');
   const set = labelled('claims.json');
-  const items = set.items ?? set;
+  const items = LIMIT ? (set.items ?? set).slice(0, LIMIT) : (set.items ?? set);
   const ST = { currentGoal: '', currentFocus: '', blockingUnknown: '', turn: 2 };
   const entry = (text) => ({
     id: 'c1', conversationId: 'c1', projectId: null, userId: 'u', turn: 1, kind: 'conclusion',
@@ -332,7 +374,10 @@ async function claims() {
     stability: { stable, unstable, rate: pct(stable, stable + unstable), repeats: REPEATS },
     wrong: wrong.slice(0, 20),
     calls: step.calls.length,
-    note: 'Stand-in model is frontier-grade; production runs gpt-4o-mini. These are UPPER BOUNDS.',
+    live: LIVE ? { calls: liveCalls, totalTokens: liveTokens, model: MODEL || 'per-call default (COGNITION_MODEL)' } : null,
+    note: LIVE
+      ? 'LIVE: real provider, real shipping model. These are measurements, not upper bounds.'
+      : 'Stand-in model is frontier-grade; production runs gpt-4o-mini. These are UPPER BOUNDS.',
   };
   writeFileSync(join(runDir, 'report.json'), JSON.stringify(report, null, 2));
   return report;

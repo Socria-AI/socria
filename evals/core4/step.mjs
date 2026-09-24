@@ -50,8 +50,21 @@ try {
   const scenario = loadCorpus().find((s) => s.id === args.scenario);
   if (!scenario) throw new Error(`no scenario "${args.scenario}"`);
   mkdirSync(runDir, { recursive: true });
+  // --off switches named mechanisms off at BUILD time (evals/core4/lib/ablate.mjs),
+  // so an arm can answer the only question that matters about a mechanism: is
+  // the reply worse without it? The stub returns exactly what the real module
+  // returns when a probe finds nothing, so the arm is Core 4 on a quiet turn
+  // rather than Core 4 with a hole in it.
+  const off = typeof args.off === 'string' ? args.off.split(',').map((x) => x.trim()).filter(Boolean) : [];
   const routePath = join(runDir, '.build', 'chat.mjs');
-  if (!existsSync(routePath)) await buildRoute(join(runDir, '.build'));
+  if (!existsSync(routePath)) {
+    if (off.length) {
+      const { buildAblatedRoute } = await import('./lib/ablate.mjs');
+      await buildAblatedRoute(join(runDir, '.build'), off);
+    } else {
+      await buildRoute(join(runDir, '.build'));
+    }
+  }
 
   const world = freezeWorld();
   const step = stepwiseClient(runDir, arm);

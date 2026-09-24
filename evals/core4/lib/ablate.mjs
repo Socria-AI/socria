@@ -24,8 +24,7 @@
 // finds nothing — which is the correct null hypothesis. The arm is not Core 4
 // with a hole in it; it is Core 4 on a turn where the mechanism found nothing.
 
-import { build } from 'esbuild';
-import { mkdirSync } from 'node:fs';
+import { buildRoute } from './build.mjs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -93,7 +92,6 @@ export const MECHANISMS = {
  * @param {string[]} off       keys of MECHANISMS to switch off
  */
 export async function buildAblatedRoute(outDir, off) {
-  mkdirSync(outDir, { recursive: true });
   const unknown = off.filter((k) => !MECHANISMS[k]);
   if (unknown.length) throw new Error(`unknown mechanism(s): ${unknown.join(', ')}`);
 
@@ -106,12 +104,11 @@ export async function buildAblatedRoute(outDir, off) {
     byModule.set(m.module, m);
   }
 
-  const stubPlugin = {
+  const stub = {
     name: 'ablate',
     setup(b) {
-      for (const [mod, spec] of byModule) {
-        const filter = new RegExp(`(^|/)${mod}$`);
-        b.onResolve({ filter }, (args) => {
+      for (const mod of byModule.keys()) {
+        b.onResolve({ filter: new RegExp(`(^|/)${mod}$`) }, (args) => {
           if (!args.importer.includes('/lib/core4/')) return null;
           return { path: `ablate:${mod}`, namespace: 'ablate' };
         });
@@ -119,9 +116,8 @@ export async function buildAblatedRoute(outDir, off) {
       b.onLoad({ filter: /.*/, namespace: 'ablate' }, (args) => {
         const mod = args.path.replace('ablate:', '');
         const spec = byModule.get(mod);
-        const real = join(ROOT, 'lib', 'core4', `${mod}.ts`);
         return {
-          contents: spec.stub.replaceAll('__REAL__', real),
+          contents: spec.stub.replaceAll('__REAL__', join(ROOT, 'lib', 'core4', `${mod}.ts`)),
           loader: 'ts',
           resolveDir: join(ROOT, 'lib', 'core4'),
         };
@@ -129,17 +125,6 @@ export async function buildAblatedRoute(outDir, off) {
     },
   };
 
-  await build({
-    entryPoints: { chat: join(ROOT, 'app/api/chat/route.ts') },
-    bundle: true,
-    format: 'esm',
-    platform: 'node',
-    outdir: outDir,
-    outExtension: { '.js': '.mjs' },
-    external: ['next', 'next/server', 'openai', '@clerk/nextjs', '@clerk/nextjs/server', 'undici', 'unpdf', '@supabase/supabase-js'],
-    alias: { 'server-only': join(ROOT, 'test/helpers/server-only-shim.mjs') },
-    plugins: [stubPlugin],
-    logLevel: 'error',
-  });
-  return join(outDir, 'chat.mjs');
+  // The SAME build the real route uses, with one plugin in front of it.
+  return buildRoute(outDir, { plugins: [stub] });
 }

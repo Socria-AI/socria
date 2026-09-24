@@ -17,7 +17,16 @@ export const ROOT = join(here, '..', '..', '..');
 const HELPERS = join(ROOT, 'test', 'helpers');
 export const FAKE_DB = join(HELPERS, 'fake-supabase.mjs');
 
-export async function buildRoute(outDir) {
+/**
+ * @param {string} outDir
+ * @param {{plugins?: import('esbuild').Plugin[]}} [opts]
+ *   `plugins` are prepended, so an ablation can intercept a module before the
+ *   eval-swap plugin sees it. One build config, not two: an ablated arm that
+ *   differs from the real route in any way other than the mechanism under test
+ *   is not an ablation, it is a different system, and a duplicated config is
+ *   the obvious way for that to happen without anyone noticing.
+ */
+export async function buildRoute(outDir, opts = {}) {
   mkdirSync(outDir, { recursive: true });
   await build({
     entryPoints: { chat: join(ROOT, 'app/api/chat/route.ts') },
@@ -28,6 +37,7 @@ export async function buildRoute(outDir) {
     outExtension: { '.js': '.mjs' },
     tsconfig: join(ROOT, 'tsconfig.json'),
     plugins: [
+      ...(opts.plugins ?? []),
       {
         name: 'eval-swap',
         setup(b) {
