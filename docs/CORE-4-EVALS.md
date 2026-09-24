@@ -687,6 +687,49 @@ overreaching. The next evidence has to come from human raters
 (`evals/core4/human-pack.mjs`) and from new scenarios. Every scenario in
 this corpus has now been used.
 
+### Run 7 — the power-user suite, on a bundle whose gate silenced it
+
+Eight scenarios written so that the valuable contribution is only reachable
+if the system kept the structure across turns: a raise decision resting on a
+scoping choice made four turns earlier, a design contradicting an invariant
+declared three turns back, a timeline still resting on a withdrawn
+contractor, a load-bearing claim with nothing behind it, an unresolved
+question upstream of every number since, a two-option framing, a matched
+expert/novice pair — and one **control** where the reasoning is complete and
+raising anything is the failure.
+
+| | Core 4 | Baseline | Tie | n |
+|---|---|---|---|---|
+| scenarios | **2** | **6** | 0 | 8 |
+| turns | 4 | 14 | 4 | 22 |
+
+**A loss, and not a clean test.** The frozen bundle contained the problem
+model and the detector but not two fixes found afterwards by the
+end-to-end test: the novelty gate was classifying each finding against the
+person's own sentences *including the ones the finding quotes*, so most
+findings were dropped as already-said; and the problem model was unscoped,
+so it mixed in other conversations. Run 8 re-runs Core 4 alone against these
+same baseline transcripts with both fixed.
+
+**What it did show, which the score does not.**
+- **The control was won by Core 4.** The baseline reopened an assumption the
+  statistician had settled and the regulator had accepted, at ~2.5× the
+  length; the judge marked it paternalistic. Core 4 answered and stopped.
+  Manufactured novelty is the failure mode this architecture is most at risk
+  of, and on the one scenario built to catch it, it did not.
+- **The stale-premise scenario was won by Core 4**, which opened by naming
+  that the March date came from a contracted build she had withdrawn — the
+  exact target of the STALE_BELIEF detector, hit even with the gate bug.
+- **`power-rests-on-001` was missed by both.** Neither brought the turn-1
+  annual-contract exclusion back to the turn-3 raise decision. That is the
+  canonical case for this architecture and it failed on the bundle where the
+  gate was suppressing findings.
+- Core 4 asked no questions at all (0.00 per reply vs 0.05), wrote 303 words
+  to the baseline's 425, and scored friction 1.63 vs 2.63, peer 5.00 vs
+  4.63, agency 5.00 vs 4.88 — and helpfulness 4.25 vs 4.75. The pattern is
+  the same one six runs have shown: restraint is not the problem.
+- `mustContribute` 3/6 vs 5/6.
+
 ### Full corpus
 
 Not yet run.
