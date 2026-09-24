@@ -15,9 +15,11 @@
 // upstream error object rides along with it.
 
 import { classifyUpstream, failureText, streamFailureNotice } from './.tmp/upstream-error.mjs';
+import { probeModels, summarise, deployedCommit } from './.tmp/upstream-health.mjs';
 
 let pass = 0, fail = 0;
 const ok = (n, c, x = '') => (c ? pass++ : (fail++, console.log('FAIL', n, x)));
+const check = ok;
 const err = (o) => Object.assign(new Error(o.message ?? 'x'), o);
 
 // The same three, once the reply has started streaming. Reported from dev:
@@ -201,6 +203,32 @@ console.log('\n=== nothing from a body is trusted into the UI unchecked ===');
   // The real shape still passes.
   ok('a genuine six-char ref is kept',
     failureText({ error: 'Failed.', ref: 'a1b2c3' }) === 'Failed. (ref a1b2c3)');
+}
+
+// Three rounds of "quote me the sentence" is two too many: the deployment can
+// answer both questions itself — can it reach the provider, and is it even
+// running the build we think it is.
+console.log('=== the deployment answering for itself ===');
+{
+  const client = (fail) => ({ models: { retrieve: async (id) => { const e = fail[id]; if (e) throw e; return { id }; } } });
+  const ok = await probeModels(client({}), ['a', 'b']);
+  check('a reachable model passes', ok.every((p) => p.ok) && ok.length === 2);
+  const unreachable = Object.assign(new Error('Connection error.'), { name: 'APIConnectionError' });
+  const mixed = await probeModels(client({ a: unreachable }), ['a', 'b']);
+  check('a failure is classified, not raw', mixed[0].code === 'upstream_unreachable' && !/Connection error/.test(JSON.stringify(mixed[0])), JSON.stringify(mixed[0]));
+  check('  and the others are still tried', mixed[1].ok === true);
+  const base = { commit: 'abc1234', node: 'v22', hasApiKey: true };
+  check('no key is said plainly', /No OPENAI_API_KEY/.test(summarise({ ...base, hasApiKey: false, probes: [] })));
+  check('unreachable names egress, not the key', /egress, DNS/.test(summarise({ ...base, probes: mixed })));
+  const badKey = await probeModels(client({ a: Object.assign(new Error('x'), { status: 401 }) }), ['a']);
+  check('a rejected key says to replace it', /Replace OPENAI_API_KEY/.test(summarise({ ...base, probes: badKey })));
+  const badModel = await probeModels(client({ a: Object.assign(new Error('x'), { status: 404 }) }), ['a']);
+  check('a missing model says so', /model id/.test(summarise({ ...base, probes: badModel })));
+  check('all clear says the fault is further in', /after this point/.test(summarise({ ...base, probes: ok })));
+  check('the commit is reported short', deployedCommit({ VERCEL_GIT_COMMIT_SHA: 'abcdef1234567890' }) === 'abcdef1');
+  check('a host that does not say is not guessed at', deployedCommit({}) === null);
+  const probed = await probeModels(client({ a: Object.assign(new Error('boom'), { status: 401, message: 'sk-live-abc is invalid' }) }), ['a']);
+  check('no part of the error text survives', !/sk-live|boom/.test(JSON.stringify(probed)), JSON.stringify(probed));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
