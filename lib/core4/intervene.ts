@@ -580,9 +580,27 @@ export function renderDecision(dec: InterventionDecision, a: Allocation): string
   // the prompt's own default is already the least language the move needs,
   // and a second instruction to be brief is how a short reply becomes a
   // curt one.
+  //
+  // The three clauses after the first are not decoration: each answers a
+  // padding failure a blind judge named in the E15 A/B (run 9 vs run 9b, the
+  // same system differing only in this line).
+  //
+  //   "nothing they already know" — `complete` only fires when expertise is
+  //   expert, but the expert calibration clause is attached to TEACHING moves
+  //   only, so a CHALLENGE to an expert got "cover more" with nothing saying
+  //   "not the basics". The judge caught the result: a device-latency primer
+  //   written for a twenty-year distributed-systems principal who had already
+  //   attributed the cost to fsync. The guarantee belongs here, where the
+  //   expertise is already known to hold.
+  //
+  //   "nothing you would concede in the same breath" — the same packet raised
+  //   a quorum-in-memory lever and conceded "most ledgers decline" one clause
+  //   later. A consideration you immediately withdraw cannot change what they
+  //   do, which is the test the first sentence already sets; it needed saying
+  //   out loud.
   const coverage =
     dec.coverage === 'complete'
-      ? 'COVERAGE: this is a consequential call and they work in this area. Completeness on what matters beats brevity here: cover every non-obvious consideration that would change what they do or conclude — each once, as tightly as it can be said — then stop. Do not restate what they established, do not add a summary, and do not reach for extra considerations to fill the space. Where the objective above caps how much to add ("one sentence on it", "then stop"), this supersedes that cap; what kind of move this is, and the question limit, still stand.'
+      ? 'COVERAGE: this is a consequential call and they work in this area. Completeness on what matters beats brevity here: cover every non-obvious consideration that would change what they do or conclude — each once, as tightly as it can be said — then stop. Nothing they already know: no primer on their own field, no definitions of terms they used correctly, no restating their setup back to them. Nothing you would concede in the same breath — a consideration you raise and then withdraw changes nothing and costs them the reading. Do not add a summary, and do not reach for extra considerations to fill the space; covering what matters is the instruction, and length is not. Where the objective above caps how much to add ("one sentence on it", "then stop"), this supersedes that cap; what kind of move this is, and the question limit, still stand.'
       : null;
 
   // Not forced: constraints only; the model chooses the move (council D1).

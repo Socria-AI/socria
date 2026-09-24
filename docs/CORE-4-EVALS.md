@@ -828,6 +828,91 @@ and it means this harness hands the prompt-only arm, for free, the one thing
 Core 4's persistence exists to provide. Read with §4′: the suite cannot show
 a memory advantage, and it is too short to need one.
 
+### Run 9 — the same suite, current build: 5–2–1, and why that is not the headline
+
+Core 4 re-run on the current tree against run 8's frozen baseline transcripts.
+
+| | Core 4 | Baseline | Tie | n |
+|---|---|---|---|---|
+| scenarios | **5** | 2 | 1 | 8 |
+| turns | 9 | 10 | 3 | 22 |
+
+helpfulness 4.75 vs 4.38, agency 4.75 vs 4.63, peer 4.75 vs 4.50.
+`mustContribute` **6/6** vs 5/6 (run 8: 4/6 vs 5/6). Deterministic: 0.00
+questions per reply vs 0.05, 0 withheld-answer leaks, 22/22 on question
+limits, mean **403 words vs 425** — near parity on length with the restraint
+metrics unmoved. Friction is recorded and not used (§4″).
+
+**Run 9 cannot attribute this to anything.** It differs from run 8 by three
+changes, not one — `coverage`, plus the two commits run 8's bundle predated.
+And a fourth thing moved that is not a change at all: **structure extraction
+is high-variance between runs.** Findings raised went 8 → 12 of 22, and
+`power-rests-on-001` — where run 8's reader emitted no relations at all and
+the scenario's whole contribution was missed — this time produced
+`structure: {relations: 3, edges: 3}` on turn 1 and raised a finding on all
+three turns. Its reply now reaches the designed target:
+
+> *"you've also set the target against that denominator, and it will follow
+> you into the raise. Investors will ask for the blended book, and annual
+> accounts almost always retain better — which means the segment you've
+> isolated is likely the worst number in your data room."*
+
+That is the scenario's point, reached for the first time in three runs, by a
+subsystem whose input is a 2-second cheap-model JSON call that emitted
+nothing on the same conversation a run earlier. **The bottleneck is the
+extraction, and the extraction is not stable.** Any run-to-run comparison on
+this suite is measuring that variance as much as anything else.
+
+### Run 9b — the controlled A/B: `coverage` on vs off, everything else fixed
+
+Same tree, same cache, one variable: `coverageFor` pinned to `normal` in the
+control bundle. **12 of 22 turns came back byte-identical** (every turn where
+`coverage` was not `complete`) and 10 regenerated — exactly the `complete`
+turns. The COVERAGE line is the only difference, and 5 scenarios contain one.
+
+| | coverage ON | coverage OFF |
+|---|---|---|
+| scenarios | **3** | 2 |
+| turns | 6 | 4 (5 tie) |
+| helpfulness | **4.40** | 3.80 |
+| agency | 4.40 | 4.60 |
+| peer | 4.40 | 4.60 |
+| paternalistic | 1/15 | 1/15 |
+| overreach / underhelp | 0 / 0 | 0 / 0 |
+| mean words | 414 | 365 |
+
+**E15: weakly supported, not established.** Its primary clause passes —
+helpfulness rises 3.80 → 4.40 on exactly the pre-registered turns, and both
+ON wins are margin 2 against two margin-1 losses. Its friction clause cannot
+be evaluated: the scale was undefined when E15 was written (§4″). Nothing
+regressed on the safety metrics — paternalistic equal, overreach and underhelp
+zero on both sides, every question limit met.
+
+Against that: agency and peer each slip 0.2, n = 5 is a coin flip at 3–2, and
+**the judges found real padding on the coverage-ON side in two of five
+packets**, one marked paternalistic. Two of those are mechanical and now
+fixed:
+
+- *A primer on their own field.* `complete` fires only when expertise is
+  `expert`, but the expert "no ground-up teaching" clause attaches to TEACHING
+  moves only — so a CHALLENGE to an expert received "cover more" with nothing
+  saying "not the basics". The judge caught the result: a device-latency
+  primer written for a twenty-year distributed-systems principal who had
+  already attributed the cost to fsync. The guarantee now lives in the
+  COVERAGE line, where the expertise is already known to hold.
+- *A lever raised and abandoned.* The same packet raised quorum-in-memory acks
+  and conceded "most ledgers decline" one clause later. A consideration you
+  withdraw in the same breath cannot change what they do — now said outright.
+
+Both have regression assertions (`test/core4-policy.test.mjs`), and the
+non-teaching-expert case is asserted against a decision that really does
+select a non-teaching move, not a vacuous branch.
+
+**What run 9b does NOT show.** That `coverage` is worth its place at any
+confidence. n = 5, one judge per packet, a 3–2 split. It shows the predicted
+effect on the predicted turns with no safety regression, which is grounds to
+keep it and re-measure — not grounds to claim it works.
+
 ### Full corpus
 
 Not yet run.

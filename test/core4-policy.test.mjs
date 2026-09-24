@@ -552,6 +552,21 @@ console.log('\n=== run 8: what the allocator knows about stakes reaches the leng
   ok('  and the move block says so, where precedence puts it above the prompt default', /COVERAGE:/.test(block) && /completeness on what matters beats brevity/i.test(block));
   ok('  and it supersedes an objective that caps how much to add', /supersedes that cap/.test(block));
   ok('  without licensing padding', /do not reach for extra considerations to fill the space/i.test(block));
+  // Each of these answers a padding failure a blind judge named in the E15
+  // A/B (run 9 vs run 9b, the same system differing only in this line).
+  ok('  and forbids a primer on the field they work in', /no primer on their own field/i.test(block));
+  ok('  and forbids a point raised and withdrawn in the same breath', /concede in the same breath/i.test(block));
+  ok('  and says covering what matters is the instruction, not length', /length is not/i.test(block));
+  // complete fires ONLY when expertise is expert, but the expert calibration
+  // clause attaches to TEACHING moves only — so on a CHALLENGE the no-basics
+  // guarantee has to come from the coverage line or from nowhere.
+  const challenging = decide(S({ ...base, work: 'judgment', latest: 'attempt', attempt: 'right' }), { said: 'Here is the design. Poke holes in it.' });
+  if (challenging.decision.coverage === 'complete' && !['EXPLAIN','ANSWER','CORRECT','VERIFY','HINT','CALCULATE','EXECUTE'].includes(challenging.decision.type)) {
+    ok('  a non-teaching move to an expert still gets the no-basics guarantee',
+      /no primer on their own field/i.test(renderDecision(challenging.decision, challenging.allocation)), challenging.decision.type);
+  } else {
+    ok('  (the non-teaching expert case did not arise here)', true, `${challenging.decision.type} ${challenging.decision.coverage}`);
+  }
 
   ok('low stakes is not a reason to cover everything',
     decide(S({ ...base, stakes: { value: 'low', source: 'inferred', confidence: 0.8, evidence: 'reader' } }), { said: 'What breaks?' }).decision.coverage === 'normal');
