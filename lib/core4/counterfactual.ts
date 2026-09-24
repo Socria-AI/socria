@@ -177,7 +177,12 @@ export async function testDependencies(
   if (!target) return null;
   const probe = candidates(p, target);
   if (!probe.length) return null;
-  const all = p.live.map((i) => i.text);
+  // The conclusion is NOT one of its own premises. Without this, the ablation
+  // prompt listed the target inside the premise list it was told to reason
+  // from — "does X follow from {X, Y}" — which is trivially yes, so every
+  // ablation came back `robust` and no load-bearing premise could ever be
+  // found. Caught by dumping the prompt actually sent.
+  const all = p.live.filter((i) => i.id !== target.id).map((i) => i.text);
   const c = client ?? modelClient(apiKey);
 
   const runs = await Promise.all(

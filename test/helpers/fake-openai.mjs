@@ -29,6 +29,23 @@ export default class OpenAI {
             if (g.__guard?.__throw) throw Object.assign(new Error('guard exploded'), { status: 500 });
             return { choices: [{ message: { content: JSON.stringify(g.__guard ?? { action: 'ALLOW', findings: [], redundant: [] }) } }] };
           }
+          // Counterfactual ablation (lib/core4/counterfactual.ts).
+          // WITHOUT THIS BRANCH the call fell through to the reply path, came
+          // back as prose, failed JSON.parse and returned null — so the suite
+          // could only ever prove the NEGATIVE case (an ordinary turn measures
+          // nothing) and the gate opening was untestable. That is the shape of
+          // the run-7 failure: a stage that looks shipped and is silent.
+          if (sys.startsWith('You test whether a conclusion still follows')) {
+            (g.__ablationCalls ??= []).push(p);
+            const scripted = Array.isArray(g.__ablations) ? g.__ablations.shift() : g.__ablation;
+            return { choices: [{ message: { content: JSON.stringify(scripted ?? { holds: 'unclear', instead: '', confidence: 0.2 }) } }] };
+          }
+          // Independent re-derivation (lib/core4/calibration.ts).
+          if (sys.startsWith('You answer one factual or analytical question')) {
+            (g.__sampleCalls ??= []).push(p);
+            const scripted = Array.isArray(g.__samples) ? g.__samples.shift() : g.__sample;
+            return { choices: [{ message: { content: JSON.stringify(scripted ?? { answer: '', basis: '' }) } }] };
+          }
           // Verify Mode's separate checker (lib/core4/verify.ts CHECK_SYSTEM).
           if (sys.startsWith('You check one attempt at a problem')) {
             (g.__checkCalls ??= []).push(p);

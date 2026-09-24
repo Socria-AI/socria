@@ -586,5 +586,61 @@ console.log('\n=== the measuring stages fire only where they are worth the money
     !!ordinary.t?.trace?.measured, JSON.stringify(ordinary.t?.trace?.measured));
 }
 
+console.log('\n=== the measuring stages actually fire, and reach the prompt ===');
+{
+  // THE POSITIVE CASE. The suite previously proved only the negative one (an
+  // ordinary turn measures nothing), and that is how a stage ships looking
+  // implemented and silent — the run-7 failure. Writing this test found three
+  // defects at once: the fake client had no branch for either new system
+  // prompt, so the calls fell through to the reply path and every result was
+  // discarded; the ablation prompt listed the conclusion inside its own
+  // premise list ("does X follow from {X, Y}" — trivially yes, so nothing
+  // could ever be load-bearing); and `mergeEntries` deduped account-wide, so
+  // premises restated in a new conversation were absorbed by rows belonging to
+  // an old one and vanished from this conversation's problem model.
+  const conv = 'measure-' + Date.now();
+  const opening = 'Monthly logo churn is 4.1%, self-serve monthly only — I pulled annual contracts out of the denominator. We raise in March.';
+  await turn(conv, [U(opening)], {
+    state: {
+      taskKind: 'decide', work: 'judgment', latest: 'information', stakes: 'high',
+      currentFocus: 'raise timing', currentGoal: 'Series A',
+      expertise: { value: 'expert', source: 'inferred', confidence: 0.9, evidence: 'numerate on churn' },
+      consideredNow: [
+        { kind: 'decision', text: 'Raise in March', quote: 'We raise in March', stance: 'asserts', reason: '' },
+        { kind: 'assumption', text: 'Annual contracts excluded from the denominator', quote: 'I pulled annual contracts out of the denominator', stance: 'asserts', reason: '' },
+        { kind: 'claim', text: 'Monthly logo churn is 4.1%', quote: 'Monthly logo churn is 4.1%', stance: 'asserts', reason: '' },
+      ],
+    },
+    replies: ['Noted.'],
+  });
+  globalThis.__ablation = { holds: false, instead: 'the raise moves to June', confidence: 0.9 };
+  globalThis.__samples = [
+    { answer: 'about 40% a year' }, { answer: 'closer to 25% once cohorts are split' },
+    { answer: 'the figure is 49%' }, { answer: 'about 40% a year' }, { answer: 'nearer 30% on a blended book' },
+  ];
+  const r = await turn(conv, [U(opening), A('Noted.'), U('Given all that, is March still the right call? Walk me through what could break it.')], {
+    state: {
+      taskKind: 'decide', work: 'judgment', latest: 'question', stakes: 'high',
+      currentFocus: 'raise timing', currentGoal: 'Series A',
+      expertise: { value: 'expert', source: 'inferred', confidence: 0.9, evidence: 'numerate on churn' },
+      consideredNow: [{ kind: 'question', text: 'Is March still right', quote: 'is March still the right call', stance: 'asks', reason: '' }],
+      relations: [{ from: 'Raise in March', rel: 'depends_on', to: 'Annual contracts excluded from the denominator' }],
+    },
+    replies: ['Here is what could break it.'],
+  });
+  const t = r.t?.trace ?? {};
+  ok('the gate opens on a high-stakes expert turn', t.intervention?.coverage === 'complete', String(t.intervention?.coverage));
+  ok('premises restated across turns survive into this conversation\'s problem model', (t.structure?.items ?? 0) >= 4, JSON.stringify(t.structure));
+  ok('an ablation ran and found a load-bearing premise', t.measured?.loadBearing === 1, JSON.stringify(t.measured));
+  ok('  and the conclusion was NOT listed among its own premises',
+    !/PREMISES[^]*?\n- Raise in March/.test((globalThis.__ablationCalls ?? []).map((c) => c.messages?.[1]?.content ?? '').join('\n')),
+    (globalThis.__ablationCalls ?? [])[0]?.messages?.[1]?.content?.slice(0, 200));
+  ok('the claim was re-derived independently and did not converge', t.measured?.split === true && t.measured.samples === 5, JSON.stringify(t.measured));
+  ok('what was measured reaches the prompt', /Tested, not assumed/.test(r.prompt) && /did not settle/.test(r.prompt));
+  ok('  told to give the finding and never the method', /Never describe the test/.test(r.prompt) && /never mention attempts, samples/.test(r.prompt));
+  globalThis.__ablation = undefined;
+  globalThis.__samples = undefined;
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

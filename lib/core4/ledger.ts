@@ -216,8 +216,26 @@ export function mergeEntries(existing: LedgerEntry[], incoming: LedgerEntry[], n
   const created: LedgerEntry[] = [];
   const touched: LedgerEntry[] = [];
   for (const e of incoming) {
+    // DEDUP IS SCOPED, because scoping the READ without scoping the WRITE
+    // opens a hole. `loadLedger` pulls recent entries across the whole
+    // account, so an unscoped twin search let a sentence restated in a NEW
+    // conversation be absorbed by the row from an OLD one — the twin keeps
+    // its original conversationId, `buildProblem` is scoped per conversation
+    // (problem.ts, after a real cross-conversation leak), and the premise the
+    // person had just stated therefore became invisible here: no problem-model
+    // item, no detector, no ablation. Found by auditing why the measuring
+    // stages saw 2 live items on a turn where the person had stated four
+    // things.
+    //
+    // So a twin must be in the same conversation, or in the same Project — a
+    // Project being the person's own statement that these are one body of
+    // work, which is the same rule the read side applies. Everywhere else the
+    // same sentence said again is a fresh statement in the place they said it.
+    const sameWork = (x: LedgerEntry) =>
+      x.conversationId === e.conversationId ||
+      (!!e.projectId && (x.projectId ?? null) === e.projectId);
     const twin = entries.find(
-      (x) => x.owner === e.owner && x.status !== 'retracted' && x.kind === e.kind && similarity(x.text, e.text) >= 0.8 && samePolarity(x.text, e.text)
+      (x) => sameWork(x) && x.owner === e.owner && x.status !== 'retracted' && x.kind === e.kind && similarity(x.text, e.text) >= 0.8 && samePolarity(x.text, e.text)
     );
     if (twin) {
       // The same position restated: their latest wording is the one they hold.
