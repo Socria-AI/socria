@@ -90,6 +90,8 @@ export interface PreparedTurn {
   superseded: LedgerEntry[];
   verify: CheckResult | null;
   hidden: string[];
+  /** how much structure extraction produced, and how much resolved to edges */
+  structure: { relations: number; edges: number; items: number };
   /** what they have shown on THIS concept, from verified events */
   competence: ReturnType<typeof taskCompetence>;
   /** the problem as a connected structure, this turn */
@@ -190,9 +192,10 @@ export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
     ? entriesFromPerson(state.consideredNow, input.lastUserText, { conversationId: input.conversationId, projectId: input.projectId, turn: state.turn, now: input.now }, lastSocria(input))
     : [];
   const problemEntries = [...ledger, ...provisional];
+  const freshEdges = linksFromRelations(state.relations, problemEntries, input.now);
   const problem = buildProblem(
     problemEntries,
-    [...priorLinks, ...linksFromRelations(state.relations, problemEntries, input.now)],
+    [...priorLinks, ...freshEdges],
     state,
     { conversationId: input.conversationId ?? '', projectId: input.projectId }
   );
@@ -319,6 +322,7 @@ export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
     problem,
     missing,
     competence,
+    structure: { relations: state.relations.length, edges: freshEdges.length, items: problem.live.length },
     disputed,
     superseded,
     verify,
@@ -547,6 +551,7 @@ export async function finishTurn(
     considered: p.considered.items.length,
     missing: p.missing,
     competence: p.competence,
+    structure: p.structure,
     ms: p.ms,
     models: { reply: served, cognition: COGNITION_MODEL },
     promptVersion,

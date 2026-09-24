@@ -60,6 +60,18 @@ export interface TurnTrace {
    * can tell is working.
    */
   missing: { found: string[]; raised: number };
+  /**
+   * How much structure the reader actually produced this turn, and how much
+   * of it resolved to real edges.
+   *
+   * The detectors can only query what extraction produced, so when a finding
+   * does not fire the question is always "was there no structure, or was
+   * there structure and no finding?" — and without these two numbers that is
+   * unanswerable from a transcript. Run 8's power-rests-on-001 is the case:
+   * nothing fired, and nothing in the trace said whether the reader had named
+   * the dependency at all.
+   */
+  structure: { relations: number; edges: number; items: number };
   /** task-scoped competence, as the source that decided it — never a trait */
   competence: { value: string; source: string };
   ms: Record<string, number>;
@@ -88,6 +100,7 @@ export function buildTrace(x: {
   // that has not been updated must degrade to a thinner trace, never throw.
   missing?: readonly { kind: string }[];
   competence?: { value: string };
+  structure?: { relations: number; edges: number; items: number };
   ms: Record<string, number>;
   models: { reply: string | null; cognition: string | null };
   promptVersion: string;
@@ -143,6 +156,7 @@ export function buildTrace(x: {
     ledger: x.ledger,
     considered: x.considered,
     missing: { found: (x.missing ?? []).map((m) => m.kind), raised: (x.missing ?? []).length ? 1 : 0 },
+    structure: x.structure ?? { relations: 0, edges: 0, items: 0 },
     competence: { value: x.competence?.value ?? 'unknown', source: x.state.expertise.source },
     ms: x.ms,
     models: x.models,
