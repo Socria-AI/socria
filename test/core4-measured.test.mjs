@@ -319,5 +319,43 @@ console.log('\n=== and it finds pairs the reader never flagged ===');
     [], { ...ST, turn: 12 })).length <= 3);
 }
 
+console.log('\n=== nothing is asserted back at them that they did not say ===');
+{
+  // The delta audit found a reachable harm path and these pin it shut. The
+  // reader assigns owner 'unknown' when it could not ground an item in
+  // anything the person wrote; accepting those as a target let Socria say
+  // "your conclusion no longer follows" about a conclusion the reader had
+  // INFERRED and the person had never stated — in a block that presents itself
+  // as measured, on a high-stakes turn, with no guard reading the reply. A
+  // wrong finding is bad; a wrong finding about a position they never held is
+  // worse, because they cannot recognise it as a mistake about them.
+  const inferred = buildProblem([
+    e({ id: 'g', kind: 'decision', text: 'They have decided to raise in March', owner: 'unknown', basis: 'inferred', quote: '' }),
+    e({ id: 'p', kind: 'assumption', text: 'the churn number holds', owner: 'user', basis: 'quoted' }),
+  ], [], ST);
+  ok('an item the reader could not ground is never the target', targetOf(inferred) === null, JSON.stringify(targetOf(inferred)));
+  ok('  nor the claim that gets sampled', claimOf(buildProblem([
+    e({ id: 'g', kind: 'conclusion', text: 'They seem to believe churn is the binding constraint here', owner: 'unknown', basis: 'inferred', quote: '' }),
+  ], [], ST)) === null);
+  const socria = buildProblem([e({ id: 's', kind: 'decision', text: 'Raise in March', owner: 'socria', basis: 'quoted' })], [], ST);
+  ok('nor anything Socria said', targetOf(socria) === null);
+  const paraphrased = buildProblem([
+    e({ id: 'u', kind: 'decision', text: 'Raise in March', owner: 'user', basis: 'inferred', quote: '' }),
+  ], [], ST);
+  ok('nor their position as the reader paraphrased it without a quote', targetOf(paraphrased) === null);
+
+  // And when it IS theirs, the block quotes THEM, not the reader's rendering.
+  const real = buildProblem([
+    e({ id: 'd', kind: 'decision', text: 'Raise in March', owner: 'user', basis: 'quoted', quote: 'we are going out in March, that is settled' }),
+    e({ id: 'a', kind: 'assumption', text: 'the churn number holds', owner: 'user', basis: 'quoted', quote: 'assuming 4.1 holds through Q4' }),
+  ], [], ST);
+  ok('  (the target is found when it really is theirs)', targetOf(real)?.id === 'd');
+  const cf = await testDependencies('k', real, ST, canned({ holds: false, instead: 'it moves to June', confidence: 0.9 }));
+  const block = renderCounterfactual(cf);
+  ok('the block quotes their words, not the reader\'s paraphrase',
+    /we are going out in March/.test(block) && /assuming 4\.1 holds through Q4/.test(block), block);
+  ok('  and does not present the paraphrase as what they said', !/"Raise in March"/.test(block), block);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

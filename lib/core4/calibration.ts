@@ -85,7 +85,11 @@ Answer it as you actually see it. Do not aim for a safe or middle answer, and do
  * usefully be re-derived is something that purports to be TRUE.
  */
 export function claimOf(p: ProblemModel): ProblemItem | null {
-  const mine = (i: ProblemItem) => i.owner === 'user' || i.owner === 'unknown';
+  // Theirs, and quoted — the same rule `targetOf` applies, for the same
+  // reason: this block tells the person a claim of theirs is unsettled, and
+  // saying that about something the reader merely inferred is a statement
+  // about a position they never took.
+  const mine = (i: ProblemItem) => i.owner === 'user' && i.basis === 'quoted';
   const pick = (k: ProblemItem['kind']) =>
     p.live.filter((i) => i.kind === k && mine(i) && i.text.trim().length > 20).sort((a, b) => b.turn - a.turn)[0];
   return pick('conclusion') ?? pick('claim') ?? null;
@@ -234,7 +238,7 @@ export async function calibrate(
   const clusters = cluster(answers);
   const agreement = clusters[0].count / answers.length;
   return {
-    claim: claim.text,
+    claim: (claim.quote ?? '').trim().length >= 12 ? (claim.quote ?? '').trim() : claim.text,
     claimId: claim.id,
     clusters,
     agreement,

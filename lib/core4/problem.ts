@@ -66,6 +66,15 @@ export interface ProblemItem {
   epistemic: Epistemic;
   /** their words, when it rests on them */
   quote: string;
+  /**
+   * How the entry got here — 'quoted' means their own words support it.
+   *
+   * Exposed because the measuring stages need it: they assert things back at
+   * the person about their own reasoning, and nothing should be asserted that
+   * way unless the person actually said it. `epistemicOf` reads basis already;
+   * it just never surfaced.
+   */
+  basis: LedgerEntry['basis'];
   turn: number;
   /** resolved, rejected or superseded: still history, no longer live */
   settled: boolean;
@@ -149,6 +158,7 @@ export function buildProblem(
       owner: e.owner,
       epistemic: epistemicOf(e),
       quote: e.quote ?? '',
+      basis: e.basis,
       turn: e.turn,
       settled: SETTLED.has(e.status),
       supports: [],

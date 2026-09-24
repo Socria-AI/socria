@@ -312,13 +312,21 @@ export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
   // same thing is not also shown: two blocks making the same point, one of
   // them weaker, is how a person learns to discount both. Same for a
   // contradiction that was put to the test.
-  const measuredDependency = !!counterfactual?.ablations.some((a) => a.dependence === 'load_bearing');
-  const measuredContradiction = contradictions.length > 0;
-  const supersededKinds = new Set<string>([
-    ...(measuredDependency ? ['HIDDEN_ASSUMPTION'] : []),
-    ...(measuredContradiction ? ['CONTRADICTION'] : []),
+  //
+  // SUPERSEDE THE ITEM, NOT THE KIND. Keying this on kind dropped a finding
+  // about one conclusion because a DIFFERENT conclusion had been measured:
+  // `targetOf` tests the latest decision, `detectMissing` keeps the
+  // highest-confidence hidden assumption across all of them, and those are
+  // routinely not the same item. The effect was silent information loss — the
+  // person was told less than the system knew — which is quieter than a false
+  // finding and therefore easier to miss.
+  const measuredIds = new Set<string>([
+    ...(counterfactual?.ablations.filter((a) => a.dependence === 'load_bearing').flatMap((a) => [counterfactual.conclusionId, a.premiseId]) ?? []),
+    ...contradictions.flatMap((c) => [c.aId, c.bId]),
   ]);
-  const missingShown = supersededKinds.size ? missing.filter((m) => !supersededKinds.has(m.kind)) : missing;
+  const missingShown = measuredIds.size
+    ? missing.filter((m) => !m.ids.some((id) => measuredIds.has(id)))
+    : missing;
 
   // Nothing the person wrote themselves is a secret (run 2, direct-answer-012:
   // they asked "is the answer definitely 7?" and the sentence saying yes was
@@ -364,6 +372,22 @@ export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
   }
   if (allocation.announce) {
     move += '\nThis is the first time you are holding something back in this conversation: say so once, in a clause, and that they can have it by asking (e.g. "say the word and I\'ll give you the answer"). Do not repeat this in later turns.\n';
+  }
+
+  // THE GUARD MUST READ A TURN THAT CARRIES MEASURED CLAIMS.
+  //
+  // `guardRequired` was `!!allocation.withhold`, and the measuring gate
+  // requires `!allocation.withhold` — mutually exclusive, so the turns that
+  // inject up to three blocks asserting things about the person's own
+  // reasoning were exactly the turns with no novelty gate, no redundancy
+  // check, no tool-claim strip and no coherence floor. The blocks present
+  // themselves as measured, which is precisely why a reply built on them
+  // should be read before it ships rather than after.
+  //
+  // Set here rather than in intervene.ts because the measurements do not exist
+  // until after the decision is made.
+  if (counterfactual || calibration || contradictions.length) {
+    decision = { ...decision, guardRequired: true };
   }
 
   ms.prepare = Date.now() - t0;

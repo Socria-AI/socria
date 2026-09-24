@@ -81,6 +81,8 @@ export interface Ablation {
   /** the premise that was removed */
   premiseId: string;
   premise: string;
+  /** their own words for that premise, when the ledger has them */
+  premiseQuote: string;
   /** did the conclusion survive without it? */
   dependence: Dependence;
   /** what follows instead, when it does not survive */
@@ -93,6 +95,8 @@ export interface Ablation {
 export interface Counterfactual {
   /** the conclusion under test, in the person's own terms */
   conclusion: string;
+  /** their verbatim words for it, when the ledger has them */
+  conclusionQuote: string;
   conclusionId: string;
   ablations: Ablation[];
   /** calls actually made */
@@ -144,7 +148,18 @@ function sanitize(raw: unknown): { dependence: Dependence; instead: string; conf
  * navel-gazing, and the person did not ask for it.
  */
 export function targetOf(p: ProblemModel): ProblemItem | null {
-  const mine = (i: ProblemItem) => i.owner === 'user' || i.owner === 'unknown';
+  // THEIRS, AND IN THEIR OWN WORDS. `owner: 'unknown'` is what the ledger
+  // assigns when grounding failed — the cheap reader produced an item it could
+  // not tie to anything the person wrote. Accepting those as the target meant
+  // Socria could tell someone "your conclusion no longer follows" about a
+  // conclusion the reader had inferred and they had never stated, on a
+  // high-stakes turn, in a block that presents itself as measured. A wrong
+  // finding is bad; a wrong finding about a position they never held is worse,
+  // because there is no way for them to recognise it as a mistake about them.
+  //
+  // `basis === 'quoted'` is the same rule the withhold path already applies:
+  // nothing is asserted back at the person unless their own words support it.
+  const mine = (i: ProblemItem) => i.owner === 'user' && i.basis === 'quoted';
   const byKind = (k: ProblemItem['kind']) => p.live.filter((i) => i.kind === k && mine(i)).sort((a, b) => b.turn - a.turn)[0];
   return byKind('decision') ?? byKind('conclusion') ?? byKind('claim') ?? null;
 }
@@ -219,6 +234,7 @@ export async function ablateOne(
     return {
       premiseId: premise.id,
       premise: premise.text,
+      premiseQuote: premise.quote ?? '',
       dependence: v.dependence,
       instead: v.instead,
       confidence: v.confidence,
@@ -258,7 +274,7 @@ export async function testDependencies(
 
   const ablations = runs.filter((a): a is Ablation => a !== null);
   if (!ablations.length) return null;
-  return { conclusion: target.text, conclusionId: target.id, ablations, tested: probe.length };
+  return { conclusion: target.text, conclusionQuote: target.quote ?? '', conclusionId: target.id, ablations, tested: probe.length };
 }
 
 /**
@@ -274,6 +290,19 @@ export async function testDependencies(
  * without X" is genuinely useful to someone about to go and verify X — it
  * tells them not to bother.
  */
+/**
+ * Their words where we have them, the reader's rendering only as a fallback.
+ *
+ * `ProblemItem.text` is the cheap reader's paraphrase; `quote` is what the
+ * person actually typed. Quoting the paraphrase back inside a block that says
+ * "this was measured, not inferred from how they wrote it" is precisely the
+ * wrong way round, and the reply model has no way to tell the two apart.
+ */
+const said = (i: { text: string; quote?: string }): string => {
+  const q = (i.quote ?? '').trim();
+  return q.length >= 12 ? q : i.text;
+};
+
 export function renderCounterfactual(cf: Counterfactual | null): string {
   if (!cf) return '';
   const shaky = new Set(['assumed', 'needs_verification', 'inferred', 'unknown']);
@@ -283,10 +312,10 @@ export function renderCounterfactual(cf: Counterfactual | null): string {
   const lines: string[] = [];
   for (const a of load.slice(0, 2)) {
     const mark = a.standing === 'assumed' ? ' (which is an assumption, not a finding)' : a.standing === 'needs_verification' ? ' (which nothing has checked)' : '';
-    lines.push(`  - Remove "${a.premise}"${mark} and "${cf.conclusion}" no longer follows — instead: ${a.instead}`);
+    lines.push(`  - Remove "${said({ text: a.premise, quote: a.premiseQuote })}"${mark} and "${said({ text: cf.conclusion, quote: cf.conclusionQuote })}" no longer follows — instead: ${a.instead}`);
   }
   for (const a of firm.slice(0, 1)) {
-    lines.push(`  - "${cf.conclusion}" holds even without "${a.premise}", so that one is not worth chasing.`);
+    lines.push(`  - "${said({ text: cf.conclusion, quote: cf.conclusionQuote })}" holds even without "${said({ text: a.premise, quote: a.premiseQuote })}", so that one is not worth chasing.`);
   }
   return (
     `\n=== Tested, not assumed: what this actually rests on ===\n${lines.join('\n')}\n` +
@@ -425,7 +454,7 @@ export async function testContradictions(
         const conf = typeof o.confidence === 'number' && Number.isFinite(o.confidence) ? Math.min(1, Math.max(0, o.confidence)) : 0;
         const conflict = typeof o.conflict === 'string' ? o.conflict.trim().slice(0, 300) : '';
         if (o.compatible !== false || conf < CF_FLOOR || !conflict) return null;
-        return { aId: a.id, bId: b.id, a: a.text, b: b.text, distance: Math.abs(a.turn - b.turn), conflict, confidence: conf, source };
+        return { aId: a.id, bId: b.id, a: said(a), b: said(b), distance: Math.abs(a.turn - b.turn), conflict, confidence: conf, source };
       } catch {
         return null;
       }

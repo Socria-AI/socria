@@ -631,7 +631,11 @@ console.log('\n=== the measuring stages actually fire, and reach the prompt ==='
   const t = r.t?.trace ?? {};
   ok('the gate opens on a high-stakes expert turn', t.intervention?.coverage === 'complete', String(t.intervention?.coverage));
   ok('premises restated across turns survive into this conversation\'s problem model', (t.structure?.items ?? 0) >= 4, JSON.stringify(t.structure));
-  ok('an ablation ran and found a load-bearing premise', t.measured?.loadBearing === 1, JSON.stringify(t.measured));
+  // Not === 1: MAX_ABLATIONS is 6, so every eligible premise is probed, and the
+  // scripted client answers each the same way. What matters is that ablations
+  // ran and at least one came back load-bearing.
+  ok('an ablation ran and found a load-bearing premise', (t.measured?.loadBearing ?? 0) >= 1 && (t.measured?.ablations ?? 0) >= 1, JSON.stringify(t.measured));
+  ok('  and a measured result superseded the asserted finding it covers', (t.measured?.superseded ?? 0) >= 1, JSON.stringify(t.measured));
   ok('  and the conclusion was NOT listed among its own premises',
     !/PREMISES[^]*?\n- Raise in March/.test((globalThis.__ablationCalls ?? []).map((c) => c.messages?.[1]?.content ?? '').join('\n')),
     (globalThis.__ablationCalls ?? [])[0]?.messages?.[1]?.content?.slice(0, 200));
