@@ -196,7 +196,12 @@ function selectMove(input: SelectInput): InterventionDecision {
   const switchedFrom = diminishing.detected ? diminishing.from : null;
   const dimNote = diminishing.detected ? ` Strategy changed: ${diminishing.signals.join('; ')}.` : '';
   const consideredNote = avoid.length
-    ? ' They have already considered the items listed under "Already on the table" — do not raise any of them as new; go past them.'
+    // The heading has to be one the REPLY prompt actually contains. "Already
+    // on the table" is the STATE READER's heading (engine.ts) and appears
+    // nowhere the reply model can see, so this pointed at nothing — an
+    // instruction to look somewhere that does not exist is worse than no
+    // instruction, because it spends the model's attention on a search.
+    ? ' They have already considered the items listed under "Already raised" below — do not raise any of them as new; go past them.'
     : '';
 
   // ── the person asked about their own earlier reasoning ──

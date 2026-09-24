@@ -429,6 +429,16 @@ console.log('\n=== review before run 6: withhold and vent false positives ===');
   ok('"hints only" does not', hintsOnly2.allocation.reasonCode.endsWith('.stuck') && /whether it is right and where it goes wrong/.test(hintsOnly2.decision.objective), `${hintsOnly2.allocation.reasonCode} ${hintsOnly2.decision.objective.slice(0, 80)}`);
 }
 
+console.log('\n=== an instruction must point at a heading the reply prompt has ===');
+{
+  const s = S({ work: 'judgment', taskKind: 'decide', latest: 'question' });
+  const d = decide(s, { said: 'Which way would you go?', considered: ['they hold: the lease runs to 2029', 'they raised: moving the team is the real cost'] });
+  const block = renderDecision({ ...d.decision, avoid: ['they raised: moving the team is the real cost'] }, d.allocation);
+  const pointed = (d.decision.objective.match(/listed under "([^"]+)"/) ?? [])[1];
+  ok('the objective names a heading', !!pointed, d.decision.objective.slice(-120));
+  ok('  and the move block actually contains it', !pointed || block.includes(pointed), `${pointed} not in block`);
+}
+
 console.log('\n=== expertise changes the pitch of every teaching move, not one fork ===');
 {
   const E = (value, source = 'observed', confidence = 0.65) => ({ value, source, confidence, evidence: 'shown' });
