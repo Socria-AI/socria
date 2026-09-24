@@ -52,6 +52,19 @@ export interface TurnTrace {
   ledger: { user: number; socria: number; unknown: number; disputed: number; superseded?: number };
   considered: number;
   /**
+   * The two stages that measure rather than read. Content-free like every
+   * other trace field: how many ablations ran and what they returned, never
+   * the premises or the answers themselves.
+   */
+  measured: {
+    ablations: number;
+    loadBearing: number;
+    robust: number;
+    samples: number;
+    agreement: number | null;
+    split: boolean;
+  };
+  /**
    * What the structure said was absent, and whether the reply was given it.
    *
    * Content-free: kinds and counts, never the finding's text — the text
@@ -98,6 +111,8 @@ export function buildTrace(x: {
   considered: number;
   // Optional: the trace is telemetry and runs beside the reply, so a caller
   // that has not been updated must degrade to a thinner trace, never throw.
+  counterfactual?: { ablations: readonly { dependence: string }[] } | null;
+  calibration?: { samples: number; agreement: number; split: boolean } | null;
   missing?: readonly { kind: string }[];
   competence?: { value: string };
   structure?: { relations: number; edges: number; items: number };
@@ -156,6 +171,14 @@ export function buildTrace(x: {
     sent: { questions: x.sentQuestions, chars: x.sentChars },
     ledger: x.ledger,
     considered: x.considered,
+    measured: {
+      ablations: x.counterfactual?.ablations.length ?? 0,
+      loadBearing: x.counterfactual?.ablations.filter((a) => a.dependence === 'load_bearing').length ?? 0,
+      robust: x.counterfactual?.ablations.filter((a) => a.dependence === 'robust').length ?? 0,
+      samples: x.calibration?.samples ?? 0,
+      agreement: x.calibration ? Math.round(x.calibration.agreement * 100) / 100 : null,
+      split: x.calibration?.split ?? false,
+    },
     missing: { found: (x.missing ?? []).map((m) => m.kind), raised: (x.missing ?? []).length ? 1 : 0 },
     structure: x.structure ?? { relations: 0, edges: 0, items: 0 },
     competence: { value: x.competence?.value ?? 'unknown', source: x.state.expertise.source },

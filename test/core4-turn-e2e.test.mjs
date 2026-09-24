@@ -567,5 +567,24 @@ console.log('\n=== the structure reaches the prompt the reply is written from ==
   ok('  and no checker call on a turn with nothing to check', fresh.checkCalls === 0, String(fresh.checkCalls));
 }
 
+console.log('\n=== the measuring stages fire only where they are worth the money ===');
+{
+  // Counterfactual testing and calibration each cost extra model calls, so the
+  // gate IS the safety story: they run only when coverage is 'complete' (high
+  // stakes AND demonstrated expertise, substantive move, nothing withheld) and
+  // the problem has at least two live items. An ordinary turn must pay nothing.
+  const ordinary = await turn('ord-' + Date.now(), [U('What is the syntax for a partial index in Postgres?')], {
+    state: { taskKind: 'explore', work: 'information', latest: 'question', stakes: 'low' },
+    replies: ['CREATE INDEX ... WHERE status = \'active\'.'],
+  });
+  ok('an ordinary information question measures nothing',
+    !/Tested, not assumed/.test(ordinary.prompt) && !/did not settle/.test(ordinary.prompt));
+  ok('  and its trace records no ablations and no samples',
+    ordinary.t?.trace?.measured?.ablations === 0 && ordinary.t?.trace?.measured?.samples === 0,
+    JSON.stringify(ordinary.t?.trace?.measured));
+  ok('  and the trace always carries the field, so telemetry never throws',
+    !!ordinary.t?.trace?.measured, JSON.stringify(ordinary.t?.trace?.measured));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

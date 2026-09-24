@@ -26,6 +26,8 @@ import 'server-only';
 
 import { EMPTY_STATE, type CognitiveState } from '../cognition/state';
 import { readState, guardModel, checkWork, COGNITION_MODEL } from '../cognition/engine';
+import { testDependencies, renderCounterfactual, type Counterfactual } from './counterfactual';
+import { calibrate as sampleClaim, renderCalibration, type Calibration } from './calibration';
 import { readSignals, readContract } from './signals';
 import { mergeState, recordTurn, gapCheck } from './merge';
 import { allocate } from './allocation';
@@ -94,6 +96,10 @@ export interface PreparedTurn {
   structure: { relations: number; edges: number; items: number };
   /** what they have shown on THIS concept, from verified events */
   competence: ReturnType<typeof taskCompetence>;
+  /** what was measured by ablation, when the gate opened */
+  counterfactual: Counterfactual | null;
+  /** what independent re-derivation said, when it disagreed with itself */
+  calibration: Calibration | null;
   /**
    * The expertise BEFORE task calibration — what is persisted.
    *
@@ -266,6 +272,36 @@ export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
       }
     }
   }
+  // ── MEASURED, NOT ASSERTED ──────────────────────────────────────
+  //
+  // The two stages that are not a re-reading of the transcript. Everything
+  // else in this pipeline hands a weaker model text the reply model already
+  // holds, which is why an adversarial audit reproduced sixteen of nineteen
+  // claimed remainders with a prompt (docs/CORE-4-ARCHITECTURE.md §5″). These
+  // two run the model on inputs the conversation never contained — a premise
+  // set with one premise removed, and the same question asked independently
+  // several times — so what they produce is generated, not recalled.
+  //
+  // GATED TO WHERE IT IS WORTH THE MONEY. `coverage === 'complete'` already
+  // means high stakes AND demonstrated expertise on a substantive move with
+  // nothing withheld: the turns where someone is about to act on their own
+  // reasoning. On everything else these never fire, so D17's per-turn cost
+  // ceiling holds for the ordinary turn and is deliberately exceeded here.
+  //
+  // Both fail to null, in parallel, behind hard timeouts. A turn is never
+  // worse for either being unavailable — the same failure direction every
+  // other optional stage takes.
+  let counterfactual: Counterfactual | null = null;
+  let calibration: Calibration | null = null;
+  if (decision.coverage === 'complete' && problem.live.length >= 2 && !allocation.withhold) {
+    const t3 = Date.now();
+    [counterfactual, calibration] = await Promise.all([
+      withTimeout(testDependencies(input.apiKey, problem, state).catch(() => null), 2500, null),
+      withTimeout(sampleClaim(input.apiKey, problem, transcript).catch(() => null), 2500, null),
+    ]);
+    ms.measure = Date.now() - t3;
+  }
+
   // Nothing the person wrote themselves is a secret (run 2, direct-answer-012:
   // they asked "is the answer definitely 7?" and the sentence saying yes was
   // deleted because 7 was the checker's expected value).
@@ -331,11 +367,13 @@ export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
     competence,
     baseExpertise: settled.expertise,
     structure: { relations: state.relations.length, edges: freshEdges.length, items: problem.live.length },
+    counterfactual,
+    calibration,
     disputed,
     superseded,
     verify,
     hidden,
-    blocks: { state: renderStateBlock(state) + renderProblem(problem) + lastTime(ledger, input, state.turn), verify: verifyBlock + computed, move },
+    blocks: { state: renderStateBlock(state) + renderProblem(problem) + renderCounterfactual(counterfactual) + renderCalibration(calibration) + lastTime(ledger, input, state.turn), verify: verifyBlock + computed, move },
     ms,
   };
 }
@@ -583,6 +621,8 @@ export async function finishTurn(
     considered: p.considered.items.length,
     missing: p.missing,
     competence: p.competence,
+    counterfactual: p.counterfactual,
+    calibration: p.calibration,
     structure: p.structure,
     ms: p.ms,
     models: { reply: served, cognition: COGNITION_MODEL },

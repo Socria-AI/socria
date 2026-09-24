@@ -1086,6 +1086,46 @@ E15's fail condition: if helpfulness does not rise on the `complete` turns, or f
 
 ---
 
+## D19. Reading the transcript again is not architecture (added after the prompt-reproducibility audit)
+
+**Implementation status: IMPLEMENTED, UNMEASURED** (`lib/core4/counterfactual.ts`, `lib/core4/calibration.ts`; E17/E18 pre-register what kills each).
+
+### The finding
+
+Twenty-six adversarial agents, nineteen claimed remainders, **sixteen refuted** (CORE-4-ARCHITECTURE §5″). The refuted sixteen share one property and it is the whole lesson:
+
+> **Every one of them hands a weaker model text the reply model already holds.**
+
+The state reader, the problem model, the missing-contribution detectors, the allocator, the intervention engine, `coverage` — all re-readings of the transcript. That is why a prompt reproduced them: you cannot beat a model at reading by reading harder with something smaller. The three survivors were, without exception, cases where Socria held information the transcript does not contain.
+
+This is not a criticism of those subsystems. They make behaviour enforceable, they cost cheap tokens instead of frontier reasoning, and they are the reason the restraint metrics hold at 0.00 questions per reply across nine runs. But **enforceability is not a capability**, and a product cannot be differentiated by a guarantee its competitor also satisfies 95% of the time — only by something the competitor cannot do at all.
+
+### The decision
+
+**A subsystem earns the name "architecture" only if it produces information the transcript does not contain.** With API-only access there is exactly one instrument for that: run the model on inputs the conversation never contained.
+
+Two follow from it directly:
+- **Ablate a premise and re-derive.** Turns "X rests on Y" from an assertion into a measurement, and sidesteps E16 entirely — extraction stability stops mattering once you are no longer trusting the extraction.
+- **Sample the same claim independently and look at the spread.** A single forward pass cannot know its own variance.
+
+Both cost real money on the turns they fire, which is why both are gated to `coverage === 'complete'`.
+
+### The constraint that makes the second one safe
+
+Calibration runs on the cheap model, and the honest reading of a cheap model's output is **asymmetric**: its agreement with itself is worth nothing (it can be repeatably wrong, and small models are good at that), while its disagreement with itself is real evidence the material does not determine the answer. So the rule is absolute and enforced in code: **agreement is never rendered.** A stage that can only lower a claim's standing cannot be used to inflate one.
+
+The mirror risk is named in E18 and it is the one to watch: **manufactured doubt**. A system that calls settled things unsettled trains people to ignore it, exactly as manufactured novelty would. That is why `power-no-finding-006` exists as a control and why E18's fail condition is a false-split rate, not a hit rate.
+
+### Test
+
+`test/core4-measured.test.mjs` — 50 assertions, including the discard rules (an `"unclear"` verdict is a premise not tested, not a premise cleared) and the asymmetry (five identical answers render as the empty string).
+
+### Reversal conditions
+
+E17: a false-positive rate above 10% of rendered findings kills it — telling someone their conclusion rests on something it does not is a wrong answer carrying the authority of a measurement, which is worse than silence. E18: a false-split rate above 20% on settled claims kills it.
+
+---
+
 ## Deleted or deferred by the council
 
 - DELETED: treating every regex hit as confidence-1 standing explicit. Weak-tier phrases can never withhold. Why: 25/29 false positives were verified.
