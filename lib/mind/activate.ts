@@ -18,7 +18,7 @@
 // and a sentence in, a subgraph out, which is what makes the behaviour
 // testable rather than merely plausible.
 
-import { aboutThem, asksName, selfNodes, selfReferential } from './self';
+import { aboutThem, asksName, asksRecall, selfNodes, selfReferential } from './self';
 import { resolveNode } from './resolve';
 import {
   ANCHOR_SEED, CROSS_MIN_ACTIVATION, MEMBERSHIP_RELATIONSHIPS, SEED_FLOOR, STRONG_EDGE,
@@ -207,6 +207,16 @@ export function activate(
   // honest answer when no name is known, and reciting the graph's most
   // important nodes at it would be a stranger failure than the one being
   // fixed.
+  // "Remind me", "where did we leave off" — the same shape of question as
+  // "what do you know about me", answered from the most recently touched
+  // things rather than from anything the message named, because it named
+  // nothing. Deliberately NOT a general fallback: a message that touches
+  // nothing recalls nothing, which is what keeps memory out of every turn.
+  if (asksRecall(message)) {
+    const recent = [...visible].sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 5);
+    for (const n of recent) seeds.set(n.id, Math.max(seeds.get(n.id) ?? 0, 0.6));
+  }
+
   if (aboutThem(message) && !asksName(message)) {
     const digest = [...visible]
       .sort((a, b) => (b.importance * 2 + b.updatedAt / 1e13) - (a.importance * 2 + a.updatedAt / 1e13))

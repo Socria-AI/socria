@@ -27,7 +27,7 @@
 // self digest surfaces only what the graph already holds. Nothing here mints a
 // belief about anybody.
 
-import { normalize, type MindNode } from './types';
+import { normalize, STATUS_WEIGHT, type MindGraph, type MindNode } from './types';
 
 /**
  * The alias every node ABOUT THE PERSON carries.
@@ -112,6 +112,20 @@ const ASKS_NAME = /\b(?:my name|who am i|what am i called)\b/i;
 const ABOUT_THEM =
   /\b(?:what do you (?:know|remember|have)|do you (?:know|remember)|tell me what you know)\b[^?.!]{0,40}\b(?:about me|me|who i am)\b|\bwho am i\b|\bremember me\b|\bwhat have you got on me\b|\bwhat do you know abt me\b/i;
 
+/**
+ * They are asking what was said BEFORE — "remind me", "where did we leave
+ * off", "what did we talk about last time".
+ *
+ * Its own class because it is the one question association cannot answer
+ * either: it names no topic, and the answer is "whatever was most recent",
+ * which no lexical seed can produce.
+ */
+const ASKS_RECALL = /\b(?:remind me|where (?:did|were) we (?:leave|left|get to)|what did we (?:talk|discuss|cover|say)|last time|earlier you said|we were talking about|pick(?:ing)? up where|catch me up)\b/i;
+
+export function asksRecall(text: string): boolean {
+  return ASKS_RECALL.test((text ?? '').trim());
+}
+
 export function asksName(text: string): boolean {
   return ASKS_NAME.test((text ?? '').trim());
 }
@@ -155,4 +169,114 @@ export function nameCandidate(name: string) {
     importance: 0.95,
     aliases: [SELF_ALIAS, 'my name', 'their name'],
   };
+}
+
+// ── THE STANDING PROFILE ─────────────────────────────────────────────
+//
+// Retrieval is associative: it lights what the message touches. That is the
+// right design for a memory and the wrong one for an INTRODUCTION, and the
+// difference is what "it forgot me in a new chat" actually means. Somebody
+// opening a new conversation with "hey" or "quick question" has touched
+// nothing, so nothing lights, so Socria meets them as a stranger — however
+// much it holds about them.
+//
+// So a handful of standing facts travel on EVERY turn, whatever the message
+// says. Not the graph: a short, stable header — who they are, what they are
+// working on, how they have asked to be dealt with. It is the part of memory a
+// person actually notices, and it is the part association can never supply,
+// because you do not mention your own name.
+//
+// SMALL ON PURPOSE. Six lines. A profile that grows without bound becomes a
+// preamble the model reads past on every turn, and the associative retrieval
+// below it is what handles depth.
+
+/**
+ * Types that describe a person's standing situation rather than a topic.
+ *
+ * `Person` is NOT on this list, and the reason is a test that caught it: their
+ * tutor, their colleague and their sister are all Person nodes, and a profile
+ * built from the type would have introduced every conversation with somebody
+ * else's professor. The only Person who belongs here is THEM, and they are
+ * reached by the self alias instead.
+ */
+const STANDING = new Set(['Goal', 'Plan', 'Preference', 'Project', 'Organization', 'Decision']);
+
+/** How many standing lines travel on every turn. */
+export const PROFILE_LINES = 6;
+
+/**
+ * The few things worth knowing before reading anything they say.
+ *
+ * Ordered by how load-bearing each is, not by recency: their name first
+ * (nothing else in a conversation supplies it), then what they are doing and
+ * how they have asked to be treated. Status still discounts — a superseded
+ * goal is not who they are now — and a private node never leaves a surface
+ * that excludes private material.
+ */
+export function standingProfile(
+  graph: Pick<MindGraph, 'nodes'>,
+  opts: {
+    now: number;
+    excludePrivate?: boolean;
+    limit?: number;
+    /**
+     * Nodes belonging to a Project other than the one this turn is in.
+     *
+     * Project isolation is a promise the product makes, and a header that
+     * travels on every turn is exactly the thing that would quietly break it:
+     * without this, a Calculus tutor's office hours introduced a conversation
+     * inside Socria. The caller computes it (pipeline.ts), because only the
+     * caller knows which Project is current.
+     */
+    elsewhere?: ReadonlySet<string>;
+  } = { now: Date.now() }
+): MindNode[] {
+  const limit = opts.limit ?? PROFILE_LINES;
+  const usable = graph.nodes.filter(
+    (n) =>
+      (!opts.excludePrivate || !n.private) &&
+      !opts.elsewhere?.has(n.id) &&
+      n.status !== 'archived' &&
+      n.status !== 'superseded' &&
+      n.status !== 'contradicted'
+  );
+  const isSelf = (n: MindNode) => n.aliases.some((a) => normalize(a) === SELF_ALIAS);
+  const score = (n: MindNode) => {
+    // Their identity outranks everything: it is the one fact no message ever
+    // supplies and the one whose absence reads as amnesia.
+    const identity = isSelf(n) ? 2 : 0;
+    const kind = STANDING.has(String(n.type)) ? 0.6 : 0;
+    // Weeks, not minutes: a standing fact should not be reshuffled by what was
+    // touched an hour ago, but something a year stale should fall off.
+    const age = Math.max(0, (opts.now - n.updatedAt) / (30 * 86_400_000));
+    return identity + kind + n.importance + Math.max(0, 0.5 - age * 0.1) + (STATUS_WEIGHT[n.status] ?? 0.5) * 0.3;
+  };
+  return usable
+    .filter((n) => isSelf(n) || (STANDING.has(String(n.type)) && n.importance >= 0.45))
+    .sort((a, b) => score(b) - score(a))
+    .slice(0, limit);
+}
+
+/**
+ * The header, or nothing.
+ *
+ * Deliberately NOT framed as facts to recite. The failure mode of a standing
+ * profile is a model that opens every reply by telling somebody their own name
+ * back to them, which is worse than forgetting it.
+ */
+export function renderProfile(nodes: readonly MindNode[]): string {
+  if (!nodes.length) return '';
+  const lines = nodes.map((n) => {
+    const status = n.status === 'active' ? '' : ` [${n.status}]`;
+    return `- ${n.type}: ${n.label}${status} — ${n.content}`;
+  });
+  return (
+    '\n=== Who you are talking to ===\n' +
+    'Standing context, carried into every conversation because it is true between them. ' +
+    'Use it the way you would use knowing somebody: it changes how you answer, and you do not announce it. ' +
+    'Do not open by telling them what you know about them, do not list it back, and do not thank them for it. ' +
+    'If something here is wrong, what they say now wins — they can correct any of it on the memory page.\n' +
+    lines.join('\n') +
+    '\n'
+  );
 }

@@ -62,6 +62,16 @@ assumptions, open questions, uncertainties, insights, evidence, sources,
 events, experiences. Not: pleasantries, the mechanics of the conversation,
 anything true only of this moment.
 
+WHO THEY ARE COUNTS, and it is the thing most often missed because it arrives
+in a short sentence that looks like small talk. Their name, what they study or
+do, where, what they are working on or applying to, who matters to them, how
+they have asked to be worked with — every later conversation needs these and
+none of them is a pleasantry. "my name is X", "I'm a freshman at UT studying
+business", "I'm applying to McCombs", "keep answers short" are each worth a
+node, marked stated, even when the message is five words long. Give them a
+LABEL somebody would search for — the name, the school, the programme — and
+put the sentence in content.
+
 A SINGLE EVENT IS NOT A TRAIT. If someone describes one difficult
 interaction, that is an Event. Do not also conclude a Belief or Preference
 about their character from it. If a pattern is real it will come up again.

@@ -1,4 +1,3 @@
-import { nameCandidate, nameFrom } from './self';
 import 'server-only';
 // lib/mind/pipeline.ts
 //
@@ -14,6 +13,8 @@ import 'server-only';
 // functions with a different surface.
 
 import { activate, touch, type ActivatedSubgraph } from './activate';
+import { nameCandidate, nameFrom, renderProfile, standingProfile } from './self';
+import { projectIndex } from './projects';
 import { applyCandidates, type ApplyReport, type EdgeCandidate, type NodeCandidate } from './apply';
 import { extract } from './extract';
 import { FILE_BUDGET, TURN_BUDGET, type Budget } from './gate';
@@ -164,6 +165,35 @@ export async function recall(
       project: anchors.size ? { current, anchors } : undefined,
     });
 
+    // WHO THEY ARE, ON EVERY TURN. Association lights what the message
+    // touches, which is right for a memory and wrong for an introduction:
+    // "hey" in a new conversation touches nothing, so nothing lights, and
+    // Socria meets somebody it knows as a stranger. The standing profile is
+    // the part association can never supply — you do not mention your own
+    // name — so it travels whatever the message says.
+    //
+    // Project isolation applies to it like everything else: anything belonging
+    // to a Project that is not this turn's is left out, or the header would be
+    // the one channel by which another Project's material arrived on every
+    // turn (projects-e2e caught exactly that — a Calculus tutor introducing a
+    // conversation inside Socria).
+    const elsewhere = new Set<string>();
+    if (anchors.size) {
+      for (const [nodeId, owners] of projectIndex(graph, anchors)) {
+        const foreign = [...owners].some((a) => a !== current);
+        const ours = current ? owners.has(current) : false;
+        if (foreign && !ours) elsewhere.add(nodeId);
+      }
+      for (const a of anchors) if (a !== current) elsewhere.add(a);
+    }
+    const profile = renderProfile(
+      standingProfile(graph, {
+        now: opts.now,
+        excludePrivate: opts.surface === 'logos',
+        elsewhere,
+      })
+    );
+
     // Anchor ids -> Project names, for anything that surfaced from a Project
     // other than this one.
     const names = new Map(projects.map((p) => [p.nodeId, p.name]));
@@ -177,7 +207,7 @@ export async function recall(
     void touchNodes(userId, touch(subgraph, opts.now));
 
     return {
-      block: renderMindGraph(subgraph, { now: opts.now, maxTokens: win.tokens, origin }),
+      block: profile + renderMindGraph(subgraph, { now: opts.now, maxTokens: win.tokens, origin }),
       subgraph,
       graph,
       projectBlock,

@@ -67,16 +67,25 @@ console.log('=== the reported bug ===');
   // never prints its objective (council D1 — the model picks the move), so an
   // instruction left there would reach nobody. That is how the first version
   // of this fix would have failed silently.
-  ok('the reply still contains real work, and it comes first',
-    /make a SMALL, REAL piece of it/.test(r.block) && /put it first/.test(r.block));
-  ok('  and it is explicitly not the finished thing', /not the finished thing/.test(r.block));
-  ok('  nor a description of the thing', /Not a description of what you would write/.test(r.block));
+  // A COUNTABLE LIMIT, because the first version's did not bind: "make a
+  // story" came back as a complete four-paragraph story, which is roughly 300
+  // tokens and fitted comfortably inside the 420-token ceiling it was given.
+  // A ceiling the failure fits inside is not a ceiling.
+  ok('the reply still contains real work, and it is bounded',
+    /AT MOST FOUR SENTENCES of the actual thing/.test(r.block));
+  ok('  real sentences of it, not a description', /not a description of what you would write, not an outline/.test(r.block));
+  ok('  and the ceiling is one a finished artifact cannot fit inside', r.decision.maxTokens === 200, String(r.decision.maxTokens));
   ok('one question, at most, and never a menu',
-    /ask the ONE thing that most decides the rest/.test(r.block) && /not a menu of options/.test(r.block));
+    /the single thing that most decides the rest/.test(r.block) && /not a menu of options/.test(r.block));
   ok('  budgeted as one', r.decision.maxQuestions === 1);
   ok('no apologising and no offering to write more',
     /do not apologise for the length/.test(r.block) && /do not close by offering to write more/.test(r.block));
-  ok('  and the SCOPE clause is what carries it', /^SCOPE: they asked you to make something/m.test(r.block));
+  ok('  and the SCOPE clause is what carries it', /^SCOPE — THIS OVERRIDES/m.test(r.block));
+  // The line that produced the failure: "help fully: answer what they asked"
+  // is the right default and the wrong instruction here, so where SCOPE fires
+  // it REPLACES that clause instead of arguing with it three lines later.
+  ok('  and the contradicting default is gone from the turn',
+    !/help fully: answer what they asked/.test(r.block), r.block.slice(0, 200));
 }
 
 console.log('\n=== explicit delegation is honoured, which is also Human-First ===');
@@ -155,7 +164,8 @@ console.log('\n=== MUST NOT FIRE: the turns that are not about making anything =
   const fact = turn('what is the default isolation level in Postgres?', { work: 'information', taskKind: 'lookup', latest: 'question' });
   ok('a factual question still answers directly', fact.decision.type === 'ANSWER' && fact.decision.maxTokens >= 1000);
   ok('  with no question back', fact.decision.maxQuestions === 0);
-  ok('  and no small-start instruction', !/SCOPE:/.test(fact.block));
+  ok('  and no small-start instruction', !/SCOPE —/.test(fact.block));
+  ok('  and it is still told to help fully', /help fully: answer what they asked/.test(fact.block));
 
   const fix = turn('the checkout total is wrong for 3 of 200 orders, here is the function', { work: 'diagnosis', taskKind: 'debug', latest: 'information' });
   ok('a debugging turn is untouched', fix.allocation.generation === null && fix.decision.maxTokens >= 1000);
@@ -172,8 +182,11 @@ console.log('\n=== it does not bring back constant questioning ===');
   const spent = [{ type: 'ANSWER', asked: true }, { type: 'ANSWER', asked: true }];
   const r = turn('write me a poem', CREATE, spent);
   ok('with the budget spent, it asks nothing', r.decision.maxQuestions === 0, String(r.decision.maxQuestions));
-  ok('  and says what it assumed instead', /say in one clause what you assumed/.test(r.block));
-  ok('  while still producing the small real piece', /make a SMALL, REAL piece of it/.test(r.block));
+  // And it says so like a person, not like a form: the live failure printed
+  // "Assumption: This is a whimsical story for a young audience."
+  ok('  and says what it took it to be, in its own words', /what you took it to be/.test(r.block));
+  ok('  never as a labelled field', /Not a labelled "Assumption:" line/.test(r.block));
+  ok('  while still producing the small real piece', /AT MOST FOUR SENTENCES/.test(r.block));
 
   // "Stop asking me questions" is an instruction, and it outranks the read.
   const told = turn('write me a poem, and stop asking me questions', CREATE);
@@ -200,7 +213,7 @@ console.log('\n=== the priority order, as behaviour ===');
   // Style must never be able to shrink a reply below the work the allocator
   // assigned: a Concise preference cannot delete the small real piece.
   const concise = turn('write me a story', CREATE);
-  ok('the allocator’s ceiling survives the length policy', concise.decision.proportion === 'normal' && concise.decision.maxTokens === 420);
+  ok('the allocator’s ceiling survives the length policy', concise.decision.proportion === 'normal' && concise.decision.maxTokens === 200);
   // And an explicit length they asked for still wins over everything.
   const twoLines = turn('write me a story in two sentences', CREATE);
   ok('a length they stated is theirs', twoLines.decision.proportion === 'normal');
@@ -230,8 +243,8 @@ console.log('\n=== style cannot decide what work is taken over ===');
     const r = withPrefs(prefs);
     const tag = `${prefs.readability}/${prefs.length}`;
     ok(`${tag}: the allocation is unchanged`, r.allocation.generation === 'unscoped');
-    ok(`${tag}: the ceiling is the allocator's`, r.decision.maxTokens === 420, String(r.decision.maxTokens));
-    ok(`${tag}: the small real piece survives`, /make a SMALL, REAL piece of it/.test(r.block));
+    ok(`${tag}: the ceiling is the allocator's`, r.decision.maxTokens === 200, String(r.decision.maxTokens));
+    ok(`${tag}: the small real piece survives`, /AT MOST FOUR SENTENCES/.test(r.block));
   }
 }
 

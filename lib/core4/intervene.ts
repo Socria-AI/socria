@@ -577,7 +577,13 @@ function selectMove(input: SelectInput): InterventionDecision {
                 : 'Then say in one clause what you assumed and what would change it. Do not ask a question.')
               + ' Do not explain what you are doing, do not offer to write more, and do not apologise for the length.'
               + consideredNote,
-            alloc: a, avoid, maxQuestions: canAsk ? 1 : 0, maxTokens: 420,
+            // 200, NOT 420. The first ceiling did not bind: "make a story"
+            // came back as a complete four-paragraph story, and four
+            // paragraphs is about 300 tokens — comfortably inside 420. A
+            // ceiling that the failure fits inside is not a ceiling. 200 is
+            // roughly 150 words: an opening paragraph and a question fit, a
+            // finished artifact does not.
+            alloc: a, avoid, maxQuestions: canAsk ? 1 : 0, maxTokens: 200,
           });
         }
         // ── they asked to DEVELOP it, not to receive it. The authorship is
@@ -794,11 +800,11 @@ export function renderDecision(dec: InterventionDecision, a: Allocation): string
   // work the reply contains and they only shape what is left of it.
   const scope =
     a.generation === 'unscoped'
-      ? 'SCOPE: they asked you to make something, and nothing in the ask decides what the thing should be — who it is for, what it is for, what it must contain. Writing the whole artifact here means guessing all of that and handing back the guess as a finished product, and the guessing was the part that mattered.\n' +
-        'So: make a SMALL, REAL piece of it — an opening, one option, the first few lines, a short draft — good enough to react to, and put it first. Not a description of what you would write, not an offer to write it, and not the finished thing.\n' +
+      ? 'SCOPE — THIS OVERRIDES THE LINE ABOVE ABOUT ANSWERING FULLY. They asked you to make something, and nothing in the ask decides what the thing should be: who it is for, what it is for, what it must contain, how long. Writing the whole artifact means guessing all of that and handing back the guess as a finished product — and the guessing was the part that mattered.\n' +
+        'Write AT MOST FOUR SENTENCES of the actual thing. Real sentences of it — the opening, one option, the first few lines — not a description of what you would write, not an outline, not an offer. Then stop; the rest is theirs to steer. Four sentences is a ceiling, not a target.\n' +
         (dec.maxQuestions === 1
-          ? 'Then ask the ONE thing that most decides the rest. One question, not a list, and not a menu of options they have to read before they can answer.'
-          : 'Then say in one clause what you assumed and what would change it. Do not ask a question.') +
+          ? 'Then one question: the single thing that most decides the rest. Not a list, not a menu of options they have to read before they can answer.'
+          : 'Then, in the same breath and in your own words, what you took it to be — the way a person says "I went light and a bit wry; say if that is wrong". Not a labelled "Assumption:" line, and no question.') +
         '\nDo not explain what you are doing, do not apologise for the length, and do not close by offering to write more.'
       : a.generation === 'developing'
         ? 'SCOPE: they asked to DEVELOP this, not to receive it — the writing is the work they are doing, and handing back a finished piece would end it.\n' +
@@ -809,7 +815,13 @@ export function renderDecision(dec: InterventionDecision, a: Allocation): string
   if (!dec.forced) {
     return [
       '\n=== This turn ===',
-      'No move is imposed. Reply to what they actually said, as a strong peer would, and help fully: answer what they asked, correct what is wrong, and where you can, add the one thing they have not considered — never manufacture it.',
+      // "Help fully: answer what they asked" is the right default and the
+      // wrong instruction on an unscoped generative ask — it is the sentence
+      // that produced a whole story. Where SCOPE fires it replaces the clause
+      // rather than arguing with it three lines later.
+      scope
+        ? 'No move is imposed. Reply to what they actually said, as a strong peer would: correct what is wrong, and where you can, add the one thing they have not considered — never manufacture it. How much of what they asked for to produce is settled by SCOPE below, which wins over any instinct to deliver the whole thing.'
+        : 'No move is imposed. Reply to what they actually said, as a strong peer would, and help fully: answer what they asked, correct what is wrong, and where you can, add the one thing they have not considered — never manufacture it.',
       ...(scope ? [scope] : []),
       ...(coverage ? [coverage] : []),
       ...(proportion ? [proportion] : []),

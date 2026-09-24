@@ -23,7 +23,10 @@
 // answers {} for. A regex costs nothing, cannot be talked out of it, and
 // cannot decide the turn was not worth remembering.
 
-import { nameFrom, aboutThem, asksName, selfReferential, selfNodes, nameCandidate, SELF_ALIAS } from './.tmp/self.mjs';
+import {
+  nameFrom, aboutThem, asksName, asksRecall, selfReferential, selfNodes, nameCandidate,
+  standingProfile, renderProfile, SELF_ALIAS, PROFILE_LINES,
+} from './.tmp/self.mjs';
 import { activate } from './.tmp/activate.mjs';
 import { EMPTY_GRAPH } from './.tmp/types.mjs';
 
@@ -119,6 +122,86 @@ console.log('\n=== a question about a topic is not a question about them ===');
   const g = { ...EMPTY_GRAPH, nodes, edges: [] };
   ok('a message naming nothing still recalls nothing', activate(g, 'ok sure', { now: T0, limit: 10 }).nodes.length === 0);
   ok('  but a question about them recalls the digest', activate(g, 'what do you know about me', { now: T0, limit: 10 }).nodes.length > 0);
+}
+
+console.log('\n=== the standing profile: what travels on EVERY turn ===');
+{
+  // THE POINT. Association lights what a message touches, which is right for
+  // a memory and wrong for an introduction. "Hey" in a new conversation
+  // touches nothing, so nothing lights, and Socria meets somebody it knows as
+  // a stranger. You do not mention your own name, so association can never
+  // supply it.
+  const me = mk({ id: 'p-me', type: 'Person', label: 'Pradeep', content: 'Their name.', aliases: ['me'], importance: 0.95 });
+  const goal = mk({ id: 'p-goal', type: 'Goal', label: 'McCombs BHP', content: 'Applying this cycle.', importance: 0.8 });
+  const pref = mk({ id: 'p-pref', type: 'Preference', label: 'Short answers', content: 'They asked for less padding.', importance: 0.6 });
+  const trivia = mk({ id: 'p-triv', type: 'Event', label: 'A bad Tuesday', content: 'One meeting went badly.', importance: 0.3 });
+  const old = mk({ id: 'p-old', type: 'Goal', label: 'Law school', content: 'What they used to be aiming at.', importance: 0.8, status: 'superseded' });
+  const secret = mk({ id: 'p-sec', type: 'Goal', label: 'A private plan', content: 'Not for a shared screen.', importance: 0.9, private: true });
+  const graph = { nodes: [trivia, goal, pref, me, old, secret] };
+
+  const prof = standingProfile(graph, { now: T0 });
+  ok('their name leads it', prof[0]?.id === 'p-me', JSON.stringify(prof.map((n) => n.label)));
+  ok('what they are working on is in it', prof.some((n) => n.id === 'p-goal'));
+  ok('how they asked to be dealt with is in it', prof.some((n) => n.id === 'p-pref'));
+  ok('one bad Tuesday is not who they are', !prof.some((n) => n.id === 'p-triv'));
+  ok('what they used to want is not presented as standing', !prof.some((n) => n.id === 'p-old'));
+  ok('it is short by construction', prof.length <= PROFILE_LINES);
+
+  // Private material never reaches a surface that can be shown to somebody.
+  ok('Logos does not receive private standing facts',
+    !standingProfile(graph, { now: T0, excludePrivate: true }).some((n) => n.id === 'p-sec'));
+  ok('  and Core does', standingProfile(graph, { now: T0 }).some((n) => n.id === 'p-sec'));
+
+  const block = renderProfile(prof);
+  ok('the block names them', /Pradeep/.test(block));
+  // The failure mode of a standing profile is a model that opens every reply
+  // by reciting somebody's own name back at them.
+  ok('it is told to use it, not announce it', /you do not announce it/.test(block));
+  ok('  explicitly not as an opening', /Do not open by telling them what you know about them/.test(block));
+  ok('  and what they say now still wins', /what they say now wins/.test(block));
+  ok('an empty graph produces no header at all', renderProfile([]) === '');
+}
+
+console.log('\n=== the profile is not a hole in Project isolation ===');
+{
+  // CAUGHT BY projects-e2e, which is why it is pinned here too: a header that
+  // travels on EVERY turn is exactly the channel by which another Project's
+  // material would arrive everywhere. A Calculus tutor introduced a
+  // conversation inside Socria.
+  const me = mk({ id: 's-me', type: 'Person', label: 'Pradeep', content: 'Their name.', aliases: ['me'], importance: 0.95 });
+  const tutor = mk({ id: 's-lin', type: 'Person', label: 'Professor Lin', content: 'Teaches the section.', importance: 0.8 });
+  const theirGoal = mk({ id: 's-goal', type: 'Goal', label: 'Ship Core 4', content: 'Launching in October.', importance: 0.85 });
+  const calcGoal = mk({ id: 's-calc', type: 'Goal', label: 'Pass Calc II', content: 'The exam is in May.', importance: 0.85 });
+  const g = { nodes: [me, tutor, theirGoal, calcGoal] };
+
+  const prof = standingProfile(g, { now: T0 });
+  ok('somebody else’s professor is not who you are talking to', !prof.some((n) => n.id === 's-lin'), JSON.stringify(prof.map((n) => n.label)));
+  ok('  because Person is reached by the self alias, not by the type', prof.some((n) => n.id === 's-me'));
+
+  const scoped = standingProfile(g, { now: T0, elsewhere: new Set(['s-calc']) });
+  ok('another Project’s goal stays in that Project', !scoped.some((n) => n.id === 's-calc'));
+  ok('  while this one’s still travels', scoped.some((n) => n.id === 's-goal'));
+  ok('  and their name is not Project-scoped', scoped.some((n) => n.id === 's-me'));
+}
+
+console.log('\n=== "remind me" is answered from the most recent, not from a topic ===');
+{
+  for (const t of ['remind me what I said', 'where did we leave off', 'what did we talk about last time', 'catch me up'])
+    ok(`"${t}"`, asksRecall(t) === true);
+  ok('an ordinary question is not that', asksRecall('what is the filing deadline') === false);
+
+  const nodes = [
+    mk({ id: 'r-old', label: 'Old thing', updatedAt: T0 - 90 * 86_400_000 }),
+    mk({ id: 'r-new', label: 'Recent thing', updatedAt: T0 - 86_400_000 }),
+  ];
+  const g = { ...EMPTY_GRAPH, nodes, edges: [] };
+  const back = activate(g, 'remind me where we left off', { now: T0, limit: 10 });
+  ok('it recalls the most recent', back.nodes.some((n) => n.id === 'r-new'), JSON.stringify(back.nodes.map((n) => n.label)));
+  // And it stays a named class, not a general fallback: a message that touches
+  // nothing still recalls nothing, which is what keeps memory out of a turn
+  // that did not ask for it.
+  ok('an ordinary unmatched message still recalls nothing',
+    activate(g, 'ok sure thanks', { now: T0, limit: 10 }).nodes.length === 0);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
