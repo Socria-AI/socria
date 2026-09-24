@@ -95,6 +95,7 @@ export function gapCheck(prior: CognitiveState, now: number): CognitiveState {
     directness: momentaryAnswer ? { value: 'none', source: 'default', confidence: 0 } : prior.directness,
     lastOutcome: null,
     history: [],
+    heardOnly: false,
     learningGoal: halve(prior.learningGoal),
     expertise: halve(prior.expertise),
     stakes: halve(prior.stakes),
@@ -203,11 +204,17 @@ export function mergeState({ prior, read, signals, contract, readOk }: MergeInpu
     questionsPreference,
     persistPolicy,
     flagOnly: signals.directness === 'answer' ? false : signals.flagOnly || !!p.flagOnly,
-    answersOnly: signals.answersOnly || contract.answersOnly || !!p.answersOnly,
+    // "From now on, explain" ends it; a one-off "why?" suspends it for the turn (intervene).
+    answersOnly: signals.explainAsked && signals.horizon ? false : signals.answersOnly || contract.answersOnly || !!p.answersOnly,
     // Being heard is not a one-message wish: turn 3 of run 5's reflective-001
     // drifted into advice for someone who had said "I'm not asking what to
     // do". It holds until they ask something or ask for advice.
-    heardOnly: signals.vent || (!!p.heardOnly && !(base.latest === 'question' || base.latest === 'request' || signals.directness === 'answer' || signals.recommendationRequested || signals.delegate)),
+    // Not set by a message that is itself a question or a request, and it
+    // ends when they ask, attempt, delegate or move to other work.
+    heardOnly: (signals.vent && base.latest !== 'question' && base.latest !== 'request') ||
+      (!!p.heardOnly && !(base.latest === 'question' || base.latest === 'request' || base.latest === 'attempt' ||
+        signals.directness === 'answer' || signals.recommendationRequested || signals.delegate ||
+        !(base.work === 'reflection' || base.work === 'conversation'))),
     lastOutcome,
     history,
     turn,

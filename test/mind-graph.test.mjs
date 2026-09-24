@@ -745,5 +745,22 @@ console.log('\n=== run 5: the extractor sees what this conversation already wrot
   ok('no conversation, no change', extractionContext(narrow, g, null) === narrow);
 }
 
+console.log('\n=== review before run 6: the replacement path never lets an inference overwrite their words ===');
+{
+  let g = EMPTY_GRAPH;
+  ({ graph: g } = apply(g, [
+    C('Belief', 'Office work', 'They prefer working from the office three days a week'),
+    C('Belief', 'Remote work', 'They said remote work suits their deep-focus days'),
+  ]));
+  ({ graph: g } = apply(g, [C('Belief', 'Remote work', 'They secretly resent their manager and want to avoid the office', 'inferred', { replaces: 'Office work' })]));
+  const remote = g.nodes.find((n) => n.label === 'Remote work' && n.status !== 'superseded');
+  ok('their stated words survive an inferred replacement', remote?.content === 'They said remote work suits their deep-focus days', remote?.content);
+  const again = apply(g, [C('Belief', 'Remote work', 'They said remote work suits their deep-focus days', 'stated', { replaces: 'Office work' })]).graph;
+  const dup = again.edges.filter((e) => e.relationship === 'superseded_by' && e.targetId === remote?.id).length;
+  ok('  and a replayed change adds no second edge', dup <= 1, String(dup));
+  const full = { nodes: g.nodes.slice(0, 2), edges: [], seeds: [], scores: {} };
+  ok('extraction context adds nothing when recall already fills the limit', extractionContext(full, g, 'c1', 2).nodes.length === 2);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

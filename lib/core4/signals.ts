@@ -95,12 +95,12 @@ const NO_ANSWER = new RegExp(
     // get there myself", "I want to have found it", "no rewritten query",
     // "don't finish it for me".
     String.raw`\bi want to (?:have found it\b|get there(?:\s+(?:myself|on my own|for myself)\b|(?=\s*(?:[.,;:!)\]—–-]|$))))`,
-    String.raw`\b(?:get there|find|solve|spot|crack|fix|derive|prove|work out|figure out) (?:it|this|that|the \w+|my own \w+) (?:myself|on my own|for myself)\b`,
-    // Run 5 (learning-017, learning-008): "I want to find my own mistake",
-    // "I don't want the working", "please don't give me the construction".
-    String.raw`\bi want to (?:find|spot|fix) my own (?:mistake|error|bug|slip)\b`,
-    String.raw`\bi don'?t want the (?:working|answer|solution|fix|construction|derivation)\b`,
-    String.raw`\b(?:do not|don'?t|please don'?t) (?:give|show|tell)(?: me)? the (?:construction|working|derivation|proof)\b`,
+    // A stated wish, never a report: "I'd really like to find the fix
+    // myself" — not "I tried to fix it myself but it still fails" (review
+    // before run 6).
+    String.raw`\b(?:i (?:really )?(?:want|need) to|i(?:'d| would) (?:really )?(?:like|love|rather|prefer) to|let me|i'?ll) (?:try to )?(?:get there|find|solve|spot|crack|fix|derive|prove|work out|figure out) (?:it|this|that|the \w+|my own \w+) (?:myself|on my own|for myself)\b`,
+    // Run 5 (learning-017): "I want to find my own mistake".
+    String.raw`\bi want to (?:find|spot|fix) my own (?:mistake|error|slip|bug)(?=\s*(?:[.,;:!)\]—–-]|$))`,
     String.raw`\bno (?:rewritten|corrected|fixed) (?:query|code|version|solution|function)\b`,
     String.raw`\b(?:do not|don'?t) (?:finish|solve|do) it for me\b`,
     String.raw`\bwithout (?:telling me|giving (?:me )?|revealing )(?:the (?:answer|solution)|it away)\b`,
@@ -236,11 +236,28 @@ function requestedTokensOf(text: string): number {
   return 0;
 }
 
-const VENT = /\b(i (?:just )?(?:need|want) to vent|(?:i )?(?:don'?t|do not) want (?:any )?advice|not looking for (?:advice|solutions)|(?:please )?just listen|i don'?t need (?:you to )?(?:fix|solve) (?:it|this|anything)|(?:just )?need to get (?:this|it) off my chest|i'?m not asking (?:what to do|for advice|you to (?:fix|solve) (?:it|this|anything))|not asking for advice|i just need to (?:say|tell) (?:this|it|someone)|i just need to say (?:this|it) (?:somewhere|to someone))\b/i;
+// Clause-final forms only: "I'm not asking for advice on the design, just
+// review the code" is a request, not a wish to be heard (review before run 6).
+const CLAUSE_END = String.raw`(?=\s*(?:[.!;—–-]|$))`;
+const VENT = new RegExp(String.raw`\b(i (?:just )?(?:need|want) to vent|(?:i )?(?:don'?t|do not) want (?:any )?advice${CLAUSE_END}|not looking for (?:advice|solutions)${CLAUSE_END}|(?:please )?just listen|i don'?t need (?:you to )?(?:fix|solve) (?:it|this|anything)${CLAUSE_END}|(?:just )?need to get (?:this|it) off my chest|i'?m not asking (?:what to do|for advice|you to (?:fix|solve) (?:it|this|anything))${CLAUSE_END}|i just need to say (?:this|it) (?:somewhere|to someone|out loud)\b)`, 'i');
 
 // Run 5 (adversarial-005): a Project said "answers only, no explanations".
-const ANSWERS_ONLY = /\b(answers? only|only (?:the )?answers?|no explanations?|without (?:any )?explanations?|just the (?:command|code|query|answer|number|value|snippet)s?(?: please)?[.!]?$|no commentary|skip the explanation)\b/i;
-const EXPLAIN_ASK = /\b(why(?: does| is| would| did|\?)|explain|walk me through|how come|what'?s the reasoning)\b/i;
+// Anchored to the person's own framing, clause-final: "Answer only in
+// British English", "there's no explanation for why he left" and "please
+// don't skip the explanation" are not it (review before run 6).
+const ANSWERS_ONLY = new RegExp(
+  [
+    String.raw`\banswers? only(?=\s*(?:[.,;:!—–-]|$|please))`,
+    String.raw`\bonly (?:the )?(?:final )?answers?(?=\s*(?:[.,;:!—–-]|$|please))`,
+    String.raw`(?<!(?:there(?:'s| is| was)|it'?s|is|was|had|have|got|gave|give) )\bno explanations?(?=\s*(?:[.,;:!—–-]|$|please|needed|necessary|required))`,
+    String.raw`\bwithout (?:any )?explanations?(?=\s*(?:[.,;:!—–-]|$|please))`,
+    String.raw`\bno commentary(?=\s*(?:[.,;:!—–-]|$|please))`,
+    String.raw`(?<!don'?t |do not )\bskip the explanations?(?=\s*(?:[.,;:!—–-]|$|please))`,
+    String.raw`\bjust the (?:final )?(?:command|code|query|answer|number|value|snippet)s?(?=\s*(?:please)?\s*[.!]?\s*$)`,
+  ].join('|'),
+  'i'
+);
+const EXPLAIN_ASK = /\b(?:why\b|explain\b|walk me through|how come|what'?s the reasoning|how does (?:that|this|it) work)/i;
 
 const END_QUIZ = /\b(let'?s stop (?:there|here|for (?:now|today))|that'?s enough(?: for (?:now|today))?|enough for today|i(?:'m| am) done for (?:now|today))\b/i;
 const REVISION = /\b(i was (?:computing|calculating|doing|asking|solving|answering) the wrong (?:thing|question)|i was wrong(?: about| on| there)?|scratch that|i(?:'ve| have) changed my mind|ignore (?:what|that) i (?:just )?said|forget what i (?:just )?said)\b/i;

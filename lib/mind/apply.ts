@@ -106,8 +106,11 @@ export function applyCandidates(
     ...extra,
   });
 
-  const byLabel = (label: string): MindNode | undefined =>
-    nodes.find((n) => normalize(n.label) === normalize(label));
+  // A live node first: an old, superseded one under the same name is history.
+  const byLabel = (label: string): MindNode | undefined => {
+    const all = nodes.filter((n) => normalize(n.label) === normalize(label));
+    return all.find((n) => n.status !== 'superseded' && n.status !== 'archived') ?? all[0];
+  };
 
   let nodeBudget = opts.budget.nodes;
 
@@ -164,27 +167,41 @@ export function applyCandidates(
     // position. The edge between them records when and on what grounds —
     // the brief's Belief A -> superseded_by -> Belief B, reason attached.
     if (replaced) {
+      const i = nodes.indexOf(replaced);
+      // The new position may already be a live node under this very label
+      // (the extractor reused it, as it is told to). Then THAT node carries
+      // the new position — a second live node with the same name is the
+      // duplicate run 5's players saw (learning-002). Only when the gate lets
+      // this candidate rewrite (an inference never overwrites what they
+      // said), only for the same type, and never twice for the same change.
+      const same = nodes.find((n) => n !== replaced && normalize(n.label) === normalize(label) && normalize(n.type) === normalize(c.type) &&
+        n.status !== 'superseded' && n.status !== 'archived');
+      if (same && verdict.mayRewrite) {
+        nodes[i] = { ...replaced, status: 'superseded', updatedAt: opts.now };
+        const j = nodes.indexOf(same);
+        nodes[j] = { ...same, content, status: verdict.status, seen: (same.seen ?? 1) + 1, confidence: reinforceConfidence(same.confidence),
+          updatedAt: opts.now, provenance: boundProvenance([...same.provenance, prov(c.kind)]) };
+        if (!edges.some((e) => e.sourceId === replaced.id && e.targetId === same.id && e.relationship === 'superseded_by')) {
+          edges.push(makeEdge(replaced.id, same.id, 'superseded_by', opts, prov(c.kind, { note: `changed from: ${replaced.content}` })));
+        }
+        report.nodes.push({ label, action: 'superseded', id: same.id });
+        continue;
+      }
+      if (same) {
+        // Not allowed to rewrite it: record the change of position without
+        // touching the words they gave.
+        nodes[i] = { ...replaced, status: 'superseded', updatedAt: opts.now };
+        if (!edges.some((e) => e.sourceId === replaced.id && e.targetId === same.id && e.relationship === 'superseded_by')) {
+          edges.push(makeEdge(replaced.id, same.id, 'superseded_by', opts, prov(c.kind, { note: `changed from: ${replaced.content}` })));
+        }
+        report.nodes.push({ label, action: 'superseded', id: same.id });
+        continue;
+      }
       if (nodeBudget <= 0) {
         report.refused.push({ label, reason: 'over-budget' });
         continue;
       }
-      const i = nodes.indexOf(replaced);
       nodes[i] = { ...replaced, status: 'superseded', updatedAt: opts.now };
-      // The new position may already be a live node under this very label
-      // (the extractor reused it, as it is told to). Then THAT node carries
-      // the new position — a second live node with the same name is the
-      // duplicate run 5's players saw (learning-002).
-      const same = byLabel(label);
-      if (same && same !== replaced && same.status !== 'superseded' && same.status !== 'archived') {
-        const j = nodes.indexOf(same);
-        nodes[j] = { ...same, content, status: 'active', updatedAt: opts.now, provenance: boundProvenance([...same.provenance, prov(c.kind)]) };
-        edges.push(
-          makeEdge(replaced.id, same.id, 'superseded_by', opts,
-            prov(c.kind, { note: `changed from: ${replaced.content}` }))
-        );
-        report.nodes.push({ label, action: 'superseded', id: same.id });
-        continue;
-      }
       nodeBudget--;
       const fresh = makeNode(c, label, content, verdict.status, opts, prov(c.kind));
       nodes.push(fresh);

@@ -135,7 +135,7 @@ export function allocate({ state: s, signals, contract }: Ctx): Allocation {
   // ── being heard — only when they SAID so (run 1: an inferred "reflection"
   // gave four turns of acknowledgement to someone who wanted a plan; the
   // baseline simply helped). An inference never narrows help.
-  if ((signals.vent || s.heardOnly) && directness !== 'no_answer' && directness !== 'guidance') {
+  if (((signals.vent && s.latest !== 'question' && s.latest !== 'request') || s.heardOnly) && directness !== 'no_answer' && directness !== 'guidance') {
     return alloc('HUMAN_REFLECTS', 'reflect.heard', 'They are thinking out loud or want to be heard; Socria follows.', 0.7,
       ['their own processing'], ['precise acknowledgement', 'at most one observation'], null, s);
   }
@@ -162,6 +162,14 @@ export function allocate({ state: s, signals, contract }: Ctx): Allocation {
     // example or the next step outright — and a plain reminder that the full
     // answer is theirs the moment they ask (council D6, the Agency
     // Advocate's position over the hard cap).
+    // Only for a boundary they drew: "don't tell me" or "hints ONLY" — not a
+    // one-off "give me a hint", which still bottoms out (review before run 6).
+    const boundary = directness === 'no_answer' || /\b(?:hints? only|only (?:a )?hints?|just hints|no (?:answers?|solutions?|spoilers))\b/i.test(s.directness.evidence ?? '');
+    if (!withholdable && !boundary) {
+      return alloc('AI_EXPLAINS', 'practice.bottom_out',
+        'Several attempts on this item have not landed: work it fully, with the principle named, and give the next item back to them.', 1,
+        ['the next item'], ['the worked solution'], null, s);
+    }
     if (!withholdable) {
       return alloc('HUMAN_PRACTICES', `${reason}.stuck`,
         'Several attempts have not landed, and they asked to keep it: much stronger support inside that boundary, and the full answer the moment they ask.', 1,

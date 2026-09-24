@@ -144,11 +144,13 @@ export function selectIntervention(input: SelectInput): InterventionDecision {
   // "Answers only, no explanations" (their words or the Project), unless this
   // turn they ask why (run 5, adversarial-005: margin-2 losses to both
   // baselines for explanations a stated preference ruled out).
-  if ((input.signals.answersOnly || input.state.answersOnly) && !input.signals.explainAsked && !input.signals.safety && dec.type !== 'GET_OUT_OF_THE_WAY') {
+  // No token cap: "the complete code, no explanations" is long and wanted
+  // (review before run 6). Not on a withheld turn, where "give the answer"
+  // would contradict the move.
+  if ((input.signals.answersOnly || input.state.answersOnly) && !input.signals.explainAsked && !input.signals.safety && !a.withhold && dec.type !== 'GET_OUT_OF_THE_WAY') {
     dec = {
       ...dec,
       forced: true,
-      maxTokens: Math.min(dec.maxTokens, 400),
       objective: `${dec.objective} They asked for answers only: give the answer — the command, value, line or verdict — and nothing around it. No explanation, rationale or background; one short caveat only if the answer would be wrong or unsafe without it.`,
     };
   }
@@ -321,7 +323,7 @@ function selectMove(input: SelectInput): InterventionDecision {
         return d('HINT', {
           reasonCode: 'practice.support_up', reason: `${a.rationale} Support goes up.${dimNote}`,
           intended: 'They get unstuck and still produce the answer themselves.',
-          objective: 'They are stuck. Give substantially more support without giving THE answer: work a closely analogous example step by step, or supply the next step outright and stop before the final one. No questions — make it something they can act on.',
+          objective: 'They are stuck. If they just made an attempt, say first, plainly, whether it is right and where it goes wrong. Then give substantially more support without giving THE answer: work a closely analogous example step by step, or supply the next step outright and stop before the final one. No questions — make it something they can act on.',
           alloc: a, avoid, switchedFrom,
         });
       }

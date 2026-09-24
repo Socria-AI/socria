@@ -279,7 +279,7 @@ function lastTime(ledger: LedgerEntry[], input: TurnInput, turn: number): string
   // what they are saying touches it — run 5 (longitudinal-005,
   // debugging-001) lost the cross-session connection on session two's
   // SECOND turn, after the block had gone.
-  if (turn > 1 && !same.some((e) => similarity(e.text, input.lastUserText) >= 0.34)) return '';
+  if (turn > 1 && !same.filter((e) => e.owner === 'user').slice(0, 8).some((e) => similarity(e.text, input.lastUserText) >= 0.5)) return '';
   const when = new Date(latest.updatedAt).toISOString().slice(0, 10);
   const word: Record<string, string> = { asserts: 'held', entertains: 'raised the possibility', asks: 'asked', rejects: 'ruled out', accepts: 'accepted', resolved: 'settled' };
   const lines = [

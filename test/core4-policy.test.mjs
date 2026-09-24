@@ -367,11 +367,18 @@ console.log('\n=== run 5: answers only; being heard holds ===');
   const ops = 'Ops snippets: answers only, no explanations.';
   const s1 = turn({ work: 'information', latest: 'question' }, 'How do I tail the last 200 lines of the nginx error log?', { project: ops });
   const d1 = decide(s1, { said: 'How do I tail the last 200 lines of the nginx error log?', project: ops });
-  ok('a Project\'s "answers only, no explanations" makes the reply the answer and nothing around it', s1.answersOnly === true && /answers only/.test(d1.decision.objective) && d1.decision.maxTokens <= 400 && d1.decision.forced, `${d1.decision.maxTokens} ${d1.decision.forced}`);
+  ok('a Project\'s "answers only, no explanations" makes the reply the answer and nothing around it', s1.answersOnly === true && /answers only/.test(d1.decision.objective) && d1.decision.forced, `${d1.decision.maxTokens} ${d1.decision.forced}`);
+  ok('  with no token cap: "the complete code, no explanations" is long and wanted', d1.decision.maxTokens >= 1200, String(d1.decision.maxTokens));
   const d2 = decide(turn({ work: 'information', latest: 'question' }, 'why does -F keep following after rotation?', { prior: s1, project: ops }), { said: 'why does -F keep following after rotation?', project: ops });
   ok('  but not when they ask why', !/They asked for answers only/.test(d2.decision.objective), d2.decision.objective);
   for (const said of ['answers only please', 'no explanations, just the command.', 'Just the query please']) ok(`answersOnly: "${said}"`, readSignals(said).answersOnly === true);
-  for (const said of ['Can you explain the answers only section of the docs?', 'The answer is only valid for Postgres 15']) ok(`not answersOnly: "${said}"`, readSignals(said).answersOnly === false || /explain/.test(said), String(readSignals(said).answersOnly));
+  // The review before run 6 found these all setting answers-only — some for a whole Project.
+  for (const said of ['Can you explain the answers only section of the docs?', 'The answer is only valid for Postgres 15', 'Answer only in British English.', 'Only answer in Spanish please', 'Please answer only what I ask, and be thorough.', 'Answer only questions related to my thesis.', 'No commentary on formatting; focus on argument.', "There's no explanation for this behaviour in the docs. What's going on?", "There's no explanation for why he left me.", "There's no explanation.", 'The answer only works for positive n, right?', 'My teacher accepts answers only in simplest form.', "Please don't skip the explanation", 'Is it possible to prove this without any explanation of the lemma?']) {
+    ok(`not answersOnly: "${said}"`, readSignals(said).answersOnly === false && readContract(said).answersOnly === false, String(readSignals(said).answersOnly));
+  }
+  for (const said of ['Why?', 'why?', 'Why do I need sudo?', 'How does that work?', 'why not use a set?']) ok(`"${said}" suspends answers-only`, readSignals(said).explainAsked === true);
+  const fromNow = turn({ work: 'information', latest: 'question' }, 'From now on explain your answers please', { prior: s1 });
+  ok('"from now on, explain" ends answers-only', fromNow.answersOnly === false);
 
   const vent = "I'm not asking what to do. I just need to say this somewhere that isn't going to tell me to update my brag doc.";
   ok('"I\'m not asking what to do" is wanting to be heard', readSignals(vent).vent === true);
@@ -380,6 +387,23 @@ console.log('\n=== run 5: answers only; being heard holds ===');
   ok('two turns later, still being heard, not advised', h3.heardOnly === true && decide(h3, { said: 'Anyway. I think I am going to sit on it for a week.' }).allocation.mode === 'HUMAN_REFLECTS', decide(h3).allocation.reasonCode);
   const h4 = turn({ work: 'judgment', latest: 'question' }, 'What would you say to my manager?', { prior: h3 });
   ok('  until they ask for it', h4.heardOnly === false && decide(h4, { said: 'What would you say to my manager?' }).allocation.mode !== 'HUMAN_REFLECTS');
+}
+
+console.log('\n=== review before run 6: withhold and vent false positives ===');
+{
+  for (const said of ["I tried to fix it myself but it still fails, what's wrong?", 'I managed to fix the bug myself, now I want to know how to add tests', "I couldn't solve this on my own so here's my code", "Why can't I solve this myself? Explain the concept.", "Can you show me the proof? I'd rather not derive it myself", "I don't want the fix to break anything else. What should I change?", "I don't want the answer to be wrong, so double check it", "I don't want the solution to use recursion. Can you write it iteratively?", "Don't show me the working, I only want the final answer", 'Don\'t give me the proof, just the final number please', 'I want to fix my own bug report template, can you draft one?']) {
+    ok(`not a refusal: "${said.slice(0, 60)}"`, readSignals(said).directness !== 'no_answer', readSignals(said).directness);
+  }
+  ok('"just the final number" after "don\'t give me the proof" is answers-only', readSignals('Don\'t give me the proof, just the final number please').answersOnly === true);
+  for (const said of ["I'm not asking what to do about the bug, I'm asking why it happens", "I'm not asking for advice on the design, just review the code", 'Not asking for advice on stocks, just what a P/E ratio is', 'I just need to tell it apart from the other function — how?', "I just need to say it in French: how do you say 'good morning'?", 'i just need to tell this to my manager, how should I phrase it?']) {
+    ok(`not venting: "${said.slice(0, 60)}"`, readSignals(said).vent === false);
+  }
+  // A one-off "give me a hint" still bottoms out; "hints only" does not.
+  const failed2 = Array.from({ length: 2 }, (_, i) => ({ turn: i + 1, type: 'VERIFY', family: 'telling', questions: 0, withheld: true, failed: true }));
+  const oneHint = decide(S({ work: 'practice', latest: 'attempt', attempt: 'wrong', directness: { value: 'guidance', source: 'explicit', confidence: 1, evidence: 'give me a hint' }, history: failed2 }));
+  ok('a one-off "give me a hint" still bottoms out after repeated failure', oneHint.allocation.reasonCode === 'practice.bottom_out', oneHint.allocation.reasonCode);
+  const hintsOnly2 = decide(S({ work: 'practice', latest: 'attempt', attempt: 'wrong', directness: { value: 'guidance', source: 'explicit', confidence: 1, evidence: 'hints only' }, history: failed2 }));
+  ok('"hints only" does not', hintsOnly2.allocation.reasonCode.endsWith('.stuck') && /whether it is right and where it goes wrong/.test(hintsOnly2.decision.objective), `${hintsOnly2.allocation.reasonCode} ${hintsOnly2.decision.objective.slice(0, 80)}`);
 }
 
 console.log('\n=== run 4: a substantive move has the baseline\'s ceiling ===');

@@ -388,5 +388,6 @@ export function extractionContext(
     .filter((n) => n.provenance.some((p) => p.conversationId === conversationId));
   if (!own.length) return sub;
   const room = Math.max(0, limit - base.nodes.length);
-  return { ...base, nodes: [...base.nodes, ...own.slice(-room)] };
+  // slice(-0) is the whole array: with no room, add nothing (review before run 6).
+  return { ...base, nodes: [...base.nodes, ...(room > 0 ? own.slice(-room) : [])] };
 }
