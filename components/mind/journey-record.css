@@ -1,0 +1,12 @@
+/* components/mind/journey-record.css
+   The Thinking Journey strip on /memory. Scoped under .jr-root: a CSS file
+   imported from a component is a GLOBAL stylesheet in Next.js, and this repo
+   has already had one leak. Same paper and ink tokens as core4-record.css. */
+
+.jr-root{background:var(--paper);color:var(--ink);padding:clamp(22px,4vh,40px) clamp(16px,4vw,56px) clamp(30px,6vh,64px);border-top:1px solid var(--ink-12)}
+.jr-root .jr-kicker{font-family:var(--sans);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-60)}
+.jr-root h2{font-family:var(--serif);font-weight:400;font-size:clamp(1.5rem,3vw,2.1rem);letter-spacing:-.02em;line-height:1.1;margin:8px 0 0}
+.jr-root .jr-deck{margin:10px 0 0;max-width:72ch;font-size:15px;line-height:1.62;color:var(--ink-70)}
+.jr-root .jr-open{margin:16px 0 0;font-family:var(--serif);font-size:15px;color:var(--moss-700);
+  border-bottom:1px solid var(--moss-600);padding-bottom:2px;transition:opacity .18s}
+.jr-root .jr-open:hover{opacity:.72}

@@ -20,6 +20,7 @@ import { useRouter } from 'next/navigation';
 import { useUser } from '@clerk/nextjs';
 import { MindGraphView } from '@/components/mind/MindGraphView';
 import { Core4Record } from '@/components/mind/Core4Record';
+import { JourneyRecord } from '@/components/mind/JourneyRecord';
 
 export default function MemoryPage() {
   const { isLoaded, isSignedIn } = useUser();
@@ -33,11 +34,17 @@ export default function MemoryPage() {
 
   // The Mind Graph is what Socria knows about them; Core4Record is what Core
   // 4 recorded about their THINKING — the reasoning ledger, what it took
-  // into account, the capability evidence — each correctable.
+  // into account, the capability evidence — each correctable. JourneyRecord
+  // is the older Cores' store, shown last and labelled as theirs, so that one
+  // page covers everything any model reads.
   return (
     <>
       <MindGraphView />
       <Core4Record />
+      {/* And the store the older Cores read, which is not Core 4's memory —
+          it says so itself. It is here because the sidebar link that used to
+          open it now comes here, and it carried the only per-entry forget. */}
+      <JourneyRecord />
     </>
   );
 }

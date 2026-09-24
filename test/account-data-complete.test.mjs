@@ -101,5 +101,25 @@ ok(
 ok('billing is cancelled before anything is deleted', del.indexOf('subscriptions.cancel') < del.indexOf('for (const table of OWNED_TABLES)'));
 ok('the Clerk identity is deleted too', /clerkClient\.users\.deleteUser/.test(del));
 
+// A control that deletes ONE thing is easier to lose than a route: it lives
+// in a chip somebody redesigns. The chat sidebar chip that opened the Thinking
+// Journey is gone — it pointed at a store Core 4 does not read — and it
+// carried the only per-entry forget. This pins where it went, so the next
+// person to move that link has to move the control with it.
+console.log('\n=== forgetting ONE thing is still reachable ===');
+{
+  const memoryPage = read('app/memory/page.tsx');
+  const record = read('components/mind/JourneyRecord.tsx');
+  const chat = read('app/chat/page.tsx');
+  ok('the chat sidebar points at /memory', /href="\/memory"/.test(chat));
+  ok('  and no longer mounts the journey modal itself', !/JourneyDebugModal/.test(chat));
+  ok('/memory renders the journey', /<JourneyRecord \/>/.test(memoryPage));
+  ok('  with the per-entry route wired', /api\/profile\/forget/.test(record));
+  ok('  and forget-everything wired to the account route', /api\/account\/memory/.test(record) && /method: 'DELETE'/.test(record));
+  // A forget that reached the server and not this browser comes back on the
+  // next sync as a proposal the tombstone then has to refuse.
+  ok('  and the browser copy is cleared with it', /removeItem\(JOURNEY_KEY\)/.test(record));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

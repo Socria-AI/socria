@@ -63,7 +63,6 @@ import { InsightCard } from '@/components/InsightCard';
 import { InsightShareModal } from '@/components/InsightShareModal';
 import { ImportProfileModal } from '@/components/ImportProfileModal';
 import Link from 'next/link';
-import { JourneyDebugModal } from '@/components/JourneyDebugModal';
 import { SynthesisCard, SynthesisPending } from '@/components/SynthesisCard';
 import { ChoiceChips } from '@/components/ChoiceChips';
 import { parseMessage, splitChoices, type SynthesisData } from '@/lib/synthesis';
@@ -385,7 +384,6 @@ export default function ChatPage() {
   const [shareInsight, setShareInsight] = useState<Insight | null>(null);
   const [importedProfile, setImportedProfile] = useState('');
   const [importOpen, setImportOpen] = useState(false);
-  const [journeyDebugOpen, setJourneyDebugOpen] = useState(false);
 
   // WHEN THE TOUR MAY OPEN.
   //
@@ -395,7 +393,7 @@ export default function ChatPage() {
   // under the Logos modal on a first visit. Depending on the real state
   // means the tour simply waits, and opens when the screen is free.
   const anythingOpen =
-    logosModalOpen || acctOpen || importOpen || journeyDebugOpen || !!shareInsight;
+    logosModalOpen || acctOpen || importOpen || !!shareInsight;
   useEffect(() => {
     if (!isLoaded || !isSignedIn || tourOpen || anythingOpen) return;
     try {
@@ -2237,48 +2235,6 @@ export default function ChatPage() {
         profile={importedProfile}
         onSave={saveImportedProfile}
       />
-      <JourneyDebugModal
-        open={journeyDebugOpen}
-        onClose={() => setJourneyDebugOpen(false)}
-        journey={journey}
-        plan={planState.plan}
-        signedIn={!!isSignedIn}
-        onForget={async (id) => {
-          if (isSignedIn) {
-            try {
-              const res = await fetch('/api/profile/forget', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id }),
-              });
-              if (res.ok) {
-                const j = await res.json();
-                if (j?.understanding) saveJourney(j.understanding);
-              }
-            } catch {}
-            return;
-          }
-          // Signed out: the journey lives in this browser, so the tombstone
-          // does too. lib/person-memory's forgetEntry, applied locally.
-          const cur = journeyRef.current;
-          if (!cur) return;
-          const { forgetEntry } = await import('@/lib/person-memory');
-          const { entries, forgotten } = forgetEntry(cur.entries, cur.forgotten, id);
-          saveJourney({ ...cur, entries, forgotten, updatedAt: Date.now() });
-        }}
-        onForgetAll={async () => {
-          if (isSignedIn) {
-            try {
-              await fetch('/api/account/memory', { method: 'DELETE' });
-            } catch {}
-          }
-          setJourney(null);
-          journeyRef.current = null;
-          try {
-            localStorage.removeItem(JOURNEY_KEY);
-          } catch {}
-        }}
-      />
       {/* Mobile backdrop when sidebar is open */}
       {sidebarOpen && (
         <div
@@ -2504,7 +2460,11 @@ export default function ChatPage() {
             store that happened to share the words "what Socria remembers". So
             it showed a person one thing and told Socria another.
             /memory IS the Mind Graph — the same rows the prompt was built
-            from — so the link now goes where the memory actually lives.
+            from — so the link now goes where the memory actually lives. The
+            Journey is on that page too (components/mind/JourneyRecord),
+            labelled as the older Cores' store: the chip carried the only
+            per-entry forget, and a deletion control does not get dropped on
+            the way past.
           */}
           <Link href="/memory" className="s-link" onClick={() => setSidebarOpen(false)}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
