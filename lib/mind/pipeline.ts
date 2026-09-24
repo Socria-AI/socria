@@ -1,3 +1,4 @@
+import { nameCandidate, nameFrom } from './self';
 import 'server-only';
 // lib/mind/pipeline.ts
 //
@@ -238,6 +239,25 @@ export async function remember(
 
     const candidates =
       opts.candidates ?? (await extract(opts.apiKey, text, opts.existing ?? null));
+
+    // ── WHAT THEY SAID ABOUT THEMSELVES, WITHOUT ASKING A MODEL ──────
+    //
+    // "My name is X" is a regex, and a regex cannot be talked out of it, cost
+    // a call, or decide the turn was not worth remembering. The extractor
+    // frequently answered {} for exactly this turn — its own instructions say
+    // most turns add nothing and name pleasantries as the example — and the
+    // name was then lost while the reply said "Got it, Pradeep."
+    //
+    // Only the USER's half of the turn is read: `text` is "User: …\n\nSocria: …",
+    // and a name Socria used in its reply is Socria repeating them, not a
+    // second source.
+    const saidByThem = text.split(/\n\nSocria:/)[0];
+    const name = nameFrom(saidByThem);
+    if (name) {
+      const already = candidates.nodes.some((n) => n.label.trim().toLowerCase() === name.toLowerCase());
+      if (!already) candidates.nodes.unshift(nameCandidate(name));
+    }
+
     if (!candidates.nodes.length && !candidates.edges.length) {
       return { report: null, persisted: false };
     }

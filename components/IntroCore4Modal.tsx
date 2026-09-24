@@ -26,6 +26,12 @@
 // FOUR SCENES, ON A CLOCK, with dots to jump. The clock exists because the
 // first scene has to make its point in the time somebody gives a modal, and
 // the dots exist because the fourth is the one a sceptic wants.
+//
+// AND ALMOST NO PROSE AROUND THEM. The first version carried a kicker, a
+// headline, a standfirst, three numbered dispatches and a footnote — a page of
+// reading in front of a demonstration that says the same things by running.
+// What is left is the stage, one sentence and the button: if the scenes do not
+// make the case, three paragraphs claiming they do will not either.
 
 import { useEffect, useRef, useState } from 'react';
 import { Dial } from './ModelPicker';
@@ -84,23 +90,6 @@ const RESEARCH = {
 const WEB_REPLY =
   'The annual report is due **15 May**, not the date on your calendar [1]. An extension moves the filing, not the payment [2] — so the cash still has to be there in May either way.';
 
-const DISPATCHES = [
-  {
-    n: 'i',
-    h: 'It decides how far to go — you do not',
-    p: 'There is no depth dial to set in advance, because the right depth is a property of the turn and not of your mood. A worry gets a sentence. A question with real material behind it gets the whole answer.',
-  },
-  {
-    n: 'ii',
-    h: 'You say how it is written',
-    p: 'Two dials: how it reads, and how much it says. They change the sentences and nothing else — Simple never means a worse answer, and the two move independently, so Advanced and Concise is a real setting.',
-  },
-  {
-    n: 'iii',
-    h: 'It holds what matters, and you can take it back',
-    p: 'What Socria knows about how you think lives in the Mind Graph — visible on one page, correctable line by line, and deletable. It comes up when it helps and stays quiet when it does not.',
-  },
-];
 
 export function IntroCore4Modal({
   open,
@@ -286,37 +275,16 @@ export function IntroCore4Modal({
         </div>
 
         <div className="j3-body">
-          <p className="j3-kicker reveal-in" style={{ animationDelay: '60ms' }}>
-            New · Socria Core 4
-          </p>
-          <h2 id="intro-core4-title" className="j3-title reveal-in" style={{ animationDelay: '130ms' }}>
+          <h2 id="intro-core4-title" className="j3-title reveal-in" style={{ animationDelay: '80ms' }}>
             It thinks <span className="j3-title-em">with you</span>, not for you.
           </h2>
-          <p className="j3-standfirst reveal-in" style={{ animationDelay: '200ms' }}>
-            Core 4 reads what kind of turn this is before it writes a word — and
-            judges, every time, whether answering outright would take work that
-            is worth doing yourself.
-          </p>
-
-          <ol className="j3-dispatches">
-            {DISPATCHES.map((d, i) => (
-              <li key={d.n} className="j3-dispatch reveal-in" style={{ animationDelay: `${280 + i * 70}ms` }}>
-                <span className="j3-dispatch-n">{d.n}.</span>
-                <div>
-                  <h3>{d.h}</h3>
-                  <p>{d.p}</p>
-                </div>
-              </li>
-            ))}
-          </ol>
-
-          <p className="tl-free reveal-in" style={{ animationDelay: '520ms' }}>
+          <p className="j3-standfirst reveal-in" style={{ animationDelay: '150ms' }}>
             {isSignedIn
-              ? 'Core 3.1 stays exactly where it is — this is a choice, not a migration.'
-              : 'Core 4 needs an account, because it keeps something. Core 3.1 is open without one.'}
+              ? 'Core 4 reads what kind of turn this is before it writes a word — how far to go, what to leave you, and what it already knows about how you think.'
+              : 'Core 4 reads what kind of turn this is before it writes a word. It needs an account, because it keeps something; Core 3.1 is open without one.'}
           </p>
 
-          <div className="core3-modal-footer reveal-in" style={{ animationDelay: '620ms' }}>
+          <div className="core3-modal-footer reveal-in" style={{ animationDelay: '230ms' }}>
             <label className="core3-modal-checkbox">
               <input type="checkbox" checked={dontShow} onChange={(e) => setDontShow(e.target.checked)} />
               <span>Don&rsquo;t show again</span>

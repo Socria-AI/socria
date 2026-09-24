@@ -18,6 +18,7 @@
 // and a sentence in, a subgraph out, which is what makes the behaviour
 // testable rather than merely plausible.
 
+import { aboutThem, asksName, selfNodes, selfReferential } from './self';
 import { resolveNode } from './resolve';
 import {
   ANCHOR_SEED, CROSS_MIN_ACTIVATION, MEMBERSHIP_RELATIONSHIPS, SEED_FLOOR, STRONG_EDGE,
@@ -171,6 +172,48 @@ export function activate(
   const byId = new Map(visible.map((n) => [n.id, n]));
 
   const seeds = seedActivation({ ...graph, nodes: visible }, message, opts.focus ?? []);
+
+  // ── WHO THEY ARE, WHICH NO MESSAGE EVER NAMES ────────────────────
+  //
+  // Seeding is lexical on labels, so a node labelled with somebody's name is
+  // reachable only by a message containing that name — and "do you know my
+  // name?" contains know, my, name. The identity was in the graph and
+  // unreachable by the one question that asks for it.
+  //
+  // So: anything carrying the self alias is lit whenever they refer to
+  // themselves at all. It is a small set by construction (see self.ts — only
+  // a stated name gets the alias), and it is seeded BELOW a direct lexical
+  // hit, so it can never displace what the message actually named.
+  const mine = selfNodes(visible);
+  if (mine.length) {
+    // Asking what they are called lights the identity outright. Otherwise it
+    // fills a gap rather than competing for one: a message that talks about
+    // themselves and named nothing gets it faintly, and a message that named
+    // something does not, because ranking weighs importance as well as seed
+    // strength and an identity node is important by construction — it would
+    // have led every turn that contained the word "I".
+    const weight = asksName(message) || aboutThem(message) ? 1 : selfReferential(message) && !seeds.size ? 0.3 : 0;
+    if (weight) for (const n of mine) seeds.set(n.id, Math.max(seeds.get(n.id) ?? 0, weight));
+  }
+
+  // ── AND WHEN THE SUBJECT IS THEM ─────────────────────────────────
+  //
+  // "What do you know about me" names no topic, so nothing was seeded, and
+  // the early return below handed the reply an empty subgraph — which is how
+  // a graph full of somebody's material answered "not much". A question about
+  // the person is answered from what the graph holds ABOUT the person: the
+  // most important, most recently touched things it knows.
+  // Only the broad question gets the digest. "Do you know my name?" has one
+  // honest answer when no name is known, and reciting the graph's most
+  // important nodes at it would be a stranger failure than the one being
+  // fixed.
+  if (aboutThem(message) && !asksName(message)) {
+    const digest = [...visible]
+      .sort((a, b) => (b.importance * 2 + b.updatedAt / 1e13) - (a.importance * 2 + a.updatedAt / 1e13))
+      .slice(0, 6);
+    for (const n of digest) seeds.set(n.id, Math.max(seeds.get(n.id) ?? 0, 0.55 * (0.4 + 0.6 * n.importance)));
+  }
+
   if (opts.conversationId) {
     const mine = visible
       .filter((n) => n.provenance.some((p) => p.conversationId === opts.conversationId))

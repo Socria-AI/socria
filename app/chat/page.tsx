@@ -59,7 +59,7 @@ import {
   searchRail,
   shouldShowSearch,
 } from '@/lib/session-rail';
-import { TryLogosPill } from '@/components/TryLogosPill';
+import { TryCore4Pill } from '@/components/TryCore4Pill';
 import { TryLogosModal } from '@/components/TryLogosModal';
 import { IntroCore4Modal } from '@/components/IntroCore4Modal';
 import { RichText } from '@/components/RichText';
@@ -369,6 +369,8 @@ export default function ChatPage() {
   const justOnboarded = useRef(false);
   const [logosDismissed, setLogosDismissed] = useState(false);
   const [core4IntroOpen, setCore4IntroOpen] = useState(false);
+  /** they pressed "don't show again" — the pill goes with the auto-open */
+  const [core4Dismissed, setCore4Dismissed] = useState(false);
   const [autoOpenChecked, setAutoOpenChecked] = useState(false);
   const [shareInsight, setShareInsight] = useState<Insight | null>(null);
   const [importedProfile, setImportedProfile] = useState('');
@@ -790,6 +792,7 @@ export default function ChatPage() {
     try {
       setLogosDismissed(localStorage.getItem(LOGOS_INTRO_DISMISS_KEY) === '1');
       const dismissed = localStorage.getItem(CORE4_INTRO_DISMISS_KEY) === '1';
+      setCore4Dismissed(dismissed);
       const here = readModel();
       if (!dismissed && here !== 'core-4' && !isLogosSurface(here)) {
         setCore4IntroOpen(true);
@@ -802,6 +805,7 @@ export default function ChatPage() {
       try {
         localStorage.setItem(CORE4_INTRO_DISMISS_KEY, '1');
       } catch {}
+      setCore4Dismissed(true);
     }
     setCore4IntroOpen(false);
   }
@@ -818,6 +822,7 @@ export default function ChatPage() {
       try {
         localStorage.setItem(CORE4_INTRO_DISMISS_KEY, '1');
       } catch {}
+      setCore4Dismissed(true);
       setCore4IntroOpen(false);
       setModel('core-4');
       chooseModel('core-4');
@@ -2577,10 +2582,13 @@ export default function ChatPage() {
               </span>
             )}
             <div className="hidden sm:block">
-              <TryLogosPill
+              {/* The standing invitation is Core 4's now. It stays until they
+                  say "don't show again" in the modal itself, and disappears on
+                  the model it is inviting them to. */}
+              <TryCore4Pill
                 currentModel={model}
-                visible={!logosDismissed}
-                onOpen={() => setLogosModalOpen(true)}
+                visible={!core4Dismissed}
+                onOpen={() => setCore4IntroOpen(true)}
               />
             </div>
             <SignedOut>

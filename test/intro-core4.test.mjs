@@ -50,6 +50,30 @@ console.log('=== the stage is the real product, not a picture of it ===');
   ok('reduced motion gets no clock at all', /prefers-reduced-motion: reduce/.test(modal));
 }
 
+console.log('\n=== opened, it is the demonstration and nothing else ===');
+{
+  // The first version carried a kicker, a headline, a standfirst, three
+  // numbered dispatches and a footnote in front of a stage that says the same
+  // things by running. If the scenes do not make the case, three paragraphs
+  // claiming they do will not either.
+  ok('the dispatch list is gone', !/j3-dispatch/.test(modal) && !/DISPATCHES/.test(modal));
+  ok('  and so is the kicker above the headline', !/j3-kicker/.test(modal));
+  ok('one sentence under the title, not three', (modal.match(/j3-standfirst/g) ?? []).length === 1);
+  ok('the stage itself is untouched', /c4-stage/.test(modal) && (modal.match(/scene\.id === /g) ?? []).length === 4);
+  ok('and the way out is still two controls', /core3-modal-checkbox/.test(modal) && /core3-modal-primary/.test(modal));
+}
+
+console.log('\n=== the standing invitation is Core 4’s, in the rail ===');
+{
+  const pill = read('components/TryCore4Pill.tsx');
+  ok('the pill is Core 4’s', /Try Core 4/.test(pill) && /ModelGlyph model="core-4"/.test(pill));
+  ok('  and the Logos pill is gone', !/TryLogosPill/.test(chat));
+  ok('it opens the Core 4 introduction', /onOpen=\{\(\) => setCore4IntroOpen\(true\)\}/.test(chat));
+  ok('nobody is invited to where they already are', /currentModel === 'core-4'/.test(pill));
+  ok('“don’t show again” takes the pill with it',
+    /visible=\{!core4Dismissed\}/.test(chat) && /setCore4Dismissed\(true\)/.test(chat));
+}
+
 console.log('\n=== who is asked, and who is not ===');
 {
   ok('it has its own dismissal key, not the Logos one',

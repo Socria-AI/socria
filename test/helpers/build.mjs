@@ -89,6 +89,7 @@ const MODULES = [
   'lib/mind/layout.ts',
   'lib/mind/projects.ts',
   'lib/mind/resolve.ts',
+  'lib/mind/self.ts',
   'lib/mind/gate.ts',
   'lib/mind/apply.ts',
   'lib/mind/activate.ts',
