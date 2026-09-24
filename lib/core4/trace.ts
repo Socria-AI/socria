@@ -60,9 +60,6 @@ export interface TurnTrace {
     ablations: number;
     loadBearing: number;
     robust: number;
-    samples: number;
-    agreement: number | null;
-    split: boolean;
     /** candidate pairs that survived a direct "can both hold?" test */
     contradictions: number;
     /** of those, how many the reader never flagged — the ones it found itself */
@@ -118,7 +115,6 @@ export function buildTrace(x: {
   // Optional: the trace is telemetry and runs beside the reply, so a caller
   // that has not been updated must degrade to a thinner trace, never throw.
   counterfactual?: { ablations: readonly { dependence: string }[] } | null;
-  calibration?: { samples: number; agreement: number; split: boolean } | null;
   contradictions?: readonly { source: string }[];
   superseded?: number;
   missing?: readonly { kind: string }[];
@@ -183,9 +179,6 @@ export function buildTrace(x: {
       ablations: x.counterfactual?.ablations.length ?? 0,
       loadBearing: x.counterfactual?.ablations.filter((a) => a.dependence === 'load_bearing').length ?? 0,
       robust: x.counterfactual?.ablations.filter((a) => a.dependence === 'robust').length ?? 0,
-      samples: x.calibration?.samples ?? 0,
-      agreement: x.calibration ? Math.round(x.calibration.agreement * 100) / 100 : null,
-      split: x.calibration?.split ?? false,
       contradictions: x.contradictions?.length ?? 0,
       contradictionsFoundByStructure: x.contradictions?.filter((c) => c.source === 'structure').length ?? 0,
       superseded: x.superseded ?? 0,

@@ -78,7 +78,7 @@ const MODULES = [
   'lib/core4/ledger.ts',
   'lib/core4/capability.ts',
   'lib/core4/counterfactual.ts',
-  'lib/core4/calibration.ts',
+  'lib/core4/history.ts',
   'lib/core4/trace.ts',
   'lib/core4/stream-gate.ts',
   'lib/cognition/router.ts',

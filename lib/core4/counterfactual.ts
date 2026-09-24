@@ -87,6 +87,17 @@ export interface Ablation {
   dependence: Dependence;
   /** what follows instead, when it does not survive */
   instead: string;
+  /**
+   * The value at which the conclusion stops holding, when the premise is a
+   * number and the conclusion is a comparison.
+   *
+   * THE POINT OF THE UPGRADE. "Your churn assumption is load-bearing" is a
+   * sentence a good prompt writes. "It stops holding above 4.8% and you are at
+   * 4.1%" is a boundary the person cannot read off their own workings: they
+   * know their figure and they know their conclusion, and what they do not know
+   * is how much slack sits between them. Empty whenever it cannot be computed.
+   */
+  flipsAt: string;
   confidence: number;
   /** the epistemic standing of the premise itself — an unchecked load-bearing one is the prize */
   standing: string;
@@ -121,6 +132,14 @@ holds       true | false | "unclear"
             "unclear" — you genuinely cannot tell from what remains
 instead     one line: what follows INSTEAD, when holds is false. "" otherwise.
             Be specific and quantitative where the premises are.
+flipsAt     ONLY when the removed premise states a NUMBER and the conclusion is a
+            comparison, a threshold or a target: the value of that number at which
+            the conclusion stops holding, with its unit. "" in every other case.
+            This is the one figure the person cannot read off their own workings:
+            they know their number and they know their conclusion, and what they
+            do not know is how much slack there is between them. Give the boundary
+            value, not a restatement of theirs. If you cannot compute it from the
+            premises, leave it empty rather than estimating.
 confidence  0-1, how sure you are of that verdict
 
 "unclear" is a good answer. A premise you cannot evaluate is not a premise you have cleared.`;
@@ -130,13 +149,17 @@ const ask = (conclusion: string, premises: readonly string[], removed: string) =
     premises.map((p) => `- ${p}`).join('\n') || '- (none remain)'
   }\n\nREMOVED PREMISE (treat as unknown, not as false):\n- ${removed}`;
 
-function sanitize(raw: unknown): { dependence: Dependence; instead: string; confidence: number } {
+function sanitize(raw: unknown): { dependence: Dependence; instead: string; flipsAt: string; confidence: number } {
   const o = (raw ?? {}) as Record<string, unknown>;
   const h = o.holds;
   const dependence: Dependence = h === true ? 'robust' : h === false ? 'load_bearing' : 'unclear';
   const c = typeof o.confidence === 'number' && Number.isFinite(o.confidence) ? Math.min(1, Math.max(0, o.confidence)) : 0;
   const instead = typeof o.instead === 'string' ? o.instead.trim().slice(0, 300) : '';
-  return { dependence, instead, confidence: c };
+  // A threshold with no digit in it is a sentence, not a boundary — and a
+  // sentence here would be the thing a prompt already produces.
+  const raw2 = typeof o.flipsAt === 'string' ? o.flipsAt.trim().slice(0, 120) : '';
+  const flipsAt = /\d/.test(raw2) ? raw2 : '';
+  return { dependence, instead, flipsAt, confidence: c };
 }
 
 /**
@@ -237,6 +260,7 @@ export async function ablateOne(
       premiseQuote: premise.quote ?? '',
       dependence: v.dependence,
       instead: v.instead,
+      flipsAt: v.flipsAt,
       confidence: v.confidence,
       standing: premise.epistemic,
     };
@@ -312,7 +336,11 @@ export function renderCounterfactual(cf: Counterfactual | null): string {
   const lines: string[] = [];
   for (const a of load.slice(0, 2)) {
     const mark = a.standing === 'assumed' ? ' (which is an assumption, not a finding)' : a.standing === 'needs_verification' ? ' (which nothing has checked)' : '';
-    lines.push(`  - Remove "${said({ text: a.premise, quote: a.premiseQuote })}"${mark} and "${said({ text: cf.conclusion, quote: cf.conclusionQuote })}" no longer follows — instead: ${a.instead}`);
+    lines.push(
+      a.flipsAt
+        ? `  - "${said({ text: cf.conclusion, quote: cf.conclusionQuote })}" holds only while "${said({ text: a.premise, quote: a.premiseQuote })}"${mark} stays within ${a.flipsAt} — past that: ${a.instead}`
+        : `  - Remove "${said({ text: a.premise, quote: a.premiseQuote })}"${mark} and "${said({ text: cf.conclusion, quote: cf.conclusionQuote })}" no longer follows — instead: ${a.instead}`
+    );
   }
   for (const a of firm.slice(0, 1)) {
     lines.push(`  - "${said({ text: cf.conclusion, quote: cf.conclusionQuote })}" holds even without "${said({ text: a.premise, quote: a.premiseQuote })}", so that one is not worth chasing.`);
@@ -320,6 +348,7 @@ export function renderCounterfactual(cf: Counterfactual | null): string {
   return (
     `\n=== Tested, not assumed: what this actually rests on ===\n${lines.join('\n')}\n` +
     `This was measured by removing each premise and re-deriving, not inferred from how they wrote it. ` +
+    `Where a boundary value is given, LEAD WITH IT and give it exactly — the distance between their figure and the point where their conclusion breaks is the part they cannot work out from what they already have. ` +
     `Where it changes what they should do next, say it plainly and in your own words — what falls over, and what they would have to check to know. ` +
     `Never describe the test, the removal, or that anything was run: they want the finding, not the method.\n`
   );

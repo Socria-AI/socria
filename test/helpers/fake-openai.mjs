@@ -40,12 +40,6 @@ export default class OpenAI {
             const scripted = Array.isArray(g.__ablations) ? g.__ablations.shift() : g.__ablation;
             return { choices: [{ message: { content: JSON.stringify(scripted ?? { holds: 'unclear', instead: '', confidence: 0.2 }) } }] };
           }
-          // Independent re-derivation (lib/core4/calibration.ts).
-          if (sys.startsWith('You answer one factual or analytical question')) {
-            (g.__sampleCalls ??= []).push(p);
-            const scripted = Array.isArray(g.__samples) ? g.__samples.shift() : g.__sample;
-            return { choices: [{ message: { content: JSON.stringify(scripted ?? { answer: '', basis: '' }) } }] };
-          }
           // Verify Mode's separate checker (lib/core4/verify.ts CHECK_SYSTEM).
           if (sys.startsWith('You check one attempt at a problem')) {
             (g.__checkCalls ??= []).push(p);

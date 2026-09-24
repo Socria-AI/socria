@@ -579,8 +579,8 @@ console.log('\n=== the measuring stages fire only where they are worth the money
   });
   ok('an ordinary information question measures nothing',
     !/Tested, not assumed/.test(ordinary.prompt) && !/did not settle/.test(ordinary.prompt));
-  ok('  and its trace records no ablations and no samples',
-    ordinary.t?.trace?.measured?.ablations === 0 && ordinary.t?.trace?.measured?.samples === 0,
+  ok('  and its trace records no ablations',
+    ordinary.t?.trace?.measured?.ablations === 0 && ordinary.t?.trace?.measured?.contradictions === 0,
     JSON.stringify(ordinary.t?.trace?.measured));
   ok('  and the trace always carries the field, so telemetry never throws',
     !!ordinary.t?.trace?.measured, JSON.stringify(ordinary.t?.trace?.measured));
@@ -614,10 +614,6 @@ console.log('\n=== the measuring stages actually fire, and reach the prompt ==='
     replies: ['Noted.'],
   });
   globalThis.__ablation = { holds: false, instead: 'the raise moves to June', confidence: 0.9 };
-  globalThis.__samples = [
-    { answer: 'about 40% a year' }, { answer: 'closer to 25% once cohorts are split' },
-    { answer: 'the figure is 49%' }, { answer: 'about 40% a year' }, { answer: 'nearer 30% on a blended book' },
-  ];
   const r = await turn(conv, [U(opening), A('Noted.'), U('Given all that, is March still the right call? Walk me through what could break it.')], {
     state: {
       taskKind: 'decide', work: 'judgment', latest: 'question', stakes: 'high',
@@ -639,11 +635,9 @@ console.log('\n=== the measuring stages actually fire, and reach the prompt ==='
   ok('  and the conclusion was NOT listed among its own premises',
     !/PREMISES[^]*?\n- Raise in March/.test((globalThis.__ablationCalls ?? []).map((c) => c.messages?.[1]?.content ?? '').join('\n')),
     (globalThis.__ablationCalls ?? [])[0]?.messages?.[1]?.content?.slice(0, 200));
-  ok('the claim was re-derived independently and did not converge', t.measured?.split === true && t.measured.samples === 5, JSON.stringify(t.measured));
-  ok('what was measured reaches the prompt', /Tested, not assumed/.test(r.prompt) && /did not settle/.test(r.prompt));
-  ok('  told to give the finding and never the method', /Never describe the test/.test(r.prompt) && /never mention attempts, samples/.test(r.prompt));
+  ok('what was measured reaches the prompt', /Tested, not assumed/.test(r.prompt));
+  ok('  told to give the finding and never the method', /Never describe the test/.test(r.prompt));
   globalThis.__ablation = undefined;
-  globalThis.__samples = undefined;
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

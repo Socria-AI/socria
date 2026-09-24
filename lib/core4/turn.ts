@@ -27,7 +27,7 @@ import 'server-only';
 import { EMPTY_STATE, type CognitiveState } from '../cognition/state';
 import { readState, guardModel, checkWork, COGNITION_MODEL } from '../cognition/engine';
 import { testDependencies, renderCounterfactual, testContradictions, renderContradictions, type Counterfactual, type ContradictionTest } from './counterfactual';
-import { calibrate as sampleClaim, renderCalibration, type Calibration } from './calibration';
+import { discoverFromHistory, renderHistory, type HistoricalFinding } from './history';
 import { readSignals, readContract } from './signals';
 import { mergeState, recordTurn, gapCheck } from './merge';
 import { allocate } from './allocation';
@@ -98,10 +98,10 @@ export interface PreparedTurn {
   competence: ReturnType<typeof taskCompetence>;
   /** what was measured by ablation, when the gate opened */
   counterfactual: Counterfactual | null;
-  /** what independent re-derivation said, when it disagreed with itself */
-  calibration: Calibration | null;
   /** candidate contradictions that survived a direct test */
   contradictions: ContradictionTest[];
+  /** what the record can say that this conversation cannot */
+  historical: HistoricalFinding[];
   /** the findings actually rendered, after measured results superseded asserted ones */
   missingShown: MissingContribution[];
   /**
@@ -276,6 +276,18 @@ export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
       }
     }
   }
+  // ── WHAT THE RECORD KNOWS AND THE CONVERSATION DOES NOT ─────────
+  //
+  // Ungated, because it costs nothing: no model call, no I/O, pure arithmetic
+  // over entries already loaded. Every other discovery mechanism had to be
+  // gated to roughly 15% of turns to be affordable, and a gate is one more
+  // thing that can be wrong — this one runs whenever there is a record to
+  // compute over, which is the only reason it can reach a turn that does not
+  // look important in advance.
+  const historical = input.conversationId
+    ? discoverFromHistory([...ledger, ...provisional], [...priorLinks, ...freshEdges], input.now)
+    : [];
+
   // ── MEASURED, NOT ASSERTED ──────────────────────────────────────
   //
   // The two stages that are not a re-reading of the transcript. Everything
@@ -296,13 +308,11 @@ export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
   // worse for either being unavailable — the same failure direction every
   // other optional stage takes.
   let counterfactual: Counterfactual | null = null;
-  let calibration: Calibration | null = null;
   let contradictions: ContradictionTest[] = [];
   if (decision.coverage === 'complete' && problem.live.length >= 2 && !allocation.withhold) {
     const t3 = Date.now();
-    [counterfactual, calibration, contradictions] = await Promise.all([
+    [counterfactual, contradictions] = await Promise.all([
       withTimeout(testDependencies(input.apiKey, problem, state).catch(() => null), 2500, null),
-      withTimeout(sampleClaim(input.apiKey, problem, transcript).catch(() => null), 2500, null),
       withTimeout(testContradictions(input.apiKey, problem).catch(() => []), 2500, [] as ContradictionTest[]),
     ]);
     ms.measure = Date.now() - t3;
@@ -386,7 +396,7 @@ export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
   //
   // Set here rather than in intervene.ts because the measurements do not exist
   // until after the decision is made.
-  if (counterfactual || calibration || contradictions.length) {
+  if (counterfactual || contradictions.length || historical.length) {
     decision = { ...decision, guardRequired: true };
   }
 
@@ -410,14 +420,14 @@ export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
     baseExpertise: settled.expertise,
     structure: { relations: state.relations.length, edges: freshEdges.length, items: problem.live.length },
     counterfactual,
-    calibration,
     contradictions,
+    historical,
     missingShown,
     disputed,
     superseded,
     verify,
     hidden,
-    blocks: { state: renderStateBlock(state) + renderProblem(problem) + renderCounterfactual(counterfactual) + renderContradictions(contradictions) + renderCalibration(calibration) + lastTime(ledger, input, state.turn), verify: verifyBlock + computed, move },
+    blocks: { state: renderStateBlock(state) + renderProblem(problem) + renderCounterfactual(counterfactual) + renderContradictions(contradictions) + renderHistory(historical) + lastTime(ledger, input, state.turn), verify: verifyBlock + computed, move },
     ms,
   };
 }
@@ -666,7 +676,6 @@ export async function finishTurn(
     missing: p.missing,
     competence: p.competence,
     counterfactual: p.counterfactual,
-    calibration: p.calibration,
     contradictions: p.contradictions,
     superseded: p.missing.length - p.missingShown.length,
     structure: p.structure,

@@ -18,9 +18,6 @@ import {
   testDependencies, renderCounterfactual, targetOf, candidates, CF_FLOOR, MAX_ABLATIONS,
   testContradictions, renderContradictions, contradictionCandidates,
 } from './.tmp/counterfactual.mjs';
-import {
-  calibrate, renderCalibration, claimOf, cluster, sameAnswer, SAMPLES, SPLIT_AT,
-} from './.tmp/calibration.mjs';
 
 let pass = 0, fail = 0;
 const ok = (n, c, x = '') => (c ? (pass++, console.log('  ok   ' + n)) : (fail++, console.log('  FAIL ' + n + '  ' + x)));
@@ -150,114 +147,6 @@ console.log('\n=== what the measurement earned the right to say ===');
     renderCounterfactual(robust) === '', JSON.stringify(robust?.ablations));
 }
 
-console.log('\n=== calibration: what is sampled, and how often ===');
-{
-  const log = [];
-  const p = buildProblem([
-    e({ id: 'c', kind: 'conclusion', text: 'we are losing about 40% of logos a year at this rate', turn: 2 }),
-    e({ id: 'd', kind: 'decision', text: 'raise in March', turn: 4 }),
-  ], [], ST);
-  ok('a decision is NOT sampled — re-deriving a choice measures nothing', claimOf(p)?.kind === 'conclusion', claimOf(p)?.kind);
-  await calibrate('k', p, 'the transcript', canned({ answer: 'roughly 40%', basis: 'compounding' }, log));
-  ok(`${SAMPLES} independent attempts are made`, log.length === SAMPLES, String(log.length));
-  ok('at a temperature that lets them differ', log[0].temperature >= 0.8, String(log[0].temperature));
-  const socria = buildProblem([e({ id: 's', kind: 'conclusion', text: 'a long enough conclusion of ours', owner: 'socria' })], [], ST);
-  ok('only their claim is sampled, never Socria\'s', claimOf(socria) === null);
-}
-
-console.log('\n=== sameAnswer: the number usually IS the answer ===');
-{
-  // similarity() from considered.ts was the first thing tried here and it is
-  // wrong for this job in two ways this suite caught: it scores two identical
-  // short strings at 0 when every word is a stopword, and it scores "about 40%
-  // a year" against "around 40% annually" at 0 — the same answer in different
-  // words, the one case that MUST collapse.
-  ok('the same quantity in different words is one answer', sameAnswer('about 40% a year', 'around 40% annually'));
-  ok('identical strings are one answer even when every word is a stopword', sameAnswer('a a a a', 'a a a a'));
-  ok('different quantities are different answers', !sameAnswer('about 40% a year', 'closer to 25% once cohorts are split'));
-  ok('  even when only one digit apart', !sameAnswer('the figure is 49%', 'the figure is 40%'));
-  ok('a trailing year does not split answers that agree on the figure that matters',
-    sameAnswer('about 40% in 2026', '40%, measured over 2026'));
-  ok('number-free answers fall back to what they are about', sameAnswer('the index is unusable', 'unusable index, not a costing problem'));
-  ok('  and stay apart when they are about different things', !sameAnswer('the index is unusable', 'the planner is costing it wrong'));
-  ok('an empty answer matches nothing', !sameAnswer('', 'about 40%'));
-
-  // THE TWO BUGS THAT NEARLY GOT A WORKING MECHANISM DELETED. E18's first run
-  // reported a 35% false-split rate and 50% contested detection — a clear
-  // failure against its kill condition. The mechanism was fine; this function
-  // was destroying the signal in both directions at once.
-  //
-  // Too STRICT on agreement: five unanimous confirmations of a settled claim,
-  // worded differently, clustered as five different answers, so the claim was
-  // reported as unsettled. Three of E18's seven false splits were exactly this.
-  ok('two confirmations are the same answer however differently worded',
-    sameAnswer('Right — /billing/refunds.ts sits under /billing, so the stricter branch applies',
-               'Correct. The rule keys on the directory touched, not on who reviewed'));
-  ok('  and so are two denials', sameAnswer('No, that is not right — it is 2,586', 'Not quite; the figure is 2,586'));
-  ok('a confirmation and a denial are NOT the same answer',
-    !sameAnswer('Correct, the arithmetic holds', 'Not quite — the arithmetic is off by a factor of two'));
-  ok('  and a verdict only counts when it OPENS the answer',
-    !sameAnswer('The pooled rate overstates variance, so no', 'Yes, that is right'));
-
-  // Too LOOSE on disagreement: any number matching any number merged five
-  // genuinely different estimates of the Hubble constant into one cluster,
-  // because each mentioned 73 somewhere. A contested claim read as settled.
-  ok('the PRIMARY number decides, not any number anywhere in the sentence',
-    !sameAnswer('Use 67-68, not 73 — the Planck value is what the age figure comes from',
-                '73 is fine provided you label it the local distance-ladder value'));
-  ok('  while answers that lead with the same figure still agree',
-    sameAnswer('73.0 plus or minus 1, from SH0ES', '73, the local ladder value, give or take'));
-}
-
-console.log('\n=== clustering: the same answer in different words is one answer ===');
-{
-  const c1 = cluster(['about 40% a year', 'roughly 40% a year', 'around 40% annually']);
-  ok('paraphrases collapse to one cluster', c1.length === 1 && c1[0].count === 3, JSON.stringify(c1));
-  const c2 = cluster(['about 40% a year', 'closer to 25% once cohorts are split', 'no, the figure is 49%']);
-  ok('genuinely different answers stay apart', c2.length === 3, JSON.stringify(c2));
-  ok('the most common comes first', cluster(['a a a a', 'b b b b', 'a a a a'])[0].count === 2);
-}
-
-console.log('\n=== THE ASYMMETRY: agreement is never confidence ===');
-{
-  const p = buildProblem([
-    e({ id: 'c', kind: 'conclusion', text: 'we are losing about 40% of logos a year at this rate', turn: 2 }),
-  ], [], ST);
-  // Five identical answers from a weak model. It may be repeatably wrong, and
-  // small models are especially good at that.
-  const agreed = await calibrate('k', p, 'ctx', canned({ answer: 'about 40% a year', basis: 'compounding' }));
-  ok('five identical answers is not a split', agreed?.split === false && agreed?.agreement === 1, JSON.stringify(agreed));
-  ok('and it reaches the prompt as NOTHING — a weak model agreeing with itself is not evidence',
-    renderCalibration(agreed) === '', JSON.stringify(renderCalibration(agreed)));
-
-  // Disagreement is different: the same inputs produced different outputs.
-  let n = 0;
-  const split = await calibrate('k', p, 'ctx', canned(() => {
-    n += 1;
-    const a = ['about 40% a year', 'closer to 25% once cohorts are split', 'the figure is 49%', 'about 40% a year', 'nearer 30% on a blended book'][n - 1];
-    return JSON.stringify({ answer: a, basis: 'b' });
-  }));
-  ok('a wide spread is recorded as a split', split?.split === true && split.agreement < SPLIT_AT, JSON.stringify(split?.agreement));
-  const block = renderCalibration(split);
-  ok('  and THAT reaches the prompt', block.length > 0);
-  ok('  as evidence the material does not determine it', /does not determine it/.test(block));
-  ok('  explicitly not as evidence any one answer is right', /not evidence that any one of these is right/.test(block));
-  ok('  forbidding the modal answer being passed off as the answer', /Do not present the most common version as the answer/.test(block));
-  ok('  and forbidding any mention of sampling', /never mention attempts, samples, sampling/.test(block));
-}
-
-console.log('\n=== calibration fails safe ===');
-{
-  const p = buildProblem([
-    e({ id: 'c', kind: 'conclusion', text: 'we are losing about 40% of logos a year at this rate', turn: 2 }),
-  ], [], ST);
-  ok('a malformed answer never throws', (await calibrate('k', p, 'ctx', canned(() => 'garbage'))) === null);
-  let i = 0;
-  const thin = await calibrate('k', p, 'ctx', canned(() => (++i <= 2 ? JSON.stringify({ answer: 'a real answer here' }) : 'broken')));
-  ok('two samples is a coin on its edge, not a measurement', thin === null, JSON.stringify(thin));
-  ok('nothing on the table means nothing to sample', (await calibrate('k', buildProblem([], [], ST), 'ctx', canned({ answer: 'x' }))) === null);
-}
-
 console.log('\n=== measured contradiction: the reader asserted it, now it gets tested ===');
 {
   // The audit's sharpest finding: contribution.ts's CONTRADICTION fired only
@@ -334,9 +223,6 @@ console.log('\n=== nothing is asserted back at them that they did not say ===');
     e({ id: 'p', kind: 'assumption', text: 'the churn number holds', owner: 'user', basis: 'quoted' }),
   ], [], ST);
   ok('an item the reader could not ground is never the target', targetOf(inferred) === null, JSON.stringify(targetOf(inferred)));
-  ok('  nor the claim that gets sampled', claimOf(buildProblem([
-    e({ id: 'g', kind: 'conclusion', text: 'They seem to believe churn is the binding constraint here', owner: 'unknown', basis: 'inferred', quote: '' }),
-  ], [], ST)) === null);
   const socria = buildProblem([e({ id: 's', kind: 'decision', text: 'Raise in March', owner: 'socria', basis: 'quoted' })], [], ST);
   ok('nor anything Socria said', targetOf(socria) === null);
   const paraphrased = buildProblem([
