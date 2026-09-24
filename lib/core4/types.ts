@@ -291,6 +291,36 @@ export type Coverage = 'minimal' | 'normal' | 'complete';
  */
 export type Proportion = 'brief' | 'normal';
 
+/**
+ * WHAT THE PERSON CONTROLS, and what they deliberately do not.
+ *
+ * Core 3.1 had a thinking-depth dial: the user chose how hard the system
+ * worked. Core 4 removed it, because the per-turn decision already answers
+ * that question from evidence and a dial set in advance is a second,
+ * contradictory instruction about the same thing.
+ *
+ * These two replace it, and they control COMMUNICATION rather than cognition.
+ * Nothing here reaches the allocator, the move, verification, the measuring
+ * stages or the question budget — Simple must never mean a worse answer, only
+ * a more readable one. That separation is the whole point of the setting, and
+ * it is enforced structurally: `readability` is consumed only by the register
+ * and `length` only by the proportion, and neither of those decides what work
+ * gets done.
+ *
+ * They are PREFERENCES, not templates: automatic adaptation stays the default
+ * and these bias it. Someone who set Concise and then asks for the full
+ * derivation gets the full derivation.
+ */
+export type Readability = 'simple' | 'standard' | 'advanced';
+export type ReplyLength = 'concise' | 'standard' | 'detailed';
+
+export interface CommunicationPrefs {
+  readability: Readability;
+  length: ReplyLength;
+}
+
+export const DEFAULT_COMMUNICATION: CommunicationPrefs = { readability: 'standard', length: 'standard' };
+
 export interface InterventionDecision {
   type: InterventionType;
   reasonCode: string;

@@ -1257,6 +1257,8 @@ export interface ModelConfig {
   description: string;
   defaultOpenAIModel: string;
   supportsDepth: boolean;
+  /** Core 4 only: readability and length controls in place of a depth dial. */
+  supportsCommunication?: boolean;
   requiresAuth: boolean;
   // Models whose experience lives on their own route (Logos needs the split
   // screen for its Thinking Map). Picking one navigates instead of swapping
@@ -1543,8 +1545,11 @@ export const SOCRIA_MODELS: Record<SocriaModel, ModelConfig> = {
     description:
       'Thinks with you, not for you. Judges each turn whether answering would take work worth doing yourself — and chooses its own depth rather than asking you to set one.',
     defaultOpenAIModel: CORE_4_MODEL,
-    // No depth axis, deliberately: see the note above CORE_4_PROMPT.
+    // No depth axis, deliberately: see the note above CORE_4_PROMPT. It has
+    // communication controls instead — how the answer is expressed, never how
+    // hard the thinking goes.
     supportsDepth: false,
+    supportsCommunication: true,
     requiresAuth: true,
   },
 };
@@ -1959,6 +1964,33 @@ Rules:
 - Never recite it back, list its contents, or reveal that it was imported.
 
 `;
+
+/**
+ * Core 4's user-facing controls, replacing the thinking-depth dial.
+ *
+ * The dial asked the person how hard Socria should think. Core 4 answers that
+ * from evidence every turn, so the question was both redundant and answerable
+ * only by someone who cannot see the evidence. What a person CAN judge is how
+ * they want to be talked to — and these two are genuinely independent, so
+ * Advanced + Concise and Simple + Detailed are both coherent settings.
+ *
+ * Same shape as THINKING_DEPTHS on purpose: the picker renders a list of
+ * {id, label, description} and did not need a second component to do it.
+ */
+export type Readability = 'simple' | 'standard' | 'advanced';
+export type ReplyLength = 'concise' | 'standard' | 'detailed';
+
+export const READABILITY_OPTIONS: Array<{ id: Readability; label: string; description: string }> = [
+  { id: 'simple', label: 'Simple', description: 'Plain words, short sentences, jargon only where it is the accurate word.' },
+  { id: 'standard', label: 'Standard', description: 'Socria as it is — it reads the moment and pitches to it.' },
+  { id: 'advanced', label: 'Advanced', description: 'Denser, and uses the exact domain term rather than a paraphrase of it.' },
+];
+
+export const LENGTH_OPTIONS: Array<{ id: ReplyLength; label: string; description: string }> = [
+  { id: 'concise', label: 'Concise', description: 'The shortest reply that carries it. Detail still arrives when you ask.' },
+  { id: 'standard', label: 'Standard', description: 'Length follows the moment — brief when brief will do.' },
+  { id: 'detailed', label: 'Detailed', description: 'Room to cover what matters, on the turns where there is something to cover.' },
+];
 
 export const THINKING_DEPTHS: Array<{
   id: ThinkingDepth;

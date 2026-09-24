@@ -45,7 +45,8 @@
 // to be visible is not a personality.
 
 import type { CognitiveState } from '../cognition/state';
-import type { ExplicitSignals, InterventionDecision } from './types';
+import type { ExplicitSignals, InterventionDecision, CommunicationPrefs, Readability } from './types';
+import { DEFAULT_COMMUNICATION } from './types';
 
 export type Warmth = 'cool' | 'neutral' | 'warm';
 export type Edge = 'soft' | 'measured' | 'sharp';
@@ -65,6 +66,8 @@ export interface VoiceInput {
   state: CognitiveState;
   signals: ExplicitSignals;
   decision: InterventionDecision;
+  /** their standing preference for how the answer is expressed, not how it is reached */
+  prefs?: CommunicationPrefs;
 }
 
 /** Moves whose whole job is to push on something. */
@@ -91,6 +94,11 @@ const BREAKTHROUGH = /\b(?:it works|working now|finally|turns out|figured (?:it 
  * that the topic happens to be technical.
  */
 export function voiceFor(input: VoiceInput): Voice {
+  return applyReadability(situationalVoice(input), (input.prefs ?? DEFAULT_COMMUNICATION).readability);
+}
+
+/** The register the SITUATION asks for, before their standing preference. */
+function situationalVoice(input: VoiceInput): Voice {
   const { state: s, signals: sig, decision: dec } = input;
   const text = s.currentFocus ?? '';
 
@@ -181,6 +189,28 @@ export function voiceFor(input: VoiceInput): Voice {
   return { warmth: 'neutral', edge: 'measured', play: 'dry', density: expert ? 'dense' : 'normal', because: 'default' };
 }
 
+/**
+ * Their readability preference, applied to the register the situation chose.
+ *
+ * ONLY DENSITY, and that is deliberate. Readability is about how hard the
+ * prose is to read: vocabulary, sentence length, how much is packed in.
+ * It is not about warmth, and a person who prefers plain language has not
+ * asked to be handled more gently or to be disagreed with less — mapping the
+ * setting onto those would be a different and patronising product.
+ *
+ * Simple never means a worse answer. It cannot reach the allocator, the move,
+ * verification or the measuring stages, because it is applied here and nowhere
+ * else. The finding is the same finding; the sentence carrying it is plainer.
+ */
+export function applyReadability(v: Voice, r: Readability): Voice {
+  if (r === 'standard') return v;
+  if (r === 'simple') return { ...v, density: 'spare', because: `${v.because}; plain language preferred` };
+  // Advanced does not force density onto a turn the situation made spare — an
+  // urgent practical answer stays short for someone who reads papers for a
+  // living. It lifts the ordinary case.
+  return v.density === 'normal' ? { ...v, density: 'dense', because: `${v.because}; dense language preferred` } : v;
+}
+
 const WARMTH: Record<Warmth, string> = {
   cool: 'Address the problem rather than the person. No warmth for its own sake.',
   neutral: 'Talk to them as a colleague: the problem first, them acknowledged in passing if at all.',
@@ -200,9 +230,9 @@ const PLAY: Record<Play, string> = {
 };
 
 const DENSITY: Record<Density, string> = {
-  spare: 'Short sentences. One idea each. Nothing subordinate.',
+  spare: 'Short sentences. One idea each. Nothing subordinate. Plain words wherever a plain word exists — and where a technical term is the only accurate one, use it and give it a half-line gloss rather than reaching for a vaguer word that is easier to read and less true.',
   normal: 'Ordinary conversational rhythm — vary the sentence length so it reads as speech.',
-  dense: 'Pack it: every sentence carries a distinct load, no run-up, no summary. Assume they can follow a compressed argument, because they can.',
+  dense: 'Pack it: every sentence carries a distinct load, no run-up, no summary. Use the exact domain term rather than a paraphrase of it, and assume they can follow a compressed argument, because they can.',
 };
 
 /**

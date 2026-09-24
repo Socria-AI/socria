@@ -29,6 +29,7 @@ import { readState, guardModel, checkWork, COGNITION_MODEL } from '../cognition/
 import { testDependencies, renderCounterfactual, testContradictions, renderContradictions, type Counterfactual, type ContradictionTest } from './counterfactual';
 import { discoverFromHistory, renderHistory, type HistoricalFinding } from './history';
 import { voiceFor, renderVoice, type Voice } from './voice';
+import type { CommunicationPrefs } from './types';
 import { readSignals, readContract } from './signals';
 import { mergeState, recordTurn, gapCheck } from './merge';
 import { allocate } from './allocation';
@@ -72,6 +73,12 @@ export interface TurnInput {
   lastUserText: string;
   /** the Project's standing instructions, if any */
   instructions: string;
+  /**
+   * How they want the answer expressed. A standing preference, not a template:
+   * it biases the register and the length and reaches nothing that decides
+   * what work gets done.
+   */
+  prefs?: CommunicationPrefs;
   now: number;
 }
 
@@ -236,7 +243,7 @@ export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
 
   const decide = () => {
     const a = allocate({ state, signals, contract });
-    return { allocation: a, decision: selectIntervention({ state, allocation: a, budget, diminishing, signals, considered: allLines.slice(0, 12), lastUserText: input.lastUserText }) };
+    return { allocation: a, decision: selectIntervention({ state, allocation: a, budget, diminishing, signals, considered: allLines.slice(0, 12), lastUserText: input.lastUserText, prefs: input.prefs }) };
   };
   let { allocation, decision } = decide();
 
@@ -411,7 +418,7 @@ export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
   //
   // Appended to the MOVE block rather than the state block: the state block
   // describes the person, and this is an instruction to Socria.
-  const voice = voiceFor({ state, signals, decision });
+  const voice = voiceFor({ state, signals, decision, prefs: input.prefs });
   move += renderVoice(voice);
 
   ms.prepare = Date.now() - t0;

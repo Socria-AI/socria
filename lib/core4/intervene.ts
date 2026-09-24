@@ -30,6 +30,7 @@ import type {
   ExplicitSignals,
   Coverage,
   Proportion,
+  CommunicationPrefs,
   InterventionDecision,
   InterventionType,
   QuestionBudget,
@@ -54,6 +55,8 @@ export interface SelectInput {
    * words the person typed.
    */
   lastUserText?: string;
+  /** their standing preference for how much is said — a bias, never a template */
+  prefs?: CommunicationPrefs;
 }
 
 /** Moves whose content raises a perspective, a question or a challenge: the novelty gate reads them. */
@@ -229,6 +232,15 @@ export function proportionFor(input: SelectInput, dec: InterventionDecision): Pr
   const asked = REQUESTY.test(text);
   const concrete = concreteness(text);
 
+  // THEIR STANDING PREFERENCE, as a bias on the reading rather than a rule over
+  // it. Concise leans brief on a turn that could go either way; Detailed leans
+  // the other way. Neither overrides what they asked for in THIS message —
+  // someone who set Concise and then asks for the full derivation gets it,
+  // which is why this sits after the explicit-signal checks above and not
+  // before them.
+  const pref = input.prefs?.length ?? 'standard';
+  if (pref === 'detailed') return 'normal';
+
   // A REQUEST IS ENOUGH ON ITS OWN. The first version also demanded concrete
   // material and so trimmed "Here are my churn numbers and the raise timing,
   // what breaks?" to 220 tokens — a real question about real material, gutted,
@@ -240,7 +252,10 @@ export function proportionFor(input: SelectInput, dec: InterventionDecision): Pr
   if (concrete >= 2 || words > 40) return 'normal';
   // Short, abstract, nothing named and nothing asked. An opening, not a brief —
   // and the shape that was getting a paragraph of reassurance.
-  return words <= 30 ? 'brief' : 'normal';
+  if (words <= 30) return 'brief';
+  // Concise widens the band that counts as an opening. It does not force brief
+  // onto a turn with real material or a real question: those returned above.
+  return pref === 'concise' ? 'brief' : 'normal';
 }
 
 export function coverageFor(input: SelectInput, dec: InterventionDecision): Coverage {

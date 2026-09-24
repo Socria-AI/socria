@@ -329,6 +329,18 @@ export async function POST(req: NextRequest) {
               brief,
               lastUserText: last.content,
               instructions: project?.instructions ?? '',
+              // Communication preferences: how the answer is expressed, never
+              // how hard the thinking goes. Validated here rather than trusted,
+              // because an unknown value silently falling through would change
+              // behaviour with no symptom.
+              prefs: {
+                readability: ['simple', 'standard', 'advanced'].includes(String(body?.readability))
+                  ? (body.readability as 'simple' | 'standard' | 'advanced')
+                  : 'standard',
+                length: ['concise', 'standard', 'detailed'].includes(String(body?.length))
+                  ? (body.length as 'concise' | 'standard' | 'detailed')
+                  : 'standard',
+              },
               now: Date.now(),
             }).catch((e) => {
               console.error('[socria/chat] core 4 turn preparation failed; replying from the prompt alone', e);

@@ -192,5 +192,60 @@ console.log('\n=== the register never overrides the reasoning ===');
   ok('  and length is still governed above, not by the register', /how much you say is settled above/.test(wrong.block));
 }
 
+console.log('\n=== communication controls: expression only, never cognition ===');
+{
+  // Core 3.1 asked the person how hard Socria should think. Core 4 answers that
+  // from evidence every turn, so the dial was both redundant and answerable
+  // only by someone who cannot see the evidence. These two ask what a person
+  // CAN judge: how they want to be talked to.
+  const pref = (readability, length) => ({ readability, length });
+  const withPrefs = (said, over, prefs) => {
+    const state = { ...EMPTY_STATE, currentFocus: said, ...over };
+    const signals = readSignals(said);
+    const dim = diminishingReturns(state, signals, []);
+    const budget = budgetFrom(state, signals, 0, 0, dim);
+    const allocation = allocate({ state, signals, contract: NO_SIGNALS });
+    const decision = selectIntervention({ state, allocation, budget, diminishing: dim, signals, considered: [], lastUserText: said, prefs });
+    return { decision, voice: voiceFor({ state, signals, decision, prefs }) };
+  };
+
+  const ANALYTIC = { taskKind: 'decide', work: 'judgment', latest: 'request', stakes: inf('high') };
+  const hard = 'Walk me through what breaks if the churn figure is wrong.';
+
+  // SIMPLE MUST NOT MEAN A WORSE ANSWER. Same move, same ceiling, same
+  // measuring — only the prose changes.
+  const std = withPrefs(hard, ANALYTIC, pref('standard', 'standard'));
+  const simple = withPrefs(hard, ANALYTIC, pref('simple', 'standard'));
+  ok('Simple does not change the move', simple.decision.type === std.decision.type, `${simple.decision.type} vs ${std.decision.type}`);
+  ok('  nor the coverage the stakes earned', simple.decision.coverage === std.decision.coverage, simple.decision.coverage);
+  ok('  nor the question budget', simple.decision.maxQuestions === std.decision.maxQuestions);
+  ok('  it only makes the prose plainer', simple.voice.density === 'spare', simple.voice.density);
+  ok('  and says plain words, with the accurate term kept', /Plain words wherever a plain word exists/.test(renderVoice(simple.voice)) && /the only accurate one/.test(renderVoice(simple.voice)));
+
+  // Readability touches density and nothing else — a person who wants plain
+  // language has not asked to be handled more gently.
+  ok('Simple does not make it warmer', simple.voice.warmth === std.voice.warmth, `${simple.voice.warmth} vs ${std.voice.warmth}`);
+  ok('  and does not blunt the disagreement', simple.voice.edge === std.voice.edge, `${simple.voice.edge} vs ${std.voice.edge}`);
+
+  const adv = withPrefs(hard, ANALYTIC, pref('advanced', 'standard'));
+  ok('Advanced uses the exact domain term', /exact domain term/.test(renderVoice(adv.voice)));
+
+  // THE TWO AXES ARE INDEPENDENT: both combinations are coherent.
+  const advConcise = withPrefs("I'm not sure the essay angle works", { taskKind: 'explore', work: 'conversation', latest: 'information' }, pref('advanced', 'concise'));
+  ok('Advanced + Concise is coherent', advConcise.decision.proportion === 'brief', advConcise.decision.proportion);
+  const simpleDetailed = withPrefs("I'm not sure the essay angle works", { taskKind: 'explore', work: 'conversation', latest: 'information' }, pref('simple', 'detailed'));
+  ok('Simple + Detailed is coherent', simpleDetailed.decision.proportion === 'normal' && simpleDetailed.voice.density === 'spare', `${simpleDetailed.decision.proportion}/${simpleDetailed.voice.density}`);
+
+  // A PREFERENCE, NOT A TEMPLATE. What they ask for in THIS message wins.
+  const conciseButAsked = withPrefs('Explain in detail how the planner picks a scan', { work: 'explanation', latest: 'question' }, pref('standard', 'concise'));
+  ok('Concise does not override an explicit ask for detail', conciseButAsked.decision.proportion === 'normal');
+  const conciseRealQuestion = withPrefs('Here are my churn numbers and the raise timing. What breaks?', ANALYTIC, pref('standard', 'concise'));
+  ok('  nor gut a real question with material', conciseRealQuestion.decision.proportion === 'normal', conciseRealQuestion.decision.proportion);
+
+  // Defaults change nothing.
+  const none = withPrefs(hard, ANALYTIC, undefined);
+  ok('no preference behaves exactly as Standard', none.voice.density === std.voice.density && none.decision.proportion === std.decision.proportion);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -62,6 +62,7 @@ import { splitInline } from '@/lib/rich-text';
 import { InsightCard } from '@/components/InsightCard';
 import { InsightShareModal } from '@/components/InsightShareModal';
 import { ImportProfileModal } from '@/components/ImportProfileModal';
+import Link from 'next/link';
 import { JourneyDebugModal } from '@/components/JourneyDebugModal';
 import { SynthesisCard, SynthesisPending } from '@/components/SynthesisCard';
 import { ChoiceChips } from '@/components/ChoiceChips';
@@ -2449,27 +2450,21 @@ export default function ChatPage() {
               )}
             </span>
           </button>
-          <button
-            type="button"
-            className="s-link"
-            onClick={() => {
-              setJourneyDebugOpen(true);
-              setSidebarOpen(false);
-            }}
-          >
+          {/*
+            This used to open the Thinking Journey, which Core 4 does not read:
+            its memory is the Mind Graph, and the chip pointed at a different
+            store that happened to share the words "what Socria remembers". So
+            it showed a person one thing and told Socria another.
+            /memory IS the Mind Graph — the same rows the prompt was built
+            from — so the link now goes where the memory actually lives.
+          */}
+          <Link href="/memory" className="s-link" onClick={() => setSidebarOpen(false)}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="9" />
               <path d="M12 8v4l2.5 2.5" strokeLinecap="round" />
             </svg>
-            <span>
-              What Socria remembers{' '}
-              {journeyHasContent(journey) ? (
-                <span className="yes">· view</span>
-              ) : (
-                <span className="no">· nothing yet</span>
-              )}
-            </span>
-          </button>
+            <span>What Socria remembers</span>
+          </Link>
           <SignedIn>
             <p className="s-vow">Synced across your devices. Your reasoning is yours.</p>
           </SignedIn>
