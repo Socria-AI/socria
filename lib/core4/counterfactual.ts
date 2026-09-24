@@ -152,12 +152,61 @@ export function candidates(p: ProblemModel, target: ProblemItem): ProblemItem[] 
     if (i.kind === 'constraint' || i.kind === 'evidence') r += 1;
     return r;
   };
+  // RANK ORDERS, IT DOES NOT GATE. An earlier version filtered to rank > 0,
+  // which quietly meant only premises the READER had already marked assumed,
+  // unchecked or edge-connected were ever probed — so the one stage built to
+  // replace reader assertions with measurement was selecting its candidates
+  // from reader assertions. A plain user-stated fact, which is what most
+  // premises are, was never tested at all. Found by running the E17 validator
+  // and seeing zero model calls on 24 labelled items.
   return pool
     .map((i) => ({ i, r: rank(i) }))
-    .filter((x) => x.r > 0)
     .sort((a, b) => b.r - a.r || b.i.turn - a.i.turn)
     .slice(0, MAX_ABLATIONS)
     .map((x) => x.i);
+}
+
+/**
+ * ONE ablation: remove this premise, re-derive, keep the verdict only if it
+ * settled something.
+ *
+ * Exported because the E17 validator drives it directly against labelled
+ * ground truth — measuring VERDICT accuracy separately from candidate
+ * selection, which has its own failure mode and its own history.
+ */
+export async function ablateOne(
+  c: ModelClient,
+  conclusion: string,
+  allPremiseTexts: readonly string[],
+  premise: ProblemItem
+): Promise<Ablation | null> {
+  try {
+    const remaining = allPremiseTexts.filter((t) => t !== premise.text);
+    const res = await c.complete({
+      role: 'verify',
+      model: COGNITION_MODEL,
+      temperature: 0,
+      json: true,
+      system: SYSTEM,
+      messages: [{ role: 'user', content: ask(conclusion, remaining, premise.text) }],
+      maxTokens: 300,
+    });
+    const v = sanitize(JSON.parse(res.text || '{}'));
+    if (v.confidence < CF_FLOOR || v.dependence === 'unclear') return null;
+    // A conclusion that "does not follow" with nothing to say about what does
+    // is a shrug wearing a verdict's clothes.
+    if (v.dependence === 'load_bearing' && !v.instead) return null;
+    return {
+      premiseId: premise.id,
+      premise: premise.text,
+      dependence: v.dependence,
+      instead: v.instead,
+      confidence: v.confidence,
+      standing: premise.epistemic,
+    };
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -185,37 +234,7 @@ export async function testDependencies(
   const all = p.live.filter((i) => i.id !== target.id).map((i) => i.text);
   const c = client ?? modelClient(apiKey);
 
-  const runs = await Promise.all(
-    probe.map(async (premise): Promise<Ablation | null> => {
-      try {
-        const remaining = all.filter((t) => t !== premise.text);
-        const res = await c.complete({
-          role: 'verify',
-          model: COGNITION_MODEL,
-          temperature: 0,
-          json: true,
-          system: SYSTEM,
-          messages: [{ role: 'user', content: ask(target.text, remaining, premise.text) }],
-          maxTokens: 300,
-        });
-        const v = sanitize(JSON.parse(res.text || '{}'));
-        if (v.confidence < CF_FLOOR || v.dependence === 'unclear') return null;
-        // A conclusion that "does not follow" with nothing to say about what
-        // does is a shrug wearing a verdict's clothes.
-        if (v.dependence === 'load_bearing' && !v.instead) return null;
-        return {
-          premiseId: premise.id,
-          premise: premise.text,
-          dependence: v.dependence,
-          instead: v.instead,
-          confidence: v.confidence,
-          standing: premise.epistemic,
-        };
-      } catch {
-        return null;
-      }
-    })
-  );
+  const runs = await Promise.all(probe.map((premise) => ablateOne(c, target.text, all, premise)));
 
   const ablations = runs.filter((a): a is Ablation => a !== null);
   if (!ablations.length) return null;

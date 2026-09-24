@@ -77,6 +77,19 @@ console.log('\n=== the premises worth spending a call on ===');
   ok('nor is a fragment too short to remove meaningfully', !ids.includes('short'));
   ok('nor the conclusion itself', !ids.includes('d'));
   ok('Socria\'s own unchecked claim IS worth testing — it is the system\'s guess wearing a claim\'s clothes', ids.includes('v'), ids.join(','));
+  // RANK ORDERS, IT DOES NOT GATE. An earlier version filtered to rank > 0,
+  // so only premises the READER had already marked assumed, unchecked or
+  // edge-connected were ever probed — the one stage built to replace reader
+  // assertions with measurement was picking its candidates from reader
+  // assertions, and a plain stated fact was never tested at all. The E17
+  // validator made 0 model calls on 24 labelled items before this was fixed.
+  const plain = buildProblem([
+    e({ id: 'd', kind: 'decision', text: 'Raise in March', turn: 4 }),
+    e({ id: 'f1', kind: 'claim', text: 'Cash on hand is 15.2 million dollars', basis: 'quoted', owner: 'user' }),
+    e({ id: 'f2', kind: 'claim', text: 'Net burn is 800 thousand a month', basis: 'quoted', owner: 'user' }),
+  ], [], ST);
+  const plainIds = candidates(plain, targetOf(plain)).map((x) => x.id);
+  ok('a plainly stated fact with no reader flag is still probed', plainIds.includes('f1') && plainIds.includes('f2'), plainIds.join(','));
   ok(`at most ${MAX_ABLATIONS} are probed`, c.length <= MAX_ABLATIONS);
 }
 

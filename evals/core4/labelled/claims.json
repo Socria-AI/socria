@@ -1,0 +1,322 @@
+[
+  {
+    "id": "clm-001",
+    "claim": "At 6.25% on a 30-year fixed, principal and interest on the $420,000 we'd be borrowing comes to about $2,586 a month.",
+    "truth": "settled",
+    "why": "Standard amortisation on inputs the claim itself states: 420000 x (0.0625/12) / (1 - (1 + 0.0625/12)^-360) = 2586.0. The formula is fixed and every input is given, so any competent re-derivation returns the same figure to the dollar. Nothing here rests on judgement.",
+    "domain": "personal finance",
+    "context": "We're pre-approved and trying to see whether the monthly number fits before we make an offer. Taxes and insurance are escrowed separately, so I'm only looking at principal and interest. Our ceiling is $2,700."
+  },
+  {
+    "id": "clm-002",
+    "claim": "The Hubble constant is about 73 kilometres per second per megaparsec, so I'll use that for the expansion rate rather than the round 70 the textbook prints.",
+    "truth": "contested",
+    "why": "Two carefully executed methods disagree by more than their quoted errors. The local distance ladder (Cepheid-calibrated Type Ia supernovae) gives about 73.0 +/- 1.0; the CMB read through standard LCDM gives about 67.4 +/- 0.5; JWST-based tip-of-the-red-giant-branch and JAGB calibrations land near 70 with larger error bars. A competent astronomer asked for one number gives 73, 67, or 70 depending on which method they weight, and nobody has shown the gap is an error rather than physics.",
+    "domain": "cosmology",
+    "context": "I'm setting the constant for a back-of-envelope age-of-the-universe calculation in a public talk. I want the figure I quote to survive an astronomer in the audience. The slide has room for one number."
+  },
+  {
+    "id": "clm-003",
+    "claim": "At Postgres REPEATABLE READ, the second of two concurrent updates to the same row fails with a serialisation error - it doesn't silently overwrite.",
+    "truth": "settled",
+    "why": "Documented, deterministic behaviour of Postgres snapshot isolation: the second transaction raises 'could not serialize access due to concurrent update' when it tries to update a row a concurrent transaction has committed a change to. Anyone re-deriving this from the manual or from a two-terminal test lands in the same place; there is no version or configuration in normal use where it differs.",
+    "domain": "databases",
+    "context": "Two workers picked up the same job row last night and we're working out whether we lost an update or something else happened. We run at REPEATABLE READ across the board. Half the team thinks the isolation level already covers this case."
+  },
+  {
+    "id": "clm-004",
+    "claim": "The Late Bronze Age collapse was the Sea Peoples - a wave of raiders that took the palace states down one after another.",
+    "truth": "contested",
+    "why": "Specialists reading the same evidence reach genuinely different conclusions, and the competing answers are distinct: migration and raiding as the driver; a systems collapse of interdependent palace economies that were fragile before anyone arrived; a multi-decade drought now supported by pollen and isotope records from the Levant and Anatolia; and earthquake sequences. Several argue the Sea Peoples were a symptom of the collapse rather than its cause. The Egyptian sources are thin and partisan, and the destruction layers cannot be dated tightly enough to order the causes.",
+    "domain": "ancient history",
+    "context": "I'm writing the framing chapter and this is the sentence the rest of it hangs off. The textbooks I learned from state it this way. I have one paragraph to set up the period before the argument starts."
+  },
+  {
+    "id": "clm-005",
+    "claim": "Totality on 2 August 2027 will last about six minutes twenty at Luxor, nearly three times what we got in 2024.",
+    "truth": "settled",
+    "why": "Eclipse circumstances are computed from orbital ephemerides centuries in advance. Greatest eclipse on 2 August 2027 falls close to Luxor with roughly 6 minutes 23 seconds of totality; against the 2 minutes 10 seconds the context states for April 2024, the ratio is about 2.9. Both the ephemeris and the ratio are checkable and return the same answer every time. A settled claim about a future event.",
+    "domain": "astronomy",
+    "context": "Planning the club trip now because hotels along that track are already going. We got 2 minutes 10 seconds at our site in April 2024 and half of it was through thin cloud. The argument in the group is whether Egypt in August is worth it."
+  },
+  {
+    "id": "clm-006",
+    "claim": "Moving the codebase to a statically typed language would measurably cut our production defect rate.",
+    "truth": "contested",
+    "why": "The empirical literature does not converge, and the reason is methodological rather than rhetorical. A large observational study of GitHub repositories reported small quality advantages for statically typed languages; a careful reproduction found most of those effects vanished once the analysis was corrected for multiple comparisons and confounds; controlled experiments on typed versus untyped APIs have produced results in both directions depending on task and on how much documentation the untyped arm had. Defensible answers range from a modest reduction to none detectable.",
+    "domain": "software engineering",
+    "context": "We're scoping a migration that would take two quarters and the defect argument is the one carrying it. Our current incident rate is about four production defects a month. Everything else in the proposal is developer preference."
+  },
+  {
+    "id": "clm-007",
+    "claim": "Equilibrium climate sensitivity is 3 degrees per doubling of CO2, so that's what we run the scenario on rather than the 2.5 the reinsurer used.",
+    "truth": "contested",
+    "why": "Independent lines of evidence give materially different answers. Historical energy-budget constraints put equilibrium sensitivity near or below 2.5 C; paleoclimate records and process-based emergent constraints put it at 3 to 4 C; several CMIP6 models exceed 5 C. The assessed likely range spans 2.5 to 4.0 C precisely because the estimate depends on which evidence stream is weighted and how cloud feedbacks and the pattern effect are handled. A competent re-derivation gives about 2.3, about 3.0, or about 3.9 depending on defensible choices the claim does not make.",
+    "domain": "climate science",
+    "context": "We're setting the temperature pathway for the physical-risk model the insurer will see. The number chosen drives every downstream loss figure in the report. Someone has to sign off on it this week."
+  },
+  {
+    "id": "clm-008",
+    "claim": "p = 0.03 means there's a 3% chance the null hypothesis is true.",
+    "truth": "settled",
+    "why": "Stated wrong, and wrong in one unambiguous way. The p-value is the probability of data at least this extreme given that the null is true, not the probability of the null given the data. The inversion is a definitional error; the correct posterior requires a prior the claim does not supply. Every competent statistician corrects it identically.",
+    "domain": "statistics",
+    "context": "Writing up the A/B test for the leadership review and I want the wording right. The variant came in at p = 0.03 on conversion. I've got one slide to explain what that buys us."
+  },
+  {
+    "id": "clm-009",
+    "claim": "The 10 GbE link gives us 10 GB/s, so the 2.5 GB/s NVMe drive is what's limiting the transfer, not the network.",
+    "truth": "settled",
+    "why": "Stated wrong by a fixed factor. 10 gigabits per second is 1.25 gigabytes per second, an eighth of the figure assumed, so the network is the ceiling and the drive is not. Bits-to-bytes is a conversion, not a judgement, and the conclusion reverses the same way on every re-derivation.",
+    "domain": "networking",
+    "context": "We're copying nightly snapshots between two racks and it tops out around 1.1 GB/s. Ops wants to buy faster drives. I'm trying to find where the real ceiling is before we spend anything."
+  },
+  {
+    "id": "clm-010",
+    "claim": "Routine mammography starting at 40 saves enough lives to justify inviting every woman that age.",
+    "truth": "contested",
+    "why": "Expert bodies reading the same trial evidence reach opposite recommendations. The US Preventive Services Task Force now recommends biennial screening from 40; the Canadian Task Force does not recommend routine invitation in that decade and leaves it to individual decision; the Cochrane review judges the mortality benefit small relative to overdiagnosis. The disagreement turns on how much weight to give overdiagnosis estimates that themselves range from near zero to roughly 30%, and on whether trials run before modern adjuvant therapy still bound the benefit. The answers are 'yes, invite', 'no, offer on request', and 'the net effect is close to zero'.",
+    "domain": "medicine",
+    "context": "We're revising the practice's recall policy and this line decides what the letters say. The current policy starts at 50. Two of the partners want it moved."
+  },
+  {
+    "id": "clm-011",
+    "claim": "Most of the human genome is functional - ENCODE assigned reproducible biochemical activity to about 80% of it, so the junk-DNA picture is out of date.",
+    "truth": "contested",
+    "why": "The competing answers differ by roughly an order of magnitude, and the dispute has real empirical content rather than being a word game. ENCODE's biochemical criterion - reproducible transcription, protein binding, or chromatin marks - yields about 80%. Evolutionary-conservation estimates give 8 to 10%. Mutational-load arguments cap the functional fraction at 10 to 25% on the grounds that a larger fraction implies an unsustainable deleterious mutation rate. Each camp accepts the other's measurements and rejects the inference drawn from them.",
+    "domain": "genomics",
+    "context": "I'm answering a question a student asked after class and I'd rather give a straight answer than a reading list. They had seen the 80% figure quoted in a documentary. Next lecture is Thursday."
+  },
+  {
+    "id": "clm-012",
+    "claim": "At 0.8c the Lorentz factor is 5/3, so ten years of ship time will be a bit under seventeen years back home.",
+    "truth": "settled",
+    "why": "gamma = 1 / sqrt(1 - 0.8^2) = 1/0.6 = 1.6667 exactly, and 10 x 1.6667 = 16.67 years. Both steps are arithmetic applied to a definition, with no modelling choice anywhere in them.",
+    "domain": "physics",
+    "context": "I'm sanity-checking the timeline in a story before I send it out. The ship cruises at 0.8c for what the crew experiences as ten years. I need to know what year it is on Earth when they arrive."
+  },
+  {
+    "id": "clm-013",
+    "claim": "So PR 4412 doesn't meet our merge rule - it touches /billing/refunds.ts and both its approvals are from platform engineers.",
+    "truth": "settled",
+    "why": "A direct consequence of premises stated in the context. The rule requires two approvals from the payments team for anything under /billing; this PR is under /billing and has two approvals, neither from payments. Given the premises the conclusion is forced, and nothing outside them is needed to reach it.",
+    "domain": "process and logic",
+    "context": "Our rule is that any PR touching /billing needs two approvals from the payments team, and everything else needs one from anyone. PR 4412 changes /billing/refunds.ts and has approvals from two platform engineers. The author is asking why the merge button is greyed out."
+  },
+  {
+    "id": "clm-014",
+    "claim": "A $15 federal minimum, phased in over four years, would cost about 1.4 million jobs - roughly 0.9% of employment.",
+    "truth": "contested",
+    "why": "The 0.9% is only arithmetic on the job figure; the job figure is what competent labour economists disagree about, because they use different identification strategies on the same data. The Congressional Budget Office's central estimate was in the range of 1.3 to 1.4 million, with an uncertainty band from close to zero to over 2.7 million. Bunching-estimator work following Cengiz, Dube, Lindner and Zipperer finds employment effects statistically indistinguishable from zero. Panel studies in the Neumark and Wascher tradition find substantial losses. The three answers are roughly 0, roughly 1.4 million, and considerably more.",
+    "domain": "economics",
+    "context": "I'm drafting the employer's side of a submission on a state wage bill and this is the number that would carry it. It came from a summary rather than the source. The other side's submission cites work saying employment barely moves."
+  },
+  {
+    "id": "clm-015",
+    "claim": "It's got a six-hour half-life, so after a day and a bit - call it thirty hours - there's still about a fifth of the peak left.",
+    "truth": "settled",
+    "why": "Stated wrong. Thirty hours is five half-lives, leaving 1/2^5 = 3.1% of peak, not about 20%. First-order elimination with a stated half-life and a stated interval gives one answer, and every competent re-derivation produces 3%.",
+    "domain": "pharmacology",
+    "context": "Trying to work out the washout before the next dose in the protocol. Elimination half-life is six hours and we're spacing doses thirty hours apart. The question is whether there's meaningful accumulation."
+  },
+  {
+    "id": "clm-016",
+    "claim": "Proto-Indo-European was spoken on the Pontic-Caspian steppe about six thousand years ago.",
+    "truth": "contested",
+    "why": "Two families of answer, differing in both place and date by thousands of years. The steppe hypothesis puts it north of the Black Sea around 4500 to 3500 BCE, supported by ancient DNA showing steppe ancestry spreading into Europe with the Yamnaya horizon. The Anatolian farming-dispersal hypothesis puts it much earlier and further south, supported by Bayesian phylogenetic dating of the languages themselves. Recent ancient-DNA syntheses propose hybrid homelands in the Caucasus and lower Volga that satisfy neither cleanly. Linguistic and genetic evidence pull in different directions and specialists divide accordingly.",
+    "domain": "historical linguistics",
+    "context": "I'm writing the opening of a popular-science piece and this is the first line of it. The editor wants a statement, not a survey. I have a linguist and a geneticist on the reading list."
+  },
+  {
+    "id": "clm-017",
+    "claim": "Data centres are around 4.4% of US electricity today, and that will roughly triple by 2030.",
+    "truth": "contested",
+    "why": "The baseline is not what is at issue: data centres were about 4.4% of US electricity in 2023 and that figure is well measured. The trajectory is. Published projections span a wide range for stated modelling reasons - the Berkeley Lab assessment gives a 2028 range of roughly 6.7% to 12% of total US electricity depending on utilisation and hardware-efficiency assumptions, and other analysts argue a large share of the announced interconnection queue is speculative or double-counted across utilities. A doubling, a tripling and a much smaller rise are each defensible from assumptions no one has yet shown to be wrong.",
+    "domain": "energy",
+    "context": "This figure sets the demand curve in the twenty-year resource plan we file with the regulator. The plan commits capital either way. Two of the consultants we asked gave us different numbers."
+  },
+  {
+    "id": "clm-018",
+    "claim": "Every tonne of carbon in the fuel comes out as about 3.7 tonnes of CO2, because you're adding two oxygens at 16 each to a carbon at 12.",
+    "truth": "settled",
+    "why": "44/12 = 3.667. Molar masses are fixed and complete combustion produces one CO2 per carbon atom, so the ratio is identical on every derivation. The reasoning shown in the claim is also the correct reasoning.",
+    "domain": "chemistry",
+    "context": "I'm converting our fleet's diesel volume into a carbon number for the annual report and the two spreadsheets in circulation disagree by nearly a factor of four. One is working in tonnes of carbon and the other in tonnes of CO2. I need to know which conversion is right."
+  },
+  {
+    "id": "clm-019",
+    "claim": "Big-O is only an upper bound, so merge sort being O(n log n) means it is also O(n squared) - Theta(n log n) is the statement that rules the looser bound out.",
+    "truth": "settled",
+    "why": "Definitional and not usage-dependent. O(f) is the set of functions bounded above by f up to a constant, so O(n log n) is a subset of O(n squared) and both descriptions of merge sort are true, the second merely loose. Theta is the notation that asserts a tight bound. Stated this way there is no colloquial reading on which a competent reader answers differently.",
+    "domain": "computer science",
+    "context": "We're arguing about a line in the interview rubric that marks a candidate down for an imprecise complexity answer. The candidate said merge sort is O(n squared) and then corrected themselves. The question is whether the first answer was actually a mistake."
+  },
+  {
+    "id": "clm-020",
+    "claim": "Rapa Nui is the clearest case we have of a society destroying itself by stripping its own environment.",
+    "truth": "contested",
+    "why": "Two accounts are seriously defended by specialists. One is self-inflicted deforestation and collapse before European contact. The other holds that introduced Polynesian rats ate the palm seeds, that the pre-contact population was stable at a level the island's rock-garden agriculture could support, and that the catastrophic decline followed contact, slave raiding and introduced disease. Ancient-DNA work finding no genetic signature of a pre-contact population crash has strengthened the second reading without closing the question. The competing answers are 'ecocide', 'rats plus contact', and 'no collapse to explain'.",
+    "domain": "archaeology",
+    "context": "It's the case study that closes the sustainability module and students remember it more than anything else in the course. I've taught it this way for six years. I'm rewriting the module this summer."
+  },
+  {
+    "id": "clm-021",
+    "claim": "Cold connection, no resumption, 80 ms round trip: one RTT for TCP, one for TLS 1.3, one for the request - so no first byte before about 240 ms.",
+    "truth": "settled",
+    "why": "Standard protocol accounting, with the exceptions excluded by the claim's own terms. The TCP three-way handshake costs one RTT before application data can arrive, a full TLS 1.3 handshake costs one more, and the request plus response costs a third: 3 x 80 ms = 240 ms. 'No resumption' rules out TLS session resumption and 0-RTT, and 'cold connection' rules out TCP Fast Open, which needs a cookie from a prior connection. Nothing is left to disagree about.",
+    "domain": "networking",
+    "context": "Our p50 time to first byte is 260 ms and there's pressure to make the origin faster. Origin is in Frankfurt, users are mostly on the US east coast, and the round trip measures 80 ms. Server-side processing is about 15 ms."
+  },
+  {
+    "id": "clm-022",
+    "claim": "The neutrino mass ordering is normal - the two closely spaced states are the light ones and the isolated state is heavy.",
+    "truth": "contested",
+    "why": "Two discrete answers are live, and the claim picks one. Global fits currently favour normal ordering at roughly 2 to 3 sigma, and the size of that preference has moved between analyses as atmospheric and long-baseline pulls were re-evaluated. That is well short of what the field treats as decided, and JUNO and DUNE are being built in part to settle it. A competent physicist answers 'probably normal, not established' or 'undetermined'; a flat assertion of normal ordering is not defensible, and inverted ordering is not excluded.",
+    "domain": "particle physics",
+    "context": "I'm writing the motivation paragraph for a proposal and need to state where things stand. The experiment we're proposing doesn't depend on the answer but the paragraph does. My co-author wants it stated flatly."
+  },
+  {
+    "id": "clm-023",
+    "claim": "Driving HbA1c below 6.5% in type 2 diabetes cuts heart attacks and strokes, so tighter is better as long as he tolerates the medication.",
+    "truth": "contested",
+    "why": "The large randomised trials disagree, and the disagreement is about the trials, not about wording. ACCORD's intensive arm was stopped early for increased all-cause mortality. ADVANCE and VADT found no significant macrovascular benefit. UKPDS post-trial follow-up found a myocardial-infarction reduction emerging roughly a decade later, the so-called legacy effect. Whether intensive control helps macrovascular outcomes depends on which population and which time horizon is taken as the relevant one, and competent endocrinologists answer yes, no, and only in the young and newly diagnosed.",
+    "domain": "medicine",
+    "context": "I'm deciding whether to tighten the target for a 58-year-old with a ten-year history and no established cardiovascular disease. He's at 7.4% on metformin alone. He's asking whether pushing lower is worth the extra medication."
+  },
+  {
+    "id": "clm-024",
+    "claim": "The Versailles treaty was signed about seven months after the fighting stopped - armistice in November 1918, signature in June 1919.",
+    "truth": "settled",
+    "why": "Documented dates: the armistice took effect on 11 November 1918 and the treaty was signed on 28 June 1919, a gap of seven and a half months. Neither date is in dispute in any serious source, and the arithmetic on them is trivial.",
+    "domain": "history",
+    "context": "I'm building a timeline handout for a module on the interwar period and want the gap between the ceasefire and the settlement visible on it. Students consistently think the two were the same event. The handout has one line for each."
+  },
+  {
+    "id": "clm-025",
+    "claim": "Mitochondrial DNA comes down the maternal line, so it can't tell you whether two men share a paternal ancestor.",
+    "truth": "settled",
+    "why": "Human mitochondrial DNA is maternally inherited; the paternal-line marker is the Y chromosome. The consequence the claim draws follows directly and is what every genealogical testing service and textbook states. The rare reported cases of paternal leakage do not make mtDNA informative about a paternal line.",
+    "domain": "genetics",
+    "context": "Two branches of the family with the same surname want to know whether they connect, and the cheaper test on offer is mitochondrial. The link, if there is one, would run through fathers. I'm working out whether to spend the money."
+  },
+  {
+    "id": "clm-026",
+    "claim": "The multiplier on infrastructure spending is about 1.5, so the programme pays for roughly half of itself in output terms.",
+    "truth": "contested",
+    "why": "Estimates differ by identification strategy and by the state of the economy, and the spread is not noise. Narrative and military-news identification gives multipliers around 0.6 to 0.8. State-dependent estimates give close to zero in expansions and 2 or more in deep slumps. Forecast-error work from the post-2008 austerity period implied values near or above 1.5. The answer depends on assumptions about monetary accommodation and slack that the claim does not state, and reasonable analysts return 0.7, 1.5, or 2.0.",
+    "domain": "macroeconomics",
+    "context": "The costing note for the capital programme uses this to net off part of the headline price. It goes to the finance committee on Thursday. The programme is about 40 billion over six years."
+  },
+  {
+    "id": "clm-027",
+    "claim": "Apollo put twelve men on the Moon across six landings between July 1969 and December 1972 - the whole thing was about three and a half years end to end.",
+    "truth": "settled",
+    "why": "Six successful landings (Apollo 11, 12, 14, 15, 16 and 17), two crew on the surface each time, so twelve moonwalkers; Apollo 11 landed on 20 July 1969 and Apollo 17 on 11 December 1972, a span of three years and five months. Every element is a matter of record and the arithmetic is trivial.",
+    "domain": "history of technology",
+    "context": "I'm writing the panel text for a museum case and the curator wants the span made concrete rather than left as a decade. The case covers the landings only, not the later programme. There's room for about two sentences."
+  },
+  {
+    "id": "clm-028",
+    "claim": "Of the roughly 7,000 languages spoken today, half will be gone by the end of the century.",
+    "truth": "contested",
+    "why": "Published projections range from roughly 50% to roughly 90%, and the spread is driven by two real choices the claim leaves open. First, what counts as gone: no remaining fluent speakers, no intergenerational transmission, or no daily community use. Second, whether current transmission rates are simply extrapolated or modelled against predictors such as road density, years of schooling and speaker numbers, which recent work projects as a sharp near-term increase in endangerment. Defensible answers differ by a factor approaching two.",
+    "domain": "linguistics",
+    "context": "This is the line that opens the funding application for the documentation project. The reviewers will include a sociolinguist. I want the number to survive that."
+  },
+  {
+    "id": "clm-029",
+    "claim": "Giving the senior engineers AI assistants will speed them up on this codebase by something like 25%.",
+    "truth": "contested",
+    "why": "Measured effects differ sharply and systematically by setting. A randomised trial of experienced open-source maintainers working in repositories they knew well found them roughly 19% slower with AI tools while believing they had been about 20% faster. Controlled greenfield tasks and large field deployments have shown speedups from 26% to over 50%. Whether a mature codebase with heavy internal conventions resembles the first setting or the second is exactly the open question, so competent estimates run from clearly negative to clearly positive.",
+    "domain": "software engineering",
+    "context": "This number is in the business case for the licences and the headcount plan that follows from it. The codebase is eleven years old with heavy internal conventions. The team is six people, all senior."
+  },
+  {
+    "id": "clm-030",
+    "claim": "Depreciation is non-cash, which is why it's added back at the top of the indirect cash flow statement.",
+    "truth": "settled",
+    "why": "Definitional in accrual accounting. Depreciation is a non-cash charge, and the indirect method reconciles net income to operating cash flow by adding non-cash charges back. Any competent preparer describes it the same way, and the stated reason is the correct reason.",
+    "domain": "accounting",
+    "context": "The new analyst asked why our operating cash flow is so much higher than net income, and the answer is mostly the equipment. We took a large depreciation charge this year after the fit-out. I want to give him the one-line version before the board pack goes out."
+  },
+  {
+    "id": "clm-031",
+    "claim": "In Mandarin, tone is part of the word, not the speaker's mood - ma said high-level and ma said falling are two different words.",
+    "truth": "settled",
+    "why": "Tone is lexically contrastive in Mandarin, and minimal pairs distinguished only by tone are standard first-chapter material in any description of the language. This is a descriptive fact about the phonology rather than an interpretive claim, and every competent describer states it the same way.",
+    "domain": "linguistics",
+    "context": "I'm making the case for adding a tone drill to the first two weeks of the beginner course. The current materials treat tone as polish to add later. Several students have come back from exchange saying nobody understood them."
+  },
+  {
+    "id": "clm-032",
+    "claim": "What turned the 1929 crash into the Depression was the Fed letting the money supply contract by a third.",
+    "truth": "contested",
+    "why": "Serious economic historians defend different primary causes and the choice changes the counterfactual. The monetary contraction account (Friedman and Schwartz); adherence to the gold standard and its international transmission (Eichengreen, Temin), on which the Fed's hands were substantially tied; the collapse of banking intermediation and credit as a channel distinct from the money stock (Bernanke); and a demand-side collapse in spending. They assign different weights to the same time series and imply different policy lessons, which is why the argument has not resolved in ninety years.",
+    "domain": "economic history",
+    "context": "This is the analogy I'm using to argue for the policy response in the memo. The memo goes to people who will know the literature. I have two sentences for the historical part."
+  },
+  {
+    "id": "clm-033",
+    "claim": "Swapping saturated fat for polyunsaturated vegetable oils lowers cardiovascular mortality, which is why the sheet says cook with sunflower rather than butter.",
+    "truth": "contested",
+    "why": "The evidence splits by endpoint and by trial. Meta-analyses of the substitution find reduced coronary events but no clear reduction in cardiovascular or all-cause mortality. Recovered data from the Minnesota Coronary Experiment and the Sydney Diet-Heart Study found no mortality benefit despite the expected drop in serum cholesterol, with a signal of harm in older participants. Prospective-cohort substitution analyses find a meaningful reduction. A competent reading gives 'yes for events, unproven for mortality', 'yes for both', or 'no', depending on how the recovered trial data are weighted.",
+    "domain": "nutrition",
+    "context": "I'm rewriting the one-page dietary handout we give at the first appointment and this is the claim the fat section is built on. The current version states it flatly. Patients ask about it more than anything else on the sheet."
+  },
+  {
+    "id": "clm-034",
+    "claim": "A Raft leader can't commit an entry from an earlier term by counting replicas - it has to commit one from its own term first.",
+    "truth": "settled",
+    "why": "This is the rule in section 5.4.2 of the Raft paper, motivated by the Figure 8 counterexample: entries from previous terms are never committed by counting replicas, only indirectly once an entry from the leader's current term commits. Re-deriving it from the paper, or from the Figure 8 scenario directly, gives the same rule every time.",
+    "domain": "distributed systems",
+    "context": "We're reviewing a Raft implementation one of the team wrote and the commit path looks suspicious. It advances commitIndex as soon as a majority acknowledges, regardless of the term of the entry. I want to be sure of the rule before I write the review."
+  },
+  {
+    "id": "clm-035",
+    "claim": "The sickle-cell allele stays common in parts of West Africa because carrying one copy protects against severe falciparum malaria.",
+    "truth": "settled",
+    "why": "Textbook balancing selection with heterozygote advantage. The geographic overlap between allele frequency and historical malaria endemicity, the measured protection of HbAS carriers against severe disease, and the molecular mechanism are all established and mutually consistent. It has been uncontested for decades.",
+    "domain": "genetics",
+    "context": "I'm putting together a first-year lecture on why harmful alleles don't simply disappear and want an example that isn't hand-waving. This is the one I keep coming back to. The students will have had one week of population genetics."
+  },
+  {
+    "id": "clm-036",
+    "claim": "Growth-mindset interventions raise achievement enough to be worth a school rolling one out.",
+    "truth": "contested",
+    "why": "The meta-analyses and the large trials disagree, and the dispute is live and specific. Broad meta-analyses report average effects close to zero once study quality is accounted for. The large pre-registered National Study of Learning Mindsets found a small grade-point gain concentrated in lower-achieving students in schools with supportive norms. The argument is over which studies meet inclusion criteria and whether averaging across contexts conceals a real conditional effect, so competent readers answer 'no measurable effect', 'a small effect for some students', or 'worth it at this cost'.",
+    "domain": "education research",
+    "context": "The trust is deciding whether to buy the programme for all eleven schools next year. It costs about the same as two teaching assistants per school. The head who's championing it has read one of the papers."
+  },
+  {
+    "id": "clm-037",
+    "claim": "2100 won't be a leap year - century years only get the extra day when they divide by 400, which is why 2000 had one and 1900 didn't.",
+    "truth": "settled",
+    "why": "The Gregorian rule is fixed and 2100 is not divisible by 400, so it is a common year. It is a definitional consequence of the calendar, checkable by hand, and the two examples given are correct. A settled claim about a future date.",
+    "domain": "calendars",
+    "context": "We're writing date handling for contracts that run into the 2100s and there's a hardcoded divisible-by-four check in the old code. I want to know whether that's actually a bug or just ugly. Nobody here has had to care before."
+  },
+  {
+    "id": "clm-038",
+    "claim": "The White Sands footprints put people in North America by at least twenty thousand years ago, well before the Clovis horizon.",
+    "truth": "contested",
+    "why": "The claim rests on evidence whose dating is actively disputed by specialists on both sides. The White Sands footprints have been dated to roughly 21,000 to 23,000 years by radiocarbon on seeds and subsequently by independent pollen radiocarbon and optically stimulated luminescence on quartz; critics argue the aquatic-plant dates carry a hard-water reservoir offset and question the stratigraphic association. Genetic divergence estimates and the securely dated archaeological record are read by others as supporting an entry nearer 16,000 years. Both readings are held by competent researchers and neither has been retracted.",
+    "domain": "archaeology",
+    "context": "I'm setting the earliest date on the exhibit timeline and it will be on the wall for a decade. The current panel says thirteen thousand. The curator wants the strongest defensible number."
+  },
+  {
+    "id": "clm-039",
+    "claim": "Moving from AES-128 to AES-256 doubles the work for an attacker brute-forcing the key.",
+    "truth": "settled",
+    "why": "Stated wrong. The key space goes from 2^128 to 2^256, so classical brute-force work is squared, not doubled. The quantum caveat does not open a second answer: Grover search takes the cost from about 2^64 to about 2^128, which is also a squaring. The correction is arithmetic on the definition of key length and comes out the same either way.",
+    "domain": "cryptography",
+    "context": "We're writing the justification for the key-size change in the security review doc. The reviewer wants one sentence on what the upgrade actually buys. Everything else in the stack is unchanged."
+  },
+  {
+    "id": "clm-040",
+    "claim": "Small-cap value beats the market over any long enough horizon, so the tilt is worth holding through the bad stretches.",
+    "truth": "contested",
+    "why": "The evidence is genuinely mixed and the disagreement is between named, serious positions. The premium is large and robust in the long historical US sample, but weak or absent since the early 1990s. One camp attributes that to post-publication arbitrage and structural change in how intangible-heavy firms are valued on book measures, implying a permanently smaller or zero premium. The other treats it as an ordinary drawdown within a still-positive expected premium and points to the valuation spread. Expected premiums quoted by competent researchers run from about zero to several percent a year.",
+    "domain": "finance",
+    "context": "This is the reason a third of the portfolio is where it is, and the client has now underperformed the index for eight years. I have to either defend the tilt or unwind it at the next review. The client is 54."
+  }
+]

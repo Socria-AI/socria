@@ -48,7 +48,53 @@ const labelled = (f) => JSON.parse(readFileSync(join(here, 'labelled', f), 'utf8
 const libs = await buildGraderLib(join(runDir, '.build'));
 const load = async (name) => import(pathToFileURL(join(runDir, '.build', `${name}.mjs`)).href);
 
-const step = stepwiseClient(runDir, which);
+// A COLLECTING client, not the pipeline's one-at-a-time stepwise client.
+//
+// `stepwiseClient` deliberately surfaces only the FIRST missing completion per
+// replay, because in a real turn every later call is computed from state the
+// first one would have changed. Here that property does not hold: each
+// labelled item is independent, and every ablation within an item is
+// independent of the others. Using the one-at-a-time client would mean ~360
+// sequential replays to validate one set, which is not a measurement anyone
+// will run twice.
+//
+// So on a miss this records the request and returns a NEUTRAL answer that the
+// mechanism's own discard rules throw away ("unclear", empty). Pass 1
+// therefore completes end to end and writes every missing request at once;
+// the answers are filled in; pass 2 reads them all from cache and computes the
+// real report. Nothing about the mechanism under test is changed — it is the
+// same functions, driven the same way.
+const cacheDir = join(runDir, 'cache');
+const pendingDir = join(runDir, 'pending');
+mkdirSync(cacheDir, { recursive: true });
+mkdirSync(pendingDir, { recursive: true });
+
+const { createHash } = await import('node:crypto');
+const keyOf = (req) =>
+  `${which}.${req.role}-${createHash('sha256').update(JSON.stringify({ system: req.system, messages: req.messages })).digest('hex').slice(0, 20)}`;
+
+const missing = new Set();
+let served = 0;
+const step = {
+  calls: [],
+  pending: [],
+  client: {
+    async complete(req) {
+      const k = keyOf(req);
+      step.calls.push(k);
+      const hit = join(cacheDir, `${k}.txt`);
+      if (existsSync(hit)) { served += 1; return { text: readFileSync(hit, 'utf8') }; }
+      missing.add(k);
+      const f = join(pendingDir, `${k}.json`);
+      if (!existsSync(f)) {
+        writeFileSync(f, JSON.stringify({ key: k, role: req.role, json: !!req.json, system: req.system, messages: req.messages, answerTo: hit }, null, 2));
+      }
+      // Neutral: every mechanism under test discards this shape.
+      return { text: JSON.stringify({ holds: 'unclear', instead: '', confidence: 0, answer: '', compatible: 'unclear', conflict: '' }) };
+    },
+    stream() { throw new Error('not used'); },
+  },
+};
 globalThis.__socriaModelClient = step.client;
 
 const say = (o) => process.stdout.write(JSON.stringify(o) + '\n');
@@ -89,15 +135,16 @@ async function ablation() {
     // Drive the real function, but force every premise to be probed rather
     // than letting `candidates()` pick — this measures VERDICT accuracy, not
     // candidate selection, which is measured separately below.
+    // Drive ONE ablation per premise directly, so this measures VERDICT
+    // accuracy. Candidate SELECTION is a separate mechanism with its own
+    // failure mode (it used to filter to premises the reader had already
+    // flagged, which meant it never probed a plain stated fact) and is
+    // measured separately below.
+    const allText = item.premises.map((x) => x.text);
     const got = {};
     for (const prem of item.premises) {
-      const one = await cf.testDependencies(
-        'k',
-        { ...p, live: p.live.filter((x) => x.id === 'concl' || x.id === prem.id) },
-        ST,
-        client
-      );
-      const a = one?.ablations?.[0];
+      const item2 = p.live.find((x) => x.id === prem.id);
+      const a = item2 ? await cf.ablateOne(client, item.conclusion, allText, item2) : null;
       got[prem.id] = a ? a.dependence : 'unclear';
     }
     return got;
@@ -147,6 +194,25 @@ async function ablation() {
     }
   }
 
+  // CANDIDATE SELECTION, measured separately: of the genuinely load-bearing
+  // premises, how many would the live pipeline even put to a call?
+  let selectable = 0, selectedLB = 0, totalLB = 0;
+  for (const { item } of rows) {
+    const entries = [
+      entry('concl', 'decision', item.conclusion, 1),
+      ...item.premises.map((q, i) => entry(q.id, 'claim', q.text, i + 2)),
+    ];
+    const pm = buildProblem(entries, [], { ...ST, turn: item.premises.length + 2 }, { conversationId: 'c1', projectId: null });
+    const target = cf.targetOf(pm);
+    const chosen = target ? cf.candidates(pm, target).map((x) => x.id) : [];
+    selectable += chosen.length;
+    for (const q of item.premises) {
+      if (!q.loadBearing) continue;
+      totalLB += 1;
+      if (chosen.includes(q.id)) selectedLB += 1;
+    }
+  }
+
   const decided = tp + fp + tn + fn;
   const report = {
     which: 'E17 ablation',
@@ -158,6 +224,7 @@ async function ablation() {
     precision: pct(tp, tp + fp),
     recall: pct(tp, tp + fn),
     falsePositiveRate: pct(fp, fp + tn),
+    selection: { probedPerItem: Math.round((selectable / rows.length) * 10) / 10, loadBearingReachable: pct(selectedLB, totalLB), totalLoadBearing: totalLB },
     stability: { stable, unstable, rate: pct(stable, stable + unstable), repeats: REPEATS },
     wording: { same, flipped, stableRate: pct(same, same + flipped) },
     misses: misses.slice(0, 20),
@@ -240,12 +307,12 @@ async function claims() {
 
 try {
   const report = which === 'claims' ? await claims() : await ablation();
-  say({ status: 'done', report: join(runDir, 'report.json'), ...report });
-} catch (e) {
-  if (step.pending.length) {
-    say({ status: 'pending', pending: [...new Set(step.pending)].slice(0, 40), total: new Set(step.pending).size });
+  if (missing.size) {
+    say({ status: 'pending', answered: served, missing: missing.size, pendingDir, note: 'Answer the files in pendingDir, then run again for the real report.' });
   } else {
-    say({ status: 'error', error: String(e && e.stack ? e.stack : e) });
-    process.exit(1);
+    say({ status: 'done', report: join(runDir, 'report.json'), ...report });
   }
+} catch (e) {
+  say({ status: 'error', error: String(e && e.stack ? e.stack : e), missing: missing.size });
+  process.exit(1);
 }

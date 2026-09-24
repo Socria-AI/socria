@@ -70,6 +70,17 @@ export async function buildGraderLib(outDir) {
     platform: 'node',
     outdir: outDir,
     outExtension: { '.js': '.mjs' },
+    // counterfactual/calibration reach the model through lib/core4/model.ts,
+    // which imports the OpenAI SDK. The validator never uses the production
+    // client — it installs its own — so the SDK must stay external rather than
+    // being inlined, where its dynamic require('stream') cannot resolve.
+    external: ['openai', 'undici', 'unpdf'],
+    // `server-only` is a guard, not code: it throws when resolved outside a
+    // server component. esbuild picks the browser condition even at
+    // platform:'node', so a server-only module under test would explode on
+    // import. Resolve it as Next.js does on the server, exactly as the unit
+    // test build does.
+    alias: { 'server-only': join(ROOT, 'test/helpers/server-only-shim.mjs') },
     logLevel: 'error',
   });
   return {
