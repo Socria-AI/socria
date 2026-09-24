@@ -389,6 +389,14 @@ console.log('\n=== run 5: answers only; being heard holds ===');
   ok('  until they ask for it', h4.heardOnly === false && decide(h4, { said: 'What would you say to my manager?' }).allocation.mode !== 'HUMAN_REFLECTS');
 }
 
+console.log('\n=== run 6: no "more than last time" on the first turn, none for someone being heard ===');
+{
+  const first = renderState({ ...EMPTY_STATE, stuck: 'stalled', turn: 1 });
+  ok('turn 1 never says "more than last time"', !/more than last time/.test(first) && /they seem stuck/.test(first), first);
+  ok('  a later turn does', /more than last time/.test(renderState({ ...EMPTY_STATE, stuck: 'stalled', turn: 3 })));
+  ok('  and someone being heard gets no push to "support"', !/Support:/.test(renderState({ ...EMPTY_STATE, stuck: 'stalled', turn: 2, heardOnly: true })));
+}
+
 console.log('\n=== review before run 6: withhold and vent false positives ===');
 {
   for (const said of ["I tried to fix it myself but it still fails, what's wrong?", 'I managed to fix the bug myself, now I want to know how to add tests', "I couldn't solve this on my own so here's my code", "Why can't I solve this myself? Explain the concept.", "Can you show me the proof? I'd rather not derive it myself", "I don't want the fix to break anything else. What should I change?", "I don't want the answer to be wrong, so double check it", "I don't want the solution to use recursion. Can you write it iteratively?", "Don't show me the working, I only want the final answer", 'Don\'t give me the proof, just the final number please', 'I want to fix my own bug report template, can you draft one?']) {

@@ -136,6 +136,14 @@ console.log('\n=== run 4: a quoted draft is not Socria asking them (expert-017) 
   ok('a sentence that opens a quote line (as the stream gate sees it) is not a question', questionLoad('> Could we add a finite-size scaling analysis?') === 0);
 }
 
+console.log('\n=== run 6: the withhold notice is never stripped (learning-020) ===');
+{
+  const notice = "Work out what that means for the ending and you'll have it — though if you'd rather just have the answer, say so and I'll give it to you.";
+  ok('it is not counted as a question', questionLoad(notice) === 0, JSON.stringify(interrogatives(notice)));
+  ok('and survives stripping', stripInterrogatives('The adjective ending depends on the case. ' + notice).text?.includes('say so and I'), stripInterrogatives('The adjective ending depends on the case. ' + notice).text);
+  ok('a real disguised question is still one', questionLoad('Work out what that means for the ending.') >= 0);
+}
+
 console.log('\n=== stripping ===');
 {
   const r = stripInterrogatives('Great question! The sign flips because the derivative of cos is -sin. What do you think happens at pi? Let me know if you want more.');

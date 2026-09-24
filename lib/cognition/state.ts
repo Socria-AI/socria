@@ -474,7 +474,13 @@ export function renderState(s: CognitiveState): string {
   parts.push(`Kind of work: ${s.work}${s.taskKind ? ` (${s.taskKind})` : ''}`);
   if (s.attempt !== 'none') parts.push(`Their latest attempt: ${s.attempt}`);
   if (s.stuck === 'frustrated') parts.push('Support: go straight to the most useful help — the answer or a worked step — with no questions.');
-  else if (s.stuck !== 'no') parts.push('Support: more than last time — a concrete next step or a worked example, not another pointer.');
+  // Never on the first turn (there is no "last time"), and never for someone
+  // who asked to be heard, not helped (run 6, reflective-003).
+  else if (s.stuck !== 'no' && !s.heardOnly) {
+    parts.push(s.turn > 1
+      ? 'Support: more than last time — a concrete next step or a worked example, not another pointer.'
+      : 'Support: they seem stuck — something concrete they can act on, not a pointer.');
+  }
   if (s.urgency !== 'none') parts.push(`Urgency: ${s.urgency}`);
   const bullets = (label: string, xs: string[]) =>
     xs.length ? parts.push(`${label}:\n${xs.map((x) => `  - ${x}`).join('\n')}`) : undefined;

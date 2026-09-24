@@ -114,6 +114,13 @@ const DISGUISED = new RegExp(
 // deleted one from the middle of a reply because it started "If you want".
 const OFFER = /^(?:let me know|feel free to (?:ask|reach|ping|let me)|if you(?:'d| would) like(?:,)? (?:i|me)\b|if you want(?:,)? (?:i|me)\b|if (?:that|this) helps,? (?:i|let me)\b|want me to|shall i|should i|would you like (?:me|to see|a|an|the)|happy to|i can also|do you want me to|does (?:that|this) (?:make sense|help)|make sense\?|any questions|is (?:that|this) clear|sound good|hope (?:this|that) helps)\b/i;
 
+// The one-time notice that something is held back and how to get it
+// (council D6: a withhold is disclosed once, with the way out). Never a
+// question to strip: run 6 (learning-020) lost "…if you'd rather just have
+// the answer, say so and I'll give it to you" as a "disguised question"
+// because the sentence opened "Work out what that means…".
+const DISCLOSURE = /\b(?:say so|just ask|say the word|ask and i'?ll|ask for it and|if you(?:'d| would) rather (?:just )?have (?:it|the answer|the fix))\b/i;
+
 const SYCOPHANCY = /^(?:great|excellent|good|fantastic|wonderful|interesting|fascinating) (?:question|point|thought|observation)[.!,]?|^(?:you(?:'re| are) (?:absolutely |completely |totally )?right)[.!,]|^(?:what a (?:great|good|fascinating) )|^(?:i love (?:this|that|how you))/i;
 
 export interface Interrogatives {
@@ -129,7 +136,7 @@ export function interrogatives(text: string): Interrogatives {
     // without their line) is quoted material, not a question to them.
     if (/^\s*>/.test(raw)) continue;
     const s = raw.trim().replace(/^[-*•\d.)\s]+/, '');
-    if (!s) continue;
+    if (!s || DISCLOSURE.test(s)) continue;
     if (OFFER.test(s)) out.offers.push(raw.trim());
     else if (/\?["'’”)\]]*\s*$/.test(s)) out.explicit.push(raw.trim());
     else if (DISGUISED.test(s)) out.disguised.push(raw.trim());
@@ -193,6 +200,10 @@ export function stripInterrogatives(text: string, keep: 0 | 1 = 0): { text: stri
   parts.forEach((raw, i) => {
     const s = raw.trim().replace(/^[-*•\d.)\s]+/, '');
     if (s.includes('\u0000')) {
+      out.push(raw);
+      return;
+    }
+    if (DISCLOSURE.test(s)) {
       out.push(raw);
       return;
     }
