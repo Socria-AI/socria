@@ -64,7 +64,6 @@ stuck         no | stalled | looping | frustrated
 masteryEvidence  short observations of what they have shown they can do
 confusions    specific things they are stuck on, in their words
 positions     what they have committed to
-assumptions   what they take for granted without saying so
 tensions      where their own statements pull against each other
 constraints   what bounds this
 openThreads   raised and not resolved
@@ -75,7 +74,6 @@ newRelation   "A → how → B": a connection their latest message makes between
 blockingUnknown  the ONE thing that genuinely blocks any useful reply, or "" (usually "")
 practice      none | retrieval | prediction | self-explanation | application
 urgency       none | some | high   ("high" = real time pressure in the world)
-supportLevel  listen | question | hint | partial | explain | demonstrate
 
 consideredNow [{"kind":"question|objection|assumption|alternative|claim|hypothesis|evidence|decision|uncertainty|conclusion","text":"<tight paraphrase>","quote":"<their EXACT words from their latest message, copied verbatim>","stance":"asserts|entertains|asks|rejects|accepts|resolved","reason":"<why, if they rejected or changed it>"}]
               Considerations THE PERSON raised IN THEIR LATEST MESSAGE: questions

@@ -175,7 +175,13 @@ export interface CognitiveState {
 
   /** what they have committed to — never restate these back as new */
   positions: string[];
-  /** what they are taking for granted without saying so */
+  /**
+   * Retired. The reader filled it every turn and nothing ever read it: it is
+   * not in renderState, no branch tests it, and what it was for — the things
+   * a conclusion quietly rests on — is the ledger's `assumption` kind, which
+   * the problem model reads with its dependency edges attached. Kept as a
+   * field so stored states still parse; never populated.
+   */
   assumptions: string[];
   /** where their own statements pull against each other */
   tensions: string[];
@@ -207,9 +213,11 @@ export interface CognitiveState {
 
   urgency: Urgency;
   /**
-   * The rung of Core 4's own ladder this conversation currently sits on:
-   * question → hint → stronger hint → partial → explanation → demonstration.
-   * Derived, not guessed fresh each turn — see engine.ts.
+   * Retired for the same reason: the comment claimed it was derived, the
+   * reader was in fact asked to guess it every turn, and no code and no
+   * prompt line has ever read it. The ladder that matters is enforced by the
+   * allocator and the D6 bottom-out, not by a label. Kept so stored states
+   * still parse; never populated.
    */
   supportLevel: SupportLevel;
 
@@ -408,7 +416,7 @@ export function sanitizeState(raw: unknown): CognitiveState {
     attempt: oneOf(r.attempt, ATTEMPT, 'none'),
     confusions: list(r.confusions),
     positions: list(r.positions),
-    assumptions: list(r.assumptions),
+    assumptions: [],
     tensions: list(r.tensions),
     constraints: list(r.constraints),
     openThreads: list(r.openThreads),
@@ -427,7 +435,7 @@ export function sanitizeState(raw: unknown): CognitiveState {
     blockingUnknown: line(r.blockingUnknown),
     practice: oneOf(r.practice, PRACTICE, 'none'),
     urgency: oneOf(r.urgency, URGENCY, 'none'),
-    supportLevel: oneOf(r.supportLevel, SUPPORT_LEVELS, 'question'),
+    supportLevel: 'question',
     // The reader reports both; when it gives only the coarse task kind, the
     // work kind follows from it rather than collapsing to 'conversation'.
     work: oneOf(r.work, WORK_KINDS, WORK_FROM_TASK[oneOf(r.taskKind, TASK_KINDS, 'explore')]),
