@@ -504,6 +504,20 @@ console.log('\n=== only Core 4 was broken on dev: one rule, written twice, drift
   ok('  and the turn still closes cleanly', g.status === 200, String(g.status));
 }
 
+console.log('\n=== the checker runs when they showed work, and only then ===');
+{
+  const shown = await turn('check-shown-' + Date.now(), [U('d/dx(x^2 sin x) = 2x cos x, right?')], {
+    state: { taskKind: 'learn', work: 'verification', latest: 'attempt', attempt: 'wrong', currentFocus: 'differentiating x^2 sin x' },
+    replies: ['Not quite.'], check: { verdict: 'incorrect', confidence: 0.9, location: 'the product rule', errorType: 'step' },
+  });
+  ok('an attempt with no withhold now gets a real verdict', shown.checkCalls === 1, String(shown.checkCalls));
+  const planning = await turn('check-plan-' + Date.now(), [U('I think we should ship the migration in March and do the backfill after.')], {
+    state: { taskKind: 'decide', work: 'judgment', latest: 'information', attempt: 'partial', currentFocus: 'migration timing' },
+    replies: ['March works if the backfill is idempotent.'],
+  });
+  ok('a planning statement does not, even when the reader guesses "attempt"', planning.checkCalls === 0, String(planning.checkCalls));
+}
+
 console.log('\n=== the structure reaches the prompt the reply is written from ===');
 {
   // Turn 1: she states the churn figure and the scoping choice behind it,
@@ -533,14 +547,17 @@ console.log('\n=== the structure reaches the prompt the reply is written from ==
   });
   ok('the prompt says what the decision rests on', /rests on "Monthly churn is 4\.1%"/.test(r.prompt), r.prompt.slice(-900));
   ok('  and marks the scoping choice as assumed', /assumed/.test(r.prompt), r.prompt.slice(-900));
-  ok('the reply is handed the thing nobody said out loud', /Noticed in the structure/.test(r.prompt) && /excludes annual contracts/.test(r.prompt), r.prompt.slice(-900));
+  ok('the reply is handed the thing nobody said out loud', /Noticed across their turns/.test(r.prompt) && /excludes annual contracts/.test(r.prompt), r.prompt.slice(-900));
   ok('  told to raise at most one, in its own words', /Raise at most ONE/.test(r.prompt) && /Never as a list/i.test(r.prompt), r.prompt.slice(-400));
   ok('the trace records what was found', r.t?.trace?.missing?.found?.includes('HIDDEN_ASSUMPTION'), JSON.stringify(r.t?.trace?.missing));
   // A first turn with nothing accumulated must add nothing at all.
   const fresh = await turn('fresh-' + Date.now(), [U('What is the default isolation level in Postgres?')], {
     state: { work: 'information', latest: 'question' }, replies: ['Read committed.'],
   });
-  ok('an unstructured question gets no structure block', !/What rests on what|Noticed in the structure/.test(fresh.prompt), (fresh.prompt.match(/What rests on what|Noticed in the structure/) ?? []).join());
+  ok('an unstructured question gets no structure block', !/What rests on what|Noticed across their turns/.test(fresh.prompt), (fresh.prompt.match(/What rests on what|Noticed across their turns/) ?? []).join());
+  // The checker costs 1.5 s and can only answer "unknown" when there is
+  // nothing to check: a planning question must not pay for one.
+  ok('  and no checker call on a turn with nothing to check', fresh.checkCalls === 0, String(fresh.checkCalls));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

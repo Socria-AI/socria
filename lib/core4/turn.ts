@@ -236,7 +236,15 @@ export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
   // actually offered something to check, only when exact arithmetic could not
   // already settle it, 1.5 s at worst, on a turn whose whole point is "is
   // this right".
-  if (!verify && state.attempt !== 'none') {
+  //
+  // The gate is what they DID, not the reader's `attempt` field alone: that
+  // field comes back non-none on planning questions and status updates, so
+  // gating on it alone fired the checker on turns with nothing to check —
+  // a 1.5 s call that can only answer "unknown". Found by a run-8 player
+  // within minutes of the change, which is the cost of widening a gate
+  // without tightening what it reads.
+  const showedWork = state.latest === 'attempt' || state.work === 'verification' || state.work === 'practice';
+  if (!verify && showedWork && state.attempt !== 'none') {
     const t2 = Date.now();
     verify = await withTimeout(checkWork(input.apiKey, input.brief.slice(-5).map((m) => `${m.role === 'user' ? 'Them' : 'Socria'}: ${m.content}`).join('\n'), input.lastUserText), 1500, null);
     ms.verify = Date.now() - t2;
