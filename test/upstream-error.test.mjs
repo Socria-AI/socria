@@ -23,6 +23,34 @@ const err = (o) => Object.assign(new Error(o.message ?? 'x'), o);
 // The same three, once the reply has started streaming. Reported from dev:
 // every message, including "hi", came back as "[Connection interrupted.
 // Please try again.]" and nothing else — the generic line, one layer in.
+// Reported from dev after the notice above shipped: "[Something went wrong on
+// our side. (ref 5cgzr3)]" — the unclassified branch. A provider nobody can
+// reach and a bug in our own code both landed there, and they have different
+// fixes, which is the whole complaint this file started from.
+console.log('=== the request that never arrived, and the bug that is ours ===');
+{
+  const undici = Object.assign(new TypeError('fetch failed'), {
+    cause: Object.assign(new Error('getaddrinfo ENOTFOUND api.openai.com'), { code: 'ENOTFOUND' }),
+  });
+  ok('"fetch failed" is read through its cause, not taken at face value', classifyUpstream(undici).code === 'upstream_unreachable', classifyUpstream(undici).code);
+  ok('  and says the request never arrived', /never arrived/.test(streamFailureNotice('t', undici, false)));
+  ok('  without leaking the host it could not resolve', !/openai/i.test(streamFailureNotice('t', undici, false)));
+  const sdk = err({ name: 'APIConnectionError', message: 'Connection error.' });
+  ok('the SDK\'s own connection error lands there too', classifyUpstream(sdk).code === 'upstream_unreachable');
+  const refused = Object.assign(new TypeError('fetch failed'), { cause: err({ code: 'ECONNREFUSED', message: 'connect ECONNREFUSED' }) });
+  ok('a refused socket too', classifyUpstream(refused).code === 'upstream_unreachable');
+  const slow = err({ name: 'APIConnectionTimeoutError', message: 'Request timed out.' });
+  ok('a timeout is still a timeout, not unreachable', classifyUpstream(slow).code === 'upstream_timeout');
+  const ours = new TypeError("Cannot read properties of null (reading 'decision')");
+  const f = classifyUpstream(ours);
+  ok('a bug in our code stays internal, but names its class', f.code === 'internal' && f.detail === 'TypeError', JSON.stringify(f));
+  const notice = streamFailureNotice('t', ours, false);
+  ok('  so the two no longer read the same', /\(TypeError\)/.test(notice) && !/never arrived/.test(notice), notice);
+  ok('  and the message itself never rides along', !/Cannot read properties/.test(notice), notice);
+  ok('a plain Error adds no class name', classifyUpstream(new Error('???')).detail === undefined);
+  ok('a cause chain cannot loop forever', (() => { const a = err({ message: 'a' }); a.cause = a; return classifyUpstream(a).code === 'internal'; })());
+}
+
 console.log('=== a failure that lands after the headers ===');
 {
   const auth = streamFailureNotice('t', err({ status: 401, message: 'Incorrect API key provided' }), false);

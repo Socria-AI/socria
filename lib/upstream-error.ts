@@ -28,6 +28,7 @@ export type UpstreamCode =
   | 'upstream_quota'
   | 'upstream_model'
   | 'upstream_timeout'
+  | 'upstream_unreachable'
   | 'upstream_unavailable'
   | 'internal';
 
@@ -39,6 +40,16 @@ export interface UpstreamFailure {
   status: number;
   /** six characters, in the response AND in the server log, to tie them together */
   ref: string;
+  /**
+   * For 'internal' only: the error's CLASS NAME, nothing else.
+   *
+   * An unclassified failure used to read "Something went wrong on our side."
+   * — true of a bug in our code and of a provider nobody could reach, which
+   * are not the same problem and do not have the same fix. A class name
+   * ("TypeError") separates the two and cannot carry a request body, a URL or
+   * a key fragment, which is what the rest of this file is careful about.
+   */
+  detail?: string;
 }
 
 const SAY: Record<UpstreamCode, string> = {
@@ -49,6 +60,8 @@ const SAY: Record<UpstreamCode, string> = {
   upstream_model:
     'The model Socria is configured to use is unavailable to this deployment. This is our configuration, not anything you did.',
   upstream_timeout: 'The model took too long to answer. Nothing was counted — try again.',
+  upstream_unreachable:
+    'Socria could not reach the model provider at all — the request never arrived. This is our network or configuration, not anything you did.',
   upstream_unavailable: 'The model provider is having trouble right now. Try again shortly.',
   internal: 'Something went wrong on our side.',
 };
@@ -65,6 +78,29 @@ function statusOf(e: unknown): number | null {
 }
 
 /**
+ * The error, and everything it was caused by.
+ *
+ * Node's fetch reports a dead socket as `TypeError: fetch failed` and hides
+ * the part that says why — ECONNREFUSED, ENOTFOUND, UND_ERR_CONNECT_TIMEOUT —
+ * one or more `cause` links down. Reading only the top said "fetch failed",
+ * which matched nothing here and came out as "Something went wrong on our
+ * side": the one sentence this file exists to stop.
+ */
+function chain(err: unknown, depth = 4): Array<{ message: string; code: string; name: string }> {
+  const out: Array<{ message: string; code: string; name: string }> = [];
+  let e = err as { message?: unknown; code?: unknown; name?: unknown; cause?: unknown } | null;
+  for (let i = 0; e && typeof e === 'object' && i <= depth; i++) {
+    out.push({
+      message: typeof e.message === 'string' ? e.message.toLowerCase() : '',
+      code: typeof e.code === 'string' ? e.code.toLowerCase() : '',
+      name: typeof e.name === 'string' ? e.name : '',
+    });
+    e = e.cause as typeof e;
+  }
+  return out;
+}
+
+/**
  * Classify a failure, and say the one sentence worth saying about it.
  *
  * The order matters: a 404 that mentions a model is a model problem, and a 404
@@ -74,8 +110,11 @@ function statusOf(e: unknown): number | null {
  */
 export function classifyUpstream(err: unknown): UpstreamFailure {
   const e = err as { message?: unknown; code?: unknown; name?: unknown } | null;
-  const msg = typeof e?.message === 'string' ? e.message.toLowerCase() : '';
-  const code = typeof e?.code === 'string' ? e.code.toLowerCase() : '';
+  const links = chain(err);
+  // Any link may hold the reason; a bare "fetch failed" never does.
+  const msg = links.map((l) => l.message).join(' | ');
+  const code = links.map((l) => l.code).join(' | ');
+  const names = links.map((l) => l.name);
   const status = statusOf(err);
   const ref = reference();
 
@@ -100,16 +139,30 @@ export function classifyUpstream(err: unknown): UpstreamFailure {
     return is('upstream_model', 502);
   }
   if (
-    e?.name === 'AbortError' ||
+    names.includes('AbortError') ||
+    names.includes('APIConnectionTimeoutError') ||
     /timeout|timed out|etimedout|econnreset|socket hang up/.test(msg) ||
-    /etimedout|econnreset/.test(code)
+    /etimedout|econnreset|und_err_connect_timeout|und_err_headers_timeout/.test(code)
   ) {
     return is('upstream_timeout', 504);
+  }
+  // The request never left, or never landed: DNS, a refused socket, blocked
+  // egress, a wrong base URL. The SDK says "Connection error."; Node's fetch
+  // says "fetch failed" and puts the reason in `cause`.
+  if (
+    names.includes('APIConnectionError') ||
+    /fetch failed|connection error|network error|enotfound|econnrefused|eai_again|unable to connect/.test(msg) ||
+    /enotfound|econnrefused|eai_again|epipe|und_err_socket|certificate/.test(code)
+  ) {
+    return is('upstream_unreachable', 502);
   }
   if (typeof status === 'number' && status >= 500) {
     return is('upstream_unavailable', 502);
   }
-  return is('internal', 500);
+  // Unclassified: say WHICH class of thing threw, so a bug in our code is not
+  // reported in the same words as a provider problem.
+  const named = names.find((n) => n && n !== 'Error');
+  return named ? { ...is('internal', 500), detail: named } : is('internal', 500);
 }
 
 /**
@@ -119,7 +172,7 @@ export function classifyUpstream(err: unknown): UpstreamFailure {
  */
 export function reportUpstream(where: string, err: unknown): UpstreamFailure {
   const f = classifyUpstream(err);
-  console.error(`[${where}] ${f.code} ref=${f.ref}`, err);
+  console.error(`[${where}] ${f.code}${f.detail ? ` ${f.detail}` : ''} ref=${f.ref}`, err);
   return f;
 }
 
@@ -175,9 +228,10 @@ export function failureText(body: unknown, fallback = 'Something went wrong.'): 
  */
 export function streamFailureNotice(where: string, err: unknown, sentSomething: boolean): string {
   const f = reportUpstream(where, err);
+  const reason = f.detail ? `${f.reason} (${f.detail})` : f.reason;
   // Mid-reply, the sentence has to say the reply stopped — the person can see
   // that it did, and an explanation that ignores it reads as a non-sequitur.
   return sentSomething
-    ? `\n\n[The reply stopped here. ${f.reason} (ref ${f.ref})]`
-    : `\n\n[${f.reason} (ref ${f.ref})]`;
+    ? `\n\n[The reply stopped here. ${reason} (ref ${f.ref})]`
+    : `\n\n[${reason} (ref ${f.ref})]`;
 }
