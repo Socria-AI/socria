@@ -1,0 +1,234 @@
+[
+  {
+    "id": "power-rests-on-001",
+    "category": "decision",
+    "persona": "Maya Oyelaran, 34, co-founder and CTO of a 19-person B2B analytics company. Ex-Stripe infra. Reasons in public, anticipates objections, and is irritated by anything that reads as a checklist.",
+    "notes": "THE ARCHITECTURE TEST. In turn 1 she states a churn figure and, in passing, the scoping choice behind it — annual contracts excluded. Four turns later she builds a fundraising decision on that figure without revisiting the scoping. Nothing in the last message is wrong; the last message alone gives no reason to doubt anything. The valuable contribution is only visible if the system kept the dependency: the raise decision rests on 4%, and 4% excludes the cohort with the lowest churn, so the blended figure that an investor will compute is different. A prompt with the transcript can find this only by re-reading five turns and noticing unprompted; that is exactly the thing to measure.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Monthly logo churn is 4.1% and I want to get it under 3 before we raise. That 4.1 is self-serve and monthly SMB only — I pulled annual contracts out of the denominator because their renewal dates cluster in Q4 and they'd make the monthly series unreadable. Sanity check my read: at 4.1 we're losing about 40% of the base a year, which is bad but not unusual for sub-$100 ACV.",
+            "expect": { "maxQuestions": 1, "mustAnswer": true }
+          },
+          {
+            "user": "Right. The retention work is landing — 4.1 to 3.6 over two months, mostly from the onboarding rebuild.",
+            "expect": { "maxQuestions": 0 }
+          },
+          {
+            "user": "Board wants a view on timing. My read: we hit 3 by March, then raise on a clean twelve-month retention curve. Series A, $12M on a $50M pre. Is that the right sequencing or am I leaving money on the table by waiting?",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true,
+              "mustContribute": "That the 3% target and the retention curve it will be sold on are computed on a denominator she herself narrowed in turn 1 — annual contracts excluded — so the blended, all-customer churn a diligence process will compute is a different and almost certainly lower number, which changes both the story and possibly the timing. Surfacing the dependency between the raise decision and the scoping choice made four turns earlier is the contribution.",
+              "alreadyConsidered": ["that 4.1% implies roughly 40% annual loss", "that sub-$100 ACV churns faster than enterprise", "that the onboarding rebuild drove the improvement"]
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "power-contradiction-002",
+    "category": "expert",
+    "persona": "Dr Anselm Roeder, 51, principal engineer at a payments company, twenty years in distributed systems. Writes design docs other people cite. Hates being told what a quorum is.",
+    "notes": "A contradiction across distant turns. Turn 1 states the invariant: they never serve reads from a replica that is behind by more than one commit. Turn 4 proposes an optimisation that serves reads from replicas with a 200ms staleness budget, and he does not notice he has contradicted his own invariant. Same-message tension detection cannot see this; it is three turns apart. The contribution is naming it, precisely, without lecturing him on replication.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Design constraint for the ledger service, non-negotiable: reads never come from a replica more than one commit behind the primary. Settlement depends on it. I've already priced the latency cost and it's fine.",
+            "expect": { "maxQuestions": 0 }
+          },
+          {
+            "user": "Write path is the bottleneck now — p99 on commit is 340ms, mostly fsync on the WAL. Group commit gets it to about 90.",
+            "expect": { "maxQuestions": 1 }
+          },
+          {
+            "user": "Batching window of 5ms, flush on whichever comes first. I've modelled the throughput and it holds to about 4x current volume.",
+            "expect": { "maxQuestions": 0 }
+          },
+          {
+            "user": "Last piece: read scaling. I want to route balance queries to the read replicas with a 200ms staleness budget — balances are eventually consistent from the client's point of view anyway, and it takes 60% of the read load off the primary. Poke holes in it.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustChallenge": true,
+              "mustContribute": "That this directly violates the invariant he declared non-negotiable in turn 1 — reads never from a replica more than one commit behind — and that balance queries are precisely the settlement-adjacent reads that invariant existed to protect. Naming the conflict between the two statements he made, three turns apart, is the contribution.",
+              "alreadyConsidered": ["that balances are eventually consistent from the client's point of view", "that this removes 60% of read load from the primary"]
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "power-stale-003",
+    "category": "longitudinal",
+    "persona": "Priya Raghunathan, 41, health economist. Building a cost-effectiveness model for a national screening programme. Methodical, cites her own prior decisions accurately.",
+    "notes": "A belief still resting on something explicitly dropped. In session 1 she plans around a January start for the contractor; mid-session she says the contractor fell through and she will do it in-house. In session 2 she presents a timeline that still assumes the January date. The dependency was withdrawn and the thing it held up was never revisited.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Model build plan: the microsimulation engine is contracted out, starts January, six weeks. I do the parameter estimation in parallel and we integrate in March. Does that sequencing hold?",
+            "expect": { "maxQuestions": 1 }
+          },
+          {
+            "user": "Update — contractor's out, they took a pharma retainer. I'll build the engine myself. It'll be slower but I know the structure better than they would have.",
+            "expect": { "maxQuestions": 1 }
+          }
+        ]
+      },
+      {
+        "days_later": 6,
+        "turns": [
+          {
+            "user": "Drafting the grant timeline. Integration in March, first results to the committee in April, paper drafted over the summer. The parameter work is done so the critical path is the engine. Sense check the dates before I commit to them in writing.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustReference": true,
+              "mustContribute": "That the March integration date came from a six-week contracted build starting in January, and she withdrew that contractor and took the build in-house — slower, by her own account — so the date the whole timeline hangs on has lost the thing that produced it and has not been re-derived. Noticing that the commitment rests on a superseded premise is the contribution.",
+              "alreadyConsidered": ["that she knows the model structure better than the contractor would have", "that building it herself will be slower"]
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "power-unsupported-004",
+    "category": "decision",
+    "persona": "Tomas Bergqvist, 38, head of product at a logistics SaaS. Numerate, decisive, allergic to 'it depends'.",
+    "notes": "A load-bearing claim with nothing behind it. The whole pricing decision rests on 'enterprise buyers don't churn on price', which he states once as fact and never supports. Everything else in the conversation is well-evidenced, which is what makes the unsupported one findable: it is the single claim carrying the decision with no source.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Pricing change: moving enterprise from per-seat to per-shipment. Modelled on last year's volumes it's +18% ARR on the existing book. Two accounts go down, eleven go up, the big one goes up 40%. Enterprise buyers don't churn on price anyway. What breaks?",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true,
+              "mustContribute": "That 'enterprise buyers don't churn on price' is the load-bearing claim of the entire decision and the only one in the conversation with nothing behind it — every other figure is from last year's volumes — and that the 40% increase on the largest account is exactly the case where it would be tested. Identifying which claim carries the decision, rather than listing pricing risks generally, is the contribution."
+            }
+          },
+          {
+            "user": "Fair. The 40% one is a three-year deal, renews in fourteen months, and their ops lead has told me twice the tool is load-bearing for them. So I'm not worried about them specifically.",
+            "expect": { "maxQuestions": 1, "mustAnswer": true }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "power-open-loop-005",
+    "category": "expert",
+    "persona": "Nadia Sarr, 29, ML engineer at a mid-size search company. Sharp, moves fast, leaves threads open.",
+    "notes": "An open question that nothing closed, while everything built on top of it. In turn 1 she asks herself whether the eval set leaks into training and moves on without answering. Three turns later she is drawing conclusions from eval numbers. The contribution is that the unanswered question is upstream of every number since.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Reranker's up 4.2 points nDCG@10 on the internal eval. One thing nagging me — I'm not certain the eval queries were held out of the distillation set, the sampling script changed hands twice. Anyway: the gain is concentrated in head queries, which is the opposite of what I expected.",
+            "expect": { "maxQuestions": 1 }
+          },
+          {
+            "user": "Head-heavy gain makes sense actually — the teacher model is strongest there, so distillation transfers most where the teacher is confident.",
+            "expect": { "maxQuestions": 1 }
+          },
+          {
+            "user": "Tail is flat to slightly negative. I think that's a capacity thing, the student is 340M and the tail needs more parameters to memorise.",
+            "expect": { "maxQuestions": 1 }
+          },
+          {
+            "user": "Writing this up for the team as: distillation gives head gains, tail needs a bigger student, recommend we scale the student to 1B for the next run. That's the whole story, right?",
+            "expect": {
+              "maxQuestions": 1,
+              "mustChallenge": true,
+              "mustContribute": "That she raised, and never resolved, whether the eval queries were held out of the distillation set — and that if they were not, contamination would produce exactly this signature: large gains on head queries the teacher saw, flat tail. So the unanswered question from turn 1 is upstream of the entire write-up and of the 1B recommendation, and it is cheap to settle before spending the compute.",
+              "alreadyConsidered": ["that the teacher is strongest on head queries", "that the student may lack capacity for the tail", "that the gain is concentrated in head queries"]
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "power-no-finding-006",
+    "category": "expert",
+    "persona": "Dr Iman Haddad, 46, statistician on a clinical trials unit. Precise, complete, and has already done the thinking.",
+    "notes": "THE CONTROL. There is no missing contribution here. Her reasoning is complete, her assumptions are stated and supported, and she asks a narrow, answerable question. The failure mode being tested is manufactured novelty: inventing a contradiction, an assumption or an alternative in order to look insightful. The right reply answers the question well and adds nothing decorative. A reply that raises a 'have you considered' here should be marked down.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Non-inferiority margin for the trial: 6 percentage points on 12-month remission, derived from the 95% CI lower bound of the historical effect (the M1 approach), preserving 50% of it. Regulator has seen the justification and didn't object. Blinded sample size re-estimation at 50% events, no alpha adjustment because we're only re-estimating nuisance. One question: with blinded BSSR, do I need to say anything in the SAP about the re-estimation not being a formal interim, or is that understood?",
+            "expect": {
+              "maxQuestions": 0,
+              "mustAnswer": true,
+              "mustContribute": null,
+              "alreadyConsidered": ["the M1 approach for the non-inferiority margin", "preserving 50% of the historical effect", "that blinded re-estimation of a nuisance parameter needs no alpha adjustment", "that the regulator has seen the margin justification"]
+            }
+          },
+          {
+            "user": "Good. I'll put a sentence in §9.4 stating it's blinded and nuisance-only.",
+            "expect": { "maxQuestions": 0, "mustContribute": null }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "power-binary-007",
+    "category": "decision",
+    "persona": "Ruth Kavanagh, 44, founder of a design studio, 12 staff. Practical, weighs things out loud, decides quickly.",
+    "notes": "A two-option framing inherited from how the question was first asked. She has been comparing hire-a-senior against promote-internally for the whole conversation. A third path — restructure the work so neither is needed this quarter — is available and never surfaced. The contribution is the third option, not a summary of the two. Manufactured third options that are obviously worse should not count.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Design lead left. Either I hire a senior externally — three months to find, £75k, unknown culture fit — or I promote Dara, who's technically ready but has never managed. Those are the options. Talk me through it.",
+            "expect": { "maxQuestions": 1, "mustAnswer": true }
+          },
+          {
+            "user": "Dara's the cheaper bet and I'd keep the studio's voice. But the client-facing part is the risk — half the role is holding the room in a pitch, and she's never done that without me there. I'd be signing up to do that part myself for six months.",
+            "expect": {
+              "maxQuestions": 1,
+              "mustContribute": "That she has framed this as a binary inherited from the departing person's job description, and her own last sentence describes the actual shape of the problem: the role is two roles — craft leadership, which Dara is ready for, and client-facing pitch work, which she is already saying she would cover. Splitting the role, or buying the pitch capability part-time, is the path neither option contains.",
+              "alreadyConsidered": ["that an external hire takes three months and carries culture risk", "that Dara is technically ready but has not managed", "that promoting Dara keeps the studio's voice"]
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "power-calibration-008",
+    "category": "expertise-mismatch",
+    "persona": "Two people, one problem. Session 1 is Erik Lindqvist, a staff database engineer who has been tuning Postgres for a decade. Session 2 is the same question from Amara Boateng, six months into her first backend job. The question is nearly identical; the right reply is not.",
+    "notes": "Expert calibration, measured directly. Erik's reply should contain no definition of a term he used correctly, no explanation of what an index is, no ground-up teaching. Amara's should name the principle before applying it and keep the steps explicit. The failure modes are symmetric: lecturing Erik, and dropping Amara into jargon.",
+    "sessions": [
+      {
+        "turns": [
+          {
+            "user": "Partial index on (tenant_id, created_at) WHERE status = 'active' isn't being chosen for the dashboard query — planner takes a seq scan on 40M rows. Stats are fresh, n_distinct on tenant_id looks right, and the predicate matches exactly. I've checked it's not a type mismatch on the timestamptz. What am I missing?",
+            "expect": {
+              "maxQuestions": 1,
+              "mustAnswer": true,
+              "stance": true,
+              "alreadyConsidered": ["that the statistics are fresh", "that n_distinct on tenant_id looks correct", "that the predicate matches the partial index exactly", "that it is not a timestamptz type mismatch"]
+            }
+          }
+        ]
+      },
+      {
+        "days_later": 1,
+        "turns": [
+          {
+            "user": "I made an index on my orders table but the query is still slow. It's got status and a date in it. How do I make Postgres actually use the index?",
+            "expect": { "maxQuestions": 1, "mustAnswer": true }
+          }
+        ]
+      }
+    ]
+  }
+]
