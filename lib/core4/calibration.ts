@@ -103,6 +103,23 @@ const STOP = new Set([
   'your', 'we', 'our', 'they', 'their', 'so', 'if', 'then', 'than', 'more', 'less', 'only',
 ]);
 
+/**
+ * Does this answer open by confirming or by denying the claim?
+ *
+ * Only the opening clause counts: "Correct, though the units are unusual" is a
+ * confirmation, and "Not quite — it is 2,586" is a denial, and what follows
+ * either is elaboration rather than a different answer.
+ */
+const AFFIRM = /^(?:yes\b|right\b|correct\b|accurate\b|agreed\b|true\b|that(?:'s| is) (?:right|correct)|confirmed\b|verified\b|the (?:claim|reasoning|arithmetic|maths?|figure|number) (?:holds|is right|is correct|checks out)|holds\b|checks out\b)/i;
+const DENY = /^(?:no\b|not quite\b|not really\b|incorrect\b|wrong\b|that(?:'s| is) (?:wrong|not right|not correct)|nearly\b|close,? but\b|actually\b|the (?:claim|figure|number) is (?:wrong|off))/i;
+
+function verdict(s: string): 'yes' | 'no' | null {
+  const t = norm(s).replace(/^[\s"'\-—:]+/, '');
+  if (AFFIRM.test(t)) return 'yes';
+  if (DENY.test(t)) return 'no';
+  return null;
+}
+
 const terms = (s: string): Set<string> =>
   new Set(norm(s).split(/[^a-z0-9.%-]+/).filter((w) => w.length > 2 && !STOP.has(w)));
 
@@ -127,13 +144,27 @@ const terms = (s: string): Set<string> =>
  */
 export function sameAnswer(a: string, b: string): boolean {
   if (norm(a) === norm(b)) return true;
+  // A VERDICT IS AN ANSWER. Most answers to "is this right?" open by agreeing
+  // or disagreeing, and two agreements are the same answer however differently
+  // they are worded. Without this, five unanimous confirmations — "Right",
+  // "Correct", "Yes", "The reasoning holds", "Right" — clustered as FIVE
+  // different answers and the claim was reported as unsettled. That was E18's
+  // largest error source and it was this function's fault, not the
+  // mechanism's: on clm-013, clm-025 and clm-030 every sample agreed and the
+  // measurement called each one contested.
+  const va = verdict(a);
+  const vb = verdict(b);
+  if (va && vb) return va === vb;
   const na = numbers(a);
   const nb = numbers(b);
   if (na.length && nb.length) {
-    // The leading quantity carries the answer; a trailing year or sample size
-    // should not split two answers that agree on the number that matters.
+    // THE PRIMARY NUMBER, not any number. Matching any-against-any merged
+    // answers that plainly disagree: five estimates of the Hubble constant —
+    // 67-68, 70, 73, "both", 69-70 — all mention 73 somewhere, so all five
+    // collapsed into one cluster and a genuinely contested claim was reported
+    // as settled. The number a reader would take away is the first one.
     const close = (x: number, y: number) => Math.abs(x - y) <= Math.max(1e-9, Math.abs(y) * TOLERANCE);
-    return na.some((x) => nb.some((y) => close(x, y)));
+    return close(na[0], nb[0]);
   }
   const ta = terms(a);
   const tb = terms(b);

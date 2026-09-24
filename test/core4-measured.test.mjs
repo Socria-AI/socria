@@ -181,6 +181,32 @@ console.log('\n=== sameAnswer: the number usually IS the answer ===');
   ok('number-free answers fall back to what they are about', sameAnswer('the index is unusable', 'unusable index, not a costing problem'));
   ok('  and stay apart when they are about different things', !sameAnswer('the index is unusable', 'the planner is costing it wrong'));
   ok('an empty answer matches nothing', !sameAnswer('', 'about 40%'));
+
+  // THE TWO BUGS THAT NEARLY GOT A WORKING MECHANISM DELETED. E18's first run
+  // reported a 35% false-split rate and 50% contested detection — a clear
+  // failure against its kill condition. The mechanism was fine; this function
+  // was destroying the signal in both directions at once.
+  //
+  // Too STRICT on agreement: five unanimous confirmations of a settled claim,
+  // worded differently, clustered as five different answers, so the claim was
+  // reported as unsettled. Three of E18's seven false splits were exactly this.
+  ok('two confirmations are the same answer however differently worded',
+    sameAnswer('Right — /billing/refunds.ts sits under /billing, so the stricter branch applies',
+               'Correct. The rule keys on the directory touched, not on who reviewed'));
+  ok('  and so are two denials', sameAnswer('No, that is not right — it is 2,586', 'Not quite; the figure is 2,586'));
+  ok('a confirmation and a denial are NOT the same answer',
+    !sameAnswer('Correct, the arithmetic holds', 'Not quite — the arithmetic is off by a factor of two'));
+  ok('  and a verdict only counts when it OPENS the answer',
+    !sameAnswer('The pooled rate overstates variance, so no', 'Yes, that is right'));
+
+  // Too LOOSE on disagreement: any number matching any number merged five
+  // genuinely different estimates of the Hubble constant into one cluster,
+  // because each mentioned 73 somewhere. A contested claim read as settled.
+  ok('the PRIMARY number decides, not any number anywhere in the sentence',
+    !sameAnswer('Use 67-68, not 73 — the Planck value is what the age figure comes from',
+                '73 is fine provided you label it the local distance-ladder value'));
+  ok('  while answers that lead with the same figure still agree',
+    sameAnswer('73.0 plus or minus 1, from SH0ES', '73, the local ladder value, give or take'));
 }
 
 console.log('\n=== clustering: the same answer in different words is one answer ===');
