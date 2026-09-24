@@ -123,7 +123,7 @@ console.log('\n=== the model underneath, and its override ===');
   ok('the override is honoured', resolveOpenAIModel('core-4') === 'some-other-model');
   ok('and does not move Core 3.1', resolveOpenAIModel('core-3') !== 'some-other-model');
   delete process.env.OPENAI_MODEL_CORE_4;
-  ok('it is versioned separately', CORE_4_PROMPT_VERSION === 'core-4-v6');
+  ok('it is versioned separately', CORE_4_PROMPT_VERSION === 'core-4-v7');
 }
 
 console.log('\n=== it has the same safety net Core 3.1 has ===');

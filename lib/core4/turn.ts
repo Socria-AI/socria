@@ -28,6 +28,7 @@ import { EMPTY_STATE, type CognitiveState } from '../cognition/state';
 import { readState, guardModel, checkWork, COGNITION_MODEL } from '../cognition/engine';
 import { testDependencies, renderCounterfactual, testContradictions, renderContradictions, type Counterfactual, type ContradictionTest } from './counterfactual';
 import { discoverFromHistory, renderHistory, type HistoricalFinding } from './history';
+import { voiceFor, renderVoice, type Voice } from './voice';
 import { readSignals, readContract } from './signals';
 import { mergeState, recordTurn, gapCheck } from './merge';
 import { allocate } from './allocation';
@@ -102,6 +103,8 @@ export interface PreparedTurn {
   contradictions: ContradictionTest[];
   /** what the record can say that this conversation cannot */
   historical: HistoricalFinding[];
+  /** how Socria meets them this turn — register, never identity */
+  voice: Voice;
   /** the findings actually rendered, after measured results superseded asserted ones */
   missingShown: MissingContribution[];
   /**
@@ -400,6 +403,17 @@ export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
     decision = { ...decision, guardRequired: true };
   }
 
+  // ── REGISTER ────────────────────────────────────────────────────
+  //
+  // Last, because it reads the finished decision: the move chosen and whether
+  // coverage opened both change how the turn should sound. Deterministic and
+  // free — every input was computed earlier in this function.
+  //
+  // Appended to the MOVE block rather than the state block: the state block
+  // describes the person, and this is an instruction to Socria.
+  const voice = voiceFor({ state, signals, decision });
+  move += renderVoice(voice);
+
   ms.prepare = Date.now() - t0;
   return {
     input,
@@ -422,6 +436,7 @@ export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
     counterfactual,
     contradictions,
     historical,
+    voice,
     missingShown,
     disputed,
     superseded,
@@ -677,6 +692,7 @@ export async function finishTurn(
     competence: p.competence,
     counterfactual: p.counterfactual,
     contradictions: p.contradictions,
+    voice: p.voice,
     superseded: p.missing.length - p.missingShown.length,
     structure: p.structure,
     ms: p.ms,

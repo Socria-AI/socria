@@ -43,6 +43,8 @@ export interface TurnTrace {
   };
   allocation: { mode: string; reasonCode: string; withhold: string | null; withholdSource: string | null; confidence: number };
   intervention: { type: string; reasonCode: string; maxQuestions: number; switchedFrom: string | null; confidence: number; coverage: string; proportion: string };
+  /** the register chosen for this turn — content-free, like every trace field */
+  voice: { warmth: string; edge: string; play: string; density: string; because: string };
   budget: { streak: number; density: number; allowed: number };
   diminishing: { detected: boolean; count: number };
   novelty: { checked: number; redundant: number; uncertain: number; partial: number };
@@ -116,6 +118,7 @@ export function buildTrace(x: {
   // that has not been updated must degrade to a thinner trace, never throw.
   counterfactual?: { ablations: readonly { dependence: string }[] } | null;
   contradictions?: readonly { source: string }[];
+  voice?: { warmth: string; edge: string; play: string; density: string; because: string };
   superseded?: number;
   missing?: readonly { kind: string }[];
   competence?: { value: string };
@@ -176,6 +179,7 @@ export function buildTrace(x: {
     sent: { questions: x.sentQuestions, chars: x.sentChars },
     ledger: x.ledger,
     considered: x.considered,
+    voice: x.voice ?? { warmth: 'neutral', edge: 'measured', play: 'dry', density: 'normal', because: 'untraced' },
     measured: {
       ablations: x.counterfactual?.ablations.length ?? 0,
       loadBearing: x.counterfactual?.ablations.filter((a) => a.dependence === 'load_bearing').length ?? 0,
