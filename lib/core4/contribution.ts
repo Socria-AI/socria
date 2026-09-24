@@ -28,7 +28,7 @@
 // experiment E1 already caught once. Those stay the reply model's job; this
 // module's job is to hand it the structure it could not have built.
 
-import { classify } from './considered';
+import { classify, conceptTerms } from './considered';
 import { ofKind, restsOn, type ProblemItem, type ProblemModel } from './problem';
 import type { CognitiveState } from '../cognition/state';
 
@@ -51,6 +51,13 @@ export interface MissingContribution {
   ids: string[];
   /** what to say, in the system's own words — never shown verbatim to the person */
   what: string;
+  /**
+   * The item texts the finding is ABOUT, so the novelty gate can tell
+   * "they already made this point" from "this point is about something they
+   * said". Without it every structural finding looks redundant, because a
+   * finding necessarily quotes the material it is about.
+   */
+  subjects?: string[];
   /** why it is worth a sentence of their attention */
   whyItMatters: string;
   confidence: number;
@@ -79,6 +86,7 @@ function hiddenAssumption(p: ProblemModel): MissingContribution[] {
       out.push({
         kind: base.epistemic === 'assumed' ? 'HIDDEN_ASSUMPTION' : 'UNVERIFIED_FACT',
         ids: [d.id, base.id],
+        subjects: [d.text, base.text],
         what: `"${d.text}" rests on "${base.text}", which is ${base.epistemic === 'assumed' ? 'assumed' : 'unchecked'} and nothing supports.`,
         whyItMatters: 'If that turns out to be wrong, the conclusion goes with it — and it was never examined.',
         confidence: base.epistemic === 'assumed' ? 0.75 : 0.6,
@@ -100,6 +108,7 @@ function missingEvidence(p: ProblemModel): MissingContribution[] {
     out.push({
       kind: 'MISSING_EVIDENCE',
       ids: [c.id],
+      subjects: [c.text],
       what: `"${c.text}" is carrying a decision and has nothing behind it${evidence.length ? '' : ' (no evidence has been put on the table at all)'}.`,
       whyItMatters: 'It is the load-bearing claim, so it is the one worth checking first.',
       confidence: 0.6,
@@ -132,6 +141,7 @@ function contradiction(p: ProblemModel): MissingContribution[] {
       out.push({
         kind: 'CONTRADICTION',
         ids: [a.id, b.id],
+        subjects: [a.text, b.text],
         what: `"${a.text}" (turn ${a.turn}) and "${b.text}" (turn ${b.turn}) cannot both hold.`,
         whyItMatters: 'Both are still being used as if settled, and they are far enough apart that nobody has put them side by side.',
         confidence: 0.8,
@@ -153,6 +163,7 @@ function staleBelief(p: ProblemModel): MissingContribution[] {
       out.push({
         kind: 'STALE_BELIEF',
         ids: [i.id, dep.id],
+        subjects: [i.text, dep.text],
         what: `"${i.text}" still rests on "${dep.text}", which has since been dropped.`,
         whyItMatters: 'The support was withdrawn and the thing it was holding up was never revisited.',
         confidence: 0.7,
@@ -174,6 +185,7 @@ function missingCriteria(p: ProblemModel, state: Pick<CognitiveState, 'taskKind'
   return [{
     kind: 'MISSING_DECISION_CRITERIA',
     ids: decisions.map((d) => d.id).slice(0, 2),
+    subjects: decisions.map((d) => d.text).slice(0, 2),
     what: 'A decision is being weighed and nothing has been said about what would make one option better than another.',
     whyItMatters: 'Without a criterion the comparison cannot close, and the conversation circles.',
     confidence: 0.55,
@@ -190,6 +202,7 @@ function falseBinary(p: ProblemModel, state: Pick<CognitiveState, 'taskKind' | '
   return [{
     kind: 'FALSE_BINARY',
     ids: options.map((o) => o.id),
+    subjects: options.map((o) => o.text),
     what: `The choice is being treated as "${options[0].text}" or "${options[1].text}" and no third path has been put on the table.`,
     whyItMatters: 'Two-option framings are usually inherited from how the question was first asked, not from the problem.',
     confidence: 0.45,
@@ -207,6 +220,7 @@ function repeatedLoop(p: ProblemModel): MissingContribution[] {
     out.push({
       kind: 'REPEATED_LOOP',
       ids: [q.id],
+      subjects: [q.text],
       what: `"${q.text}" was open ${age} turns ago and is still open.`,
       whyItMatters: 'Everything since has been built on top of a question nobody closed.',
       confidence: 0.5,
@@ -225,6 +239,7 @@ function underweightedUncertainty(p: ProblemModel): MissingContribution[] {
   return [{
     kind: 'UNDERWEIGHTED_UNCERTAINTY',
     ids: [open[0].id, decisions[0].id],
+    subjects: [open[0].text, decisions[0].text],
     what: `"${open[0].text}" is unresolved and the decision is proceeding around it rather than through it.`,
     whyItMatters: 'It is the part of the problem with the widest range, so it dominates the outcome.',
     confidence: 0.5,
@@ -286,7 +301,23 @@ export function gateContributions(
   const floor = expertise === 'expert' ? 0.7 : expertise === 'intermediate' ? 0.55 : 0.4;
   const out: MissingContribution[] = [];
   for (const c of found) {
-    const verdict = classify(c.what, considered).verdict;
+    // Compare against what they have said EXCEPT the very items this finding
+    // is about. A finding quotes its subjects, so classifying it against a
+    // list containing those subjects marks almost everything redundant — the
+    // end-to-end test caught exactly that: "their churn figure is carrying
+    // the decision and has nothing behind it" read as already-said, because
+    // they had indeed said the churn figure.
+    // Exclude only the lines that ARE the subject, not the lines that make a
+    // point about it. "Monthly churn is 4.1%" is the subject and must not
+    // silence a finding about it; "nothing supports the churn figure and the
+    // decision rests on it" IS the finding's point and must silence it. The
+    // test is whether the line says anything beyond the subject — same
+    // concepts, or one more, is a restatement.
+    const subjects = c.subjects ?? [];
+    const isJustTheSubject = (line: string) =>
+      subjects.some((s) => classify(line, [s]).verdict === 'REDUNDANT' && conceptTerms(line).size <= conceptTerms(s).size + 1);
+    const others = considered.filter((line) => !isJustTheSubject(line));
+    const verdict = classify(c.what, others).verdict;
     if (verdict === 'REDUNDANT') continue;
     if (c.confidence < floor) continue;
     out.push({ ...c, novelty: verdict });

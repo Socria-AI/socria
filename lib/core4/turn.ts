@@ -190,7 +190,12 @@ export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
     ? entriesFromPerson(state.consideredNow, input.lastUserText, { conversationId: input.conversationId, projectId: input.projectId, turn: state.turn, now: input.now }, lastSocria(input))
     : [];
   const problemEntries = [...ledger, ...provisional];
-  const problem = buildProblem(problemEntries, [...priorLinks, ...linksFromRelations(state.relations, problemEntries, input.now)], state);
+  const problem = buildProblem(
+    problemEntries,
+    [...priorLinks, ...linksFromRelations(state.relations, problemEntries, input.now)],
+    state,
+    { conversationId: input.conversationId ?? '', projectId: input.projectId }
+  );
   const missing = gateContributions(detectMissing(problem, state), considered.items, state.expertise.value);
 
   const diminishing = diminishingReturns(state, signals, input.brief);

@@ -504,5 +504,44 @@ console.log('\n=== only Core 4 was broken on dev: one rule, written twice, drift
   ok('  and the turn still closes cleanly', g.status === 200, String(g.status));
 }
 
+console.log('\n=== the structure reaches the prompt the reply is written from ===');
+{
+  // Turn 1: she states the churn figure and the scoping choice behind it,
+  // and the reader names the dependency between them. Turn 2, four turns of
+  // conversation later, she builds a decision on the figure. Nothing in the
+  // last message is wrong; the contribution exists only because the edge was
+  // kept. This is the whole architecture, end to end, through the real route.
+  const conv = 'rests-on-' + Date.now();
+  await turn(conv, [U('Monthly churn is 4.1%. That figure is self-serve only — I pulled annual contracts out of the denominator.')], {
+    state: {
+      taskKind: 'decide', work: 'judgment', latest: 'information', currentFocus: 'churn and the raise',
+      consideredNow: [
+        { kind: 'claim', text: 'Monthly churn is 4.1%', quote: 'Monthly churn is 4.1%', stance: 'asserts', reason: '' },
+        { kind: 'assumption', text: 'The 4.1% excludes annual contracts', quote: 'I pulled annual contracts out of the denominator', stance: 'asserts', reason: '' },
+      ],
+      relations: [{ from: 'Monthly churn is 4.1%', rel: 'assumes', to: 'The 4.1% excludes annual contracts' }],
+    },
+    replies: ['Noted — 4.1% self-serve.'],
+  });
+  const r = await turn(conv, [U('Monthly churn is 4.1%.'), A('Noted.'), U('So we raise once churn is under 3. Is that the right sequencing?')], {
+    state: {
+      taskKind: 'decide', work: 'judgment', latest: 'question', currentFocus: 'raise timing',
+      consideredNow: [{ kind: 'decision', text: 'Raise once churn is under 3', quote: 'we raise once churn is under 3', stance: 'asserts', reason: '' }],
+      relations: [{ from: 'Raise once churn is under 3', rel: 'depends_on', to: 'Monthly churn is 4.1%' }],
+    },
+    replies: ['Sequencing looks right.'],
+  });
+  ok('the prompt says what the decision rests on', /rests on "Monthly churn is 4\.1%"/.test(r.prompt), r.prompt.slice(-900));
+  ok('  and marks the scoping choice as assumed', /assumed/.test(r.prompt), r.prompt.slice(-900));
+  ok('the reply is handed the thing nobody said out loud', /Noticed in the structure/.test(r.prompt) && /excludes annual contracts/.test(r.prompt), r.prompt.slice(-900));
+  ok('  told to raise at most one, in its own words', /Raise at most ONE/.test(r.prompt) && /never as a list/.test(r.prompt));
+  ok('the trace records what was found', r.t?.trace?.missing?.found?.includes('HIDDEN_ASSUMPTION'), JSON.stringify(r.t?.trace?.missing));
+  // A first turn with nothing accumulated must add nothing at all.
+  const fresh = await turn('fresh-' + Date.now(), [U('What is the default isolation level in Postgres?')], {
+    state: { work: 'information', latest: 'question' }, replies: ['Read committed.'],
+  });
+  ok('an unstructured question gets no structure block', !/What rests on what|Noticed in the structure/.test(fresh.prompt), (fresh.prompt.match(/What rests on what|Noticed in the structure/) ?? []).join());
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

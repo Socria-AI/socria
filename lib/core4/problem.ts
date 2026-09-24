@@ -112,15 +112,36 @@ export function epistemicOf(e: LedgerEntry): Epistemic {
   return 'inferred';
 }
 
-/** The problem as it stands: the live ledger, read as a connected structure. */
+/**
+ * The problem as it stands: the live ledger, read as a connected structure.
+ *
+ * SCOPE IS PART OF CORRECTNESS, not a detail. The ledger loads recent entries
+ * across the whole account, so an unscoped build makes a decision in one
+ * conversation appear to rest on an assumption from an unrelated one — wrong,
+ * and a leak of one piece of work into another. Caught by the end-to-end test
+ * before it shipped: a brand-new conversation about Postgres was handed the
+ * structure of a fundraising conversation.
+ *
+ * So: this conversation, plus the same Project when there is one, because a
+ * Project is an explicit statement by the person that these are one body of
+ * work. And never a private entry outside the conversation it was made in —
+ * the same rule consideredView already applies (council D14/D15).
+ */
 export function buildProblem(
   entries: readonly LedgerEntry[],
   links: readonly LedgerLink[],
-  state: Pick<CognitiveState, 'currentGoal' | 'currentFocus' | 'blockingUnknown' | 'turn'>
+  state: Pick<CognitiveState, 'currentGoal' | 'currentFocus' | 'blockingUnknown' | 'turn'>,
+  scope?: { conversationId: string; projectId: string | null }
 ): ProblemModel {
+  const inScope = (e: LedgerEntry): boolean => {
+    if (!scope) return true;
+    const here = e.conversationId === scope.conversationId;
+    if (e.private) return here;
+    return here || (!!scope.projectId && e.projectId === scope.projectId);
+  };
   const items = new Map<string, ProblemItem>();
   for (const e of entries) {
-    if (e.status === 'retracted') continue;
+    if (e.status === 'retracted' || !inScope(e)) continue;
     items.set(e.id, {
       id: e.id,
       kind: e.kind,

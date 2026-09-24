@@ -146,8 +146,8 @@ console.log('\n=== what the structure says is missing ===');
 console.log('\n=== the gate: already said, and not worth an expert\'s time ===');
 {
   const found = [
-    { kind: 'HIDDEN_ASSUMPTION', ids: ['a'], what: 'The plan rests on the churn number, which is assumed', whyItMatters: 'x', confidence: 0.75, novelty: 'UNCERTAIN', risk: 'medium' },
-    { kind: 'FALSE_BINARY', ids: ['b'], what: 'Only two options are on the table', whyItMatters: 'y', confidence: 0.45, novelty: 'UNCERTAIN', risk: 'low' },
+    { kind: 'HIDDEN_ASSUMPTION', ids: ['a'], subjects: ['The churn number'], what: 'The plan rests on the churn number, which is assumed', whyItMatters: 'x', confidence: 0.75, novelty: 'UNCERTAIN', risk: 'medium' },
+    { kind: 'FALSE_BINARY', ids: ['b'], subjects: ['Build it', 'Buy it'], what: 'Only two options are on the table', whyItMatters: 'y', confidence: 0.45, novelty: 'UNCERTAIN', risk: 'low' },
   ];
   ok('a novice hears both', gateContributions(found, [], 'novice').length === 2);
   ok('an expert is not told the obvious one', gateContributions(found, [], 'expert').map((f) => f.kind).join() === 'HIDDEN_ASSUMPTION');
@@ -159,6 +159,16 @@ console.log('\n=== the gate: already said, and not worth an expert\'s time ===')
   ok('the move block gets at most two, with the instruction to raise one', /Raise at most ONE/.test(rendered) && rendered.split('\n  - ').length - 1 <= 2, rendered);
   ok('  and never as a list to the person', /never as a list/.test(rendered));
   ok('nothing missing renders nothing', renderMissing([]) === '');
+  // The gate must not read a finding as already-said just because it quotes
+  // the thing it is about (found by the end-to-end test).
+  const aboutTheirWords = [{ kind: 'MISSING_EVIDENCE', ids: ['c'], subjects: ['Monthly churn is 4.1%'],
+    what: '"Monthly churn is 4.1%" is carrying the decision and has nothing behind it', whyItMatters: 'z', confidence: 0.6, novelty: 'UNCERTAIN', risk: 'medium' }];
+  ok('quoting their own sentence is not the same as repeating their point',
+     gateContributions(aboutTheirWords, ['Monthly churn is 4.1%'], 'novice').length === 1,
+     JSON.stringify(gateContributions(aboutTheirWords, ['Monthly churn is 4.1%'], 'novice')));
+  ok('  but making the same point they made is dropped',
+     gateContributions(aboutTheirWords, ['the churn figure is carrying the decision and has nothing behind it'], 'novice').length === 0,
+     JSON.stringify(gateContributions(aboutTheirWords, ['the churn figure is carrying the decision and has nothing behind it'], 'novice')));
 }
 
 console.log('\n=== end to end: a real two-turn shape ===');
