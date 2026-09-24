@@ -217,11 +217,26 @@ export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
   };
   let { allocation, decision } = decide();
 
-  // Verify Mode, part two: when the answer must stay theirs and arithmetic
-  // could not settle it, a SEPARATE checker call judges the attempt. Its
-  // solution never reaches the reply model (renderCheck, hiddenValues). A
-  // confident verdict that contradicts the reader re-decides the move.
-  if (!verify && allocation.withhold && state.attempt !== 'none') {
+  // Verify Mode, part two: when arithmetic could not settle it, a SEPARATE
+  // checker call judges the attempt. Under a withhold its solution never
+  // reaches the reply model (renderCheck, hiddenValues). A confident verdict
+  // that contradicts the reader re-decides the move.
+  //
+  // IT USED TO REQUIRE A WITHHOLD, and that was the wrong gate. Measured over
+  // run 6: the person offered checkable work on 38 of 82 turns and the
+  // checker ran on 6 — the 6 with a withhold. On the other 32 the cheap
+  // reader's GUESS went into the prompt as fact, and it was visibly wrong:
+  // a correct statement of Keeler–Cretin arrived as "their latest attempt:
+  // partial" and the reply opened "two things to tighten"; arithmetic that
+  // was wrong arrived as "partial" with no check and the reply said "the
+  // arithmetic holds". Withholding is about who does the work. Whether the
+  // work is RIGHT is a different question and it is always worth asking.
+  //
+  // The cost is bounded and lands where it is wanted: only turns where they
+  // actually offered something to check, only when exact arithmetic could not
+  // already settle it, 1.5 s at worst, on a turn whose whole point is "is
+  // this right".
+  if (!verify && state.attempt !== 'none') {
     const t2 = Date.now();
     verify = await withTimeout(checkWork(input.apiKey, input.brief.slice(-5).map((m) => `${m.role === 'user' ? 'Them' : 'Socria'}: ${m.content}`).join('\n'), input.lastUserText), 1500, null);
     ms.verify = Date.now() - t2;
