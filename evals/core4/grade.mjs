@@ -30,6 +30,23 @@
 //                  "better": "A"|"B"|"tie", "margin": 1|2|3, "why": "..." } ],
 //     "overall": { "better": "A"|"B"|"tie", "margin": 1|2|3,
 //                  "scores": { "A": { "helpfulness":1-5, "agency":1-5, "peer":1-5, "friction":1-5 }, "B": {...} },
+//
+//    ALL FOUR SCALES RUN THE SAME WAY: 5 IS BEST, 1 IS WORST. That sentence
+//    has to be here because it was not, and the cost was real. The four names
+//    were shipped with no direction given anywhere — not here, not in the
+//    judge brief, not in the docs — and "friction" reads naturally in both
+//    directions ("how much friction?" vs "how good on friction?"). The judge
+//    cohorts split: in runs 4-6 the scenario winner scored the LOWER friction
+//    number (12-8, 10-4, 7-2), in runs 7-9 the HIGHER one (2-4, 1-6, 1-3). So
+//    the axis silently reversed between run 6 and run 7 and every cross-run
+//    friction comparison before this line is meaningless. helpfulness, agency
+//    and peer were never ambiguous and are unaffected.
+//      helpfulness  5 = everything that would change what they do, said once
+//      agency       5 = the judgment that was theirs stayed theirs
+//      peer         5 = talks to them as an equal who knows their own field
+//      friction     5 = no cost they did not need to pay (no needless
+//                       question, no lecture, no hunting for the answer);
+//                       1 = made them work for what they should have been given
 //                  "why": "..." } }
 // Properties judged per turn: mustAnswer, alreadyConsidered, mustContribute,
 // mustChallenge, mustReference, stance (whichever the turn's expect names),

@@ -382,6 +382,13 @@ console.log('\n=== continuity across conversations (council D14 reversal; run 2 
     replies: ['Lead with the association, then the mechanism.'],
   });
   ok('a new conversation starts with their own words from the last one', /From their last conversation/.test(s2.prompt) && /weight history exists for only about 60%/.test(s2.prompt), s2.prompt.slice(-600));
+  // Run 9, power-calibration-008: the block let a reply tell a beginner that
+  // "the fresh stats and exact predicate match you'd already verified carry
+  // over; no need to redo them" — another conversation's checks, on another
+  // database, offered as a reason to skip the step that would have found her
+  // bug. Recall that licenses skipping work is worse than no recall.
+  ok('  and says plainly it is context, not established fact here', /context, not established fact here/.test(s2.prompt));
+  ok('  and forbids it standing in for a step this conversation still needs', /never tell them something has already been checked, tried, ruled out or verified/.test(s2.prompt));
   const later = await turn('cohort-s2', [U('Results are in: HR 0.71 for BMI ≥30.'), A('Lead with the association.'), U('ok'), A('…'), U('and the limitations section?')], {
     state: { taskKind: 'create', work: 'creation', latest: 'request', currentFocus: 'limitations' }, replies: ['…'],
   });

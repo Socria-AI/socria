@@ -725,7 +725,7 @@ same baseline transcripts with both fixed.
   canonical case for this architecture and it failed on the bundle where the
   gate was suppressing findings.
 - Core 4 asked no questions at all (0.00 per reply vs 0.05), wrote 303 words
-  to the baseline's 425, and scored friction 1.63 vs 2.63, peer 5.00 vs
+  to the baseline's 425, and scored peer 5.00 vs
   4.63, agency 5.00 vs 4.88 — and helpfulness 4.25 vs 4.75. The pattern is
   the same one six runs have shown: restraint is not the problem.
 - `mustContribute` 3/6 vs 5/6.
@@ -780,12 +780,19 @@ FALSE_BINARY, REPEATED_LOOP, UNDERWEIGHTED_UNCERTAINTY) — including on
 | helpfulness | 4.13 | 4.88 |
 | agency | 5.00 | 4.88 |
 | peer | 5.00 | 4.63 |
-| friction | **1.75** | 3.00 |
+| friction | 1.75 | 3.00 | ← UNINTERPRETABLE, see §4″ |
 
-Core 4 is ahead or level on every axis except helpfulness, and it is ahead on
-friction by a wide margin. Mean reply: **280 words against 425.** Across the
-sixteen scenario-arm pairs, mean reply length correlates with the judges'
-helpfulness score at **r = 0.50** (friction r = 0.66). Core 4 scored
+Core 4 is ahead or level on agency and peer and behind on helpfulness. **The
+friction row cannot be read in either direction** — the scale's polarity was
+never specified and reversed between run 6 and run 7 (§4″), so it is recorded
+here and used for nothing. An earlier version of this section read it as a
+wide Core 4 win; that was wrong, and the "the gap is not manner" conclusion
+rests instead on helpfulness against level agency and peer, and on the
+deterministic metrics above, whose direction is fixed.
+
+Mean reply: **280 words against 425.** Across the sixteen scenario-arm pairs,
+mean reply length correlates with the judges' helpfulness score at **r =
+0.50**. Core 4 scored
 helpfulness 5 exactly once, on the control. Six of the eight verdicts say
 some version of what `power-rests-on-001` says outright: *"A's extra material
 — the upgrade-path bias, the significance check, the process calendar and
@@ -824,6 +831,54 @@ a memory advantage, and it is too short to need one.
 ### Full corpus
 
 Not yet run.
+
+## 4″. One of the four judge scales had no direction, and it reversed
+
+`grade.mjs` shipped the judgment format with four 1–5 scores — helpfulness,
+agency, peer, friction — and **never said which end was good**. Not in the
+format comment, not in the judge briefs, not in this file. Three of the four
+names are unambiguous in English. "Friction" is not: *how much friction?* and
+*how good on friction?* are both natural readings, and they are opposites.
+
+Measured against who actually won each scenario:
+
+| run | winner scored HIGHER friction | winner scored LOWER |
+|---|---|---|
+| run 4 | 8 | **12** |
+| run 5 | 4 | **10** |
+| run 6 | 2 | **7** |
+| run 7 | **4** | 2 |
+| run 8 | **6** | 1 |
+| run 9 | **3** | 1 |
+
+The polarity **reversed between run 6 and run 7**. Runs 4–6 scored it as "how
+much friction, lower is better"; runs 7–9 as "how good on friction, higher is
+better". Nobody was wrong — they were answering an unspecified question.
+
+**Consequences, stated plainly.**
+- Every cross-run friction comparison in §4 before this section is void.
+  Within a single run the two arms were scored by the same judge on the same
+  reading, so the *direction of the gap* inside one run still means something;
+  its sign across runs does not.
+- The run 8 section originally read `1.75 vs 3.00` as a decisive Core 4 win on
+  friction, and used it as evidence that Core 4's deficit "is not manner".
+  Under run 8's own cohort convention the sign is the other way. That sentence
+  has been corrected. The conclusion survives on helpfulness against level
+  agency and peer, and on the deterministic metrics.
+- helpfulness, agency and peer are unaffected: no cohort ever inverted them,
+  and in every run the scenario winner scores higher on helpfulness.
+
+**Fixed** in `evals/core4/grade.mjs` and in the judge brief: all four scales
+now state "5 IS BEST, 1 IS WORST" with a one-line definition each, including
+what a 5 and a 1 on friction actually mean. Runs from 10 on are comparable;
+runs 1–9 are not, on that axis only.
+
+**The general lesson, which is not about friction.** A measurement whose
+direction is not written down is not a measurement. The same failure shape
+produced D18 on the product side — a rule the prompt made conditional on a
+state nobody delivered. Here it was a scale whose meaning nobody delivered to
+the people applying it. In both cases the thing existed, looked implemented,
+and silently did something other than what the design assumed.
 
 ## 4′. The instrument cannot see what the architecture is for
 

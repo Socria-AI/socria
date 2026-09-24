@@ -365,7 +365,16 @@ function lastTime(ledger: LedgerEntry[], input: TurnInput, turn: number): string
     // ("was that your idea or mine?") instead of evading (longitudinal-005).
     ...same.filter((e) => e.owner === 'socria' && e.kind !== 'question').slice(0, 4).map((e) => `  - Socria suggested: ${e.text}`),
   ];
-  return `\n=== From their last conversation (${when}) — attributed as recorded; use what matters now ===\n${lines.join('\n')}\n`;
+  // WHAT THIS BLOCK IS NOT. Run 9, power-calibration-008: a beginner asked a
+  // plain "how do I make Postgres use my index" question, and the reply
+  // closed with "the fresh stats and exact predicate match you'd already
+  // verified carry over; no need to redo them". She had verified neither —
+  // those were another conversation's checks, on another database. So the
+  // block did not merely mis-attribute: it told someone a diagnostic step was
+  // already done and could be skipped, and that step was the one that would
+  // have found her problem. Recall that licenses skipping work is worse than
+  // no recall, because the person cannot see what it is resting on.
+  return `\n=== From their last conversation (${when}) — attributed as recorded; use what matters now ===\n${lines.join('\n')}\nThis is what they were working on THEN, in a different conversation. It is context, not established fact here: never tell them something has already been checked, tried, ruled out or verified on the strength of these lines, and never let one stand in for a step this conversation still needs. If it matters now, it is to be established now.\n`;
 }
 
 // renderState is imported lazily to keep the dependency direction clean.
