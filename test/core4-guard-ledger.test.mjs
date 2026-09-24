@@ -399,5 +399,21 @@ console.log('\n=== run 6: arithmetic they wrote out is checked exactly (decision
   }
 }
 
+console.log('\n=== a withheld value inside a code fence was detected and shipped anyway ===');
+{
+  // deleteSentences shields fenced code so it never mangles a snippet, and
+  // leaksHidden reads through fences. So the guard found the value, "removed"
+  // it with a delete that refused to touch it, and passed the draft on.
+  const withheld = alloc('AI_VERIFIES', PRACTICE);
+  const draft = 'Your loop bound is the problem, not the comparison.\n\n```python\nresult = 391  # the value\n```\n\nTry it again from there.';
+  const g = guardStructure({ decision: dec('VERIFY'), allocation: withheld, draft, considered: [], hidden: ['391'], target: 'what is 17 * 23 for the loop bound' });
+  ok('the leak is found', g.findings.some((f) => f.code === 'hidden_value'), JSON.stringify(g.findings.map((f) => f.code)));
+  ok('and no revised draft still carrying it is handed back', !(g.revised ?? '').includes('391'), g.revised);
+  ok('  the turn is sent back to be written again instead', !!g.retryNote, JSON.stringify({ retry: g.retryNote, revised: g.revised }));
+  // Prose is still removable in place, as before.
+  const prose = guardStructure({ decision: dec('VERIFY'), allocation: withheld, draft: 'The loop bound is wrong there. The answer is 391 exactly. Look again at the comparison in the while.', considered: [], hidden: ['391'], target: 'what is 17 * 23' });
+  ok('a leak in prose is still deleted in place', !!prose.revised && !prose.revised.includes('391') && prose.revised.includes('loop bound'), JSON.stringify({ revised: prose.revised, retry: prose.retryNote }));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

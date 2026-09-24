@@ -140,9 +140,23 @@ export function coherent(original: string, edited: string, sizeMatters = true): 
 }
 
 /** A draft with some sentences removed; null if nothing of substance is left. */
+/**
+ * The draft with those sentences gone — or null when it cannot be done.
+ *
+ * The re-check is the point. deleteSentences shields fenced code so it never
+ * mangles a snippet, and leaksHidden reads THROUGH fences, so a withheld
+ * value written inside ``` was detected, "removed" by a delete that refused
+ * to touch it, and shipped: the guard recorded a hidden_value finding, set
+ * MODIFY_FOR_MORE_AGENCY, and passed the unchanged draft on. A removal that
+ * is not verified is not a removal. Returning null here sends the turn to
+ * regeneration or to fallbackReply instead, which is the behaviour the
+ * withhold guarantee is supposed to have.
+ */
 function without(draft: string, drop: string[]): string | null {
   const kept = deleteSentences(draft, drop);
-  return kept && sentencesOf(kept).some((s) => s.trim().split(/\s+/).length >= 4) ? kept : null;
+  if (!kept) return null;
+  if (leaksHidden(kept, drop).length) return null;
+  return sentencesOf(kept).some((s) => s.trim().split(/\s+/).length >= 4) ? kept : null;
 }
 
 const MACHINE_DOES = new Set(['AI_EXECUTES', 'AI_EXPLAINS', 'AI_ASSISTS']);

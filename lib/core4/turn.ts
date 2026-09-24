@@ -451,6 +451,12 @@ function withoutText(s: CognitiveState): CognitiveState {
     ...s,
     currentGoal: '', currentFocus: '', confusions: [], positions: [], assumptions: [], tensions: [], constraints: [],
     openThreads: [], recentChanges: [], newRelation: '', blockingUnknown: '', masteryEvidence: [], consideredNow: [],
+    // `relations` carries the person's own sentences as `from`/`to` text.
+    // Adding a field to CognitiveState without adding it here writes their
+    // words into core4_state after they asked for nothing to be kept — the
+    // exact failure this function exists to prevent, and one an audit caught
+    // within an hour of the field being added.
+    relations: [],
     learningGoal: bare(s.learningGoal), expertise: bare(s.expertise), stakes: bare(s.stakes), directness: bare(s.directness), authorship: bare(s.authorship),
     lastOutcome: s.lastOutcome ? { ...s.lastOutcome, evidence: '' } : null,
     history: s.history.map((h) => (h.outcome ? { ...h, outcome: { ...h.outcome, evidence: '' } } : h)),
