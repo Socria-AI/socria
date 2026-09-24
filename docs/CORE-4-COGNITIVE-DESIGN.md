@@ -1054,6 +1054,38 @@ Tighten buffering further if human raters in the in-situ study rate latency as t
 
 ---
 
+## D18. Length is a decision, not a style default (added after run 8)
+
+**Implementation status: IMPLEMENTED** (`lib/core4/intervene.ts coverageFor`, rendered in `renderDecision`). Measured: run 9, pre-registered as E15.
+
+### The failure
+
+D17 set token ceilings. Ceilings are not the binding constraint: run 8's replies averaged 280 words against a prompt-only baseline's 425, on a 1200-token ceiling that was never approached. What bound them was the prompt's own default — "Default to 1–3 short paragraphs" — and, on forced turns, a move objective that capped how much to add ("one sentence on it. Then stop").
+
+The Core 4 prompt already carries the correct exception, added in v6 after run 4: *a consequential decision or an expert's analysis is the exception: there, completeness on what matters beats brevity*. It lost to the nearer instruction, every time. On 12 of run 8's 22 turns the state block read `stakes: high, expertise: expert` — the exception's own trigger, computed, recorded in the trace, and never delivered to the layer that needed it.
+
+### The decision
+
+Coverage is a field on the intervention decision (`minimal | normal | complete`), computed from stakes and demonstrated expertise, rendered inside the move block — the one place the prompt's Precedence section ranks above the general guidance, and above the objective's own cap.
+
+This is the general principle the failure exposes, and it is worth stating beyond this one field: **anything the prompt makes conditional on a state Core 4 computes must be delivered by the decision, not left for the model to infer from the same state a second time.** A conditional in a static prompt competes with every other sentence in it; the same conditional in the move block is an instruction with precedence. Where a future rule is written as "X is the exception", the exception belongs in code.
+
+### Why it is gated hard
+
+The opposite failure is on record: runs 4–6 lost expert turns for padding past a length the person had asked for. So `complete` requires **both** high stakes and demonstrated expertise (not either), fires only on moves that carry substance, and is refused outright when anything is withheld — "cover every consideration that matters" beside "keep this one thing from them" is a contradiction that resolves as a leak. Any length the person named — a sentence count, a standing "answers only", a close — wins outright and returns `minimal`.
+
+`minimal` renders nothing. The prompt's default is already the least language the move needs; a second instruction to be brief is how a short reply becomes a curt one.
+
+### Test
+
+`test/core4-policy.test.mjs`, "run 8: what the allocator knows about stakes reaches the length policy" — 13 assertions, each non-vacuous (the withhold case asserts the withhold is real; the short-move case asserts the move really is one of the short ones).
+
+### Reversal conditions
+
+E15's fail condition: if helpfulness does not rise on the `complete` turns, or friction rises above 2.5, or any turn where the person named a length runs past it, revert `coverage` to a constant. Length would then have been a symptom, not the cause, and the question becomes what the baseline's extra 145 words actually contained.
+
+---
+
 ## Deleted or deferred by the council
 
 - DELETED: treating every regex hit as confidence-1 standing explicit. Weak-tier phrases can never withhold. Why: 25/29 false positives were verified.
