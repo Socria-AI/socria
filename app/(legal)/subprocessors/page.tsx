@@ -73,7 +73,8 @@ const ROWS = [
   {
     name: 'Serper / Tavily',
     role: 'Web search, when a source is looked up',
-    gets: 'The search phrase only — not your conversation. Only when Logos looks something up for you.',
+    gets:
+      'The search phrase only — never your conversation. Two things can send one: Logos, when it looks something up for a node, and Core 4, when your message asks it to check something or turns on how the world is right now. Core 4 shows you the exact phrase before it answers, builds it from that one message and nothing else, and strips your email, phone, handle, long number runs and any name you introduced yourself by. A sensitive message, or one you have put off the record, is never searched at all.',
     where: 'United States',
     site: 'https://serper.dev/privacy-policy',
   },
@@ -105,7 +106,7 @@ export default function SubprocessorsPage() {
         The companies that process data on Socria&rsquo;s behalf. Each sees one
         slice, and only what it needs to do its job.
       </p>
-      <p className="lg-dates">Last updated August 2026</p>
+      <p className="lg-dates">Last updated September 2026</p>
 
       <h2 id="list">Who processes what</h2>
       <div className="lg-tablewrap">

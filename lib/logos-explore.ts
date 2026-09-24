@@ -104,7 +104,19 @@ function siteOf(url: string): string {
 }
 
 export interface SearchBundle {
-  results: { title: string; url: string; snippet: string; site: string }[];
+  results: {
+    title: string;
+    url: string;
+    snippet: string;
+    site: string;
+    /**
+     * When the provider says the page was published. Optional because neither
+     * provider promises it, and absent is different from unknown-and-guessed.
+     * Explore does not show it; Core 4 does, because a date is most of what
+     * decides whether a source answers a question about how things are now.
+     */
+    published?: string;
+  }[];
   images: ExploreImage[];
   provider: string | null;
 }
@@ -145,6 +157,7 @@ async function serper(query: string): Promise<SearchBundle> {
             url,
             snippet: String(o?.snippet ?? '').slice(0, 400),
             site: siteOf(url),
+            ...(typeof o?.date === 'string' && o.date.trim() ? { published: o.date.trim().slice(0, 24) } : {}),
           }
         : null;
     })
@@ -189,6 +202,9 @@ async function tavily(query: string): Promise<SearchBundle> {
             url,
             snippet: String(o?.content ?? '').slice(0, 400),
             site: siteOf(url),
+            ...(typeof o?.published_date === 'string' && o.published_date.trim()
+              ? { published: o.published_date.trim().slice(0, 24) }
+              : {}),
           }
         : null;
     })

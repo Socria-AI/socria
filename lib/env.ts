@@ -111,6 +111,23 @@ export const ENV_SPEC: Spec[] = [
     hint: 'at least 16 characters. Rotating it orphans every existing connection',
   },
   {
+    // Web search, shared by Logos Explore and Core 4 (lib/logos-explore.ts is
+    // the one provider layer; lib/core4/web-server.ts calls it). Either key is
+    // enough and neither is required: with none, Core 4's gate still opens,
+    // finds nothing configured, and the reply says it could not check — which
+    // is the honest failure. There is deliberately no scraping fallback.
+    name: 'SERPER_API_KEY',
+    scope: 'server',
+    needed: 'Explore sources and Core 4 checking a claim on the web',
+    required: 'optional',
+  },
+  {
+    name: 'TAVILY_API_KEY',
+    scope: 'server',
+    needed: 'the same, when Serper is not configured — Serper wins when both are set',
+    required: 'optional',
+  },
+  {
     name: 'NEXT_PUBLIC_SANITY_PROJECT_ID',
     scope: 'public',
     needed: 'the blog',

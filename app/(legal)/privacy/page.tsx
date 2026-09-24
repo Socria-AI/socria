@@ -162,7 +162,7 @@ export default function PrivacyPage() {
             <tr>
               <td><strong>Serper / Tavily</strong></td>
               <td>Web search</td>
-              <td>The search phrase only, when Research looks something up</td>
+              <td>The search phrase only, when Research or Core 4 looks something up</td>
             </tr>
             <tr>
               <td><strong>Resend, Inc.</strong></td>
@@ -173,9 +173,16 @@ export default function PrivacyPage() {
         </table>
       </div>
       <p>
-        When Research looks something up, a search provider receives{' '}
+        When Research or Core 4 looks something up, a search provider receives{' '}
         <strong>the search phrase and nothing else</strong> &mdash; your
-        conversation is never sent to it. A rate-limiting service receives a
+        conversation is never sent to it. Core 4 does this when your message
+        asks it to, when you paste a link and ask about it, or when the answer
+        turns on how the world is right now; it shows you the exact phrase
+        above its reply, builds that phrase from that one message and nothing
+        else, and strips your email address, phone number, handle, long digit
+        runs and any name you introduced yourself by. A message you have put
+        off the record, or one about something sensitive, is never searched at
+        all. A rate-limiting service receives a
         counter keyed to your account id, or your IP when you are signed out,
         and no content at all. If you connect Google or Notion yourself, your
         searches and the documents you choose reach those services too; both are

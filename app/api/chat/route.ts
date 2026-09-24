@@ -28,6 +28,7 @@ import { getProject } from '@/lib/mind/store';
 import { extractionContext, type ActivatedSubgraph } from '@/lib/mind/activate';
 import type { MindNode } from '@/lib/mind/types';
 import { prepareTurn, guardReply, fallbackReply, finishTurn, SentenceGate, type PreparedTurn } from '@/lib/core4/turn';
+import { renderDisclosure } from '@/lib/core4/web';
 import { modelClient, collect, type ChatTurn } from '@/lib/core4/model';
 import type { GuardOutcome, NoveltyVerdict } from '@/lib/core4/types';
 import { waitUntil } from '@vercel/functions';
@@ -674,6 +675,21 @@ function core4Reply(x: {
       let regenerated = false;
       const t0 = Date.now();
       try {
+        // THE DISCLOSURE, FIRST — before the model has written a word.
+        //
+        // tools-contract.ts says a query is shown to the person as it runs,
+        // not confessed afterwards, and this is the only place that can honour
+        // it: by the time a reply exists the search is long over. It is
+        // written here, in code, from what actually left the machine — a model
+        // asked what it searched for answers from memory, which is exactly the
+        // sentence a person must be able to trust.
+        //
+        // It is deliberately not part of `reply`: the guard reads the model's
+        // draft, and the ledger records what Socria said, neither of which
+        // this is.
+        const disclosure = renderDisclosure(p?.research ?? null);
+        if (disclosure) controller.enqueue(encoder.encode(disclosure));
+
         const buffered = !p || p.decision.guardRequired;
         // The first delta decides the model: a rejected model id falls back once.
         const open = async (modelId: string) => {

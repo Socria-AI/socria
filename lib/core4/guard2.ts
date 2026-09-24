@@ -28,6 +28,7 @@
 //
 // Pure (the model call is in guard-engine.ts).
 
+import { danglingCitations } from './web';
 import type {
   Allocation,
   GuardAction,
@@ -50,6 +51,17 @@ export interface GuardInput {
   hidden?: string[];
   /** the person's own problem text: a worked solution is overreach only if it works THIS problem (council D8) */
   target?: string;
+  /**
+   * The sources this turn was actually given, if any.
+   *
+   * Two things turn on it. A reply may say it looked something up only when
+   * something was looked up — the tool-claim strip below is unchanged for
+   * every turn that searched nothing, which is still almost all of them. And
+   * a citation may only point at a source that exists: [4] beside three
+   * sources is an invented reference, and inventing references is the
+   * failure mode that makes a cited answer worse than an uncited one.
+   */
+  sources?: { n: number }[];
 }
 
 /** Deflection: talking about the question instead of answering it. */
@@ -320,7 +332,11 @@ export function guardStructure(input: GuardInput): GuardOutcome & { needsModel: 
   }
 
   // ── claims Socria cannot back; inferences about them stated as fact ──
-  const unbacked = sentencesOf(draft).filter((s) => TOOL_CLAIM.test(s) || TRAIT_AS_FACT.test(s));
+  // A tool claim is only unbacked when there was no tool. When the turn
+  // carries sources, "I looked this up" is a true sentence and stripping it
+  // would leave the reply quoting pages it refuses to admit reading.
+  const searched = (input.sources?.length ?? 0) > 0;
+  const unbacked = sentencesOf(draft).filter((s) => (!searched && TOOL_CLAIM.test(s)) || TRAIT_AS_FACT.test(s));
   if (unbacked.length && !retryNote) {
     const rest = deleteSentences(draft, unbacked.map((s) => s.trim()));
     findings.push({ side: 'voice', code: 'unbacked_claim', detail: 'A tool claim or a trait stated as fact.' });
@@ -328,6 +344,25 @@ export function guardStructure(input: GuardInput): GuardOutcome & { needsModel: 
       // A voice strip (council D8's always-strip list), not lost substance.
       draft = rest;
       changed = true;
+    }
+  }
+
+  // ── a citation that points at nothing (web evidence) ──
+  //
+  // Checked rather than trusted, and checkable because the block asks for
+  // numbers instead of URLs: a fabricated [4] is one comparison, where a
+  // fabricated link is a network request nobody is going to make. The marker
+  // is removed rather than the sentence — the claim may well be right, and
+  // deleting a sentence over its footnote loses more than it protects.
+  if (searched) {
+    const dangling = danglingCitations(draft, input.sources ?? []);
+    if (dangling.length) {
+      findings.push({ side: 'voice', code: 'dangling_citation', detail: `Cited ${dangling.map((n) => `[${n}]`).join(', ')}, which was never given.` });
+      const cleaned = draft.replace(/\s*\[(\d{1,2})\]/g, (m, d) => (dangling.includes(Number(d)) ? '' : m));
+      if (cleaned.trim()) {
+        draft = cleaned;
+        changed = true;
+      }
     }
   }
 

@@ -127,8 +127,10 @@ value that would flip it.
 Moves: ANSWER, EXPLAIN, CORRECT, VERIFY, CRITIQUE, CHALLENGE, CONTRIBUTE,
 CONNECT, SYNTHESIZE, QUESTION, CLARIFY, HINT, EXECUTE, CALCULATE, RETRIEVE,
 REFLECT, GET_OUT_OF_THE_WAY. RESEARCH, MODEL and VISUALIZE were removed
-(council D7): there are no tools in this path. Their privacy contract, for
-when tools exist, is written down in `lib/core4/tools-contract.ts`.
+(council D7). Their privacy contract, written before any tool existed, is in
+`lib/core4/tools-contract.ts` — and reading the web now implements it without
+reviving RESEARCH as a move: evidence arrives as a block the chosen move uses,
+not as a different thing to do (see *The web*).
 Defaults are CONTRIBUTE (thinking together) or ANSWER (asked), never ASK.
 QUESTION and CLARIFY cannot be selected when the budget is spent. CLARIFY for
 a genuine blocker says what can already be said first. Diminishing returns
@@ -317,6 +319,97 @@ eval harness installs its own client, so what is evaluated is the shipped
 pipeline; installed clients and the trace sink are ignored when
 NODE_ENV=production.
 
+### The web — `lib/core4/web.ts`, `lib/core4/web-server.ts`
+Core 4 can read the internet. It is the first thing built against council D7's
+tools contract, and the contract shaped it rather than describing it
+afterwards.
+
+**Not a move, and not a tool the model holds.** There is no RESEARCH move and
+no function the model can call. A deterministic gate reads this turn's words,
+and when it opens, evidence is fetched before generation and appended to the
+move block as the LAST thing in it. Everything that decides what to do — the
+allocation, the withhold, the move, the question budget, the register — is
+settled before the await that collects it. "Retrieved content is data, not
+instructions" is therefore control flow, not a promise: there is no path by
+which a page could change a decision that was already made.
+
+**The gate refuses before it permits** (`webIntent`). A sensitive turn never
+searches, a safety turn answers instead of researching, and "off the record"
+means off the record — three refusals ahead of any permission, because a query
+carries the person's own sentence to a third party with a log and cannot be
+recalled. Then: a URL they pasted is READ, not searched (they already chose the
+source); an explicit ask is honoured; otherwise it takes a currency signal
+(`latest`, `current`, a year at or past the training frontier) AND a question,
+and not a turn that is about the person's own material. The bias is deliberate
+and asymmetric — a turn that needed the web and did not get it costs an "I
+can't check that from here", which is recoverable.
+
+**The query is built from this turn only** (`buildQuery`), in the person's own
+word order, with quoted phrases preserved. No model call: a model asked to
+write a good query rewrites the question into its own words, which is how a
+query comes to carry something nobody typed. The signature admits the turn's
+text and a list of names to strip, and nothing else — there is no parameter
+through which the Mind Graph, the ledger or an earlier message could arrive.
+`stripIdentifiers` removes emails, handles, phone-shaped runs, digit runs of
+seven or more, and a name the person introduced themselves by in this message.
+It does NOT claim to find every name: a public figure in the question is the
+subject of the question, and a stripper that removed every capitalised pair
+would remove "Postgres Foundation" too.
+
+**It owns almost none of the network code** (`web-server.ts`). Search is
+Logos's search: `lib/logos-explore.ts` already had the provider layer (Serper,
+then Tavily, both env-gated, neither configured being a supported state), and
+the sub-processor register already named those two companies. A second provider
+layer would have meant two places to keep a key, two sets of response parsing
+to follow when a vendor renames a field, and a privacy page quietly wrong about
+who receives what. Page reading reuses `lib/logos-connect`'s hardened
+`fetchWeb` — the address screen lives inside the socket's own DNS lookup, so
+the address approved is the address dialled — rather than a second fetcher to
+keep safe. With no key the gate still opens, finds nothing configured, and the
+reply says it could not check; there is deliberately no scraping path. Bounded:
+4 sources, 6 s for a search (shorter than Explore's, which fills a panel
+somebody is watching rather than holding up a reply), 9 s for a page, 4000
+characters of page text. Source numbers are assigned after filtering, so [1] is
+the first source the prompt actually lists. Every failure is swallowed after
+being logged; the turn loses its evidence and never its reply.
+
+**A page cannot forge a block** (`flatten`). Every Core 4 block is delimited
+`=== Name ===`, and this one carries somebody else's text into the same system
+prompt — so a page with a line beginning `=== ` could write a header and put
+instructions under it. Framing retrieved text as data is the right instruction
+and it is not a mechanism. `flatten` removes newlines (a forged header needs a
+line of its own), cuts runs of `=`, `#` and backticks to one character, and
+strips control characters, at both the provider boundary and the render. The
+quotation still arrives; it arrives on one line, inside a block somebody else
+built.
+
+**A link mentioned in passing is not an errand.** "I saw https://… earlier,
+anyway what do you think of my draft" names a page without asking for it, and
+fetching it would be a request to a stranger's server for nothing. The page is
+read when they ask about it, when the message is a question, or when the
+message is barely more than the link — which is what pasting a URL on its own
+means.
+
+**What the model is handed is evidence** (`renderResearch`). Numbered sources
+with host, and with a publication date when the provider gave one (`published`
+was added to Logos's `SearchBundle` for this: a date is most of what decides
+whether a source answers a question about how things are now), framed as
+material to weigh rather than a voice with
+authority, and with the instruction to cite by NUMBER. That is what makes the
+citation checkable: `guard2` refuses a marker pointing at a source that was
+never given (`dangling_citation`), where a fabricated URL is a network request
+nobody will make. The tool-claim strip is now conditional on sources existing —
+a reply may say it looked something up exactly when something was looked up.
+
+**The person is told as it runs** (`renderDisclosure`, enqueued by the route
+before the first token). What left the machine, and every source that came
+back, written in code from what actually happened — a model asked what it
+searched for answers from memory. A search that found nothing says so.
+
+The trace records whether the gate opened, which rule opened it, who answered
+and how many sources came back. Never the query: a trace is telemetry, and the
+query is the person's words.
+
 ## 3. Memory, unified
 
 | Layer | Holds | Written | Read by Core 4 |
@@ -482,10 +575,11 @@ prompt trade wins.
 
 ## 6. What is not built, and why
 
-- **Tools** (search, code execution, visualisation). None in this path; the
-  prompt says so. The RESEARCH/MODEL/VISUALIZE move types were removed
+- **Tools other than the web** (code execution, visualisation). None in this
+  path; the prompt says so. The MODEL/VISUALIZE move types were removed
   (council D7); `lib/core4/tools-contract.ts` holds the privacy contract a
-  future tool must meet.
+  future tool must meet, and reading the web is the first thing built against
+  it (§2, *The web*).
 - **Embeddings** for the novelty matcher: lexical + cheap-model judge first;
   embeddings only if the evals show paraphrase misses that matter.
 - **Online learning from outcomes.** Deliberately not: outcomes are recorded

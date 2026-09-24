@@ -68,7 +68,19 @@ console.log('\n=== it runs on its own prompt ===');
   ok('holding back needs a stated reason', p4.includes('Hold something back only when the decision for this turn names what to hold back and why'));
   ok('a wrong answer is not a reason to hide the right one', p4.includes('A wrong answer is not a reason to hide the right one'));
   ok('the decision wins over the general guidance, their words over both', /the decision wins; where the person's own words in their latest message disagree with both, their words win/.test(p4));
-  ok('no tools are promised', !/Research facts, retrieve evidence/.test(p4) && p4.includes('You have no tools in this conversation'));
+  // Core 4 can be GIVEN the web (lib/core4/web.ts): the pages are fetched
+  // before the turn and handed to it as a block. What it still cannot do is
+  // reach for a tool on its own, and the prompt has to say both — a flat "you
+  // have no tools" was false the moment a source block could appear, and a
+  // model that believes it cannot have searched refuses to use what it is
+  // holding.
+  ok('no tool it can reach for itself is promised',
+    !/Research facts, retrieve evidence/.test(p4) && p4.includes('you have no tools you can reach for yourself'));
+  ok('  and it cannot run code either', /You cannot run code/.test(p4));
+  ok('  evidence it was handed is usable, and citable by number',
+    /When a block headed "From the web" is present/.test(p4) && /cite them by the number given/.test(p4));
+  ok('  with no block, it says so instead of answering from memory',
+    /When no such block is present, you have not looked anything up/.test(p4));
   // Run 3: mustContribute was Core 4's one deficit (88% vs 100%), and its
   // prompt, unlike the baseline's, never asked for the contribution.
   ok('it contributes what they have not considered, without contrarianism', p4.includes('the valuable move is usually something they have not considered') && p4.includes('never manufacture contrarianism'));
@@ -123,7 +135,7 @@ console.log('\n=== the model underneath, and its override ===');
   ok('the override is honoured', resolveOpenAIModel('core-4') === 'some-other-model');
   ok('and does not move Core 3.1', resolveOpenAIModel('core-3') !== 'some-other-model');
   delete process.env.OPENAI_MODEL_CORE_4;
-  ok('it is versioned separately', CORE_4_PROMPT_VERSION === 'core-4-v7');
+  ok('it is versioned separately', CORE_4_PROMPT_VERSION === 'core-4-v8');
 }
 
 console.log('\n=== it has the same safety net Core 3.1 has ===');

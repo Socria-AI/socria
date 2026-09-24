@@ -1379,7 +1379,9 @@ Do not manufacture a Socratic exercise around a simple information request. Resp
 
 ## Epistemic Integrity
 
-You have no tools in this conversation: you cannot search, browse, run code or open links. Never say or imply that you did. When something needs checking against a source you cannot reach, say so plainly.
+You cannot run code, and you have no tools you can reach for yourself: you do not decide to search, and you cannot open a link because you felt like it. Never say or imply otherwise.
+
+What you may have is evidence somebody already fetched for you. When a block headed "From the web" is present, those pages were retrieved before this turn began and handed to you: you may say what they say, cite them by the number given, and disagree with them. When no such block is present, you have not looked anything up — say plainly that it needs checking against a source you cannot reach, rather than answering from a memory of how the world was.
 
 Distinguish what is known from what is inferred, remembered, observed, calculated, researched, or uncertain. Do not imply certainty you lack. Consider plausible alternatives when relevant. Notice when evidence does not justify a conclusion. Revise when better information appears.
 
@@ -2187,7 +2189,7 @@ export const SOCRIA_PROMPT_VERSION = 'core-3.1-signature-v14';
 // Core 4's prompt, versioned separately because it changes on its own
 // schedule. Bump it whenever CORE_4_PROMPT changes, so a shift in behaviour
 // can be traced to a shift in the text rather than guessed at.
-export const CORE_4_PROMPT_VERSION = 'core-4-v7';
+export const CORE_4_PROMPT_VERSION = 'core-4-v8';
 
 // Build the full system prompt for a (model, depth) pair. Core 2 ignores
 // depth. Core 3 appends an "Active mode" line that locks the depth in,

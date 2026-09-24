@@ -45,6 +45,13 @@ export interface TurnTrace {
   intervention: { type: string; reasonCode: string; maxQuestions: number; switchedFrom: string | null; confidence: number; coverage: string; proportion: string };
   /** the register chosen for this turn — content-free, like every trace field */
   voice: { warmth: string; edge: string; play: string; density: string; because: string };
+  /**
+   * The internet, if it was asked. CONTENT-FREE like everything else here:
+   * whether the gate opened, which rule opened it, who answered and how many
+   * sources came back — never the query and never a line of what was read.
+   * The query is the person's own words, and a trace is telemetry.
+   */
+  web: { ran: boolean; sources: number; why: string; provider: string };
   budget: { streak: number; density: number; allowed: number };
   diminishing: { detected: boolean; count: number };
   novelty: { checked: number; redundant: number; uncertain: number; partial: number };
@@ -119,6 +126,7 @@ export function buildTrace(x: {
   counterfactual?: { ablations: readonly { dependence: string }[] } | null;
   contradictions?: readonly { source: string }[];
   voice?: { warmth: string; edge: string; play: string; density: string; because: string };
+  research?: { why: string; provider: string; sources: readonly unknown[] } | null;
   superseded?: number;
   missing?: readonly { kind: string }[];
   competence?: { value: string };
@@ -180,6 +188,12 @@ export function buildTrace(x: {
     ledger: x.ledger,
     considered: x.considered,
     voice: x.voice ?? { warmth: 'neutral', edge: 'measured', play: 'dry', density: 'normal', because: 'untraced' },
+    web: {
+      ran: !!x.research,
+      sources: x.research?.sources.length ?? 0,
+      why: x.research?.why ?? '',
+      provider: x.research?.provider ?? '',
+    },
     measured: {
       ablations: x.counterfactual?.ablations.length ?? 0,
       loadBearing: x.counterfactual?.ablations.filter((a) => a.dependence === 'load_bearing').length ?? 0,

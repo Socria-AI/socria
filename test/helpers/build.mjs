@@ -80,6 +80,7 @@ const MODULES = [
   'lib/core4/counterfactual.ts',
   'lib/core4/history.ts',
   'lib/core4/voice.ts',
+  'lib/core4/web.ts',
   'lib/core4/trace.ts',
   'lib/core4/stream-gate.ts',
   'lib/cognition/router.ts',

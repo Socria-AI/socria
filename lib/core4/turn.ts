@@ -29,6 +29,8 @@ import { readState, guardModel, checkWork, COGNITION_MODEL } from '../cognition/
 import { testDependencies, renderCounterfactual, testContradictions, renderContradictions, type Counterfactual, type ContradictionTest } from './counterfactual';
 import { discoverFromHistory, renderHistory, type HistoricalFinding } from './history';
 import { voiceFor, renderVoice, type Voice } from './voice';
+import { renderResearch, type Research } from './web';
+import { runResearch } from './web-server';
 import type { CommunicationPrefs } from './types';
 import { readSignals, readContract } from './signals';
 import { mergeState, recordTurn, gapCheck } from './merge';
@@ -112,6 +114,8 @@ export interface PreparedTurn {
   historical: HistoricalFinding[];
   /** how Socria meets them this turn — register, never identity */
   voice: Voice;
+  /** what the internet was asked, and what it said — null when it was not asked */
+  research: Research | null;
   /** the findings actually rendered, after measured results superseded asserted ones */
   missingShown: MissingContribution[];
   /**
@@ -152,6 +156,29 @@ export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
 
   const focus = `${prior?.currentFocus ?? ''} ${input.lastUserText}`.slice(0, 600);
   const preView = consideredView(ledger, { focus, conversationId: input.conversationId ?? '', projectId: input.projectId });
+
+  // THE INTERNET, STARTED HERE AND AWAITED LATER.
+  //
+  // It needs only this turn's words and the explicit signals, both of which
+  // exist by now, and it is the slowest thing in the function — a search is
+  // network latency where everything else is arithmetic. Starting it beside
+  // the state read costs the turn nothing; awaiting it where the blocks are
+  // built costs whatever is left after the reader has finished.
+  //
+  // It cannot reach the decision. Nothing between here and the await reads it,
+  // which is the contract's "retrieved content is data, not instructions"
+  // expressed as control flow rather than as a promise.
+  const researching = runResearch({
+    lastUserText: input.lastUserText,
+    signals,
+    // The conversation's standing policy, not only this message's words: a
+    // conversation already marked sensitive or off the record must not be
+    // searched on a later turn that happens to read as an ordinary question.
+    policy: prior?.persistPolicy,
+  }).catch((e) => {
+    console.error('[core4] research failed; the turn continues without it', e);
+    return null;
+  });
 
   const t1 = Date.now();
   const transcript = input.brief.map((m) => `${m.role === 'user' ? 'Them' : 'Socria'}: ${m.content}`).join('\n\n').slice(-8000);
@@ -421,6 +448,17 @@ export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
   const voice = voiceFor({ state, signals, decision, prefs: input.prefs });
   move += renderVoice(voice);
 
+  // ── WHAT THE WEB SAID ───────────────────────────────────────────
+  //
+  // Awaited after every decision is final, and appended last. Both facts are
+  // the same fact: a page cannot change the move, what is withheld, the
+  // question budget or the register, because all of those were settled before
+  // this line runs. What it can do is give the answer something to stand on.
+  const tWeb = Date.now();
+  const research = await researching;
+  ms.web = Date.now() - tWeb;
+  move += renderResearch(research);
+
   ms.prepare = Date.now() - t0;
   return {
     input,
@@ -444,6 +482,7 @@ export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
     contradictions,
     historical,
     voice,
+    research,
     missingShown,
     disputed,
     superseded,
@@ -526,7 +565,7 @@ export interface GuardedReply {
 
 /** Answer Guard 2.0 on a complete draft. */
 export async function guardReply(p: PreparedTurn, draft: string): Promise<GuardedReply> {
-  const input: GuardInput = { decision: p.decision, allocation: p.allocation, draft, considered: p.considered.items, hidden: p.hidden, target: targetOf(p) };
+  const input: GuardInput = { decision: p.decision, allocation: p.allocation, draft, considered: p.considered.items, hidden: p.hidden, target: targetOf(p), sources: p.research?.sources };
   const g = guardStructure(input);
   let text = g.revised ?? draft;
   let outcome: GuardOutcome = { action: g.action, findings: g.findings, by: g.by, ...(g.revised ? { revised: g.revised } : {}), ...(g.retryNote ? { retryNote: g.retryNote } : {}) };
@@ -573,7 +612,7 @@ export function fallbackReply(p: PreparedTurn, first: string, retry: string | nu
   const codes: string[] = [];
   for (const candidate of [retry, first]) {
     if (!candidate) continue;
-    const g = guardStructure({ decision: p.decision, allocation: p.allocation, draft: candidate, considered: p.considered.items, hidden: p.hidden, target: targetOf(p) });
+    const g = guardStructure({ decision: p.decision, allocation: p.allocation, draft: candidate, considered: p.considered.items, hidden: p.hidden, target: targetOf(p), sources: p.research?.sources });
     const text = g.revised ?? candidate;
     if (!g.retryNote) return { text, codes: [...codes, 'fallback:passed'] };
     const leaks = g.findings.some((f) => f.side === 'overreach');
@@ -700,6 +739,7 @@ export async function finishTurn(
     counterfactual: p.counterfactual,
     contradictions: p.contradictions,
     voice: p.voice,
+    research: p.research,
     superseded: p.missing.length - p.missingShown.length,
     structure: p.structure,
     ms: p.ms,
