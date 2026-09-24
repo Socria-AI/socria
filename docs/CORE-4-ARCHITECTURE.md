@@ -35,9 +35,12 @@ client sends the conversation; the server holds everything Core 4 knows.
 | 7 | Corrections | `lib/core4/ledger.ts disputeTurn` | "That's not what I meant" marks their ledger entries from the previous turn *disputed*. |
 | 8 | MEASURE (before): budget + diminishing returns | `lib/core4/budget.ts`, `questions.ts` | The question budget is priced from the transcript (any interrogative content: explicit, disguised, closing offers), streak and density. Diminishing returns are detected from explicit signals (one suffices) or inferred ones (two must agree). |
 | 9 | Verify Mode, exact | `lib/core4/verify.ts exactCheck` | Arithmetic in an attempt is computed exactly **before** the move is chosen; a computed verdict overrides the reader's. |
+| 9′ | PROBLEM MODEL | `lib/core4/problem.ts buildProblem` | The live ledger read as a connected structure, not a list: each item with an epistemic reading (assumed / unchecked / disputed / user-stated, derived from columns that already exist) and the dependency edges the reader named this turn plus the ones stored from earlier turns. A **view**, not a store — same sentences, one place. Scoped to this conversation, plus the same Project when there is one; never a private entry outside its own conversation. Pure; no model call. |
+| 9″ | MISSING CONTRIBUTION | `lib/core4/contribution.ts detectMissing` | What is ABSENT, asked before the move is chosen: a conclusion resting on an unsupported assumption, a contradiction between distant turns, a belief still resting on something dropped, a load-bearing claim with no evidence, a decision with nothing bounding it, a two-option framing, a question open for many turns. Pure queries over the graph. Gated by the same novelty classifier the guard uses (excluding the finding's own subjects) and by task-scoped expertise; at most one is raised. |
+| 9‴ | EXPERTISE, per task | `lib/core4/capability.ts taskCompetence` | What they have SHOWN on this concept, counted from verified events in `capability_evidence` — which had been written every turn and never read back. Conservative and asymmetric: two unassisted successes for 'expert', one miss pulls back. Their own words are never overridden. |
 | 10 | ALLOCATE | `lib/core4/allocation.ts` | Who does which part of the thinking, with a machine-readable rationale and a withhold (what, reason, evidence, source) — or none. |
 | 11 | INTERVENE | `lib/core4/intervene.ts` | One move, with type, reason code, intended outcome, human work preserved, AI work performed, confidence, whether the guard must read it, max questions, token budget — and whether it is **forced**. Forced only on explicit or verified evidence (their words, a contract, safety, a computed/checked verdict, an injected calculation); otherwise the move block renders constraints only ("No move is imposed"). |
-| 12 | Verify Mode, checker | `lib/cognition/engine.ts checkWork` | Only when something is withheld and arithmetic could not settle it: a separate cheap-model call judges the attempt (1.5 s timeout). Its expected answer never reaches the reply model; a confident verdict that contradicts the reader re-decides the move. |
+| 12 | Verify Mode, checker | `lib/cognition/engine.ts checkWork` | Whenever they offered something to check and arithmetic could not settle it — not only under a withhold, which was the old gate and meant the checker ran on 6 of the 38 turns in run 6 that had checkable work, the other 32 shipping the cheap reader's guess as fact. A separate cheap-model call judges the attempt (1.5 s timeout). Its expected answer never reaches the reply model; a confident verdict that contradicts the reader re-decides the move. |
 | 13 | Prompt assembled | `lib/socria-prompt.ts buildSystemPrompt` | Core 4 prompt v6 (v5 added the baseline's peer instruction, contributing what they have not considered, after run 3; v6 lets decisions and expert analysis be complete rather than brief, after run 4), imported profile, Project, Mind Graph, then the state block, the verify block, the move block — in that order, last before the transcript. No thread memory, no Thinking Journey. |
 | 14 | Generate | `route.ts core4Reply`, `lib/core4/model.ts` | Through the model seam. **Buffered** only if something is withheld (so the guard reads the whole draft before anything is sent); otherwise **streamed** through the sentence gate (council D8 — buffering every perspective move put the latency on expert turns). |
 | 15 | Answer Guard 2.0 | `lib/core4/guard2.ts`, `turn.ts guardReply` | Deterministic first; cheap model only for what structure cannot decide, and only to *delete* sentences. One regeneration by the reply model if needed; the retry is always re-checked; a failing retry is never shipped (`fallbackReply`). |
@@ -304,6 +307,42 @@ attempts — the checker (≤1.5 s). Buffered (withheld) moves add the guard (de
 negligible; cheap model: ≤1.5 s) and,
 rarely, one regeneration. Streamed moves add nothing but the sentence gate.
 Timings for every stage are in the trace (`ms`).
+
+## 5′. What the architecture audit found (2026-09-24)
+
+Nine subsystems were mapped against the code, then cross-checked for
+duplicate concepts and dead structure. The documentation was not trusted;
+every claim was verified against a file and a line. What it found, kept here
+because a map of the real thing is worth more than a description of the
+intended one:
+
+**Fixed as a result.**
+- A withheld value inside a fenced code block was detected and shipped: the
+  delete shields fences, the leak detector reads through them, and nothing
+  re-checked the result. `without()` now verifies its own output.
+- The private checker ran only under a withhold — 6 of the 38 turns in run 6
+  that offered checkable work. The other 32 shipped the cheap reader's guess
+  as fact, visibly wrong twice.
+- Off the record missed `relations`, so a conversation nobody was supposed to
+  keep still wrote the person's sentences into `core4_state`.
+- An instruction pointed at "Already on the table", a heading that exists
+  only in the state reader's input, not in the reply prompt.
+- Ledger links were written every turn and never read back on the reply path;
+  capability evidence likewise.
+
+**Known and not yet fixed** (see §6).
+- The Answer Guard runs only on withheld turns, so the novelty gate, the
+  redundancy check and the tool-claim strip never see the ordinary majority.
+- The novelty matcher is lexical: ~10% recall on paraphrase at the deletion
+  threshold. Already Considered is therefore closer to decorative than its
+  name suggests, and this is the single biggest weakness in the system.
+- A withhold with a blank quote fails OPEN in production and silently: the
+  withhold becomes null, which also turns the guard off for that turn.
+- `supportLevel` and `assumptions` are computed every turn and read by
+  nothing; 11 of 36 state fields reach a decision.
+- In a default deployment `OPENAI_MODEL_CORE_4` is unset and the configured
+  id is rejected, so Core 4 answers on the fallback model. It is not in
+  `.env.example`.
 
 ## 6. What is not built, and why
 
