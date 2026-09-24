@@ -146,6 +146,28 @@ export function selectIntervention(input: SelectInput): InterventionDecision {
     const n = input.signals.sentences;
     dec = { ...dec, forced: true, objective: `${dec.objective} They asked for ${n === 1 ? 'one sentence' : `${n} sentences`}: write exactly that many, and nothing before or after.` };
   }
+  // ── expert calibration ──────────────────────────────────────────
+  //
+  // Before this, `expertise` was read in ONE branch of the allocator (fix it
+  // or explain it) and nowhere else, so "Core 4 adapts to your expertise" was
+  // a single boolean at a single fork. It now changes the pitch of every
+  // teaching move — which is where a knowledgeable person actually notices,
+  // because the failure they complain about is being told what they already
+  // know, not being routed to the wrong move.
+  //
+  // Only on moves that TEACH something. Reflection, getting out of the way
+  // and asking are unaffected: there is no register to calibrate.
+  const TEACHING = new Set<InterventionType>(['EXPLAIN', 'ANSWER', 'CORRECT', 'VERIFY', 'HINT', 'CALCULATE', 'EXECUTE']);
+  const x = input.state.expertise;
+  const shown = x.source === 'explicit' || x.source === 'observed' || x.confidence >= 0.6;
+  if (shown && TEACHING.has(dec.type)) {
+    if (x.value === 'expert') {
+      dec = { ...dec, objective: `${dec.objective} They know this domain: no definitions of terms they used correctly, no ground-up teaching, no restating their own setup. Assume the standard material and spend the words on what is specific to their case.` };
+    } else if (x.value === 'novice') {
+      dec = { ...dec, objective: `${dec.objective} They are new to this: name the principle before applying it, keep the steps explicit, and define any term you introduce.` };
+    }
+  }
+
   // A length they asked for sets the budget (council D17).
   if (input.signals.requestedTokens) dec = { ...dec, maxTokens: Math.min(4000, Math.max(dec.maxTokens, input.signals.requestedTokens)) };
   // "Answers only, no explanations" (their words or the Project), unless this

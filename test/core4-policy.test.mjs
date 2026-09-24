@@ -429,6 +429,20 @@ console.log('\n=== review before run 6: withhold and vent false positives ===');
   ok('"hints only" does not', hintsOnly2.allocation.reasonCode.endsWith('.stuck') && /whether it is right and where it goes wrong/.test(hintsOnly2.decision.objective), `${hintsOnly2.allocation.reasonCode} ${hintsOnly2.decision.objective.slice(0, 80)}`);
 }
 
+console.log('\n=== expertise changes the pitch of every teaching move, not one fork ===');
+{
+  const E = (value, source = 'observed', confidence = 0.65) => ({ value, source, confidence, evidence: 'shown' });
+  const expert = decide(S({ work: 'explanation', latest: 'question', expertise: E('expert') }), { said: 'Why does the planner pick a seq scan here?' });
+  ok('an expert is not taught the basics', /no ground-up teaching|no definitions of terms they used correctly/.test(expert.decision.objective), expert.decision.objective.slice(-160));
+  const novice = decide(S({ work: 'explanation', latest: 'question', expertise: E('novice') }), { said: 'Why does the planner pick a seq scan here?' });
+  ok('a novice gets the principle named and the steps explicit', /name the principle|steps explicit/.test(novice.decision.objective), novice.decision.objective.slice(-160));
+  ok('  and they are not the same instruction', expert.decision.objective !== novice.decision.objective);
+  const guessy = decide(S({ work: 'explanation', latest: 'question', expertise: { value: 'expert', source: 'inferred', confidence: 0.3, evidence: 'used a word' } }));
+  ok('a weak guess changes nothing', !/no ground-up teaching/.test(guessy.decision.objective));
+  const heard = decide(S({ work: 'reflection', latest: 'information', expertise: E('expert') }), { said: 'I just need to say this somewhere.' });
+  ok('being heard has no register to calibrate', !/no ground-up teaching/.test(heard.decision.objective), heard.decision.type);
+}
+
 console.log('\n=== run 4: a substantive move has the baseline\'s ceiling ===');
 {
   const judged = decide(S({ work: 'judgment', taskKind: 'decide', latest: 'request' }), { said: 'Here is my plan and my numbers — what am I missing?' });

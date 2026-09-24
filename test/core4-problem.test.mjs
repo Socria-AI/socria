@@ -19,6 +19,7 @@ import { buildProblem, epistemicOf, ofKind, restsOn, renderProblem } from './.tm
 import { detectMissing, gateContributions, renderMissing } from './.tmp/contribution.mjs';
 import { linksFromRelations, entriesFromPerson, mergeEntries } from './.tmp/ledger.mjs';
 import { EMPTY_STATE } from './.tmp/state.mjs';
+import { taskCompetence, calibrate, conceptKey } from './.tmp/capability.mjs';
 
 let pass = 0, fail = 0;
 const ok = (n, c, x = '') => (c ? (pass++, console.log('  ok   ' + n)) : (fail++, console.log('  FAIL ' + n + '  ' + x)));
@@ -183,6 +184,31 @@ console.log('\n=== end to end: a real two-turn shape ===');
   const out = gateContributions(detectMissing(p, S({ taskKind: 'decide', work: 'judgment' })), [], 'expert');
   ok('an expert is told the decision rests on an unexamined assumption', out.some((f) => f.kind === 'HIDDEN_ASSUMPTION'), JSON.stringify(out.map((f) => f.kind)));
   ok('  and the sentence names the real texts', /Series A/.test(out[0].what) && /annual cohort/.test(out[0].what), out[0]?.what);
+}
+
+console.log('\n=== competence is per concept, from events, not a label for a person ===');
+{
+  let n = 0;
+  const ev = (concept, event, assistance = 0, conversationId = 'c' + ++n) =>
+    ({ id: 'x' + n, concept, event, assistance, conversationId, turn: 1, confidence: 0.7, at: n });
+  const key = conceptKey('the chain rule for derivatives');
+  ok('no events, no opinion', taskCompetence([], key).value === 'unknown');
+  const strong = [ev(key, 'demonstrated_unassisted'), ev(key, 'demonstrated_unassisted')];
+  ok('two unassisted successes reads as expert ON THIS CONCEPT', taskCompetence(strong, key).value === 'expert');
+  ok('  and says what it counted', /2 unassisted/.test(taskCompetence(strong, key).evidence));
+  ok('  but says nothing about another concept', taskCompetence(strong, conceptKey('Postgres index bloat')).value === 'unknown');
+  const shaky = [ev(key, 'misunderstanding'), ev(key, 'misunderstanding')];
+  ok('two misunderstandings and no successes reads as novice', taskCompetence(shaky, key).value === 'novice');
+  ok('one success against one miss is not expert', taskCompetence([ev(key, 'demonstrated_unassisted'), ev(key, 'misunderstanding')], key).value === 'intermediate');
+  ok('help does not count as doing it alone', taskCompetence([ev(key, 'demonstrated_assisted', 3), ev(key, 'demonstrated_assisted', 3)], key).value === 'unknown');
+  ok('a related concept key still counts', taskCompetence(strong, conceptKey('chain rule derivatives practice')).value === 'expert');
+
+  const said = { value: 'expert', source: 'explicit', confidence: 1, evidence: 'I am a biostatistician' };
+  ok('their own words are never overridden by events', calibrate(said, taskCompetence(shaky, key)).value === 'expert');
+  const guess = { value: 'novice', source: 'inferred', confidence: 0.5, evidence: 'asked a basic question' };
+  ok('a demonstrated record beats a guess from one message', calibrate(guess, taskCompetence(strong, key)).value === 'expert');
+  ok('  and is marked observed, not inferred', calibrate(guess, taskCompetence(strong, key)).source === 'observed');
+  ok('no record leaves the guess alone', calibrate(guess, taskCompetence([], key)).value === 'novice');
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

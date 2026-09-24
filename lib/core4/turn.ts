@@ -34,7 +34,7 @@ import { selectIntervention, renderDecision } from './intervene';
 import { guardStructure, leaksHidden, type GuardInput } from './guard2';
 import { exactCheck, renderCheck, hiddenValues, computeAsked, statedSlips, type CheckResult, CHECK_FLOOR } from './verify';
 import { consideredView, entriesFromPerson, entriesFromSocria, mergeEntries, disputeTurn, supersedeRestated, raisable, echoesSocria, grounding, linksFromRelations } from './ledger';
-import { evidenceFromTurn } from './capability';
+import { calibrate, conceptKey, evidenceFromTurn, taskCompetence } from './capability';
 import { buildProblem, renderProblem, type ProblemModel } from './problem';
 import { detectMissing, gateContributions, renderMissing, type MissingContribution } from './contribution';
 import { buildTrace } from './trace';
@@ -50,6 +50,7 @@ import type {
   InterventionDecision,
   LedgerEntry,
   LedgerLink,
+  CapabilityEvidence,
   NoveltyVerdict,
   QuestionBudget,
 } from './types';
@@ -89,6 +90,8 @@ export interface PreparedTurn {
   superseded: LedgerEntry[];
   verify: CheckResult | null;
   hidden: string[];
+  /** what they have shown on THIS concept, from verified events */
+  competence: ReturnType<typeof taskCompetence>;
   /** the problem as a connected structure, this turn */
   problem: ProblemModel;
   /** what the structure says is absent, novelty-gated and expertise-gated */
@@ -110,10 +113,11 @@ export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
 
   // Last turn's state and the ledger, together.
   const canStore = !!(input.userId && input.conversationId);
-  const [prior, ledger, priorLinks] = await Promise.all([
+  const [prior, ledger, priorLinks, capability] = await Promise.all([
     canStore ? store.loadState(input.userId!, input.conversationId!) : Promise.resolve(null),
     input.userId ? store.loadLedger(input.userId, { conversationId: input.conversationId ?? '', projectId: input.projectId }) : Promise.resolve([] as LedgerEntry[]),
     input.userId ? store.loadLinks(input.userId) : Promise.resolve([] as LedgerLink[]),
+    input.userId ? store.listCapability(input.userId) : Promise.resolve([] as CapabilityEvidence[]),
   ]);
   ms.load = Date.now() - t0;
 
@@ -133,7 +137,13 @@ export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
   // "Their last message answered what Socria asked" only when Socria asked
   // something: the reader's word alone told the model to use an answer to a
   // question nobody put (run 4, direct-answer-003).
-  const state = merged.resolved && questionLoad(lastSocria(input)) === 0 ? { ...merged, resolved: false } : merged;
+  const settled = merged.resolved && questionLoad(lastSocria(input)) === 0 ? { ...merged, resolved: false } : merged;
+  // Task-scoped competence: what they have SHOWN on this concept, from
+  // verified events only, overriding a global guess made from one message.
+  // The events have been recorded since the capability model was built and
+  // nothing ever read them back on the reply path.
+  const competence = taskCompetence(capability, conceptKey(settled.currentFocus || settled.currentGoal));
+  const state = { ...settled, expertise: calibrate(settled.expertise, competence) };
 
   // "That's not what I meant": what was recorded as theirs last turn is disputed.
   // A correction of Socria, or their own revision ("I was computing the wrong
@@ -280,6 +290,7 @@ export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
     considered: { lines: allLines, items: gateItems },
     problem,
     missing,
+    competence,
     disputed,
     superseded,
     verify,
