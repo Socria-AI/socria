@@ -269,6 +269,9 @@
 .app-root .mp-row.logos .does::after{content:" \2192";color:var(--moss-700)}
 
 .app-root .mp-depths{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+/* three options whose descriptions are sentences: a 340px sheet split three
+   ways leaves ~105px a column, which wraps every one of them to four lines */
+.app-root .mp-depths.one{grid-template-columns:1fr}
 .app-root .mp-d{display:flex;flex-direction:column;gap:0;text-align:left;padding:6px 9px;border-radius:9px;
   border:1px solid var(--ink-16);transition:border-color .18s,background .18s}
 .app-root .mp-d:hover:not(.locked){border-color:var(--moss-600)}

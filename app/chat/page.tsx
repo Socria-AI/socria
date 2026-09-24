@@ -94,6 +94,8 @@ import {
 
   type SocriaModel,
   type ThinkingDepth,
+  type Readability,
+  type ReplyLength,
   sanitizeUserUnderstanding,
   hasJourneyContent,
   type ConversationMemory,
@@ -163,6 +165,10 @@ const MIGRATED_KEY = 'socria.cloudMigrated.v1';
 // sign-in — even if they delete the first one. Cleared on sign-in.
 const USED_FREE_KEY = 'socria.usedFreeConvo.v1';
 const DEPTH_KEY = 'socria.depth.v1';
+/** Core 4's two communication settings. Preferences, not templates: they bias
+    how the answer is written and never reach how it is reasoned. */
+const READABILITY_KEY = 'socria.readability.v1';
+const LENGTH_KEY = 'socria.length.v1';
 /** How often this person has told us a topic change was intentional. */
 const DRIFT_KEY = 'socria.chat.driftDismissals.v1';
 
@@ -193,6 +199,28 @@ function readDepth(): ThinkingDepth {
     return 'balanced';
   } catch {
     return 'balanced';
+  }
+}
+
+function readReadability(): Readability {
+  if (typeof window === 'undefined') return 'standard';
+  try {
+    const raw = localStorage.getItem(READABILITY_KEY);
+    if (raw === 'simple' || raw === 'advanced') return raw;
+    return 'standard';
+  } catch {
+    return 'standard';
+  }
+}
+
+function readLength(): ReplyLength {
+  if (typeof window === 'undefined') return 'standard';
+  try {
+    const raw = localStorage.getItem(LENGTH_KEY);
+    if (raw === 'concise' || raw === 'detailed') return raw;
+    return 'standard';
+  } catch {
+    return 'standard';
   }
 }
 
@@ -346,6 +374,8 @@ export default function ChatPage() {
   const [usedFree, setUsedFree] = useState(false);
   const [model, setModel] = useState<SocriaModel>('core-2');
   const [depth, setDepth] = useState<ThinkingDepth>('balanced');
+  const [readability, setReadability] = useState<Readability>('standard');
+  const [replyLength, setReplyLength] = useState<ReplyLength>('standard');
   const [smartUnlocked, setSmartUnlocked] = useState(false);
   const [logosModalOpen, setLogosModalOpen] = useState(false);
   /** they arrived straight from /onboarding this session */
@@ -520,6 +550,8 @@ export default function ChatPage() {
   useEffect(() => {
     setModel(readModel());
     setDepth(readDepth());
+    setReadability(readReadability());
+    setReplyLength(readLength());
     setSmartUnlocked(readSmartUnlocked());
     try {
       setImportedProfile(localStorage.getItem(PROFILE_KEY) || '');
@@ -736,6 +768,18 @@ export default function ChatPage() {
     setDepth(next);
     try {
       localStorage.setItem(DEPTH_KEY, next);
+    } catch {}
+  }
+  function pickReadability(next: Readability) {
+    setReadability(next);
+    try {
+      localStorage.setItem(READABILITY_KEY, next);
+    } catch {}
+  }
+  function pickLength(next: ReplyLength) {
+    setReplyLength(next);
+    try {
+      localStorage.setItem(LENGTH_KEY, next);
     } catch {}
   }
 
@@ -1455,6 +1499,10 @@ export default function ChatPage() {
           messages: forRequest(convoForRequest.messages, model === 'core-4'),
           model,
           depth,
+          // How they want it written. The route validates both rather than
+          // trusting them, and neither reaches the reasoning.
+          readability,
+          length: replyLength,
           memory: convoForRequest.memory ?? EMPTY_MEMORY,
           profile: importedProfile || undefined,
           understanding: journey ?? undefined,
@@ -3076,6 +3124,10 @@ export default function ChatPage() {
                   onChange={pickModel}
                   depth={depth}
                   onDepth={pickDepth}
+                  readability={readability}
+                  onReadability={pickReadability}
+                  length={replyLength}
+                  onLength={pickLength}
                   isSignedIn={canUseCore3}
                   onLockedAttempt={() => setLogosModalOpen(true)}
                   plan={planState.known ? planState.plan : undefined}

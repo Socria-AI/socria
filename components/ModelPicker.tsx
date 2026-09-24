@@ -12,11 +12,19 @@
 // far it goes — with the second section simply absent when the chosen model
 // has no second axis.
 //
+// Core 4 has a different second axis. It decides its own depth from evidence
+// every turn, so asking the person to set one was a question only somebody
+// who cannot see the evidence would be answering. What they CAN judge is how
+// they want to be written to, so the sheet asks that instead: how it reads,
+// and how much it says. Same widget, different table — nothing here special-
+// cases a model id, it reads supportsDepth and supportsCommunication.
+//
 // Ported from the design's chat kit; the stylesheet is app/app-shell.css,
 // scoped under .app-root, so the button lives inside an `app-inline` wrapper.
 // What is NOT the design's: every list here comes from this product's own
 // tables. SOCRIA_MODELS decides which models exist and which need an account;
-// THINKING_DEPTHS decides the registers; PLANS decides whether a register is
+// THINKING_DEPTHS and READABILITY_OPTIONS/LENGTH_OPTIONS decide the second
+// axis; PLANS decides whether a register is
 // locked. The mock hard-coded all three, and a menu that disagrees with the
 // server about what you can pick is worse than no menu.
 
@@ -24,8 +32,12 @@ import { useEffect, useRef, useState } from 'react';
 import {
   SOCRIA_MODELS,
   THINKING_DEPTHS,
+  READABILITY_OPTIONS,
+  LENGTH_OPTIONS,
   type SocriaModel,
   type ThinkingDepth,
+  type Readability,
+  type ReplyLength,
 } from '@/lib/socria-prompt';
 import { PLANS } from '@/lib/entitlements';
 import { type Plan } from '@/lib/socria-one';
@@ -54,6 +66,10 @@ export function ModelPicker({
   onChange,
   depth,
   onDepth,
+  readability,
+  onReadability,
+  length,
+  onLength,
   isSignedIn = true,
   onLockedAttempt,
   plan,
@@ -63,6 +79,14 @@ export function ModelPicker({
   /** Omit both to render the model axis alone (the docs demo does). */
   depth?: ThinkingDepth;
   onDepth?: (next: ThinkingDepth) => void;
+  /**
+   * The other axis, for the models that have one. Same rule as depth: omit
+   * them and the section is simply absent.
+   */
+  readability?: Readability;
+  onReadability?: (next: Readability) => void;
+  length?: ReplyLength;
+  onLength?: (next: ReplyLength) => void;
   isSignedIn?: boolean;
   onLockedAttempt?: (locked: SocriaModel) => void;
   /**
@@ -110,7 +134,24 @@ export function ModelPicker({
   // The depth axis exists when the model has one AND the caller gave us the
   // state for it. Both, because the docs demo shows the model axis alone.
   const hasDepth = current.supportsDepth && !!depth && !!onDepth;
+  // The communication axes, which replace depth on the models that decide
+  // their own. Both or neither: they are two halves of one question about how
+  // the answer is written, and a sheet offering one of them would read as a
+  // half-built control.
+  const hasComm =
+    !!current.supportsCommunication && !!readability && !!onReadability && !!length && !!onLength;
   const allDepths = plan ? PLANS[plan].allDepths : true;
+  // What the button says after the model name, when it is not at its default.
+  // Nothing at all when both are standard — a pill that always shows "Standard"
+  // is a pill that says nothing.
+  const commLabel = !hasComm
+    ? null
+    : [
+        readability !== 'standard' ? READABILITY_OPTIONS.find((r) => r.id === readability)?.label : null,
+        length !== 'standard' ? LENGTH_OPTIONS.find((l) => l.id === length)?.label : null,
+      ]
+        .filter(Boolean)
+        .join(', ') || null;
 
   const pick = (id: SocriaModel) => {
     // Announced but not built — the row is inert; the copy below the name
@@ -159,7 +200,13 @@ export function ModelPicker({
             here and nothing is said twice. */}
         <span className="meta">
           <span className="nm">{m.short}</span>
-          {!m.supportsDepth && !surface && !soon ? ' — no depth modes.' : ''}
+          {/* "no depth modes" is the footnote for a model that answers at one
+              register. It is the wrong footnote for one that sets its own —
+              and that model's description already says so, so this says
+              nothing rather than saying it twice. */}
+          {!m.supportsDepth && !m.supportsCommunication && !surface && !soon
+            ? ' — no depth modes.'
+            : ''}
         </span>
       </button>
     );
@@ -186,6 +233,14 @@ export function ModelPicker({
               <span className="dp">
                 {THINKING_DEPTHS.find((d) => d.id === depth)?.label}
               </span>
+            </>
+          )}
+          {commLabel && (
+            <>
+              <span className="sep" aria-hidden="true">
+                ·
+              </span>
+              <span className="dp">{commLabel}</span>
             </>
           )}
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -266,7 +321,58 @@ export function ModelPicker({
                 )}
               </>
             )}
-            {!hasDepth && current.supportsDepth === false && (
+            {hasComm && (
+              <>
+                <div className="mp-rule" />
+                {/* Two questions about the writing, never about the thinking.
+                    They are independent on purpose: Advanced + Concise and
+                    Simple + Detailed are both coherent, and a single dial
+                    would have forced one to imply the other. */}
+                <p className="mp-lbl">How it reads</p>
+                <div className="mp-depths one">
+                  {READABILITY_OPTIONS.map((r) => (
+                    <button
+                      key={r.id}
+                      type="button"
+                      role="menuitemradio"
+                      aria-checked={readability === r.id}
+                      className={`mp-d${readability === r.id ? ' on' : ''}`}
+                      // The sheet stays open: there are two settings here and
+                      // closing after the first would mean reopening to make
+                      // the second.
+                      onClick={() => onReadability?.(r.id)}
+                    >
+                      <span className="d">{r.label}</span>
+                      <span className="does">{r.description}</span>
+                    </button>
+                  ))}
+                </div>
+
+                <div className="mp-rule" />
+                <p className="mp-lbl">How much it says</p>
+                <div className="mp-depths one">
+                  {LENGTH_OPTIONS.map((l) => (
+                    <button
+                      key={l.id}
+                      type="button"
+                      role="menuitemradio"
+                      aria-checked={length === l.id}
+                      className={`mp-d${length === l.id ? ' on' : ''}`}
+                      onClick={() => onLength?.(l.id)}
+                    >
+                      <span className="d">{l.label}</span>
+                      <span className="does">{l.description}</span>
+                    </button>
+                  ))}
+                </div>
+
+                <p className="mp-note">
+                  These change how the answer is written — never how hard it is
+                  thought about. <em>{current.short} decides that itself.</em>
+                </p>
+              </>
+            )}
+            {!hasDepth && !hasComm && current.supportsDepth === false && (
               <p className="mp-note">
                 {current.short} answers at one register.{' '}
                 <em>Core 3.1 is the one that asks how far to go.</em>
