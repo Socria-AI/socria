@@ -74,10 +74,10 @@
       "domain": "legal",
       "conclusion": "We can terminate the vendor contract on 30 days' notice without paying a penalty.",
       "premises": [
-        {"id": "p1", "text": "Section 9.2 permits termination for convenience on 30 days' written notice.", "loadBearing": true,
-         "why": "This is the entire basis for the right to terminate at all. Without it nothing establishes that 30 days' notice ends the contract."},
-        {"id": "p2", "text": "Section 9.4 applies the early-termination fee only to terminations during the initial 12-month term.", "loadBearing": true,
-         "why": "Subtle. Without 9.4, being 26 months in says nothing about fees; the 'without penalty' half of the conclusion loses its ground even though the sentence still reads as true."},
+        {"id": "p1", "text": "Section 9.2 permits termination for convenience on 30 days' written notice, subject to the early-termination fee in Section 9.4.", "loadBearing": true,
+         "why": "This is the entire basis for the right to terminate at all. Without it nothing establishes that 30 days' notice ends the contract. It also states that a fee exists, which is what makes p2's carve-out genuinely load-bearing."},
+        {"id": "p2", "text": "Section 9.4 applies that fee only to terminations during the initial 12-month term.", "loadBearing": true,
+         "why": "Subtle, and airtight only because p1 states the fee exists. Ablate p2 and what remains is a termination right expressly 'subject to the early-termination fee in Section 9.4', with nothing exempting us: the 'without penalty' half of the conclusion does not merely lose support, it reverses. This is deliberately NOT an absence-of-evidence argument — the fee survives the ablation, only the exemption goes."},
         {"id": "p3", "text": "The contract has run 26 months and is in its second renewal term.", "loadBearing": true,
          "why": "This is the fact that puts us outside 9.4's initial term. Remove it and we cannot place ourselves outside the fee window."},
         {"id": "p4", "text": "Vendor uptime has averaged 99.2% against a 99.5% commitment.", "loadBearing": false,
@@ -85,7 +85,7 @@
         {"id": "p5", "text": "Procurement has already selected a replacement vendor.", "loadBearing": false,
          "why": "Operational readiness to leave is not contractual entitlement to leave. The conclusion is about what the contract permits."}
       ],
-      "note": "Subtle load-bearing (p2) plus a different-conclusion distractor (p4). Tests whether removing the fee carve-out is detected when the conclusion still sounds right."
+      "note": "Subtle load-bearing (p2) plus a different-conclusion distractor (p4). Tests whether removing the fee carve-out is detected when the conclusion still sounds right. The fee is asserted in p1 and only exempted in p2, so ablating p2 leaves a stated fee with no carve-out; an earlier draft mentioned the fee only inside p2, where removing it removed the threat as well and 'robust' was defensible."
     },
     {
       "id": "abl-006",
@@ -116,30 +116,30 @@
          "why": "10 x 0.78 = $7.8M is the lease side of the comparison. Remove it and there is nothing to beat."},
         {"id": "p3", "text": "Ownership adds about $40K a year in maintenance and property tax that the lease currently covers.", "loadBearing": false,
          "why": "Tempting because it is a genuine cash item on the buy side, but removing it only lowers the buy total: 6.2 < 7.8 still holds, so the conclusion survives."},
-        {"id": "p4", "text": "The landlord has offered to waive the 3% annual escalator in exchange for a 12-year term.", "loadBearing": false,
-         "why": "A different option over a different horizon; it supports a different conclusion and is not part of the ten-year buy-versus-renew totals."},
-        {"id": "p5", "text": "Comparable buildings on the same street sold for $6.6M and $6.9M last year.", "loadBearing": false,
-         "why": "Comparables argue the price is fair; they do not enter the cash-out arithmetic, which uses the actual $6.2M."}
+        {"id": "p4", "text": "The landlord has offered a twelve-year renewal in place of the ten-year one.", "loadBearing": false,
+         "why": "A different option over a different horizon; it supports a different conclusion and is not part of the ten-year buy-versus-renew totals. It carries no price of its own, so it cannot stand in for p2 when p2 is the premise ablated."},
+        {"id": "p5", "text": "Comparable buildings on the same street sold for $7.5M and $8.1M last year.", "loadBearing": false,
+         "why": "Comparables argue the $6.2M price is good; they do not enter the cash-out arithmetic, which uses the actual $6.2M. They sit ABOVE the lease total on purpose: read as a stand-in for the purchase price when p1 is ablated they would give 7.9-8.5 against 7.8 and break the conclusion, so they cannot rescue it."}
       ],
-      "note": "Arithmetic with a deliberately safe margin so no discounting argument can flip it. p3 is the designed trap: a real cost that changes the total without changing the ordering."
+      "note": "Arithmetic with a deliberately safe margin so no discounting argument can flip it. p3 is the designed trap: a real cost that changes the total without changing the ordering. p5's comparables were $6.6M/$6.9M in an earlier draft, which made p1 arguably robust — with the price ablated they supplied one — so they were moved above the lease total."
     },
     {
       "id": "abl-008",
       "domain": "engineering",
       "conclusion": "The outage was caused by the 14:02 config change, not by the morning database upgrade.",
       "premises": [
-        {"id": "p1", "text": "Error rates went from 0.1% to 41% within sixty seconds of the 14:02 config deploy.", "loadBearing": true,
-         "why": "This is the only premise linking the config change to the failure. Remove it and nothing attributes the outage to the config deploy."},
+        {"id": "p1", "text": "Sixty seconds after the 14:02 config deploy, error rates stood at 41%.", "loadBearing": true,
+         "why": "This is the only premise reporting that anything failed, and the only one tying the failure to the config deploy. Remove it and what remains is a clean four and a half hours, a pool-size change and a calendar entry: nothing attributes an outage to anything. It deliberately does not state the PRE-change rate, or it would carry p2's alibi as well."},
         {"id": "p2", "text": "The database upgrade completed at 09:40 and error rates held at 0.1% for the four and a half hours from 09:40 to 14:02.", "loadBearing": true,
-         "why": "Subtle. This is what excludes the upgrade. Without it the 'not the database upgrade' half of the conclusion has no support, even though the sentence still reads plausibly."},
+         "why": "Subtle. This is the only pre-14:02 baseline, and it is what excludes the upgrade. Ablate it and '41% sixty seconds after the deploy' is equally consistent with error rates having sat at 41% since the 09:40 upgrade, so the 'not the database upgrade' half has no support at all, even though the sentence still reads plausibly."},
         {"id": "p3", "text": "The config change lowered the connection-pool maximum from 200 to 20.", "loadBearing": false,
          "why": "This explains WHY the config change would cause an error spike. Removing the mechanism does not remove the timing evidence in p1, which already carries the attribution."},
         {"id": "p4", "text": "The database upgrade had been on the change calendar for six weeks.", "loadBearing": false,
          "why": "Scheduling history carries no exculpatory or inculpatory force. The attribution rests on p1 and p2."},
-        {"id": "p5", "text": "On-call was paged at 14:05 and the incident was declared at 14:09.", "loadBearing": false,
-         "why": "Response timeline, downstream of the failure. It does not bear on which change caused it."}
+        {"id": "p5", "text": "The response ran under the sev-1 process, with the platform on-call as incident commander.", "loadBearing": false,
+         "why": "How the response was organised, downstream of the failure. It does not bear on which change caused it. It carries no timestamps on purpose: an earlier draft gave the 14:05 page and the 14:09 declaration, which pinned the failure to just after 14:02 and so stood in for p1 when p1 was the premise ablated."}
       ],
-      "note": "Subtle load-bearing (p2, the alibi for the rival cause) alongside a 'why it is true' distractor (p3). Tests whether an exclusionary premise is recognised as load-bearing."
+      "note": "Subtle load-bearing (p2, the alibi for the rival cause) alongside a 'why it is true' distractor (p3). Tests whether an exclusionary premise is recognised as load-bearing. p1 and p5 are worded to keep the alibi in exactly one premise: p1 gives the post-change error rate without the pre-change baseline, p5 carries no clock times, so neither can substitute for p2."
     },
     {
       "id": "abl-009",
@@ -258,10 +258,10 @@
          "why": "Remove the delivery date and 6 days of cover is not short of anything; 'before the next delivery' has no referent."},
         {"id": "p4", "text": "The lot expires in fourteen days.", "loadBearing": false,
          "why": "A competing depletion mechanism, but it binds at day 14 and stock-out occurs at day 6. The earlier event still determines the conclusion, so it survives removal."},
-        {"id": "p5", "text": "Usage rose from five to seven vials a day when the second infusion chair opened.", "loadBearing": false,
-         "why": "This explains why usage is seven. p2 still states seven, so 42/7 = 6 < 9 is unchanged."}
+        {"id": "p5", "text": "Usage stepped up when the second infusion chair opened in July.", "loadBearing": false,
+         "why": "This explains why usage is at its present level but states no rate of its own. p2 still supplies seven vials a day, so 42/7 = 6 < 9 is unchanged."}
       ],
-      "note": "Arithmetic. p4 is the designed trap: a second deadline in the same units that never binds because it falls after the stock-out."
+      "note": "Arithmetic. p4 is the designed trap: a second deadline in the same units that never binds because it falls after the stock-out. p5 explains the usage rate without restating it — an earlier draft said 'rose from five to seven vials a day', which survived p2's ablation and made p2 look robust."
     },
     {
       "id": "abl-016",
@@ -269,9 +269,9 @@
       "conclusion": "The 6% short-ship rate originates with the vendor, not in our warehouse.",
       "premises": [
         {"id": "p1", "text": "Our receiving team counts every pallet against the packing slip at the dock, and those counts match the slips.", "loadBearing": true,
-         "why": "Subtle. This is the only premise clearing our own side of the handoff. Without it the discrepancy could arise after receipt, and the 'not in our warehouse' half no longer follows."},
-        {"id": "p2", "text": "The packing slips themselves show 6% fewer units than the purchase orders.", "loadBearing": true,
-         "why": "This places the shortfall upstream of the dock. Remove it and nothing locates the 6% at the vendor."},
+         "why": "Subtle. This is the only premise clearing our own side of the handoff. Without it the discrepancy could arise after receipt — p5 actively suggests it might — and the 'not in our warehouse' half no longer follows, nor does the attribution of the whole 6% to the vendor."},
+        {"id": "p2", "text": "The packing slips themselves list fewer units than the purchase orders they fulfil.", "loadBearing": true,
+         "why": "This places a shortfall upstream of the dock. Remove it and p1 says only that what arrived matched the paperwork, which locates nothing at the vendor. It deliberately does not restate the 6%: at exactly 6% it would account for the entire observed rate on its own and leave nothing for the warehouse, which would make p1 robust."},
         {"id": "p3", "text": "The vendor switched to a new co-packer in March.", "loadBearing": false,
          "why": "This explains why the vendor might be short-shipping. The attribution already follows from p1 and p2 without any account of the vendor's internal change."},
         {"id": "p4", "text": "Short-ship rates from our other three vendors are under 0.4%.", "loadBearing": false,
@@ -279,7 +279,7 @@
         {"id": "p5", "text": "Our warehouse had 11% staff turnover last quarter.", "loadBearing": false,
          "why": "The strongest distractor: it points at the very party the conclusion exonerates. But p1 clears the warehouse empirically, so removing the turnover figure leaves the conclusion untouched."}
       ],
-      "note": "Subtle load-bearing (p1, the exculpating control) with a distractor (p5) that argues against the conclusion. Removing a premise that opposes a conclusion should never make the conclusion stop following."
+      "note": "Subtle load-bearing (p1, the exculpating control) with a distractor (p5) that argues against the conclusion. Removing a premise that opposes a conclusion should never make the conclusion stop following. Both load-bearing premises are needed because neither leg closes alone: p2 shows the vendor short-ships, p1 shows the shortfall does not grow after receipt."
     },
     {
       "id": "abl-017",
@@ -322,16 +322,16 @@
       "premises": [
         {"id": "p1", "text": "We owe EUR 4.0M in October.", "loadBearing": true,
          "why": "Remove the payment amount and there is no exposure to compare with the EUR 1M policy threshold."},
-        {"id": "p2", "text": "Treasury policy requires any single FX exposure above EUR 1M to be hedged.", "loadBearing": true,
-         "why": "Remove the policy and a EUR 4.0M exposure obliges nothing; the conclusion is explicitly a policy requirement."},
-        {"id": "p3", "text": "We have no euro receipts in the period, so the exposure is the full EUR 4.0M gross.", "loadBearing": true,
-         "why": "Subtle. Without it the exposure could net down below the EUR 1M threshold and the policy would not bite. The conclusion still sounds right but no longer follows."},
-        {"id": "p4", "text": "The forward is currently about 40bp in our favour against spot.", "loadBearing": false,
-         "why": "An economic argument for keeping the hedge, but the policy in p2 already compels it. Removing the mark leaves the requirement intact."},
+        {"id": "p2", "text": "Treasury policy requires any net euro exposure above EUR 1M in a settlement month to be hedged.", "loadBearing": true,
+         "why": "Remove the policy and a EUR 4.0M exposure obliges nothing; the conclusion is explicitly about what policy REQUIRES, not about what is prudent."},
+        {"id": "p3", "text": "We have no euro receipts at all in October, so nothing offsets that payment.", "loadBearing": true,
+         "why": "Subtle, and load-bearing because p2 is written in NET terms and p4 puts euro receivables on the books. Ablate p3 and October's net exposure is undetermined — the EUR 3.6M in p4 is the obvious candidate to net against it, which would drop the exposure to EUR 0.4M and below the threshold. The conclusion still sounds right but no longer follows. Deliberately not an absence-of-evidence argument: p4 keeps offsets explicitly live."},
+        {"id": "p4", "text": "Our euro receivables of EUR 3.6M all fall due in November.", "loadBearing": false,
+         "why": "The near-miss: the premise that makes netting look live, and the reason p3 is needed. But p2 nets within a settlement month and November is not October, so these receipts cannot offset the payment. Removing them leaves p3's statement that October has no receipts and the net exposure still EUR 4.0M."},
         {"id": "p5", "text": "Unwinding the forward early would cost roughly EUR 18,000 in bank fees.", "loadBearing": false,
-         "why": "Cost of the alternative action, pointing the same way but not needed for a requirement that follows from p1, p2 and p3."}
+         "why": "Cost of the alternative action, pointing the same way but not needed for a requirement that already follows from p1, p2 and p3."}
       ],
-      "note": "Subtle load-bearing (p3, the netting premise). Both distractors argue FOR the conclusion, which is the harder direction: a mechanism may mistake supporting evidence for necessary evidence."
+      "note": "Subtle load-bearing (p3, the netting premise), made airtight by stating the policy in NET terms and by p4, which puts euro receivables on the books so that 'nothing offsets it' is a premise rather than a default assumption. p4 is the near-miss distractor: an offset large enough to matter that falls in the wrong month. In an earlier draft the policy read 'any single FX exposure', under which the EUR 4.0M payable was self-evidently the exposure and p3 was arguably robust."
     },
     {
       "id": "abl-020",
@@ -357,11 +357,11 @@
       "conclusion": "A positive result on this screen is more likely a false positive than a true case.",
       "premises": [
         {"id": "p1", "text": "Prevalence in the screened population is 1 in 1,000.", "loadBearing": true,
-         "why": "Per 100,000 screened: 100 cases yield 99 true positives, 99,900 non-cases yield 4,995 false positives. Remove prevalence and neither count can be formed."},
+         "why": "Per 100,000 screened: 100 cases, so at most 100 true positives, against 99,900 non-cases yielding 5% x 99,900 = 4,995 false positives. Remove prevalence and the 5% has nothing to apply to and nothing to be compared against; neither count can be formed."},
         {"id": "p2", "text": "The false-positive rate is 5%.", "loadBearing": true,
-         "why": "Remove it and the 4,995 false positives cannot be computed, so the comparison with true positives is impossible."},
-        {"id": "p3", "text": "Sensitivity is 99%.", "loadBearing": true,
-         "why": "Remove it and the 99 true positives cannot be computed; the ratio 4,995 to 99 has no denominator."},
+         "why": "Remove it and the 4,995 false positives cannot be computed at all, so there is nothing to outweigh the true positives and no verdict about which kind of positive dominates follows."},
+        {"id": "p3", "text": "Sensitivity is 99%.", "loadBearing": false,
+         "why": "NOT load-bearing, despite being the third input to the textbook formula and the hardest call in the set. A true positive requires a case, so true positives are bounded above by the 100 cases per 100,000 that p1 gives, whatever the sensitivity; p1 and p2 alone already fix false positives at 4,995. Since 4,995 > 100 for EVERY sensitivity between 0 and 100%, ablating this figure turns an exact count into a range and leaves the comparison — and therefore the conclusion — standing."},
         {"id": "p4", "text": "The assay costs $18 and runs on the analyser we already own.", "loadBearing": false,
          "why": "Cost supports a different conclusion about programme economics and enters no step of the posterior calculation."},
         {"id": "p5", "text": "The programme screens 40,000 people a year.", "loadBearing": false,
@@ -369,7 +369,7 @@
         {"id": "p6", "text": "Confirmatory testing takes four to six weeks.", "loadBearing": false,
          "why": "Downstream logistics; it does not bear on which kind of positive is more likely."}
       ],
-      "note": "Six premises, base-rate arithmetic with three indisputable load-bearing inputs. p5 tests whether a mechanism confuses a scale parameter with a rate parameter."
+      "note": "Six premises, base-rate arithmetic, and only TWO load-bearing inputs. p3 is the sharpest item in the set: sensitivity is the third number in the textbook formula, and it is inert, because the true-positive count it scales is already bounded below the false-positive count by p1 and p2 alone. It was labelled load-bearing in the first draft and that label was wrong on the arithmetic. p5 tests the same reflex on a scale parameter, p4 and p6 on topical relevance."
     },
     {
       "id": "abl-022",
@@ -412,10 +412,10 @@
          "why": "This is the only premise bearing on sulphur exposure, and the comparison 0.2 < 5 is the whole inference. Remove it and nothing rules sulphur out."},
         {"id": "p2", "text": "Activity loss this campaign tracks the sintering curve measured at the same bed temperature.", "loadBearing": false,
          "why": "An alternative explanation for deactivation. It supports a different conclusion (that the cause is sintering); the negative claim about sulphur follows from p1 alone."},
-        {"id": "p3", "text": "The guard bed was replaced at the start of the campaign.", "loadBearing": false,
-         "why": "This explains WHY feed sulphur is low. The measurements in p1 stand on their own, so the conclusion survives."}
+        {"id": "p3", "text": "The guard bed was replaced at the start of the campaign and has not been sampled since.", "loadBearing": false,
+         "why": "This explains WHY feed sulphur is low. The measurements in p1 stand on their own, so the conclusion survives its removal. The unsampled clause is deliberate: a fresh guard bed on its own would imply low sulphur, and together with p2 it would reconstruct the conclusion when p1 is the premise ablated."}
       ],
-      "note": "Shortest item with a single load-bearing premise. Both distractors are the two classic false-positive shapes: a rival explanation and a cause of a load-bearing fact."
+      "note": "Shortest item with a single load-bearing premise. Both distractors are the two classic false-positive shapes: a rival explanation and a cause of a load-bearing fact. p3 states that the guard bed is unverified so that the two distractors cannot jointly stand in for p1's measurement when p1 is ablated."
     }
   ]
 }

@@ -73,8 +73,22 @@ const { createHash } = await import('node:crypto');
 const keyOf = (req) =>
   `${which}.${req.role}-${createHash('sha256').update(JSON.stringify({ system: req.system, messages: req.messages })).digest('hex').slice(0, 20)}`;
 
+const SAMPLES_WANTED = 5;
 const missing = new Set();
 let served = 0;
+// INDEPENDENT SAMPLES NEED INDEPENDENT ANSWERS.
+//
+// Calibration makes N identical requests at temperature 1 and reads the
+// SPREAD. Those requests hash to one key, so a naive cache returns the same
+// answer N times, agreement is 1.0 by construction and nothing can ever
+// split — the mechanism would score a perfect zero false-split rate while
+// measuring nothing at all. That is the harness lying, not the mechanism
+// working.
+//
+// So a cache entry for a sampled role may hold a JSON ARRAY of independent
+// answers, and repeat calls on the same key walk it. That reproduces what
+// temperature-1 sampling actually gives the mechanism in production.
+const seenCount = new Map();
 const step = {
   calls: [],
   pending: [],
@@ -82,12 +96,26 @@ const step = {
     async complete(req) {
       const k = keyOf(req);
       step.calls.push(k);
+      const n = (seenCount.get(k) ?? 0);
+      seenCount.set(k, n + 1);
       const hit = join(cacheDir, `${k}.txt`);
-      if (existsSync(hit)) { served += 1; return { text: readFileSync(hit, 'utf8') }; }
+      if (existsSync(hit)) {
+        served += 1;
+        const raw = readFileSync(hit, 'utf8');
+        try {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) return { text: JSON.stringify(parsed[n % parsed.length]) };
+        } catch { /* a single answer, not an array */ }
+        return { text: raw };
+      }
       missing.add(k);
       const f = join(pendingDir, `${k}.json`);
       if (!existsSync(f)) {
-        writeFileSync(f, JSON.stringify({ key: k, role: req.role, json: !!req.json, system: req.system, messages: req.messages, answerTo: hit }, null, 2));
+        writeFileSync(f, JSON.stringify({
+          key: k, role: req.role, json: !!req.json, system: req.system, messages: req.messages,
+          answerTo: hit,
+          ...(which === 'claims' ? { wants: `a JSON ARRAY of ${SAMPLES_WANTED} INDEPENDENT answers to this same question` } : {}),
+        }, null, 2));
       }
       // Neutral: every mechanism under test discards this shape.
       return { text: JSON.stringify({ holds: 'unclear', instead: '', confidence: 0, answer: '', compatible: 'unclear', conflict: '' }) };
@@ -95,6 +123,7 @@ const step = {
     stream() { throw new Error('not used'); },
   },
 };
+
 globalThis.__socriaModelClient = step.client;
 
 const say = (o) => process.stdout.write(JSON.stringify(o) + '\n');

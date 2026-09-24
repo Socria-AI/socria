@@ -69,8 +69,8 @@
       "of": "abl-005", "variant": 1,
       "conclusion": "Thirty days' notice is all we need to exit the vendor contract, and no penalty will be due.",
       "premises": [
-        {"id": "p1", "text": "Termination for convenience is permitted by Section 9.2 on 30 days' written notice."},
-        {"id": "p2", "text": "Under Section 9.4 the early-termination fee is chargeable only where termination occurs within the initial 12-month term."},
+        {"id": "p1", "text": "Termination for convenience is permitted by Section 9.2 on 30 days' written notice, subject to the early-termination fee in Section 9.4."},
+        {"id": "p2", "text": "Under Section 9.4 that fee is chargeable only where termination occurs within the initial 12-month term."},
         {"id": "p3", "text": "We are 26 months into the contract, now in its second renewal term."},
         {"id": "p4", "text": "Against a 99.5% commitment, the vendor has delivered 99.2% uptime on average."},
         {"id": "p5", "text": "A replacement vendor has already been chosen by procurement."}
@@ -82,17 +82,17 @@
       "premises": [
         {"id": "p3", "text": "The contract is 26 months old and sitting in its second renewal term."},
         {"id": "p5", "text": "Procurement has lined up a replacement supplier already."},
-        {"id": "p1", "text": "Section 9.2 lets us end the agreement for convenience with 30 days' written notice."},
+        {"id": "p1", "text": "Section 9.2 lets us end the agreement for convenience with 30 days' written notice, subject to the early-termination fee set by Section 9.4."},
         {"id": "p4", "text": "The vendor promised 99.5% uptime and has averaged 99.2%."},
-        {"id": "p2", "text": "Section 9.4 limits the early-termination fee to terminations made inside the first 12-month term."}
+        {"id": "p2", "text": "Section 9.4 limits that fee to terminations made inside the first 12-month term."}
       ]
     },
     {
       "of": "abl-005", "variant": 3,
       "conclusion": "Exiting the vendor agreement costs us nothing beyond giving 30 days' notice.",
       "premises": [
-        {"id": "p2", "text": "The early-termination fee described in Section 9.4 bites only during the original 12-month term."},
-        {"id": "p1", "text": "A convenience termination is available under Section 9.2 on 30 days' written notice."},
+        {"id": "p2", "text": "That Section 9.4 fee bites only during the original 12-month term."},
+        {"id": "p1", "text": "A convenience termination is available under Section 9.2 on 30 days' written notice, and Section 9.4 attaches an early-termination fee to it."},
         {"id": "p5", "text": "Procurement's selection of a replacement vendor is complete."},
         {"id": "p3", "text": "Twenty-six months have elapsed and the contract is in renewal term two."},
         {"id": "p4", "text": "Average vendor uptime has been 99.2%, short of the 99.5% committed."}
@@ -103,21 +103,21 @@
       "of": "abl-008", "variant": 1,
       "conclusion": "The config change at 14:02 caused the outage; the morning database upgrade did not.",
       "premises": [
-        {"id": "p1", "text": "Within a minute of the 14:02 config deploy, error rates climbed from 0.1% to 41%."},
+        {"id": "p1", "text": "A minute after the 14:02 config deploy, error rates were at 41%."},
         {"id": "p2", "text": "Between the database upgrade's completion at 09:40 and 14:02, a span of four and a half hours, error rates stayed at 0.1%."},
         {"id": "p3", "text": "That config change dropped the connection-pool maximum from 200 down to 20."},
         {"id": "p4", "text": "The database upgrade had been sitting on the change calendar for six weeks."},
-        {"id": "p5", "text": "The page went out to on-call at 14:05 and the incident was declared at 14:09."}
+        {"id": "p5", "text": "The response was run as a sev-1, with the platform on-call as incident commander."}
       ]
     },
     {
       "of": "abl-008", "variant": 2,
       "conclusion": "Responsibility for the outage lies with the 14:02 config change, not with the database upgrade carried out that morning.",
       "premises": [
-        {"id": "p5", "text": "On-call was paged at 14:05, and the incident was declared four minutes later."},
+        {"id": "p5", "text": "The sev-1 process was followed, and the platform on-call took incident command."},
         {"id": "p2", "text": "Error rates were held at 0.1% throughout the four and a half hours between the 09:40 completion of the database upgrade and 14:02."},
         {"id": "p4", "text": "Six weeks of notice had been given on the change calendar for the database upgrade."},
-        {"id": "p1", "text": "A jump in error rates from 0.1% to 41% was observed inside sixty seconds of the 14:02 config deploy."},
+        {"id": "p1", "text": "An error rate of 41% was observed inside sixty seconds of the 14:02 config deploy."},
         {"id": "p3", "text": "The connection-pool maximum was reduced from 200 to 20 by that config change."}
       ]
     },
@@ -125,11 +125,11 @@
       "of": "abl-008", "variant": 3,
       "conclusion": "It was the 14:02 config push that broke things, not the database upgrade from the morning.",
       "premises": [
-        {"id": "p1", "text": "Errors went from 0.1% to 41% less than a minute after the config push at 14:02."},
+        {"id": "p1", "text": "Errors were running at 41% less than a minute after the config push at 14:02."},
         {"id": "p3", "text": "The push cut the maximum connection-pool size from 200 to 20."},
         {"id": "p2", "text": "The database upgrade finished at 09:40 and errors sat at 0.1% for the next four and a half hours, right up to 14:02."},
         {"id": "p4", "text": "The upgrade had been scheduled on the change calendar six weeks earlier."},
-        {"id": "p5", "text": "On-call got paged at 14:05 and an incident was opened at 14:09."}
+        {"id": "p5", "text": "It was handled as a sev-1, with the platform on-call running the incident."}
       ]
     },
 

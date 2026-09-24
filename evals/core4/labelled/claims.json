@@ -49,11 +49,11 @@
   },
   {
     "id": "clm-007",
-    "claim": "Equilibrium climate sensitivity is 3 degrees per doubling of CO2, so that's what we run the scenario on rather than the 2.5 the reinsurer used.",
+    "claim": "The AMOC is on a path to collapse this century - the early-warning work puts the tipping point around mid-century, so that's what the scenario should assume.",
     "truth": "contested",
-    "why": "Independent lines of evidence give materially different answers. Historical energy-budget constraints put equilibrium sensitivity near or below 2.5 C; paleoclimate records and process-based emergent constraints put it at 3 to 4 C; several CMIP6 models exceed 5 C. The assessed likely range spans 2.5 to 4.0 C precisely because the estimate depends on which evidence stream is weighted and how cloud feedbacks and the pattern effect are handled. A competent re-derivation gives about 2.3, about 3.0, or about 3.9 depending on defensible choices the claim does not make.",
+    "why": "Two well-supported readings of the same ocean, giving answers that differ by more than a century. Statistical early-warning analyses of the sea-surface-temperature fingerprint (Ditlevsen and Ditlevsen 2023 and related work) extrapolate a tipping point centred around mid-century with a wide interval; IPCC AR6 assessed a collapse before 2100 as very unlikely under every scenario considered, at medium confidence. The disagreement has specific content: the CMIP6 models underlying the AR6 assessment are known to be biased towards a too-stable circulation through their freshwater-transport term, and correcting that bias in ocean-only and hosing experiments moves the threshold much closer, while the fingerprint reconstruction depends on treating a 150-year SST record as a proxy for overturning strength, which its critics dispute. Competent oceanographers answer 'plausible this century', 'very unlikely this century', and 'not constrainable from what we can currently measure'.",
     "domain": "climate science",
-    "context": "We're setting the temperature pathway for the physical-risk model the insurer will see. The number chosen drives every downstream loss figure in the report. Someone has to sign off on it this week."
+    "context": "This sets the tail assumption in the physical-risk model the insurer will see, and it drives every North Atlantic loss figure in the report. Someone has to sign off on it this week. The model takes one pathway, not a distribution."
   },
   {
     "id": "clm-008",
@@ -109,7 +109,7 @@
     "truth": "contested",
     "why": "The 0.9% is only arithmetic on the job figure; the job figure is what competent labour economists disagree about, because they use different identification strategies on the same data. The Congressional Budget Office's central estimate was in the range of 1.3 to 1.4 million, with an uncertainty band from close to zero to over 2.7 million. Bunching-estimator work following Cengiz, Dube, Lindner and Zipperer finds employment effects statistically indistinguishable from zero. Panel studies in the Neumark and Wascher tradition find substantial losses. The three answers are roughly 0, roughly 1.4 million, and considerably more.",
     "domain": "economics",
-    "context": "I'm drafting the employer's side of a submission on a state wage bill and this is the number that would carry it. It came from a summary rather than the source. The other side's submission cites work saying employment barely moves."
+    "context": "I'm drafting the employer's side of a submission on a state wage bill and this is the number that would carry it. It came from a summary rather than the source. The submission is due Friday and the figure will be quoted back at us."
   },
   {
     "id": "clm-015",
@@ -133,7 +133,7 @@
     "truth": "contested",
     "why": "The baseline is not what is at issue: data centres were about 4.4% of US electricity in 2023 and that figure is well measured. The trajectory is. Published projections span a wide range for stated modelling reasons - the Berkeley Lab assessment gives a 2028 range of roughly 6.7% to 12% of total US electricity depending on utilisation and hardware-efficiency assumptions, and other analysts argue a large share of the announced interconnection queue is speculative or double-counted across utilities. A doubling, a tripling and a much smaller rise are each defensible from assumptions no one has yet shown to be wrong.",
     "domain": "energy",
-    "context": "This figure sets the demand curve in the twenty-year resource plan we file with the regulator. The plan commits capital either way. Two of the consultants we asked gave us different numbers."
+    "context": "This figure sets the demand curve in the twenty-year resource plan we file with the regulator. The plan commits capital either way. The filing takes a single number, not a range."
   },
   {
     "id": "clm-018",
@@ -171,7 +171,7 @@
     "id": "clm-022",
     "claim": "The neutrino mass ordering is normal - the two closely spaced states are the light ones and the isolated state is heavy.",
     "truth": "contested",
-    "why": "Two discrete answers are live, and the claim picks one. Global fits currently favour normal ordering at roughly 2 to 3 sigma, and the size of that preference has moved between analyses as atmospheric and long-baseline pulls were re-evaluated. That is well short of what the field treats as decided, and JUNO and DUNE are being built in part to settle it. A competent physicist answers 'probably normal, not established' or 'undetermined'; a flat assertion of normal ordering is not defensible, and inverted ordering is not excluded.",
+    "why": "Two discrete answers are live and competent physicists divide over whether either is yet established. Global oscillation fits favour normal ordering, but the strength of that preference has moved between analyses - from around 3 sigma down to well under 2 - as atmospheric and long-baseline data were re-evaluated, with NOvA and T2K pulling in different directions. Cosmological bounds on the summed neutrino mass disfavour the inverted ordering further, and some read those as close to deciding it while others treat them as contingent on the assumed cosmology. So the answers on offer are 'normal, and the combined evidence is now strong', 'favoured but not established', and 'undetermined' - which is why JUNO and DUNE are being built to measure it directly.",
     "domain": "particle physics",
     "context": "I'm writing the motivation paragraph for a proposal and need to state where things stand. The experiment we're proposing doesn't depend on the answer but the paragraph does. My co-author wants it stated flatly."
   },
@@ -185,7 +185,7 @@
   },
   {
     "id": "clm-024",
-    "claim": "The Versailles treaty was signed about seven months after the fighting stopped - armistice in November 1918, signature in June 1919.",
+    "claim": "The Versailles treaty was signed about seven and a half months after the fighting stopped - armistice in November 1918, signature in June 1919.",
     "truth": "settled",
     "why": "Documented dates: the armistice took effect on 11 November 1918 and the treaty was signed on 28 June 1919, a gap of seven and a half months. Neither date is in dispute in any serious source, and the arithmetic on them is trivial.",
     "domain": "history",
@@ -211,7 +211,7 @@
     "id": "clm-027",
     "claim": "Apollo put twelve men on the Moon across six landings between July 1969 and December 1972 - the whole thing was about three and a half years end to end.",
     "truth": "settled",
-    "why": "Six successful landings (Apollo 11, 12, 14, 15, 16 and 17), two crew on the surface each time, so twelve moonwalkers; Apollo 11 landed on 20 July 1969 and Apollo 17 on 11 December 1972, a span of three years and five months. Every element is a matter of record and the arithmetic is trivial.",
+    "why": "Six successful landings (Apollo 11, 12, 14, 15, 16 and 17), two crew on the surface each time, so twelve moonwalkers; Apollo 11 landed on 20 July 1969 and Apollo 17 on 11 December 1972, a span of three years and just under five months. Every element is a matter of record and the arithmetic is trivial.",
     "domain": "history of technology",
     "context": "I'm writing the panel text for a museum case and the curator wants the span made concrete rather than left as a decade. The case covers the landings only, not the later programme. There's room for about two sentences."
   },
@@ -233,11 +233,11 @@
   },
   {
     "id": "clm-030",
-    "claim": "Depreciation is non-cash, which is why it's added back at the top of the indirect cash flow statement.",
+    "claim": "In anaphylaxis adrenaline comes first - intramuscular, into the outer thigh - and the antihistamine and the steroid are adjuncts, because neither acts on the airway or the blood pressure in time to matter.",
     "truth": "settled",
-    "why": "Definitional in accrual accounting. Depreciation is a non-cash charge, and the indirect method reconciles net income to operating cash flow by adding non-cash charges back. Any competent preparer describes it the same way, and the stated reason is the correct reason.",
-    "domain": "accounting",
-    "context": "The new analyst asked why our operating cash flow is so much higher than net income, and the answer is mostly the equipment. We took a large depreciation charge this year after the fit-out. I want to give him the one-line version before the board pack goes out."
+    "why": "Every current guideline states the same first-line treatment and the same reason: Resuscitation Council UK, the AAAAI/ACAAI joint parameter, the World Allergy Organization and EAACI all put intramuscular adrenaline into the anterolateral thigh first and without delay, because H1 antagonists act on urticaria and itch and corticosteroids act far too slowly to affect acute airway swelling or circulatory collapse. The adjunct status of the other two is not local preference - the guidelines converge because the pharmacology forces them to. Intravenous adrenaline in refractory cases under monitoring, and the newer intranasal route, are questions about how adrenaline is given, not about whether it goes first.",
+    "domain": "emergency medicine",
+    "context": "I'm rewriting the allergy card that goes home with families after a first reaction. The current one lists the antihistamine first, because that's the thing most of them already have in the house. Two of the parents have asked why the pen matters if the tablet is right there."
   },
   {
     "id": "clm-031",
