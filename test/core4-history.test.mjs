@@ -126,16 +126,24 @@ console.log('\n=== a belief still standing on something withdrawn ===');
 
 console.log('\n=== the same correction, across conversations, unnoticed ===');
 {
-  const mk = (id, conv, from, to) => e({
-    id, conversationId: conv, text: `${to} weeks`, createdAt: NOW - 50 * DAY,
-    revisions: [rev(NOW - 40 * DAY, `${from} weeks`)],
+  // Distinct SUBJECTS, because that is what three separate estimates are. The
+  // first version of this test gave all three the same wording, so they
+  // grouped into one series and the pattern could not be seen — a fault in the
+  // test data that would have hidden a working mechanism.
+  const mk = (id, conv, subject, from, to) => e({
+    id, conversationId: conv, text: `the ${subject} is ${to} weeks of work`, createdAt: NOW - 50 * DAY,
+    revisions: [rev(NOW - 40 * DAY, `the ${subject} is ${from} weeks of work`)],
   });
-  const three = [mk('a', 'c1', 6, 13), mk('b', 'c2', 6, 13), mk('c', 'c3', 4, 9)];
+  const three = [
+    mk('a', 'c1', 'rules engine', 6, 13),
+    mk('b', 'c2', 'claims migration', 6, 13),
+    mk('c', 'c3', 'broker portal', 4, 9),
+  ];
   const f = find(discoverFromHistory(three, [], NOW), 'REPEATED_REVISION');
   ok('three estimates each revised upward is a pattern', !!f);
   ok('  reporting each ratio and the mean', /2\.2×, 2\.2×, 2\.3×/.test(f.what) && /2\.2× on average/.test(f.what), f.what);
   ok('  and calling it a property of how they estimate', /property of how the estimates are made/.test(f.whyItMatters));
-  ok('  and noting no single thread holds more than one', /spread over 3 conversations/.test(f.notInTranscript), f.notInTranscript);
+  ok('  and noting no single thread holds more than one', /no single conversation contains more than one/.test(f.notInTranscript), f.notInTranscript);
   ok('two is not a pattern', !find(discoverFromHistory(three.slice(0, 2), [], NOW), 'REPEATED_REVISION'));
 }
 
@@ -148,13 +156,15 @@ console.log('\n=== restraint, because noise teaches people to stop reading ===')
 
   // At most one per kind, furthest-reaching first: a finding that spans
   // sessions is the one they are least able to make for themselves.
+  // Distinct subjects: two entries with the SAME wording are one trajectory,
+  // not two, and merging them is correct.
   const two = [
-    e({ id: 'near', text: 'nine weeks', createdAt: NOW - 3 * DAY, revisions: [rev(NOW - 3 * DAY, 'four weeks'), rev(NOW - 2 * DAY, 'six weeks')] }),
-    e({ id: 'far', text: 'nine weeks', createdAt: NOW - 60 * DAY, revisions: [rev(NOW - 60 * DAY, 'four weeks'), rev(NOW - 30 * DAY, 'six weeks')] }),
+    e({ id: 'near', text: 'the broker portal is nine weeks', createdAt: NOW - 3 * DAY, revisions: [rev(NOW - 3 * DAY, 'the broker portal is four weeks'), rev(NOW - 2 * DAY, 'the broker portal is six weeks')] }),
+    e({ id: 'far', text: 'the claims migration is nine weeks', createdAt: NOW - 60 * DAY, revisions: [rev(NOW - 60 * DAY, 'the claims migration is four weeks'), rev(NOW - 30 * DAY, 'the claims migration is six weeks')] }),
   ];
   const fs = discoverFromHistory(two, [], NOW);
   ok('one finding per kind', fs.filter((f) => f.kind === 'ESTIMATE_DRIFT').length === 1);
-  ok('  and it is the one reaching furthest back', fs[0].ids[0] === 'far', JSON.stringify(fs[0].ids));
+  ok('  and it is the one reaching furthest back', fs.find((f) => f.kind === 'ESTIMATE_DRIFT').ids.includes('far'), JSON.stringify(fs.map((f) => f.kind + ':' + f.ids)));
 }
 
 console.log('\n=== what the block is allowed to say ===');

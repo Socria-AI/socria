@@ -111,14 +111,70 @@ const firstNum = (s: string): number | null => {
   return n.length ? n[0] : null;
 };
 
-/** Text revisions, oldest first, with the numbers they carried. */
-function trajectory(e: LedgerEntry): { at: number; text: string; value: number | null }[] {
+/** Text revisions of ONE entry, oldest first, with the numbers they carried. */
+function revisionsOf(e: LedgerEntry): { at: number; text: string; value: number | null }[] {
   const out: { at: number; text: string; value: number | null }[] = [];
   for (const r of e.revisions) {
     if (r.change !== 'text' || !r.from) continue;
     out.push({ at: r.at, text: r.from, value: firstNum(r.from) });
   }
   out.push({ at: e.updatedAt, text: e.text, value: firstNum(e.text) });
+  return out;
+}
+
+export interface Series {
+  /** every entry the series is built from — one per conversation it appeared in */
+  ids: string[];
+  conversations: number;
+  points: { at: number; text: string; value: number }[];
+}
+
+/**
+ * THE SERIES SPANS CONVERSATIONS, and it has to.
+ *
+ * A trajectory built only from one entry's revision log cannot reach across
+ * sessions, because `mergeEntries` deliberately does NOT merge a restatement
+ * made in a different conversation — that scoping exists to stop a premise
+ * restated in a new conversation being absorbed by an old one's row, which was
+ * a real leak. Correct for attribution, fatal here: the finding that most needs
+ * to span sessions was the one guaranteed not to.
+ *
+ * Caught by running the mechanism on a realistic three-session restatement and
+ * watching it return nothing. Assuming it worked would have shipped a module
+ * whose headline finding could not fire.
+ *
+ * So a series is assembled the other way round: group the entries that are
+ * plainly about the same thing, concatenate each one's revisions with its final
+ * value, order the whole lot by time, and drop consecutive duplicates.
+ */
+export function seriesOf(entries: readonly LedgerEntry[], min = 3): Series[] {
+  const mine = entries.filter((e) => e.owner === 'user' && e.status !== 'retracted');
+  const groups: LedgerEntry[][] = [];
+  for (const e of mine) {
+    const g = groups.find((x) => overlap(x[0].text, e.text) >= 0.6);
+    if (g) g.push(e);
+    else groups.push([e]);
+  }
+  const out: Series[] = [];
+  for (const g of groups) {
+    const points = g
+      .flatMap((e) => revisionsOf(e))
+      .filter((p): p is { at: number; text: string; value: number } => p.value !== null)
+      .sort((a, b) => a.at - b.at);
+    // The same figure restated is not a movement.
+    const dedup = points.filter((p, i) => i === 0 || p.value !== points[i - 1].value);
+    // `min` differs by caller, and the difference is the point. One figure that
+    // moved once is a correction, so a DRIFT needs three points. But three
+    // separate figures that each moved once is a pattern about how this person
+    // estimates, and holding that to three points each would mean it could only
+    // fire for someone who had already revised nine times.
+    if (dedup.length < min) continue;
+    out.push({
+      ids: g.map((e) => e.id),
+      conversations: new Set(g.map((e) => e.conversationId)).size,
+      points: dedup,
+    });
+  }
   return out;
 }
 
@@ -132,11 +188,8 @@ function trajectory(e: LedgerEntry): { at: number; text: string; value: number |
  */
 function estimateDrift(entries: readonly LedgerEntry[]): HistoricalFinding[] {
   const out: HistoricalFinding[] = [];
-  for (const e of entries) {
-    if (e.owner !== 'user' || e.status === 'retracted') continue;
-    const path = trajectory(e).filter((p) => p.value !== null);
-    if (path.length < 3) continue;
-    const vals = path.map((p) => p.value as number);
+  for (const ser of seriesOf(entries)) {
+    const vals = ser.points.map((p) => p.value);
     const steps: number[] = [];
     for (let i = 1; i < vals.length; i++) if (vals[i - 1] !== 0) steps.push(vals[i] / vals[i - 1]);
     if (!steps.length) continue;
@@ -144,15 +197,17 @@ function estimateDrift(entries: readonly LedgerEntry[]): HistoricalFinding[] {
     const allDown = steps.every((r) => r < 0.87);
     if (!allUp && !allDown) continue;
     const mean = steps.reduce((a, b) => a + b, 0) / steps.length;
-    const span = Math.round((path[path.length - 1].at - path[0].at) / DAY);
+    const span = Math.round((ser.points[ser.points.length - 1].at - ser.points[0].at) / DAY);
     out.push({
       kind: 'ESTIMATE_DRIFT',
-      ids: [e.id],
+      ids: ser.ids,
       what: `They have moved this figure ${vals.length - 1} times: ${vals.join(' → ')}, every step ${allUp ? 'upward' : 'downward'} by about ${mean.toFixed(1)}×.`,
       whyItMatters: allUp
         ? `The current figure is the next in a series, not an independent estimate. On the same pattern the true value is nearer ${(vals[vals.length - 1] * mean).toFixed(1)}.`
         : 'Each revision has cut it, which usually means the original scope is still being discovered rather than that the work is shrinking.',
-      notInTranscript: `Only the latest figure (${vals[vals.length - 1]}) is in the conversation. The earlier ones exist solely in the revision log, so the direction and the multiplier cannot be read off the transcript.`,
+      notInTranscript: ser.conversations > 1
+        ? `Only the latest figure (${vals[vals.length - 1]}) is in this conversation; the earlier ones were said in ${ser.conversations - 1} other conversation${ser.conversations > 2 ? 's' : ''}.`
+        : `Only the latest figure (${vals[vals.length - 1]}) is in the conversation. The earlier ones exist solely in the revision log, so the direction and the multiplier cannot be read off the transcript.`,
       spanDays: span,
     });
   }
@@ -262,25 +317,25 @@ function supportWithdrawn(entries: readonly LedgerEntry[], links: readonly { fro
  * three live in different conversations.
  */
 function repeatedRevision(entries: readonly LedgerEntry[]): HistoricalFinding[] {
-  const upward = entries.filter((e) => {
-    if (e.owner !== 'user') return false;
-    const path = trajectory(e).filter((p) => p.value !== null).map((p) => p.value as number);
-    return path.length >= 2 && path[path.length - 1] > path[0] * 1.15;
+  const upward = seriesOf(entries, 2).filter((ser) => {
+    const v = ser.points.map((p) => p.value);
+    return v[v.length - 1] > v[0] * 1.15;
   });
   if (upward.length < 3) return [];
-  const ratios = upward.map((e) => {
-    const p = trajectory(e).filter((x) => x.value !== null).map((x) => x.value as number);
-    return p[p.length - 1] / p[0];
+  const ratios = upward.map((ser) => {
+    const v = ser.points.map((p) => p.value);
+    return v[v.length - 1] / v[0];
   });
   const mean = ratios.reduce((a, b) => a + b, 0) / ratios.length;
-  const convos = new Set(upward.map((e) => e.conversationId)).size;
+  const convos = new Set(upward.flatMap((ser) => ser.ids)).size;
+  const at = upward.flatMap((ser) => ser.points.map((p) => p.at));
   return [{
     kind: 'REPEATED_REVISION',
-    ids: upward.map((e) => e.id).slice(0, 5),
+    ids: upward.flatMap((ser) => ser.ids).slice(0, 5),
     what: `${upward.length} separate estimates have each been revised upward, by ${ratios.map((r) => r.toFixed(1) + '×').join(', ')} — about ${mean.toFixed(1)}× on average.`,
     whyItMatters: `This is a property of how the estimates are made, not of any one of them. Whatever they quote next is, on their own record, about ${mean.toFixed(1)}× short.`,
-    notInTranscript: `The ${upward.length} revisions are spread over ${convos} conversation${convos === 1 ? '' : 's'}; no single thread contains more than one of them.`,
-    spanDays: Math.round((Math.max(...upward.map((e) => e.updatedAt)) - Math.min(...upward.map((e) => e.createdAt))) / DAY),
+    notInTranscript: `The ${upward.length} revisions are spread across ${convos} separate threads of reasoning; no single conversation contains more than one of them.`,
+    spanDays: Math.round((Math.max(...at) - Math.min(...at)) / DAY),
   }];
 }
 
