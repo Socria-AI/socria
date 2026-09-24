@@ -33,10 +33,17 @@ export default class OpenAI {
           }
           if (p.stream) {
             (g.__prompts ??= []).push(sys);
+            // __streamError makes the provider fail the way it really does:
+            // create() resolves and the FIRST token throws, so the failure
+            // lands inside the stream rather than in the route's outer catch.
+            const boom = g.__streamError;
             // __replies scripts successive replies (first draft, retry, ...);
             // __reply is the same text every time.
             const text = (g.__replies ?? []).shift() ?? g.__reply ?? 'Noted.';
-            return (async function* () { yield { choices: [{ delta: { content: text } }] }; })();
+            return (async function* () {
+              if (boom) throw Object.assign(new Error(boom.message ?? 'upstream'), boom);
+              yield { choices: [{ delta: { content: text } }] };
+            })();
           }
           // A buffered Core 4 regeneration (role 'retry') is a non-streamed
           // call with the reply prompt.

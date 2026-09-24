@@ -10,6 +10,7 @@
 // limited either way.
 
 import { NextRequest, NextResponse } from 'next/server';
+import { streamFailureNotice } from '@/lib/upstream-error';
 import OpenAI from 'openai';
 import { auth } from '@clerk/nextjs/server';
 import {
@@ -406,13 +407,19 @@ export async function POST(req: NextRequest) {
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
       async start(controller) {
+        let sent = false;
         try {
           for await (const chunk of completion) {
             const delta = chunk.choices?.[0]?.delta?.content ?? '';
-            if (delta) controller.enqueue(encoder.encode(delta));
+            if (delta) {
+              sent = true;
+              controller.enqueue(encoder.encode(delta));
+            }
           }
-        } catch {
-          controller.enqueue(encoder.encode('\n\n[Connection interrupted.]'));
+        } catch (e) {
+          // Was `catch {}` with a fixed line: the failure reached neither the
+          // person nor the log, so an expired key looked like a flaky network.
+          controller.enqueue(encoder.encode(streamFailureNotice('logos chat stream', e, sent)));
         } finally {
           controller.close();
         }

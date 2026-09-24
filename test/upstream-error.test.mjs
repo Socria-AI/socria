@@ -14,11 +14,30 @@
 // somebody sees names something they can act on, and that nothing from the
 // upstream error object rides along with it.
 
-import { classifyUpstream, failureText } from './.tmp/upstream-error.mjs';
+import { classifyUpstream, failureText, streamFailureNotice } from './.tmp/upstream-error.mjs';
 
 let pass = 0, fail = 0;
 const ok = (n, c, x = '') => (c ? pass++ : (fail++, console.log('FAIL', n, x)));
 const err = (o) => Object.assign(new Error(o.message ?? 'x'), o);
+
+// The same three, once the reply has started streaming. Reported from dev:
+// every message, including "hi", came back as "[Connection interrupted.
+// Please try again.]" and nothing else — the generic line, one layer in.
+console.log('=== a failure that lands after the headers ===');
+{
+  const auth = streamFailureNotice('t', err({ status: 401, message: 'Incorrect API key provided' }), false);
+  ok('a bad key names authentication, not the connection', /authenticate with the model provider/.test(auth) && !/Connection interrupted/.test(auth), auth);
+  ok('  and carries a reference to quote', /\(ref [a-z0-9]{6}\)/.test(auth), auth);
+  const quota = streamFailureNotice('t', err({ status: 429, message: 'Rate limit reached' }), false);
+  ok('quota is told apart from a bad key', /rate-limiting or has run out of quota/.test(quota), quota);
+  const model = streamFailureNotice('t', err({ status: 404, message: 'The model `x` does not exist' }), false);
+  ok('an unreachable model is told apart from both', /model .* is unavailable to this deployment/.test(model), model);
+  ok('the three no longer read the same', new Set([auth, quota, model].map((s) => s.replace(/ref [a-z0-9]+/, ''))).size === 3);
+  const mid = streamFailureNotice('t', err({ status: 500, message: 'upstream boom' }), true);
+  ok('mid-reply, it says the reply stopped', /^\n\n\[The reply stopped here\./.test(mid), mid);
+  ok('  and nothing from the error object rides along', !/boom/.test(mid) && !/500/.test(mid), mid);
+  ok('an unclassifiable failure still says something', /Something went wrong on our side/.test(streamFailureNotice('t', new Error('???'), false)));
+}
 
 console.log('=== the three that used to look identical ===');
 {

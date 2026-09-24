@@ -150,3 +150,34 @@ export function failureText(body: unknown, fallback = 'Something went wrong.'): 
   if (!/^[a-z0-9]{4,12}$/.test(ref)) return sentence;
   return `${sentence} (ref ${ref})`;
 }
+
+/**
+ * The same classification, for a failure that lands AFTER the response has
+ * started streaming.
+ *
+ * THE GAP THIS CLOSES. Everything above runs in the route's outer catch — the
+ * one that can still choose a status code and a JSON body. But a streamed
+ * reply awaits the provider's FIRST TOKEN inside the stream, so the three
+ * failures this module exists to tell apart (an expired key, a model the
+ * account cannot reach, the provider being down) all arrive after the headers
+ * have gone out. They were caught there and rendered as one sentence:
+ *
+ *     [Connection interrupted. Please try again.]
+ *
+ * which is the same unactionable answer as `{"error":"Internal error"}`, one
+ * layer further in — and worse than nothing when retrying cannot help,
+ * because it asks the person to keep trying something that will keep failing.
+ * Reported again from dev: every reply, including "hi", came back as exactly
+ * that line and nothing else.
+ *
+ * Same discipline as the rest of the file: nothing from the error is
+ * forwarded, only a fixed sentence and a reference that is also in the log.
+ */
+export function streamFailureNotice(where: string, err: unknown, sentSomething: boolean): string {
+  const f = reportUpstream(where, err);
+  // Mid-reply, the sentence has to say the reply stopped — the person can see
+  // that it did, and an explanation that ignores it reads as a non-sequitur.
+  return sentSomething
+    ? `\n\n[The reply stopped here. ${f.reason} (ref ${f.ref})]`
+    : `\n\n[${f.reason} (ref ${f.ref})]`;
+}

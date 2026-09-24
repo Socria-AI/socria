@@ -81,9 +81,10 @@ async function quiet() {
 }
 
 /** One Core 4 turn. Returns what Core 4 was told, what the person received, and the eval trace. */
-async function turn(conversationId, messages, { state = {}, replies, guard, check, projectId } = {}) {
+async function turn(conversationId, messages, { state = {}, replies, guard, check, projectId, streamError } = {}) {
   globalThis.__state = state;
   globalThis.__replies = [...(replies ?? ['Noted.'])];
+  globalThis.__streamError = streamError;
   globalThis.__reply = undefined;
   globalThis.__guard = guard;
   globalThis.__check = check;
@@ -455,6 +456,22 @@ console.log('\n=== run 5: their own question is never "they accepted Socria\'s p
   const said2 = [U('Two groups: subsidy and non-subsidy counties.'), A('The effect is the change in the subsidy counties minus the change in the others.'), U('So the effect is the change in the subsidy counties minus the change in the others, 2.1 points.')];
   const r2 = await turn(conv + '-b', said2, { state: { work: 'verification', latest: 'attempt', currentFocus: 'difference in differences', consideredNow: [{ kind: 'claim', text: 'The effect is the change in the subsidy counties minus the change in the others', quote: 'the effect is the change in the subsidy counties minus the change in the others', stance: 'asserts', reason: '' }] } });
   ok('their echoing conclusion is "they said just now", never credited to Socria', r2.prompt.includes('they said just now: The effect is the change') && !r2.prompt.includes("Socria's point"), r2.prompt.slice(-700));
+}
+
+console.log('\n=== a provider failure says what happened (reported from dev) ===');
+{
+  // "hi" came back as "[Connection interrupted. Please try again.]" and
+  // nothing else: the provider failed on the first token, which lands inside
+  // the stream, where every cause was rendered as the same unactionable line.
+  const bad = await turn('upstream-401', [U('hi')], { state: { work: 'conversation', latest: 'other' }, streamError: { status: 401, message: 'Incorrect API key provided' } });
+  ok('the person is told it is authentication, not their connection', /authenticate with the model provider/.test(bad.received) && !/Connection interrupted/.test(bad.received), bad.received);
+  ok('  with a reference that is also in the log', /\(ref [a-z0-9]{6}\)/.test(bad.received), bad.received);
+  ok('  and no fragment of the upstream error', !/Incorrect API key/.test(bad.received) && !/401/.test(bad.received), bad.received);
+  const quota = await turn('upstream-429', [U('hi')], { state: { work: 'conversation', latest: 'other' }, streamError: { status: 429, message: 'You exceeded your current quota' } });
+  ok('a different cause reads differently', /rate-limiting or has run out of quota/.test(quota.received), quota.received);
+  globalThis.__streamError = undefined;
+  const fine = await turn('upstream-ok', [U('hi')], { state: { work: 'conversation', latest: 'other' }, replies: ['Hello.'] });
+  ok('a healthy turn is untouched', fine.received.includes('Hello.') && !/ref /.test(fine.received), fine.received);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

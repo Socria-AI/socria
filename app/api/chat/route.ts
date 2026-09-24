@@ -38,7 +38,7 @@ import {
 } from '@/lib/conversation-controller';
 import { enforceRateLimit } from '@/lib/rate-limit';
 import { eggFor } from '@/lib/easter-eggs';
-import { reportUpstream } from '@/lib/upstream-error';
+import { reportUpstream, streamFailureNotice } from '@/lib/upstream-error';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { memoryCaps, selectRelevant, visibleEntries } from '@/lib/person-memory';
 import { mayUse } from '@/lib/route-guard';
@@ -580,13 +580,14 @@ export async function POST(req: NextRequest) {
           }
 
         } catch (e) {
-          console.error('stream error:', e);
           // On a guarded turn nothing has been sent yet, so whatever was
           // collected before the failure goes out with the notice rather
           // than being lost entirely.
+          // Either it streamed as it arrived, or it is being sent now: the
+          // person has words in front of them iff anything was collected.
           if (guarded && reply.trim()) controller.enqueue(encoder.encode(reply));
           controller.enqueue(
-            encoder.encode('\n\n[Connection interrupted. Please try again.]')
+            encoder.encode(streamFailureNotice('core chat stream', e, !!reply.trim()))
           );
         } finally {
           controller.close();
@@ -748,15 +749,17 @@ function core4Reply(x: {
           if (p) p.ms.generate = Date.now() - t0;
         }
       } catch (e) {
-        console.error('stream error:', e);
-        if (reply.trim() && (!p || p.decision.guardRequired)) {
+        const buffered = !p || p.decision.guardRequired;
+        let sent = !buffered && !!reply.trim();
+        if (reply.trim() && buffered) {
           // Nothing has been sent on a buffered turn; send only what the
           // deterministic guard accepts, never the raw draft.
           const safe = p ? fallbackReply(p, reply, null).text : reply;
           controller.enqueue(encoder.encode(safe));
           reply = safe;
+          sent = !!safe.trim();
         }
-        controller.enqueue(encoder.encode('\n\n[Connection interrupted. Please try again.]'));
+        controller.enqueue(encoder.encode(streamFailureNotice('core 4 stream', e, sent)));
       } finally {
         try {
           if (p) await finishTurn(p, reply, guard, regenerated, novelty, served, CORE_4_PROMPT_VERSION);
