@@ -730,6 +730,97 @@ same baseline transcripts with both fixed.
   the same one six runs have shown: restraint is not the problem.
 - `mustContribute` 3/6 vs 5/6.
 
+### Run 8 — the fixes land, the result gets worse, and the reason is measurable
+
+The same eight power-user scenarios, Core 4 re-run against the same frozen
+baseline transcripts, with both run-7 bugs fixed (novelty gate no longer
+classifies a finding against the sentences the finding itself quotes; the
+problem model is scoped to the conversation and its Project). Eight blind
+judgments, arms relabelled A/B under a fresh salt.
+
+| | Core 4 | Baseline | Tie | n |
+|---|---|---|---|---|
+| scenarios | **1** | **6** | 1 | 8 |
+| turns | 4 | 13 | 5 | 22 |
+
+Worse than run 7, on a strictly better build. The one win is the **control**
+— `power-no-finding-006`, where raising anything is the failure — for the
+second run running.
+
+**The detectors now fire, and firing does not help.** Run 7 surfaced nothing;
+run 8 raised a finding on 8 of 22 turns, all on the intended target
+(CONTRADICTION ×4, HIDDEN_ASSUMPTION ×3, MISSING_DECISION_CRITERIA ×2,
+STALE_BELIEF ×1), and was silent on the control. Split the turn-level
+judgments by whether a finding was raised:
+
+| | Core 4 | Baseline | Tie |
+|---|---|---|---|
+| turns where a finding was raised (8) | 1 | 6 | 1 |
+| turns with no finding (14) | 3 | 7 | 4 |
+
+Raising a finding did not improve the win rate; it is slightly worse.
+
+One confound, stated because it is real and it is mine: run 8's frozen bundle
+(`runs/run8/.build`, 07:47) predates `cc1ad9e` (08:06), which was written
+*because of* a run-8 reply — `power-unsupported-004` turn 1 opened "The thing
+the model structurally cannot see", quoting the move block's own framing back
+at the person. One reply of 22, on a finding turn, in a scenario the baseline
+won by margin 1. It does not explain six losses, and the fix is in the tree,
+not in this measurement. Run 8's bundle also predates `bfced89` (retiring two
+state fields nobody read), which has no behavioural effect on a reply.
+
+Five detectors never fired at all (MISSING_EVIDENCE, UNVERIFIED_FACT,
+FALSE_BINARY, REPEATED_LOOP, UNDERWEIGHTED_UNCERTAINTY) — including on
+`power-binary-007`, which was written for FALSE_BINARY.
+
+**The gap is not manner. It is volume.**
+
+| mean score (1–5) | Core 4 | Baseline |
+|---|---|---|
+| helpfulness | 4.13 | 4.88 |
+| agency | 5.00 | 4.88 |
+| peer | 5.00 | 4.63 |
+| friction | **1.75** | 3.00 |
+
+Core 4 is ahead or level on every axis except helpfulness, and it is ahead on
+friction by a wide margin. Mean reply: **280 words against 425.** Across the
+sixteen scenario-arm pairs, mean reply length correlates with the judges'
+helpfulness score at **r = 0.50** (friction r = 0.66). Core 4 scored
+helpfulness 5 exactly once, on the control. Six of the eight verdicts say
+some version of what `power-rests-on-001` says outright: *"A's extra material
+— the upgrade-path bias, the significance check, the process calendar and
+growth arithmetic — is substance rather than padding."*
+
+**The mechanism, found in Core 4's own trace.** On **12 of those 22 turns**
+the state block already read `stakes: high` and `expertise: expert`. The Core
+4 prompt names exactly that case as the exception to its own brevity default
+("a consequential decision or an expert's analysis is the exception: there,
+completeness on what matters beats brevity"). Nothing carried the reading
+from the allocator to the length policy, so the nearer and more concrete
+instruction — "Default to 1–3 short paragraphs" — won, and on forced turns
+the move objective won by explicit precedence. `power-rests-on-001` turn 1 is
+the clean case: the founder posts a finished retention analysis, Core 4 reads
+it as a correct attempt, selects VERIFY, whose objective ends *"one sentence
+on it. Then stop — no new quiz."* — and replies in **132 words** to the
+baseline's 353. The judge: baseline "is the only side that ever surfaces the
+scoping dependency the scenario is testing."
+
+That is not a prompt-tuning oversight. It is the allocator computing a
+reading and then discarding it before the layer that needed it. Fixed by
+`coverage` (`lib/core4/intervene.ts`): computed from stakes and demonstrated
+expertise, rendered inside the move block where Precedence puts it above the
+general guidance, and gated hard — substantive moves only, never beside a
+withhold, and any length the person named wins outright. It fires on 12 of
+run 8's 22 turns. **Unmeasured: run 9 is the test, and if Core 4's replies on
+those turns do not gain substance, the hypothesis is wrong.**
+
+**What the eval deliberately gives away.** The baseline arm receives the full
+transcripts of earlier sessions (`evals/core4/lib/runner.mjs`: "the baseline
+is not allowed to lose because it forgot"). That is the conservative choice,
+and it means this harness hands the prompt-only arm, for free, the one thing
+Core 4's persistence exists to provide. Read with §4′: the suite cannot show
+a memory advantage, and it is too short to need one.
+
 ### Full corpus
 
 Not yet run.

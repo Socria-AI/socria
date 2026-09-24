@@ -39,7 +39,7 @@ client sends the conversation; the server holds everything Core 4 knows.
 | 9″ | MISSING CONTRIBUTION | `lib/core4/contribution.ts detectMissing` | What is ABSENT, asked before the move is chosen: a conclusion resting on an unsupported assumption, a contradiction between distant turns, a belief still resting on something dropped, a load-bearing claim with no evidence, a decision with nothing bounding it, a two-option framing, a question open for many turns. Pure queries over the graph. Gated by the same novelty classifier the guard uses (excluding the finding's own subjects) and by task-scoped expertise; at most one is raised. |
 | 9‴ | EXPERTISE, per task | `lib/core4/capability.ts taskCompetence` | What they have SHOWN on this concept, counted from verified events in `capability_evidence` — which had been written every turn and never read back. Conservative and asymmetric: two unassisted successes for 'expert', one miss pulls back. Their own words are never overridden. |
 | 10 | ALLOCATE | `lib/core4/allocation.ts` | Who does which part of the thinking, with a machine-readable rationale and a withhold (what, reason, evidence, source) — or none. |
-| 11 | INTERVENE | `lib/core4/intervene.ts` | One move, with type, reason code, intended outcome, human work preserved, AI work performed, confidence, whether the guard must read it, max questions, token budget — and whether it is **forced**. Forced only on explicit or verified evidence (their words, a contract, safety, a computed/checked verdict, an injected calculation); otherwise the move block renders constraints only ("No move is imposed"). |
+| 11 | INTERVENE | `lib/core4/intervene.ts` | One move, with type, reason code, intended outcome, human work preserved, AI work performed, confidence, whether the guard must read it, max questions, token budget, **coverage** (how much of what matters this reply should cover — `complete` only on a high-stakes turn for someone with demonstrated expertise, on a move that carries substance, with nothing withheld) — and whether it is **forced**. Forced only on explicit or verified evidence (their words, a contract, safety, a computed/checked verdict, an injected calculation); otherwise the move block renders constraints only ("No move is imposed"). |
 | 12 | Verify Mode, checker | `lib/cognition/engine.ts checkWork` | Whenever they offered something to check and arithmetic could not settle it — not only under a withhold, which was the old gate and meant the checker ran on 6 of the 38 turns in run 6 that had checkable work, the other 32 shipping the cheap reader's guess as fact. A separate cheap-model call judges the attempt (1.5 s timeout). Its expected answer never reaches the reply model; a confident verdict that contradicts the reader re-decides the move. |
 | 13 | Prompt assembled | `lib/socria-prompt.ts buildSystemPrompt` | Core 4 prompt v6 (v5 added the baseline's peer instruction, contributing what they have not considered, after run 3; v6 lets decisions and expert analysis be complete rather than brief, after run 4), imported profile, Project, Mind Graph, then the state block, the verify block, the move block — in that order, last before the transcript. No thread memory, no Thinking Journey. |
 | 14 | Generate | `route.ts core4Reply`, `lib/core4/model.ts` | Through the model seam. **Buffered** only if something is withheld (so the guard reads the whole draft before anything is sent); otherwise **streamed** through the sentence gate (council D8 — buffering every perspective move put the latency on expert turns). |
@@ -133,7 +133,22 @@ a genuine blocker says what can already be said first. Diminishing returns
 switch strategy and the switch is recorded. Every decision carries
 `reasonCode, reason, intendedOutcome, humanWorkPreserved, aiWorkPerformed,
 confidence, guardRequired, maxQuestions, objective, avoid, switchedFrom,
-maxTokens`.
+maxTokens, coverage`.
+
+**`coverage`** (`minimal | normal | complete`) is how much of what matters the
+reply should cover, computed from the state the allocator already read. Run 8
+measured why it has to exist: on 12 of 22 turns the state block said `stakes:
+high, expertise: expert`, the prompt names exactly that case as the exception
+to its own "1-3 short paragraphs" default, and nothing carried the reading to
+it — so Core 4 answered in 280 words to a prompt-only baseline's 425 and lost
+6 of 8 scenarios on substance while winning friction 1.75 to 3.00. Rendered
+inside the move block, where the prompt's Precedence section puts it above the
+general guidance, and above an objective that caps how much to add ("one
+sentence on it. Then stop"). Gated hard, because the opposite failure is on
+record too (runs 4-6 lost expert turns for padding): substantive moves only,
+both conditions required, **never beside a withhold** — "cover everything that
+matters" next to "keep this from them" resolves as a leak — and any length the
+person named wins outright.
 
 ### Question budget and diminishing returns — `lib/core4/budget.ts`, `questions.ts`
 One counter for "a question" everywhere (engine, guard, gate, grader):

@@ -28,6 +28,7 @@ import type {
   Allocation,
   Diminishing,
   ExplicitSignals,
+  Coverage,
   InterventionDecision,
   InterventionType,
   QuestionBudget,
@@ -104,6 +105,7 @@ function d(
     avoid: o.avoid.slice(0, 12),
     switchedFrom: o.switchedFrom ?? null,
     maxTokens: TOKENS[type] ?? 600,
+    coverage: 'normal',
     questionsAreContent: false,
     forced: false,
   };
@@ -122,6 +124,57 @@ function recentlyChallenged(s: CognitiveState): boolean {
 
 /** Moves imposed because the PERSON or a verified fact asked for them (council D1). */
 const FORCING = new Set(['safety', 'practice.bottom_out', 'practice.let_me_try', 'quiz.contract', 'done', 'recommendation.requested', 'retrieve.history', 'reflect.heard', 'reflect.minimal']);
+
+/**
+ * Moves that carry substance. A reply that explains, decides, corrects,
+ * critiques or connects can be worth more when it covers more; a hint that
+ * covers more has stopped being a hint.
+ */
+const SUBSTANTIVE = new Set<InterventionType>([
+  'ANSWER', 'EXPLAIN', 'CRITIQUE', 'SYNTHESIZE', 'CHALLENGE', 'CONNECT',
+  'CONTRIBUTE', 'CORRECT', 'EXECUTE', 'CALCULATE', 'VERIFY',
+]);
+
+/** Moves that are short by nature — there is nothing to be complete about. */
+const BRIEF_BY_NATURE = new Set<InterventionType>([
+  'HINT', 'QUESTION', 'CLARIFY', 'REFLECT', 'GET_OUT_OF_THE_WAY',
+]);
+
+/**
+ * How much of what matters this reply should cover.
+ *
+ * Run 8 (power-user suite, 8 held-out scenarios, blind judges): Core 4 lost
+ * 6 of 8 to a prompt-only frontier baseline, mean reply 280 words against
+ * 425, and in this sample mean length correlates with the judges'
+ * helpfulness score at r = 0.50. On agency, peer and friction Core 4 was
+ * level or ahead — friction 1.75 against 3.00 — so the gap was not manner.
+ * It said less. On 12 of those 22 turns its own state block already read
+ * `stakes: high` and `expertise: expert`, which is exactly the case the
+ * prompt names as the exception to its own brevity default. Nothing carried
+ * that reading from the allocator to the length policy, so the nearer, more
+ * concrete instruction won.
+ *
+ * The gates are deliberately narrow, because the opposite failure is on
+ * record too: runs 4–6 lost expert turns for padding past a length the
+ * person had asked for. So both conditions must hold, the move must be one
+ * that carries substance, and any explicit length the person gave wins
+ * outright.
+ */
+export function coverageFor(input: SelectInput, dec: InterventionDecision): Coverage {
+  const { state: s, allocation: a, signals } = input;
+  // A length they named, a standing "answers only", a close: their words.
+  if (signals.sentences || signals.done || signals.answersOnly || s.answersOnly) return 'minimal';
+  if (BRIEF_BY_NATURE.has(dec.type)) return 'minimal';
+  if (!SUBSTANTIVE.has(dec.type)) return 'normal';
+  // Never beside a withhold: "cover everything that matters" next to "keep
+  // this one thing from them" is a contradiction, and the contradiction
+  // resolves as a leak.
+  if (a.withhold) return 'normal';
+  const known = s.expertise.source === 'explicit' || s.expertise.source === 'observed' || s.expertise.confidence >= 0.6;
+  if (!known || s.expertise.value !== 'expert') return 'normal';
+  if (s.stakes.value !== 'high') return 'normal';
+  return 'complete';
+}
 
 export function selectIntervention(input: SelectInput): InterventionDecision {
   let dec = selectMove(input);
@@ -186,6 +239,7 @@ export function selectIntervention(input: SelectInput): InterventionDecision {
   // Questions they ASKED FOR (interview questions, a quiz, practice problems)
   // are the content of the reply, not interrogation: the budget does not
   // price them and the guard does not strip them (council D4).
+  dec = { ...dec, coverage: coverageFor(input, dec) };
   return input.signals.requestsQuestions ? { ...dec, questionsAreContent: true } : dec;
 }
 
@@ -520,11 +574,23 @@ export function renderDecision(dec: InterventionDecision, a: Allocation): string
         ? 'Questions this turn: NONE. Not as a question, not disguised as a hint or a challenge ("consider whether…", "ask yourself…"), not as a closing offer.'
         : 'Questions this turn: at most ONE, and only if it is genuinely needed. No closing offers.';
 
+  // The completeness clause the prompt already carries, invoked from the one
+  // place that has the evidence for it (their stakes, their demonstrated
+  // expertise) and at the precedence level that wins. `minimal` says nothing:
+  // the prompt's own default is already the least language the move needs,
+  // and a second instruction to be brief is how a short reply becomes a
+  // curt one.
+  const coverage =
+    dec.coverage === 'complete'
+      ? 'COVERAGE: this is a consequential call and they work in this area. Completeness on what matters beats brevity here: cover every non-obvious consideration that would change what they do or conclude — each once, as tightly as it can be said — then stop. Do not restate what they established, do not add a summary, and do not reach for extra considerations to fill the space. Where the objective above caps how much to add ("one sentence on it", "then stop"), this supersedes that cap; what kind of move this is, and the question limit, still stand.'
+      : null;
+
   // Not forced: constraints only; the model chooses the move (council D1).
   if (!dec.forced) {
     return [
       '\n=== This turn ===',
       'No move is imposed. Reply to what they actually said, as a strong peer would, and help fully: answer what they asked, correct what is wrong, and where you can, add the one thing they have not considered — never manufacture it.',
+      ...(coverage ? [coverage] : []),
       ...context,
       '',
       questions,
@@ -536,6 +602,7 @@ export function renderDecision(dec: InterventionDecision, a: Allocation): string
     '\n=== Your move this turn ===',
     `MOVE: ${dec.type}`,
     `OBJECTIVE: ${dec.objective}`,
+    ...(coverage ? [coverage] : []),
   ];
   if (a.withhold) {
     lines.push(

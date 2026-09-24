@@ -534,5 +534,57 @@ console.log('\n=== every decision is well-formed ===');
   ok('the engine reaches most of the vocabulary', seen.size >= 8, [...seen].join(','));
 }
 
+console.log('\n=== run 8: what the allocator knows about stakes reaches the length policy ===');
+{
+  // Run 8 measured the gap: Core 4 replied in 280 words where the prompt-only
+  // baseline used 425, lost 6 of 8 scenarios, and every loss read as the
+  // baseline carrying more substance — while Core 4's own state block on 12
+  // of those 22 turns said `stakes: high, expertise: expert`. The prompt
+  // already names that case as the exception to its brevity default; nothing
+  // carried the reading to it.
+  const E = (value, source = 'observed', confidence = 0.7) => ({ value, source, confidence, evidence: 'shown' });
+  const high = { value: 'high', source: 'inferred', confidence: 0.8, evidence: 'reader' };
+  const base = { work: 'judgment', taskKind: 'decide', latest: 'request', expertise: E('expert'), stakes: high };
+
+  const consequential = decide(S(base), { said: 'Here are my churn numbers and the raise timing. What breaks?' });
+  ok('a consequential call by someone who works in the area is covered completely', consequential.decision.coverage === 'complete', `${consequential.decision.type} ${consequential.decision.coverage}`);
+  const block = renderDecision(consequential.decision, consequential.allocation);
+  ok('  and the move block says so, where precedence puts it above the prompt default', /COVERAGE:/.test(block) && /completeness on what matters beats brevity/i.test(block));
+  ok('  and it supersedes an objective that caps how much to add', /supersedes that cap/.test(block));
+  ok('  without licensing padding', /do not reach for extra considerations to fill the space/i.test(block));
+
+  ok('low stakes is not a reason to cover everything',
+    decide(S({ ...base, stakes: { value: 'low', source: 'inferred', confidence: 0.8, evidence: 'reader' } }), { said: 'What breaks?' }).decision.coverage === 'normal');
+  ok('high stakes alone is not either — a novice gets the normal reply',
+    decide(S({ ...base, expertise: E('novice') }), { said: 'What breaks?' }).decision.coverage === 'normal');
+  ok('a weak guess at expertise does not unlock it',
+    decide(S({ ...base, expertise: { value: 'expert', source: 'inferred', confidence: 0.3, evidence: 'used a word' } }), { said: 'What breaks?' }).decision.coverage === 'normal');
+
+  // The opposite failure is on record too (runs 4-6: expert turns lost for
+  // padding past a length the person asked for), so their own words win.
+  ok('a sentence count they asked for wins outright',
+    decide(S(base), { said: 'In one sentence: what breaks?' }).decision.coverage === 'minimal');
+  ok('"answers only" wins outright',
+    decide(S({ ...base, answersOnly: true }), { said: 'What breaks?' }).decision.coverage === 'minimal');
+  ok('a close stays a close',
+    decide(S(base), { said: 'Got it, thanks.' }).decision.coverage === 'minimal');
+
+  // "Cover everything that matters" beside "keep this one thing from them"
+  // is a contradiction, and the contradiction resolves as a leak.
+  const heldSaid = 'I want to learn to do these myself. This is the SEC filing my board reads — I got 2x cos x, right?';
+  const withheld = decide(turn({ taskKind: 'learn', work: 'verification', latest: 'attempt', attempt: 'wrong', expertise: E('expert'), stakes: high }, heldSaid), { said: heldSaid });
+  ok('  (the withhold is real)', withheld.allocation.withhold?.reason === 'practice_goal', JSON.stringify(withheld.allocation.withhold));
+  ok('  (and the state that would otherwise unlock it is real)', withheld.decision.type === 'VERIFY' && withheld.allocation.withhold !== null);
+  ok('nothing is covered completely beside a withhold', withheld.decision.coverage === 'normal', `withhold=${!!withheld.allocation.withhold} coverage=${withheld.decision.coverage}`);
+
+  // A hint that covers everything has stopped being a hint.
+  const hinting = decide(S({ work: 'practice', practice: 'retrieval', stuck: 'stuck', expertise: E('expert'), stakes: high, learningGoal: { value: 'yes', source: 'explicit', confidence: 1, evidence: 'I want to learn this' } }));
+  ok('  (the move really is one of the short ones)', ['HINT', 'QUESTION', 'CLARIFY', 'REFLECT', 'GET_OUT_OF_THE_WAY'].includes(hinting.decision.type), hinting.decision.type);
+  ok('a move that is short by nature stays short', hinting.decision.coverage === 'minimal', `${hinting.decision.type} ${hinting.decision.coverage}`);
+
+  ok('an ordinary turn says nothing about coverage at all',
+    !/COVERAGE:/.test(renderDecision(decide(S({ work: 'explanation', latest: 'question' })).decision, decide(S({ work: 'explanation', latest: 'question' })).allocation)));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

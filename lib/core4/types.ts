@@ -277,6 +277,14 @@ export interface Diminishing {
   from: string | null;
 }
 
+/**
+ * minimal — short by nature, or a length they asked for.
+ * normal  — the prompt's default: the least language the move needs.
+ * complete — cover every non-obvious consideration that would change what
+ *            they do or conclude, each once, as tightly as it can be said.
+ */
+export type Coverage = 'minimal' | 'normal' | 'complete';
+
 export interface InterventionDecision {
   type: InterventionType;
   reasonCode: string;
@@ -296,6 +304,27 @@ export interface InterventionDecision {
   switchedFrom: string | null;
   /** generation budget for this move */
   maxTokens: number;
+  /**
+   * How much of what matters this reply should cover.
+   *
+   * WHY THIS IS A FIELD AND NOT A SENTENCE IN THE PROMPT. The Core 4 prompt
+   * already carries the rule — "a consequential decision or an expert's
+   * analysis is the exception: there, completeness on what matters beats
+   * brevity" — and it sat next to a nearer, more concrete default ("1–3 short
+   * paragraphs"). Run 8 measured which one wins: Core 4 replied in 280 words
+   * where the prompt-only baseline used 425, lost 6 of 8 scenarios, and every
+   * loss was written up as the baseline carrying more substance. Meanwhile the
+   * trace for those same turns says `stakes: high, expertise: expert`. The
+   * system knew; nothing carried the knowledge to the length policy.
+   *
+   * So coverage is computed where the evidence lives and rendered inside the
+   * move block, which the prompt's Precedence section says outranks the
+   * general guidance. It is not permission to pad: it fires only on high
+   * stakes AND demonstrated expertise, only on moves that carry substance,
+   * and never when something is being held back — "cover everything" beside
+   * "keep this from them" is a contradiction that invites a leak.
+   */
+  coverage: Coverage;
   /** the person asked FOR questions (a quiz, interview questions): they are content, not interrogation */
   questionsAreContent: boolean;
   /**
