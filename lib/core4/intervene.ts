@@ -139,6 +139,13 @@ export function selectIntervention(input: SelectInput): InterventionDecision {
       input.signals.directness !== 'none' ||
       (input.state.directness.source === 'explicit' && input.state.directness.value !== 'none'),
   };
+  // An exact sentence count they asked for is part of the task (run 6:
+  // expert-004 and expert-009 lost for padding past "one sentence" and "two
+  // sentences").
+  if (input.signals.sentences) {
+    const n = input.signals.sentences;
+    dec = { ...dec, forced: true, objective: `${dec.objective} They asked for ${n === 1 ? 'one sentence' : `${n} sentences`}: write exactly that many, and nothing before or after.` };
+  }
   // A length they asked for sets the budget (council D17).
   if (input.signals.requestedTokens) dec = { ...dec, maxTokens: Math.min(4000, Math.max(dec.maxTokens, input.signals.requestedTokens)) };
   // "Answers only, no explanations" (their words or the Project), unless this

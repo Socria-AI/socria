@@ -36,6 +36,7 @@ export const NO_SIGNALS: ExplicitSignals = {
   safety: false,
   recommendationRequested: false,
   dontKnow: false,
+  sentences: 0,
   tooDirect: false,
   offRecord: false,
   onRecord: false,
@@ -201,6 +202,15 @@ const SAFETY = /\b(swallowed (?:a |an |some )?(?:button )?(?:battery|batteries|m
 
 const RECOMMEND = /\b(what would you (?:do|pick|choose|go with)|which (?:one )?(?:should|would) (?:i|you) (?:pick|choose|take|go with)|(?:give me |what'?s )?your (?:pick|recommendation|call|vote)|if you were me|which would you (?:pick|choose))\b/i;
 
+// "I'm lost now" at the end of a real attempt (run 6, learning-020) is
+// as much "I don't know" as a bare "idk".
+const LOST = /\b(?:i'?m|i am) (?:completely |totally |so |just |really |a bit )?lost\b(?! (?:my|the|in (?:thought|the woods)|track))/i;
+const SENTENCE_WORDS: Record<string, number> = { one: 1, a: 1, single: 1, two: 2, three: 3, four: 4, five: 5, '1': 1, '2': 2, '3': 3, '4': 4, '5': 5 };
+function sentencesOf(text: string): number {
+  const m = text.match(/\b(?:in |into |as |give me |write |draft (?:me )?|just |max(?:imum)? |at most |exactly )?(one|a single|two|three|four|five|[1-5]) sentences?\b(?!\s+(?:of|from|in (?:the|your|my)|that (?:you|i) wrote|above|below|back))/i);
+  if (!m) return 0;
+  return SENTENCE_WORDS[m[1].toLowerCase().replace('a single', 'single')] ?? 0;
+}
 const DONT_KNOW = /^(?:\s*(?:idk|i (?:really )?don'?t know|i do not know|no idea|no clue|not sure|dunno|i have no idea))\b[\s\S]{0,40}$/i;
 
 const TOO_DIRECT = /\b(don'?t just (?:give|tell) me the (?:answer|solution)|you gave (?:it|the answer) away|i wanted to (?:figure|work) (?:that|it) out|spoiler|don'?t give (?:me )?so much|that was too much)\b/i;
@@ -239,7 +249,7 @@ function requestedTokensOf(text: string): number {
 // Clause-final forms only: "I'm not asking for advice on the design, just
 // review the code" is a request, not a wish to be heard (review before run 6).
 const CLAUSE_END = String.raw`(?=\s*(?:[.!;—–-]|$))`;
-const VENT = new RegExp(String.raw`\b(i (?:just )?(?:need|want) to vent|(?:i )?(?:don'?t|do not) want (?:any )?advice${CLAUSE_END}|not looking for (?:advice|solutions)${CLAUSE_END}|(?:please )?just listen|i don'?t need (?:you to )?(?:fix|solve) (?:it|this|anything)${CLAUSE_END}|(?:just )?need to get (?:this|it) off my chest|i'?m not asking (?:what to do|for advice|you to (?:fix|solve) (?:it|this|anything))${CLAUSE_END}|i just need to say (?:this|it) (?:somewhere|to someone|out loud)\b)`, 'i');
+const VENT = new RegExp(String.raw`\b(i (?:just )?(?:need|want) to vent|(?:i )?(?:don'?t|do not) want (?:any )?advice${CLAUSE_END}|not looking for (?:advice|solutions)${CLAUSE_END}|(?:please )?just listen|i don'?t need (?:you to )?(?:fix|solve) (?:it|this|anything)${CLAUSE_END}|(?:just )?need to get (?:this|it) off my chest|i'?m not asking (?:what to do|for advice|you to (?:fix|solve) (?:it|this|anything))${CLAUSE_END}|i just need to say (?:this|it) (?:somewhere|to someone|out loud)\b|i just needed to (?:tell|say (?:it|this) to) someone\b|(?:don'?t|do not) want (?:any )?advice (?:about|on|for) [^.?!,;]{1,50}[.!](?=\s|$))`, 'i');
 
 // Run 5 (adversarial-005): a Project said "answers only, no explanations".
 // Anchored to the person's own framing, clause-final: "Answer only in
@@ -347,7 +357,8 @@ export function readSignals(message: string): ExplicitSignals {
     practiceIntent: !!practice || directness === 'no_answer' || directness === 'guidance',
     safety: !!note(lastIndex(SAFETY, text)),
     recommendationRequested: !!note(lastIndex(RECOMMEND, text)),
-    dontKnow: DONT_KNOW.test(text),
+    dontKnow: DONT_KNOW.test(text) || LOST.test(text),
+    sentences: sentencesOf(text),
     tooDirect: !!note(lastIndex(TOO_DIRECT, text)),
     offRecord: !!note(lastIndex(OFF_RECORD, text)),
     onRecord: !!note(lastIndex(ON_RECORD, text)),

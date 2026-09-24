@@ -102,6 +102,8 @@ export interface ExplicitSignals {
   done: boolean;
   /** a requested length in tokens ("in 300 words" ≈ 420; "the full file" = 3000), or 0 (council D17) */
   requestedTokens: number;
+  /** "in one sentence", "two sentences": an exact sentence count, or 0 (run 6: expert-004, expert-009) */
+  sentences: number;
   /** "I just need to vent", "I don't want advice", "just listen": being heard, said explicitly (run 1: an INFERRED "reflection" withheld practical help) */
   vent: boolean;
   /** "let's stop there", "that's enough for today": ends a quiz without being frustration */

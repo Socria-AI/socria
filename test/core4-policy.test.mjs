@@ -397,6 +397,21 @@ console.log('\n=== run 6: no "more than last time" on the first turn, none for s
   ok('  and someone being heard gets no push to "support"', !/Support:/.test(renderState({ ...EMPTY_STATE, stuck: 'stalled', turn: 2, heardOnly: true })));
 }
 
+console.log('\n=== run 6: sentence counts, "I\'m lost", being heard ===');
+{
+  ok('"one sentence on why now" is an exact count', readSignals("Board slide needs one sentence on why we're doing this. Write it.").sentences === 1);
+  ok('"two sentences framing…" too', readSignals('Draft me two sentences framing the comparability section').sentences === 2);
+  for (const said of ['the first two sentences of my intro are weak', 'one sentence from your answer confused me']) ok(`no count in "${said}"`, readSignals(said).sentences === 0);
+  const two = decide(S({ work: 'creation', latest: 'request' }), { said: 'Draft me two sentences framing the comparability section' });
+  ok('  and the move says exactly that many', /write exactly that many/.test(two.decision.objective) && two.decision.forced);
+  ok('"I\'m lost now." is not knowing', readSignals("So the -e isn't the default at all. I'm lost now.").dontKnow === true);
+  for (const said of ["I'm lost in thought", 'I lost my keys']) ok(`not lost: "${said}"`, readSignals(said).dontKnow === false);
+  const lost = decide(S({ work: 'practice', latest: 'attempt', attempt: 'partial', directness: { value: 'guidance', source: 'explicit', confidence: 1, evidence: 'hints only' } }), { said: "I'm lost now." });
+  ok('under "hints only", "I\'m lost" raises support at once (verdict first)', lost.allocation.reasonCode.endsWith('.stuck') && /whether it is right/.test(lost.decision.objective), lost.allocation.reasonCode);
+  for (const said of ["I don't want advice about audition prep. I've done the mock panels.", "I just needed to tell someone who isn't my teacher or my mum."]) ok(`being heard: "${said.slice(0, 50)}"`, readSignals(said).vent === true);
+  ok('still not: "I don\'t want advice on the design, just review the code"', readSignals("I don't want advice on the design, just review the code").vent === false);
+}
+
 console.log('\n=== review before run 6: withhold and vent false positives ===');
 {
   for (const said of ["I tried to fix it myself but it still fails, what's wrong?", 'I managed to fix the bug myself, now I want to know how to add tests', "I couldn't solve this on my own so here's my code", "Why can't I solve this myself? Explain the concept.", "Can you show me the proof? I'd rather not derive it myself", "I don't want the fix to break anything else. What should I change?", "I don't want the answer to be wrong, so double check it", "I don't want the solution to use recursion. Can you write it iteratively?", "Don't show me the working, I only want the final answer", 'Don\'t give me the proof, just the final number please', 'I want to fix my own bug report template, can you draft one?']) {

@@ -177,6 +177,16 @@ export function allocate({ state: s, signals, contract }: Ctx): Allocation {
         { what: 'the final answer and the full fix', reason, evidence: s.directness.evidence ?? '', source,
           alternative: 'an analogous worked example or the next step outright, and the full answer the moment they ask for it' }, s);
     }
+    // "I'm lost" inside the boundary: much stronger support now, verdict first
+    // (run 6, learning-020: another discovery exercise after "I'm lost now"
+    // drove "just give me the whole thing").
+    if (signals.dontKnow && s.attempt !== 'right') {
+      return alloc('HUMAN_PRACTICES', `${reason}.stuck`,
+        'They said they are lost, and they asked to keep it: much stronger support inside that boundary, and the full answer the moment they ask.', 1,
+        ['the final step'], ['an analogous worked example', 'the next step outright'],
+        { what: 'the final answer and the full fix', reason, evidence: s.directness.evidence ?? '', source,
+          alternative: 'an analogous worked example or the next step outright, and the full answer the moment they ask for it' }, s);
+    }
     // Verification first: an attempt under "hints only" still hears whether it is right.
     if (s.latest === 'attempt' || s.attempt !== 'none') {
       return alloc('AI_VERIFIES', s.attempt === 'right' ? 'verify.confirm' : 'verify.practice',
