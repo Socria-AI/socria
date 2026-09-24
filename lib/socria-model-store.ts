@@ -20,9 +20,22 @@
 // "open on their best surface" becomes "override what they asked for", which
 // is worse than the bug.
 
-import { SOCRIA_MODELS, type SocriaModel } from './socria-prompt';
+import { SOCRIA_MODELS, type Readability, type ReplyLength, type SocriaModel } from './socria-prompt';
 
 export const MODEL_KEY = 'socria.model.v1';
+/**
+ * Core 4's two communication settings, kept beside the model because they are
+ * the same kind of thing: what this browser remembers about how Socria should
+ * arrive. They live here rather than in the chat page because onboarding sets
+ * them too — a person moves the dials during the introduction and the
+ * conversation they land in is already written the way they asked for.
+ *
+ * An unreadable or unknown value is 'standard', never an error: whatever is in
+ * localStorage was put there by some version of this app or by a person with
+ * devtools open, and a preference is not worth a broken screen.
+ */
+export const READABILITY_KEY = 'socria.readability.v1';
+export const LENGTH_KEY = 'socria.length.v1';
 const LAST_CORE_KEY = 'socria.model.lastCore.v1';
 /** Set only when the person picked from the menu — never when we resolved. */
 const MODEL_CHOSEN_KEY = 'socria.model.chosen.v1';
@@ -72,6 +85,36 @@ export function modelWasChosen(): boolean {
   }
 }
 
+export function readReadability(): Readability {
+  try {
+    const raw = localStorage.getItem(READABILITY_KEY);
+    return raw === 'simple' || raw === 'advanced' ? raw : 'standard';
+  } catch {
+    return 'standard';
+  }
+}
+
+export function readLength(): ReplyLength {
+  try {
+    const raw = localStorage.getItem(LENGTH_KEY);
+    return raw === 'concise' || raw === 'detailed' ? raw : 'standard';
+  } catch {
+    return 'standard';
+  }
+}
+
+export function rememberReadability(v: Readability): void {
+  try {
+    localStorage.setItem(READABILITY_KEY, v);
+  } catch {}
+}
+
+export function rememberLength(v: ReplyLength): void {
+  try {
+    localStorage.setItem(LENGTH_KEY, v);
+  } catch {}
+}
+
 /** What is stored, or null when nothing usable is. */
 export function readStoredModel(): SocriaModel | null {
   try {
@@ -86,19 +129,27 @@ export function readStoredModel(): SocriaModel | null {
  * The model somebody opens on when they have not chosen one.
  *
  * Entitlement, not history. A member opens in the environment they are paying
- * for; anyone with an account opens on Core 3.1, which is the model Socria is
- * actually about; and only a visitor with neither opens on Core 2, which is
- * the one that works without an account.
+ * for; everybody else opens on Core 3.1, including a visitor with no account.
  *
- * `canUseCore3` is sign-in OR the typed access key, because the key grants
- * exactly that and a key-holder is not a stranger.
+ * CORE 2 IS NO LONGER THE DOOR. It used to be the answer for anyone without
+ * an account, because it was the model that needed none — and it retires on
+ * 2 October. Keeping a weaker model alive purely to hold the door open would
+ * have meant a signed-out person meeting the product at its worst, which is
+ * the bug this function was written to fix in the first place. So the free
+ * tier moved up rather than out: Core 3.1 is open signed out (see
+ * `requiresAuth` in the registry), and what an account buys is Logos, Core 4,
+ * memory across devices and more than one conversation.
+ *
+ * `hasAccount` is sign-in OR the typed access key — a key-holder is not a
+ * stranger. It no longer decides Core 3.1, because nothing does; it is the
+ * flag that keeps a Logos default from being handed to somebody who would be
+ * bounced out of it.
  *
  * Pure, and separated from the storage above so the rule can be tested
  * without a browser — it is a policy, and policies are what drift.
  */
-export function autoModel(opts: { canUseCore3: boolean; isOne: boolean }): SocriaModel {
-  if (!opts.canUseCore3) return 'core-2';
-  return opts.isOne ? 'logos' : 'core-3';
+export function autoModel(opts: { hasAccount: boolean; isOne: boolean }): SocriaModel {
+  return opts.isOne && opts.hasAccount ? 'logos' : 'core-3';
 }
 
 /** The Core model to return to when leaving Logos. */
@@ -118,5 +169,7 @@ export function lastCoreModel(): SocriaModel {
       return raw as SocriaModel;
     }
   } catch {}
-  return 'core-2';
+  // Core 3.1, not Core 2: the way out of Logos lands where the product now
+  // opens, and Core 2 has a date on it.
+  return 'core-3';
 }

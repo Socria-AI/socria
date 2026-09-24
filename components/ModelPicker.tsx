@@ -188,6 +188,11 @@ export function ModelPicker({
           {soon ? (
             // The roadmap word — where a lock or a sign-in prompt would go.
             <span className="need">{m.soon}</span>
+          ) : m.leaving ? (
+            // A date, in the same slot and the opposite colour. It outranks
+            // the sign-in prompt and the surface tag because it is the one
+            // thing somebody choosing this model has to know first.
+            <span className="left">{m.leaving}</span>
           ) : gated ? (
             <span className="need">Sign in</span>
           ) : surface ? (
@@ -225,6 +230,10 @@ export function ModelPicker({
         >
           <span className="dot" aria-hidden="true" />
           <span className="nm">{current.short}</span>
+          {/* On the button as well as in the sheet: somebody working in a
+              model that is going away should not have to open a menu to find
+              that out. */}
+          {current.leaving && <span className="left">{current.leaving}</span>}
           {hasDepth && (
             <>
               <span className="sep" aria-hidden="true">
@@ -263,7 +272,7 @@ export function ModelPicker({
               <p className="mp-need">
                 <strong>{needs}</strong> needs an account — a map has to be kept
                 somewhere, and that somewhere is yours.{' '}
-                <em>Core 2 stays open, signed out.</em>
+                <em>Core 3.1 stays open, signed out.</em>
               </p>
             )}
 
@@ -375,7 +384,7 @@ export function ModelPicker({
  * from the accessibility tree: they duplicate the slider rather than adding
  * anything to it, and two controls for one value read as two values.
  */
-function Dial<T extends string>({
+export function Dial<T extends string>({
   name,
   options,
   value,

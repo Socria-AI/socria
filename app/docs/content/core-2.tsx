@@ -73,9 +73,20 @@ export function Core2() {
       </Callout>
 
       <H2 id="access">Access</H2>
+      <Callout tag="Retiring 2 October" warn>
+        <p>
+          <strong>Core 2 retires on 2 October.</strong> It answers normally
+          until then, and the model menu says so beside its name. The job it
+          held — the model that works with no account — has moved up to{' '}
+          <Link href="/docs/core-3">Core 3.1</Link>, which is now what a
+          signed-out visitor opens on. Nothing you have written goes anywhere:
+          your conversations stay where they are and can be continued on
+          another model.
+        </p>
+      </Callout>
       <p>
-        Core 2 is free and works without an account: anyone can have one full
-        session signed out. After that first session, starting another
+        Until then Core 2 is free and works without an account: anyone can have
+        one full session signed out. After that first session, starting another
         requires signing in — the first stays saved on your device and you
         can keep talking in it, but syncing across devices needs an account.
         The model itself stays free either way, and is never part of the{' '}

@@ -1272,6 +1272,16 @@ export interface ModelConfig {
    */
   soon?: string;
   /**
+   * On its way out, and the date it goes.
+   *
+   * The picker shows it where `soon` would go — mustard rather than grey,
+   * because this is the opposite kind of news and a person on this model needs
+   * to read it without opening a menu. The model still answers until the date;
+   * a retirement announced by removal is how somebody loses a conversation
+   * they were in the middle of.
+   */
+  leaving?: string;
+  /**
    * This model opens the Logos surface (a Thinking Map beside the chat).
    * Both Logos and Logos 2 set it; Logos 2 adds `collab` on top.
    */
@@ -1485,6 +1495,10 @@ export function fallbackOpenAIModel(model: SocriaModel): string | null {
 }
 
 export const SOCRIA_MODELS: Record<SocriaModel, ModelConfig> = {
+  // Core 2 retires on 2 October. It was the model that needed no account, and
+  // that job has moved to Core 3.1 (requiresAuth: false below) — which is the
+  // only honest way to retire it, since removing it otherwise would have left
+  // a signed-out visitor with nothing at all.
   'core-2': {
     id: 'core-2',
     label: 'Socria Core 2',
@@ -1493,7 +1507,11 @@ export const SOCRIA_MODELS: Record<SocriaModel, ModelConfig> = {
     defaultOpenAIModel: 'gpt-4o-mini',
     supportsDepth: false,
     requiresAuth: false,
+    leaving: 'until Oct 2',
   },
+  // Open without an account from the day Core 2's retirement was announced.
+  // The free tier had to move somewhere, and moving it to the model Socria is
+  // actually about is better than keeping a weaker one alive to hold the door.
   'core-3': {
     id: 'core-3',
     label: 'Socria Core 3.1',
@@ -1502,7 +1520,7 @@ export const SOCRIA_MODELS: Record<SocriaModel, ModelConfig> = {
       'Language-noticing with typographic emphasis. Adjustable thinking depth.',
     defaultOpenAIModel: CORE_3_MODEL,
     supportsDepth: true,
-    requiresAuth: true,
+    requiresAuth: false,
   },
   logos: {
     id: 'logos',

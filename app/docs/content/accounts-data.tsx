@@ -19,11 +19,12 @@ export function AccountsData() {
     <Article page={page} sections={sections}>
       <H2 id="signedout">Signed out</H2>
       <p>
-        You can use Socria without an account: Core 2 gives every anonymous
-        visitor one full session, kept in that browser. Logos and Core 3.1
-        normally ask you to sign in — an access code opens them without an
-        account, in which case your lines of thinking are kept locally and
-        the rail says so plainly: <em>&ldquo;Kept in this
+        You can use Socria without an account: Core 3.1 gives every anonymous
+        visitor one full session, kept in that browser. (Core 2 held that job
+        until its retirement on 2 October; the free tier moved up rather than
+        out.) Logos, Logos 2 and Core 4 ask you to sign in — an access code
+        opens them without an account, in which case your lines of thinking
+        are kept locally and the rail says so plainly: <em>&ldquo;Kept in this
         browser.&rdquo;</em>
       </p>
 

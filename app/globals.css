@@ -2435,6 +2435,84 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
   .tl-dot.is-on .tl-dot-fill { animation: none; transform: scaleX(1); background: var(--moss-700); }
 }
 
+/* ── the Core 4 stage ──────────────────────────────────────────────
+   Same furniture as the Logos tour (it reuses .tl-dots and the masthead), a
+   quieter surface, and three rules that exist only because what is inside is
+   the REAL control rather than a picture of one: the picker's dials arrive
+   with .app-root geometry meant for a menu sheet, the design system's node
+   cards arrive with .logos-root's full-viewport chrome, and both have to sit
+   inside a 236px box without either of them being redrawn here. */
+.c4-stage {
+  position: relative;
+  padding: 14px 18px 16px;
+  background:
+    radial-gradient(120% 130% at 88% 0%, rgba(94, 118, 51, 0.08), transparent 62%),
+    var(--paper, #F5F3EB);
+  border-bottom: 1px solid var(--border);
+  overflow: hidden;
+}
+.c4-scene { position: relative; overflow: hidden; }
+.c4-pane { display: flex; flex-direction: column; gap: 10px; height: 100%; }
+@media (prefers-reduced-motion: no-preference) {
+  .c4-pane { animation: c4-pane-in 0.5s var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)); }
+}
+@keyframes c4-pane-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+/* a turn: what they said, and what came back */
+.c4-turn, .c4-web .c4-reply { opacity: 0; transform: translateY(5px); transition: opacity 0.45s ease, transform 0.45s ease; }
+.c4-turn.is-in, .c4-web .c4-reply.is-in { opacity: 1; transform: none; }
+.c4-said {
+  display: block; font-size: 12.5px; line-height: 1.4; color: rgba(31, 31, 31, 0.58);
+  border-left: 2px solid rgba(94, 118, 51, 0.32); padding-left: 9px; margin-bottom: 5px;
+}
+.c4-reply {
+  font-family: var(--serif); font-size: 13.5px; line-height: 1.5; color: var(--ink, #1F1F1F);
+  background: rgba(255, 255, 255, 0.55); border: 1px solid var(--border);
+  border-radius: 12px; border-top-left-radius: 4px; padding: 9px 12px;
+}
+.c4-reply strong { font-weight: 600; }
+.c4-reply em { font-style: italic; color: var(--moss-700); }
+
+/* ii · the picker's own dials, inside a modal instead of a menu sheet */
+.c4-dials.app-root { display: block; background: none; padding: 2px 2px 0; }
+.c4-dials .mp-lbl { margin-left: 0; }
+.c4-dials .mp-dial { margin-left: 0; margin-right: 0; }
+.c4-dials .mp-dial-does { min-height: 2.4em; }
+
+/* iii · the design system's node cards, without its page chrome */
+.c4-memory.logos-root {
+  position: relative; inset: auto; width: auto; height: 100%;
+  min-height: 0; display: block; color: inherit;
+}
+.c4-memory.logos-root::before, .c4-memory.logos-root::after { display: none; }
+.c4-nodes { position: relative; height: 158px; }
+.c4-nd { position: absolute; opacity: 0; transform: translateY(6px); transition: opacity 0.5s ease, transform 0.5s ease; }
+.c4-nd.is-in { opacity: 1; transform: none; }
+.c4-ph {
+  display: block; font-family: var(--sans); font-size: 9.5px; letter-spacing: 0.18em;
+  text-transform: uppercase; color: rgba(31, 31, 31, 0.42); margin-bottom: 4px;
+}
+.c4-aside {
+  margin: 0; font-family: var(--serif); font-style: italic; font-size: 11.5px;
+  color: rgba(31, 31, 31, 0.5);
+}
+.c4-aside em { color: var(--moss-700); font-style: italic; }
+
+/* iv · the disclosure, as the chat prints it */
+.c4-web .c4-reply:first-of-type { background: rgba(94, 118, 51, 0.07); font-size: 12.5px; }
+.c4-web .c4-reply:first-of-type em { color: rgba(31, 31, 31, 0.6); }
+
+.c4-rail {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  margin-top: 10px;
+}
+.c4-rail-label { font-size: 11.5px; color: rgba(31, 31, 31, 0.55); }
+.c4-rail-label em { font-family: var(--serif); font-style: italic; color: var(--moss-700); }
+
+@media (prefers-reduced-motion: reduce) {
+  .c4-turn, .c4-nd, .c4-web .c4-reply { opacity: 1; transform: none; transition: none; }
+}
+
 .tl-free {
   margin-top: 16px;
   font-size: 12.5px;

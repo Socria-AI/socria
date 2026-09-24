@@ -50,8 +50,8 @@ export function Overview() {
       <ul>
         <li>
           <strong><Link href="/docs/core-2">Core 2</Link></strong> — calm,
-          restrained Socratic questioning in plain prose. Free, works without
-          an account.
+          restrained Socratic questioning in plain prose. <em>Retiring 2
+          October</em>; Core 3.1 is what a signed-out visitor opens on now.
         </li>
         <li>
           <strong><Link href="/docs/core-3">Core 3.1</Link></strong> — the

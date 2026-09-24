@@ -97,15 +97,28 @@ console.log('\n=== the picker, as two dials ===');
 console.log('\n=== the page stores it and sends it ===');
 {
   const src = read('app/chat/page.tsx');
-  ok('both are persisted', /READABILITY_KEY/.test(src) && /LENGTH_KEY/.test(src));
+  // The keys moved into lib/socria-model-store.ts when onboarding started
+  // setting them too: two copies of a storage key is how a preference set in
+  // one place quietly fails to be read in another.
+  const store = read('lib/socria-model-store.ts');
+  ok('both are persisted', /rememberReadability\(next\)/.test(src) && /rememberLength\(next\)/.test(src));
+  ok('  through one definition of each key, not two',
+    /READABILITY_KEY = 'socria\.readability\.v1'/.test(store) && /LENGTH_KEY = 'socria\.length\.v1'/.test(store)
+      && !/'socria\.readability\.v1'/.test(src));
   ok('  and hydrated on mount', /setReadability\(readReadability\(\)\)/.test(src) && /setReplyLength\(readLength\(\)\)/.test(src));
   ok('both are sent with the turn', /\n\s+readability,\n\s+length: replyLength,/.test(src));
   ok('the picker is given both', /readability=\{readability\}/.test(src) && /length=\{replyLength\}/.test(src));
 
   // A stored value is whatever was last in localStorage, including whatever a
   // previous version of the app or a hand-edit put there.
-  ok('an unknown stored readability falls back to standard', /raw === 'simple' \|\| raw === 'advanced'/.test(src));
-  ok('an unknown stored length falls back to standard', /raw === 'concise' \|\| raw === 'detailed'/.test(src));
+  ok('an unknown stored readability falls back to standard',
+    /raw === 'simple' \|\| raw === 'advanced' \? raw : 'standard'/.test(store));
+  ok('an unknown stored length falls back to standard',
+    /raw === 'concise' \|\| raw === 'detailed' \? raw : 'standard'/.test(store));
+  // A private window throws on every accessor, and a dial is not worth a
+  // white screen: both readers answer 'standard' from their catch.
+  ok('  and a browser that refuses storage still answers',
+    (store.match(/\} catch \{\s*return 'standard';/g) ?? []).length === 2);
 }
 
 console.log('\n=== the route does not trust the browser ===');

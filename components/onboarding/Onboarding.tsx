@@ -1,11 +1,19 @@
 'use client';
 // components/onboarding/Onboarding.tsx
 //
-// Four beats, and the last one is the product working.
+// Five beats, and the last two are the product working.
 //
 // Pick what you came for, give it one real thing, get a question back that
-// lands, then see it drawn. The philosophy arrives once at the end, when
-// there is finally evidence for it.
+// lands, see it drawn — and then meet the model you are about to talk to. The
+// philosophy arrives once at the end, when there is finally evidence for it.
+//
+// BEAT V IS SET, NOT SHOWN, which is the same rule the coach marks follow
+// (lib/onboarding.ts): nothing here performs itself at somebody. It is the
+// picker's own <Dial>, reading the real option tables, writing to the real
+// keys — so the two settings a person moves during the introduction are the
+// settings the conversation they land in is written with. A tour would have
+// told them Core 4 has communication controls; this hands them two and they
+// arrive having already used one.
 //
 // THE EXCHANGE IS REHEARSED, NOT CALLED. Beat iii answers from a table (see
 // lib/onboarding-script.ts) rather than the model. That is not a shortcut:
@@ -20,6 +28,19 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button, InsightCard, Label, Logo, LogosNode } from '@/components/journal/ds';
+import { Dial } from '@/components/ModelPicker';
+import {
+  READABILITY_OPTIONS,
+  LENGTH_OPTIONS,
+  type Readability,
+  type ReplyLength,
+} from '@/lib/socria-prompt';
+import {
+  readLength,
+  readReadability,
+  rememberLength,
+  rememberReadability,
+} from '@/lib/socria-model-store';
 import {
   CARRY_KEY,
   INTENTS,
@@ -149,6 +170,16 @@ export function Onboarding() {
   const [text, setText] = useState('');
   const [typed, setTyped] = useState(false);
   const [kept, setKept] = useState(false);
+  // Beat v. Read from storage rather than assumed, so somebody who comes back
+  // through the introduction sees what they already set.
+  const [readability, setReadability] = useState<Readability>('standard');
+  const [length, setLength] = useState<ReplyLength>('standard');
+  const [touched, setTouched] = useState(false);
+
+  useEffect(() => {
+    setReadability(readReadability());
+    setLength(readLength());
+  }, []);
   const area = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -182,12 +213,28 @@ export function Onboarding() {
 
   const leave = useCallback(() => {
     carry();
-    // INTO LOGOS, not Core. The last beat of this sequence is a map, and
-    // landing somebody in a surface that cannot draw one would take the
-    // promise back in the first second. `?model=` is the switch the chat
-    // already honours.
-    router.push('/chat?model=logos');
+    // INTO CORE 4. This sequence used to end on the map and hand people to
+    // Logos, which was right when the map was the last thing they had seen.
+    // It ends on Core 4 now, and landing somebody in a different model from
+    // the one they just set the dials for would make the last beat a
+    // demonstration of something they were not given. Logos is one press away
+    // in the picker, and its own invitation still lives in the rail.
+    // `?model=` is the switch the chat already honours; a signed-out browser
+    // is clamped there to the model it can actually use.
+    router.push('/chat?model=core-4');
   }, [carry, router]);
+
+  /** Both dials write through on the move, so leaving early keeps the setting. */
+  const pickReadability = (v: Readability) => {
+    setReadability(v);
+    setTouched(true);
+    rememberReadability(v);
+  };
+  const pickLength = (v: ReplyLength) => {
+    setLength(v);
+    setTouched(true);
+    rememberLength(v);
+  };
 
   return (
     <div className="ob">
@@ -197,7 +244,7 @@ export function Onboarding() {
         <span style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
           <Logo size="sm" markSrc="/socria-mark.png" />
           <span className="ob-beats" aria-hidden="true">
-            {[0, 1, 2, 3].map((i) => (
+            {[0, 1, 2, 3, 4].map((i) => (
               <i key={i} className={i <= beat ? 'on' : ''}>
                 <b />
               </i>
@@ -205,7 +252,7 @@ export function Onboarding() {
           </span>
         </span>
         <button type="button" className="ob-skip" onClick={leave}>
-          {beat < 3 ? 'Skip — take me to Socria' : 'Skip'}
+          {beat < 4 ? 'Skip — take me to Socria' : 'Skip'}
         </button>
       </div>
 
@@ -354,10 +401,45 @@ export function Onboarding() {
                 dependent.
               </p>
               <div className="row">
-                <Button variant="primary" arrow onClick={leave}>
-                  Continue into Socria
+                <Button variant="primary" arrow onClick={() => setBeat(4)}>
+                  Meet Core 4
                 </Button>
                 <span className="aside">It has not answered you yet. That was the point.</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── v · the model they are about to talk to, set rather than shown ── */}
+        {beat === 4 && (
+          <div className="ob-wrap" key="b4">
+            <Label tone="moss">Core 4 · the one you will be talking to</Label>
+            <h1 className="ob-q">
+              <Rise text="It decides how far to go. You decide how it reads." />
+            </h1>
+            <p className="ob-sf ob-fade" style={{ '--d': '.5s' } as React.CSSProperties}>
+              There is no depth to set: the right depth belongs to the turn, not to your mood, and
+              Core 4 judges it every time. What is yours to say is how the answer is written.
+            </p>
+            <div className="ob-dials app-root ob-fade" style={{ '--d': '.7s' } as React.CSSProperties}>
+              <p className="mp-lbl">How it reads</p>
+              <Dial name="Readability" options={READABILITY_OPTIONS} value={readability} onPick={pickReadability} />
+              <p className="mp-lbl mp-lbl-2">How much it says</p>
+              <Dial name="Length" options={LENGTH_OPTIONS} value={length} onPick={pickLength} />
+            </div>
+            <p className="ob-hint ob-fade" style={{ '--d': '.84s' } as React.CSSProperties}>
+              {touched
+                ? 'Saved. Change it any time from the model menu.'
+                : 'Move either one — they are the real controls, and they change the sentences, never the thinking.'}
+            </p>
+            <div className="ob-creed ob-fade" style={{ '--d': '.96s' } as React.CSSProperties}>
+              <div className="row">
+                <Button variant="primary" arrow onClick={leave}>
+                  Start with Core 4
+                </Button>
+                <span className="aside">
+                  It remembers what matters, shows you all of it, and forgets what you tell it to.
+                </span>
               </div>
             </div>
           </div>

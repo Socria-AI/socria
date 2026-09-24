@@ -176,3 +176,14 @@
 .ob-creed .aside{font-family:var(--serif);font-style:italic;font-size:.95rem;color:var(--ink-45)}
 .ob-kept{margin:10px 2px 0;font-family:var(--serif);font-size:.95rem;color:var(--ink-45)}
 .ob-kept em{font-style:italic;color:var(--moss-700)}
+
+/* ── beat v · the real dials, in a page that is not the composer ──────
+   Imported from the picker, so every rule that draws them lives in
+   app-shell.css under .app-root. What this adds is the box they sit in: the
+   sheet they normally live in is 340px wide and this column is not. */
+.ob-dials.app-root{display:block;background:none;max-width:420px;margin-top:22px;padding:0}
+.ob-dials .mp-lbl{margin-left:0;font-size:10px}
+.ob-dials .mp-dial{margin-left:0;margin-right:0}
+.ob-dials .mp-dial-does{min-height:2.6em;font-size:12.5px}
+.ob-dials .mp-stop{font-size:11px}
+@media (max-width:560px){.ob-dials.app-root{max-width:100%}}

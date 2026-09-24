@@ -29,8 +29,12 @@ import {
   autoModel,
   chooseModel,
   modelWasChosen,
+  readLength,
+  readReadability,
   readStoredModel,
+  rememberLength,
   rememberModel,
+  rememberReadability,
 } from '@/lib/socria-model-store';
 import { buildStarters } from '@/lib/starters';
 import {
@@ -57,6 +61,7 @@ import {
 } from '@/lib/session-rail';
 import { TryLogosPill } from '@/components/TryLogosPill';
 import { TryLogosModal } from '@/components/TryLogosModal';
+import { IntroCore4Modal } from '@/components/IntroCore4Modal';
 import { RichText } from '@/components/RichText';
 import { splitInline } from '@/lib/rich-text';
 import { InsightCard } from '@/components/InsightCard';
@@ -77,6 +82,15 @@ const INSIGHT_MIN_GAP = 3;
 // A key of its own: dismissing the old Core 3.1 note is not a decision about
 // Logos, so anyone who had seen that one is still shown this once.
 const LOGOS_INTRO_DISMISS_KEY = 'socria.logosIntroDontShowAgain.v1';
+/**
+ * The Core 4 introduction, which now holds the one slot this page opens with.
+ *
+ * Its own key rather than the Logos one: somebody who dismissed the Logos
+ * invitation months ago has not been shown this, and reusing that flag would
+ * have silently skipped the announcement for exactly the people who have been
+ * here longest.
+ */
+const CORE4_INTRO_DISMISS_KEY = 'socria.core4IntroDontShowAgain.v1';
 // Set to '1' once the user unlocks auth-gated models with the typed access
 // key. Lets anonymous (not-signed-in) users reach Core 3.1.
 const SMART_KEY_STORAGE = 'socria.core3AccessKey.v1';
@@ -164,10 +178,6 @@ const MIGRATED_KEY = 'socria.cloudMigrated.v1';
 // sign-in — even if they delete the first one. Cleared on sign-in.
 const USED_FREE_KEY = 'socria.usedFreeConvo.v1';
 const DEPTH_KEY = 'socria.depth.v1';
-/** Core 4's two communication settings. Preferences, not templates: they bias
-    how the answer is written and never reach how it is reasoned. */
-const READABILITY_KEY = 'socria.readability.v1';
-const LENGTH_KEY = 'socria.length.v1';
 /** How often this person has told us a topic change was intentional. */
 const DRIFT_KEY = 'socria.chat.driftDismissals.v1';
 
@@ -198,28 +208,6 @@ function readDepth(): ThinkingDepth {
     return 'balanced';
   } catch {
     return 'balanced';
-  }
-}
-
-function readReadability(): Readability {
-  if (typeof window === 'undefined') return 'standard';
-  try {
-    const raw = localStorage.getItem(READABILITY_KEY);
-    if (raw === 'simple' || raw === 'advanced') return raw;
-    return 'standard';
-  } catch {
-    return 'standard';
-  }
-}
-
-function readLength(): ReplyLength {
-  if (typeof window === 'undefined') return 'standard';
-  try {
-    const raw = localStorage.getItem(LENGTH_KEY);
-    if (raw === 'concise' || raw === 'detailed') return raw;
-    return 'standard';
-  } catch {
-    return 'standard';
   }
 }
 
@@ -380,6 +368,7 @@ export default function ChatPage() {
   /** they arrived straight from /onboarding this session */
   const justOnboarded = useRef(false);
   const [logosDismissed, setLogosDismissed] = useState(false);
+  const [core4IntroOpen, setCore4IntroOpen] = useState(false);
   const [autoOpenChecked, setAutoOpenChecked] = useState(false);
   const [shareInsight, setShareInsight] = useState<Insight | null>(null);
   const [importedProfile, setImportedProfile] = useState('');
@@ -393,7 +382,7 @@ export default function ChatPage() {
   // under the Logos modal on a first visit. Depending on the real state
   // means the tour simply waits, and opens when the screen is free.
   const anythingOpen =
-    logosModalOpen || acctOpen || importOpen || !!shareInsight;
+    logosModalOpen || core4IntroOpen || acctOpen || importOpen || !!shareInsight;
   useEffect(() => {
     if (!isLoaded || !isSignedIn || tourOpen || anythingOpen) return;
     try {
@@ -420,8 +409,11 @@ export default function ChatPage() {
 
   const mode: 'cloud' | 'local' = isSignedIn ? 'cloud' : 'local';
 
-  // Signed in OR unlocked with the typed access key → may use Core 3.1.
-  const canUseCore3 = !!isSignedIn || smartUnlocked;
+  // Signed in OR unlocked with the typed access key. It used to be the
+  // question "may they use Core 3.1", and the name said so; Core 3.1 is open
+  // to everybody now that Core 2 has a retirement date, so what this flag
+  // actually decides is Logos, Core 4, and the surfaces an account carries.
+  const hasAccount = !!isSignedIn || smartUnlocked;
   // What they hold, for the two quiet mentions of One on this page: the
   // sidebar foot and the model menu. Both wait for `known` — see usePlan.
   const planState = usePlan();
@@ -671,16 +663,17 @@ export default function ChatPage() {
     }
   }
 
-  // Anonymous users without the access key may have a Core 3 selection saved
-  // from a previous signed-in (or unlocked) session — downgrade to Core 2 so
-  // the API gate doesn't bounce every message they send.
+  // A signed-out browser may hold a selection from a session that had an
+  // account — Logos, Logos 2, Core 4 — and the API gate would bounce every
+  // message sent on one. Downgrade to Core 3.1, which is now the model that
+  // needs no account.
   useEffect(() => {
     if (!isLoaded) return;
-    if (!canUseCore3 && SOCRIA_MODELS[model].requiresAuth) {
-      setModel('core-2');
-      rememberModel('core-2');
+    if (!hasAccount && SOCRIA_MODELS[model].requiresAuth) {
+      setModel('core-3');
+      rememberModel('core-3');
     }
-  }, [isLoaded, canUseCore3, model]);
+  }, [isLoaded, hasAccount, model]);
 
   // Open on the surface they are entitled to, when they have never said
   // otherwise.
@@ -703,17 +696,20 @@ export default function ChatPage() {
   // anything themselves this stops deciding for them.
   useEffect(() => {
     if (!isLoaded || !planState.known || modelWasChosen()) return;
-    const next = autoModel({ canUseCore3, isOne: planState.plan === 'one' });
+    const next = autoModel({ hasAccount, isOne: planState.plan === 'one' });
     setModel(next);
     rememberModel(next);
-  }, [isLoaded, planState.known, planState.plan, canUseCore3]);
+  }, [isLoaded, planState.known, planState.plan, hasAccount]);
 
   function pickModel(next: SocriaModel) {
     const config = SOCRIA_MODELS[next];
     // Gated model, and the user hasn't signed in or unlocked with the key:
-    // open the intro modal, which offers both the key entry and sign-in.
-    if (config.requiresAuth && !canUseCore3) {
-      setLogosModalOpen(true);
+    // open the introduction for the model they actually reached for. Sending
+    // somebody who pressed Core 4 to a Logos pitch answers a question they
+    // did not ask.
+    if (config.requiresAuth && !hasAccount) {
+      if (next === 'core-4') setCore4IntroOpen(true);
+      else setLogosModalOpen(true);
       return;
     }
     // Logos lives on its own route — it needs the split screen for the map.
@@ -770,30 +766,66 @@ export default function ChatPage() {
   }
   function pickReadability(next: Readability) {
     setReadability(next);
-    try {
-      localStorage.setItem(READABILITY_KEY, next);
-    } catch {}
+    rememberReadability(next);
   }
   function pickLength(next: ReplyLength) {
     setReplyLength(next);
-    try {
-      localStorage.setItem(LENGTH_KEY, next);
-    } catch {}
+    rememberLength(next);
   }
 
-  // Show the Logos invitation once per mount, unless it has been permanently
-  // dismissed or they are already in Logos — where the pitch would be absurd.
+  // The one thing this page opens with, once.
+  //
+  // It used to be the Logos invitation. Logos is one surface among several
+  // now, and the thing worth somebody's first thirty seconds is the model they
+  // are about to talk to — so Core 4 has the slot and Logos keeps its pill in
+  // the rail, which is where an invitation to a different surface belongs.
+  //
+  // Not shown to somebody already on Core 4 (they have it), nor on a Logos
+  // surface (a modal about the chat, over the map, is an interruption about
+  // something else). Both dismissals are still read, so nobody who has said no
+  // to either is asked again.
   useEffect(() => {
     if (!isLoaded || autoOpenChecked) return;
     setAutoOpenChecked(true);
     try {
-      const dismissed = localStorage.getItem(LOGOS_INTRO_DISMISS_KEY) === '1';
-      setLogosDismissed(dismissed);
-      if (!dismissed && !isLogosSurface(readModel())) {
-        setLogosModalOpen(true);
+      setLogosDismissed(localStorage.getItem(LOGOS_INTRO_DISMISS_KEY) === '1');
+      const dismissed = localStorage.getItem(CORE4_INTRO_DISMISS_KEY) === '1';
+      const here = readModel();
+      if (!dismissed && here !== 'core-4' && !isLogosSurface(here)) {
+        setCore4IntroOpen(true);
       }
     } catch {}
   }, [isLoaded, autoOpenChecked]);
+
+  function handleCore4IntroClose(dontShowAgain: boolean) {
+    if (dontShowAgain) {
+      try {
+        localStorage.setItem(CORE4_INTRO_DISMISS_KEY, '1');
+      } catch {}
+    }
+    setCore4IntroOpen(false);
+  }
+
+  /**
+   * "Start on Core 4" — or sign in, for somebody who cannot yet.
+   *
+   * The dismiss is written only for the people who actually got there. A
+   * visitor sent to sign-in has not seen Core 4, and marking the announcement
+   * as read on their way out would mean they never see it again.
+   */
+  function handleCore4IntroStart() {
+    if (hasAccount) {
+      try {
+        localStorage.setItem(CORE4_INTRO_DISMISS_KEY, '1');
+      } catch {}
+      setCore4IntroOpen(false);
+      setModel('core-4');
+      chooseModel('core-4');
+      return;
+    }
+    setCore4IntroOpen(false);
+    router.push('/sign-in?redirect_url=%2Fchat%3Fmodel%3Dcore-4');
+  }
 
   function handleLogosModalClose(dontShowAgain: boolean) {
     if (dontShowAgain) {
@@ -809,7 +841,7 @@ export default function ChatPage() {
     // Anyone with access goes straight in and stops being nudged. Anyone else
     // is sent to sign-in WITHOUT a permanent dismiss, so the invitation is
     // still there when they come back with an account.
-    if (canUseCore3) {
+    if (hasAccount) {
       try {
         localStorage.setItem(LOGOS_INTRO_DISMISS_KEY, '1');
       } catch {}
@@ -1633,15 +1665,15 @@ export default function ChatPage() {
       // it the thread memory or the Thinking Journey. Extracting them anyway
       // would keep two more memories of the same conversation, unread, that
       // the person could still see and correct as though they mattered.
-      if (canUseCore3 && model === 'core-3') {
+      if (hasAccount && model === 'core-3') {
         void extractAndPersistMemory(workingId!, updated);
-      } else if (canUseCore3 && model === 'core-4') {
+      } else if (hasAccount && model === 'core-4') {
         void extractAndPersistMemory(workingId!, updated, { titleOnly: true });
       }
       // Insight Cards and auto-synthesis stay Core 3.1's. They are surfaces
       // of their own rather than things the prompt asks for, and Core 4 is
       // deliberately just its prompt for now.
-      if (canUseCore3 && model === 'core-3') {
+      if (hasAccount && model === 'core-3') {
         void maybeGenerateInsight(workingId!, updated);
         void maybeGenerateSynthesis(workingId!, updated);
       }
@@ -2217,6 +2249,12 @@ export default function ChatPage() {
           }}
         />
       )}
+      <IntroCore4Modal
+        open={core4IntroOpen}
+        onClose={handleCore4IntroClose}
+        onStart={handleCore4IntroStart}
+        isSignedIn={hasAccount}
+      />
       <TryLogosModal
         open={logosModalOpen}
         onClose={handleLogosModalClose}
@@ -3088,7 +3126,7 @@ export default function ChatPage() {
                   onReadability={pickReadability}
                   length={replyLength}
                   onLength={pickLength}
-                  isSignedIn={canUseCore3}
+                  isSignedIn={hasAccount}
                   onLockedAttempt={() => setLogosModalOpen(true)}
                   plan={planState.known ? planState.plan : undefined}
                 />

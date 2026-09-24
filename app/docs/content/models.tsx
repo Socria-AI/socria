@@ -95,8 +95,9 @@ export function Models() {
       <H2 id="choosing">Which one, when</H2>
       <ul>
         <li>
-          <strong>Core 2</strong> — you want questions, not machinery. It is
-          also the model that works with no account at all.
+          <strong>Core 2</strong> — you want questions, not machinery.{' '}
+          <em>It retires on 2 October</em>, and the model that works with no
+          account at all is Core 3.1 from now on.
         </li>
         <li>
           <strong>Core 3.1</strong> — a thread you will return to. It notices
