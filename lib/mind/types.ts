@@ -424,6 +424,34 @@ export function fingerprintEdge(
   return `e:${fingerprintNode(sourceType, sourceLabel)}|${normalize(relationship)}|${fingerprintNode(targetType, targetLabel)}`;
 }
 
+/**
+ * A private node outside the conversation it was made in.
+ *
+ * `private` was documented as a Logos boundary — "never carried into Logos" —
+ * and that is what the code enforced: recall passed excludePrivate only for the
+ * Logos surface. But Core 4 marks a whole conversation `conversation_only` when
+ * it reads as sensitive, and implements it by writing the nodes `private`. So a
+ * conversation about starting a medication was private in the sense that its
+ * Thinking Map could not be exported, and in no other sense: the node was
+ * activated in unrelated conversations and eligible for the standing profile,
+ * which travels on EVERY turn by design. Someone opened a new chat about a work
+ * update and the "who you are talking to" header carried the decision they had
+ * asked to keep to one conversation.
+ *
+ * So it is scoped like the reasoning ledger: available where it was made,
+ * nowhere else. `alsoHideFromHere` is the Logos case, where even that is too
+ * much.
+ */
+export function privateElsewhere(
+  n: Pick<MindNode, 'private' | 'provenance'>,
+  here: string | undefined,
+  alsoHideFromHere = false
+): boolean {
+  if (!n.private) return false;
+  if (alsoHideFromHere || !here) return true;
+  return !n.provenance?.some((p) => p.conversationId === here);
+}
+
 export function isForgotten(graph: MindGraph, fingerprint: string): boolean {
   return graph.tombstones.includes(fingerprint);
 }

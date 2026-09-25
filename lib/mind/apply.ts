@@ -434,7 +434,13 @@ function makeNode(
 ): MindNode {
   return {
     id: opts.nextId(),
-    type: c.type,
+    // CLIPPED like the label and the content, and for the same reason:
+    // serialize renders `${n.type}${status}: ${n.label} — ${n.content}` on one
+    // line, so a type carrying a newline opens a line of its own inside the
+    // system prompt — a forged block header, reachable from an uploaded file
+    // through the same extractor. label, content, aliases and the hand-edit
+    // route all clip; this was the one write path that did not.
+    type: clip(c.type, MAX_LABEL) as MindNode['type'],
     label,
     content,
     aliases: (c.aliases ?? []).map((a) => clip(a, MAX_LABEL)).filter(Boolean).slice(0, MAX_ALIASES),

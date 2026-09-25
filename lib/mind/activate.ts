@@ -25,7 +25,7 @@ import {
   STRONG_RELATION, affinity, affinityFactor, projectIndex,
 } from './projects';
 import {
-  PARTNER_RELATIONSHIPS, STATUS_WEIGHT, normalize, relWeight,
+  PARTNER_RELATIONSHIPS, STATUS_WEIGHT, normalize, privateElsewhere, relWeight,
   type MindEdge, type MindGraph, type MindNode,
 } from './types';
 
@@ -47,7 +47,11 @@ export interface ActivateOptions {
   now: number;
   /** how many nodes may be carried into the conversation — the plan's window */
   limit: number;
-  /** Logos never receives private nodes: its map can be exported as an image */
+  /**
+   * Logos never receives private nodes at all: its map can be exported as an
+   * image and shown to someone. Core 4 gets a private node only in the
+   * conversation it was made in — see privateElsewhere.
+   */
   excludePrivate?: boolean;
   /** extra terms beyond the message — the Cognitive State's currentFocus */
   focus?: string[];
@@ -167,7 +171,10 @@ export function activate(
   message: string,
   opts: ActivateOptions
 ): ActivatedSubgraph {
-  const visible = opts.excludePrivate ? graph.nodes.filter((n) => !n.private) : graph.nodes;
+  // A private node is available in the conversation it was made in and nowhere
+  // else — the ledger's rule, applied to the graph. Logos gets none of them at
+  // all, because its map can be exported as an image.
+  const visible = graph.nodes.filter((n) => !privateElsewhere(n, opts.conversationId, opts.excludePrivate));
   const allowed = new Set(visible.map((n) => n.id));
   const byId = new Map(visible.map((n) => [n.id, n]));
 

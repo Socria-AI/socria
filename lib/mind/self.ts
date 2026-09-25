@@ -27,7 +27,7 @@
 // self digest surfaces only what the graph already holds. Nothing here mints a
 // belief about anybody.
 
-import { normalize, STATUS_WEIGHT, type MindGraph, type MindNode } from './types';
+import { normalize, privateElsewhere, STATUS_WEIGHT, type MindGraph, type MindNode } from './types';
 
 /**
  * The alias every node ABOUT THE PERSON carries.
@@ -221,6 +221,8 @@ export function standingProfile(
   opts: {
     now: number;
     excludePrivate?: boolean;
+    /** The conversation this turn belongs to, for the private-node rule. */
+    here?: string;
     limit?: number;
     /**
      * Nodes belonging to a Project other than the one this turn is in.
@@ -237,7 +239,10 @@ export function standingProfile(
   const limit = opts.limit ?? PROFILE_LINES;
   const usable = graph.nodes.filter(
     (n) =>
-      (!opts.excludePrivate || !n.private) &&
+      // A header that travels on EVERY turn is the last place a private node
+      // should reach: it is how a conversation marked sensitive introduced
+      // itself in an unrelated one. Available where it was made, nowhere else.
+      !privateElsewhere(n, opts.here, opts.excludePrivate) &&
       !opts.elsewhere?.has(n.id) &&
       n.status !== 'archived' &&
       n.status !== 'superseded' &&

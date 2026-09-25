@@ -93,6 +93,36 @@ console.log('\n=== a failed read does not open the internet either ===');
   ok("  and 'none' is a refusal there", /policy === 'none'|policy !== 'full'/.test(web));
 }
 
+console.log('\n=== a failed read does not switch memory off for good ===');
+{
+  // The fail-closed intent was right and the forced value was PERSISTED, and
+  // mergeState carries a prior 'none' forward unchanged — so one slow Supabase
+  // second switched a conversation's memory off for the rest of its life: no
+  // ledger, no capability evidence, no Mind Graph write, every later state row
+  // saved text-free, and no announcement, because that only fires on an
+  // explicit request. "One turn of continuity is lost" is what the rule
+  // promises; this is what makes it true.
+  ok('the turn carries the unknown policy without writing it', /policyUnknown: boolean;/.test(turn));
+  ok('  and the state save is skipped rather than written as "none"',
+    /p\.policyUnknown\s*\n?\s*\? Promise\.resolve\(\)\s*\n?\s*: store\.saveState/.test(turn));
+  const merge = read('lib/core4/merge.ts');
+  ok("  which matters because a stored 'none' is sticky by design",
+    /prev === 'none'/.test(merge) || /'none'/.test(merge));
+}
+
+console.log('\n=== the off-the-record sentence says what is true ===');
+{
+  // "Socria will not keep anything from this conversation" was a promise the
+  // system does not keep: every Core 4 writer honours the policy, and the chat
+  // itself is still saved to their account by the client, in their sidebar and
+  // their export. An overstated privacy promise is worse than an accurate one.
+  ok('the acknowledgement is scoped to what Socria remembers',
+    /nothing from here goes into what Socria remembers about them/.test(turn));
+  ok('  and says where the conversation itself lives', /stays in their sidebar/.test(turn));
+  ok('  and how to turn memory back on', /"you can remember this" turns memory back on/.test(turn));
+  ok('the old over-promise is gone', !/will not keep anything from this conversation/.test(turn));
+}
+
 console.log('\n=== the route outlives its own deadlines ===');
 {
   // Core 4's internal budget sums past 8 s before the reply model is called,

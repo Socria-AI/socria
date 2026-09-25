@@ -27,7 +27,7 @@ import 'server-only';
 
 import { modelClient } from '../core4/model';
 import { SAVED_VOICE_RULE } from '../memory-voice';
-import { KNOWN_NODE_TYPES, KNOWN_RELATIONSHIPS, PROVENANCE_KINDS } from './types';
+import { KNOWN_NODE_TYPES, KNOWN_RELATIONSHIPS, PROVENANCE_KINDS, clip } from './types';
 import type { EdgeCandidate, NodeCandidate } from './apply';
 import type { ActivatedSubgraph } from './activate';
 
@@ -181,7 +181,9 @@ export function sanitizeExtraction(raw: unknown): ExtractResult {
             : 'inferred'
           : 'tentative';
       out.nodes.push({
-        type: TYPES.has(type) ? type : type.slice(0, 40),
+        // clip(), not slice(): the cap was there and the whitespace collapse was
+        // not, so a type could still carry a newline into the prompt.
+        type: TYPES.has(type) ? type : clip(type, 40),
         label,
         content: typeof n.content === 'string' ? n.content : '',
         kind: kind as NodeCandidate['kind'],

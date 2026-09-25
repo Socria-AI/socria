@@ -190,6 +190,7 @@ export async function recall(
       standingProfile(graph, {
         now: opts.now,
         excludePrivate: opts.surface === 'logos',
+        here: opts.conversationId,
         elsewhere,
       })
     );

@@ -147,10 +147,19 @@ console.log('\n=== the standing profile: what travels on EVERY turn ===');
   ok('what they used to want is not presented as standing', !prof.some((n) => n.id === 'p-old'));
   ok('it is short by construction', prof.length <= PROFILE_LINES);
 
-  // Private material never reaches a surface that can be shown to somebody.
+  // Private material never reaches a surface that can be shown to somebody —
+  // and, since Core 4 implements conversation_only by writing nodes private,
+  // never reaches a DIFFERENT CONVERSATION either. "And Core does", which this
+  // assertion used to say, is how a conversation marked sensitive introduced
+  // itself in an unrelated one through the header that travels on every turn.
   ok('Logos does not receive private standing facts',
-    !standingProfile(graph, { now: T0, excludePrivate: true }).some((n) => n.id === 'p-sec'));
-  ok('  and Core does', standingProfile(graph, { now: T0 }).some((n) => n.id === 'p-sec'));
+    !standingProfile(graph, { now: T0, here: 'c1', excludePrivate: true }).some((n) => n.id === 'p-sec'));
+  ok('  Core does, in the conversation it was made in',
+    standingProfile(graph, { now: T0, here: 'c1' }).some((n) => n.id === 'p-sec'));
+  ok('  and not in another conversation',
+    !standingProfile(graph, { now: T0, here: 'c2' }).some((n) => n.id === 'p-sec'));
+  ok('  nor when there is no conversation to check against',
+    !standingProfile(graph, { now: T0 }).some((n) => n.id === 'p-sec'));
 
   const block = renderProfile(prof);
   ok('the block names them', /Pradeep/.test(block));

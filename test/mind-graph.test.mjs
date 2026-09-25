@@ -649,17 +649,28 @@ console.log('\n=== the window bounds what reaches the prompt ===');
   ok('the whole graph is never serialized', !text.includes('Topic 11') || wide.nodes.length <= 3);
 }
 
-console.log('\n=== private stays out of Logos ===');
+console.log('\n=== private stays in the conversation it was made in ===');
 {
+  // THIS ASSERTION USED TO READ "Core can recall it", anywhere, and that was
+  // the bug. `private` was documented as a Logos boundary, but Core 4 marks a
+  // whole conversation conversation_only when it reads as sensitive and
+  // implements it by writing the nodes private — so "Core can recall it"
+  // meant a conversation about therapy was recalled in an unrelated one, and
+  // was eligible for the standing profile, which travels on every turn.
+  // The rule is the reasoning ledger's: available where it was made.
   let g = EMPTY_GRAPH;
   ({ graph: g } = apply(g, [
     C('Concept', 'The therapy sessions', 'Something weighty they are working through', 'stated', { private: true }),
     C('Project', 'Core 4', 'The model they are building'),
-  ]));
-  const core = activate(g, 'the therapy sessions and Core 4', { now: T0, limit: 10 });
-  ok('Core can recall it', core.nodes.some((n) => n.private));
-  const logos = activate(g, 'the therapy sessions and Core 4', { now: T0, limit: 10, excludePrivate: true });
-  ok('Logos cannot', !logos.nodes.some((n) => n.private), 'a Logos map can be exported as an image');
+  ], [], { provenance: { surface: 'core', conversationId: 'c1' } }));
+  const ask = 'the therapy sessions and Core 4';
+  const here = activate(g, ask, { now: T0, limit: 10, conversationId: 'c1' });
+  ok('Core recalls it in that conversation', here.nodes.some((n) => n.private));
+  const elsewhere = activate(g, ask, { now: T0, limit: 10, conversationId: 'c2' });
+  ok('and not in another one', !elsewhere.nodes.some((n) => n.private), 'conversation_only means this conversation');
+  ok('  which does still see the rest', elsewhere.nodes.some((n) => n.label === 'Core 4'));
+  const logos = activate(g, ask, { now: T0, limit: 10, conversationId: 'c1', excludePrivate: true });
+  ok('Logos cannot, even there', !logos.nodes.some((n) => n.private), 'a Logos map can be exported as an image');
   ok('but still sees the rest', logos.nodes.some((n) => n.label === 'Core 4'));
 }
 

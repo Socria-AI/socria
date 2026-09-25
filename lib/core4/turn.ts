@@ -95,6 +95,12 @@ export interface PreparedTurn {
   prior: CognitiveState | null;
   state: CognitiveState;
   readOk: boolean;
+  /**
+   * The stored policy could not be READ this turn — a Supabase error or a
+   * timeout. The turn is treated as off the record, and that treatment is NOT
+   * written back: see the save in finishTurn.
+   */
+  policyUnknown: boolean;
   signals: ExplicitSignals;
   contract: ExplicitSignals;
   allocation: Allocation;
@@ -472,7 +478,13 @@ export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
 
   let move = renderDecision({ ...decision, avoid: allLines.slice(0, 12) }, allocation) + renderMissing(missingShown);
   if (signals.offRecord && !signals.onRecord) {
-    move += '\nThey asked for this to be off the record: say in one clause that Socria will not keep anything from this conversation from now on, and that "you can remember this" turns it back on. Then carry on.\n';
+    // WHAT IS TRUE, not what sounds reassuring. "Socria will not keep anything
+    // from this conversation" was a promise the system does not keep: every
+    // Core 4 writer honours the policy — no ledger, no capability evidence, no
+    // free-text state, no Mind Graph — but the chat itself is still saved to
+    // their account by the client, and it is in their sidebar and their export.
+    // An overstated privacy promise is worse than an accurate narrower one.
+    move += '\nThey asked for this to be off the record: say in one clause that nothing from here goes into what Socria remembers about them, that the conversation itself stays in their sidebar for them to delete, and that "you can remember this" turns memory back on. Then carry on.\n';
   }
   if (allocation.announce) {
     move += '\nThis is the first time you are holding something back in this conversation: say so once, in a clause, and that they can have it by asking (e.g. "say the word and I\'ll give you the answer"). Do not repeat this in later turns.\n';
@@ -522,6 +534,7 @@ export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
     prior,
     state,
     readOk: read.ok,
+    policyUnknown,
     signals,
     contract,
     allocation,
@@ -821,8 +834,19 @@ export async function finishTurn(
   // Off the record (council D15): no ledger, no capability evidence, no free
   // text in the saved state. The content-free trace is still written.
   const offRecord = state.persistPolicy === 'none';
+  // A FAILED READ MAY NOT WRITE THE POLICY IT COULD NOT READ.
+  //
+  // Forcing 'none' for the turn is right. Persisting it was not: mergeState
+  // carries a prior 'none' forward unchanged, so one slow Supabase second
+  // switched a conversation's memory off for the rest of its life — no ledger,
+  // no capability evidence, no Mind Graph write, every later state row saved
+  // text-free — and the person was never told, because the announcement only
+  // fires on an explicit request. "One turn of continuity is lost", which is
+  // what the fail-closed rule promises, is what this makes true.
   const writes: Promise<unknown>[] = [
-    store.saveState(input.userId, input.conversationId, offRecord ? withoutText(next) : next, input.now),
+    p.policyUnknown
+      ? Promise.resolve()
+      : store.saveState(input.userId, input.conversationId, offRecord ? withoutText(next) : next, input.now),
     offRecord ? Promise.resolve() : store.saveLedger(input.userId, [...merged.created, ...merged.touched, ...p.disputed, ...p.superseded], links),
     store.insertTurn(input.userId, input.conversationId, trace, input.now),
     offRecord || privateHere ? Promise.resolve() : store.insertCapability(input.userId, evidence),
