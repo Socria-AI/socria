@@ -79,8 +79,13 @@ console.log('\n=== it runs on its own prompt ===');
   ok('  and it cannot run code either', /You cannot run code/.test(p4));
   ok('  evidence it was handed is usable, and citable by number',
     /When a block headed "From the web" is present/.test(p4) && /cite them by the number given/.test(p4));
-  ok('  with no block, it says so instead of answering from memory',
-    /When no such block is present, you have not looked anything up/.test(p4));
+  // THIS LINE USED TO SAY "you have not looked anything up", and the model read
+  // it as a statement about itself: "I can't look up articles directly". Nothing
+  // fetched is a fact about the turn.
+  ok('  with no block, nothing fetched is not answered from memory',
+    /When no such block is present, nothing was fetched this turn/.test(p4));
+  ok('    and what it knows is marked as knowledge, not as a source',
+    /mark what you do know as knowledge rather than as a source/.test(p4));
   // Run 3: mustContribute was Core 4's one deficit (88% vs 100%), and its
   // prompt, unlike the baseline's, never asked for the contribution.
   ok('it contributes what they have not considered, without contrarianism', p4.includes('the valuable move is usually something they have not considered') && p4.includes('never manufacture contrarianism'));
@@ -88,6 +93,15 @@ console.log('\n=== it runs on its own prompt ===');
   // baseline covered more of what mattered".
   ok('decisions and expert analysis get completeness over brevity', p4.includes('completeness on what matters beats brevity'));
   ok('Socria’s ideas are not presented as theirs', p4.includes('Never present Socria\'s idea as theirs'));
+  // THE CAPABILITY CLAIM IS NOT THE MODEL'S TO MAKE. With no evidence block in
+  // the prompt it used to be told to say a source "cannot be reached", and it
+  // turned that into "I can't look up articles directly" — a statement about
+  // what Socria IS, inferred from what one turn happened to carry.
+  ok('an empty turn is not a statement about what Socria can do',
+    /a fact about this turn and not about what you are/.test(p4));
+  ok('  and the disclaimer may not become the reply',
+    /never tell somebody you are unable to look things up/.test(p4));
+  ok('  what replaces it is where to look', /the useful reply is where to look/.test(p4));
 
   // Council D1 prompt-lint: no default-withholding or drip-feed instruction survives.
   for (const banned of ['let them generate before you reveal', 'first elicit enough of their thinking', 'request for directness with surrendering', 'Advance one meaningful step at a time', 'develop through turns, not exhaustive single responses', 'When uncertain whether to say more, stop']) {

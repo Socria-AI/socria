@@ -11,7 +11,7 @@
 // party with a log, and nothing can take it back. So the gate is narrow, and
 // half of this suite is turns that must NOT leave the machine.
 
-import { webIntent, buildQuery, stripIdentifiers, renderResearch, renderDisclosure, danglingCitations, flatten } from './.tmp/web.mjs';
+import { webIntent, buildQuery, stripIdentifiers, renderResearch, renderNoResearch, renderDisclosure, danglingCitations, flatten } from './.tmp/web.mjs';
 
 let pass = 0, fail = 0;
 const ok = (n, c, x = '') => (c ? (pass++, console.log('  ok   ' + n)) : (fail++, console.log('  FAIL ' + n + '  ' + x)));
@@ -49,6 +49,36 @@ console.log('\n=== turns that must NOT reach the internet ===');
   ok('off the record stays off the record',
     webIntent('look up the current pricing', { offRecord: true }).want === false);
   ok('an empty turn looks nothing up', webIntent('', NO).want === false);
+
+  // A LOOKUP THAT WAS WANTED AND DID NOT HAPPEN.
+  //
+  // Reported from production: "look up recent shorthorn articles" → "I can't
+  // look up articles directly, but I can help guide you on where to find them…
+  // let me know!" The gate wanted a search, the search did not reach the web,
+  // and with no block of any kind in the prompt the model inferred its own
+  // capabilities from what it had been handed — and made a reply out of the
+  // disclaimer.
+  {
+    const none = renderNoResearch(false, 'anything');
+    ok('nothing is said when no lookup was wanted', none === '');
+    const block = renderNoResearch(true, 'recent shorthorn articles');
+    ok('a wanted lookup that did not run says so', /The lookup did not run/.test(block));
+    ok('  and carries their query, so the reply can name it', /recent shorthorn articles/.test(block));
+    ok('  it forbids inventing what an article says', /say nothing about what any specific recent article contains/.test(block));
+    ok('  it forbids the disclaimer reply outright', /DO NOT make this a disclaimer/.test(block));
+    ok('    naming the sentence that was actually produced', /I can't look things up, but I can help you find them/.test(block));
+    ok('  and spends the turn on WHERE TO LOOK instead', /WHERE TO LOOK, concretely/.test(block));
+    ok('    with named sources, not a category', /not "academic databases"/.test(block));
+    ok('    the exact query to paste', /the exact query to paste/.test(block));
+    ok('    and whose work to follow', /whose work to follow/.test(block));
+    // THE CAPABILITY CLAIM IS NOT THE MODEL'S TO MAKE. Whether a search ran is
+    // a fact about the turn; what Socria can do is not something to infer from
+    // an empty prompt.
+    ok('  it never lets the model disclaim the capability itself',
+      /Never say or imply you lack the ability to search/.test(block));
+    ok('    saying why: it is a fact about the turn, not about what it is',
+      /a fact about this turn, not about what you are/.test(block));
+  }
 
   // AN IMPERATIVE IS HOW HALF OF PEOPLE ASK FOR A LOOKUP.
   //
