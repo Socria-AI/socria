@@ -370,9 +370,21 @@ export function readSignals(message: string): ExplicitSignals {
 
   // 40 characters, not 24: "yours, go ahead and draft it" is an answer to a
   // question, not a sentence about ownership in the middle of a paragraph.
+  //
+  // THE MATCH IS RECORDED AS EVIDENCE, and that is not bookkeeping. Council D6
+  // requires a withhold to carry the person's own words; without a quote,
+  // `alloc` drops the withhold entirely in production (and throws under
+  // CORE4_STRICT, which is how this was found). So somebody answering "mine"
+  // set authorship = theirs with an empty quote, and the withhold that was
+  // supposed to protect their work silently did not apply. The protection was
+  // hollow exactly where it mattered most.
   const answering = text.trim().length <= 40;
-  const delegated = !!note(lastIndex(DELEGATE, text)) || (answering && HANDS_IT_OVER.test(text.trim()));
-  const keepsIt = !!note(lastIndex(OWN_WORK, text)) || (answering && KEEPS_IT.test(text.trim()));
+  const handed = answering ? HANDS_IT_OVER.exec(text.trim()) : null;
+  const kept = answering ? KEEPS_IT.exec(text.trim()) : null;
+  if (handed) evidence.push(text.trim().slice(0, 60));
+  if (kept) evidence.push(text.trim().slice(0, 60));
+  const delegated = !!note(lastIndex(DELEGATE, text)) || !!handed;
+  const keepsIt = !!note(lastIndex(OWN_WORK, text)) || !!kept;
 
   return {
     directness,

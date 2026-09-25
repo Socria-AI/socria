@@ -296,6 +296,23 @@ console.log('\n=== the same loop, the other way ===');
   ok('  without asking again', next.decision.type !== 'CLARIFY');
 }
 
+console.log('\n=== the answer carries their words, or the protection is hollow ===');
+{
+  // FOUND BY THE RUNNER'S STRICT MODE, not by the suite: this file passed
+  // standalone and crashed inside `npm test`, which sets CORE4_STRICT=1.
+  // Council D6 requires a withhold to carry the person's own quote, and
+  // without one `alloc` DROPS the withhold in production rather than throwing.
+  // So somebody answering "mine" set authorship = theirs with an empty quote,
+  // and the withhold meant to protect their work silently did not apply — the
+  // protection was hollow exactly where it mattered.
+  for (const t of ['mine', 'yours', 'mine i think', 'yours, go ahead']) {
+    ok(`"${t}" is recorded with what they said`, readSignals(t).evidence.length > 0, JSON.stringify(readSignals(t).evidence));
+  }
+  // And the withhold it produces actually survives being built.
+  const theirs = turn('write the conclusion', { ...CREATE, authorship: { value: 'theirs', source: 'explicit', confidence: 1, evidence: 'it has to be my own words' } });
+  ok('the withhold exists and carries a quote', !!theirs.allocation.withhold?.quote, JSON.stringify(theirs.allocation.withhold?.quote));
+}
+
 console.log('\n=== a hedged answer is still an answer ===');
 {
   // The question is written to be answerable in a word, so people answer it in
