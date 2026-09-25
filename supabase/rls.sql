@@ -24,9 +24,6 @@ alter table logos_connections    enable row level security;
 alter table socria_subscriptions enable row level security;
 alter table logos_usage          enable row level security;
 alter table lifecycle_emails     enable row level security;
-alter table logos_rooms         enable row level security;
-alter table logos_room_members  enable row level security;
-alter table logos_room_events   enable row level security;
 alter table mind_nodes          enable row level security;
 alter table mind_edges          enable row level security;
 alter table mind_tombstones     enable row level security;
@@ -49,9 +46,6 @@ alter table logos_connections    force row level security;
 alter table socria_subscriptions force row level security;
 alter table logos_usage          force row level security;
 alter table lifecycle_emails     force row level security;
-alter table logos_rooms         force row level security;
-alter table logos_room_members  force row level security;
-alter table logos_room_events   force row level security;
 alter table mind_nodes          force row level security;
 alter table mind_edges          force row level security;
 alter table mind_tombstones     force row level security;
@@ -77,9 +71,6 @@ revoke all on logos_connections    from anon, authenticated;
 revoke all on socria_subscriptions from anon, authenticated;
 revoke all on logos_usage          from anon, authenticated;
 revoke all on lifecycle_emails     from anon, authenticated;
-revoke all on logos_rooms         from anon, authenticated;
-revoke all on logos_room_members  from anon, authenticated;
-revoke all on logos_room_events   from anon, authenticated;
 revoke all on mind_nodes          from anon, authenticated;
 revoke all on mind_edges          from anon, authenticated;
 revoke all on mind_tombstones     from anon, authenticated;
@@ -100,14 +91,6 @@ revoke all on capability_evidence from anon, authenticated;
 -- adding a table and adding its wall are two separate acts and only one of
 -- them breaks anything. test/rls-covers-schema now fails the build instead.
 --
--- The three logos_room_* tables hold TWO people's words in one place, which
--- makes them the only tables here where "your rows" and "rows about you" are
--- different sets. Nothing reaches them but the service role, and every read
--- and write goes through a membership check in app/api/logos/room/*.
---
--- An earlier version of this note said the browser needed the Supabase anon
--- key for Logos 2, which made an un-walled table reachable by anyone who read
--- a script tag. That is no longer true: the browser holds no Supabase
--- credentials at all, and collaboration goes through our own authenticated
--- routes. The walls stay regardless — they are the second line, not the
--- first.
+-- The browser holds no Supabase credentials at all: everything goes through our
+-- own authenticated routes. The walls stay regardless — they are the second
+-- line, not the first.

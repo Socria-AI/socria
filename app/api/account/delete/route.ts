@@ -12,7 +12,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth, clerkClient } from '@clerk/nextjs/server';
 import { supabaseAdmin } from '@/lib/supabase';
-import { purgeUserFromRooms } from '@/lib/logos-rooms-server';
 import { ACCESS_COOKIE } from '@/lib/access-codes-server';
 import { readSubscription, isCompCustomer } from '@/lib/subscriptions';
 import { stripe, stripeConfigured } from '@/lib/stripe';
@@ -39,7 +38,7 @@ const OWNED_TABLES = [
   'lifecycle_emails',
   'logos_usage',
   // The Mind Graph. Every row is keyed to one person, so a flat delete is
-  // the right shape here — unlike the shared logos_room_* tables below.
+  // the right shape here.
   'mind_nodes',
   'mind_edges',
   'mind_tombstones',
@@ -74,9 +73,6 @@ const LATE_TABLES = new Set<string>([
   'mind_sources',
   'mind_projects',
   'logos_usage',
-  'logos_room_events',
-  'logos_room_members',
-  'logos_rooms',
   'core4_state',
   'reasoning_entries',
   'reasoning_links',
@@ -181,37 +177,6 @@ export async function DELETE(req: NextRequest) {
       );
     }
     deleted.push(table);
-  }
-
-  // Shared rooms, which a flat "delete every row with your id on it" cannot
-  // express. purgeUserFromRooms removes THIS person's events and membership,
-  // clears them as host so the other participant's events are not orphaned,
-  // and drops rooms nobody is left in. The other participant's words stay —
-  // they are that person's to export and to delete. See the deletion note in
-  // supabase/schema.sql.
-  try {
-    await purgeUserFromRooms(userId, Date.now());
-    deleted.push('logos_rooms');
-  } catch (e) {
-    // A database that has not run the collaboration migration genuinely has
-    // nothing of theirs in it; anything else is a real failure and stops the
-    // deletion, exactly like a failed table above. Swallowing it would report
-    // a completed deletion that had left rooms behind.
-    const m = e instanceof Error ? e.message.toLowerCase() : '';
-    const missing =
-      m.includes('42p01') || m.includes('does not exist') || m.includes('schema cache');
-    if (!missing) {
-      console.error('account delete: room purge', e);
-      return NextResponse.json(
-        {
-          error:
-            'Could not delete everything, so nothing further was removed and your account still exists. Please email hellosocria@gmail.com and we will finish it by hand.',
-          failedAt: 'logos_rooms',
-          deleted,
-        },
-        { status: 500 }
-      );
-    }
   }
 
   // The identity last.

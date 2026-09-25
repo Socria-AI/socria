@@ -201,18 +201,13 @@ console.log('\n=== junk in storage is not a model ===');
   }
   localStorage.setItem(MODEL_KEY, 'logos');
   ok('a real one still reads', readStoredModel() === 'logos');
-  // Logos 2 is real and selectable — it must store like any other.
-  localStorage.setItem(MODEL_KEY, 'logos-2');
-  ok('Logos 2 is a stored model', readStoredModel() === 'logos-2');
 }
 
 console.log('\n=== leaving a logos surface returns to a Core model ===');
 {
   fresh();
   rememberModel('core-3');
-  rememberModel('logos-2');   // a logos surface must not become "last core"
-  ok('Logos 2 does not overwrite the last Core', lastCoreModel() === 'core-3');
-  rememberModel('logos');
+  rememberModel('logos');   // a logos surface must not become "last core"
   ok('nor does plain Logos', lastCoreModel() === 'core-3');
 }
 
@@ -239,7 +234,7 @@ console.log('\n=== the retirement is data, and it is visible ===');
   ok('Core 3.1 needs no account', MODELS['core-3'].requiresAuth === false);
   ok('Core 2 still answers until the date', MODELS['core-2'].requiresAuth === false && !MODELS['core-2'].soon);
   ok('the surfaces that keep something still need one',
-    MODELS['logos'].requiresAuth && MODELS['logos-2'].requiresAuth && MODELS['core-4'].requiresAuth);
+    MODELS['logos'].requiresAuth && MODELS['core-4'].requiresAuth);
   ok('the menu no longer offers Core 2 as the way in, signed out',
     /Core 3\.1 stays open, signed out/.test(picker));
 }

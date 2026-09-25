@@ -1245,7 +1245,7 @@ It should feel like a conversation that develops naturally, accumulates insight,
 
 // ===== Public API =====
 
-export type SocriaModel = 'core-2' | 'core-3' | 'logos' | 'logos-2' | 'core-4';
+export type SocriaModel = 'core-2' | 'core-3' | 'logos' | 'core-4';
 export type ThinkingDepth = 'quick' | 'balanced' | 'deep' | 'abstract';
 
 export interface ModelConfig {
@@ -1281,13 +1281,8 @@ export interface ModelConfig {
    * they were in the middle of.
    */
   leaving?: string;
-  /**
-   * This model opens the Logos surface (a Thinking Map beside the chat).
-   * Both Logos and Logos 2 set it; Logos 2 adds `collab` on top.
-   */
+  /** This model opens the Logos surface (a Thinking Map beside the chat). */
   logosSurface?: boolean;
-  /** Logos 2: two people in one workspace. See lib/collab.ts. */
-  collab?: boolean;
 }
 
 // ===== Core 4 =====
@@ -1538,22 +1533,6 @@ export const SOCRIA_MODELS: Record<SocriaModel, ModelConfig> = {
     supportsDepth: false,
     requiresAuth: true,
     logosSurface: true,
-  },
-  // Logos 2 — two people in one Logos workspace, thinking together in real
-  // time. Socria sits between them as the shared reasoning layer. It is the
-  // same surface and the same model as Logos; `collab` is what turns the room
-  // into a two-seat one. See lib/collab.ts.
-  'logos-2': {
-    id: 'logos-2',
-    label: 'Socria Logos 2',
-    short: 'Logos 2',
-    description:
-      'Think together. Two people, one Thinking Map, Socria between you — naming the connections, the disagreements and the open questions.',
-    defaultOpenAIModel: 'gpt-5.6-sol',
-    supportsDepth: false,
-    requiresAuth: true,
-    logosSurface: true,
-    collab: true,
   },
   // Core 4 — built, and selectable. It carried `soon` while it was an
   // announcement, which made the picker grey it out; that flag came off when

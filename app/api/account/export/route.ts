@@ -173,47 +173,6 @@ export async function GET(req: NextRequest) {
     'is marked as yours only when it is grounded in your own words. core4Turns hold no text ' +
     'at all. None of this is used to train models.';
 
-  // ── Logos 2: shared rooms ───────────────────────────────────────────
-  //
-  // A shared room is the one place in Socria where an export cannot simply
-  // be "every row with your id on it": the room holds two people's words.
-  // What goes in an export is what THIS person contributed, plus the rooms
-  // they were in and who else was there — never the other participant's
-  // messages, which are that person's to export.
-  const { data: memberships, error: membershipsErr } = await db
-    .from('logos_room_members')
-    .select('room_id, seat, display_name, joined_at, left_at')
-    .eq('user_id', userId);
-  out.collabMemberships = memberships ?? [];
-
-  // The rooms themselves, so the export stands on its own rather than
-  // referring to ids that mean nothing outside our database.
-  const roomIds = Array.from(
-    new Set((memberships ?? []).map((m: { room_id: string }) => m.room_id))
-  );
-  const { data: rooms, error: roomsErr } = roomIds.length
-    ? await db
-        .from('logos_rooms')
-        .select('id, code, created_at, closed_at')
-        .in('id', roomIds)
-    : { data: [] as unknown[], error: null };
-  // Never host_user_id: whether the other person hosted is about them.
-  out.collabRooms = rooms ?? [];
-
-  const { data: myEvents, error: myEventsErr } = await db
-    .from('logos_room_events')
-    .select('room_id, seq, kind, payload, created_at')
-    .eq('user_id', userId)
-    .order('seq', { ascending: true });
-  out.collabContributions = myEvents ?? [];
-
-  // Said plainly inside the file itself, because a person reading their own
-  // export should not have to infer why a conversation they remember looks
-  // one-sided.
-  out.collabNote =
-    'collabContributions holds only what you contributed to a shared Logos room. ' +
-    'What the other person wrote belongs to their account and appears in their export, not yours.';
-
   // An export that silently ships an empty section is worse than one that
   // fails: the file looks complete and nobody can tell from the outside what
   // is missing. Every read above records its error; if any failed, the file
@@ -225,9 +184,6 @@ export async function GET(req: NextRequest) {
     ['connections', connsErr],
     ['lifecycleEmails', lifecycleErr],
     ['logosUsage', usageErr],
-    ['collabMemberships', membershipsErr],
-    ['collabRooms', roomsErr],
-    ['collabContributions', myEventsErr],
     ['mindNodes', mindNodesErr],
     ['mindEdges', mindEdgesErr],
     ['mindForgotten', mindTombstonesErr],

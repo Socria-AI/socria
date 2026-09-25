@@ -1999,7 +1999,6 @@ export default function ChatPage() {
     return (
       <LogosApp
         initialInput={carriedText}
-        collab={SOCRIA_MODELS[model].collab ? true : undefined}
         onSwitchModel={(next) => {
           setModel(next);
           chooseModel(next);

@@ -21,7 +21,6 @@ import {
   buildFocusPrompt,
 } from '@/lib/logos';
 import { renderMessageForModel, sanitizeAttachments } from '@/lib/logos-attachments';
-import { collabBlock, type Seat } from '@/lib/collab';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { boundaryNote, limitOf } from '@/lib/entitlements';
 import { reportUpstream } from '@/lib/upstream-error';
@@ -85,22 +84,6 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => null);
     const messages = body?.messages;
 
-    // The two people in a shared room, if this is one. Names only — never who
-    // is signed in, never an id — and cleaned to shape like every other field
-    // that arrives from a browser.
-    const collabPeopleFrom = (raw: unknown): { name: string; seat: Seat }[] => {
-      if (!raw || typeof raw !== 'object') return [];
-      const people = (raw as { people?: unknown }).people;
-      if (!Array.isArray(people)) return [];
-      return people
-        .filter((p): p is Record<string, unknown> => !!p && typeof p === 'object')
-        .map((p) => ({
-          name: typeof p.name === 'string' ? p.name.replace(/\s+/g, ' ').trim().slice(0, 40) : '',
-          seat: (p.seat === 'host' || p.seat === 'guest' ? p.seat : 'guest') as Seat,
-        }))
-        .filter((p) => p.name)
-        .slice(0, 2);
-    };
     const nameOf = (by: unknown): string =>
       by && typeof by === 'object' && typeof (by as { name?: unknown }).name === 'string'
         ? (by as { name: string }).name.replace(/\s+/g, ' ').trim().slice(0, 40)
@@ -154,13 +137,6 @@ export async function POST(req: NextRequest) {
       )
       .slice(-MAX_HISTORY);
 
-    // Two people, or one? A shared Logos 2 room passes `collab.people` — the
-    // two display names — and each human turn carries a `by`. When both are
-    // present, every human line is prefixed with its author's name so the
-    // model always knows who said what; alone, nothing changes.
-    const collabPeople = collabPeopleFrom(body?.collab);
-    const twoPeople = collabPeople.length >= 2;
-
     // Attachments are flattened into the text the model reads. Only the turn
     // being answered carries a long note in full.
     const clean = kept
@@ -169,10 +145,9 @@ export async function POST(req: NextRequest) {
           { role: m.role, content: m.content, attachments: sanitizeAttachments(m.attachments) },
           i === kept.length - 1
         );
-        const name = twoPeople && m.role === 'user' ? nameOf(m.by) : '';
         return {
           role: m.role as 'user' | 'assistant',
-          content: name && rendered ? `${name}: ${rendered}` : rendered,
+          content: rendered,
         };
       })
       .filter((m) => m.content.trim());
@@ -337,12 +312,7 @@ export async function POST(req: NextRequest) {
         body?.viz ? sanitizeViz(body.viz) : null,
         body?.vizValues && typeof body.vizValues === 'object' ? body.vizValues : undefined
       ) +
-      memoryBlock +
-      // Logos 2: when two people are in the room, Socria becomes the layer
-      // between them. See lib/collab.ts collabBlock — it names both, confines
-      // the model to surfacing connections/disagreements/assumptions/questions
-      // between what each said, and forbids taking a side or concluding.
-      (twoPeople ? collabBlock(collabPeople) : '');
+      memoryBlock;
 
     const openai = new OpenAI({ apiKey });
     const configured = process.env.OPENAI_MODEL_LOGOS || LOGOS_MODEL;

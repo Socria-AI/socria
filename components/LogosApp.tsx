@@ -23,9 +23,6 @@ import { DraftSpace, type DraftHandle, type DraftSelection } from '@/components/
 import { DraftResponsePanel } from '@/components/DraftResponsePanel';
 import { LogosGuide, GUIDE_SEEN_KEY } from '@/components/LogosGuide';
 import { LogosMark } from '@/components/LogosMark';
-import { CollabBar } from '@/components/CollabBar';
-import { useLogosCollab } from '@/components/useLogosCollab';
-import { cleanName, joinCodeFrom, SEAT_COLOR } from '@/lib/collab';
 import { AccountControl } from '@/components/account/AccountControl';
 import { AccountSheet } from '@/components/account/AccountSheet';
 import { ModelGlyph } from '@/components/ModelGlyph';
@@ -211,13 +208,9 @@ export function LogosApp({
   // the handover clears as it is read) and hands it down, so it reaches
   // whichever composer actually mounted rather than racing for it.
   initialInput,
-  // Logos 2: this surface is a two-seat room. Everything below is unchanged
-  // when it is absent — single-player Logos does not know collab exists.
-  collab,
 }: {
   onSwitchModel?: (next: SocriaModel) => void;
   initialInput?: string;
-  collab?: boolean;
 } = {}) {
   const { isLoaded, isSignedIn, user } = useUser();
   const [unlocked, setUnlocked] = useState(false);
@@ -1194,25 +1187,6 @@ export function LogosApp({
 
   const persist = useCallback(
     async (s: LogosSession) => {
-      // A shared room is NOT saved to anybody's conversation row.
-      //
-      // It used to be: the host's client held the merged session — both
-      // people's messages — and PUT the whole thing to /api/conversations as
-      // itself. So the guest's words were stored under the host's user_id,
-      // where the guest could neither export nor delete them, and the host's
-      // export contained a second person's thinking.
-      //
-      // The room's own event log is the shared record now
-      // (logos_room_events), and every row in it carries the id of whoever
-      // wrote it. Each person exports what they contributed and deletes what
-      // they wrote; neither ends up holding the other's words by accident.
-      if (roomRef.current?.active) return;
-      // And not after leaving, either: the session still in memory is the
-      // MERGED one, both people's words. Persisting it on the way out would
-      // put the other person's thinking in this account's row — exactly the
-      // thing suppressing it during the room was for. A room's record is the
-      // room's; see lib/logos-rooms-server.ts.
-      if (sharedIdsRef.current.has(s.id)) return;
       if (!cloud) {
         saveLocal(sessionsRef.current);
         return;
@@ -1246,40 +1220,6 @@ export function LogosApp({
     },
     [applySessions, persist]
   );
-
-  // ── Logos 2 — two people in one workspace ───────────────────────────
-  //
-  // The whole of collaboration lives in this hook and the bar it feeds; the
-  // rest of LogosApp calls it at three points (a message sent, a map
-  // extracted, a node handed onto the map) and is otherwise untouched. When
-  // `collab` is absent the hook is disabled and nothing here runs.
-  const joinCode = useMemo(
-    () => (typeof window === 'undefined' ? null : joinCodeFrom(window.location.search)),
-    []
-  );
-  const roomIdRef = useRef<string | null>(null);
-  /** every session id that has ever been a shared room in this tab */
-  const sharedIdsRef = useRef<Set<string>>(new Set());
-  const room = useLogosCollab({
-    enabled: !!collab,
-    identity: { id: user?.id || '', name: cleanName(user?.firstName || user?.username, 'You') },
-    joinCode,
-    getSession: () => sessionsRef.current.find((x) => x.id === activeIdRef.current) ?? null,
-    setSession: (shared) => {
-      sharedIdsRef.current.add(shared.id);
-      // A guest with no session of its own adopts the host's; both then keep
-      // the shared session as the active one, merged by the reducer.
-      roomIdRef.current = shared.id;
-      applySessions(
-        sessionsRef.current.some((x) => x.id === shared.id)
-          ? sessionsRef.current.map((x) => (x.id === shared.id ? shared : x))
-          : [shared, ...sessionsRef.current]
-      );
-      if (activeIdRef.current !== shared.id) setActiveId(shared.id);
-    },
-  });
-  const roomRef = useRef(room);
-  roomRef.current = room;
 
   // Load the session list once access resolves.
   useEffect(() => {
@@ -1598,15 +1538,7 @@ export function LogosApp({
                 viz = { ...json.map.viz, overlays: s.map.viz.overlays };
               }
               const map = { ...json.map, ...(viz ? { viz } : {}) };
-              // Share the extraction: the host draws, both see it. onLocalMap
-              // returns the map with each node attributed, so the local view
-              // shows the same author dots the other person sees; alone it
-              // returns the map unchanged.
-              const shown =
-                roomRef.current.active && sharedIdsRef.current.has(s.id)
-                  ? roomRef.current.onLocalMap(map)
-                  : map;
-              return { ...s, map: shown, contexts };
+              return { ...s, map, contexts };
             });
             setChanged(new Set(delta.changed));
             setDeltaNote(summarizeDelta(delta));
@@ -2011,14 +1943,7 @@ export function LogosApp({
       content,
       ...(atts.length ? { attachments: atts } : {}),
     };
-    // In a shared room the turn is stamped with who wrote it and broadcast to
-    // the other person before anything else happens. Alone, this returns the
-    // turn unchanged and sends nothing.
-    // In a room AND in the room's own session: switching to another line of
-    // thinking while a room is open must not broadcast it into that room.
-    const inShared =
-      roomRef.current.active && sharedIdsRef.current.has(activeIdRef.current ?? '');
-    const sent = inShared ? roomRef.current.onLocalMessage(turn) : turn;
+    const sent = turn;
     const before = messages;
     const next = [...before, sent];
     patchActive((s) => ({ ...s, messages: next }), false);
@@ -2063,11 +1988,6 @@ export function LogosApp({
           // What they are looking at, so "why is it flat there" has something
           // to be about. Re-sanitised on the server like every other field.
           ...(mapRef.current?.viz ? { viz: mapRef.current.viz } : {}),
-          // Logos 2: the two people in the room, so Socria answers as the
-          // layer between them. Names only — never who is signed in.
-          ...(roomRef.current.active && roomRef.current.people.length >= 2
-            ? { collab: { people: roomRef.current.people } }
-            : {}),
         }),
       });
       if (res.status === 402) {
@@ -2120,15 +2040,7 @@ export function LogosApp({
         isSignedIn &&
         userTurns >= JOURNEY_EVERY_TURNS &&
         userTurns % JOURNEY_EVERY_TURNS === 0 &&
-        mapRef.current.context !== 'reflecting' &&
-        // NEVER from a shared room. The understanding pass reads the whole
-        // conversation and writes what it concludes into this account's
-        // permanent user_profiles row — so in a two-person room it would fold
-        // the other participant's words into a private profile they cannot
-        // see, export or delete. Suppressing the pass is the only version of
-        // this that is honest: there is no way to derive "what you seem to be
-        // working through" from a conversation without reading both halves.
-        !sharedIdsRef.current.has(sid)
+        mapRef.current.context !== 'reflecting'
       ) {
         void (async () => {
           try {
@@ -2415,7 +2327,7 @@ export function LogosApp({
 
         {/* ── Conversation ───────────────────────────────── */}
         <section className="lg-convo" aria-label="Conversation">
-          <header className={`lg-head${collab ? ' lg-head-collab' : ''}`}>
+          <header className="lg-head">
             {/* The header measures itself; this row is what it arranges. They
                 are two elements because a container query cannot restyle the
                 container — only what is inside it (globals.css, "the header,
@@ -2462,9 +2374,6 @@ export function LogosApp({
             >
               ?
             </button>
-            {/* Logos 2: who is here, and how to bring someone in. Renders
-                nothing on plain Logos — the hook is disabled there. */}
-            {collab && <CollabBar room={room} />}
             <button
               type="button"
               className="lg-style-open"
@@ -2592,7 +2501,6 @@ export function LogosApp({
               <div
                 key={i}
                 className={`lg-msg lg-msg-${m.role}${m.by ? ' lg-msg-by' : ''}`}
-                style={m.by ? ({ '--by': SEAT_COLOR[m.by.seat] } as React.CSSProperties) : undefined}
               >
                 {m.role === 'assistant' && <span className="lg-msg-who">Socria</span>}
                 {/* In a shared room a person's own line is signed with their
