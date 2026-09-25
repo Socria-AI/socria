@@ -153,7 +153,19 @@ export function resolveNode(graph: MindGraph, c: Candidate): Match | null {
   const wanted = normalize(c.label);
   if (!wanted) return null;
 
-  const pool = graph.nodes.filter((n) => typesCompatible(c.type, n.type));
+  // A LIVE NODE BEFORE A SUPERSEDED ONE, at every tier.
+  //
+  // Each loop below returns the first match in array order, which meant that
+  // once a change of position had left two rows under one label, the OLDER,
+  // superseded row won every later match. Measured: the position the person
+  // had just restated was written into the row marked `superseded` — which
+  // serialize renders as "(superseded)" — while the live row was never
+  // reinforced, corrupting both the history and the current standing at once.
+  // apply.ts's own byLabel() already prefers a live node; this makes the
+  // matcher agree with it instead of quietly disagreeing.
+  const dead = (n: MindNode) => n.status === 'superseded' || n.status === 'archived';
+  const compatible = graph.nodes.filter((n) => typesCompatible(c.type, n.type));
+  const pool = [...compatible.filter((n) => !dead(n)), ...compatible.filter(dead)];
   if (!pool.length) return null;
 
   // 1. the same name
@@ -261,7 +273,13 @@ export function matchesForgotten(
     // A tombstone keeps no content, so this is label-only — stricter than the
     // live matcher, which is the right way round: refusing to re-learn
     // something somebody deleted is cheap, and re-learning it is the failure.
-    if (overlap(cl, labelTokens(t.label)) >= 0.5 && ct.size > 0) return true;
+    // TWO WORDS ON BOTH SIDES here too, for the reason spelled out above the
+    // containment branch — this one was left without the guard and so kept
+    // blacklisting words: after deleting a Concept "Python", a later Goal
+    // "Python performance" and Preference "Python typing" were both refused as
+    // forgotten, because one shared token out of one is an overlap of 1.0.
+    const tl = labelTokens(t.label);
+    if (cl.size >= 2 && tl.size >= 2 && overlap(cl, tl) >= 0.5 && ct.size > 0) return true;
   }
   return false;
 }

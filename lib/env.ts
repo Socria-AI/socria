@@ -140,6 +140,27 @@ export const ENV_SPEC: Spec[] = [
     required: 'optional',
     looksLike: /^https:\/\//,
   },
+  {
+    // The URL was here and the token was not, and lib/rate-limit.ts needs
+    // BOTH: a deployment with only the URL passed `check:env` and quietly fell
+    // back to a per-warm-instance counter — which is the only defence against
+    // cost amplification, so it is the one variable whose half-configuration
+    // costs money rather than features.
+    name: 'UPSTASH_REDIS_REST_TOKEN',
+    scope: 'server',
+    needed: 'rate limiting across instances, together with UPSTASH_REDIS_REST_URL',
+    required: 'optional',
+  },
+  {
+    // Not required, and never wanted in production: set, it turns the rate
+    // limiter off completely. Listed so `check:env` shows it rather than
+    // leaving it out of the spec entirely, and flagged below when set against
+    // a production target.
+    name: 'RATE_LIMIT_DISABLED',
+    scope: 'server',
+    needed: 'nothing — it DISABLES rate limiting, for the end-to-end suites only',
+    required: 'optional',
+  },
 ];
 
 export interface EnvProblem {
@@ -181,6 +202,29 @@ export function checkEnv(
         message: `does not look right${spec.hint ? ` — ${spec.hint}` : ''}`,
       });
     }
+  }
+
+  // Rate limiting is the only per-call cost cap there is, so its two failure
+  // modes are checked as a pair rather than per variable: half-configured
+  // (degrades silently to a per-instance counter) and switched off outright.
+  const redisUrl = env.UPSTASH_REDIS_REST_URL?.trim();
+  const redisToken = env.UPSTASH_REDIS_REST_TOKEN?.trim();
+  if (!!redisUrl !== !!redisToken) {
+    const absent = redisUrl ? 'UPSTASH_REDIS_REST_TOKEN' : 'UPSTASH_REDIS_REST_URL';
+    problems.push({
+      name: absent,
+      kind: 'missing',
+      message:
+        'rate limiting needs BOTH Upstash variables — with one of them set, limits silently ' +
+        'fall back to a per-instance counter, which is no cap at all across instances',
+    });
+  }
+  if (target === 'production' && env.RATE_LIMIT_DISABLED?.trim()) {
+    problems.push({
+      name: 'RATE_LIMIT_DISABLED',
+      kind: 'malformed',
+      message: 'set in production — rate limiting is off, and it is the only per-call cost cap',
+    });
   }
 
   // The one check that is about safety rather than correctness: a secret must

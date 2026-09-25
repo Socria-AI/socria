@@ -35,6 +35,7 @@ import type {
   InterventionType,
   QuestionBudget,
 } from './types';
+import { EVIDENCE_WITHHELD } from './types';
 import { familyOf } from './budget';
 
 export interface SelectInput {
@@ -1011,7 +1012,10 @@ export function renderDecision(dec: InterventionDecision, a: Allocation): string
   if (a.withhold) {
     lines.push(
       `KEEP WITH THEM: ${a.withhold.what}.`,
-      `BECAUSE THEY SAID: "${a.withhold.quote}"`,
+      a.withhold.quote === EVIDENCE_WITHHELD
+        ? 'BECAUSE THEY ASKED FOR THAT, earlier in this conversation. Their exact'
+          + ' words are not stored: they asked for nothing to be kept.'
+        : `BECAUSE THEY SAID: "${a.withhold.quote}"`,
       `THEY CAN HAVE: ${a.withhold.alternative}.`,
       'This is not a style note: they have a reason to produce it themselves',
       `(${a.withhold.reason.replace(/_/g, ' ')}). Do not produce it, not even inside an example,`,

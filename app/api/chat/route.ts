@@ -54,6 +54,14 @@ import {
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+// Core 4's own deadlines sum past 8 s before the reply model is called — store
+// 2000 + state 2000 + check 1500 + measure 2500 — and a guarded turn buffers
+// the whole reply before sending a byte. On the platform default this route was
+// killed mid-stream: the person saw a reply stop dead, and because the state and
+// ledger writes finish before the stream closes, a kill could lose the turn's
+// memory as well. The cron route declared a duration and the one route that
+// needed it did not.
+export const maxDuration = 60;
 
 const MAX_INPUT_LEN = 8000;
 const MAX_HISTORY = 30;

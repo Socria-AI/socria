@@ -168,6 +168,9 @@ export function nameCandidate(name: string) {
     certainty: 1,
     importance: 0.95,
     aliases: [SELF_ALIAS, 'my name', 'their name'],
+    // They just said it. A tombstone from an earlier deletion does not outrank
+    // the sentence in front of us: see GateInput.restated.
+    restated: true as const,
   };
 }
 

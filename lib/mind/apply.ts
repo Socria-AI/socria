@@ -44,6 +44,12 @@ export interface NodeCandidate extends Candidate {
   replaces?: string;
   /** The label of an existing node this DISAGREES with, both staying. */
   conflictsWith?: string;
+  /**
+   * The person said this again themselves, in this message, read
+   * deterministically from their own words — the one thing a tombstone does
+   * not outrank. Never set from a model response. See GateInput.restated.
+   */
+  restated?: boolean;
 }
 
 export interface EdgeCandidate {
@@ -149,6 +155,7 @@ export function applyCandidates(
       matchedSeen: match?.node.seen,
       matched: !!match,
       conversationId: opts.provenance.conversationId,
+      restated: c.restated === true,
     });
     if (!verdict.pass) {
       report.refused.push({ label, reason: verdict.reason });

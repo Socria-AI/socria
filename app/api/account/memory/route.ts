@@ -3,17 +3,32 @@
 //
 // The distinction matters and is the reason this is its own endpoint. Your
 // conversations are yours and stay. What goes is the layer Socria built ON TOP
-// of them: the per-thread memory (goals, values, constraints, decisions) and
-// the cross-conversation Thinking Journey, and everything Core 4 worked out
-// (its Cognitive State, Reasoning Ledger, turn traces and capability
-// evidence). Someone who wants to be forgotten
-// but keep their notes has, until now, had no way to say so.
+// of them: the per-thread memory (goals, values, constraints, decisions), the
+// cross-conversation Thinking Journey, everything Core 4 worked out (its
+// Cognitive State, Reasoning Ledger, turn traces and capability evidence), and
+// the Mind Graph. Someone who wants to be forgotten but keep their notes has,
+// until now, had no way to say so.
+//
+// THE MIND GRAPH WAS MISSING FROM THIS LIST, and the panel describing this
+// button describes the Mind Graph almost word for word — "goals, values,
+// constraints, decisions and open uncertainties". Account deletion and export
+// both covered mind_*; this route did not, so the reply said "Memory cleared.
+// Socria starts fresh from here" and the very next turn still carried the
+// person's name, school and goals in the standing profile. Being told you were
+// forgotten and then greeted by name is worse than not having the button.
+//
+// What is KEPT, deliberately: the Project containers in mind_projects (their
+// name, description and instructions are the person's own words and their own
+// organisation of their work) and the anchor node each one hangs on, without
+// which a Project would survive with nothing to attach a memory to. Every edge
+// into that anchor goes: the neighbourhood is what Socria worked out.
 
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { enforceRateLimit } from '@/lib/rate-limit';
 import { CORE4_TABLES } from '@/lib/core4/store';
+import { MIND_DERIVED_TABLES } from '@/lib/mind/store';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -24,6 +39,11 @@ const DERIVED = [
   'uncertainties', 'insights', 'emergingUnderstanding', 'thinkingStyle',
   'latestInsight', 'lastInsightAtTurn', 'latestSynthesis', 'lastSynthesisAtTurn',
 ];
+
+/** A table a migration has not created yet holds nothing of theirs to clear. */
+function missingTable(error: { code?: string | null; message?: string | null }): boolean {
+  return /42p01|pgrst205|relation .*does not exist/i.test(`${error.code ?? ''} ${error.message ?? ''}`);
+}
 
 export async function DELETE(req: NextRequest) {
   const { userId } = auth();
@@ -77,10 +97,33 @@ export async function DELETE(req: NextRequest) {
     const failed: string[] = [];
     for (const table of CORE4_TABLES) {
       const { error } = await db.from(table).delete().eq('user_id', userId);
-      if (error && !/42p01|pgrst205|relation .*does not exist/i.test(`${error.code ?? ''} ${error.message ?? ''}`)) failed.push(table);
+      if (error && !missingTable(error)) failed.push(table);
     }
+    // The Mind Graph. Same forgiveness for a table a migration has not
+    // created yet, and the same refusal to report success on anything else.
+    for (const table of MIND_DERIVED_TABLES) {
+      const { error } = await db.from(table).delete().eq('user_id', userId);
+      if (error && !missingTable(error)) failed.push(table);
+    }
+
+    // The nodes, minus the Project anchors. Deleting by explicit id rather than
+    // by a negated filter: node ids carry ':' and '|', which is not worth
+    // quoting into a PostgREST list when the cap is 5,000 rows.
+    {
+      const { data: projects, error: pErr } = await db.from('mind_projects').select('node_id').eq('user_id', userId);
+      if (pErr && !missingTable(pErr)) failed.push('mind_projects');
+      const anchors = new Set((projects ?? []).map((r) => (r as { node_id: string }).node_id));
+      const { data: nodes, error: nErr } = await db.from('mind_nodes').select('id').eq('user_id', userId);
+      if (nErr && !missingTable(nErr)) failed.push('mind_nodes');
+      const doomed = (nodes ?? []).map((r) => (r as { id: string }).id).filter((id) => !anchors.has(id));
+      for (let i = 0; i < doomed.length; i += 200) {
+        const { error } = await db.from('mind_nodes').delete().eq('user_id', userId).in('id', doomed.slice(i, i + 200));
+        if (error && !missingTable(error)) { failed.push('mind_nodes'); break; }
+      }
+    }
+
     if (failed.length) {
-      return NextResponse.json({ error: 'Could not clear all of Core 4\'s memory.', failed }, { status: 500 });
+      return NextResponse.json({ error: 'Could not clear all of Socria\'s memory.', failed: [...new Set(failed)] }, { status: 500 });
     }
 
     return NextResponse.json({ ok: true, clearedThreads });

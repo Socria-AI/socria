@@ -41,13 +41,17 @@ import { guardStructure, leaksHidden, type GuardInput } from './guard2';
 import { exactCheck, renderCheck, hiddenValues, computeAsked, statedSlips, type CheckResult, CHECK_FLOOR } from './verify';
 import { consideredView, entriesFromPerson, entriesFromSocria, mergeEntries, disputeTurn, supersedeRestated, raisable, echoesSocria, grounding, linksFromRelations } from './ledger';
 import { calibrate, conceptKey, evidenceFromTurn, taskCompetence } from './capability';
-import { buildProblem, renderProblem, type ProblemModel } from './problem';
+import { buildProblem, entryInScope, renderProblem, type ProblemModel } from './problem';
 import { detectMissing, gateContributions, renderMissing, type MissingContribution } from './contribution';
 import { buildTrace } from './trace';
 import { questionLoad, stripInterrogatives, deleteSentences } from './questions';
 export { SentenceGate } from './stream-gate';
+// Re-exported for the suites: the off-the-record marker is asserted against the
+// constant rather than a copy of its text.
+export { EVIDENCE_WITHHELD } from './types';
 import * as store from './store';
 import { similarity } from './considered';
+import { EVIDENCE_WITHHELD } from './types';
 import type {
   Allocation,
   Diminishing,
@@ -201,7 +205,13 @@ export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
     // The conversation's standing policy, not only this message's words: a
     // conversation already marked sensitive or off the record must not be
     // searched on a later turn that happens to read as an ordinary question.
-    policy: prior?.persistPolicy,
+    //
+    // FAIL CLOSED when the read failed, exactly as persistence does sixteen
+    // lines up. `prior` is null on a failed read as well as on turn one, so
+    // passing `prior?.persistPolicy` alone sent turn three of a conversation
+    // about a diagnosis to a third-party search provider the moment the
+    // database had a bad second.
+    policy: policyUnknown ? 'none' : prior?.persistPolicy,
   }).catch((e) => {
     console.error('[core4] research failed; the turn continues without it', e);
     return null;
@@ -356,8 +366,20 @@ export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
   // thing that can be wrong — this one runs whenever there is a record to
   // compute over, which is the only reason it can reach a turn that does not
   // look important in advance.
+  //
+  // SCOPED, for the same reason buildProblem is: `ledger` is the account's
+  // recent entries, not this conversation's. Unscoped, a conversation the
+  // person marked off the record had its own sentence quoted back into an
+  // unrelated one, under an instruction to raise it — the leak problem.ts's
+  // header says was caught once already, reintroduced by a second reader of
+  // the same array. The predicate is imported, not copied.
+  const historyScope = { conversationId: input.conversationId ?? '', projectId: input.projectId };
   const historical = input.conversationId
-    ? discoverFromHistory([...ledger, ...provisional], [...priorLinks, ...freshEdges], input.now)
+    ? discoverFromHistory(
+        [...ledger, ...provisional].filter((e) => entryInScope(e, historyScope)),
+        [...priorLinks, ...freshEdges],
+        input.now
+      )
     : [];
 
   // ── MEASURED, NOT ASSERTED ──────────────────────────────────────
@@ -676,9 +698,21 @@ export function fallbackReply(p: PreparedTurn, first: string, retry: string | nu
 
 // ── after the reply ─────────────────────────────────────────────────
 
-/** The state with every free-text field emptied: only enums, numbers and memos survive. */
-function withoutText(s: CognitiveState): CognitiveState {
-  const bare = <T>(f: { value: T; source: string; confidence: number }) => ({ ...f, evidence: '' });
+/**
+ * The state with every free-text field emptied: only enums, numbers and memos
+ * survive. Exported so a suite can assert the withhold invariant across a save
+ * rather than trusting a throw inside prepareTurn that the route catches.
+ */
+export function withoutText(s: CognitiveState): CognitiveState {
+  // An explicitly stated field keeps a MARKER rather than an empty string.
+  // Emptying it stored nothing — correct — but also dropped the quote a
+  // withhold must rest on, so off-the-record conversations stopped withholding
+  // from turn 2 while still reading as explicitly stated. The marker carries
+  // none of their text and keeps the withhold armed.
+  const bare = <T>(f: { value: T; source: string; confidence: number; evidence?: string }) => ({
+    ...f,
+    evidence: f.source === 'explicit' && (f.evidence ?? '').trim() ? EVIDENCE_WITHHELD : '',
+  });
   return {
     ...s,
     currentGoal: '', currentFocus: '', confusions: [], positions: [], assumptions: [], tensions: [], constraints: [],
@@ -711,7 +745,7 @@ export async function finishTurn(
   // The ledger: the person's items attributed by grounding in their words;
   // Socria's from what was actually sent.
   const fromPerson = entriesFromPerson(state.consideredNow, input.lastUserText, ctx, lastSocria(input));
-  const fromSocria = entriesFromSocria(sent, decision.type, ctx);
+  const fromSocria = entriesFromSocria(sent, decision.type, ctx, input.lastUserText);
   const privateHere = state.persistPolicy === 'conversation_only';
   const merged = mergeEntries(p.ledger, [...fromPerson, ...fromSocria].map((e) => (privateHere ? { ...e, private: true } : e)), input.now);
   // No lexical auto-links (council D10): a link drawn from word overlap is

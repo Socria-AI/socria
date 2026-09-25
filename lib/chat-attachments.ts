@@ -21,6 +21,19 @@ import { MAX_FILE_TEXT } from './file-kinds';
 
 /** Characters of attached text across the whole history — about 30k tokens. */
 export const ATTACHMENT_BUDGET = 120_000;
+/**
+ * The most the turn being answered may spend on its own files — about 50k
+ * tokens.
+ *
+ * The rule below is that what they just handed over goes in whole, and it was
+ * unconditional: the server takes six attachments of up to 60k characters each,
+ * so one turn could carry 360k characters of files and the "budget" bounded
+ * none of it. Measured at 488k characters (~122k tokens) across a history,
+ * which overflows the fallback model's window once the system prompt is added —
+ * and an overflow was then misread as a rejected model id and retried whole.
+ * Within this ceiling nothing changes: a long paper is ~60k characters.
+ */
+export const TURN_ATTACHMENT_MAX = 200_000;
 /** What an older file is reduced to once the budget is spent. */
 export const OPENING_CHARS = 1_200;
 /** What the Mind Graph reads of each file on the turn it arrives. */
@@ -56,11 +69,18 @@ function whose(a: Attachment): string {
       : 'source material, NOT their own position';
 }
 
-function noteBlock(a: Attachment, keep: 'full' | 'opening'): string {
+function noteBlock(a: Attachment, keep: 'full' | 'opening' | 'name'): string {
   const text = a.text ?? '';
   const words = (a.words ?? wordCount(text)).toLocaleString('en-US');
   const name = a.name ? `“${a.name}”` : 'pasted text';
   const cut = a.truncated ? ' The file was longer; this is as much of it as Socria keeps.' : '';
+  if (keep === 'name') {
+    return (
+      `[Attached file ${name} — ${whose(a)} — ${words} words. Attached earlier and not shown here: ` +
+      `this conversation is carrying more attached text than fits. If they ask about it, say so and ask ` +
+      `them to attach it again.]`
+    );
+  }
   if (keep === 'full' || text.length <= OPENING_CHARS) {
     return `[Attached file ${name} — ${whose(a)} — ${words} words.${cut}]\n${text}`;
   }
@@ -87,9 +107,15 @@ export function renderForModel(
   budget = ATTACHMENT_BUDGET
 ): { role: 'user' | 'assistant'; content: string }[] {
   let left = budget;
+  // What the turn being answered has spent on its own files, which is bounded
+  // separately: its allowance is its own, so a long attachment does not push
+  // the rest of the conversation out, and a pathological one cannot push the
+  // whole request past the model's window.
+  let spentHere = 0;
   const rendered: { role: 'user' | 'assistant'; content: string }[] = new Array(messages.length);
   for (let i = messages.length - 1; i >= 0; i--) {
     const m = messages[i];
+    const here = i === messages.length - 1;
     const parts: string[] = [];
     if (m.content.trim()) parts.push(m.content);
     for (const a of m.attachments ?? []) {
@@ -98,12 +124,17 @@ export function renderForModel(
         continue;
       }
       const len = (a.text ?? '').length;
-      // The turn being answered always gets its files whole — it is what
-      // they just handed over — and it counts against what is left for the rest.
-      // A note the browser already cut to its opening stays an opening.
-      const full = !a.opening && (i === messages.length - 1 || len <= left);
-      parts.push(noteBlock(a, full ? 'full' : 'opening'));
-      left -= full ? len : Math.min(len, OPENING_CHARS);
+      // The turn being answered gets its files whole — it is what they just
+      // handed over — up to its own ceiling, and it counts against what is left
+      // for the rest. A note the browser already cut to its opening stays one.
+      const full = !a.opening && (here ? spentHere + len <= TURN_ATTACHMENT_MAX : len <= left);
+      // Once there is nothing left, an older file is named rather than opened:
+      // an opening was appended however deep into deficit `left` already was,
+      // so the stated budget bounded neither end of the history.
+      parts.push(noteBlock(a, full ? 'full' : left > 0 || here ? 'opening' : 'name'));
+      const spent = full ? len : left > 0 || here ? Math.min(len, OPENING_CHARS) : 0;
+      left -= spent;
+      if (here) spentHere += spent;
     }
     rendered[i] = { role: m.role, content: parts.join('\n\n') };
   }

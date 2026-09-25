@@ -78,5 +78,32 @@ console.log('\n=== an empty answer from the state model is not an answer ===');
   ok('  while a real answer is still believed', /return \{ state: sanitizeState\(parsed\), ok: true \}/.test(engine));
 }
 
+console.log('\n=== a failed read does not open the internet either ===');
+{
+  // The comment above the call already said a conversation marked sensitive
+  // must not be searched on a later turn that happens to read as an ordinary
+  // question — and then passed `prior?.persistPolicy`, which is undefined when
+  // the read FAILED as well as on turn one. So turn three of a conversation
+  // about a diagnosis could have the person's own sentence sent to a
+  // third-party search provider the moment the database had a bad second.
+  // `policyUnknown` was computed sixteen lines above and used only for writes.
+  ok('research is told the policy is unknown, and treats that as "none"',
+    /policy: policyUnknown \? 'none' : prior\?\.persistPolicy/.test(turn));
+  const web = read('lib/core4/web.ts');
+  ok("  and 'none' is a refusal there", /policy === 'none'|policy !== 'full'/.test(web));
+}
+
+console.log('\n=== the route outlives its own deadlines ===');
+{
+  // Core 4's internal budget sums past 8 s before the reply model is called,
+  // and the state and ledger writes finish before the stream closes — so a
+  // platform-default cut-off could both truncate the reply mid-sentence and
+  // lose the turn's memory. The cron route declared a duration; the one route
+  // that needed it did not.
+  const route = read('app/api/chat/route.ts');
+  ok('the chat route declares a maxDuration', /export const maxDuration = \d+/.test(route));
+  ok('  longer than the serial budget before generation', (Number(/export const maxDuration = (\d+)/.exec(route)?.[1] ?? 0) * 1000) > 8000);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

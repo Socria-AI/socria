@@ -74,16 +74,38 @@ function posedExpressions(problem: string): string[] {
   return out;
 }
 
-/** The value they ANSWERED with: after the last "=", "is", "got", "get" or "answer"; else their last number. */
-function finalValue(attempt: string): number | null {
+/**
+ * The value they ANSWERED with — the number after an anchor ("=", "is",
+ * "got", "get", "answer"); their last number if there is no anchor.
+ *
+ * BOTH the first and the last anchor, because taking only the last one turned
+ * ordinary English into a wrong verdict: "It is 144. That is roughly 6 times
+ * what I expected." cut after "That is" and compared 6 against 144, returning
+ * incorrect at confidence 1 — which turn.ts treats as fact that outranks the
+ * reader. A trailing clause is how people write; it is not a second answer.
+ * The first anchor is where the answer is, the last is where it was before
+ * this fix, and agreeing with either is enough.
+ */
+function statedValues(attempt: string): number[] {
   const t = attempt.replace(/,(?=\d{3}\b)/g, '');
-  let cut = -1;
-  for (const m of t.matchAll(/=|\bis\b|\bgot\b|\bget\b|\banswer\b/gi)) cut = Math.max(cut, (m.index ?? 0) + m[0].length);
-  const tail = cut >= 0 ? t.slice(cut) : t;
-  const nums = (tail.match(/-?\d+(?:\.\d+)?/g) ?? []).map(Number).filter(Number.isFinite);
-  if (nums.length) return nums[0];
-  const all = numbersIn(t);
-  return all.length ? all[all.length - 1] : null;
+  const cuts: number[] = [];
+  for (const m of t.matchAll(/=|\bis\b|\bgot\b|\bget\b|\banswer\b/gi)) cuts.push((m.index ?? 0) + m[0].length);
+  const after = (cut: number): number | null => {
+    const n = (t.slice(cut).match(/-?\d+(?:\.\d+)?/g) ?? []).map(Number).filter(Number.isFinite);
+    return n.length ? n[0] : null;
+  };
+  const out: number[] = [];
+  if (cuts.length) {
+    for (const cut of [cuts[0], cuts[cuts.length - 1]]) {
+      const v = after(cut);
+      if (v !== null && !out.includes(v)) out.push(v);
+    }
+  }
+  if (!out.length) {
+    const all = numbersIn(t);
+    if (all.length) out.push(all[all.length - 1]);
+  }
+  return out;
 }
 
 /**
@@ -103,10 +125,10 @@ export function exactCheck(problem: string, attempt: string): CheckResult | null
     if (!c || c.vars.length) continue;
     const value = c.eval({});
     if (!Number.isFinite(value)) continue;
-    const given = finalValue(attempt);
-    if (given === null) return null;
+    const given = statedValues(attempt);
+    if (!given.length) return null;
     const tol = Math.max(1e-6, Math.abs(value) * 1e-4);
-    const right = Math.abs(given - value) <= tol;
+    const right = given.some((g) => Math.abs(g - value) <= tol);
     const shown = Number.isInteger(value) ? String(value) : String(Math.round(value * 1e6) / 1e6);
     return {
       verdict: right ? 'correct' : 'incorrect',
@@ -220,12 +242,33 @@ function apply(a: number, op: string, b: number): number {
   if (/[×x*]/.test(op)) return a * b;
   return a / b;
 }
+/** Additive or multiplicative: left-to-right is only safe within one tier. */
+const MULTIPLICATIVE = /[×x*/÷]/;
+/**
+ * A match preceded by an operator, or touching an identifier, is a FRAGMENT of
+ * something longer, and the fragment's value is not the writer's claim:
+ * `a[i] * 2 + 1 = 9` matched `2 + 1 = 9` and reported "the right value is 3,
+ * not 9". A preceding WORD is fine — "budget 40k + 10k = 55k" is exactly what
+ * this function is for — so adjacency matters for identifiers and does not for
+ * operators.
+ */
+const FRAGMENT_BEFORE = /[+\-−–×x*/÷^]\s*$|[A-Za-z0-9_$\]\)]$/;
 export function statedSlips(text: string): StatedSlip[] {
   const out: StatedSlip[] = [];
   for (const m of text.matchAll(STATED)) {
     const [line, a, op1, b, op2, c, eq] = m;
     const A = amount(a), B = amount(b), C = c ? amount(c) : null, E = amount(eq);
     if (!A || !B || !E || (c && !C)) continue;
+    // `apply` runs strictly left to right, so a mixed-tier expression is not
+    // this function's arithmetic to judge: `2 + 3 * 4 = 14` is correct and was
+    // being "corrected" to 20, in a block labelled "computed exactly", on a
+    // forced move. Precedence belongs to the compiler in exactCheck; here,
+    // saying nothing is the only honest option.
+    if (op2 && MULTIPLICATIVE.test(op1) !== MULTIPLICATIVE.test(op2)) continue;
+    // AMOUNT can swallow the space before the number, so measure the boundary
+    // from the first non-space character of the match, not from m.index.
+    const start = (m.index ?? 0) + (m[0].length - m[0].trimStart().length);
+    if (FRAGMENT_BEFORE.test(text.slice(0, start))) continue;
     // Multiplying two money amounts is not arithmetic anyone states.
     let v = apply(A.value, op1, B.value);
     if (op2 && C) v = apply(v, op2, C.value);

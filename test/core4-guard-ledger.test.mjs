@@ -168,6 +168,46 @@ console.log('\n=== council D13: Verify Mode only checks what the person posed ==
   ok('an unanchored number in the prose is not a problem', exactCheck('We ran 3 trials of 20 each, the harmonic sum was 1 + 1/2 + 1/3.', 'my proof holds') === null);
   ok('computeAsked evaluates what they asked', computeAsked('Compute 17*23.')?.value === '391');
   ok('and nothing when nothing was posed', computeAsked('How do I compute a moving average in pandas?') === null);
+
+  // A TRAILING CLAUSE IS NOT A SECOND ANSWER.
+  //
+  // `finalValue` cut after the LAST "is"/"got"/"answer" and compared whatever
+  // number came next, so "It is 144. That is roughly 6 times what I expected."
+  // was scored against 6 and returned incorrect at confidence 1 — and
+  // turn.ts treats method 'exact' as fact that outranks the reader and forces
+  // the move. The person did the arithmetic right and was told, unanswerably,
+  // that they had not. The clause needed to trigger it is ordinary English.
+  ok('a trailing comparison does not become the answer',
+    exactCheck('what is 12 * 12', 'It is 144. That is roughly 6 times what I expected.')?.verdict === 'correct');
+  ok('nor does an unrelated number after it',
+    exactCheck('compute 15 * 4', 'I think the answer is 60. Also my budget is 45 dollars.')?.verdict === 'correct');
+  ok('a wrong answer is still wrong', exactCheck('compute 15 * 4', 'I got 55.')?.verdict === 'incorrect');
+  ok('  and the number they actually wrote is the one judged',
+    exactCheck('what is 12 * 12', '12*12 = 100, but I am not sure')?.verdict === 'incorrect');
+}
+
+console.log('\n=== statedSlips: arithmetic it may not judge ===');
+{
+  // UNGATED, ON EVERY TURN, IN A BLOCK LABELLED "computed exactly", on a move
+  // marked forced. `apply` runs strictly left to right, so a correct
+  // mixed-precedence line was "corrected" to the wrong value and the reply was
+  // told to carry the correction through everything depending on it. For a
+  // product whose purpose is helping people check their own working, saying
+  // nothing is the only honest option here; precedence belongs to exactCheck's
+  // compiler.
+  ok('mixed precedence is left alone', statedSlips('2 + 3 * 4 = 14').length === 0);
+  ok('  in either order', statedSlips('so 10 + 2 * 5 = 20, which checks out').length === 0);
+  ok('one tier is still evaluated left to right', statedSlips('100 - 20 - 5 = 75').length === 0);
+  ok('  and a real slip in one tier is still caught', statedSlips('they said 30 + 30 = 70')[0]?.actual === '60');
+  // A match preceded by an operator is a fragment of something longer, and the
+  // fragment's value is not the writer's claim.
+  ok('a fragment of an expression is not harvested', statedSlips('I wrote a[i] * 2 + 1 = 9 for i=4').length === 0);
+  ok('  nor is one after an exponent', statedSlips('2^3 + 1 = 9').length === 0);
+  ok('but a preceding WORD is fine', statedSlips('budget 40k + 10k = 55k')[0]?.actual === '50k');
+  // The case the function was written for (run 2, strategy-014).
+  ok('the money slip it exists to catch still lands',
+    statedSlips('$410k - $163.9k = $250k')[0]?.actual === '$246.1k');
+  ok('  and the correct version stays silent', statedSlips('$410k - $163.9k = $246.1k').length === 0);
 }
 
 console.log('\n=== the stream gate ===');

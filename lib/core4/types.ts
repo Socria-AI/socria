@@ -192,6 +192,17 @@ export const ALLOCATION_MODES = [
 export type AllocationMode = (typeof ALLOCATION_MODES)[number];
 
 /** The ONLY reasons Socria may deliberately keep something back. */
+/**
+ * What stands in for the person's words when the conversation is off the
+ * record. `withoutText` empties every free-text field before the state is
+ * saved, which silently disarmed withholding from turn 2 onward: allocate()
+ * requires a quote (council D6), found an empty string, and helped instead —
+ * so the person who said "I want to work this out myself" was handed the
+ * answer on their next message. A marker keeps the withhold armed while
+ * storing none of their text.
+ */
+export const EVIDENCE_WITHHELD = '(their words, not stored: off the record)';
+
 export const WITHHOLD_REASONS = [
   'practice_goal',        // they are deliberately learning/practising this
   'requested_no_answer',  // they asked not to be told

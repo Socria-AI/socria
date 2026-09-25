@@ -174,8 +174,17 @@ const SOCRIA_KIND: Partial<Record<InterventionType, LedgerKind>> = {
  * What Socria actually said that the person might otherwise hear again: its
  * questions, challenges and contributions — recorded as SOCRIA's, from the
  * text that was sent.
+ *
+ * `userText` IS ATTRIBUTION, NOT CONTEXT. A reply routinely opens by restating
+ * the person's own constraint before adding anything, and that opening sentence
+ * was the first non-question sentence of five words or more — so it was stored
+ * as Socria's claim and read back in a later conversation as "Socria suggested:
+ * <their own budget figure>". The line exists so Socria can answer "was that
+ * your idea or mine?" honestly, and it was giving the wrong answer in exactly
+ * that case. A sentence grounded in their message is theirs; it is skipped here
+ * rather than credited to Socria. The reverse direction was already protected.
  */
-export function entriesFromSocria(sent: string, type: InterventionType, ctx: TurnContext): LedgerEntry[] {
+export function entriesFromSocria(sent: string, type: InterventionType, ctx: TurnContext, userText = ''): LedgerEntry[] {
   const out: LedgerEntry[] = [];
   const add = (kind: LedgerKind, text: string) =>
     out.push({
@@ -200,7 +209,12 @@ export function entriesFromSocria(sent: string, type: InterventionType, ctx: Tur
   for (const s of [...q.explicit, ...q.disguised].slice(0, 2)) add('question', s);
   const kind = SOCRIA_KIND[type];
   if (kind && kind !== 'question') {
-    const first = sentencesOf(sent).map((s) => s.trim()).find((s) => s.split(/\s+/).length >= 5 && !/\?\s*$/.test(s));
+    const first = sentencesOf(sent)
+      .map((s) => s.trim())
+      .find((s) =>
+        s.split(/\s+/).length >= 5 &&
+        !/\?\s*$/.test(s) &&
+        (!userText || grounding({ text: s, quote: s }, userText) === 'inferred'));
     if (first) add(kind, first);
   }
   return out;

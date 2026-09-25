@@ -91,6 +91,20 @@ export interface GateInput {
   matched?: boolean;
   /** which conversation proposed it, for the isolation rule */
   conversationId?: string;
+  /**
+   * The person has just said this again, in so many words, in this message.
+   *
+   * Set only by a deterministic read of their own sentence — today that is
+   * `nameCandidate`, from "my name is …". It is the one thing allowed past a
+   * tombstone, because deleting a memory and volunteering the fact again are
+   * both explicit acts and the later one is the person's current instruction.
+   * Without it, using the Memory page's delete button on the name node made
+   * the name unlearnable for good: the reply said "Got it, Pradeep" (the live
+   * text matches), the next conversation said it did not know their name, and
+   * nothing the person could type would ever fix it — the exact bug the
+   * standing profile was written to end, made permanent.
+   */
+  restated?: boolean;
 }
 
 export type GateVerdict =
@@ -158,6 +172,18 @@ export function gate(input: GateInput): GateVerdict {
     isGeneralising(input.type) &&
     (input.kind === 'inferred' || input.kind === 'hypothesis');
   let mayRewrite = true;
+  // WHAT THEY DID NOT STATE MAY NOT REWRITE WHAT THEY DID.
+  //
+  // Gate 2 covers 'inferred' and 'hypothesis' and stops them landing at all.
+  // 'tentative' is a third thing — a position being tried on — and it is also
+  // what a model response lands on when it omits `kind` at all, so the case
+  // the failure above describes was open through the widest door in the file:
+  // a stated Concept "Deadlines" ("deadlines help them focus") revised in place
+  // by a longer, opposite claim, still marked active, rendered into every later
+  // prompt as settled. It may persist, marked 'tentative'. It may not overwrite
+  // their own words. Nor may 'researched' or 'calculated' — a source and a sum
+  // are not the person.
+  if (isGeneralising(input.type) && input.kind !== 'stated' && input.kind !== 'established') mayRewrite = false;
   if (generalising) {
     // Corroborated by an earlier sighting held in `pending`? Then it may be
     // believed now. Otherwise it is refused and the caller records it, so
@@ -214,7 +240,8 @@ export function gate(input: GateInput): GateVerdict {
     }
   }
 
-  // 4. Forgetting, last and absolute. Nothing above can override it.
+  // 4. Forgetting, last and absolute. Nothing above can override it — except
+  //    the person saying the thing again themselves (`restated`, below).
   //
   //    Checked across every COMPATIBLE type, not just the one proposed.
   //    Otherwise forgetting "Prompt Limit" as a Concept is undone by the next
@@ -224,7 +251,7 @@ export function gate(input: GateInput): GateVerdict {
   //    check catches only an identical re-proposal; anything the matcher
   //    would have merged with the forgotten node has to be refused too, or
   //    "the Berlin offer" walks straight past a tombstone for "Berlin offer".
-  if (matchesForgotten(input.graph.tombstones, {
+  if (!input.restated && matchesForgotten(input.graph.tombstones, {
     type: input.type,
     label: input.label,
     content: input.content,

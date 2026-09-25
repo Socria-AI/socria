@@ -367,6 +367,15 @@ function rowToProject(r: Record<string, unknown>): ProjectContainer {
   };
 }
 
+/**
+ * The Mind Graph tables that hold Socria's own reading of the person, cleared
+ * whole by "Forget what Socria worked out". `mind_nodes` is not here because
+ * the Project anchors inside it have to survive, and `mind_projects` is not
+ * either: a Project's name, description and instructions are the person's own
+ * words, and the button promises to keep everything they wrote.
+ */
+export const MIND_DERIVED_TABLES = ['mind_edges', 'mind_pending', 'mind_sources', 'mind_tombstones'] as const;
+
 /** Every Project, archived included. Throws MindStoreError when the table is missing. */
 export async function listProjects(userId: string): Promise<ProjectContainer[]> {
   const { data, error } = await supabaseAdmin()

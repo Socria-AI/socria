@@ -162,6 +162,33 @@ console.log('\n=== the budget across a long conversation ===');
   ok('with room, both are whole', roomy[0].content.includes('OLD '.repeat(12_000).trim()) && roomy[2].content.includes('NEW '.repeat(10_000).trim()));
   const onlyLast = att.renderForModel(att.sanitizeChatMessages([{ role: 'user', content: 'x', attachments: [old] }]), 10);
   ok('the turn being answered is always whole, whatever the budget', onlyLast[0].content.includes('OLD '.repeat(12_000).trim()));
+
+  // THE BUDGET BOUNDED NEITHER END OF THE HISTORY.
+  //
+  // "The turn being answered gets its files whole" was unconditional, and the
+  // server takes six attachments of up to 60k characters each — so one turn
+  // could carry 360k characters, with 127k more of openings appended however
+  // deep into deficit the budget already was. Measured at 488k characters
+  // (~122k tokens) across a history, which overflows the fallback model's
+  // window once the system prompt is added; and an overflow was then misread as
+  // a rejected model id and sent again whole. Two ceilings now: the current
+  // turn has its own, and an older file past the budget is named rather than
+  // opened.
+  const big = (n) => ({ kind: 'note', name: `f${n}.pdf`, text: 'x'.repeat(60_000), origin: 'source' });
+  const six = [big(1), big(2), big(3), big(4), big(5), big(6)];
+  const long = [];
+  for (let t = 0; t < 15; t++) long.push({ role: 'assistant', content: 'ok' }, { role: 'user', content: `turn ${t}`, attachments: six });
+  const huge = att.renderForModel(att.sanitizeChatMessages(long.slice(-30)));
+  const total = huge.reduce((n, m) => n + m.content.length, 0);
+  ok('the whole request is bounded', total <= att.TURN_ATTACHMENT_MAX + att.ATTACHMENT_BUDGET, String(total));
+  ok('  the turn being answered keeps its own ceiling', huge[huge.length - 1].content.length <= att.TURN_ATTACHMENT_MAX);
+  ok('  and it still gets whole files, not openings', huge[huge.length - 1].content.includes('x'.repeat(60_000)));
+  ok('older files past the budget are named, not opened',
+    huge.some((m) => /not shown here/.test(m.content)), 'no name-only block');
+  ok('  and the person is told what to do about it',
+    huge.some((m) => /not shown here[\s\S]*attach it again/.test(m.content)));
+  ok('one ordinary paper on the current turn is untouched',
+    att.renderForModel(att.sanitizeChatMessages([{ role: 'user', content: 'read this', attachments: [big(1)] }]))[0].content.includes('x'.repeat(60_000)));
 }
 
 console.log('\n=== what the server trusts ===');

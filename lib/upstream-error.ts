@@ -284,6 +284,13 @@ export function isModelRejection(err: unknown): boolean {
   const links = chain(err);
   const msg = links.map((l) => l.message).join(' | ');
   const code = links.map((l) => l.code).join(' | ');
+  // NOR IS AN OVERSIZED REQUEST. OpenAI says "This model's maximum context
+  // length is 128000 tokens..." — which contains "model", so the same request
+  // was sent again to a model with the same window. Two failures, twice the
+  // cost, a log line naming the wrong cause, and a stream error for the person.
+  // The fallback cannot help here: the request has to get smaller.
+  if (/context_length_exceeded|string_above_max_length/.test(code)) return false;
+  if (/maximum context length|context length exceeded|reduce the length/i.test(msg)) return false;
   return (
     status === 404 ||
     /model/.test(code) ||

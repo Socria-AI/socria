@@ -246,6 +246,15 @@ console.log('=== would another model have answered? ===');
   check('nor a forbidden account', !isModelRejection(err({ status: 403, message: 'You do not have access to model gpt-x' })));
   check('a provider outage is not a model problem', !isModelRejection(err({ status: 503, message: 'The server is overloaded' })));
   check('and neither is a bug of ours', !isModelRejection(new TypeError('Cannot read properties of null')));
+  // AN OVERSIZED REQUEST IS NOT A REJECTED MODEL, and it reads like one: the
+  // message says "This model's maximum context length is...", which contains
+  // the word "model". So a request too big for the window was sent again to a
+  // model with the same window — two failures, twice the cost, and a log line
+  // naming the wrong cause. The fallback cannot help; the request has to shrink.
+  const over = err({ status: 400, code: 'context_length_exceeded', message: "This model's maximum context length is 128000 tokens. However, your messages resulted in 137000 tokens. Please reduce the length of the messages." });
+  check('a context overflow is NOT retried on the fallback', !isModelRejection(over));
+  check('  and it still reaches a human as a request problem', classifyUpstream(over).code === 'upstream_request', classifyUpstream(over).code);
+  check('  the message alone is enough, without the code', !isModelRejection(err({ status: 400, message: "This model's maximum context length is 128000 tokens" })));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

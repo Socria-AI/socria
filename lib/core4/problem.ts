@@ -136,18 +136,29 @@ export function epistemicOf(e: LedgerEntry): Epistemic {
  * work. And never a private entry outside the conversation it was made in —
  * the same rule consideredView already applies (council D14/D15).
  */
+export type LedgerScope = { conversationId: string; projectId: string | null };
+
+/**
+ * The one scope rule, exported so every reader of the account-wide ledger uses
+ * the same one. It was copied by hand into three consumers and missed by a
+ * fourth (discoverFromHistory), which put a private entry from a conversation
+ * about custody into an unrelated work conversation's prompt. A rule that has
+ * to be remembered will eventually be forgotten; this one is importable.
+ */
+export function entryInScope(e: LedgerEntry, scope?: LedgerScope): boolean {
+  if (!scope) return true;
+  const here = e.conversationId === scope.conversationId;
+  if (e.private) return here;
+  return here || (!!scope.projectId && e.projectId === scope.projectId);
+}
+
 export function buildProblem(
   entries: readonly LedgerEntry[],
   links: readonly LedgerLink[],
   state: Pick<CognitiveState, 'currentGoal' | 'currentFocus' | 'blockingUnknown' | 'turn'>,
-  scope?: { conversationId: string; projectId: string | null }
+  scope?: LedgerScope
 ): ProblemModel {
-  const inScope = (e: LedgerEntry): boolean => {
-    if (!scope) return true;
-    const here = e.conversationId === scope.conversationId;
-    if (e.private) return here;
-    return here || (!!scope.projectId && e.projectId === scope.projectId);
-  };
+  const inScope = (e: LedgerEntry): boolean => entryInScope(e, scope);
   const items = new Map<string, ProblemItem>();
   for (const e of entries) {
     if (e.status === 'retracted' || !inScope(e)) continue;
