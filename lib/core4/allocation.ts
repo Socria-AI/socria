@@ -234,7 +234,13 @@ export function ownershipRead(text: string, signals: ExplicitSignals, s: Cogniti
     signals.directness === 'answer' ||
     (s.directness.source === 'explicit' && s.directness.value === 'answer') ||
     signals.stopQuestions ||
-    DELEGATED.test(t)
+    DELEGATED.test(t) ||
+    // ALREADY ANSWERED, ON AN EARLIER TURN. mergeState writes
+    // authorship = explicit('shared') when somebody hands the work over, and
+    // nothing read it back: they said "yours", Socria wrote the thing, and on
+    // the next request it asked whose it was all over again. A settled
+    // contract that gets re-litigated every turn is worse than never asking.
+    (s.authorship.source === 'explicit' && s.authorship.value !== 'theirs')
   ) {
     return 'delegated';
   }

@@ -53,7 +53,11 @@ console.log('\n=== a runtime without waitUntil still writes ===');
 console.log('\n=== off the record still stops it ===');
 {
   // The fix must not have widened what gets written.
-  const after = src.slice(src.indexOf('after: (reply: string)'), src.indexOf('after: (reply: string)') + 1400);
+  // The whole callback, not a fixed-width window: the first version sliced
+  // 1400 characters and a comment added later pushed the last assertion out of
+  // it, failing against correct code.
+  const from = src.indexOf('after: (reply: string)');
+  const after = src.slice(from, src.indexOf('\n        },', from));
   ok('signed out writes nothing', /if \(!userId\) return;/.test(after));
   ok('off the record writes nothing', /persistPolicy === 'none'\) return;/.test(after));
   ok('a sensitive conversation writes private', /persistPolicy === 'conversation_only' \? \{ private: true \}/.test(after));

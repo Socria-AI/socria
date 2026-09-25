@@ -28,6 +28,7 @@ import { readSignals, NO_SIGNALS } from './.tmp/signals.mjs';
 import { allocate, ownershipRead } from './.tmp/allocation.mjs';
 import { budgetFrom, diminishingReturns } from './.tmp/budget.mjs';
 import { selectIntervention, renderDecision } from './.tmp/intervene.mjs';
+import { mergeState, recordTurn } from './.tmp/merge.mjs';
 
 let pass = 0, fail = 0;
 const ok = (n, c, x = '') => (c ? (pass++, console.log('  ok   ' + n)) : (fail++, console.log('  FAIL ' + n + '  ' + x)));
@@ -237,6 +238,74 @@ console.log('\n=== gate 3: asked once, and never at the cost of the work ===');
 
   const told = turn('write a poem, and stop asking me questions', CREATE);
   ok('told not to ask, it does not', told.decision.type !== 'CLARIFY' && told.own === 'delegated');
+}
+
+console.log('\n=== THE WHOLE LOOP, which is the only thing that matters ===');
+{
+  // Every assertion above is a single turn. The feature is three turns, and it
+  // was broken at both seams: the answer turn was capped at 220 tokens with
+  // "reply in one or two sentences" (a one-word message reads as an opening to
+  // the length policy, and the question is engineered to be answered in one
+  // word), and the delegation was recorded as authorship=shared and never read
+  // back, so the turn after asked whose it was all over again.
+  let prior = null;
+  const step = (said) => {
+    const signals = readSignals(said);
+    const read = { ...EMPTY_STATE, currentFocus: said, ...CREATE };
+    const state = mergeState({ prior, read, signals, contract: NO_SIGNALS, readOk: true });
+    const dim = diminishingReturns(state, signals, []);
+    const budget = budgetFrom(state, signals, 0, 0, dim);
+    const allocation = allocate({ state, signals, contract: NO_SIGNALS, lastUserText: said });
+    const decision = selectIntervention({ state, allocation, budget, diminishing: dim, signals, considered: [], lastUserText: said });
+    prior = recordTurn(state, { type: decision.type, asked: decision.maxQuestions > 0, withheld: !!allocation.withhold, failed: false });
+    return { allocation, decision, state };
+  };
+
+  const t1 = step('write a story');
+  ok('turn 1 asks whose it is', t1.decision.type === 'CLARIFY' && t1.decision.maxQuestions === 1);
+
+  const t2 = step('yours');
+  ok('turn 2 hears the answer', t2.allocation.ownership === 'delegated', String(t2.allocation.ownership));
+  ok('  and is given room to actually write it', t2.decision.maxTokens >= 1000, String(t2.decision.maxTokens));
+  ok('  with no question back', t2.decision.maxQuestions === 0 && t2.decision.type !== 'CLARIFY');
+  ok('  and the delegation is recorded as a contract', t2.state.authorship.source === 'explicit', `${t2.state.authorship.value}/${t2.state.authorship.source}`);
+
+  const t3 = step('write another one, about a lighthouse');
+  ok('turn 3 does not ask again', t3.decision.type !== 'CLARIFY', t3.decision.type);
+  ok('  because the contract is read back', t3.allocation.ownership === 'delegated', String(t3.allocation.ownership));
+  ok('  and it writes', t3.decision.maxTokens >= 1000, String(t3.decision.maxTokens));
+}
+
+console.log('\n=== the same loop, the other way ===');
+{
+  let prior = null;
+  const step = (said) => {
+    const signals = readSignals(said);
+    const state = mergeState({ prior, read: { ...EMPTY_STATE, currentFocus: said, ...CREATE }, signals, contract: NO_SIGNALS, readOk: true });
+    const dim = diminishingReturns(state, signals, []);
+    const allocation = allocate({ state, signals, contract: NO_SIGNALS, lastUserText: said });
+    const decision = selectIntervention({ state, allocation, budget: budgetFrom(state, signals, 0, 0, dim), diminishing: dim, signals, considered: [], lastUserText: said });
+    prior = recordTurn(state, { type: decision.type, asked: decision.maxQuestions > 0, withheld: !!allocation.withhold, failed: false });
+    return { allocation, decision, state };
+  };
+  step('write a story');
+  const mine = step('mine');
+  ok('"mine" keeps the work', mine.allocation.ownership === 'theirs', String(mine.allocation.ownership));
+  const next = step('write another one, about a lighthouse');
+  ok('  and it stays theirs on the next turn too', next.allocation.ownership === 'theirs', String(next.allocation.ownership));
+  ok('  without asking again', next.decision.type !== 'CLARIFY');
+}
+
+console.log('\n=== a hedged answer is still an answer ===');
+{
+  // The question is written to be answerable in a word, so people answer it in
+  // a word plus a hedge. Measured as unheard before this — the question was
+  // asked and the answer ignored, which is worse than never asking.
+  for (const t of ['yours, go ahead', 'definitely yours', 'yours please']) ok(`"${t}"`, readSignals(t).delegate === true);
+  for (const t of ['mine i think', 'mine, let me try']) ok(`"${t}"`, readSignals(t).ownWork === true);
+  // And a long sentence that merely contains the word is not an answer to it.
+  ok('a sentence that merely contains "yours" is not',
+    readSignals('the deadline is yours to set but the essay is what worries me').delegate === false);
 }
 
 console.log('\n=== the answer to the question is heard ===');

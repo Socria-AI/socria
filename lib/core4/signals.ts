@@ -187,8 +187,13 @@ const DELEGATE = /\b(you (?:do|write|handle|take care of|draft) it|do it for me|
  * not heard, which is worse than never asking — so it lands in `delegate` and
  * `ownWork`, the two signals the allocator already treats as contracts.
  */
-const HANDS_IT_OVER = /^\s*(?:yours?|you(?:rs)?(?: do(?: it)?| please| can)?|go ahead|please do|sure,? go|you take it|all yours)\b[\s.!]*$/i;
-const KEEPS_IT = /^\s*(?:mine|me|i(?:'ll| will)(?: do| write| try)?(?: it)?|let me|my own|i want to(?: try| do| write)?(?: it)?)\b[\s.!]*$/i;
+// A short message CONTAINING the word, not one made only of it. The question
+// is written to be answerable in a word, so people answer it in a word plus a
+// hedge: "yours, go ahead", "definitely yours", "mine i think". Measured as
+// unheard before this, which meant the question was asked and its answer
+// ignored — worse than never asking.
+const HANDS_IT_OVER = /\b(?:yours|you do it|you take it|all yours|go ahead|please do|be my guest)\b/i;
+const KEEPS_IT = /\b(?:mine|let me|my own|i'?ll (?:do|write|try) it|i want to (?:try|do|write) it)\b/i;
 
 const OWN_WORK = /\b(don'?t (?:re)?write (?:it|this|my \w+)(?: for me)?|don'?t do (?:it|this|that) for me|i(?:'ll| will| want to| would like to| am going to)? ?(?:write|do|draft|make) (?:it|this|that)(?: myself| on my own)(?= |$|[.,!])|i want to write (?:it|this) myself|(?:it|this) (?:has|needs) to be (?:my|in my) own (?:words|work)|don'?t tell me what to (?:conclude|decide|think)|i(?:'ll| will) (?:decide|make the call)(?: myself)?|keep (?:it|this) in my (?:voice|words))\b/i;
 
@@ -363,8 +368,11 @@ export function readSignals(message: string): ExplicitSignals {
   // "don't tell me the answer" does — unless a later "just tell me" wins.
   if (directness === 'none' && FLAG_ONLY.test(text)) directness = 'no_answer';
 
-  const delegated = !!note(lastIndex(DELEGATE, text)) || (text.trim().length <= 24 && HANDS_IT_OVER.test(text.trim()));
-  const keepsIt = !!note(lastIndex(OWN_WORK, text)) || (text.trim().length <= 24 && KEEPS_IT.test(text.trim()));
+  // 40 characters, not 24: "yours, go ahead and draft it" is an answer to a
+  // question, not a sentence about ownership in the middle of a paragraph.
+  const answering = text.trim().length <= 40;
+  const delegated = !!note(lastIndex(DELEGATE, text)) || (answering && HANDS_IT_OVER.test(text.trim()));
+  const keepsIt = !!note(lastIndex(OWN_WORK, text)) || (answering && KEEPS_IT.test(text.trim()));
 
   return {
     directness,

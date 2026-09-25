@@ -222,6 +222,15 @@ export function proportionFor(input: SelectInput, dec: InterventionDecision): Pr
   // takes over, and the length policy shapes what is left. It must not be able
   // to shrink a reply below the work the allocator assigned.
   if (input.allocation.ownership === 'ambiguous' || input.allocation.ownership === 'theirs') return 'normal';
+  // AND THE TURN THAT DOES THE DELEGATED WORK IS NEVER TRIMMED.
+  //
+  // The ownership question is engineered to be answered in one word, and a
+  // one-word message is exactly what the length policy reads as an opening —
+  // so "write a story" / "yours, or mine?" / "yours" produced a story in one
+  // or two sentences, hard-capped at 220 tokens. The feature failed at its own
+  // payoff. An instruction about who does the work is not a short open turn;
+  // it is the shortest possible way to commission something.
+  if (input.allocation.ownership === 'delegated' && (signals.delegate || signals.ownWork)) return 'normal';
   // Their words win, in both directions: a length they asked for, or an
   // explicit ask for detail, is never overridden by our reading of the turn.
   if (signals.requestedTokens || signals.explainAsked || signals.sentences) return 'normal';
