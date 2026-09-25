@@ -54,5 +54,29 @@ console.log('\n=== the signed-out and no-conversation paths still read as ok ===
   ok('no store means ok, not unknown', /Promise\.resolve\(\{ state: null, ok: true \}\)/.test(turn));
 }
 
+console.log('\n=== the database gets a deadline, like recall already had ===');
+{
+  // Four reads sat before the first token of every reply with no timeout at
+  // all. A database having a slow minute held the entire reply for as long as
+  // the connection took to give up — a turn with less continuity is a
+  // degradation, a turn that never arrives is an outage.
+  ok('the loads are bounded', /await withTimeout\(\s*\n\s*Promise\.all\(\[/.test(turn));
+  ok('  by the same two seconds recall uses', /STORE_TIMEOUT_MS = 2000/.test(turn));
+  ok('  and a timeout reads as "policy unknown", not as a first turn',
+    /\[\{ state: null, ok: false \}/.test(turn));
+}
+
+console.log('\n=== an empty answer from the state model is not an answer ===');
+{
+  const engine = read('lib/cognition/engine.ts');
+  // JSON.parse(res.text || '{}') turned an empty completion into a valid,
+  // empty state marked ok — and ok means "believe this", so everything carried
+  // forward was replaced with defaults by a model that returned nothing.
+  ok('an empty completion is a failed read', /const raw = \(res\.text \?\? ''\)\.trim\(\)/.test(engine));
+  ok('  as is an object with no fields', /!Object\.keys\(parsed as object\)\.length/.test(engine));
+  ok('  and it carries the prior state forward', /carrying the prior state forward'\);\s*\n\s*return \{ state: sanitizeState\(null\), ok: false \}/.test(engine));
+  ok('  while a real answer is still believed', /return \{ state: sanitizeState\(parsed\), ok: true \}/.test(engine));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

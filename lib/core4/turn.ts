@@ -63,6 +63,8 @@ import type {
 
 // Council D17: the reader has 2 s; on timeout the prior state carries forward.
 const STATE_TIMEOUT_MS = 2000;
+/** The same deadline recall has had for months, now on the Core 4 reads too. */
+const STORE_TIMEOUT_MS = 2000;
 
 export interface TurnInput {
   apiKey: string;
@@ -144,14 +146,28 @@ export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
   const signals = readSignals(input.lastUserText);
   const contract = readContract(input.instructions);
 
-  // Last turn's state and the ledger, together.
+  // Last turn's state and the ledger, together — under a deadline.
+  //
+  // These four reads sit before the first token of every Core 4 reply and had
+  // no timeout at all, where recall next door has had one for months: a
+  // database having a slow minute held the entire reply for as long as the
+  // connection took to give up. A turn without its ledger has less continuity;
+  // a turn that never arrives is an outage, and the second is worse.
+  //
+  // A timeout reads as "the state could not be read", which fails closed on
+  // persistence below — the conservative direction, and the same one a real
+  // read error takes.
   const canStore = !!(input.userId && input.conversationId);
-  const [priorRead, ledger, priorLinks, capability] = await Promise.all([
-    canStore ? store.loadState(input.userId!, input.conversationId!) : Promise.resolve({ state: null, ok: true }),
-    input.userId ? store.loadLedger(input.userId, { conversationId: input.conversationId ?? '', projectId: input.projectId }) : Promise.resolve([] as LedgerEntry[]),
-    input.userId ? store.loadLinks(input.userId) : Promise.resolve([] as LedgerLink[]),
-    input.userId ? store.listCapability(input.userId) : Promise.resolve([] as CapabilityEvidence[]),
-  ]);
+  const [priorRead, ledger, priorLinks, capability] = await withTimeout(
+    Promise.all([
+      canStore ? store.loadState(input.userId!, input.conversationId!) : Promise.resolve({ state: null, ok: true }),
+      input.userId ? store.loadLedger(input.userId, { conversationId: input.conversationId ?? '', projectId: input.projectId }) : Promise.resolve([] as LedgerEntry[]),
+      input.userId ? store.loadLinks(input.userId) : Promise.resolve([] as LedgerLink[]),
+      input.userId ? store.listCapability(input.userId) : Promise.resolve([] as CapabilityEvidence[]),
+    ]),
+    STORE_TIMEOUT_MS,
+    [{ state: null, ok: false }, [] as LedgerEntry[], [] as LedgerLink[], [] as CapabilityEvidence[]] as const
+  );
   ms.load = Date.now() - t0;
   const prior = priorRead.state;
   // THE READ FAILED, SO WE DO NOT KNOW WHAT THEY ASKED FOR.

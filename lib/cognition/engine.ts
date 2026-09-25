@@ -151,7 +151,18 @@ export async function readState(apiKey: string, ctx: ReadContext): Promise<{ sta
       messages: [{ role: 'user', content: parts.join('\n\n') }],
       maxTokens: 1100,
     });
-    return { state: sanitizeState(JSON.parse(res.text || '{}')), ok: true };
+    // AN EMPTY ANSWER IS NOT AN ANSWER. `JSON.parse(res.text || '{}')` turned
+    // an empty completion into a valid, empty state marked ok — and ok means
+    // "believe this", so mergeState replaced everything carried forward with
+    // defaults. A model that returns nothing is a failure, and the documented
+    // failure direction for this read is to carry the prior state forward.
+    const raw = (res.text ?? '').trim();
+    const parsed: unknown = raw ? JSON.parse(raw) : null;
+    if (!parsed || typeof parsed !== 'object' || !Object.keys(parsed as object).length) {
+      console.error('[socria/cognition] state read returned nothing usable; carrying the prior state forward');
+      return { state: sanitizeState(null), ok: false };
+    }
+    return { state: sanitizeState(parsed), ok: true };
   } catch (e) {
     console.error('[socria/cognition] state read failed; carrying the prior state forward', e);
     return { state: sanitizeState(null), ok: false };
