@@ -63,18 +63,26 @@ function conversation(over = CREATE) {
 
 console.log('=== THE REPORTED SEQUENCE ===');
 {
+  // THE SEQUENCE CHANGED SHAPE WHEN "yours, or mine?" WENT. Turn 1 no longer
+  // asks who owns it — there is no state in which Socria takes it — so it asks
+  // the useful question instead, and "mine" lands on a turn that has already
+  // been told the substance is theirs.
   const say = conversation();
   const t1 = say('write me a story');
-  ok('it asks whose it is', t1.decision.type === 'CLARIFY' && t1.decision.reasonCode === 'ownership.ask');
+  ok('it asks for THEIR first fragment', t1.decision.type === 'CLARIFY' && t1.decision.reasonCode === 'creation.elicit', t1.decision.reasonCode);
+  ok('  with no examples, because an example is the creative act',
+    /an example IS the creative act|an example is the creative act/.test(t1.decision.objective));
+  ok('  and nothing suggested',
+    /Do not suggest a premise, a direction, a genre or a "what if"/.test(t1.decision.objective));
+  ok('  nor a list of what they could bring', /not itself a list of ideas/.test(t1.decision.objective));
+  ok('  short enough that it cannot smuggle one', t1.decision.maxTokens <= 130, String(t1.decision.maxTokens));
 
   const t2 = say('mine');
   ok('"mine" is heard', t2.own === 'theirs', String(t2.own));
-  ok('  and the move is to draw out THEIR first fragment', t2.decision.reasonCode === 'creation.elicit', t2.decision.reasonCode);
+  ok('  and it does not ask the same thing twice', t2.decision.reasonCode === 'creation.elicit.again', t2.decision.reasonCode);
   ok('  not to critique an empty page', t2.decision.type !== 'CRITIQUE');
-  ok('  with no examples, because an example is the creative act', /NO EXAMPLES/.test(t2.block) && /an example is the creative act/.test(t2.block));
-  ok('  and nothing suggested', /Do not suggest a premise, a genre, a direction or a "what if"/.test(t2.block));
-  ok('  nor a list of what they could bring', /not itself a list of ideas/.test(t2.block));
-  ok('  short enough that it cannot smuggle one', t2.decision.maxTokens <= 130, String(t2.decision.maxTokens));
+  ok('  and still originating nothing',
+    /Do NOT supply a plot, character, premise, theme, title, concept, name or direction of your own/.test(t2.decision.objective));
 
   // WHAT IS WITHHELD IS THE ORIGINATION, which is the hole the report fell
   // through: originating a premise replaces nothing, so a withhold about
@@ -156,7 +164,9 @@ console.log('\n=== THE GUARD ACTS: a takeover is regenerated, not shipped ===');
   };
   const theirs = 'I have a lighthouse keeper who stopped writing in the log after his daughter left.';
   const g = guardStructure({ decision: dec, allocation: alloc, draft: 'Consider a story where a young inventor discovers a hidden world beneath the city.', considered: [], target: theirs });
-  ok('it is caught as overreach', g.findings.some((f) => f.code === 'originated_substance'), JSON.stringify(g.findings.map((f) => f.code)));
+  // RENAMED: the same check now covers judgement and reasoning as well as
+  // creative substance, because it is one failure with three faces.
+  ok('it is caught as overreach', g.findings.some((f) => f.code === 'replaced_cognition'), JSON.stringify(g.findings.map((f) => f.code)));
   ok('  and the turn is sent back for more agency', g.action === 'MODIFY_FOR_MORE_AGENCY', g.action);
   ok('  with a note that names what it invented', /Rewrite it using only what THEY have put down/.test(g.retryNote ?? ''), g.retryNote?.slice(0, 80));
   ok('  and closes the phrasing loopholes in the note', /"consider…", "what about…", "one angle could be…" and an example are the same act/.test(g.retryNote ?? ''));
@@ -220,8 +230,15 @@ console.log('\n=== NOT UNDER-HELP: everything else still happens in full ===');
   const debug = conversation({ work: 'diagnosis', taskKind: 'debug', latest: 'information' })('the checkout total is wrong for 3 of 200 orders, here is the function and the failing case');
   ok('a bug is still fixed', debug.decision.maxTokens >= 1000 && debug.own === null, `${debug.own}/${debug.decision.maxTokens}`);
 
+  // "JUST DO IT" DOES NOT PRODUCE THE STORY, and this assertion used to say it
+  // did. What it produces is silence about ownership and every other part of the
+  // work at full length: the invariant is universal, and an instruction moves
+  // the service level rather than who originates the substance.
   const delegated = conversation()('write me a story, just do it, I don\'t care what it is about');
-  ok('explicit delegation still produces the work', delegated.own === 'delegated', String(delegated.own));
+  ok('explicit delegation stops the questions', delegated.decision.maxQuestions === 0 && delegated.decision.type !== 'CLARIFY', delegated.decision.type);
+  ok('  and does not buy the substance', delegated.own === 'theirs', String(delegated.own));
+  ok('  while everything around it is still done',
+    delegated.allocation.aiWork.length >= 3, JSON.stringify(delegated.allocation.aiWork));
   ok('  at a real ceiling', delegated.decision.maxTokens >= 1000, String(delegated.decision.maxTokens));
   ok('  and is not interrogated', delegated.decision.type !== 'CLARIFY');
 

@@ -68,6 +68,7 @@ const MODULES = [
   'lib/core4/questions.ts',
   'lib/core4/merge.ts',
   'lib/core4/budget.ts',
+  'lib/core4/split.ts',
   'lib/core4/allocation.ts',
   'lib/core4/intervene.ts',
   'lib/core4/considered.ts',

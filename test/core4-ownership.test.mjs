@@ -53,28 +53,49 @@ const asked = (r) => r.decision.maxQuestions === 1 && r.decision.type === 'CLARI
 
 console.log('=== the ten cases, by what they actually mean ===');
 {
-  // 1. AMBIGUOUS CREATIVE — the report.
+  // THE EXPECTATIONS IN THIS SECTION CHANGED, AND THE CHANGE IS THE POINT.
+  //
+  // They used to assert that "write a story" asked "yours, or mine?", and that
+  // "just do it" and "decide for me" handed the work over. One line, answerable
+  // in a word, and much better than the scope interview it replaced — but its
+  // "mine" branch handed Socria the origination of somebody's work, and that is
+  // not a thing Socria takes. The invariant is universal: there is no state in
+  // which the meaningful cognition transfers. So the question is gone, unclear
+  // resolves to theirs, and an instruction to get on with it moves the service
+  // level — no questions, full length, everything around the substance — and
+  // not who does the thinking.
+
+  // 1. UNCLEAR CREATIVE — the original report.
   const story = turn('write a story', CREATE);
-  ok('"write a story" is ambiguous ownership', story.own === 'ambiguous', String(story.own));
-  ok('  and asks one short line', asked(story) && story.decision.maxTokens <= 120, `${story.decision.type}/${story.decision.maxTokens}`);
-  // Asserted on the RENDERED block, not the objective: an unforced turn never
-  // prints its objective (council D1 — the model picks the move), so an
-  // instruction left there would reach nobody.
-  ok('  offering both readings', /you do it for them, or you work on it with them and it stays theirs/.test(story.block));
-  ok('  answerable in a word', /Answerable in a word/i.test(story.block));
-  ok('  and it does not start the work', /Do not begin the work/.test(story.block));
-  ok('  nor name what it is doing', /do not name what you are doing/.test(story.block));
+  ok('"write a story" leaves the substance with them', story.own === 'theirs', String(story.own));
+  ok('  and asks for THEIRS rather than offering to take it',
+    /^creation\.elicit/.test(story.decision.reasonCode), story.decision.reasonCode);
+  // Asserted on the RENDERED block, not the objective, for the unforced case:
+  // an unforced turn never prints its objective (council D1).
+  // The elicit move is forced (its whole instruction lives in the objective), so
+  // the objective is what reaches the model — the scope clause is for the
+  // unforced case. Asserted where the words actually go.
+  ok('  the objective asks for the first fragment of THEIRS',
+    /Ask for the first fragment/.test(story.decision.objective), story.decision.objective.slice(0, 90));
+  ok('  it never offers to do it instead', !/you do it for them/.test(story.block));
   ok('  and the contradicting default is replaced, not argued with',
     !/help fully: answer what they asked/.test(story.block));
+  ok('  and forbids offering one instead',
+    /Do not suggest a premise, a direction, a genre or a "what if"/.test(story.decision.objective));
+  ok('  including a list of kinds, which is a list of ideas',
+    /do not list the kinds of thing they could bring/.test(story.decision.objective));
 
-  // 2. AMBIGUOUS REASONING — the half a generation-only reading misses.
+  // 2. UNCLEAR REASONING — the half a generation-only reading misses.
   const solve = turn('solve this problem', { taskKind: 'learn', work: 'explanation', latest: 'request' });
-  ok('"solve this problem" is ambiguous too', solve.own === 'ambiguous', String(solve.own));
+  ok('"solve this problem" is read as substantial', solve.own !== null, String(solve.own));
 
-  // 3. EXPLICIT DELEGATION OF JUDGEMENT.
+  // 3. "DECIDE FOR ME" IS ANSWERED, AND NOT BY DECIDING.
   const decide = turn('decide for me', THINK);
-  ok('"decide for me" is delegation', decide.own === 'delegated', String(decide.own));
+  ok('"decide for me" does not transfer the decision', decide.own === 'theirs', String(decide.own));
   ok('  and nothing is asked', decide.decision.maxQuestions === 0 && decide.decision.type !== 'CLARIFY');
+  ok('  the reply is everything the choice rests on', /judgment\.theirs/.test(decide.allocation.reasonCode), decide.allocation.reasonCode);
+  ok('  including a view, marked as a view',
+    decide.allocation.aiWork.some((w) => /view/.test(w)), JSON.stringify(decide.allocation.aiWork));
 
   // 4. COLLABORATION — the doing is the point.
   const brainstorm = turn('brainstorm with me', TALK);
@@ -86,19 +107,19 @@ console.log('=== the ten cases, by what they actually mean ===');
     /^creation\.elicit/.test(brainstorm.decision.reasonCode), brainstorm.decision.reasonCode);
   ok('  with no examples, because an example is the creative act', /an example IS the creative act|an example is the creative act/.test(brainstorm.block));
 
-  // 5. AMBIGUOUS, AND THE COMMONEST ONE IN A WORKING DAY.
+  // 5. THE COMMONEST ONE IN A WORKING DAY.
   const email = turn('write this email', CREATE);
-  ok('"write this email" is ambiguous', email.own === 'ambiguous', String(email.own));
-  ok('  and asks rather than writing it', asked(email));
+  ok('"write this email" leaves the substance with them', email.own === 'theirs', String(email.own));
+  ok('  and asks for theirs rather than writing it', asked(email) || /^creation\.elicit/.test(email.decision.reasonCode));
 
-  // 6. THEIR MATERIAL, THEIR ASK — no question earned.
+  // 6. THEIR MATERIAL, THEIR ASK — no question earned, and Socria does the work.
   const improve = turn('improve my paragraph', CREATE);
   ok('"improve my paragraph" is scoped by their material', improve.own === 'scoped', String(improve.own));
   ok('  and is not interrogated', improve.decision.type !== 'CLARIFY');
 
-  // 7. EXPLICIT DELEGATION.
+  // 7. "GIVE ME THE ANSWER" on a knowledge gap is answered.
   const give = turn('give me the answer', { taskKind: 'learn', work: 'explanation', latest: 'request' });
-  ok('"give me the answer" is delegation', give.own === 'delegated' || give.decision.type !== 'CLARIFY', String(give.own));
+  ok('"give me the answer" is not interrogated', give.decision.type !== 'CLARIFY', String(give.own));
   ok('  and it answers', give.decision.maxQuestions === 0);
 
   // 8. HUMAN OWNERSHIP, STATED AS A REQUEST FOR HELP.
@@ -106,21 +127,20 @@ console.log('=== the ten cases, by what they actually mean ===');
   ok('"help me figure it out" is theirs', figure.own === 'theirs', String(figure.own));
   ok('  and does not become an interview', figure.decision.type !== 'CLARIFY');
 
-  // 9. "JUST DO IT".
+  // 9. "JUST DO IT" — the service level moves, the substance does not.
   const justDo = turn('just do it', CREATE);
-  ok('"just do it" is delegation', justDo.own === 'delegated', String(justDo.own));
+  ok('"just do it" does not buy the substance', justDo.own === 'theirs', String(justDo.own));
   ok('  and asks nothing', justDo.decision.maxQuestions === 0);
+  ok('  while every other part is done, at length',
+    justDo.allocation.aiWork.length >= 3, JSON.stringify(justDo.allocation.aiWork));
 
   // 10. "DON'T DO IT FOR ME" — and the regex trap inside it.
   const dont = turn("don't do it for me", CREATE);
   ok('"don\'t do it for me" is theirs, not delegation', dont.own === 'theirs', String(dont.own));
   ok('  the delegation pattern inside its own negation does not win',
     readSignals("don't do it for me").delegate === false);
-  // They said whose it is, so the ownership question is not asked. What IS
-  // asked for is their material, which is a different question and the only
-  // move available on an empty page under their ownership.
-  ok('  and it is not asked whose it is — they said', dont.decision.reasonCode !== 'ownership.ask');
-  ok('  it asks for their material instead', /^creation\.elicit/.test(dont.decision.reasonCode), dont.decision.reasonCode);
+  ok('  and it asks for their material rather than about ownership',
+    /^creation\.elicit/.test(dont.decision.reasonCode), dont.decision.reasonCode);
 }
 
 console.log('\n=== THE PRODUCTION BLOCKER: it must not depend on how the message got labelled ===');
@@ -133,8 +153,9 @@ console.log('\n=== THE PRODUCTION BLOCKER: it must not depend on how the message
   // timeout; anything gated on its label is gated on a coin toss.
   for (const latest of ['request', 'question', 'information', 'other', 'reaction']) {
     const r = turn('make a story', { taskKind: 'create', work: 'creation', latest });
-    ok(`latest=${latest}: ownership still decides`, r.own === 'ambiguous' && r.decision.type === 'CLARIFY', `${r.own}/${r.decision.type}/${r.decision.maxTokens}`);
-    ok(`  and the ceiling is not the artifact's`, r.decision.maxTokens <= 120, String(r.decision.maxTokens));
+    ok(`latest=${latest}: the substance is still theirs`, r.own === 'theirs', `${r.own}/${r.decision.type}/${r.decision.maxTokens}`);
+    ok(`  and the ceiling is not the artifact's`, r.decision.maxTokens <= 250, String(r.decision.maxTokens));
+    ok(`  and it asks for theirs rather than writing it`, /^creation\.elicit/.test(r.decision.reasonCode), r.decision.reasonCode);
   }
   // The same for the other side: a turn whose ownership is theirs must not be
   // rescued by the label either.
@@ -147,17 +168,20 @@ console.log('\n=== THE PRODUCTION BLOCKER: it must not depend on how the message
 
 console.log('\n=== THE BLANK-REPLY BLOCKER: the question is the thing this product deletes ===');
 {
-  // MEASURED, and it is the worst failure a reply can have. The ownership
-  // question is syntactically a closing offer — "do you want me to write it,
-  // or would you rather write it yourself?" — and Core 4 spent its life
-  // removing exactly that shape. Three of five natural phrasings were stripped
-  // to NOTHING by the sentence gate, so the person got a blank message.
+  // MEASURED, and it is the worst failure a reply can have. A one-line question
+  // is syntactically a closing offer, and Core 4 spends its life removing
+  // exactly that shape: on the ownership question this replaced, three of five
+  // natural phrasings were stripped to NOTHING by the sentence gate, so the
+  // person got a blank message. The elicit question is the same shape and is
+  // protected the same way — buffered past the gate, and exempted from the
+  // offer strip in guard2 by reason code.
   const r = turn('write a story', CREATE);
   ok('the ask is read whole, never streamed through the gate', r.decision.guardRequired === true);
-  ok('  which is what keeps an offer-shaped reply from being deleted mid-stream', r.decision.type === 'CLARIFY');
-  ok('the prompt forbids the offer shape outright', /never as an offer of help/.test(r.block));
-  ok('  naming the three phrasings that produced it', /do not name what you are doing|would you like me to/.test(r.block) && /shall I/.test(r.block));
-  ok('  and gives the shape that survives', /"yours, or mine\?" is the shape/i.test(r.block));
+  ok('  which is what keeps a question-shaped reply from being deleted mid-stream', r.decision.type === 'CLARIFY');
+  ok('  and it is the elicit question, which the strip exempts by name',
+    r.decision.reasonCode === 'creation.elicit', r.decision.reasonCode);
+  ok('the objective keeps it to two sentences, so it cannot smuggle an idea',
+    /Two sentences at most/.test(r.decision.objective));
 }
 
 console.log('\n=== a clause written for one move is not printed over another ===');
@@ -167,11 +191,14 @@ console.log('\n=== a clause written for one move is not printed over another ===
   // an EXPLAIN turn at a 1200-token ceiling was told to write four sentences
   // and stop — two instructions about length, disagreeing, in one prompt.
   const explain = turn('explain how to write a story arc', { taskKind: 'learn', work: 'explanation', latest: 'question' });
-  ok('the read is still attached', explain.own === 'ambiguous', String(explain.own));
-  ok('  but the clause is not printed', !/AT MOST FOUR SENTENCES/.test(explain.block));
+  ok('the read is still attached', explain.own !== null, String(explain.own));
+  ok('  but the clause is not printed', !/WHICH PART OF THIS IS THEIRS/.test(explain.block));
   ok('  and the ceiling is the move\'s own', explain.decision.maxTokens >= 1000, String(explain.decision.maxTokens));
-  ok('  while the move that asked for it still gets it',
-    /WHOSE WORK IS THIS/.test(turn('write a story', CREATE).block));
+  // The clause is for the UNFORCED case; the elicit and develop moves are
+  // forced and carry the same instruction in their objective instead.
+  const develop = turn('take this further', { ...CREATE, authorship: { value: 'theirs', source: 'explicit', confidence: 1, evidence: 'mine' } }, []);
+  ok('  while a move that owns the clause carries the instruction',
+    /Do NOT originate|Do not suggest a premise|Do not supply a plot/.test(develop.decision.objective + develop.block), develop.decision.reasonCode);
 }
 
 console.log('\n=== a standing claim must need more than the word "I" ===');
@@ -214,9 +241,12 @@ console.log('\n=== gate 2: anything they have said settles it ===');
 {
   // Standing contracts, not a new system: the same signals and state fields
   // the allocator already treats as instructions.
-  ok('a standing "just tell me" delegates', read('write the summary', {}, ) === 'ambiguous');
+  ok('a bare "write the summary" is read as substantial', read('write the summary', {}) === 'ambiguous');
   const direct = turn('write the summary', { ...CREATE, directness: { value: 'answer', source: 'explicit', confidence: 1, evidence: 'just tell me' } });
-  ok('  and with it recorded, nothing is asked', direct.own === 'delegated', String(direct.own));
+  // A standing "just tell me" buys silence, not authorship: nothing is asked,
+  // and the substance is still theirs to originate.
+  ok('  and with it recorded, nothing is asked', direct.decision.maxQuestions === 0 && direct.decision.type !== 'CLARIFY', `${direct.own}/${direct.decision.type}`);
+  ok('  while the substance stays theirs', direct.own === 'theirs', String(direct.own));
 
   const theirs = turn('write the conclusion', { ...CREATE, authorship: { value: 'theirs', source: 'explicit', confidence: 1, evidence: 'it has to be my own words' } });
   ok('a standing authorship claim keeps it theirs', theirs.own === 'theirs', String(theirs.own));
@@ -231,22 +261,26 @@ console.log('\n=== gate 2: anything they have said settles it ===');
 
 console.log('\n=== gate 3: asked once, and never at the cost of the work ===');
 {
-  // A second ownership question in a row is the loop Core 4 exists to prevent.
-  const already = [{ type: 'CLARIFY', asked: true }];
+  // ONE QUESTION, AND ONLY WHEN IT IS AVAILABLE. The question left is the useful
+  // one — what have you got? — and asking it twice in a row is the loop Core 4
+  // exists to prevent. When it cannot be asked, the words they DID use become
+  // the material and the turn works with exactly those.
+  const already = [{ type: 'CLARIFY', reason: 'creation.elicit', asked: true }];
   const again = turn('write a poem', CREATE, already);
   ok('having asked once, it does not ask again', again.decision.type !== 'CLARIFY', again.decision.type);
-  ok('  it starts instead of stalling', again.decision.reasonCode === 'ownership.start', again.decision.reasonCode);
-  ok('  bounded to four sentences', /AT MOST FOUR SENTENCES/.test(again.block));
-  ok('  at a ceiling a finished artifact cannot fit inside', again.decision.maxTokens === 200, String(again.decision.maxTokens));
-  ok('  and it says what it took the job to be', /what you took the job to be/.test(again.block));
-  ok('  in its own words, not as a form', /Not a labelled "Assumption:" line/.test(again.block));
+  ok('  it works with their own words instead', again.decision.reasonCode === 'creation.elicit.again', again.decision.reasonCode);
+  ok('  taking them literally', /take them literally and work with exactly those/.test(again.decision.objective));
+  ok('  and still originating nothing',
+    /Do NOT supply a plot, character, premise, theme, title, concept, name or direction of your own/.test(again.decision.objective));
+  ok('  at a ceiling a finished artifact cannot fit inside', again.decision.maxTokens <= 250, String(again.decision.maxTokens));
 
   const spent = [{ type: 'ANSWER', asked: true }, { type: 'ANSWER', asked: true }];
   const noBudget = turn('write a poem', CREATE, spent);
-  ok('with the question budget spent it also starts', noBudget.decision.type !== 'CLARIFY');
+  ok('with the question budget spent it does not ask either', noBudget.decision.type !== 'CLARIFY');
 
   const told = turn('write a poem, and stop asking me questions', CREATE);
-  ok('told not to ask, it does not', told.decision.type !== 'CLARIFY' && told.own === 'delegated');
+  ok('told not to ask, it does not', told.decision.type !== 'CLARIFY', told.decision.type);
+  ok('  and the substance is still theirs', told.own === 'theirs', String(told.own));
 }
 
 console.log('\n=== THE WHOLE LOOP, which is the only thing that matters ===');
@@ -273,19 +307,32 @@ console.log('\n=== THE WHOLE LOOP, which is the only thing that matters ===');
     return { allocation, decision, state };
   };
 
+  // THE LOOP THIS SUITE WAS WRITTEN FOR WAS "ask whose it is, hear 'yours',
+  // write it". The middle step is gone: "yours" is somebody offering Socria the
+  // origination of their work, and there is no state in which that transfers.
+  // What the loop has to do now is stay USEFUL across the three turns without
+  // ever asking the same thing twice and without ever writing their story.
   const t1 = step('write a story');
-  ok('turn 1 asks whose it is', t1.decision.type === 'CLARIFY' && t1.decision.maxQuestions === 1);
+  ok('turn 1 asks for theirs, once', t1.decision.type === 'CLARIFY' && t1.decision.maxQuestions === 1);
+  ok('  and it is the fragment question', t1.decision.reasonCode === 'creation.elicit', t1.decision.reasonCode);
 
   const t2 = step('yours');
-  ok('turn 2 hears the answer', t2.allocation.ownership === 'delegated', String(t2.allocation.ownership));
-  ok('  and is given room to actually write it', t2.decision.maxTokens >= 1000, String(t2.decision.maxTokens));
-  ok('  with no question back', t2.decision.maxQuestions === 0 && t2.decision.type !== 'CLARIFY');
-  ok('  and the delegation is recorded as a contract', t2.state.authorship.source === 'explicit', `${t2.state.authorship.value}/${t2.state.authorship.source}`);
+  ok('turn 2 does not take the work', t2.allocation.ownership === 'theirs', String(t2.allocation.ownership));
+  ok('  and does not ask again', t2.decision.type !== 'CLARIFY', t2.decision.type);
+  // "yours" is somebody handing it over, so the reply does everything except the
+  // one thing only they can supply — at length, and without a question.
+  ok('  it does every other part instead',
+    t2.decision.reasonCode === 'creation.asked.to.finish', t2.decision.reasonCode);
+  ok('  with no question back', t2.decision.maxQuestions === 0);
+  ok('  at a real ceiling, not a consolation reply', t2.decision.maxTokens >= 600, String(t2.decision.maxTokens));
+  ok('  naming in one sentence the thing only they can give',
+    /name the single thing only they can supply/.test(t2.decision.objective));
 
   const t3 = step('write another one, about a lighthouse');
-  ok('turn 3 does not ask again', t3.decision.type !== 'CLARIFY', t3.decision.type);
-  ok('  because the contract is read back', t3.allocation.ownership === 'delegated', String(t3.allocation.ownership));
-  ok('  and it writes', t3.decision.maxTokens >= 1000, String(t3.decision.maxTokens));
+  ok('turn 3 does not ask either', t3.decision.type !== 'CLARIFY', t3.decision.type);
+  ok('  and the substance is still theirs', t3.allocation.ownership === 'theirs', String(t3.allocation.ownership));
+  ok('  while a lighthouse — which is THEIRS — is something to work with',
+    /lighthouse/.test(t3.state.currentFocus ?? ''), t3.state.currentFocus);
 }
 
 console.log('\n=== the same loop, the other way ===');

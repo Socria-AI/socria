@@ -31,7 +31,8 @@
 // Pure.
 
 import type { CognitiveState } from '../cognition/state';
-import type { Allocation, AllocationMode, ExplicitSignals, Inferred, WithholdReason } from './types';
+import type { Allocation, AllocationMode, CognitiveSplit, ExplicitSignals, Inferred, WithholdReason } from './types';
+import { humanOwned, keptBack, splitFor } from './split';
 
 interface Ctx {
   state: CognitiveState;
@@ -71,7 +72,7 @@ function failedAttempts(s: CognitiveState): number {
   return n;
 }
 
-function alloc(
+function allocBase(
   mode: AllocationMode,
   reasonCode: string,
   rationale: string,
@@ -106,8 +107,16 @@ function alloc(
     hold = null;
   }
   const announce = !!hold && !s.history.some((h) => h.withheld);
-  return { mode, reasonCode, rationale, confidence: Math.round(Math.min(1, confidence) * 100) / 100, humanWork, aiWork, withhold: hold, announce, ownership };
+  // `split` is filled in by allocateFor, which is the only caller and the only
+  // place that has the message. Everything reads it from the Allocation.
+  return { mode, reasonCode, rationale, confidence: Math.round(Math.min(1, confidence) * 100) / 100, humanWork, aiWork, withhold: hold, announce, ownership, split: SUPPORTING };
 }
+
+/** The split for a turn with no meaningful cognition in it: Socria does all of it. */
+const SUPPORTING: CognitiveSplit = {
+  reasoning: 'perform', metacognition: 'share', judgment: 'share', creativity: 'share',
+  retrieval: 'perform', representation: 'perform', verification: 'perform', mechanical: 'perform',
+};
 
 // ── WHOSE WORK IS THIS? ──────────────────────────────────────────────
 //
@@ -296,14 +305,40 @@ export function allocate(ctx: Ctx): Allocation {
   return own === null ? a : { ...a, ownership: own };
 }
 
-function allocateFor({ state: s, signals, contract, lastUserText }: Ctx): Allocation {
+function allocateFor(ctx: Ctx): Allocation {
+  const { state: s, signals, contract, lastUserText } = ctx;
   const own = ownershipRead(lastUserText ?? s.currentFocus ?? '', signals, s);
+  // ── THE SPLIT, TAKEN ONCE AND CARRIED BY EVERY BRANCH ──────────────
+  //
+  // Eight dimensions, decided in split.ts, attached to whatever this function
+  // returns. `alloc` is shadowed rather than threaded through twenty-seven call
+  // sites: the local one is the module function with the split stapled on.
+  const split = splitFor({ state: s, signals, text: lastUserText ?? s.currentFocus ?? '', ownership: own });
+  const alloc = (...args: Parameters<typeof allocBase>): Allocation => ({ ...allocBase(...args), split });
+  // Does any meaningful cognition belong to them this turn? On most turns, no —
+  // and then nothing below behaves differently from before this existed.
+  const theirCognition = humanOwned(split);
+
+  const failedRun = failedAttempts(s);
+  // ASKED, TOLD IT WAS AVAILABLE, ASKED AGAIN.
+  //
+  // The invariant says an impatient sentence does not move who does the
+  // meaningful cognition, and it is right: "just give me the answer" on turn one
+  // of somebody's own practice is the moment the product exists for. But a
+  // system that answers the same request the same way for ever is refusing, and
+  // refusing was never the design. So the first ask gets everything around the
+  // step and a plain statement that the step itself is available for the asking;
+  // a second ask, after that, is a decision rather than impatience, and it is
+  // honoured. One exchange, not a negotiation, and never silent.
+  const frustrated = s.stuck === 'frustrated' || s.stuck === 'looping';
+  const askedAgain = signals.directness === 'answer' && s.history.slice(-1).some((h) => h.withheld);
+  const bottomOut = failedRun >= 3 || (failedRun >= 2 && (signals.dontKnow || frustrated)) || askedAgain;
+  const withholdable = !bottomOut;
   const expertInferred = s.expertise.value === 'expert' && (s.expertise.source !== 'inferred' || s.expertise.confidence >= 0.6);
   const learningExplicit = s.learningGoal.source === 'explicit' && s.learningGoal.value === 'yes';
   const ownWorkExplicit = s.authorship.source === 'explicit' && s.authorship.value === 'theirs';
   const directness = s.directness.value;
   const directnessNow = signals.directness !== 'none';
-  const frustrated = s.stuck === 'frustrated' || s.stuck === 'looping';
   const attemptingProblem = s.latest === 'attempt' || s.attempt !== 'none' || s.work === 'practice' || s.work === 'verification';
 
   // ── the safety gate: harm now overrides every contract, and only ever
@@ -325,12 +360,33 @@ function allocateFor({ state: s, signals, contract, lastUserText }: Ctx): Alloca
         { what: 'the submittable answer to the graded item', reason: 'assessment_integrity', evidence: signals.evidence.join('; '), source: signals.assessment ? 'message' : 'project' }, s);
     }
     const override = contract.directness === 'no_answer' || contract.directness === 'guidance';
-    return alloc(signals.delegate ? 'AI_EXECUTES' : s.work === 'explanation' ? 'AI_EXPLAINS' : 'AI_EXECUTES',
-      override ? 'answer.requested.overrides_contract' : 'answer.requested',
-      override
-        ? 'They asked for the answer now; their latest explicit instruction overrides the Project’s standing "hints only".'
-        : 'They asked for the answer (or for Socria to do it); their right to delegate wins.',
-      1, [], ['the answer / the work', 'the reasoning that matters for using it'], null, s);
+    // ── WHAT "JUST DO IT" CAN AND CANNOT MOVE ──────────────────────────
+    //
+    // It moves the service level: no questions, full length, every piece of
+    // supporting work at once, and no coyness about a view they asked for. It
+    // does not move who does the meaningful cognition, because that is not a
+    // preference about service — somebody saying "you do the thinking" is asking
+    // for precisely the thing that costs them what they came for, and a product
+    // that grants it on request is a substitute with an opt-in.
+    //
+    // On the overwhelming majority of turns there IS no meaningful cognition of
+    // theirs in play — a fact, a definition, a conversion, a verdict on
+    // correctness, a lookup — and this branch behaves exactly as it always has.
+    // When there is, the turn falls through to the branch for that kind of work,
+    // which gives everything around it, at length, and asks nothing.
+    // `override` too: a Project's standing "hints only" is an instruction THEY
+    // set, and their newer sentence outranks their older one (council D2). That
+    // is two instructions from the same person, not the invariant — which is
+    // about work nobody asked Socria to take, not about which of their own
+    // settings wins.
+    if (!theirCognition || bottomOut || override) {
+      return alloc(signals.delegate ? 'AI_EXECUTES' : s.work === 'explanation' ? 'AI_EXPLAINS' : 'AI_EXECUTES',
+        override ? 'answer.requested.overrides_contract' : 'answer.requested',
+        override
+          ? 'They asked for the answer now; their latest explicit instruction overrides the Project’s standing "hints only".'
+          : 'They asked for the answer (or for Socria to do it); their right to delegate wins.',
+        1, [], ['the answer / the work', 'the reasoning that matters for using it'], null, s);
+    }
   }
 
   // ── being heard — only when they SAID so (run 1: an inferred "reflection"
@@ -344,9 +400,7 @@ function allocateFor({ state: s, signals, contract, lastUserText }: Ctx): Alloca
   // The practice ladder bottoms out after two failed attempts: a full
   // worked solution with the principle labelled, then the next item is
   // theirs again (council D6). Endless hints are not help.
-  const failedRun = failedAttempts(s);
-  const bottomOut = failedRun >= 3 || (failedRun >= 2 && (signals.dontKnow || frustrated));
-  const withholdable = !bottomOut;
+
 
   // ── an explicit request NOT to be given the answer (now, earlier, or Project) ──
   // Scoped to working a problem: a standing "don't tell me" never covers a
@@ -435,9 +489,24 @@ function allocateFor({ state: s, signals, contract, lastUserText }: Ctx): Alloca
 
   // ── judgement: the decision stays theirs; information does not ──
   if (s.work === 'judgment' || s.taskKind === 'decide') {
-    return alloc('HUMAN_LEADS', 'judgment.theirs',
-      'The decision is theirs: Socria surfaces evidence, assumptions, tradeoffs and what they have not considered, and gives its view if asked.',
-      0.75, ['the decision'], ['evidence', 'tradeoffs', 'what is missing'], null, s);
+    // "DECIDE FOR ME" IS ANSWERED, AND NOT BY DECIDING. The view is given —
+    // withholding an opinion somebody asked for is coyness, not agency (run 1)
+    // — with the reasons and the value that would flip it, and the choice is
+    // still made by the person who has to live with it. What changes when they
+    // ask this way is that nothing is held back and nothing is asked.
+    // `own === 'delegated'` is the widest and most accurate read of "you decide":
+    // ownershipRead's DELEGATED pattern catches "decide for me", "you decide",
+    // "your call", "whatever you think", where the signals module's narrower one
+    // does not. Every one of them is somebody asking for the view, so every one
+    // of them gets it.
+    const handed = own === 'delegated' || signals.delegate || signals.directness === 'answer' ||
+      signals.stopQuestions || (s.directness.source === 'explicit' && s.directness.value === 'answer');
+    return alloc('HUMAN_LEADS', handed ? 'judgment.theirs.asked' : 'judgment.theirs',
+      handed
+        ? 'They asked Socria to decide: give the view, the reasons and the hinge in full, with no questions — and the choice itself stays with them.'
+        : 'The decision is theirs: Socria surfaces evidence, assumptions, tradeoffs and what they have not considered, and gives its view if asked.',
+      0.75, ['the decision'], ['evidence', 'tradeoffs', 'what is missing', ...(handed ? ['a clear view, marked as a view'] : [])], null, s,
+      'theirs');
   }
 
   // ── creation: their work stays theirs when they have said so ──
@@ -464,10 +533,21 @@ function allocateFor({ state: s, signals, contract, lastUserText }: Ctx): Alloca
           alternative: 'everything around it — what is already latent in what they have written, the tension between two of their own pieces, a targeted question, critique, craft knowledge, organisation of their material, and the whole thing the moment they hand it over',
         }, s, 'theirs');
     }
-    // How much of the work would producing it be? See generationRead.
+    // THEY ASKED FOR IT FINISHED, AND THAT IS NOT A TRANSFER OF AUTHORSHIP.
+    //
+    // This returned AI_EXECUTES — "they handed it over: make it" — which is the
+    // invariant with an opt-out. Originating somebody's premise because they
+    // said "just write it" is the same substitution as doing it unasked; the
+    // only difference is that they will not notice. So the request is honoured
+    // where it can be: no questions, maximum work, everything that is not the
+    // substance, and one sentence saying what is theirs rather than a debate
+    // about it.
     if (own === 'delegated') {
-      return alloc('AI_EXECUTES', 'creation.delegated', 'They handed it over: make it.', 0.9,
-        [], ['the artifact itself'], null, s, 'delegated');
+      return alloc('AI_ASSISTS', 'creation.asked.to.finish',
+        'They asked for it finished: do every part that is not the substance, at full length, and ask nothing. The premise, the direction and the ideas are still theirs to originate.',
+        0.85, ['originating the substance: the premise, the characters, the direction, the argument'],
+        ['structure', 'craft knowledge', 'developing whatever they have put down', 'critique', 'the mechanical work', 'the whole draft the moment the substance is theirs'],
+        null, s, 'theirs');
     }
     if (own === 'theirs') {
       // NOT 'options', and not 'material to work with'. Both readings let
@@ -478,10 +558,21 @@ function allocateFor({ state: s, signals, contract, lastUserText }: Ctx): Alloca
         ['originating the substance: the ideas, the premise, the direction'],
         ['eliciting what they have', 'developing and connecting it', 'tensions already latent in it', 'critique', 'craft knowledge'], null, s, 'theirs');
     }
-    if (own === 'ambiguous') {
-      return alloc('AI_ASSISTS', 'ownership.unclear',
-        'Substantial work, and nothing said whose it is: one short question settles whether Socria takes it or works on it with them.',
-        0.7, ['the choice of who does this'], ['whatever they choose, in full'], null, s, 'ambiguous');
+    // UNCLEAR IS NOT A QUESTION ANY MORE, BECAUSE THERE IS NOTHING TO ASK.
+    //
+    // This asked "yours, or mine?" — one line, answerable in a word, and better
+    // than an interview. But it offered Socria the cognition, and the offer was
+    // the bug: there is no state in which Socria takes over originating
+    // somebody's work, so a question whose "mine" branch does exactly that was
+    // asking permission for something that is not on the table. Unclear now
+    // resolves the way the invariant already requires — their substance, every
+    // bit of support around it — and the only question left is the useful one:
+    // what have they got?
+    if (own === 'ambiguous' || own === null) {
+      return alloc('AI_ASSISTS', 'creation.theirs.developing',
+        'Nothing said whose this is, so it is theirs: draw out what they have and push on it. The substance stays theirs to originate.', 0.7,
+        ['originating the substance: the ideas, the premise, the direction'],
+        ['eliciting what they have', 'developing and connecting it', 'tensions already latent in it', 'critique', 'craft knowledge'], null, s, 'theirs');
     }
     return alloc('AI_ASSISTS', 'creation.shared', 'Making something: Socria drafts, develops or critiques as asked; they steer.', 0.6,
       ['direction'], ['drafting', 'developing', 'critique'], null, s, own);
@@ -496,10 +587,15 @@ function allocateFor({ state: s, signals, contract, lastUserText }: Ctx): Alloca
     // request to make something "creation": "write me a script", "make me a
     // table" arrive as execution, and a bare imperative with nothing to
     // determine the artifact is the same guess whatever the label on it.
-    if (own === 'ambiguous') {
-      return alloc('AI_ASSISTS', 'ownership.unclear',
-        'Substantial work, and nothing said whose it is: one short question settles whether Socria takes it or works on it with them.',
-        0.7, ['the choice of who does this'], ['whatever they choose, in full'], null, s, 'ambiguous');
+    // The reader does not always call a request to make something "creation":
+    // "write me a script", "make me a table" arrive as execution. Where the
+    // substance would be Socria's, the same rule applies as above; where it is
+    // plumbing, this is the mechanical branch and it does the work.
+    if ((own === 'ambiguous' || own === 'theirs') && split.creativity === 'human') {
+      return alloc('AI_ASSISTS', 'creation.theirs.developing',
+        'Making something of theirs: draw out what they have and push on it. The substance stays theirs to originate.', 0.7,
+        ['originating the substance: the ideas, the premise, the direction'],
+        ['eliciting what they have', 'developing and connecting it', 'critique', 'craft knowledge', 'all of the mechanical work'], null, s, 'theirs');
     }
     return alloc('AI_EXECUTES', 'execution', 'Mechanical work: do it.', 0.9, [], ['the work'], null, s, own);
   }
@@ -511,14 +607,35 @@ function allocateFor({ state: s, signals, contract, lastUserText }: Ctx): Alloca
     return alloc('AI_EXPLAINS', 'explanation', 'They asked how or why: explain.', 0.85, [], ['the explanation'], null, s);
   }
   if (s.work === 'research') {
+    // RETRIEVAL IS DELEGABLE AND THE CONCLUSION IS NOT. Finding out is supporting
+    // work and Socria does all of it, including the search, the sources and what
+    // they say. What it must not do is hand back the strategic reading of what
+    // was found as though retrieval and interpretation were one errand.
     return alloc('SHARED_REASONING', 'research.interpretation',
       'Research: Socria supplies what it knows and says what it cannot verify; interpretation stays with them.', 0.7,
-      ['interpreting the evidence'], ['information', 'methods', 'what is uncertain'], null, s);
+      ['interpreting the evidence'], ['information', 'methods', 'what is uncertain'], null, s, 'theirs');
   }
   if (s.work === 'practice' && !learningExplicit) {
-    // It looks like practice but they never said so: help, do not withhold.
+    // IT LOOKS LIKE PRACTICE AND THEY NEVER SAID SO.
+    //
+    // This helped fully, because the alternative — inferring "you wanted to
+    // struggle with this" from the shape of a sentence — is the paternalism the
+    // allocator exists to stop, and run 1 measured what that costs. But "help
+    // fully" performed the whole reasoning path, which is the substitution this
+    // product is against, and on a problem shaped like an exercise that is the
+    // likelier mistake.
+    //
+    // So: everything except the step itself, and the step is available for the
+    // asking. Nothing is withheld in the council-D6 sense — there is no quote
+    // to rest it on and there must not be — and the split says reasoning is
+    // scaffolded, which the move reads.
+    if (split.reasoning === 'scaffold') {
+      return alloc('SHARED_REASONING', 'reason.scaffold',
+        'A problem whose working is the point, and nothing says they want it taken off them: set it up, give the method, the facts and the arithmetic, and leave the step itself — with the whole of it the moment they ask.',
+        0.6, ['the step that is the exercise'], ['the method and why it applies', 'the facts and notation', 'the arithmetic', 'an analogous worked case', 'checking their step'], null, s, 'theirs');
+    }
     return alloc('AI_EXPLAINS', 'practice.unconfirmed',
-      'It looks like a practice problem, but they have not said they want to work it themselves: help fully.', 0.6,
+      'It looks like a practice problem, but they have asked for it done and have not said they are learning it: help fully.', 0.6,
       [], ['the explanation', 'the solution'], null, s);
   }
 

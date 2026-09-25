@@ -176,7 +176,10 @@ const CORRECTION = /\b(that'?s not what i (?:meant|said)|you misunderstood|you(?
 const POSITIVE = /\b(that (?:helped|helps|was (?:really |very )?(?:helpful|useful)|makes sense now|clicked)|(?:very|really|super) helpful|that'?s (?:exactly|precisely) (?:it|what i needed)|oh,? i see|aha|got it,? thanks|perfect,? thanks)\b/i;
 const NEGATIVE = /\b(not (?:very |really )?(?:helpful|useful)|that didn'?t help|unhelpful|useless|that'?s not (?:helpful|useful|what i asked)|you'?re not helping|that doesn'?t answer)\b/i;
 
-const DELEGATE = /\b(you (?:do|write|handle|take care of|draft) it|do it for me|write it for me|just (?:do|handle|write|draft|implement) it|can you (?:just )?(?:write|draft|implement|code) (?:it|this|that)(?: for me)?(?=[\s.,!?]*$))\b/i;
+// `finish` and `finish it off` are here because "fine, just finish it" is how
+// somebody actually says it, and without them the reply to an impatient sentence
+// was a question — the one thing that sentence is asking not to get.
+const DELEGATE = /\b(you (?:do|write|handle|take care of|draft|finish) it|do it for me|write it for me|just (?:do|handle|write|draft|implement|finish|get on with) it|finish it(?: off)?(?=[\s.,!?]*$)|can you (?:just )?(?:write|draft|implement|code) (?:it|this|that)(?: for me)?(?=[\s.,!?]*$))\b/i;
 
 /**
  * The answer to "yours, or mine?".

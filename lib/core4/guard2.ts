@@ -31,6 +31,7 @@
 import { danglingCitations } from './web';
 import type {
   Allocation,
+  Dimension,
   GuardAction,
   GuardFinding,
   GuardOutcome,
@@ -40,6 +41,7 @@ import type {
 import { questionLoad, stripInterrogatives, hasSycophanticOpener, stripSycophanticOpener, hasFillerOpener, stripFillerOpener, sentencesOf, interrogatives, deleteSentences } from './questions';
 import { classify, gateCandidates } from './considered';
 import { noveltyGated, THINKING_MODES } from './intervene';
+import { mustNotPerform } from './split';
 
 export interface GuardInput {
   decision: InterventionDecision;
@@ -179,6 +181,28 @@ function contentWords(text: string): Set<string> {
 }
 
 /**
+ * A sentence that DELIVERS THE CHOICE on a turn whose choice is theirs.
+ *
+ * Wording does not save it and wording does not condemn it: what is caught is a
+ * sentence whose substance is the decision — one option named as the one to
+ * take. "I'd go with B", "the stronger option is B", "B is the obvious move",
+ * "go with B" and "B, then" are the same act. A view they ASKED for is a
+ * different move (recommendation.requested) and is exempted at the call site,
+ * because withholding an opinion somebody asked for is coyness, not agency.
+ */
+const DECIDES = /\b(?:i(?:'d| would)(?: probably)? (?:go with|choose|pick|take|do|recommend|say)|i recommend|my (?:recommendation|pick|vote|call) (?:is|would be)|(?:the|your) best (?:option|bet|choice|move|approach|strategy) (?:is|would be)|(?:the|your) (?:stronger|strongest|better|best|right|obvious|clear) (?:option|choice|move|play|answer|one|path|route) (?:is|here is|would be)|you should (?:go with|choose|pick|take|do|start with|use|hire|launch|raise|build)|go with (?:the|option|a\b|b\b|\d)|the (?:answer|call|decision) (?:is|here is)|clearly (?:the|option)|definitely (?:the|option|go)|(?:so|then),? (?:go|choose|pick|do) )/i;
+
+/**
+ * A sentence that HANDS BACK THE REASONING STEP on a turn whose step is theirs.
+ *
+ * The final value, the conclusion, the "therefore". Deliberately narrow: a
+ * scaffolded turn is supposed to contain the method, the facts, the arithmetic
+ * of the supporting work and a worked analogous case, and none of those may trip
+ * this. What trips it is arriving at the answer to THEIR problem.
+ */
+const CONCLUDES = /\b(?:so (?:the (?:answer|result|value|total|integral|derivative|solution)|it(?:'s| is)|you get|we get|that(?:'s| is))|therefore[,:]? (?:the|it|x|y|we|you)|(?:the|your) (?:answer|result|solution|value|total) (?:is|comes (?:out|to)|works out (?:to|as))|which gives(?: you| us)?\b|= *-?\d|in conclusion|to summari[sz]e, the)/i;
+
+/**
  * Sentences that propose substance the person did not supply.
  *
  * Exported because it is the invariant in one function, and an invariant about
@@ -198,6 +222,33 @@ export function originatesSubstance(draft: string, theirMaterial: string): strin
     // vocabulary inside a proposal frame means it is Socria's idea.
     return novel.length >= 3 && novel.length / words.length >= 0.6;
   });
+}
+
+/**
+ * Sentences where the draft performs cognition this turn left with the person.
+ *
+ * ONE FUNCTION FOR ALL OF IT, because the failure is one failure. It was written
+ * for creative work — where it was first caught, with "mine" answered by a
+ * protagonist, a setting and a conflict — and the same reply shape decides
+ * somebody's strategy, hands back somebody's integral and writes somebody's
+ * conclusion. The test is never the wording; it is whether the substance of the
+ * sentence is the thing the person was going to do.
+ */
+export function replacesCognition(
+  draft: string,
+  theirMaterial: string,
+  dimensions: readonly Dimension[]
+): { dimension: Dimension; sentences: string[] } | null {
+  for (const dimension of dimensions) {
+    const found =
+      dimension === 'creativity'
+        ? originatesSubstance(draft, theirMaterial)
+        : sentencesOf(draft)
+            .map((x) => x.trim())
+            .filter((x) => (dimension === 'judgment' ? DECIDES : CONCLUDES).test(x));
+    if (found.length) return { dimension, sentences: found };
+  }
+  return null;
 }
 
 /** Coherence floor (council D8): an edit that guts the reply is not shipped. */
@@ -331,14 +382,14 @@ export function guardStructure(input: GuardInput): GuardOutcome & { needsModel: 
   const load = questionLoad(draft);
   // THE ONE MOVE WHOSE CONTENT IS A QUESTION.
   //
-  // "Do you want me to write it, or would you rather write it yourself?" is,
-  // syntactically, exactly the closing offer this product exists to delete —
-  // and on an ownership.ask turn it is the entire reply. Measured: three of
-  // five natural phrasings were stripped to nothing, so the person got a BLANK
-  // MESSAGE. The strip is right everywhere else and wrong here, so it is
-  // exempted here and nowhere else; the budget check above still applies, so
-  // this turn may still only ask one.
-  const askIsTheMove = dec.reasonCode === 'ownership.ask';
+  // "What have you got so far, however rough?" is, syntactically, close enough
+  // to the closing offer this product exists to delete that the strip took it —
+  // and on an elicit turn it is the entire reply. Measured on the ownership
+  // question this replaced: three of five natural phrasings were stripped to
+  // nothing, so the person got a BLANK MESSAGE. The strip is right everywhere
+  // else and wrong here, so it is exempted here and nowhere else; the budget
+  // check above still applies, so this turn may still only ask one.
+  const askIsTheMove = dec.reasonCode === 'creation.elicit';
   if (load > dec.maxQuestions || (!askIsTheMove && interrogatives(draft).offers.length)) {
     const stripped = stripInterrogatives(draft, dec.maxQuestions);
     if (load > dec.maxQuestions) {
@@ -427,21 +478,43 @@ export function guardStructure(input: GuardInput): GuardOutcome & { needsModel: 
   // It is a REGENERATION, not a strip. Deleting the proposals would leave a
   // reply whose shape assumed them; the model is told instead to do the same
   // turn out of their material.
-  const humanOwned = a.ownership === 'theirs' || a.withhold?.reason === 'authorship';
-  if (humanOwned && !retryNote) {
-    const invented = originatesSubstance(draft, input.target ?? '');
-    if (invented.length) {
+  //
+  // WHICH DIMENSIONS, FROM THE SPLIT. This tested only creative origination, and
+  // the same draft shape decides somebody's strategy or hands back their
+  // integral. A view they asked for is exempt: recommendation.requested exists
+  // because withholding an opinion somebody asked for is coyness, not agency.
+  const ownedTurn = a.ownership === 'theirs' || a.withhold?.reason === 'authorship';
+  const dims = mustNotPerform(a.split).filter((dimension) =>
+    dimension === 'creativity' ||
+    (dimension === 'judgment' && dec.reasonCode !== 'recommendation.requested') ||
+    dimension === 'reasoning');
+  // No split on the allocation — a stored trace, or a caller from before the
+  // field existed — falls back to the dimension this was first written for.
+  const owned: readonly Dimension[] = !ownedTurn ? [] : dims.length ? dims : ['creativity'];
+  if (owned.length && !retryNote) {
+    const took = replacesCognition(draft, input.target ?? '', owned);
+    if (took) {
+      const NOTE: Record<string, string> = {
+        creativity:
+          'Rewrite it using only what THEY have put down — what is latent in it, the tension between two of their own pieces, the assumption underneath it, the one question that would make them decide — or ask for more of theirs. '
+          + 'No plot, character, premise, theme, title, concept, name, angle or direction of your own, in any wording: "consider…", "what about…", "one angle could be…" and an example are the same act.',
+        judgment:
+          'Rewrite it as everything the choice rests on: the evidence, what each way costs, the assumption each one needs, what they have not considered, and what would settle it. '
+          + 'Do not name the option to take, and do not name it by implication — "the stronger option", "I would", "the obvious move" are the same act as choosing.',
+        reasoning:
+          'Rewrite it as the supporting work: what kind of problem this is, the method and why it applies, the facts and notation, the arithmetic, a worked ANALOGOUS case with different numbers, and an offer to check their step or give it outright. '
+          + 'Do not carry their own problem to its answer, and do not do it in disguise: "so you get…", a final value, or their numbers worked through are the same act.',
+      };
       findings.push({
         side: 'overreach',
-        code: 'originated_substance',
-        detail: `Proposed ${invented.length} idea(s) of its own on work they said was theirs.`,
+        code: 'replaced_cognition',
+        detail: `Performed the ${took.dimension} this turn left with them, in ${took.sentences.length} sentence(s).`,
       });
       action = 'MODIFY_FOR_MORE_AGENCY';
       retryNote =
-        'They said this work is theirs, and the draft supplies the substance of it: '
-        + invented.slice(0, 2).map((x) => `"${x.trim().slice(0, 80)}"`).join('; ')
-        + '. Rewrite it using only what THEY have put down — what is latent in it, the tension between two of their own pieces, the assumption underneath it, the one question that would make them decide — or ask for more of theirs. '
-        + 'No plot, character, premise, theme, title, concept, name, angle or direction of your own, in any wording: "consider…", "what about…", "one angle could be…" and an example are the same act.';
+        `This turn leaves the ${took.dimension} with them, and the draft does it for them: `
+        + took.sentences.slice(0, 2).map((x) => `"${x.trim().slice(0, 80)}"`).join('; ')
+        + '. ' + NOTE[took.dimension];
     }
   }
 

@@ -526,8 +526,13 @@ console.log('\n=== every decision is well-formed ===');
     const d = selectIntervention({ state: s, allocation: a, budget: { streak: 0, density: 0, allowed, reasons: [] }, diminishing: NO_DIM, signals: NO_SIGNALS, considered: [] });
     seen.add(d.type);
     const complete = d.reasonCode && d.reason && d.intendedOutcome && d.objective && d.aiWorkPerformed !== undefined && typeof d.confidence === 'number' && d.maxTokens > 0;
-    // Council D8: buffered (guard reads the whole draft) ONLY when something is withheld.
-    const guardOk = d.guardRequired === !!a.withhold;
+    // Council D8: buffered (the guard reads the whole draft) when something is
+    // withheld — and on the one move whose whole content is a question. The
+    // sentence gate drops anything question-shaped as it streams, and measured
+    // on the ownership question this replaced, three of five natural phrasings
+    // streamed out as an EMPTY MESSAGE. Buffering costs that turn its
+    // first-token latency; the turn is 110 tokens long.
+    const guardOk = d.guardRequired === (!!a.withhold || d.reasonCode === 'creation.elicit');
     if (!complete || !guardOk) bad++;
   }
   ok('every decision carries type, reason, intended outcome, work split, confidence', bad === 0, `${bad} malformed`);

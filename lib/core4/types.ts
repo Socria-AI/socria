@@ -212,6 +212,53 @@ export const WITHHOLD_REASONS = [
 ] as const;
 export type WithholdReason = (typeof WITHHOLD_REASONS)[number];
 
+// ── THE SPLIT ────────────────────────────────────────────────────────
+//
+// THE INVARIANT, and it is one sentence: SOCRIA MUST NOT REPLACE MEANINGFUL
+// HUMAN COGNITION. Not in creative work, where it was first caught, and not in
+// mathematics, problem solving, decisions, strategy, writing, essays, code,
+// research reasoning, planning, brainstorming, analysis, design, learning or
+// judgement either. There is no state in which somebody hands the meaningful
+// cognitive task over and Socria simply performs it.
+//
+// THAT IS NOT A REFUSAL AND NOT A QUESTION. The question "can Socria do this?"
+// is the wrong one; the question is WHICH PART is valuable for this person to
+// stay cognitively responsible for, and which parts Socria can perform to make
+// them more capable. Most of the answer is "Socria performs it": retrieval,
+// explanation, arithmetic, verification, organisation, representation, tool
+// use, clerical execution and any information they do not reasonably possess.
+// A version of this that withholds useful information to force somebody to
+// think is Core 3.1, and it was replaced for good reason.
+//
+// SO IT IS A SPLIT, NOT A VERDICT, and it is taken across all eight dimensions
+// rather than for the turn as a whole. "Solve this" is not one decision: the
+// arithmetic is Socria's, the method may be Socria's, the step that is the
+// point of the exercise is theirs, and checking the result is Socria's again.
+export const DIMENSIONS = [
+  'reasoning',        // working the problem: the steps from what is known to what is not
+  'metacognition',    // noticing what is unexamined, what is assumed, what is missing
+  'judgment',         // choosing, weighing, deciding under uncertainty
+  'creativity',       // originating substance: a premise, a concept, a direction
+  'retrieval',        // finding out: facts, sources, prior art, documentation
+  'representation',   // making reasoning visible: structure, notation, a diagram, a table
+  'verification',     // checking correctness
+  'mechanical',       // execution with no judgement in it: format, convert, compute, rename
+] as const;
+export type Dimension = (typeof DIMENSIONS)[number];
+
+/**
+ * What Socria does with one dimension.
+ *
+ *   'perform'   Socria does it, whole. Most dimensions, most turns.
+ *   'share'     Socria does it openly, in the person's sight, and the
+ *               conclusion stays theirs to accept or reject.
+ *   'scaffold'  Socria sets it up, supplies what is missing and checks each
+ *               step — the step itself is taken by the person.
+ *   'human'     the person's, and Socria does not supply it in any wording.
+ */
+export type Role = 'perform' | 'share' | 'scaffold' | 'human';
+export type CognitiveSplit = Record<Dimension, Role>;
+
 export interface Allocation {
   mode: AllocationMode;
   /** the cognitive work that stays with the person this turn */
@@ -258,6 +305,11 @@ export interface Allocation {
    * It decides who holds the pen, not whether help is given.
    */
   ownership: 'delegated' | 'scoped' | 'theirs' | 'ambiguous' | null;
+  /**
+   * HOW THE COGNITION IS SPLIT, dimension by dimension. Internal: the labels
+   * are never shown to the person and never named in a reply.
+   */
+  split: CognitiveSplit;
   /** machine-readable */
   reasonCode: string;
   /** one line a person could read */

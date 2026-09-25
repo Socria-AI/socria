@@ -37,6 +37,7 @@ import type {
 } from './types';
 import { EVIDENCE_WITHHELD } from './types';
 import { familyOf } from './budget';
+import { mustNotPerform } from './split';
 
 export interface SelectInput {
   state: CognitiveState;
@@ -105,7 +106,7 @@ function d(
     confidence?: number;
     switchedFrom?: string | null;
     avoid: string[];
-    /** a ceiling this move needs instead of its type's — see ownership.ask */
+    /** a ceiling this move needs instead of its type's — see creation.elicit */
     maxTokens?: number;
     /** read whole before anybody sees it, even with nothing withheld */
     buffered?: boolean;
@@ -160,6 +161,7 @@ const FORCING = new Set([
   // unforced, the most important instruction in the system reached nobody, and
   // the model was free to answer an empty page with a premise.
   'creation.elicit', 'creation.elicit.again', 'creation.critique', 'ownership.theirs',
+  'reason.scaffold', 'judgment.scaffold', 'creation.asked.to.finish',
 ]);
 
 /**
@@ -634,49 +636,96 @@ function selectMove(input: SelectInput): InterventionDecision {
       // The question is allowed only if the budget has one. When it does
       // not, the reply says what it assumed instead, which is the same
       // information without the interrogation.
-      if (a.ownership === 'ambiguous') {
-        // ASKED ONCE, NEVER TWICE. A second ownership question in a row is
-        // the loop Core 4 exists to prevent, so the budget governs it like
-        // any other question and a conversation that has already had it
-        // takes the answer instead — their reply is an explicit statement,
-        // which allocation.ts reads on the next turn as a settled contract.
-        const askedAlready = s.history.slice(-3).some((h) => h.type === 'CLARIFY');
-        const canAsk = budget.allowed === 1 && !input.signals.stopQuestions && !askedAlready;
-        if (canAsk) {
-          return d('CLARIFY', {
-            reasonCode: 'ownership.ask', reason: a.rationale,
-            // READ WHOLE, NOT STREAMED. The sentence gate drops anything
-            // offer-shaped, and this move is offer-shaped by nature: measured,
-            // three of five natural phrasings streamed out as an EMPTY
-            // MESSAGE. Buffering costs this turn its first-token latency, and
-            // the turn is ninety tokens long.
-            buffered: true,
-            intended: 'They say whose work this is, in a word, and then get all of it.',
-            objective:
-              'ONE short line, and nothing else. Offer both readings of what they asked: that you do it for them, or that you work on it with them and it stays theirs. '
-              + 'Make it answerable in a word — the shape of "yours, or mine?" rather than a list of options or a form to fill in. '
-              + 'Do not begin the work in this reply, do not explain why you are asking, and do not use the words ownership, authorship, cognition or delegation at them. '
-              + 'Whatever they answer, the next turn does all of it.',
-            alloc: a, avoid, maxQuestions: 1, maxTokens: 90,
-          });
-        }
-        // NO QUESTION AVAILABLE, SO IT STARTS RATHER THAN STALLS. Doing work
-        // that was offered costs nothing; refusing to move because nobody
-        // clarified costs them the turn. Small, and it says what it took the
-        // job to be, so steering it back costs one sentence.
-        return d('ANSWER', {
-          reasonCode: 'ownership.start', reason: `${a.rationale} No question is available this turn.`,
-          intended: 'They get something real to react to, and correcting the direction costs them one sentence.',
+      // ── THE QUESTION "YOURS, OR MINE?" IS GONE, AND SO IS THE STATE IT
+      //    ASKED ABOUT.
+      //
+      // It was one line, answerable in a word, and much better than the scope
+      // interview it replaced. But its "mine" branch handed Socria the
+      // origination of somebody's work, and that is not a thing Socria takes —
+      // so it was asking permission for something not on the table, and half
+      // the answers moved the cognition. Unclear now resolves the way the
+      // invariant already requires, and the only question left is the useful
+      // one: what have they got? (allocation.ts routes 'ambiguous' to the same
+      // place as 'theirs'.)
+      //
+      // WHICH SCAFFOLD, THOUGH, DEPENDS ON WHICH DIMENSION IS THEIRS. Asking a
+      // person working an integral for "the first fragment they already have"
+      // is the creative-writing move applied to arithmetic, and it reads as
+      // nonsense. The split says which one this turn is about.
+      const lead = mustNotPerform(a.split)[0];
+      // ASK FOR THEIR FRAGMENT ONLY WHEN A QUESTION IS ACTUALLY AVAILABLE — and
+      // never when they have said to get on with it. "Just do it" does not buy
+      // the substance, and it does buy silence: answering it with a question is
+      // the friction this product is supposed to be the opposite of, and the
+      // reply has plenty to do without one.
+      const handedOver = input.signals.delegate || input.signals.directness === 'answer' ||
+        input.signals.stopQuestions || (s.directness.source === 'explicit' && s.directness.value === 'answer');
+      const mayElicit =
+        budget.allowed >= 1 && !handedOver &&
+        !s.history.slice(-2).some((h) => h.reason === 'creation.elicit');
+      /**
+       * They asked for it finished, so there are no questions and no short reply
+       * — every part that is not the substance, at length.
+       *
+       * The short "work with their words" move is right for somebody who has
+       * been asked once and said little; it is wrong for somebody who said "just
+       * do it, I don't care what it's about", who gets 220 tokens where they
+       * expected a page. Same invariant, opposite proportion.
+       */
+      const askedToFinish = () => d('ANSWER', {
+        reasonCode: 'creation.asked.to.finish', reason: a.rationale,
+        intended: 'They get everything the piece needs except the one thing only they can decide.',
+        objective:
+          'They have asked for this done and asked nothing of you in return, so ask NOTHING and write at length. '
+          + 'Do every part that is not the substance: the structure and how the parts would carry weight, the craft decisions and what each one costs, the conventions of the form, the parts that follow from anything they HAVE said, and the mechanical work. '
+          + 'Then, in ONE sentence, name the single thing only they can supply — the premise, the direction, the concept — and say the rest is ready the moment they give it. '
+          + 'Do NOT originate that thing, in any wording: a premise, a character, a theme, a title, a concept, an angle, a "what if", an example or a list of options are the same act. '
+          + 'Do not apologise, do not explain the policy, do not name ownership or authorship, and do not ask.'
+          + consideredNote,
+        alloc: a, avoid, maxQuestions: 0,
+      });
+      /** Nothing of theirs, and no question to be had: work with the words they used. */
+      const elicitedAlready = () => d('ANSWER', {
+        reasonCode: 'creation.elicit.again', reason: a.rationale,
+        intended: 'Their own words, however few, are taken seriously and pushed on.',
+        objective:
+          'They have given you very little and you cannot ask — do not ask. The words THEY used are the material: take them literally and work with exactly those. '
+          + 'Say what their own words already commit them to and what they leave open, or name the one thing that would most change what this becomes — in their terms, not yours. '
+          + 'Do NOT supply a plot, character, premise, theme, title, concept, name or direction of your own, in any wording: "consider…", "what about…", "one angle could be…" and an example are the same act. '
+          + 'Two or three sentences.',
+        alloc: a, avoid, maxQuestions: 0, maxTokens: 220,
+      });
+      if (a.ownership === 'theirs' && !a.withhold && lead === 'reasoning') {
+        // THE STEP IS THEIRS; EVERYTHING AROUND IT IS SOCRIA'S, AT LENGTH.
+        // Not a hint-only reply and not a Socratic one: the method, the facts,
+        // the arithmetic and a worked analogous case all go in, which is most of
+        // the useful content of an answer. What is left out is the one step that
+        // is the exercise, and the reply says plainly that it is available.
+        return d('EXPLAIN', {
+          reasonCode: 'reason.scaffold', reason: a.rationale,
+          intended: 'They take the step, with everything they need to take it in front of them.',
           objective:
-            'Start it. Write AT MOST FOUR SENTENCES of the actual thing — real sentences of it, put first, not a description of what you would write and not an offer to write it. '
-            + 'Then, in your own words, what you took the job to be, so they can redirect it in a sentence. Not a labelled "Assumption:" line. '
-            + 'Do not deliver the finished thing: they have not said whose this is, and a finished artifact decides that for them.'
+            'Give all of the supporting work: what kind of problem this is, which method applies and why, the facts, definitions and notation it needs, any arithmetic, and — if it helps — a fully worked ANALOGOUS example with different numbers. '
+            + 'Then stop at the step that is the actual exercise here and say, in one clause, that you will check it or give it outright if they would rather. '
+            + 'Do not perform that step, and do not perform it in disguise: a worked example on THEIR numbers, "so you would get…", or a final value is the same act. '
+            + 'No questions, no encouragement, nothing about learning styles.'
             + consideredNote,
-          alloc: a, avoid, maxQuestions: 0, maxTokens: 200,
+          alloc: a, avoid, maxQuestions: 0,
         });
       }
-      if (a.ownership === 'theirs' && !a.withhold) {
+      // NO SEPARATE JUDGEMENT MOVE, DELIBERATELY. One was written and taken out:
+      // it fired on every SHARED_REASONING turn whose decision was theirs and
+      // pre-empted CONNECT, CHALLENGE and the view somebody had asked for
+      // outright — four regressions for a clause the scope block and the guard
+      // already carry. The decision staying theirs is not a move; it is a
+      // constraint on whatever move fits.
+      if (a.ownership === 'theirs' && !a.withhold && lead === 'creativity') {
         // "BRAINSTORM WITH ME" IS NOT "GENERATE IDEAS FOR ME".
+        //
+        // GATED ON THE DIMENSION. Without `lead === 'creativity'` this asked a
+        // person weighing a job offer for "the first fragment they already have",
+        // and capped a judgement turn at a 110-token clarification: the
+        // creative-writing move applied to everything whose substance was theirs.
         //
         // This asked for "two or three concrete directions — a premise, an
         // angle, a structure", which is the takeover written as an
@@ -684,7 +733,7 @@ function selectMove(input: SelectInput): InterventionDecision {
         // a menu of somebody else's thinking. Under human ownership the
         // substance is theirs to originate; what Socria adds is everything
         // around it.
-        if (!input.material) {
+        if (!input.material && mayElicit) {
           return d('CLARIFY', {
             reasonCode: 'creation.elicit', reason: a.rationale,
             intended: 'They put down the first piece, and it is theirs.',
@@ -695,6 +744,7 @@ function selectMove(input: SelectInput): InterventionDecision {
             alloc: a, avoid, maxQuestions: 1, maxTokens: 110, buffered: true,
           });
         }
+        if (!input.material) return handedOver ? askedToFinish() : elicitedAlready();
         return d('ANSWER', {
           reasonCode: 'ownership.theirs', reason: a.rationale,
           intended: 'Their own material goes further, and every idea in it is still theirs.',
@@ -724,26 +774,14 @@ function selectMove(input: SelectInput): InterventionDecision {
           // fragment when they had one costs a sentence; inventing one when
           // they had none costs them the work.
           if (!input.material) {
-            // ASKED ONCE. Asking for their fragment twice in a row is the
-            // friction loop this product is supposed to be the opposite of —
-            // so the second time, whatever words they DID use become the
-            // material, and the turn works with those rather than asking again.
-            // The FRAGMENT question specifically, not any CLARIFY: "yours, or
-            // mine?" and "what have you got?" are different questions, and
-            // counting the first as the second meant the fragment was never
-            // asked for at all.
-            if (s.history.slice(-2).some((h) => h.reason === 'creation.elicit')) {
-              return d('ANSWER', {
-                reasonCode: 'creation.elicit.again', reason: a.rationale,
-                intended: 'Their own words, however few, are taken seriously and pushed on.',
-                objective:
-                  'They have given you very little and you have already asked once — do not ask again. The words THEY used are the material: take them literally and work with exactly those. '
-                  + 'Say what their own words already commit them to and what they leave open, or name the one thing that would most change what this becomes — in their terms, not yours. '
-                  + 'Do NOT supply a plot, character, premise, theme, title, concept, name or direction of your own, in any wording: "consider…", "what about…", "one angle could be…" and an example are the same act. '
-                  + 'Two or three sentences.',
-                alloc: a, avoid, maxQuestions: 0, maxTokens: 220,
-              });
-            }
+            // ASKED ONCE, AND ONLY WHEN A QUESTION IS AVAILABLE. Asking for
+            // their fragment twice in a row is the friction loop this product is
+            // supposed to be the opposite of — so the second time, whatever
+            // words they DID use become the material, and the turn works with
+            // those rather than asking again. Same when the question budget is
+            // spent or they have asked for no questions: the elicit move used to
+            // ask anyway, which is the one thing the budget exists to stop.
+            if (!mayElicit) return handedOver ? askedToFinish() : elicitedAlready();
             return d('CLARIFY', {
               reasonCode: 'creation.elicit', reason: a.rationale,
               intended: 'They put down the first piece, and it is theirs.',
@@ -962,23 +1000,39 @@ export function renderDecision(dec: InterventionDecision, a: Allocation): string
   // an EXPLAIN or VERIFY turn at a 1200-token ceiling was told to write four
   // sentences and stop — a clause written for one move, printed over another.
   // The three reason codes below are the only moves that asked for it.
+  // KEYED ON THE DECISION, NOT THE ALLOCATION.
+  //
+  // `allocate()` attaches the ownership read to every allocation, including the
+  // modes whose branches never act on it. Keyed on `a.ownership` alone, an
+  // EXPLAIN or VERIFY turn at a 1200-token ceiling was told to write four
+  // sentences and stop — a clause written for one move, printed over another.
+  // Only the moves that asked for it get it.
+  //
+  // AND IT NO LONGER HANDS OVER WHAT IT IS PROTECTING. This clause used to say
+  // "give them material to develop with: two or three concrete directions — a
+  // premise, an angle, a structure — say which one you would follow", which is
+  // the substitution written out as an instruction, on the very turn whose job
+  // was to prevent it. The ideas arrived from Socria and the person picked from
+  // a menu of somebody else's thinking.
   const scopeMove =
-    dec.reasonCode === 'ownership.ask' || dec.reasonCode === 'ownership.start' || dec.reasonCode === 'ownership.theirs';
-  const scope =
-    scopeMove && a.ownership === 'ambiguous'
-      ? (dec.reasonCode === 'ownership.ask'
-          ? 'WHOSE WORK IS THIS — THIS OVERRIDES THE LINE ABOVE ABOUT ANSWERING FULLY. They asked for something substantial and nothing has said whether they are handing it over or doing it themselves. Both readings are ordinary and you cannot tell from the words.\n' +
-            'So: ONE short line putting the two side by side — you do it for them, or you work on it with them and it stays theirs. Answerable in a word.\n' +
-            'Phrase it as a CHOICE, never as an offer of help: not "do you want me to…", not "would you like me to…", not "shall I…". "Yours, or mine?" is the shape. An offer reads as a machine asking permission; a choice reads as a person asking which.\n' +
-            'Do not begin the work, do not explain the question, do not name what you are doing. The next turn does all of whatever they choose.'
-          : 'WHOSE WORK IS THIS — THIS OVERRIDES THE LINE ABOVE ABOUT ANSWERING FULLY. They asked for something substantial, nothing has said whose it is, and no question is available this turn, so start it rather than stall.\n' +
-            'Write AT MOST FOUR SENTENCES of the actual thing. Real sentences of it — the opening, one option, the first few lines — not a description of what you would write, not an outline, not an offer. Four sentences is a ceiling, not a target.\n' +
-            'Then, in your own words, what you took the job to be — the way a person says "I went light and a bit wry; say if that is wrong". Not a labelled "Assumption:" line, and no question.\n' +
-            'Do not deliver the finished thing, do not apologise for the length, and do not close by offering to write more.')
-      : scopeMove && a.ownership === 'theirs'
-        ? 'WHOSE WORK IS THIS: theirs. They asked to work on it, not to receive it — the doing is the work they came for, and handing back a finished piece would end it.\n' +
-          'Give them material to develop WITH: two or three concrete, specific directions — a premise, an angle, a structure, a line of argument — one or two lines each, different in kind rather than in wording. Say which one you would follow and what makes it strongest. Do not write the piece itself, and do not write a polished version of any option.'
-        : null;
+    dec.reasonCode === 'ownership.theirs' || dec.reasonCode === 'creation.theirs.developing' ||
+    dec.reasonCode === 'creation.asked.to.finish' || dec.reasonCode === 'reason.scaffold' ||
+    dec.reasonCode === 'judgment.scaffold';
+  const lead = mustNotPerform(a.split)[0];
+  const scope = !scopeMove
+    ? null
+    : lead === 'reasoning'
+      ? 'WHICH PART OF THIS IS THEIRS — THIS OVERRIDES THE LINE ABOVE ABOUT ANSWERING FULLY. The working is the point of this one, so the step itself is theirs and everything around it is yours to give, at length.\n' +
+        'Give: what kind of problem it is, the method and why it applies, the facts, definitions and notation, any arithmetic, and a fully worked ANALOGOUS case with different numbers if that helps. That is most of an answer and all of it goes in.\n' +
+        'Stop at the step that is the exercise. Say in one clause that you will check it, or give it outright, if they would rather — then stop. Do not take that step in disguise: their numbers worked through, "so you would get…", or a final value is the same act.'
+      : lead === 'judgment'
+        ? 'WHICH PART OF THIS IS THEIRS — THIS OVERRIDES THE LINE ABOVE ABOUT ANSWERING FULLY. The choice is theirs; everything it rests on is yours to supply, in full.\n' +
+          'Give: the evidence, what each way costs, the assumption each one needs, what they have not considered, and what would settle it. If they asked for your view, give it plainly, marked as your view, with the one value that would flip it.\n' +
+          'Do not make the choice for them, and do not make it by implication: "the stronger option is", "I would go with", "the obvious move" or a list with one item argued twice are all the same act.'
+        : 'WHICH PART OF THIS IS THEIRS — THIS OVERRIDES THE LINE ABOVE ABOUT ANSWERING FULLY. The substance of this is theirs to originate: the premise, the characters, the concept, the angle, the direction, the argument.\n' +
+          'Everything else is yours and there is a lot of it: draw out what they already have, take their own material further, set two of their pieces against each other and say what that tension opens, name the assumption underneath it, organise what they have so its shape shows, bring craft knowledge, critique it hard, and do every mechanical part.\n' +
+          'Do NOT originate. No plot, character, premise, theme, title, concept, name, angle or direction of yours, in any wording — "consider…", "one angle could be…", "what about…", "you might try…", a worked example and a list of options are the same act with different punctuation.\n' +
+          'If they have given you almost nothing, ask for theirs rather than filling the gap.'
 
   // Not forced: constraints only; the model chooses the move (council D1).
   if (!dec.forced) {
