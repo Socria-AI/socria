@@ -26,6 +26,7 @@ import { budgetFrom, diminishingReturns } from './.tmp/budget.mjs';
 import { selectIntervention, renderDecision, hasOwnMaterial } from './.tmp/intervene.mjs';
 import { contributesNothing, guardStructure, replacesCognition } from './.tmp/guard2.mjs';
 import { mustNotPerform } from './.tmp/split.mjs';
+import { buildSystemPrompt } from './.tmp/socria-prompt.mjs';
 import { entriesFromSocria, entriesFromPerson } from './.tmp/ledger.mjs';
 import { fallbackReply } from './.tmp/turn.mjs';
 
@@ -512,6 +513,69 @@ console.log('\n=== what Core 3.1 learned the hard way, enforced structurally ===
   // for is given, marked as a view, rather than hedged away.
   const [asked] = run(W.decide, ['which would you pick, A or B?']);
   ok('a view they asked for is not withheld', asked.allocation.withhold === null && asked.decision.maxQuestions === 0, asked.decision.reasonCode);
+}
+
+// ── 6d. THE FORK IN THE ROAD ────────────────────────────────────────
+
+console.log('\n=== "eat lunch or study" — reported from production ===');
+{
+  // WHAT HAPPENED: it answered. "If you're hungry, eating lunch first might make
+  // your study session more effective." One sentence, somebody's choice made for
+  // them, and nothing in it they could not have told you. Then "but what" got
+  // another one. Two failures at once — the choice taken, and a reply with
+  // nothing inside it.
+  //
+  // WHY: the reader called it conversation, and every decision pattern wanted a
+  // decision verb. Two things with an "or" between them is the commonest fork
+  // there is and it matched none of them.
+  const VAGUE = { taskKind: 'explore', work: 'conversation', latest: 'question' };
+  const [t] = run(VAGUE, ['eat lunch or study']);
+  ok('a bare fork reserves the choice', t.reserved.includes('judgment'), JSON.stringify(t.reserved));
+  ok('  and the turn is read whole before anybody sees it', t.decision.guardRequired === true);
+  ok('  with the frame it owes them in the prompt', CLAUSE.test(t.decision.objective), t.decision.objective.slice(-90));
+
+  for (const text of ['the job in berlin or the one here', 'launch in march or june', 'react or svelte for this']) {
+    const [r] = run(VAGUE, [text]);
+    ok(`"${text.slice(0, 34)}…" too`, r.reserved.includes('judgment'), JSON.stringify(r.reserved));
+  }
+  // The follow-up inherits it: "but what" asks for nothing on its own.
+  const say = run(VAGUE, ['eat lunch or study', 'but what']);
+  ok('a bare follow-up does not lose it', say[1].reserved.includes('judgment'), `${JSON.stringify(say[1].reserved)}/${say[1].decision.reasonCode}`);
+
+  // AND AN "or" IS NOT ALWAYS A FORK. A question about two things is a question.
+  for (const [text, work] of [
+    ['what is a mutex or a semaphore', 'information'],
+    ['explain recursion or iteration', 'explanation'],
+    ['is the total 5 or 6', 'verification'],
+    ['convert this to json or yaml', 'execution'],
+  ]) {
+    const [r] = run({ taskKind: 'lookup', work, latest: 'question' }, [text]);
+    ok(`"${text.slice(0, 34)}…" is answered`, r.reserved.length === 0 && r.decision.type !== 'CLARIFY', JSON.stringify(r.reserved));
+  }
+  // Prose that happens to contain the word is not a fork either.
+  const [prose] = run(VAGUE, ['we have been going back and forth on this for weeks and honestly we could ship it now or wait until the hiring round closes, which is what my cofounder keeps saying']);
+  ok('a paragraph containing "or" is not caught by the short-fork rule',
+    prose.decision.type !== 'CLARIFY', prose.decision.reasonCode);
+}
+
+console.log('\n=== Core 3.1\'s strictness, in the prompt Core 4 actually sends ===');
+{
+  // The prompt as it is actually assembled and sent, not a constant.
+  const p4 = buildSystemPrompt('core-4').prompt;
+  ok('no paraphrase without insight', /NO PARAPHRASE WITHOUT INSIGHT/.test(p4));
+  ok('  and it names restating as the failure', /Restating what they said in different words is a\nfailure/.test(p4));
+  ok('reveal, don\'t explain', /REVEAL, DON'T EXPLAIN/.test(p4));
+  // The reported reply itself is the example, so the rule is anchored to a real
+  // failure rather than to an abstraction. Matched across the line wrap.
+  ok('  with the reported reply as the example of what not to do',
+    /If\s+you're hungry, eating first helps you concentrate/.test(p4));
+  ok('say it like you mean it', /SAY IT LIKE YOU MEAN IT/.test(p4) && /drains a true observation/.test(p4));
+  ok('  assertive about the pattern, never about their decision', /Be assertive about the PATTERN\. Never about what they should decide\./.test(p4));
+  ok('compress', /COMPRESS/.test(p4) && /Response weight matches\nvalue added/.test(p4));
+  ok('match depth to the moment', /MATCH DEPTH TO THE MOMENT/.test(p4) && /performing depth/.test(p4));
+  ok('and the one the report was about: do not answer where the arriving is the point',
+    /DO NOT ANSWER INSTANTLY WHERE THE ARRIVING IS THE POINT/.test(p4));
+  ok('  which says why, in one line', /A\nperson who reaches a conclusion holds it; a person handed one has borrowed it/.test(p4));
 }
 
 // ── 7. PROVENANCE ──────────────────────────────────────────────────
