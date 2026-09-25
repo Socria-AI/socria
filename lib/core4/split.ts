@@ -52,6 +52,24 @@ import { DIMENSIONS, type CognitiveSplit, type Dimension, type ExplicitSignals, 
 const PROBLEM = /\b(?:solve|prove|derive|integrate|differentiate|factor|simplify|show that|work (?:out|through)|figure out|compute the (?:proof|derivation)|do (?:this|these|my) (?:problem|problems|homework|exercise|exercises|assignment)|answer (?:this|these) question)\b/i;
 
 /**
+ * Two things, and an "or" between them. The commonest decision there is.
+ *
+ * "eat lunch or study" reserved nothing: the reader called it conversation and
+ * every pattern below wanted a decision verb. So Socria answered it — "if you're
+ * hungry, eating lunch first might make your study session more effective" —
+ * which made somebody's choice for them in one sentence, badly, and taught them
+ * nothing. Reported from production.
+ *
+ * SHORT, because length is what separates a choice from prose that happens to
+ * contain the word. "Eat lunch or study" is a fork; a paragraph about a project
+ * that says "we could ship it or wait" is a person thinking, and the rest of the
+ * allocator is better at that than a regex is. Both sides must carry a word, so
+ * "or" trailing a half-finished sentence does not count.
+ */
+const ALTERNATIVES = /^[^?!.]{1,60}\s\bor\b\s[^?!.]{1,60}\??$/i;
+const SHORT_ENOUGH = 14;
+
+/**
  * Asking for the judgement itself, rather than for what bears on it.
  *
  * The reader's `work`/`taskKind` is the primary signal and this is the floor
@@ -226,8 +244,10 @@ export function splitFor({ state: s, signals, text, ownership }: SplitInput): Co
   // reserving the judgement there withholds an answer nobody is deciding with.
   const labelled = s.work === 'information' || s.work === 'explanation' ||
     s.work === 'verification' || s.work === 'execution' || s.work === 'diagnosis';
+  const forkInTheRoad =
+    ALTERNATIVES.test(t.trim()) && t.trim().split(/\s+/).length <= SHORT_ENOUGH;
   const deciding = s.work === 'judgment' || s.taskKind === 'decide' ||
-    (DECISION.test(t) && !creating && !labelled) ||
+    ((DECISION.test(t) || forkInTheRoad) && !creating && !labelled) ||
     (carried.includes('judgment') && !creating && !elsewhere);
 
   // Reasoning: 'scaffold' when the path is the point and they are building
