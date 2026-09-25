@@ -16,6 +16,7 @@
 // design intends, and the record is what the design says it is.
 
 import { build } from 'esbuild';
+import { readActivity } from './.tmp/activity.mjs';
 import { mkdirSync, rmSync } from 'node:fs';
 import { dirname, join, resolve as res } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -99,7 +100,11 @@ async function turn(conversationId, messages, { state = {}, replies, guard, chec
     body: JSON.stringify({ model: 'core-4', messages, conversationId, ...(projectId ? { projectId } : {}) }),
   });
   const r = await chatRoute.POST(req);
-  const received = await r.text();
+  // The activity markers are part of the wire protocol, not the reply: the real
+  // client pulls them out before a character can be revealed as prose, and a
+  // harness that stands in for the client has to do the same or it measures a
+  // reply nobody receives.
+  const received = readActivity(await r.text()).text;
   await quiet();
   const prompt = globalThis.__prompts[0] ?? '';
   return {
@@ -161,9 +166,18 @@ const t3 = await turn(c1, [m1, a1, m2, a2, m3], {
   state: { taskKind: 'learn', work: 'practice', latest: 'request', currentFocus: 'differentiating x^2 sin x' },
   replies: ['It is 2x sin x + x^2 cos x: the product rule, (fg)\' = f\'g + fg\', with f = x^2 and g = sin x.'],
 });
-ok('their words beat their own earlier goal: nothing withheld', t3.t?.allocation.withhold === null, JSON.stringify(t3.t?.allocation));
-ok('ANSWER, with no questions', (t3.move === 'ANSWER' || t3.move === 'EXPLAIN' || t3.move === 'EXECUTE') && /Questions this turn: NONE/.test(t3.prompt), t3.move);
-ok('the answer reached them', /x\^2 cos x/.test(t3.received), t3.received);
+// THE REVERSAL, and it is deliberate. This asserted that "just tell me the
+// answer" beat their own earlier "I want to learn this myself", on council D2's
+// rule that the latest explicit instruction wins. That rule is right about how
+// direct to be, how long to be and whether to ask anything, and wrong about who
+// does the meaningful cognition: asking harder is not new information about
+// whose exercise this is, and an invariant that yields to being asked twice is
+// not one. What moves it is repeated FAILURE, and even then the reply is the
+// technique worked through a problem that is not theirs.
+ok('their own learning goal survives being asked again', !!t3.t?.allocation.withhold, JSON.stringify(t3.t?.allocation.withhold));
+ok('  and the reply is not an interview either', /Questions this turn: NONE/.test(t3.prompt), t3.move);
+ok('  what they are promised instead is the technique, not the answer',
+  /analogous/.test(t3.t?.allocation.withhold?.alternative ?? ''), t3.t?.allocation.withhold?.alternative);
 const turns = rows('core4_turns').filter((r) => r.conversation_id === c1).sort((a, b) => a.turn - b.turn);
 ok('three trace rows', turns.length === 3, String(turns.length));
 ok('the previous turn is marked WAS_TOO_INDIRECT, from their words', turns[1].outcome_label === 'WAS_TOO_INDIRECT' && turns[1].outcome_source === 'explicit', JSON.stringify(turns[1]));

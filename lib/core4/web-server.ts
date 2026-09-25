@@ -1,4 +1,5 @@
 import 'server-only';
+import type { Activity } from './activity';
 // lib/core4/web-server.ts
 //
 // The half of Core 4's internet access that touches the network — and it owns
@@ -120,6 +121,8 @@ export interface ResearchInput {
    * as ordinary questions.
    */
   policy?: 'full' | 'conversation_only' | 'none';
+  /** the word under the dots — see lib/core4/activity.ts. Presentation only. */
+  onActivity?: (activity: Activity, phase: 'start' | 'end') => void;
 }
 
 /**
@@ -135,8 +138,17 @@ export async function runResearch(input: ResearchInput): Promise<Research | null
   const intent = webIntent(input.lastUserText, input.signals, input.policy);
   if (!intent.want) return null;
 
+  // THE INDICATOR SAYS "searching" ONLY WHERE A QUERY ACTUALLY GOES OUT.
+  //
+  // Emitted from here rather than from the caller, which cannot know: most turns
+  // never search at all — the gate is the policy, the signals and a configured
+  // provider — and a word announced beside a call that returns null on the first
+  // line would be exactly the fake state the indicator exists to avoid.
+  const say = input.onActivity;
   if (intent.kind === 'page' && intent.url) {
+    say?.('reading', 'start');
     const page = await readPage(intent.url);
+    say?.('reading', 'end');
     if (!page) return null;
     return { query: page.url, why: intent.why, sources: [page], provider: 'fetch' };
   }
@@ -144,7 +156,16 @@ export async function runResearch(input: ResearchInput): Promise<Research | null
   if (!webAvailable()) return null;
   const query = buildQuery(input.lastUserText, input.names ?? []);
   if (query.length < 3) return null;
+  say?.('searching', 'start');
   const { sources, provider } = await searchWeb(query);
+  say?.('searching', 'end');
   if (!sources.length) return null;
+  // The pages themselves were fetched inside searchWeb; saying so after the fact
+  // would be a lie about when. What IS true now is that their text is about to be
+  // read into the prompt, and that is what this names.
+  if (sources.some((x) => x.text)) {
+    say?.('reading', 'start');
+    say?.('reading', 'end');
+  }
   return { query, why: intent.why, sources, provider };
 }

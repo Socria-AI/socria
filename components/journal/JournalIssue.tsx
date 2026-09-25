@@ -317,22 +317,29 @@ export function JournalIssue() {
         tint
         title={
           <>
-            A tool that knows <span className="em">when to stop.</span>
+            Introducing <span className="em">Core 4.</span>
           </>
         }
-        deck="You watched it decline twice — once in prose, once on the Board. Most assistants are rewarded for saying more. This one is rewarded for saying just enough."
+        deck="The engine underneath all of this, and the first one built so that the part worth keeping stays yours. You watched it decline twice — once in prose, once on the Board."
       >
         <div className="cols">
           <p className="drop">
-            <span className="kick">The guard</span>While you are learning, the answer stays yours to
-            reach. That sentence is a product specification, not a slogan: the Answer Guard holds
-            across every surface simultaneously, because a refusal that can be walked around is not a
-            refusal.
+            <span className="kick">Core 4</span>Every turn, Socria decides which part of the thinking
+            is worth keeping with you and does everything else in full. Not a setting, not a mood, and
+            not something you can talk it out of: the decision is made before a word is generated, and
+            the reply is read against it before it reaches you.
           </p>
           <p>
-            It is not withholding for its own sake. Ask for a fact and you get the fact. Ask to be
-            carried past the one step you are actually standing on, and it will put you back on it —
-            with a question that is easier to answer than the one you asked.
+            It is not withholding for its own sake, and it is not a tutor. Ask for a fact and you get
+            the fact. Ask for the calculation, the sources, the verification, the format fix, the
+            comparison — all of it, at length, immediately. What it will not do is hand back the one
+            thing you came to be able to do.
+          </p>
+          <p>
+            So it tells you where to look, and where not to bother looking. It gives you the method
+            and works it through a problem that is not yours. It finds the assumption holding your
+            argument up. And then it stops, because the last step is the one that makes you better at
+            this.
           </p>
           <p className="breakout">
             Not yet. You&rsquo;re one step away — what does dividing both sides by three do here?
@@ -528,7 +535,7 @@ export function JournalIssue() {
           </p>
           <div className="row rv d2">
             <Button as="a" href="/chat" variant="primary" size="xl" onDark arrow>
-              Open Logos
+              Open Core 4
             </Button>
             <Button as="a" href="/one" variant="link" onDark>
               or read the One issue

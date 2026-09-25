@@ -28,6 +28,9 @@ import { getProject } from '@/lib/mind/store';
 import { extractionContext, type ActivatedSubgraph } from '@/lib/mind/activate';
 import type { MindNode } from '@/lib/mind/types';
 import { prepareTurn, guardReply, fallbackReply, finishTurn, SentenceGate, type PreparedTurn } from '@/lib/core4/turn';
+import { conversationsToday } from '@/lib/core4/store';
+import { core4ChatAllowed, limitMessage } from '@/lib/core4/limits';
+import { encodeActivity, type Activity } from '@/lib/core4/activity';
 import { renderDisclosure } from '@/lib/core4/web';
 import { modelClient, collect, type ChatTurn } from '@/lib/core4/model';
 import type { GuardOutcome, NoveltyVerdict } from '@/lib/core4/types';
@@ -311,6 +314,34 @@ export async function POST(req: NextRequest) {
         ? body.conversationId
         : null;
     if (socriaModel === 'core-4') {
+      // ── THE DAY'S CHATS ────────────────────────────────────────────
+      //
+      // Three Core 4 conversations a day on the free plan, counted as distinct
+      // conversations rather than messages: a thread already counted stays open
+      // however long it runs, and coming back to it tomorrow costs nothing. The
+      // audit found the only server-side gate here was "are you signed in",
+      // which left one free signup with 400 frontier-model turns a day and no
+      // spend ceiling.
+      //
+      // One indexed read, before any model call. A failed read lets the turn
+      // through: a cap that eats somebody's conversation during a database blip
+      // is worse than a few turns of overage.
+      const today = userId ? await conversationsToday(userId, now) : { ids: [], ok: false };
+      const allowance = core4ChatAllowed({
+        plan: plan === 'one' ? 'one' : 'free',
+        usedToday: today.ids,
+        conversationId,
+        countOk: today.ok,
+      });
+      if (!allowance.allowed) {
+        return NextResponse.json(
+          {
+            error: limitMessage(allowance),
+            limit: { model: 'core-4', used: allowance.used, limit: allowance.limit, period: 'day' },
+          },
+          { status: 429 }
+        );
+      }
       const project = userId && projectId ? await getProject(userId, projectId).catch(() => null) : null;
       const brief = (withFiles ?? clean).map((m) => ({
         role: m.role as 'user' | 'assistant',
@@ -711,6 +742,25 @@ function core4Reply(x: {
         const disclosure = renderDisclosure(p?.research ?? null);
         if (disclosure) controller.enqueue(encoder.encode(disclosure));
 
+        // ── THE WORD UNDER THE DOTS ────────────────────────────────────
+        //
+        // A control line the client strips before a character of it can be
+        // read as prose. It is emitted only where the operation actually runs,
+        // so it can never claim a search that did not happen.
+        //
+        // WHAT CAN BE SAID FROM HERE, AND WHAT CANNOT. Everything before this
+        // point — the record being read, a search going out, their work being
+        // checked, premises being ablated — happens before the stream exists,
+        // and a marker has nowhere to go until a controller does. turn.ts and
+        // web-server.ts already call onActivity at each of those points; the
+        // route has to open its stream before it prepares the turn for them to
+        // arrive live, which is a restructure of this function and not of the
+        // indicator. Until then the honest set from here is: reading the reply
+        // before it is sent, and thinking.
+        const say = (a: Activity) => {
+          try { controller.enqueue(encoder.encode(encodeActivity(a))); } catch {}
+        };
+
         const buffered = !p || p.decision.guardRequired;
         // The first delta decides the model: a rejected model id falls back once.
         const open = async (modelId: string) => {
@@ -748,6 +798,7 @@ function core4Reply(x: {
           served = done?.served ?? served;
           if (p) {
             if (p) p.ms.generate = Date.now() - t0;
+            say('verifying');
             const first = await guardReply(p, reply);
             guard = first.outcome;
             novelty = first.novelty;

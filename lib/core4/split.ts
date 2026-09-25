@@ -93,19 +93,19 @@ function instrumental(s: CognitiveState, signals: ExplicitSignals): boolean {
   //    bottoms out on repeated failure, which is a principled exit, and an
   //    impatient sentence is not.
   if (learning || (s.authorship.source === 'explicit' && s.authorship.value === 'theirs')) return false;
-  // 2. THEY ASKED FOR THE ANSWER AND NOTHING SAYS THIS IS THEIR EXERCISE.
+  // 2. AN IMPATIENT SENTENCE IS NOT A CHANGE OF TASK.
   //
-  //    This is where reasoning differs from creativity and judgement, and the
-  //    difference is not a compromise. A story somebody else originated is not
-  //    their story and a decision somebody else made is not their decision —
-  //    the cognition is constitutive of the thing, so no instruction can move
-  //    it. An integral somebody else computed is still the right number, and
-  //    whether computing it was this person's job depends entirely on what they
-  //    are doing with it. With no sign that they are exercising it and an
-  //    explicit request for the answer, treating their problem as homework is
-  //    the paternal inference the allocator exists to prevent — and withholding
-  //    a method they asked for is Core 3.1, which was replaced for good reason.
-  if (signals.directness === 'answer' || signals.delegate || signals.stopQuestions) return true;
+  //    This returned true for "just give me the answer", and that was the loose
+  //    version of the rule: asking harder made the reasoning instrumental, which
+  //    is delegation deciding its own permission. The thing that decides whether
+  //    a reasoning path is this person's to walk is what they are DOING with it —
+  //    their own practice, or plumbing for work they own — and no sentence about
+  //    how they feel about waiting moves that.
+  //
+  //    WHAT STILL MOVES IT, below: expertise, urgency, and a task the reader
+  //    read as execution or information. Those are facts about the work. Where
+  //    none of them holds, the path is theirs and the reply guides rather than
+  //    hands over — which is the product, not a restriction on it.
   // 3. The shape of practice, without the words.
   if (s.work === 'practice' || s.taskKind === 'learn') return false;
   return expert || s.urgency === 'high' || s.work === 'execution' || s.work === 'information';
@@ -338,7 +338,7 @@ export function keptBack(
       what:
         'any substantive creative content of your own — a plot, a character, a premise, a theme, a title, a concept, an angle, a direction, or a "what if" that supplies one',
       alternative:
-        'everything around it — what is already latent in what they have written, the tension between two of their own pieces, a targeted question, critique, craft knowledge, organisation of their material, and the whole thing the moment they hand it over',
+        'everything around it — what is already latent in what they have written, the tension between two of their own pieces, a targeted question, critique, craft knowledge, organisation of their material, and the whole of it the moment the substance is theirs',
     };
   }
   if (lead === 'judgment') {
@@ -358,6 +358,6 @@ export function keptBack(
         ? 'the step they are working on, and the finished answer'
         : 'the reasoning step that is the point of this — the one they are doing',
     alternative:
-      'everything around it — what the method is and why it applies, the facts and notation, the arithmetic, a worked analogous case, whether each step of theirs is right and exactly where it goes wrong, and the whole of it the moment they say they want it',
+      'everything around it — what the method is and why it applies, the facts and notation, the arithmetic, a worked analogous case, whether each step of theirs is right and exactly where it goes wrong, and the whole method worked through an analogous problem the moment they are stuck',
   };
 }

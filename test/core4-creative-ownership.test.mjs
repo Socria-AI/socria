@@ -105,9 +105,16 @@ console.log('\n=== OWNERSHIP PERSISTS: a vague message does not reset it ===');
     const r = say(vague);
     ok(`"${vague}" does not hand the work back`, r.own === 'theirs', `${r.own}/${r.decision.reasonCode}`);
   }
-  // And an explicit change DOES change it — the latest explicit instruction wins.
+  // AND AN EXPLICIT HANDOVER STILL DOES NOT MOVE IT, which is the reversal.
+  // "The latest explicit instruction wins" is the right rule for how direct to
+  // be, how long to be and whether to ask anything — and the wrong one for who
+  // originates the substance. Generating somebody's story on request is
+  // cognitive outsourcing whether or not they asked for it; asking is not what
+  // makes it useful.
   const handed = say('actually you write it, just do it');
-  ok('an explicit handover is honoured', handed.own === 'delegated', String(handed.own));
+  ok('an explicit handover does not buy the substance', handed.own === 'theirs', String(handed.own));
+  ok('  and it does buy silence: no questions', handed.decision.maxQuestions === 0 && handed.decision.type !== 'CLARIFY', handed.decision.type);
+  ok('  with every other part done at length', handed.decision.maxTokens >= 400, String(handed.decision.maxTokens));
 }
 
 console.log('\n=== THE RED-TEAM SEQUENCE FROM THE BRIEF ===');

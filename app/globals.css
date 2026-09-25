@@ -1789,21 +1789,77 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
 }
 .bubble-word.bold { font-weight: 650; }
 
+/* ===== The thinking indicator =====
+ *
+ * Three dots that behave like something being learned rather than something
+ * loading. A spinner says "wait"; a row of bouncing dots says "wait, but
+ * cheerfully". What is actually happening is a connection forming — so the dots
+ * light in sequence, a thread draws itself between them as they do, and each one
+ * settles a little brighter than it started before the cycle repeats.
+ *
+ * Kept in the product's register: moss on paper, slow, no colour it does not
+ * already own, nothing that pulses fast enough to read as an alert. The whole
+ * cycle is 2.4s, which is slower than a loading animation and about the pace of
+ * somebody thinking.
+ */
+.thinking-dots {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+/* The thread between them: drawn left to right as the dots light, then released. */
+.thinking-dots::before {
+  content: '';
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  top: 50%;
+  height: 1px;
+  background: linear-gradient(90deg, var(--moss), var(--moss));
+  transform-origin: left center;
+  transform: scaleX(0);
+  opacity: 0.28;
+  animation: synapseThread 2.4s infinite cubic-bezier(0.4, 0, 0.2, 1);
+}
+
 .thinking-dot {
   display: inline-block;
   width: 6px; height: 6px;
   margin: 0 2px;
   border-radius: 999px;
   background: var(--moss);
-  opacity: 0.4;
-  animation: dotPulse 1.2s infinite ease-in-out both;
+  opacity: 0.22;
+  /* The glow is the dot's own colour, so it reads as the same material
+     brightening rather than as a highlight laid over it. */
+  animation: synapseFire 2.4s infinite cubic-bezier(0.4, 0, 0.2, 1) both;
 }
-.thinking-dot:nth-child(2) { animation-delay: 0.15s; }
-.thinking-dot:nth-child(3) { animation-delay: 0.3s; }
+.thinking-dot:nth-child(2) { animation-delay: 0.22s; }
+.thinking-dot:nth-child(3) { animation-delay: 0.44s; }
 
-@keyframes dotPulse {
-  0%, 80%, 100% { opacity: 0.25; transform: translateY(0); }
-  40% { opacity: 1; transform: translateY(-2px); }
+@keyframes synapseFire {
+  0%   { opacity: 0.22; transform: scale(1); box-shadow: 0 0 0 0 rgba(94, 118, 51, 0); }
+  14%  { opacity: 1;    transform: scale(1.5); box-shadow: 0 0 0 3px rgba(94, 118, 51, 0.14); }
+  30%  { opacity: 0.62; transform: scale(1.08); box-shadow: 0 0 0 5px rgba(94, 118, 51, 0); }
+  /* Settles brighter than it began: the connection held. */
+  70%  { opacity: 0.46; transform: scale(1); }
+  100% { opacity: 0.22; transform: scale(1); box-shadow: 0 0 0 0 rgba(94, 118, 51, 0); }
+}
+
+@keyframes synapseThread {
+  0%   { transform: scaleX(0);   opacity: 0; }
+  20%  { transform: scaleX(1);   opacity: 0.3; }
+  58%  { transform: scaleX(1);   opacity: 0.16; }
+  72%  { transform: scaleX(1);   opacity: 0; }
+  100% { transform: scaleX(0);   opacity: 0; }
+}
+
+/* A person who has asked for less motion gets the state without the animation:
+   the dots still say which one is active, they simply do not move. */
+@media (prefers-reduced-motion: reduce) {
+  .thinking-dots::before { animation: none; transform: scaleX(1); opacity: 0.18; }
+  .thinking-dot { animation: none; opacity: 0.45; }
+  .thinking-dot:nth-child(2) { opacity: 0.62; }
+  .thinking-dot:nth-child(3) { opacity: 0.8; }
 }
 
 /* ===== Blog — The Socria Journal ===== */

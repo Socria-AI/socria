@@ -1,4 +1,5 @@
 import 'server-only';
+import { dayStart } from './limits';
 // lib/core4/store.ts
 //
 // Persistence for Core 4's per-person reasoning state. Five tables, one
@@ -352,6 +353,38 @@ export async function deleteConversation(userId: string, conversationId: string)
   for (const table of ['reasoning_entries', 'core4_state', 'core4_turns', 'capability_evidence'] as const) {
     const { error } = await db.from(table).delete().eq('user_id', userId).eq('conversation_id', conversationId);
     if (error && !/42p01|pgrst205|relation .*does not exist/i.test(`${error.code ?? ''} ${error.message ?? ''}`)) throw error;
+  }
+}
+
+/**
+ * The distinct conversations this account has used Core 4 on today.
+ *
+ * One indexed read on (user_id, created_at) before the turn starts, and the only
+ * thing the daily cap needs: which chats are already counted. Returns `ok` so a
+ * database failure can be told apart from an empty day — see core4ChatAllowed,
+ * which lets the turn through rather than eating somebody's conversation during
+ * a blip.
+ */
+export async function conversationsToday(
+  userId: string,
+  now: number
+): Promise<{ ids: string[]; ok: boolean }> {
+  try {
+    const { data, error } = await supabaseAdmin()
+      .from('core4_turns')
+      .select('conversation_id')
+      .eq('user_id', userId)
+      .gte('created_at', dayStart(now))
+      .limit(500);
+    if (error) {
+      fail('core4_turns', error);
+      return { ids: [], ok: false };
+    }
+    const ids = new Set((data ?? []).map((r) => (r as { conversation_id: string }).conversation_id));
+    return { ids: [...ids], ok: true };
+  } catch (e) {
+    fail('core4_turns', e);
+    return { ids: [], ok: false };
   }
 }
 

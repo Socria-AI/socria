@@ -21,6 +21,7 @@
 // gets the reply the design intends.
 
 import { build } from 'esbuild';
+import { readActivity } from './.tmp/activity.mjs';
 import { mkdirSync, rmSync } from 'node:fs';
 import { dirname, join, resolve as res } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -100,7 +101,11 @@ async function turn(messages, { state, draft, extract }) {
     body: JSON.stringify({ model: 'core-4', messages, conversationId: 'mccombs' }),
   });
   const r = await chatRoute.POST(req);
-  const received = await r.text();
+  // The activity markers are part of the wire protocol, not the reply: the real
+  // client pulls them out before a character can be revealed as prose, and a
+  // harness that stands in for the client has to do the same or it measures a
+  // reply nobody receives.
+  const received = readActivity(await r.text()).text;
   await quiet();
   const prompt = globalThis.__prompts[0] ?? '';
   // The decision, from the eval trace: an unforced move is not named in the

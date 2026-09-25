@@ -312,7 +312,15 @@ console.log('\n=== council D1/D6: safety, recommendations, the ladder ===');
   // Run 5 (learning-002, learning-009): under THEIR explicit "don't tell me"
   // the ladder no longer bottoms out into the solution by itself.
   ok('under their explicit "don\'t tell me", a third failed attempt gets much stronger support, not the solution', third.allocation.reasonCode.endsWith('.stuck') && !!third.allocation.withhold && third.decision.type !== 'EXPLAIN', `${third.allocation.reasonCode} ${third.decision.type}`);
-  ok('  with the full answer offered the moment they ask', /the moment they ask/.test(third.allocation.withhold?.alternative ?? ''));
+  // WHAT IS ON OFFER CHANGED, and the promise now matches what the system does.
+  // It used to say "the full answer the moment they ask", and asking no longer
+  // buys the answer — so saying so was a promise Socria does not keep. What is
+  // offered is the technique worked through a problem that is not theirs, which
+  // un-sticks somebody completely without taking the thing they were doing.
+  ok('  with the technique offered, worked on a problem that is not theirs',
+    /analogous/.test(third.allocation.withhold?.alternative ?? ''), third.allocation.withhold?.alternative);
+  ok('  and no promise of an answer it will not give',
+    !/full answer the moment/.test(third.allocation.withhold?.alternative ?? ''));
   const idk = decide(S({ work: 'practice', latest: 'attempt', attempt: 'wrong', directness: standing, history: failed(1) }), { said: 'idk' });
   ok('"idk" after a failed attempt raises support too, inside the boundary', idk.allocation.reasonCode.endsWith('.stuck') && !!idk.allocation.withhold, idk.allocation.reasonCode);
   // (merged state: their words now replace the standing "don't tell me")
@@ -480,7 +488,7 @@ console.log('\n=== run 3: an analogous worked example only once they are stuck (
   ok('a withhold on their words', !!a.withhold && a.withhold.quote.length > 0, a.reasonCode);
   ok('  offers the principle and a verdict, not a worked example', !/worked example/.test(a.withhold.alternative) && /principle/.test(a.withhold.alternative), a.withhold.alternative);
   const looping = allocate({ state: { ...fight, stuck: 'looping' }, signals: NO_SIGNALS, contract: NO_SIGNALS });
-  ok('  looping on it → an analogous worked example is on offer', /analogous worked example/.test(looping.withhold?.alternative ?? ''), looping.reasonCode);
+  ok('  looping on it → the technique worked on an analogous problem is on offer', /analogous/.test(looping.withhold?.alternative ?? ''), looping.withhold?.alternative);
 }
 
 console.log('\n=== THE PRODUCT RULE (withheld only because they said so) ===');

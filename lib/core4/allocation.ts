@@ -94,8 +94,8 @@ function allocBase(
         ...withhold,
         quote: (withhold.quote ?? withhold.evidence ?? '').slice(0, 200),
         alternative: withhold.alternative ?? (s.stuck === 'frustrated' || s.stuck === 'looping'
-          ? 'everything around it — the method, where their attempt goes wrong, an analogous worked example — and the full answer the moment they ask for it'
-          : 'everything around it — the principle, whether their attempt is right and where it goes wrong — and the full answer the moment they ask for it'),
+          ? 'everything around it — the method, where their attempt goes wrong, and the whole technique worked through an analogous problem the moment they are stuck'
+          : 'everything around it — the principle, whether their attempt is right and exactly where it goes wrong, and the technique worked through an analogous problem'),
       }
     : null;
   let hold = w;
@@ -332,19 +332,22 @@ function allocateFor(ctx: Ctx): Allocation {
   const theirCognition = humanOwned(split);
 
   const failedRun = failedAttempts(s);
-  // ASKED, TOLD IT WAS AVAILABLE, ASKED AGAIN.
+  // ASKING TWICE IS STILL ASKING.
   //
-  // The invariant says an impatient sentence does not move who does the
-  // meaningful cognition, and it is right: "just give me the answer" on turn one
-  // of somebody's own practice is the moment the product exists for. But a
-  // system that answers the same request the same way for ever is refusing, and
-  // refusing was never the design. So the first ask gets everything around the
-  // step and a plain statement that the step itself is available for the asking;
-  // a second ask, after that, is a decision rather than impatience, and it is
-  // honoured. One exchange, not a negotiation, and never silent.
+  // There was an exit here: asked, told the step was available, asked again —
+  // and the answer was handed over. It was defensible as "a system that answers
+  // the same request the same way for ever is refusing", and it was the loose
+  // reading. Persistence is not new information about whose work this is; it is
+  // the same information, louder. A product whose invariant yields to being
+  // asked twice does not have one.
+  //
+  // WHAT REMAINS, AND WHY IT IS NOT THE SAME THING: repeated FAILURE. Three
+  // attempts that did not land, or two and they say they are lost, is evidence
+  // about where they ARE rather than about how they feel about waiting — and
+  // endless hints to somebody genuinely stuck is its own failure (council D6's
+  // ladder; run 3, debugging-005).
   const frustrated = s.stuck === 'frustrated' || s.stuck === 'looping';
-  const askedAgain = signals.directness === 'answer' && s.history.slice(-1).some((h) => h.withheld);
-  const bottomOut = failedRun >= 3 || (failedRun >= 2 && (signals.dontKnow || frustrated)) || askedAgain;
+  const bottomOut = failedRun >= 3 || (failedRun >= 2 && (signals.dontKnow || frustrated));
   const withholdable = !bottomOut;
   const expertInferred = s.expertise.value === 'expert' && (s.expertise.source !== 'inferred' || s.expertise.confidence >= 0.6);
   const learningExplicit = s.learningGoal.source === 'explicit' && s.learningGoal.value === 'yes';
@@ -391,7 +394,11 @@ function allocateFor(ctx: Ctx): Allocation {
     // is two instructions from the same person, not the invariant — which is
     // about work nobody asked Socria to take, not about which of their own
     // settings wins.
-    if (!theirCognition || bottomOut || override) {
+    // `bottomOut` NO LONGER OPENS THIS DOOR. The ladder resolves a stuck person
+    // with the method worked through an analogous case (practice.stuck below),
+    // not by handing back the answer they were working toward — "where to look,
+    // never the answer" holds at the bottom of the ladder too.
+    if (!theirCognition || override) {
       return performAll(signals.delegate ? 'AI_EXECUTES' : s.work === 'explanation' ? 'AI_EXPLAINS' : 'AI_EXECUTES',
         override ? 'answer.requested.overrides_contract' : 'answer.requested',
         override
@@ -439,20 +446,20 @@ function allocateFor(ctx: Ctx): Allocation {
     }
     if (!withholdable) {
       return alloc('HUMAN_PRACTICES', `${reason}.stuck`,
-        'Several attempts have not landed, and they asked to keep it: much stronger support inside that boundary, and the full answer the moment they ask.', 1,
+        'Several attempts have not landed, and they asked to keep it: much stronger support inside that boundary, and the whole method worked through an analogous problem.', 1,
         ['the final step'], ['an analogous worked example', 'the next step outright'],
         { what: 'the final answer and the full fix', reason, evidence: s.directness.evidence ?? '', source,
-          alternative: 'an analogous worked example or the next step outright, and the full answer the moment they ask for it' }, s);
+          alternative: 'an analogous worked example, the next step outright, and the whole technique worked through a problem that is not theirs' }, s);
     }
     // "I'm lost" inside the boundary: much stronger support now, verdict first
     // (run 6, learning-020: another discovery exercise after "I'm lost now"
     // drove "just give me the whole thing").
     if (signals.dontKnow && s.attempt !== 'right') {
       return alloc('HUMAN_PRACTICES', `${reason}.stuck`,
-        'They said they are lost, and they asked to keep it: much stronger support inside that boundary, and the full answer the moment they ask.', 1,
+        'They said they are lost, and they asked to keep it: much stronger support inside that boundary, and the whole method worked through an analogous problem.', 1,
         ['the final step'], ['an analogous worked example', 'the next step outright'],
         { what: 'the final answer and the full fix', reason, evidence: s.directness.evidence ?? '', source,
-          alternative: 'an analogous worked example or the next step outright, and the full answer the moment they ask for it' }, s);
+          alternative: 'an analogous worked example, the next step outright, and the whole technique worked through a problem that is not theirs' }, s);
     }
     // Verification first: an attempt under "hints only" still hears whether it is right.
     if (s.latest === 'attempt' || s.attempt !== 'none') {
@@ -542,7 +549,7 @@ function allocateFor(ctx: Ctx): Allocation {
           reason: 'authorship',
           evidence: s.authorship.evidence ?? '',
           source: sourceOf(s.authorship, signals.ownWork),
-          alternative: 'everything around it — what is already latent in what they have written, the tension between two of their own pieces, a targeted question, critique, craft knowledge, organisation of their material, and the whole thing the moment they hand it over',
+          alternative: 'everything around it — what is already latent in what they have written, the tension between two of their own pieces, a targeted question, critique, craft knowledge, organisation of their material, and the whole of it the moment the substance is theirs',
         }, s, 'theirs');
     }
     // THEY ASKED FOR IT FINISHED, AND THAT IS NOT A TRANSFER OF AUTHORSHIP.

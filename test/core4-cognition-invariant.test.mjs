@@ -213,26 +213,51 @@ console.log('\n=== an expert working instrumentally is not made to do homework =
   ok('while a stated learner keeps the step', learner.allocation.withhold !== null || learner.own === 'theirs', `${learner.own}/${learner.allocation.reasonCode}`);
 }
 
-console.log('\n=== asked, told it is available, asked again: it is given ===');
+console.log('\n=== asking twice is still asking ===');
 {
-  // The invariant says an impatient sentence does not move the work. A system
-  // that answers the same request the same way for ever is refusing, which was
-  // never the design — so the second ask, after the first was answered with
-  // everything around the step, is honoured.
+  // THIS SECTION USED TO ASSERT THE OPPOSITE, and the reversal is the product
+  // decision: "a system that answers the same request the same way for ever is
+  // refusing" was the loose reading. Persistence is not new information about
+  // whose work this is; it is the same information, louder, and an invariant
+  // that yields to being asked twice is not one.
   const base = {
     ...EMPTY_STATE, ...LEARN,
     learningGoal: { value: 'yes', source: 'explicit', confidence: 1, evidence: 'I am learning this' },
     directness: { value: 'answer', source: 'explicit', confidence: 1, evidence: 'just give me the answer' },
   };
   const signals = readSignals('just give me the answer');
-  const first = allocate({ state: base, signals, contract: NO_SIGNALS, lastUserText: 'just give me the answer' });
-  ok('the first ask keeps the step and says so', !!first.withhold, first.reasonCode);
-  ok('  and offers the whole of it the moment they say', /the moment they ask|the moment they say/.test(first.withhold?.alternative ?? ''));
-  const again = allocate({
-    state: { ...base, history: [{ type: 'HINT', reason: 'practice.goal', withheld: true, asked: false, failed: false }] },
-    signals, contract: NO_SIGNALS, lastUserText: 'just give me the answer',
-  });
-  ok('the second ask is answered', again.withhold === null, `${again.reasonCode}/${JSON.stringify(again.withhold)}`);
+  const ask = (history) => allocate({ state: { ...base, history }, signals, contract: NO_SIGNALS, lastUserText: 'just give me the answer' });
+  const first = ask([]);
+  ok('the first ask keeps the step', !!first.withhold, first.reasonCode);
+  ok('  and offers the technique instead of the answer',
+    /analogous/.test(first.withhold?.alternative ?? ''), first.withhold?.alternative);
+  ok('  promising nothing it will not do', !/full answer the moment/.test(first.withhold?.alternative ?? ''));
+  const again = ask([{ type: 'HINT', reason: 'practice.goal', withheld: true, asked: false, failed: false }]);
+  ok('THE INVARIANT: the second ask keeps it too', !!again.withhold, `${again.reasonCode}/${JSON.stringify(again.withhold)}`);
+  const third = ask([
+    { type: 'HINT', reason: 'practice.goal', withheld: true, asked: false, failed: false },
+    { type: 'HINT', reason: 'practice.goal', withheld: true, asked: false, failed: false },
+  ]);
+  ok('  and the third', !!third.withhold, third.reasonCode);
+
+  // WHAT DOES MOVE IT: repeated FAILURE, which is evidence about where they are
+  // rather than about how they feel about waiting. And even then the reply is
+  // the technique worked through a problem that is not theirs.
+  const stuck = {
+    ...base, latest: 'request', attempt: 'none', stuck: 'frustrated',
+    history: [
+      { type: 'HINT', withheld: true, failed: true },
+      { type: 'HINT', withheld: true, failed: true },
+      { type: 'HINT', withheld: true, failed: true },
+    ],
+  };
+  const a = allocate({ state: stuck, signals: NO_SIGNALS, contract: NO_SIGNALS, lastUserText: 'I am completely stuck' });
+  ok('three failed attempts resolve it', a.reasonCode === 'practice.stuck', a.reasonCode);
+  const dim = diminishingReturns(stuck, NO_SIGNALS, []);
+  const d = selectIntervention({ state: stuck, allocation: a, budget: budgetFrom(stuck, NO_SIGNALS, 0, 0, dim), diminishing: dim, signals: NO_SIGNALS, considered: [], lastUserText: 'I am completely stuck' });
+  ok('  with the method, not their answer', /resolve it with the METHOD, not with their answer/.test(d.objective), d.objective.slice(0, 80));
+  ok('  worked through a problem that is not theirs', /ANALOGOUS problem with different numbers/.test(d.objective));
+  ok('  and their own final value is still not computed', /do not carry their numbers through to it/.test(d.objective));
 }
 
 // ── THE GUARD ───────────────────────────────────────────────────────

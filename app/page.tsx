@@ -21,9 +21,9 @@ import { JournalIssue } from '@/components/journal/JournalIssue';
 import './journal.css';
 
 export const metadata: Metadata = {
-  title: 'Socria — Issue No. 4',
+  title: 'Socria Core 4 — AI that makes you better at thinking',
   description:
-    'AI gets stronger. Humans should too. Issue No. 4 of the Socria Journal asks you eight questions — and shows you the product refusing to answer one.',
+    'Introducing Core 4: the first engine built so the part worth keeping stays yours. It does the research, the calculation, the verification and the critique in full — and hands back the one step that makes you capable. Issue No. 4 of the Socria Journal.',
 };
 
 export default function Page() {

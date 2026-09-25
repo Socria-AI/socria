@@ -53,6 +53,7 @@ import * as store from './store';
 import { similarity } from './considered';
 import { EVIDENCE_WITHHELD } from './types';
 import { mustNotPerform } from './split';
+import type { Activity } from './activity';
 import type {
   Allocation,
   Diminishing,
@@ -88,6 +89,15 @@ export interface TurnInput {
    * what work gets done.
    */
   prefs?: CommunicationPrefs;
+  /**
+   * What is happening right now, for the word under the dots.
+   *
+   * PRESENTATION ONLY, and true by construction: each call is made from the
+   * place that actually starts or finishes the operation, so the indicator
+   * cannot claim a search that is not running. It reaches nothing — no prompt,
+   * no move, no model call — and a caller that omits it changes nothing.
+   */
+  onActivity?: (activity: Activity, phase: 'start' | 'end') => void;
   now: number;
 }
 
@@ -169,6 +179,7 @@ export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
   // persistence below — the conservative direction, and the same one a real
   // read error takes.
   const canStore = !!(input.userId && input.conversationId);
+  input.onActivity?.('remembering', 'start');
   const [priorRead, ledger, priorLinks, capability] = await withTimeout(
     Promise.all([
       canStore ? store.loadState(input.userId!, input.conversationId!) : Promise.resolve({ state: null, ok: true }),
@@ -180,6 +191,7 @@ export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
     [{ state: null, ok: false }, [] as LedgerEntry[], [] as LedgerLink[], [] as CapabilityEvidence[]] as const
   );
   ms.load = Date.now() - t0;
+  input.onActivity?.('remembering', 'end');
   const prior = priorRead.state;
   // THE READ FAILED, SO WE DO NOT KNOW WHAT THEY ASKED FOR.
   //
@@ -219,6 +231,9 @@ export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
     // about a diagnosis to a third-party search provider the moment the
     // database had a bad second.
     policy: policyUnknown ? 'none' : prior?.persistPolicy,
+    // Emitted from inside, where a query either goes out or does not: most turns
+    // never search, and announcing it here would be a fake state.
+    onActivity: input.onActivity,
   }).catch((e) => {
     console.error('[core4] research failed; the turn continues without it', e);
     return null;
@@ -355,8 +370,10 @@ export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
   const showedWork = state.latest === 'attempt' || state.work === 'verification' || state.work === 'practice';
   if (!verify && showedWork && state.attempt !== 'none') {
     const t2 = Date.now();
+    input.onActivity?.('checking', 'start');
     verify = await withTimeout(checkWork(input.apiKey, input.brief.slice(-5).map((m) => `${m.role === 'user' ? 'Them' : 'Socria'}: ${m.content}`).join('\n'), input.lastUserText), 1500, null);
     ms.verify = Date.now() - t2;
+    input.onActivity?.('checking', 'end');
     if (verify && verify.confidence >= CHECK_FLOOR && verify.verdict !== 'unknown') {
       const judged = verify.verdict === 'correct' ? 'right' : verify.verdict === 'partial' ? 'partial' : 'wrong';
       if (judged !== state.attempt) {
@@ -412,11 +429,18 @@ export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
   let contradictions: ContradictionTest[] = [];
   if (decision.coverage === 'complete' && problem.live.length >= 2 && !allocation.withhold) {
     const t3 = Date.now();
+    // Two real operations, named separately: one removes a premise and re-runs
+    // to see what actually depends on it, the other puts two of their positions
+    // against each other. `shownActivity` picks whichever is worth saying.
+    input.onActivity?.('examining', 'start');
+    input.onActivity?.('comparing', 'start');
     [counterfactual, contradictions] = await Promise.all([
       withTimeout(testDependencies(input.apiKey, problem, state).catch(() => null), 2500, null),
       withTimeout(testContradictions(input.apiKey, problem).catch(() => []), 2500, [] as ContradictionTest[]),
     ]);
     ms.measure = Date.now() - t3;
+    input.onActivity?.('examining', 'end');
+    input.onActivity?.('comparing', 'end');
   }
   // A MEASURED RELATION SUPERSEDES AN ASSERTED ONE. Where the ablation
   // actually tested what a conclusion rests on, the reader's guess about the

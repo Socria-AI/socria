@@ -70,6 +70,7 @@ import { ImportProfileModal } from '@/components/ImportProfileModal';
 import Link from 'next/link';
 import { SynthesisCard, SynthesisPending } from '@/components/SynthesisCard';
 import { ChoiceChips } from '@/components/ChoiceChips';
+import { readActivity, type Activity } from '@/lib/core4/activity';
 import { parseMessage, splitChoices, type SynthesisData } from '@/lib/synthesis';
 import { synthesisCadence, type Insight } from '@/lib/socria-prompt';
 
@@ -339,6 +340,12 @@ export default function ChatPage() {
   }, []);
   const [sending, setSending] = useState(false);
   const [streamed, setStreamed] = useState('');
+  /**
+   * The word under the dots. Driven by markers the server sends from the place
+   * each operation actually runs, so it never claims something that is not
+   * happening; 'thinking' is the default and the fallback.
+   */
+  const [activity, setActivity] = useState<Activity>('thinking');
   const [error, setError] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   // What is typed in the rail's search box, and whether the "Maps only" chip
@@ -1522,6 +1529,9 @@ export default function ChatPage() {
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
     setSending(true);
     setStreamed('');
+    // Every turn starts at the honest default and is moved only by a marker
+    // from the operation itself.
+    setActivity('thinking');
 
     try {
       const convoForRequest = withUser.find((c) => c.id === workingId)!;
@@ -1619,11 +1629,20 @@ export default function ChatPage() {
         });
 
         const receive = (async () => {
+          // Activity markers ride the same stream as the prose, on their own
+          // control lines, and are pulled out before a character of them can be
+          // revealed as text. `tail` carries a marker split across a chunk
+          // boundary — a partial line is not an activity yet, and must not be
+          // printed either.
+          let tail = '';
           try {
             while (true) {
               const { done, value } = await reader.read();
               if (done) break;
-              received += decoder.decode(value, { stream: true });
+              const parsed = readActivity(tail + decoder.decode(value, { stream: true }));
+              tail = parsed.tail;
+              if (parsed.activities.length) setActivity(parsed.activities[parsed.activities.length - 1]);
+              received += parsed.text;
             }
           } finally {
             streamDone = true;
@@ -2855,11 +2874,16 @@ export default function ChatPage() {
               )}
 
             {sending && !streamed && (
-              <div className="my-6 flex items-center gap-1 text-ink/50">
-                <span className="thinking-dot" />
-                <span className="thinking-dot" />
-                <span className="thinking-dot" />
-                <span className="ml-2 font-serif italic text-sm">thinking</span>
+              <div className="my-6 flex items-center gap-1 text-ink/50" aria-live="polite">
+                <span className="thinking-dots">
+                  <span className="thinking-dot" />
+                  <span className="thinking-dot" />
+                  <span className="thinking-dot" />
+                </span>
+                {/* The word is whatever Socria is actually doing — never a
+                    synonym rotated for variety, and never an operation that is
+                    not running. `thinking` is the honest default. */}
+                <span className="ml-2 font-serif italic text-sm">{activity}</span>
               </div>
             )}
 

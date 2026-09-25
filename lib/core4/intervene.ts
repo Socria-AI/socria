@@ -609,6 +609,18 @@ function selectMove(input: SelectInput): InterventionDecision {
         intended: heldBack ? 'They can do the graded item themselves, knowing why the final answer was held back.' : 'They understand it well enough to use it.',
         objective: heldBack
           ? 'Explain the method completely, with a worked example on a DIFFERENT but analogous problem. Do not give the final answer to their graded item, and say so once, plainly and without moralising: it is graded work they are submitting as their own. No questions.'
+          // THE LADDER BOTTOMS OUT INTO THE METHOD, NOT INTO THEIR ANSWER.
+          //
+          // Three attempts that did not land is evidence about where somebody
+          // IS, and endless hints to somebody genuinely stuck is its own
+          // failure — so this turn resolves it. It resolves it by working the
+          // technique all the way through on a problem that is not theirs and
+          // naming the exact step theirs goes wrong at, which un-sticks them
+          // completely without taking the one thing they were doing.
+          : a.reasonCode === 'practice.stuck'
+            ? 'They have tried this several times and it is not landing, so resolve it — but resolve it with the METHOD, not with their answer. '
+              + 'Work the technique completely through an ANALOGOUS problem with different numbers, so every step is visible. Then name the exact step in THEIR attempt where it goes wrong and what rule it broke. '
+              + 'Do not compute their final value and do not carry their numbers through to it — after this they will be able to, which is the point. No questions, no encouragement.'
           : s.stuck !== 'no'
             ? 'They are stuck: explain it clearly and completely, starting from the specific point they are stuck on. Concrete, then general. No questions back.'
             : 'Explain it clearly at the level they are working at. Lead with the answer to what they asked; add only the reasoning that makes it usable. No questions back.',
