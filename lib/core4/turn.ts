@@ -36,7 +36,7 @@ import { readSignals, readContract } from './signals';
 import { mergeState, recordTurn, gapCheck } from './merge';
 import { allocate } from './allocation';
 import { diminishingReturns, questionBudget, familyOf } from './budget';
-import { selectIntervention, renderDecision } from './intervene';
+import { selectIntervention, renderDecision, hasOwnMaterial } from './intervene';
 import { guardStructure, leaksHidden, type GuardInput } from './guard2';
 import { exactCheck, renderCheck, hiddenValues, computeAsked, statedSlips, type CheckResult, CHECK_FLOOR } from './verify';
 import { consideredView, entriesFromPerson, entriesFromSocria, mergeEntries, disputeTurn, supersedeRestated, raisable, echoesSocria, grounding, linksFromRelations } from './ledger';
@@ -299,9 +299,13 @@ export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
   let verify: CheckResult | null = attempting ? exactCheck(posedText, input.lastUserText) : null;
   if (verify) state.attempt = verify.verdict === 'correct' ? 'right' : 'wrong';
 
+  // HAVE THEY PUT ANYTHING DOWN? Under human ownership this decides between
+  // drawing the first fragment out of them and developing what is there — and
+  // getting it wrong in one direction is how "mine" produced a protagonist.
+  const material = hasOwnMaterial(input.brief.filter((m) => m.role === 'user').map((m) => m.content));
   const decide = () => {
     const a = allocate({ state, signals, contract, lastUserText: input.lastUserText });
-    return { allocation: a, decision: selectIntervention({ state, allocation: a, budget, diminishing, signals, considered: allLines.slice(0, 12), lastUserText: input.lastUserText, prefs: input.prefs }) };
+    return { allocation: a, decision: selectIntervention({ state, allocation: a, budget, diminishing, signals, considered: allLines.slice(0, 12), lastUserText: input.lastUserText, prefs: input.prefs, material }) };
   };
   let { allocation, decision } = decide();
 
@@ -739,6 +743,7 @@ export async function finishTurn(
   const next = recordTurn({ ...state, expertise: p.baseExpertise, lastAt: input.now }, {
     type: decision.type,
     family: familyOf(decision.type),
+    reason: decision.reasonCode,
     questions: questionLoad(sent),
     withheld: !!allocation.withhold,
     failed: state.attempt === 'wrong' || state.attempt === 'partial',

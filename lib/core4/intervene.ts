@@ -55,6 +55,12 @@ export interface SelectInput {
    * words the person typed.
    */
   lastUserText?: string;
+  /**
+   * Whether they have put any of their own material down yet. Under human
+   * ownership this decides between drawing the first fragment out of them and
+   * developing what is already there — see hasOwnMaterial.
+   */
+  material?: boolean;
   /** their standing preference for how much is said — a bias, never a template */
   prefs?: CommunicationPrefs;
 }
@@ -142,7 +148,18 @@ function recentlyChallenged(s: CognitiveState): boolean {
 }
 
 /** Moves imposed because the PERSON or a verified fact asked for them (council D1). */
-const FORCING = new Set(['safety', 'practice.bottom_out', 'practice.let_me_try', 'quiz.contract', 'done', 'recommendation.requested', 'retrieve.history', 'reflect.heard', 'reflect.minimal']);
+const FORCING = new Set([
+  'safety', 'practice.bottom_out', 'practice.let_me_try', 'quiz.contract', 'done',
+  'recommendation.requested', 'retrieve.history', 'reflect.heard', 'reflect.minimal',
+  // THE OWNERSHIP MOVES, and they belong here for the same reason the rest do:
+  // the PERSON imposed them by saying whose the work is. They are also the
+  // moves whose whole instruction lives in the objective — "ask for their
+  // fragment, and give no examples, because an example is the creative act" —
+  // and an unforced turn never prints its objective (council D1). Left
+  // unforced, the most important instruction in the system reached nobody, and
+  // the model was free to answer an empty page with a premise.
+  'creation.elicit', 'creation.elicit.again', 'creation.critique', 'ownership.theirs',
+]);
 
 /**
  * Moves that carry substance. A reply that explains, decides, corrects,
@@ -207,6 +224,37 @@ function concreteness(text: string): number {
   n += (t.match(/(?<=[a-z,;:]\s)[A-Z][a-zA-Z0-9_.-]{2,}/g) ?? []).length ? 1 : 0;
   n += /`|```|\/\w+\/|\.\w{2,4}\b|\b[A-Za-z_]\w*\(\)/.test(t) ? 2 : 0;
   return n;
+}
+
+/**
+ * Have THEY put anything down yet?
+ *
+ * The question the creative-ownership failure turned on. "Mine" arrived with
+ * an empty page, and the move chosen was CRITIQUE — critique of material that
+ * did not exist, at a 1200-token ceiling, with "options where useful". A model
+ * told to critique nothing invents something to critique, and what it invents
+ * is the protagonist, the setting and the conflict: the creative act, already
+ * performed, in a reply that was formally obeying a withhold.
+ *
+ * Deliberately crude, and biased toward "they have something". An instruction
+ * ("write me a story"), an answer ("mine"), a nudge ("okay help me") are not
+ * material; a paragraph, a pasted draft, a list of their own fragments is. The
+ * cost of reading material as absent is one question asking for it, which is
+ * the right move anyway; the cost of reading absence as material is a reply
+ * that invents the thing.
+ */
+export function hasOwnMaterial(userMessages: readonly string[]): boolean {
+  for (const raw of userMessages) {
+    const t = (raw ?? '').trim();
+    if (!t) continue;
+    // Their own words at length, a quotation, a pasted block, or a list they
+    // wrote: each is something to work ON.
+    if (/```|\n\s*[-*\d]/.test(t)) return true;
+    if (/["“][^"”]{20,}/.test(t)) return true;
+    const words = t.split(/\s+/).length;
+    if (words >= 14 && !/^\s*(?:write|make|draft|create|generate|give me|help me|brainstorm)\b/i.test(t)) return true;
+  }
+  return false;
 }
 
 export function proportionFor(input: SelectInput, dec: InterventionDecision): Proportion {
@@ -627,11 +675,32 @@ function selectMove(input: SelectInput): InterventionDecision {
         });
       }
       if (a.ownership === 'theirs' && !a.withhold) {
+        // "BRAINSTORM WITH ME" IS NOT "GENERATE IDEAS FOR ME".
+        //
+        // This asked for "two or three concrete directions — a premise, an
+        // angle, a structure", which is the takeover written as an
+        // instruction: the ideas arrive from Socria and the person picks from
+        // a menu of somebody else's thinking. Under human ownership the
+        // substance is theirs to originate; what Socria adds is everything
+        // around it.
+        if (!input.material) {
+          return d('CLARIFY', {
+            reasonCode: 'creation.elicit', reason: a.rationale,
+            intended: 'They put down the first piece, and it is theirs.',
+            objective:
+              'They want to work on this themselves and there is nothing of theirs here yet. Ask for the first fragment — whatever they already have, however rough, in whatever form. '
+              + 'Two sentences at most, and no examples: an example IS the creative act, and one offered here takes the thing they said they wanted to do. '
+              + 'Do not suggest a premise, a direction, a genre or a "what if", and do not list the kinds of thing they could bring as though that list were not itself a list of ideas.',
+            alloc: a, avoid, maxQuestions: 1, maxTokens: 110, buffered: true,
+          });
+        }
         return d('ANSWER', {
           reasonCode: 'ownership.theirs', reason: a.rationale,
-          intended: 'They have something concrete to push against, and the piece is still theirs to write.',
+          intended: 'Their own material goes further, and every idea in it is still theirs.',
           objective:
-            'Give them material to develop WITH: two or three concrete, specific directions — a premise, an angle, a structure, a line of argument — one or two lines each, different from each other in kind rather than in wording. Say which one you would follow and what makes it the strongest. Do NOT write the piece itself, and do not write a polished version of any option: a finished artifact would end the work they asked to do.'
+            'Work on what THEY have put down. Take their material further without adding substance of your own: name what is already latent in it, set two of their own pieces against each other and say what that tension opens up, ask the one question that would make them decide something, point at the assumption underneath it, or organise what they have so its shape is visible. '
+            + 'Do NOT originate: no plot, character, premise, theme, title, concept, name, angle or direction of yours, in any wording. "Consider…", "one angle could be…", "what about…", "you might try…" and a worked example are the same act with different punctuation. '
+            + 'If they have given you almost nothing, ask for more of theirs rather than filling the gap.'
             + consideredNote,
           alloc: a, avoid, maxTokens: 600,
         });
@@ -641,10 +710,56 @@ function selectMove(input: SelectInput): InterventionDecision {
       // theirs, but withholding a view they asked for is not agency, it is coyness.
       if (s.latest === 'question' || s.latest === 'request') {
         if (a.mode === 'HUMAN_LEADS' && s.work === 'creation' && a.withhold) {
+          // NOTHING OF THEIRS TO WORK ON YET.
+          //
+          // This went straight to CRITIQUE, and critique of an empty page is
+          // an invitation to invent something to critique — which is how
+          // "mine" produced a protagonist, a setting and a conflict inside a
+          // reply that was formally honouring a withhold. On an empty page the
+          // first move is to get the first fragment out of them.
+          //
+          // `!input.material` rather than `=== false`: a caller that does not
+          // supply the read gets the conservative branch. Asking for their
+          // fragment when they had one costs a sentence; inventing one when
+          // they had none costs them the work.
+          if (!input.material) {
+            // ASKED ONCE. Asking for their fragment twice in a row is the
+            // friction loop this product is supposed to be the opposite of —
+            // so the second time, whatever words they DID use become the
+            // material, and the turn works with those rather than asking again.
+            // The FRAGMENT question specifically, not any CLARIFY: "yours, or
+            // mine?" and "what have you got?" are different questions, and
+            // counting the first as the second meant the fragment was never
+            // asked for at all.
+            if (s.history.slice(-2).some((h) => h.reason === 'creation.elicit')) {
+              return d('ANSWER', {
+                reasonCode: 'creation.elicit.again', reason: a.rationale,
+                intended: 'Their own words, however few, are taken seriously and pushed on.',
+                objective:
+                  'They have given you very little and you have already asked once — do not ask again. The words THEY used are the material: take them literally and work with exactly those. '
+                  + 'Say what their own words already commit them to and what they leave open, or name the one thing that would most change what this becomes — in their terms, not yours. '
+                  + 'Do NOT supply a plot, character, premise, theme, title, concept, name or direction of your own, in any wording: "consider…", "what about…", "one angle could be…" and an example are the same act. '
+                  + 'Two or three sentences.',
+                alloc: a, avoid, maxQuestions: 0, maxTokens: 220,
+              });
+            }
+            return d('CLARIFY', {
+              reasonCode: 'creation.elicit', reason: a.rationale,
+              intended: 'They put down the first piece, and it is theirs.',
+              objective:
+                'They have said this work is theirs and there is nothing of theirs here yet. Ask for the first fragment — a character, an image, a line, a conflict, a mood, whatever they already have, however rough. '
+                + 'Two sentences at most, and NO EXAMPLES: an example is the creative act, and one offered here takes the thing they just said they wanted to do. '
+                + 'Do not suggest a premise, a genre, a direction or a "what if", do not offer to start them off, and do not list the kinds of thing they could bring as though that list were not itself a list of ideas.',
+              alloc: a, avoid, maxQuestions: 1, maxTokens: 110, buffered: true,
+            });
+          }
           return d('CRITIQUE', {
             reasonCode: 'creation.critique', reason: a.rationale,
             intended: 'Their work gets better and stays theirs.',
-            objective: 'Specific, useful critique of THEIR material: what works, what does not, and why — concrete enough to act on. Options where useful. Do not rewrite it for them.',
+            objective:
+              'Specific, useful critique of THEIR material: what works, what does not, and why — concrete enough to act on. '
+              + 'Everything you say must be ABOUT what they wrote. Do not supply a plot, character, premise, theme, title, concept or direction of your own, in any wording — not as "consider…", not as "one angle could be…", not as an example, not as a what-if. '
+              + 'Where a choice is open, name the tension already in their material and what each way would cost them, without choosing. Do not rewrite it for them.',
             alloc: a, avoid,
           });
         }

@@ -144,6 +144,16 @@ export interface TurnMemo {
   turn: number;
   type: string;
   family: string;
+  /**
+   * Which decision it was, not only which move.
+   *
+   * Two CLARIFYs can be entirely different questions — "yours, or mine?" and
+   * "what have you got so far?" — and a turn that needs to know whether it has
+   * already asked ONE of them cannot tell from the move name. Without this,
+   * the ownership question counted as the fragment question and the fragment
+   * was never asked for.
+   */
+  reason?: string;
   /** interrogative load of what was actually sent */
   questions: number;
   /** was something deliberately held back this turn */

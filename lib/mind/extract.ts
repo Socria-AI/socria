@@ -38,8 +38,16 @@ const SYSTEM = `You build a semantic memory graph from a conversation.
 
 You return NODES (things worth remembering) and EDGES (how they relate).
 
-REGISTER IS YOUR FIRST QUESTION, before what was said: in what spirit was it
-said? Mark every node with the "kind" that matches:
+WHOSE IDEA IT WAS IS THE QUESTION BEFORE REGISTER. The material contains both
+sides of a conversation. Something SOCRIA said is not something the person
+believes, decided, proposed or invented — however good it was and however
+warmly they received it. "That's interesting" is not adoption, and neither is
+silence. An idea Socria supplied may be recorded as Socria's contribution to
+the topic; it may never be written as the person's own position, plan, belief
+or creation. When you cannot tell who originated something, it is not theirs.
+
+REGISTER IS YOUR NEXT QUESTION: in what spirit was it said? Mark every node
+with the "kind" that matches:
   stated       — said outright, meant
   established  — held and repeated, clearly settled for them
   tentative    — a position being tried on out loud ("I think maybe I...")

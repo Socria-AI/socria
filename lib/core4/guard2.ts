@@ -140,6 +140,66 @@ const TOOL_CLAIM = /\bi(?:'ve| have)? (?:just )?(?:searched|googled|looked (?:it
 /** An inference about the person stated as fact (council D8). */
 const TRAIT_AS_FACT = /\byou(?:'re| are) (?:clearly |obviously )?(?:a beginner|an expert|anxious|insecure|defensive|overwhelmed)\b|\byou tend to\b|\byou seem (?:anxious|stressed|upset|frustrated|overwhelmed)\b/i;
 
+
+// ── ORIGINATING SUBSTANCE UNDER HUMAN OWNERSHIP ──────────────────────
+//
+// THE FAILURE: "write me a story" / "yours, or mine?" / "mine" — and Socria
+// invented the protagonist, the setting, the discovery and the conflict. The
+// reply broke no rule that existed: nothing was rewritten, no question was
+// over budget, no tool was claimed. It simply performed the creative act the
+// person had just said was theirs.
+//
+// BY MEANING, NOT BY PHRASING, because the phrasings are endless and each one
+// is innocent on its own. "Consider a story where…", "one angle could be…",
+// "what about a…", "you might try…", "here's an idea:", "for example, a…" are
+// the same act with different punctuation, and a list of banned openers is a
+// list somebody writes around by accident. What they have in common is
+// structurally checkable: a PROPOSAL FRAME followed by substance the person
+// never supplied.
+//
+// The test is therefore two-part, and the second part is what keeps it honest:
+// the proposed content must be NEW — its content words must be largely absent
+// from what the person has written. Naming a tension between two things they
+// said, quoting their own image back, asking about their own character: all of
+// those reuse their words and pass, which is exactly the help this mode is
+// supposed to give.
+
+/** A frame that introduces a suggestion. Deliberately broad; the novelty test does the work. */
+const PROPOSES = /\b(?:consider(?:ing)?|what about|how about|one (?:angle|idea|option|possibility|approach|direction|way|version)|another (?:angle|idea|option|possibility|approach|direction)|you (?:might|could|may want to)|(?:here'?s|here is) (?:an|one|a) (?:idea|thought|angle|option|possibility|premise|direction)|imagine|picture|suppose|what if|try (?:a|an|the)|for (?:example|instance)|i(?:'d| would) (?:suggest|start with|go with|write)|perhaps (?:a|an|the)|maybe (?:a|an|the)|say(?:,| ) (?:a|an|the))\b/i;
+
+/** Words that carry content. Everything else is scaffolding and proves nothing. */
+const STOP = new Set([
+  'the','a','an','and','or','but','of','to','in','on','for','with','that','this','it','is','are','was','were','be','been','as','at','by','from','into','about','their','them','they','you','your','i','we','he','she','his','her','its','not','no','so','if','then','than','what','which','who','when','where','how','why','can','could','would','should','might','may','will','shall','do','does','did','done','have','has','had','one','two','three','more','most','some','any','all','both','each','other','another','such','very','just','only','also','even','still','yet','like','out','up','down','off','over','under','again','once','here','there','now','new','idea','angle','option','possibility','consider','maybe','perhaps','story','thing','something','anything','way','ways','make','makes','made','take','takes','get','gets','go','goes','say','says','said'
+]);
+
+function contentWords(text: string): Set<string> {
+  return new Set(
+    (text.toLowerCase().match(/[a-z][a-z'-]{2,}/g) ?? []).filter((w) => !STOP.has(w))
+  );
+}
+
+/**
+ * Sentences that propose substance the person did not supply.
+ *
+ * Exported because it is the invariant in one function, and an invariant about
+ * whose thinking a reply contains should be readable and testable on its own.
+ */
+export function originatesSubstance(draft: string, theirMaterial: string): string[] {
+  const theirs = contentWords(theirMaterial);
+  return sentencesOf(draft).filter((raw) => {
+    const sentence = raw.trim();
+    if (!PROPOSES.test(sentence)) return false;
+    // A question that proposes nothing of its own is the help, not the harm:
+    // "what about the sister — is she the one who knows?" reuses their words.
+    const words = [...contentWords(sentence)];
+    if (words.length < 3) return false;
+    const novel = words.filter((w) => !theirs.has(w));
+    // Mostly their vocabulary means it is about their material. Mostly new
+    // vocabulary inside a proposal frame means it is Socria's idea.
+    return novel.length >= 3 && novel.length / words.length >= 0.6;
+  });
+}
+
 /** Coherence floor (council D8): an edit that guts the reply is not shipped. */
 export function coherent(original: string, edited: string, sizeMatters = true): boolean {
   if (!edited.trim()) return false;
@@ -354,6 +414,34 @@ export function guardStructure(input: GuardInput): GuardOutcome & { needsModel: 
       // A voice strip (council D8's always-strip list), not lost substance.
       draft = rest;
       changed = true;
+    }
+  }
+
+  // ── ORIGINATING THE SUBSTANCE OF WORK THEY SAID WAS THEIRS ──
+  //
+  // The invariant, enforced where the words actually are rather than in the
+  // objective that asked for them: under human-owned creative or intellectual
+  // work, Socria may transform, interrogate, scaffold, critique, connect and
+  // develop what they wrote — and may not supply the substance.
+  //
+  // It is a REGENERATION, not a strip. Deleting the proposals would leave a
+  // reply whose shape assumed them; the model is told instead to do the same
+  // turn out of their material.
+  const humanOwned = a.ownership === 'theirs' || a.withhold?.reason === 'authorship';
+  if (humanOwned && !retryNote) {
+    const invented = originatesSubstance(draft, input.target ?? '');
+    if (invented.length) {
+      findings.push({
+        side: 'overreach',
+        code: 'originated_substance',
+        detail: `Proposed ${invented.length} idea(s) of its own on work they said was theirs.`,
+      });
+      action = 'MODIFY_FOR_MORE_AGENCY';
+      retryNote =
+        'They said this work is theirs, and the draft supplies the substance of it: '
+        + invented.slice(0, 2).map((x) => `"${x.trim().slice(0, 80)}"`).join('; ')
+        + '. Rewrite it using only what THEY have put down — what is latent in it, the tension between two of their own pieces, the assumption underneath it, the one question that would make them decide — or ask for more of theirs. '
+        + 'No plot, character, premise, theme, title, concept, name, angle or direction of your own, in any wording: "consider…", "what about…", "one angle could be…" and an example are the same act.';
     }
   }
 

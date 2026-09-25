@@ -79,8 +79,12 @@ console.log('=== the ten cases, by what they actually mean ===');
   // 4. COLLABORATION — the doing is the point.
   const brainstorm = turn('brainstorm with me', TALK);
   ok('"brainstorm with me" is theirs', brainstorm.own === 'theirs', String(brainstorm.own));
-  ok('  so the piece is not written for them', /Do not write the piece itself/.test(brainstorm.block));
-  ok('  and it is not a question', brainstorm.decision.maxQuestions === 0);
+  // AND IT DOES NOT BECOME "generate ideas for me". With nothing of theirs on
+  // the table the move is to draw out their first fragment — the ideas are the
+  // thing they said they wanted to have. See core4-creative-ownership.
+  ok('  so it asks for theirs rather than supplying its own',
+    /^creation\.elicit/.test(brainstorm.decision.reasonCode), brainstorm.decision.reasonCode);
+  ok('  with no examples, because an example is the creative act', /an example IS the creative act|an example is the creative act/.test(brainstorm.block));
 
   // 5. AMBIGUOUS, AND THE COMMONEST ONE IN A WORKING DAY.
   const email = turn('write this email', CREATE);
@@ -112,7 +116,11 @@ console.log('=== the ten cases, by what they actually mean ===');
   ok('"don\'t do it for me" is theirs, not delegation', dont.own === 'theirs', String(dont.own));
   ok('  the delegation pattern inside its own negation does not win',
     readSignals("don't do it for me").delegate === false);
-  ok('  and it is not asked whose it is — they said', dont.decision.type !== 'CLARIFY');
+  // They said whose it is, so the ownership question is not asked. What IS
+  // asked for is their material, which is a different question and the only
+  // move available on an empty page under their ownership.
+  ok('  and it is not asked whose it is — they said', dont.decision.reasonCode !== 'ownership.ask');
+  ok('  it asks for their material instead', /^creation\.elicit/.test(dont.decision.reasonCode), dont.decision.reasonCode);
 }
 
 console.log('\n=== THE PRODUCTION BLOCKER: it must not depend on how the message got labelled ===');
@@ -132,7 +140,8 @@ console.log('\n=== THE PRODUCTION BLOCKER: it must not depend on how the message
   // rescued by the label either.
   for (const latest of ['information', 'other']) {
     const r = turn('help me develop this essay idea', { taskKind: 'create', work: 'creation', latest });
-    ok(`latest=${latest}: theirs is honoured too`, r.own === 'theirs' && /Do not write the piece itself/.test(r.block), `${r.own}`);
+    ok(`latest=${latest}: theirs is honoured too`, r.own === 'theirs', String(r.own));
+    ok(`  and originates nothing`, /^creation\.elicit/.test(r.decision.reasonCode) || /Do NOT originate/.test(r.block), r.decision.reasonCode);
   }
 }
 
@@ -257,7 +266,10 @@ console.log('\n=== THE WHOLE LOOP, which is the only thing that matters ===');
     const budget = budgetFrom(state, signals, 0, 0, dim);
     const allocation = allocate({ state, signals, contract: NO_SIGNALS, lastUserText: said });
     const decision = selectIntervention({ state, allocation, budget, diminishing: dim, signals, considered: [], lastUserText: said });
-    prior = recordTurn(state, { type: decision.type, asked: decision.maxQuestions > 0, withheld: !!allocation.withhold, failed: false });
+    // The same memo finishTurn writes — including `reason`, without which the
+    // engine cannot tell one CLARIFY from another and asks the same question
+    // twice.
+    prior = recordTurn(state, { type: decision.type, reason: decision.reasonCode, family: decision.type, questions: decision.maxQuestions, withheld: !!allocation.withhold, failed: false });
     return { allocation, decision, state };
   };
 
@@ -285,7 +297,10 @@ console.log('\n=== the same loop, the other way ===');
     const dim = diminishingReturns(state, signals, []);
     const allocation = allocate({ state, signals, contract: NO_SIGNALS, lastUserText: said });
     const decision = selectIntervention({ state, allocation, budget: budgetFrom(state, signals, 0, 0, dim), diminishing: dim, signals, considered: [], lastUserText: said });
-    prior = recordTurn(state, { type: decision.type, asked: decision.maxQuestions > 0, withheld: !!allocation.withhold, failed: false });
+    // The same memo finishTurn writes — including `reason`, without which the
+    // engine cannot tell one CLARIFY from another and asks the same question
+    // twice.
+    prior = recordTurn(state, { type: decision.type, reason: decision.reasonCode, family: decision.type, questions: decision.maxQuestions, withheld: !!allocation.withhold, failed: false });
     return { allocation, decision, state };
   };
   step('write a story');
@@ -293,7 +308,12 @@ console.log('\n=== the same loop, the other way ===');
   ok('"mine" keeps the work', mine.allocation.ownership === 'theirs', String(mine.allocation.ownership));
   const next = step('write another one, about a lighthouse');
   ok('  and it stays theirs on the next turn too', next.allocation.ownership === 'theirs', String(next.allocation.ownership));
-  ok('  without asking again', next.decision.type !== 'CLARIFY');
+  // It may ask ONCE for their material — the only move on an empty page under
+  // their ownership — but never twice, and it never fills the page itself.
+  ok('  and never originates the substance', !/two or three concrete, specific directions/.test(next.block));
+  ok('  and having asked once, works from their words instead of asking again',
+    mine.decision.reasonCode !== 'creation.elicit' || next.decision.reasonCode === 'creation.elicit.again',
+    `${mine.decision.reasonCode} -> ${next.decision.reasonCode}`);
 }
 
 console.log('\n=== the answer carries their words, or the protection is hollow ===');

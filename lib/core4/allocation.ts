@@ -443,9 +443,26 @@ function allocateFor({ state: s, signals, contract, lastUserText }: Ctx): Alloca
   // ── creation: their work stays theirs when they have said so ──
   if (s.work === 'creation' || s.taskKind === 'create') {
     if (ownWorkExplicit) {
-      return alloc('HUMAN_LEADS', 'creation.theirs', 'They said the work must stay theirs: specific critique and options, not a rewrite.',
-        1, ['the text itself'], ['critique', 'options', 'craft knowledge'],
-        { what: 'a replacement version of their work', reason: 'authorship', evidence: s.authorship.evidence ?? '', source: sourceOf(s.authorship, signals.ownWork) }, s, 'theirs');
+      // WHAT IS HELD BACK IS THE ORIGINATION, NOT ONLY THE REWRITE.
+      //
+      // This said 'a replacement version of their work', and originating a
+      // premise is not a replacement of anything — so nothing in the withhold
+      // forbade it. Somebody said "mine" and got a protagonist, a setting, a
+      // discovery and a conflict, none of which they had written: their work
+      // was not replaced, it was pre-empted. The substantive creative content
+      // — the plot, the characters, the premise, the angle, the direction — is
+      // theirs to originate, and that is what this names.
+      return alloc('HUMAN_LEADS', 'creation.theirs',
+        'They said the work stays theirs: develop what THEY put down, and never originate the substance of it.',
+        1, ['originating the substance: the premise, the characters, the direction, the argument'],
+        ['eliciting what they already have', 'developing and connecting their material', 'critique', 'craft knowledge'],
+        {
+          what: 'any substantive creative content of your own — a plot, a character, a premise, a theme, a title, a concept, an angle, a direction, or a "what if" that supplies one',
+          reason: 'authorship',
+          evidence: s.authorship.evidence ?? '',
+          source: sourceOf(s.authorship, signals.ownWork),
+          alternative: 'everything around it — what is already latent in what they have written, the tension between two of their own pieces, a targeted question, critique, craft knowledge, organisation of their material, and the whole thing the moment they hand it over',
+        }, s, 'theirs');
     }
     // How much of the work would producing it be? See generationRead.
     if (own === 'delegated') {
@@ -453,8 +470,13 @@ function allocateFor({ state: s, signals, contract, lastUserText }: Ctx): Alloca
         [], ['the artifact itself'], null, s, 'delegated');
     }
     if (own === 'theirs') {
-      return alloc('AI_ASSISTS', 'creation.theirs.developing', 'The doing is the point: build on what they have and give them something to push against, not the piece itself.', 0.8,
-        ['the piece itself'], ['material to work with', 'options', 'craft knowledge'], null, s, 'theirs');
+      // NOT 'options', and not 'material to work with'. Both readings let
+      // Socria supply the ideas — "brainstorm with me" became "generate ideas
+      // for me", which is the same takeover in a friendlier register.
+      return alloc('AI_ASSISTS', 'creation.theirs.developing',
+        'The doing is the point: draw out what they have and push on it. The substance stays theirs to originate.', 0.8,
+        ['originating the substance: the ideas, the premise, the direction'],
+        ['eliciting what they have', 'developing and connecting it', 'tensions already latent in it', 'critique', 'craft knowledge'], null, s, 'theirs');
     }
     if (own === 'ambiguous') {
       return alloc('AI_ASSISTS', 'ownership.unclear',
