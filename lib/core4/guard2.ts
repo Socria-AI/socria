@@ -269,7 +269,17 @@ export function guardStructure(input: GuardInput): GuardOutcome & { needsModel: 
 
   // ── UNDERHELP ──
   const load = questionLoad(draft);
-  if (load > dec.maxQuestions || interrogatives(draft).offers.length) {
+  // THE ONE MOVE WHOSE CONTENT IS A QUESTION.
+  //
+  // "Do you want me to write it, or would you rather write it yourself?" is,
+  // syntactically, exactly the closing offer this product exists to delete —
+  // and on an ownership.ask turn it is the entire reply. Measured: three of
+  // five natural phrasings were stripped to nothing, so the person got a BLANK
+  // MESSAGE. The strip is right everywhere else and wrong here, so it is
+  // exempted here and nowhere else; the budget check above still applies, so
+  // this turn may still only ask one.
+  const askIsTheMove = dec.reasonCode === 'ownership.ask';
+  if (load > dec.maxQuestions || (!askIsTheMove && interrogatives(draft).offers.length)) {
     const stripped = stripInterrogatives(draft, dec.maxQuestions);
     if (load > dec.maxQuestions) {
       findings.push({ side: 'underhelp', code: 'over_budget', detail: `${load} question(s) where ${dec.maxQuestions} were allowed.` });

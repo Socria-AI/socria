@@ -497,8 +497,15 @@ export async function POST(req: NextRequest) {
         fallbackModel: fallbackOpenAIModel(model),
         after: (reply: string) => {
           if (!userId) return;
-          // Off the record (council D15): nothing from this conversation goes into the Mind Graph.
-          if (prepared?.state.persistPolicy === 'none') return;
+          // Off the record (council D15): nothing from this conversation goes
+          // into the Mind Graph.
+          //
+          // `!prepared` fails CLOSED. Read through an optional chain this was
+          // `undefined === 'none'` — false — so a turn whose preparation threw
+          // wrote the conversation to durable memory without ever having read
+          // whether it was allowed to. The one case where we know least is the
+          // one where we were writing anyway.
+          if (!prepared || prepared.state.persistPolicy === 'none') return;
           // waitUntil keeps the function alive past the response on Vercel. On
           // a runtime that has no request context it throws instead, and a
           // thrown registration must not be the difference between having a

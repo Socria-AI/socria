@@ -146,13 +146,24 @@ export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
 
   // Last turn's state and the ledger, together.
   const canStore = !!(input.userId && input.conversationId);
-  const [prior, ledger, priorLinks, capability] = await Promise.all([
-    canStore ? store.loadState(input.userId!, input.conversationId!) : Promise.resolve(null),
+  const [priorRead, ledger, priorLinks, capability] = await Promise.all([
+    canStore ? store.loadState(input.userId!, input.conversationId!) : Promise.resolve({ state: null, ok: true }),
     input.userId ? store.loadLedger(input.userId, { conversationId: input.conversationId ?? '', projectId: input.projectId }) : Promise.resolve([] as LedgerEntry[]),
     input.userId ? store.loadLinks(input.userId) : Promise.resolve([] as LedgerLink[]),
     input.userId ? store.listCapability(input.userId) : Promise.resolve([] as CapabilityEvidence[]),
   ]);
   ms.load = Date.now() - t0;
+  const prior = priorRead.state;
+  // THE READ FAILED, SO WE DO NOT KNOW WHAT THEY ASKED FOR.
+  //
+  // persistPolicy lives in that row. A failed read is indistinguishable from a
+  // first turn, so an off-the-record conversation would restart at 'full' and
+  // be written to durable memory — an explicit instruction reversed by a
+  // transient database error, silently. When we cannot read the policy we do
+  // not write: one turn of continuity is lost on a turn where the database was
+  // already failing, and nothing is remembered that somebody asked to keep off
+  // the record.
+  const policyUnknown = !priorRead.ok;
 
   const focus = `${prior?.currentFocus ?? ''} ${input.lastUserText}`.slice(0, 600);
   const preView = consideredView(ledger, { focus, conversationId: input.conversationId ?? '', projectId: input.projectId });
@@ -199,7 +210,11 @@ export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
   // The events have been recorded since the capability model was built and
   // nothing ever read them back on the reply path.
   const competence = taskCompetence(capability, conceptKey(settled.currentFocus || settled.currentGoal));
-  const state = { ...settled, expertise: calibrate(settled.expertise, competence) };
+  const state = {
+    ...settled,
+    expertise: calibrate(settled.expertise, competence),
+    ...(policyUnknown ? { persistPolicy: 'none' as const } : {}),
+  };
 
   // "That's not what I meant": what was recorded as theirs last turn is disputed.
   // A correction of Socria, or their own revision ("I was computing the wrong

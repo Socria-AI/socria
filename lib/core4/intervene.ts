@@ -100,6 +100,8 @@ function d(
     avoid: string[];
     /** a ceiling this move needs instead of its type's — see ownership.ask */
     maxTokens?: number;
+    /** read whole before anybody sees it, even with nothing withheld */
+    buffered?: boolean;
   }
 ): InterventionDecision {
   const maxQuestions = o.maxQuestions ?? 0;
@@ -115,7 +117,7 @@ function d(
     // back (council D8): buffering every perspective move put the latency on
     // exactly the expert turns. Everything else streams through the sentence
     // gate, which holds questions (and drops re-asked ones) until the end.
-    guardRequired: !!o.alloc.withhold,
+    guardRequired: !!o.alloc.withhold || !!o.buffered,
     maxQuestions,
     objective: o.objective,
     avoid: o.avoid.slice(0, 12),
@@ -585,6 +587,12 @@ function selectMove(input: SelectInput): InterventionDecision {
         if (canAsk) {
           return d('CLARIFY', {
             reasonCode: 'ownership.ask', reason: a.rationale,
+            // READ WHOLE, NOT STREAMED. The sentence gate drops anything
+            // offer-shaped, and this move is offer-shaped by nature: measured,
+            // three of five natural phrasings streamed out as an EMPTY
+            // MESSAGE. Buffering costs this turn its first-token latency, and
+            // the turn is ninety tokens long.
+            buffered: true,
             intended: 'They say whose work this is, in a word, and then get all of it.',
             objective:
               'ONE short line, and nothing else. Offer both readings of what they asked: that you do it for them, or that you work on it with them and it stays theirs. '
@@ -822,16 +830,27 @@ export function renderDecision(dec: InterventionDecision, a: Allocation): string
   //
   // It sits ABOVE the length and coverage clauses, because it decides what
   // work the reply contains and they only shape what is left of it.
+  // KEYED ON THE DECISION, NOT THE ALLOCATION.
+  //
+  // `allocate()` attaches the ownership read to every allocation, including
+  // the modes whose branches never act on it. Keyed on `a.ownership` alone,
+  // an EXPLAIN or VERIFY turn at a 1200-token ceiling was told to write four
+  // sentences and stop — a clause written for one move, printed over another.
+  // The three reason codes below are the only moves that asked for it.
+  const scopeMove =
+    dec.reasonCode === 'ownership.ask' || dec.reasonCode === 'ownership.start' || dec.reasonCode === 'ownership.theirs';
   const scope =
-    a.ownership === 'ambiguous'
+    scopeMove && a.ownership === 'ambiguous'
       ? (dec.reasonCode === 'ownership.ask'
           ? 'WHOSE WORK IS THIS — THIS OVERRIDES THE LINE ABOVE ABOUT ANSWERING FULLY. They asked for something substantial and nothing has said whether they are handing it over or doing it themselves. Both readings are ordinary and you cannot tell from the words.\n' +
-            'So: ONE short line offering both — you do it for them, or you work on it with them and it stays theirs. Answerable in a word. Do not begin the work, do not explain the question, do not name what you are doing. The next turn does all of whatever they choose.'
+            'So: ONE short line putting the two side by side — you do it for them, or you work on it with them and it stays theirs. Answerable in a word.\n' +
+            'Phrase it as a CHOICE, never as an offer of help: not "do you want me to…", not "would you like me to…", not "shall I…". "Yours, or mine?" is the shape. An offer reads as a machine asking permission; a choice reads as a person asking which.\n' +
+            'Do not begin the work, do not explain the question, do not name what you are doing. The next turn does all of whatever they choose.'
           : 'WHOSE WORK IS THIS — THIS OVERRIDES THE LINE ABOVE ABOUT ANSWERING FULLY. They asked for something substantial, nothing has said whose it is, and no question is available this turn, so start it rather than stall.\n' +
             'Write AT MOST FOUR SENTENCES of the actual thing. Real sentences of it — the opening, one option, the first few lines — not a description of what you would write, not an outline, not an offer. Four sentences is a ceiling, not a target.\n' +
             'Then, in your own words, what you took the job to be — the way a person says "I went light and a bit wry; say if that is wrong". Not a labelled "Assumption:" line, and no question.\n' +
             'Do not deliver the finished thing, do not apologise for the length, and do not close by offering to write more.')
-      : a.ownership === 'theirs'
+      : scopeMove && a.ownership === 'theirs'
         ? 'WHOSE WORK IS THIS: theirs. They asked to work on it, not to receive it — the doing is the work they came for, and handing back a finished piece would end it.\n' +
           'Give them material to develop WITH: two or three concrete, specific directions — a premise, an angle, a structure, a line of argument — one or two lines each, different in kind rather than in wording. Say which one you would follow and what makes it strongest. Do not write the piece itself, and do not write a polished version of any option.'
         : null;

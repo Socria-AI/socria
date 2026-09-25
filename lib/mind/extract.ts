@@ -152,7 +152,26 @@ export function sanitizeExtraction(raw: unknown): ExtractResult {
       const label = typeof n.label === 'string' ? n.label.trim() : '';
       const type = typeof n.type === 'string' ? n.type.trim() : '';
       if (!label || !type) continue;
-      const kind = typeof n.kind === 'string' && KINDS.has(n.kind) ? n.kind : 'inferred';
+      // A MISSING FIELD IS NOT EVIDENCE OF INFERENCE.
+      //
+      // This defaulted to 'inferred', and 'inferred' is the one register the
+      // corroboration gate holds back: a claim about the person arrived at by
+      // inference waits for a second, different conversation before it becomes
+      // a node (gate.ts). So a model that simply forgot to emit `kind` — a
+      // malformed-output path, not a judgement — lost the fact silently, and
+      // the person's memory quietly under-retained with nothing in any log.
+      //
+      // 'tentative' instead: it persists, it is discounted in retrieval, and
+      // the prompt labels it as a reading rather than a fact. A mis-SPELLED
+      // kind still falls to 'inferred', because that is a model asserting a
+      // register Socria does not recognise, and refusing to guess at what it
+      // meant is the conservative reading.
+      const kind =
+        typeof n.kind === 'string'
+          ? KINDS.has(n.kind)
+            ? n.kind
+            : 'inferred'
+          : 'tentative';
       out.nodes.push({
         type: TYPES.has(type) ? type : type.slice(0, 40),
         label,

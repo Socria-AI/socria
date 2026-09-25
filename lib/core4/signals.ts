@@ -190,7 +190,7 @@ const DELEGATE = /\b(you (?:do|write|handle|take care of|draft) it|do it for me|
 const HANDS_IT_OVER = /^\s*(?:yours?|you(?:rs)?(?: do(?: it)?| please| can)?|go ahead|please do|sure,? go|you take it|all yours)\b[\s.!]*$/i;
 const KEEPS_IT = /^\s*(?:mine|me|i(?:'ll| will)(?: do| write| try)?(?: it)?|let me|my own|i want to(?: try| do| write)?(?: it)?)\b[\s.!]*$/i;
 
-const OWN_WORK = /\b(don'?t (?:re)?write (?:it|this|my \w+)(?: for me)?|don'?t do (?:it|this|that) for me|i(?:'ll| will| want to| would like to)? ?(?:write|do|draft|make) (?:it|this|that)(?: myself)?(?= |$|[.,!])|i want to write (?:it|this) myself|(?:it|this) (?:has|needs) to be (?:my|in my) own (?:words|work)|don'?t tell me what to (?:conclude|decide|think)|i(?:'ll| will) (?:decide|make the call)(?: myself)?|keep (?:it|this) in my (?:voice|words))\b/i;
+const OWN_WORK = /\b(don'?t (?:re)?write (?:it|this|my \w+)(?: for me)?|don'?t do (?:it|this|that) for me|i(?:'ll| will| want to| would like to| am going to)? ?(?:write|do|draft|make) (?:it|this|that)(?: myself| on my own)(?= |$|[.,!])|i want to write (?:it|this) myself|(?:it|this) (?:has|needs) to be (?:my|in my) own (?:words|work)|don'?t tell me what to (?:conclude|decide|think)|i(?:'ll| will) (?:decide|make the call)(?: myself)?|keep (?:it|this) in my (?:voice|words))\b/i;
 
 const URGENT = /\b((?:prod(?:uction)?|the site|our site|the app|checkout|the api) is (?:down|broken|failing)|outage|(?:due|deadline|submission|meeting|presentation|demo) (?:is )?(?:in|within) (?:an? |the next )?(?:hour|\d+\s?(?:min(?:ute)?s?|hours?))|urgent(?:ly)?|asap|emergency|customers? (?:are|is) (?:affected|blocked|down))\b/i;
 

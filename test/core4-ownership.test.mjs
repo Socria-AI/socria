@@ -135,6 +135,51 @@ console.log('\n=== THE PRODUCTION BLOCKER: it must not depend on how the message
   }
 }
 
+console.log('\n=== THE BLANK-REPLY BLOCKER: the question is the thing this product deletes ===');
+{
+  // MEASURED, and it is the worst failure a reply can have. The ownership
+  // question is syntactically a closing offer — "do you want me to write it,
+  // or would you rather write it yourself?" — and Core 4 spent its life
+  // removing exactly that shape. Three of five natural phrasings were stripped
+  // to NOTHING by the sentence gate, so the person got a blank message.
+  const r = turn('write a story', CREATE);
+  ok('the ask is read whole, never streamed through the gate', r.decision.guardRequired === true);
+  ok('  which is what keeps an offer-shaped reply from being deleted mid-stream', r.decision.type === 'CLARIFY');
+  ok('the prompt forbids the offer shape outright', /never as an offer of help/.test(r.block));
+  ok('  naming the three phrasings that produced it', /do not name what you are doing|would you like me to/.test(r.block) && /shall I/.test(r.block));
+  ok('  and gives the shape that survives', /"yours, or mine\?" is the shape/i.test(r.block));
+}
+
+console.log('\n=== a clause written for one move is not printed over another ===');
+{
+  // `allocate()` attaches the ownership read to EVERY allocation, including
+  // the modes whose branches never act on it. Keyed on the allocation alone,
+  // an EXPLAIN turn at a 1200-token ceiling was told to write four sentences
+  // and stop — two instructions about length, disagreeing, in one prompt.
+  const explain = turn('explain how to write a story arc', { taskKind: 'learn', work: 'explanation', latest: 'question' });
+  ok('the read is still attached', explain.own === 'ambiguous', String(explain.own));
+  ok('  but the clause is not printed', !/AT MOST FOUR SENTENCES/.test(explain.block));
+  ok('  and the ceiling is the move\'s own', explain.decision.maxTokens >= 1000, String(explain.decision.maxTokens));
+  ok('  while the move that asked for it still gets it',
+    /WHOSE WORK IS THIS/.test(turn('write a story', CREATE).block));
+}
+
+console.log('\n=== a standing claim must need more than the word "I" ===');
+{
+  // MEASURED FALSE POSITIVES, before the fix: "I write this in Python
+  // usually", "i do this every day at work", "I want to make it faster" and
+  // "I will do this later" all set ownWork — which flips the conversation to
+  // authorship-theirs permanently and makes Socria refuse to write anything.
+  for (const t of ['I write this in Python usually', 'i do this every day at work', 'I want to make it faster', 'I will do this later', 'I write tests first']) {
+    ok(`"${t}" is not a claim on the work`, readSignals(t).ownWork === false);
+  }
+  for (const t of ['I will write it myself', 'I want to do this on my own', "don't do it for me"]) {
+    ok(`"${t}" is`, readSignals(t).ownWork === true);
+  }
+  // The short answer to the question still lands, because it is anchored.
+  ok('"I\'ll do it" as a whole message still counts', readSignals("I'll do it").ownWork === true);
+}
+
 console.log('\n=== gate 1: mechanical work is never interrogated ===');
 {
   // The friction of a clarification is only worth paying when the work is

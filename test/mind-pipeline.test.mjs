@@ -41,7 +41,12 @@ console.log('\n=== an unknown TYPE is kept, an unknown KIND is not ===');
   ok('an unknown kind becomes inferred', bad.nodes[0]?.kind === 'inferred',
      'it must never default to something that can assert');
   const missing = sanitizeExtraction({ nodes: [{ type: 'Belief', label: 'x', content: 'y' }] });
-  ok('a missing kind becomes inferred', missing.nodes[0]?.kind === 'inferred');
+  // A MISSING field is not the same as a WRONG one. 'inferred' is the register
+  // the corroboration gate holds back, so defaulting an absent field to it
+  // meant a model that forgot to emit `kind` lost the fact silently — an
+  // extraction bug becoming memory loss with nothing in any log. 'tentative'
+  // persists, is discounted in retrieval, and is labelled as a reading.
+  ok('a missing kind becomes tentative, not inferred', missing.nodes[0]?.kind === 'tentative', String(missing.nodes[0]?.kind));
 }
 
 console.log('\n=== scores are clamped, not trusted ===');

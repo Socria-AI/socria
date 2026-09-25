@@ -34,15 +34,34 @@ function fail(table: string, error: { code?: string; message?: string } | unknow
 
 // ── the Cognitive State ──────────────────────────────────────────────
 
-export async function loadState(userId: string, conversationId: string): Promise<CognitiveState | null> {
+/**
+ * Last turn's state — and whether the READ worked, which is not the same
+ * question as whether there was a row.
+ *
+ * It used to answer null for both, and the caller could not tell "this is the
+ * first turn" from "the database had a bad second". The difference is a
+ * privacy promise: `persistPolicy` lives in this row, so a failed read on turn
+ * five of an OFF THE RECORD conversation looked exactly like turn one, the
+ * state started from EMPTY_STATE with persistPolicy 'full', and the
+ * conversation somebody had explicitly asked not to be remembered was written
+ * to durable memory. Silently, and only when the database was already having a
+ * bad minute, which is the hardest kind of bug to ever see.
+ */
+export async function loadState(
+  userId: string,
+  conversationId: string
+): Promise<{ state: CognitiveState | null; ok: boolean }> {
   try {
     const { data, error } = await supabaseAdmin()
       .from('core4_state').select('state').eq('user_id', userId).eq('conversation_id', conversationId).maybeSingle();
-    if (error) return fail('core4_state', error), null;
-    return (data?.state as CognitiveState) ?? null;
+    if (error) {
+      fail('core4_state', error);
+      return { state: null, ok: false };
+    }
+    return { state: (data?.state as CognitiveState) ?? null, ok: true };
   } catch (e) {
     fail('core4_state', e);
-    return null;
+    return { state: null, ok: false };
   }
 }
 
