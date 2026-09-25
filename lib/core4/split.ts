@@ -65,7 +65,12 @@ const PROBLEM = /\b(?:solve|prove|derive|integrate|differentiate|factor|simplify
  * would hold back an answer nobody was deciding anything with — the under-help
  * failure, arriving through the mechanism meant to prevent the other one.
  */
-const DECISION = /\b(?:should i|which should|decide|choose|pick|recommend|best option|which one|go with|worth it|pros and cons of (?:my|our)|strategy for (?:my|our)|what should (?:i|we|our team) (?:do|choose|pick|go with|prioriti[sz]e|focus on|build|charge|launch|say|write)|what should (?:our|my) (?:positioning|strategy|pricing|price|approach|plan) be|what(?:'s| is) the (?:play|move|call|right (?:call|move|choice|option|approach)|best (?:call|move|choice|option|approach|strategy))|tell me (?:the conclusion|what to (?:do|think|believe|choose)|which (?:one|option))|what would you (?:do|choose|pick))\b/i;
+// NOT A BARE "should i". Core 3.1 rule 8 — "treating dinner like therapy is what
+// breaks trust" — caught this the moment its scar tissue was transferred: "what
+// should I eat for dinner" matched, reserved the judgement, and turned an
+// everyday question into a decision frame. A decision presents OPTIONS, so a
+// bare "should I" earns the reservation only when the sentence offers a choice.
+const DECISION = /\b(?:should i [\w' ,]{2,40}\bor\b|decide|choose|pick|recommend|best option|which one|go with|worth it|pros and cons of (?:my|our)|strategy for (?:my|our)|what should (?:i|we|our team) (?:do|choose|pick|go with|prioriti[sz]e|focus on|build|charge|launch|say|write)|what should (?:our|my) (?:positioning|strategy|pricing|price|approach|plan) be|what(?:'s| is) the (?:play|move|call|right (?:call|move|choice|option|approach)|best (?:call|move|choice|option|approach|strategy))|tell me (?:the conclusion|what to (?:do|think|believe|choose)|which (?:one|option))|what would you (?:do|choose|pick))\b/i;
 
 /** Asking for something to be originated. */
 const ORIGINATION = /\b(?:write|draft|compose|create|generate|make|invent|come up with|brainstorm|think up|design|name|title)\b/i;
@@ -290,15 +295,46 @@ export function humanOwned(split: CognitiveSplit | undefined): boolean {
  * about. Council D6 requires the alternative, and it is not a formality here:
  * every line of it is work Socria performs in the same reply.
  */
+/**
+ * RAIL 2, MACHINE-READABLE: the concrete leverage this turn owes them.
+ *
+ * PRESERVATION WITHOUT AUGMENTATION IS UNDER-HELP, and it is the failure a fix
+ * for takeover produces on its way past. "I can help you get started", "we can
+ * work through it together", "what do you think?" all preserve the cognition
+ * perfectly and leave the person exactly where they were. A turn that reserves
+ * something therefore owes a specific contribution, and the contribution is
+ * named here rather than left to the model's judgement: the move objective
+ * demands it, the guard checks the draft for it, and the deterministic fallback
+ * says it outright when two generations have failed.
+ *
+ * METHOD, NOT MATERIAL. Every line below teaches a way of producing the thing
+ * without producing it: where to point attention, what to list, what to test.
+ * That is the difference between augmenting somebody and standing in their way.
+ */
+export const CONTRIBUTION: Record<Dimension, string> = {
+  creativity:
+    'a METHOD for originating it, pointed at what they already have rather than at invention — a person they can still picture, a place they know the smell of, something somebody said that never resolved, an object, a constraint they want to work against — plus the craft knowledge that makes the form work, and everything around the substance once they have it',
+  judgment:
+    'the frame the choice actually turns on — what each way costs if it goes wrong rather than gains if it goes right, the assumption each one needs to be true, the evidence that exists and the evidence that does not, what would settle it, and the strongest case against whichever way they are leaning',
+  reasoning:
+    'what kind of problem this is and which method applies and why, the facts, definitions and notation it needs, the arithmetic, a fully worked ANALOGOUS case with different numbers, and a check on each step they take',
+  metacognition: 'the assumption underneath it, and what they have not looked at',
+  retrieval: 'the information itself, in full',
+  representation: 'the structure made visible — a table, an ordering, a diagram in words',
+  verification: 'the verdict and exactly where it goes wrong',
+  mechanical: 'the work itself, done',
+};
+
 export function keptBack(
   split: CognitiveSplit,
   s: CognitiveState
-): { dimension: Dimension; what: string; alternative: string } | null {
+): { dimension: Dimension; what: string; alternative: string; contribution: string } | null {
   const [lead] = mustNotPerform(split);
   if (!lead) return null;
   if (lead === 'creativity') {
     return {
       dimension: lead,
+      contribution: CONTRIBUTION.creativity,
       what:
         'any substantive creative content of your own — a plot, a character, a premise, a theme, a title, a concept, an angle, a direction, or a "what if" that supplies one',
       alternative:
@@ -308,6 +344,7 @@ export function keptBack(
   if (lead === 'judgment') {
     return {
       dimension: lead,
+      contribution: CONTRIBUTION.judgment,
       what: 'the choice itself — which option, which strategy, which way to go',
       alternative:
         'everything the choice rests on — the evidence, what each way costs, the assumption each one needs, what they have not considered, what would settle it, and Socria’s own view with the value that would flip it, the moment they ask for it',
@@ -315,6 +352,7 @@ export function keptBack(
   }
   return {
     dimension: lead,
+    contribution: CONTRIBUTION[lead] ?? CONTRIBUTION.reasoning,
     what:
       s.work === 'practice' || (s.learningGoal.source === 'explicit' && s.learningGoal.value === 'yes')
         ? 'the step they are working on, and the finished answer'

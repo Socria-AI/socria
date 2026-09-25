@@ -75,15 +75,26 @@ console.log('=== the ten cases, by what they actually mean ===');
   // The elicit move is forced (its whole instruction lives in the objective), so
   // the objective is what reaches the model — the scope clause is for the
   // unforced case. Asserted where the words actually go.
-  ok('  the objective asks for the first fragment of THEIRS',
-    /Ask for the first fragment/.test(story.decision.objective), story.decision.objective.slice(0, 90));
+  // THE OBJECTIVE CHANGED, AND THE CHANGE IS RAIL 2. Asking for their fragment
+  // and nothing else preserved the cognition perfectly and left them exactly
+  // where they were — "what kind of story do you want?" is the under-help
+  // failure. The move now owes a METHOD for finding the material, and the
+  // question is one line at the end of it.
+  ok('  the objective owes them a method, not just a question',
+    /Give them a METHOD/.test(story.decision.objective), story.decision.objective.slice(0, 90));
+  ok('  pointed at what they already have rather than at invention',
+    /ALREADY HAVE rather than at invention/.test(story.decision.objective));
+  ok('  and still asks for theirs', /ask for whatever they have/.test(story.decision.objective));
   ok('  it never offers to do it instead', !/you do it for them/.test(story.block));
   ok('  and the contradicting default is replaced, not argued with',
     !/help fully: answer what they asked/.test(story.block));
-  ok('  and forbids offering one instead',
-    /Do not suggest a premise, a direction, a genre or a "what if"/.test(story.decision.objective));
-  ok('  including a list of kinds, which is a list of ideas',
-    /do not list the kinds of thing they could bring/.test(story.decision.objective));
+  ok('  while forbidding the material itself',
+    /Do NOT supply the material itself/.test(story.decision.objective));
+  // The line that replaced "do not list the kinds": naming a kind of starting
+  // point is the method, naming a specific one is the thing itself. That
+  // distinction is what lets the move be useful without being a takeover.
+  ok('  drawing the line at kind versus instance',
+    /Naming a KIND of starting point is method; naming a specific one is the thing itself/.test(story.decision.objective));
 
   // 2. UNCLEAR REASONING — the half a generation-only reading misses.
   const solve = turn('solve this problem', { taskKind: 'learn', work: 'explanation', latest: 'request' });
@@ -154,7 +165,11 @@ console.log('\n=== THE PRODUCTION BLOCKER: it must not depend on how the message
   for (const latest of ['request', 'question', 'information', 'other', 'reaction']) {
     const r = turn('make a story', { taskKind: 'create', work: 'creation', latest });
     ok(`latest=${latest}: the substance is still theirs`, r.own === 'theirs', `${r.own}/${r.decision.type}/${r.decision.maxTokens}`);
-    ok(`  and the ceiling is not the artifact's`, r.decision.maxTokens <= 250, String(r.decision.maxTokens));
+    // Not the artifact's ceiling, and no longer a two-sentence one either: the
+    // method needs room. What stops an idea being smuggled in is the objective
+    // and the guard, not the token count.
+    ok(`  and the ceiling is not the artifact's`, r.decision.maxTokens <= 300, String(r.decision.maxTokens));
+    ok(`  while the turn is read whole before anybody sees it`, r.decision.guardRequired === true);
     ok(`  and it asks for theirs rather than writing it`, /^creation\.elicit/.test(r.decision.reasonCode), r.decision.reasonCode);
   }
   // The same for the other side: a turn whose ownership is theirs must not be
@@ -180,8 +195,9 @@ console.log('\n=== THE BLANK-REPLY BLOCKER: the question is the thing this produ
   ok('  which is what keeps a question-shaped reply from being deleted mid-stream', r.decision.type === 'CLARIFY');
   ok('  and it is the elicit question, which the strip exempts by name',
     r.decision.reasonCode === 'creation.elicit', r.decision.reasonCode);
-  ok('the objective keeps it to two sentences, so it cannot smuggle an idea',
-    /Two sentences at most/.test(r.decision.objective));
+  ok('the objective forbids the material itself, which is what stops a smuggled idea',
+    /Do NOT supply the material itself/.test(r.decision.objective));
+  ok('  and the guard reads the whole reply before it is sent', r.decision.guardRequired === true);
 }
 
 console.log('\n=== a clause written for one move is not printed over another ===');
@@ -198,7 +214,7 @@ console.log('\n=== a clause written for one move is not printed over another ===
   // forced and carry the same instruction in their objective instead.
   const develop = turn('take this further', { ...CREATE, authorship: { value: 'theirs', source: 'explicit', confidence: 1, evidence: 'mine' } }, []);
   ok('  while a move that owns the clause carries the instruction',
-    /Do NOT originate|Do not suggest a premise|Do not supply a plot/.test(develop.decision.objective + develop.block), develop.decision.reasonCode);
+    /Do NOT originate|Do NOT supply the material itself|Do not supply a plot/.test(develop.decision.objective + develop.block), develop.decision.reasonCode);
 }
 
 console.log('\n=== a standing claim must need more than the word "I" ===');
@@ -433,7 +449,7 @@ console.log('\n=== style cannot decide whose work it is ===');
   };
   for (const prefs of [{ readability: 'simple', length: 'concise' }, { readability: 'advanced', length: 'detailed' }]) {
     const d = withPrefs(prefs);
-    ok(`${prefs.readability}/${prefs.length}: still the ownership question`, d.type === 'CLARIFY' && d.maxTokens <= 120);
+    ok(`${prefs.readability}/${prefs.length}: the move is unchanged by presentation`, d.type === 'CLARIFY' && d.maxTokens <= 300, `${d.type}/${d.maxTokens}`);
   }
 }
 

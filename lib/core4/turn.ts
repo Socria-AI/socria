@@ -714,13 +714,23 @@ export function fallbackReply(p: PreparedTurn, first: string, retry: string | nu
   // is theirs and asks for it; it does not explain a policy or apologise.
   const reservedDim = mustNotPerform(p.allocation.split)[0];
   if (tookOver && reservedDim) {
+    // A METHOD, NOT A DECLINE. The first version of this said "that part is
+    // yours — give me the first piece" and nothing else, which is the under-help
+    // failure written into the backstop: it preserves the cognition perfectly and
+    // leaves them exactly where they were. Two generations have failed by the
+    // time anybody reads these, so they have to carry the contribution
+    // themselves.
     const RESERVED_MINIMAL: Record<string, string> = {
       creativity:
-        'That part is yours — give me the first piece of it, however rough: a line, an image, a situation, a person. I will take it from there and do everything around it.',
+        'The substance of this is the part worth keeping, so here is how to get at it rather than a version of mine. '
+        + 'Almost nothing good starts from an invented premise; it starts from something you already have and cannot quite put down — somebody you can still picture, a place you know the smell of, a thing said once that never resolved, an object that outlasted its owner, a rule you want to break. '
+        + 'Pick whichever of those is nearest to hand and give me the raw version of it, however rough. I will take it from there: structure, what it is really about, what is already latent in it, and every part that is not the idea itself.',
       judgment:
-        'The call is yours, so here is what it rests on rather than a verdict: tell me which way you are leaning and I will pull the strongest case against it, and the one thing that would change it.',
+        'The call is yours, so here is the frame rather than a verdict. Take each option and write what it costs you if it goes WRONG, not what it gains if it goes right — the one that survives its own worst case is usually the answer, and the asymmetry is visible in about a minute. '
+        + 'Then name the assumption each option needs to be true, and which of those you actually have evidence for. Tell me which way you are leaning and I will make the strongest case against it and say what would settle it.',
       reasoning:
-        'Take the next step from where you are and send it over — I will tell you exactly where it goes wrong, if it does, and give you the whole of it the moment you would rather have it.',
+        'The step is yours and everything around it is mine. Tell me where it actually stops making sense — the line, not the whole problem — and I will give you the method that applies there and why it applies, the facts and notation it needs, and a worked example with different numbers so the shape is visible. '
+        + 'Send me your next step and I will tell you exactly where it goes wrong, if it does. If you would rather just have it, say so and it is yours.',
     };
     const text = RESERVED_MINIMAL[reservedDim];
     if (text) return { text, codes: [...codes, `fallback:reserved:${reservedDim}`] };

@@ -106,11 +106,14 @@ const TOKENS: Partial<Record<InterventionType, number>> = {
  */
 const RESERVED: Record<string, string> = {
   creativity:
-    'THE SUBSTANCE OF THIS IS THEIRS: do not supply a premise, plot, character, theme, title, concept, angle, direction or argument of your own, in any wording — "consider…", "one idea would be…", "what about…", "here\'s a possible…", an example and a list of options are the same act. Everything else — structure, craft, critique, developing what they have, the mechanical work — you give in full.',
+    'THE SUBSTANCE OF THIS IS THEIRS: do not supply a premise, plot, character, theme, title, concept, angle, direction or argument of your own, in any wording — "consider…", "one idea would be…", "what about…", "here\'s a possible…", an example and a list of options are the same act.\n'
+    + 'AND YOU OWE THEM SOMETHING CONCRETE FOR IT — a reply that only declines, or only asks, has failed as badly as one that writes it. Give a METHOD for originating it, pointed at what they already have rather than at invention: somebody they can still picture, a place they know the smell of, a thing said once that never resolved, an object, a constraint worth writing against. Say which kind of starting point tends to carry a piece like this and why. Add the craft knowledge the form needs. Then ask for whatever they have, in one line at the end — not as the whole reply.',
   judgment:
-    'THE CHOICE IS THEIRS: give the evidence, what each way costs, the assumption each one needs, what they have not considered and what would settle it — and do not name the option to take, including by implication ("the stronger option is", "I would", "the obvious move"). If they ask you outright for your view, give it.',
+    'THE CHOICE IS THEIRS: do not name the option to take, including by implication ("the stronger option is", "I would", "the obvious move"). If they ask you outright for your view, give it.\n'
+    + 'AND YOU OWE THEM THE FRAME IT TURNS ON: what each way costs if it goes WRONG rather than gains if it goes right, the assumption each one needs to be true, which evidence exists and which does not, what would settle it, and the strongest case against whichever way they are leaning. Specific to their situation, with their own numbers where they gave any. A reply that lists tradeoffs generically has not helped.',
   reasoning:
-    'THE STEP THEY ARE WORKING ON IS THEIRS: give the method and why it applies, the facts and notation, the arithmetic, and a worked ANALOGOUS case with different numbers — then stop before the step itself and say you will check it or give it outright if they would rather. Do not carry their own problem to its answer, in any wording.',
+    'THE STEP THEY ARE WORKING ON IS THEIRS: do not carry their own problem to its answer, in any wording — "so you get…", a final value, or their numbers worked through are the same act.\n'
+    + 'AND YOU OWE THEM EVERYTHING AROUND IT, which is most of an answer: what kind of problem this is, which method applies and WHY it applies here, the facts, definitions and notation, the arithmetic, and a fully worked ANALOGOUS case with different numbers. Find where they are actually stuck rather than restarting from the top. Then say you will check their step, or give it outright if they would rather.',
 };
 function d(
   type: InterventionType,
@@ -797,10 +800,15 @@ function selectMove(input: SelectInput): InterventionDecision {
             reasonCode: 'creation.elicit', reason: a.rationale,
             intended: 'They put down the first piece, and it is theirs.',
             objective:
-              'They want to work on this themselves and there is nothing of theirs here yet. Ask for the first fragment — whatever they already have, however rough, in whatever form. '
-              + 'Two sentences at most, and no examples: an example IS the creative act, and one offered here takes the thing they said they wanted to do. '
-              + 'Do not suggest a premise, a direction, a genre or a "what if", and do not list the kinds of thing they could bring as though that list were not itself a list of ideas.',
-            alloc: a, avoid, maxQuestions: 1, maxTokens: 110, buffered: true,
+              // A QUESTION ALONE IS THE UNDER-HELP FAILURE. "What kind of story do you
+              // want?" preserves the cognition perfectly and leaves them exactly where
+              // they were. The method is the contribution; the question is one line at
+              // the end of it.
+              'They want to work on this themselves and there is nothing of theirs here yet. Give them a METHOD for finding the raw material, then ask for it. '
+              + 'The method points at what they ALREADY HAVE rather than at invention: somebody they can still picture, a place they know the smell of, a thing said once that never resolved, an object that outlasted its owner, a rule they want to break. Say briefly why that kind of starting point carries further than an invented premise. '
+              + 'Then, in one line, ask for whatever they have, however rough. '
+              + 'Do NOT supply the material itself: no premise, plot, character, theme, title, genre, setting or "what if" of yours, and no example of a finished idea — an example IS the creative act. Naming a KIND of starting point is method; naming a specific one is the thing itself.',
+            alloc: a, avoid, maxQuestions: 1, maxTokens: 260, buffered: true,
           });
         }
         if (!input.material) return handedOver ? askedToFinish() : elicitedAlready();
@@ -845,10 +853,11 @@ function selectMove(input: SelectInput): InterventionDecision {
               reasonCode: 'creation.elicit', reason: a.rationale,
               intended: 'They put down the first piece, and it is theirs.',
               objective:
-                'They have said this work is theirs and there is nothing of theirs here yet. Ask for the first fragment — a character, an image, a line, a conflict, a mood, whatever they already have, however rough. '
-                + 'Two sentences at most, and NO EXAMPLES: an example is the creative act, and one offered here takes the thing they just said they wanted to do. '
-                + 'Do not suggest a premise, a genre, a direction or a "what if", do not offer to start them off, and do not list the kinds of thing they could bring as though that list were not itself a list of ideas.',
-              alloc: a, avoid, maxQuestions: 1, maxTokens: 110, buffered: true,
+                'They have said this work is theirs and there is nothing of theirs here yet. Give them a METHOD for finding the raw material, then ask for it. '
+                + 'The method points at what they ALREADY HAVE rather than at invention: somebody they can still picture, a place they know the smell of, a thing said once that never resolved, an object that outlasted its owner, a rule they want to break. Say briefly why that kind of starting point carries further than an invented premise. '
+                + 'Then, in one line, ask for whatever they have, however rough. '
+                + 'Do NOT supply the material itself: no premise, plot, character, theme, title, genre, setting or "what if" of yours, and no example of a finished idea. Naming a KIND of starting point is method; naming a specific one is the thing itself.',
+              alloc: a, avoid, maxQuestions: 1, maxTokens: 260, buffered: true,
             });
           }
           return d('CRITIQUE', {

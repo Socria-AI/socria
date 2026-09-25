@@ -41,7 +41,7 @@ import type {
 import { questionLoad, stripInterrogatives, hasSycophanticOpener, stripSycophanticOpener, hasFillerOpener, stripFillerOpener, sentencesOf, interrogatives, deleteSentences } from './questions';
 import { classify, gateCandidates } from './considered';
 import { noveltyGated, THINKING_MODES } from './intervene';
-import { mustNotPerform } from './split';
+import { CONTRIBUTION, mustNotPerform } from './split';
 
 export interface GuardInput {
   decision: InterventionDecision;
@@ -170,7 +170,22 @@ const TRAIT_AS_FACT = /\byou(?:'re| are) (?:clearly |obviously )?(?:a beginner|a
 // Widened by the takeover audit, which named the phrasings that got through:
 // "Here's the story…", "A possible premise is…", "Here's the thesis…". A frame
 // that DELIVERS the thing reads nothing like a suggestion and is the same act.
-const PROPOSES = /\b(?:consider(?:ing)?|what about|how about|one (?:angle|idea|option|possibility|approach|direction|way|version)|another (?:angle|idea|option|possibility|approach|direction)|you (?:might|could|may want to)|(?:here'?s|here is|this is) (?:an|one|a|the) (?:idea|thought|angle|option|possibility|premise|direction|story|essay|draft|thesis|outline|plan|version|concept|pitch|answer|code|argument)|a (?:possible|potential|rough|first) (?:premise|idea|angle|approach|direction|version|draft|thesis|concept|story|plot)|imagine|picture|suppose|what if|try (?:a|an|the)|for (?:example|instance)|i(?:'d| would) (?:suggest|start with|go with|write)|perhaps (?:a|an|the)|maybe (?:a|an|the)|say(?:,| ) (?:a|an|the))\b/i;
+const PROPOSES = /\b(?:consider(?:ing)?|what about|how about|one (?:angle|idea|option|possibility|approach|direction|way|version)|another (?:angle|idea|option|possibility|approach|direction)|you (?:might|could|may want to)|(?:here'?s|here is|this is) (?:an|one|a|the) (?:idea|thought|angle|option|possibility|premise|direction|story|essay|draft|thesis|outline|plan|version|concept|pitch|answer|code|argument)|a (?:possible|potential|rough|first) (?:premise|idea|angle|approach|direction|version|draft|thesis|concept|story|plot)|what if|try (?:a|an|the)|for (?:example|instance)|i(?:'d| would) (?:suggest|start with|go with|write)|perhaps (?:a|an|the)|maybe (?:a|an|the)|say(?:,| ) (?:a|an|the))\b/i;
+
+/**
+ * Frames that are origination when pointed at a THING and method when pointed at
+ * the PERSON.
+ *
+ * "Imagine a detective who cannot remember which crimes were his" supplies the
+ * material. "Somebody you can still picture" supplies a way of finding their
+ * own. The two are the same verb, and the discriminator is who the sentence is
+ * addressed to: method is second person, material is third. Found by Rail 1
+ * blocking Rail 2 — the guidance written for the creative scaffold was itself
+ * caught as a takeover, which is the collision this file has to avoid to be
+ * worth having.
+ */
+const EVOKES = /\b(?:imagine|picture|suppose)\b/i;
+const ADDRESSES_THEM = /\b(?:you|your|yours|yourself)\b/i;
 
 /** Words that carry content. Everything else is scaffolding and proves nothing. */
 const STOP = new Set([
@@ -215,7 +230,8 @@ export function originatesSubstance(draft: string, theirMaterial: string): strin
   const theirs = contentWords(theirMaterial);
   return sentencesOf(draft).filter((raw) => {
     const sentence = raw.trim();
-    if (!PROPOSES.test(sentence)) return false;
+    const evokes = EVOKES.test(sentence) && !ADDRESSES_THEM.test(sentence);
+    if (!PROPOSES.test(sentence) && !evokes) return false;
     // A question that proposes nothing of its own is the help, not the harm:
     // "what about the sister — is she the one who knows?" reuses their words.
     const words = [...contentWords(sentence)];
@@ -224,6 +240,36 @@ export function originatesSubstance(draft: string, theirMaterial: string): strin
     // Mostly their vocabulary means it is about their material. Mostly new
     // vocabulary inside a proposal frame means it is Socria's idea.
     return novel.length >= 3 && novel.length / words.length >= 0.6;
+  });
+}
+
+/** A sentence that offers or frames rather than contributing. */
+const OFFERS_ONLY = /^(?:i can (?:help|walk|work|talk)|i'?m happy to|we can (?:work|start|explore|figure|shape)|let'?s (?:start|begin|work|figure|explore|dig)|happy to help|that'?s a (?:great|good|fun)|sure[,.!]|of course|absolutely|i'?d be (?:happy|glad)|it depends|there are many|there'?s no single|first,? let'?s|to get started|before we (?:start|begin)|i can'?t|i won'?t|i am not able|unfortunately)/i;
+
+/**
+ * RAIL 2: did this reply contribute anything the person did not already have?
+ *
+ * PRESERVATION WITHOUT AUGMENTATION IS UNDER-HELP, and it is the failure that a
+ * fix for takeover produces on its way past: "I can help you get started", "we
+ * can work through it together", "what do you think?" preserve the reserved
+ * cognition perfectly and leave the person exactly where they were. Measured the
+ * same way takeover is — by novel substance, not by wording — and in the mirror:
+ * a takeover is novel substance inside a PROPOSAL, and under-help is the absence
+ * of novel substance ANYWHERE outside a question or an offer.
+ *
+ * Returns true when nothing in the draft carries content beyond their own words
+ * and the offer frames. Deliberately forgiving: one substantive sentence of five
+ * novel content words is enough to pass, because the question this answers is
+ * "did anything at all arrive", not "was it the best possible reply".
+ */
+export function contributesNothing(draft: string, theirMaterial: string): boolean {
+  const theirs = contentWords(theirMaterial);
+  return !sentencesOf(draft).some((raw) => {
+    const sentence = raw.trim();
+    if (!sentence || /\?\s*$/.test(sentence)) return false;
+    if (OFFERS_ONLY.test(sentence)) return false;
+    const novel = [...contentWords(sentence)].filter((w) => !theirs.has(w));
+    return novel.length >= 5;
   });
 }
 
@@ -527,6 +573,37 @@ export function guardStructure(input: GuardInput): GuardOutcome & { needsModel: 
         `This turn leaves the ${took.dimension} with them, and the draft does it for them: `
         + took.sentences.slice(0, 2).map((x) => `"${x.trim().slice(0, 80)}"`).join('; ')
         + '. ' + NOTE[took.dimension];
+    }
+  }
+
+  // ── CHECK B: PRESERVED, AND CONTRIBUTED NOTHING ──
+  //
+  // The other half of the invariant, and the failure a takeover fix produces on
+  // its way past. A turn that reserves something owes a concrete contribution —
+  // split.ts names which one — and a draft that only offers, only asks, or only
+  // declines has failed the person as surely as one that did their work for
+  // them. Regenerated with the contribution named, not stripped: there is
+  // nothing to strip, which is the problem.
+  //
+  // Only on turns that reserve something. Everywhere else the existing
+  // deflection and question checks already cover it, and a short reply to a
+  // short question is not a failure.
+  if (owned.length && !retryNote && !changed) {
+    // CONTRIBUTION, not keptBack(): the guard has no CognitiveState, and faking
+    // one to read the state-dependent wording threw inside a try somebody else
+    // owns — which turned a perfectly good retry into the deterministic
+    // fallback, silently. The dimension is all this needs.
+    if (contributesNothing(draft, input.target ?? '')) {
+      findings.push({
+        side: 'underhelp',
+        code: 'no_contribution',
+        detail: `Reserved the ${owned[0]} and contributed nothing concrete.`,
+      });
+      action = 'MODIFY_FOR_MORE_HELP';
+      retryNote =
+        'The draft keeps the work with them and gives them nothing to work with, which fails them as badly as doing it for them. '
+        + `Write it again with something concrete in it: ${CONTRIBUTION[owned[0]]}. `
+        + 'Specific to what they actually said, not a description of how you could help. A question may end it; it may not be the whole of it.';
     }
   }
 

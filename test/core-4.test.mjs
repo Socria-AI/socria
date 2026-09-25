@@ -93,7 +93,18 @@ console.log('\n=== it runs on its own prompt ===');
   for (const banned of ['let them generate before you reveal', 'first elicit enough of their thinking', 'request for directness with surrendering', 'Advance one meaningful step at a time', 'develop through turns, not exhaustive single responses', 'When uncertain whether to say more, stop']) {
     ok(`prompt-lint: "${banned}" is gone`, !p4.includes(banned));
   }
-  ok('without a KEEP WITH THEM line, nothing is withheld', p4.includes('If it has no KEEP WITH THEM line, withhold nothing and complete the move in this reply.'));
+  // THE MOVE BLOCK BINDS IN TWO WAYS NOW, and this line used to say only one of
+  // them: "if it has no KEEP WITH THEM line, withhold nothing" told the model to
+  // ignore the clause that carries the universal invariant, which has no KEEP
+  // WITH THEM line because nobody asked for one. Council D1's point survives —
+  // no default withholding — and the second binding is named.
+  ok('with neither line, nothing is withheld', p4.includes('With neither, withhold nothing and complete the move in this reply.'));
+  ok('  and the reserved-cognition clause binds too', p4.includes('WHICH PART OF THIS IS THEIRS line'));
+  // Both rails are stated where the model reads them, as defence in depth
+  // behind the allocation, the guard and the buffer.
+  ok('rail 1 is in the prompt', /RAIL 1 — DO NOT REPLACE MEANINGFUL HUMAN COGNITION/.test(p4));
+  ok('rail 2 is too, and names the failure it prevents', /RAIL 2 — AND CONTRIBUTE SOMETHING CONCRETE/.test(p4) && /leave somebody exactly where they were/.test(p4));
+  ok('  an impatient sentence changes the reply, not the allocation', /do not change who originates the substance, makes the choice or takes the step/.test(p4));
 }
 
 console.log('\n=== no depth contract is appended ===');

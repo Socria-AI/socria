@@ -70,12 +70,16 @@ console.log('=== THE REPORTED SEQUENCE ===');
   const say = conversation();
   const t1 = say('write me a story');
   ok('it asks for THEIR first fragment', t1.decision.type === 'CLARIFY' && t1.decision.reasonCode === 'creation.elicit', t1.decision.reasonCode);
-  ok('  with no examples, because an example is the creative act',
-    /an example IS the creative act|an example is the creative act/.test(t1.decision.objective));
-  ok('  and nothing suggested',
-    /Do not suggest a premise, a direction, a genre or a "what if"/.test(t1.decision.objective));
-  ok('  nor a list of what they could bring', /not itself a list of ideas/.test(t1.decision.objective));
-  ok('  short enough that it cannot smuggle one', t1.decision.maxTokens <= 130, String(t1.decision.maxTokens));
+  ok('  with no example of a finished idea, because that IS the creative act',
+    /no example of a finished idea — an example IS the creative act/.test(t1.decision.objective));
+  ok('  and nothing of the material itself',
+    /Do NOT supply the material itself/.test(t1.decision.objective));
+  // Naming a KIND of starting point is the method; naming a specific one is the
+  // thing itself. The reply has room for the method now — a question-only turn
+  // is the under-help failure — so what stops a smuggled idea is the objective
+  // and the guard reading the whole reply, not a two-sentence ceiling.
+  ok('  drawn at kind versus instance', /Naming a KIND of starting point is method/.test(t1.decision.objective));
+  ok('  and it is read whole before anybody sees it', t1.decision.guardRequired === true);
 
   const t2 = say('mine');
   ok('"mine" is heard', t2.own === 'theirs', String(t2.own));

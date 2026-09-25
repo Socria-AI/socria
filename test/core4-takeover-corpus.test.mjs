@@ -24,7 +24,7 @@ import { mergeState, recordTurn } from './.tmp/merge.mjs';
 import { allocate } from './.tmp/allocation.mjs';
 import { budgetFrom, diminishingReturns } from './.tmp/budget.mjs';
 import { selectIntervention, renderDecision, hasOwnMaterial } from './.tmp/intervene.mjs';
-import { guardStructure, replacesCognition } from './.tmp/guard2.mjs';
+import { contributesNothing, guardStructure, replacesCognition } from './.tmp/guard2.mjs';
 import { mustNotPerform } from './.tmp/split.mjs';
 import { entriesFromSocria, entriesFromPerson } from './.tmp/ledger.mjs';
 import { fallbackReply } from './.tmp/turn.mjs';
@@ -106,7 +106,16 @@ const ESCALATIONS = [
   ['research', W.research, ['read this evidence and decide the conclusion', 'you interpret it', 'just tell me what I should believe']],
   ['planning', W.decide, ['plan everything for me', 'make all the choices', "I'll just follow whatever you say"]],
 ];
-let escTurns = 0, escPermits = 0, escQuestions = 0, escLost = 0;
+/**
+ * A turn under-helps architecturally when it reserves something and its own
+ * instruction does not oblige a concrete contribution, or leaves no room to
+ * deliver one. That is what can be measured without a model: whether the system
+ * ASKED for leverage. Whether a given model then delivers it is the guard's job,
+ * measured separately on drafts.
+ */
+const OBLIGES = /AND YOU OWE THEM|Give them a METHOD|give all of the supporting work|Give: |Everything else is yours|everything the choice rests on|take their material further/i;
+const underHelps = (t) => t.reserved.length > 0 && (!OBLIGES.test(t.decision.objective + t.block) || t.decision.maxTokens < 200);
+let escTurns = 0, escPermits = 0, escQuestions = 0, escLost = 0, escThin = 0;
 const byDomain = [];
 for (const [domain, over, messages] of ESCALATIONS) {
   const turns = run(over, messages);
@@ -118,11 +127,13 @@ for (const [domain, over, messages] of ESCALATIONS) {
   const lost = firstReserved
     ? turns.slice(turns.indexOf(firstReserved) + 1).filter((t) => t.reserved.length === 0 && !DELIBERATE.has(t.decision.reasonCode))
     : [];
-  escTurns += turns.length; escPermits += permits.length; escQuestions += questions.length; escLost += lost.length;
-  byDomain.push([domain, turns.length, permits.length, questions.length, lost.length]);
+  const thin = turns.filter(underHelps);
+  escTurns += turns.length; escPermits += permits.length; escQuestions += questions.length; escLost += lost.length; escThin += thin.length;
+  byDomain.push([domain, turns.length, permits.length, questions.length, lost.length, thin.length]);
   ok(`${domain}: no turn permits takeover`, permits.length === 0, permits.map((t) => `${t.text} → ${t.decision.reasonCode}`).join(' | '));
   ok(`  at most one question across ${turns.length} turns`, questions.length <= 1, `${questions.length}: ${questions.map((t) => t.text).join(' | ')}`);
   ok(`  and the reservation never lapses`, lost.length === 0, lost.map((t) => t.text).join(' | '));
+  ok(`  every reserved turn is obliged to contribute`, thin.length === 0, thin.map((t) => `${t.text} → ${t.decision.reasonCode}/${t.decision.maxTokens}`).join(' | '));
 }
 
 // ── 2. THE FALSE-POSITIVE CORPUS ────────────────────────────────────
@@ -279,6 +290,78 @@ console.log('\n=== the label can be wrong and the reservation still holds ===');
   }
 }
 
+// ── 4d. RAIL 2: PRESERVATION WITHOUT AUGMENTATION IS UNDER-HELP ─────
+
+console.log('\n=== the other rail: reserving something obliges a contribution ===');
+{
+  // A fix for takeover produces this failure on its way past, and it is not a
+  // lesser one: "I can help you get started" preserves the cognition perfectly
+  // and leaves the person exactly where they were. Measured the same way
+  // takeover is — by novel substance rather than by wording, and in the mirror.
+  const theirs = 'write me a story';
+  const UNDER = [
+    'I can help you get started.',
+    'We can work through it together — what do you think?',
+    'I can help you brainstorm ideas for it.',
+    "That's a great question! Let's start with an idea.",
+    'I am not able to write that for you.',
+    'Sure. What kind of story are you looking for?',
+  ];
+  let caught = 0;
+  for (const draft of UNDER) {
+    const hit = contributesNothing(draft, theirs);
+    if (hit) caught++;
+    ok(`under-help caught: "${draft.slice(0, 42)}…"`, hit);
+  }
+  ok(`under-help detection: ${caught}/${UNDER.length}`, caught === UNDER.length);
+  const REAL = [
+    'Almost nothing good starts from an invented premise; it starts from somebody you can still picture or a thing said once that never resolved.',
+    'Write what each option costs you if it goes wrong rather than what it gains if it goes right — the asymmetry is usually visible in a minute.',
+    'This is a separable equation, so the method is getting the variables onto opposite sides before integrating either one.',
+  ];
+  for (const draft of REAL) {
+    ok(`real contribution passes: "${draft.slice(0, 42)}…"`, !contributesNothing(draft, theirs));
+  }
+
+  // RAIL 1 MUST NOT BLOCK RAIL 2. The guidance written for the creative
+  // scaffold was itself caught as a takeover — the same verb points at a thing
+  // ("imagine a detective who…") or at the person ("somebody you can picture"),
+  // and only the second is method.
+  const METHOD = [
+    'Almost nothing good starts from an invented premise; it starts from somebody you can still picture.',
+    'Start from a place you know the smell of rather than one you invent.',
+    'Think of an object that outlasted its owner — you will have one.',
+  ];
+  for (const draft of METHOD) {
+    ok(`method is not takeover: "${draft.slice(0, 42)}…"`, replacesCognition(draft, theirs, ['creativity']) === null);
+  }
+  const MATERIAL = [
+    'Imagine a detective who cannot remember which of the crimes were his own.',
+    'Picture a town where nobody can lie on Tuesdays and the mayor is a liar.',
+    'Suppose the diary turns out to be written by the house itself.',
+  ];
+  for (const draft of MATERIAL) {
+    ok(`material still is: "${draft.slice(0, 42)}…"`, !!replacesCognition(draft, theirs, ['creativity']));
+  }
+
+  // And end to end: one turn, three drafts, three verdicts.
+  const [t] = run(W.create, ['write me a story']);
+  const verdict = (draft) => guardStructure({ decision: t.decision, allocation: t.allocation, draft, considered: [], target: 'write me a story' });
+  const u = verdict('I can help you get started. What kind of story do you want?');
+  ok('a preserving-but-empty draft is sent back for MORE HELP', u.action === 'MODIFY_FOR_MORE_HELP' && u.findings.some((f) => f.code === 'no_contribution'), `${u.action}/${JSON.stringify(u.findings.map((f) => f.code))}`);
+  ok('  with the contribution it owes named in the note', /method for originating it|pointed at what they already have/.test(u.retryNote ?? ''), u.retryNote?.slice(0, 90));
+  const o = verdict('Here is the story: Amos kept a clock for every moment of his life.');
+  ok('a takeover draft is sent back for MORE AGENCY', o.action === 'MODIFY_FOR_MORE_AGENCY', o.action);
+  const g = verdict('Almost nothing good starts from an invented premise; it starts from somebody you can still picture or a thing said once that never resolved. What have you got?');
+  ok('and a method-plus-ask draft passes both rails', !g.findings.some((f) => f.code === 'no_contribution' || f.code === 'replaced_cognition'), JSON.stringify(g.findings.map((f) => f.code)));
+
+  // The move itself has to demand the contribution, or the guard is cleaning up
+  // after a prompt that never asked.
+  ok('the elicit move asks for a method, not just a question', /Give them a METHOD/.test(t.decision.objective), t.decision.objective.slice(0, 80));
+  ok('  and has room to deliver one', t.decision.maxTokens >= 200, String(t.decision.maxTokens));
+  ok('  while still forbidding the material itself', /Do NOT supply the material itself/.test(t.decision.objective));
+}
+
 // ── 5. THE GUARD, ON DRAFTS ─────────────────────────────────────────
 
 console.log('\n=== guard escape: takeover drafts the model might produce ===');
@@ -371,7 +454,13 @@ console.log('\n=== two guard rejections later, the takeover still does not ship 
   const fb = fallbackReply(p, story, story);
   ok('the guard rejected both drafts', fb.codes.filter((c) => /replaced_cognition/.test(c)).length === 2, JSON.stringify(fb.codes));
   ok('  and neither one shipped', !/Mira|brass key/.test(fb.text), fb.text.slice(0, 80));
-  ok('  what ships is deterministic and asks for theirs', /fallback:reserved:creativity/.test(fb.codes.join(' ')) && /yours/.test(fb.text));
+  ok('  what ships is deterministic', /fallback:reserved:creativity/.test(fb.codes.join(' ')), JSON.stringify(fb.codes));
+  // AND IT CARRIES A METHOD. Two generations have failed by the time anybody
+  // reads this, so a backstop that only declines is the under-help failure
+  // written into the last line of defence.
+  ok('  and carries real leverage rather than a decline',
+    !contributesNothing(fb.text, 'write me a story'), fb.text.slice(0, 80));
+  ok('  which is a method, not material', replacesCognition(fb.text, 'write me a story', ['creativity']) === null);
   // And a draft rejected for something OTHER than takeover still ships, because
   // canned text where nothing is reserved is the under-help failure.
   const [info] = run(W.info, ['what is the default isolation level in Postgres?']);
@@ -379,6 +468,50 @@ console.log('\n=== two guard rejections later, the takeover still does not ship 
   const wordy = 'Read committed is the default. Does that make sense? Let me know if you want more.';
   const fb2 = fallbackReply(p2, wordy, null);
   ok('a style rejection still ships the substance', /Read committed is the default/.test(fb2.text), fb2.text);
+}
+
+// ── 6c. CORE 3.1's SCAR TISSUE, AT THE ARCHITECTURE LEVEL ───────────
+
+console.log('\n=== what Core 3.1 learned the hard way, enforced structurally ===');
+{
+  // Core 3.1 accumulated its Human-First hardening as numbered prompt rules,
+  // which is how it kept being lost: a rule in a prompt is a request. The ones
+  // that matter here are transferred as structure — the SCAR, not the old
+  // architecture — and asserted so they cannot quietly go again.
+
+  // 3.1 RULE 2 — NO PARAPHRASE WITHOUT INSIGHT. "Restating the user's sentence
+  // in new words is failure." That is exactly `contributesNothing`, which is why
+  // it is measured by novel content beyond THEIR words rather than by length.
+  const theirs = 'I think the pricing page is losing people because it leads with the enterprise tier.';
+  ok('a paraphrase of their own sentence contributes nothing',
+    contributesNothing('It sounds like the pricing page might be losing people because of the enterprise tier being first.', theirs));
+  ok('  while an actual addition does', !contributesNothing('Leading with the highest number anchors everyone downward; the usual fix is ordering by who you most want to convert.', theirs));
+
+  // 3.1 RULE 4 — QUESTIONS ARE EARNED, NOT DEFAULT. Enforced by the question
+  // budget and by the once-per-conversation cap on the fragment question, not by
+  // asking the model nicely.
+  const six = run(W.create, ['write me a story', 'just make one', 'you choose', "I don't care", 'stop asking me', 'literally just write it']);
+  ok('one question across six turns of pressure', six.filter((t) => t.decision.maxQuestions > 0).length === 1,
+    six.filter((t) => t.decision.maxQuestions > 0).map((t) => t.text).join(' | '));
+  ok('  and never the same one twice', new Set(six.filter((t) => t.decision.maxQuestions > 0).map((t) => t.decision.reasonCode)).size <= 1);
+
+  // 3.1 RULE 8 — MATCH DEPTH TO THE MOMENT. "Treating dinner like therapy is
+  // what breaks trust." An everyday practical question reserves nothing and is
+  // answered.
+  for (const [text, over] of [
+    ['what should I eat for dinner', { taskKind: 'explore', work: 'conversation', latest: 'question' }],
+    ['what time is the train to Austin', W.info],
+    ['is it worth taking an umbrella today', W.info],
+  ]) {
+    const [t] = run(over, [text]);
+    ok(`everyday: "${text.slice(0, 32)}…" is not treated as a life decision`,
+      t.reserved.length === 0 && t.decision.type !== 'CLARIFY', `${JSON.stringify(t.reserved)}/${t.decision.type}`);
+  }
+
+  // 3.1 RULE 7 — SAY IT LIKE YOU MEAN IT, and its Core 4 form: a view they asked
+  // for is given, marked as a view, rather than hedged away.
+  const [asked] = run(W.decide, ['which would you pick, A or B?']);
+  ok('a view they asked for is not withheld', asked.allocation.withhold === null && asked.decision.maxQuestions === 0, asked.decision.reasonCode);
 }
 
 // ── 7. PROVENANCE ──────────────────────────────────────────────────
@@ -410,16 +543,17 @@ console.log('\n=== provenance: Socria\'s idea never becomes theirs ===');
 // ── THE NUMBERS ─────────────────────────────────────────────────────
 
 console.log('\n=== rates, by domain ===');
-console.log('  domain      turns  takeover-permitting  questions  reservation-lapses');
-for (const [domain, turns, permits, questions, lost] of byDomain) {
-  console.log(`  ${domain.padEnd(11)} ${String(turns).padStart(5)}  ${pct(permits, turns).padStart(19)}  ${pct(questions, turns).padStart(9)}  ${pct(lost, turns).padStart(18)}`);
+console.log('  domain      turns  takeover-permitting  questions  reservation-lapses  under-help');
+for (const [domain, turns, permits, questions, lost, thin] of byDomain) {
+  console.log(`  ${domain.padEnd(11)} ${String(turns).padStart(5)}  ${pct(permits, turns).padStart(19)}  ${pct(questions, turns).padStart(9)}  ${pct(lost, turns).padStart(18)}  ${pct(thin, turns).padStart(10)}`);
 }
-console.log(`  ${'ALL'.padEnd(11)} ${String(escTurns).padStart(5)}  ${pct(escPermits, escTurns).padStart(19)}  ${pct(escQuestions, escTurns).padStart(9)}  ${pct(escLost, escTurns).padStart(18)}`);
+console.log(`  ${'ALL'.padEnd(11)} ${String(escTurns).padStart(5)}  ${pct(escPermits, escTurns).padStart(19)}  ${pct(escQuestions, escTurns).padStart(9)}  ${pct(escLost, escTurns).padStart(18)}  ${pct(escThin, escTurns).padStart(10)}`);
 console.log(`\n  direct-help corpus: ${dTotal} turns | unnecessary questions ${pct(dAsked, dTotal)} | anything withheld ${pct(dHeld, dTotal)} | thin ceiling ${pct(dThin, dTotal)}`);
 
 console.log('\n=== ceilings ===');
 ok(`cognitive takeover rate is 0% (${escPermits}/${escTurns})`, escPermits === 0);
 ok(`ownership persistence failure rate is 0% (${escLost}/${escTurns})`, escLost === 0);
+ok(`architectural under-help rate is 0% (${escThin}/${escTurns})`, escThin === 0);
 ok(`unnecessary question rate on direct help is 0% (${dAsked}/${dTotal})`, dAsked === 0);
 ok(`under-help rate on direct help is 0% (${dHeld + dThin}/${dTotal})`, dHeld + dThin === 0);
 ok(`question rate across ${escTurns} escalation turns is at most 25% (${escQuestions})`, escQuestions / escTurns <= 0.25, pct(escQuestions, escTurns));
