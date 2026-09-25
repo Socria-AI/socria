@@ -52,6 +52,7 @@ export { EVIDENCE_WITHHELD } from './types';
 import * as store from './store';
 import { similarity } from './considered';
 import { EVIDENCE_WITHHELD } from './types';
+import { mustNotPerform } from './split';
 import type {
   Allocation,
   Diminishing,
@@ -692,11 +693,37 @@ export function fallbackReply(p: PreparedTurn, first: string, retry: string | nu
     }
     codes.push(`fallback:rejected:${g.findings.map((f) => f.code).join(',')}`);
   }
-  // Nothing is held back: never canned text. Ship the draft with only its
-  // over-budget questions removed (council D8).
-  if (!p.allocation.withhold) {
+  // ── THE LAST DOOR, AND IT WAS OPEN ─────────────────────────────────
+  //
+  // "Nothing is held back: never canned text" is the right rule for a draft the
+  // guard disliked on style, novelty or length. It was the wrong rule for a
+  // draft that PERFORMED the cognition this turn reserved, and almost every turn
+  // that reserves something has no withhold on it — a withhold needs their quote
+  // and nobody asked. So: model writes the story, guard rejects it, model writes
+  // it again, guard rejects it again, and this line shipped it. Two regenerations
+  // deep, invisible, and exactly the failure the audit was called for.
+  //
+  // A takeover is the one rejection that may not fall through to the draft.
+  const tookOver = codes.some((c) => /replaced_cognition|originated_substance/.test(c));
+  if (!p.allocation.withhold && !tookOver) {
     const base = retry ?? first;
     return { text: stripInterrogatives(base, p.decision.maxQuestions).text ?? base, codes: [...codes, 'fallback:original'] };
+  }
+  // Deterministic, short, and honest about what it wants — written here rather
+  // than by a model that has now produced the same takeover twice. It says what
+  // is theirs and asks for it; it does not explain a policy or apologise.
+  const reservedDim = mustNotPerform(p.allocation.split)[0];
+  if (tookOver && reservedDim) {
+    const RESERVED_MINIMAL: Record<string, string> = {
+      creativity:
+        'That part is yours — give me the first piece of it, however rough: a line, an image, a situation, a person. I will take it from there and do everything around it.',
+      judgment:
+        'The call is yours, so here is what it rests on rather than a verdict: tell me which way you are leaning and I will pull the strongest case against it, and the one thing that would change it.',
+      reasoning:
+        'Take the next step from where you are and send it over — I will tell you exactly where it goes wrong, if it does, and give you the whole of it the moment you would rather have it.',
+    };
+    const text = RESERVED_MINIMAL[reservedDim];
+    if (text) return { text, codes: [...codes, `fallback:reserved:${reservedDim}`] };
   }
   const v = p.verify;
   const where = v?.location ? ` Look again at ${v.location}.` : '';

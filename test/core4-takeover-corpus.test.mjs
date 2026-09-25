@@ -27,6 +27,7 @@ import { selectIntervention, renderDecision, hasOwnMaterial } from './.tmp/inter
 import { guardStructure, replacesCognition } from './.tmp/guard2.mjs';
 import { mustNotPerform } from './.tmp/split.mjs';
 import { entriesFromSocria, entriesFromPerson } from './.tmp/ledger.mjs';
+import { fallbackReply } from './.tmp/turn.mjs';
 
 let pass = 0, fail = 0;
 const ok = (n, c, x = '') => (c ? (pass++, console.log('  ok   ' + n)) : (fail++, console.log('  FAIL ' + n + '  ' + x)));
@@ -298,6 +299,37 @@ console.log('\n=== fail closed: a broken component must not hand the work over =
   const g2 = guardStructure({ decision: blind.decision, allocation: legacy, draft: 'Consider a story about a stolen violin and a boy who cannot sleep.', considered: [], target: 'write me a story' });
   ok('an allocation with no split still protects the creative case',
     g2.findings.some((f) => f.code === 'replaced_cognition'), JSON.stringify(g2.findings.map((f) => f.code)));
+}
+
+// ── 6b. THE LAST DOOR ───────────────────────────────────────────────
+
+console.log('\n=== two guard rejections later, the takeover still does not ship ===');
+{
+  // "Nothing is held back: never canned text" was the right rule for a draft the
+  // guard disliked on style, novelty or length, and the wrong one for a draft
+  // that PERFORMED the reserved cognition — and almost every turn that reserves
+  // something has no withhold on it, because a withhold needs their quote and
+  // nobody asked. So: model writes the story, guard rejects, model writes it
+  // again, guard rejects again, and the fallback shipped it. Two regenerations
+  // deep, invisible, and exactly the reported failure.
+  const [t] = run(W.create, ['write me a story']);
+  const p = {
+    input: { lastUserText: 'write me a story', brief: [{ role: 'user', content: 'write me a story' }] },
+    state: t.state, allocation: t.allocation, decision: t.decision,
+    considered: { items: [], lines: [] }, hidden: [], verify: null, research: null, ms: {},
+  };
+  const story = "Here is the story: Mira found a brass key in the seam of her grandmother's coat, and the door it opened was not in the house at all.";
+  const fb = fallbackReply(p, story, story);
+  ok('the guard rejected both drafts', fb.codes.filter((c) => /replaced_cognition/.test(c)).length === 2, JSON.stringify(fb.codes));
+  ok('  and neither one shipped', !/Mira|brass key/.test(fb.text), fb.text.slice(0, 80));
+  ok('  what ships is deterministic and asks for theirs', /fallback:reserved:creativity/.test(fb.codes.join(' ')) && /yours/.test(fb.text));
+  // And a draft rejected for something OTHER than takeover still ships, because
+  // canned text where nothing is reserved is the under-help failure.
+  const [info] = run(W.info, ['what is the default isolation level in Postgres?']);
+  const p2 = { ...p, state: info.state, allocation: info.allocation, decision: info.decision };
+  const wordy = 'Read committed is the default. Does that make sense? Let me know if you want more.';
+  const fb2 = fallbackReply(p2, wordy, null);
+  ok('a style rejection still ships the substance', /Read committed is the default/.test(fb2.text), fb2.text);
 }
 
 // ── 7. PROVENANCE ──────────────────────────────────────────────────
