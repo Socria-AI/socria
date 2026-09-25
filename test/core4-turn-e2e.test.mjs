@@ -657,5 +657,37 @@ console.log('\n=== the measuring stages actually fire, and reach the prompt ==='
   globalThis.__ablation = undefined;
 }
 
+console.log('\n=== a lookup that was asked for and did not run reaches the prompt ===');
+{
+  // REPORTED TWICE FROM PRODUCTION, with the key configured the second time:
+  // "find me recent uta shorthorn articles on AI" → "I can't browse the web in
+  // real time… visit their official website and use the search feature." The
+  // gate is right and the query is right; what had to be proven is that when no
+  // search result comes back, the instruction telling the reply what to do
+  // INSTEAD actually reaches the model rather than leaving it to invent a
+  // sentence about its own capabilities.
+  //
+  // No search key exists in this harness, so runResearch returns null here for
+  // the same reason it would in production if the key were missing — which is
+  // exactly the path under test.
+  const cWeb = 'weblookup';
+  const ask = U('find me recent uta shorthorn articles on AI');
+  const w = await turn(cWeb, [ask], {
+    state: { taskKind: 'lookup', work: 'information', latest: 'question', currentFocus: 'recent UTA Shorthorn AI coverage' },
+    replies: ['Here is where to look.'],
+  });
+  ok('the prompt says the lookup did not run', /The lookup did not run/.test(w.prompt), w.prompt.slice(-400));
+  ok('  and carries the query it would have run', /recent uta shorthorn articles on AI/i.test(w.prompt));
+  ok('  it forbids the disclaimer reply', /DO NOT make this a disclaimer/.test(w.prompt));
+  ok('  and spends the turn on where to look', /WHERE TO LOOK, concretely/.test(w.prompt));
+  ok('  never letting it deny the capability', /Never say or imply you lack the ability to search/.test(w.prompt));
+  // And a turn nobody asked to look anything up on carries none of it.
+  const quiet = await turn('noweb', [U('what is the quotient rule')], {
+    state: { taskKind: 'learn', work: 'explanation', latest: 'question', currentFocus: 'the quotient rule' },
+    replies: ['It is (u/v)\u2032 = (u\u2032v \u2212 uv\u2032)/v\u00b2.'],
+  });
+  ok('an ordinary question carries no lookup block', !/The lookup did not run/.test(quiet.prompt));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
