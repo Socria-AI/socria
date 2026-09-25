@@ -50,6 +50,32 @@ console.log('\n=== turns that must NOT reach the internet ===');
     webIntent('look up the current pricing', { offRecord: true }).want === false);
   ok('an empty turn looks nothing up', webIntent('', NO).want === false);
 
+  // AN IMPERATIVE IS HOW HALF OF PEOPLE ASK FOR A LOOKUP.
+  //
+  // The freshness branch tested interrogative shape alone, so "what is the
+  // latest research on X" searched and "summarise the latest research on X"
+  // did not — the same errand, phrased the way people actually phrase it.
+  // Still gated on the answer being one that MOVES: the imperative on its own
+  // is almost always about their own material, which is the second block here.
+  for (const t of [
+    'summarise the latest research on GLP-1 and muscle mass',
+    'tell me the current price of natural gas',
+    'catch me up on the news in taiwan',
+    'find out what their pricing is now',
+    'update me on the rate decision this week',
+  ]) {
+    ok(`imperative lookup searches: "${t.slice(0, 44)}…"`, webIntent(t, NO).want === true, webIntent(t, NO).why);
+  }
+  for (const t of [
+    'summarise this document',
+    'list the pros and cons of my plan',
+    'compare my two drafts',
+    'tell me what you think of my essay',
+    'give me three story ideas',
+  ]) {
+    ok(`their own material does not: "${t.slice(0, 44)}…"`, webIntent(t, NO).want === false, webIntent(t, NO).why);
+  }
+
   // SENSITIVITY IS ESTABLISHED ONCE AND THEN PERSISTS. The third turn of a
   // conversation about somebody's diagnosis reads like an ordinary question,
   // and reading only this message's signals would have caught the first turn
