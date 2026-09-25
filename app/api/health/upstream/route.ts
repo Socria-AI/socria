@@ -11,7 +11,8 @@ import { auth } from '@clerk/nextjs/server';
 import OpenAI from 'openai';
 import { enforceRateLimit } from '@/lib/rate-limit';
 import { CORE_3_MODEL, CORE_3_FALLBACK_MODEL, CORE_4_MODEL } from '@/lib/socria-prompt';
-import { deployedCommit, probeModels, summarise } from '@/lib/upstream-health';
+import { deployedCommit, probeModels, probeSearch, summarise } from '@/lib/upstream-health';
+import { runSearch, searchConfigured } from '@/lib/logos-explore';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -29,8 +30,21 @@ export async function GET(req: NextRequest) {
     hasApiKey: !!apiKey,
   };
 
+  // Whether Core 4 can look things up, asked of this runtime rather than of the
+  // dashboard. `images: false` because nothing here displays one, and it is one
+  // fewer billed request per check.
+  const search = await probeSearch({
+    configured: searchConfigured,
+    run: (q) => runSearch(q, { images: false }),
+  });
+
   if (!apiKey) {
-    return NextResponse.json({ ...base, probes: [], verdict: summarise({ ...base, probes: [] }) });
+    return NextResponse.json({
+      ...base,
+      probes: [],
+      search,
+      verdict: summarise({ ...base, probes: [], search }),
+    });
   }
 
   // The reply models, then the fallback: the fallback answering while the
@@ -38,5 +52,5 @@ export async function GET(req: NextRequest) {
   // three at once is what makes that readable.
   const models = [...new Set([CORE_4_MODEL, CORE_3_MODEL, CORE_3_FALLBACK_MODEL])];
   const probes = await probeModels(new OpenAI({ apiKey, maxRetries: 0 }), models);
-  return NextResponse.json({ ...base, probes, verdict: summarise({ ...base, probes }) });
+  return NextResponse.json({ ...base, probes, search, verdict: summarise({ ...base, probes, search }) });
 }

@@ -119,36 +119,122 @@ export interface SearchBundle {
   }[];
   images: ExploreImage[];
   provider: string | null;
+  /**
+   * Why there are no results, when there are none.
+   *
+   * WHY THIS FIELD EXISTS. Every path out of a failed search used to be
+   * `.catch(() => null)` and `r.ok ? r.json() : null`, so a key the provider
+   * rejects, an account out of credits, blocked egress and a genuinely empty
+   * result set all arrived here as the same empty array and were logged
+   * nowhere. Four rounds of "search still isn't working" were spent on that,
+   * because the one fact that would have settled any of them in a second — the
+   * status code the provider returned — was thrown away at the point it was
+   * known. Absent on success.
+   */
+  failure?: SearchFailure;
+}
+
+/** What went wrong, in a form that can be logged and shown without leaking. */
+export interface SearchFailure {
+  provider: string;
+  /** the HTTP status, or null when the request never got an answer at all */
+  status: number | null;
+  /**
+   * The reason, from a fixed set. NEVER the provider's response body: it can
+   * echo the request, and a diagnostic that leaks a key is worse than the bug
+   * it diagnoses (same discipline as lib/upstream-error.ts).
+   */
+  why: 'rejected' | 'out of credits' | 'rate-limited' | 'unreachable' | 'no results';
 }
 
 export const EMPTY_SEARCH: SearchBundle = { results: [], images: [], provider: null };
 
+/**
+ * A provider key as the environment holds it, cleaned up.
+ *
+ * WHY THIS IS NOT PARANOIA. A key pasted into a dashboard field arrives with a
+ * trailing newline often enough, and wrapped in the quotes it was copied inside
+ * often enough, that both are ordinary. Either one passes `searchConfigured`
+ * — the variable IS set — and then goes out in a header the provider answers
+ * with 403, which reads from outside as "the key is wrong" when the key is
+ * fine. Trimming costs nothing and removes a whole class of afternoon.
+ *
+ * Empty after cleaning counts as absent: a variable set to "" or to a couple of
+ * spaces is somebody's half-finished configuration, not a key.
+ */
+function providerKey(name: 'SERPER_API_KEY' | 'TAVILY_API_KEY'): string | null {
+  const raw = process.env[name];
+  if (typeof raw !== 'string') return null;
+  const clean = raw.trim().replace(/^["']|["']$/g, '').trim();
+  return clean ? clean : null;
+}
+
+/**
+ * One POST, with the status kept.
+ *
+ * The status is the whole point: `fetch(...).then(r => r.ok ? r.json() : null)`
+ * is a one-liner that destroys the only evidence about why a search came back
+ * empty, and it is what this replaces.
+ */
+async function post(
+  url: string,
+  headers: Record<string, string>,
+  body: unknown
+): Promise<{ json: any; status: number | null }> {
+  try {
+    const r = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+      cache: 'no-store',
+    });
+    if (!r.ok) return { json: null, status: r.status };
+    return { json: await r.json().catch(() => null), status: r.status };
+  } catch {
+    // DNS, a refused socket, blocked egress, a proxy in the way: the request
+    // never landed, which is a different fault from one the provider answered.
+    return { json: null, status: null };
+  }
+}
+
+/** Name an empty result set from the status that produced it. */
+export function whyEmpty(provider: string, status: number | null): SearchFailure {
+  const why: SearchFailure['why'] =
+    status === null
+      ? 'unreachable'
+      : status === 402
+        ? 'out of credits'
+        : status === 429
+          ? 'rate-limited'
+          : status >= 400
+            ? 'rejected'
+            : 'no results';
+  return { provider, status, why };
+}
+
+/** Say it once, where it happened. No key, no body — a provider and a status. */
+function noteEmpty(f: SearchFailure): SearchFailure {
+  console.error('[search] no results', { provider: f.provider, status: f.status, why: f.why });
+  return f;
+}
+
 // ── providers ───────────────────────────────────────────────────────
 // Serper gives literal Google results; Tavily is the fallback. Neither
 // configured is a supported state, not an error.
-async function serper(query: string): Promise<SearchBundle> {
-  const key = process.env.SERPER_API_KEY!;
-  const headers = { 'X-API-KEY': key, 'Content-Type': 'application/json' };
+async function serper(query: string, images: boolean): Promise<SearchBundle> {
+  const headers = { 'X-API-KEY': providerKey('SERPER_API_KEY') ?? '', 'Content-Type': 'application/json' };
+  // TWO ENDPOINTS ONLY WHEN SOMETHING SHOWS IMAGES. Explore puts them beside a
+  // node; a chat reply has nowhere to put one. Asking anyway spent a second
+  // billed request per search and added a second way to fail, for a caller that
+  // discards the answer.
   const [web, img] = await Promise.all([
-    fetch('https://google.serper.dev/search', {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ q: query, num: 8 }),
-      cache: 'no-store',
-    })
-      .then((r) => (r.ok ? r.json() : null))
-      .catch(() => null),
-    fetch('https://google.serper.dev/images', {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ q: query, num: 10 }),
-      cache: 'no-store',
-    })
-      .then((r) => (r.ok ? r.json() : null))
-      .catch(() => null),
+    post('https://google.serper.dev/search', headers, { q: query, num: 8 }),
+    images
+      ? post('https://google.serper.dev/images', headers, { q: query, num: 10 })
+      : Promise.resolve({ json: null as any, status: 200 }),
   ]);
 
-  const results = (web?.organic ?? [])
+  const results = (web.json?.organic ?? [])
     .map((o: any) => {
       const url = safeUrl(o?.link);
       return url
@@ -164,7 +250,7 @@ async function serper(query: string): Promise<SearchBundle> {
     .filter(Boolean)
     .slice(0, 8);
 
-  const images = (img?.images ?? [])
+  const pictures = (img.json?.images ?? [])
     .map((i: any) => {
       const url = safeUrl(i?.imageUrl);
       return url
@@ -174,26 +260,28 @@ async function serper(query: string): Promise<SearchBundle> {
     .filter(Boolean)
     .slice(0, MAX_IMAGES);
 
-  return { results, images, provider: 'google' };
+  return {
+    results,
+    images: pictures,
+    provider: 'google',
+    ...(results.length ? {} : { failure: noteEmpty(whyEmpty('google', web.status)) }),
+  };
 }
 
-async function tavily(query: string): Promise<SearchBundle> {
-  const res = await fetch('https://api.tavily.com/search', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      api_key: process.env.TAVILY_API_KEY,
+async function tavily(query: string, images: boolean): Promise<SearchBundle> {
+  const res = await post(
+    'https://api.tavily.com/search',
+    { 'Content-Type': 'application/json' },
+    {
+      api_key: providerKey('TAVILY_API_KEY'),
       query,
-      include_images: true,
+      include_images: images,
       max_results: 8,
       search_depth: 'basic',
-    }),
-    cache: 'no-store',
-  })
-    .then((r) => (r.ok ? r.json() : null))
-    .catch(() => null);
+    }
+  );
 
-  const results = (res?.results ?? [])
+  const results = (res.json?.results ?? [])
     .map((o: any) => {
       const url = safeUrl(o?.url);
       return url
@@ -211,7 +299,7 @@ async function tavily(query: string): Promise<SearchBundle> {
     .filter(Boolean)
     .slice(0, 8);
 
-  const images = (res?.images ?? [])
+  const pictures = (res.json?.images ?? [])
     .map((i: any) => {
       const url = safeUrl(typeof i === 'string' ? i : i?.url);
       return url ? { url } : null;
@@ -219,21 +307,40 @@ async function tavily(query: string): Promise<SearchBundle> {
     .filter(Boolean)
     .slice(0, MAX_IMAGES);
 
-  return { results, images, provider: 'tavily' };
+  return {
+    results,
+    images: pictures,
+    provider: 'tavily',
+    ...(results.length ? {} : { failure: noteEmpty(whyEmpty('tavily', res.status)) }),
+  };
 }
 
 export function searchConfigured(): boolean {
-  return !!(process.env.SERPER_API_KEY || process.env.TAVILY_API_KEY);
+  return !!(providerKey('SERPER_API_KEY') || providerKey('TAVILY_API_KEY'));
 }
 
-export async function runSearch(query: string): Promise<SearchBundle> {
+/**
+ * One search, or a named nothing.
+ *
+ * `images: false` for any caller with nowhere to show one — it halves the
+ * requests and removes a failure that would not have mattered anyway.
+ *
+ * Still never throws: a dead search provider must not break the panel or hold
+ * up a reply. What changed is that it no longer stays quiet about it.
+ */
+export async function runSearch(
+  query: string,
+  opts?: { images?: boolean }
+): Promise<SearchBundle> {
+  const images = opts?.images !== false;
+  const provider = providerKey('SERPER_API_KEY') ? 'google' : providerKey('TAVILY_API_KEY') ? 'tavily' : null;
+  if (!provider) return EMPTY_SEARCH;
   try {
-    if (process.env.SERPER_API_KEY) return await serper(query);
-    if (process.env.TAVILY_API_KEY) return await tavily(query);
-  } catch {
-    // A dead search provider must not break the panel.
+    return provider === 'google' ? await serper(query, images) : await tavily(query, images);
+  } catch (e) {
+    console.error('[search] provider threw', { provider, kind: (e as Error)?.name ?? typeof e });
+    return { ...EMPTY_SEARCH, provider, failure: noteEmpty({ provider, status: null, why: 'unreachable' }) };
   }
-  return EMPTY_SEARCH;
 }
 
 // ── prompts ─────────────────────────────────────────────────────────

@@ -63,8 +63,22 @@ export async function searchWeb(query: string): Promise<{ sources: WebSource[]; 
   try {
     // Logos's own search, with a shorter leash: Explore runs in a panel the
     // person is watching fill, where this is holding up a reply.
-    const bundle = await withTimeout(runSearch(query), SEARCH_TIMEOUT_MS);
-    if (!bundle) return { sources: [], provider: '' };
+    // `images: false`: a reply has nowhere to put a picture, and asking for
+    // them anyway spent a second billed request per search and added a second
+    // endpoint that could fail on a turn that would have discarded the answer.
+    const bundle = await withTimeout(runSearch(query, { images: false }), SEARCH_TIMEOUT_MS);
+    if (!bundle) {
+      console.error('[core4/web] search timed out', { ms: SEARCH_TIMEOUT_MS });
+      return { sources: [], provider: '' };
+    }
+    // A NAMED NOTHING. The provider says why it had nothing — a rejected key,
+    // an account out of credits, blocked egress, or a query that genuinely
+    // matched nothing — and those need entirely different fixes. Reaching the
+    // rest of the turn as one empty array is what made four rounds of "search
+    // still isn't working" unanswerable from outside.
+    if (bundle.failure) {
+      console.error('[core4/web] no sources for this turn', bundle.failure);
+    }
     const sources = bundle.results
       .filter((r) => r.url.startsWith('http'))
       .slice(0, MAX_SOURCES)
