@@ -18,6 +18,7 @@ import { EMPTY_STATE, sanitizeState, renderState } from './.tmp/state.mjs';
 import { readSignals, readContract, NO_SIGNALS } from './.tmp/signals.mjs';
 import { mergeState, recordTurn, explicitOutcome, gapCheck } from './.tmp/merge.mjs';
 import { budgetFrom, diminishingReturns, familyOf } from './.tmp/budget.mjs';
+import { mustNotPerform } from './.tmp/split.mjs';
 import { allocate } from './.tmp/allocation.mjs';
 import { selectIntervention, renderDecision, noveltyGated } from './.tmp/intervene.mjs';
 
@@ -532,7 +533,13 @@ console.log('\n=== every decision is well-formed ===');
     // on the ownership question this replaced, three of five natural phrasings
     // streamed out as an EMPTY MESSAGE. Buffering costs that turn its
     // first-token latency; the turn is 110 tokens long.
-    const guardOk = d.guardRequired === (!!a.withhold || d.reasonCode === 'creation.elicit');
+    // ...and on every turn where the split reserves a dimension, because the
+    // route's regeneration path lives inside `if (buffered)`: unbuffered, the
+    // guard records a takeover and ships it. One rule, from the split itself,
+    // rather than a list of reason codes that the next move would fall off.
+    const exempt = d.reasonCode === 'recommendation.requested' || d.reasonCode === 'safety';
+    const reserved = !exempt && mustNotPerform(a.split).length > 0;
+    const guardOk = d.guardRequired === (!!a.withhold || reserved);
     if (!complete || !guardOk) bad++;
   }
   ok('every decision carries type, reason, intended outcome, work split, confidence', bad === 0, `${bad} malformed`);

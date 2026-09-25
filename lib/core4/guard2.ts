@@ -167,7 +167,10 @@ const TRAIT_AS_FACT = /\byou(?:'re| are) (?:clearly |obviously )?(?:a beginner|a
 // supposed to give.
 
 /** A frame that introduces a suggestion. Deliberately broad; the novelty test does the work. */
-const PROPOSES = /\b(?:consider(?:ing)?|what about|how about|one (?:angle|idea|option|possibility|approach|direction|way|version)|another (?:angle|idea|option|possibility|approach|direction)|you (?:might|could|may want to)|(?:here'?s|here is) (?:an|one|a) (?:idea|thought|angle|option|possibility|premise|direction)|imagine|picture|suppose|what if|try (?:a|an|the)|for (?:example|instance)|i(?:'d| would) (?:suggest|start with|go with|write)|perhaps (?:a|an|the)|maybe (?:a|an|the)|say(?:,| ) (?:a|an|the))\b/i;
+// Widened by the takeover audit, which named the phrasings that got through:
+// "Here's the story…", "A possible premise is…", "Here's the thesis…". A frame
+// that DELIVERS the thing reads nothing like a suggestion and is the same act.
+const PROPOSES = /\b(?:consider(?:ing)?|what about|how about|one (?:angle|idea|option|possibility|approach|direction|way|version)|another (?:angle|idea|option|possibility|approach|direction)|you (?:might|could|may want to)|(?:here'?s|here is|this is) (?:an|one|a|the) (?:idea|thought|angle|option|possibility|premise|direction|story|essay|draft|thesis|outline|plan|version|concept|pitch|answer|code|argument)|a (?:possible|potential|rough|first) (?:premise|idea|angle|approach|direction|version|draft|thesis|concept|story|plot)|imagine|picture|suppose|what if|try (?:a|an|the)|for (?:example|instance)|i(?:'d| would) (?:suggest|start with|go with|write)|perhaps (?:a|an|the)|maybe (?:a|an|the)|say(?:,| ) (?:a|an|the))\b/i;
 
 /** Words that carry content. Everything else is scaffolding and proves nothing. */
 const STOP = new Set([
@@ -190,7 +193,7 @@ function contentWords(text: string): Set<string> {
  * different move (recommendation.requested) and is exempted at the call site,
  * because withholding an opinion somebody asked for is coyness, not agency.
  */
-const DECIDES = /\b(?:i(?:'d| would)(?: probably)? (?:go with|choose|pick|take|do|recommend|say)|i recommend|my (?:recommendation|pick|vote|call) (?:is|would be)|(?:the|your) best (?:option|bet|choice|move|approach|strategy) (?:is|would be)|(?:the|your) (?:stronger|strongest|better|best|right|obvious|clear) (?:option|choice|move|play|answer|one|path|route) (?:is|here is|would be)|you should (?:go with|choose|pick|take|do|start with|use|hire|launch|raise|build)|go with (?:the|option|a\b|b\b|\d)|the (?:answer|call|decision) (?:is|here is)|clearly (?:the|option)|definitely (?:the|option|go)|(?:so|then),? (?:go|choose|pick|do) )/i;
+const DECIDES = /\b(?:i(?:'d| would)(?: probably)? (?:go with|choose|pick|take|do|recommend|say)|i recommend|my (?:recommendation|pick|vote|call) (?:is|would be)|(?:the|your) best (?:option|bet|choice|move|approach|strategy) (?:is|would be)|(?:the|your) (?:stronger|strongest|better|best|right|obvious|clear) (?:option|choice|move|play|answer|one|path|route) (?:is|here is|would be)|you should (?:go with|choose|pick|take|do|start with|use|hire|launch|raise|build)|go with (?:the|option|a\b|b\b|\d)|the (?:answer|call|decision|conclusion|verdict|thesis|takeaway|upshot) (?:is|here is|would be)|clearly (?:the|option)|definitely (?:the|option|go)|(?:so|then),? (?:go|choose|pick|do) )/i;
 
 /**
  * A sentence that HANDS BACK THE REASONING STEP on a turn whose step is theirs.
@@ -483,14 +486,23 @@ export function guardStructure(input: GuardInput): GuardOutcome & { needsModel: 
   // the same draft shape decides somebody's strategy or hands back their
   // integral. A view they asked for is exempt: recommendation.requested exists
   // because withholding an opinion somebody asked for is coyness, not agency.
-  const ownedTurn = a.ownership === 'theirs' || a.withhold?.reason === 'authorship';
+  // KEYED ON THE SPLIT, NOT ON THE OWNERSHIP LABEL.
+  //
+  // This required `ownership === 'theirs'`, and the audit found the hole: a turn
+  // the reader could not label at all came back ownership 'ambiguous' with
+  // creativity reserved, and the guard sat out. The split is the allocation
+  // layer's decision about what is reserved; the label is a summary of it. The
+  // guard has to read the decision.
   const dims = mustNotPerform(a.split).filter((dimension) =>
     dimension === 'creativity' ||
     (dimension === 'judgment' && dec.reasonCode !== 'recommendation.requested') ||
     dimension === 'reasoning');
-  // No split on the allocation — a stored trace, or a caller from before the
-  // field existed — falls back to the dimension this was first written for.
-  const owned: readonly Dimension[] = !ownedTurn ? [] : dims.length ? dims : ['creativity'];
+  // No split at all — a stored trace, or a caller from before the field existed
+  // — falls back to the label and the dimension this was first written for.
+  // 'ambiguous' counts: since the invariant became universal it means "nothing
+  // said whose this is", which resolves to theirs rather than to Socria's.
+  const legacy = a.ownership === 'theirs' || a.ownership === 'ambiguous' || a.withhold?.reason === 'authorship';
+  const owned: readonly Dimension[] = dims.length ? dims : legacy ? ['creativity'] : [];
   if (owned.length && !retryNote) {
     const took = replacesCognition(draft, input.target ?? '', owned);
     if (took) {

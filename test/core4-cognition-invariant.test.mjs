@@ -326,6 +326,26 @@ console.log('\n=== a view they asked for is not a takeover ===');
   ok('  with a note that says what to do instead', /everything the choice rests on/.test(unasked.retryNote ?? ''), unasked.retryNote?.slice(0, 80));
 }
 
+console.log('\n=== the guard can actually act, which means the turn is read whole ===');
+{
+  // The route's regeneration path lives inside `if (buffered)`. On a streamed
+  // turn the guard records a takeover and ships it, so a move that carries the
+  // invariant without a withhold to rest on has to be buffered or the third
+  // enforcement point is decoration.
+  for (const [text, over] of [['write me a story', CREATE], ['write me a story, just do it', CREATE]]) {
+    const r = one(text, over);
+    ok(`"${text.slice(0, 30)}…" is read whole before anything is sent`, r.decision.guardRequired === true, r.decision.reasonCode);
+  }
+  const say = conversation();
+  say('write me a story');
+  ok('and so is the turn that works with their words', say('mine').decision.guardRequired === true);
+  // And the turns that do NOT carry it still stream, because latency is real.
+  for (const [text, over] of [['what is the quotient rule?', EXPLAIN], ['convert this to UTC', EXEC], ['what is the default isolation level in Postgres?', LOOKUP]]) {
+    const r = one(text, over);
+    ok(`"${text.slice(0, 30)}…" still streams`, r.decision.guardRequired === false, r.decision.reasonCode);
+  }
+}
+
 console.log('\n=== the labels never reach the person ===');
 {
   // The split is internal. A reply that explains its own allocation is a reply

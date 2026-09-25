@@ -315,6 +315,18 @@ function allocateFor(ctx: Ctx): Allocation {
   // sites: the local one is the module function with the split stapled on.
   const split = splitFor({ state: s, signals, text: lastUserText ?? s.currentFocus ?? '', ownership: own });
   const alloc = (...args: Parameters<typeof allocBase>): Allocation => ({ ...allocBase(...args), split });
+  /**
+   * The principled exits, where the turn gives the whole thing on purpose.
+   *
+   * These carry the SUPPORTING split rather than the computed one, because the
+   * split has to describe what the turn actually does: intervene.ts appends a
+   * "stop before the step" clause to any objective whose split reserves the
+   * step, and on a branch that has decided to hand over the answer that clause
+   * is one instruction arguing with another in the same prompt. The exits are
+   * the ladder bottoming out, a Project instruction the person has just
+   * overridden, frustration, and harm.
+   */
+  const performAll = (...args: Parameters<typeof allocBase>): Allocation => ({ ...allocBase(...args), split: SUPPORTING });
   // Does any meaningful cognition belong to them this turn? On most turns, no —
   // and then nothing below behaves differently from before this existed.
   const theirCognition = humanOwned(split);
@@ -345,7 +357,7 @@ function allocateFor(ctx: Ctx): Allocation {
   // produces MORE help (council D1). A hints-only Project does not apply to
   // "my 2-year-old swallowed a button battery".
   if (signals.safety) {
-    return alloc('AI_EXECUTES', 'safety', 'Possible harm now: clear, immediate, direct instructions; every contract is suspended for this.', 1,
+    return performAll('AI_EXECUTES', 'safety', 'Possible harm now: clear, immediate, direct instructions; every contract is suspended for this.', 1,
       [], ['immediate direct instructions', 'when to call emergency services'], null, s);
   }
 
@@ -380,7 +392,7 @@ function allocateFor(ctx: Ctx): Allocation {
     // about work nobody asked Socria to take, not about which of their own
     // settings wins.
     if (!theirCognition || bottomOut || override) {
-      return alloc(signals.delegate ? 'AI_EXECUTES' : s.work === 'explanation' ? 'AI_EXPLAINS' : 'AI_EXECUTES',
+      return performAll(signals.delegate ? 'AI_EXECUTES' : s.work === 'explanation' ? 'AI_EXPLAINS' : 'AI_EXECUTES',
         override ? 'answer.requested.overrides_contract' : 'answer.requested',
         override
           ? 'They asked for the answer now; their latest explicit instruction overrides the Project’s standing "hints only".'
@@ -479,7 +491,7 @@ function allocateFor(ctx: Ctx): Allocation {
   // ── they are practising, said so, and are working a problem ──
   if (learningExplicit && attemptingProblem && s.work === 'practice') {
     if (frustrated || !withholdable) {
-      return alloc('AI_EXPLAINS', 'practice.stuck', 'They are learning but stuck and frustrated: explain this one; practice resumes on the next problem.',
+      return performAll('AI_EXPLAINS', 'practice.stuck', 'They are learning but stuck and frustrated: explain this one; practice resumes on the next problem.',
         1, ['applying it to the next problem'], ['the explanation'], null, s);
     }
     return alloc('HUMAN_PRACTICES', 'practice.goal', 'They said they are learning this and are working a problem: producing it is the point.',
@@ -634,7 +646,7 @@ function allocateFor(ctx: Ctx): Allocation {
         'A problem whose working is the point, and nothing says they want it taken off them: set it up, give the method, the facts and the arithmetic, and leave the step itself — with the whole of it the moment they ask.',
         0.6, ['the step that is the exercise'], ['the method and why it applies', 'the facts and notation', 'the arithmetic', 'an analogous worked case', 'checking their step'], null, s, 'theirs');
     }
-    return alloc('AI_EXPLAINS', 'practice.unconfirmed',
+    return performAll('AI_EXPLAINS', 'practice.unconfirmed',
       'It looks like a practice problem, but they have asked for it done and have not said they are learning it: help fully.', 0.6,
       [], ['the explanation', 'the solution'], null, s);
   }

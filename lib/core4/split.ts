@@ -51,8 +51,21 @@ import { DIMENSIONS, type CognitiveSplit, type Dimension, type ExplicitSignals, 
  */
 const PROBLEM = /\b(?:solve|prove|derive|integrate|differentiate|factor|simplify|show that|work (?:out|through)|figure out|compute the (?:proof|derivation)|do (?:this|these|my) (?:problem|problems|homework|exercise|exercises|assignment)|answer (?:this|these) question)\b/i;
 
-/** Asking for the judgement itself, rather than for what bears on it. */
-const DECISION = /\b(?:should i|which should|what should i|decide|choose|pick|recommend|best option|which one|go with|worth it|pros and cons of (?:my|our)|strategy for (?:my|our))\b/i;
+/**
+ * Asking for the judgement itself, rather than for what bears on it.
+ *
+ * The reader's `work`/`taskKind` is the primary signal and this is the floor
+ * under it, because the reader is a cheap model on a two-second deadline. Widened
+ * by the takeover audit, which found three phrasings that reserved nothing:
+ * "what is the play on pricing here", "what should our positioning be", "tell me
+ * the conclusion from this data".
+ *
+ * DELIBERATELY VERB-SPECIFIC on the "what should" family. "What should I expect
+ * from this API" is an information question, and reserving the judgement on it
+ * would hold back an answer nobody was deciding anything with — the under-help
+ * failure, arriving through the mechanism meant to prevent the other one.
+ */
+const DECISION = /\b(?:should i|which should|decide|choose|pick|recommend|best option|which one|go with|worth it|pros and cons of (?:my|our)|strategy for (?:my|our)|what should (?:i|we|our team) (?:do|choose|pick|go with|prioriti[sz]e|focus on|build|charge|launch|say|write)|what should (?:our|my) (?:positioning|strategy|pricing|price|approach|plan) be|what(?:'s| is) the (?:play|move|call|right (?:call|move|choice|option|approach)|best (?:call|move|choice|option|approach|strategy))|tell me (?:the conclusion|what to (?:do|think|believe|choose)|which (?:one|option))|what would you (?:do|choose|pick))\b/i;
 
 /** Asking for something to be originated. */
 const ORIGINATION = /\b(?:write|draft|compose|create|generate|make|invent|come up with|brainstorm|think up|design|name|title)\b/i;
@@ -147,21 +160,59 @@ export function splitFor({ state: s, signals, text, ownership }: SplitInput): Co
   // dimension instead — learningGoal, practice, taskKind 'learn' — which is the
   // honest signal for "am I building this capability" and does not depend on
   // guessing from the noun.
-  const creating = !mechanicalAsk && (
-    s.work === 'creation' || s.taskKind === 'create' ||
-    (ORIGINATION.test(t) && s.work !== 'information' && s.work !== 'execution' && s.work !== 'diagnosis'));
+  //
+  // THE LABEL PERSISTS; THE MESSAGE DOES NOT HAVE TO REPEAT ITSELF. This read
+  // the current message only, and "I don't care" is not a request for anything —
+  // so ownershipRead returned null, the veto fired, creativity came back 'share'
+  // and the fourth turn of a creative conversation lost its protection entirely.
+  // Measured: four messages of ordinary impatience ("just make one" / "you
+  // choose" / "I don't care") and the turn was a generic answer with no clause
+  // on it. A contentless follow-up must inherit what the conversation already
+  // established, so the conversation's own work label decides, and only their
+  // own material ('scoped') settles it from there.
+  const creating = s.work === 'creation' || s.taskKind === 'create'
+    ? ownership !== 'scoped'
+    : ORIGINATION.test(t) && !mechanicalAsk &&
+      s.work !== 'information' && s.work !== 'execution' && s.work !== 'diagnosis';
 
   // Judgement: the choice is theirs whenever the turn is a decision. Their
   // asking for Socria's view does not move this — the view is given (see
   // recommendation.requested in intervene.ts) and the choice is still theirs.
-  const deciding = s.work === 'judgment' || s.taskKind === 'decide' || DECISION.test(t);
+  //
+  // `&& !creating` BECAUSE OF A MEASURED FAILURE. "you choose" in the middle of
+  // a creative conversation matched DECISION on the word "choose", judgment came
+  // out 'human', and judgment sorts before creativity — so the leading dimension
+  // became judgement on a turn that was about a story, the creative branch in
+  // intervene.ts was skipped, and the turn fell through to a generic answer with
+  // no clause and no buffering. Three messages of ordinary impatience and Socria
+  // would have written the story. A word in their sentence must not be able to
+  // relabel what kind of work this is.
+  //
+  // The regex is a FLOOR under an absent or vague label, not an override of a
+  // specific one. "What should I expect from this API" and "what should I read
+  // about elasticity" both match the `should i` family and are both information
+  // questions; when the reader has said information, explanation, verification,
+  // execution or diagnosis, it has said the bottleneck is knowledge, and
+  // reserving the judgement there withholds an answer nobody is deciding with.
+  const labelled = s.work === 'information' || s.work === 'explanation' ||
+    s.work === 'verification' || s.work === 'execution' || s.work === 'diagnosis';
+  const deciding = s.work === 'judgment' || s.taskKind === 'decide' ||
+    (DECISION.test(t) && !creating && !labelled);
 
   // Reasoning: 'scaffold' when the path is the point and they are building
   // capability in it; 'share' when it is instrumental — Socria reasons openly
   // and the conclusion is theirs to accept; 'perform' when there is no path,
   // only a fact or an operation.
+  //
+  // NOT `taskKind === 'learn'`. That is a mode the person is in, not a shape the
+  // task has, and including it scaffolded "what is the quotient rule?" — a pure
+  // knowledge gap, where the bottleneck is what Socria knows and the answer is
+  // the whole of the help. A path is a problem to traverse: their own practice,
+  // a judgement, research to interpret, or a message that asks for one to be
+  // worked. Measured: with 'learn' in here, 278 of the policy suite's decisions
+  // reserved a dimension they had no business reserving.
   const path = PROBLEM.test(t) || s.work === 'practice' || s.work === 'judgment' ||
-    s.work === 'research' || s.taskKind === 'decide' || s.taskKind === 'learn';
+    s.work === 'research' || s.taskKind === 'decide';
   const reasoning: Role = !path ? 'perform' : learning || !instrumental(s, signals) ? 'scaffold' : 'share';
 
   return {

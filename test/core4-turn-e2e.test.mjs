@@ -248,15 +248,18 @@ const t9 = await turn(c5, [l1, A(t8.received), l2], {
   // Word overlap alone no longer deletes a statement; the model check names it.
   guard: { action: 'MODIFY_FOR_MORE_HELP', findings: [{ side: 'novelty', detail: 'repeats a ruled-out option' }], redundant: ['Raising prices before the pilot ends would hurt trust.'] },
 });
-// Council D8/D9: nothing is withheld here, so the reply streams; prevention
-// (the avoid list in the prompt) is primary and the stream gate deletes only
-// re-asked questions. A re-raised STATEMENT on a streamed turn is not caught
-// — a known limit, measured by E5.
-ok('streamed, not buffered: no guard model call', t9.guardCalls === 0, String(t9.guardCalls));
+// THE KNOWN LIMIT HAS NARROWED, and this is where it shows. Nothing is withheld
+// here, so the reply used to stream — prevention (the avoid list in the prompt)
+// was primary, and a re-raised STATEMENT on a streamed turn was not caught,
+// measured by E5. A judgement turn now reserves the choice, and every turn that
+// reserves a dimension is read whole before anybody sees it: the guard runs, and
+// the re-raised statement is deleted after all. The limit survives only where
+// nothing is reserved and nothing is withheld.
+ok('a judgement turn is read whole, so the guard runs', t9.guardCalls === 1, String(t9.guardCalls));
 ok('next turn, what they already covered is in front of the model', /they ruled out: raising prices before the pilot ends/.test(t9.prompt), t9.prompt.slice(-900));
 ok('what Socria already said is marked as Socria\'s', /Socria already said: .*demo is stable/.test(t9.prompt));
-ok('known limit: a re-raised statement on a streamed turn is not deleted', /Raising prices/.test(t9.received), t9.received);
-ok('the new one did', /support load/.test(t9.received), t9.received);
+ok('and the re-raised statement is deleted', !/Raising prices/.test(t9.received), t9.received);
+ok('while the new one survives', /support load/.test(t9.received), t9.received);
 
 const l3 = U("that's not what I meant — I haven't decided on March at all");
 const t10 = await turn(c5, [l1, A(t8.received), l2, A(t9.received), l3], {

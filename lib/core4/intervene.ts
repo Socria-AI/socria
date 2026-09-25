@@ -94,6 +94,24 @@ const TOKENS: Partial<Record<InterventionType, number>> = {
   CLARIFY: 250, REFLECT: 200, GET_OUT_OF_THE_WAY: 120,
 };
 
+
+/**
+ * What the reply may not do, by dimension, in words a model acts on.
+ *
+ * Short on purpose. This is appended to whatever objective the chosen move
+ * already has, on every turn where the split reserves something, so it has to
+ * read as one more constraint rather than as a second set of instructions
+ * arguing with the first. It never mentions Human-First, ownership, allocation
+ * or any other internal vocabulary: it says what not to write.
+ */
+const RESERVED: Record<string, string> = {
+  creativity:
+    'THE SUBSTANCE OF THIS IS THEIRS: do not supply a premise, plot, character, theme, title, concept, angle, direction or argument of your own, in any wording — "consider…", "one idea would be…", "what about…", "here\'s a possible…", an example and a list of options are the same act. Everything else — structure, craft, critique, developing what they have, the mechanical work — you give in full.',
+  judgment:
+    'THE CHOICE IS THEIRS: give the evidence, what each way costs, the assumption each one needs, what they have not considered and what would settle it — and do not name the option to take, including by implication ("the stronger option is", "I would", "the obvious move"). If they ask you outright for your view, give it.',
+  reasoning:
+    'THE STEP THEY ARE WORKING ON IS THEIRS: give the method and why it applies, the facts and notation, the arithmetic, and a worked ANALOGOUS case with different numbers — then stop before the step itself and say you will check it or give it outright if they would rather. Do not carry their own problem to its answer, in any wording.',
+};
 function d(
   type: InterventionType,
   o: {
@@ -113,6 +131,27 @@ function d(
   }
 ): InterventionDecision {
   const maxQuestions = o.maxQuestions ?? 0;
+  // ── THE CHOKE POINT ────────────────────────────────────────────────
+  //
+  // ONE PLACE, AND EVERY MOVE GOES THROUGH IT. The branches above write specific
+  // instructions for the cases they know about; this catches the cases nobody
+  // wrote a branch for. A measured example: "you choose" on the third turn of a
+  // creative conversation reached the generic "answer what they asked" move with
+  // no clause on it and nothing buffered — three sentences of ordinary impatience
+  // away from a written story, because one branch did not fire.
+  //
+  // A missing branch must not be able to turn Core 4 into an ordinary assistant.
+  // So whatever the move, if the split reserves a dimension: the constraint is
+  // appended to the objective, and the turn is read whole before anybody sees it,
+  // because a guard that runs after the text has streamed enforces nothing.
+  //
+  // Exempt: a view they asked for outright (recommendation.requested) and the
+  // safety path, which only ever produces more help.
+  const reserved = o.reasonCode === 'recommendation.requested' || o.reasonCode === 'safety'
+    ? []
+    : mustNotPerform(o.alloc.split);
+  const clause = reserved.length ? RESERVED[reserved[0]] : '';
+  const objective = clause && !o.objective.includes(clause) ? `${o.objective}\n${clause}` : o.objective;
   return {
     type,
     reasonCode: o.reasonCode,
@@ -125,9 +164,9 @@ function d(
     // back (council D8): buffering every perspective move put the latency on
     // exactly the expert turns. Everything else streams through the sentence
     // gate, which holds questions (and drops re-asked ones) until the end.
-    guardRequired: !!o.alloc.withhold || !!o.buffered,
+    guardRequired: !!o.alloc.withhold || !!o.buffered || reserved.length > 0,
     maxQuestions,
-    objective: o.objective,
+    objective,
     avoid: o.avoid.slice(0, 12),
     switchedFrom: o.switchedFrom ?? null,
     maxTokens: o.maxTokens ?? TOKENS[type] ?? 600,
@@ -155,6 +194,21 @@ const FORCING = new Set([
   'recommendation.requested', 'retrieve.history', 'reflect.heard', 'reflect.minimal',
   // THE OWNERSHIP MOVES, and they belong here for the same reason the rest do:
   // the PERSON imposed them by saying whose the work is. They are also the
+// ── READ WHOLE, NOT STREAMED ─────────────────────────────────────────
+//
+// The guard is one of the three places the invariant is enforced, and on a
+// STREAMED turn it cannot enforce anything: the regeneration path in the chat
+// route lives inside `if (buffered)`, so on an unbuffered turn a takeover is
+// recorded and shipped. Every move whose substance is the person's to originate
+// therefore sets `buffered: true` — the withhold turns were already buffered by
+// council D8, and these are the ones that carry the invariant WITHOUT a withhold
+// to rest on (there is no quote to rest one on when nobody was asked).
+//
+// The cost is that turn's first-token latency and nothing else: information,
+// explanation, execution, diagnosis and verification turns still stream.
+// Judgement and scaffolded-reasoning turns also still stream, which is the one
+// place the guard remains advisory — see the report.
+
   // moves whose whole instruction lives in the objective — "ask for their
   // fragment, and give no examples, because an example is the creative act" —
   // and an unforced turn never prints its objective (council D1). Left
@@ -660,9 +714,14 @@ function selectMove(input: SelectInput): InterventionDecision {
       // reply has plenty to do without one.
       const handedOver = input.signals.delegate || input.signals.directness === 'answer' ||
         input.signals.stopQuestions || (s.directness.source === 'explicit' && s.directness.value === 'answer');
+      // ONCE IN A CONVERSATION, not once in the last two turns. Measured with
+      // the reported escalation: elicit → elicit.again → elicit.again → elicit,
+      // because the window had slid past the first ask. Four turns, two of them
+      // the same question, which is the loop this product exists to be the
+      // opposite of.
       const mayElicit =
         budget.allowed >= 1 && !handedOver &&
-        !s.history.slice(-2).some((h) => h.reason === 'creation.elicit');
+        !s.history.some((h) => h.reason === 'creation.elicit');
       /**
        * They asked for it finished, so there are no questions and no short reply
        * — every part that is not the substance, at length.
@@ -682,7 +741,7 @@ function selectMove(input: SelectInput): InterventionDecision {
           + 'Do NOT originate that thing, in any wording: a premise, a character, a theme, a title, a concept, an angle, a "what if", an example or a list of options are the same act. '
           + 'Do not apologise, do not explain the policy, do not name ownership or authorship, and do not ask.'
           + consideredNote,
-        alloc: a, avoid, maxQuestions: 0,
+        alloc: a, avoid, maxQuestions: 0, buffered: true,
       });
       /** Nothing of theirs, and no question to be had: work with the words they used. */
       const elicitedAlready = () => d('ANSWER', {
@@ -693,7 +752,7 @@ function selectMove(input: SelectInput): InterventionDecision {
           + 'Say what their own words already commit them to and what they leave open, or name the one thing that would most change what this becomes — in their terms, not yours. '
           + 'Do NOT supply a plot, character, premise, theme, title, concept, name or direction of your own, in any wording: "consider…", "what about…", "one angle could be…" and an example are the same act. '
           + 'Two or three sentences.',
-        alloc: a, avoid, maxQuestions: 0, maxTokens: 220,
+        alloc: a, avoid, maxQuestions: 0, maxTokens: 220, buffered: true,
       });
       if (a.ownership === 'theirs' && !a.withhold && lead === 'reasoning') {
         // THE STEP IS THEIRS; EVERYTHING AROUND IT IS SOCRIA'S, AT LENGTH.
@@ -753,7 +812,7 @@ function selectMove(input: SelectInput): InterventionDecision {
             + 'Do NOT originate: no plot, character, premise, theme, title, concept, name, angle or direction of yours, in any wording. "Consider…", "one angle could be…", "what about…", "you might try…" and a worked example are the same act with different punctuation. '
             + 'If they have given you almost nothing, ask for more of theirs rather than filling the gap.'
             + consideredNote,
-          alloc: a, avoid, maxTokens: 600,
+          alloc: a, avoid, maxTokens: 600, buffered: true,
         });
       }
 
@@ -799,7 +858,7 @@ function selectMove(input: SelectInput): InterventionDecision {
               'Specific, useful critique of THEIR material: what works, what does not, and why — concrete enough to act on. '
               + 'Everything you say must be ABOUT what they wrote. Do not supply a plot, character, premise, theme, title, concept or direction of your own, in any wording — not as "consider…", not as "one angle could be…", not as an example, not as a what-if. '
               + 'Where a choice is open, name the tension already in their material and what each way would cost them, without choosing. Do not rewrite it for them.',
-            alloc: a, avoid,
+            alloc: a, avoid, buffered: true,
           });
         }
         if (input.signals.recommendationRequested) {
