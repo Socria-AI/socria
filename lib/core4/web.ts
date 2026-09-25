@@ -175,7 +175,20 @@ export function webIntent(
 
   if (ASKED.test(t)) return { want: true, kind: 'search', why: 'they asked for it' };
 
-  const asks = /\?|^\s*(?:what|which|who|when|where|how much|how many|is|are|does|do|did|has|have|can)\b/i.test(t);
+  // A QUESTION MARK IS NOT THE ONLY WAY TO ASK FOR SOMETHING.
+  //
+  // This tested interrogative shape alone, so "summarise the latest research on
+  // GLP-1 and muscle mass" — a freshness word and an unmistakable request to go
+  // and find out — came back no-search, while "what is the latest research…"
+  // searched. An imperative is how half of people phrase a lookup.
+  //
+  // Still gated on a freshness word: the imperative alone means nothing ("list
+  // the pros and cons of my plan" is their material, not the internet's), and
+  // adding it here only widens the CURRENT branch, which already requires the
+  // answer to be one that moves.
+  const asks =
+    /\?|^\s*(?:what|which|who|when|where|how much|how many|is|are|does|do|did|has|have|can)\b/i.test(t) ||
+    /^\s*(?:summari[sz]e|tell me|give me|show me|list|compare|find out|catch me up|update me|remind me)\b/i.test(t);
   if ((CURRENT.test(t) || FUTURE_YEAR.test(t)) && asks && !INWARD.test(t)) {
     return { want: true, kind: 'search', why: 'the answer is one that moves' };
   }
