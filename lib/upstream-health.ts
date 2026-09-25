@@ -64,6 +64,79 @@ export async function probeModels(
   return out;
 }
 
+/**
+ * Whether this deployment can actually search, asked by making it search.
+ *
+ * WHY A SECOND PROBE. The model probes answered "can we reach OpenAI" and
+ * nothing else, so when Core 4's lookups silently stopped working the endpoint
+ * that exists to end this exact argument reported everything healthy. A key
+ * present in the Vercel dashboard is not the same fact as a key the provider
+ * accepts from this runtime, and only one of those two facts is worth knowing.
+ */
+export interface SearchProbe {
+  /** whether any provider key is readable from this runtime AT ALL */
+  configured: boolean;
+  /** which provider would be used, or null when none is configured */
+  provider: string | null;
+  ok: boolean;
+  /** how many results came back */
+  results: number;
+  /** the provider's HTTP status, when a request got an answer */
+  status?: number | null;
+  /** the fixed reason, when there were no results */
+  why?: string;
+  ms: number;
+}
+
+/** Just enough of the search layer to ask whether it works. */
+export interface SearchProbeClient {
+  configured(): boolean;
+  run(query: string): Promise<{
+    results: readonly unknown[];
+    provider: string | null;
+    failure?: { provider: string; status: number | null; why: string };
+  }>;
+}
+
+/**
+ * One real query, against whichever provider is configured.
+ *
+ * A FIXED QUERY, not a caller-supplied one: this endpoint is rate-limited but
+ * signed-in, and an arbitrary string here would make it a free search proxy.
+ */
+export async function probeSearch(
+  client: SearchProbeClient,
+  now: () => number = Date.now
+): Promise<SearchProbe> {
+  const t0 = now();
+  if (!client.configured()) {
+    return { configured: false, provider: null, ok: false, results: 0, why: 'no key', ms: 0 };
+  }
+  try {
+    const bundle = await client.run('socria health check');
+    const results = bundle.results.length;
+    return {
+      configured: true,
+      provider: bundle.provider ?? bundle.failure?.provider ?? null,
+      ok: results > 0,
+      results,
+      ...(bundle.failure ? { status: bundle.failure.status, why: bundle.failure.why } : {}),
+      ms: now() - t0,
+    };
+  } catch (e) {
+    // runSearch does not throw, so this is our code rather than theirs — named
+    // by class only, the same discipline as every other line here.
+    return {
+      configured: true,
+      provider: null,
+      ok: false,
+      results: 0,
+      why: `threw: ${(e as Error)?.name ?? typeof e}`,
+      ms: now() - t0,
+    };
+  }
+}
+
 export interface HealthReport {
   /** the build actually serving this request — the question a stale deploy makes unanswerable */
   commit: string | null;
@@ -71,9 +144,27 @@ export interface HealthReport {
   /** whether a key is configured. NEVER the key, and never any part of one. */
   hasApiKey: boolean;
   probes: Probe[];
+  /** whether Core 4 can look anything up. Absent on hosts that skip the check. */
+  search?: SearchProbe;
   /** one line naming what to do, chosen from the probes */
   verdict: string;
 }
+
+/** What to do about a search that does not work, by the reason it gave. */
+const SEARCH_VERDICT: Record<string, string> = {
+  'no key':
+    'Neither SERPER_API_KEY nor TAVILY_API_KEY is readable from this runtime, so Core 4 cannot look anything up. Set one and REDEPLOY — Vercel captures environment variables per deployment, so a key added after the last build is not in the build that is serving.',
+  rejected:
+    'The search provider refused the key this deployment holds. Check the value for stray whitespace or quotes, confirm it is set for the Production environment specifically, and redeploy.',
+  'out of credits':
+    'The search account is out of credits. Top it up; nothing in the code can work around it.',
+  'rate-limited':
+    'The search provider is rate-limiting this account. It will recover on its own; if it does not, the plan is too small for the traffic.',
+  unreachable:
+    'This deployment cannot reach the search provider at all. Check egress, DNS and any proxy or firewall in front of it.',
+  'no results':
+    'The provider answered and had nothing for the probe query. That is a provider-side oddity rather than a configuration fault — try again.',
+};
 
 const VERDICT: Partial<Record<UpstreamCode, string>> = {
   upstream_auth: 'The key this deployment holds is not accepted. Replace OPENAI_API_KEY and redeploy.',
@@ -88,8 +179,19 @@ const VERDICT: Partial<Record<UpstreamCode, string>> = {
 export function summarise(report: Omit<HealthReport, 'verdict'>): string {
   if (!report.hasApiKey) return 'No OPENAI_API_KEY is set on this deployment. Nothing can work until it is.';
   const bad = report.probes.find((p) => !p.ok);
-  if (!bad) return 'Everything this check can reach is working. If chat still fails, the fault is after this point — send the ref from the failing reply.';
-  return VERDICT[bad.code ?? 'internal'] ?? 'Something failed that this check cannot name.';
+  // The reply model first: without it there is no reply to put a source in.
+  if (bad) return VERDICT[bad.code ?? 'internal'] ?? 'Something failed that this check cannot name.';
+  // Then the web. Reported even though chat still works without it, because
+  // "Core 4 cannot look things up" is a whole feature missing and the symptom
+  // — a reply that says it could not pull anything up live — reads to everyone
+  // like a bug in the reply rather than a key that is not there.
+  if (report.search && !report.search.ok) {
+    return (
+      SEARCH_VERDICT[report.search.why ?? ''] ??
+      'Core 4 cannot look anything up, for a reason this check cannot name.'
+    );
+  }
+  return 'Everything this check can reach is working. If chat still fails, the fault is after this point — send the ref from the failing reply.';
 }
 
 /**

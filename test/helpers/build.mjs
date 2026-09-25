@@ -37,6 +37,7 @@ const MODULES = [
   'lib/easter-eggs.ts',
   'lib/upstream-error.ts',
   'lib/upstream-health.ts',
+  'lib/logos-explore.ts',
   'lib/socria-model-store.ts',
   'lib/math-context.ts',
   'lib/topic-drift.ts',
