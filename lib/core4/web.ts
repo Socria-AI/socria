@@ -269,6 +269,44 @@ export function flatten(raw: string): string {
  * from memory invents them, and a number is checkable — guard2 refuses a
  * citation that points at a source that was never given.
  */
+/**
+ * The block for a lookup that was WANTED and did not happen.
+ *
+ * THE FAILURE THIS FIXES, reported from production. "look up recent shorthorn
+ * articles" — the gate wanted a search, the search could not run, no block
+ * reached the prompt, and the model was left to guess at its own capabilities.
+ * It guessed: "I can't look up articles directly, but I can help guide you on
+ * where to find them... let me know!" A disclaimer, an offer, and nothing a
+ * person can act on — the emptiest reply this product can produce, on the one
+ * request where it should be at its most useful.
+ *
+ * Two things were wrong. The model was inferring what tools it has from what it
+ * was handed, which it must never do. And the instruction it followed said what
+ * NOT to claim without saying what to DO, so it produced an apology.
+ *
+ * WHERE TO LOOK IS THE ANSWER HERE. Somebody who asked for recent articles and
+ * cannot be handed them should still leave with the databases that index the
+ * field, the query that will actually find them, the two or three names whose
+ * work to follow, and what has changed recently enough that the search is worth
+ * running. That is not a consolation prize; on a retrieval turn it is most of
+ * the value, and it is the one thing a model can give without a network.
+ */
+export function renderNoResearch(wanted: boolean, query: string): string {
+  if (!wanted) return '';
+  return (
+    `\n=== The lookup did not run ===\n` +
+    `They asked you to look something up${query ? ` ("${flatten(query).slice(0, 120)}")` : ''} and no search reached the web this turn, ` +
+    `so you have no pages and no citations: say nothing about what any specific recent article contains.\n` +
+    `DO NOT make this a disclaimer. "I can't look things up, but I can help you find them" is the least useful sentence available and it is not what this turn is for. ` +
+    `Say in ONE clause that you could not pull it up live, then spend the rest of the reply on WHERE TO LOOK, concretely:\n` +
+    `- the specific databases, journals, registries, archives or sites that index this subject by name — not "academic databases"\n` +
+    `- the exact query to paste, in their words, including the operators or filters that actually narrow it\n` +
+    `- the people, groups or publications whose work to follow, where you know them\n` +
+    `- what you already know about the state of this subject, marked clearly as knowledge rather than as a fetched source, and what about it most needs checking against something current\n` +
+    `Never say or imply you lack the ability to search. Whether a search ran this turn is a fact about this turn, not about what you are.\n`
+  );
+}
+
 export function renderResearch(r: Research | null): string {
   if (!r || !r.sources.length) return '';
   const lines = r.sources

@@ -29,7 +29,7 @@ import { readState, guardModel, checkWork, COGNITION_MODEL } from '../cognition/
 import { testDependencies, renderCounterfactual, testContradictions, renderContradictions, type Counterfactual, type ContradictionTest } from './counterfactual';
 import { discoverFromHistory, renderHistory, type HistoricalFinding } from './history';
 import { voiceFor, renderVoice, type Voice } from './voice';
-import { renderResearch, type Research } from './web';
+import { buildQuery, renderNoResearch, renderResearch, webIntent, type Research } from './web';
 import { runResearch } from './web-server';
 import type { CommunicationPrefs } from './types';
 import { readSignals, readContract } from './signals';
@@ -551,7 +551,21 @@ export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
   const tWeb = Date.now();
   const research = await researching;
   ms.web = Date.now() - tWeb;
-  move += renderResearch(research);
+  // A LOOKUP THAT WAS WANTED AND DID NOT HAPPEN IS ITS OWN INSTRUCTION.
+  //
+  // With neither block present the model was inferring what tools it has from
+  // what it was handed, and answering "I can't look up articles directly, but I
+  // can help guide you" — a disclaimer and an offer, on the one request where
+  // this product should be most useful. Whether a search ran is a fact about the
+  // turn; what Socria is capable of is not the model's to guess at.
+  const wantedWeb = webIntent(
+    input.lastUserText,
+    signals,
+    policyUnknown ? 'none' : prior?.persistPolicy
+  );
+  move += research
+    ? renderResearch(research)
+    : renderNoResearch(wantedWeb.want, buildQuery(input.lastUserText, []));
 
   ms.prepare = Date.now() - t0;
   return {
