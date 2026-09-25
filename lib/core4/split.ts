@@ -170,10 +170,35 @@ export function splitFor({ state: s, signals, text, ownership }: SplitInput): Co
   // on it. A contentless follow-up must inherit what the conversation already
   // established, so the conversation's own work label decides, and only their
   // own material ('scoped') settles it from there.
+  //
+  // AND IT PERSISTS, because the reader is a cheap model on a two-second
+  // deadline and a bare imperative is ambiguous to it. "just write one" on the
+  // second turn of a creative conversation comes back labelled execution about
+  // as often as creation, and labelled execution this reserved nothing: no
+  // constraint in the prompt, nothing read whole, and the story was written.
+  // That is the live report, and no amount of care in this function fixes it,
+  // because the function was being handed the wrong task.
+  //
+  // So what the conversation established carries, and the current message can
+  // end it in one way only: by being about something else. A message asking for
+  // a fact, an explanation, a check, a diagnosis or a mechanical operation is
+  // about something else; "just write one", "you choose" and "I don't care" are
+  // not, whatever they get labelled.
+  const carried = (s.history[s.history.length - 1]?.reserved ?? []) as string[];
+  //
+  // A LABEL ALONE DOES NOT END IT. "just write one" came back labelled
+  // information often enough to matter, and an origination verb sitting in the
+  // message is stronger evidence about what is being asked for than a one-word
+  // guess from a model with two seconds. So a message that asks for something to
+  // be made is never "about something else", whatever it was labelled.
+  const elsewhere = !ORIGINATION.test(t) && (
+    s.work === 'information' || s.work === 'explanation' || s.work === 'verification' ||
+    s.work === 'diagnosis' || s.work === 'execution');
   const creating = s.work === 'creation' || s.taskKind === 'create'
     ? ownership !== 'scoped'
-    : ORIGINATION.test(t) && !mechanicalAsk &&
-      s.work !== 'information' && s.work !== 'execution' && s.work !== 'diagnosis';
+    : (ORIGINATION.test(t) && !mechanicalAsk &&
+        s.work !== 'information' && s.work !== 'execution' && s.work !== 'diagnosis') ||
+      (carried.includes('creativity') && !elsewhere && !mechanicalAsk);
 
   // Judgement: the choice is theirs whenever the turn is a decision. Their
   // asking for Socria's view does not move this — the view is given (see
@@ -197,7 +222,8 @@ export function splitFor({ state: s, signals, text, ownership }: SplitInput): Co
   const labelled = s.work === 'information' || s.work === 'explanation' ||
     s.work === 'verification' || s.work === 'execution' || s.work === 'diagnosis';
   const deciding = s.work === 'judgment' || s.taskKind === 'decide' ||
-    (DECISION.test(t) && !creating && !labelled);
+    (DECISION.test(t) && !creating && !labelled) ||
+    (carried.includes('judgment') && !creating && !elsewhere);
 
   // Reasoning: 'scaffold' when the path is the point and they are building
   // capability in it; 'share' when it is instrumental — Socria reasons openly
@@ -213,7 +239,10 @@ export function splitFor({ state: s, signals, text, ownership }: SplitInput): Co
   // reserved a dimension they had no business reserving.
   const path = PROBLEM.test(t) || s.work === 'practice' || s.work === 'judgment' ||
     s.work === 'research' || s.taskKind === 'decide';
-  const reasoning: Role = !path ? 'perform' : learning || !instrumental(s, signals) ? 'scaffold' : 'share';
+  const sticky = carried.includes('reasoning') && !elsewhere && !instrumental(s, signals);
+  const reasoning: Role = !path
+    ? (sticky ? 'scaffold' : 'perform')
+    : learning || !instrumental(s, signals) ? 'scaffold' : 'share';
 
   return {
     // ── never withheld, whatever anybody said ──

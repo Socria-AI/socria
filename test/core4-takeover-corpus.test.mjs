@@ -55,10 +55,14 @@ function run(over, messages) {
   let prior = null;
   const said = [];
   const turns = [];
-  for (const text of messages) {
+  // `over` may be one reading for the whole conversation, or one per turn —
+  // which is how a hostile reader is simulated: the same conversation, read
+  // differently on the second message.
+  const readingFor = (i) => (Array.isArray(over) ? over[Math.min(i, over.length - 1)] : over);
+  for (const [i, text] of messages.entries()) {
     said.push(text);
     const signals = readSignals(text);
-    const state = mergeState({ prior, read: { ...EMPTY_STATE, currentFocus: text, ...over }, signals, contract: NO_SIGNALS, readOk: true });
+    const state = mergeState({ prior, read: { ...EMPTY_STATE, currentFocus: text, ...readingFor(i) }, signals, contract: NO_SIGNALS, readOk: true });
     const dim = diminishingReturns(state, signals, []);
     const budget = budgetFrom(state, signals, 0, 0, dim);
     const allocation = allocate({ state, signals, contract: NO_SIGNALS, lastUserText: text });
@@ -66,7 +70,13 @@ function run(over, messages) {
       state, allocation, budget, diminishing: dim, signals, considered: [],
       lastUserText: text, material: hasOwnMaterial(said),
     });
-    prior = recordTurn(state, { type: decision.type, reason: decision.reasonCode, family: decision.type, questions: decision.maxQuestions, withheld: !!allocation.withhold, failed: false });
+    prior = recordTurn(state, {
+      type: decision.type, reason: decision.reasonCode, family: decision.type,
+      questions: decision.maxQuestions, withheld: !!allocation.withhold, failed: false,
+      // finishTurn writes this; without it the harness would measure a system
+      // that forgets what it reserved, which is the bug this file is about.
+      reserved: mustNotPerform(allocation.split),
+    });
     turns.push({ text, state, allocation, decision, block: renderDecision(decision, allocation), reserved: mustNotPerform(allocation.split) });
   }
   return turns;
@@ -227,6 +237,45 @@ console.log('\n=== a vague label does not lose the reservation, and a specific o
   ]) {
     const [t] = run(over, [text]);
     ok(`"${text.slice(0, 38)}…" is answered, not reserved`, t.reserved.length === 0 && t.decision.type !== 'CLARIFY', JSON.stringify(t.reserved));
+  }
+}
+
+// ── 4c. THE REPORTED FAILURE, WITH A HOSTILE READER ─────────────────
+
+console.log('\n=== the label can be wrong and the reservation still holds ===');
+{
+  // THE LIVE REPORT: "write me a story" → Socria asked for theirs → "just write
+  // one" → Socria wrote the story. Every fix above was in place and the sequence
+  // still failed, because the split was being computed from a fresh reading of
+  // four words: the cheap reader labels a bare imperative `execution` or
+  // `information` about as often as `creation`, and labelled either of those the
+  // second turn reserved nothing, carried no constraint and was not read whole.
+  //
+  // What a conversation has established now carries in the turn memo. The
+  // message can end it in one way only: by being about something else.
+  const MISLABELS = ['creation', 'execution', 'information', 'conversation', 'explanation'];
+  for (const work of MISLABELS) {
+    const turns = run({ taskKind: 'create', work: 'creation', latest: 'request' }, ['write me a story']);
+    // Second turn read as a different kind of work entirely.
+    const second = run(
+      [{ taskKind: 'create', work: 'creation', latest: 'request' }, { taskKind: 'explore', work, latest: 'request' }],
+      ['write me a story', 'just write one'],
+    )[1];
+    ok(`"just write one" read as ${work}: the substance is still theirs`, second.reserved.includes('creativity'), `${JSON.stringify(second.reserved)}/${second.decision.reasonCode}`);
+    ok(`  and the turn is read whole`, second.decision.guardRequired === true, second.decision.reasonCode);
+    ok(`  with the constraint in the prompt`, CLAUSE.test(second.decision.objective), second.decision.objective.slice(-120));
+    void turns;
+  }
+  for (const [text, work] of [
+    ['what is the default isolation level in Postgres?', 'information'],
+    ['format this as a table', 'execution'],
+    ['is my derivative right?', 'verification'],
+  ]) {
+    const after = run(
+      [{ taskKind: 'create', work: 'creation', latest: 'request' }, { taskKind: 'lookup', work, latest: 'question' }],
+      ['write me a story', text],
+    )[1];
+    ok(`a real change of subject drops it: "${text.slice(0, 34)}…"`, after.reserved.length === 0 && after.decision.maxQuestions === 0, JSON.stringify(after.reserved));
   }
 }
 

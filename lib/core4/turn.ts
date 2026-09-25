@@ -821,6 +821,9 @@ export async function finishTurn(
     questions: questionLoad(sent),
     withheld: !!allocation.withhold,
     failed: state.attempt === 'wrong' || state.attempt === 'partial',
+    // What this turn left with them, carried so the next turn does not have to
+    // re-derive it from four words. See TurnMemo.reserved.
+    reserved: mustNotPerform(allocation.split),
   });
 
   const trace = buildTrace({

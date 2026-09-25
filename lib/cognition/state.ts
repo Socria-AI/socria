@@ -160,6 +160,18 @@ export interface TurnMemo {
   withheld?: boolean;
   /** their attempt this turn was wrong or partial (for the practice ladder's bottom-out, council D6) */
   failed?: boolean;
+  /**
+   * Which cognition this turn left with the person (lib/core4/split.ts).
+   *
+   * PERSISTED BECAUSE THE READER IS A COIN TOSS ON A SHORT MESSAGE. The split is
+   * computed from the turn's own reading, and a bare imperative — "just write
+   * one" — comes back labelled execution about as often as creation. Labelled
+   * execution, the second turn of a creative conversation reserved nothing,
+   * carried no constraint and was not read whole, and the story was written.
+   * Measured against the live report. What a conversation has established is not
+   * re-derived from four words.
+   */
+  reserved?: string[];
   outcome?: OutcomeReading;
 }
 
