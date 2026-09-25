@@ -107,7 +107,28 @@ export function stripIdentifiers(text: string, names: string[] = []): string {
 // ── the gate ─────────────────────────────────────────────────────────
 
 /** They asked for it in so many words. */
-const ASKED = /\b(?:search (?:for|the web|online|it up)?|google (?:it|this|that)?|look (?:it|this|that|them) up|look up\b|check (?:online|the web|the internet|the news)|browse|find (?:me )?(?:a |the )?(?:link|source|article|paper|documentation|docs)\b|what do(?:es)? the (?:docs|documentation|spec) say)\b/i;
+// THE NOUN IS RARELY NEXT TO THE VERB. "find me a paper on X" matched and
+// "find me recent uta shorthorn articles on AI" did not, because the pattern
+// wanted the document word immediately after "find me" and a real request puts
+// three or four words of subject in between. Reported from production: the
+// search never ran, and the reply told somebody to go and use a website's own
+// search bar. Same for "find recent research on…", "pull up the latest coverage
+// of…", "get me studies about…".
+const FETCHABLE =
+  /\b(?:links?|sources?|articles?|papers?|documentation|docs|stud(?:y|ies)|research|news|reports?|coverage|citations?|references?)\b/;
+const ASKED = new RegExp(
+  '\\b(?:' +
+    'search (?:for|the web|online|it up)?' +
+    '|google (?:it|this|that)?' +
+    '|look (?:it|this|that|them) up|look up\\b' +
+    '|check (?:online|the web|the internet|the news)' +
+    '|browse' +
+    // find / get / show / pull up / dig up, then the subject, then the thing.
+    '|(?:find|get|show|pull up|dig up)\\b[^.?!]{0,60}?' + FETCHABLE.source +
+    '|what do(?:es)? the (?:docs|documentation|spec) say' +
+  ')\\b',
+  'i'
+);
 
 /** A question whose answer moves: it is about now, not about always. */
 const CURRENT = /\b(?:latest|current(?:ly)?|right now|today|this (?:week|month|year)|as of (?:today|now|this)|recent(?:ly)?|news|just (?:announced|released|shipped)|still (?:true|the case|supported|maintained)|price of|pricing|release date|changelog|deprecat(?:ed|ion)|who (?:is|are) the current)\b/i;

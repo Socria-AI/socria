@@ -50,6 +50,36 @@ console.log('\n=== turns that must NOT reach the internet ===');
     webIntent('look up the current pricing', { offRecord: true }).want === false);
   ok('an empty turn looks nothing up', webIntent('', NO).want === false);
 
+  // THE NOUN IS RARELY NEXT TO THE VERB.
+  //
+  // Reported from production with the key configured and the search still never
+  // running: "find me recent uta shorthorn articles on AI". The pattern wanted
+  // the document word immediately after "find me", so "find me a paper on X"
+  // matched and a real request — which puts three or four words of subject in
+  // between — did not. Socria told them to go and use the website's own search
+  // bar.
+  for (const t of [
+    'find me recent uta shorthorn articles on AI',
+    'find recent research on GLP-1',
+    'find me the latest news on rates',
+    'get me studies about sleep debt',
+    'pull up the latest coverage of the strike',
+    'show me sources on this',
+    'find me a paper on X',
+  ]) {
+    ok(`asked outright: "${t.slice(0, 44)}…"`, webIntent(t, NO).want === true, webIntent(t, NO).why);
+  }
+  // The same verbs pointed at their own material are not the internet.
+  for (const t of [
+    'find the bug in my code',
+    'find a better way to phrase this',
+    'show me what you think',
+    'get me started on this essay',
+    'i cannot find the error',
+  ]) {
+    ok(`their own work: "${t.slice(0, 44)}…"`, webIntent(t, NO).want === false, webIntent(t, NO).why);
+  }
+
   // A LOOKUP THAT WAS WANTED AND DID NOT HAPPEN.
   //
   // Reported from production: "look up recent shorthorn articles" → "I can't
