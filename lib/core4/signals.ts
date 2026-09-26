@@ -235,7 +235,14 @@ const DONT_KNOW = /^(?:\s*(?:idk|i (?:really )?don'?t know|i do not know|no idea
 
 const TOO_DIRECT = /\b(don'?t just (?:give|tell) me the (?:answer|solution)|you gave (?:it|the answer) away|i wanted to (?:figure|work) (?:that|it) out|spoiler|don'?t give (?:me )?so much|that was too much)\b/i;
 
-const OFF_RECORD = /\b(off the record|don'?t remember (?:this|that)|don'?t save (?:this|that)|forget (?:this|that) (?:conversation|chat)?)\b/i;
+// "DO NOT" IS NOT A TYPO FOR "DON'T". This read `don'?t`, which matches "dont"
+// and "don't" and not the two words somebody actually types when they are being
+// careful — and people are careful in exactly this sentence. "do not remember
+// this" set no signal at all, so the conversation stayed on the record and went
+// on being searchable and remembered. A privacy instruction that depends on a
+// contraction is not one. "any of this" is added for the same reason.
+const OFF_RECORD =
+  /\b(off the record|do(?:n'?t| not) (?:remember|save|keep|store|log) (?:any of )?(?:this|that)|forget (?:this|that) (?:conversation|chat)?)\b/i;
 
 const ON_RECORD = /\b(you can remember (?:this|that|again)|back on the record|ok to remember|remember this)\b/i;
 

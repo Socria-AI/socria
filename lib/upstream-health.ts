@@ -137,6 +137,36 @@ export async function probeSearch(
   }
 }
 
+/**
+ * Whether Core 4 can read the tables it keeps a person's reasoning in.
+ *
+ * The same lesson as the search probe, learnt the same way: every read in
+ * lib/core4/store.ts fails soft, which is right for a reply in flight and wrong
+ * for a deployment, because a missing table fails every read on every turn and
+ * the symptoms surface nowhere near the cause. One of those symptoms was Core 4
+ * quietly losing its internet.
+ */
+export interface StoreProbe {
+  ok: boolean;
+  /** the tables that could not be read, by name. Never any row from them. */
+  missing: string[];
+  why?: string;
+  ms: number;
+}
+
+export async function probeStore(
+  read: () => Promise<{ ok: boolean; missing: string[]; why?: string }>,
+  now: () => number = Date.now
+): Promise<StoreProbe> {
+  const t0 = now();
+  try {
+    const r = await read();
+    return { ok: r.ok, missing: r.missing, ...(r.why ? { why: r.why } : {}), ms: now() - t0 };
+  } catch (e) {
+    return { ok: false, missing: [], why: `threw: ${(e as Error)?.name ?? typeof e}`, ms: now() - t0 };
+  }
+}
+
 export interface HealthReport {
   /** the build actually serving this request — the question a stale deploy makes unanswerable */
   commit: string | null;
@@ -146,6 +176,8 @@ export interface HealthReport {
   probes: Probe[];
   /** whether Core 4 can look anything up. Absent on hosts that skip the check. */
   search?: SearchProbe;
+  /** whether Core 4 can read its own tables. Absent on hosts that skip the check. */
+  store?: StoreProbe;
   /** one line naming what to do, chosen from the probes */
   verdict: string;
 }
@@ -181,6 +213,16 @@ export function summarise(report: Omit<HealthReport, 'verdict'>): string {
   const bad = report.probes.find((p) => !p.ok);
   // The reply model first: without it there is no reply to put a source in.
   if (bad) return VERDICT[bad.code ?? 'internal'] ?? 'Something failed that this check cannot name.';
+  // Then the store, ahead of the web: an unreadable state row is why Core 4
+  // loses its memory, its carried-forward reasoning AND — until the fix that
+  // came with this probe — its internet, so a missing table explains more
+  // symptoms than anything else here and should be the sentence that prints.
+  if (report.store && !report.store.ok) {
+    const where = report.store.missing.length ? ` (${report.store.missing.join(', ')})` : '';
+    return report.store.why === 'table missing'
+      ? `Core 4's tables are not in this database${where}. Apply supabase/schema.sql. Until then it has no memory across turns, no carried-forward reasoning, and no lookups.`
+      : `Core 4 cannot read its own tables${where}: ${report.store.why ?? 'unknown'}. Check SUPABASE_SERVICE_ROLE_KEY and the database's availability.`;
+  }
   // Then the web. Reported even though chat still works without it, because
   // "Core 4 cannot look things up" is a whole feature missing and the symptom
   // — a reply that says it could not pull anything up live — reads to everyone

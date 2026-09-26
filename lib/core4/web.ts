@@ -152,6 +152,9 @@ const INWARD = /\b(?:i (?:feel|think|wonder|keep|can'?t)|should i|am i|my (?:dra
  *      week to a third party with a log.
  *   2. off the record means off the record. A person who has just said not to
  *      remember this has not agreed to have it looked up.
+ *   2a. AND A DATABASE THAT COULD NOT BE READ IS NEITHER OF THOSE. See the
+ *      `policy` parameter: 'unknown' is a fourth value precisely because
+ *      collapsing it into 'none' cost Core 4 its internet entirely.
  *   3. a URL they pasted is read, not searched: they already chose the source.
  *   4. an explicit ask is honoured.
  *   5. otherwise it takes a currency signal AND a question or request — "the
@@ -167,8 +170,36 @@ export function webIntent(
    * looks like an ordinary question and must still not be searched. Reading
    * only this message's signals would have caught the first turn and let every
    * one after it through.
+   *
+   * 'unknown' MEANS THE ROW COULD NOT BE READ, AND IS NOT A REFUSAL.
+   *
+   * This distinction is the whole of a bug that survived four rounds of fixes.
+   * The caller passed 'none' when the state read failed, reasoning by analogy
+   * with persistence — where failing closed is right, because persistPolicy
+   * lives in that row and a lost "don't remember this" would be an explicit
+   * instruction reversed by a database blip. The analogy does not hold here:
+   *
+   *   - Persistence asks "may I write this down?" and a wrong yes is permanent.
+   *     Search asks "may I send the words they just typed to a provider?" and
+   *     the answer is already governed by this turn's own signals, which are
+   *     computed from the message and do not need a database at all. A
+   *     sensitive, unsafe or off-the-record MESSAGE is refused three lines
+   *     above this one, read or no read.
+   *   - A failed read is not rare. The table missing, or no service key in the
+   *     environment, fails EVERY read on EVERY turn — so this did not degrade
+   *     search during a bad minute, it deleted the feature permanently, on a
+   *     deployment where Logos's search over the very same provider worked.
+   *   - And it deleted the explanation with it: `renderNoResearch` emits
+   *     nothing when nothing was wanted, so the model was handed no block at
+   *     all and filled the gap itself — "I can't browse the web in real time",
+   *     a sentence about what Socria IS, invented from the absence of one.
+   *
+   * What protects a carried-forward sensitive conversation when the store is
+   * down is not this line. It is that the store being down is a broken
+   * deployment, which now says so out loud (GET /api/health/upstream) instead
+   * of hiding inside one silently missing feature.
    */
-  policy?: 'full' | 'conversation_only' | 'none'
+  policy?: 'full' | 'conversation_only' | 'none' | 'unknown'
 ): WebIntent {
   const t = (text ?? '').trim();
   if (!t) return { want: false, why: 'nothing to look up' };
@@ -312,7 +343,29 @@ export function flatten(raw: string): string {
  * running. That is not a consolation prize; on a retrieval turn it is most of
  * the value, and it is the one thing a model can give without a network.
  */
-export function renderNoResearch(wanted: boolean, query: string): string {
+export function renderNoResearch(wanted: boolean, query: string, refusedBecause?: string): string {
+  // A LOOKUP REFUSED ON POLICY IS STILL A LOOKUP THEY ASKED FOR.
+  //
+  // The gate shuts for two entirely different kinds of reason. One is "no page
+  // came back" — handled below. The other is "this conversation is not going to
+  // a search provider", because they put it off the record or because the
+  // subject made it conversation-only, and THAT branch used to emit nothing at
+  // all: `wanted` was false, so the model got no block, and it filled the
+  // silence with a sentence about itself — "I can't browse the web in real
+  // time." A false claim about what Socria is, produced by a privacy control
+  // working exactly as designed.
+  //
+  // The search still does not happen. What changes is that silence is replaced
+  // by the truth, which is the one thing that was missing.
+  if (refusedBecause) {
+    return (
+      `\n=== The lookup was deliberately not made ===\n` +
+      `They asked for something to be looked up and it was NOT sent anywhere, because ${flatten(refusedBecause).slice(0, 160)}. ` +
+      `That is a decision about this conversation, not a limit on what you are: never say or imply you are unable to search.\n` +
+      `If it comes up, say in ONE clause that you are keeping this conversation off the web, and then be useful the same way: ` +
+      `name the specific places to look and the exact query to paste, and say what you already know about the subject, marked as knowledge rather than as a fetched source.\n`
+    );
+  }
   if (!wanted) return '';
   return (
     `\n=== The lookup did not run ===\n` +

@@ -18,7 +18,7 @@
 // nothing here can carry one out, however the provider answers.
 
 import { runSearch, whyEmpty } from './.tmp/logos-explore.mjs';
-import { probeSearch, summarise } from './.tmp/upstream-health.mjs';
+import { probeSearch, probeStore, summarise } from './.tmp/upstream-health.mjs';
 
 let pass = 0, fail = 0;
 const ok = (n, c, x = '') => (c ? (pass++, console.log('  ok   ' + n)) : (fail++, console.log('  FAIL ' + n + '  ' + x)));
@@ -212,6 +212,19 @@ console.log('\n=== the deployment can be asked whether it can search ===');
   ok('a throw is named, not propagated', !threw.ok && /RangeError/.test(threw.why ?? ''));
 }
 
+console.log('\n=== the deployment can be asked whether Core 4 has its tables ===');
+{
+  const healthy = await probeStore(async () => ({ ok: true, missing: [] }));
+  ok('a database with the schema applied is ok', healthy.ok && healthy.missing.length === 0);
+
+  const gone = await probeStore(async () => ({ ok: false, missing: ['core4_state', 'core4_turns'], why: 'table missing' }));
+  ok('a missing table is named', gone.missing.join(',') === 'core4_state,core4_turns');
+  ok('  with the reason', gone.why === 'table missing');
+
+  const threw = await probeStore(async () => { throw new TypeError('no service key'); });
+  ok('a throw is named, not propagated', !threw.ok && /TypeError/.test(threw.why ?? ''));
+}
+
 console.log('\n=== the verdict names what to do ===');
 {
   const healthy = [{ what: 'model a', ok: true, ms: 1 }];
@@ -229,6 +242,36 @@ console.log('\n=== the verdict names what to do ===');
     /egress/.test(say({ configured: true, provider: 'google', ok: false, results: 0, why: 'unreachable', ms: 9 })));
   ok('a working search is not mentioned at all',
     /Everything this check can reach is working/.test(say({ configured: true, provider: 'google', ok: true, results: 4, why: undefined, ms: 9 })));
+
+  // THE ONE THAT WOULD HAVE ENDED THIS IN A SECOND. A missing core4_state took
+  // Core 4's memory, its carried-forward reasoning AND its internet, and the
+  // symptom was a reply that said it could not browse the web — so this verdict
+  // outranks the search's, because the search is downstream of it.
+  const noTables = summarise({
+    commit: 'abc1234', node: 'v20', hasApiKey: true, probes: healthy,
+    store: { ok: false, missing: ['core4_state'], why: 'table missing', ms: 4 },
+    search: { configured: true, provider: 'google', ok: true, results: 4, ms: 9 },
+  });
+  ok('a missing schema says to apply it', /supabase\/schema\.sql/.test(noTables), noTables);
+  ok('  and names all three things it costs', /memory/.test(noTables) && /reasoning/.test(noTables) && /lookups/.test(noTables));
+  ok('  and names the table', /core4_state/.test(noTables));
+  ok('a store fault outranks a search fault',
+    /supabase\/schema\.sql/.test(summarise({
+      commit: 'a', node: 'v20', hasApiKey: true, probes: healthy,
+      store: { ok: false, missing: ['core4_state'], why: 'table missing', ms: 4 },
+      search: { configured: false, provider: null, ok: false, results: 0, why: 'no key', ms: 0 },
+    })));
+  ok('an unreachable store points at the service key, not the schema',
+    /SUPABASE_SERVICE_ROLE_KEY/.test(summarise({
+      commit: 'a', node: 'v20', hasApiKey: true, probes: healthy,
+      store: { ok: false, missing: ['core4_state'], why: 'threw: TypeError', ms: 4 },
+    })));
+  ok('a healthy store is not mentioned',
+    /Everything this check can reach is working/.test(summarise({
+      commit: 'a', node: 'v20', hasApiKey: true, probes: healthy,
+      store: { ok: true, missing: [], ms: 4 },
+      search: { configured: true, provider: 'google', ok: true, results: 4, ms: 9 },
+    })));
 
   // Order matters: without a reply model there is no reply to put a source in,
   // so the model fault is the one to fix first and the one to print.

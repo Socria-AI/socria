@@ -390,3 +390,39 @@ export async function conversationsToday(
 
 /** Every Core 4 table, for account deletion, export and "forget what Socria worked out". */
 export const CORE4_TABLES = ['core4_state', 'reasoning_entries', 'reasoning_links', 'core4_turns', 'capability_evidence'] as const;
+
+/**
+ * Can this deployment read its own Core 4 tables?
+ *
+ * WHY THIS IS WORTH A FUNCTION. Every read here fails soft by design — a turn
+ * that cannot read its state runs from the state reader alone rather than
+ * taking the conversation down — and that is the right call for a reply in
+ * flight. It is the wrong call for a DEPLOYMENT: a missing table fails every
+ * read on every turn, and "fails soft" then means a permanently half-working
+ * product whose symptoms show up nowhere near the cause. Core 4 lost its
+ * internet to exactly this, because an unreadable state row was read as "this
+ * conversation is off the record" (see webIntent's `policy`).
+ *
+ * `head: true` fetches no rows: this asks whether the table is there and
+ * readable, and deliberately cannot see anybody's data. Reported by
+ * GET /api/health/upstream.
+ */
+export async function storeHealth(): Promise<{ ok: boolean; missing: string[]; why?: string }> {
+  const missing: string[] = [];
+  let why: string | undefined;
+  for (const table of CORE4_TABLES) {
+    try {
+      const { error } = await supabaseAdmin().from(table).select('user_id', { head: true, count: 'exact' });
+      if (error) {
+        missing.push(table);
+        const e = error as { code?: string; message?: string };
+        // The code, not the message: a Postgres error body can quote the query.
+        why = why ?? (e?.code === '42P01' || e?.code === 'PGRST205' ? 'table missing' : `error ${e?.code ?? 'unknown'}`);
+      }
+    } catch (e) {
+      missing.push(table);
+      why = why ?? `threw: ${(e as Error)?.name ?? typeof e}`;
+    }
+  }
+  return { ok: missing.length === 0, missing, ...(why ? { why } : {}) };
+}
