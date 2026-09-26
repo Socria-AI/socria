@@ -28,9 +28,16 @@ export const db = {
   tables: {},
   /** table -> Set of columns the table DOES NOT have, to simulate an old schema */
   missing: {},
+  /**
+   * Tables that are NOT IN THE DATABASE AT ALL — a schema that was never
+   * applied, which is a different fault from a schema that is out of date and
+   * has different consequences: every read and write on the table fails, on
+   * every turn, forever, instead of one column going quiet.
+   */
+  absent: new Set(),
   /** every write, in order, for tests that care about sequencing */
   log: [],
-  reset() { this.tables = {}; this.missing = {}; this.log = []; },
+  reset() { this.tables = {}; this.missing = {}; this.absent = new Set(); this.log = []; },
   rows(t) { return (this.tables[t] ??= []); },
 };
 
@@ -42,7 +49,13 @@ function colErr(table, col, write) {
     : { code: '42703', message: `column ${table}.${col} does not exist` };
 }
 
+/** What PostgREST says about a relation that is not there. */
+function tableErr(table) {
+  return { code: '42P01', message: `relation "public.${table}" does not exist` };
+}
+
 function checkCols(table, cols, write) {
+  if (db.absent.has(table)) return tableErr(table);
   const gone = db.missing[table];
   if (!gone) return null;
   for (const c of cols) if (gone.has(c)) return colErr(table, c, write);

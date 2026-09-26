@@ -61,7 +61,14 @@ console.log('\n=== the database gets a deadline, like recall already had ===');
   // the connection took to give up — a turn with less continuity is a
   // degradation, a turn that never arrives is an outage.
   ok('the loads are bounded', /await withTimeout\(\s*\n\s*Promise\.all\(\[/.test(turn));
-  ok('  by the same two seconds recall uses', /STORE_TIMEOUT_MS = 2000/.test(turn));
+  // FOUR SECONDS, NOT TWO, AND THE CHANGE IS THE POINT. Two was "the same
+  // deadline recall uses", and two seconds does not cover four Supabase round
+  // trips from a cold serverless function. Missing it is not free: no
+  // carried-forward state, nothing written that turn, and — for as long as a
+  // failed read was treated as "off the record" — no lookups either. A cold
+  // start was enough to do all three, which is what was reported from
+  // production as a broken search.
+  ok('  with a deadline a cold connection can actually meet', /STORE_TIMEOUT_MS = 4000/.test(turn));
   ok('  and a timeout reads as "policy unknown", not as a first turn',
     /\[\{ state: null, ok: false \}/.test(turn));
 }
@@ -78,19 +85,45 @@ console.log('\n=== an empty answer from the state model is not an answer ===');
   ok('  while a real answer is still believed', /return \{ state: sanitizeState\(parsed\), ok: true \}/.test(engine));
 }
 
-console.log('\n=== a failed read does not open the internet either ===');
+console.log('\n=== a failed read is told to research as UNKNOWN, which is not "none" ===');
 {
-  // The comment above the call already said a conversation marked sensitive
-  // must not be searched on a later turn that happens to read as an ordinary
-  // question — and then passed `prior?.persistPolicy`, which is undefined when
-  // the read FAILED as well as on turn one. So turn three of a conversation
-  // about a diagnosis could have the person's own sentence sent to a
-  // third-party search provider the moment the database had a bad second.
-  // `policyUnknown` was computed sixteen lines above and used only for writes.
-  ok('research is told the policy is unknown, and treats that as "none"',
-    /policy: policyUnknown \? 'none' : prior\?\.persistPolicy/.test(turn));
+  // THIS ASSERTION USED TO PIN THE OPPOSITE, AND IT WAS WRONG.
+  //
+  // It pinned `policy: policyUnknown ? 'none' : prior?.persistPolicy` under the
+  // heading "a failed read does not open the internet either" — fail-closed by
+  // analogy with persistence. The analogy does not hold, and the cost was paid
+  // in production four times:
+  //
+  //   - 'none' does not mean "we don't know". It means "they asked for this to
+  //     be off the record". An unreadable row was turned into an instruction
+  //     nobody gave.
+  //   - The read does not fail for a bad second only. A missing table, an
+  //     absent service key, or a 2 s deadline a cold connection cannot meet
+  //     fails EVERY read on EVERY turn — so this did not degrade search, it
+  //     deleted it, while Logos searched the same provider fine.
+  //   - And it deleted the explanation with it: renderNoResearch emits nothing
+  //     when nothing was wanted, so the model was handed no block and wrote its
+  //     own sentence — "I can't browse the web in real time." A false claim
+  //     about what Socria is, manufactured by a fail-closed default.
+  //
+  // What still protects a sensitive conversation on a failed read is the part
+  // that never needed a database: the signals from their own words. What
+  // protects the rest is that a store which cannot be read is now a loud broken
+  // deployment (GET /api/health/upstream) rather than one quietly missing
+  // feature.
+  ok("research is told 'unknown', not 'none'",
+    /policy: policyUnknown \? 'unknown' : prior\?\.persistPolicy/.test(turn));
   const web = read('lib/core4/web.ts');
-  ok("  and 'none' is a refusal there", /policy === 'none'|policy !== 'full'/.test(web));
+  ok("  'none' is still a refusal there", /policy === 'none'/.test(web));
+  ok("  and 'unknown' is explicitly not one",
+    /'unknown' MEANS THE ROW COULD NOT BE READ, AND IS NOT A REFUSAL/.test(web));
+  // The write side is untouched: losing search was never the price of not
+  // writing, and it still is not.
+  ok('persistence still fails closed on the same flag',
+    /p\.policyUnknown\s*\n?\s*\? Promise\.resolve\(\)/.test(turn));
+  // And a refusal that IS the person's own policy no longer goes out silent.
+  ok('a policy refusal reaches the prompt as a reason',
+    /renderNoResearch\(wantedWeb\.want, buildQuery\(input\.lastUserText, \[\]\), refusedByPolicy\)/.test(turn));
 }
 
 console.log('\n=== a failed read does not switch memory off for good ===');

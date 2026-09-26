@@ -689,5 +689,72 @@ console.log('\n=== a lookup that was asked for and did not run reaches the promp
   ok('an ordinary question carries no lookup block', !/The lookup did not run/.test(quiet.prompt));
 }
 
+console.log('\n=== THE FAULT: an unreadable state row used to mean "off the record" ===');
+{
+  // REPORTED A FOURTH TIME, and the sentence that located it was "works for
+  // logos but not for core 4" — same key, same provider, same egress, so the
+  // fault had to be in the gate Core 4 puts in front of the search and Logos
+  // does not.
+  //
+  // It was this: `policy: policyUnknown ? 'none' : prior?.persistPolicy`.
+  // Fail-closed by analogy with persistence, where it is right. Here 'none'
+  // means "they asked for this to be off the record", so an unreadable row was
+  // read as an instruction nobody gave — and because a missing table fails
+  // EVERY read on EVERY turn, the feature was not degraded, it was gone. Worse,
+  // `renderNoResearch` emits nothing when nothing was wanted, so the model was
+  // handed no block at all and wrote its own sentence about what Socria is:
+  // "I can't browse the web in real time."
+  //
+  // The table is removed from the database entirely, which is the production
+  // shape of this (schema never applied / no service key), not a bad second.
+  db.absent.add('core4_state');
+  const nodesBefore = (db.tables['mind_nodes'] ?? []).length;
+  try {
+    const gone = await turn('stategone', [U('find me recent uta shorthorn articles on AI')], {
+      state: { taskKind: 'lookup', work: 'information', latest: 'question', currentFocus: 'recent UTA Shorthorn AI coverage' },
+      replies: ['Here is where to look.'],
+    });
+    ok('the lookup is still wanted with the state row unreadable', /The lookup did not run/.test(gone.prompt),
+      gone.prompt.slice(-300));
+    ok('  so the model is never left to invent what it can do', /Never say or imply you lack the ability to search/.test(gone.prompt));
+    ok('  and the query survives the failed read', /recent uta shorthorn articles on AI/i.test(gone.prompt));
+    // The privacy control that DOES belong here still holds, and it needs no
+    // database: it comes from the words in the message.
+    const sensitive = await turn('stategone2', [U('look up the current treatment options for this diagnosis — off the record')], {
+      state: { taskKind: 'lookup', work: 'information', latest: 'question', currentFocus: 'treatment options' },
+      replies: ['Here is where to look.'],
+    });
+    ok('an off-the-record message still looks nothing up', !/=== From the web/.test(sensitive.prompt));
+    // And the OTHER half of the old fail-closed rule is untouched: with the
+    // policy unreadable, nothing is written to durable memory. Losing search
+    // was never the price of that, and it still is not.
+    ok('nothing was persisted on a turn whose policy could not be read',
+      !(db.tables['core4_state'] ?? []).some((r) => r.conversation_id === 'stategone') &&
+        (db.tables['mind_nodes'] ?? []).length === nodesBefore,
+      `state=${(db.tables['core4_state'] ?? []).length} nodes=${(db.tables['mind_nodes'] ?? []).length} was ${nodesBefore}`);
+  } finally {
+    db.absent.delete('core4_state');
+  }
+
+  // AND THE OTHER HALF: the gate shutting on the CONVERSATION's policy, which is
+  // correct, must still tell the model why. Turn one establishes the policy; turn
+  // two asks for a lookup and must get the honest block rather than silence.
+  const off = await turn('offrec', [U('keep this off the record')], {
+    state: { taskKind: 'other', work: 'conversation', latest: 'instruction', currentFocus: 'privacy' },
+    replies: ['Understood.'],
+  });
+  ok('the off-the-record instruction stuck to the conversation',
+    rows('core4_state').find((r) => r.conversation_id === 'offrec')?.state.persistPolicy === 'none',
+    JSON.stringify(rows('core4_state').find((r) => r.conversation_id === 'offrec')?.state.persistPolicy));
+  const after = await turn('offrec', [U('keep this off the record'), A('Understood.'), U('now look up the current filing deadline')], {
+    state: { taskKind: 'lookup', work: 'information', latest: 'question', currentFocus: 'the filing deadline' },
+    replies: ['Here is where to look.'],
+  });
+  ok('a lookup refused on policy is explained, not hidden', /The lookup was deliberately not made/.test(after.prompt),
+    after.prompt.slice(-400));
+  ok('  and the capability claim is forbidden', /never say or imply you are unable to search/i.test(after.prompt));
+  ok('  and nothing was searched', !/=== From the web/.test(after.prompt));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

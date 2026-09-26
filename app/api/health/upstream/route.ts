@@ -11,8 +11,9 @@ import { auth } from '@clerk/nextjs/server';
 import OpenAI from 'openai';
 import { enforceRateLimit } from '@/lib/rate-limit';
 import { CORE_3_MODEL, CORE_3_FALLBACK_MODEL, CORE_4_MODEL } from '@/lib/socria-prompt';
-import { deployedCommit, probeModels, probeSearch, summarise } from '@/lib/upstream-health';
+import { deployedCommit, probeModels, probeSearch, probeStore, summarise } from '@/lib/upstream-health';
 import { runSearch, searchConfigured } from '@/lib/logos-explore';
+import { storeHealth } from '@/lib/core4/store';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -33,17 +34,21 @@ export async function GET(req: NextRequest) {
   // Whether Core 4 can look things up, asked of this runtime rather than of the
   // dashboard. `images: false` because nothing here displays one, and it is one
   // fewer billed request per check.
-  const search = await probeSearch({
-    configured: searchConfigured,
-    run: (q) => runSearch(q, { images: false }),
-  });
+  const [search, store] = await Promise.all([
+    probeSearch({ configured: searchConfigured, run: (q) => runSearch(q, { images: false }) }),
+    // Whether Core 4 can read its own tables. Ahead of the models in the
+    // verdict's order, because an unreadable state row takes its memory, its
+    // carried-forward reasoning and its lookups with it.
+    probeStore(storeHealth),
+  ]);
 
   if (!apiKey) {
     return NextResponse.json({
       ...base,
       probes: [],
       search,
-      verdict: summarise({ ...base, probes: [], search }),
+      store,
+      verdict: summarise({ ...base, probes: [], search, store }),
     });
   }
 
@@ -52,5 +57,5 @@ export async function GET(req: NextRequest) {
   // three at once is what makes that readable.
   const models = [...new Set([CORE_4_MODEL, CORE_3_MODEL, CORE_3_FALLBACK_MODEL])];
   const probes = await probeModels(new OpenAI({ apiKey, maxRetries: 0 }), models);
-  return NextResponse.json({ ...base, probes, search, verdict: summarise({ ...base, probes, search }) });
+  return NextResponse.json({ ...base, probes, search, store, verdict: summarise({ ...base, probes, search, store }) });
 }

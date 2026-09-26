@@ -134,7 +134,7 @@ export interface ResearchInput {
    * record, stays that way on every later turn — including the ones that read
    * as ordinary questions.
    */
-  policy?: 'full' | 'conversation_only' | 'none';
+  policy?: 'full' | 'conversation_only' | 'none' | 'unknown';
   /** the word under the dots — see lib/core4/activity.ts. Presentation only. */
   onActivity?: (activity: Activity, phase: 'start' | 'end') => void;
 }
