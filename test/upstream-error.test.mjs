@@ -65,7 +65,12 @@ console.log('=== a failure that lands after the headers ===');
   ok('the three no longer read the same', new Set([auth, quota, model].map((s) => s.replace(/ref [a-z0-9]+/, ''))).size === 3);
   const mid = streamFailureNotice('t', err({ status: 500, message: 'upstream boom' }), true);
   ok('mid-reply, it says the reply stopped', /^\n\n\[The reply stopped here\./.test(mid), mid);
-  ok('  and nothing from the error object rides along', !/boom/.test(mid) && !/500/.test(mid), mid);
+  // THE REF IS SIX RANDOM BASE-36 CHARACTERS, so about once in a few thousand
+  // runs it contains "500" on its own and this assertion failed on its own
+  // reference code rather than on a leak. Checking the notice WITHOUT the ref
+  // is what the assertion always meant.
+  const midBody = mid.replace(/ref [a-z0-9]+/g, 'ref …');
+  ok('  and nothing from the error object rides along', !/boom/.test(midBody) && !/500/.test(midBody), midBody);
   ok('an unclassifiable failure still says something', /Something went wrong on our side/.test(streamFailureNotice('t', new Error('???'), false)));
 }
 

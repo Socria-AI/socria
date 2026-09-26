@@ -1,0 +1,525 @@
+.c4m-root {
+  /* A plate is a thin platform; the words stand UP off it on a sign.
+   *
+   * WHY, AND IT IS THE WHOLE LAYOUT. Text lying on a plate tilted by P is
+   * foreshortened by cos(P) — at 58° that is 0.53, and the first build of this
+   * page was unreadable because of it. A sign standing perpendicular to the
+   * plate is foreshortened by sin(P) instead — 0.85 at the same angle. Same
+   * scene, same tilt, nearly twice the legibility, and it looks more like an
+   * object rather than less. So the plates carry almost nothing and the signs
+   * carry the words. */
+  --plate-w: 430px;
+  --plate-h: 168px;
+  --gap: 150px;
+  --yaw: -24deg;
+  --pitch: 58deg;
+  --zoom: 0.70;
+  --pure: var(--moss-600);
+  --cheap: #9a6a1f;
+  --front: var(--prussian);
+  --stop: var(--machine);
+  --human: #5a4b86;
+  --human-soft: rgba(90, 75, 134, 0.14);
+  --loop: 26s;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+/* ── the page around the model ─────────────────────────────────── */
+
+.c4m-top {
+  padding: clamp(48px, 7vw, 96px) var(--edge) clamp(16px, 2.4vw, 28px);
+  max-width: 1180px;
+  margin: 0 auto;
+}
+.c4m-kicker {
+  font-size: var(--type-label);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--ink-45);
+  margin: 0 0 18px;
+}
+.c4m-top h1 {
+  font-family: var(--serif);
+  font-size: clamp(2.4rem, 6vw, 4.2rem);
+  line-height: 1.02;
+  letter-spacing: -0.02em;
+  margin: 0 0 18px;
+  font-weight: 400;
+  text-wrap: balance;
+}
+.c4m-top h1 em { font-style: italic; color: var(--moss-700); }
+.c4m-lede {
+  font-size: clamp(1.02rem, 1.7vw, 1.22rem);
+  line-height: var(--leading-prose);
+  color: var(--ink-70);
+  max-width: 60ch;
+  margin: 0;
+}
+
+/* ── the stage ─────────────────────────────────────────────────── */
+
+.c4m-stage-wrap {
+  position: relative;
+  margin: clamp(10px, 2vw, 20px) auto clamp(24px, 4vw, 44px);
+  max-width: 1180px;
+  padding-inline: var(--edge);
+}
+.c4m-stage {
+  position: relative;
+  height: clamp(500px, 74vh, 700px);
+  perspective: 1500px;
+  perspective-origin: 50% 48%;
+  touch-action: pan-y;
+  cursor: grab;
+  overflow: hidden;
+  border-radius: 6px;
+  background: radial-gradient(118% 76% at 50% 40%, #fcfbf6 0%, var(--paper) 52%, var(--paper-2) 100%);
+  border: 1px solid var(--border);
+}
+.c4m-stage.is-dragging { cursor: grabbing; }
+.c4m-stage:focus-visible { outline: 2px solid var(--moss-600); outline-offset: -2px; }
+
+.c4m-world {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  /* The translate is in SCREEN space, before the rotations: the signs hinge at
+     each plate's front edge and add height below the last one, which pushed the
+     bottom of the stack out of the frame. */
+  transform: translateY(-20px) scale(var(--zoom)) rotateX(var(--pitch)) rotateZ(var(--yaw));
+  transition: transform 520ms var(--ease-out-expo);
+}
+.c4m-stage.is-dragging .c4m-world { transition: none; }
+
+/* A plate at index i sits at z = (i − 2.5) × −gap: the six stops the token
+   holds at, and the table the caption is keyed to. */
+.c4m-plane {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--plate-w);
+  height: var(--plate-h);
+  margin-left: calc(var(--plate-w) / -2);
+  margin-top: calc(var(--plate-h) / -2);
+  transform-style: preserve-3d;
+  transform: translateZ(calc((var(--i) - 2.5) * var(--gap) * -1));
+  border-radius: 4px;
+  border: 1px solid var(--ink-16);
+  background: rgba(250, 249, 242, 0.85);
+  box-shadow: 0 18px 34px -24px rgba(31, 31, 31, 0.55);
+}
+/* THE APERTURE THE TOKEN GOES THROUGH.
+   Without it the token is simply behind a translucent plate and the motion
+   reads as "a dot moving over some cards" rather than as a reply being passed
+   down through gates — which is the one thing the model is for. */
+.c4m-plane::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 34px;
+  height: 34px;
+  margin: -17px 0 0 -17px;
+  border-radius: 50%;
+  border: 1px solid var(--ink-16);
+  /* NOT filled: a filled aperture hides the very thing it is an aperture for,
+     and the token passing through it is the animation. */
+  background: transparent;
+}
+.c4m-num {
+  position: absolute;
+  right: 9px;
+  bottom: 7px;
+  font-size: 0.56rem;
+  letter-spacing: 0.2em;
+  color: var(--ink-25);
+}
+.c4m-plane[data-by='pure'] { border-color: rgba(94, 118, 51, 0.5); }
+.c4m-plane[data-by='cheap'] { border-color: rgba(154, 106, 31, 0.5); }
+.c4m-plane[data-by='front'] { border-color: rgba(38, 72, 90, 0.5); }
+.c4m-plane[data-by='stop'] { border-color: rgba(216, 64, 47, 0.5); }
+
+/* ── the sign standing on each plate ───────────────────────────── */
+
+.c4m-sign {
+  position: absolute;
+  left: -6px;
+  /* Hinged just INSIDE the plate's front edge, not at its back one. At the
+     back the sign rises into the space the plate above occupies and the lower
+     labels were half-hidden behind it; flush with the front edge it reads, at
+     a glance, as the label of the plate BELOW. Overlapping its own plate by a
+     few pixels settles which one it belongs to. */
+  top: calc(100% - 26px);
+  width: 400px;
+  height: 46px;
+  /* A TRUE BILLBOARD, and the counter-rotation is the whole of it.
+   *
+   * The world is rotateX(pitch) rotateZ(yaw). A sign that only stands up —
+   * rotateX(−90) — is still carried around by the yaw, so turning the model
+   * swung the words away from the reader and they came out slanting up the
+   * screen. Cancelling the yaw first leaves a net rotation of (pitch − 90)
+   * whatever the yaw is: the sign stands on its plate, turns with the object,
+   * and always faces front. */
+  transform: rotateZ(calc(var(--yaw) * -1)) rotateX(-90deg);
+  transform-origin: left bottom;
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  padding: 0 2px;
+  white-space: nowrap;
+}
+.c4m-sign b {
+  font-size: 0.62rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  font-weight: 600;
+  flex: none;
+}
+.c4m-sign span {
+  font-family: var(--serif);
+  font-size: 1.16rem;
+  line-height: 1.1;
+  color: var(--ink-70);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.c4m-plane[data-by='pure'] .c4m-sign b { color: var(--pure); }
+.c4m-plane[data-by='cheap'] .c4m-sign b { color: var(--cheap); }
+.c4m-plane[data-by='front'] .c4m-sign b { color: var(--front); }
+.c4m-plane[data-by='stop'] .c4m-sign b { color: var(--stop); }
+/* the post the sign stands on, so it does not float */
+.c4m-sign::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -1px;
+  width: 150px;
+  height: 1px;
+  background: currentColor;
+  opacity: 0.22;
+}
+
+/* ── the eight dimensions, standing up from the ALLOCATE plate ─── */
+
+.c4m-pillars {
+  position: absolute;
+  left: 16px;
+  bottom: 18px;
+  display: flex;
+  gap: 9px;
+  transform-style: preserve-3d;
+}
+.c4m-pillar {
+  width: 15px;
+  height: 52px;
+  /* Billboarded for the same reason as the sign: a bar 15px wide turns
+     edge-on and vanishes at the wrong yaw, and a dimension that disappears
+     when you turn the model is not showing anything. */
+  transform: rotateZ(calc(var(--yaw) * -1)) rotateX(-90deg);
+  transform-origin: center bottom;
+  background: var(--pure);
+  opacity: 0.85;
+  border-radius: 1px;
+  position: relative;
+}
+.c4m-pillar[data-role='perform'] { height: 52px; }
+.c4m-pillar[data-role='share'] { height: 34px; opacity: 0.55; }
+.c4m-pillar[data-role='scaffold'] { height: 20px; background: var(--human); opacity: 0.7; }
+/* THE ONE THE INVARIANT IS ABOUT. Drawn as a marked-off space with nothing in
+   it, not as a short bar — it is not a smaller amount of the same thing. */
+.c4m-pillar[data-role='human'] {
+  height: 52px;
+  background: repeating-linear-gradient(
+    -45deg, var(--human-soft), var(--human-soft) 3px, transparent 3px, transparent 6px);
+  border: 1px dashed var(--human);
+  opacity: 1;
+}
+
+/* ── the one door, on the INTERVENE plate ──────────────────────── */
+
+.c4m-choke {
+  position: absolute;
+  right: 22px;
+  bottom: 20px;
+  width: 78px;
+  height: 78px;
+  transform-style: preserve-3d;
+}
+.c4m-choke i {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1px solid var(--stop);
+  opacity: 0.3;
+}
+.c4m-choke i:nth-child(2) { transform: scale(0.7); opacity: 0.48; }
+.c4m-choke i:nth-child(3) { transform: scale(0.42); opacity: 0.68; }
+.c4m-choke i:nth-child(4) { transform: scale(0.18); background: var(--stop); opacity: 0.9; border: 0; }
+
+/* ── the token, falling through ────────────────────────────────── */
+
+/*
+ * THE TOKEN RIDES A PLANE 11px ABOVE THE PLATES.
+ *
+ * At exactly a plate's own z it is coplanar with an opaque surface, and the
+ * compositor is free to draw the plate over it — so the reply being passed down
+ * the stack was invisible on every stop, which is the whole animation. Lifting
+ * it in a wrapper keeps the keyframe table equal to the plate positions, which
+ * is the one thing about this file that must stay easy to check.
+ */
+.c4m-rider {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  transform: translateZ(11px);
+}
+
+.c4m-token {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 19px;
+  height: 19px;
+  margin: -9.5px 0 0 -9.5px;
+  border-radius: 50%;
+  background: var(--moss-600);
+  box-shadow: 0 0 0 6px rgba(94, 118, 51, 0.2), 0 0 26px 8px rgba(94, 118, 51, 0.4);
+  animation: c4m-fall var(--loop) cubic-bezier(0.5, 0, 0.4, 1) infinite;
+}
+.c4m-trail {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 1px;
+  margin-left: -0.5px;
+  height: calc(var(--gap) * 5.4);
+  margin-top: calc(var(--gap) * -2.7);
+  background: linear-gradient(
+    to bottom, transparent, var(--ink-16) 12%, var(--ink-16) 88%, transparent);
+  transform: rotateX(-90deg);
+}
+
+/* THE ONE PLACE TWO FILES HAVE TO AGREE.
+ *
+ * A plate at index i sits at translateZ((i − 2.5) × --gap × −1): 375, 225, 75,
+ * −75, −225, −375 at the default gap. The token's holds are those same six
+ * numbers, and PHASES in Core4Model.tsx carries the percentages so the caption
+ * names the plate the token is actually on. Move a stop in one file and move it
+ * in the other; there is no third place that derives them, because a table this
+ * small is easier to keep right by hand than by machinery.
+ *
+ * The bounce is between GENERATE and THE GUARD, deliberately: a rejected draft
+ * goes back to the model that wrote it, which is what regeneration is.
+ */
+@keyframes c4m-fall {
+  0%    { transform: translateZ(500px); opacity: 0; background: var(--moss-600); }
+  3%    { transform: translateZ(500px); opacity: 1; }
+  14%   { transform: translateZ(375px); }   /* 01 UNDERSTAND */
+  24%   { transform: translateZ(375px); }
+  30%   { transform: translateZ(225px); }   /* 02 ALLOCATE */
+  40%   { transform: translateZ(225px); }
+  44%   { transform: translateZ(75px); }    /* 03 INTERVENE */
+  53%   { transform: translateZ(75px); }
+  58%   { transform: translateZ(-75px); background: var(--prussian); }  /* 04 GENERATE */
+  66%   { transform: translateZ(-75px); background: var(--prussian); }
+  70%   { transform: translateZ(-225px); background: var(--machine); }  /* 05 refused */
+  74%   { transform: translateZ(-225px) scale(1.35); background: var(--machine); }
+  78%   { transform: translateZ(-75px) scale(1); background: var(--prussian); }  /* written again */
+  82%   { transform: translateZ(-75px); background: var(--prussian); }
+  86%   { transform: translateZ(-225px); background: var(--moss-600); }  /* through */
+  93%   { transform: translateZ(-375px); background: var(--moss-600); }  /* 06 LEARN */
+  97%   { transform: translateZ(-500px); opacity: 1; }
+  100%  { transform: translateZ(-560px); opacity: 0; }
+}
+
+/* A plate lights while the token is on it. */
+.c4m-plane {
+  animation: c4m-lit var(--loop) linear infinite;
+  /* A NEGATIVE DELAY IS A HEAD START, which is what puts each plate's highlight
+     at its own moment without a timer anywhere. Progress at wall-time t is
+     (t + delay); setting delay to −(at − 0.02) puts every plate 2% into its lit
+     window exactly as the token arrives on it. */
+  animation-delay: calc(var(--loop) * (var(--at) - 0.02) * -1);
+}
+@keyframes c4m-lit {
+  0%, 7% {
+    background: rgba(255, 255, 255, 0.95);
+    box-shadow: 0 0 0 1px rgba(94, 118, 51, 0.5), 0 26px 50px -26px rgba(94, 118, 51, 0.55);
+  }
+  16%, 100% {
+    background: rgba(250, 249, 242, 0.85);
+    box-shadow: 0 18px 34px -24px rgba(31, 31, 31, 0.55);
+  }
+}
+
+/* ── the readout, BELOW the stage rather than over it ──────────── */
+/*
+ * It was overlaid on the model, and at every angle worth looking at it landed
+ * on the lowest plate. A caption that covers the thing it is captioning is a
+ * caption with a bug in it, so it sits underneath, where it also gives the
+ * stack its full height back.
+ */
+.c4m-hud {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: end;
+  gap: 16px;
+  padding: 16px var(--edge) 0;
+  max-width: 1180px;
+  margin: 0 auto;
+  min-height: 84px;
+}
+.c4m-hud-step {
+  font-size: 0.62rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ink-45);
+  margin: 0 0 5px;
+}
+.c4m-hud-line {
+  font-family: var(--serif);
+  font-size: clamp(1.05rem, 2.1vw, 1.42rem);
+  line-height: 1.3;
+  margin: 0;
+  color: var(--ink);
+  max-width: 56ch;
+}
+
+.c4m-controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex: none;
+}
+.c4m-btn {
+  font: inherit;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  padding: 7px 13px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--ink-16);
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--ink-70);
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  transition: border-color 160ms, color 160ms;
+}
+.c4m-btn:hover { border-color: var(--moss-600); color: var(--moss-700); }
+.c4m-btn:focus-visible { outline: 2px solid var(--moss-600); outline-offset: 2px; }
+
+.c4m-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  padding: 14px var(--edge) 0;
+  max-width: 1180px;
+  margin: 0 auto;
+  font-size: 0.7rem;
+  color: var(--ink-60);
+}
+.c4m-legend span { display: inline-flex; align-items: center; gap: 7px; }
+.c4m-legend i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: none;
+}
+
+/* ── paused ────────────────────────────────────────────────────── */
+
+.c4m-stage-wrap[data-paused='true'] .c4m-token,
+.c4m-stage-wrap[data-paused='true'] .c4m-plane { animation-play-state: paused; }
+
+/* ── the prose under the model ─────────────────────────────────── */
+
+.c4m-read {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: clamp(36px, 6vw, 72px) var(--edge) clamp(56px, 8vw, 110px);
+}
+.c4m-read h2 {
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: clamp(1.6rem, 3.4vw, 2.3rem);
+  letter-spacing: -0.015em;
+  margin: 0 0 10px;
+  text-wrap: balance;
+}
+.c4m-read p {
+  font-size: 1rem;
+  line-height: var(--leading-prose);
+  color: var(--ink-70);
+  max-width: 64ch;
+  margin: 0 0 14px;
+}
+.c4m-read p strong { color: var(--ink); font-weight: 600; }
+.c4m-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 14px;
+  margin: 26px 0 40px;
+}
+.c4m-card {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px 17px;
+  background: #fbfaf4;
+}
+.c4m-card h4 {
+  margin: 0 0 6px;
+  font-size: 0.68rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink-45);
+}
+.c4m-card p { font-size: 0.86rem; line-height: 1.55; margin: 0; }
+.c4m-card[data-by='pure'] { border-left: 2px solid var(--pure); }
+.c4m-card[data-by='cheap'] { border-left: 2px solid var(--cheap); }
+.c4m-card[data-by='front'] { border-left: 2px solid var(--front); }
+.c4m-card[data-by='stop'] { border-left: 2px solid var(--stop); }
+.c4m-card[data-by='human'] { border-left: 2px solid var(--human); }
+
+.c4m-rule { border: 0; border-top: 1px solid var(--border); margin: 0 0 34px; }
+
+/* ── narrow ────────────────────────────────────────────────────── */
+
+@media (max-width: 760px) {
+  .c4m-root { --plate-w: 210px; --plate-h: 122px; --gap: 112px; --zoom: 0.78; }
+  .c4m-stage { height: clamp(380px, 56vh, 500px); }
+  .c4m-sign { width: 200px; }
+  .c4m-sign span { font-size: 0.95rem; }
+  .c4m-hud { grid-template-columns: 1fr; }
+  .c4m-controls { justify-content: flex-start; }
+}
+
+/* ── reduced motion, and no scripting ──────────────────────────── */
+/*
+ * NOT "the animation stops". A stopped animation leaves the token wherever the
+ * keyframe happened to put it and every plane at its unlit weight, which is a
+ * picture of nothing. Under reduced motion the model becomes a STILL of the
+ * moment that matters — the draft at the guard — with every plane lit at the
+ * same weight and the token parked where the rejection happens.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .c4m-root { --pitch: 58deg; --yaw: -22deg; }
+  .c4m-token,
+  .c4m-plane { animation: none !important; }
+  .c4m-token {
+    transform: translateZ(-225px);
+    background: var(--machine);
+    box-shadow: 0 0 0 5px rgba(216, 64, 47, 0.22), 0 0 0 1px rgba(216, 64, 47, 0.5);
+  }
+  .c4m-plane {
+    border-color: var(--ink-16);
+    background: rgba(253, 252, 246, 0.92);
+  }
+  .c4m-world { transition: none; }
+}
+
+/* Printing an animated stack of transformed planes produces one black
+   rectangle. The prose is the page in print; the model is not. */
+@media print {
+  .c4m-stage-wrap, .c4m-legend { display: none; }
+  .c4m-read { padding-top: 0; }
+}
