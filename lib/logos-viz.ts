@@ -38,6 +38,25 @@ import {
   type FlowBox,
 } from './logos-flow';
 import {
+  B_CRIT,
+  PHYS,
+  blackHole,
+  ergosphereAt,
+  orbit,
+  orbitPeriod,
+  oscillator,
+  oscillatorAt,
+  percent,
+  photonPath,
+  positionAt,
+  projectile,
+  ratio,
+  redshift,
+  say,
+  tidal,
+  type BlackHole,
+} from './logos-physics';
+import {
   boxLines,
   place,
   sampleSurface,
@@ -325,6 +344,12 @@ export const VIZ_KINDS = [
   // flow, where the exact solutions of Navier-Stokes finally have somewhere
   // to be drawn. See lib/logos-flow.ts.
   'flow',
+  // AN OBJECT, SIMULATED. Every kind above draws a formula somebody wrote;
+  // this one draws a THING, and the arithmetic behind it is real physics in
+  // SI units rather than coordinates the model made up (lib/logos-physics.ts).
+  // The model names the object and sets the starting values; every number in
+  // the picture and every readout beside it is computed here.
+  'simulation',
 ] as const;
 export type VizKind = (typeof VIZ_KINDS)[number];
 
@@ -439,6 +464,9 @@ export function kindNarrates(kind: VizKind): boolean {
 
 /** Kinds that draw an expression; the others carry their objects directly. */
 const OBJECT_KINDS = new Set<VizKind>([
+  // A simulation has no single formula either: it has an object and a dozen
+  // formulae, and the one thing it must not have is an `expr` the model wrote.
+  'simulation',
   'vectors',
   'matrix',
   'distribution',
@@ -518,6 +546,16 @@ export interface VizScene {
    * it is carried here, and the cut slider inherits its bounds from it.
    */
   yRange?: { min: number; max: number };
+  /**
+   * simulation: WHICH OBJECT, and nothing else.
+   *
+   * Deliberately the only thing the extractor may say about a simulation. The
+   * sliders, their ranges, the geometry and every readout come from
+   * SIM_PARAMS and lib/logos-physics.ts — a model allowed to set the spin
+   * range would eventually set it past 1, and the picture would go on looking
+   * convincing while meaning nothing.
+   */
+  sim?: SimSpec;
   /** matrix: the 2×2 transformation, rows first: [[a, b], [c, d]] */
   matrix?: [[number, number], [number, number]];
   /** vectors: the arrows themselves; with exactly two, s·u + t·v is offered */
@@ -765,6 +803,82 @@ function specialView(
       yMin: yr ? yr.min : -3,
       yMax: yr ? yr.max : 3,
     };
+  }
+
+  // ── a simulated object ──
+  // Fixed per object, and NOT fitted to what is drawn. Every one of these has
+  // something that moves with a slider — the disk's inner edge, the swept
+  // sector, the trajectory — and a window that re-fitted itself around them
+  // would keep the moving thing the same size on screen while the numbers
+  // changed underneath it, which is the one reading the picture must not
+  // allow. So the frame is the object's natural extent at its widest setting,
+  // and things genuinely grow and shrink inside it.
+  if (scene.kind === 'simulation') {
+    switch (simOf(scene)) {
+      // Gravitational radii. The geometry in these units does not depend on
+      // the mass at all, which is the first surprising thing about black holes
+      // and worth showing rather than hiding behind a rescaling axis.
+      case 'black-hole':
+        return { xMin: -30, xMax: 30, yMin: -21, yMax: 21 };
+      // AU, sized to the widest orbit the slider reaches.
+      case 'orbit': {
+        const a = scene.params.find((p) => p.id === 'a')?.value ?? 1;
+        const e = scene.params.find((p) => p.id === 'e')?.value ?? 0;
+        const w = a * (1 + e) * 1.25;
+        return { xMin: -w, xMax: w, yMin: (-w * 2) / 3, yMax: (w * 2) / 3 };
+      }
+      // The response curve runs over the frequency axis; the motion shares it.
+      //
+      // THE ONE EXCEPTION to holding the window still, and it is forced: the
+      // height of a resonance peak runs over orders of magnitude with the
+      // damping — at ζ = 0.01 it is fifty times the static deflection and at
+      // ζ = 1 there is no peak at all. A fixed ceiling would put the entire
+      // curve off the top of the picture for exactly the settings resonance is
+      // interesting at. So it is fitted to the peak, and CLAMPED, so that
+      // lightly damped cases stay on the page without the frame chasing an
+      // amplitude that is on its way to infinity.
+      case 'oscillator': {
+        const o = oscillator({
+          m: 1,
+          k: scene.params.find((p) => p.id === 'k')?.value ?? 100,
+          c: scene.params.find((p) => p.id === 'c')?.value ?? 2,
+          F: 10,
+          w: 1,
+        });
+        // Three things share this window and any of them can be the tallest:
+        // the resonance peak, the static deflection the curve starts from, and
+        // the motion itself — whose transient overshoots the steady amplitude
+        // by up to about double before it settles. Taking the largest of the
+        // three and then clamping is what keeps a lightly damped case on the
+        // page without the frame chasing an amplitude on its way to infinity.
+        const live = oscillator({
+          m: 1,
+          k: scene.params.find((p) => p.id === 'k')?.value ?? 100,
+          c: scene.params.find((p) => p.id === 'c')?.value ?? 2,
+          F: 10,
+          w: scene.params.find((p) => p.id === 'w')?.value ?? 5,
+        });
+        const wants = Math.max(
+          Number.isFinite(o.peak) ? o.peak * 1.15 : 0,
+          o.staticDeflection * 1.6,
+          Number.isFinite(live.amplitude) ? live.amplitude * 2.3 : 0
+        );
+        // The clamp is 120× the static deflection, not 30×: at ζ = 0.005 the
+        // resonant amplitude really is a hundred times the static one, and
+        // somebody who has driven it there is looking AT that. The clamp is
+        // only there so that ζ → 0, where the peak is infinite, still has a
+        // finite frame.
+        const top = Math.min(wants, o.staticDeflection * 120);
+        return { xMin: 0, xMax: 30, yMin: -top * 0.9, yMax: top };
+      }
+      // Metres, sized to the vacuum parabola — which is always the larger of
+      // the two curves, so the real trajectory never leaves the frame.
+      case 'projectile': {
+        const v = scene.params.find((p) => p.id === 'v')?.value ?? 60;
+        const R = (v * v) / PHYS.g0;
+        return { xMin: -R * 0.04, xMax: R * 1.08, yMin: -R * 0.06, yMax: R * 0.62 };
+      }
+    }
   }
 
   // ── three dimensions ──
@@ -3619,6 +3733,448 @@ const buildFlow: Builder = (scene, _fn, vals, view, guarded) => {
   };
 };
 
+
+// ── simulated objects ───────────────────────────────────────────────
+//
+// THE MODEL NAMES THE OBJECT; THE CODE OWNS EVERY NUMBER.
+//
+// This is the one kind where the extractor may not author coordinates. It
+// picks an object and may set where the sliders start; the geometry and the
+// readouts are computed from lib/logos-physics.ts in SI units. The reason is
+// the whole point of the feature: what makes a black hole worth drawing is not
+// its silhouette, it is that the horizon of a ten-solar-mass hole is 29.5 km
+// across and that spinning it to a★ = 0.9 moves the innermost stable orbit from
+// 6 r_g to 2.32 and raises the accretion efficiency from 5.7% to 15.6%. A model
+// writing coordinates can produce a picture of those facts. It cannot produce
+// the facts.
+
+export const SIM_OBJECTS = ['black-hole', 'orbit', 'oscillator', 'projectile'] as const;
+export type SimObject = (typeof SIM_OBJECTS)[number];
+
+export interface SimSpec {
+  object: SimObject;
+}
+
+/**
+ * The sliders each object has, authored here rather than by the extractor.
+ *
+ * Ranges are physical, not decorative: spin stops at 0.998 because that is the
+ * Thorne limit and a hole cannot be spun past it; eccentricity stops below 1
+ * because at 1 the orbit is no longer an ellipse and the period is infinite.
+ * A model free to set these would eventually set one outside the physics and
+ * the picture would quietly stop meaning anything.
+ */
+const SIM_PARAMS: Record<SimObject, VizParam[]> = {
+  'black-hole': [
+    {
+      id: 'm', min: 1, max: 100, step: 0.5, value: 10, symbol: 'M',
+      help: 'The mass, in suns. Everything else about the hole follows from this one number — double it and every radius doubles, while the Hawking temperature halves.',
+    },
+    {
+      id: 'a', min: 0, max: 0.998, step: 0.002, symbol: 'a_\\star', value: 0,
+      help: 'How fast it spins, as a fraction of the maximum. It stops at 0.998 because that is where radiation captured from the disk starts to spin the hole DOWN as fast as infalling gas spins it up — the Thorne limit. Spin drags the innermost stable orbit inward, which is what lets a disk radiate so much more.',
+    },
+    {
+      id: 'b', min: 2, max: 30, step: 0.05, value: 7, symbol: 'b',
+      help: 'How close a ray of light is aimed, in gravitational radii. Below √27 ≈ 5.196 it cannot get out again. Just above, it loops the hole before escaping — which is what makes the bright ring in a real image of one.',
+    },
+    {
+      id: 'i', min: 0, max: 88, step: 1, value: 18, symbol: 'i',
+      help: 'How far the disk is tilted away from face-on, in degrees. At 0 you look straight down on it; near 90 you see it edge-on.',
+    },
+  ],
+  orbit: [
+    { id: 'm', min: 0.08, max: 50, step: 0.01, value: 1, symbol: 'M', help: 'The mass of the central body, in suns.' },
+    { id: 'a', min: 0.05, max: 40, step: 0.01, value: 1, symbol: 'a', help: 'The semi-major axis, in astronomical units — the average of the closest and furthest distances. Kepler’s third law turns this alone into the year.' },
+    { id: 'e', min: 0, max: 0.95, step: 0.005, value: 0.2, symbol: 'e', help: 'Eccentricity: 0 is a circle, and the closer to 1 the longer and thinner the ellipse. Earth’s is 0.017; Halley’s comet is 0.967.' },
+    { id: 't', min: 0, max: 1, step: 0.002, value: 0, sweep: 'up', toward: 'one orbit', help: 'Where in the orbit the body is, as a fraction of its year. It moves fast near the focus and slow at the far end — that is Kepler’s second law, and it is why this is solved rather than drawn at constant speed.' },
+  ],
+  oscillator: [
+    { id: 'k', min: 1, max: 400, step: 1, value: 100, symbol: 'k', help: 'Spring stiffness, in newtons per metre. With the mass, it fixes the natural frequency.' },
+    { id: 'c', min: 0, max: 40, step: 0.1, value: 2, symbol: 'c', help: 'Damping, in newton-seconds per metre. Zero rings forever; enough of it and the motion never oscillates at all.' },
+    { id: 'w', min: 0.1, max: 30, step: 0.05, value: 5, symbol: '\\omega', help: 'How fast it is being driven, in radians per second. Sweep it through the natural frequency to find resonance — which sits slightly BELOW that frequency, not on it.' },
+    { id: 't', min: 0, max: 1, step: 0.002, value: 1, sweep: 'up', toward: 'settled', help: 'How far into the motion, from release to settled. The first cycles look nothing like the steady state everyone plots.' },
+  ],
+  projectile: [
+    { id: 'v', min: 5, max: 300, step: 1, value: 60, symbol: 'v_0', help: 'Launch speed, in metres per second.' },
+    { id: 'a', min: 1, max: 89, step: 1, value: 45, symbol: '\\theta', help: 'Launch angle, in degrees. In vacuum the best angle is exactly 45°; with air in the way it is not, and you can find the real one by moving this.' },
+    { id: 'd', min: 0.01, max: 0.6, step: 0.005, value: 0.07, symbol: 'd', help: 'Diameter, in metres. Drag goes as the area, so this matters more than it looks.' },
+    { id: 'm', min: 0.01, max: 50, step: 0.01, value: 0.145, symbol: 'm', help: 'Mass, in kilograms — a baseball is 0.145. Heavier for the same size means drag matters less.' },
+  ],
+};
+
+/** A slider's live value, or the declared default when the scene has none. */
+function simVal(scene: VizScene, vals: Record<string, number>, id: string): number {
+  const v = vals[id];
+  if (typeof v === 'number' && Number.isFinite(v)) return v;
+  const p = scene.params.find((q) => q.id === id) ?? SIM_PARAMS[simOf(scene)].find((q) => q.id === id);
+  return p ? p.value : 0;
+}
+
+function simOf(scene: VizScene): SimObject {
+  const o = scene.sim?.object;
+  return o && (SIM_OBJECTS as readonly string[]).includes(o) ? o : 'black-hole';
+}
+
+// ── the black hole ──────────────────────────────────────────────────
+
+/**
+ * What the hole looks like, and what it is.
+ *
+ * Drawn with the existing orthographic projector rather than WebGL, for the
+ * reason logos-viz3d.ts gives: a shaded GL sphere would look like a different
+ * product, cost a dependency bigger than the app, and give up the sliders, the
+ * sweep, the guard, the readouts and the export. Everything here is a ring, a
+ * mesh or a filled region — the same primitives a Riemann sum is made of.
+ *
+ * Distances on the canvas are in GRAVITATIONAL RADII, so the picture is the
+ * same shape for a stellar hole and a supermassive one and the readouts carry
+ * the metres. That is not a shortcut: in units of r_g the geometry genuinely
+ * does not depend on the mass, which is the first surprising thing about black
+ * holes and worth showing rather than hiding behind a rescaling axis.
+ */
+function buildBlackHole(scene: VizScene, vals: Record<string, number>, guarded: boolean): VizFrame {
+  const M = simVal(scene, vals, 'm') * PHYS.Msun;
+  const spin = simVal(scene, vals, 'a');
+  const bImpact = simVal(scene, vals, 'b');
+  const incl = (simVal(scene, vals, 'i') * Math.PI) / 180;
+  const bh = blackHole(M, spin);
+  const g = bh.rg;
+
+  // Everything below is in r_g. The camera looks down on the disk from `incl`
+  // above its plane; a ring at radius R is the ellipse (R cos φ, R sin φ sin i).
+  const flat = (R: number, n = 160, squash = Math.sin(incl)) => {
+    const pts: Pt[] = [];
+    for (let i = 0; i <= n; i++) {
+      const t = (2 * Math.PI * i) / n;
+      pts.push({ x: R * Math.cos(t), y: R * squash * Math.sin(t) });
+    }
+    return pts;
+  };
+  const circle = (R: number, n = 96) => flat(R, n, 1);
+
+  const objects: VizObject[] = [];
+
+  // The lensing grid: a polar mesh of the disk plane, drawn first and faintly,
+  // so the geometry has somewhere to sit. Rings are spaced by equal steps in
+  // √R, which crowds them where the curvature is.
+  const gridLines: Pt[][] = [];
+  const outer = 26;
+  for (let i = 1; i <= 7; i++) {
+    const R = 2 + (outer - 2) * (i / 7) ** 1.6;
+    gridLines.push(flat(R, 120));
+  }
+  for (let k = 0; k < 24; k++) {
+    const t = (2 * Math.PI * k) / 24;
+    const spoke: Pt[] = [];
+    for (let j = 0; j <= 20; j++) {
+      const R = 2 + (outer - 2) * (j / 20);
+      spoke.push({ x: R * Math.cos(t), y: R * Math.sin(incl) * Math.sin(t) });
+    }
+    gridLines.push(spoke);
+  }
+  objects.push({ o: 'mesh', id: 'grid', lines: gridLines, tone: 'ghost', width: 0.7 });
+
+  // The accretion disk: real circular orbits, from the ISCO outward. Its inner
+  // edge MOVES when the spin slider moves, which is the single most important
+  // thing this picture has to show.
+  const iscoR = bh.isco / g;
+  const diskOut = 22;
+  const disk: Pt[][] = [];
+  for (let i = 0; i <= 14; i++) {
+    const R = iscoR + (diskOut - iscoR) * (i / 14) ** 1.3;
+    disk.push(flat(R, 160));
+  }
+  objects.push({ o: 'mesh', id: 'disk', lines: disk, tone: 'accent', width: 1 });
+
+  // The shadow — what a distant observer actually sees as dark. √27 r_g, not
+  // the horizon: light passing inside that is captured, so the dark patch on
+  // the sky is 2.6 Schwarzschild radii wide rather than 1. Filled, and drawn
+  // after the disk so the disk's far side is correctly hidden behind it.
+  objects.push({ o: 'region', id: 'shadow', pts: circle(bh.shadow / g), tone: 'primary' });
+  objects.push({ o: 'curve', id: 'shadowline', pts: circle(bh.shadow / g), tone: 'primary', width: 1.4 });
+
+  // The horizon and the ergosphere, in the plane of the sky. The ergosphere is
+  // the reason a spinning hole is drawn differently from a still one: it is a
+  // flattened surface touching the horizon at the poles and reaching 2 r_g at
+  // the equator, and nothing inside it can stay still however hard it thrusts.
+  objects.push({ o: 'curve', id: 'horizon', pts: circle(bh.horizon / g), tone: 'tension', dashed: true, width: 1.2 });
+  if (spin > 0.02) {
+    const ergo: Pt[] = [];
+    for (let i = 0; i <= 128; i++) {
+      const th = (Math.PI * i) / 128;
+      const r = ergosphereAt(bh, th) / g;
+      ergo.push({ x: r * Math.sin(th), y: r * Math.cos(th) });
+    }
+    for (let i = 128; i >= 0; i--) {
+      const th = (Math.PI * i) / 128;
+      const r = ergosphereAt(bh, th) / g;
+      ergo.push({ x: -r * Math.sin(th), y: r * Math.cos(th) });
+    }
+    objects.push({ o: 'curve', id: 'ergo', pts: ergo, tone: 'tension', width: 1, dashed: true });
+  }
+
+  // The photon sphere: the orbit light itself can hold, unstably.
+  objects.push({ o: 'curve', id: 'photonring', pts: circle(bh.photonSphere / g), tone: 'muted', dashed: true, width: 1 });
+
+  // AND THE RAY. Integrated, not drawn — see photonPath. This is the object
+  // that makes the picture worth having a physics module behind it.
+  const ray = photonPath(bImpact);
+  if (ray.points.length > 1) {
+    objects.push({
+      o: 'curve',
+      id: 'photon',
+      pts: ray.points.map((q) => ({ x: q.x, y: q.y })),
+      tone: ray.captured ? 'tension' : 'primary',
+      width: 1.8,
+    });
+    const tip = ray.points[ray.points.length - 1];
+    objects.push({ o: 'point', id: 'photontip', x: tip.x, y: tip.y, tone: ray.captured ? 'tension' : 'primary' });
+  }
+  objects.push({
+    o: 'label', id: 'raylbl',
+    x: -outer * 0.94, y: bImpact,
+    text: ray.captured ? 'captured' : 'photon',
+    tone: ray.captured ? 'tension' : 'primary',
+    anchor: 'start',
+  });
+
+  const readouts: VizReadout[] = [
+    { id: 'rs', tex: 'r_s = 2GM/c^2', value: say(bh.rs, 'm'), help: 'The Schwarzschild radius: where the escape speed reaches the speed of light. For a non-spinning hole this is the horizon itself.' },
+    { id: 'rh', tex: 'r_+', value: say(bh.horizon, 'm'), help: 'The outer event horizon. Spin shrinks it: at the maximum it is half the Schwarzschild radius.' },
+    { id: 'shadow', tex: 'r_{\\rm shadow} = \\sqrt{27}\\,r_g', value: say(bh.shadow, 'm'), help: 'How big the dark patch looks from far away. Larger than the horizon, because light passing near the hole is bent into it — this is the size a telescope measures.' },
+    { id: 'isco', tex: 'r_{\\rm ISCO}', value: say(bh.isco, 'm'), help: 'The innermost stable circular orbit — inside it there is no orbit at all, only a fall. It is the inner edge of the disk, and spin drags it inward.' },
+    { id: 'eff', tex: '\\eta', value: guarded ? null : percent(bh.efficiency), help: 'What fraction of the infalling mass a disk can turn into light before it crosses the horizon. Compare hydrogen fusion, which manages 0.7%.' },
+    { id: 'iscoperiod', tex: 'T_{\\rm ISCO}', value: say(orbitPeriod(bh, bh.isco), 's'), help: 'How long one orbit takes at the inner edge of the disk. Kepler’s third law survives general relativity intact in these coordinates.' },
+    { id: 'z', tex: 'z(3r_s)', value: ratio(redshift(bh, 3 * bh.rs)), help: 'How far light emitted three Schwarzschild radii out is reddened by the time it reaches you. At the horizon this is infinite, which is one way of saying what a horizon is.' },
+    { id: 'tidal', tex: '\\Delta a\\,(1.8\\,\\mathrm{m})', value: say(tidal(bh, bh.horizon, 1.8), 'm/s2'), help: 'The difference in pull between your head and your feet at the horizon. Small holes tear you apart long before you arrive; large ones do not.' },
+    { id: 'th', tex: 'T_H', value: say(bh.hawkingT, 'K'), help: 'The Hawking temperature. Bigger holes are colder — this one is far colder than the microwave background, so in practice it absorbs rather than evaporates.' },
+    { id: 'evap', tex: 't_{\\rm evap}', value: say(bh.evaporation, 's'), help: 'How long it would take to evaporate completely, if nothing ever fell in. The age of the universe is 1.4 × 10¹⁰ years.' },
+    { id: 'defl', tex: '\\alpha(b)', value: ray.captured ? 'captured' : `${ratio(ray.deflection)}\\,\\mathrm{rad}`, help: 'How far the ray was bent, by integrating its actual path. Far from the hole this matches Einstein’s 4GM/bc² — the prediction the 1919 eclipse confirmed.' },
+    { id: 'bcrit', tex: 'b_{\\rm crit} = \\sqrt{27}\\,r_g', value: `${ratio(B_CRIT)}\\,r_g`, help: 'Aim a ray closer than this and it cannot escape, however fast it is going. It is the same number as the shadow radius, and for the same reason.' },
+  ];
+
+  const solar = bh.M / PHYS.Msun;
+  const caption = ray.captured
+    ? `${ratio(solar)} M☉, spin ${ratio(spin)}. The ray aimed at b = ${ratio(bImpact)} r_g is inside the capture radius: it crosses the horizon.`
+    : `${ratio(solar)} M☉, spin ${ratio(spin)}. The ray aimed at b = ${ratio(bImpact)} r_g is bent by ${ratio(ray.deflection)} rad and escapes.`;
+
+  return {
+    objects,
+    readouts,
+    caption,
+    narration: spin > 0.4
+      ? 'Spun up, the innermost stable orbit has moved inward and the ergosphere has opened out around the equator.'
+      : 'The disk stops at the innermost stable orbit. Inside it there is no orbit to have — only a fall.',
+    ask: 'The dark patch is wider than the horizon. What is filling the gap between them?',
+  };
+}
+
+// ── two bodies ──────────────────────────────────────────────────────
+
+/**
+ * A Kepler orbit, with the body where it actually is at this moment.
+ *
+ * The position comes from solving Kepler's equation, not from walking around
+ * the ellipse at a constant rate — which is the difference between a drawing of
+ * an orbit and an orbit. Under the sweep the body visibly races through
+ * periapsis and crawls at the far end, and the equal-areas readout says so in
+ * numbers at the same time.
+ */
+function buildOrbit(scene: VizScene, vals: Record<string, number>, guarded: boolean): VizFrame {
+  const m1 = simVal(scene, vals, 'm') * PHYS.Msun;
+  const aAU = simVal(scene, vals, 'a');
+  const e = simVal(scene, vals, 'e');
+  const t = simVal(scene, vals, 't');
+  const o = orbit(m1, PHYS.Mearth, aAU * PHYS.AU, e);
+
+  // Drawn in AU with the focus at the origin, which is where the star is —
+  // not the centre of the ellipse, and the offset between the two is the
+  // eccentricity made visible.
+  const A = o.a / PHYS.AU;
+  const c = A * o.e;
+  const B = A * Math.sqrt(1 - o.e * o.e);
+  const path: Pt[] = [];
+  for (let i = 0; i <= 240; i++) {
+    const E = (2 * Math.PI * i) / 240;
+    path.push({ x: A * (Math.cos(E) - o.e), y: B * Math.sin(E) });
+  }
+
+  const now = positionAt(o, t);
+  const nx = now.x / PHYS.AU;
+  const ny = now.y / PHYS.AU;
+
+  const objects: VizObject[] = [
+    { o: 'curve', id: 'ellipse', pts: path, tone: 'primary', width: 1.4 },
+    { o: 'point', id: 'star', x: 0, y: 0, tone: 'accent', label: 'focus' },
+    { o: 'point', id: 'centre', x: -c, y: 0, tone: 'ghost', hollow: true },
+    { o: 'segment', id: 'radius', x1: 0, y1: 0, x2: nx, y2: ny, tone: 'muted', dashed: true },
+    { o: 'point', id: 'body', x: nx, y: ny, tone: 'tension' },
+    { o: 'point', id: 'peri', x: A * (1 - o.e), y: 0, tone: 'ghost', hollow: true, label: 'periapsis' },
+    { o: 'point', id: 'apo', x: -A * (1 + o.e), y: 0, tone: 'ghost', hollow: true, label: 'apoapsis' },
+  ];
+
+  // The swept sector, over a fixed slice of the period. Equal areas in equal
+  // times is not something to be told; it is something to watch stay the same
+  // size while it changes shape.
+  const sector: Pt[] = [{ x: 0, y: 0 }];
+  for (let i = 0; i <= 24; i++) {
+    const q = positionAt(o, t + (0.06 * i) / 24);
+    sector.push({ x: q.x / PHYS.AU, y: q.y / PHYS.AU });
+  }
+  objects.push({ o: 'region', id: 'swept', pts: sector, tone: 'accent' });
+
+  return {
+    objects,
+    readouts: [
+      { id: 'period', tex: 'T = 2\\pi\\sqrt{a^3/\\mu}', value: guarded ? null : say(o.period, 's'), help: 'The year. Kepler\u2019s third law: it depends on the semi-major axis and the masses and on nothing else — not on the eccentricity, which is the surprising half.' },
+      { id: 'r', tex: 'r', value: say(now.r, 'm'), help: 'How far out the body is right now.' },
+      { id: 'v', tex: 'v = \\sqrt{\\mu(2/r - 1/a)}', value: say(now.v, 'm/s'), help: 'Its speed right now, from the vis-viva equation. Watch it rise as the body falls inward and fall as it climbs away.' },
+      { id: 'vp', tex: 'v_{\\rm peri}', value: say(o.vPeri, 'm/s'), help: 'The fastest it ever goes, at the closest point.' },
+      { id: 'va', tex: 'v_{\\rm apo}', value: say(o.vApo, 'm/s'), help: 'The slowest, at the furthest point. The ratio of the two is (1+e)/(1−e) exactly.' },
+      { id: 'rp', tex: 'r_{\\rm peri} = a(1-e)', value: say(o.periapsis, 'm'), help: 'Closest approach.' },
+      { id: 'ra', tex: 'r_{\\rm apo} = a(1+e)', value: say(o.apoapsis, 'm'), help: 'Furthest.' },
+      { id: 'energy', tex: '\\varepsilon = -\\mu/2a', value: say(o.energy, 'J'), help: 'Energy per kilogram of the orbiting body. Negative means bound — it depends only on the semi-major axis, so every orbit with this `a` costs the same to be in, however elongated.' },
+      { id: 'h', tex: 'h = \\sqrt{\\mu a(1-e^2)}', value: `${ratio(o.angularMomentum / 1e15)}\\times 10^{15}`, help: 'Angular momentum per kilogram, in m²/s. It is conserved, which IS Kepler\u2019s second law — the swept sector keeps its area because this number does not change.' },
+      { id: 'vesc', tex: 'v_{\\rm esc}', value: say(o.vEscape, 'm/s'), help: 'How fast it would have to be going at its closest point to leave for good.' },
+    ],
+    caption: `${ratio(aAU)} AU, e = ${ratio(e)} — one orbit in ${say(o.period, 's')}, at ${say(now.v, 'm/s')} right now.`,
+    narration: e > 0.4
+      ? 'The shaded sector covers the same slice of the year wherever it is — long and thin out here, short and fat near the focus.'
+      : 'Nearly circular: the focus and the centre are almost the same point, and the speed hardly changes.',
+    ask: 'The period does not depend on the eccentricity at all. Where in the formula did it go?',
+  };
+}
+
+// ── a driven oscillator ─────────────────────────────────────────────
+
+/**
+ * The response curve, and the actual motion, together.
+ *
+ * Resonance is usually taught as a peak on a graph of amplitude against drive
+ * frequency, and separately as a picture of something shaking. They are the
+ * same fact, and the reason to draw both is that the peak sits slightly BELOW
+ * the natural frequency and vanishes entirely above ζ = 1/√2 — neither of which
+ * is visible in either picture on its own.
+ */
+function buildOscillator(scene: VizScene, vals: Record<string, number>, guarded: boolean): VizFrame {
+  const k = simVal(scene, vals, 'k');
+  const cDamp = simVal(scene, vals, 'c');
+  const w = simVal(scene, vals, 'w');
+  const tFrac = simVal(scene, vals, 't');
+  const input = { m: 1, k, c: cDamp, F: 10, w };
+  const o = oscillator(input);
+
+  // The response curve over the frequency axis, with the live drive marked.
+  const wMax = 30;
+  const curve: Pt[] = [];
+  let top = 0;
+  for (let i = 0; i <= 300; i++) {
+    const ww = (wMax * i) / 300;
+    const a = oscillator({ ...input, w: ww }).amplitude;
+    if (Number.isFinite(a)) top = Math.max(top, a);
+    curve.push({ x: ww, y: a });
+  }
+  // Time runs along the same axis, rescaled, so both live on one canvas: the
+  // response on the left half against ω, the motion on the right against t.
+  const span = Math.min(8 * o.tau, 12 / Math.max(0.2, o.w0) * 8);
+  const tEnd = span * Math.max(0.02, tFrac);
+  const motion: Pt[] = [];
+  for (let i = 0; i <= 400; i++) {
+    const tt = (tEnd * i) / 400;
+    motion.push({ x: tt, y: oscillatorAt(input, o, tt) });
+  }
+
+  const objects: VizObject[] = [
+    { o: 'curve', id: 'response', pts: curve, tone: 'primary', width: 1.6 },
+    { o: 'vrule', id: 'w0', at: o.w0, tone: 'ghost', dashed: true, label: 'ω₀' },
+    { o: 'point', id: 'here', x: w, y: Number.isFinite(o.amplitude) ? o.amplitude : top, tone: 'tension' },
+    { o: 'curve', id: 'motion', pts: motion, tone: 'accent', width: 1.2 },
+  ];
+  if (o.wResonance > 0) {
+    objects.push({ o: 'vrule', id: 'wr', at: o.wResonance, tone: 'muted', dashed: true, label: 'peak' });
+  }
+
+  return {
+    objects,
+    readouts: [
+      { id: 'w0', tex: '\\omega_0 = \\sqrt{k/m}', value: `${ratio(o.w0)}\\,\\mathrm{rad/s}`, help: 'The frequency it would ring at with no damping and nothing driving it.' },
+      { id: 'zeta', tex: '\\zeta', value: ratio(o.zeta), help: 'The damping ratio. Below 1 it oscillates on the way to rest; at exactly 1 it returns as fast as possible without overshooting; above 1 it crawls back.' },
+      { id: 'wd', tex: '\\omega_d', value: o.wd > 0 ? `${ratio(o.wd)}\\,\\mathrm{rad/s}` : 'no oscillation', help: 'The frequency it actually rings at once damped — always lower than ω₀, and gone entirely once ζ reaches 1.' },
+      { id: 'Q', tex: 'Q = 1/2\\zeta', value: Number.isFinite(o.Q) ? ratio(o.Q) : '\\infty', help: 'How many cycles it takes to lose most of its energy, roughly. A wine glass is in the thousands.' },
+      { id: 'amp', tex: 'A(\\omega)', value: guarded ? null : say(o.amplitude, 'm'), help: 'How far it swings at the drive frequency you have set, once it has settled.' },
+      { id: 'gain', tex: 'A/A_{\\rm static}', value: guarded ? null : ratio(o.gain), help: 'How much bigger the shaking is than simply pushing with the same force and holding.' },
+      { id: 'wr', tex: '\\omega_{\\rm res}', value: o.wResonance > 0 ? `${ratio(o.wResonance)}\\,\\mathrm{rad/s}` : 'none', help: 'Where the peak actually is: ω₀√(1−2ζ²), which is BELOW the natural frequency — and above ζ = 1/√2 ≈ 0.707 there is no peak at all.' },
+      { id: 'phase', tex: '\\varphi', value: `${ratio(o.phase)}\\,\\mathrm{rad}`, help: 'How far the motion lags the push. It is a quarter turn exactly at ω₀, whatever the damping, which is the reliable way to find resonance in a laboratory.' },
+      { id: 'tau', tex: '\\tau = 1/\\zeta\\omega_0', value: Number.isFinite(o.tau) ? `${ratio(o.tau)}\\,\\mathrm{s}` : '\\infty', help: 'How long the transient takes to fade — the first part of the motion, which looks nothing like the steady state.' },
+    ],
+    caption: `Driven at ${ratio(w)} rad/s against a natural ${ratio(o.w0)}; ζ = ${ratio(o.zeta)}.`,
+    narration: o.zeta < 0.2 && Math.abs(w - o.w0) < 1
+      ? 'Near resonance and lightly damped: the amplitude is still climbing, and the transient beats against the drive on the way up.'
+      : 'The pale curve is the response against drive frequency; the darker one is the motion itself, in time.',
+    ask: 'The peak is not at the natural frequency. Which way has it moved, and what pushed it there?',
+  };
+}
+
+// ── a projectile, with the air in the way ───────────────────────────
+
+/**
+ * The trajectory, against the parabola it would have been in vacuum.
+ *
+ * Both curves at once, because the gap between them is the lesson: drag is not
+ * a correction to the parabola, it changes the shape. The real path is steeper
+ * coming down than going up, the apex moves past halfway, and the best angle
+ * stops being 45° — three facts that the textbook treatment cannot produce and
+ * that a person can find here by moving one slider.
+ */
+function buildProjectile(scene: VizScene, vals: Record<string, number>, guarded: boolean): VizFrame {
+  const v0 = simVal(scene, vals, 'v');
+  const angle = simVal(scene, vals, 'a');
+  const d = simVal(scene, vals, 'd');
+  const mass = simVal(scene, vals, 'm');
+  const p = projectile({ v0, angle, mass, diameter: d, cd: 0.47 });
+
+  const objects: VizObject[] = [
+    { o: 'curve', id: 'vac', pts: p.vacuum, tone: 'ghost', dashed: true, width: 1.2 },
+    { o: 'curve', id: 'path', pts: p.points, tone: 'primary', width: 1.8 },
+    { o: 'point', id: 'apex', x: p.apexAt, y: p.apex, tone: 'accent', label: 'apex' },
+    { o: 'point', id: 'land', x: p.range, y: 0, tone: 'tension' },
+    { o: 'vrule', id: 'vacland', at: p.vacuumRange, tone: 'ghost', dashed: true, label: 'vacuum' },
+    { o: 'hrule', id: 'ground', at: 0, tone: 'muted' },
+  ];
+
+  const lost = p.vacuumRange > 0 ? 1 - p.range / p.vacuumRange : 0;
+  return {
+    objects,
+    readouts: [
+      { id: 'range', tex: 'R', value: guarded ? null : say(p.range, 'm'), help: 'Where it actually lands, by integrating the motion with quadratic drag.' },
+      { id: 'vacr', tex: 'R_{\\rm vac} = v_0^2\\sin 2\\theta/g', value: say(p.vacuumRange, 'm'), help: 'Where the textbook says it lands. The difference is what the air took.' },
+      { id: 'lost', tex: '\\Delta R/R_{\\rm vac}', value: guarded ? null : percent(lost), help: 'How much of the range drag costs at these settings. For a real baseball it is most of it.' },
+      { id: 'apex', tex: 'h_{\\max}', value: say(p.apex, 'm'), help: 'Greatest height reached.' },
+      { id: 'asym', tex: 'x_{\\rm apex}/R', value: ratio(p.range > 0 ? p.apexAt / p.range : 0), help: 'Where the top of the arc sits along the flight. In vacuum this is exactly 0.5; with drag it is past halfway, because the descent is slower.' },
+      { id: 'time', tex: 't_{\\rm flight}', value: say(p.duration, 's'), help: 'How long it is in the air.' },
+      { id: 'vimp', tex: 'v_{\\rm impact}', value: say(p.impactSpeed, 'm/s'), help: 'Speed when it lands. In vacuum this equals the launch speed exactly; with drag it never does.' },
+      { id: 'aimp', tex: '\\theta_{\\rm impact}', value: `${ratio(p.impactAngle)}°`, help: 'How steeply it comes down. In vacuum this matches the launch angle; with drag it is steeper, which is why the path looks lopsided.' },
+      { id: 'vt', tex: 'v_t = \\sqrt{g/k}', value: say(p.terminal, 'm/s'), help: 'Terminal velocity for this body — the speed at which drag alone balances its weight.' },
+    ],
+    caption: `${ratio(v0)} m/s at ${ratio(angle)}°: ${say(p.range, 'm')}, against ${say(p.vacuumRange, 'm')} in vacuum.`,
+    narration: lost > 0.3
+      ? 'Drag is taking most of the range here, and the descent is visibly steeper than the climb.'
+      : 'The dashed parabola is the same launch with the air removed.',
+    ask: 'In vacuum the best angle is exactly 45°. Move the angle and watch the range — is it still?',
+  };
+}
+
+const SIM_BUILDERS: Record<SimObject, (s: VizScene, v: Record<string, number>, g: boolean) => VizFrame> = {
+  'black-hole': buildBlackHole,
+  orbit: buildOrbit,
+  oscillator: buildOscillator,
+  projectile: buildProjectile,
+};
+
+const buildSimulation: Builder = (scene, _fn, vals, _view, guarded) =>
+  SIM_BUILDERS[simOf(scene)](scene, vals, guarded);
+
 const KINDS: Record<VizKind, Builder> = {
   function: buildFunction,
   limit: buildLimit,
@@ -3636,6 +4192,7 @@ const KINDS: Record<VizKind, Builder> = {
   diagram: buildDiagram,
   surface: buildSurface,
   flow: buildFlow,
+  simulation: buildSimulation,
 };
 
 /**
@@ -3748,6 +4305,16 @@ export function compileScene(scene: VizScene): CompiledExpr | null {
 
 const REQUIRED: Record<VizKind, (scene: VizScene) => VizParam[]> = {
   function: () => [],
+  /**
+   * A simulation's controls are the object's own, in physical ranges.
+   *
+   * Every other kind lets the extractor declare sliders; this one does not,
+   * because the ranges ARE physics. Spin stops at 0.998 because a hole cannot
+   * be spun past the Thorne limit, eccentricity stops below 1 because at 1 the
+   * orbit is not an ellipse. Returning them from here means the declared list
+   * can only supply starting VALUES — clamped, below — and never a range.
+   */
+  simulation: (sc) => SIM_PARAMS[simOf(sc)].map((p) => ({ ...p })),
   // Nothing is implied for a diagram: its controls are the ones the picture
   // is about, and inventing one would put a slider under a drawing that has
   // nothing to move.
@@ -4014,10 +4581,15 @@ export const RESERVED_PARAM: Record<VizKind, string | null> = {
   // and pressing play is the whole difference between a diagram of a vortex
   // and watching one die.
   flow: 't',
+  // The simulated objects that move in time reserve 't' for the clock; the
+  // black hole is a still geometry and reserves nothing, so its sliders are
+  // all named here and none of them is the animation's.
+  simulation: 't',
 };
 
 export const KIND_LABEL: Record<VizKind, string> = {
   function: 'Function',
+  simulation: 'Simulation',
   limit: 'Limit',
   derivative: 'Derivative',
   riemann: 'Integral',
@@ -4081,8 +4653,30 @@ function span(scene: VizScene, divisor: number, cap: number): number {
   return Math.max(0.05, Math.min(cap, w / divisor));
 }
 
+/**
+ * Kinds whose slider RANGES are a fact about the world rather than a choice.
+ *
+ * Everywhere else the extractor may declare a slider and keep its range, which
+ * is right: the sensible span of a coefficient depends on the picture. A
+ * simulation is not like that. Spin runs to 0.998 because of the Thorne limit,
+ * eccentricity stops below 1 because at 1 the orbit is not an ellipse — and a
+ * model that set either one wider would produce a picture that went on looking
+ * convincing while meaning nothing. So here the declared slider contributes a
+ * starting VALUE, clamped, and nothing else.
+ */
+const OWNS_RANGES = new Set<VizKind>(['simulation']);
+
 function withRequired(scene: VizScene): VizScene {
   const need = REQUIRED[scene.kind](scene);
+  if (OWNS_RANGES.has(scene.kind)) {
+    return {
+      ...scene,
+      params: need.map((p) => {
+        const given = scene.params.find((q) => q.id === p.id);
+        return given ? { ...p, value: Math.min(p.max, Math.max(p.min, given.value)) } : p;
+      }),
+    };
+  }
   const have = new Set(scene.params.map((p) => p.id));
   const params = [...scene.params];
   for (const p of need) if (!have.has(p.id)) params.push(p);
@@ -4588,12 +5182,26 @@ export function sanitizeViz(raw: any): VizScene | null {
       // curve is not drawn — and the model has every reason to reach for e
       // as a name (EC50, an elasticity, an efficiency) without knowing it
       // has just redefined Euler's number underneath itself.
-      if (id === 'e' || id === 'pi' || id === 'tau') return null;
+      // …except where there is no expression for it to shadow. A simulation
+      // has no scene-wide formula at all — its numbers come from
+      // lib/logos-physics.ts — and `e` is the notation for eccentricity in
+      // every account of orbits ever written, so refusing it there would cost
+      // the right name to protect an expression that does not exist.
+      if (!OWNS_RANGES.has(kind) && (id === 'e' || id === 'pi' || id === 'tau')) return null;
       if (kind === 'ode' && id === 'y') return null; // y is the solution, not a slider
       if (kind === 'surface' && id === 'y') return null; // y is an axis, not a slider
       const min = num(p?.min, -1e4, 1e4, 0);
       const max = num(p?.max, -1e4, 1e4, 1);
       if (!(max > min)) return null;
+      // WHERE THE RANGE IS PHYSICS, THE DECLARED RANGE MUST NOT TOUCH THE
+      // VALUE EITHER. withRequired throws the model's range away for these
+      // kinds — but the value was clamped into it first, so "10 solar masses"
+      // declared alongside a careless min/max of 0…1 arrived as 1 and the
+      // picture was of a different star. Read it raw here; the real range
+      // clamps it a moment later.
+      if (OWNS_RANGES.has(kind)) {
+        return { id, min, max, step: 1, value: num(p?.value, -1e9, 1e9, 0) };
+      }
       const integer = p?.integer === true;
       const step = integer ? 1 : num(p?.step, 1e-6, Math.max(1e-6, max - min), (max - min) / 100);
       return {
@@ -4690,6 +5298,18 @@ export function sanitizeViz(raw: any): VizScene | null {
               ? { min: lo, max: hi }
               : { min: -3, max: 3 };
           })(),
+        }
+      : {}),
+    // WHICH OBJECT, and that is all that is read. An unknown name is not an
+    // error worth losing the picture over — it becomes the black hole, which
+    // is the one people ask for.
+    ...(kind === 'simulation'
+      ? {
+          sim: {
+            object: (SIM_OBJECTS as readonly string[]).includes(raw?.sim?.object)
+              ? (raw.sim.object as SimObject)
+              : 'black-hole',
+          },
         }
       : {}),
     ...(kind === 'matrix' ? { matrix: sanitizeMatrix(raw.matrix) ?? undefined } : {}),
