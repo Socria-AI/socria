@@ -19,7 +19,7 @@ export function UseCases() {
   return (
     <Article page={page} sections={sections}>
       <p>
-        Socria is one product with three registers, so the practical question
+        Socria is one product with several registers, so the practical question
         is less <em>"what can it do"</em> than <em>"which surface fits this
         moment."</em> These are the shapes of use the product was actually
         built around.
@@ -106,7 +106,12 @@ export function UseCases() {
         <strong>Core 3.1</strong> if the thread is one you will come back to:
         it holds memory across the conversation, periodically synthesizes what
         you have worked out, and keeps a running picture of how you tend to
-        think. Either way, if the thinking starts to sprawl, open Logos and give
+        think. <strong><Link href="/docs/core-4">Core 4</Link></strong> if the
+        work is long and consequential — a decision that runs for weeks, a
+        piece of research, a plan you need the load-bearing assumption of. It
+        contributes rather than quizzes, keeps a record of what you have
+        settled so nothing is re-litigated, and holds an answer back only for
+        a reason you gave it in your own words. Either way, if the thinking starts to sprawl, open Logos and give
         it a line of thinking of its own — chat and Logos sessions sit in one
         list, interleaved by when you last touched them, whichever model made
         them.

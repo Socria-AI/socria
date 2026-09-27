@@ -113,6 +113,7 @@ const MODULES = [
   'lib/email.ts',
   'lib/socria-prompt.ts',
   'app/explore/scenarios.ts',
+  'app/docs/registry.ts',
 ];
 
 export async function buildAll() {
