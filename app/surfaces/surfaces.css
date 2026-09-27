@@ -280,3 +280,5 @@
    fixed height: the pane is what the reader sized. */
 .l2 .sfx { height: 100%; border: 0; border-radius: 0; }
 .l2 .sfx-grip { display: none; }
+/* The wireframe on the facing hemisphere — what tells the eye it is a ball. */
+.bhx-wire { fill: none; stroke: rgba(255, 255, 255, 0.2); stroke-width: 0.7; vector-effect: non-scaling-stroke; }

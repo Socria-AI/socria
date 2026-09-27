@@ -164,8 +164,11 @@ export function BlackHoleSurface() {
       const f = cam.dist / Math.max(0.35, depth);
       return { x: W / 2 + rx * scale * f, y: H / 2 - ry * scale * f, depth, f };
     };
-    /** a point in the disc's own plane, tipped by the tilt control */
-    const onDisc = (x: number, z: number) => cast(x, z * si, z * ci);
+    /**
+     * A point in the disc's own plane, tipped by the tilt control — and `h`
+     * above it, which is what gives the disc a thickness to be seen edge-on.
+     */
+    const onDisc = (x: number, z: number, h = 0) => cast(x, z * si + h * ci, z * ci - h * si);
     const centre = cast(0, 0, 0);
     const bodyR = g.horizon * scale * centre.f;
     const hidden = (p: { x: number; y: number; depth: number }) =>
@@ -184,7 +187,7 @@ export function BlackHoleSurface() {
       if (run.length > 1) out.push(run);
       return out;
     };
-    const ring = (r: number, n = 128) =>
+    const ringAt = (r: number, n = 128) =>
       Array.from({ length: n + 1 }, (_, i) => {
         const th = (i / n) * Math.PI * 2;
         return onDisc(r * Math.cos(th), r * Math.sin(th));
@@ -197,50 +200,83 @@ export function BlackHoleSurface() {
         return plane === 'xz' ? cast(c, 0, s) : cast(0, c, s);
       });
 
-    const nodes: React.ReactNode[] = [];
-
-    // ── the disc, in its own colour ────────────────────────────────
+    // ── A DEPTH-SORTED SCENE, WHICH IS WHAT MAKES IT AN OBJECT ─────
     //
-    // Each ring is drawn as a set of short arcs so the colour can follow the
-    // Doppler factor around it: the approaching quarter is bright and blue,
-    // the receding one dim and red, and the transition is where the gas is
-    // moving across the line of sight.
+    // Everything above this point was drawn in a fixed order, so nothing ever
+    // passed BEHIND anything: the disc's far side sat on top of the hole, the
+    // rays crossed it, and the result was a tilted flat diagram rather than a
+    // model of a thing. Each primitive is collected with the depth of the
+    // point it belongs to and the whole list is painted far-to-near. That one
+    // change is most of the difference between a picture of a black hole and
+    // a black hole.
+    const scene: { z: number; node: React.ReactNode }[] = [];
+    const put = (z: number, node: React.ReactNode) => scene.push({ z, node });
+    const mid = (pts: { depth: number }[]) => pts.reduce((a, q) => a + q.depth, 0) / pts.length;
+
+    // ── the disc, with thickness, in its own colour ────────────────
+    //
+    // Each ring is a band rather than a line: an inner and an outer edge at a
+    // small height above and below the plane, filled as a quad. A disc drawn
+    // as concentric hairlines is a contour map of a disc; this one has a near
+    // edge that can occlude and a far edge that can be occluded.
     if (layers.disc) {
-      const RINGS = 16;
-      for (let i = 0; i <= RINGS; i++) {
-        const frac = i / RINGS;
-        const r = rIn + (rOut - rIn) * frac ** 1.35;
-        const rSI = r * bh.rs;
+      const RINGS = 14;
+      const SEGS = 60;
+      const thick = Math.max(0.05, 0.035 * rOut);
+      for (let i = 0; i < RINGS; i++) {
+        const f0 = i / RINGS;
+        const f1 = (i + 1) / RINGS;
+        const r0 = rIn + (rOut - rIn) * f0 ** 1.35;
+        const r1 = rIn + (rOut - rIn) * f1 ** 1.35;
+        const rSI = ((r0 + r1) / 2) * bh.rs;
         const beta = orbitalBeta(bh, rSI);
-        const SEGS = 48;
+        const h = thick * (0.35 + 0.65 * f0);
         for (let k = 0; k < SEGS; k++) {
           const th0 = (k / SEGS) * Math.PI * 2;
           const th1 = ((k + 1) / SEGS) * Math.PI * 2;
-          const pts = [th0, (th0 + th1) / 2, th1].map((th) =>
-            onDisc(r * Math.cos(th), r * Math.sin(th))
-          );
-          if (pts.some(hidden)) continue;
-          // The component of the orbital velocity along the line of sight.
-          // The gas runs anticlockwise in the disc plane; after the camera's
-          // yaw the approaching side is where sin carries it toward the eye.
+          // A quad: inner edge at this angle and the next, outer edge back.
+          // FLAT ACROSS AZIMUTH, FLARED WITH RADIUS. Putting −h/2 on one
+          // azimuthal edge and +h/2 on the other twists each patch out of the
+          // plane, and the disc came out as a ring of fan blades. The height
+          // belongs to the RADIUS — a real thin disc flares outward, H/R
+          // growing with r — so both corners at r₀ share one height and both
+          // at r₁ share another, and the surface stays a surface.
+          const h0 = h * (r0 - rIn) / Math.max(0.01, rOut - rIn);
+          const h1 = h * (r1 - rIn) / Math.max(0.01, rOut - rIn);
+          const quad = [
+            onDisc(r0 * Math.cos(th0), r0 * Math.sin(th0), h0),
+            onDisc(r1 * Math.cos(th0), r1 * Math.sin(th0), h1),
+            onDisc(r1 * Math.cos(th1), r1 * Math.sin(th1), h1),
+            onDisc(r0 * Math.cos(th1), r0 * Math.sin(th1), h0),
+          ];
+          if (quad.every(hidden)) continue;
           const thm = (th0 + th1) / 2;
           const vx = -Math.sin(thm);
           const vz = Math.cos(thm);
-          const losX = -sy * cp;
-          const losZ = -cy * cp;
-          const cosTheta = Math.max(-1, Math.min(1, vx * losX + vz * losZ * ci));
+          const cosTheta = Math.max(-1, Math.min(1, vx * (-sy * cp) + vz * (-cy * cp) * ci));
           const { T, boost } = observedTemperature(bh, rSI, mdot, cosTheta);
           if (T <= 0) continue;
-          const alpha = Math.min(0.95, 0.1 + 0.42 * Math.cbrt(boost) * (1 - 0.55 * frac));
-          nodes.push(
+          // THE BEAMING HAS TO BE VISIBLE OR IT IS NOT BEING SHOWN.
+          //
+          // At these temperatures the disc is blue-white everywhere — that is
+          // true, and it means colour cannot carry the asymmetry. Brightness
+          // has to. A cube root over a narrow range washed a twelvefold
+          // difference in surface brightness down to a barely perceptible one;
+          // this keeps the ratio the arithmetic actually gives.
+          const alpha = Math.min(
+            0.95,
+            0.05 + 0.9 * Math.pow(Math.min(1, boost / 3.4), 0.85) * (1 - 0.3 * f0)
+          );
+          put(
+            mid(quad),
             <path
               key={`d${i}_${k}`}
-              d={d(pts)}
-              fill="none"
+              d={`${d(quad)} Z`}
+              fill={blackbodyCSS(T, 1)}
+              fillOpacity={alpha}
               stroke={blackbodyCSS(T, 1)}
-              strokeOpacity={alpha}
-              strokeWidth={Math.max(0.9, 2.6 * (1 - frac * 0.55))}
-              strokeLinecap="round"
+              strokeOpacity={alpha * 0.55}
+              strokeWidth={0.4}
             />
           );
         }
@@ -255,21 +291,22 @@ export function BlackHoleSurface() {
         const r = rIn + (((i * 7919) % n) / n) * (rOut - rIn);
         const om = 1.7 * drag * Math.pow(r / rIn, -1.5);
         const th = (i / n) * Math.PI * 2 + om * t;
-        const p = onDisc(r * Math.cos(th), r * Math.sin(th));
+        const p = onDisc(r * Math.cos(th), r * Math.sin(th), 0);
         if (hidden(p)) continue;
         const rSI = r * bh.rs;
         const vx = -Math.sin(th);
         const vz = Math.cos(th);
         const cosTheta = Math.max(-1, Math.min(1, vx * (-sy * cp) + vz * (-cy * cp) * ci));
         const { T, boost } = observedTemperature(bh, rSI, mdot, cosTheta);
-        nodes.push(
+        put(
+          p.depth,
           <circle
             key={`m${i}`}
             cx={p.x}
             cy={p.y}
-            r={Math.max(0.8, (1.9 - 1.1 * ((r - rIn) / Math.max(0.1, rOut - rIn))) * p.f)}
+            r={Math.max(0.7, (1.7 - 1.0 * ((r - rIn) / Math.max(0.1, rOut - rIn))) * p.f)}
             fill={blackbodyCSS(T, 1)}
-            opacity={Math.min(1, 0.35 + 0.3 * Math.cbrt(boost))}
+            opacity={Math.min(1, 0.4 + 0.3 * Math.cbrt(boost))}
           />
         );
       }
@@ -277,8 +314,6 @@ export function BlackHoleSurface() {
 
     // ── the marked surfaces ────────────────────────────────────────
     if (layers.ergo && Math.abs(vals.spin) > 0.02) {
-      // r_E(θ) = r_g(1 + √(1 − a²cos²θ)), in r_s. It touches the horizon at
-      // the poles and reaches 1 r_s at the equator whatever the spin.
       const A = Math.abs(vals.spin);
       const pts: { x: number; y: number; depth: number }[] = [];
       for (let i = 0; i <= 96; i++) {
@@ -291,71 +326,98 @@ export function BlackHoleSurface() {
         const rE = (1 + Math.sqrt(Math.max(0, 1 - A * A * Math.cos(th) ** 2))) / 2;
         pts.push(cast(-rE * Math.sin(th), rE * Math.cos(th), 0));
       }
-      nodes.push(<path key="ergo" className="bhx-ergo" d={d(pts)} />);
+      put(centre.depth - 0.01, <path key="ergo" className="bhx-ergo" d={d(pts)} />);
     }
     if (layers.photon) {
-      nodes.push(<path key="ph1" className="bhx-photon" d={d(greatCircle(g.photon, 'xz'))} />);
-      nodes.push(<path key="ph2" className="bhx-photon" d={d(greatCircle(g.photon, 'yz'))} />);
+      for (const [pl, key] of [['xz', 'a'], ['yz', 'b']] as const) {
+        const c = greatCircle(g.photon, pl);
+        runs(c).forEach((seg, k) =>
+          put(mid(seg), <path key={`ph${key}${k}`} className="bhx-photon" d={d(seg)} />)
+        );
+      }
     }
     if (layers.isco) {
-      runs(ring(isco)).forEach((s, k) => nodes.push(<path key={`i${k}`} className="bhx-isco" d={d(s)} />));
+      runs(ringAt(isco)).forEach((seg, k) =>
+        put(mid(seg), <path key={`i${k}`} className="bhx-isco" d={d(seg)} />)
+      );
     }
 
-    // ── the hole ───────────────────────────────────────────────────
-    nodes.push(<circle key="h" className="bhx-horizon" cx={centre.x} cy={centre.y} r={bodyR} />);
-    // The shadow: what is actually dark to a distant observer, which is wider
-    // than the horizon because light passing near it is bent in.
-    nodes.push(
-      <circle key="sh" className="bhx-shadow" cx={centre.x} cy={centre.y} r={g.bc * scale * centre.f} />
-    );
+    // ── THE HOLE, AS A SPHERE ──────────────────────────────────────
+    //
+    // A filled circle is a disc, and at any angle but dead-on it reads as one.
+    // The silhouette is still a circle — that is what a sphere projects to —
+    // but the surface carries a wireframe of latitudes and meridians on the
+    // FACING hemisphere only, which is what tells the eye it is looking at a
+    // ball rather than a hole punched in the page. Hidden-line removal is the
+    // same occlusion test everything else here uses.
+    const Rh = g.horizon;
+    put(centre.depth, <circle key="h" className="bhx-horizon" cx={centre.x} cy={centre.y} r={bodyR} />);
+    const wire: React.ReactNode[] = [];
+    for (let li = 1; li <= 5; li++) {
+      const lat = -Math.PI / 2 + (li * Math.PI) / 6;
+      const pts = Array.from({ length: 73 }, (_, k) => {
+        const lon = (k / 72) * Math.PI * 2;
+        return cast(Rh * Math.cos(lat) * Math.cos(lon), Rh * Math.sin(lat), Rh * Math.cos(lat) * Math.sin(lon));
+      });
+      // Only the near half: a latitude drawn all the way round makes a sphere
+      // look like a wire cage rather than a solid.
+      const front = pts.filter((q) => q.depth < centre.depth);
+      if (front.length > 1) wire.push(<path key={`la${li}`} className="bhx-wire" d={d(front)} />);
+    }
+    for (let mi = 0; mi < 8; mi++) {
+      const lon = (mi / 8) * Math.PI * 2;
+      const pts = Array.from({ length: 49 }, (_, k) => {
+        const lat = -Math.PI / 2 + (k / 48) * Math.PI;
+        return cast(Rh * Math.cos(lat) * Math.cos(lon), Rh * Math.sin(lat), Rh * Math.cos(lat) * Math.sin(lon));
+      });
+      const front = pts.filter((q) => q.depth < centre.depth);
+      if (front.length > 1) wire.push(<path key={`me${mi}`} className="bhx-wire" d={d(front)} />);
+    }
+    put(centre.depth - bodyR * 0.001, <g key="wire">{wire}</g>);
+
+    // The shadow: what is actually dark to a distant observer, √27 r_g wide —
+    // 2.6 times the horizon, because light passing near it is bent in. Drawn
+    // flat to the sky, because that is what it is: an apparent size.
+    put(-1e9, <circle key="sh" className="bhx-shadow" cx={centre.x} cy={centre.y} r={g.bc * scale * centre.f} />);
 
     // ── the light, integrated ──────────────────────────────────────
     let captured = 0;
     if (layers.rays) {
       const n = Math.round(vals.rays);
       for (let i = 0; i < n; i++) {
-        // Impact parameters spread about the capture radius, so some fall in
-        // and some do not, and the boundary between them is visible.
         const b = g.bc * (0.5 + (n === 1 ? 0.6 : (i / (n - 1)) * vals.spread));
-        // photonPath works in r_g; b here is in r_s, so double it going in and
-        // halve the path coming out.
         const ray = photonPath(b * 2, { steps: 1400, maxTurn: 8 * Math.PI });
         if (ray.captured) captured++;
-        // IN VIEW ONLY. photonPath starts the ray six impact parameters out so
-        // the integration has somewhere to converge from; at b = 5 r that is 30 r,
-        // and drawing all of it put four straight lines across the whole panel
-        // and left the bend — the only interesting part — squeezed into a corner.
         const clip = rOut * 1.25;
         const pts = ray.points
           .map((q) => ({ wx: q.x / 2, wz: q.y / 2 }))
           .filter((q) => Math.hypot(q.wx, q.wz) <= clip)
-          // The vertical plane, not the disc's. In the disc plane the arc is
-          // foreshortened by exactly the tilt that makes the disc read as a
-          // disc, and the bend — the only thing a light ray is here to show —
-          // flattened into a stroke.
           .map((q) => cast(q.wx, q.wz, 0));
         const near = Math.abs(b - vals.bsel) < 0.35;
-        runs(pts).forEach((s, k) =>
-          nodes.push(
+        runs(pts).forEach((seg, k) =>
+          put(
+            mid(seg),
             <path
               key={`r${i}_${k}`}
               className={(ray.captured ? 'bhx-ray-lost' : 'bhx-ray') + (near ? ' on' : '')}
-              d={d(s)}
+              d={d(seg)}
             />
           )
         );
-        // a photon running along its own path, so the direction is visible
         if (pts.length > 4) {
           const ph = ((t * 0.18 + i * 0.17) % 1 + 1) % 1;
           const q = pts[Math.min(pts.length - 1, Math.floor(ph * pts.length))];
           if (!hidden(q)) {
-            nodes.push(
-              <circle key={`rd${i}`} className={`bhx-dot${ray.captured ? ' lost' : ''}`} cx={q.x} cy={q.y} r={2.2} />
-            );
+            put(q.depth, <circle key={`rd${i}`} className={`bhx-dot${ray.captured ? ' lost' : ''}`} cx={q.x} cy={q.y} r={2.2} />);
           }
         }
       }
     }
+
+    // Painted far to near. The labels are added after, because they belong to
+    // the reader rather than to the scene and must never be occluded by it.
+    scene.sort((a, b) => b.z - a.z);
+    const nodes: React.ReactNode[] = scene.map((s) => s.node);
 
     // ── labels ─────────────────────────────────────────────────────
     if (layers.labels) {
@@ -415,8 +477,13 @@ export function BlackHoleSurface() {
       groups={GROUPS}
       layers={LAYERS}
       initial={INITIAL}
-      initialCam={{ yaw: 0.5, pitch: 0.52, dist: 15 }}
-      distRange={[4, 90]}
+      // FAR ENOUGH OUT TO BE LOOKING AT IT. `dist` is in the same units as the
+      // radii, so 15 put the eye a quarter of a disc-width from the near edge:
+      // the near side was magnified nine times over the far side and the whole
+      // thing opened like a fan. At 48 the ratio is under two, which is the
+      // perspective of looking at an object rather than standing in one.
+      initialCam={{ yaw: 0.5, pitch: 0.62, dist: 48 }}
+      distRange={[16, 260]}
       render={render}
     />
   );
