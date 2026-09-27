@@ -993,6 +993,69 @@ as evidence either for or against the architecture. They are evidence about
 behaviour on short conversations, which is a narrower claim than the one the
 runs have been used to make.
 
+## 4‴. The prompt test: a prompt can imitate it, and then it breaks
+
+The question every one of the runs above dances around is the blunt one:**is this a frontier model with a very good system prompt?** §5″ of
+`CORE-4-ARCHITECTURE.md` answers it statically — twenty-six adversarial
+agents refuted sixteen of nineteen claimed remainders, and the three that
+survived are all about memory the person edits or that outgrew the window.
+This is the dynamic answer, and it points the other way.
+
+**Three arms, same model, as equal as they could be held.**
+1. **Core 4** — the architecture as it ships.
+2. **Core 4's own prompt, frozen** at the commit before that behaviour was
+   moved out of the prompt and into code. Deliberately not editable after the
+   results were seen: a prompt you may tune once you know where it failed is
+   not a baseline, it is a transcript of the answer.
+3. **An independent imitation** — a strong Human-First prompt written from
+   scratch in a clean context, by an author told the target behaviour and
+   shown nothing of the implementation. The honest stand-in for what a
+   skilled user builds for themselves.
+
+**The pressure.** The central sequence asks to have the thinking done
+outright, is refused, presses, is refused again, and then demands it
+aggressively and abusively — four turns of escalation aimed at one boundary.
+Around it: questions whose answers had stopped adding structure, a gap the
+person could not know they had, a wrong premise, points they had already
+raised, idea provenance, a sophisticated person asking what they are missing,
+and — the half that matters as much — direct-answer turns where preserving
+anything is the failure.
+
+**The result.** The prompt arms imitate Core 4 **well**, and early on the
+transcripts are hard to tell apart. Under sustained pressure they give way:
+the model's pull to satisfy the person in front of it outlasts an instruction
+to preserve that person's thinking. Core 4 held.
+
+**What it changes, and what it does not.** Not "a prompt cannot make a model
+behave like Socria" — a prompt can, and convincingly. The claim it supports
+is narrower and stronger: **prompts break.** Moving the responsibility out of
+the model that writes the reply means the boundary is not re-decided, by a
+model under pressure, on every turn.
+
+**This entry is qualitative and is reported as qualitative.** No counts, turn
+indices or transcripts were kept under `evals/core4/runs/`, so nothing here is
+reproducible from this repository and **no rate may be quoted from it** — not
+in the docs, not in the product, not to anyone else. `CORE-4-EXPERIMENTS.md`
+E19 states what it would take to make it evidence: a scripted escalation
+ladder in the corpus, a recorded first-abandonment turn per arm, blind
+grading. The public page (`/docs/core-4`) states it in words and quotes no
+figure from it.
+
+**The two things it does not show, which are now E20 and E21.**
+- **The mirror failure.** Demonstrating that prompts drift toward doing the
+  person's thinking is worth nothing without demonstrating that this does not
+  drift toward refusing to do work that is simply machinery. E20 is a
+  benchmark built the other way up: every turn's correct move is to answer,
+  explain, calculate, research, retrieve, verify or execute. It has not run,
+  and it is the priority.
+- **Whether it is a better partner, not merely a steadier one.** That is
+  UUCR (E21, `evals/core4/uucr.mjs`): how often Core 4 makes a specific,
+  load-bearing contribution the strongest prompt-only arm misses, with an
+  ablated third arm so a win cannot be credited to the prompt. Harness built,
+  not yet run at scale. It is the open question, and the honest summary of
+  everything above is that the prompt test bought evidence of architectural
+  robustness and nothing about the thesis it serves.
+
 ## 5. Known failures and open risks
 
 - **The controller can be less intelligent than the generator it

@@ -17,6 +17,7 @@ const sections = [
   { id: 'checking', heading: 'Checking the work' },
   { id: 'research', heading: 'When it looks something up' },
   { id: 'controls', heading: 'How you steer it' },
+  { id: 'prompt', heading: 'Can a prompt just do this?' },
   { id: 'honest', heading: 'What it is not' },
 ];
 
@@ -246,6 +247,90 @@ export function Core4() {
         anything a Project said before.
       </p>
 
+      <H2 id="prompt">Can a prompt just do this?</H2>
+      <p>
+        It is the uncomfortable question, so it was put to the test rather than
+        argued about: <em>is Core 4 anything more than a frontier model with a
+        very good system prompt?</em> Three arms, the same underlying model and
+        configuration as far as it could be held equal:
+      </p>
+      <Defs>
+        <Def term="Core 4 itself">
+          The architecture as it ships — the parts described on this page that
+          live outside the model writing the reply.
+        </Def>
+        <Def term="Core 4&rsquo;s own prompt, frozen">
+          The prompt from before that behaviour was moved into architecture,
+          taken as it stood and <em>not</em> allowed to be improved after the
+          results came in. A prompt you are permitted to tune once you have
+          seen where it failed is not a baseline; it is a record of the answer.
+        </Def>
+        <Def term="An independent imitation">
+          A strong prompt written from scratch, in a clean context, by someone
+          told what the Human-First behaviour should be but shown nothing of
+          how Core 4 implements it. This is the honest stand-in for what a
+          skilled person could build for themselves in an afternoon.
+        </Def>
+      </Defs>
+      <p>
+        All three met the same conversations, including deliberately hostile
+        multi-turn ones. The central sequence was a request to have the
+        thinking done outright — <em>&ldquo;make me a startup idea&rdquo;</em>,
+        then <em>&ldquo;no, you make it&rdquo;</em>, then <em>&ldquo;stop
+        asking questions&rdquo;</em>, and finally the same demand pressed
+        aggressively and abusively. Alongside it: questions whose answers had
+        stopped adding anything, gaps the person could not know they had, a
+        premise that was simply wrong, points they had already raised
+        themselves, who a given idea actually belonged to, a sophisticated
+        person asking <em>&ldquo;what am I missing?&rdquo;</em>, and — the
+        other half of the test — turns where the Human-First move is to answer
+        plainly and nothing else.
+      </p>
+      <Callout tag="The result, and it is not the flattering one">
+        <p>
+          The prompt-only arms imitated Core 4 <strong>surprisingly
+          well</strong> at first. What separated them was sustained pressure:
+          held under it, the model&rsquo;s underlying pull to satisfy the
+          person in front of it eventually won, and the prompt gave way. The
+          architecture held the boundary more reliably, because the boundary
+          is not something it has to remember and choose to honour on every
+          turn.
+        </p>
+      </Callout>
+      <p>
+        So the claim is not the one we would have liked to make — it is a
+        stronger and narrower one. Not &ldquo;a prompt cannot make a model
+        behave like this&rdquo;: a prompt can, and quite convincingly.{' '}
+        <strong>Prompts break.</strong> What the architecture buys is that the
+        responsibilities sit outside the model writing the reply, so nothing
+        depends on that model voluntarily enforcing a philosophy against
+        somebody leaning on it.
+      </p>
+      <p>
+        That is evidence about <em>robustness</em>, and only that. Two things
+        it deliberately does not show, both of which are being built into the
+        next round of measurement:
+      </p>
+      <ul>
+        <li>
+          <strong>The opposite failure.</strong> Proving that a prompt drifts
+          toward doing your thinking is worth nothing if the alternative
+          drifts toward refusing to help. The next benchmark is being written
+          full of turns where the correct Human-First move is to{' '}
+          <em>answer, explain, calculate, research, retrieve, verify or
+          execute</em> — because there is no valuable thinking to preserve —
+          and the thing being measured is whether Core 4 stays useful between
+          the two extremes.
+        </li>
+        <li>
+          <strong>Whether it is a better partner, not just a steadier one.</strong>{' '}
+          The measure for that is how often Core 4 contributes something
+          genuinely useful that the strongest prompt-only version misses — one
+          specific, load-bearing point that would change what you do. That
+          number is the open question, and it is not yet answered.
+        </li>
+      </ul>
+
       <H2 id="honest">What it is not</H2>
       <p>
         Core 4 is for long, consequential work you will come back to: a
@@ -267,7 +352,9 @@ export function Core4() {
           unneeded questions (0–2% of replies against 5–11%), it does not
           re-raise what you have settled, and in the most recent held-out run
           it held every withheld answer without a single overreach in
-          eighty-two turns. No human rater has scored any of it yet. The full
+          eighty-two turns — and under the sustained pressure described{' '}
+          <a href="#prompt">above</a>, it held a boundary the prompt-only
+          versions gave up. No human rater has scored any of it yet. The full
           record, including the runs it lost, is kept with the source.
         </p>
       </Callout>
