@@ -26,6 +26,7 @@ import Link from 'next/link';
 import { drawHands, loadHandLandmarker, openCamera, type Landmarker } from '@/lib/hand-tracking';
 import {
   ACTIONS,
+  CONFIRM_WINDOW,
   GESTURE,
   GestureTracker,
   TwoHandTracker,
@@ -91,9 +92,10 @@ export function Logos2Test() {
   const [aim, setAim] = useState({ x: 0.5, y: 0.5 });
   const [over, setOver] = useState<string | null>(null);
   const [held, setHeld] = useState<{ action: Action; at: number } | null>(null);
-  const [held2, setHeld2] = useState<string | null>(null);
   const [log, setLog] = useState<string[]>([]);
   const [zoom, setZoom] = useState(1);
+  /** What is waiting for a thumbs up, and on which node. */
+  const [armed, setArmed] = useState<{ action: Action; id: string; label: string } | null>(null);
 
   const video = useRef<HTMLVideoElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
@@ -103,6 +105,11 @@ export function Logos2Test() {
   const raf = useRef(0);
   const tracker = useRef(new GestureTracker());
   const two = useRef(new TwoHandTracker());
+  // The loop needs to see what is armed without being rebuilt when it changes.
+  const armedRef = useRef<{ action: Action; id: string; label: string } | null>(null);
+  useEffect(() => {
+    armedRef.current = armed;
+  }, [armed]);
   // The node in hand. A ref, not state: it is read inside the animation loop
   // sixty times a second and setting state there would re-render as often.
   const carrying = useRef<string | null>(null);
@@ -138,6 +145,30 @@ export function Logos2Test() {
         setNodes((ns) => ns.map((n) => (n.id === id ? { ...n, ...RESULT[action](n) } : n)));
         say(`${action === 'research' ? 'Researched' : 'Challenged'} "${label}".`);
       }
+    },
+    [say]
+  );
+
+  /** Arm an action against a node: it does nothing until it is confirmed. */
+  const arm = useCallback((action: Action, id: string) => {
+    const label = live.current.find((n) => n.id === id)?.label ?? id;
+    setArmed({ action, id, label });
+  }, []);
+
+  const confirm = useCallback(() => {
+    const a = armedRef.current;
+    if (!a) return;
+    act(a.action, a.id);
+    setArmed(null);
+  }, [act]);
+
+  const cancel = useCallback(
+    (why = 'called off') => {
+      const a = armedRef.current;
+      if (!a) return;
+      tracker.current.disarm();
+      setArmed(null);
+      say(`${a.action} on "${a.label}" ${why}.`);
     },
     [say]
   );
@@ -209,7 +240,14 @@ export function Logos2Test() {
           carrying.current = null;
         }
 
-        if (out.fired) act(out.fired, near?.id ?? null);
+        // ARMING CAPTURES THE TARGET. Confirming happens with a thumbs up,
+        // which means the hand has moved and is no longer aiming at anything —
+        // so the node has to be remembered from the moment the action was
+        // armed, not looked up again when it fires.
+        if (out.justArmed && near) arm(out.justArmed, near.id);
+        else if (out.justArmed) tracker.current.disarm();
+        if (out.fired) confirm();
+        if (out.cancelled) cancel(out.cancelled.why === 'timeout' ? 'timed out' : 'called off');
         raf.current = requestAnimationFrame(tick);
       };
       raf.current = requestAnimationFrame(tick);
@@ -217,7 +255,7 @@ export function Logos2Test() {
       setStatus('error');
       setError(e instanceof Error ? e.message : String(e));
     }
-  }, [act]);
+  }, [act, arm, confirm, cancel]);
 
   const stop = useCallback(() => {
     cancelAnimationFrame(raf.current);
@@ -250,34 +288,11 @@ export function Logos2Test() {
     carrying.current = null;
   };
 
-  // Holding a button is the pointer's version of holding a pose, so the
-  // confirmation is the same on both and the bench tests one idea, not two.
-  const holdRef = useRef<{ id: string; action: Action; from: number; raf: number } | null>(null);
-  const beginHold = (action: Action, id: string) => () => {
-    const from = performance.now();
-    const step = () => {
-      const h = holdRef.current;
-      if (!h) return;
-      const at = Math.min(1, (performance.now() - h.from) / GESTURE[h.action].hold);
-      setHeld({ action: h.action, at });
-      setHeld2(h.id);
-      if (at >= 1) {
-        act(h.action, h.id);
-        endHold();
-        return;
-      }
-      h.raf = requestAnimationFrame(step);
-    };
-    holdRef.current = { id, action, from, raf: requestAnimationFrame(step) };
-  };
-  const endHold = () => {
-    if (holdRef.current) cancelAnimationFrame(holdRef.current.raf);
-    holdRef.current = null;
-    setHeld(null);
-    setHeld2(null);
-  };
+  // THE POINTER ARMS AS WELL. The bench is testing one idea — that a thing
+  // should be asked for and then confirmed — so the mouse does the same two
+  // steps rather than a different one, and the confirm bar is shared.
+  const target = over ?? armed?.id ?? null;
 
-  const target = over ?? held2;
 
   return (
     <div className="l2t">
@@ -306,10 +321,11 @@ export function Logos2Test() {
       </header>
 
       <p className="l2t-lede">
-        Pinch to pick a node up. Aim at one and hold two fingers to research it, three to
-        challenge it, or close your hand to delete it — that one counts down, so you can stop.
-        Two hands apart or together zoom the board. Everything works with a pointer as well:
-        drag a node, or press and hold one of its buttons.
+        Pinch to pick a node up and move it. To do anything else, aim at a node and ask:
+        two fingers for research, three to challenge, a closed hand to delete. Nothing
+        happens yet — the action is armed, and a <b>thumbs up</b> commits it while an open
+        hand calls it off. Two hands apart or together zoom the board. A pointer does the
+        same two steps: click what you want, then Confirm.
       </p>
 
       <div className="l2t-body">
@@ -355,9 +371,7 @@ export function Logos2Test() {
                     key={a}
                     type="button"
                     className={`l2t-mini${a === 'delete' ? ' del' : ''}`}
-                    onPointerDown={beginHold(a, n.id)}
-                    onPointerUp={endHold}
-                    onPointerLeave={endHold}
+                    onClick={() => arm(a, n.id)}
                     title={GESTURE[a].says}
                   >
                     {a}
@@ -384,9 +398,23 @@ export function Logos2Test() {
               </svg>
             </div>
           )}
-          {held && held2 && (
-            <div className="l2t-holdbar">
-              <i style={{ width: `${held.at * 100}%` }} className={held.action === 'delete' ? 'del' : ''} />
+          {armed && (
+            <div className={`l2t-confirm${armed.action === 'delete' ? ' del' : ''}`} role="alertdialog">
+              <span className="l2t-confirm-t">
+                <b>{armed.action}</b> “{armed.label}”
+              </span>
+              <span className="l2t-confirm-h">
+                {status === 'on' ? 'Thumbs up to confirm · open hand to cancel' : 'Nothing has happened yet'}
+              </span>
+              <span className="l2t-confirm-b">
+                <button type="button" className="l2t-btn on" onClick={confirm}>
+                  Confirm
+                </button>
+                <button type="button" className="l2t-btn" onClick={() => cancel()}>
+                  Cancel
+                </button>
+              </span>
+              <i className="l2t-confirm-clock" style={{ animationDuration: `${CONFIRM_WINDOW}ms` }} />
             </div>
           )}
         </div>
@@ -411,6 +439,14 @@ export function Logos2Test() {
                 <span>{GESTURE[a].says}</span>
               </li>
             ))}
+            <li>
+              <b>Thumbs up</b>
+              <span>Confirms whatever is armed. Nothing but a grab happens without it.</span>
+            </li>
+            <li>
+              <b>Open hand</b>
+              <span>Calls off an armed action. So does waiting: it gives up after eight seconds.</span>
+            </li>
             <li>
               <b>Two hands</b>
               <span>Move them apart or together to zoom the board.</span>

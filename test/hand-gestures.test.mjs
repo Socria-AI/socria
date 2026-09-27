@@ -15,6 +15,7 @@
 
 import {
   readHand, GestureTracker, TwoHandTracker, aimedAt, GESTURE, ACTIONS, POSES,
+  CONFIRM_POSE, CONFIRM_WINDOW,
 } from './.tmp/hand-gestures.mjs';
 
 let pass = 0, fail = 0;
@@ -70,6 +71,7 @@ const POSE = {
   two: () => hand({ up: [0, 1, 1, 0, 0] }),
   three: () => hand({ up: [0, 1, 1, 1, 0] }),
   pinch: () => hand({ up: [0, 1, 0, 0, 0], pinch: true }),
+  thumb: () => hand({ up: [1, 0, 0, 0, 0] }),
 };
 
 console.log('=== a hand is read as a pose ===');
@@ -85,8 +87,18 @@ console.log('=== a hand is read as a pose ===');
 
   // Scale independence: the same pose at half the size is the same pose. A
   // classifier that measures in raw frame units works at one distance only.
-  for (const [name, make] of Object.entries(POSE)) {
-    const small = readHand(hand({ ...{ up: [1,1,1,1,1] }, ...(name === 'fist' ? { up: [0,0,0,0,0] } : name === 'point' ? { up: [0,1,0,0,0] } : name === 'two' ? { up: [0,1,1,0,0] } : name === 'three' ? { up: [0,1,1,1,0] } : name === 'pinch' ? { up: [0,1,0,0,0], pinch: true } : {}), scale: 0.45, at: [0.2, 0.8] }));
+  const ARGS = {
+    open: { up: [1, 1, 1, 1, 1] },
+    fist: { up: [0, 0, 0, 0, 0] },
+    point: { up: [0, 1, 0, 0, 0] },
+    two: { up: [0, 1, 1, 0, 0] },
+    three: { up: [0, 1, 1, 1, 0] },
+    pinch: { up: [0, 1, 0, 0, 0], pinch: true },
+    thumb: { up: [1, 0, 0, 0, 0] },
+  };
+  ok('the table covers every pose the bench uses', Object.keys(ARGS).length === Object.keys(POSE).length);
+  for (const name of Object.keys(POSE)) {
+    const small = readHand(hand({ ...ARGS[name], scale: 0.45, at: [0.2, 0.8] }));
     ok(`  ${name} still reads at half the size, across the frame`, small && small.pose === name, small ? small.pose : 'null');
   }
 
@@ -111,77 +123,106 @@ console.log('\n=== the tracker will not believe a flicker ===');
   ok('no hand means no pose', t.read(null, 200).pose === 'none');
 }
 
-console.log('\n=== THE ONE THAT MUST NOT MISFIRE ===');
+console.log('\n=== nothing fires without a thumbs up ===');
 {
-  // A hand closing to point passes THROUGH a fist. If a fist fired on sight,
-  // pointing at something would delete it — which is the failure that makes a
-  // gesture interface untrustworthy after exactly one occurrence.
+  // THE CHANGE THAT MATTERS, and it came from using the thing: a dwell is not
+  // a confirmation. Holding a pose for a second and a half proves you held a
+  // pose for a second and a half — and while somebody is reaching, gesturing
+  // or thinking with their hands, poses happen. So a pose ARMS and a thumbs up
+  // COMMITS, and these are the assertions that the first half cannot do the
+  // second half's job.
+  const run = (seq) => {
+    const t = new GestureTracker(120);
+    let fired = null, armed = null, cancelled = null, now = 0;
+    for (const [make, ms] of seq) {
+      for (let i = 0; i < ms; i += 16, now += 16) {
+        const r = t.read(readHand(make()), now);
+        if (r.fired) fired = r.fired;
+        if (r.justArmed) armed = r.justArmed;
+        if (r.cancelled) cancelled = r.cancelled;
+      }
+    }
+    return { fired, armed, cancelled, out: t.read(readHand(POSE.open()), now + 16) };
+  };
+
+  // A fist held as long as you like arms delete and does NOT delete.
+  const held = run([[POSE.fist, 5000]]);
+  ok('a fist held forever arms delete', held.armed === 'delete');
+  ok('  and deletes nothing on its own', held.fired === null, String(held.fired));
+
+  // The thumbs up is what does it.
+  // Fist to thumbs up is one motion — the thumb comes out — and does not pass
+  // through an open hand, which would cancel it. That it cancels is asserted
+  // immediately below; this is the path somebody actually takes.
+  const done = run([[POSE.fist, 900], [POSE.thumb, 400]]);
+  ok('a thumbs up after it confirms', done.fired === 'delete', String(done.fired));
+
+  // An open hand calls it off, and then a thumbs up does nothing.
+  const off = run([[POSE.fist, 900], [POSE.open, 400], [POSE.thumb, 400]]);
+  ok('an open hand calls it off first', off.cancelled && off.cancelled.why === 'released');
+  ok('  so the thumbs up confirms nothing', off.fired === null, String(off.fired));
+
+  // Waiting gives up, which is what stops something staying armed all day.
+  const late = run([[POSE.fist, 900], [POSE.point, CONFIRM_WINDOW + 400], [POSE.thumb, 400]]);
+  ok('an armed action times out', late.cancelled && late.cancelled.why === 'timeout');
+  ok('  and cannot be confirmed afterwards', late.fired === null, String(late.fired));
+
+  // A thumbs up with nothing armed is not an action.
+  const alone = run([[POSE.thumb, 3000]]);
+  ok('a thumbs up on its own does nothing', alone.fired === null && alone.armed === null);
+
+  // One thumb, one action: holding it up does not confirm whatever comes next.
   const t = new GestureTracker(120);
-  let fired = null;
-  // 400ms of fist on the way past, then open again
-  for (let now = 0; now <= 400; now += 16) {
-    const r = t.read(readHand(POSE.fist()), now);
-    if (r.fired) fired = r.fired;
-  }
-  for (let now = 416; now <= 700; now += 16) {
-    const r = t.read(readHand(POSE.open()), now);
-    if (r.fired) fired = r.fired;
-  }
-  ok('passing through a fist deletes nothing', fired === null, String(fired));
+  let now = 0, fires = 0;
+  const feed = (make, ms) => { for (let i = 0; i < ms; i += 16, now += 16) { const r = t.read(readHand(make()), now); if (r.fired) fires++; } };
+  feed(POSE.fist, 900); feed(POSE.thumb, 3000);
+  ok('holding the thumb up confirms once, not repeatedly', fires === 1, String(fires));
 
-  // Held long enough, it fires — once.
+  // While something is armed, another pose cannot quietly replace it.
+  const swap = run([[POSE.fist, 900], [POSE.two, 1500]]);
+  ok('a second pose does not re-arm over the first', swap.armed === 'delete');
+
+  // A hand passing THROUGH a fist should not even arm.
+  const brush = run([[POSE.open, 200], [POSE.fist, 300], [POSE.point, 600]]);
+  ok('passing through a fist arms nothing', brush.armed === null, String(brush.armed));
+
+  // Losing the hand disarms: the next person to raise one must not be able to
+  // confirm something they never asked for.
   const t2 = new GestureTracker(120);
-  let fires = 0;
-  for (let now = 0; now <= 4000; now += 16) {
-    const r = t2.read(readHand(POSE.fist()), now);
-    if (r.fired === 'delete') fires++;
-  }
-  ok('held past the threshold, it fires', fires >= 1);
-  ok('  exactly once, however long it is held', fires === 1, `${fires}`);
+  let n2 = 0, fired2 = null;
+  for (let i = 0; i < 900; i += 16, n2 += 16) t2.read(readHand(POSE.fist()), n2);
+  for (let i = 0; i < 300; i += 16, n2 += 16) t2.read(null, n2);
+  for (let i = 0; i < 600; i += 16, n2 += 16) { const r = t2.read(readHand(POSE.thumb()), n2); if (r.fired) fired2 = r.fired; }
+  ok('losing the hand disarms it', fired2 === null, String(fired2));
 
-  // And the hold is reported while it runs, so the person can see it coming
-  // and stop — which is the whole reason it is a hold.
-  const t3 = new GestureTracker(120);
-  let sawProgress = false;
-  for (let now = 0; now <= 900; now += 16) {
-    const r = t3.read(readHand(POSE.fist()), now);
-    if (r.holding && r.holding.action === 'delete' && r.holding.at > 0.2 && r.holding.at < 1) sawProgress = true;
-  }
-  ok('the countdown is visible while it runs', sawProgress);
-
-  // Letting go part way through starts again from zero rather than resuming.
-  const t4 = new GestureTracker(120);
-  for (let now = 0; now <= 900; now += 16) t4.read(readHand(POSE.fist()), now);
-  for (let now = 916; now <= 1200; now += 16) t4.read(readHand(POSE.open()), now);
-  let firedAfter = null;
-  for (let now = 1216; now <= 1216 + 900; now += 16) {
-    const r = t4.read(readHand(POSE.fist()), now);
-    if (r.fired) firedAfter = r.fired;
-  }
-  ok('releasing part way through starts the count again', firedAfter === null);
-
-  // Delete is held longest of all the actions, on purpose.
-  ok('delete is the longest hold there is',
-    ACTIONS.every((a) => a === 'delete' || GESTURE[a].hold < GESTURE.delete.hold));
-  ok('  and grabbing needs no hold at all, being reversible', GESTURE.grab.hold === 0);
+  ok('delete still holds longest before it will even arm',
+    ACTIONS.every((a) => a === 'delete' || !GESTURE[a].confirm || GESTURE[a].hold < GESTURE.delete.hold));
+  ok('and a grab needs no confirming, being undone by letting go',
+    GESTURE.grab.confirm === false && GESTURE.grab.hold === 0);
+  ok('everything else needs confirming',
+    ACTIONS.every((a) => a === 'grab' || GESTURE[a].confirm === true));
+  ok('the confirm pose is the thumb', CONFIRM_POSE === 'thumb');
 }
 
 console.log('\n=== research and challenge ===');
 {
-  const run = (make, ms) => {
+  const armThen = (make, ms) => {
     const t = new GestureTracker(120);
-    let fired = null;
-    for (let now = 0; now <= ms; now += 16) {
-      const r = t.read(readHand(make()), now);
-      if (r.fired) fired = r.fired;
-    }
-    return fired;
+    let now = 0, armed = null, fired = null;
+    for (let i = 0; i < ms; i += 16, now += 16) { const r = t.read(readHand(make()), now); if (r.justArmed) armed = r.justArmed; }
+    for (let i = 0; i < 300; i += 16, now += 16) t.read(readHand(POSE.point()), now);
+    for (let i = 0; i < 400; i += 16, now += 16) { const r = t.read(readHand(POSE.thumb()), now); if (r.fired) fired = r.fired; }
+    return { armed, fired };
   };
-  ok('two fingers held research', run(POSE.two, 1200) === 'research');
-  ok('three fingers held challenge', run(POSE.three, 1200) === 'challenge');
-  ok('  and a brush past neither', run(POSE.two, 300) === null && run(POSE.three, 300) === null);
-  ok('an open hand does nothing at all', run(POSE.open, 3000) === null);
-  ok('  and so does pointing', run(POSE.point, 3000) === null);
+  const two = armThen(POSE.two, 700);
+  ok('two fingers arm research', two.armed === 'research');
+  ok('  and a thumbs up does it', two.fired === 'research');
+  const three = armThen(POSE.three, 700);
+  ok('three fingers arm challenge', three.armed === 'challenge');
+  ok('  and a thumbs up does it', three.fired === 'challenge');
+  ok('  a brush past arms neither', armThen(POSE.two, 150).armed === null);
+  ok('an open hand arms nothing at all', armThen(POSE.open, 3000).armed === null);
+  ok('  and neither does pointing', armThen(POSE.point, 3000).armed === null);
 }
 
 console.log('\n=== grabbing ===');

@@ -146,3 +146,34 @@
 @media (prefers-reduced-motion: reduce) {
   .l2t-node, .l2t-btn, .l2t-mini { transition: none; }
 }
+
+/* ── the confirm bar ───────────────────────────────────────────── */
+/*
+ * Armed, not done. It sits across the bottom of the board rather than beside
+ * the node, because an armed action is about the whole board being about to
+ * change and because the hand that confirms it has already moved away from
+ * whatever it was aiming at.
+ */
+.l2t-confirm {
+  position: absolute; left: 12px; right: 12px; bottom: 12px;
+  display: grid; grid-template-columns: 1fr auto; grid-template-areas: 't b' 'h b';
+  gap: 2px 14px; align-items: center;
+  padding: 11px 14px; border-radius: 10px; overflow: hidden;
+  background: #fff; border: 1px solid var(--lg-primary, #354620);
+  box-shadow: 0 10px 30px -14px rgba(31,31,31,.5);
+}
+.l2t-confirm.del { border-color: var(--lg-tension, #9C5B3C); }
+.l2t-confirm-t { grid-area: t; font-size: 13.5px; }
+.l2t-confirm-t b { text-transform: uppercase; letter-spacing: .1em; font-size: 10.5px; }
+.l2t-confirm.del .l2t-confirm-t b { color: var(--lg-tension, #9C5B3C); }
+.l2t-confirm-h { grid-area: h; font-size: 11px; color: var(--lg-ink-40, rgba(35,36,31,.4)); }
+.l2t-confirm-b { grid-area: b; display: flex; gap: 6px; }
+/* the window running out, shown rather than merely happening */
+.l2t-confirm-clock {
+  position: absolute; left: 0; bottom: 0; height: 2px; width: 100%;
+  background: var(--lg-primary, #354620);
+  transform-origin: left; animation: l2t-run linear forwards;
+}
+.l2t-confirm.del .l2t-confirm-clock { background: var(--lg-tension, #9C5B3C); }
+@keyframes l2t-run { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+@media (prefers-reduced-motion: reduce) { .l2t-confirm-clock { animation: none; } }

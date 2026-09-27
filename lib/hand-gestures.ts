@@ -29,7 +29,7 @@ export interface Pt {
 }
 
 /** Which named poses the tracker can report. */
-export const POSES = ['none', 'open', 'point', 'pinch', 'two', 'three', 'fist'] as const;
+export const POSES = ['none', 'open', 'point', 'pinch', 'two', 'three', 'fist', 'thumb'] as const;
 export type Pose = (typeof POSES)[number];
 
 export interface HandRead {
@@ -98,6 +98,11 @@ export function readHand(
     pose = 'fist';
   } else if (up === 1 && extended[1]) {
     pose = 'point';
+  } else if (up === 1 && extended[0]) {
+    // THE CONFIRM. Nothing else in the vocabulary is one finger and a thumb,
+    // and nothing anybody does by accident looks like it either — which is the
+    // property a confirmation needs and a dwell timer does not have.
+    pose = 'thumb';
   } else if (up === 2 && extended[1] && extended[2]) {
     pose = 'two';
   } else if (up === 3 && extended[1] && extended[2] && extended[3]) {
@@ -124,17 +129,40 @@ export function readHand(
 export const ACTIONS = ['grab', 'research', 'challenge', 'delete'] as const;
 export type Action = (typeof ACTIONS)[number];
 
-/** Which pose asks for which action, and whether it must be held. */
-export const GESTURE: Record<Action, { pose: Pose; hold: number; label: string; says: string }> = {
-  // Reversible the instant you let go, so it needs no confirmation at all.
-  grab: { pose: 'pinch', hold: 0, label: 'Pinch', says: 'Pinch to pick a node up. Let go to drop it.' },
-  // Additive: it asks a question of a node, and a stray one costs a moment.
-  research: { pose: 'two', hold: 600, label: 'Two fingers', says: 'Two fingers, held, to research the node you are aiming at.' },
-  challenge: { pose: 'three', hold: 600, label: 'Three fingers', says: 'Three fingers, held, to challenge it.' },
-  // THE ONE THAT MUST NOT MISFIRE. A hand closing to point passes through a
-  // fist, so this is the longest hold on the page and the only one that draws
-  // its own countdown.
-  delete: { pose: 'fist', hold: 1400, label: 'Fist', says: 'Close your hand and hold to delete. The ring shows how long is left — open your hand to stop.' },
+/** The pose that confirms an armed action. Nothing fires without it. */
+export const CONFIRM_POSE: Pose = 'thumb';
+
+/** How long an armed action waits for a thumbs up before giving up. */
+export const CONFIRM_WINDOW = 8000;
+
+/**
+ * Which pose ASKS for which action — and asking is not doing.
+ *
+ * A DWELL IS NOT A CONFIRMATION, and it took using this to see why. Holding a
+ * pose for a second and a half proves you held a pose for a second and a half;
+ * it does not prove you meant the thing, and while you are reaching, gesturing
+ * or thinking with your hands, poses happen. The result was a board where
+ * things moved and vanished on their own.
+ *
+ * So the pose now ARMS an action and a thumbs up COMMITS it. Two gestures that
+ * look nothing alike, in sequence, is a far stronger signal than one gesture
+ * held for longer — and it is a better one to design around, because the
+ * second step can be shown, named and refused. `hold` is now only long enough
+ * to be sure the pose was meant rather than passed through.
+ */
+export const GESTURE: Record<
+  Action,
+  { pose: Pose; hold: number; confirm: boolean; label: string; says: string }
+> = {
+  // The exception, and it earns it: a grab is undone by opening your hand, so
+  // there is nothing to confirm and asking would make the one direct thing on
+  // the page indirect.
+  grab: { pose: 'pinch', hold: 0, confirm: false, label: 'Pinch', says: 'Pinch to pick a node up and move it. Let go to drop it — no confirming needed, because letting go undoes it.' },
+  research: { pose: 'two', hold: 320, confirm: true, label: 'Two fingers', says: 'Two fingers at a node arms “research”. Thumbs up to do it.' },
+  challenge: { pose: 'three', hold: 320, confirm: true, label: 'Three fingers', says: 'Three fingers arms “challenge”. Thumbs up to do it.' },
+  // A hand closing to point passes through a fist, so this still holds longest
+  // before it will even arm — and then it still has to be confirmed.
+  delete: { pose: 'fist', hold: 700, confirm: true, label: 'Fist', says: 'A closed hand arms “delete”. Nothing is deleted until you give it a thumbs up — open your hand to call it off.' },
 };
 
 export interface Progress {
@@ -146,10 +174,16 @@ export interface Progress {
 export interface TrackerOut {
   /** the pose the tracker believes, after smoothing */
   pose: Pose;
-  /** an action that fired on THIS call, and only this one */
+  /** an action CONFIRMED on this call, and only this one */
   fired: Action | null;
-  /** an action being held, and how far through */
+  /** an action being held toward arming, and how far through */
   holding: Progress | null;
+  /** an action waiting for a thumbs up */
+  armed: Action | null;
+  /** an armed action that was just called off, and why */
+  cancelled: { action: Action; why: 'released' | 'timeout' } | null;
+  /** an action armed on THIS call — the moment to capture what it is aimed at */
+  justArmed: Action | null;
   /** where the hand is aiming, smoothed */
   aim: { x: number; y: number };
   /** true while a pinch is closed — the caller drags with this */
@@ -176,11 +210,16 @@ export class GestureTracker {
   private heldFrom = 0;
   private spent = false;
   private smoothed: { x: number; y: number } | null = null;
+  /** the action waiting for a thumbs up, and when it started waiting */
+  private armedAction: Action | null = null;
+  private armedAt = 0;
 
   constructor(
     private settle = 120,
     /** 0 = jump to the hand, 1 = never move. The aim is noisy at a distance. */
-    private smoothing = 0.55
+    private smoothing = 0.55,
+    /** how long an armed action waits before giving up */
+    private window = CONFIRM_WINDOW
   ) {}
 
   reset() {
@@ -188,12 +227,26 @@ export class GestureTracker {
     this.candidate = 'none';
     this.spent = false;
     this.smoothed = null;
+    this.armedAction = null;
+  }
+
+  /** Call off whatever is armed, from outside — a cancel button, say. */
+  disarm() {
+    this.armedAction = null;
+    this.spent = true;
   }
 
   read(hand: HandRead | null, now: number): TrackerOut {
+    const idle = (): TrackerOut => ({
+      pose: 'none', fired: null, holding: null, armed: null, cancelled: null,
+      justArmed: null, aim: this.smoothed ?? { x: 0.5, y: 0.5 }, grabbing: false,
+    });
     if (!hand) {
+      // Losing the hand is not consent, and it is not a refusal either — but
+      // leaving something armed while nobody is there would mean the next
+      // person to raise a hand could confirm it by accident.
       this.reset();
-      return { pose: 'none', fired: null, holding: null, aim: this.smoothed ?? { x: 0.5, y: 0.5 }, grabbing: false };
+      return idle();
     }
 
     // Smooth the aim before anything reads it: an unsmoothed fingertip jitters
@@ -216,13 +269,50 @@ export class GestureTracker {
 
     let fired: Action | null = null;
     let holding: Progress | null = null;
+    let justArmed: Action | null = null;
+    let cancelled: TrackerOut['cancelled'] = null;
+
+    // ── while something is armed, only two things matter ──
+    //
+    // A thumbs up does it; an open hand calls it off; everything else is
+    // ignored. Letting other poses re-arm while one is pending would put the
+    // reader back where they started — reaching, gesturing, and watching the
+    // board change under them.
+    if (this.armedAction) {
+      if (now - this.armedAt > this.window) {
+        cancelled = { action: this.armedAction, why: 'timeout' };
+        this.armedAction = null;
+      } else if (this.believed === CONFIRM_POSE) {
+        fired = this.armedAction;
+        this.armedAction = null;
+        // Spent, so holding the thumb up does not confirm the next thing too.
+        this.spent = true;
+      } else if (this.believed === 'open') {
+        cancelled = { action: this.armedAction, why: 'released' };
+        this.armedAction = null;
+      }
+      return {
+        pose: this.believed,
+        fired,
+        holding: null,
+        armed: this.armedAction,
+        cancelled,
+        justArmed: null,
+        aim: this.smoothed,
+        grabbing: false,
+      };
+    }
+
+    // ── nothing armed: a held pose arms one ──
     for (const a of ACTIONS) {
       const g = GESTURE[a];
       if (g.pose !== this.believed) continue;
-      if (g.hold <= 0) break;
-      const at = Math.min(1, (now - this.heldFrom) / g.hold);
+      if (!g.confirm) break; // a grab is immediate and has nothing to arm
+      const at = Math.min(1, (now - this.heldFrom) / Math.max(1, g.hold));
       if (at >= 1 && !this.spent) {
-        fired = a;
+        this.armedAction = a;
+        this.armedAt = now;
+        justArmed = a;
         this.spent = true;
       } else if (at < 1) {
         holding = { action: a, at };
@@ -232,8 +322,11 @@ export class GestureTracker {
 
     return {
       pose: this.believed,
-      fired,
+      fired: null,
       holding,
+      armed: this.armedAction,
+      cancelled,
+      justArmed,
       aim: this.smoothed,
       grabbing: this.believed === 'pinch',
     };
