@@ -768,6 +768,100 @@ async function readCapped(res: Response, max: number): Promise<string> {
   return new TextDecoder('utf-8', { fatal: false }).decode(joined);
 }
 
+/**
+ * One screened request, following redirects by hand.
+ *
+ * Redirects are followed A HOP AT A TIME so every hop is screened BEFORE the
+ * request is made rather than after. Letting fetch follow them itself did the
+ * opposite: the internal request was issued and only the response body was
+ * withheld, which still reaches internal services, still has side effects,
+ * and still times differently depending on what is there.
+ *
+ * Shared by every fetcher below rather than copied into each, because a
+ * second copy of this loop is a second place for the screen to go missing.
+ * The caller has already screened the FIRST address; this screens each one
+ * after it.
+ */
+async function openScreened(
+  start: URL,
+  opts: { accept: string; signal: AbortSignal }
+): Promise<{ res: Response; final: URL }> {
+  let current = start;
+  for (let hop = 0; ; hop++) {
+    if (hop > MAX_REDIRECTS) {
+      throw new ConnectError('That page redirected too many times.', 502);
+    }
+    // `dispatcher` is undici's, and Node's fetch IS undici — but the DOM
+    // RequestInit type does not know about it, so the cast is the honest
+    // way to say "this runs on Node". The pinned dispatcher is what makes
+    // the screened address the dialled one.
+    const res = await fetch(current.toString(), {
+      dispatcher: safeAgent,
+      signal: opts.signal,
+      redirect: 'manual',
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; SocriaLogos/1.0)',
+        Accept: opts.accept,
+      },
+      cache: 'no-store',
+    } as RequestInit & { dispatcher: unknown });
+    if (res.status < 300 || res.status > 399) return { res, final: current };
+    const loc = res.headers.get('location');
+    if (!loc) return { res, final: current };
+    let next: URL;
+    try {
+      next = new URL(loc, current);
+    } catch {
+      throw new ConnectError('That address is not allowed.', 400);
+    }
+    // The screen runs on the hop we are ABOUT to make.
+    await assertDestinationAllowed(next);
+    current = next;
+  }
+}
+
+/**
+ * The head of a page, as raw HTML, for reading what it says about itself.
+ *
+ * SEPARATE FROM fetchWeb, and smaller in every dimension: a quarter of the
+ * bytes, a third of the time, and the markup rather than the prose. A cover
+ * is a nicety beside a reply that has already been written, so it may not
+ * spend a reader's patience — and it must not be able to hold up anything
+ * else if a publisher's server is slow.
+ */
+export async function fetchPageHead(
+  rawUrl: string,
+  opts?: { bytes?: number; timeoutMs?: number }
+): Promise<{ html: string; final: string }> {
+  let url: URL;
+  try {
+    url = new URL(rawUrl.trim());
+  } catch {
+    throw new ConnectError('That doesn’t look like a URL.', 400);
+  }
+  await assertDestinationAllowed(url);
+
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), opts?.timeoutMs ?? 4_000);
+  try {
+    const { res, final } = await openScreened(url, {
+      accept: 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.1',
+      signal: ctrl.signal,
+    });
+    const ctype = res.headers.get('content-type') ?? '';
+    if (!/text\/html|application\/xhtml/.test(ctype)) {
+      throw new ConnectError('That page isn’t markup.', 422);
+    }
+    const html = await readCapped(res, opts?.bytes ?? 96_000);
+    return { html, final: final.toString() };
+  } catch (e) {
+    if (e instanceof ConnectError) throw e;
+    throw new ConnectError('That page could not be reached.', 502);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export async function fetchWeb(rawUrl: string): Promise<FetchedContext> {
   let url: URL;
   try {
@@ -777,47 +871,14 @@ export async function fetchWeb(rawUrl: string): Promise<FetchedContext> {
   }
   await assertDestinationAllowed(url);
 
-  // Redirects are followed BY HAND, one hop at a time, so every hop is
-  // screened before the request is made rather than after. `redirect:
-  // 'follow'` did the opposite: the internal request was issued and only the
-  // response body was withheld, which still reaches internal services, still
-  // has side effects, and still times differently depending on what is there.
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 12_000);
   let res: Response;
-  let current = url;
   try {
-    for (let hop = 0; ; hop++) {
-      if (hop > MAX_REDIRECTS) {
-        throw new ConnectError('That page redirected too many times.', 502);
-      }
-      // `dispatcher` is undici's, and Node's fetch IS undici — but the DOM
-      // RequestInit type does not know about it, so the cast is the honest
-      // way to say "this runs on Node". The pinned dispatcher is what makes
-      // the screened address the dialled one.
-      res = await fetch(current.toString(), {
-        dispatcher: safeAgent,
-        signal: ctrl.signal,
-        redirect: 'manual',
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; SocriaLogos/1.0)',
-          Accept: 'text/html,text/plain;q=0.9,*/*;q=0.5',
-        },
-        cache: 'no-store',
-      } as RequestInit & { dispatcher: unknown });
-      if (res.status < 300 || res.status > 399) break;
-      const loc = res.headers.get('location');
-      if (!loc) break;
-      let next: URL;
-      try {
-        next = new URL(loc, current);
-      } catch {
-        throw new ConnectError('That address is not allowed.', 400);
-      }
-      // The screen runs on the hop we are ABOUT to make.
-      await assertDestinationAllowed(next);
-      current = next;
-    }
+    ({ res } = await openScreened(url, {
+      accept: 'text/html,text/plain;q=0.9,*/*;q=0.5',
+      signal: ctrl.signal,
+    }));
   } catch (e) {
     clearTimeout(timer);
     if (e instanceof ConnectError) throw e;
