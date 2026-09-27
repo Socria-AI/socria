@@ -40,6 +40,7 @@ const MODULES = [
   'lib/logos-explore.ts',
   'lib/logos-physics.ts',
   'lib/elements.ts',
+  'lib/hand-gestures.ts',
   'lib/socria-model-store.ts',
   'lib/math-context.ts',
   'lib/topic-drift.ts',
