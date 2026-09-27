@@ -41,18 +41,21 @@ import {
   B_CRIT,
   PHYS,
   blackHole,
+  blackbodyCSS,
+  eddingtonRate,
   ergosphereAt,
+  observedTemperature,
   orbit,
   orbitPeriod,
   oscillator,
   oscillatorAt,
-  percent,
+  percentText,
   photonPath,
   positionAt,
   projectile,
-  ratio,
+  ratioText,
   redshift,
-  say,
+  sayText,
   tidal,
   type BlackHole,
 } from './logos-physics';
@@ -157,8 +160,8 @@ export interface Pt {
 
 export type VizObject =
   /** a sampled path; NaN y breaks the pen, which is how asymptotes work */
-  | { o: 'curve'; id: string; pts: Pt[]; tone?: Tone; dashed?: boolean; width?: number }
-  | { o: 'point'; id: string; x: number; y: number; tone?: Tone; hollow?: boolean; label?: string }
+  | { o: 'curve'; id: string; pts: Pt[]; tone?: Tone; color?: Measured; dashed?: boolean; width?: number }
+  | { o: 'point'; id: string; x: number; y: number; tone?: Tone; color?: Measured; hollow?: boolean; label?: string }
   | { o: 'segment'; id: string; x1: number; y1: number; x2: number; y2: number; tone?: Tone; dashed?: boolean; width?: number }
   /** an unbounded line, drawn to the edges of the viewport */
   | { o: 'line'; id: string; x: number; y: number; slope: number; tone?: Tone; dashed?: boolean; width?: number }
@@ -166,14 +169,29 @@ export type VizObject =
   /** Riemann bars and anything else made of upright boxes */
   | { o: 'rects'; id: string; bars: { x0: number; x1: number; y: number }[]; tone?: Tone }
   /** the area between a curve and the axis, over an interval */
-  | { o: 'region'; id: string; pts: Pt[]; tone?: Tone }
+  | { o: 'region'; id: string; pts: Pt[]; tone?: Tone; color?: Measured }
   /** discrete terms: a sequence, a set of partial sums */
   | { o: 'sequence'; id: string; pts: Pt[]; tone?: Tone; stems?: boolean }
   /** many polylines drawn as ONE path — grids, direction fields */
-  | { o: 'mesh'; id: string; lines: Pt[][]; tone?: Tone; width?: number }
+  | { o: 'mesh'; id: string; lines: Pt[][]; tone?: Tone; color?: Measured; width?: number }
   | { o: 'vrule'; id: string; at: number; tone?: Tone; dashed?: boolean; label?: string }
   | { o: 'hrule'; id: string; at: number; tone?: Tone; dashed?: boolean; label?: string }
   | { o: 'label'; id: string; x: number; y: number; text: string; tone?: Tone; anchor?: 'start' | 'middle' | 'end'; dy?: number };
+
+/**
+ * A colour that is a MEASUREMENT, not a role.
+ *
+ * Tones below are semantic — primary is the lesson, tension is friction — and
+ * that is right for everything drawn from an expression. It is wrong for a
+ * simulated object, where the colour IS a computed quantity: the blackbody
+ * colour of a disc ring at its own temperature, an element in the convention a
+ * chemist reads. Those cannot be one of five named roles, so an object may
+ * carry an explicit colour and the renderer prefers it over the tone.
+ *
+ * Only the simulation builders set it. Everything else leaves it alone and the
+ * palette keeps its meaning.
+ */
+export type Measured = string;
 
 /** Semantic colour roles, resolved to the Logos palette by the renderer. */
 export type Tone =
@@ -3880,19 +3898,41 @@ function buildBlackHole(scene: VizScene, vals: Record<string, number>, guarded: 
   // thing this picture has to show.
   const iscoR = bh.isco / g;
   const diskOut = 22;
-  const disk: Pt[][] = [];
+  // EACH RING IN ITS OWN COLOUR, and the colour is a temperature.
+  //
+  // The thin-disc profile gives the ring its blackbody temperature; the climb
+  // out of the well reddens it. Drawn as one accent-coloured mesh the disc was
+  // a set of contour lines around a dark circle — correct, and carrying none of
+  // the one thing about an accretion disc anybody would recognise.
+  const mdot = eddingtonRate(bh, 0.1);
   for (let i = 0; i <= 14; i++) {
     const R = iscoR + (diskOut - iscoR) * (i / 14) ** 1.3;
-    disk.push(flat(R, 160));
+    const T = observedTemperature(bh, R * g, mdot, 0).T;
+    objects.push({
+      o: 'curve',
+      id: `disk${i}`,
+      pts: flat(R, 160),
+      color: T > 0 ? blackbodyCSS(T, 1) : undefined,
+      tone: 'accent',
+      width: Math.max(0.8, 1.9 - 1.1 * (i / 14)),
+    });
   }
-  objects.push({ o: 'mesh', id: 'disk', lines: disk, tone: 'accent', width: 1 });
 
   // The shadow — what a distant observer actually sees as dark. √27 r_g, not
   // the horizon: light passing inside that is captured, so the dark patch on
   // the sky is 2.6 Schwarzschild radii wide rather than 1. Filled, and drawn
   // after the disk so the disk's far side is correctly hidden behind it.
-  objects.push({ o: 'region', id: 'shadow', pts: circle(bh.shadow / g), tone: 'primary' });
-  objects.push({ o: 'curve', id: 'shadowline', pts: circle(bh.shadow / g), tone: 'primary', width: 1.4 });
+  objects.push({
+    o: 'region',
+    id: 'shadow',
+    pts: circle(bh.shadow / g),
+    // Dark, because it is the dark patch. A palette tone at 12% drew the hole
+    // as a pale green disc, which is the one thing on this picture that has to
+    // read without a caption.
+    color: 'rgba(18, 22, 28, 0.92)',
+    tone: 'primary',
+  });
+  objects.push({ o: 'curve', id: 'shadowline', pts: circle(bh.shadow / g), tone: 'ghost', width: 1, dashed: true });
 
   // The horizon and the ergosphere, in the plane of the sky. The ergosphere is
   // the reason a spinning hole is drawn differently from a still one: it is a
@@ -3940,24 +3980,24 @@ function buildBlackHole(scene: VizScene, vals: Record<string, number>, guarded: 
   });
 
   const readouts: VizReadout[] = [
-    { id: 'rs', tex: 'r_s = 2GM/c^2', value: say(bh.rs, 'm'), help: 'The Schwarzschild radius: where the escape speed reaches the speed of light. For a non-spinning hole this is the horizon itself.' },
-    { id: 'rh', tex: 'r_+', value: say(bh.horizon, 'm'), help: 'The outer event horizon. Spin shrinks it: at the maximum it is half the Schwarzschild radius.' },
-    { id: 'shadow', tex: 'r_{\\rm shadow} = \\sqrt{27}\\,r_g', value: say(bh.shadow, 'm'), help: 'How big the dark patch looks from far away. Larger than the horizon, because light passing near the hole is bent into it — this is the size a telescope measures.' },
-    { id: 'isco', tex: 'r_{\\rm ISCO}', value: say(bh.isco, 'm'), help: 'The innermost stable circular orbit — inside it there is no orbit at all, only a fall. It is the inner edge of the disk, and spin drags it inward.' },
-    { id: 'eff', tex: '\\eta', value: guarded ? null : percent(bh.efficiency), help: 'What fraction of the infalling mass a disk can turn into light before it crosses the horizon. Compare hydrogen fusion, which manages 0.7%.' },
-    { id: 'iscoperiod', tex: 'T_{\\rm ISCO}', value: say(orbitPeriod(bh, bh.isco), 's'), help: 'How long one orbit takes at the inner edge of the disk. Kepler’s third law survives general relativity intact in these coordinates.' },
-    { id: 'z', tex: 'z(3r_s)', value: ratio(redshift(bh, 3 * bh.rs)), help: 'How far light emitted three Schwarzschild radii out is reddened by the time it reaches you. At the horizon this is infinite, which is one way of saying what a horizon is.' },
-    { id: 'tidal', tex: '\\Delta a\\,(1.8\\,\\mathrm{m})', value: say(tidal(bh, bh.horizon, 1.8), 'm/s2'), help: 'The difference in pull between your head and your feet at the horizon. Small holes tear you apart long before you arrive; large ones do not.' },
-    { id: 'th', tex: 'T_H', value: say(bh.hawkingT, 'K'), help: 'The Hawking temperature. Bigger holes are colder — this one is far colder than the microwave background, so in practice it absorbs rather than evaporates.' },
-    { id: 'evap', tex: 't_{\\rm evap}', value: say(bh.evaporation, 's'), help: 'How long it would take to evaporate completely, if nothing ever fell in. The age of the universe is 1.4 × 10¹⁰ years.' },
-    { id: 'defl', tex: '\\alpha(b)', value: ray.captured ? 'captured' : `${ratio(ray.deflection)}\\,\\mathrm{rad}`, help: 'How far the ray was bent, by integrating its actual path. Far from the hole this matches Einstein’s 4GM/bc² — the prediction the 1919 eclipse confirmed.' },
-    { id: 'bcrit', tex: 'b_{\\rm crit} = \\sqrt{27}\\,r_g', value: `${ratio(B_CRIT)}\\,r_g`, help: 'Aim a ray closer than this and it cannot escape, however fast it is going. It is the same number as the shadow radius, and for the same reason.' },
+    { id: 'rs', tex: 'r_s = 2GM/c^2', value: sayText(bh.rs, 'm'), help: 'The Schwarzschild radius: where the escape speed reaches the speed of light. For a non-spinning hole this is the horizon itself.' },
+    { id: 'rh', tex: 'r_+', value: sayText(bh.horizon, 'm'), help: 'The outer event horizon. Spin shrinks it: at the maximum it is half the Schwarzschild radius.' },
+    { id: 'shadow', tex: 'r_{\\rm shadow} = \\sqrt{27} r_g', value: sayText(bh.shadow, 'm'), help: 'How big the dark patch looks from far away. Larger than the horizon, because light passing near the hole is bent into it — this is the size a telescope measures.' },
+    { id: 'isco', tex: 'r_{\\rm ISCO}', value: sayText(bh.isco, 'm'), help: 'The innermost stable circular orbit — inside it there is no orbit at all, only a fall. It is the inner edge of the disk, and spin drags it inward.' },
+    { id: 'eff', tex: '\\eta', value: guarded ? null : percentText(bh.efficiency), help: 'What fraction of the infalling mass a disk can turn into light before it crosses the horizon. Compare hydrogen fusion, which manages 0.7%.' },
+    { id: 'iscoperiod', tex: 'T_{\\rm ISCO}', value: sayText(orbitPeriod(bh, bh.isco), 's'), help: 'How long one orbit takes at the inner edge of the disk. Kepler’s third law survives general relativity intact in these coordinates.' },
+    { id: 'z', tex: 'z(3r_s)', value: ratioText(redshift(bh, 3 * bh.rs)), help: 'How far light emitted three Schwarzschild radii out is reddened by the time it reaches you. At the horizon this is infinite, which is one way of saying what a horizon is.' },
+    { id: 'tidal', tex: '\\Delta a\\,(1.8\\,\\mathrm{m})', value: sayText(tidal(bh, bh.horizon, 1.8), 'm/s2'), help: 'The difference in pull between your head and your feet at the horizon. Small holes tear you apart long before you arrive; large ones do not.' },
+    { id: 'th', tex: 'T_H', value: sayText(bh.hawkingT, 'K'), help: 'The Hawking temperature. Bigger holes are colder — this one is far colder than the microwave background, so in practice it absorbs rather than evaporates.' },
+    { id: 'evap', tex: 't_{\\rm evap}', value: sayText(bh.evaporation, 's'), help: 'How long it would take to evaporate completely, if nothing ever fell in. The age of the universe is 1.4 × 10¹⁰ years.' },
+    { id: 'defl', tex: '\\alpha(b)', value: ray.captured ? 'captured' : `${ratioText(ray.deflection)} rad`, help: 'How far the ray was bent, by integrating its actual path. Far from the hole this matches Einstein’s 4GM/bc² — the prediction the 1919 eclipse confirmed.' },
+    { id: 'bcrit', tex: 'b_{\\rm crit} = \\sqrt{27} r_g', value: `${ratioText(B_CRIT)} r_g`, help: 'Aim a ray closer than this and it cannot escape, however fast it is going. It is the same number as the shadow radius, and for the same reason.' },
   ];
 
   const solar = bh.M / PHYS.Msun;
   const caption = ray.captured
-    ? `${ratio(solar)} M☉, spin ${ratio(spin)}. The ray aimed at b = ${ratio(bImpact)} r_g is inside the capture radius: it crosses the horizon.`
-    : `${ratio(solar)} M☉, spin ${ratio(spin)}. The ray aimed at b = ${ratio(bImpact)} r_g is bent by ${ratio(ray.deflection)} rad and escapes.`;
+    ? `${ratioText(solar)} M☉, spin ${ratioText(spin)}. The ray aimed at b = ${ratioText(bImpact)} r_g is inside the capture radius: it crosses the horizon.`
+    : `${ratioText(solar)} M☉, spin ${ratioText(spin)}. The ray aimed at b = ${ratioText(bImpact)} r_g is bent by ${ratioText(ray.deflection)} rad and escapes.`;
 
   return {
     objects,
@@ -4027,18 +4067,18 @@ function buildOrbit(scene: VizScene, vals: Record<string, number>, guarded: bool
   return {
     objects,
     readouts: [
-      { id: 'period', tex: 'T = 2\\pi\\sqrt{a^3/\\mu}', value: guarded ? null : say(o.period, 's'), help: 'The year. Kepler\u2019s third law: it depends on the semi-major axis and the masses and on nothing else — not on the eccentricity, which is the surprising half.' },
-      { id: 'r', tex: 'r', value: say(now.r, 'm'), help: 'How far out the body is right now.' },
-      { id: 'v', tex: 'v = \\sqrt{\\mu(2/r - 1/a)}', value: say(now.v, 'm/s'), help: 'Its speed right now, from the vis-viva equation. Watch it rise as the body falls inward and fall as it climbs away.' },
-      { id: 'vp', tex: 'v_{\\rm peri}', value: say(o.vPeri, 'm/s'), help: 'The fastest it ever goes, at the closest point.' },
-      { id: 'va', tex: 'v_{\\rm apo}', value: say(o.vApo, 'm/s'), help: 'The slowest, at the furthest point. The ratio of the two is (1+e)/(1−e) exactly.' },
-      { id: 'rp', tex: 'r_{\\rm peri} = a(1-e)', value: say(o.periapsis, 'm'), help: 'Closest approach.' },
-      { id: 'ra', tex: 'r_{\\rm apo} = a(1+e)', value: say(o.apoapsis, 'm'), help: 'Furthest.' },
-      { id: 'energy', tex: '\\varepsilon = -\\mu/2a', value: say(o.energy, 'J'), help: 'Energy per kilogram of the orbiting body. Negative means bound — it depends only on the semi-major axis, so every orbit with this `a` costs the same to be in, however elongated.' },
-      { id: 'h', tex: 'h = \\sqrt{\\mu a(1-e^2)}', value: `${ratio(o.angularMomentum / 1e15)}\\times 10^{15}`, help: 'Angular momentum per kilogram, in m²/s. It is conserved, which IS Kepler\u2019s second law — the swept sector keeps its area because this number does not change.' },
-      { id: 'vesc', tex: 'v_{\\rm esc}', value: say(o.vEscape, 'm/s'), help: 'How fast it would have to be going at its closest point to leave for good.' },
+      { id: 'period', tex: 'T = 2\\pi\\sqrt{a^3/\\mu}', value: guarded ? null : sayText(o.period, 's'), help: 'The year. Kepler\u2019s third law: it depends on the semi-major axis and the masses and on nothing else — not on the eccentricity, which is the surprising half.' },
+      { id: 'r', tex: 'r', value: sayText(now.r, 'm'), help: 'How far out the body is right now.' },
+      { id: 'v', tex: 'v = \\sqrt{\\mu(2/r - 1/a)}', value: sayText(now.v, 'm/s'), help: 'Its speed right now, from the vis-viva equation. Watch it rise as the body falls inward and fall as it climbs away.' },
+      { id: 'vp', tex: 'v_{\\rm peri}', value: sayText(o.vPeri, 'm/s'), help: 'The fastest it ever goes, at the closest point.' },
+      { id: 'va', tex: 'v_{\\rm apo}', value: sayText(o.vApo, 'm/s'), help: 'The slowest, at the furthest point. The ratio of the two is (1+e)/(1−e) exactly.' },
+      { id: 'rp', tex: 'r_{\\rm peri} = a(1-e)', value: sayText(o.periapsis, 'm'), help: 'Closest approach.' },
+      { id: 'ra', tex: 'r_{\\rm apo} = a(1+e)', value: sayText(o.apoapsis, 'm'), help: 'Furthest.' },
+      { id: 'energy', tex: '\\varepsilon = -\\mu/2a', value: sayText(o.energy, 'J'), help: 'Energy per kilogram of the orbiting body. Negative means bound — it depends only on the semi-major axis, so every orbit with this `a` costs the same to be in, however elongated.' },
+      { id: 'h', tex: 'h = \\sqrt{\\mu a(1-e^2)}', value: `${ratioText(o.angularMomentum / 1e15)}×10^15`, help: 'Angular momentum per kilogram, in m²/s. It is conserved, which IS Kepler\u2019s second law — the swept sector keeps its area because this number does not change.' },
+      { id: 'vesc', tex: 'v_{\\rm esc}', value: sayText(o.vEscape, 'm/s'), help: 'How fast it would have to be going at its closest point to leave for good.' },
     ],
-    caption: `${ratio(aAU)} AU, e = ${ratio(e)} — one orbit in ${say(o.period, 's')}, at ${say(now.v, 'm/s')} right now.`,
+    caption: `${ratioText(aAU)} AU, e = ${ratioText(e)} — one orbit in ${sayText(o.period, 's')}, at ${sayText(now.v, 'm/s')} right now.`,
     narration: e > 0.4
       ? 'The shaded sector covers the same slice of the year wherever it is — long and thin out here, short and fat near the focus.'
       : 'Nearly circular: the focus and the centre are almost the same point, and the speed hardly changes.',
@@ -4098,17 +4138,17 @@ function buildOscillator(scene: VizScene, vals: Record<string, number>, guarded:
   return {
     objects,
     readouts: [
-      { id: 'w0', tex: '\\omega_0 = \\sqrt{k/m}', value: `${ratio(o.w0)}\\,\\mathrm{rad/s}`, help: 'The frequency it would ring at with no damping and nothing driving it.' },
-      { id: 'zeta', tex: '\\zeta', value: ratio(o.zeta), help: 'The damping ratio. Below 1 it oscillates on the way to rest; at exactly 1 it returns as fast as possible without overshooting; above 1 it crawls back.' },
-      { id: 'wd', tex: '\\omega_d', value: o.wd > 0 ? `${ratio(o.wd)}\\,\\mathrm{rad/s}` : 'no oscillation', help: 'The frequency it actually rings at once damped — always lower than ω₀, and gone entirely once ζ reaches 1.' },
-      { id: 'Q', tex: 'Q = 1/2\\zeta', value: Number.isFinite(o.Q) ? ratio(o.Q) : '\\infty', help: 'How many cycles it takes to lose most of its energy, roughly. A wine glass is in the thousands.' },
-      { id: 'amp', tex: 'A(\\omega)', value: guarded ? null : say(o.amplitude, 'm'), help: 'How far it swings at the drive frequency you have set, once it has settled.' },
-      { id: 'gain', tex: 'A/A_{\\rm static}', value: guarded ? null : ratio(o.gain), help: 'How much bigger the shaking is than simply pushing with the same force and holding.' },
-      { id: 'wr', tex: '\\omega_{\\rm res}', value: o.wResonance > 0 ? `${ratio(o.wResonance)}\\,\\mathrm{rad/s}` : 'none', help: 'Where the peak actually is: ω₀√(1−2ζ²), which is BELOW the natural frequency — and above ζ = 1/√2 ≈ 0.707 there is no peak at all.' },
-      { id: 'phase', tex: '\\varphi', value: `${ratio(o.phase)}\\,\\mathrm{rad}`, help: 'How far the motion lags the push. It is a quarter turn exactly at ω₀, whatever the damping, which is the reliable way to find resonance in a laboratory.' },
-      { id: 'tau', tex: '\\tau = 1/\\zeta\\omega_0', value: Number.isFinite(o.tau) ? `${ratio(o.tau)}\\,\\mathrm{s}` : '\\infty', help: 'How long the transient takes to fade — the first part of the motion, which looks nothing like the steady state.' },
+      { id: 'w0', tex: '\\omega_0 = \\sqrt{k/m}', value: `${ratioText(o.w0)} rad/s`, help: 'The frequency it would ring at with no damping and nothing driving it.' },
+      { id: 'zeta', tex: '\\zeta', value: ratioText(o.zeta), help: 'The damping ratio. Below 1 it oscillates on the way to rest; at exactly 1 it returns as fast as possible without overshooting; above 1 it crawls back.' },
+      { id: 'wd', tex: '\\omega_d', value: o.wd > 0 ? `${ratioText(o.wd)} rad/s` : 'no oscillation', help: 'The frequency it actually rings at once damped — always lower than ω₀, and gone entirely once ζ reaches 1.' },
+      { id: 'Q', tex: 'Q = 1/2\\zeta', value: Number.isFinite(o.Q) ? ratioText(o.Q) : '\\infty', help: 'How many cycles it takes to lose most of its energy, roughly. A wine glass is in the thousands.' },
+      { id: 'amp', tex: 'A(\\omega)', value: guarded ? null : sayText(o.amplitude, 'm'), help: 'How far it swings at the drive frequency you have set, once it has settled.' },
+      { id: 'gain', tex: 'A/A_{\\rm static}', value: guarded ? null : ratioText(o.gain), help: 'How much bigger the shaking is than simply pushing with the same force and holding.' },
+      { id: 'wr', tex: '\\omega_{\\rm res}', value: o.wResonance > 0 ? `${ratioText(o.wResonance)} rad/s` : 'none', help: 'Where the peak actually is: ω₀√(1−2ζ²), which is BELOW the natural frequency — and above ζ = 1/√2 ≈ 0.707 there is no peak at all.' },
+      { id: 'phase', tex: '\\varphi', value: `${ratioText(o.phase)} rad`, help: 'How far the motion lags the push. It is a quarter turn exactly at ω₀, whatever the damping, which is the reliable way to find resonance in a laboratory.' },
+      { id: 'tau', tex: '\\tau = 1/\\zeta\\omega_0', value: Number.isFinite(o.tau) ? `${ratioText(o.tau)} s` : '\\infty', help: 'How long the transient takes to fade — the first part of the motion, which looks nothing like the steady state.' },
     ],
-    caption: `Driven at ${ratio(w)} rad/s against a natural ${ratio(o.w0)}; ζ = ${ratio(o.zeta)}.`,
+    caption: `Driven at ${ratioText(w)} rad/s against a natural ${ratioText(o.w0)}; ζ = ${ratioText(o.zeta)}.`,
     narration: o.zeta < 0.2 && Math.abs(w - o.w0) < 1
       ? 'Near resonance and lightly damped: the amplitude is still climbing, and the transient beats against the drive on the way up.'
       : 'The pale curve is the response against drive frequency; the darker one is the motion itself, in time.',
@@ -4147,17 +4187,17 @@ function buildProjectile(scene: VizScene, vals: Record<string, number>, guarded:
   return {
     objects,
     readouts: [
-      { id: 'range', tex: 'R', value: guarded ? null : say(p.range, 'm'), help: 'Where it actually lands, by integrating the motion with quadratic drag.' },
-      { id: 'vacr', tex: 'R_{\\rm vac} = v_0^2\\sin 2\\theta/g', value: say(p.vacuumRange, 'm'), help: 'Where the textbook says it lands. The difference is what the air took.' },
-      { id: 'lost', tex: '\\Delta R/R_{\\rm vac}', value: guarded ? null : percent(lost), help: 'How much of the range drag costs at these settings. For a real baseball it is most of it.' },
-      { id: 'apex', tex: 'h_{\\max}', value: say(p.apex, 'm'), help: 'Greatest height reached.' },
-      { id: 'asym', tex: 'x_{\\rm apex}/R', value: ratio(p.range > 0 ? p.apexAt / p.range : 0), help: 'Where the top of the arc sits along the flight. In vacuum this is exactly 0.5; with drag it is past halfway, because the descent is slower.' },
-      { id: 'time', tex: 't_{\\rm flight}', value: say(p.duration, 's'), help: 'How long it is in the air.' },
-      { id: 'vimp', tex: 'v_{\\rm impact}', value: say(p.impactSpeed, 'm/s'), help: 'Speed when it lands. In vacuum this equals the launch speed exactly; with drag it never does.' },
-      { id: 'aimp', tex: '\\theta_{\\rm impact}', value: `${ratio(p.impactAngle)}°`, help: 'How steeply it comes down. In vacuum this matches the launch angle; with drag it is steeper, which is why the path looks lopsided.' },
-      { id: 'vt', tex: 'v_t = \\sqrt{g/k}', value: say(p.terminal, 'm/s'), help: 'Terminal velocity for this body — the speed at which drag alone balances its weight.' },
+      { id: 'range', tex: 'R', value: guarded ? null : sayText(p.range, 'm'), help: 'Where it actually lands, by integrating the motion with quadratic drag.' },
+      { id: 'vacr', tex: 'R_{\\rm vac} = v_0^2\\sin 2\\theta/g', value: sayText(p.vacuumRange, 'm'), help: 'Where the textbook says it lands. The difference is what the air took.' },
+      { id: 'lost', tex: '\\Delta R/R_{\\rm vac}', value: guarded ? null : percentText(lost), help: 'How much of the range drag costs at these settings. For a real baseball it is most of it.' },
+      { id: 'apex', tex: 'h_{\\max}', value: sayText(p.apex, 'm'), help: 'Greatest height reached.' },
+      { id: 'asym', tex: 'x_{\\rm apex}/R', value: ratioText(p.range > 0 ? p.apexAt / p.range : 0), help: 'Where the top of the arc sits along the flight. In vacuum this is exactly 0.5; with drag it is past halfway, because the descent is slower.' },
+      { id: 'time', tex: 't_{\\rm flight}', value: sayText(p.duration, 's'), help: 'How long it is in the air.' },
+      { id: 'vimp', tex: 'v_{\\rm impact}', value: sayText(p.impactSpeed, 'm/s'), help: 'Speed when it lands. In vacuum this equals the launch speed exactly; with drag it never does.' },
+      { id: 'aimp', tex: '\\theta_{\\rm impact}', value: `${ratioText(p.impactAngle)}°`, help: 'How steeply it comes down. In vacuum this matches the launch angle; with drag it is steeper, which is why the path looks lopsided.' },
+      { id: 'vt', tex: 'v_t = \\sqrt{g/k}', value: sayText(p.terminal, 'm/s'), help: 'Terminal velocity for this body — the speed at which drag alone balances its weight.' },
     ],
-    caption: `${ratio(v0)} m/s at ${ratio(angle)}°: ${say(p.range, 'm')}, against ${say(p.vacuumRange, 'm')} in vacuum.`,
+    caption: `${ratioText(v0)} m/s at ${ratioText(angle)}°: ${sayText(p.range, 'm')}, against ${sayText(p.vacuumRange, 'm')} in vacuum.`,
     narration: lost > 0.3
       ? 'Drag is taking most of the range here, and the descent is visibly steeper than the climb.'
       : 'The dashed parabola is the same launch with the air removed.',

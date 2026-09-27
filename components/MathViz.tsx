@@ -1249,7 +1249,11 @@ function Obj({
   /** the arrow marker belonging to THIS plot — see the note on clipId */
   arrowId: string;
 }) {
-  const stroke = TONE[ob.tone ?? 'primary'];
+  // A MEASURED COLOUR WINS OVER A SEMANTIC ONE. The palette carries meaning
+  // for everything drawn from an expression; a simulated object's colour IS a
+  // computed quantity — the blackbody colour of a disc ring at its own
+  // temperature — and there is no role in the palette that could stand for it.
+  const stroke = ('color' in ob && ob.color) || TONE[ob.tone ?? 'primary'];
   const dash = 'dashed' in ob && ob.dashed ? '4 4' : undefined;
 
   switch (ob.o) {
@@ -1281,7 +1285,18 @@ function Obj({
     }
 
     case 'region':
-      return <path d={`${path(ob.pts, sx, sy, view)} Z`} fill={stroke} opacity={0.12} stroke="none" />;
+      // A MEASURED FILL CARRIES ITS OWN ALPHA. The flat 12% is right for a
+      // region that means "this area, roughly" — an integral, a surplus — and
+      // wrong for one that means "this is the black hole", which came out as a
+      // pale green disc where the dark should be.
+      return (
+        <path
+          d={`${path(ob.pts, sx, sy, view)} Z`}
+          fill={stroke}
+          opacity={'color' in ob && ob.color ? 1 : 0.12}
+          stroke="none"
+        />
+      );
 
     case 'segment':
       return (

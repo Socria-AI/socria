@@ -234,6 +234,23 @@ export function ratio(value: number, digits = 3): string {
   return sig(value, digits);
 }
 
+/**
+ * The same two, as plain text.
+ *
+ * `ratio` and `percent` render for KaTeX: an exponent comes out as
+ * `\times 10^{58}` and a percent sign has to be escaped. A readout's value and
+ * a caption are both plain strings — the renderer puts them in a <b> and a <p>
+ * — so the escapes were printed rather than typeset. Same numbers, no notation.
+ */
+export function ratioText(value: number, digits = 3): string {
+  if (!Number.isFinite(value)) return '—';
+  return sig(value, digits).replace(/\\times 10\^\{(-?\d+)\}/, '×10^$1');
+}
+
+export function percentText(value: number, digits = 3): string {
+  return `${ratioText(value * 100, digits)}%`;
+}
+
 /** A fraction as a percentage, for efficiencies. */
 export function percent(value: number, digits = 3): string {
   return `${sig(value * 100, digits)}\\%`;

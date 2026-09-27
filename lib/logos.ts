@@ -105,6 +105,19 @@ export const THINKING_CONTEXTS = [
   'reflecting',
   'analysing',
   'math',
+  /**
+   * A SIMULATED OBJECT IS NOT MATHEMATICS.
+   *
+   * "Simulate a black hole" came back labelled Math, and the panel said so in
+   * the header. It is not wrong that there is arithmetic in it — there is
+   * arithmetic in an argument about rent — but the label names the kind of work
+   * a person thinks they are doing, and nobody simulating a black hole thinks
+   * they are doing mathematics. It also pulled in the machinery that IS for
+   * mathematics: a solution chain to draw, a learning intent, an Answer Guard
+   * with a result to withhold. A simulation has none of those; it has an object
+   * and some controls.
+   */
+  'simulating',
 ] as const;
 export type ThinkingContext = (typeof THINKING_CONTEXTS)[number];
 
@@ -120,6 +133,7 @@ export const CONTEXT_LABEL: Record<ThinkingContext, string> = {
   reflecting: 'Reflecting',
   analysing: 'Analysing',
   math: 'Math',
+  simulating: 'Simulating',
 };
 
 // How the person is engaging with a mathematical problem — inferred, and it
@@ -399,14 +413,29 @@ export function sanitizeMap(raw: any): ThinkingMap {
   //
   // So: a scene survives if the work is mathematical, or if its kind is one
   // that carries its own subject with it.
+  // A SIMULATED OBJECT CARRIES ITS OWN SUBJECT, exactly as a diagram does, and
+  // leaving it off this list is why "simulate a black hole" came back labelled
+  // Math. The scene only survived if the work was called mathematical — so the
+  // extractor had to call a black hole mathematics to get it drawn at all, and
+  // the panel then said Math in its header because that is what it had been
+  // told. The label was a symptom; this line was the cause.
   const scene = sanitizeViz(raw.viz);
-  const viz = scene && (isMath || ECON_KINDS.has(scene.kind) || scene.kind === 'diagram') ? scene : null;
+  const carriesItsOwn =
+    !!scene && (ECON_KINDS.has(scene.kind) || scene.kind === 'diagram' || scene.kind === 'simulation');
+  const viz = scene && (isMath || carriesItsOwn) ? scene : null;
+
+  // …and then it is named for what it is. A person simulating a black hole is
+  // not doing mathematics, and none of the machinery that word turns on — a
+  // solution chain, a learning intent, a result to withhold — has anything to
+  // work with here.
+  const named: ThinkingContext | undefined =
+    viz?.kind === 'simulation' ? 'simulating' : context;
 
   return {
     nodes,
     edges,
-    ...(context ? { context } : {}),
-    ...(intent ? { intent } : {}),
+    ...(named ? { context: named } : {}),
+    ...(intent && named === 'math' ? { intent } : {}),
     ...(viz ? { viz } : {}),
   };
 }

@@ -34,6 +34,7 @@ import {
 } from './.tmp/logos-physics.mjs';
 import { ELEMENTS, element, bySymbol, elementColour, darkenForPaper, primordial } from './.tmp/elements.mjs';
 import { sanitizeViz, buildFrame, SIM_OBJECTS, VIZ_KINDS } from './.tmp/logos-viz.mjs';
+import { sanitizeMap, CONTEXT_LABEL } from './.tmp/logos.mjs';
 
 let pass = 0, fail = 0;
 const ok = (n, c, x = '') => (c ? (pass++, console.log('  ok   ' + n)) : (fail++, console.log('  FAIL ' + n + '  ' + x)));
@@ -423,7 +424,8 @@ console.log('\n=== the drawing IS the physics, not a picture beside it ===');
     const f = draw({ a: spin });
     const bh = blackHole(10 * PHYS.Msun, spin);
     const at = (id) => f.objects.find((o) => o.id === id);
-    const innerEdge = Math.min(...at('disk').lines.map((l) => Math.max(...l.map((q) => Math.hypot(q.x, q.y)))));
+    const rings = f.objects.filter((o) => /^disk\d+$/.test(o.id));
+    const innerEdge = Math.min(...rings.map((r) => Math.max(...r.pts.map((q) => Math.hypot(q.x, q.y)))));
     okNear(`a★ = ${spin}: the shadow is drawn at √27 r_g`, outer(at('shadow')), bh.shadow / bh.rg, 1e-9);
     okNear(`  the horizon at r_+`, outer(at('horizon')), bh.horizon / bh.rg, 1e-9);
     okNear(`  the photon ring at the photon sphere`, outer(at('photonring')), bh.photonSphere / bh.rg, 1e-9);
@@ -435,7 +437,11 @@ console.log('\n=== the drawing IS the physics, not a picture beside it ===');
   // inner edge really moves, from 6 r_g to under 2.
   const edge = (a) => {
     const f = draw({ a });
-    return Math.min(...f.objects.find((o) => o.id === 'disk').lines.map((l) => Math.max(...l.map((q) => Math.hypot(q.x, q.y)))));
+    return Math.min(
+      ...f.objects
+        .filter((o) => /^disk\d+$/.test(o.id))
+        .map((r) => Math.max(...r.pts.map((q) => Math.hypot(q.x, q.y))))
+    );
   };
   ok('spinning the hole pulls the disk inward on the canvas', edge(0) > 6 - 1e-9 && edge(0.95) < 2);
 
@@ -625,6 +631,75 @@ console.log('\n=== a number said two ways ===');
   ok('  and fractions of c', sayText(PHYS.c / 2, 'm/s') === '0.500 c', sayText(PHYS.c / 2, 'm/s'));
   ok('  with no LaTeX escape anywhere in it',
     ['m', 's', 'kg', 'K', 'm/s', 'm/s2', 'W', 'J', 'N'].every((u) => !sayText(1234, u).includes('\\')));
+}
+
+console.log('\n=== a readout is plain text, and a simulation is not mathematics ===');
+{
+  // REPORTED FROM THE RUNNING APP, with a screenshot of both.
+  //
+  // 1. The panel printed "29.5\\,\\mathrm{km}" with the backslashes showing. A
+  //    readout's `tex` goes through KaTeX; its `value` is rendered straight
+  //    into a <b>. say() returns LaTeX, so every number in every simulation
+  //    leaked its notation onto the screen.
+  const scene = (object) =>
+    sanitizeViz({ kind: 'simulation', sim: { object }, view: { xMin: -28, xMax: 28 } });
+  for (const object of SIM_OBJECTS) {
+    const sc = scene(object);
+    const f = buildFrame(sc, null, Object.fromEntries(sc.params.map((p) => [p.id, p.value])),
+      { xMin: -30, xMax: 30, yMin: -21, yMax: 21 }, false);
+    const leaks = f.readouts.filter((r) => r.value && /\\/.test(r.value));
+    ok(`${object}: no LaTeX escapes in any readout value`, leaks.length === 0,
+      leaks.map((r) => r.value).join(' | '));
+    ok(`  ${object}: nor in the caption`, !/\\/.test(f.caption), f.caption);
+    // The tex side still carries notation — it is the half that IS typeset.
+    ok(`  ${object}: but the tex side still does`, f.readouts.some((r) => /\\|\^|_/.test(r.tex)));
+  }
+
+  // 2. "Simulate a black hole" came back labelled MATH. The cause was not the
+  //    label: a scene only survived sanitizeMap if the work was called
+  //    mathematical, so the extractor had to call a black hole mathematics to
+  //    get it drawn at all.
+  const asLearning = sanitizeMap({
+    context: 'learning',
+    nodes: [{ id: 'n1', type: 'concept', label: 'Black hole' }],
+    edges: [],
+    viz: { kind: 'simulation', sim: { object: 'black-hole' }, view: { xMin: -28, xMax: 28 } },
+  });
+  ok('a simulation survives without being called mathematics', !!asLearning.viz);
+  ok('  and is named for what it is', asLearning.context === 'simulating');
+  ok('  which reads "Simulating" on screen', CONTEXT_LABEL[asLearning.context] === 'Simulating');
+  ok('  with no maths intent attached to it', asLearning.intent === undefined);
+
+  // Even when the extractor DOES say math, a simulation is still a simulation.
+  const asMath = sanitizeMap({
+    context: 'math', intent: 'learning', nodes: [], edges: [],
+    viz: { kind: 'simulation', sim: { object: 'orbit' }, view: { xMin: -6, xMax: 6 } },
+  });
+  ok('and it is not mathematics even when it was called that', asMath.context === 'simulating');
+
+  // Nothing else moves: real mathematics keeps its label, its intent and its
+  // scene, and a diagram still survives outside maths as it always did.
+  const maths = sanitizeMap({
+    context: 'math', intent: 'learning', nodes: [], edges: [],
+    viz: { kind: 'function', expr: 'x^2', view: { xMin: -6, xMax: 6 } },
+  });
+  ok('real mathematics is untouched',
+    maths.context === 'math' && maths.intent === 'learning' && maths.viz.kind === 'function');
+  const diagram = sanitizeMap({
+    context: 'learning', nodes: [], edges: [],
+    viz: { kind: 'diagram', view: { xMin: -6, xMax: 6 }, parts: [{ o: 'point', x: 0, y: 0 }] },
+  });
+  ok('  and a diagram still carries its own subject', !!diagram.viz);
+
+  // 3. The disc now carries a MEASURED colour rather than a palette role,
+  //    because no role in the palette could stand for a temperature.
+  const bhSc = scene('black-hole');
+  const bhF = buildFrame(bhSc, null, Object.fromEntries(bhSc.params.map((p) => [p.id, p.value])),
+    { xMin: -30, xMax: 30, yMin: -21, yMax: 21 }, false);
+  const coloured = bhF.objects.filter((o) => o.color);
+  ok('the disc rings carry a computed colour', coloured.length >= 10, `${coloured.length}`);
+  ok('  and every one of them is a real CSS colour',
+    coloured.every((o) => /^rgba?\(/.test(o.color)));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
