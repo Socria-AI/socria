@@ -43,8 +43,8 @@ export const DOC_PAGES: DocPage[] = [
   },
   {
     slug: 'models',
-    title: 'The three models',
-    blurb: 'Core 2, Core 3.1 and Logos side by side — what each is for and how to switch.',
+    title: 'The models',
+    blurb: 'Core 2, Core 3.1, Core 4 and Logos side by side — what each is for and how to switch.',
     group: 'The models',
   },
   {
@@ -57,6 +57,12 @@ export const DOC_PAGES: DocPage[] = [
     slug: 'core-3',
     title: 'Socria Core 3.1',
     blurb: 'The conversation that remembers, synthesizes, and follows your thinking across sessions.',
+    group: 'The models',
+  },
+  {
+    slug: 'core-4',
+    title: 'Socria Core 4',
+    blurb: 'Decides, each turn, which part of the work is yours — and contributes everything else.',
     group: 'The models',
   },
   {

@@ -41,12 +41,12 @@ export function Overview() {
       <H2 id="shape">The shape of the product</H2>
       <p>
         Everything lives at one address — <code>socria.app/chat</code> — behind
-        one model switcher. This is what the fullest of the three looks like:
+        one model switcher. This is what the fullest of them looks like:
         the conversation on the left, a map of the thinking it produced on the
         right, kept in step with each other.
       </p>
       <DemoSplit />
-      <p>Three models share that address:</p>
+      <p>Four models share that address:</p>
       <ul>
         <li>
           <strong><Link href="/docs/core-2">Core 2</Link></strong> — calm,
@@ -59,6 +59,13 @@ export function Overview() {
           what you have worked out, and a running model of how you think.
         </li>
         <li>
+          <strong><Link href="/docs/core-4">Core 4</Link></strong> — the model
+          that decides, each turn, which part of the work is yours and does
+          everything else itself. It keeps a record of the reasoning — claims,
+          objections, decisions, and whose each one is — so a long piece of
+          work stops circling.
+        </li>
+        <li>
           <strong><Link href="/docs/logos">Logos</Link></strong> — the full
           reasoning environment. The conversation runs beside a live{' '}
           <Link href="/docs/thinking-map">Thinking Map</Link> that draws your
@@ -69,8 +76,10 @@ export function Overview() {
         </li>
       </ul>
       <p>
-        Core 2 and Core 3.1 are chat models with different depths of attention.
-        Logos is a different kind of thing — an environment — and it is the
+        Core 2, Core 3.1 and Core 4 are chat models: different depths of
+        attention, and in Core 4&rsquo;s case a different question — not how
+        deep to go, but whose work this is. Logos is a different kind of thing
+        — an environment — and it is the
         centerpiece of <Link href="/docs/socria-one">Socria One</Link>, the
         {priceWithPeriod()} plan. Its free tier is not a trial of Logos but Logos
         itself, twice a month: what Socria One sells is how many lines of

@@ -9,6 +9,7 @@ import { UseCases } from './use-cases';
 import { Models } from './models';
 import { Core2 } from './core-2';
 import { Core3 } from './core-3';
+import { Core4 } from './core-4';
 import { Logos } from './logos';
 import { ThinkingMapDoc } from './thinking-map';
 import { Economics } from './economics';
@@ -24,6 +25,7 @@ export const CONTENT: Record<string, ComponentType> = {
   models: Models,
   'core-2': Core2,
   'core-3': Core3,
+  'core-4': Core4,
   logos: Logos,
   'thinking-map': ThinkingMapDoc,
   mathematics: Mathematics,
