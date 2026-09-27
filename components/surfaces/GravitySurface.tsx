@@ -35,7 +35,7 @@ import {
   type Body,
   type GravityPreset,
 } from '@/lib/logos-physics';
-import { Surface3D, type RenderArgs, type SurfaceRender } from './Surface3D';
+import { Surface3D, type RenderArgs, type SurfaceRender, type SurfaceProps, snap } from './Surface3D';
 
 const PRESETS: { id: GravityPreset; label: string }[] = [
   { id: 'two', label: 'Two bodies' },
@@ -83,7 +83,7 @@ const LAYERS = [
 
 const INITIAL = { preset: 1, speed: 60, trail: 400, zoomf: 1, rate: 1 };
 
-export function GravitySurface() {
+export function GravitySurface({ initial, fill }: SurfaceProps = {}) {
   // The state the integrator owns. Held in a ref rather than in React state
   // because it changes sixty times a second and nothing about it belongs in a
   // render: the component reads it, it never sets it.
@@ -194,9 +194,9 @@ export function GravitySurface() {
           nodes.push(
             <circle
               key={`b${i}`}
-              cx={p.x}
-              cy={p.y}
-              r={r}
+              cx={snap(p.x)}
+              cy={snap(p.y)}
+              r={snap(r)}
               fill={MASS_COLOUR[i % MASS_COLOUR.length]}
               stroke="var(--lg-panel)"
               strokeWidth="0.8"
@@ -249,10 +249,11 @@ export function GravitySurface() {
       title="Gravity · N bodies, integrated"
       groups={GROUPS}
       layers={LAYERS}
-      initial={INITIAL}
+      initial={{ ...INITIAL, ...initial }}
       initialCam={{ yaw: 0, pitch: 1.2, dist: 15 }}
       distRange={[5, 60]}
       render={render}
+      fill={fill}
     />
   );
 }

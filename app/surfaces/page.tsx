@@ -8,7 +8,7 @@ import type { Metadata } from 'next';
 import { BlackHoleSurface } from '@/components/surfaces/BlackHoleSurface';
 import { BigBangSurface } from '@/components/surfaces/BigBangSurface';
 import { GravitySurface } from '@/components/surfaces/GravitySurface';
-import './surfaces.css';
+import './page.css';
 
 export const metadata: Metadata = {
   title: 'Working surfaces — Socria Logos',

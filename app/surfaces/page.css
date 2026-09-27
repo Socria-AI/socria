@@ -1,0 +1,44 @@
+/* app/surfaces/page.css — only the page the three surfaces are shown on.
+ *
+ * The surfaces' own styles travel with the component (components/surfaces/
+ * surfaces.css, imported by Surface3D) so that mounting one anywhere else —
+ * the Logos plot lens, a workspace pane — brings its stylesheet with it
+ * rather than depending on the route having remembered to import it.
+ */
+/* ── the page these are shown on ────────────────────────────────── */
+.sfx-page { max-width: 1400px; margin: 0 auto; padding: clamp(32px, 5vw, 64px) var(--edge) 80px; }
+.sfx-page header { margin-bottom: clamp(20px, 3vw, 34px); }
+.sfx-page .k {
+  font-size: 0.7rem; letter-spacing: 0.28em; text-transform: uppercase;
+  color: var(--ink-45); margin: 0 0 16px;
+}
+.sfx-page h1 {
+  font-family: var(--serif); font-weight: 400; font-size: clamp(2rem, 4.6vw, 3.2rem);
+  line-height: 1.04; letter-spacing: -0.02em; margin: 0 0 14px; text-wrap: balance;
+}
+.sfx-page .lede {
+  font-size: clamp(0.98rem, 1.5vw, 1.12rem); line-height: 1.65;
+  color: var(--ink-70); max-width: 68ch; margin: 0;
+}
+.sfx-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 18px; }
+.bhx-leader { fill: none; stroke: var(--lg-ink-24, rgba(35, 36, 31, 0.24)); stroke-width: 0.7; vector-effect: non-scaling-stroke; }
+
+/* ── the surface switcher ───────────────────────────────────────── */
+.sfx-switch { display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 8px; min-height: 0; }
+.sfx-tabs { display: flex; gap: 3px; flex-wrap: wrap; }
+.sfx-tabs button {
+  font: inherit; font-size: 10.5px; padding: 4px 11px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--lg-line, rgba(53, 70, 32, 0.14)); background: #fff;
+  color: var(--lg-ink-60, rgba(35, 36, 31, 0.6)); transition: all 0.18s; white-space: nowrap;
+}
+.sfx-tabs button:hover { border-color: var(--lg-primary, #354620); color: var(--lg-primary, #354620); }
+.sfx-tabs button[aria-selected='true'] {
+  background: var(--lg-primary, #354620); border-color: var(--lg-primary, #354620);
+  color: var(--lg-panel, #FAF8F2);
+}
+/* Inside the layout the surface fills its pane rather than carrying its own
+   fixed height: the pane is what the reader sized. */
+.l2 .sfx { height: 100%; border: 0; border-radius: 0; }
+.l2 .sfx-grip { display: none; }
+/* The wireframe on the facing hemisphere — what tells the eye it is a ball. */
+.bhx-wire { fill: none; stroke: rgba(255, 255, 255, 0.2); stroke-width: 0.7; vector-effect: non-scaling-stroke; }

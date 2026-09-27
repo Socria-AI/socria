@@ -40,8 +40,17 @@ import {
 import {
   B_CRIT,
   PHYS,
+  COSMO,
+  ageAt,
+  ageNow,
   blackHole,
   blackbodyCSS,
+  epochs,
+  equalityZ,
+  heliumFraction,
+  lastScatteringZ,
+  percentText,
+  temperatureAt,
   eddingtonRate,
   ergosphereAt,
   observedTemperature,
@@ -49,7 +58,6 @@ import {
   orbitPeriod,
   oscillator,
   oscillatorAt,
-  percentText,
   photonPath,
   positionAt,
   projectile,
@@ -254,6 +262,9 @@ export interface VizFrame {
 // assigned on the way out, so the extractor cannot collide them or leave one
 // out. Curves carry their own `expr` rather than the scene's, which is why
 // `diagram` sits in OBJECT_KINDS: the scene as a whole has no single formula.
+
+/** What a simulation's builder is: a scene and its slider values, to a frame. */
+type Builder2 = (scene: VizScene, vals: Record<string, number>, guarded: boolean) => VizFrame;
 
 /** A number, or an expression over the parameters that evaluates to one. */
 export type NumOrExpr = number | string;
@@ -3766,7 +3777,7 @@ const buildFlow: Builder = (scene, _fn, vals, view, guarded) => {
 // writing coordinates can produce a picture of those facts. It cannot produce
 // the facts.
 
-export const SIM_OBJECTS = ['black-hole', 'orbit', 'oscillator', 'projectile'] as const;
+export const SIM_OBJECTS = ['black-hole', 'big-bang', 'orbit', 'oscillator', 'projectile'] as const;
 export type SimObject = (typeof SIM_OBJECTS)[number];
 
 export interface SimSpec {
@@ -3800,6 +3811,12 @@ const SIM_PARAMS: Record<SimObject, VizParam[]> = {
       id: 'i', min: 0, max: 88, step: 1, value: 18, symbol: 'i',
       help: 'How far the disk is tilted away from face-on, in degrees. At 0 you look straight down on it; near 90 you see it edge-on.',
     },
+  ],
+  'big-bang': [
+    { id: 'a', min: -32, max: 0, step: 0.01, value: -12, symbol: '\\log a', help: 'Where in the history you are, as the log of the scale factor. The temperature, the age and what exists all follow from this one number.' },
+    { id: 'm', min: 0.05, max: 0.95, step: 0.005, value: 0.3111, symbol: '\\Omega_m', help: 'Matter density. Raise it and matter–radiation equality happens earlier, and last scattering moves — both are computed, not placed on a line.' },
+    { id: 'l', min: 0, max: 0.95, step: 0.005, value: 0.6889, symbol: '\\Omega_\\Lambda', help: 'Dark energy. It does nothing early and everything late; it sets the age of the universe.' },
+    { id: 'h', min: 50, max: 85, step: 0.1, value: 67.66, symbol: 'H_0', help: 'The expansion rate today, in km/s per megaparsec. It scales the whole clock.' },
   ],
   orbit: [
     { id: 'm', min: 0.08, max: 50, step: 0.01, value: 1, symbol: 'M', help: 'The mass of the central body, in suns.' },
@@ -4205,8 +4222,77 @@ function buildProjectile(scene: VizScene, vals: Record<string, number>, guarded:
   };
 }
 
+/**
+ * The Big Bang, for the plot renderer.
+ *
+ * The SURFACE is the real one (components/surfaces/BigBangSurface) — a shell
+ * with the content inside it, coloured by what the content is. This is the
+ * fallback for anywhere that draws a scene rather than mounting a surface: the
+ * expansion history as a curve, with the numbers that move when the sliders do.
+ * Same arithmetic either way; only the picture differs.
+ */
+const buildBigBang: Builder2 = (scene, vals, guarded) => {
+  const c = {
+    H0: simVal(scene, vals, 'h'),
+    omegaM: simVal(scene, vals, 'm'),
+    omegaL: simVal(scene, vals, 'l'),
+    omegaR: COSMO.omegaR,
+    T0: COSMO.T0,
+  };
+  const logA = simVal(scene, vals, 'a');
+  const A = Math.pow(10, logA);
+  const T = temperatureAt(c, A);
+  const age = ageAt(c, A);
+  const zLS = lastScatteringZ(c);
+  const eps = epochs(c);
+  const here = [...eps].reverse().find((e) => e.a <= A * 1.0001) ?? eps[0];
+
+  // log a against log t: forty orders of magnitude, which is the only way to
+  // see the whole history at once.
+  const curve: Pt[] = [];
+  for (let i = 0; i <= 140; i++) {
+    const la = -32 + (32 * i) / 140;
+    const t = ageAt(c, Math.pow(10, la));
+    if (t > 0) curve.push({ x: Math.log10(t), y: la });
+  }
+  const objects: VizObject[] = [
+    { o: 'curve', id: 'expand', pts: curve, tone: 'primary', width: 1.8 },
+    { o: 'point', id: 'now', x: Math.log10(Math.max(1e-45, age)), y: logA, tone: 'tension' },
+  ];
+  for (const e of eps) {
+    const t = ageAt(c, e.a);
+    if (t <= 0) continue;
+    objects.push({
+      o: 'vrule',
+      id: `e_${e.id}`,
+      at: Math.log10(t),
+      tone: e.speculative ? 'ghost' : 'muted',
+      dashed: true,
+    });
+  }
+
+  return {
+    objects,
+    readouts: [
+      { id: 'T', tex: 'T', value: sayText(T, 'K'), help: 'The temperature of the radiation now — T₀ divided by the scale factor, and the thing everything else follows from.' },
+      { id: 't', tex: 't', value: sayText(age, 's'), help: 'How long after the start this is, by integrating da/(aH).' },
+      { id: 'z', tex: 'z', value: ratioText(1 / A - 1), help: 'Redshift: how much the light from here is stretched by the time it reaches now.' },
+      { id: 'zeq', tex: 'z_{\\rm eq}', value: ratioText(equalityZ(c)), help: 'Where matter density passes radiation density and structure can begin to grow. Computed from the sliders, not placed.' },
+      { id: 'zls', tex: 'z_{\\rm ls}', value: ratioText(zLS), help: 'Last scattering — where the fog clears and the microwave background is released. Later than recombination, which is a different event.' },
+      { id: 'age', tex: 't_0', value: guarded ? null : sayText(ageNow(c), 's'), help: 'The age of the universe at these densities.' },
+      { id: 'Y', tex: 'Y_{\\rm He}', value: percentText(heliumFraction()), help: 'The fraction of the mass left as helium after nucleosynthesis. Nothing heavier was made.' },
+    ],
+    caption: `${here.label}${here.speculative ? ' — not established physics' : ''}. T = ${sayText(T, 'K')}, t = ${sayText(age, 's')}.`,
+    narration: here.speculative
+      ? 'Before about a picosecond the physics is extrapolation, and the marks here are drawn faintly for that reason.'
+      : 'Each mark is an epoch, placed by its own physics — move the densities and equality and last scattering move with them.',
+    ask: 'Recombination and last scattering are not the same moment. Which one is the microwave background from?',
+  };
+};
+
 const SIM_BUILDERS: Record<SimObject, (s: VizScene, v: Record<string, number>, g: boolean) => VizFrame> = {
   'black-hole': buildBlackHole,
+  'big-bang': buildBigBang,
   orbit: buildOrbit,
   oscillator: buildOscillator,
   projectile: buildProjectile,

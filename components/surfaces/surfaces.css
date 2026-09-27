@@ -1,4 +1,4 @@
-/* app/surfaces/surfaces.css
+/* components/surfaces/surfaces.css
  *
  * The working surfaces, in the Logos register.
  *
@@ -245,40 +245,39 @@
   .sfx-icon, .sfx-seg button, .sfx-groups button, .sfx-layers button, .sfx-grip i { transition: none; }
 }
 
-/* ── the page these are shown on ────────────────────────────────── */
-.sfx-page { max-width: 1400px; margin: 0 auto; padding: clamp(32px, 5vw, 64px) var(--edge) 80px; }
-.sfx-page header { margin-bottom: clamp(20px, 3vw, 34px); }
-.sfx-page .k {
-  font-size: 0.7rem; letter-spacing: 0.28em; text-transform: uppercase;
-  color: var(--ink-45); margin: 0 0 16px;
+/* ── filling a panel instead of standing on its own ──────────────── */
+/*
+ * On its own page a surface is a card with a height the reader drags. Mounted
+ * INSIDE something that already sized it — the Logos plot lens, a workspace
+ * pane — that card is wrong: it would draw its own border inside a border and
+ * ignore the height it was given. `is-fill` makes it the shape of its hole.
+ */
+.sfx.is-fill {
+  height: 100%;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
-.sfx-page h1 {
-  font-family: var(--serif); font-weight: 400; font-size: clamp(2rem, 4.6vw, 3.2rem);
-  line-height: 1.04; letter-spacing: -0.02em; margin: 0 0 14px; text-wrap: balance;
-}
-.sfx-page .lede {
-  font-size: clamp(0.98rem, 1.5vw, 1.12rem); line-height: 1.65;
-  color: var(--ink-70); max-width: 68ch; margin: 0;
-}
-.sfx-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 18px; }
-.bhx-leader { fill: none; stroke: var(--lg-ink-24, rgba(35, 36, 31, 0.24)); stroke-width: 0.7; vector-effect: non-scaling-stroke; }
+.sfx.is-fill .sfx-grip { display: none; }
+.sfx.is-fill .sfx-head { background: transparent; }
 
-/* ── the surface switcher ───────────────────────────────────────── */
-.sfx-switch { display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 8px; min-height: 0; }
-.sfx-tabs { display: flex; gap: 3px; flex-wrap: wrap; }
-.sfx-tabs button {
-  font: inherit; font-size: 10.5px; padding: 4px 11px; border-radius: 999px; cursor: pointer;
-  border: 1px solid var(--lg-line, rgba(53, 70, 32, 0.14)); background: #fff;
-  color: var(--lg-ink-60, rgba(35, 36, 31, 0.6)); transition: all 0.18s; white-space: nowrap;
+/* IN A PANE, THE DRAWING KEEPS THE ROOM.
+ *
+ * A surface mounted in the Logos map lens gets whatever height the pane has,
+ * and the controls below it do not shrink — so on a short pane the stage was
+ * squeezed to a sliver and a black hole read as a smudge between two rows of
+ * sliders. The stage takes a floor of the panel's height (a percentage row
+ * resolves against it, which is definite here because `is-fill` is 100% of a
+ * box that has one), the foot tightens, and the running note gives up its
+ * third line rather than the picture giving up its last third. Nothing is
+ * removed: the foot scrolls, and full screen restores every line of it.
+ */
+.sfx.is-fill { grid-template-rows: auto minmax(45%, 1fr) auto auto; }
+.sfx.is-fill .sfx-foot { padding: 6px 12px 8px; }
+.sfx.is-fill .sfx-note {
+  margin-top: 6px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
-.sfx-tabs button:hover { border-color: var(--lg-primary, #354620); color: var(--lg-primary, #354620); }
-.sfx-tabs button[aria-selected='true'] {
-  background: var(--lg-primary, #354620); border-color: var(--lg-primary, #354620);
-  color: var(--lg-panel, #FAF8F2);
-}
-/* Inside the layout the surface fills its pane rather than carrying its own
-   fixed height: the pane is what the reader sized. */
-.l2 .sfx { height: 100%; border: 0; border-radius: 0; }
-.l2 .sfx-grip { display: none; }
-/* The wireframe on the facing hemisphere — what tells the eye it is a ball. */
-.bhx-wire { fill: none; stroke: rgba(255, 255, 255, 0.2); stroke-width: 0.7; vector-effect: non-scaling-stroke; }

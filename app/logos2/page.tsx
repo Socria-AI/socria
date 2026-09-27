@@ -8,7 +8,6 @@
 
 import type { Metadata } from 'next';
 import { Logos2Workspace } from './Logos2Workspace';
-import '../surfaces/surfaces.css';
 import './logos2.css';
 
 export const metadata: Metadata = {

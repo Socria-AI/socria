@@ -19,6 +19,7 @@
 // timer of its own, which is what makes each of them testable as a pure
 // function of its inputs.
 
+import './surfaces.css';
 import {
   useCallback,
   useEffect,
@@ -81,6 +82,40 @@ export interface SurfaceRender {
   label: string;
 }
 
+/**
+ * What every surface takes from whoever mounts it.
+ *
+ * A surface knows its own controls and their sensible defaults; a caller knows
+ * where it is being put and, sometimes, what the conversation already said it
+ * should start at — "a ten-solar-mass hole" is a starting value, not a new
+ * control. Anything unknown is ignored and anything out of range is clamped by
+ * the control itself, so a caller cannot widen a physical range by passing a
+ * number through here.
+ */
+/**
+ * Snap a float on its way into an SVG attribute.
+ *
+ * WHY THIS EXISTS. `Math.pow`, `Math.sin` and `Math.cbrt` are not required to
+ * agree to the last bit across two V8 builds, and a server render and the
+ * browser that hydrates it ARE two builds. A disc patch came out at
+ * fillOpacity 0.2738210066763288 on the server and 0.27382100667632886 in the
+ * page: the same number to look at, and a hydration mismatch to React, which
+ * then throws away the server's markup for that subtree. Path coordinates
+ * already go through `toFixed(1)` for exactly this reason — this is the same
+ * discipline for everything that is not a path.
+ *
+ * Three decimals is far past what an opacity or a radius in viewBox units can
+ * show, so the drawing loses nothing by it.
+ */
+export function snap(n: number, dp = 3): number {
+  return Number.isFinite(n) ? Number(n.toFixed(dp)) : 0;
+}
+
+export interface SurfaceProps {
+  initial?: Record<string, number>;
+  fill?: boolean;
+}
+
 export interface Surface3DProps {
   title: string;
   groups: SurfaceGroup[];
@@ -93,6 +128,13 @@ export interface Surface3DProps {
   render: (a: RenderArgs) => SurfaceRender;
   /** surfaces with nothing moving hide the clock and the play button */
   animated?: boolean;
+  /**
+   * Fill the box it is mounted in rather than standing as a card of its own.
+   * Set wherever something else has already decided the size — the Logos plot
+   * lens, a workspace pane — so the surface does not draw a border inside a
+   * border and ignore the height it was handed.
+   */
+  fill?: boolean;
 }
 
 // THE VIEWBOX IS THE PIXEL BOX, 1:1, and that is not a detail.
@@ -113,6 +155,7 @@ export function Surface3D({
   distRange = [4, 80],
   render,
   animated = true,
+  fill = false,
 }: Surface3DProps) {
   const [vals, setVals] = useState<Record<string, number>>(initial);
   const [cam, setCam] = useState<Cam>(initialCam);
@@ -308,8 +351,8 @@ export function Surface3D({
   return (
     <div
       ref={shell}
-      className={`sfx${full ? ' is-full' : ''}`}
-      style={full ? undefined : ({ ['--sfx-h' as string]: `${tall}px` })}
+      className={`sfx${full ? ' is-full' : ''}${fill ? ' is-fill' : ''}`}
+      style={full || fill ? undefined : ({ ['--sfx-h' as string]: `${tall}px` })}
     >
       <div className="sfx-head">
         <span className="sfx-title">{title}</span>

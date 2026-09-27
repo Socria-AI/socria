@@ -40,7 +40,7 @@ import {
   type Cosmology,
 } from '@/lib/logos-physics';
 import { elementColour, primordial } from '@/lib/elements';
-import { Surface3D, type RenderArgs, type SurfaceRender } from './Surface3D';
+import { Surface3D, type RenderArgs, type SurfaceRender, type SurfaceProps, snap } from './Surface3D';
 
 /** One colour per family. The legend and the picture read the same table. */
 export const FAMILY_COLOUR: Record<string, string> = {
@@ -91,7 +91,7 @@ const LAYERS = [
 
 const INITIAL = { logA: -12, rate: 0.6, om: COSMO.omegaM, ol: COSMO.omegaL, h0: COSMO.H0, n: 160 };
 
-export function BigBangSurface() {
+export function BigBangSurface({ initial, fill }: SurfaceProps = {}) {
   const render = useCallback((a: RenderArgs): SurfaceRender => {
     const { W, H, cam, t, vals, layers } = a;
     const c: Cosmology = {
@@ -205,11 +205,11 @@ export function BigBangSurface() {
         nodes.push(
           <circle
             key={`p${i}`}
-            cx={p.x}
-            cy={p.y}
-            r={Math.max(0.5, 1.35 * p.f)}
+            cx={snap(p.x)}
+            cy={snap(p.y)}
+            r={snap(Math.max(0.5, 1.35 * p.f))}
             fill={fill}
-            opacity={opaque ? 0.42 + 0.35 * u : 0.7 + 0.25 * u}
+            opacity={snap(opaque ? 0.42 + 0.35 * u : 0.7 + 0.25 * u)}
           />
         );
       }
@@ -222,7 +222,7 @@ export function BigBangSurface() {
             key="fog"
             cx={W / 2}
             cy={H / 2}
-            r={R * scale * (cam.dist / Math.max(0.35, cam.dist))}
+            r={snap(R * scale * (cam.dist / Math.max(0.35, cam.dist)))}
             fill={blackbodyCSS(Math.min(40000, Math.max(1200, T)), 1)}
             opacity={0.13}
           />
@@ -252,7 +252,7 @@ export function BigBangSurface() {
         );
       }
       nodes.push(
-        <circle key="head" className="bbx-head" cx={at(logA)} cy={y0} r="3.4" />
+        <circle key="head" className="bbx-head" cx={snap(at(logA))} cy={snap(y0)} r="3.4" />
       );
     }
 
@@ -290,10 +290,11 @@ export function BigBangSurface() {
       title="The Big Bang · a thermal history"
       groups={GROUPS}
       layers={LAYERS}
-      initial={INITIAL}
+      initial={{ ...INITIAL, ...initial }}
       initialCam={{ yaw: 0.4, pitch: 0.3, dist: 9 }}
       distRange={[3, 40]}
       render={render}
+      fill={fill}
     />
   );
 }

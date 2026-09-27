@@ -326,7 +326,10 @@ console.log('\n=== saying a number the way a person would ===');
 console.log('\n=== the model names the object; the code owns the numbers ===');
 {
   ok('simulation is a kind', VIZ_KINDS.includes('simulation'));
-  ok('  with four objects', SIM_OBJECTS.length === 4);
+  // Every object the extractor may name must have a builder, and every builder
+  // must be nameable — a count catches a new one added on only one side.
+  ok('  with five objects', SIM_OBJECTS.length === 5);
+  ok('  the universe among them', SIM_OBJECTS.includes('big-bang'));
 
   const scene = (raw) => sanitizeViz({ kind: 'simulation', view: { xMin: -28, xMax: 28 }, ...raw });
 

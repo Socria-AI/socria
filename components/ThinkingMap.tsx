@@ -26,6 +26,7 @@ import { NodeGlyph } from './NodeGlyph';
 import { StatusMark } from './StatusMark';
 import { TeX, MathText } from './TeX';
 import { MathPlot } from './MathPlot';
+import { SceneSurface, isSimulation } from '@/components/surfaces/SceneSurface';
 import { MathViz } from './MathViz';
 import { MatrixLens } from './MatrixLens';
 import type { VizScene } from '@/lib/logos-viz';
@@ -612,13 +613,29 @@ export function ThinkingMap({
             without one it stays the static drawing it has always been. */}
         {lens === 'plot' &&
           (map.viz ? (
-            <MathViz
-              scene={map.viz}
-              width={size.w}
-              height={size.h}
-              guarded={guarded}
-              onSceneChange={onViz}
-            />
+            // A SIMULATED OBJECT GETS ITS OWN SURFACE, not the plot renderer.
+            //
+            // Everything else here is a picture of a formula, and MathViz draws
+            // those exactly right: orthographic, because a perspective camera
+            // makes equal quantities look unequal and a graph must not lie
+            // about that. An accretion disc is the opposite case — it is a
+            // thing at a place, and drawn flat with no camera and nothing
+            // passing behind anything it reads as a diagram of a black hole
+            // rather than one. The surfaces are the real ones; this is where
+            // the lens reaches them.
+            isSimulation(map.viz) ? (
+              <div className="lg-viz-surface">
+                <SceneSurface scene={map.viz} />
+              </div>
+            ) : (
+              <MathViz
+                scene={map.viz}
+                width={size.w}
+                height={size.h}
+                guarded={guarded}
+                onSceneChange={onViz}
+              />
+            )
           ) : (
             <MathPlot map={map} width={size.w} height={size.h} guarded={guarded} />
           ))}

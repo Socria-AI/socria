@@ -38,7 +38,7 @@ import {
   sayText,
   type BlackHole,
 } from '@/lib/logos-physics';
-import { Surface3D, type RenderArgs, type SurfaceRender } from './Surface3D';
+import { Surface3D, type RenderArgs, type SurfaceRender, type SurfaceProps, snap } from './Surface3D';
 
 /** The geometry in Schwarzschild radii, which is how the labels read. */
 function inRs(bh: BlackHole) {
@@ -104,7 +104,7 @@ const INITIAL = {
   rays: 6, spread: 2, bsel: 3.2, rate: 1,
 };
 
-export function BlackHoleSurface() {
+export function BlackHoleSurface({ initial, fill }: SurfaceProps = {}) {
   const render = useCallback((a: RenderArgs): SurfaceRender => {
     const { W, H, cam, t, vals, layers } = a;
     const bh = blackHole(vals.m * 1e6 * PHYS.Msun, Math.abs(vals.spin));
@@ -273,9 +273,9 @@ export function BlackHoleSurface() {
               key={`d${i}_${k}`}
               d={`${d(quad)} Z`}
               fill={blackbodyCSS(T, 1)}
-              fillOpacity={alpha}
+              fillOpacity={snap(alpha)}
               stroke={blackbodyCSS(T, 1)}
-              strokeOpacity={alpha * 0.55}
+              strokeOpacity={snap(alpha * 0.55)}
               strokeWidth={0.4}
             />
           );
@@ -302,11 +302,11 @@ export function BlackHoleSurface() {
           p.depth,
           <circle
             key={`m${i}`}
-            cx={p.x}
-            cy={p.y}
-            r={Math.max(0.7, (1.7 - 1.0 * ((r - rIn) / Math.max(0.1, rOut - rIn))) * p.f)}
+            cx={snap(p.x)}
+            cy={snap(p.y)}
+            r={snap(Math.max(0.7, (1.7 - 1.0 * ((r - rIn) / Math.max(0.1, rOut - rIn))) * p.f))}
             fill={blackbodyCSS(T, 1)}
-            opacity={Math.min(1, 0.4 + 0.3 * Math.cbrt(boost))}
+            opacity={snap(Math.min(1, 0.4 + 0.3 * Math.cbrt(boost)))}
           />
         );
       }
@@ -351,7 +351,7 @@ export function BlackHoleSurface() {
     // ball rather than a hole punched in the page. Hidden-line removal is the
     // same occlusion test everything else here uses.
     const Rh = g.horizon;
-    put(centre.depth, <circle key="h" className="bhx-horizon" cx={centre.x} cy={centre.y} r={bodyR} />);
+    put(centre.depth, <circle key="h" className="bhx-horizon" cx={snap(centre.x)} cy={snap(centre.y)} r={snap(bodyR)} />);
     const wire: React.ReactNode[] = [];
     for (let li = 1; li <= 5; li++) {
       const lat = -Math.PI / 2 + (li * Math.PI) / 6;
@@ -378,7 +378,7 @@ export function BlackHoleSurface() {
     // The shadow: what is actually dark to a distant observer, √27 r_g wide —
     // 2.6 times the horizon, because light passing near it is bent in. Drawn
     // flat to the sky, because that is what it is: an apparent size.
-    put(-1e9, <circle key="sh" className="bhx-shadow" cx={centre.x} cy={centre.y} r={g.bc * scale * centre.f} />);
+    put(-1e9, <circle key="sh" className="bhx-shadow" cx={snap(centre.x)} cy={snap(centre.y)} r={snap(g.bc * scale * centre.f)} />);
 
     // ── the light, integrated ──────────────────────────────────────
     let captured = 0;
@@ -408,7 +408,7 @@ export function BlackHoleSurface() {
           const ph = ((t * 0.18 + i * 0.17) % 1 + 1) % 1;
           const q = pts[Math.min(pts.length - 1, Math.floor(ph * pts.length))];
           if (!hidden(q)) {
-            put(q.depth, <circle key={`rd${i}`} className={`bhx-dot${ray.captured ? ' lost' : ''}`} cx={q.x} cy={q.y} r={2.2} />);
+            put(q.depth, <circle key={`rd${i}`} className={`bhx-dot${ray.captured ? ' lost' : ''}`} cx={snap(q.x)} cy={snap(q.y)} r={2.2} />);
           }
         }
       }
@@ -443,7 +443,7 @@ export function BlackHoleSurface() {
               className="bhx-leader"
               d={`M${p.x.toFixed(1)},${p.y.toFixed(1)} L${(lx - Math.cos(bearing) * 5).toFixed(1)},${(ly - Math.sin(bearing) * 5).toFixed(1)}`}
             />
-            <text className={`sfx-l ${cls}`} x={lx} y={ly} textAnchor="middle">
+            <text className={`sfx-l ${cls}`} x={snap(lx)} y={snap(ly)} textAnchor="middle">
               {text}
             </text>
           </g>
@@ -476,7 +476,7 @@ export function BlackHoleSurface() {
       title="Black hole · Kerr geometry"
       groups={GROUPS}
       layers={LAYERS}
-      initial={INITIAL}
+      initial={{ ...INITIAL, ...initial }}
       // FAR ENOUGH OUT TO BE LOOKING AT IT. `dist` is in the same units as the
       // radii, so 15 put the eye a quarter of a disc-width from the near edge:
       // the near side was magnified nine times over the far side and the whole
@@ -485,6 +485,7 @@ export function BlackHoleSurface() {
       initialCam={{ yaw: 0.5, pitch: 0.62, dist: 48 }}
       distRange={[16, 260]}
       render={render}
+      fill={fill}
     />
   );
 }
