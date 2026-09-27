@@ -78,6 +78,32 @@ console.log('\n=== Core 4 is documented, and documented honestly ===');
   ok('  and the cold start', /starts flat|first message there is no record/i.test(src));
   ok('  and that no human has rated it', /no human rater|No human rater/i.test(src));
 
+  // The prompt test. The page may describe it, and may not put a number on
+  // it — the run kept no counts, and a rate quoted from a qualitative result
+  // is a fabrication with a citation attached.
+  ok('  describes the three arms of the prompt test',
+    /frozen/i.test(src) && /independent imitation/i.test(src) && /clean context/i.test(src));
+  ok('  says the frozen prompt could not be improved afterwards',
+    /not.{0,40}allowed to be improved|not<\/em> allowed to be improved/i.test(src));
+  ok('  reports the unflattering half: the imitation was good',
+    /imitated Core 4/i.test(src) && /surprisingly/i.test(src));
+  ok('  and states the claim it actually supports',
+    /Prompts break/.test(src) && /a prompt can/i.test(src));
+  ok('  names the escalation without repeating the abuse',
+    /aggressively and abusively/.test(src) && !/\bf+u+c+k/i.test(src));
+  ok('  names the mirror failure as the next benchmark',
+    /answer, explain, calculate, research, retrieve, verify or\s*\n?\s*<em>|answer, explain, calculate/i.test(src));
+  ok('  and leaves the partner question open', /open question/i.test(src));
+  ok('  quotes no rate from a run that kept no counts',
+    !/\d+%[^<]{0,40}(pressure|imitation|prompt arm)/i.test(src));
+
+  const experiments = read('docs/CORE-4-EXPERIMENTS.md');
+  ok('  the internal record carries it as an experiment', /\| E19 \|/.test(experiments));
+  ok('  with the under-help benchmark after it', /\| E20 \|/.test(experiments));
+  ok('  and UUCR after that', /\| E21 \|/.test(experiments));
+  ok('  and says plainly that no rate may be quoted from it',
+    /no rate may be quoted/i.test(experiments) && /no rate may be quoted/i.test(read('docs/CORE-4-EVALS.md')));
+
   // Numbers on a docs page must match the source of truth for them.
   const evals = read('docs/CORE-4-EVALS.md');
   ok('  the question rate it quotes is the measured one',
