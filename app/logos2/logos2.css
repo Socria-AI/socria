@@ -1,0 +1,151 @@
+/* app/logos2/logos2.css — the workspace, and the panes the reader arranges. */
+
+.l2 {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  height: 100vh;
+  height: 100dvh;
+  background: var(--lg-paper, #F5F3EB);
+  color: var(--lg-ink, #23241F);
+  font-family: var(--sans);
+  overflow: hidden;
+}
+.l2-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 9px 16px;
+  border-bottom: 1px solid var(--lg-line, rgba(53, 70, 32, 0.14));
+  background: var(--lg-panel, #FAF8F2);
+}
+.l2-brand { font-family: var(--serif); font-size: 1.15rem; letter-spacing: -0.01em; }
+.l2-restore { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.l2-hint { font-size: 11px; color: var(--lg-ink-40, rgba(35, 36, 31, 0.4)); }
+.l2-chip {
+  font: inherit; font-size: 10.5px; padding: 4px 11px; border-radius: 999px; cursor: pointer;
+  border: 1px dashed var(--lg-ink-24, rgba(35, 36, 31, 0.24)); background: transparent;
+  color: var(--lg-ink-60, rgba(35, 36, 31, 0.6)); transition: all 0.18s;
+}
+.l2-chip:hover {
+  border-style: solid; border-color: var(--lg-primary, #354620);
+  color: var(--lg-primary, #354620); background: #fff;
+}
+
+.l2-body { display: flex; min-height: 0; min-width: 0; }
+.l2-pane {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+  background: var(--lg-panel, #FAF8F2);
+  border-right: 1px solid var(--lg-line, rgba(53, 70, 32, 0.14));
+}
+.l2-col {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: grid;
+  grid-auto-rows: minmax(0, 1fr);
+  gap: 0;
+}
+.l2-col .l2-pane { border-right: 0; border-bottom: 1px solid var(--lg-line, rgba(53, 70, 32, 0.14)); }
+.l2-col .l2-pane:last-child { border-bottom: 0; }
+.l2-rail { flex: none; }
+.l2-chat { min-width: 0; }
+
+.l2-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--lg-line, rgba(53, 70, 32, 0.14));
+}
+.l2-title {
+  font-size: 10.5px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase;
+  color: var(--lg-ink-60, rgba(35, 36, 31, 0.6)); white-space: nowrap; overflow: hidden;
+  text-overflow: ellipsis;
+}
+.l2-x {
+  font: inherit; font-size: 15px; line-height: 1; width: 22px; height: 22px; flex: none;
+  border-radius: 50%; border: 1px solid transparent; background: transparent; cursor: pointer;
+  color: var(--lg-ink-40, rgba(35, 36, 31, 0.4)); transition: all 0.16s;
+}
+.l2-x:hover {
+  color: var(--lg-tension, #9C5B3C);
+  border-color: var(--lg-line, rgba(53, 70, 32, 0.14));
+  background: #fff;
+}
+/* A FLEX COLUMN, not a block.
+ *
+ * The Thinking Map's own wrapper is `flex: 1` (app/globals.css .lg-map-wrap),
+ * which resolves to no height at all inside a plain block — so the map mounted,
+ * styled itself correctly, and drew into a zero-high canvas. Every pane's
+ * contents get a column to grow into instead. */
+.l2-fill {
+  min-height: 0;
+  min-width: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+}
+.l2-fill > * { min-height: 0; }
+
+/* the dividers */
+.l2-split {
+  flex: none; width: 7px; cursor: col-resize; background: transparent;
+  border-right: 1px solid var(--lg-line, rgba(53, 70, 32, 0.14));
+  transition: background 0.16s;
+}
+.l2-split:hover { background: rgba(53, 70, 32, 0.08); }
+
+.l2-empty {
+  flex: 1; display: grid; place-content: center; gap: 12px; justify-items: center;
+  color: var(--lg-ink-40, rgba(35, 36, 31, 0.4));
+}
+.l2-empty p { font-family: var(--serif); font-size: 1.3rem; margin: 0; }
+.l2-empty span { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+
+/* ── what sits in the panes on the demo route ───────────────────── */
+.l2-sessions { padding: 8px; display: flex; flex-direction: column; gap: 2px; }
+.l2-session {
+  padding: 8px 10px; border-radius: 8px; cursor: pointer; border: 1px solid transparent;
+  background: transparent; text-align: left; font: inherit; width: 100%;
+}
+.l2-session:hover { background: rgba(53, 70, 32, 0.05); }
+.l2-session.on { background: #fff; border-color: var(--lg-line, rgba(53, 70, 32, 0.14)); }
+.l2-session b { display: block; font-size: 13px; font-weight: 500; }
+.l2-session span { font-size: 11px; color: var(--lg-ink-40, rgba(35, 36, 31, 0.4)); }
+
+.l2-thread { padding: 18px 20px 8px; display: flex; flex-direction: column; gap: 16px; }
+.l2-msg { max-width: 62ch; }
+.l2-msg.them {
+  align-self: flex-end; background: #fff; border: 1px solid var(--lg-line, rgba(53, 70, 32, 0.14));
+  border-radius: 12px; padding: 11px 14px; font-size: 14px; line-height: 1.55;
+}
+.l2-msg.socria { font-size: 15px; line-height: 1.62; color: var(--lg-ink, #23241F); }
+.l2-composer {
+  position: sticky; bottom: 0; padding: 10px 20px 16px;
+  background: linear-gradient(to bottom, transparent, var(--lg-panel, #FAF8F2) 28%);
+}
+.l2-composer div {
+  display: flex; align-items: center; gap: 10px; background: #fff;
+  border: 1px solid var(--lg-line, rgba(53, 70, 32, 0.14)); border-radius: 999px; padding: 10px 16px;
+}
+.l2-composer input {
+  flex: 1; border: 0; outline: 0; font: inherit; font-size: 14px; background: transparent;
+  color: var(--lg-ink, #23241F);
+}
+.l2-composer input::placeholder { color: var(--lg-ink-40, rgba(35, 36, 31, 0.4)); }
+.l2-send {
+  flex: none; width: 30px; height: 30px; border-radius: 50%; border: 0; cursor: pointer;
+  background: var(--lg-primary, #354620); color: var(--lg-panel, #FAF8F2); font-size: 15px;
+}
+
+@media (max-width: 900px) {
+  .l2-body { flex-direction: column; overflow: auto; }
+  .l2-rail { width: auto !important; }
+  .l2-chat { flex: none !important; min-height: 46vh; }
+  .l2-split { display: none; }
+  .l2-col { min-height: 70vh; }
+}

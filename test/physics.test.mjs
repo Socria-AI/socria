@@ -26,8 +26,13 @@
 import {
   PHYS, B_CRIT, blackHole, iscoEnergy, ergosphereAt, orbitPeriod, redshift, tidal,
   deflectionWeak, photonPath, orbit, speedAt, eccentricAnomaly, positionAt,
-  oscillator, oscillatorAt, projectile, say, ratio, percent,
+  oscillator, oscillatorAt, projectile, say, sayText, ratio, percent,
+  COSMO, ageNow, ageAt, gStar, hubbleAt, recombinationZ, lastScatteringZ, equalityZ,
+  heliumFraction, temperatureAt, kTeV, epochs, speciesAt,
+  gravityPreset, gravityRun, gravityStep, energy, recentre, barycentre,
+  discTemperature, eddingtonRate, observedTemperature, doppler, orbitalBeta, blackbodyRGB,
 } from './.tmp/logos-physics.mjs';
+import { ELEMENTS, element, bySymbol, elementColour, darkenForPaper, primordial } from './.tmp/elements.mjs';
 import { sanitizeViz, buildFrame, SIM_OBJECTS, VIZ_KINDS } from './.tmp/logos-viz.mjs';
 
 let pass = 0, fail = 0;
@@ -442,6 +447,184 @@ console.log('\n=== the drawing IS the physics, not a picture beside it ===');
   };
   ok('a captured ray is drawn all the way to the horizon', tip(3) < 2.05);
   ok('  and an escaping one is drawn off the far side', tip(9) > 40);
+}
+
+console.log('\n=== the universe, against what is measured ===');
+{
+  const c = COSMO;
+  // Every one of these is a published number, not one of ours.
+  okNear('the universe is 13.797 billion years old', ageNow(c) / PHYS.year / 1e9, 13.797, 0.002);
+  okNear('matter overtakes radiation at z = 3400', equalityZ(c), 3400, 0.01);
+  okNear('half the electrons are captured by z = 1380', recombinationZ(c), 1380, 0.02);
+  // RECOMBINATION AND LAST SCATTERING ARE NOT THE SAME EVENT, and conflating
+  // them is the commonest error in a cosmology timeline. The microwave
+  // background comes from the later one.
+  okNear('  but the fog only clears at z = 1090', lastScatteringZ(c), 1089.9, 0.01);
+  ok('  and that is later, not earlier', lastScatteringZ(c) < recombinationZ(c));
+  const als = 1 / (1 + lastScatteringZ(c));
+  okNear('  373,000 years after the start', ageAt(c, als) / PHYS.year / 1e3, 373, 0.02);
+  okNear('  at 2970 K', temperatureAt(c, als), 2970, 0.01);
+
+  // THE CHECK EVERY TEXTBOOK MAKES: kT ≈ 1 MeV at t ≈ 1 s. It only comes out
+  // right because the radiation density carries g_*(T); with g_* held at its
+  // present value this read 2.35 MeV.
+  let lo = 1e-12, hi = 1e-8;
+  for (let i = 0; i < 200; i++) { const m = Math.sqrt(lo * hi); if (ageAt(c, m) < 1) lo = m; else hi = m; }
+  okNear('kT is about 1 MeV one second in', kTeV(temperatureAt(c, Math.sqrt(lo * hi))) / 1e6, 0.9, 0.12);
+  okNear('g* above the top quark is 106.75', gStar(1.16e13), 106.75, 1e-9);
+  okNear('  10.75 between the muon and the electron', gStar(1.16e10), 10.75, 1e-9);
+  okNear('  and 3.38 today', gStar(c.T0), 3.38, 1e-9);
+
+  okNear('a quarter of the mass ends as helium', heliumFraction(), 0.245, 0.06);
+  ok('expansion accelerates today and decelerated early',
+    hubbleAt(c, 1) > 0 && hubbleAt(c, 1e-4) > hubbleAt(c, 1));
+
+  // The sliders have to MOVE these, or it is a timeline rather than a model.
+  const heavy = { ...c, omegaM: 0.6, omegaL: 0.4 };
+  ok('more matter moves equality earlier', equalityZ(heavy) > equalityZ(c));
+  ok('  and changes the age', Math.abs(ageNow(heavy) - ageNow(c)) / ageNow(c) > 0.05);
+  ok('  and moves last scattering', Math.abs(lastScatteringZ(heavy) - lastScatteringZ(c)) > 1);
+
+  const eps = epochs(c);
+  ok('the epochs run in order', eps.every((e, i) => i === 0 || e.a >= eps[i - 1].a));
+  ok('  and the Planck era is marked as not established', eps[0].speculative === true);
+  ok('  while nucleosynthesis is not', !eps.find((e) => e.id === 'nuc').speculative);
+  ok('quarks are free early and confined later',
+    speciesAt(c, 1e-12).some((s) => s.family === 'quark') && !speciesAt(c, 1).some((s) => s.family === 'quark'));
+  ok('atoms exist only after the fog clears',
+    !speciesAt(c, als * 0.5).some((s) => s.family === 'atom') && speciesAt(c, 1).some((s) => s.family === 'atom'));
+}
+
+console.log('\n=== gravity, stepped forward ===');
+{
+  // THE PROPERTY THAT MAKES IT WATCHABLE. A symplectic integrator's energy
+  // error oscillates; Euler's accumulates. Over six thousand steps that is the
+  // difference between an orbit and a spiral, and it is asserted rather than
+  // trusted.
+  for (const which of ['two', 'figure8', 'inner', 'binary', 'cluster']) {
+    const p = gravityPreset(which);
+    const b0 = recentre(p.bodies);
+    const E0 = energy(b0, p.eps);
+    const b1 = gravityRun(b0, p.dt, 6000, p.eps);
+    const drift = Math.abs((energy(b1, p.eps) - E0) / E0);
+    ok(`${which}: energy holds over 6000 steps`, drift < 1e-3, `${(drift * 100).toExponential(2)}%`);
+  }
+
+  // A circular orbit is the case with an exact answer, so it is the one the
+  // integrator can be marked against: after a full period it must be back.
+  const p = gravityPreset('two');
+  const b0 = recentre(p.bodies);
+  const T = 2 * Math.PI * Math.sqrt(PHYS.AU ** 3 / (PHYS.G * (PHYS.Msun + PHYS.Mearth)));
+  const steps = Math.round(T / p.dt);
+  const after = gravityRun(b0, T / steps, steps, p.eps);
+  const d0 = Math.hypot(b0[1].x - b0[0].x, b0[1].y - b0[0].y);
+  const d1 = Math.hypot(after[1].x - after[0].x, after[1].y - after[0].y);
+  okNear('one orbit returns to the same radius', d1, d0, 1e-4);
+  ok('  and to the same place', Math.hypot(after[1].x - b0[1].x, after[1].y - b0[1].y) < d0 * 0.02);
+
+  // Momentum is conserved exactly by the scheme, not approximately.
+  const c0 = barycentre(b0);
+  const c1 = barycentre(gravityRun(b0, p.dt, 500, p.eps));
+  ok('the system does not push itself', Math.abs(c1.px - c0.px) < Math.abs(c0.m * 1e-6) + 1e-9);
+  ok('recentring removes the drift', Math.abs(barycentre(recentre(b0)).px) < 1e-9 * b0[0].m);
+
+  // The figure eight is a real solution and must still be one after a while:
+  // all three masses equal, and the configuration bounded.
+  const f = gravityPreset('figure8');
+  const fb = gravityRun(recentre(f.bodies), f.dt, 9000, f.eps);
+  const span = Math.max(...fb.map((b) => Math.hypot(b.x, b.y)));
+  ok('the figure eight stays bounded', span < 3 * PHYS.AU, `${(span / PHYS.AU).toFixed(2)} AU`);
+  ok('  with its three masses equal', new Set(f.bodies.map((b) => b.m)).size === 1);
+}
+
+console.log('\n=== what a disc looks like, and why ===');
+{
+  const bh = blackHole(1e7 * PHYS.Msun, 0);
+  const mdot = eddingtonRate(bh, 0.1);
+  ok('the disc is cold at the inner edge, where there is no torque',
+    discTemperature(bh, bh.isco, mdot) === 0);
+  // The hottest ring is NOT the innermost: the profile peaks at (49/36)·r_in.
+  let best = 0, bestR = 0;
+  for (let f = 1.001; f < 6; f += 0.002) {
+    const T = discTemperature(bh, bh.isco * f, mdot);
+    if (T > best) { best = T; bestR = f; }
+  }
+  okNear('  and peaks at 49/36 of the inner radius', bestR, 49 / 36, 0.01);
+  ok('  then falls away outward', discTemperature(bh, bh.isco * 20, mdot) < best);
+
+  // A BIGGER HOLE IS A COOLER DISC. T goes as M^-1/4, which is why an AGN
+  // disc peaks in the ultraviolet and a stellar one in X-rays.
+  const small = blackHole(10 * PHYS.Msun, 0);
+  const tSmall = discTemperature(small, small.isco * 1.36, eddingtonRate(small, 0.1));
+  ok('a stellar hole runs far hotter than a supermassive one', tSmall > best * 10);
+
+  // The lopsidedness, which is the whole reason a real image looks the way it
+  // does: the approaching side is beamed about an order of magnitude brighter.
+  const near = doppler(0.3, 1);
+  const far = doppler(0.3, -1);
+  ok('the approaching side is brighter', near.boost > far.boost);
+  okNear('  by about twelve times at 0.3c', near.boost / far.boost, 11.9, 0.1);
+  ok('  and bluer', near.delta > 1 && far.delta < 1);
+  ok('gas at the ISCO of a still hole moves at about c/√6', Math.abs(orbitalBeta(bh, bh.isco) - 1 / Math.sqrt(6)) < 0.02);
+
+  // Observed temperature folds in the climb out of the well as well as the
+  // motion, so one ring at one emitted temperature is not one colour.
+  const a = observedTemperature(bh, bh.isco * 2, mdot, 1).T;
+  const b = observedTemperature(bh, bh.isco * 2, mdot, -1).T;
+  ok('one ring is two colours, near side and far', a > b * 1.3);
+  const rgbHot = blackbodyRGB(20000), rgbCool = blackbodyRGB(2000);
+  ok('hot is blue and cool is red', rgbHot[2] > rgbHot[0] && rgbCool[0] > rgbCool[2]);
+}
+
+console.log('\n=== the periodic table ===');
+{
+  ok('all 118 elements are there', ELEMENTS.length === 118);
+  ok('  numbered without a gap', ELEMENTS.every((e, i) => e.z === i + 1));
+  ok('  each with a colour', ELEMENTS.every((e) => /^#[0-9A-Fa-f]{6}$/.test(e.colour)));
+  ok('hydrogen is first and oganesson last', ELEMENTS[0].symbol === 'H' && ELEMENTS[117].symbol === 'Og');
+  okNear('carbon weighs 12.011', element(6).mass, 12.011, 1e-9);
+  okNear('  iron 55.845', bySymbol('Fe').mass, 55.845, 1e-9);
+  ok('lookup ignores case', bySymbol('fe').z === 26 && bySymbol('FE').z === 26);
+  ok('an unknown symbol is null, not a guess', bySymbol('Xx') === null && element(0) === null);
+
+  // THE CONVENTION IS THE POINT: a chemist reads these colours.
+  ok('oxygen is red', elementColour(8).toUpperCase() === '#FF0D0D');
+  ok('nitrogen is blue', elementColour(7).toUpperCase() === '#3050F8');
+  ok('sulfur is yellow', elementColour(16).toUpperCase() === '#FFFF30');
+  ok('carbon is grey', elementColour('C').toUpperCase() === '#909090');
+
+  // …but white hydrogen on cream paper is invisible, so the paper variant
+  // darkens anything too pale — by one rule, not by hand.
+  ok('hydrogen darkens for paper', elementColour('H', true) !== '#FFFFFF');
+  ok('  and so does helium', elementColour('He', true).toLowerCase() !== '#d9ffff');
+  ok('  while oxygen is left alone', darkenForPaper('#FF0D0D').toUpperCase() === '#FF0D0D');
+  const lum = (hex) => { const n = parseInt(hex.slice(1), 16);
+    return (0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255)) / 255; };
+  ok('nothing survives the paper rule too pale to see',
+    ELEMENTS.every((e) => lum(darkenForPaper(e.colour)) <= 0.63));
+
+  // What the Big Bang actually made: hydrogen, a quarter helium, and nothing
+  // heavier. Every carbon atom in a reader came later, in a star.
+  const mix = primordial(heliumFraction());
+  const total = mix.reduce((a, m) => a + m.fraction, 0);
+  okNear('the primordial mixture adds to one', total, 1, 1e-6);
+  ok('  and is only hydrogen, helium and a trace of lithium',
+    mix.every((m) => ['H', 'He', 'Li'].includes(m.symbol)));
+  ok('  with helium about a quarter by mass',
+    mix.find((m) => m.symbol === 'He').fraction > 0.2);
+}
+
+console.log('\n=== a number said two ways ===');
+{
+  ok('the LaTeX form carries notation', say(29532, 'm') === '29.5\\,\\mathrm{km}');
+  // An SVG <text> node is not KaTeX; feeding it the LaTeX printed the
+  // backslashes on the screen.
+  ok('the plain form carries none', sayText(29532, 'm') === '29.5 km', sayText(29532, 'm'));
+  ok('  and still picks the right unit', sayText(5.2 * PHYS.AU, 'm').endsWith('AU'));
+  ok('  including kelvin', sayText(6.17e-8, 'K') === '61.7 nK', sayText(6.17e-8, 'K'));
+  ok('  and fractions of c', sayText(PHYS.c / 2, 'm/s') === '0.500 c', sayText(PHYS.c / 2, 'm/s'));
+  ok('  with no LaTeX escape anywhere in it',
+    ['m', 's', 'kg', 'K', 'm/s', 'm/s2', 'W', 'J', 'N'].every((u) => !sayText(1234, u).includes('\\')));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

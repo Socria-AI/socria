@@ -77,6 +77,8 @@ export type Unit = 'm' | 's' | 'kg' | 'K' | 'm/s' | 'm/s2' | 'W' | 'J' | 'N' | '
 interface Step {
   /** how many SI units this one is */
   size: number;
+  /** the same unit as plain text, for anywhere that is not rendering LaTeX */
+  txt: string;
   /**
    * The magnitude at which this step takes over, when that is not its own
    * size. Only `c` needs it: half the speed of light is better said as 0.5 c
@@ -99,78 +101,78 @@ interface Step {
  */
 const LADDERS: Record<Unit, Step[]> = {
   m: [
-    { size: PHYS.pc, tex: '\\,\\mathrm{pc}' },
-    { size: PHYS.ly, tex: '\\,\\mathrm{ly}' },
-    { size: PHYS.AU, tex: '\\,\\mathrm{AU}' },
-    { size: PHYS.Rsun, tex: '\\,R_\\odot' },
-    { size: 1e3, tex: '\\,\\mathrm{km}' },
-    { size: 1, tex: '\\,\\mathrm{m}' },
-    { size: 1e-3, tex: '\\,\\mathrm{mm}' },
-    { size: 1e-6, tex: '\\,\\mu\\mathrm{m}' },
-    { size: 1e-9, tex: '\\,\\mathrm{nm}' },
+    { size: PHYS.pc, tex: '\\,\\mathrm{pc}', txt: 'pc' },
+    { size: PHYS.ly, tex: '\\,\\mathrm{ly}', txt: 'ly' },
+    { size: PHYS.AU, tex: '\\,\\mathrm{AU}', txt: 'AU' },
+    { size: PHYS.Rsun, tex: '\\,R_\\odot', txt: 'R☉' },
+    { size: 1e3, tex: '\\,\\mathrm{km}', txt: 'km' },
+    { size: 1, tex: '\\,\\mathrm{m}', txt: 'm' },
+    { size: 1e-3, tex: '\\,\\mathrm{mm}', txt: 'mm' },
+    { size: 1e-6, tex: '\\,\\mu\\mathrm{m}', txt: 'µm' },
+    { size: 1e-9, tex: '\\,\\mathrm{nm}', txt: 'nm' },
   ],
   s: [
-    { size: 1e9 * PHYS.year, tex: '\\,\\mathrm{Gyr}' },
-    { size: 1e6 * PHYS.year, tex: '\\,\\mathrm{Myr}' },
-    { size: PHYS.year, tex: '\\,\\mathrm{yr}' },
-    { size: 86400, tex: '\\,\\mathrm{d}' },
-    { size: 3600, tex: '\\,\\mathrm{h}' },
-    { size: 60, tex: '\\,\\mathrm{min}' },
-    { size: 1, tex: '\\,\\mathrm{s}' },
-    { size: 1e-3, tex: '\\,\\mathrm{ms}' },
-    { size: 1e-6, tex: '\\,\\mu\\mathrm{s}' },
+    { size: 1e9 * PHYS.year, tex: '\\,\\mathrm{Gyr}', txt: 'Gyr' },
+    { size: 1e6 * PHYS.year, tex: '\\,\\mathrm{Myr}', txt: 'Myr' },
+    { size: PHYS.year, tex: '\\,\\mathrm{yr}', txt: 'yr' },
+    { size: 86400, tex: '\\,\\mathrm{d}', txt: 'd' },
+    { size: 3600, tex: '\\,\\mathrm{h}', txt: 'h' },
+    { size: 60, tex: '\\,\\mathrm{min}', txt: 'min' },
+    { size: 1, tex: '\\,\\mathrm{s}', txt: 's' },
+    { size: 1e-3, tex: '\\,\\mathrm{ms}', txt: 'ms' },
+    { size: 1e-6, tex: '\\,\\mu\\mathrm{s}', txt: 'µs' },
   ],
   kg: [
-    { size: PHYS.Msun, tex: '\\,M_\\odot' },
-    { size: PHYS.Mearth, tex: '\\,M_\\oplus' },
-    { size: 1e3, tex: '\\,\\mathrm{t}' },
-    { size: 1, tex: '\\,\\mathrm{kg}' },
-    { size: 1e-3, tex: '\\,\\mathrm{g}' },
+    { size: PHYS.Msun, tex: '\\,M_\\odot', txt: 'M☉' },
+    { size: PHYS.Mearth, tex: '\\,M_\\oplus', txt: 'M⊕' },
+    { size: 1e3, tex: '\\,\\mathrm{t}', txt: 't' },
+    { size: 1, tex: '\\,\\mathrm{kg}', txt: 'kg' },
+    { size: 1e-3, tex: '\\,g', txt: 'g' },
   ],
   K: [
-    { size: 1e9, tex: '\\,\\mathrm{GK}' },
-    { size: 1e6, tex: '\\,\\mathrm{MK}' },
-    { size: 1e3, tex: '\\,\\mathrm{kK}' },
-    { size: 1, tex: '\\,\\mathrm{K}' },
-    { size: 1e-6, tex: '\\,\\mu\\mathrm{K}' },
-    { size: 1e-9, tex: '\\,\\mathrm{nK}' },
+    { size: 1e9, tex: '\\,\\mathrm{GK}', txt: 'GK' },
+    { size: 1e6, tex: '\\,\\mathrm{MK}', txt: 'MK' },
+    { size: 1e3, tex: '\\,\\mathrm{kK}', txt: 'kK' },
+    { size: 1, tex: '\\,\\mathrm{K}', txt: 'K' },
+    { size: 1e-6, tex: '\\,\\mu\\mathrm{K}', txt: 'µK' },
+    { size: 1e-9, tex: '\\,\\mathrm{nK}', txt: 'nK' },
   ],
   'm/s': [
-    { size: PHYS.c, from: 0.1 * PHYS.c, tex: '\\,c' },
-    { size: 1e3, tex: '\\,\\mathrm{km/s}' },
-    { size: 1, tex: '\\,\\mathrm{m/s}' },
+    { size: PHYS.c, from: 0.1 * PHYS.c, tex: '\\,c', txt: 'c' },
+    { size: 1e3, tex: '\\,\\mathrm{km/s}', txt: 'km/s' },
+    { size: 1, tex: '\\,\\mathrm{m/s}', txt: 'm/s' },
   ],
   // ACCELERATION IS NOT SPEED, and the ladder is where that gets confused: a
   // tidal stretch of 1.9 × 10⁸ m/s² came out as "61.9 c" while looking exactly
   // like a number somebody meant. Earth gravity is the unit anybody actually
   // reasons in for this quantity.
   'm/s2': [
-    { size: PHYS.g0, tex: '\\,g' },
-    { size: 1, tex: '\\,\\mathrm{m/s^2}' },
+    { size: PHYS.g0, tex: '\\,g', txt: 'g' },
+    { size: 1, tex: '\\,\\mathrm{m/s^2}', txt: 'm/s^2' },
   ],
   W: [
-    { size: 1e12, tex: '\\,\\mathrm{TW}' },
-    { size: 1e9, tex: '\\,\\mathrm{GW}' },
-    { size: 1e6, tex: '\\,\\mathrm{MW}' },
-    { size: 1e3, tex: '\\,\\mathrm{kW}' },
-    { size: 1, tex: '\\,\\mathrm{W}' },
+    { size: 1e12, tex: '\\,\\mathrm{TW}', txt: 'TW' },
+    { size: 1e9, tex: '\\,\\mathrm{GW}', txt: 'GW' },
+    { size: 1e6, tex: '\\,\\mathrm{MW}', txt: 'MW' },
+    { size: 1e3, tex: '\\,\\mathrm{kW}', txt: 'kW' },
+    { size: 1, tex: '\\,\\mathrm{W}', txt: 'W' },
   ],
   J: [
-    { size: 1e15, tex: '\\,\\mathrm{PJ}' },
-    { size: 1e12, tex: '\\,\\mathrm{TJ}' },
-    { size: 1e9, tex: '\\,\\mathrm{GJ}' },
-    { size: 1e6, tex: '\\,\\mathrm{MJ}' },
-    { size: 1e3, tex: '\\,\\mathrm{kJ}' },
-    { size: 1, tex: '\\,\\mathrm{J}' },
+    { size: 1e15, tex: '\\,\\mathrm{PJ}', txt: 'PJ' },
+    { size: 1e12, tex: '\\,\\mathrm{TJ}', txt: 'TJ' },
+    { size: 1e9, tex: '\\,\\mathrm{GJ}', txt: 'GJ' },
+    { size: 1e6, tex: '\\,\\mathrm{MJ}', txt: 'MJ' },
+    { size: 1e3, tex: '\\,\\mathrm{kJ}', txt: 'kJ' },
+    { size: 1, tex: '\\,\\mathrm{J}', txt: 'J' },
   ],
   N: [
-    { size: 1e9, tex: '\\,\\mathrm{GN}' },
-    { size: 1e6, tex: '\\,\\mathrm{MN}' },
-    { size: 1e3, tex: '\\,\\mathrm{kN}' },
-    { size: 1, tex: '\\,\\mathrm{N}' },
+    { size: 1e9, tex: '\\,\\mathrm{GN}', txt: 'GN' },
+    { size: 1e6, tex: '\\,\\mathrm{MN}', txt: 'MN' },
+    { size: 1e3, tex: '\\,\\mathrm{kN}', txt: 'kN' },
+    { size: 1, tex: '\\,\\mathrm{N}', txt: 'N' },
   ],
-  rad: [{ size: 1, tex: '\\,\\mathrm{rad}' }],
-  none: [{ size: 1, tex: '' }],
+  rad: [{ size: 1, tex: '\\,\\mathrm{rad}', txt: 'rad' }],
+  none: [{ size: 1, tex: '', txt: '' }],
 };
 
 /** Three significant figures, without an exponent when one is not needed. */
@@ -201,10 +203,30 @@ function sig(v: number, digits = 3): string {
  */
 export function say(value: number, unit: Unit, digits = 3): string {
   if (!Number.isFinite(value)) return '—';
+  const { n, step } = pick(value, unit);
+  return `${sig(n, digits)}${step.tex}`;
+}
+
+function pick(value: number, unit: Unit) {
   const ladder = LADDERS[unit];
   const mag = Math.abs(value);
   const step = ladder.find((s) => mag >= (s.from ?? s.size)) ?? ladder[ladder.length - 1];
-  return `${sig(value / step.size, digits)}${step.tex}`;
+  return { n: value / step.size, step };
+}
+
+/**
+ * The same number, as PLAIN TEXT rather than LaTeX.
+ *
+ * `say` renders for a KaTeX readout. An SVG <text> node is not KaTeX, and
+ * feeding it the LaTeX put "157\\,\\mathrm{kK}" on the screen, backslashes and
+ * all — a unit system leaking its notation into a picture. Same ladder, same
+ * significant figures, a suffix a person can read.
+ */
+export function sayText(value: number, unit: Unit, digits = 3): string {
+  if (!Number.isFinite(value)) return '—';
+  const { n, step } = pick(value, unit);
+  const body = sig(n, digits).replace(/\\times 10\^\{(-?\d+)\}/, '×10^$1');
+  return `${body}${step.txt ? ' ' + step.txt : ''}`;
 }
 
 /** A plain ratio or count, with no unit attached. */
@@ -833,4 +855,669 @@ export function projectile(i: ProjectileInput): Projectile {
     vacuumApex: (i.v0 * Math.sin(th)) ** 2 / (2 * g),
     vacuum,
   };
+}
+
+// ════════════════════════════════════════════════════════════════════
+// WHAT AN ACCRETION DISC LOOKS LIKE, AND WHY
+// ════════════════════════════════════════════════════════════════════
+//
+// The disc is the part of a black hole picture people actually recognise, and
+// almost every drawing of one gets its colour from taste. It does not come
+// from taste. A thin disc radiates as a blackbody whose temperature follows
+// from the mass falling through it (Shakura–Sunyaev), which makes the inner
+// edge blue-white and the outer edge red — and then the near side, coming
+// toward you at a good fraction of c, is beamed brighter and blued further
+// while the far side is dimmed and reddened. That asymmetry is the single
+// most recognisable feature of a real image of one, and it is arithmetic.
+
+/**
+ * Effective temperature of a thin disc at radius r, in kelvin.
+ *
+ * T(r) = [ 3GMṀ / (8πσr³) · (1 − √(r_in/r)) ]^¼ — the standard thin-disc
+ * profile. The bracket goes to zero at the inner edge, because there is no
+ * torque there to dissipate: the disc's hottest ring is not its innermost one
+ * but sits a little outside it, at r = (49/36)·r_in, which is a detail worth
+ * keeping because it is visible.
+ */
+export function discTemperature(bh: BlackHole, r: number, mdot: number): number {
+  if (r <= bh.isco) return 0;
+  const sigma = 5.670374419e-8;
+  const br = 1 - Math.sqrt(bh.isco / r);
+  const t4 = ((3 * PHYS.G * bh.M * mdot) / (8 * Math.PI * sigma * r ** 3)) * br;
+  return t4 > 0 ? Math.pow(t4, 0.25) : 0;
+}
+
+/** Accretion rate, in kg/s, that radiates a given fraction of the Eddington luminosity. */
+export function eddingtonRate(bh: BlackHole, fraction = 0.1): number {
+  // L_Edd = 4πGMm_p c / σ_T, and Ṁ = L / ηc².
+  const mp = 1.67262192369e-27;
+  const sigmaT = 6.6524587321e-29;
+  const lEdd = (4 * Math.PI * PHYS.G * bh.M * mp * PHYS.c) / sigmaT;
+  return (fraction * lEdd) / (Math.max(0.01, bh.efficiency) * PHYS.c * PHYS.c);
+}
+
+/**
+ * How much brighter, and how much bluer, a patch of the disc looks.
+ *
+ * Special relativity does all of it. A patch moving with speed β at angle θ to
+ * the line of sight has Doppler factor
+ *
+ *     δ = 1 / [ γ(1 − β cos θ) ]
+ *
+ * and a blackbody seen through it looks δ times hotter, while its surface
+ * brightness goes as δ⁴ — the beaming exponent for a continuum source. The
+ * near side of the disc therefore blazes and the far side nearly vanishes,
+ * which is not an artistic choice about a black hole picture, it is the
+ * reason the real ones look lopsided.
+ *
+ * `cosTheta` is +1 for a patch coming straight at the observer.
+ */
+export function doppler(beta: number, cosTheta: number): { delta: number; boost: number } {
+  const b = Math.min(0.999, Math.max(0, beta));
+  const gamma = 1 / Math.sqrt(1 - b * b);
+  const delta = 1 / (gamma * (1 - b * cosTheta));
+  return { delta, boost: delta ** 4 };
+}
+
+/** Orbital speed as a fraction of c for a circular orbit at r (Schwarzschild). */
+export function orbitalBeta(bh: BlackHole, r: number): number {
+  // v = √(GM/r) in these coordinates; at the ISCO of a still hole that is c/√6.
+  return Math.min(0.999, Math.sqrt((PHYS.G * bh.M) / r) / PHYS.c);
+}
+
+/**
+ * A blackbody's colour, as sRGB in 0…255.
+ *
+ * Planck's law through the CIE colour-matching functions is the right way and
+ * is a hundred lines of tabulated data; this is the standard piecewise fit to
+ * the same curve (good to a few percent over 1000–40000 K), which is far
+ * inside what a screen can show. Below 1000 K it clamps to a dull red rather
+ * than going black, because a disc ring that renders as the background is a
+ * ring the reader will read as absent rather than as cold.
+ */
+export function blackbodyRGB(kelvin: number): [number, number, number] {
+  const t = Math.min(40000, Math.max(1000, kelvin)) / 100;
+  const clamp255 = (v: number) => Math.round(Math.min(255, Math.max(0, v)));
+  const r = t <= 66 ? 255 : 329.698727446 * Math.pow(t - 60, -0.1332047592);
+  const g = t <= 66
+    ? 99.4708025861 * Math.log(t) - 161.1195681661
+    : 288.1221695283 * Math.pow(t - 60, -0.0755148492);
+  const b = t >= 66 ? 255 : t <= 19 ? 0 : 138.5177312231 * Math.log(t - 10) - 305.0447927307;
+  return [clamp255(r), clamp255(g), clamp255(b)];
+}
+
+/**
+ * What temperature a patch of disc APPEARS to have, from far away.
+ *
+ * Three things act on it and all three are real: the blackbody temperature it
+ * radiates at, the Doppler factor from its orbital motion, and the
+ * gravitational redshift of climbing out of the hole's well, √(1 − r_s/r).
+ * Together they are why one side of a real image is blue-white and the other
+ * is dim and red — a variation of two or three across a ring that is all at
+ * one emitted temperature.
+ */
+export function observedTemperature(
+  bh: BlackHole,
+  r: number,
+  mdot: number,
+  cosTheta: number
+): { T: number; boost: number } {
+  const emitted = discTemperature(bh, r, mdot);
+  const grav = Math.sqrt(Math.max(0, 1 - bh.rs / r));
+  const { delta, boost } = doppler(orbitalBeta(bh, r), cosTheta);
+  return { T: emitted * delta * grav, boost: boost * grav ** 4 };
+}
+
+/** `blackbodyRGB` as a CSS colour, with an alpha for how bright it is. */
+export function blackbodyCSS(kelvin: number, alpha = 1): string {
+  const [r, g, b] = blackbodyRGB(kelvin);
+  return `rgba(${r}, ${g}, ${b}, ${Math.min(1, Math.max(0.04, alpha)).toFixed(3)})`;
+}
+
+// ════════════════════════════════════════════════════════════════════
+// THE BIG BANG — a thermal history, integrated
+// ════════════════════════════════════════════════════════════════════
+//
+// WHAT THIS IS AND IS NOT. It is the standard hot Big Bang: a radiation-then-
+// matter-then-Λ universe whose expansion follows the Friedmann equation, whose
+// temperature follows from the expansion, and whose contents change as that
+// temperature falls past the mass of each species. Everything below is
+// computed from six numbers — the density parameters and H₀ — rather than
+// drawn from a table of epochs.
+//
+// It is NOT a simulation of structure, and it does not pretend to be. Nothing
+// here integrates a fluid or forms a galaxy. What it does is the thing the
+// pictures in books cannot: let somebody move Ω_m or Ω_Λ and watch
+// recombination move, or turn the radiation content up and watch matter–
+// radiation equality slide past it.
+//
+// BEFORE ~10⁻¹² s THE PHYSICS IS NOT SETTLED, and the model says so rather
+// than drawing confident lines through it. The electroweak epoch and anything
+// earlier is marked `speculative`, which the renderer draws differently. A
+// model that renders the Planck era in the same ink as nucleosynthesis is
+// making a claim nobody can make.
+
+export const COSMO = {
+  /** Hubble constant today, km/s/Mpc */
+  H0: 67.66,
+  /** matter density parameter */
+  omegaM: 0.3111,
+  /** dark energy */
+  omegaL: 0.6889,
+  /** photons + neutrinos today */
+  omegaR: 9.182e-5,
+  /** CMB temperature today, K */
+  T0: 2.7255,
+  /** baryon-to-photon ratio */
+  eta: 6.1e-10,
+} as const;
+
+export interface Cosmology {
+  H0: number;
+  omegaM: number;
+  omegaL: number;
+  omegaR: number;
+  T0: number;
+}
+
+/**
+ * Effective relativistic degrees of freedom at temperature T.
+ *
+ * WHY THIS IS NOT OPTIONAL. Radiation density is g_* times a constant times
+ * T⁴, and g_* is 3.38 today but 106.75 above the top quark — a factor of
+ * thirty. Treating it as constant, which is what "Ω_r a⁻⁴" alone does, puts
+ * the first second of the universe in the wrong place by a factor of a few:
+ * the check everybody knows, kT ≈ 1 MeV at t ≈ 1 s, came out at 2.35 MeV
+ * before this existed.
+ *
+ * A staircase, at the standard thresholds, in the standard order: each species
+ * drops out of the count as kT falls below its mass. It ignores the smooth
+ * shape of each transition and the small reheating of the photons when the
+ * electrons go — which also makes T ∝ 1/a slightly wrong across e± annihilation
+ * — and neither is visible at the resolution of a picture.
+ */
+export function gStar(kelvin: number): number {
+  const mev = kTeV(kelvin) / 1e6;
+  if (mev > 300) return 106.75;   // everything, above the top quark
+  if (mev > 180) return 96.25;    // minus top
+  if (mev > 80e3 / 1e3) return 86.25;
+  if (mev > 4200) return 75.75;   // minus the heavy bosons
+  if (mev > 1777) return 72.25;   // minus bottom
+  if (mev > 1270) return 61.75;   // minus tau
+  if (mev > 150) return 51.25;    // minus charm — still a quark–gluon plasma
+  if (mev > 105.7) return 17.25;  // hadrons: pions, muons, e±, ν, γ
+  if (mev > 0.511) return 10.75;  // muons gone: e±, three ν, γ
+  return 3.38;                    // after e± annihilation: γ and neutrinos
+}
+
+/** H₀ in s⁻¹. */
+export function hubbleSI(H0: number): number {
+  return (H0 * 1000) / PHYS.pc / 1e6;
+}
+
+/**
+ * The Friedmann equation, as a function of the scale factor.
+ *
+ * H(a)² = H₀²[ Ω_r a⁻⁴ + Ω_m a⁻³ + Ω_Λ ] — the whole expansion history in one
+ * line, and the reason the epochs below do not have to be put in by hand: the
+ * a⁻⁴ term dominates early, the a⁻³ term takes over at equality, and Λ takes
+ * over at the end, each because of its own exponent.
+ */
+export function hubbleAt(c: Cosmology, a: number): number {
+  const x = Math.max(1e-40, a);
+  const h0 = hubbleSI(c.H0);
+  // The radiation term carries g_*(T)/g_*(today): without it the first second
+  // lands in the wrong place (see gStar).
+  const g = gStar(c.T0 / x) / 3.38;
+  return h0 * Math.sqrt((c.omegaR * g) / x ** 4 + c.omegaM / x ** 3 + c.omegaL);
+}
+
+/**
+ * Cosmic time at scale factor a, in seconds — by integrating da/(aH).
+ *
+ * Logarithmic in a, because the interesting range spans forty orders of
+ * magnitude and a linear grid would spend every step in the last billion
+ * years. Simpson's rule over that log grid is good to well under a percent
+ * against the analytic radiation- and matter-dominated limits, which the tests
+ * check at both ends.
+ */
+export function ageAt(c: Cosmology, a: number, steps = 2000): number {
+  const hi = Math.log(Math.max(1e-40, a));
+  const lo = Math.log(1e-40);
+  const h = (hi - lo) / steps;
+  // t = ∫ da/(aH) = ∫ dlna / H
+  const f = (lna: number) => 1 / hubbleAt(c, Math.exp(lna));
+  let sum = f(lo) + f(hi);
+  for (let i = 1; i < steps; i++) sum += f(lo + i * h) * (i % 2 ? 4 : 2);
+  return (sum * h) / 3;
+}
+
+/** The age of the universe now, in seconds. */
+export function ageNow(c: Cosmology): number {
+  return ageAt(c, 1);
+}
+
+/** Radiation temperature at scale factor a, in kelvin: T = T₀/a. */
+export function temperatureAt(c: Cosmology, a: number): number {
+  return c.T0 / Math.max(1e-40, a);
+}
+
+/** Energy per particle at temperature T, in electronvolts. */
+export function kTeV(kelvin: number): number {
+  return (PHYS.kB * kelvin) / 1.602176634e-19;
+}
+
+/**
+ * When the universe stopped being opaque.
+ *
+ * Recombination is a Saha problem, and solving it properly is worth the
+ * fifteen lines: the answer moves when the baryon density moves, which is
+ * exactly what a reader turning Ω_m wants to see. The ionised fraction x obeys
+ *
+ *     x²/(1−x) = (1/n_b)(m_e kT/2πħ²)^{3/2} e^{−B/kT},   B = 13.6 eV
+ *
+ * and "recombination" is where x falls to a half. Reported as a redshift,
+ * because that is the number everyone quotes (≈1100) and it is the one that
+ * can be checked.
+ */
+export function recombinationZ(c: Cosmology, etaB = COSMO.eta): number {
+  const me = 9.1093837015e-31;
+  const B = 13.605693 * 1.602176634e-19;
+  const x = (z: number) => {
+    const T = c.T0 * (1 + z);
+    const kT = PHYS.kB * T;
+    // photon number density, then baryons from the ratio
+    const nGamma = 0.2436 * (kT / (PHYS.hbar * PHYS.c)) ** 3;
+    const nB = etaB * nGamma;
+    const rhs =
+      (1 / nB) * Math.pow((me * kT) / (2 * Math.PI * PHYS.hbar ** 2), 1.5) * Math.exp(-B / kT);
+    if (!Number.isFinite(rhs)) return rhs > 0 ? 1 : 0;
+    // x²/(1−x) = rhs  →  x = (−rhs + √(rhs² + 4rhs))/2
+    return (-rhs + Math.sqrt(rhs * rhs + 4 * rhs)) / 2;
+  };
+  // x falls with z; bisect for x = 0.5.
+  let lo = 200;
+  let hi = 5000;
+  for (let i = 0; i < 80; i++) {
+    const mid = (lo + hi) / 2;
+    if (x(mid) > 0.5) hi = mid;
+    else lo = mid;
+  }
+  return (lo + hi) / 2;
+}
+
+/**
+ * LAST SCATTERING, which is not the same event as recombination.
+ *
+ * `recombinationZ` finds where half the electrons have been captured — the
+ * Saha half-ionisation point, z ≈ 1380. The number everybody quotes, z ≈ 1090,
+ * is later: it is where the optical depth to Thomson scattering falls through
+ * one and the photons stop being scattered at all. Conflating them is the
+ * commonest error in a cosmology timeline, so both are here under their own
+ * names, and it is THIS one the microwave background comes from.
+ *
+ * Hu & Sugiyama's fitting formula, which is accurate to a fraction of a per
+ * cent over the parameter range anybody will move these sliders across, and —
+ * the point — moves when the densities move.
+ */
+export function lastScatteringZ(c: Cosmology, omegaB = 0.04897): number {
+  const h = c.H0 / 100;
+  const wb = Math.max(1e-4, omegaB * h * h);
+  const wm = Math.max(1e-3, c.omegaM * h * h);
+  const g1 = (0.0783 * Math.pow(wb, -0.238)) / (1 + 39.5 * Math.pow(wb, 0.763));
+  const g2 = 0.56 / (1 + 21.1 * Math.pow(wb, 1.81));
+  return 1048 * (1 + 0.00124 * Math.pow(wb, -0.738)) * (1 + g1 * Math.pow(wm, g2));
+}
+
+/** Matter–radiation equality, as a redshift: where Ω_m a⁻³ = Ω_r a⁻⁴. */
+export function equalityZ(c: Cosmology): number {
+  return c.omegaM / c.omegaR - 1;
+}
+
+/**
+ * The particle content at a temperature, as what a reader would name.
+ *
+ * Species appear when kT is comparable to what it costs to make them and
+ * vanish when it is not, so this is thresholds rather than a table of eras —
+ * turn the temperature and the contents change for a reason.
+ */
+export interface Species {
+  id: string;
+  label: string;
+  /** roughly what kT it takes to have these about, in eV */
+  threshold: number;
+  /** what it is, which is what the colour is keyed to */
+  family: 'quark' | 'gluon' | 'lepton' | 'boson' | 'photon' | 'neutrino' | 'hadron' | 'nucleus' | 'atom';
+}
+
+export const SPECIES: Species[] = [
+  { id: 'quark', label: 'quarks', threshold: 2e8, family: 'quark' },
+  { id: 'gluon', label: 'gluons', threshold: 2e8, family: 'gluon' },
+  { id: 'wz', label: 'W, Z', threshold: 8e10, family: 'boson' },
+  { id: 'higgs', label: 'Higgs', threshold: 1.25e11, family: 'boson' },
+  { id: 'tau', label: 'taus', threshold: 1.777e9, family: 'lepton' },
+  { id: 'muon', label: 'muons', threshold: 1.057e8, family: 'lepton' },
+  { id: 'electron', label: 'electrons', threshold: 5.11e5, family: 'lepton' },
+  { id: 'photon', label: 'photons', threshold: 0, family: 'photon' },
+  { id: 'neutrino', label: 'neutrinos', threshold: 0, family: 'neutrino' },
+  { id: 'proton', label: 'protons', threshold: -1, family: 'hadron' },
+  { id: 'neutron', label: 'neutrons', threshold: -1, family: 'hadron' },
+  { id: 'helium', label: 'helium nuclei', threshold: -2, family: 'nucleus' },
+  { id: 'hydrogen', label: 'hydrogen atoms', threshold: -3, family: 'atom' },
+];
+
+/** Which species are around at this temperature, given where we are in the history. */
+export function speciesAt(c: Cosmology, a: number): Species[] {
+  const T = temperatureAt(c, a);
+  const eV = kTeV(T);
+  const zNow = 1 / a - 1;
+  const zRec = recombinationZ(c);
+  const out: Species[] = [];
+  for (const s of SPECIES) {
+    if (s.threshold >= 0) {
+      // free quarks and gluons are confined below the QCD scale (~150 MeV)
+      if ((s.family === 'quark' || s.family === 'gluon') && eV < 1.5e8) continue;
+      if (eV >= s.threshold) out.push(s);
+    } else if (s.threshold === -1) {
+      // nucleons: after confinement, always
+      if (eV < 1.5e8) out.push(s);
+    } else if (s.threshold === -2) {
+      // helium: after nucleosynthesis, which finishes around 30 keV
+      if (eV < 3e4) out.push(s);
+    } else if (s.threshold === -3) {
+      // neutral atoms: after recombination
+      if (zNow < zRec) out.push(s);
+    }
+  }
+  return out;
+}
+
+export interface Epoch {
+  id: string;
+  label: string;
+  /** what happens, in one line */
+  what: string;
+  /** the scale factor it begins at */
+  a: number;
+  /** true where the physics is not settled and the picture should say so */
+  speculative?: boolean;
+}
+
+/**
+ * The named epochs, positioned by their own physics wherever that is possible.
+ *
+ * Equality and recombination are COMPUTED from the cosmology, so moving Ω_m
+ * moves them — which is the whole reason this is a model rather than a
+ * timeline. The early ones are fixed by particle masses, which do not depend
+ * on the cosmology. The first two are marked speculative: before about a
+ * picosecond the physics is extrapolation, and a picture that draws the Planck
+ * era in the same ink as nucleosynthesis is making a claim nobody can make.
+ */
+export function epochs(c: Cosmology): Epoch[] {
+  const aOfT = (eV: number) => c.T0 / ((eV * 1.602176634e-19) / PHYS.kB);
+  const zEq = equalityZ(c);
+  const zRec = recombinationZ(c);
+  return [
+    { id: 'planck', label: 'Planck', what: 'Gravity is not separable from the rest. Nothing here is established physics.', a: aOfT(1.22e28), speculative: true },
+    { id: 'inflation', label: 'Inflation', what: 'A brief enormous expansion, inferred from what the sky looks like rather than observed.', a: aOfT(1e24), speculative: true },
+    { id: 'ew', label: 'Electroweak', what: 'The electroweak force separates; W and Z become massive.', a: aOfT(1e11) },
+    { id: 'quark', label: 'Quark–gluon plasma', what: 'Quarks and gluons are free. This state has been made in a collider.', a: aOfT(1e9) },
+    { id: 'hadron', label: 'Hadrons form', what: 'Quarks confine into protons and neutrons. Antimatter annihilates and a residue of matter is left.', a: aOfT(1.5e8) },
+    { id: 'nuc', label: 'Nucleosynthesis', what: 'Protons and neutrons fuse. A quarter of the mass ends as helium, and almost nothing heavier.', a: aOfT(1e5) },
+    { id: 'eq', label: 'Matter takes over', what: 'Matter density passes radiation density; structure can begin to grow.', a: 1 / (1 + zEq) },
+    { id: 'rec', label: 'Recombination', what: 'Half the electrons have been captured. The gas is still thick enough to scatter light.', a: 1 / (1 + zRec) },
+    { id: 'ls', label: 'Last scattering', what: 'The fog clears: photons stop being scattered and fly free. That light is the microwave background, and it is still arriving.', a: 1 / (1 + lastScatteringZ(c)) },
+    { id: 'dark', label: 'The dark ages', what: 'Neutral gas, no stars yet, nothing radiating but the cooling background.', a: 1 / (1 + 100) },
+    { id: 'stars', label: 'First light', what: 'The first stars ignite and begin to re-ionise the gas around them.', a: 1 / (1 + 20) },
+    { id: 'now', label: 'Now', what: 'Dark energy has taken over, and the expansion is accelerating.', a: 1 },
+  ];
+}
+
+/**
+ * Primordial helium, computed rather than quoted.
+ *
+ * The mass fraction of ⁴He is essentially all of the neutrons that survive to
+ * nucleosynthesis: Y ≈ 2n/(n+p). The neutron-to-proton ratio freezes out at
+ * about kT = 0.8 MeV at the equilibrium value e^{−Δm/kT}, and then decays for
+ * the few hundred seconds it takes the deuterium bottleneck to clear. Two
+ * lines of arithmetic give 0.24, which is one of the most precisely tested
+ * numbers in cosmology.
+ */
+export function heliumFraction(freezeOutMeV = 0.8, delaySeconds = 264): number {
+  const dm = 1.29333; // neutron − proton, MeV
+  const tau = 879.4; // free neutron lifetime, s
+  const ratio = Math.exp(-dm / freezeOutMeV) * Math.exp(-delaySeconds / tau);
+  return (2 * ratio) / (1 + ratio);
+}
+
+// ════════════════════════════════════════════════════════════════════
+// GRAVITY, N BODIES OF IT
+// ════════════════════════════════════════════════════════════════════
+//
+// The two-body orbit further up has a closed form, which is why it can be
+// drawn exactly. Three bodies do not, and have not since Poincaré — so the
+// only honest way to show three is to integrate them, and the only honest way
+// to integrate them is with a scheme that does not quietly leak energy.
+//
+// VELOCITY VERLET, NOT EULER, AND THE REASON IS VISIBLE. Forward Euler on an
+// orbit spirals outward: the error is one-signed, so the orbit gains energy
+// every step and a "stable" system drifts apart on screen over a minute. Verlet
+// is symplectic — its energy error oscillates instead of accumulating — so a
+// circular orbit stays a circle for as long as anyone watches. `energy()` is
+// exported so a test can assert that rather than a reader having to trust it.
+//
+// SOFTENING, AND WHAT IT COSTS. The 1/r² force goes to infinity as two bodies
+// touch, and a close pass with a fixed step then throws one to the other side
+// of the screen. The force is therefore computed with (r² + ε²) in place of
+// r², which is standard for N-body work and is a real approximation: below the
+// softening length the model is no longer Newton's. The tests pin the energy
+// drift rather than pretending the softening is free.
+
+export interface Body {
+  /** kilograms */
+  m: number;
+  /** metres */
+  x: number;
+  y: number;
+  /** metres per second */
+  vx: number;
+  vy: number;
+}
+
+/** Total energy of the system, in joules: the thing that must not drift. */
+export function energy(bodies: readonly Body[], softening = 0): number {
+  let ke = 0;
+  let pe = 0;
+  for (let i = 0; i < bodies.length; i++) {
+    const a = bodies[i];
+    ke += 0.5 * a.m * (a.vx * a.vx + a.vy * a.vy);
+    for (let j = i + 1; j < bodies.length; j++) {
+      const b = bodies[j];
+      const r = Math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2 + softening * softening);
+      pe -= (PHYS.G * a.m * b.m) / r;
+    }
+  }
+  return ke + pe;
+}
+
+/** Centre of mass, and the momentum of the whole system. */
+export function barycentre(bodies: readonly Body[]): { x: number; y: number; px: number; py: number; m: number } {
+  let m = 0;
+  let x = 0;
+  let y = 0;
+  let px = 0;
+  let py = 0;
+  for (const b of bodies) {
+    m += b.m;
+    x += b.m * b.x;
+    y += b.m * b.y;
+    px += b.m * b.vx;
+    py += b.m * b.vy;
+  }
+  return { x: m ? x / m : 0, y: m ? y / m : 0, px, py, m };
+}
+
+function accelerations(bodies: readonly Body[], eps: number): { ax: number; ay: number }[] {
+  const out = bodies.map(() => ({ ax: 0, ay: 0 }));
+  const e2 = eps * eps;
+  for (let i = 0; i < bodies.length; i++) {
+    for (let j = i + 1; j < bodies.length; j++) {
+      const dx = bodies[j].x - bodies[i].x;
+      const dy = bodies[j].y - bodies[i].y;
+      const r2 = dx * dx + dy * dy + e2;
+      const inv = 1 / (r2 * Math.sqrt(r2));
+      const gi = PHYS.G * bodies[j].m * inv;
+      const gj = PHYS.G * bodies[i].m * inv;
+      out[i].ax += gi * dx;
+      out[i].ay += gi * dy;
+      out[j].ax -= gj * dx;
+      out[j].ay -= gj * dy;
+    }
+  }
+  return out;
+}
+
+/**
+ * One velocity-Verlet step. Pure: it returns a new array and mutates nothing,
+ * so a caller can keep the previous state for a trail without copying by hand.
+ */
+export function gravityStep(bodies: readonly Body[], dt: number, eps: number): Body[] {
+  const a0 = accelerations(bodies, eps);
+  const half = bodies.map((b, i) => ({
+    ...b,
+    x: b.x + b.vx * dt + 0.5 * a0[i].ax * dt * dt,
+    y: b.y + b.vy * dt + 0.5 * a0[i].ay * dt * dt,
+  }));
+  const a1 = accelerations(half, eps);
+  return half.map((b, i) => ({
+    ...b,
+    vx: b.vx + 0.5 * (a0[i].ax + a1[i].ax) * dt,
+    vy: b.vy + 0.5 * (a0[i].ay + a1[i].ay) * dt,
+  }));
+}
+
+/** Run `n` steps. Substepping is the caller's business; this just iterates. */
+export function gravityRun(bodies: readonly Body[], dt: number, n: number, eps: number): Body[] {
+  let s = bodies as Body[];
+  for (let i = 0; i < n; i++) s = gravityStep(s, dt, eps);
+  return s;
+}
+
+export type GravityPreset = 'two' | 'figure8' | 'inner' | 'binary' | 'cluster';
+
+/**
+ * Starting conditions worth watching, each chosen because it shows something
+ * the others cannot.
+ *
+ *   two      a circular orbit — the case with an exact answer, so the
+ *            integrator can be checked against it by eye as well as by test
+ *   figure8  Chenciner and Montgomery's three equal masses chasing each other
+ *            round a figure of eight. It is a real solution of the three-body
+ *            problem, discovered in 2000, and it is stable enough to watch.
+ *            Nothing about it is obvious, which is the point.
+ *   inner    the real inner solar system, at real masses and distances
+ *   binary   a close pair with a distant third — the commonest arrangement in
+ *            the sky, and the one where the third body's orbit visibly wobbles
+ *   cluster  a dozen bodies with no plan, which is how you see that three is
+ *            already the hard case and twelve is not harder in kind
+ */
+export function gravityPreset(which: GravityPreset): { bodies: Body[]; dt: number; eps: number; span: number } {
+  const AU = PHYS.AU;
+  const Ms = PHYS.Msun;
+  if (which === 'figure8') {
+    // The published solution, in units where G = m = 1, scaled to something
+    // with a sun's mass and an AU so the readouts carry real units.
+    const L = AU;
+    const T = Math.sqrt((L * L * L) / (PHYS.G * Ms));
+    const V = L / T;
+    const p = [0.97000436, -0.24308753];
+    const v = [-0.93240737, -0.86473146];
+    return {
+      bodies: [
+        { m: Ms, x: p[0] * L, y: p[1] * L, vx: (-v[0] / 2) * V, vy: (-v[1] / 2) * V },
+        { m: Ms, x: -p[0] * L, y: -p[1] * L, vx: (-v[0] / 2) * V, vy: (-v[1] / 2) * V },
+        { m: Ms, x: 0, y: 0, vx: v[0] * V, vy: v[1] * V },
+      ],
+      dt: T / 900,
+      eps: L * 1e-3,
+      span: 1.6 * L,
+    };
+  }
+  if (which === 'inner') {
+    const planet = (aAU: number, m: number) => {
+      const r = aAU * AU;
+      return { m, x: r, y: 0, vx: 0, vy: Math.sqrt((PHYS.G * Ms) / r) };
+    };
+    return {
+      bodies: [
+        { m: Ms, x: 0, y: 0, vx: 0, vy: 0 },
+        planet(0.387, 3.301e23),
+        planet(0.723, 4.867e24),
+        planet(1.0, PHYS.Mearth),
+        planet(1.524, 6.417e23),
+      ],
+      dt: 3600 * 6,
+      eps: 1e8,
+      span: 1.9 * AU,
+    };
+  }
+  if (which === 'binary') {
+    const r = 0.5 * AU;
+    const v = Math.sqrt((PHYS.G * Ms) / (4 * r));
+    const far = 6 * AU;
+    return {
+      bodies: [
+        { m: Ms, x: -r, y: 0, vx: 0, vy: -v },
+        { m: Ms, x: r, y: 0, vx: 0, vy: v },
+        { m: 0.2 * Ms, x: far, y: 0, vx: 0, vy: Math.sqrt((PHYS.G * 2 * Ms) / far) },
+      ],
+      dt: 3600 * 12,
+      eps: 1e8,
+      span: 7 * AU,
+    };
+  }
+  if (which === 'cluster') {
+    // Deterministic pseudo-random, so the same cluster comes back every time:
+    // a scene that is different on every reload cannot be talked about.
+    let seed = 20260926;
+    const rnd = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
+    const bodies: Body[] = [];
+    for (let i = 0; i < 12; i++) {
+      const r = (0.4 + 2.2 * Math.sqrt(rnd())) * AU;
+      const th = rnd() * Math.PI * 2;
+      const m = (0.2 + rnd() * 1.4) * Ms;
+      const v = Math.sqrt((PHYS.G * 6 * Ms) / r) * (0.55 + rnd() * 0.35);
+      bodies.push({
+        m,
+        x: r * Math.cos(th),
+        y: r * Math.sin(th),
+        vx: -v * Math.sin(th),
+        vy: v * Math.cos(th),
+      });
+    }
+    // SOFTENING AND STEP ARE NOT DECORATION HERE. At eps = 3 × 10⁹ m and a
+    // six-hour step this system gained four hundred per cent of its own energy
+    // in four thousand steps: two bodies passed close, the force spiked between
+    // samples, and one of them left. Twelve bodies have close passes constantly,
+    // so the softening has to be a real fraction of the typical separation.
+    return { bodies, dt: 3600 * 1.5, eps: 0.05 * AU, span: 3.2 * AU };
+  }
+  const r = AU;
+  return {
+    bodies: [
+      { m: Ms, x: 0, y: 0, vx: 0, vy: 0 },
+      { m: PHYS.Mearth, x: r, y: 0, vx: 0, vy: Math.sqrt((PHYS.G * Ms) / r) },
+    ],
+    dt: 3600 * 6,
+    eps: 1e8,
+    span: 1.4 * AU,
+  };
+}
+
+/** Drop the system's net drift, so the picture does not wander off the page. */
+export function recentre(bodies: readonly Body[]): Body[] {
+  const c = barycentre(bodies);
+  const vx = c.m ? c.px / c.m : 0;
+  const vy = c.m ? c.py / c.m : 0;
+  return bodies.map((b) => ({ ...b, x: b.x - c.x, y: b.y - c.y, vx: b.vx - vx, vy: b.vy - vy }));
 }

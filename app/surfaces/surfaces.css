@@ -1,0 +1,282 @@
+/* app/surfaces/surfaces.css
+ *
+ * The working surfaces, in the Logos register.
+ *
+ * Ported from the design's 3d.css onto the tokens this app already declares
+ * (--lg-*, in app/globals.css) rather than shipping a second copy of them:
+ * two sets of the same colours under two names is how a palette drifts. Every
+ * rule here is scoped under .sfx or a surface's own prefix, so nothing escapes
+ * onto a page that merely happens to be nearby.
+ *
+ * The one addition to the design's vocabulary is colour that MEANS a physical
+ * quantity rather than a role — the disc's blackbody colour, the particle
+ * families. Those are set as inline attributes by the surfaces that compute
+ * them, because their value is arithmetic and does not belong in a stylesheet.
+ */
+
+.sfx {
+  --sfx-h: 560px;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  min-height: 0;
+  height: var(--sfx-h);
+  background: var(--lg-panel, #FAF8F2);
+  border: 1px solid var(--lg-line, rgba(53, 70, 32, 0.14));
+  border-radius: 12px;
+  overflow: hidden;
+  color: var(--lg-ink, #23241F);
+  font-family: var(--sans);
+}
+
+/* Full screen, whether the browser granted it or we are faking it with a
+   fixed overlay. Both paths land here so nothing downstream has to know. */
+.sfx.is-full {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  height: 100vh;
+  height: 100dvh;
+  border-radius: 0;
+  border: 0;
+}
+.sfx:fullscreen { height: 100vh; border-radius: 0; }
+
+.sfx-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--lg-line, rgba(53, 70, 32, 0.14));
+}
+.sfx-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--lg-ink-60, rgba(35, 36, 31, 0.6));
+}
+.sfx-icon {
+  font: inherit;
+  font-size: 10.5px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--lg-line, rgba(53, 70, 32, 0.14));
+  background: #fff;
+  color: var(--lg-ink-60, rgba(35, 36, 31, 0.6));
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 0.18s, color 0.18s;
+}
+.sfx-icon:hover { border-color: var(--lg-primary, #354620); color: var(--lg-primary, #354620); }
+.sfx-icon[aria-pressed='true'] {
+  background: var(--lg-primary, #354620);
+  border-color: var(--lg-primary, #354620);
+  color: var(--lg-panel, #FAF8F2);
+}
+
+.sfx-stage {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
+  padding: 6px 8px;
+  overflow: hidden;
+  cursor: grab;
+  touch-action: none;
+}
+.sfx-stage:active { cursor: grabbing; }
+.sfx-stage:focus-visible { outline: 2px solid var(--lg-primary, #354620); outline-offset: -3px; }
+.sfx-svg { display: block; width: 100%; height: 100%; overflow: hidden; }
+
+/* the handle the reader drags to make the panel taller */
+.sfx-grip {
+  height: 11px;
+  display: grid;
+  place-items: center;
+  cursor: ns-resize;
+  background: transparent;
+  border-top: 1px solid var(--lg-line, rgba(53, 70, 32, 0.14));
+}
+.sfx-grip i {
+  display: block;
+  width: 40px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--lg-ink-24, rgba(35, 36, 31, 0.24));
+  transition: background 0.18s;
+}
+.sfx-grip:hover i, .sfx-grip:focus-visible i { background: var(--lg-primary, #354620); }
+.sfx-grip:focus-visible { outline: 2px solid var(--lg-primary, #354620); outline-offset: -2px; }
+.sfx.is-full .sfx-grip { display: none; }
+
+.sfx-foot {
+  padding: 8px 14px 11px;
+  border-top: 1px solid var(--lg-line, rgba(53, 70, 32, 0.14));
+  overflow-y: auto;
+  min-height: 0;
+}
+.sfx-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.sfx-clock {
+  font-size: 11px;
+  color: var(--lg-ink-60, rgba(35, 36, 31, 0.6));
+  font-variant-numeric: tabular-nums;
+}
+.sfx-seg { display: flex; gap: 2px; }
+.sfx-seg button, .sfx-groups button, .sfx-layers button {
+  font: inherit;
+  font-size: 10.5px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  white-space: nowrap;
+  color: var(--lg-ink-60, rgba(35, 36, 31, 0.6));
+  border: 1px solid var(--lg-line, rgba(53, 70, 32, 0.14));
+  background: #fff;
+  cursor: pointer;
+  transition: all 0.18s;
+}
+.sfx-seg button:hover, .sfx-groups button:hover, .sfx-layers button:hover {
+  border-color: var(--lg-primary, #354620);
+  color: var(--lg-primary, #354620);
+}
+.sfx-seg button[aria-pressed='true'],
+.sfx-groups button[aria-selected='true'],
+.sfx-layers button[aria-pressed='true'] {
+  background: var(--lg-primary, #354620);
+  border-color: var(--lg-primary, #354620);
+  color: var(--lg-panel, #FAF8F2);
+}
+.sfx-groups { display: flex; gap: 2px; margin: 9px 0 8px; flex-wrap: wrap; }
+.sfx-layers { display: flex; gap: 3px; flex-wrap: wrap; margin-top: 3px; }
+
+.sfx-ctls { display: flex; flex-direction: column; gap: 6px; }
+.sfx-ctl { display: flex; align-items: center; gap: 9px; }
+.sfx-ctl .k {
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--lg-ink-60, rgba(35, 36, 31, 0.6));
+  flex: 0 0 3.4em;
+}
+.sfx-ctl .v {
+  font-size: 11px;
+  color: var(--lg-ink, #23241F);
+  font-variant-numeric: tabular-nums;
+  flex: 0 0 auto;
+  min-width: 7.2em;
+  text-align: right;
+}
+.sfx-ctl input[type='range'] {
+  flex: 1;
+  min-width: 0;
+  height: 2px;
+  appearance: none;
+  -webkit-appearance: none;
+  background: var(--lg-ink-24, rgba(35, 36, 31, 0.24));
+  border-radius: 2px;
+}
+.sfx-ctl input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--lg-primary, #354620);
+  border: 2px solid var(--lg-panel, #FAF8F2);
+  cursor: pointer;
+}
+.sfx-ctl input[type='range']::-moz-range-thumb {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--lg-primary, #354620);
+  border: 2px solid var(--lg-panel, #FAF8F2);
+  cursor: pointer;
+}
+
+.sfx-note {
+  margin: 9px 0 0;
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--lg-ink-60, rgba(35, 36, 31, 0.6));
+}
+
+/* the surface's own ink */
+.sfx-l {
+  font-family: var(--sans);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  fill: var(--lg-ink-60, rgba(35, 36, 31, 0.6));
+}
+.sfx-l.person { fill: var(--lg-primary, #354620); }
+.sfx-l.question { fill: #3E6B7A; }
+.sfx-l.evidence { fill: var(--lg-accent, #264653); }
+
+/* ── the black hole ─────────────────────────────────────────────── */
+.bhx-horizon { fill: #12161c; stroke: var(--lg-ink-40, rgba(35, 36, 31, 0.4)); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.bhx-shadow { fill: none; stroke: var(--lg-ink-24, rgba(35, 36, 31, 0.24)); stroke-width: 1; stroke-dasharray: 2 3; vector-effect: non-scaling-stroke; }
+.bhx-photon { fill: none; stroke: var(--lg-secondary, #B8A26B); stroke-width: 1; stroke-dasharray: 4 4; vector-effect: non-scaling-stroke; }
+.bhx-isco { fill: none; stroke: var(--lg-accent, #264653); stroke-width: 1; opacity: 0.55; vector-effect: non-scaling-stroke; }
+.bhx-ergo { fill: none; stroke: var(--lg-tension, #9C5B3C); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0.7; vector-effect: non-scaling-stroke; }
+.bhx-ray { fill: none; stroke: var(--lg-primary, #354620); stroke-width: 1.6; opacity: 0.7; vector-effect: non-scaling-stroke; transition: opacity 0.25s; }
+.bhx-ray-lost { fill: none; stroke: var(--lg-tension, #9C5B3C); stroke-width: 1.6; stroke-dasharray: 4 3; opacity: 0.75; vector-effect: non-scaling-stroke; }
+.bhx-ray.on, .bhx-ray-lost.on { opacity: 1; stroke-width: 1.9; }
+.bhx-dot { fill: var(--lg-primary, #354620); stroke: var(--lg-panel, #FAF8F2); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.bhx-dot.lost { fill: var(--lg-tension, #9C5B3C); }
+
+/* ── the Big Bang ───────────────────────────────────────────────── */
+.bbx-shell { fill: none; stroke: var(--lg-accent, #264653); stroke-width: 1; opacity: 0.45; vector-effect: non-scaling-stroke; }
+.bbx-wake { fill: none; stroke: var(--lg-accent, #264653); stroke-width: 0.8; vector-effect: non-scaling-stroke; }
+.bbx-axis { fill: none; stroke: var(--lg-ink-24, rgba(35, 36, 31, 0.24)); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.bbx-tick { fill: none; stroke: var(--lg-ink-40, rgba(35, 36, 31, 0.4)); stroke-width: 1; vector-effect: non-scaling-stroke; }
+/* Where the physics is not settled, the ink says so rather than the caption
+   alone: a dashed tick for the Planck era and inflation. */
+.bbx-tick.spec { stroke-dasharray: 2 2; opacity: 0.55; }
+.bbx-head { fill: var(--lg-primary, #354620); stroke: var(--lg-panel, #FAF8F2); stroke-width: 1.2; }
+
+/* ── gravity ────────────────────────────────────────────────────── */
+.gvx-com { fill: none; stroke: var(--lg-ink-40, rgba(35, 36, 31, 0.4)); stroke-width: 1; vector-effect: non-scaling-stroke; }
+
+@media (prefers-reduced-motion: reduce) {
+  .sfx-icon, .sfx-seg button, .sfx-groups button, .sfx-layers button, .sfx-grip i { transition: none; }
+}
+
+/* ── the page these are shown on ────────────────────────────────── */
+.sfx-page { max-width: 1400px; margin: 0 auto; padding: clamp(32px, 5vw, 64px) var(--edge) 80px; }
+.sfx-page header { margin-bottom: clamp(20px, 3vw, 34px); }
+.sfx-page .k {
+  font-size: 0.7rem; letter-spacing: 0.28em; text-transform: uppercase;
+  color: var(--ink-45); margin: 0 0 16px;
+}
+.sfx-page h1 {
+  font-family: var(--serif); font-weight: 400; font-size: clamp(2rem, 4.6vw, 3.2rem);
+  line-height: 1.04; letter-spacing: -0.02em; margin: 0 0 14px; text-wrap: balance;
+}
+.sfx-page .lede {
+  font-size: clamp(0.98rem, 1.5vw, 1.12rem); line-height: 1.65;
+  color: var(--ink-70); max-width: 68ch; margin: 0;
+}
+.sfx-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 18px; }
+.bhx-leader { fill: none; stroke: var(--lg-ink-24, rgba(35, 36, 31, 0.24)); stroke-width: 0.7; vector-effect: non-scaling-stroke; }
+
+/* ── the surface switcher ───────────────────────────────────────── */
+.sfx-switch { display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 8px; min-height: 0; }
+.sfx-tabs { display: flex; gap: 3px; flex-wrap: wrap; }
+.sfx-tabs button {
+  font: inherit; font-size: 10.5px; padding: 4px 11px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--lg-line, rgba(53, 70, 32, 0.14)); background: #fff;
+  color: var(--lg-ink-60, rgba(35, 36, 31, 0.6)); transition: all 0.18s; white-space: nowrap;
+}
+.sfx-tabs button:hover { border-color: var(--lg-primary, #354620); color: var(--lg-primary, #354620); }
+.sfx-tabs button[aria-selected='true'] {
+  background: var(--lg-primary, #354620); border-color: var(--lg-primary, #354620);
+  color: var(--lg-panel, #FAF8F2);
+}
+/* Inside the layout the surface fills its pane rather than carrying its own
+   fixed height: the pane is what the reader sized. */
+.l2 .sfx { height: 100%; border: 0; border-radius: 0; }
+.l2 .sfx-grip { display: none; }

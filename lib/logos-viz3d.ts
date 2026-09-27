@@ -292,3 +292,100 @@ export function slicePlane(atY: number, frame: Frame3, cam: Camera): Pt2[] {
 export function byDepth<T extends { depth: number }>(items: T[]): T[] {
   return [...items].sort((a, b) => b.depth - a.depth);
 }
+
+// ── a camera with perspective, for the simulated objects ────────────
+//
+// WHY A SECOND CAMERA, WHEN THE HEADER ARGUES FOR ORTHOGRAPHIC. That argument
+// is about MATHEMATICS: a perspective camera makes equal quantities look
+// unequal, so z = f(x, y) must be drawn orthographically or the picture lies
+// about the function. A simulated object is the opposite case. A black hole is
+// a thing at a place, and drawing an accretion disc with the far side the same
+// width as the near side does not read as a disc at all — it reads as a flat
+// annulus, which is exactly what the object is not. Here the foreshortening is
+// information rather than distortion.
+//
+// So: both, each used where it belongs. `project3` stays the camera for
+// surfaces and fields; this one is for `simulation`, and nothing shares state
+// between them.
+
+export interface Orbit3 extends Camera {
+  /** how far the eye sits from the origin, in the model's own units */
+  dist: number;
+}
+
+/**
+ * World point → screen point, with distance shrinking things.
+ *
+ * The chain is yaw about the vertical, then pitch, then a divide by depth.
+ * `scale` is the factor that would apply at the origin; what comes back has
+ * already been multiplied by the foreshortening for its own depth, so callers
+ * that need to size something AT a point (a sphere's radius, a dot) can read
+ * `f` and use it rather than re-deriving it.
+ *
+ * `behind` is true for anything at or through the eye. Those points cannot be
+ * drawn — the divide flips their sign and they reappear, mirrored, on the far
+ * side of the picture — so every caller drops them rather than clamping.
+ */
+export function orbit3(
+  p: Pt3,
+  cam: Orbit3,
+  scale: number
+): { x: number; y: number; depth: number; f: number; behind: boolean } {
+  const cy = Math.cos(cam.yaw);
+  const sy = Math.sin(cam.yaw);
+  const rx = p.x * cy - p.y * sy;
+  const ry = p.x * sy + p.y * cy;
+
+  const cp = Math.cos(cam.pitch);
+  const sp = Math.sin(cam.pitch);
+  const up = p.z * cp - ry * sp;
+  const depth = ry * cp + p.z * sp + cam.dist;
+
+  const near = 0.35;
+  const behind = depth <= near;
+  const f = cam.dist / Math.max(near, depth);
+  return { x: rx * scale * f, y: -up * scale * f, depth, f, behind };
+}
+
+/**
+ * Whether a point is hidden BEHIND the body at the origin.
+ *
+ * The one occlusion test the simulated objects need, and it is worth having
+ * rather than sorting by depth: an accretion disc passes behind the hole, and
+ * a disc drawn over the hole it orbits is the single thing that would make the
+ * picture read as a drawing instead of an object. A point is hidden when it is
+ * further away than the centre and its projection lands inside the body's
+ * projected disc.
+ */
+export function occluded(
+  p: { x: number; y: number; depth: number },
+  centreDepth: number,
+  bodyScreenRadius: number
+): boolean {
+  return p.depth > centreDepth && Math.hypot(p.x, p.y) < bodyScreenRadius;
+}
+
+/**
+ * Cut a polyline wherever it goes behind the body, so the visible arcs are
+ * drawn and the hidden ones are not.
+ *
+ * Returns a list of runs; a run of one point is dropped, because a single
+ * point is not a line and the renderer would draw nothing for it anyway.
+ */
+export function visibleRuns<T extends { x: number; y: number; depth: number; behind?: boolean }>(
+  pts: T[],
+  hidden: (p: T) => boolean
+): T[][] {
+  const out: T[][] = [];
+  let run: T[] = [];
+  for (const p of pts) {
+    if (p.behind || hidden(p)) {
+      if (run.length > 1) out.push(run);
+      run = [];
+    } else {
+      run.push(p);
+    }
+  }
+  if (run.length > 1) out.push(run);
+  return out;
+}
