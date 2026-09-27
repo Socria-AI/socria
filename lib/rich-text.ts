@@ -34,12 +34,30 @@ export interface GroupsBlock {
   groups: { header: string | null; items: string[] }[];
 }
 
+/**
+ * The sources a turn actually read, as cards rather than a column of URLs.
+ *
+ * WHY THE PARSER AND NOT A SIDE CHANNEL. The disclosure is written into the
+ * reply itself (lib/core4/web.ts renderDisclosure) because that is what makes
+ * it durable: it is stored with the message, it survives a reload, it is there
+ * in an export. Reading it back out of the text keeps that property — the
+ * transcript stays something a person can read, and the cards are a way of
+ * DRAWING it rather than a second copy of it living somewhere else.
+ */
+export interface SourcesBlock {
+  kind: 'sources';
+  /** exactly what was searched for, where the disclosure said */
+  query: string | null;
+  items: { n: number; title: string; url: string }[];
+}
+
 export type Block =
   | { kind: 'p'; text: string }
   | { kind: 'ul'; items: string[] }
   | { kind: 'ol'; items: string[] }
   | GroupsBlock
-  | TableBlock;
+  | TableBlock
+  | SourcesBlock;
 
 // ── inline ───────────────────────────────────────────────────────────
 
@@ -226,6 +244,40 @@ function absorbContinuation(lines: string[], from: number, items: string[]): num
  * than as a surprise, and there is no third-party parser in the bundle whose
  * behaviour nobody here decided.
  */
+/**
+ * One line of the disclosure: `[1] Some title — https://example.com/x`.
+ *
+ * The dash is an em dash because renderDisclosure writes one, and the title
+ * has already been flattened there, so a title containing an em dash of its
+ * own still parses: the URL is anchored to the end of the line and the split
+ * is made at the LAST dash before it.
+ */
+const SOURCE_RE = /^\[(\d{1,2})\]\s+(.+?)\s+—\s+(https?:\/\/\S+)\s*$/;
+
+/** `*Searched the web for “ai articles”*` — the line above the list. */
+const SEARCHED_RE = /^\*Searched (?:the web|the page) for [“"']?(.+?)[”"']?\*\s*$/;
+
+function sourcesAt(lines: string[], i: number): { block: SourcesBlock; next: number } | null {
+  let at = i;
+  let query: string | null = null;
+  const head = lines[at]?.match(SEARCHED_RE);
+  if (head) {
+    query = head[1].trim() || null;
+    at++;
+  }
+  const items: SourcesBlock['items'] = [];
+  while (at < lines.length) {
+    const m = lines[at].match(SOURCE_RE);
+    if (!m) break;
+    items.push({ n: Number(m[1]), title: m[2].trim(), url: m[3] });
+    at++;
+  }
+  // A heading with nothing under it is prose — "nothing usable came back"
+  // reads as a sentence and should stay one.
+  if (!items.length) return null;
+  return { block: { kind: 'sources', query, items }, next: at };
+}
+
 export function parseBlocks(input: string): Block[] {
   const text = typeof input === 'string' ? input : '';
   const lines = text.replace(/\r/g, '').split('\n');
@@ -235,6 +287,15 @@ export function parseBlocks(input: string): Block[] {
   while (i < lines.length) {
     if (lines[i].trim() === '') {
       i++;
+      continue;
+    }
+
+    // Before everything else: the lines a turn's own machinery wrote. They
+    // are not prose and must not be laid out as prose.
+    const src = sourcesAt(lines, i);
+    if (src) {
+      blocks.push(src.block);
+      i = src.next;
       continue;
     }
 
@@ -278,7 +339,11 @@ export function parseBlocks(input: string): Block[] {
       lines[i].trim() !== '' &&
       !BULLET_RE.test(lines[i]) &&
       !ORDERED_RE.test(lines[i]) &&
-      !startsTable(lines, i)
+      !startsTable(lines, i) &&
+      // A reply that ends "…here are the sources:" runs straight into the
+      // list with no blank line, and a paragraph that swallowed it would
+      // print the URLs it was supposed to draw.
+      !sourcesAt(lines, i)
     ) {
       para.push(lines[i]);
       i++;

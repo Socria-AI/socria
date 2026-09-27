@@ -558,6 +558,160 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
   vertical-align: top;
 }
 .prose-socria th { font-weight: 600; background: rgba(0, 0, 0, 0.025); }
+/* ── what a turn read, as cards ───────────────────────────────────────
+ *
+ * The disclosure used to be four URLs in a column: correct, and unreadable —
+ * an address is not a description. Each source now carries the cover its own
+ * publisher declares, its name for itself, and a title set to be read, with
+ * the citation number kept because the reply points at it with [2].
+ *
+ * Written once for both surfaces. Core reads it under `.prose-socria` and
+ * Logos under `.logos-root`, which is the same arrangement the rest of the
+ * shared renderer uses — one vocabulary, two sets of CSS, and no third copy
+ * drifting quietly out of step.
+ */
+.prose-socria .src-block,
+.logos-root .src-block { margin: 0.9em 0 1.1em; }
+.prose-socria .src-head,
+.logos-root .src-head {
+  margin: 0 0 8px;
+  font-size: 12.5px;
+  color: var(--ink-60, rgba(31, 31, 31, 0.6));
+}
+.prose-socria .src-head em,
+.logos-root .src-head em {
+  font-family: var(--serif);
+  font-style: italic;
+  color: var(--moss-700, #475a28);
+}
+
+/* A row that scrolls, not a grid that stacks: four sources in a narrow
+   column would otherwise build a wall as tall as the reply they support. */
+.prose-socria .src-row,
+.logos-root .src-row {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scroll-snap-type: x proximity;
+  scrollbar-width: thin;
+}
+.prose-socria .src-card,
+.logos-root .src-card {
+  flex: 0 0 auto;
+  width: 188px;
+  display: flex;
+  flex-direction: column;
+  scroll-snap-align: start;
+  border: 1px solid var(--ink-12, rgba(31, 31, 31, 0.12));
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--paper, #F5F3EB);
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.16s, transform 0.16s;
+}
+.prose-socria .src-card:hover,
+.logos-root .src-card:hover {
+  border-color: var(--moss-600, #5e7633);
+  transform: translateY(-1px);
+}
+.prose-socria .src-card:focus-visible,
+.logos-root .src-card:focus-visible {
+  outline: 2px solid var(--moss-600, #5e7633);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .prose-socria .src-card,
+  .logos-root .src-card { transition: none; }
+  .prose-socria .src-card:hover,
+  .logos-root .src-card:hover { transform: none; }
+}
+
+.prose-socria .src-cover,
+.logos-root .src-cover {
+  position: relative;
+  display: block;
+  aspect-ratio: 16 / 9;
+  background: var(--paper-2, #ece8da);
+  overflow: hidden;
+}
+.prose-socria .src-cover img,
+.logos-root .src-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+/* No cover declared: said in type rather than with a grey rectangle. The
+   initial is at least a fact about the source. */
+.prose-socria .src-initial,
+.logos-root .src-initial {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-family: var(--serif);
+  font-size: 34px;
+  color: var(--ink-25, rgba(31, 31, 31, 0.25));
+}
+.prose-socria .src-n,
+.logos-root .src-n {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font-family: var(--sans);
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--paper, #F5F3EB);
+  background: rgba(31, 31, 31, 0.68);
+}
+.prose-socria .src-meta,
+.logos-root .src-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 10px 10px;
+}
+.prose-socria .src-site,
+.logos-root .src-site {
+  font-family: var(--sans);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-45, rgba(31, 31, 31, 0.45));
+}
+.prose-socria .src-title,
+.logos-root .src-title {
+  font-family: var(--serif);
+  font-size: 14px;
+  line-height: 1.28;
+  color: var(--ink, #1F1F1F);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+@media (max-width: 560px) {
+  .prose-socria .src-card,
+  .logos-root .src-card { width: 63vw; max-width: 240px; }
+}
+/* On paper a scrolling row is a row with its end cut off. */
+@media print {
+  .prose-socria .src-row,
+  .logos-root .src-row { display: block; overflow: visible; }
+  .prose-socria .src-card,
+  .logos-root .src-card { width: auto; break-inside: avoid; margin-bottom: 6px; }
+  .prose-socria .src-cover,
+  .logos-root .src-cover { display: none; }
+}
+
 .prose-socria .socria-strong { font-weight: 650; color: var(--ink, #1f1f1f); }
 /* Socria's signature: the one word that carries the turn, in italic
    Instrument Serif and the green. Was four Tailwind utilities inline in

@@ -15,6 +15,7 @@
 // the reason to read this file.
 
 import { splitInline, parseBlocks, stripMarks, isGroupHeader } from './.tmp/rich-text.mjs';
+import { parsePreview } from './.tmp/link-preview.mjs';
 import { LOGOS_CHAT_PROMPT } from './.tmp/logos.mjs';
 
 let pass = 0, fail = 0;
@@ -239,6 +240,81 @@ console.log('\n=== an item that wraps stays one item ===');
   // A blank line ends it too, indentation or not.
   ok('a blank line ends the list',
     parseBlocks('- a\n\n  indented after a gap').length === 2);
+}
+
+console.log('\n=== the sources a turn read become cards, not a column of URLs ===');
+{
+  // Exactly what lib/core4/web.ts renderDisclosure writes, followed by the
+  // reply itself. The whole point of reading it back out of the text is that
+  // the transcript stays a transcript: durable, exportable, and readable by
+  // the next turn's model without a second copy living anywhere else.
+  const reply =
+    '*Searched the web for “ai articles”*\n' +
+    '[1] AI—The good, the bad, and the scary — https://eng.vt.edu/magazine/stories/fall-2023/ai.html\n' +
+    '[2] The impact of artificial intelligence on human society — https://pmc.ncbi.nlm.nih.gov/articles/PMC7605294/\n' +
+    '\n' +
+    'Two of those are surveys rather than studies [1][2].';
+  const blocks = parseBlocks(reply);
+  ok('the disclosure is one block, the prose another', blocks.length === 2, JSON.stringify(blocks.map((b) => b.kind)));
+  ok('  and it is a sources block', blocks[0].kind === 'sources');
+  ok('  carrying what was searched for', blocks[0].query === 'ai articles');
+  ok('  with every source', blocks[0].items.length === 2);
+  ok('  the citation number kept, because the reply points at it', blocks[0].items[0].n === 1);
+  ok('  the title as a title', blocks[0].items[0].title === 'AI—The good, the bad, and the scary');
+  ok('  and the address intact', blocks[0].items[1].url === 'https://pmc.ncbi.nlm.nih.gov/articles/PMC7605294/');
+  ok('  the reply after it is untouched', blocks[1].kind === 'p' && /surveys rather than studies/.test(blocks[1].text));
+
+  // A title with its own em dash: the split is made at the last one, before
+  // the URL, or half the title would go missing.
+  const dashed = parseBlocks('[3] How AI is transforming the world — a survey — https://brookings.edu/x/');
+  ok('a title containing an em dash survives', dashed[0].items[0].title === 'How AI is transforming the world — a survey');
+
+  // A search that found nothing is a sentence, not an empty card rack.
+  const nothing = parseBlocks('*Searched the web for “xyzzy” — nothing usable came back.*');
+  ok('nothing found stays prose', nothing[0].kind === 'p');
+
+  // A list that runs straight out of a sentence with no blank line.
+  const glued = parseBlocks('Here is what I read:\n[1] A title — https://example.com/a');
+  ok('a paragraph does not swallow the list', glued.length === 2 && glued[1].kind === 'sources', JSON.stringify(glued.map((b) => b.kind)));
+
+  // And the things that merely look like it.
+  ok('a bracketed number in prose is prose', parseBlocks('As [1] says, it depends.')[0].kind === 'p');
+  ok('a citation without an address is prose', parseBlocks('[1] Something — nowhere')[0].kind === 'p');
+}
+
+console.log('\n=== what a page says about itself ===');
+{
+  const html = `<html><head>
+    <meta property="og:title" content="AI &amp; society">
+    <meta property="og:site_name" content="Brookings">
+    <meta property="og:image" content="/img/cover.jpg?a=1&amp;b=2">
+    <title>ignored, because og:title is the better one</title>
+  </head><body>…</body></html>`;
+  const p = parsePreview(html, 'https://www.brookings.edu/articles/x/');
+  ok('the declared cover is found', p.image === 'https://www.brookings.edu/img/cover.jpg?a=1&b=2');
+  ok('  relative made absolute, entities decoded', !p.image.includes('&amp;'));
+  ok('  the publisher\'s own title', p.title === 'AI & society');
+  ok('  and its own name for itself', p.site === 'Brookings');
+
+  ok('twitter:image is read where og has none',
+    parsePreview('<meta name="twitter:image" content="https://x.test/a.png">', 'https://x.test/p').image === 'https://x.test/a.png');
+  ok('so is link rel=image_src',
+    parsePreview('<link rel="image_src" href="https://x.test/b.png">', 'https://x.test/p').image === 'https://x.test/b.png');
+  ok('attributes in either order are read',
+    parsePreview('<meta content="https://x.test/c.png" property="og:image">', 'https://x.test/p').image === 'https://x.test/c.png');
+
+  // A page with no cover has no cover. Nothing is generated, borrowed, or
+  // taken from the body — a wrong picture is a small lie about what was read.
+  const bare = parsePreview('<html><head><title>Just words</title></head><body><img src="/logo.png"></body></html>', 'https://plain.test/a');
+  ok('no declaration, no cover', bare.image === null);
+  ok('  the host stands in for the publication', bare.site === 'plain.test');
+  ok('  and the <title> is used when og is absent', bare.title === 'Just words');
+
+  for (const bad of ['javascript:alert(1)', 'data:image/png;base64,AAAA', 'file:///etc/passwd', 'blob:https://x.test/1']) {
+    ok(`${bad.slice(0, 18)}… is refused`,
+      parsePreview(`<meta property="og:image" content="${bad}">`, 'https://x.test/p').image === null);
+  }
+  ok('junk in is nothing out', parsePreview('', 'https://x.test/p').image === null);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

@@ -85,5 +85,23 @@ ok('the whole body is no longer buffered first', !/await res\.arrayBuffer\(\)/.t
 ok('the pinned dispatcher is used on every hop', /dispatcher: safeAgent/.test(src));
 ok('and the agent screens inside its own lookup', /lookup\(hostname, options, callback\)[\s\S]{0,300}screenResolved/.test(src));
 
+// The cover reader is a second fetcher, added for the cards under a search
+// disclosure, and a second fetcher is exactly how a screen gets skipped: it
+// looks like a small helper, it only wants a page's <head>, and it is written
+// by somebody who has not read this file. It goes through the same screened
+// opener as everything else, and these pin that.
+ok('the head reader screens its destination too',
+  /export async function fetchPageHead[\s\S]{0,400}await assertDestinationAllowed\(url\)/.test(src));
+ok('  and follows redirects through the shared screened opener',
+  /export async function fetchPageHead[\s\S]{0,900}openScreened\(/.test(src));
+ok('  with a ceiling on what it reads',
+  /export async function fetchPageHead[\s\S]{0,1200}readCapped\(res,/.test(src));
+// One screened opener, not two. The other fetches in this file go to fixed
+// provider endpoints (Google, Notion); the pinned dispatcher is what marks a
+// request whose ADDRESS came from outside, and there must be exactly one
+// place that makes one.
+ok('  and exactly one place dials an address that came from outside',
+  (src.match(/dispatcher: safeAgent/g) || []).length === 1);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

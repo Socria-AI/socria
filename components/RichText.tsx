@@ -20,6 +20,7 @@
 import type { ReactNode } from 'react';
 import { parseBlocks, splitInline, stripMarks, type Block } from '@/lib/rich-text';
 import { MathText } from '@/components/TeX';
+import { SourceCards } from '@/components/SourceCards';
 
 /** A run of text, with math inside it when the surface asked for math. */
 function Body({ text, math }: { text: string; math?: boolean }): ReactNode {
@@ -122,6 +123,11 @@ function BlockNode({ block, math, k }: { block: Block; math?: boolean; k: string
           ))}
         </div>
       );
+
+    // What the turn read, drawn as what it read rather than as a column of
+    // addresses. See components/SourceCards.tsx.
+    case 'sources':
+      return <SourceCards key={k} query={block.query} items={block.items} />;
 
     case 'table':
       return (

@@ -60,6 +60,7 @@ const MODULES = [
   'lib/logos-personality.ts',
   'lib/logos-viz3d.ts',
   'lib/viz-model.ts',
+  'lib/link-preview.ts',
   'lib/viz-semantics.ts',
   'lib/why-not-answer.ts',
   'lib/wrong-chat.ts',
