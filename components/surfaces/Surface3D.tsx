@@ -20,6 +20,7 @@
 // function of its inputs.
 
 import './surfaces.css';
+import type { VizEntity, VizModelState, VizOp } from '@/lib/viz-model';
 import {
   useCallback,
   useEffect,
@@ -80,6 +81,14 @@ export interface SurfaceRender {
   note: string;
   /** what a screen reader is told the picture is */
   label: string;
+  /**
+   * The handful of facts about named objects that really are live, by entity
+   * id: "2 of 6 captured", "inner edge at 3.0 r". Meaning is declared once in
+   * lib/viz-semantics.ts; this is only what changes as it runs, and it is what
+   * lets the conversation answer "why did that one disappear?" with what the
+   * simulation recorded rather than with a plausible story.
+   */
+  live?: Record<string, string>;
 }
 
 /**
@@ -114,6 +123,19 @@ export function snap(n: number, dp = 3): number {
 export interface SurfaceProps {
   initial?: Record<string, number>;
   fill?: boolean;
+  /**
+   * The seam to the conversation. The frame hands back a function that reads
+   * the surface's whole state at the moment it is called — not a copy pushed
+   * on every frame, because the clock ticks sixty times a second and the only
+   * moment the state actually matters is the moment somebody presses send.
+   */
+  onRead?: (read: (() => VizModelState) | null) => void;
+  /**
+   * Changes asked for in words. `seq` is what makes it fire: the same batch
+   * handed down twice does nothing, and a reply with no changes in it never
+   * touches the picture.
+   */
+  ops?: { seq: number; ops: VizOp[] } | null;
 }
 
 export interface Surface3DProps {
@@ -128,6 +150,17 @@ export interface Surface3DProps {
   render: (a: RenderArgs) => SurfaceRender;
   /** surfaces with nothing moving hide the clock and the play button */
   animated?: boolean;
+  /**
+   * Who this surface is, for the conversation: the surface id, what each
+   * rendered object means, and what the model behind it holds fixed. Declared
+   * in lib/viz-semantics.ts rather than here so a reviewer can read every
+   * claim the product makes about its own pictures in one file.
+   */
+  surface: string;
+  entities?: VizEntity[];
+  model?: string;
+  assumptions?: string[];
+  equations?: string[];
   /**
    * Fill the box it is mounted in rather than standing as a card of its own.
    * Set wherever something else has already decided the size — the Logos plot
@@ -156,7 +189,14 @@ export function Surface3D({
   render,
   animated = true,
   fill = false,
-}: Surface3DProps) {
+  surface,
+  entities = [],
+  model = '',
+  assumptions = [],
+  equations = [],
+  onRead,
+  ops = null,
+}: Surface3DProps & Pick<SurfaceProps, 'onRead' | 'ops'>) {
   const [vals, setVals] = useState<Record<string, number>>(initial);
   const [cam, setCam] = useState<Cam>(initialCam);
   const [on, setOn] = useState<Record<string, boolean>>(
@@ -166,13 +206,30 @@ export function Surface3D({
   const [t, setT] = useState(0);
   const [playing, setPlaying] = useState(animated);
   const [full, setFull] = useState(false);
+  /**
+   * What the reader last clicked, by entity id.
+   *
+   * THIS IS WHAT MAKES "what is this?" ANSWERABLE. A pronoun with nothing
+   * behind it is the commonest thing anyone says to a picture, and it was the
+   * one thing the conversation could not resolve. Held here, beside the state
+   * it belongs to, and sent with the next message.
+   */
+  const [selected, setSelected] = useState<string | null>(null);
   // The panel's own height, which the reader drags. Stored rather than derived
   // so it survives a re-render and a full-screen round trip.
   const [tall, setTall] = useState(460);
 
   const stage = useRef<HTMLDivElement>(null);
   const shell = useRef<HTMLDivElement>(null);
-  const orbit = useRef<{ x: number; y: number; yaw: number; pitch: number } | null>(null);
+  const orbit = useRef<{
+    x: number;
+    y: number;
+    yaw: number;
+    pitch: number;
+    moved: number;
+    /** what was under the finger when it went down — see `up` */
+    hit: string | null;
+  } | null>(null);
   const sizing = useRef<{ y: number; h: number } | null>(null);
   const [box, setBox] = useState({ w: 600, h: 320 });
 
@@ -247,7 +304,22 @@ export function Surface3D({
   // ── turning it ──
   const down = useCallback(
     (e: React.PointerEvent) => {
-      orbit.current = { x: e.clientX, y: e.clientY, yaw: cam.yaw, pitch: cam.pitch };
+      // WHAT WAS CLICKED IS READ HERE, NOT ON THE CLICK.
+      //
+      // The stage captures the pointer so a drag that leaves the panel still
+      // turns the camera — and a captured pointer retargets everything after
+      // it, including the click, to the capturing element. So by the time a
+      // click event arrives its target is the stage div and the mark under
+      // the finger is gone. Pointerdown is the one event that still knows.
+      const hit = (e.target as Element | null)?.closest?.('[data-obj]') ?? null;
+      orbit.current = {
+        x: e.clientX,
+        y: e.clientY,
+        yaw: cam.yaw,
+        pitch: cam.pitch,
+        moved: 0,
+        hit: hit?.getAttribute('data-obj') ?? null,
+      };
       try {
         (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
       } catch {
@@ -259,6 +331,8 @@ export function Surface3D({
   const move = useCallback((e: React.PointerEvent) => {
     const d = orbit.current;
     if (!d) return;
+    // How far this press has travelled, so a turn is not also a selection.
+    d.moved = Math.max(d.moved, Math.hypot(e.clientX - d.x, e.clientY - d.y));
     setCam((c) => ({
       ...c,
       yaw: d.yaw + (e.clientX - d.x) * 0.008,
@@ -267,9 +341,18 @@ export function Surface3D({
       pitch: Math.min(1.45, Math.max(-1.45, d.pitch - (e.clientY - d.y) * 0.006)),
     }));
   }, []);
+  // ── letting go: a press that did not travel is a click on a thing ──
+  //
+  // Every surface tags its marks with `data-obj="<entity id>"`, so this is the
+  // whole of the picking logic and it is the same for all of them. A press
+  // that turned the camera is not a selection, and a press on empty paper
+  // clears it, which is what empty paper should do.
   const up = useCallback(() => {
+    const d = orbit.current;
     orbit.current = null;
-  }, []);
+    if (!d || d.moved > 4) return;
+    setSelected(d.hit && entities.some((x) => x.id === d.hit) ? d.hit : null);
+  }, [entities]);
 
   // ── zoom ──
   // Not passive: the wheel has to be claimed or the page scrolls out from
@@ -335,10 +418,39 @@ export function Surface3D({
     setCam(initialCam);
     setOn(Object.fromEntries(layers.map((l) => [l.id, true])));
     setT(0);
+    setSelected(null);
     // Deliberately NOT the panel height or full screen: those are the
     // reader's window onto the thing, not part of the thing, and having
     // "reset" collapse the panel they just enlarged is a small betrayal.
   }, [initial, initialCam, layers]);
+
+  // ── changes asked for in words ──
+  //
+  // Every op has already been checked against the state that was sent (see
+  // lib/viz-model.ts parseVizOps): the ids exist and the numbers are inside
+  // the ranges. So this applies them and does not second-guess them — except
+  // for the camera distance, whose limits belong to THIS surface and are not
+  // in the state at all.
+  const seen = useRef(-1);
+  useEffect(() => {
+    if (!ops || ops.seq === seen.current) return;
+    seen.current = ops.seq;
+    for (const op of ops.ops) {
+      if (op.op === 'set') setVals((v) => ({ ...v, [op.id]: op.value }));
+      else if (op.op === 'layer') setOn((o) => ({ ...o, [op.id]: op.on }));
+      else if (op.op === 'select') setSelected(op.id);
+      else if (op.op === 'play') setPlaying(true);
+      else if (op.op === 'pause') setPlaying(false);
+      else if (op.op === 'reset') reset();
+      else if (op.op === 'camera') {
+        setCam((c) =>
+          op.field === 'dist'
+            ? { ...c, dist: Math.min(distRange[1], Math.max(distRange[0], op.value)) }
+            : { ...c, [op.field]: op.value }
+        );
+      }
+    }
+  }, [ops, reset, distRange]);
 
   const W = Math.max(140, Math.round(box.w));
   const H = Math.max(90, Math.round(box.h));
@@ -347,6 +459,64 @@ export function Surface3D({
     [render, W, H, cam, t, vals, on]
   );
   const active = groups.find((g) => g.id === group) ?? groups[0];
+  const sel = selected ? entities.find((e) => e.id === selected) ?? null : null;
+
+  // ── the state, when somebody asks for it ──
+  //
+  // PULLED, NOT PUSHED. The clock advances sixty times a second and a state
+  // pushed up on every tick would re-render the whole chat around it for no
+  // reader's benefit. What the conversation needs is the state at ONE moment —
+  // the moment a message is sent — so the frame hands out a function that
+  // reads the current state, and holds the pieces in a ref that every render
+  // refreshes. The reply is then answering the picture as it actually stood,
+  // not as it stood some number of frames ago.
+  const now = useRef({ vals, on, cam, t, playing, out, selected });
+  useEffect(() => {
+    now.current = { vals, on, cam, t, playing, out, selected };
+  });
+  const read = useCallback((): VizModelState => {
+    const c = now.current;
+    const live = c.out.live ?? {};
+    const ctls = groups.flatMap((g) => g.ctls);
+    return {
+      surface,
+      title,
+      model,
+      assumptions,
+      equations,
+      entities: entities.map((e) => {
+        const state = live[e.id];
+        return state ? { ...e, state } : e;
+      }),
+      params: ctls.map((ctl) => {
+        const v = c.vals[ctl.id] ?? ctl.min;
+        return {
+          id: ctl.id,
+          label: ctl.label,
+          value: v,
+          read: ctl.read(v),
+          min: ctl.min,
+          max: ctl.max,
+          ...(ctl.help ? { means: ctl.help } : {}),
+        };
+      }),
+      layers: layers.map((l) => ({ id: l.id, label: l.label, on: c.on[l.id] !== false })),
+      camera: { ...c.cam },
+      ...(animated
+        ? { clock: { t: c.t, playing: c.playing, rate: c.vals.rate ?? 1 } }
+        : {}),
+      readouts: [c.out.left, c.out.right, c.out.note].filter(Boolean) as string[],
+      selected: c.selected,
+    };
+    // Everything read inside comes from the ref or from props that do not
+    // change for the life of a surface, so this function is stable — which is
+    // what lets the effect below register it once instead of on every frame.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    onRead?.(read);
+    return () => onRead?.(null);
+  }, [onRead, read]);
 
   return (
     <div
@@ -357,11 +527,29 @@ export function Surface3D({
       <div className="sfx-head">
         <span className="sfx-title">{title}</span>
         <span className="sfx-head-r">
+          {/* What "this" means, if they have clicked something. Said out loud
+              rather than left as a highlight, because a highlight tells you
+              something is selected and not what it is — and the whole point of
+              selecting is to be able to ask about it by pronoun. */}
+          {sel && (
+            <button
+              type="button"
+              className="sfx-sel"
+              onClick={() => setSelected(null)}
+              title="Clear the selection"
+            >
+              <span>{sel.label}</span>
+              <i aria-hidden="true">×</i>
+            </button>
+          )}
           <button type="button" className="sfx-icon" onClick={toggleFull} aria-pressed={full}>
             {full ? 'Exit full screen' : 'Full screen'}
           </button>
         </span>
       </div>
+      <p className="sfx-live" aria-live="polite">
+        {sel ? `Selected: ${sel.label}. ${sel.meaning}` : ''}
+      </p>
 
       <div
         ref={stage}
@@ -375,7 +563,27 @@ export function Surface3D({
         role="img"
         aria-label={out.label}
       >
-        <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet" className="sfx-svg">
+        <svg
+          viewBox={`0 0 ${W} ${H}`}
+          preserveAspectRatio="xMidYMid meet"
+          className="sfx-svg"
+          // The selection is marked in one attribute and drawn by one CSS rule
+          // (`[data-sel="x"] [data-obj="x"]`), so no surface has to know that
+          // selection exists — it only has to say what its marks are.
+          data-sel={selected ?? undefined}
+        >
+          {/* WHY A STYLE TAG AND NOT A CLASS. CSS cannot say "the mark whose
+              id matches the one on the svg" — it has no way to compare two
+              attributes — and the alternative is for the frame to reach into
+              every surface's rendered nodes and add a class, which would make
+              selection something each surface has to know about. One rule,
+              written for the id that is actually selected, keeps it the
+              frame's business alone. The id comes from this surface's own
+              entity list and is checked against it, so there is nothing here
+              a page could inject into. */}
+          {selected && /^[\w-]+$/.test(selected) && (
+            <style>{`.sfx-svg[data-sel="${selected}"] [data-obj]:not([data-obj="${selected}"]){opacity:.42}`}</style>
+          )}
           {out.content}
           {out.left && (
             <text className="sfx-l evidence" x="8" y={H - 7}>

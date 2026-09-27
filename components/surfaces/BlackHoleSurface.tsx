@@ -39,6 +39,7 @@ import {
   type BlackHole,
 } from '@/lib/logos-physics';
 import { Surface3D, type RenderArgs, type SurfaceRender, type SurfaceProps, snap } from './Surface3D';
+import { BLACK_HOLE_ENTITIES, SURFACE_MODEL } from '@/lib/viz-semantics';
 
 /** The geometry in Schwarzschild radii, which is how the labels read. */
 function inRs(bh: BlackHole) {
@@ -104,7 +105,7 @@ const INITIAL = {
   rays: 6, spread: 2, bsel: 3.2, rate: 1,
 };
 
-export function BlackHoleSurface({ initial, fill }: SurfaceProps = {}) {
+export function BlackHoleSurface({ initial, fill, onRead, ops }: SurfaceProps = {}) {
   const render = useCallback((a: RenderArgs): SurfaceRender => {
     const { W, H, cam, t, vals, layers } = a;
     const bh = blackHole(vals.m * 1e6 * PHYS.Msun, Math.abs(vals.spin));
@@ -263,14 +264,24 @@ export function BlackHoleSurface({ initial, fill }: SurfaceProps = {}) {
           // has to. A cube root over a narrow range washed a twelvefold
           // difference in surface brightness down to a barely perceptible one;
           // this keeps the ratio the arithmetic actually gives.
+          // QUIETER, BUT STILL CARRYING THE BEAMING.
+          //
+          // The disc is the widest thing on screen and at full strength it
+          // dominated the marked radii, the rays and the hole itself — the
+          // primary modelled objects were reading as annotations on top of a
+          // blue field. The ratio between the approaching and receding sides
+          // is what this alpha is FOR, so it is scaled rather than compressed:
+          // the same twelvefold difference, drawn at about seven tenths of the
+          // weight. Nothing informational is lost; the figure stops shouting.
           const alpha = Math.min(
-            0.95,
-            0.05 + 0.9 * Math.pow(Math.min(1, boost / 3.4), 0.85) * (1 - 0.3 * f0)
+            0.66,
+            0.035 + 0.63 * Math.pow(Math.min(1, boost / 3.4), 0.85) * (1 - 0.3 * f0)
           );
           put(
             mid(quad),
             <path
               key={`d${i}_${k}`}
+              data-obj="disc"
               d={`${d(quad)} Z`}
               fill={blackbodyCSS(T, 1)}
               fillOpacity={snap(alpha)}
@@ -302,6 +313,7 @@ export function BlackHoleSurface({ initial, fill }: SurfaceProps = {}) {
           p.depth,
           <circle
             key={`m${i}`}
+            data-obj="matter"
             cx={snap(p.x)}
             cy={snap(p.y)}
             r={snap(Math.max(0.7, (1.7 - 1.0 * ((r - rIn) / Math.max(0.1, rOut - rIn))) * p.f))}
@@ -326,19 +338,19 @@ export function BlackHoleSurface({ initial, fill }: SurfaceProps = {}) {
         const rE = (1 + Math.sqrt(Math.max(0, 1 - A * A * Math.cos(th) ** 2))) / 2;
         pts.push(cast(-rE * Math.sin(th), rE * Math.cos(th), 0));
       }
-      put(centre.depth - 0.01, <path key="ergo" className="bhx-ergo" d={d(pts)} />);
+      put(centre.depth - 0.01, <path key="ergo" data-obj="ergo" className="bhx-ergo" d={d(pts)} />);
     }
     if (layers.photon) {
       for (const [pl, key] of [['xz', 'a'], ['yz', 'b']] as const) {
         const c = greatCircle(g.photon, pl);
         runs(c).forEach((seg, k) =>
-          put(mid(seg), <path key={`ph${key}${k}`} className="bhx-photon" d={d(seg)} />)
+          put(mid(seg), <path key={`ph${key}${k}`} data-obj="photon" className="bhx-photon" d={d(seg)} />)
         );
       }
     }
     if (layers.isco) {
       runs(ringAt(isco)).forEach((seg, k) =>
-        put(mid(seg), <path key={`i${k}`} className="bhx-isco" d={d(seg)} />)
+        put(mid(seg), <path key={`i${k}`} data-obj="isco" className="bhx-isco" d={d(seg)} />)
       );
     }
 
@@ -351,7 +363,7 @@ export function BlackHoleSurface({ initial, fill }: SurfaceProps = {}) {
     // ball rather than a hole punched in the page. Hidden-line removal is the
     // same occlusion test everything else here uses.
     const Rh = g.horizon;
-    put(centre.depth, <circle key="h" className="bhx-horizon" cx={snap(centre.x)} cy={snap(centre.y)} r={snap(bodyR)} />);
+    put(centre.depth, <circle key="h" data-obj="horizon" className="bhx-horizon" cx={snap(centre.x)} cy={snap(centre.y)} r={snap(bodyR)} />);
     const wire: React.ReactNode[] = [];
     for (let li = 1; li <= 5; li++) {
       const lat = -Math.PI / 2 + (li * Math.PI) / 6;
@@ -373,12 +385,12 @@ export function BlackHoleSurface({ initial, fill }: SurfaceProps = {}) {
       const front = pts.filter((q) => q.depth < centre.depth);
       if (front.length > 1) wire.push(<path key={`me${mi}`} className="bhx-wire" d={d(front)} />);
     }
-    put(centre.depth - bodyR * 0.001, <g key="wire">{wire}</g>);
+    put(centre.depth - bodyR * 0.001, <g key="wire" data-obj="horizon">{wire}</g>);
 
     // The shadow: what is actually dark to a distant observer, √27 r_g wide —
     // 2.6 times the horizon, because light passing near it is bent in. Drawn
     // flat to the sky, because that is what it is: an apparent size.
-    put(-1e9, <circle key="sh" className="bhx-shadow" cx={snap(centre.x)} cy={snap(centre.y)} r={snap(g.bc * scale * centre.f)} />);
+    put(-1e9, <circle key="sh" data-obj="shadow" className="bhx-shadow" cx={snap(centre.x)} cy={snap(centre.y)} r={snap(g.bc * scale * centre.f)} />);
 
     // ── the light, integrated ──────────────────────────────────────
     let captured = 0;
@@ -399,6 +411,7 @@ export function BlackHoleSurface({ initial, fill }: SurfaceProps = {}) {
             mid(seg),
             <path
               key={`r${i}_${k}`}
+              data-obj="rays"
               className={(ray.captured ? 'bhx-ray-lost' : 'bhx-ray') + (near ? ' on' : '')}
               d={d(seg)}
             />
@@ -408,7 +421,7 @@ export function BlackHoleSurface({ initial, fill }: SurfaceProps = {}) {
           const ph = ((t * 0.18 + i * 0.17) % 1 + 1) % 1;
           const q = pts[Math.min(pts.length - 1, Math.floor(ph * pts.length))];
           if (!hidden(q)) {
-            put(q.depth, <circle key={`rd${i}`} className={`bhx-dot${ray.captured ? ' lost' : ''}`} cx={snap(q.x)} cy={snap(q.y)} r={2.2} />);
+            put(q.depth, <circle key={`rd${i}`} data-obj="rays" className={`bhx-dot${ray.captured ? ' lost' : ''}`} cx={snap(q.x)} cy={snap(q.y)} r={2.2} />);
           }
         }
       }
@@ -438,7 +451,7 @@ export function BlackHoleSurface({ initial, fill }: SurfaceProps = {}) {
         const ly = p.y + Math.sin(bearing) * push;
         if (lx < 30 || lx > W - 30 || ly < 12 || ly > H - 20) return;
         nodes.push(
-          <g key={text}>
+          <g key={text} data-obj="labels">
             <path
               className="bhx-leader"
               d={`M${p.x.toFixed(1)},${p.y.toFixed(1)} L${(lx - Math.cos(bearing) * 5).toFixed(1)},${(ly - Math.sin(bearing) * 5).toFixed(1)}`}
@@ -458,8 +471,26 @@ export function BlackHoleSurface({ initial, fill }: SurfaceProps = {}) {
     }
 
     const innerT = observedTemperature(bh, Math.max(rIn * 1.36, rIn + 0.01) * bh.rs, mdot, 0).T;
+    const spinning = Math.abs(vals.spin) > 0.02;
     return {
       content: nodes,
+      // THE FACTS THAT ARE ACTUALLY LIVE, and only those. Everything else a
+      // reader might ask about these objects is the same on every frame and is
+      // declared once in lib/viz-semantics.ts. Kept honest to the arithmetic:
+      // the capture count is the number of integrated rays that ended inside
+      // the capture radius, not an estimate of one.
+      live: {
+        horizon: `${g.horizon.toFixed(2)} r, which is ${sayText(bh.rs, 'm')} across for this mass`,
+        shadow: `${g.bc.toFixed(2)} r — the apparent size a distant observer would measure`,
+        disc: `running from ${rIn.toFixed(1)} to ${rOut.toFixed(1)} r, inner edge at ${sayText(innerT, 'K')} at ${(vals.edd * 100).toFixed(0)}% of the Eddington rate`,
+        matter: `${Math.round(vals.matter)} parcels drawn`,
+        rays: `${Math.round(vals.rays)} rays integrated, ${captured} captured (they ended inside ${g.bc.toFixed(2)} r and could not get out)`,
+        photon: `${g.photon.toFixed(2)} r`,
+        isco: `${isco.toFixed(2)} r${retro ? ', pushed outward because the disc runs against the spin' : vals.spin > 0.02 ? ', pulled inward by prograde spin' : ''}`,
+        ergo: spinning
+          ? `drawn, because the hole is spinning at a = ${vals.spin.toFixed(3)}`
+          : 'not drawn: at a = 0 there is no ergosphere',
+      },
       left: `bᶜ = ${g.bc.toFixed(2)} r · ${sayText(bh.rs, 'm')}`,
       right: `${captured} of ${Math.round(vals.rays)} captured · disc ${sayText(innerT, 'K')}`,
       note: retro
@@ -474,6 +505,13 @@ export function BlackHoleSurface({ initial, fill }: SurfaceProps = {}) {
   return (
     <Surface3D
       title="Black hole · Kerr geometry"
+      surface="black-hole"
+      entities={BLACK_HOLE_ENTITIES}
+      model={SURFACE_MODEL['black-hole'].model}
+      assumptions={SURFACE_MODEL['black-hole'].assumptions}
+      equations={SURFACE_MODEL['black-hole'].equations}
+      onRead={onRead}
+      ops={ops}
       groups={GROUPS}
       layers={LAYERS}
       initial={{ ...INITIAL, ...initial }}

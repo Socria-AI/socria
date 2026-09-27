@@ -16,6 +16,8 @@
 // the concept). Logos proposes the picture; you own it once it is on screen.
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import type { VizModelState, VizOp } from '@/lib/viz-model';
+import { entitiesFromFrame } from '@/lib/viz-semantics';
 import {
   autoParams,
   CORE_KINDS,
@@ -95,6 +97,8 @@ export function MathViz({
   height,
   guarded,
   onSceneChange,
+  onRead,
+  ops,
 }: {
   scene: VizScene;
   width: number;
@@ -102,6 +106,16 @@ export function MathViz({
   guarded?: boolean;
   /** Persist an edited scene back to the session, so it survives a reload. */
   onSceneChange?: (scene: VizScene) => void;
+  /**
+   * The same seam the working surfaces have (components/surfaces/Surface3D):
+   * a function that reads this plot's state when somebody asks for it, so the
+   * conversation can answer "what is the teal curve" from what was drawn
+   * rather than from a guess. A plot is a thinner state than a simulation —
+   * there is no camera and nothing is integrated — and it says so.
+   */
+  onRead?: (read: (() => VizModelState) | null) => void;
+  /** changes asked for in words; see lib/viz-model.ts */
+  ops?: { seq: number; ops: VizOp[] } | null;
 }) {
   // ── which scene is live ───────────────────────────────────────────
   // The prop is what Logos extracted; `edited` is what the reader has since
@@ -149,6 +163,16 @@ export function MathViz({
   // tick would also resize h and δ, which are derived from the x-window.
   const [pan, setPan] = useState<Viewport | null>(null);
   const rawView = pan ?? autoView;
+  /**
+   * The mark the reader last clicked, by object id — what "this" means.
+   *
+   * The same idea as the working surfaces have, and deliberately the same
+   * mechanism: every mark is wrapped in a `data-obj`, one handler walks up to
+   * the nearest tagged ancestor, and the id goes into the state the
+   * conversation reads. A plot is where most of these questions get asked —
+   * "why does it curve here", "what is that region" — so the plot gets it too.
+   */
+  const [selected, setSelected] = useState<string | null>(null);
 
   const progRef = useRef(0);
   const geomRef = useRef<Geom | null>(null);
@@ -179,6 +203,7 @@ export function MathViz({
     setVals(defaults(active));
     setPlaying(false);
     setPan(null);
+    setSelected(null);
     const p = sweptParam(active);
     progRef.current = p ? sweepProgress(p, defaults(active)[p.id]) : 0;
   }, [activeKey]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -274,6 +299,47 @@ export function MathViz({
     [setProgress]
   );
 
+  // ── showing and hiding one of the reader's own curves ──
+  //
+  // The same edit the legend makes, reachable from a command. It goes through
+  // `edited` and the persist timer like every other edit, so a curve hidden by
+  // asking stays hidden after a reload exactly as one hidden by clicking does.
+  const showOverlay = useCallback(
+    (id: string, on: boolean) => {
+      const overlays = (active.overlays ?? []).map((o) => (o.id === id ? { ...o, visible: on } : o));
+      const next: VizScene = { ...active, overlays };
+      setEdited(next);
+      if (persistRef.current) clearTimeout(persistRef.current);
+      persistRef.current = setTimeout(() => onSceneChange?.(next), PERSIST_MS);
+    },
+    [active, onSceneChange]
+  );
+
+  // ── changes asked for in words ──
+  //
+  // Already checked against the state that was sent (lib/viz-model.ts), so
+  // this applies them. A plot has no camera, so a camera op has nothing to
+  // land on and is ignored rather than approximated with a pan.
+  const opSeen = useRef(-1);
+  useEffect(() => {
+    if (!ops || ops.seq === opSeen.current) return;
+    opSeen.current = ops.seq;
+    for (const op of ops.ops) {
+      if (op.op === 'set') {
+        setPlaying(false);
+        setVals((v) => ({ ...v, [op.id]: op.value }));
+      } else if (op.op === 'layer') showOverlay(op.id, op.on);
+      else if (op.op === 'select') setSelected(op.id);
+      else if (op.op === 'play') play();
+      else if (op.op === 'pause') setPlaying(false);
+      else if (op.op === 'reset') {
+        reset();
+        setPan(null);
+        setSelected(null);
+      }
+    }
+  }, [ops, play, reset, showOverlay]);
+
   // ── zoom and pan ──────────────────────────────────────────────────
 
   /** Client coordinates → data coordinates, through the SVG's own matrix so
@@ -353,6 +419,8 @@ export function MathViz({
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     const g = geomRef.current;
     if (!g) return;
+    const hit = (e.target as Element | null)?.closest?.('[data-obj]');
+    pickRef.current = { x: e.clientX, y: e.clientY, id: hit?.getAttribute('data-obj') ?? null };
     ptrs.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     try {
       (e.currentTarget as SVGSVGElement).setPointerCapture(e.pointerId);
@@ -441,6 +509,13 @@ export function MathViz({
   };
 
   const endDrag = (e: React.PointerEvent<SVGSVGElement>) => {
+    // A press that did not travel is a selection: the mark becomes what "this"
+    // means in the next message. A press that panned is a pan.
+    const p0 = pickRef.current;
+    pickRef.current = null;
+    if (p0 && ptrs.current.size <= 1 && Math.hypot(e.clientX - p0.x, e.clientY - p0.y) <= 4) {
+      setSelected(p0.id);
+    }
     ptrs.current.delete(e.pointerId);
     if (ptrs.current.size < 2) pinchRef.current = null;
     if (ptrs.current.size === 1) {
@@ -604,6 +679,81 @@ export function MathViz({
     geomRef.current = view ? { view, plotW, plotH } : null;
   });
 
+  // ── the state, when somebody asks for it ──
+  //
+  // Pulled rather than pushed, for the reason the surfaces pull it: a sweep
+  // runs at sixty frames a second and the only moment this matters is the
+  // moment a message is sent. What a plot can honestly say about itself is
+  // thinner than what a simulation can — the marks come from an expression,
+  // nothing is integrated, and there is no camera — and the state says so
+  // rather than dressing a figure up as a computation.
+  const nowRef = useRef({ frame, active, vals, playing, selected, swept });
+  useEffect(() => {
+    nowRef.current = { frame, active, vals, playing, selected, swept };
+  });
+  const readState = useCallback((): VizModelState => {
+    const c = nowRef.current;
+    const sc = c.active;
+    const overlays = sc.overlays ?? [];
+    const visible = overlays.filter((o) => o.visible !== false).map((o) => o.expr);
+    return {
+      surface: 'plot',
+      title: sc.title ?? '',
+      model: `${KIND_LABEL[sc.kind] ?? sc.kind}${sc.expr ? ` of ${sc.varName} ↦ ${sc.expr}` : ''}`,
+      assumptions: [
+        'This is a figure of an expression, not a simulation: every mark is evaluated from the formula, and nothing is stepped forward in time.',
+        c.swept
+          ? `The animation sweeps ${c.swept.id}; it is ${c.playing ? 'running' : 'stopped'}.`
+          : 'Nothing on it animates on its own.',
+      ],
+      equations: [sc.expr ?? '', ...visible].filter(Boolean).slice(0, 8),
+      entities: c.frame ? entitiesFromFrame(c.frame.objects, sc) : [],
+      params: sc.params.map((q) => {
+        const v = c.vals[q.id] ?? q.value;
+        return {
+          id: q.id,
+          label: q.symbol ?? q.id,
+          value: v,
+          read: fmt(v, 3),
+          min: q.min,
+          max: q.max,
+          ...(q.help ? { means: q.help } : {}),
+        };
+      }),
+      layers: overlays.map((o) => ({ id: o.id, label: o.label || o.expr, on: o.visible !== false })),
+      readouts: c.frame
+        ? [
+            ...c.frame.readouts.map(
+              (r) =>
+                `${r.tex}${
+                  r.value === null ? ' — held back while the Answer Guard is up' : ` = ${r.value}`
+                }`
+            ),
+            c.frame.caption,
+          ].filter(Boolean)
+        : [],
+      selected: c.selected,
+    };
+    // Reads only from the ref, so the identity is stable and the effect below
+    // registers it once rather than on every frame.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    onRead?.(readState);
+    return () => onRead?.(null);
+  }, [onRead, readState]);
+
+  /**
+   * What was under the finger when it went down, and where it went down.
+   *
+   * READ ON POINTERDOWN, NOT ON CLICK. The plot captures the pointer so a pan
+   * survives leaving the element, and a captured pointer retargets every later
+   * event — the click included — to the svg itself. By the time a click
+   * arrives, the mark that was under the finger is not its target any more.
+   * Pointerdown is the last event that still knows.
+   */
+  const pickRef = useRef<{ x: number; y: number; id: string | null } | null>(null);
+
   if (!usable || !view || !frame) {
     return (
       <div className="lg-map-empty">
@@ -654,11 +804,22 @@ export function MathViz({
           onPointerUp={endDrag}
           onPointerCancel={endDrag}
           onKeyDown={onKeyDown}
+          /* What is selected, said once in an attribute; one CSS rule draws
+             it. See components/surfaces/surfaces.css for the same pattern on
+             the working surfaces — both halves of Logos select the same way. */
+          data-sel={selected ?? undefined}
           /* A double click is the one gesture everyone already expects to
              mean "put it back", and it is the only way to fit without going
              to the corner. */
           onDoubleClick={() => setPan(null)}
         >
+          {/* The selected mark stays as it was and everything else steps
+              back. Written as a rule for this id because CSS cannot compare
+              one element's attribute against another's; see the same note in
+              components/surfaces/Surface3D.tsx. */}
+          {selected && /^[\w-]+$/.test(selected) && (
+            <style>{`.lg-viz-svg[data-sel="${selected}"] [data-obj]:not([data-obj="${selected}"]){opacity:.45}`}</style>
+          )}
           <defs>
             <clipPath id={clipId}>
               <rect x={PAD.l} y={PAD.t} width={plotW} height={plotH} />
@@ -705,7 +866,11 @@ export function MathViz({
           ))}
 
           <g clipPath={`url(#${clipId})`}>
+            {/* Every mark wrapped in its id. One group per object is the whole
+                cost of being able to answer "what is this?" about it, and it
+                keeps the per-kind renderers below ignorant of selection. */}
             {frame.objects.map((ob) => (
+              <g key={ob.id} data-obj={ob.id}>
               <Obj
                 key={ob.id}
                 ob={ob}
@@ -717,6 +882,7 @@ export function MathViz({
                 plotH={plotH}
                 arrowId={arrowId}
               />
+              </g>
             ))}
           </g>
         </svg>
@@ -840,6 +1006,14 @@ export function MathViz({
         />
       )}
 
+      {selected && (
+        <p className="lg-viz-sel" aria-live="polite">
+          <button type="button" onClick={() => setSelected(null)} title="Clear the selection">
+            {selected} <i aria-hidden="true">×</i>
+          </button>
+          <span>selected — ask about it as “this”</span>
+        </p>
+      )}
       <p className="lg-viz-caption">{guarded && frame.ask ? frame.ask : frame.caption}</p>
     </div>
   );

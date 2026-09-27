@@ -59,6 +59,8 @@ const MODULES = [
   'lib/account-guards.ts',
   'lib/logos-personality.ts',
   'lib/logos-viz3d.ts',
+  'lib/viz-model.ts',
+  'lib/viz-semantics.ts',
   'lib/why-not-answer.ts',
   'lib/wrong-chat.ts',
   'lib/auth-links.ts',

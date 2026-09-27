@@ -95,6 +95,7 @@ import { MAX_CONTEXTS_PER_NODE, sanitizeContexts, type NodeContext } from '@/lib
 import { relevantNodes, type DraftAction, type DraftResponse } from '@/lib/logos-draft';
 import { boundaryNote, limitsFor, type Counter } from '@/lib/entitlements';
 import { failureText } from '@/lib/upstream-error';
+import { parseVizOps, stripVizOps, type VizModelState, type VizOp } from '@/lib/viz-model';
 import { DRIFT_DISMISS_LIMIT, readDrift, type DriftVerdict } from '@/lib/topic-drift';
 import {
   MATH_FADE_MS,
@@ -512,6 +513,30 @@ export function LogosApp({
   styleRef.current = styleText;
   const personaRef = useRef<Personality>(DEFAULT_PERSONALITY);
   personaRef.current = persona;
+  // ── the picture, as one half of a shared state ───────────────────
+  //
+  // WHAT THIS IS FOR. Somebody asked their black hole "what's the blue" and
+  // got "if you're seeing blue, it might represent…" — from the thing that had
+  // drawn it. The picture holds the answer (the disc's colour is the blackbody
+  // colour of a temperature the code computed) and the conversation could not
+  // reach it. These two lines are the reach: the mounted surface hands up a
+  // function that reads its whole state, and a reply may hand back a short
+  // list of changes to apply to it.
+  //
+  // PULLED AT SEND TIME, not held as state: the clock ticks sixty times a
+  // second, and a state kept in React would re-render the entire app around a
+  // number nobody is reading. The only moment it matters is the moment a
+  // message goes.
+  const vizRead = useRef<(() => VizModelState) | null>(null);
+  const takeViz = useCallback((read: (() => VizModelState) | null) => {
+    vizRead.current = read;
+  }, []);
+  const [vizOps, setVizOps] = useState<{ seq: number; ops: VizOp[] } | null>(null);
+  const applyVizOps = useCallback((ops: VizOp[]) => {
+    if (!ops.length) return;
+    setVizOps((prev) => ({ seq: (prev?.seq ?? 0) + 1, ops }));
+  }, []);
+
   /** the fields every Logos generation request carries */
   const guidance = () => ({
     depth: depthRef.current,
@@ -538,10 +563,17 @@ export function LogosApp({
     return reply.slice(0, at).trimEnd();
   }
 
-  /** What the person should see of a still-streaming reply. */
+  /**
+   * What the person should see of a still-streaming reply.
+   *
+   * Two things are held back: the REMEMBER line, and the block of changes to
+   * the picture. Neither is prose, and watching `set m 8` being typed out one
+   * character at a time would be watching the machinery rather than the
+   * answer. stripVizOps works on a half-written block for exactly this reason.
+   */
   const visibleStream = (acc: string) => {
     const at = acc.indexOf(REMEMBER_MARK);
-    return at === -1 ? acc : acc.slice(0, at).trimEnd();
+    return stripVizOps(at === -1 ? acc : acc.slice(0, at).trimEnd());
   };
 
   useEffect(() => {
@@ -1885,6 +1917,11 @@ export function LogosApp({
 
     const payload = [...messages.slice(-8), ...nextThread];
 
+    // The state of the picture at this instant. Taken before the request so
+    // the same snapshot is both what the model was told and what its answer is
+    // checked against — a control moved while the reply streams cannot make a
+    // command land somewhere the model never saw.
+    const sentViz = vizRead.current?.() ?? null;
     try {
       const res = await fetch('/api/logos/chat', {
         method: 'POST',
@@ -1900,6 +1937,10 @@ export function LogosApp({
             contexts: contextsRef.current[node.id] ?? [],
           },
           ...guidance(),
+          // A node opened beside the picture is still a conversation about
+          // the picture: "why does this one curve" is asked here as often as
+          // in the main thread.
+          ...(sentViz ? { vizState: sentViz } : {}),
         }),
       });
       if (!res.ok) {
@@ -1923,6 +1964,8 @@ export function LogosApp({
         }
       }
       acc = absorbRemember(acc);
+      applyVizOps(parseVizOps(acc, sentViz));
+      acc = stripVizOps(acc);
       setFocusStream('');
       setThreads((t) => ({ ...t, [key]: [...nextThread, { role: 'assistant', content: acc }] }));
       chronRef.current = [...chronRef.current, { role: 'assistant', content: acc }];
@@ -2037,6 +2080,11 @@ export function LogosApp({
     }
     const sid = activeIdRef.current ?? '';
     const u = isSignedIn ? understandingRef.current : null;
+    // The state of the picture at this instant. Taken before the request so
+    // the same snapshot is both what the model was told and what its answer is
+    // checked against — a control moved while the reply streams cannot make a
+    // command land somewhere the model never saw.
+    const sentViz = vizRead.current?.() ?? null;
 
     // Conversational reply.
     //
@@ -2063,6 +2111,11 @@ export function LogosApp({
           // What they are looking at, so "why is it flat there" has something
           // to be about. Re-sanitised on the server like every other field.
           ...(mapRef.current?.viz ? { viz: mapRef.current.viz } : {}),
+          // …and the picture's OWN state: every object with what it means,
+          // where each control stands, which layers are on, what is selected.
+          // Read here, at the moment of sending, so the reply is answering the
+          // picture as it actually stands rather than as it opened.
+          ...(sentViz ? { vizState: sentViz } : {}),
           // Logos 2: the two people in the room, so Socria answers as the
           // layer between them. Names only — never who is signed in.
           ...(roomRef.current.active && roomRef.current.people.length >= 2
@@ -2102,6 +2155,12 @@ export function LogosApp({
         }
       }
       acc = absorbRemember(acc);
+      // Changes to the picture, checked against the very state that was sent:
+      // unknown ids dropped, numbers clamped to the ranges the physics owns.
+      // Applied before the text lands so the picture and the sentence that
+      // describes it change together.
+      applyVizOps(parseVizOps(acc, sentViz));
+      acc = stripVizOps(acc);
       setStreaming('');
       const landed: Msg[] = [...next, { role: 'assistant', content: acc }];
       patchActive((s) => ({ ...s, messages: landed }));
@@ -3004,6 +3063,8 @@ export function LogosApp({
             onViz={(viz) =>
               patchActive((s) => ({ ...s, map: { ...(s.map ?? EMPTY_MAP), viz } }))
             }
+            onVizRead={takeViz}
+            vizOps={vizOps}
           />
           <FirstMap state={firstMap} onSkip={endFirstMap} onFinish={endFirstMap} />
           <ExplorePanel

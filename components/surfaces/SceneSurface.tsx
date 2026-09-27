@@ -19,6 +19,7 @@
 // begin and cannot say what is possible.
 
 import type { VizScene } from '@/lib/logos-viz';
+import type { SurfaceProps } from './Surface3D';
 import { BlackHoleSurface } from './BlackHoleSurface';
 import { BigBangSurface } from './BigBangSurface';
 import { GravitySurface } from './GravitySurface';
@@ -39,7 +40,12 @@ export function isSimulation(scene: VizScene | null | undefined): boolean {
   return !!scene && scene.kind === 'simulation' && HAS_SURFACE.has(scene.sim?.object ?? 'black-hole');
 }
 
-export function SceneSurface({ scene, fill = true }: { scene: VizScene; fill?: boolean }) {
+export function SceneSurface({
+  scene,
+  fill = true,
+  onRead,
+  ops,
+}: { scene: VizScene } & SurfaceProps) {
   // The scene's sliders become starting values. Unknown ids are ignored by the
   // surface and out-of-range ones are clamped by the control, so nothing here
   // has to be trusted.
@@ -48,8 +54,13 @@ export function SceneSurface({ scene, fill = true }: { scene: VizScene; fill?: b
     if (Number.isFinite(p.value)) initial[p.id] = p.value;
   }
 
+  // The seam to the conversation goes straight through: whichever surface is
+  // mounted, the chat reads ITS state and its commands reach IT. Nothing here
+  // knows what a black hole is, which is the property that makes the next
+  // surface a file and not a change to this one.
+  const pass = { initial, fill, onRead, ops };
   const object = scene.sim?.object ?? 'black-hole';
-  if (object === 'big-bang') return <BigBangSurface initial={initial} fill={fill} />;
-  if (object === 'orbit') return <GravitySurface initial={initial} fill={fill} />;
-  return <BlackHoleSurface initial={initial} fill={fill} />;
+  if (object === 'big-bang') return <BigBangSurface {...pass} />;
+  if (object === 'orbit') return <GravitySurface {...pass} />;
+  return <BlackHoleSurface {...pass} />;
 }

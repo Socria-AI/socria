@@ -41,6 +41,7 @@ import {
 } from '@/lib/logos-physics';
 import { elementColour, primordial } from '@/lib/elements';
 import { Surface3D, type RenderArgs, type SurfaceRender, type SurfaceProps, snap } from './Surface3D';
+import { BIG_BANG_ENTITIES, SURFACE_MODEL } from '@/lib/viz-semantics';
 
 /** One colour per family. The legend and the picture read the same table. */
 export const FAMILY_COLOUR: Record<string, string> = {
@@ -91,7 +92,7 @@ const LAYERS = [
 
 const INITIAL = { logA: -12, rate: 0.6, om: COSMO.omegaM, ol: COSMO.omegaL, h0: COSMO.H0, n: 160 };
 
-export function BigBangSurface({ initial, fill }: SurfaceProps = {}) {
+export function BigBangSurface({ initial, fill, onRead, ops }: SurfaceProps = {}) {
   const render = useCallback((a: RenderArgs): SurfaceRender => {
     const { W, H, cam, t, vals, layers } = a;
     const c: Cosmology = {
@@ -151,7 +152,7 @@ export function BigBangSurface({ initial, fill }: SurfaceProps = {}) {
           const v = Math.sin(th) * R;
           return plane === 'xz' ? cast(u, 0, v) : plane === 'yz' ? cast(0, u, v) : cast(u, v, 0);
         });
-        nodes.push(<path key={`s${key}`} className="bbx-shell" d={d(pts)} />);
+        nodes.push(<path key={`s${key}`} data-obj="shell" className="bbx-shell" d={d(pts)} />);
       }
       // a few earlier shells, so the expansion leaves a wake
       for (let k = 1; k <= 4; k++) {
@@ -161,7 +162,7 @@ export function BigBangSurface({ initial, fill }: SurfaceProps = {}) {
           const th = (i / 64) * Math.PI * 2;
           return cast(rr * Math.cos(th), 0, rr * Math.sin(th));
         });
-        nodes.push(<path key={`w${k}`} className="bbx-wake" d={d(pts)} opacity={0.3 - k * 0.055} />);
+        nodes.push(<path key={`w${k}`} data-obj="shell" className="bbx-wake" d={d(pts)} opacity={snap(0.3 - k * 0.055)} />);
       }
     }
 
@@ -205,6 +206,7 @@ export function BigBangSurface({ initial, fill }: SurfaceProps = {}) {
         nodes.push(
           <circle
             key={`p${i}`}
+            data-obj="content"
             cx={snap(p.x)}
             cy={snap(p.y)}
             r={snap(Math.max(0.5, 1.35 * p.f))}
@@ -220,6 +222,7 @@ export function BigBangSurface({ initial, fill }: SurfaceProps = {}) {
         nodes.push(
           <circle
             key="fog"
+            data-obj="fog"
             cx={W / 2}
             cy={H / 2}
             r={snap(R * scale * (cam.dist / Math.max(0.35, cam.dist)))}
@@ -237,7 +240,7 @@ export function BigBangSurface({ initial, fill }: SurfaceProps = {}) {
       const x1 = W - 18;
       const at = (la: number) => x0 + ((la + 34) / 34) * (x1 - x0);
       nodes.push(
-        <path key="axis" className="bbx-axis" d={`M${x0},${y0} L${x1},${y0}`} />
+        <path key="axis" data-obj="timeline" className="bbx-axis" d={`M${x0},${y0} L${x1},${y0}`} />
       );
       for (const e of eps) {
         const la = Math.log10(Math.max(1e-34, e.a));
@@ -246,13 +249,14 @@ export function BigBangSurface({ initial, fill }: SurfaceProps = {}) {
         nodes.push(
           <path
             key={`e${e.id}`}
+            data-obj="timeline"
             className={`bbx-tick${e.speculative ? ' spec' : ''}`}
             d={`M${x.toFixed(1)},${y0 - 5} L${x.toFixed(1)},${y0 + 5}`}
           />
         );
       }
       nodes.push(
-        <circle key="head" className="bbx-head" cx={snap(at(logA))} cy={snap(y0)} r="3.4" />
+        <circle key="head" data-obj="head" className="bbx-head" cx={snap(at(logA))} cy={snap(y0)} r="3.4" />
       );
     }
 
@@ -274,6 +278,15 @@ export function BigBangSurface({ initial, fill }: SurfaceProps = {}) {
 
     return {
       content: nodes,
+      live: {
+        shell: `radius stands for a = 10^${logA.toFixed(1)}; z = ${z > 1e4 ? z.toExponential(2) : z.toFixed(0)}`,
+        content: `${here.map((s2) => s2.label).join(', ')} — ${Math.round(vals.n)} parcels drawn as a sample`,
+        fog: opaque
+          ? `drawn: the universe is still opaque at z = ${z.toExponential(2)}, above last scattering at z = ${zLS.toFixed(0)}`
+          : `not drawn: light crosses freely below z = ${zLS.toFixed(0)}`,
+        timeline: `the epoch shown is ${current.label}${current.speculative ? ', which is not established physics' : ''}`,
+        head: `at t = ${age < 1 ? `${age.toExponential(2)} s` : sayText(age, 's')}, T = ${sayText(T, 'K')}`,
+      },
       left: `T = ${sayText(T, 'K')} · kT = ${eV > 1e6 ? `${(eV / 1e6).toPrecision(3)} MeV` : eV > 1e3 ? `${(eV / 1e3).toPrecision(3)} keV` : `${eV.toPrecision(3)} eV`}`,
       right: `t = ${age < 1 ? `${age.toExponential(2)} s` : sayText(age, 's')} · z = ${z > 1e4 ? z.toExponential(2) : z.toFixed(0)}`,
       note: current.speculative
@@ -288,6 +301,13 @@ export function BigBangSurface({ initial, fill }: SurfaceProps = {}) {
   return (
     <Surface3D
       title="The Big Bang · a thermal history"
+      surface="big-bang"
+      entities={BIG_BANG_ENTITIES}
+      model={SURFACE_MODEL['big-bang'].model}
+      assumptions={SURFACE_MODEL['big-bang'].assumptions}
+      equations={SURFACE_MODEL['big-bang'].equations}
+      onRead={onRead}
+      ops={ops}
       groups={GROUPS}
       layers={LAYERS}
       initial={{ ...INITIAL, ...initial }}

@@ -26,6 +26,7 @@ import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { boundaryNote, limitOf } from '@/lib/entitlements';
 import { reportUpstream } from '@/lib/upstream-error';
 import { sanitizeViz, sceneBlock } from '@/lib/logos-viz';
+import { sanitizeModelState, vizModelBlock } from '@/lib/viz-model';
 import {
   bumpUsage,
   chatAlreadyCounted,
@@ -322,6 +323,8 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    const vizState = sanitizeModelState(body?.vizState);
+
     const guided =
       system +
       guidanceBlock(resolveDepth(body?.depth), resolveGuard(body?.guard), 'chat') +
@@ -330,13 +333,25 @@ export async function POST(req: NextRequest) {
       // instructions — each block subordinating itself to what came before.
       personalityBlock(body?.persona) +
       styleBlock(body?.style) +
-      // What they are looking at. Re-sanitised here rather than trusted: the
-      // scene arrives from the browser like everything else in this body, and
-      // a picture is a place to hide an instruction.
-      sceneBlock(
-        body?.viz ? sanitizeViz(body.viz) : null,
-        body?.vizValues && typeof body.vizValues === 'object' ? body.vizValues : undefined
-      ) +
+      // What they are looking at.
+      //
+      // TWO BLOCKS, AND ONLY ONE OF THEM AT A TIME. `vizState` is the picture
+      // reporting itself — every object with what it means, every control
+      // where it stands, what is selected — and where it is present it says
+      // strictly more than the scene description ever could, including the
+      // fact that the values are CURRENT rather than where the picture opened.
+      // The older block stays for the case it was written for: a scene that is
+      // on screen but has not reported, on a client that has not caught up.
+      //
+      // Re-sanitised here rather than trusted. Both arrive from a browser like
+      // everything else in this body, and a description of a picture is a
+      // fine place to hide an instruction.
+      (vizState
+        ? vizModelBlock(vizState)
+        : sceneBlock(
+            body?.viz ? sanitizeViz(body.viz) : null,
+            body?.vizValues && typeof body.vizValues === 'object' ? body.vizValues : undefined
+          )) +
       memoryBlock +
       // Logos 2: when two people are in the room, Socria becomes the layer
       // between them. See lib/collab.ts collabBlock — it names both, confines

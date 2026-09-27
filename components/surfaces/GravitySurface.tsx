@@ -36,6 +36,7 @@ import {
   type GravityPreset,
 } from '@/lib/logos-physics';
 import { Surface3D, type RenderArgs, type SurfaceRender, type SurfaceProps, snap } from './Surface3D';
+import { GRAVITY_ENTITIES, SURFACE_MODEL } from '@/lib/viz-semantics';
 
 const PRESETS: { id: GravityPreset; label: string }[] = [
   { id: 'two', label: 'Two bodies' },
@@ -83,7 +84,7 @@ const LAYERS = [
 
 const INITIAL = { preset: 1, speed: 60, trail: 400, zoomf: 1, rate: 1 };
 
-export function GravitySurface({ initial, fill }: SurfaceProps = {}) {
+export function GravitySurface({ initial, fill, onRead, ops }: SurfaceProps = {}) {
   // The state the integrator owns. Held in a ref rather than in React state
   // because it changes sixty times a second and nothing about it belongs in a
   // render: the component reads it, it never sets it.
@@ -177,6 +178,7 @@ export function GravitySurface({ initial, fill }: SurfaceProps = {}) {
           nodes.push(
             <path
               key={`t${i}`}
+              data-obj="trails"
               d={d(tr.map((p) => cast(p.x, p.y)))}
               fill="none"
               stroke={MASS_COLOUR[i % MASS_COLOUR.length]}
@@ -194,6 +196,7 @@ export function GravitySurface({ initial, fill }: SurfaceProps = {}) {
           nodes.push(
             <circle
               key={`b${i}`}
+              data-obj="bodies"
               cx={snap(p.x)}
               cy={snap(p.y)}
               r={snap(r)}
@@ -208,7 +211,7 @@ export function GravitySurface({ initial, fill }: SurfaceProps = {}) {
         const c = barycentre(s.bodies);
         const p = cast(c.x, c.y);
         nodes.push(
-          <g key="com">
+          <g key="com" data-obj="com">
             <path className="gvx-com" d={`M${p.x - 5},${p.y} L${p.x + 5},${p.y}`} />
             <path className="gvx-com" d={`M${p.x},${p.y - 5} L${p.x},${p.y + 5}`} />
           </g>
@@ -228,6 +231,11 @@ export function GravitySurface({ initial, fill }: SurfaceProps = {}) {
 
       return {
         content: nodes,
+        live: {
+          bodies: `${s.bodies.length} bodies, setup "${PRESETS[Math.round(vals.preset)].label}", ${s.steps} integration steps taken so far`,
+          trails: `keeping the last ${Math.round(vals.trail)} points of each path`,
+          com: `energy drift ${(drift * 100).toExponential(1)}% since the start — the integrator marking its own work`,
+        },
         left: `energy drift ${(drift * 100).toExponential(1)}%`,
         right: `${simYears < 1 ? `${(simYears * 365.25).toFixed(1)} d` : sayText(simYears * PHYS.year, 's')} simulated`,
         note:
@@ -247,6 +255,13 @@ export function GravitySurface({ initial, fill }: SurfaceProps = {}) {
   return (
     <Surface3D
       title="Gravity · N bodies, integrated"
+      surface="orbit"
+      entities={GRAVITY_ENTITIES}
+      model={SURFACE_MODEL.orbit.model}
+      assumptions={SURFACE_MODEL.orbit.assumptions}
+      equations={SURFACE_MODEL.orbit.equations}
+      onRead={onRead}
+      ops={ops}
       groups={GROUPS}
       layers={LAYERS}
       initial={{ ...INITIAL, ...initial }}

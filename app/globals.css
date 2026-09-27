@@ -6422,6 +6422,32 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
 .logos-root .lg-viz-err { color: var(--lg-tension); }
 .logos-root .lg-viz-hint { color: var(--lg-ink-40); }
 
+/* What the reader clicked on the plot, so "this" has an antecedent in the
+   conversation as well as under the pointer. Same idea, same restraint as the
+   working surfaces' chip (components/surfaces/surfaces.css). */
+.logos-root .lg-viz-sel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 0;
+  font-size: 11px;
+  color: var(--lg-ink-60);
+}
+.logos-root .lg-viz-sel button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: inherit;
+  padding: 2px 8px;
+  border-radius: 999px;
+  color: var(--lg-primary);
+  background: rgba(53, 70, 32, 0.07);
+  border: 1px solid rgba(53, 70, 32, 0.18);
+  cursor: pointer;
+}
+.logos-root .lg-viz-sel button i { font-style: normal; opacity: 0.6; }
+.logos-root .lg-viz-svg [data-obj] { cursor: pointer; }
+
 .logos-root .lg-viz-caption {
   flex: 0 0 auto;
   margin: 0;

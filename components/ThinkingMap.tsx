@@ -27,6 +27,7 @@ import { StatusMark } from './StatusMark';
 import { TeX, MathText } from './TeX';
 import { MathPlot } from './MathPlot';
 import { SceneSurface, isSimulation } from '@/components/surfaces/SceneSurface';
+import type { VizModelState, VizOp } from '@/lib/viz-model';
 import { MathViz } from './MathViz';
 import { MatrixLens } from './MatrixLens';
 import type { VizScene } from '@/lib/logos-viz';
@@ -106,6 +107,8 @@ export function ThinkingMap({
   onLocked,
   researchLocked,
   onViz,
+  onVizRead,
+  vizOps,
 }: {
   map: TMap;
   initialLens?: LensId;
@@ -148,6 +151,17 @@ export function ThinkingMap({
   researchLocked?: boolean;
   /** the reader edited the interactive graph — keep it with the session */
   onViz?: (scene: VizScene) => void;
+  /**
+   * The seam between the picture and the conversation.
+   *
+   * Whatever is mounted in the plot lens — a working surface or a plot — hands
+   * back a function that reads its own state, and this passes it straight up.
+   * The map itself learns nothing about black holes or tangent lines by doing
+   * so, which is the property that keeps this general.
+   */
+  onVizRead?: (read: (() => VizModelState) | null) => void;
+  /** changes the conversation asked for, on their way down to the picture */
+  vizOps?: { seq: number; ops: VizOp[] } | null;
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const posRef = useRef<Map<string, P>>(new Map());
@@ -625,13 +639,15 @@ export function ThinkingMap({
             // the lens reaches them.
             isSimulation(map.viz) ? (
               <div className="lg-viz-surface">
-                <SceneSurface scene={map.viz} />
+                <SceneSurface scene={map.viz} onRead={onVizRead} ops={vizOps} />
               </div>
             ) : (
               <MathViz
                 scene={map.viz}
                 width={size.w}
                 height={size.h}
+                onRead={onVizRead}
+                ops={vizOps}
                 guarded={guarded}
                 onSceneChange={onViz}
               />
