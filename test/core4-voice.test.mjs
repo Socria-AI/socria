@@ -16,7 +16,7 @@
 // the six ways this goes wrong in a way a user would immediately clock, and
 // none of them is caught by asking "does it have a personality".
 
-import { EMPTY_STATE } from './.tmp/state.mjs';
+import { EMPTY_STATE } from './.tmp/cognition-state.mjs';
 import { readSignals, NO_SIGNALS } from './.tmp/signals.mjs';
 import { allocate } from './.tmp/allocation.mjs';
 import { budgetFrom, diminishingReturns } from './.tmp/budget.mjs';

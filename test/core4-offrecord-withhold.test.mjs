@@ -18,7 +18,7 @@
 // The throw could not fail a test. So this suite asserts the invariant over
 // the real save function instead of relying on that throw.
 
-import { EMPTY_STATE } from './.tmp/state.mjs';
+import { EMPTY_STATE } from './.tmp/cognition-state.mjs';
 import { readSignals, NO_SIGNALS } from './.tmp/signals.mjs';
 import { allocate } from './.tmp/allocation.mjs';
 // EVIDENCE_WITHHELD comes through turn.mjs: lib/mind/types.ts already owns

@@ -8,7 +8,7 @@
 // would report for a real moment; the assertions are about what Socria may
 // and may not do with it.
 
-import { EMPTY_STATE } from './.tmp/state.mjs';
+import { EMPTY_STATE } from './.tmp/cognition-state.mjs';
 import { route, renderMove } from './.tmp/router.mjs';
 import { checkStructure } from './.tmp/guard.mjs';
 import { buildSystemPrompt, EMPTY_MEMORY } from './.tmp/socria-prompt.mjs';

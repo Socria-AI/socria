@@ -1,0 +1,29 @@
+/* components/model/model-view.css
+ *
+ * The two rules the engine's renderer needs wherever it is mounted — the
+ * bench page, the Logos plot lens, a workspace pane. They travel with the
+ * component for the same reason the surfaces' stylesheet does: a view whose
+ * box is invisible and whose marks cannot be clicked is a different component
+ * depending on which page imported which file.
+ */
+
+/* The bounding box and the axes: present enough to give orientation and
+   scale, quiet enough that the model is what the eye lands on. */
+.eng-box path {
+  fill: none;
+  stroke: var(--lg-ink-24, rgba(35, 36, 31, 0.24));
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+/* The hit area for a stroke-only mark: wide, transparent, behind the visible
+   line. Selection is how a question gets an antecedent, and a wireframe
+   nobody can click is a wireframe nobody can ask about. */
+.eng-hit path,
+path.eng-hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 7;
+  vector-effect: non-scaling-stroke;
+  cursor: pointer;
+}

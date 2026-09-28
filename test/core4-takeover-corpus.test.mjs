@@ -18,7 +18,7 @@
 // by asking questions has not passed; a build that helps by writing somebody's
 // story has not passed. Both are counted, both have ceilings.
 
-import { EMPTY_STATE } from './.tmp/state.mjs';
+import { EMPTY_STATE } from './.tmp/cognition-state.mjs';
 import { readSignals, NO_SIGNALS } from './.tmp/signals.mjs';
 import { mergeState, recordTurn } from './.tmp/merge.mjs';
 import { allocate } from './.tmp/allocation.mjs';

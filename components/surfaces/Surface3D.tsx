@@ -162,6 +162,23 @@ export interface Surface3DProps {
   assumptions?: string[];
   equations?: string[];
   /**
+   * Verbs this view supports beyond the universal ones — slicing, flattening,
+   * moving through time, comparing. A surface built by hand has none of them;
+   * one backed by a model (lib/model/) has all four, because they are
+   * operations on the model rather than on the drawing.
+   */
+  can?: VizModelState['can'];
+  /**
+   * Ops the frame does not own, handed on rather than dropped.
+   *
+   * The frame applies what it holds — a control, a layer, the clock, the
+   * camera — and a model-backed view owns the rest. Without this the frame
+   * would either have to learn what a slice is or silently swallow one, and
+   * a reply that said "sliced at y = 1" while nothing moved is the worse of
+   * those two failures.
+   */
+  onOps?: (ops: VizOp[]) => void;
+  /**
    * Fill the box it is mounted in rather than standing as a card of its own.
    * Set wherever something else has already decided the size — the Logos plot
    * lens, a workspace pane — so the surface does not draw a border inside a
@@ -194,6 +211,8 @@ export function Surface3D({
   model = '',
   assumptions = [],
   equations = [],
+  can,
+  onOps,
   onRead,
   ops = null,
 }: Surface3DProps & Pick<SurfaceProps, 'onRead' | 'ops'>) {
@@ -435,6 +454,9 @@ export function Surface3D({
   useEffect(() => {
     if (!ops || ops.seq === seen.current) return;
     seen.current = ops.seq;
+    const mine = new Set(['set', 'layer', 'select', 'play', 'pause', 'reset', 'camera']);
+    const theirs = ops.ops.filter((o) => !mine.has(o.op));
+    if (theirs.length) onOps?.(theirs);
     for (const op of ops.ops) {
       if (op.op === 'set') setVals((v) => ({ ...v, [op.id]: op.value }));
       else if (op.op === 'layer') setOn((o) => ({ ...o, [op.id]: op.on }));
@@ -450,7 +472,7 @@ export function Surface3D({
         );
       }
     }
-  }, [ops, reset, distRange]);
+  }, [ops, reset, distRange, onOps]);
 
   const W = Math.max(140, Math.round(box.w));
   const H = Math.max(90, Math.round(box.h));
@@ -507,6 +529,7 @@ export function Surface3D({
         : {}),
       readouts: [c.out.left, c.out.right, c.out.note].filter(Boolean) as string[],
       selected: c.selected,
+      ...(can?.length ? { can } : {}),
     };
     // Everything read inside comes from the ref or from props that do not
     // change for the life of a surface, so this function is stable — which is

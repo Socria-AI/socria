@@ -138,6 +138,16 @@ export interface VizModelState {
   readouts: string[];
   /** what the reader last clicked, if anything — what "this" means */
   selected: string | null;
+  /**
+   * Verbs this view supports beyond the universal ones.
+   *
+   * A working surface offers the controls it was built with and nothing else;
+   * a view backed by a model (lib/model/) can also be sliced, flattened,
+   * moved through time and compared, because those are operations on the
+   * model rather than on the picture. Absent means the old set exactly, which
+   * is what keeps every existing surface behaving as it did.
+   */
+  can?: readonly ('slice' | 'view' | 'time' | 'compare')[];
 }
 
 // ── sanitising ───────────────────────────────────────────────────────
@@ -268,6 +278,11 @@ export function sanitizeModelState(raw: unknown): VizModelState | null {
   const selRaw = text(r.selected, 32);
   const selected = selRaw && entities.some((e) => e.id === selRaw) ? selRaw : null;
 
+  const CAN = ['slice', 'view', 'time', 'compare'] as const;
+  const can = Array.isArray(r.can)
+    ? (r.can.filter((c): c is (typeof CAN)[number] => CAN.includes(c as never)) as (typeof CAN)[number][])
+    : [];
+
   return {
     surface,
     title: text(r.title, 90),
@@ -281,6 +296,7 @@ export function sanitizeModelState(raw: unknown): VizModelState | null {
     ...(clock ? { clock } : {}),
     readouts: list(r.readouts, VIZ_CAPS.readouts, 200),
     selected,
+    ...(can.length ? { can } : {}),
   };
 }
 
@@ -301,7 +317,24 @@ export type VizOp =
   | { op: 'play' }
   | { op: 'pause' }
   | { op: 'reset' }
-  | { op: 'camera'; field: 'yaw' | 'pitch' | 'dist'; value: number };
+  | { op: 'camera'; field: 'yaw' | 'pitch' | 'dist'; value: number }
+  // ── the verbs a model-backed view adds ──────────────────────────
+  //
+  // These reach the MODEL rather than the drawing, which is why they are
+  // here and not in the renderer: "hold y at 1" is a statement about the
+  // thing being looked at, and the 2D curve it produces is as true as the
+  // surface it was cut from (lib/model/compile.ts buildSlice). A surface
+  // that has no model behind it never offers them — see `can` on the state.
+  /** cut a cross-section: the curve where the object meets a plane */
+  | { op: 'slice'; axis: 'x' | 'y'; at: number }
+  /** put the slice away and look at the whole thing again */
+  | { op: 'unslice' }
+  /** ask for a dimensionality rather than accepting the chosen one */
+  | { op: 'view'; as: '2d' | '3d' }
+  /** move to an instant; time is a dimension of the model, not a control */
+  | { op: 'time'; value: number }
+  /** keep the state as it stands, to put the next one beside it */
+  | { op: 'compare'; on: boolean };
 
 export const VIZ_FENCE = 'socria-viz';
 /** No reply needs more than a handful; a long list is a runaway, not an edit. */
@@ -385,6 +418,41 @@ export function parseVizOps(reply: string, state: VizModelState | null | undefin
       else if (entities.has(id)) out.push({ op: 'select', id });
       continue;
     }
+    // The model-backed verbs. Checked against `can` rather than always
+    // accepted: a working surface with no model behind it cannot be sliced,
+    // and an op it would silently ignore is worse than one that is dropped
+    // here — the reply would have described a change that never happened.
+    const allows = (v: 'slice' | 'view' | 'time' | 'compare') => (state.can ?? []).includes(v);
+
+    if (verb === 'slice' && bits.length >= 3 && allows('slice')) {
+      const axis = bits[1].toLowerCase();
+      const v = Number(bits[2]);
+      if ((axis === 'x' || axis === 'y') && Number.isFinite(v)) {
+        out.push({ op: 'slice', axis, at: v });
+      }
+      continue;
+    }
+    if ((verb === 'unslice' || (verb === 'slice' && /^(off|none|clear)$/i.test(bits[1] ?? ''))) && allows('slice')) {
+      out.push({ op: 'unslice' });
+      continue;
+    }
+    if (verb === 'view' && bits.length >= 2 && allows('view')) {
+      const as = bits[1].toLowerCase();
+      if (as === '2d' || as === '3d') out.push({ op: 'view', as });
+      continue;
+    }
+    if (verb === 'time' && bits.length >= 2 && allows('time')) {
+      const v = Number(bits[1]);
+      if (Number.isFinite(v)) out.push({ op: 'time', value: v });
+      continue;
+    }
+    if (verb === 'compare' && bits.length >= 2 && allows('compare')) {
+      const on = /^(on|true|keep|1)$/i.test(bits[1]);
+      const off = /^(off|false|clear|0)$/i.test(bits[1]);
+      if (on || off) out.push({ op: 'compare', on });
+      continue;
+    }
+
     if (verb === 'camera' && bits.length >= 3) {
       const field = bits[1].toLowerCase();
       const v = Number(bits[2]);
@@ -542,6 +610,10 @@ export function vizOpsHelp(state: VizModelState): string {
     'select <object>|none        objects: by the id in brackets above',
     'play | pause | reset',
     state.camera ? 'camera yaw|pitch|dist <number>' : '',
+    (state.can ?? []).includes('slice') ? 'slice x|y <number> | unslice     a cross-section, computed from the definition' : '',
+    (state.can ?? []).includes('view') ? 'view 2d|3d                       the same model, drawn flat or in space' : '',
+    (state.can ?? []).includes('time') ? 'time <number>                    move to an instant' : '',
+    (state.can ?? []).includes('compare') ? 'compare on|off                   hold this state beside the next one' : '',
     '```',
     `At most ${MAX_OPS} lines. Only those ids; anything else is dropped. Values outside a control's range are clamped to it, because the range belongs to the physics and not to the conversation.`,
     'No block at all when they did not ask for a change — an answer to "what is this?" moves nothing.',

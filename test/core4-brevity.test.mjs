@@ -21,7 +21,7 @@
 // long reply and cannot recover a missing one. Every "must NOT be trimmed" case
 // below is load-bearing.
 
-import { EMPTY_STATE } from './.tmp/state.mjs';
+import { EMPTY_STATE } from './.tmp/cognition-state.mjs';
 import { readSignals, readContract, NO_SIGNALS } from './.tmp/signals.mjs';
 import { allocate } from './.tmp/allocation.mjs';
 import { budgetFrom, diminishingReturns } from './.tmp/budget.mjs';

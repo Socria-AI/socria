@@ -25,7 +25,7 @@
 // retrieval, explanation, critique of real material, delegated work and
 // mechanical turns must all still happen in full.
 
-import { EMPTY_STATE } from './.tmp/state.mjs';
+import { EMPTY_STATE } from './.tmp/cognition-state.mjs';
 import { readSignals, NO_SIGNALS } from './.tmp/signals.mjs';
 import { mergeState, recordTurn } from './.tmp/merge.mjs';
 import { allocate } from './.tmp/allocation.mjs';

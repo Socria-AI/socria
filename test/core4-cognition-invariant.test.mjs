@@ -24,7 +24,7 @@
 // roles, none of the labels ever shown to a person — read by the allocator, the
 // move and the guard. Not a keyword list, and not a refusal system.
 
-import { EMPTY_STATE } from './.tmp/state.mjs';
+import { EMPTY_STATE } from './.tmp/cognition-state.mjs';
 import { readSignals, NO_SIGNALS } from './.tmp/signals.mjs';
 import { mergeState, recordTurn } from './.tmp/merge.mjs';
 import { allocate } from './.tmp/allocation.mjs';

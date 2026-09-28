@@ -27,6 +27,7 @@ import { StatusMark } from './StatusMark';
 import { TeX, MathText } from './TeX';
 import { MathPlot } from './MathPlot';
 import { SceneSurface, isSimulation } from '@/components/surfaces/SceneSurface';
+import { ModelView } from '@/components/model/ModelView';
 import type { VizModelState, VizOp } from '@/lib/viz-model';
 import { MathViz } from './MathViz';
 import { MatrixLens } from './MatrixLens';
@@ -637,7 +638,19 @@ export function ThinkingMap({
             // passing behind anything it reads as a diagram of a black hole
             // rather than one. The surfaces are the real ones; this is where
             // the lens reaches them.
-            isSimulation(map.viz) ? (
+            // A SCENE THAT CARRIES A MODEL IS DRAWN BY THE ENGINE.
+            //
+            // Three routes out of one lens, in order of how much the picture
+            // knows about itself: a structured model (lib/model/) drawn by
+            // the one renderer that draws every model; a named simulated
+            // object with a surface of its own; and everything else, which is
+            // a figure of an expression and belongs on the plot renderer.
+            // The lens learns nothing new for any of them.
+            map.viz.built ? (
+              <div className="lg-viz-surface lg-tokens">
+                <ModelView model={map.viz.built} onRead={onVizRead} ops={vizOps} />
+              </div>
+            ) : isSimulation(map.viz) ? (
               <div className="lg-viz-surface">
                 <SceneSurface scene={map.viz} onRead={onVizRead} ops={vizOps} />
               </div>

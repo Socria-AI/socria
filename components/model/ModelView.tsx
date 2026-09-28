@@ -1,0 +1,491 @@
+'use client';
+
+// components/model/ModelView.tsx
+//
+// ONE RENDERER FOR EVERY MODEL, in two dimensions or three.
+//
+// It knows points, lines, meshes, arrows, regions and words. It does not know
+// what a volatility surface is, what a pendulum is, or what a geodesic is —
+// those are models (lib/model/library.ts), and a model that needed its own
+// component would mean this design had failed.
+//
+// WHY 2D AND 3D ARE ONE COMPONENT AND NOT TWO. "Flatten this" and "hold y
+// constant" have to keep the same model, the same controls, the same
+// selection and the same conversation; two components would mean two of each,
+// drifting. So the dimensionality is a property of the VIEW, the primitives
+// are the same primitives either way, and flattening a surface draws its level
+// sets rather than a different object — which is what a contour map IS.
+//
+// WHAT IT REUSES. The frame (Surface3D) for the camera, the clock, the
+// controls, full screen, selection and the seam to the conversation; the
+// projection and the box from lib/logos-viz3d. Nothing here is a second copy
+// of either.
+
+import './model-view.css';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import { Surface3D, snap, type RenderArgs, type SurfaceRender } from '@/components/surfaces/Surface3D';
+import { boxLines, place, type Camera, type Frame3, type Pt2 } from '@/lib/logos-viz3d';
+import { contour } from '@/lib/model/sample';
+import type { P3, Primitive } from '@/lib/model/primitives';
+import { buildSlice } from '@/lib/model/compile';
+import { buildSpec, type VisualizationSpec } from '@/lib/model/spec';
+import { modelStateFrom, applyOps, type ViewState } from '@/lib/model/state';
+import { objectOf, setParam, setTime, type Model } from '@/lib/model/schema';
+import type { VizEntity, VizModelState, VizOp } from '@/lib/viz-model';
+
+/** The palette, by role. The same five the rest of Logos draws with. */
+const TONE: Record<string, string> = {
+  primary: 'var(--lg-primary)',
+  accent: 'var(--lg-accent)',
+  tension: 'var(--lg-tension)',
+  muted: 'var(--lg-ink-40)',
+  ghost: 'var(--lg-ink-24)',
+  u1: '#7C6A9C',
+  u2: '#3F7F6E',
+  u3: '#B07C3A',
+  u4: '#5A7BA6',
+};
+const strokeOf = (prim: Primitive) => prim.color || TONE[prim.tone ?? 'primary'] || TONE.primary;
+
+/** A frame that maps the spec's box onto the unit cube the projection uses. */
+function frameOf(spec: VisualizationSpec): Frame3 {
+  return {
+    x: { min: spec.box.x[0], max: spec.box.x[1] },
+    y: { min: spec.box.y[0], max: spec.box.y[1] },
+    z: { min: spec.box.z[0], max: spec.box.z[1] },
+  };
+}
+
+const d2 = (pts: { x: number; y: number }[]) =>
+  pts.map((p, i) => `${i ? 'L' : 'M'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+
+export function ModelView({
+  model: initial,
+  fill,
+  onRead,
+  ops,
+  onModel,
+}: {
+  model: Model;
+  fill?: boolean;
+  onRead?: (read: (() => VizModelState) | null) => void;
+  ops?: { seq: number; ops: VizOp[] } | null;
+  /** so a host can keep the manipulated model — a session, a comparison */
+  onModel?: (model: Model) => void;
+}) {
+  // THE MODEL IS THE STATE. The frame holds the camera and the clock; this
+  // holds the thing being looked at, so a control moved in the chrome and a
+  // control moved from the conversation land in the same place.
+  const [model, setModel] = useState<Model>(initial);
+  const [view, setView] = useState<ViewState>({});
+  const [held, setHeld] = useState<Model | null>(null);
+
+  const spec = useMemo(
+    () => buildSpec(model, { view: view.as ?? 'auto' }),
+    [model, view.as]
+  );
+  const frame = useMemo(() => frameOf(spec), [spec]);
+
+  // A cross-section, computed from the definition rather than read off the
+  // mesh — see lib/model/compile.ts buildSlice for why that distinction is
+  // not pedantry.
+  const slice = useMemo(() => {
+    if (!view.slice) return null;
+    for (const o of model.objects) {
+      const cut = buildSlice(model, o, view.slice.axis, view.slice.at);
+      if (cut?.value.length) return { of: o.id, prims: cut.value, note: cut.note };
+    }
+    return null;
+  }, [model, view.slice]);
+
+  const groups = useMemo(
+    () => [
+      {
+        id: 'model',
+        label: 'Model',
+        ctls: model.params.map((p) => ({
+          id: p.id,
+          label: p.label,
+          min: p.min,
+          max: p.max,
+          step: p.step ?? (p.max - p.min) / 100,
+          read: (v: number) => `${Number(v.toPrecision(4))}${p.units ? ` ${p.units}` : ''}`,
+          ...(p.means ? { help: p.means } : {}),
+        })),
+      },
+    ],
+    [model.params]
+  );
+  const layers = useMemo(
+    () => (model.layers ?? []).map((l) => ({ id: l.id, label: l.label })),
+    [model.layers]
+  );
+  const initialVals = useMemo(
+    () => Object.fromEntries(initial.params.map((p) => [p.id, p.value])),
+    [initial.params]
+  );
+
+  const entities: VizEntity[] = useMemo(
+    () => modelStateFrom(model, spec).entities,
+    [model, spec]
+  );
+
+  /** Ops the frame does not own: slice, flatten, time, compare. */
+  const takeOps = useCallback(
+    (list: VizOp[]) => {
+      const applied = applyOps(model, list, view);
+      setModel(applied.model);
+      setView(applied.view);
+      onModel?.(applied.model);
+    },
+    [model, view, onModel]
+  );
+
+  // The frame owns the controls, so a slider move arrives here as `vals`.
+  // Writing it back into the model is what makes one control move one object:
+  // everything downstream reads the model, and the model knows what depends
+  // on what.
+  const lastVals = useRef<Record<string, number>>(initialVals);
+  const sync = useCallback(
+    (vals: Record<string, number>, t: number) => {
+      let next = model;
+      for (const p of model.params) {
+        const v = vals[p.id];
+        if (typeof v === 'number' && v !== p.value) next = setParam(next, p.id, v);
+      }
+      if (model.time && t !== model.time.t) next = setTime(next, Math.min(model.time.max, t));
+      if (next !== model) {
+        lastVals.current = vals;
+        // Deferred: the frame is mid-render when this runs, and React will
+        // not have a component update another during one. A microtask is
+        // enough, and the next frame draws the new model.
+        queueMicrotask(() => {
+          setModel(next);
+          onModel?.(next);
+        });
+      }
+    },
+    [model, onModel]
+  );
+
+  const render = useCallback(
+    (a: RenderArgs): SurfaceRender => {
+      sync(a.vals, a.t);
+      const flat = spec.dimensionality === 2;
+      const nodes: { z: number; node: React.ReactNode }[] = [];
+      const on = (prim: Primitive) => !prim.layer || a.layers[prim.layer] !== false;
+
+      // ── where a model point lands on the page ──
+      //
+      // Three dimensions go through the projection the plot renderer already
+      // uses; two are a straight linear map with the camera's distance as the
+      // zoom, so the same primitives draw either way and a flattened view is
+      // the same picture seen square on.
+      // The projection is ORTHOGRAPHIC and takes no distance: a graph drawn
+      // in perspective makes equal quantities look unequal, which is a lie a
+      // figure must not tell. The frame's `dist` is the zoom, applied below.
+      const cam: Camera = { yaw: a.cam.yaw, pitch: a.cam.pitch };
+      const zoom = 3.4 / Math.max(0.6, a.cam.dist);
+      const pad = 28;
+      const sx = (x: number) =>
+        pad + ((x - spec.box.x[0]) / (spec.box.x[1] - spec.box.x[0])) * (a.W - pad * 2);
+      const sy = (y: number) =>
+        a.H - pad - ((y - spec.box.y[0]) / (spec.box.y[1] - spec.box.y[0])) * (a.H - pad * 2);
+      const centre = { x: a.W / 2, y: a.H / 2 };
+      const spread = Math.min(a.W, a.H) * 0.42 * zoom;
+      const at = (p: P3): Pt2 & { depth: number } => {
+        if (flat) return { x: sx(p.x), y: sy(p.y), depth: 0 };
+        // place() returns the unit box projected into [-1, 1]; the view puts
+        // that on the page, so zooming is one multiplication rather than a
+        // second projection.
+        const q = place(p, frame, cam);
+        return { x: centre.x + q.x * spread, y: centre.y - q.y * spread, depth: q.depth };
+      };
+
+      const put = (depth: number, node: React.ReactNode) => nodes.push({ z: depth, node });
+
+      // The box. In three dimensions it is the cube the projection implies;
+      // flat, it is two rules, because a rectangle around a plot is furniture.
+      if (!flat) {
+        const box = boxLines(frame, cam).map((line) =>
+          line.map((q) => ({ x: centre.x + q.x * spread, y: centre.y - q.y * spread }))
+        );
+        put(1e9, (
+          <g key="box" className="eng-box">
+            {box.map((line, i) => (
+              <path key={i} d={d2(line)} />
+            ))}
+          </g>
+        ));
+      } else {
+        put(1e9, (
+          <g key="axes" className="eng-box">
+            <path d={`M${pad},${a.H - pad} L${a.W - pad},${a.H - pad}`} />
+            <path d={`M${pad},${pad} L${pad},${a.H - pad}`} />
+          </g>
+        ));
+      }
+
+      for (const prim of spec.primitives) {
+        if (!on(prim)) continue;
+        const stroke = strokeOf(prim);
+        const dim = view.selected && view.selected !== prim.of;
+
+        switch (prim.p) {
+          case 'mesh': {
+            // FLATTENED, A SURFACE IS ITS LEVEL SETS. Not a wireframe seen
+            // from above, which is a grid; the contours are what a surface
+            // means in the plane, and they are computed from the same rows.
+            if (flat) {
+              const rows = prim.rows.map((row) =>
+                row.map((v) => ({ x: v?.x ?? 0, y: v?.y ?? 0, z: v ? v.z : null }))
+              );
+              const levels: Primitive[] = [];
+              const zs = rows.flatMap((r) => r.map((s) => s.z)).filter((z): z is number => z !== null);
+              if (zs.length) {
+                const lo = Math.min(...zs);
+                const hi = Math.max(...zs);
+                for (let k = 1; k <= 9; k++) {
+                  levels.push(...contour(prim.of, rows, lo + ((hi - lo) * k) / 10, { tone: prim.tone }).value);
+                }
+              }
+              put(0, (
+                <g key={`m${prim.of}`} data-obj={prim.of} opacity={dim ? 0.35 : 1}>
+                  {levels.map((l, i) =>
+                    l.p === 'polyline' ? (
+                      <path key={i} d={d2(l.at.map(at))} fill="none" stroke={stroke} strokeWidth={1} />
+                    ) : null
+                  )}
+                </g>
+              ));
+              break;
+            }
+            // In space: a wireframe, both families, broken at holes so a line
+            // is never drawn across something the function does not contain.
+            const paths: string[] = [];
+            const runs = (pts: (P3 | null)[]) => {
+              let run: (Pt2 & { depth: number })[] = [];
+              for (const p of pts) {
+                if (!p) {
+                  if (run.length > 1) paths.push(d2(run));
+                  run = [];
+                  continue;
+                }
+                run.push(at(p));
+              }
+              if (run.length > 1) paths.push(d2(run));
+            };
+            for (const row of prim.rows) runs(row);
+            const cols = prim.rows[0]?.length ?? 0;
+            for (let i = 0; i < cols; i++) runs(prim.rows.map((r) => r[i]));
+            const mid = prim.rows[Math.floor(prim.rows.length / 2)]?.[Math.floor(cols / 2)];
+            // A WIREFRAME IS ALMOST UNCLICKABLE, and selection is how "what
+            // is this?" gets an antecedent. A stroke-only path is only hit
+            // ON the stroke, so each line is drawn twice: once at its own
+            // weight, and once transparent and wide, which is the hit area.
+            // The visible copy takes no pointer events, so the two never
+            // fight over a click.
+            put(mid ? at(mid).depth : 0, (
+              <g key={`m${prim.of}`} data-obj={prim.of} opacity={dim ? 0.3 : 1}>
+                <g className="eng-hit">
+                  {paths.map((dd, i) => (
+                    <path key={i} d={dd} />
+                  ))}
+                </g>
+                <g style={{ pointerEvents: 'none' }}>
+                  {paths.map((dd, i) => (
+                    <path key={i} d={dd} fill="none" stroke={stroke} strokeWidth={0.8} vectorEffect="non-scaling-stroke" />
+                  ))}
+                </g>
+              </g>
+            ));
+            break;
+          }
+
+          case 'polyline': {
+            const pts = prim.at.map(at);
+            if (pts.length < 2) break;
+            const depth = pts.reduce((s, p) => s + p.depth, 0) / pts.length;
+            const dd = d2(pts);
+            put(depth, (
+              <g key={`l${prim.of}${pts.length}${prim.at[0]?.x ?? 0}`} data-obj={prim.of}>
+                <path className="eng-hit" d={dd} />
+                <path
+                  d={dd}
+                  fill="none"
+                  stroke={stroke}
+                  strokeWidth={prim.width ?? 1.6}
+                  strokeDasharray={prim.dashed ? '4 3' : undefined}
+                  opacity={dim ? 0.3 : (prim.alpha ?? 1)}
+                  vectorEffect="non-scaling-stroke"
+                  style={{ pointerEvents: 'none' }}
+                />
+              </g>
+            ));
+            break;
+          }
+
+          case 'points': {
+            put(0, (
+              <g key={`p${prim.of}`} data-obj={prim.of} opacity={dim ? 0.3 : 1}>
+                {prim.at.map((p, i) => {
+                  const q = at(p);
+                  return (
+                    <circle key={i} cx={snap(q.x)} cy={snap(q.y)} r={prim.sized?.[i] ?? prim.r ?? 2} fill={stroke} />
+                  );
+                })}
+              </g>
+            ));
+            break;
+          }
+
+          case 'vectors': {
+            put(0, (
+              <g key={`v${prim.of}`} data-obj={prim.of} opacity={dim ? 0.3 : 1}>
+                {prim.at.map((p, i) => {
+                  const dir = prim.dir[i];
+                  const tip = {
+                    x: p.x + dir.x * prim.scale,
+                    y: p.y + dir.y * prim.scale,
+                    z: p.z + (dir.z ?? 0) * prim.scale,
+                  };
+                  const a0 = at(p);
+                  const a1 = at(tip);
+                  const ang = Math.atan2(a1.y - a0.y, a1.x - a0.x);
+                  const h = 4;
+                  return (
+                    <g key={i}>
+                      <path d={`M${a0.x.toFixed(1)},${a0.y.toFixed(1)} L${a1.x.toFixed(1)},${a1.y.toFixed(1)}`} stroke={stroke} strokeWidth={1} fill="none" />
+                      <path
+                        d={`M${a1.x.toFixed(1)},${a1.y.toFixed(1)} L${(a1.x - h * Math.cos(ang - 0.4)).toFixed(1)},${(a1.y - h * Math.sin(ang - 0.4)).toFixed(1)} M${a1.x.toFixed(1)},${a1.y.toFixed(1)} L${(a1.x - h * Math.cos(ang + 0.4)).toFixed(1)},${(a1.y - h * Math.sin(ang + 0.4)).toFixed(1)}`}
+                        stroke={stroke}
+                        strokeWidth={1}
+                        fill="none"
+                      />
+                    </g>
+                  );
+                })}
+              </g>
+            ));
+            break;
+          }
+
+          case 'region': {
+            const pts = prim.at.map(at);
+            put(0, (
+              <path
+                key={`r${prim.of}`}
+                data-obj={prim.of}
+                d={`${d2(pts)} Z`}
+                fill={stroke}
+                fillOpacity={prim.alpha ?? 0.12}
+                stroke={stroke}
+                strokeWidth={0.8}
+              />
+            ));
+            break;
+          }
+
+          case 'label': {
+            const q = at(prim.at);
+            put(-1e9, (
+              <text key={`t${prim.of}`} data-obj={prim.of} className="sfx-l" x={snap(q.x)} y={snap(q.y)} textAnchor={prim.anchor ?? 'middle'}>
+                {prim.text}
+              </text>
+            ));
+            break;
+          }
+
+          case 'axes':
+            break;
+        }
+      }
+
+      // The cross-section, over everything, in the colour of a cut.
+      if (slice) {
+        for (const prim of slice.prims) {
+          if (prim.p !== 'polyline') continue;
+          const pts = prim.at.map(at);
+          if (pts.length < 2) continue;
+          put(-1e8, (
+            <path
+              key={`s${pts.length}${pts[0].x}`}
+              data-obj={slice.of}
+              d={d2(pts)}
+              fill="none"
+              stroke={TONE.tension}
+              strokeWidth={2.2}
+              vectorEffect="non-scaling-stroke"
+            />
+          ));
+        }
+      }
+
+      nodes.sort((p, q) => q.z - p.z);
+
+      const chosen = spec.notes.find((n) => n.of === (view.selected ?? ''));
+      const selectedLabel = view.selected ? objectOf(model, view.selected)?.label : null;
+      return {
+        content: nodes.map((n) => n.node),
+        left: `${spec.dimensionality}D · ${spec.coordinateSystem}${view.slice ? ` · cut at ${view.slice.axis} = ${Number(view.slice.at.toPrecision(3))}` : ''}`,
+        right: selectedLabel ? `selected: ${selectedLabel}` : spec.title,
+        note:
+          (slice ? `${slice.note}. ` : '') +
+          (chosen?.note ? `${chosen.note}. ` : '') +
+          fidelityLine(spec),
+        label: `${spec.title}: ${spec.primitives.length} drawn objects in ${spec.dimensionality} dimensions.`,
+        live: Object.fromEntries(spec.notes.map((n) => [n.of, n.problem ? `not drawn: ${n.problem}` : n.note])),
+      };
+    },
+    [spec, frame, slice, view.selected, view.slice, model, sync]
+  );
+
+  return (
+    <Surface3D
+      title={model.title}
+      surface={`m-${model.id}`}
+      entities={entities}
+      model={model.domain ?? ''}
+      assumptions={model.assumptions ?? []}
+      equations={model.equations ?? []}
+      can={['slice', 'view', 'time', 'compare']}
+      onOps={takeOps}
+      onRead={onRead}
+      ops={ops}
+      groups={groups}
+      layers={layers}
+      initial={initialVals}
+      initialCam={spec.dimensionality === 3 ? { yaw: 0.6, pitch: 0.5, dist: 3.4 } : { yaw: 0, pitch: 0, dist: 3 }}
+      distRange={[1.4, 14]}
+      animated={!!model.time}
+      render={render}
+      fill={fill}
+    />
+  );
+}
+
+const SAYS: Record<string, string> = {
+  'numerically-computed': 'computed by a numerical method — the shape is a result',
+  simulated: 'stepped forward by this model’s own simulation',
+  'model-derived': 'evaluated from the relationships this model states',
+  'data-derived': 'read from the supplied data, not computed here',
+  conceptual: 'drawn to make the idea legible, not computed',
+};
+
+/**
+ * How real this picture is — and, where its parts differ, BOTH ends of that.
+ *
+ * The view's own label is the modest one, because a picture is only as
+ * computed as its least computed part. Said alone, though, it undersells: an
+ * integrated orbit beside a fixed centre would read as "drawn", which is as
+ * wrong in the other direction. So when the parts disagree, the line says the
+ * floor and then says what the rest of it is.
+ */
+function fidelityLine(spec: VisualizationSpec): string {
+  const kinds = [...new Set(spec.notes.filter((n) => !n.problem).map((n) => n.fidelity))];
+  const floor = SAYS[spec.fidelity] ?? SAYS.conceptual;
+  const others = kinds.filter((k) => k !== spec.fidelity);
+  const capital = floor.charAt(0).toUpperCase() + floor.slice(1);
+  if (!others.length) return `${capital}.`;
+  return `${capital} — and the rest is ${others.map((k) => SAYS[k] ?? k).join(', ')}.`;
+}

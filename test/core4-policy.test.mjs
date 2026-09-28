@@ -14,7 +14,7 @@
 // prove is that the reader REPORTS these states; that is the job of the
 // route tests (scripted state) and the eval harness (evals/core4).
 
-import { EMPTY_STATE, sanitizeState, renderState } from './.tmp/state.mjs';
+import { EMPTY_STATE, sanitizeState, renderState } from './.tmp/cognition-state.mjs';
 import { readSignals, readContract, NO_SIGNALS } from './.tmp/signals.mjs';
 import { mergeState, recordTurn, explicitOutcome, gapCheck } from './.tmp/merge.mjs';
 import { budgetFrom, diminishingReturns, familyOf } from './.tmp/budget.mjs';

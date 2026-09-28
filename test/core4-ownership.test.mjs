@@ -23,7 +23,7 @@
 // the work must be substantial, nothing they have said may already settle it,
 // and a question must be available.
 
-import { EMPTY_STATE } from './.tmp/state.mjs';
+import { EMPTY_STATE } from './.tmp/cognition-state.mjs';
 import { readSignals, NO_SIGNALS } from './.tmp/signals.mjs';
 import { allocate, ownershipRead } from './.tmp/allocation.mjs';
 import { budgetFrom, diminishingReturns } from './.tmp/budget.mjs';

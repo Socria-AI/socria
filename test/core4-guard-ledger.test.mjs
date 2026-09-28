@@ -19,7 +19,7 @@ import { summarize, evidenceFromTurn, assistanceOf } from './.tmp/capability.mjs
 import { buildTrace } from './.tmp/trace.mjs';
 import { exactCheck, sanitizeCheck, renderCheck, hiddenValues, computeAsked, statedSlips } from './.tmp/verify.mjs';
 import { stripSycophanticOpener, sentencesOf, deleteSentences } from './.tmp/questions.mjs';
-import { EMPTY_STATE } from './.tmp/state.mjs';
+import { EMPTY_STATE } from './.tmp/cognition-state.mjs';
 
 let pass = 0, fail = 0;
 const ok = (n, c, x = '') => (c ? (pass++, console.log('  ok   ' + n)) : (fail++, console.log('  FAIL ' + n + '  ' + x)));

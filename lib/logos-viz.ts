@@ -27,6 +27,7 @@
 // Nothing in this file touches React, the network, or time. Frames are
 // deterministic, which is what makes the whole surface testable.
 
+import { sanitizeModel, type Model } from './model/schema';
 import { compileExpr, freeNames, taylorCoeffs, type CompiledExpr } from './logos-math';
 import {
   contourSet,
@@ -585,6 +586,20 @@ export interface VizScene {
    * convincing while meaning nothing.
    */
   sim?: SimSpec;
+  /**
+   * A MODEL, where the picture is one.
+   *
+   * The kinds above are each a shape of figure the extractor may name. This
+   * is the other door: a structured model (lib/model/schema.ts) with its own
+   * objects, meanings, definitions and provenance, drawn by the one renderer
+   * that draws every model. It is how the plot lens reaches the
+   * representation engine without the lens learning anything new, and it is
+   * the seam Logos 2 grows into.
+   *
+   * Sanitised by lib/model/schema.ts sanitizeModel, like everything else that
+   * arrives from outside.
+   */
+  built?: Model;
   /** matrix: the 2×2 transformation, rows first: [[a, b], [c, d]] */
   matrix?: [[number, number], [number, number]];
   /** vectors: the arrows themselves; with exactly two, s·u + t·v is offered */
@@ -5283,6 +5298,10 @@ export function sanitizeViz(raw: any): VizScene | null {
   const kind: VizKind | null = VIZ_KINDS.includes(raw.kind) ? raw.kind : null;
   if (!kind) return null;
 
+  // A model travels with the scene and is cleaned by its own sanitiser: the
+  // one that knows what an object, a control and a data block may be.
+  const built = raw.built ? sanitizeModel(raw.built) : null;
+
   const needsExpr = kindNeedsExpr(kind);
   const expr = typeof raw.expr === 'string' ? raw.expr.trim().slice(0, MAX_EXPR) : '';
   // A bare function scene may have no expression of its own, provided the
@@ -5377,6 +5396,8 @@ export function sanitizeViz(raw: any): VizScene | null {
     kind,
     expr,
     varName,
+    // Carried through where one arrived and survived its own sanitiser.
+    ...(built ? { built } : {}),
     view: {
       xMin,
       xMax,

@@ -1,0 +1,113 @@
+/* The bench, in the register the rest of Logos uses:
+ *
+ * PREFIXED `eng-`, and that is not fussiness: the first draft called its
+ * container `.mv-stage`, which globals.css already uses for the homepage's
+ * moving stage — dark green, aspect-ratio 3/4 — so the engine's views were
+ * drawn on a black field inside a box the wrong shape, and nothing in this
+ * file said why. A page that invents class names owns a prefix.
+ */
+/* cream paper, thin rules,
+   the serif for anything that is a name and the sans for anything that is a
+   control. Nothing here is a design of its own. */
+
+.eng-page {
+  min-height: 100vh;
+  background: var(--paper, #F5F3EB);
+  color: var(--ink, #1F1F1F);
+  padding: 48px 32px 80px;
+  font-family: var(--sans);
+}
+.eng-head { max-width: 760px; margin: 0 auto 28px; }
+.eng-kicker {
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-45, rgba(31, 31, 31, 0.45));
+  margin: 0 0 14px;
+}
+.eng-head h1 {
+  font-family: var(--serif);
+  font-size: clamp(2rem, 4vw, 3rem);
+  line-height: 1.04;
+  margin: 0 0 14px;
+}
+.eng-head h1 em { font-style: italic; color: var(--moss-700, #475a28); }
+.eng-lede {
+  font-family: var(--serif);
+  font-size: 1.05rem;
+  line-height: 1.55;
+  color: var(--ink-70, rgba(31, 31, 31, 0.7));
+  margin: 0;
+}
+
+.eng-tabs {
+  max-width: 1100px;
+  margin: 0 auto 14px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.eng-tab {
+  font: inherit;
+  font-size: 12px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--ink-12, rgba(31, 31, 31, 0.12));
+  background: transparent;
+  color: var(--ink-70, rgba(31, 31, 31, 0.7));
+  cursor: pointer;
+}
+.eng-tab:hover { border-color: var(--moss-600, #5e7633); }
+.eng-tab.is-on {
+  background: var(--moss-700, #475a28);
+  border-color: var(--moss-700, #475a28);
+  color: var(--paper, #F5F3EB);
+}
+
+.eng-stage {
+  max-width: 1100px;
+  margin: 0 auto;
+  height: 620px;
+}
+.eng-about {
+  max-width: 760px;
+  margin: 26px auto 0;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--ink-70, rgba(31, 31, 31, 0.7));
+}
+.eng-about p { margin: 0 0 8px; }
+.eng-about strong { color: var(--ink, #1F1F1F); font-weight: 600; }
+.eng-assume {
+  margin: 10px 0 0;
+  padding-left: 18px;
+  font-family: var(--serif);
+  font-style: italic;
+  color: var(--ink-60, rgba(31, 31, 31, 0.6));
+}
+.eng-assume li { margin: 4px 0; }
+
+.eng-ops {
+  max-width: 1100px;
+  margin: 12px auto 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+.eng-ops button {
+  font: inherit;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--ink-12, rgba(31, 31, 31, 0.12));
+  background: transparent;
+  color: var(--ink-70, rgba(31, 31, 31, 0.7));
+  cursor: pointer;
+}
+.eng-ops button:hover { border-color: var(--moss-600, #5e7633); }
+.eng-ops span {
+  margin-left: 6px;
+  font-family: var(--serif);
+  font-style: italic;
+  color: var(--ink-45, rgba(31, 31, 31, 0.45));
+}

@@ -60,6 +60,13 @@ const MODULES = [
   'lib/logos-personality.ts',
   'lib/logos-viz3d.ts',
   'lib/viz-model.ts',
+  'lib/model/schema.ts',
+  'lib/model/primitives.ts',
+  'lib/model/sample.ts',
+  'lib/model/compile.ts',
+  'lib/model/spec.ts',
+  'lib/model/state.ts',
+  'lib/model/library.ts',
   'lib/link-preview.ts',
   'lib/viz-semantics.ts',
   'lib/why-not-answer.ts',
@@ -128,6 +135,27 @@ export async function buildAll() {
   rmSync(OUT, { recursive: true, force: true });
   mkdirSync(OUT, { recursive: true });
   const root = join(here, '..', '..');
+  // ONE NAME PER MODULE, AND A COLLISION IS A SILENT DISASTER.
+  //
+  // The output was the basename alone, so lib/model/state.ts and
+  // lib/cognition/state.ts both wrote .tmp/state.mjs and whichever finished
+  // last won — a suite importing one of them got the other's exports, and the
+  // error it produced pointed at the import rather than at the overwrite.
+  // Where two modules share a basename, both take their folder with them; the
+  // rest keep the name every existing suite already imports.
+  const seen = new Map();
+  for (const m of MODULES) {
+    const base = m.split('/').pop().replace(/\.tsx?$/, '');
+    seen.set(base, (seen.get(base) ?? 0) + 1);
+  }
+  const outName = (m) => {
+    const parts = m.replace(/\.tsx?$/, '').split('/');
+    const base = parts[parts.length - 1];
+    if ((seen.get(base) ?? 0) < 2) return `${base}.mjs`;
+    const dir = parts[parts.length - 2] ?? 'lib';
+    return `${dir}-${base}.mjs`;
+  };
+
   await Promise.all(
     MODULES.map((m) =>
       build({
@@ -135,7 +163,7 @@ export async function buildAll() {
         bundle: true,
         format: 'esm',
         platform: 'node',
-        outfile: join(OUT, m.split('/').pop().replace(/\.tsx?$/, '.mjs')),
+        outfile: join(OUT, outName(m)),
         // tsconfig says jsx: preserve, which Node cannot load; the one .tsx
         // module under test (the poster) is bundled with the automatic runtime.
         jsx: 'automatic',

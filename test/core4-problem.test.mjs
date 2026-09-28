@@ -18,7 +18,7 @@
 import { buildProblem, epistemicOf, ofKind, restsOn, renderProblem } from './.tmp/problem.mjs';
 import { detectMissing, gateContributions, renderMissing, MISSING_KINDS } from './.tmp/contribution.mjs';
 import { linksFromRelations, entriesFromPerson, mergeEntries } from './.tmp/ledger.mjs';
-import { EMPTY_STATE } from './.tmp/state.mjs';
+import { EMPTY_STATE } from './.tmp/cognition-state.mjs';
 import { taskCompetence, calibrate, conceptKey } from './.tmp/capability.mjs';
 
 let pass = 0, fail = 0;

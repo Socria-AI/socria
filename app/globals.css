@@ -2787,7 +2787,17 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
    LOGOS — a Human-First reasoning environment (prototype)
    Split screen: conversation left, live Thinking Map right.
    =================================================================== */
-.logos-root {
+/* THE TOKENS, SEPARATELY FROM THE SURFACE.
+ *
+ * `.logos-root` is also a layout — fixed, inset 0, painted — so anything that
+ * wanted Logos's palette had to take a full-screen paper layer with it. The
+ * representation engine's views (components/model/) and the Socria One plate
+ * are drawn in these tokens and are shown outside Logos too, where they need
+ * the colours and none of the geometry. `.lg-tokens` is that half: variables
+ * only, no position, no background, safe to wrap around one component
+ * anywhere in the product. */
+.logos-root,
+.lg-tokens {
   --lg-paper: #F5F3EB;
   --lg-panel: #FAF8F2;
   --lg-primary: #354620;
@@ -2815,7 +2825,10 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
   --lg-stix: var(--font-stix), 'STIX Two Math', 'Cambria Math', KaTeX_Main, Georgia, serif;
   /* --font-math lives at :root now, not here — the journal's Board reads it
      too, and scoped to Logos it was invalid there. See the note beside it. */
+}
 
+/* …and the surface itself, which only Logos is. */
+.logos-root {
   position: fixed;
   inset: 0;
   background: var(--lg-paper);
