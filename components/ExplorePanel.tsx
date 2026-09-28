@@ -5,6 +5,7 @@
 // stop short of resolving it. Whatever the mode, the node keeps ONE thread, so
 // the conversation about a piece of reasoning survives switching lenses on it.
 
+import type { Trace as WorkspaceTrace } from '@/lib/workspace/trace';
 import { useEffect, useRef, useState } from 'react';
 import type { LogosNodeType } from '@/lib/logos';
 import { MODE_META, type ExploreResult, type NodeMode } from '@/lib/logos-explore';
@@ -41,6 +42,7 @@ export function ExplorePanel({
   node,
   data,
   lineage,
+  structure,
   thread,
   streaming,
   busy,
@@ -57,6 +59,17 @@ export function ExplorePanel({
   data: ExploreResult | null;
   /** how this node sits in the map right now — computed, never model-authored */
   lineage: string[];
+  /**
+   * The STRUCTURAL half of Trace, computed from the workspace rather than
+   * written by a model (lib/workspace/trace.ts).
+   *
+   * Trace already showed two true things: the verbatim moments a node grew out
+   * of, and where it sits in the map. What it could not say is what the node
+   * RESTS ON, what rests on it, and what would be affected if it changed —
+   * because nothing had walked the relationships. This is that walk, and it is
+   * a fact about the state rather than a plausible sentence about it.
+   */
+  structure?: WorkspaceTrace | null;
   thread: FocusMsg[];
   streaming: string;
   busy: boolean;
@@ -246,6 +259,71 @@ export function ExplorePanel({
                     <MathText>{o.quote}</MathText>
                   </blockquote>
                 ))}
+              </div>
+            )}
+
+            {/* Where it came from and what it rests on — structure, not prose.
+                Shown before the model's own reading, because "you wrote this"
+                and "three things depend on it" are answers nobody has to take
+                on trust. */}
+            {mode === 'trace' && structure && (
+              <div className="lg-x-struct">
+                <span className="lg-x-block-label">What this is</span>
+                <p className="lg-x-struct-line">{structure.what}</p>
+                <p className="lg-x-struct-line">{structure.origin}</p>
+                <p className="lg-x-struct-line">{structure.standing}</p>
+
+                {structure.supports.length > 0 && (
+                  <>
+                    <span className="lg-x-block-label">Supported by</span>
+                    <ul className="lg-x-struct-list">
+                      {structure.supports.map((l) => (
+                        <li key={l.via.id}>{l.object.label}</li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+                {structure.contradicts.length > 0 && (
+                  <>
+                    <span className="lg-x-block-label">Pulled against by</span>
+                    <ul className="lg-x-struct-list is-against">
+                      {structure.contradicts.map((l) => (
+                        <li key={l.via.id}>{l.object.label}</li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+                {structure.upstream.length > 0 && (
+                  <>
+                    <span className="lg-x-block-label">Rests on</span>
+                    <ul className="lg-x-struct-list">
+                      {structure.upstream.map((l) => (
+                        <li key={l.via.id}>
+                          {l.object.label}
+                          <i>{l.via.type.replace(/-/g, ' ')}</i>
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+                {structure.downstream.length > 0 && (
+                  <>
+                    <span className="lg-x-block-label">What rests on it</span>
+                    <ul className="lg-x-struct-list">
+                      {structure.downstream.map((l) => (
+                        <li key={l.via.id}>
+                          {l.object.label}
+                          <i>{l.distance === 1 ? 'directly' : `${l.distance} steps away`}</i>
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+                {structure.truncated && (
+                  <p className="lg-x-struct-note">
+                    This goes further than shown — the walk stopped at its limit.
+                  </p>
+                )}
               </div>
             )}
 

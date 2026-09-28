@@ -4648,6 +4648,66 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
   color: var(--lg-ink-24);
 }
 
+/* the structural half of Trace — walked from the workspace, not written.
+   Set flat against the drawer rather than in cards: these are facts about the
+   state, and dressing them up would make them look like the model's reading. */
+.logos-root .lg-x-struct { margin-top: 4px; }
+.logos-root .lg-x-struct .lg-x-block-label { margin-top: 20px; }
+.logos-root .lg-x-struct .lg-x-block-label:first-child { margin-top: 0; }
+.logos-root .lg-x-struct-line {
+  margin: 0 0 6px;
+  font-size: 14px;
+  line-height: 1.62;
+  color: var(--lg-ink);
+}
+.logos-root .lg-x-struct-line + .lg-x-struct-line { color: var(--lg-ink-60); font-size: 13.5px; }
+.logos-root .lg-x-struct-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.logos-root .lg-x-struct-list li {
+  position: relative;
+  padding-left: 14px;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--lg-ink);
+}
+.logos-root .lg-x-struct-list li::before {
+  content: "";
+  position: absolute;
+  left: 0; top: 7px;
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--lg-accent);
+  opacity: 0.5;
+}
+.logos-root .lg-x-struct-list.is-against li::before {
+  border-radius: 1px;
+  background: var(--lg-tension);
+  transform: rotate(45deg);
+  opacity: 0.7;
+}
+/* how it is attached, kept quieter than what it is attached to */
+.logos-root .lg-x-struct-list li i {
+  display: block;
+  font-style: normal;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--lg-ink-40);
+  margin-top: 2px;
+}
+.logos-root .lg-x-struct-note {
+  margin: 14px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--lg-ink-40);
+}
+
 /* a card you've already looked into */
 .logos-root .lg-node.is-explored::after {
   content: "";

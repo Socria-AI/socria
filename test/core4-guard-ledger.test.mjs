@@ -16,7 +16,7 @@ import { SentenceGate } from './.tmp/stream-gate.mjs';
 import { classify, similarity, gateCandidates } from './.tmp/considered.mjs';
 import { scrubPII, grounding, entriesFromPerson, entriesFromSocria, mergeEntries, disputeTurn, supersedeRestated, linksForTurn, consideredView, toLogosGraph } from './.tmp/ledger.mjs';
 import { summarize, evidenceFromTurn, assistanceOf } from './.tmp/capability.mjs';
-import { buildTrace } from './.tmp/trace.mjs';
+import { buildTrace } from './.tmp/core4-trace.mjs';
 import { exactCheck, sanitizeCheck, renderCheck, hiddenValues, computeAsked, statedSlips } from './.tmp/verify.mjs';
 import { stripSycophanticOpener, sentencesOf, deleteSentences } from './.tmp/questions.mjs';
 import { EMPTY_STATE } from './.tmp/cognition-state.mjs';

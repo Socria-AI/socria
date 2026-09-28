@@ -17,6 +17,9 @@ import { useRouter } from 'next/navigation';
 import { useUser } from '@clerk/nextjs';
 import { ThinkingMap, type MapNodeRef } from '@/components/ThinkingMap';
 import { ExplorePanel } from '@/components/ExplorePanel';
+import { emptyWorkspace } from '@/lib/workspace/store';
+import { projectMap } from '@/lib/workspace/adapters';
+import { trace } from '@/lib/workspace/trace';
 import { LogosRail } from '@/components/LogosRail';
 import { AttachmentList, LogosComposer, type Draft } from '@/components/LogosComposer';
 import { DraftSpace, type DraftHandle, type DraftSelection } from '@/components/DraftSpace';
@@ -415,6 +418,16 @@ export function LogosApp({
   );
   const messages = active?.messages ?? [];
   const map = active?.map ?? EMPTY_MAP;
+
+  // ── Trace's structural half ───────────────────────────────────────
+  // The map stays the store; this projects it into the shared workspace
+  // vocabulary (lib/workspace) so Trace can WALK what a node rests on and what
+  // rests on it, instead of asking a model to describe it. Only computed while
+  // the Trace lens is actually open on a node, because projecting is O(map).
+  const structure = useMemo(() => {
+    if (!explore.open || explore.mode !== 'trace' || !explore.node) return null;
+    return trace(projectMap(emptyWorkspace(), map), `map:${explore.node.id}`);
+  }, [explore.open, explore.mode, explore.node, map]);
 
   // ── is mathematics in play? ───────────────────────────────────────
   // Local and deterministic, so it can run on every keystroke; sticky, so the
@@ -3085,6 +3098,7 @@ export function LogosApp({
             node={explore.node}
             data={explore.data}
             lineage={explore.node ? describeLineage(map, explore.node.id) : []}
+            structure={structure}
             thread={
               explore.node ? (threads[`${explore.node.id}::${explore.node.label}`] ?? []) : []
             }
