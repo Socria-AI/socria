@@ -3054,6 +3054,18 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
   color: var(--lg-ink);
 }
 .logos-root .lg-thumb svg { width: 100%; height: 100%; display: block; }
+/* A chat has no map, so its box is empty apart from three lines standing in
+   for what it is: a conversation. Same box, so every title in the rail still
+   starts on the same vertical line, and quiet enough that the real thumbnails
+   beside it stay the thing the eye lands on. */
+.logos-root .lg-thumb.is-chat {
+  display: grid;
+  place-items: center;
+  background: transparent;
+  border-style: dashed;
+  color: var(--lg-ink-24);
+}
+.logos-root .lg-rail-item.is-chat .lg-rail-name { font-weight: 400; }
 .logos-root .lg-rail-meta { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; }
 .logos-root .lg-rail-name {
   font-size: 12.5px;

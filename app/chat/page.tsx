@@ -28,6 +28,7 @@ import {
   MODEL_KEY,
   autoModel,
   chooseModel,
+  lastCoreModel,
   modelWasChosen,
   readLength,
   readReadability,
@@ -2000,6 +2001,27 @@ export default function ChatPage() {
       <LogosApp
         initialInput={carriedText}
         collab={SOCRIA_MODELS[model].collab ? true : undefined}
+        // One rail, both surfaces. Logos used to list only its own sessions,
+        // so from inside it the rest of somebody's thinking did not exist and
+        // the way to a chat was to leave first and find it again. These are
+        // already in hand here; handing them down costs nothing.
+        chats={conversations.map((c) => ({
+          id: c.id,
+          title: c.title,
+          updatedAt: c.updatedAt,
+        }))}
+        // Opening one is the same swap the "Socria chat" button makes, with a
+        // destination: back to whichever Core model they came from, on that
+        // conversation. A navigation would work and would throw away the
+        // Logos session's unsaved input on the way.
+        onOpenChat={(id) => {
+          const back = lastCoreModel();
+          chooseModel(back);
+          setModel(back);
+          setActiveId(id);
+          setProjectEntry(null);
+          setSidebarOpen(false);
+        }}
         onSwitchModel={(next) => {
           setModel(next);
           chooseModel(next);

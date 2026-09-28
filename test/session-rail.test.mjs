@@ -30,6 +30,7 @@ import {
   groupRail,
   matchesQuery,
   searchRail,
+  mergeRail,
 } from './.tmp/session-rail.mjs';
 
 let pass = 0, fail = 0;
@@ -290,6 +291,56 @@ console.log('\n=== and a name stays a name ===');
   // And they agree at the threshold, because it is the same threshold.
   ok('same boundary as the tabs',
      shouldShowSearch(rows(6, 3)) === shouldShowTabs(rows(6, 3)));
+}
+
+console.log('\n=== one rail, both surfaces ===');
+{
+  // The Logos rail used to list only Logos sessions, so from inside Logos the
+  // rest of somebody's thinking did not exist. Both rails now read this.
+  const logos = [
+    { id: 'l1', title: 'The Berlin offer', updatedAt: 500, nodes: 7 },
+    { id: 'l2', title: 'Riemann sums', updatedAt: 100, nodes: 4 },
+  ];
+  const chats = [
+    { id: 'c1', title: 'What is bounded rationality?', updatedAt: 400 },
+    { id: 'c2', title: 'Whether to rewrite the essay', updatedAt: 900 },
+  ];
+  const merged = mergeRail(logos, chats);
+  ok('everything is in one list', merged.length === 4);
+  ok('  most recent first, whichever surface made it',
+    merged.map((r) => r.id).join(',') === 'c2,l1,c1,l2', merged.map((r) => r.id).join(','));
+  ok('  each row knows which surface it opens',
+    merged.find((r) => r.id === 'l1').kind === 'logos' &&
+    merged.find((r) => r.id === 'c1').kind === 'chat');
+
+  // A chat has no map, said as a number, which is what lets ONE rule file
+  // both kinds — the tabs are by whether there is a map, not by surface.
+  ok('  a chat carries no map', merged.find((r) => r.id === 'c1').nodes === 0);
+  ok('  so the tabs file both kinds by the same rule',
+    JSON.stringify(tabCounts(merged)) === JSON.stringify({ all: 4, maps: 2, chats: 2 }),
+    JSON.stringify(tabCounts(merged)));
+  ok('  and the Maps tab keeps only the mapped ones',
+    filterByTab(merged, 'maps').map((r) => r.id).join(',') === 'l1,l2');
+
+  // A stale copy of one list while a sync is in flight is normal. Showing the
+  // same session twice under two marks is not.
+  const dupes = mergeRail(logos, [{ id: 'l1', title: 'The Berlin offer', updatedAt: 900 }]);
+  ok('a session listed twice appears once', dupes.length === 2);
+  ok('  and it is the mapped one that survives',
+    dupes.find((r) => r.id === 'l1').kind === 'logos');
+
+  // Two sessions saved in the same millisecond used to swap places between
+  // renders, because the sort had nothing to break the tie with.
+  const tied = [
+    { id: 'b', title: 'B', updatedAt: 1, nodes: 1 },
+    { id: 'a', title: 'A', updatedAt: 1, nodes: 1 },
+  ];
+  ok('ties are broken deterministically',
+    mergeRail(tied, []).map((r) => r.id).join(',') === 'a,b' &&
+    mergeRail([...tied].reverse(), []).map((r) => r.id).join(',') === 'a,b');
+
+  ok('no chats is the rail it always was', mergeRail(logos, []).length === 2);
+  ok('  and no sessions at all is empty, not broken', mergeRail([], []).length === 0);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

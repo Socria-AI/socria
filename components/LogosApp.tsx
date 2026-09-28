@@ -215,10 +215,18 @@ export function LogosApp({
   // Logos 2: this surface is a two-seat room. Everything below is unchanged
   // when it is absent — single-player Logos does not know collab exists.
   collab,
+  // The Core conversations, so the rail shows everything somebody has been
+  // working on rather than only the half this surface made. Handed down by
+  // /chat, which already holds them; absent where Logos is mounted alone, and
+  // then the rail is exactly what it was.
+  chats,
+  onOpenChat,
 }: {
   onSwitchModel?: (next: SocriaModel) => void;
   initialInput?: string;
   collab?: boolean;
+  chats?: { id: string; title: string; updatedAt: number }[];
+  onOpenChat?: (id: string) => void;
 } = {}) {
   const { isLoaded, isSignedIn, user } = useUser();
   const [unlocked, setUnlocked] = useState(false);
@@ -2461,6 +2469,8 @@ export function LogosApp({
       >
         <LogosRail
           sessions={sessions}
+          chats={chats}
+          onOpenChat={onOpenChat}
           activeId={activeId}
           open={railOpen}
           syncing={hydrating}

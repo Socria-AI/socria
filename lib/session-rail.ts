@@ -224,3 +224,48 @@ export function searchRail<T extends RailRow>(
 ): T[] {
   return items.filter((i) => (!mapsOnly || hasMap(i)) && matchesQuery(i, query));
 }
+
+// ── one rail, both surfaces ─────────────────────────────────────────
+//
+// WHY THE LOGOS RAIL SHOWS CHATS TOO. /chat's sidebar has always listed both
+// kinds in one order: a chat and a line of thinking are the same thing to the
+// person reading the list — something they were working on — so they
+// interleave by when each was last touched, and the row says which surface
+// opens it. Logos had the other half of that idea and not this one: its rail
+// listed only its own sessions, so from inside Logos the rest of somebody's
+// thinking simply did not exist, and the way to a chat was to leave first.
+//
+// Now both rails read the same merged list. The distinguishing mark is the
+// one that was already there and already meant something: a session with a
+// map carries its map. A chat does not, because it does not have one.
+
+/** A row from either surface, once they are in one list. */
+export type RailKind = 'logos' | 'chat';
+
+export function mergeRail<L extends RailRow & { id: string }, C extends RailRow & { id: string }>(
+  logos: readonly L[],
+  chats: readonly C[]
+): ((L & { kind: 'logos' }) | (C & { kind: 'chat'; nodes: number }))[] {
+  type Row = (L & { kind: 'logos' }) | (C & { kind: 'chat'; nodes: number });
+  const rows: Row[] = [
+    ...logos.map((s) => ({ ...s, kind: 'logos' as const })),
+    // A chat has no map, and saying so as a number is what lets the Maps and
+    // Chats tabs file both kinds by one rule.
+    ...chats.map((c) => ({ ...c, kind: 'chat' as const, nodes: c.nodes ?? 0 })),
+  ];
+  // An id can only belong to one surface — they share a table — but a stale
+  // copy of one list is a normal state while a sync is in flight, and showing
+  // the same session twice is worse than showing it once under the wrong
+  // mark. The mapped one wins, because it is the one with something to draw.
+  const seen = new Set<string>();
+  const out: Row[] = [];
+  for (const row of rows) {
+    if (seen.has(row.id)) continue;
+    seen.add(row.id);
+    out.push(row);
+  }
+  // Most recent first, and ties broken by id so the order never depends on
+  // which list was loaded first — two sessions saved in the same millisecond
+  // used to swap places between renders.
+  return out.sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0) || a.id.localeCompare(b.id));
+}

@@ -1,8 +1,19 @@
 'use client';
 
-// The left rail: every line of thinking you've kept, each shown with the map
-// it produced. The thumbnail is the point — you recognise a session by the
-// shape its reasoning took, not by reading a title.
+// The left rail: everything you have been working on, whichever surface made
+// it, most recent first. A line of thinking is shown with the map it produced
+// — the thumbnail is the point, since you recognise a session by the shape its
+// reasoning took rather than by reading a title — and a chat is shown without
+// one, because it does not have one.
+//
+// WHY CHATS ARE HERE AT ALL. /chat's sidebar has listed both kinds in one
+// order since the rail was built: they are the same thing to the person
+// reading the list. Logos had only half of that — its rail listed its own
+// sessions and nothing else, so from inside Logos the rest of your thinking
+// did not exist and the only way to a chat was to leave first. Opening one
+// from here switches back to the Core model you came from with that
+// conversation open, which is the same swap the "Socria chat" button makes,
+// with a destination.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { FEEDBACK_URL } from '@/lib/feedback';
@@ -12,6 +23,7 @@ import {
   SESSION_TABS,
   cleanTitle,
   filterByTab,
+  mergeRail,
   shouldShowTabs,
   tabCounts,
   type SessionTab,
@@ -19,23 +31,33 @@ import {
 
 export function LogosRail({
   sessions,
+  chats,
   activeId,
   open,
   syncing,
   cloud,
   onSelect,
+  onOpenChat,
   onNew,
   onDelete,
   onRename,
   onToggle,
 }: {
   sessions: LogosSession[];
+  /**
+   * The Core conversations, so one rail shows everything. Absent where Logos
+   * is mounted somewhere that has no chats to offer, in which case the rail
+   * is exactly what it was.
+   */
+  chats?: { id: string; title: string; updatedAt: number }[];
   activeId: string | null;
   open: boolean;
   syncing: boolean;
   /** true when sessions are synced to the account rather than this browser */
   cloud: boolean;
   onSelect: (id: string) => void;
+  /** open a Core conversation: back to the chat surface, on that one */
+  onOpenChat?: (id: string) => void;
   onNew: () => void;
   onDelete: (id: string) => void;
   onRename: (id: string, title: string) => void;
@@ -49,8 +71,15 @@ export function LogosRail({
   const input = useRef<HTMLInputElement>(null);
 
   const railItems = useMemo(
-    () => sessions.map((s) => ({ ...s, nodes: s.map.nodes.length })),
-    [sessions],
+    () =>
+      mergeRail(
+        sessions.map((s) => ({ ...s, nodes: s.map.nodes.length })),
+        // Without a handler there is nowhere for a chat row to go, so it is
+        // not offered: a row that does nothing is worse than a row that is
+        // not there.
+        onOpenChat ? (chats ?? []) : [],
+      ),
+    [sessions, chats, onOpenChat],
   );
   const tabbed = shouldShowTabs(railItems);
   const counts = tabCounts(railItems);
@@ -128,23 +157,43 @@ export function LogosRail({
               <p className="lg-rail-note">Nothing here yet.</p>
             )}
 
-            {shown.map((s) => (
+            {shown.map((s) => {
+              // A chat opens the other surface; a line of thinking opens here.
+              const isChat = s.kind === 'chat';
+              const open = () => (isChat ? onOpenChat?.(s.id) : onSelect(s.id));
+              return (
               <div
-                key={s.id}
-                className={`lg-rail-item${s.id === activeId ? ' is-active' : ''}`}
-                onClick={() => onSelect(s.id)}
+                key={`${s.kind}-${s.id}`}
+                className={`lg-rail-item${
+                  !isChat && s.id === activeId ? ' is-active' : ''
+                }${isChat ? ' is-chat' : ''}`}
+                onClick={open}
                 role="button"
                 tabIndex={0}
+                title={isChat ? `${s.title} — opens in Socria chat` : undefined}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
-                    onSelect(s.id);
+                    open();
                   }
                 }}
               >
-                <MapThumb map={s.map} />
+                {/* THE THUMBNAIL IS THE MARK. A session with a map carries
+                    its map, and that is the whole of what distinguishes the
+                    two kinds in this list — no heading, no badge, no second
+                    icon set. A chat gets the same box, empty, so every title
+                    still starts on the same vertical line. */}
+                {isChat ? (
+                  <span className="lg-thumb is-chat" aria-hidden="true">
+                    <svg viewBox="0 0 58 38" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+                      <path d="M16 13h26M16 19h20M16 25h13" />
+                    </svg>
+                  </span>
+                ) : (
+                  <MapThumb map={s.map} />
+                )}
                 <span className="lg-rail-meta">
-                  {editing === s.id ? (
+                  {editing === s.id && !isChat ? (
                     <input
                       ref={input}
                       className="lg-rail-rename"
@@ -169,6 +218,7 @@ export function LogosRail({
                       // name is — the button beside it is for anyone who does
                       // not know that.
                       onDoubleClick={(e) => {
+                        if (isChat) return;
                         e.stopPropagation();
                         setDraft(s.title);
                         setEditing(s.id);
@@ -179,14 +229,20 @@ export function LogosRail({
                     </span>
                   )}
                   <span className="lg-rail-sub">
-                    {s.map.nodes.length
-                      ? `${s.map.nodes.length} node${s.map.nodes.length === 1 ? '' : 's'}`
-                      : 'no map yet'}
+                    {isChat
+                      ? 'Socria chat'
+                      : s.map.nodes.length
+                        ? `${s.map.nodes.length} node${s.map.nodes.length === 1 ? '' : 's'}`
+                        : 'no map yet'}
                     {s.updatedAt ? ` · ${relTime(s.updatedAt)}` : ''}
                   </span>
                 </span>
-                {/* Out of the way while renaming, so the box gets the row. */}
-                {editing !== s.id && (
+                {/* Out of the way while renaming, so the box gets the row —
+                    and absent entirely on a chat, whose rename and delete
+                    live where the chat does. A destructive button on a row
+                    that belongs to another surface is a way to lose something
+                    from a screen that cannot show you what you lost. */}
+                {editing !== s.id && !isChat && (
                   <>
                   <button
                     type="button"
@@ -218,7 +274,8 @@ export function LogosRail({
                   </>
                 )}
               </div>
-            ))}
+              );
+            })}
           </div>
 
           <p className="lg-rail-foot">
