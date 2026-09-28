@@ -1,19 +1,84 @@
 // app/api/mind/node/route.ts
+// POST   → add an object by hand
 // PATCH  → edit, re-type, re-status, archive or challenge one node
 // DELETE → forget a node, or an edge, for good
 //
 // This is where the Memory page stops being a visualization. A graph you can
-// only look at is a report; a graph you can correct is memory.
+// only look at is a report; a graph you can correct is memory; a graph you can
+// ADD TO is a workspace.
+//
+// POST arrived last and matters most for that third thing: until it existed,
+// every object in the graph had been put there by an extractor, and the one
+// participant who could not say "this too, and it rests on that" was the person
+// whose thinking it was. The rules it writes under are in lib/workspace/write.ts
+// — tombstones outrank it, duplicates are refused with the id of what is
+// already there, and everything it writes is marked as stated by them, which is
+// what makes it immune to being re-typed later.
+//
+// PATCH also records what an edit REACHED: correcting something other claims
+// rest on leaves those claims marked as needing another look (lib/mind/waiting.ts).
+// The marks say where to look and nothing else — no claim is re-decided, no
+// standing is lowered, and only the person can clear one.
 
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { enforceRateLimit } from '@/lib/rate-limit';
 import { listProjects, loadGraph, persistGraph } from '@/lib/mind/store';
 import { challengeNode, forgetEdge, forgetNode } from '@/lib/mind/apply';
+import { recordImpact } from '@/lib/mind/waiting';
+import { createNode } from '@/lib/workspace/write';
 import { NODE_STATUSES, MAX_CONTENT, MAX_LABEL, clip, fingerprintNode, type NodeStatus } from '@/lib/mind/types';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+
+/**
+ * Add an object by hand.
+ *
+ * Refusals come back as 200 with `refused` rather than as errors, because every
+ * one of them has something for the person to act on: the id of the thing that
+ * is already there, or the fact that they forgot this in March. An HTTP error
+ * would leave the interface with nothing to say but "that didn't work".
+ */
+export async function POST(req: NextRequest) {
+  const { userId } = auth();
+  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const limited = await enforceRateLimit(req, userId, 'aux');
+  if (limited) return limited;
+
+  const body = await req.json().catch(() => null);
+  const label = typeof body?.label === 'string' ? body.label : '';
+  const type = typeof body?.type === 'string' ? body.type : '';
+  if (!label || !type) return NextResponse.json({ error: 'What is it, and what kind?' }, { status: 400 });
+
+  const before = await loadGraph(userId);
+  const now = Date.now();
+  let n = 0;
+  const written = createNode(
+    before,
+    {
+      type,
+      label,
+      content: typeof body?.content === 'string' ? body.content : '',
+      note: typeof body?.note === 'string' ? body.note : undefined,
+      // Only ever true because they were told it was forgotten and said to add
+      // it anyway — the interface asks, this does not decide.
+      reassert: body?.reassert === true,
+    },
+    {
+      now,
+      nextId: () => `m_${now.toString(36)}_h${(n++).toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
+    }
+  );
+
+  if (!written.ok) {
+    return NextResponse.json({ ok: false, refused: written.reason, say: written.say, id: written.id ?? null });
+  }
+
+  const saved = await persistGraph(userId, before, written.graph);
+  if (!saved.ok) return NextResponse.json({ error: 'Could not save that.' }, { status: 500 });
+  return NextResponse.json({ ok: true, node: written.it, say: written.say });
+}
 
 export async function PATCH(req: NextRequest) {
   const { userId } = auth();
@@ -73,7 +138,23 @@ export async function PATCH(req: NextRequest) {
 
   const saved = await persistGraph(userId, before, after);
   if (!saved.ok) return NextResponse.json({ error: 'Could not save that.' }, { status: 500 });
-  return NextResponse.json({ ok: true, node: after.nodes.find((n) => n.id === id) ?? null });
+
+  // What this edit reached. Best-effort and after the save: the edit is the
+  // thing they asked for, and a store that cannot record the marks must not
+  // make it look as though the edit failed.
+  let reached: { marks: unknown[]; say: string } = { marks: [], say: '' };
+  try {
+    reached = await recordImpact(userId, after, id, now);
+  } catch (e) {
+    console.error('[socria/mind] could not record what that edit reached', e);
+  }
+
+  return NextResponse.json({
+    ok: true,
+    node: after.nodes.find((n) => n.id === id) ?? null,
+    reached: reached.marks.length,
+    say: reached.say,
+  });
 }
 
 export async function DELETE(req: NextRequest) {

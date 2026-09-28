@@ -57,6 +57,13 @@ export const OBJECT_TYPES = [
   'simulation-run', 'observation', 'component', 'event', 'state', 'visual-object',
   // research method
   'method', 'population', 'measurement', 'limitation',
+  // the durable ones — things in the world and things about a life, which the
+  // Mind Graph has always kept and the reasoning vocabulary had no word for.
+  // Without these a Person or a Project arriving from durable memory would be
+  // flattened to 'concept', and "who" would stop being distinguishable from
+  // "what".
+  'person', 'organization', 'place', 'project', 'preference', 'plan',
+  'insight', 'experience', 'conversation',
 ] as const;
 export type ObjectType = (typeof OBJECT_TYPES)[number];
 
@@ -116,6 +123,12 @@ export const EPISTEMIC_STATES = [
   'known', 'observed', 'user-asserted', 'source-supported',
   'multi-source-supported', 'inferred', 'assumed', 'disputed',
   'uncertain', 'unknown', 'computed', 'simulated', 'illustrative',
+  // Replaced, not refuted, and not the same as disputed: "you thought A until
+  // March" is frequently the most useful thing in a workspace, and a
+  // vocabulary that can only say `disputed` turns a change of mind into an
+  // argument. Durable memory has tracked this all along (NODE_STATUSES in
+  // lib/mind/types.ts); the workspace could not say it until now.
+  'superseded',
 ] as const;
 export type EpistemicState = (typeof EPISTEMIC_STATES)[number];
 
@@ -133,12 +146,38 @@ export const EPISTEMIC_SAYS: Record<EpistemicState, string> = {
   computed: 'produced by a computation',
   simulated: 'produced by a simulation',
   illustrative: 'there to make something legible, not to be relied on',
+  superseded: 'replaced by a later version of itself, and kept',
 };
 
 /** States that mean "this is not settled", for the health and gap passes. */
 export const UNSETTLED: readonly EpistemicState[] = [
   'assumed', 'inferred', 'disputed', 'uncertain', 'unknown',
 ];
+
+/**
+ * Something upstream changed, and this has not been looked at since.
+ *
+ * NOT A JUDGEMENT ABOUT TRUTH, which is why it is its own field and not an
+ * epistemic state: a claim resting on an assumption the person just corrected
+ * is not thereby wrong, it is UNCHECKED. Collapsing the two would either
+ * quietly demote work that is still fine or quietly keep work that isn't.
+ *
+ * `kind` is the only part a machine may act on by itself. A `recompute` mark
+ * sits on something a computation produced, and re-running the computation is
+ * not an opinion. A `review` mark sits on a claim, and nothing here is allowed
+ * to decide a claim on the person's behalf — the mark exists to tell them
+ * where to look, and only they can clear it.
+ */
+export interface Stale {
+  /** the object whose change caused this */
+  because: string;
+  /** its label at the time, so the mark still reads after a rename */
+  label?: string;
+  at: number;
+  kind: 'recompute' | 'review';
+  /** how far from the change: 1 is directly attached */
+  distance?: number;
+}
 
 export interface Uncertainty {
   plusMinus?: number;
@@ -200,6 +239,9 @@ export interface WObject {
    */
   locked?: LockedField[];
 
+  /** something it rests on changed; see Stale */
+  stale?: Stale;
+
   /** free, uninterpreted, bounded — a surface's own note to itself */
   meta?: Record<string, string | number | boolean>;
 }
@@ -227,6 +269,16 @@ export const RELATION_TYPES = [
   'alternative-to', 'generated-by', 'computed-from', 'simulated-from',
   'responds-to', 'resolves', 'reopens', 'rejected-because', 'changed-because',
   'relates-to',
+  // One thing, held on two surfaces. Deliberately NOT traversed by upstream or
+  // downstream walks: the remembered copy of a claim is not a thing the claim
+  // rests on, and following it would mix one surface's grounds into another's
+  // as though they were the same evidence. Trace reports it separately.
+  'same-as',
+  // A reason FOR something, which durable memory has always recorded
+  // (motivated_by) and this vocabulary could only flatten to 'influences' —
+  // losing the fact that a decision rests on its reasons, so a trace of the
+  // decision never reached them.
+  'motivated-by',
 ] as const;
 export type RelationType = (typeof RELATION_TYPES)[number];
 
@@ -236,7 +288,7 @@ export const CAUSAL_RELATIONS: readonly RelationType[] = ['causes', 'influences'
 /** Relations followed when asking what something rests on. */
 export const UPSTREAM_RELATIONS: readonly RelationType[] = [
   'depends-on', 'derived-from', 'assumes', 'computed-from', 'simulated-from',
-  'generated-by', 'uses', 'part-of', 'follows',
+  'generated-by', 'uses', 'part-of', 'follows', 'motivated-by',
 ];
 
 /** Relations that carry evidential weight, in each direction. */
@@ -375,6 +427,21 @@ export function sanitizeObject(raw: unknown): WObject | null {
       ['type', 'epistemic', 'label', 'claimKind'].includes(x as string)
     );
     if (locked.length) out.locked = [...new Set(locked)];
+  }
+
+  const st = r.stale as Record<string, unknown> | undefined;
+  if (st && typeof st === 'object') {
+    const because = text(st.because, 160);
+    const at = num(st.at);
+    if (ID.test(because) && at !== null) {
+      out.stale = {
+        because,
+        at,
+        kind: oneOf(st.kind, ['recompute', 'review'] as const, 'review'),
+        ...(text(st.label, WS_LIMITS.label) ? { label: text(st.label, WS_LIMITS.label) } : {}),
+        ...(num(st.distance) !== null ? { distance: Math.max(1, Math.round(num(st.distance) as number)) } : {}),
+      };
+    }
   }
 
   if (r.meta && typeof r.meta === 'object' && !Array.isArray(r.meta)) {

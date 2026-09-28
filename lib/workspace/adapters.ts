@@ -27,11 +27,25 @@
 //   a map node with no other evidence → inferred, not asserted.  The map is
 //     extracted from conversation, and extraction is a guess until somebody
 //     says otherwise.
+//   a Mind node's provenance kinds → one standing, with STATED WINNING.  A
+//     claim first inferred from a remark and later said outright is asserted,
+//     not inferred: a statement is not undone by an earlier guess. Status
+//     overrides where it says something the kinds cannot — `superseded` is a
+//     change of mind, not a dispute.
 
 import type { LedgerEntry, LedgerLink } from '@/lib/core4/types';
 import type { LogosEdge, LogosNode, ThinkingMap } from '@/lib/logos';
 import type { Model, ModelObject } from '@/lib/model/schema';
 import {
+  normalize,
+  type MindEdge,
+  type MindGraph,
+  type MindNode,
+  type NodeStatus,
+  type ProvenanceKind,
+} from '@/lib/mind/types';
+import {
+  OBJECT_TYPES,
   type EpistemicState,
   type ObjectType,
   type ProvenanceEntry,
@@ -336,6 +350,261 @@ export function projectLedger(
   return next;
 }
 
+// ── durable memory ──────────────────────────────────────────────────
+//
+// THIS IS WHAT MAKES THE WORKSPACE OUTLIVE ONE MAP.
+//
+// The Mind Graph (lib/mind) is the only store here that persists across
+// sessions: rows in mind_nodes and mind_edges, the same rows Core reads to
+// build a prompt and the same rows the Memory page shows. Projecting it means
+// a trace that starts on a node drawn ten minutes ago can reach something the
+// person said in March, without either store copying the other.
+//
+// PRIVACY IS NOT A PREFERENCE HERE. A node marked private came from a weighty
+// Core conversation and has never been allowed into Logos, whose map can be
+// exported as an image (invariant 3 in lib/mind/types.ts). `excludePrivate`
+// keeps that true through the projection, and every caller that hands a
+// workspace to Logos or to an export must pass it.
+
+const MIND_TYPE: Record<string, ObjectType> = {
+  person: 'person', organization: 'organization', project: 'project', place: 'place',
+  concept: 'concept', goal: 'goal', plan: 'plan', decision: 'decision',
+  preference: 'preference', belief: 'belief', assumption: 'assumption',
+  question: 'question', uncertainty: 'uncertainty', insight: 'insight',
+  evidence: 'evidence', source: 'source', event: 'event',
+  experience: 'experience', conversation: 'conversation',
+};
+
+/**
+ * Mind relationships, some of them turned around.
+ *
+ * `invert` is the interesting column. "A is used_by B" and "B uses A" are the
+ * same fact, and the workspace already has the second, so the projection
+ * turns the arrow rather than inventing a synonym — which also puts A upstream
+ * of B, where a dependency belongs. Adding a mirrored relation type instead
+ * would have made every traversal check two names for one thing.
+ */
+const MIND_REL: Record<string, { type: RelationType; invert?: boolean; why?: string }> = {
+  supports: { type: 'supports' },
+  contradicts: { type: 'contradicts' },
+  depends_on: { type: 'depends-on' },
+  part_of: { type: 'part-of' },
+  belongs_to: { type: 'part-of' },
+  caused: { type: 'causes' },
+  resulted_in: { type: 'causes' },
+  evidence_for: { type: 'evidence-for' },
+  derived_from: { type: 'derived-from' },
+  learned_from: { type: 'derived-from', why: 'learned from' },
+  version_of: { type: 'derived-from', why: 'a version of' },
+  changed_into: { type: 'transforms-into' },
+  superseded_by: { type: 'transforms-into', why: 'superseded by' },
+  constrained_by: { type: 'constrains', invert: true, why: 'constrains it' },
+  motivated_by: { type: 'motivated-by' },
+  used_by: { type: 'uses', invert: true, why: 'uses it' },
+  associated_with: { type: 'relates-to' },
+  works_on: { type: 'relates-to', why: 'works on' },
+  mentioned_in: { type: 'relates-to', why: 'mentioned in' },
+  relevant_to: { type: 'relates-to', why: 'relevant to' },
+  created_in: { type: 'relates-to', why: 'created in' },
+  discussed_in: { type: 'relates-to', why: 'discussed in' },
+  shared_with: { type: 'relates-to', why: 'shared with' },
+};
+
+const KIND_STATE: Record<ProvenanceKind, EpistemicState> = {
+  stated: 'user-asserted',
+  established: 'user-asserted',
+  inferred: 'inferred',
+  hypothesis: 'uncertain',
+  tentative: 'uncertain',
+  hypothetical: 'assumed',
+  temporary: 'illustrative',
+  joke: 'illustrative',
+  example: 'illustrative',
+  researched: 'source-supported',
+  calculated: 'computed',
+};
+
+/** Where a ground came from, by the surface that recorded it. */
+function mindOrigin(p: { kind: ProvenanceKind; surface: string }): ProvenanceEntry['origin'] {
+  if (p.surface === 'file') return 'uploaded-source';
+  if (p.surface === 'import') return 'imported';
+  if (p.surface === 'tool') return 'connected-source';
+  if (p.surface === 'user') return 'user';
+  if (p.kind === 'stated' || p.kind === 'established') return 'user';
+  if (p.kind === 'researched') return 'research-source';
+  if (p.kind === 'calculated') return 'computation';
+  if (p.kind === 'hypothesis') return 'socria-generated';
+  return 'socria-inference';
+}
+
+/** What a status says that the grounds cannot. */
+const STATUS_STATE: Partial<Record<NodeStatus, EpistemicState>> = {
+  contradicted: 'disputed',
+  superseded: 'superseded',
+  uncertain: 'uncertain',
+  tentative: 'uncertain',
+};
+
+/**
+ * A Mind type, into a workspace type.
+ *
+ * The table first, then the shared vocabulary BY NAME, then 'concept'. The
+ * middle step matters more than it looks: Mind types are open strings and the
+ * extractor invents them freely, so a node typed Constraint or Criterion —
+ * words this vocabulary already has — would otherwise arrive as a generic
+ * concept and stop being traceable as what it is.
+ */
+function mindType(raw: string): ObjectType {
+  const key = normalize(raw);
+  const known = MIND_TYPE[key];
+  if (known) return known;
+  const hyphenated = key.replace(/\s+/g, '-');
+  if ((OBJECT_TYPES as readonly string[]).includes(hyphenated)) return hyphenated as ObjectType;
+  return 'concept';
+}
+
+export function fromMindNode(n: MindNode): WObject {
+  const provenance: ProvenanceEntry[] = n.provenance.map((p) => ({
+    origin: mindOrigin(p),
+    at: p.at,
+    ...(p.note ? { detail: p.note } : {}),
+    ...(p.sourceNodeId ? { from: `mind:${p.sourceNodeId}` } : {}),
+  }));
+  if (!provenance.length) provenance.push({ origin: 'system', at: n.createdAt });
+
+  // Stated wins over inferred whenever both are on the record; otherwise the
+  // most recent ground decides, because grounds accumulate in order.
+  const kinds = n.provenance.map((p) => p.kind);
+  const said = kinds.includes('stated') || kinds.includes('established');
+  const last = kinds.length ? kinds[kinds.length - 1] : undefined;
+  const fromKinds: EpistemicState = said
+    ? 'user-asserted'
+    : last
+      ? (KIND_STATE[last] ?? 'unknown')
+      : 'unknown';
+
+  // The person having spoken about it at all settles what it IS. Extraction
+  // may keep adding grounds; it may not re-title or re-type their own words.
+  const touched = n.provenance.some((p) => p.surface === 'user');
+
+  return {
+    id: `mind:${n.id}`,
+    type: mindType(n.type),
+    label: n.label.slice(0, 300),
+    provenance,
+    epistemic: STATUS_STATE[n.status] ?? fromKinds,
+    ...(n.content ? { content: n.content } : {}),
+    surface: 'mind',
+    surfaceId: n.id,
+    createdBy: said ? 'user' : 'socria',
+    createdAt: n.createdAt,
+    modifiedAt: n.updatedAt,
+    ...(touched ? { locked: ['label' as const, 'type' as const] } : {}),
+    meta: {
+      status: n.status,
+      seen: n.seen,
+      // Carried so an export or a Logos-bound projection can be checked
+      // rather than trusted. Private nodes should never be in one at all.
+      ...(n.private ? { private: true } : {}),
+    },
+  };
+}
+
+export function fromMindEdge(e: MindEdge): Relationship {
+  const m = MIND_REL[normalize(e.relationship).replace(/\s+/g, '_')] ?? {
+    type: 'relates-to' as RelationType,
+    why: e.relationship,
+  };
+  const from = `mind:${m.invert ? e.targetId : e.sourceId}`;
+  const to = `mind:${m.invert ? e.sourceId : e.targetId}`;
+  const note = [...e.provenance].reverse().find((p) => p.note)?.note;
+  const stated = e.provenance.some((p) => p.kind === 'stated' || p.surface === 'user');
+  return {
+    id: `mind:${e.id}`,
+    type: m.type,
+    from,
+    to,
+    provenance: e.provenance.length
+      ? e.provenance.map((p) => ({
+          origin: mindOrigin(p),
+          at: p.at,
+          ...(p.note ? { detail: p.note } : {}),
+        }))
+      : [{ origin: 'system', at: e.createdAt }],
+    ...(note ?? m.why ? { why: note ?? m.why } : {}),
+    createdBy: stated ? 'user' : 'socria',
+    createdAt: e.createdAt,
+  };
+}
+
+export interface ProjectMindOptions {
+  /**
+   * Leave out nodes from weighty Core conversations. Required for anything
+   * Logos or an export will see — see the note above.
+   */
+  excludePrivate?: boolean;
+}
+
+/**
+ * Durable memory, projected.
+ *
+ * Edges whose endpoints did not survive the projection are dropped rather than
+ * left dangling: an edge to a private node would otherwise tell a reader that
+ * something is there and refuse to say what, which is worse than silence.
+ */
+export function projectMind(ws: Workspace, graph: MindGraph, opts?: ProjectMindOptions): Workspace {
+  let next = ws;
+  const kept = new Set<string>();
+  for (const n of graph.nodes) {
+    if (opts?.excludePrivate && n.private) continue;
+    kept.add(n.id);
+    const o = fromMindNode(n);
+    next = add(next, o, o.createdBy === 'user' ? 'user' : 'socria', n.createdAt);
+  }
+  for (const e of graph.edges) {
+    if (!kept.has(e.sourceId) || !kept.has(e.targetId)) continue;
+    const r = fromMindEdge(e);
+    next = relate(next, r, r.createdBy === 'user' ? 'user' : 'socria', e.createdAt);
+  }
+  return next;
+}
+
+/**
+ * Join the surfaces where they are talking about the same thing.
+ *
+ * Matching is by normalised label, the same key durable memory already uses
+ * for identity and for tombstones (fingerprintNode) — so this agrees with what
+ * the store itself thinks is one thing, rather than inventing a second notion
+ * of sameness. It only ever links ACROSS surfaces: two nodes in one map with
+ * the same words are that map's business.
+ *
+ * Nothing is merged. A merge would have to pick a winner, and the reason to
+ * keep both is that the durable one carries months of grounds while the
+ * session one carries where the person is right now.
+ */
+export function bridgeSurfaces(ws: Workspace, at = 0): Workspace {
+  const byLabel = new Map<string, WObject[]>();
+  for (const o of ws.objects.values()) {
+    const key = normalize(o.label);
+    if (!key) continue;
+    const list = byLabel.get(key);
+    if (list) list.push(o);
+    else byLabel.set(key, [o]);
+  }
+
+  let next = ws;
+  for (const group of byLabel.values()) {
+    if (group.length < 2) continue;
+    const durable = group.find((o) => o.surface === 'mind');
+    if (!durable) continue;
+    for (const o of group) {
+      if (o.id === durable.id || o.surface === 'mind') continue;
+      next = relate(next, sameAs(o.id, durable.id, 'the same thing, remembered'), 'system', at);
+    }
+  }
+  return next;
+}
+
 /**
  * The same thing in two surfaces.
  *
@@ -348,7 +617,7 @@ export function projectLedger(
 export function sameAs(a: string, b: string, why = 'the same thing on two surfaces'): Relationship {
   return {
     id: `${a}~same~${b}`,
-    type: 'relates-to',
+    type: 'same-as',
     from: a,
     to: b,
     provenance: [{ origin: 'system', detail: why }],

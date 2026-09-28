@@ -474,6 +474,34 @@ create table if not exists mind_sources (
   primary key (user_id, id)
 );
 
+-- What is waiting on a change somebody made.
+--
+-- A node here is not wrong and not lower-confidence: it RESTS ON something
+-- that moved and nobody has looked at it since. Keeping that in its own table
+-- rather than as a column on mind_nodes is deliberate — it is a fact about a
+-- pair of rows and a moment, it clears without touching the node's own
+-- updated_at (so recall and reinforcement are not disturbed by it), and a node
+-- deleted outright takes its marks with it rather than leaving a status behind.
+--
+-- `kind` is the only part a machine may act on: 'recompute' sits on something
+-- a computation produced, and re-running the computation is not an opinion.
+-- 'review' sits on a claim, and nothing but the person may clear one — see
+-- settle() in lib/workspace/impact.ts.
+create table if not exists mind_stale (
+  user_id text not null,
+  node_id text not null,
+  -- the node whose change caused this, and what it was called at the time, so
+  -- the mark still reads after a rename or a deletion
+  because_id text not null,
+  because_label text not null default '',
+  kind text not null default 'review',
+  distance integer not null default 1,
+  at bigint not null,
+  primary key (user_id, node_id)
+);
+
+create index if not exists mind_stale_user_at_idx on mind_stale (user_id, at desc);
+
 -- ── Projects ─────────────────────────────────────────────────────────
 --
 -- A Project is a focused REGION of the one Mind Graph, not a second store.

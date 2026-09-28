@@ -131,6 +131,15 @@ export async function GET(req: NextRequest) {
     .from('mind_sources').select('*').eq('user_id', userId);
   out.mindSources = mindSources ?? [];
 
+  // What is waiting on a change they made: the thing that moved, and what
+  // has not been looked at since. Part of the state of their thinking, so it
+  // belongs in an export of it.
+  const { data: mindStale, error: mindStaleErr } = await db
+    .from('mind_stale')
+    .select('node_id, because_id, because_label, kind, distance, at')
+    .eq('user_id', userId);
+  out.mindWaiting = mindStale ?? [];
+
   // Projects: the workspaces. What each one contains is already above, in
   // mindNodes and mindEdges — a Project is a region of that graph, reached
   // through the edges to its node_id, not a separate copy of anything.
@@ -233,6 +242,7 @@ export async function GET(req: NextRequest) {
     ['mindForgotten', mindTombstonesErr],
     ['mindPending', mindPendingErr],
     ['mindSources', mindSourcesErr],
+    ['mindWaiting', mindStaleErr],
     ['mindProjects', mindProjectsErr],
     ['core4State', core4StateErr],
     ['reasoningLedger', reasoningEntriesErr],

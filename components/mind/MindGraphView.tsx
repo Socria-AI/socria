@@ -16,6 +16,15 @@
 // moment is tens of elements rather than thousands, and SVG is both cheaper
 // to reason about and free of all of that.
 //
+// THREE THINGS BEYOND LOOKING AND CORRECTING, added later and each one a verb
+// the page was missing:
+//   WRITING     MindCompose adds an object, or connects two, by hand.
+//   WAITING     when they change something, what rested on it is marked as
+//               needing another look — and only they can clear a mark.
+//   ASKING      the filter row runs the workspace's own query over what is
+//               loaded (lib/workspace/portable.ts), so "what did I assume that
+//               nothing has confirmed" is a question this page can answer.
+//
 // A LIST VIEW IS NOT A FALLBACK, it is the other half. The canvas answers
 // "what is connected to what"; the list answers "what do you actually hold",
 // and the second question is the one somebody arrives with when they want to
@@ -27,6 +36,11 @@ import { Label, Button } from '@/components/journal/ds';
 import { NodeGlyph } from '@/components/NodeGlyph';
 import type { LogosNodeType } from '@/lib/logos';
 import { settle, foldLayout, type Positions } from '@/lib/mind/layout';
+import { MindCompose } from './MindCompose';
+import { projectMind } from '@/lib/workspace/adapters';
+import { emptyWorkspace } from '@/lib/workspace/store';
+import { query } from '@/lib/workspace/portable';
+import type { MindGraph } from '@/lib/mind/types';
 import './mind-graph.css';
 
 interface Provenance {
@@ -52,6 +66,19 @@ export interface Edge {
 }
 interface Pending { fingerprint?: string; type: string; label: string; content: string; sources: string[]; firstAt: number; lastAt: number }
 interface Source { id: string; name: string; bytes: number; createdAt: number }
+
+/** A mark saying something rests on a change nobody has looked at since. */
+interface Waiting {
+  nodeId: string;
+  becauseId: string;
+  becauseLabel: string;
+  kind: 'recompute' | 'review';
+  distance: number;
+  at: number;
+}
+
+/** The filter row's state. Four questions, not a search box with modes. */
+interface Ask { text: string; yours: boolean; unsettled: boolean; waiting: boolean }
 
 /** Mirrors MindStoreFailure in lib/mind/store.ts. */
 type StorageFault = 'missing-tables' | 'denied' | 'unavailable';
@@ -691,6 +718,9 @@ export function MindGraphView() {
   const [busy, setBusy] = useState(false);
   const [view, setView] = useState<'graph' | 'list'>('list');
   const [selected, setSelected] = useState<string | null>(null);
+  /** what is waiting on a change they made — see lib/workspace/impact.ts */
+  const [waiting, setWaiting] = useState<Waiting[]>([]);
+  const [ask, setAsk] = useState<Ask>({ text: '', yours: false, unsettled: false, waiting: false });
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -703,6 +733,7 @@ export function MindGraphView() {
       setEdges(j.edges ?? []);
       setPending(j.pending ?? []);
       setSources(j.sources ?? []);
+      setWaiting(j.waiting ?? []);
       setForgotten(j.forgotten ?? 0);
       setErr(null);
     } catch {
@@ -767,6 +798,57 @@ export function MindGraphView() {
     }
     setBusy(false);
   }
+
+  /** "I have looked at this, and it still holds." Nothing else clears a mark. */
+  async function stillHolds(id: string) {
+    setBusy(true); setNote(null);
+    try {
+      const res = await fetch('/api/mind/stale', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
+      if (!res.ok) throw new Error('failed');
+      setWaiting((w) => w.filter((x) => x.nodeId !== id));
+      setNote('Marked as still holding.');
+    } catch {
+      setNote('That could not be cleared.');
+    }
+    setBusy(false);
+  }
+
+  /**
+   * The filter row, run through the workspace's own query.
+   *
+   * Projecting here rather than filtering the rows by hand is the point: "what
+   * nothing has confirmed" is a fact about standing, which only exists once the
+   * rows are read through the shared vocabulary (lib/workspace/adapters.ts).
+   * Doing it twice — once for the prompt, once for this page — is how the two
+   * would come to disagree.
+   */
+  const asking = !!(ask.text.trim() || ask.yours || ask.unsettled || ask.waiting);
+  const shown = useMemo(() => {
+    if (!asking) return null;
+    const graph: MindGraph = { nodes: nodes as unknown as MindGraph['nodes'], edges: edges as unknown as MindGraph['edges'], tombstones: [], pending: [] };
+    let ws = projectMind(emptyWorkspace(), graph);
+    if (ask.waiting) {
+      for (const w of waiting) {
+        const id = `mind:${w.nodeId}`;
+        const o = ws.objects.get(id);
+        if (o) ws.objects.set(id, { ...o, stale: { because: `mind:${w.becauseId}`, label: w.becauseLabel, at: w.at, kind: w.kind, distance: w.distance } });
+      }
+    }
+    const hits = query(ws, {
+      ...(ask.text.trim() ? { text: ask.text.trim() } : {}),
+      ...(ask.yours ? { yours: true } : {}),
+      ...(ask.unsettled ? { unsettled: true } : {}),
+      ...(ask.waiting ? { stale: true } : {}),
+      limit: 500,
+    });
+    return new Set(hits.objects.map((o) => (o.surfaceId ?? o.id.replace(/^mind:/, ''))));
+  }, [asking, ask, nodes, edges, waiting]);
+
+  const visible = useMemo(() => (shown ? nodes.filter((n) => shown.has(n.id)) : nodes), [nodes, shown]);
 
   const node = useMemo(() => nodes.find((n) => n.id === selected) ?? null, [nodes, selected]);
   const tri = useMemo<Tri[]>(() => edges.map((e) => [e.sourceId, e.targetId, e.relationship]), [edges]);
@@ -866,6 +948,15 @@ export function MindGraphView() {
             {uploadControl}
           </div>
         </div>
+        {/* An empty graph is exactly where writing by hand matters most: there
+            is nothing to correct yet, and waiting for an extractor to notice
+            something would make this page a report they cannot act on. */}
+        <MindCompose
+          nodes={nodes}
+          busy={busy}
+          onSelect={setSelected}
+          onDone={(say) => { setNote(say); void load(); }}
+        />
         {note && <p className="mem-note" role="status">{note}</p>}
       </div>
     );
@@ -896,6 +987,42 @@ export function MindGraphView() {
             <button aria-pressed={view === 'list'} onClick={() => setView('list')}>List</button>
           </span>
           {uploadControl}
+          {/* The whole thing as one file: objects, connections and where each
+              came from. Private material is left out and the file says so. */}
+          <a className="up-btn" href="/api/workspace?download=1" download>
+            Export as a file
+          </a>
+        </div>
+
+        {/* Asking, rather than scrolling. Runs the workspace's own query. */}
+        <div className="mem-ask" role="search">
+          <input
+            value={ask.text}
+            placeholder="Find anything — a word, a name, a phrase"
+            aria-label="Find anything in your memory"
+            onChange={(e) => setAsk((a) => ({ ...a, text: e.target.value }))}
+          />
+          <button aria-pressed={ask.yours} onClick={() => setAsk((a) => ({ ...a, yours: !a.yours }))}>
+            Only what you said
+          </button>
+          <button aria-pressed={ask.unsettled} onClick={() => setAsk((a) => ({ ...a, unsettled: !a.unsettled }))}>
+            Nothing has confirmed
+          </button>
+          <button
+            aria-pressed={ask.waiting}
+            disabled={!waiting.length}
+            onClick={() => setAsk((a) => ({ ...a, waiting: !a.waiting }))}
+          >
+            Waiting on a change{waiting.length ? ` (${waiting.length})` : ''}
+          </button>
+          {asking && (
+            <span className="mem-ask-n">
+              {visible.length} of {nodes.length}
+              <button className="clear" onClick={() => setAsk({ text: '', yours: false, unsettled: false, waiting: false })}>
+                Clear
+              </button>
+            </span>
+          )}
         </div>
       </div>
 
@@ -903,12 +1030,54 @@ export function MindGraphView() {
 
       <div className={`mem-body${node ? ' has-panel' : ''}`}>
         <main className="mem-main">
+          <MindCompose
+            nodes={nodes}
+            busy={busy}
+            from={selected}
+            onSelect={setSelected}
+            onDone={(say) => { setNote(say); void load(); }}
+          />
+
+          {waiting.length > 0 && (
+            <section className="mem-wait">
+              <Label tone="moss">Waiting on a change</Label>
+              <h2>You changed something these rest on.</h2>
+              <p className="deck">
+                Not wrong — <em>unchecked</em>. Nothing has been re-decided, re-worded or marked down; this is only a
+                list of where to look. Clearing a mark is you saying it still holds, which is why nothing else can.
+              </p>
+              <div className="wlist">
+                {waiting.map((w) => {
+                  const it = nodes.find((n) => n.id === w.nodeId);
+                  if (!it) return null;
+                  return (
+                    <div className="wrow" key={w.nodeId}>
+                      <button className="wl" onClick={() => setSelected(w.nodeId)}>{it.label}</button>
+                      <span className="wsrc">
+                        rests on {w.becauseLabel ? `“${w.becauseLabel}”` : 'something you changed'}
+                        {w.distance > 1 ? `, ${w.distance} steps back` : ''} · {when(w.at)}
+                        {w.kind === 'recompute' ? ' · computed from it' : ''}
+                      </span>
+                      <button className="ok" disabled={busy} onClick={() => void stillHolds(w.nodeId)}>
+                        Still holds
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+
           {!nodes.length ? (
             <p className="deck">Nothing has been believed yet — only the claims below, noticed once.</p>
           ) : view === 'graph' ? (
-            <Graph nodes={nodes} edges={tri} sel={selected} onSel={setSelected} />
+            <Graph nodes={visible} edges={tri} sel={selected} onSel={setSelected} />
           ) : (
-            <List nodes={nodes} sel={selected} onSel={setSelected} />
+            <List nodes={visible} sel={selected} onSel={setSelected} />
+          )}
+
+          {asking && !visible.length && (
+            <p className="deck">Nothing here matches that. <em>It does not mean nothing is stored.</em></p>
           )}
 
           {pending.length > 0 && (

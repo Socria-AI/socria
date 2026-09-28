@@ -351,3 +351,57 @@
 @media(prefers-reduced-motion:reduce){.mem-root .load-rows i{animation:none;opacity:.7}}
 
 /* ---------- the preview bar (this page only) ---------- */
+
+/* ===== writing, waiting and asking =====
+   Three things the page gained after it could already show and correct: a
+   composer, a list of what is waiting on a change, and a question row. All
+   scoped under .mem-root like everything else here. */
+
+/* the composer */
+.mem-root .mk{margin:0 0 22px}
+.mem-root .mk-bar{display:flex;gap:8px;flex-wrap:wrap}
+.mem-root .mk-bar button{font:inherit;font-size:12.5px;padding:7px 13px;border:1px solid var(--ink-16);border-radius:999px;background:transparent;color:var(--ink-70);cursor:pointer;transition:color .18s,border-color .18s,background .18s}
+.mem-root .mk-bar button:hover:not(:disabled){color:var(--ink);border-color:var(--ink-40)}
+.mem-root .mk-bar button.on{color:var(--paper);background:var(--moss-700);border-color:var(--moss-700)}
+.mem-root .mk-bar button:disabled{opacity:.45;cursor:not-allowed}
+.mem-root .mk-said{margin:10px 0 0;font-size:13px;line-height:1.55;color:var(--ink-70)}
+.mem-root .mk-said.is-held{color:var(--moss-700)}
+.mem-root .mk-again{font:inherit;font-size:12px;margin-left:8px;padding:3px 9px;border:1px solid var(--moss-700);border-radius:999px;background:transparent;color:var(--moss-700);cursor:pointer}
+.mem-root .mk-form{margin:12px 0 0;padding:14px 16px;border:1px solid var(--ink-12);border-radius:10px;background:rgba(0,0,0,.015);display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px 14px}
+.mem-root .mk-form label{display:flex;flex-direction:column;gap:5px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-60)}
+.mem-root .mk-form label.wide{grid-column:1/-1}
+.mem-root .mk-form input,.mem-root .mk-form select,.mem-root .mk-form textarea{font:inherit;font-size:14px;letter-spacing:normal;text-transform:none;color:var(--ink);padding:8px 10px;border:1px solid var(--ink-16);border-radius:7px;background:var(--paper);width:100%}
+.mem-root .mk-form textarea{resize:vertical;line-height:1.5}
+.mem-root .mk-form input:focus-visible,.mem-root .mk-form select:focus-visible,.mem-root .mk-form textarea:focus-visible{outline:2px solid var(--moss-700);outline-offset:1px}
+.mem-root .mk-reads{grid-column:1/-1;margin:0;font-size:13.5px;line-height:1.55;color:var(--ink-70)}
+.mem-root .mk-reads b{font-weight:600;color:var(--ink)}
+.mem-root .mk-acts{grid-column:1/-1;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.mem-root .mk-acts .go{font:inherit;font-size:13px;padding:8px 16px;border-radius:999px;border:1px solid var(--moss-700);background:var(--moss-700);color:var(--paper);cursor:pointer}
+.mem-root .mk-acts .go:disabled{opacity:.45;cursor:not-allowed}
+.mem-root .mk-acts .no{font:inherit;font-size:13px;padding:8px 14px;border-radius:999px;border:1px solid var(--ink-16);background:transparent;color:var(--ink-70);cursor:pointer}
+.mem-root .mk-hint{font-size:12px;color:var(--ink-50);line-height:1.5}
+
+/* what is waiting on a change */
+.mem-root .mem-wait{margin:0 0 24px;padding:16px 18px;border:1px solid var(--ink-12);border-left:2px solid var(--moss-700);border-radius:0 10px 10px 0;background:rgba(0,0,0,.012)}
+.mem-root .mem-wait h2{font-family:var(--serif);font-size:1.25rem;letter-spacing:-.015em;margin:7px 0 0}
+.mem-root .mem-wait .deck{margin:8px 0 0;font-size:13.5px;line-height:1.6;color:var(--ink-70);max-width:62ch}
+.mem-root .mem-wait .deck em{font-style:italic;color:var(--moss-700)}
+.mem-root .wlist{margin:12px 0 0;display:flex;flex-direction:column;gap:8px}
+.mem-root .wrow{display:grid;grid-template-columns:1fr auto;align-items:baseline;gap:4px 12px}
+.mem-root .wrow .wl{grid-column:1;justify-self:start;font:inherit;font-size:14px;padding:0;border:0;background:none;color:var(--ink);text-align:left;cursor:pointer;border-bottom:1px solid var(--ink-16)}
+.mem-root .wrow .wl:hover{border-color:var(--ink)}
+.mem-root .wrow .wsrc{grid-column:1;font-size:12px;color:var(--ink-50);line-height:1.5}
+.mem-root .wrow .ok{grid-row:1/3;grid-column:2;align-self:center;font:inherit;font-size:12px;padding:5px 12px;border:1px solid var(--ink-16);border-radius:999px;background:transparent;color:var(--ink-70);cursor:pointer;white-space:nowrap}
+.mem-root .wrow .ok:hover:not(:disabled){color:var(--moss-700);border-color:var(--moss-700)}
+.mem-root .wrow .ok:disabled{opacity:.45;cursor:not-allowed}
+
+/* asking */
+.mem-root .mem-ask{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:12px 0 0}
+.mem-root .mem-ask input{font:inherit;font-size:13.5px;padding:7px 12px;border:1px solid var(--ink-16);border-radius:999px;background:var(--paper);color:var(--ink);min-width:min(280px,100%)}
+.mem-root .mem-ask input:focus-visible{outline:2px solid var(--moss-700);outline-offset:1px}
+.mem-root .mem-ask button{font:inherit;font-size:12px;padding:6px 12px;border:1px solid var(--ink-16);border-radius:999px;background:transparent;color:var(--ink-60);cursor:pointer}
+.mem-root .mem-ask button:hover:not(:disabled){color:var(--ink);border-color:var(--ink-40)}
+.mem-root .mem-ask button[aria-pressed='true']{color:var(--paper);background:var(--moss-700);border-color:var(--moss-700)}
+.mem-root .mem-ask button:disabled{opacity:.4;cursor:not-allowed}
+.mem-root .mem-ask-n{font-size:12px;color:var(--ink-50);display:inline-flex;align-items:center;gap:8px}
+.mem-root .mem-ask-n .clear{font-size:12px;padding:4px 10px}

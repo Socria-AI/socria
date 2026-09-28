@@ -244,6 +244,88 @@ export async function touchNodes(
   }
 }
 
+// ── what is waiting on a change ─────────────────────────────────────
+//
+// Marks, not judgements. A node here rests on something the person changed and
+// has not been looked at since (lib/workspace/impact.ts). Its own row is
+// untouched: recall, reinforcement and updated_at all carry on as if nothing
+// happened, because nothing has happened TO IT — something happened underneath
+// it. That is why this is a separate table and not a column.
+
+export interface StaleMark {
+  nodeId: string;
+  becauseId: string;
+  becauseLabel: string;
+  kind: 'recompute' | 'review';
+  distance: number;
+  at: number;
+}
+
+function staleFromRow(r: Record<string, unknown>): StaleMark {
+  return {
+    nodeId: String(r.node_id),
+    becauseId: String(r.because_id),
+    becauseLabel: String(r.because_label ?? ''),
+    kind: r.kind === 'recompute' ? 'recompute' : 'review',
+    distance: typeof r.distance === 'number' ? r.distance : 1,
+    at: typeof r.at === 'number' ? r.at : 0,
+  };
+}
+
+/**
+ * Everything waiting. Best-effort: a store that cannot answer means the marks
+ * are not shown, which is a smaller harm than a Memory page that will not load
+ * — and unlike the graph itself, nothing is lost by not showing them.
+ */
+export async function loadStale(userId: string): Promise<StaleMark[]> {
+  const { data, error } = await supabaseAdmin()
+    .from('mind_stale')
+    .select('node_id, because_id, because_label, kind, distance, at')
+    .eq('user_id', userId)
+    .order('at', { ascending: false })
+    .limit(500);
+  if (error || !data) return [];
+  return (data as Record<string, unknown>[]).map(staleFromRow);
+}
+
+/**
+ * Record what a change reached.
+ *
+ * Upsert on (user_id, node_id), so a node already waiting on something keeps
+ * ONE mark: the person needs to know that this has not been looked at, not a
+ * queue of every reason it hasn't.
+ */
+export async function writeStale(userId: string, marks: readonly StaleMark[]): Promise<boolean> {
+  if (!marks.length) return true;
+  const { error } = await supabaseAdmin().from('mind_stale').upsert(
+    marks.map((m) => ({
+      user_id: userId,
+      node_id: m.nodeId,
+      because_id: m.becauseId,
+      because_label: m.becauseLabel.slice(0, 200),
+      kind: m.kind,
+      distance: m.distance,
+      at: m.at,
+    })),
+    { onConflict: 'user_id,node_id' }
+  );
+  if (error) {
+    console.error(`[socria/mind] could not record what a change reached: ${error.message}`);
+    return false;
+  }
+  return true;
+}
+
+/** One mark cleared, because somebody looked. */
+export async function clearStale(userId: string, nodeId: string): Promise<boolean> {
+  const { error } = await supabaseAdmin()
+    .from('mind_stale')
+    .delete()
+    .eq('user_id', userId)
+    .eq('node_id', nodeId);
+  return !error;
+}
+
 // ── uploaded files ──────────────────────────────────────────────────
 
 export interface StoredSource {
@@ -374,7 +456,7 @@ function rowToProject(r: Record<string, unknown>): ProjectContainer {
  * either: a Project's name, description and instructions are the person's own
  * words, and the button promises to keep everything they wrote.
  */
-export const MIND_DERIVED_TABLES = ['mind_edges', 'mind_pending', 'mind_sources', 'mind_tombstones'] as const;
+export const MIND_DERIVED_TABLES = ['mind_edges', 'mind_pending', 'mind_sources', 'mind_stale', 'mind_tombstones'] as const;
 
 /** Every Project, archived included. Throws MindStoreError when the table is missing. */
 export async function listProjects(userId: string): Promise<ProjectContainer[]> {

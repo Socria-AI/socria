@@ -17,8 +17,8 @@ import { useRouter } from 'next/navigation';
 import { useUser } from '@clerk/nextjs';
 import { ThinkingMap, type MapNodeRef } from '@/components/ThinkingMap';
 import { ExplorePanel } from '@/components/ExplorePanel';
-import { emptyWorkspace } from '@/lib/workspace/store';
-import { projectMap } from '@/lib/workspace/adapters';
+import { emptyWorkspace, update as wsUpdate } from '@/lib/workspace/store';
+import { bridgeSurfaces, projectMap, projectMind } from '@/lib/workspace/adapters';
 import { trace } from '@/lib/workspace/trace';
 import { LogosRail } from '@/components/LogosRail';
 import { AttachmentList, LogosComposer, type Draft } from '@/components/LogosComposer';
@@ -424,10 +424,97 @@ export function LogosApp({
   // vocabulary (lib/workspace) so Trace can WALK what a node rests on and what
   // rests on it, instead of asking a model to describe it. Only computed while
   // the Trace lens is actually open on a node, because projecting is O(map).
+  //
+  // Durable memory joins it when there is an account to read one from, which is
+  // what lets a trace of something drawn a minute ago reach something said in
+  // March. Fetched through ?scope=logos: this surface can export itself as an
+  // image, so private material must never arrive here at all — a filter applied
+  // in the browser is a filter that has already been sent.
+  const [durable, setDurable] = useState<{
+    nodes: unknown[];
+    edges: unknown[];
+    waiting: { nodeId: string; becauseId: string; becauseLabel: string; kind: 'recompute' | 'review'; distance: number; at: number }[];
+  } | null>(null);
+  const askedDurable = useRef(false);
+  useEffect(() => {
+    if (!cloud || !explore.open || explore.mode !== 'trace' || askedDurable.current) return;
+    askedDurable.current = true;
+    let live = true;
+    void (async () => {
+      try {
+        const res = await fetch('/api/mind?scope=logos', { cache: 'no-store' });
+        if (!res.ok) return;
+        const j = await res.json();
+        if (live) setDurable({ nodes: j.nodes ?? [], edges: j.edges ?? [], waiting: j.waiting ?? [] });
+      } catch {
+        // Trace works without it; what is lost is reach, not correctness.
+      }
+    })();
+    return () => {
+      live = false;
+    };
+  }, [cloud, explore.open, explore.mode]);
+
   const structure = useMemo(() => {
     if (!explore.open || explore.mode !== 'trace' || !explore.node) return null;
-    return trace(projectMap(emptyWorkspace(), map), `map:${explore.node.id}`);
-  }, [explore.open, explore.mode, explore.node, map]);
+    let ws = projectMap(emptyWorkspace(), map);
+    if (durable) {
+      ws = projectMind(
+        ws,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        { nodes: durable.nodes as any, edges: durable.edges as any, tombstones: [], pending: [] },
+        { excludePrivate: true }
+      );
+      for (const w of durable.waiting) {
+        const id = `mind:${w.nodeId}`;
+        if (!ws.objects.has(id)) continue;
+        ws = wsUpdate(
+          ws,
+          id,
+          { stale: { because: `mind:${w.becauseId}`, label: w.becauseLabel, at: w.at, kind: w.kind, distance: w.distance } },
+          'system',
+          w.at
+        );
+      }
+      // Joined by label, never merged: each copy keeps its own standing and its
+      // own grounds (bridgeSurfaces, lib/workspace/adapters.ts).
+      ws = bridgeSurfaces(ws);
+    }
+    return trace(ws, `map:${explore.node.id}`);
+  }, [explore.open, explore.mode, explore.node, map, durable]);
+
+  // Keeping a node: the one place in Logos that writes to durable memory. It
+  // goes through the same write path as the Memory page, so a tombstone still
+  // outranks it and a duplicate still comes back as the id of what is there.
+  const [keepState, setKeepState] = useState<Record<string, string>>({});
+  const keepNode = useCallback(
+    async (node: { id: string; label: string; type: string }) => {
+      setKeepState((k) => ({ ...k, [node.id]: 'sending' }));
+      try {
+        const res = await fetch('/api/mind/node', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: node.type,
+            label: node.label,
+            note: `kept from a Thinking Map (${node.id})`,
+          }),
+        });
+        const j = await res.json().catch(() => null);
+        if (!res.ok) throw new Error(j?.error || 'failed');
+        if (j.ok === false) {
+          setKeepState((k) => ({ ...k, [node.id]: j.say as string }));
+          return;
+        }
+        setKeepState((k) => ({ ...k, [node.id]: 'kept' }));
+        // It is durable now, so the next trace should be able to reach it.
+        askedDurable.current = false;
+      } catch {
+        setKeepState((k) => ({ ...k, [node.id]: 'That could not be kept just now.' }));
+      }
+    },
+    []
+  );
 
   // ── is mathematics in play? ───────────────────────────────────────
   // Local and deterministic, so it can run on every keystroke; sticky, so the
@@ -3099,6 +3186,12 @@ export function LogosApp({
             data={explore.data}
             lineage={explore.node ? describeLineage(map, explore.node.id) : []}
             structure={structure}
+            onKeep={
+              cloud && explore.node
+                ? () => void keepNode(explore.node as { id: string; label: string; type: string })
+                : undefined
+            }
+            keepState={explore.node ? (keepState[explore.node.id] ?? 'idle') : 'idle'}
             thread={
               explore.node ? (threads[`${explore.node.id}::${explore.node.label}`] ?? []) : []
             }

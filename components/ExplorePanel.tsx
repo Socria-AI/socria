@@ -43,6 +43,8 @@ export function ExplorePanel({
   data,
   lineage,
   structure,
+  onKeep,
+  keepState,
   thread,
   streaming,
   busy,
@@ -70,6 +72,14 @@ export function ExplorePanel({
    * a fact about the state rather than a plausible sentence about it.
    */
   structure?: WorkspaceTrace | null;
+  /**
+   * Keep this node in durable memory. Absent when there is nobody to keep it
+   * for — a key-unlocked visitor has no account, and offering the button would
+   * promise something the product cannot do.
+   */
+  onKeep?: () => void;
+  /** 'sending' | 'kept' | a refusal to show verbatim */
+  keepState?: 'idle' | 'sending' | 'kept' | string;
   thread: FocusMsg[];
   streaming: string;
   busy: boolean;
@@ -319,10 +329,67 @@ export function ExplorePanel({
                     </ul>
                   </>
                 )}
+                {/* What this rests on is not the same question as whether it has
+                    been looked at since. A mark says where to look; it does not
+                    lower anything's standing. */}
+                {structure.object.stale && (
+                  <p className="lg-x-struct-stale">
+                    {structure.object.stale.label
+                      ? `You changed “${structure.object.stale.label}”, which this rests on. Nothing has been re-decided — this has just not been looked at since.`
+                      : 'Something this rests on changed, and it has not been looked at since.'}
+                  </p>
+                )}
+
+                {/* The same thing, remembered. Its grounds are ITS grounds:
+                    months of accumulated support is not something this session
+                    produced, and presenting it as such would be a lie about
+                    where the work came from. */}
+                {structure.elsewhere.length > 0 && (
+                  <>
+                    <span className="lg-x-block-label">Also in your memory</span>
+                    {structure.elsewhere.map((e) => (
+                      <div className="lg-x-struct-else" key={e.object.id}>
+                        <p className="lg-x-struct-line">{e.object.label}</p>
+                        {e.rests.length > 0 && (
+                          <p className="lg-x-struct-note">
+                            There it rests on {e.rests.map((l) => l.object.label).join(', ')}.
+                          </p>
+                        )}
+                        {e.carries.length > 0 && (
+                          <p className="lg-x-struct-note">
+                            {e.carries.length === 1 ? 'One thing' : `${e.carries.length} things`} in your memory rest
+                            on it.
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </>
+                )}
+
                 {structure.truncated && (
                   <p className="lg-x-struct-note">
                     This goes further than shown — the walk stopped at its limit.
                   </p>
+                )}
+
+                {/* Keeping is the bridge out of the session. A map node lives
+                    and dies with its conversation; kept, it becomes an ordinary
+                    durable object with the trail back to here recorded. */}
+                {onKeep && !structure.elsewhere.length && (
+                  <div className="lg-x-struct-keep">
+                    <button
+                      type="button"
+                      disabled={keepState === 'sending' || keepState === 'kept'}
+                      onClick={onKeep}
+                    >
+                      {keepState === 'sending' ? 'Keeping…' : keepState === 'kept' ? 'Kept' : 'Keep this'}
+                    </button>
+                    <span>
+                      {keepState && keepState !== 'idle' && keepState !== 'sending' && keepState !== 'kept'
+                        ? keepState
+                        : 'Outlives this session, and stays yours.'}
+                    </span>
+                  </div>
                 )}
               </div>
             )}

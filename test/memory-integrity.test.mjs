@@ -221,8 +221,15 @@ console.log('=== "clear memory" clears the memory it describes ===');
 {
   const route = read('app/api/account/memory/route.ts');
   const store = read('lib/mind/store.ts');
-  ok('the Mind Graph tables are named in one place',
-    /export const MIND_DERIVED_TABLES = \['mind_edges', 'mind_pending', 'mind_sources', 'mind_tombstones'\]/.test(store));
+  // The list may grow — mind_stale arrived with impact marks — so what is
+  // asserted is that it is ONE list and that every derived table is in it,
+  // rather than a frozen copy of today's contents.
+  const derived = /export const MIND_DERIVED_TABLES = \[([^\]]*)\]/.exec(store);
+  ok('the Mind Graph tables are named in one place', !!derived);
+  const named = derived ? [...derived[1].matchAll(/'([a-z_]+)'/g)].map((m) => m[1]) : [];
+  for (const t of ['mind_edges', 'mind_pending', 'mind_sources', 'mind_stale', 'mind_tombstones']) {
+    ok(`  ${t} is in it`, named.includes(t), named.join(','));
+  }
   ok('the route clears them', /for \(const table of MIND_DERIVED_TABLES\)/.test(route));
   ok('  and the nodes', /from\('mind_nodes'\)\.delete\(\)/.test(route));
   ok('  keeping the Project anchors, so a Project survives', /anchors\.has\(id\)/.test(route));

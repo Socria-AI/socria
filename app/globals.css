@@ -4701,6 +4701,39 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
   color: var(--lg-ink-40);
   margin-top: 2px;
 }
+.logos-root .lg-x-struct-stale {
+  margin: 12px 0 0;
+  padding: 9px 12px;
+  border-left: 2px solid var(--lg-accent);
+  border-radius: 0 7px 7px 0;
+  background: rgba(35, 36, 31, 0.03);
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--lg-ink-60);
+}
+.logos-root .lg-x-struct-else { margin: 0 0 10px; }
+.logos-root .lg-x-struct-keep {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 18px;
+}
+.logos-root .lg-x-struct-keep button {
+  font: inherit;
+  font-size: 12.5px;
+  padding: 6px 14px;
+  border: 1px solid var(--lg-line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--lg-ink);
+  cursor: pointer;
+  transition: color 0.18s, border-color 0.18s;
+}
+.logos-root .lg-x-struct-keep button:hover:not(:disabled) { border-color: var(--lg-primary); color: var(--lg-primary); }
+.logos-root .lg-x-struct-keep button:disabled { opacity: 0.55; cursor: default; }
+.logos-root .lg-x-struct-keep span { font-size: 12px; line-height: 1.5; color: var(--lg-ink-40); }
+
 .logos-root .lg-x-struct-note {
   margin: 14px 0 0;
   font-size: 12px;

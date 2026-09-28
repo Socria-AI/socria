@@ -80,6 +80,17 @@ export interface Trace {
   assumptions: WObject[];
   /** the sources anywhere upstream of it, or attached to it */
   sources: WObject[];
+  /**
+   * The same thing, held somewhere else — almost always durable memory.
+   *
+   * ITS OWN SECTION, not folded into upstream. A claim drawn in this session
+   * and the remembered version of it are one thing to the person and two
+   * objects to the store, each with its own grounds; merging their evidence
+   * would present months of accumulated support as though this session had
+   * produced it. So the copy is named, and what IT rests on is reported as
+   * belonging to it.
+   */
+  elsewhere: { object: WObject; rests: Linked[]; carries: Linked[] }[];
   /** every change that touched it, newest first */
   history: { at: number; said: string }[];
   /** true where a walk hit a cap */
@@ -233,6 +244,17 @@ export function trace(ws: Workspace, id: string, limits = TRACE_LIMITS): Trace |
     ...up.found.map((l) => l.object),
   ].filter((o) => o.type === 'source' || o.type === 'dataset');
 
+  // The same thing on another surface. Both directions, because which way the
+  // link was drawn is an accident of which surface was projected first.
+  const twins = [...direct, ...edgesFrom(ws, id)]
+    .filter((e) => e.r.type === 'same-as')
+    .map((e) => e.other);
+  const elsewhere = dedupe(twins).map((o) => ({
+    object: o,
+    rests: walk(ws, o.id, 'up', null, limits).found.slice(0, limits.shown),
+    carries: walk(ws, o.id, 'down', null, limits).found.slice(0, limits.shown),
+  }));
+
   const history = ws.log
     .filter((ev) => touches(ev, id))
     .map((ev) => ({ at: ev.at, said: sayShort(ev, ws) }))
@@ -250,6 +272,7 @@ export function trace(ws: Workspace, id: string, limits = TRACE_LIMITS): Trace |
     downstream: down.found.slice(0, limits.shown),
     assumptions: dedupe(assumptions).slice(0, limits.shown),
     sources: dedupe(sources).slice(0, limits.shown),
+    elsewhere,
     history,
     truncated: up.truncated || down.truncated,
   };
