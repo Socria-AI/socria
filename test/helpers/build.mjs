@@ -67,6 +67,8 @@ const MODULES = [
   'lib/model/spec.ts',
   'lib/model/state.ts',
   'lib/model/library.ts',
+  'lib/model/science.ts',
+  'lib/surface-science.ts',
   'lib/workspace/object.ts',
   'lib/workspace/store.ts',
   'lib/workspace/trace.ts',

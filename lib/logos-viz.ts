@@ -56,6 +56,8 @@ import {
   ergosphereAt,
   observedTemperature,
   orbit,
+  criticalImpact,
+  kerrShadow,
   orbitPeriod,
   oscillator,
   oscillatorAt,
@@ -3939,7 +3941,7 @@ function buildBlackHole(scene: VizScene, vals: Record<string, number>, guarded: 
   const mdot = eddingtonRate(bh, 0.1);
   for (let i = 0; i <= 14; i++) {
     const R = iscoR + (diskOut - iscoR) * (i / 14) ** 1.3;
-    const T = observedTemperature(bh, R * g, mdot, 0).T;
+    const T = observedTemperature(bh, R * g, mdot, 0, 'prograde').T;
     objects.push({
       o: 'curve',
       id: `disk${i}`,
@@ -3954,17 +3956,23 @@ function buildBlackHole(scene: VizScene, vals: Record<string, number>, guarded: 
   // the horizon: light passing inside that is captured, so the dark patch on
   // the sky is 2.6 Schwarzschild radii wide rather than 1. Filled, and drawn
   // after the disk so the disk's far side is correctly hidden behind it.
+  // Not a circle once it spins: the Kerr outline, seen at this inclination.
+  const rimPts = kerrShadow(spin, Math.PI / 2 - incl).points.map((q) => ({ x: q.alpha, y: q.beta }));
   objects.push({
     o: 'region',
     id: 'shadow',
-    pts: circle(bh.shadow / g),
+    pts: rimPts.length > 2 ? rimPts : circle(bh.shadow / g),
     // Dark, because it is the dark patch. A palette tone at 12% drew the hole
     // as a pale green disc, which is the one thing on this picture that has to
     // read without a caption.
     color: 'rgba(18, 22, 28, 0.92)',
     tone: 'primary',
   });
-  objects.push({ o: 'curve', id: 'shadowline', pts: circle(bh.shadow / g), tone: 'ghost', width: 1, dashed: true });
+  objects.push({
+    o: 'curve', id: 'shadowline',
+    pts: rimPts.length > 2 ? rimPts : circle(bh.shadow / g),
+    tone: 'ghost', width: 1, dashed: true,
+  });
 
   // The horizon and the ergosphere, in the plane of the sky. The ergosphere is
   // the reason a spinning hole is drawn differently from a still one: it is a
@@ -3986,12 +3994,24 @@ function buildBlackHole(scene: VizScene, vals: Record<string, number>, guarded: 
     objects.push({ o: 'curve', id: 'ergo', pts: ergo, tone: 'tension', width: 1, dashed: true });
   }
 
-  // The photon sphere: the orbit light itself can hold, unstably.
-  objects.push({ o: 'curve', id: 'photonring', pts: circle(bh.photonSphere / g), tone: 'muted', dashed: true, width: 1 });
+  // The photon orbit: where light itself can hold, unstably. TWO of them once
+  // the hole spins — co-rotating light orbits far closer in than light going the
+  // other way — and one circle quoted for both would be the average of two true
+  // numbers, which is not one of them.
+  objects.push({ o: 'curve', id: 'photonring', pts: flat(bh.photonSphere / g), tone: 'muted', dashed: true, width: 1 });
+  if (spin > 0.02) {
+    objects.push({ o: 'curve', id: 'photonring-retro', pts: flat(bh.photonSphereRetro / g), tone: 'muted', dashed: true, width: 0.8 });
+  }
 
   // AND THE RAY. Integrated, not drawn — see photonPath. This is the object
   // that makes the picture worth having a physics module behind it.
-  const ray = photonPath(bImpact);
+  // INTEGRATED IN THE METRIC THE PICTURE IS OF. The spin used to move the
+  // marked radii and leave the ray exactly where it was; it goes into the
+  // integration now, so the capture threshold moves with it — and the readout
+  // below quotes the threshold for this ray's own sense of rotation rather than
+  // the non-spinning √27 for both.
+  const ray = photonPath(bImpact, { spin });
+  const crit = criticalImpact(spin);
   if (ray.points.length > 1) {
     objects.push({
       o: 'curve',
@@ -4014,16 +4034,16 @@ function buildBlackHole(scene: VizScene, vals: Record<string, number>, guarded: 
   const readouts: VizReadout[] = [
     { id: 'rs', tex: 'r_s = 2GM/c^2', value: sayText(bh.rs, 'm'), help: 'The Schwarzschild radius: where the escape speed reaches the speed of light. For a non-spinning hole this is the horizon itself.' },
     { id: 'rh', tex: 'r_+', value: sayText(bh.horizon, 'm'), help: 'The outer event horizon. Spin shrinks it: at the maximum it is half the Schwarzschild radius.' },
-    { id: 'shadow', tex: 'r_{\\rm shadow} = \\sqrt{27} r_g', value: sayText(bh.shadow, 'm'), help: 'How big the dark patch looks from far away. Larger than the horizon, because light passing near the hole is bent into it — this is the size a telescope measures.' },
+    { id: 'shadow', tex: 'r_{\\rm shadow}', value: sayText(bh.shadow, 'm'), help: spin > 0.02 ? 'How big the dark patch looks from far away — and at this spin it is not a circle: co-rotating light escapes from closer in, so one side is pushed in and the other bulges. The length quoted is the √27 r_g scale; the drawn outline is the Kerr curve.' : 'How big the dark patch looks from far away: √27 r_g, larger than the horizon because light passing near the hole is bent into it. This is the size a telescope measures.' },
     { id: 'isco', tex: 'r_{\\rm ISCO}', value: sayText(bh.isco, 'm'), help: 'The innermost stable circular orbit — inside it there is no orbit at all, only a fall. It is the inner edge of the disk, and spin drags it inward.' },
     { id: 'eff', tex: '\\eta', value: guarded ? null : percentText(bh.efficiency), help: 'What fraction of the infalling mass a disk can turn into light before it crosses the horizon. Compare hydrogen fusion, which manages 0.7%.' },
-    { id: 'iscoperiod', tex: 'T_{\\rm ISCO}', value: sayText(orbitPeriod(bh, bh.isco), 's'), help: 'How long one orbit takes at the inner edge of the disk. Kepler’s third law survives general relativity intact in these coordinates.' },
+    { id: 'iscoperiod', tex: 'T_{\\rm ISCO}', value: sayText(orbitPeriod(bh, bh.isco), 's'), help: 'How long one orbit takes at the inner edge of the disk. At zero spin this is Kepler’s third law exactly — one of the few elementary results general relativity leaves alone — and once the hole spins it is not: co-rotating gas at a given radius takes longer to come round than gas going the other way.' },
     { id: 'z', tex: 'z(3r_s)', value: ratioText(redshift(bh, 3 * bh.rs)), help: 'How far light emitted three Schwarzschild radii out is reddened by the time it reaches you. At the horizon this is infinite, which is one way of saying what a horizon is.' },
     { id: 'tidal', tex: '\\Delta a\\,(1.8\\,\\mathrm{m})', value: sayText(tidal(bh, bh.horizon, 1.8), 'm/s2'), help: 'The difference in pull between your head and your feet at the horizon. Small holes tear you apart long before you arrive; large ones do not.' },
     { id: 'th', tex: 'T_H', value: sayText(bh.hawkingT, 'K'), help: 'The Hawking temperature. Bigger holes are colder — this one is far colder than the microwave background, so in practice it absorbs rather than evaporates.' },
     { id: 'evap', tex: 't_{\\rm evap}', value: sayText(bh.evaporation, 's'), help: 'How long it would take to evaporate completely, if nothing ever fell in. The age of the universe is 1.4 × 10¹⁰ years.' },
-    { id: 'defl', tex: '\\alpha(b)', value: ray.captured ? 'captured' : `${ratioText(ray.deflection)} rad`, help: 'How far the ray was bent, by integrating its actual path. Far from the hole this matches Einstein’s 4GM/bc² — the prediction the 1919 eclipse confirmed.' },
-    { id: 'bcrit', tex: 'b_{\\rm crit} = \\sqrt{27} r_g', value: `${ratioText(B_CRIT)} r_g`, help: 'Aim a ray closer than this and it cannot escape, however fast it is going. It is the same number as the shadow radius, and for the same reason.' },
+    { id: 'defl', tex: '\\alpha(b)', value: ray.captured ? (ray.decidedBy === 'threshold' ? 'captured (by threshold)' : 'captured') : `${ratioText(ray.deflection)} rad`, help: 'How far the ray was bent, by integrating its actual path in this metric. Far from the hole this matches Einstein’s 4GM/bc² — the prediction the 1919 eclipse confirmed. Within a few hundredths of the critical aiming distance the number of loops diverges and the integration cannot finish; the verdict then comes from the exact threshold, and says so.' },
+    { id: 'bcrit', tex: 'b_{\\rm crit}', value: spin > 0.02 ? `${ratioText(crit.prograde)} / ${ratioText(Math.abs(crit.retrograde))} r_g` : `${ratioText(B_CRIT)} r_g`, help: 'Aim a ray closer than this and it cannot escape, however fast it is going. At zero spin it is √27 r_g either way round; once the hole spins there are two — co-rotating light survives down to 2 r_g at the limit, while light going against the rotation is swallowed out at 7.' },
   ];
 
   const solar = bh.M / PHYS.Msun;

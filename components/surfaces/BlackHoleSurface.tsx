@@ -7,11 +7,30 @@
 // WHAT IS DIFFERENT FROM THE PICTURE THIS IS MODELLED ON. The design's version
 // bends its light rays with `cos(a·u^3.2)` — a curve chosen because it looks
 // like bending. Here the rays are the actual null geodesics of the metric,
-// integrated by RK4 on d²u/dφ² + u = 3u² (lib/logos-physics.ts), which means
-// the capture threshold is not a number typed in: a ray is drawn falling in
-// because the integration takes it through the horizon. Far from the hole the
+// integrated by RK4 in Boyer–Lindquist coordinates (lib/logos-physics.ts), which
+// means the capture threshold is not a number typed in: a ray is drawn falling
+// in because the integration takes it through the horizon. Far from the hole the
 // same integration reproduces 4GM/bc² to a hundredth of a per cent, which is
 // the deflection the 1919 eclipse measured.
+//
+// AND THE SPIN IS IN THE RAYS NOW, WHICH IT WAS NOT.
+//
+// The title said Kerr and the geodesics were Schwarzschild: spin moved the
+// marked radii and left every light path exactly where it was. The assumptions
+// list said so, honestly, but a figure whose headline is the metric ought to
+// compute in it. So the rays carry the spin, the fan is fired symmetrically —
+// half co-rotating, half counter-rotating, which is what a beam of parallel
+// light passing a spinning hole actually is — and at high spin you can see the
+// consequence directly: co-rotating light survives down to b = 2.1 r_g while
+// light going the other way is swallowed out at 7. The shadow is drawn from the
+// Kerr curve rather than a circle held at the non-spinning value, so it takes
+// on the flat edge that is the metric's most recognisable prediction.
+//
+// A RETROGRADE DISC IS COMPUTED AS ONE. Negative spin means the gas runs against
+// the rotation: its inner edge is the retrograde ISCO (out at 9 r_g rather than
+// in at 1.2), its efficiency is 3.8% rather than 32%, and both now come from the
+// retrograde root instead of the prograde one being reused with a different
+// radius drawn on top.
 //
 // AND THE DISC HAS ITS REAL COLOUR. Temperature from the thin-disc profile,
 // then the Doppler factor of the orbiting gas and the gravitational redshift
@@ -31,24 +50,61 @@ import {
   PHYS,
   blackHole,
   blackbodyCSS,
+  circularOrbit,
+  criticalImpact,
   eddingtonRate,
+  kerrShadow,
   observedTemperature,
-  orbitalBeta,
   photonPath,
   sayText,
   type BlackHole,
+  type PhotonPath,
 } from '@/lib/logos-physics';
 import { Surface3D, type RenderArgs, type SurfaceRender, type SurfaceProps, snap } from './Surface3D';
 import { BLACK_HOLE_ENTITIES, SURFACE_MODEL } from '@/lib/viz-semantics';
+import { BLACK_HOLE_SCIENCE } from '@/lib/surface-science';
+import { canCompute } from '@/lib/model/science';
 
-/** The geometry in Schwarzschild radii, which is how the labels read. */
+/**
+ * Integrated rays, kept between frames.
+ *
+ * A ray depends on its impact parameter and the spin and on nothing else — not
+ * on the clock, not on the camera — so re-integrating fourteen of them sixty
+ * times a second was work thrown away. Keyed to three decimal places of each,
+ * which is finer than a slider step. Bounded, because a session dragging the
+ * spin control sweeps a lot of keys.
+ */
+const RAY_CACHE = new Map<string, PhotonPath>();
+function ray(b: number, spin: number): PhotonPath {
+  const key = `${b.toFixed(3)}:${spin.toFixed(3)}`;
+  const held = RAY_CACHE.get(key);
+  if (held) return held;
+  const made = photonPath(b, { spin, steps: 4000, maxTurn: 8 * Math.PI });
+  if (RAY_CACHE.size > 600) RAY_CACHE.clear();
+  RAY_CACHE.set(key, made);
+  return made;
+}
+
+/**
+ * The geometry in Schwarzschild radii, which is how the labels read.
+ *
+ * Both senses of every quantity that has two. A single `isco` and a single `bc`
+ * were what let a retrograde disc be drawn at the right radius with the wrong
+ * temperature, and a Kerr figure quote one capture threshold for light going
+ * either way round.
+ */
 function inRs(bh: BlackHole) {
+  const crit = criticalImpact(bh.spin);
   return {
     horizon: bh.horizon / bh.rs,
     photon: bh.photonSphere / bh.rs,
+    photonRetro: bh.photonSphereRetro / bh.rs,
     isco: bh.isco / bh.rs,
-    /** the capture radius: √27 r_g is 2.598 r_s */
-    bc: bh.shadow / bh.rs,
+    iscoRetro: bh.iscoRetro / bh.rs,
+    /** capture threshold for co-rotating light: √27 r_g = 2.598 r_s at rest */
+    bc: crit.prograde / 2,
+    /** and for counter-rotating light, which is further out at any spin */
+    bcRetro: Math.abs(crit.retrograde) / 2,
     ergo: bh.ergosphere / bh.rs,
   };
 }
@@ -68,7 +124,13 @@ const GROUPS = [
     ctls: [
       { id: 'tilt', label: 'tilt', min: -1.2, max: 1.2, step: 0.01, read: (v: number) => `${Math.round(v * 57.2958)}°`, help: 'How far the disc is tipped from the line of sight.' },
       { id: 'outer', label: 'outer', min: 4, max: 40, step: 0.5, read: (v: number) => `${v} r`, help: 'How far out the disc is drawn. Take it far enough and the outer rings really do redden — the temperature falls as r^-3/4.' },
-      { id: 'edd', label: 'rate', min: 0.01, max: 1, step: 0.01, read: (v: number) => `${(v * 100).toFixed(0)}% Edd`, help: 'How fast it is being fed, as a fraction of the Eddington rate. It sets the temperature, and so the colour.' },
+      // STOPS AT 0.3, WHERE THE MODEL DOES. The thin-disc profile assumes an
+      // optically thick, radiatively efficient, geometrically thin disc, and past
+      // roughly a third of the Eddington rate radiation pressure thickens it and
+      // the profile stops describing anything. A slider that ran to 1.0 was
+      // offering a value the model cannot honour — see lib/model/science.ts,
+      // which now refuses that arrangement outright.
+      { id: 'edd', label: 'rate', min: 0.01, max: 0.3, step: 0.01, read: (v: number) => `${(v * 100).toFixed(0)}% Edd`, help: 'How fast it is being fed, as a fraction of the Eddington rate. It sets the temperature, and so the colour. It stops at 30% because the thin-disc profile does.' },
       { id: 'matter', label: 'matter', min: 0, max: 80, step: 1, read: (v: number) => `${v} bodies`, help: 'Gas parcels, orbiting at the Keplerian rate for their radius and dragged faster by spin.' },
     ],
   },
@@ -108,14 +170,27 @@ const INITIAL = {
 export function BlackHoleSurface({ initial, fill, onRead, ops }: SurfaceProps = {}) {
   const render = useCallback((a: RenderArgs): SurfaceRender => {
     const { W, H, cam, t, vals, layers } = a;
+    // THE VALUES ARE CHECKED BEFORE ANYTHING IS DRAWN.
+    //
+    // A NaN out of a control, or a value past the end of the model's validity,
+    // produces geometry either way — and geometry is read as a result. The
+    // science block declares where each parameter holds (lib/surface-science.ts)
+    // and canCompute reports what it had to clamp, which is said out loud in the
+    // note rather than absorbed silently.
+    const check = canCompute(BLACK_HOLE_SCIENCE, {
+      m: vals.m, spin: vals.spin, edd: vals.edd, outer: vals.outer, tilt: vals.tilt, bsel: vals.bsel,
+    });
+
     const bh = blackHole(vals.m * 1e6 * PHYS.Msun, Math.abs(vals.spin));
+    // Negative spin on the control means the DISC runs against the hole's
+    // rotation — a retrograde disc around a hole of spin |a★|, which is what it
+    // physically is. Everything the disc does then takes the retrograde root:
+    // its inner edge, its efficiency, its orbital rate and its direction.
     const retro = vals.spin < 0;
+    const sense: 'prograde' | 'retrograde' = retro ? 'retrograde' : 'prograde';
     const g = inRs(bh);
-    // Retrograde: the ISCO moves out instead of in. blackHole() returns the
-    // prograde root, so the retrograde one is taken from the same closed form
-    // with the sign of the square root flipped.
-    const isco = retro ? retrogradeIsco(Math.abs(vals.spin)) : g.isco;
-    const mdot = eddingtonRate(bh, vals.edd);
+    const isco = retro ? g.iscoRetro : g.isco;
+    const mdot = eddingtonRate(bh, vals.edd, sense);
 
     const rIn = Math.max(isco, g.horizon * 1.04);
     const rOut = Math.max(rIn + 1, vals.outer);
@@ -230,7 +305,6 @@ export function BlackHoleSurface({ initial, fill, onRead, ops }: SurfaceProps = 
         const r0 = rIn + (rOut - rIn) * f0 ** 1.35;
         const r1 = rIn + (rOut - rIn) * f1 ** 1.35;
         const rSI = ((r0 + r1) / 2) * bh.rs;
-        const beta = orbitalBeta(bh, rSI);
         const h = thick * (0.35 + 0.65 * f0);
         for (let k = 0; k < SEGS; k++) {
           const th0 = (k / SEGS) * Math.PI * 2;
@@ -255,7 +329,7 @@ export function BlackHoleSurface({ initial, fill, onRead, ops }: SurfaceProps = 
           const vx = -Math.sin(thm);
           const vz = Math.cos(thm);
           const cosTheta = Math.max(-1, Math.min(1, vx * (-sy * cp) + vz * (-cy * cp) * ci));
-          const { T, boost } = observedTemperature(bh, rSI, mdot, cosTheta);
+          const { T, boost } = observedTemperature(bh, rSI, mdot, cosTheta, sense);
           if (T <= 0) continue;
           // THE BEAMING HAS TO BE VISIBLE OR IT IS NOT BEING SHOWN.
           //
@@ -294,13 +368,25 @@ export function BlackHoleSurface({ initial, fill, onRead, ops }: SurfaceProps = 
       }
     }
 
-    // ── gas parcels, at the Keplerian rate, dragged by spin ────────
+    // ── gas parcels, at the Kerr orbital rate ──────────────────────
+    //
+    // WHAT THIS REPLACED. `om = 1.7 · (1 + 0.9a) · (r/r_in)^-1.5` — the r^-3/2 is
+    // Kepler and right, and the rest was a factor chosen to look like dragging.
+    // The real thing is in closed form: Ω = ±1/(r̃^{3/2} ± a★), which is Kepler at
+    // a★ = 0, gives co-rotating and counter-rotating gas genuinely different
+    // rates at the same radius, and reverses when the disc does. The one number
+    // that remains a choice is how fast the clock runs, and it is a clock rate
+    // rather than a physical rate: the ratio between any two parcels is the
+    // model's.
     if (layers.matter && vals.matter > 0) {
-      const drag = 1 + 0.9 * vals.spin;
       const n = Math.round(vals.matter);
+      // Normalised so the innermost ring turns at a legible rate on screen. The
+      // RATIOS between radii are the computed ones; this only sets the tempo.
+      const ref = Math.abs(circularOrbit(bh, rIn * bh.rs, sense).omega) || 1;
+      const clock = 1.7 / ref;
       for (let i = 0; i < n; i++) {
         const r = rIn + (((i * 7919) % n) / n) * (rOut - rIn);
-        const om = 1.7 * drag * Math.pow(r / rIn, -1.5);
+        const om = circularOrbit(bh, r * bh.rs, sense).omega * clock;
         const th = (i / n) * Math.PI * 2 + om * t;
         const p = onDisc(r * Math.cos(th), r * Math.sin(th), 0);
         if (hidden(p)) continue;
@@ -308,7 +394,7 @@ export function BlackHoleSurface({ initial, fill, onRead, ops }: SurfaceProps = 
         const vx = -Math.sin(th);
         const vz = Math.cos(th);
         const cosTheta = Math.max(-1, Math.min(1, vx * (-sy * cp) + vz * (-cy * cp) * ci));
-        const { T, boost } = observedTemperature(bh, rSI, mdot, cosTheta);
+        const { T, boost } = observedTemperature(bh, rSI, mdot, cosTheta, sense);
         put(
           p.depth,
           <circle
@@ -340,12 +426,30 @@ export function BlackHoleSurface({ initial, fill, onRead, ops }: SurfaceProps = 
       }
       put(centre.depth - 0.01, <path key="ergo" data-obj="ergo" className="bhx-ergo" d={d(pts)} />);
     }
+    // THE PHOTON ORBIT IS ONLY A SPHERE WHEN THE HOLE IS STILL.
+    //
+    // At a★ = 0 light can orbit at 1.5 r in any plane, and two great circles are
+    // the honest way to draw that. Once the hole spins there is no single radius:
+    // co-rotating light orbits at 1.07 r_g where counter-rotating light orbits at
+    // 4, and the surface those orbits sweep is not a sphere. Drawing a sphere
+    // there implies an isotropy the metric does not have — so above a whisper of
+    // spin this draws the TWO equatorial orbits instead, which is exactly what
+    // the closed form gives.
     if (layers.photon) {
-      for (const [pl, key] of [['xz', 'a'], ['yz', 'b']] as const) {
-        const c = greatCircle(g.photon, pl);
-        runs(c).forEach((seg, k) =>
-          put(mid(seg), <path key={`ph${key}${k}`} data-obj="photon" className="bhx-photon" d={d(seg)} />)
-        );
+      const spinning = Math.abs(vals.spin) > 0.02;
+      if (!spinning) {
+        for (const [pl, key] of [['xz', 'a'], ['yz', 'b']] as const) {
+          const c = greatCircle(g.photon, pl);
+          runs(c).forEach((seg, k) =>
+            put(mid(seg), <path key={`ph${key}${k}`} data-obj="photon" className="bhx-photon" d={d(seg)} />)
+          );
+        }
+      } else {
+        for (const [r, key] of [[g.photon, 'pro'], [g.photonRetro, 'ret']] as const) {
+          runs(ringAt(r)).forEach((seg, k) =>
+            put(mid(seg), <path key={`ph${key}${k}`} data-obj="photon" className="bhx-photon" d={d(seg)} />)
+          );
+        }
       }
     }
     if (layers.isco) {
@@ -387,32 +491,88 @@ export function BlackHoleSurface({ initial, fill, onRead, ops }: SurfaceProps = 
     }
     put(centre.depth - bodyR * 0.001, <g key="wire" data-obj="horizon">{wire}</g>);
 
-    // The shadow: what is actually dark to a distant observer, √27 r_g wide —
-    // 2.6 times the horizon, because light passing near it is bent in. Drawn
-    // flat to the sky, because that is what it is: an apparent size.
-    put(-1e9, <circle key="sh" data-obj="shadow" className="bhx-shadow" cx={snap(centre.x)} cy={snap(centre.y)} r={snap(g.bc * scale * centre.f)} />);
+    // ── THE SHADOW, AS THE METRIC DRAWS IT ─────────────────────────
+    //
+    // What is dark to a distant observer, and NOT a circle unless the hole is
+    // still. Co-rotating light escapes from closer in, so the silhouette is
+    // pushed in on one side and bulges on the other — flat-edged near the
+    // extremal limit, at exactly 2 r_g, which is the Kerr metric's most
+    // recognisable prediction and the shape an image of one gets compared
+    // against. The old code drew a fixed circle at the non-spinning radius with a
+    // comment admitting it.
+    //
+    // Drawn flat to the sky at the disc's inclination, because that is what it
+    // is: an apparent outline, not a surface anything sits on.
+    {
+      const rim = kerrShadow(bh.spin, Math.PI / 2 - Math.abs(vals.tilt));
+      // In r_s, on the sky: α across, β up. The axis is the spin axis, so the
+      // curve is oriented by the same tilt the disc is.
+      const sky = rim.points.map((q) => ({
+        x: centre.x + (q.alpha / 2) * scale * centre.f,
+        y: centre.y - (q.beta / 2) * scale * centre.f,
+      }));
+      if (sky.length > 2) {
+        put(
+          -1e9,
+          <path key="sh" data-obj="shadow" className="bhx-shadow" d={`${d(sky)} Z`} />
+        );
+      }
+    }
 
-    // ── the light, integrated ──────────────────────────────────────
+    // ── the light, integrated, and now in the right metric ─────────
+    //
+    // FIRED SYMMETRICALLY, which is both more honest and the only way to SEE the
+    // spin. A beam of parallel light passing a spinning hole has rays on both
+    // sides of the axis, and those two halves carry opposite angular momentum:
+    // one co-rotates, one runs against the rotation. They are captured at
+    // different impact parameters — ±√27 when the hole is still, +2.11 and −7.00
+    // at the Thorne limit — so the fan is split in two, and at high spin the
+    // asymmetry is the most visible thing in the figure.
     let captured = 0;
+    const fired: {
+      b: number;
+      sense: 'prograde' | 'retrograde';
+      captured: boolean;
+      deflection: number;
+      periapsis: number;
+      windings: number;
+      decidedBy: 'integration' | 'threshold';
+      highlighted: boolean;
+    }[] = [];
     if (layers.rays) {
       const n = Math.round(vals.rays);
       for (let i = 0; i < n; i++) {
-        const b = g.bc * (0.5 + (n === 1 ? 0.6 : (i / (n - 1)) * vals.spread));
-        const ray = photonPath(b * 2, { steps: 1400, maxTurn: 8 * Math.PI });
-        if (ray.captured) captured++;
+        // Half the fan each way. With one ray it goes co-rotating, because that
+        // is the side the aiming control reads against.
+        const side = n === 1 ? 1 : i % 2 === 0 ? 1 : -1;
+        const step = n <= 2 ? 0 : Math.floor(i / 2) / Math.max(1, Math.ceil(n / 2) - 1);
+        const bMag = (side > 0 ? g.bc : g.bcRetro) * (0.5 + step * vals.spread);
+        const b = side * bMag;
+        const path = ray(b * 2, bh.spin);
+        if (path.captured) captured++;
+        const highlighted = Math.abs(bMag - vals.bsel) < 0.35;
+        fired.push({
+          b: bMag,
+          sense: path.sense,
+          captured: path.captured,
+          deflection: path.deflection,
+          periapsis: path.periapsis / 2,
+          windings: path.windings,
+          decidedBy: path.decidedBy,
+          highlighted,
+        });
         const clip = rOut * 1.25;
-        const pts = ray.points
+        const pts = path.points
           .map((q) => ({ wx: q.x / 2, wz: q.y / 2 }))
           .filter((q) => Math.hypot(q.wx, q.wz) <= clip)
           .map((q) => cast(q.wx, q.wz, 0));
-        const near = Math.abs(b - vals.bsel) < 0.35;
         runs(pts).forEach((seg, k) =>
           put(
             mid(seg),
             <path
               key={`r${i}_${k}`}
               data-obj="rays"
-              className={(ray.captured ? 'bhx-ray-lost' : 'bhx-ray') + (near ? ' on' : '')}
+              className={(path.captured ? 'bhx-ray-lost' : 'bhx-ray') + (highlighted ? ' on' : '')}
               d={d(seg)}
             />
           )
@@ -421,7 +581,7 @@ export function BlackHoleSurface({ initial, fill, onRead, ops }: SurfaceProps = 
           const ph = ((t * 0.18 + i * 0.17) % 1 + 1) % 1;
           const q = pts[Math.min(pts.length - 1, Math.floor(ph * pts.length))];
           if (!hidden(q)) {
-            put(q.depth, <circle key={`rd${i}`} data-obj="rays" className={`bhx-dot${ray.captured ? ' lost' : ''}`} cx={snap(q.x)} cy={snap(q.y)} r={2.2} />);
+            put(q.depth, <circle key={`rd${i}`} data-obj="rays" className={`bhx-dot${path.captured ? ' lost' : ''}`} cx={snap(q.x)} cy={snap(q.y)} r={2.2} />);
           }
         }
       }
@@ -465,13 +625,37 @@ export function BlackHoleSurface({ initial, fill, onRead, ops }: SurfaceProps = 
       // Three labels on three different bearings, each on its own surface, so
       // they cannot stack on one another or on the hole the way they did when
       // all three sat on the vertical.
-      put(0, g.photon, 0, `photon orbit ${g.photon.toFixed(2)} r`, 'question', -Math.PI / 2, 30);
-      put(-isco, 0, 0, `ISCO ${isco.toFixed(2)} r`, 'evidence', Math.PI, 40);
+      const spinning = Math.abs(vals.spin) > 0.02;
+      put(
+        0, spinning ? g.photon : g.photon, 0,
+        spinning ? `photon orbit ${g.photon.toFixed(2)}/${g.photonRetro.toFixed(2)} r` : `photon orbit ${g.photon.toFixed(2)} r`,
+        'question', -Math.PI / 2, 30
+      );
+      put(-isco, 0, 0, `ISCO ${isco.toFixed(2)} r${retro ? ' retro' : ''}`, 'evidence', Math.PI, 40);
       put(0, -g.horizon, 0, `horizon ${g.horizon.toFixed(2)} r`, 'person', Math.PI / 2, 26);
     }
 
-    const innerT = observedTemperature(bh, Math.max(rIn * 1.36, rIn + 0.01) * bh.rs, mdot, 0).T;
+    const innerT = observedTemperature(bh, Math.max(rIn * 1.36, rIn + 0.01) * bh.rs, mdot, 0, sense).T;
     const spinning = Math.abs(vals.spin) > 0.02;
+    const inner = circularOrbit(bh, rIn * bh.rs, sense);
+
+    // The ray the aiming control is pointing at, said in full. "Why did that
+    // photon get captured?" is answerable from this and nothing else: the
+    // impact parameter it was fired with, the threshold for its OWN sense of
+    // rotation, where it actually turned, and whether the integration settled it
+    // or the exact threshold had to.
+    const picked = fired.find((f) => f.highlighted) ?? fired[0] ?? null;
+    const pickedSays = picked
+      ? `b = ${picked.b.toFixed(2)} r ${picked.sense}, threshold ${(picked.sense === 'prograde' ? g.bc : g.bcRetro).toFixed(2)} r — ` +
+        (picked.captured
+          ? `inside it, so it was captured` +
+            (picked.decidedBy === 'threshold'
+              ? '; the drawn path stops where the integration reached its winding limit, and the verdict is from the exact threshold'
+              : `, reaching ${picked.periapsis.toFixed(2)} r before crossing`)
+          : `outside it, so it escaped, bent by ${picked.deflection.toFixed(3)} rad after passing ${picked.periapsis.toFixed(2)} r` +
+            (picked.windings > 1 ? ` and going round ${picked.windings.toFixed(1)} times` : ''))
+      : 'no ray is drawn';
+
     return {
       content: nodes,
       // THE FACTS THAT ARE ACTUALLY LIVE, and only those. Everything else a
@@ -481,24 +665,30 @@ export function BlackHoleSurface({ initial, fill, onRead, ops }: SurfaceProps = 
       // the capture radius, not an estimate of one.
       live: {
         horizon: `${g.horizon.toFixed(2)} r, which is ${sayText(bh.rs, 'm')} across for this mass`,
-        shadow: `${g.bc.toFixed(2)} r — the apparent size a distant observer would measure`,
-        disc: `running from ${rIn.toFixed(1)} to ${rOut.toFixed(1)} r, inner edge at ${sayText(innerT, 'K')} at ${(vals.edd * 100).toFixed(0)}% of the Eddington rate`,
-        matter: `${Math.round(vals.matter)} parcels drawn`,
-        rays: `${Math.round(vals.rays)} rays integrated, ${captured} captured (they ended inside ${g.bc.toFixed(2)} r and could not get out)`,
-        photon: `${g.photon.toFixed(2)} r`,
+        shadow: spinning
+          ? `not a circle at this spin: ${g.bc.toFixed(2)} r on the co-rotating side, ${g.bcRetro.toFixed(2)} r on the other, from the Kerr shadow curve`
+          : `${g.bc.toFixed(2)} r in every direction — a circle, because the hole is not spinning`,
+        disc: `${sense}, running from ${rIn.toFixed(1)} to ${rOut.toFixed(1)} r, inner edge at ${sayText(innerT, 'K')} at ${(vals.edd * 100).toFixed(0)}% of the Eddington rate; efficiency ${((retro ? bh.efficiencyRetro : bh.efficiency) * 100).toFixed(1)}%`,
+        matter: `${Math.round(vals.matter)} parcels drawn, turning ${sense} at the computed Kerr rate — one orbit at the inner edge takes ${sayText(inner.period, 's')}`,
+        rays: `${Math.round(vals.rays)} rays integrated in Kerr at a = ${bh.spin.toFixed(3)}, half each way round; ${captured} captured. Thresholds: ${g.bc.toFixed(2)} r co-rotating, ${g.bcRetro.toFixed(2)} r against. The highlighted one: ${pickedSays}`,
+        photon: spinning
+          ? `${g.photon.toFixed(2)} r co-rotating and ${g.photonRetro.toFixed(2)} r against — two equatorial orbits, not a sphere, once the hole spins`
+          : `${g.photon.toFixed(2)} r, and a sphere: at a = 0 light can orbit in any plane`,
         isco: `${isco.toFixed(2)} r${retro ? ', pushed outward because the disc runs against the spin' : vals.spin > 0.02 ? ', pulled inward by prograde spin' : ''}`,
         ergo: spinning
-          ? `drawn, because the hole is spinning at a = ${vals.spin.toFixed(3)}`
+          ? `drawn, because the hole is spinning at a = ${vals.spin.toFixed(3)}; frame dragging at the inner edge is ${inner.drag.toExponential(2)} rad/s`
           : 'not drawn: at a = 0 there is no ergosphere',
       },
-      left: `bᶜ = ${g.bc.toFixed(2)} r · ${sayText(bh.rs, 'm')}`,
+      left: `bᶜ = ${g.bc.toFixed(2)}/${g.bcRetro.toFixed(2)} r · ${sayText(bh.rs, 'm')}`,
       right: `${captured} of ${Math.round(vals.rays)} captured · disc ${sayText(innerT, 'K')}`,
-      note: retro
-        ? 'Retrograde: the disc orbits against the spin and its inner edge is pushed out toward 4.5 r, so it never gets hot.'
-        : vals.spin > 0.5
-          ? 'Prograde spin pulls the innermost stable orbit in toward the horizon. The disc reaches closer, orbits faster, and runs hotter for it.'
-          : 'Every control moves the physics. The rays are integrated geodesics, not drawn curves — below bᶜ one cannot get out, and at a = 0 that is 2.60 r, not the photon orbit at 1.5.',
-      label: `A Kerr black hole of ${vals.m} million solar masses, spin ${vals.spin.toFixed(2)}. ${captured} of ${Math.round(vals.rays)} light rays are captured. The disc runs from ${rIn.toFixed(1)} to ${rOut.toFixed(1)} Schwarzschild radii.`,
+      note: check.clamped.length
+        ? `Held at the edge of the model: ${check.clamped.map((c) => `${c.id} at ${c.to} — ${c.why}`).join('; ')}.`
+        : retro
+          ? `Retrograde: the disc runs against the spin, so its inner edge is the retrograde ISCO at ${isco.toFixed(2)} r and it radiates ${(bh.efficiencyRetro * 100).toFixed(1)}% of what falls in, against ${(bh.efficiency * 100).toFixed(1)}% the other way round. It never gets as hot.`
+          : spinning
+            ? `Spin is in the light as well as the geometry: co-rotating rays survive to ${g.bc.toFixed(2)} r while rays going the other way are swallowed out at ${g.bcRetro.toFixed(2)} r, and the shadow takes its flat edge from the difference.`
+            : 'Every control moves the physics. The rays are integrated geodesics, not drawn curves — below bᶜ one cannot get out, and at a = 0 that is 2.60 r, not the photon orbit at 1.5.',
+      label: `A Kerr black hole of ${vals.m} million solar masses, spin ${vals.spin.toFixed(2)}, with a ${sense} disc from ${rIn.toFixed(1)} to ${rOut.toFixed(1)} Schwarzschild radii. ${captured} of ${Math.round(vals.rays)} integrated light rays are captured.`,
     };
   }, []);
 
@@ -510,6 +700,7 @@ export function BlackHoleSurface({ initial, fill, onRead, ops }: SurfaceProps = 
       model={SURFACE_MODEL['black-hole'].model}
       assumptions={SURFACE_MODEL['black-hole'].assumptions}
       equations={SURFACE_MODEL['black-hole'].equations}
+      science={BLACK_HOLE_SCIENCE}
       onRead={onRead}
       ops={ops}
       groups={GROUPS}
@@ -528,9 +719,4 @@ export function BlackHoleSurface({ initial, fill, onRead, ops }: SurfaceProps = 
   );
 }
 
-/** The ISCO for an orbit running against the spin: the other root. */
-function retrogradeIsco(a: number): number {
-  const Z1 = 1 + Math.cbrt(1 - a * a) * (Math.cbrt(1 + a) + Math.cbrt(1 - a));
-  const Z2 = Math.sqrt(3 * a * a + Z1 * Z1);
-  return (3 + Z2 + Math.sqrt(Math.max(0, (3 - Z1) * (3 + Z1 + 2 * Z2)))) / 2;
-}
+

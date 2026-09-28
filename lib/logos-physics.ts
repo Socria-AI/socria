@@ -291,9 +291,28 @@ export interface BlackHole {
   photonSphereRetro: number;
   /** innermost stable circular orbit, prograde, m. 6 r_g at a★ = 0 */
   isco: number;
+  /**
+   * The ISCO for a disc running AGAINST the spin, m. 6 r_g at a★ = 0, 9 r_g at
+   * the extremal limit.
+   *
+   * Its own field because a retrograde disc is not a detail: it starts further
+   * out, orbits more slowly, and radiates less — and the old code took the
+   * prograde radius from here and the prograde EFFICIENCY with it, so a
+   * retrograde disc was drawn at the right radius with the wrong temperature.
+   */
+  iscoRetro: number;
   /** what an accretion disk can convert to light, as a fraction of mc² */
   efficiency: number;
-  /** apparent radius of the shadow to a distant observer, m — √27 r_g, non-spinning */
+  /** the same, for a disc running against the spin — always the smaller number */
+  efficiencyRetro: number;
+  /**
+   * Apparent radius of the shadow to a distant observer, m — √27 r_g.
+   *
+   * ONE NUMBER, AND ONLY HONEST AT a★ = 0. A spinning hole's shadow is not a
+   * circle and has no single radius; this is kept because a readout wants a
+   * length and the √27 r_g scale is the right order at every spin, and the
+   * OUTLINE — which is what a picture should draw — comes from kerrShadow().
+   */
   shadow: number;
   /** Hawking temperature, K */
   hawkingT: number;
@@ -301,7 +320,14 @@ export interface BlackHole {
   hawkingPower: number;
   /** time to evaporate completely, s */
   evaporation: number;
-  /** surface gravity at the horizon, m/s² (Schwarzschild κ = c⁴/4GM) */
+  /**
+   * Surface gravity at the horizon, m/s².
+   *
+   * κ = (r₊ − r₋)/(2(r₊² + a²)) in geometric units — the Kerr value, which is
+   * c⁴/4GM when the hole is still and FALLS to zero as a★ → 1. The old code
+   * quoted the Schwarzschild expression at every spin, so an extremal hole was
+   * reported with the surface gravity of a still one.
+   */
   surfaceGravity: number;
   /** area of the outer horizon, m² */
   area: number;
@@ -345,11 +371,19 @@ export function blackHole(massKg: number, spinIn = 0): BlackHole {
   const Z2 = Math.sqrt(3 * a * a + Z1 * Z1);
   const iscoR = 3 + Z2 - Math.sqrt(Math.max(0, (3 - Z1) * (3 + Z1 + 2 * Z2)));
   const isco = rg * iscoR;
+  // The other root of the same closed form: the orbit that runs against the
+  // spin. The sign of the square root is the only difference, and it is the
+  // difference between reaching 1.24 r_g and being held out at 9.
+  const iscoRetroR = 3 + Z2 + Math.sqrt(Math.max(0, (3 - Z1) * (3 + Z1 + 2 * Z2)));
+  const iscoRetro = rg * iscoRetroR;
 
   // The binding energy at the ISCO is what a disk can radiate away before the
   // gas falls in: 5.7% of mc² for a still hole, ~32% at the Thorne limit. For
   // comparison, hydrogen fusion releases 0.7%.
   const efficiency = 1 - iscoEnergy(iscoR, a);
+  // Retrograde: the same binding-energy argument with the orbit going the other
+  // way, which is the spin entering with the opposite sign.
+  const efficiencyRetro = 1 - iscoEnergy(iscoRetroR, -a);
 
   // What you would actually SEE. Not the horizon: light passing within √27 r_g
   // is captured, so the dark disk on the sky is 2.6 Schwarzschild radii across,
@@ -358,11 +392,25 @@ export function blackHole(massKg: number, spinIn = 0): BlackHole {
   // looks right and is not.)
   const shadow = B_CRIT * rg;
 
-  const hawkingT = (PHYS.hbar * PHYS.c ** 3) / (8 * Math.PI * PHYS.G * M * PHYS.kB);
-  // Page's coefficient for a hole radiating photons and gravitons only.
+  // Page's coefficient for a hole radiating photons and gravitons only, and the
+  // evaporation time that follows from it. Both are Schwarzschild results and
+  // are left as such — the spin corrections are a different calculation, and
+  // quoting these at high spin is an approximation the metadata declares.
   const hawkingPower = (PHYS.hbar * PHYS.c ** 6) / (15360 * Math.PI * PHYS.G ** 2 * M ** 2);
   const evaporation = (5120 * Math.PI * PHYS.G ** 2 * M ** 3) / (PHYS.hbar * PHYS.c ** 4);
-  const surfaceGravity = PHYS.c ** 4 / (4 * PHYS.G * M);
+  // κ = (r₊ − r₋)/(2(r₊² + a²)), in units of c²/r_g. At a★ = 0 this is
+  // c⁴/4GM exactly, which the tests pin; at the extremal limit it vanishes,
+  // which is why an extremal hole has no Hawking temperature.
+  const rp = horizon / rg;
+  const rm = innerHorizon / rg;
+  const kappaGeo = (rp - rm) / (2 * (rp * rp + a * a));
+  const surfaceGravity = (kappaGeo * (PHYS.c * PHYS.c)) / rg;
+
+  // T_H = ħκ/2πck_B — from the surface gravity, so it inherits the spin. At
+  // a★ = 0 this is ħc³/8πGMk_B, the expression every account quotes; at the
+  // extremal limit it goes to zero, which is the statement that an extremal
+  // hole does not evaporate.
+  const hawkingT = (PHYS.hbar * surfaceGravity) / (2 * Math.PI * PHYS.c * PHYS.kB);
 
   // Kerr horizon area: 8π r_g r_+ (which is 16π r_g² for Schwarzschild).
   const area = 8 * Math.PI * rg * horizon;
@@ -371,7 +419,7 @@ export function blackHole(massKg: number, spinIn = 0): BlackHole {
   return {
     M, spin: a, rg, rs, horizon, innerHorizon,
     ergosphere: 2 * rg,
-    photonSphere, photonSphereRetro, isco, efficiency, shadow,
+    photonSphere, photonSphereRetro, isco, iscoRetro, efficiency, efficiencyRetro, shadow,
     hawkingT, hawkingPower, evaporation, surfaceGravity, area, entropy,
   };
 }
@@ -401,23 +449,401 @@ export function ergosphereAt(bh: BlackHole, theta: number): number {
   return bh.rg * (1 + Math.sqrt(Math.max(0, 1 - bh.spin * bh.spin * ct * ct)));
 }
 
+export interface PhotonPath {
+  /** the impact parameter it was fired with, in r_g. Signed: see `sense`. */
+  b: number;
+  /** the spin it was integrated in */
+  spin: number;
+  /**
+   * Which way it goes round relative to the hole's rotation. Meaningless at
+   * a★ = 0 and decisive at high spin: the two senses have different capture
+   * thresholds (±√27 at rest, +2 and −7 at the extremal limit), which is the
+   * single most visible consequence of rotation in this whole picture.
+   */
+  sense: 'prograde' | 'retrograde';
+  /** true when it crossed the outer horizon instead of escaping */
+  captured: boolean;
+  /** how far it was bent, in radians — 0 when captured */
+  deflection: number;
+  /** closest approach, in r_g; the starting radius if it never turned */
+  periapsis: number;
+  /** how many times it went round the hole — the photon ring, counted */
+  windings: number;
+  /** the path itself, in r_g, as (x, y) with the hole at the origin */
+  points: { x: number; y: number }[];
+  /** the step or winding cap was reached; the path drawn is unfinished */
+  truncated: boolean;
+  /**
+   * How `captured` was decided.
+   *
+   * 'integration' means the path itself settled it — it reached the horizon, or
+   * it got back out. 'threshold' means the integration ran out of sweep while
+   * the ray was still circling near the photon orbit, and the verdict comes from
+   * comparing b against the EXACT critical values instead (criticalImpact).
+   *
+   * The distinction is the whole point of the field: near the critical impact
+   * parameter the number of loops diverges logarithmically, so an honest
+   * integrator sometimes cannot finish, and a picture that quietly called those
+   * rays "escaped" would be reporting its own step budget as physics. The path
+   * is the integration; the verdict is then algebra; the reader can be told
+   * which, and is.
+   */
+  decidedBy: 'integration' | 'threshold';
+}
+
+/** Δ = r² − 2r + a², in r_g. Zero at the two horizons. */
+export function kerrDelta(r: number, a: number): number {
+  return r * r - 2 * r + a * a;
+}
+
+/**
+ * The impact parameters a photon is captured between, exactly.
+ *
+ * THE NUMBER THE WHOLE PICTURE TURNS ON, and it is not one number once the
+ * hole spins. A photon with b between these two values falls in; outside them
+ * it escapes. At a★ = 0 they are ±√27 — one threshold wearing two signs. At the
+ * extremal limit they are +2 and −7: co-rotating light can get three and a half
+ * times closer than light going the other way, which is why a spinning hole's
+ * shadow is not a circle.
+ *
+ * Derived rather than fitted. R(r) = 0 at a circular photon orbit gives
+ * b = (r² + a² ± a√Δ)/(a ± √Δ) evaluated at that orbit's radius, and the two
+ * signs pick out the two senses. At a★ = 0 the expression is 0/0, so the limit
+ * ±√27 is returned directly — the formula is right there and useless there.
+ */
+export function criticalImpact(aIn: number): { prograde: number; retrograde: number } {
+  const a = clampSpin(aIn);
+  if (a < 1e-9) return { prograde: B_CRIT, retrograde: -B_CRIT };
+  // The equatorial circular photon orbits, in r_g: 2(1 + cos(⅔ arccos(∓a)).
+  const rPro = 2 * (1 + Math.cos((2 / 3) * Math.acos(-a)));
+  const rRet = 2 * (1 + Math.cos((2 / 3) * Math.acos(a)));
+  const bAt = (r: number, sign: 1 | -1) => {
+    const root = Math.sqrt(Math.max(0, kerrDelta(r, a)));
+    const den = a + sign * root;
+    if (Math.abs(den) < 1e-12) return sign * B_CRIT;
+    return (r * r + a * a + sign * a * root) / den;
+  };
+  return { prograde: bAt(rPro, 1), retrograde: bAt(rRet, -1) };
+}
+
+/**
+ * A photon's actual path past the hole, by integrating the null geodesic.
+ *
+ * THE EQUATIONS. Equatorial motion in Kerr, Boyer–Lindquist coordinates, with
+ * the photon's conserved quantities written as one number b = L/E (the impact
+ * parameter) because scaling E does not change a null path:
+ *
+ *     R(r)  = (r² + a² − a b)² − Δ (b − a)²
+ *     ṙ²    = R(r)/r⁴
+ *     φ̇     = [ (b − a) + a(r² + a² − a b)/Δ ] / r²
+ *
+ * integrated as the SECOND-ORDER form r̈ = R′(r)/2r⁴ − 2ṙ²/r, which is the same
+ * motion with the square root differentiated away. That matters: ṙ passes
+ * through zero at the turning point, and an integrator that has to take √R
+ * there loses the sign and sends the ray back the way it came — a plausible
+ * picture of a photon bouncing off a black hole.
+ *
+ * At a★ = 0 this reduces to d²u/dφ² + u = 3u² with u = 1/r, which is the form
+ * the weak-field check is stated in and the one the tests compare against
+ * 4GM/bc². Newton's straight line is that equation without the 3u², so the
+ * whole bending of light is one term — and the whole effect of rotation is the
+ * a's above.
+ *
+ * WHAT THE COORDINATES DO AT THE END. In Boyer–Lindquist, φ winds without
+ * bound as r → r₊: the coordinate system, not the spacetime, runs out. So a ray
+ * that reaches just outside the horizon is stopped there and reported captured,
+ * rather than being integrated into a numerical spiral that means nothing.
+ *
+ * `b` is signed. Positive b co-rotates with the hole; negative b runs against
+ * it. At a★ = 0 the sign only mirrors the picture.
+ */
+export function photonPath(
+  b: number,
+  opts?: { spin?: number; steps?: number; maxTurn?: number; stepScale?: number }
+): PhotonPath {
+  const a = clampSpin(opts?.spin ?? 0);
+  // A CAP, NOT A SCHEDULE. The step is chosen from the local geometry (below),
+  // so `steps` only says when to give up: an ordinary ray finishes in about
+  // 1,300 and a ray threading the photon ring may want ten times that. Raising
+  // it does not refine anything — `stepScale` does, which is what makes the
+  // convergence test in test/physics a real test rather than a tautology.
+  const maxSteps = opts?.steps ?? 12000;
+  const maxTurn = opts?.maxTurn ?? 8 * Math.PI;
+  const stepScale = Math.min(4, Math.max(1e-3, opts?.stepScale ?? 1));
+  const sense: 'prograde' | 'retrograde' = b >= 0 ? 'prograde' : 'retrograde';
+  const horizon = 1 + Math.sqrt(Math.max(0, 1 - a * a));
+  const bAbs = Math.abs(b);
+
+  // Far enough out that the curvature terms are negligible there, and always
+  // outside the ray's own turning point — a fixed 40 r_g cannot integrate a ray
+  // whose closest approach is 50.
+  const start = Math.max(40, 6 * bAbs);
+
+  const R = (r: number) => {
+    const p = r * r + a * a - a * b;
+    return p * p - kerrDelta(r, a) * (b - a) * (b - a);
+  };
+  const dR = (r: number) => {
+    const p = r * r + a * a - a * b;
+    return 4 * r * p - (2 * r - 2) * (b - a) * (b - a);
+  };
+  const phiDot = (r: number) => {
+    const D = kerrDelta(r, a);
+    if (Math.abs(D) < 1e-12) return Number.POSITIVE_INFINITY;
+    return ((b - a) + (a * (r * r + a * a - a * b)) / D) / (r * r);
+  };
+
+  const r0 = start;
+  const rad = R(r0);
+  if (rad <= 0) {
+    // Fired from inside its own turning point: it is already receding, and
+    // there is no inbound path to integrate.
+    return {
+      b, spin: a, sense, captured: false, deflection: 0, periapsis: start,
+      windings: 0, points: [], truncated: false, decidedBy: 'integration',
+    };
+  }
+
+  let r = r0;
+  let rdot = -Math.sqrt(rad) / (r0 * r0); // inbound
+  let phi = 0;
+  let periapsis = r0;
+  let captured = false;
+  let truncated = true;
+  const pts: { x: number; y: number }[] = [];
+
+  const accel = (rr: number, rd: number) => dR(rr) / (2 * rr ** 4) - (2 * rd * rd) / rr;
+
+  for (let i = 0; i < maxSteps; i++) {
+    if (r < periapsis) periapsis = r;
+    pts.push({ x: r * Math.cos(phi), y: r * Math.sin(phi) });
+
+    // Stopped just outside the horizon: see the note on the coordinates above.
+    if (r <= horizon * 1.003) { captured = true; truncated = false; break; }
+    if (r > start && rdot > 0) { truncated = false; break; }
+    if (Math.abs(phi) > maxTurn) break;
+
+    // The step is chosen from the geometry rather than fixed: it has to resolve
+    // r near periapsis, φ where the ray swings fastest, and Δ near the horizon,
+    // and one constant cannot do all three across four decades of radius.
+    // Three limits, because one constant cannot serve four decades of radius:
+    // resolve r near periapsis, resolve φ where the ray swings fastest, and
+    // resolve Δ near the horizon where φ̇ diverges. The coefficients are the
+    // coarsest at which the weak-field deflection is converged to a hundredth
+    // of a per cent — checked by refining them in the tests, not by eye.
+    const D = Math.max(1e-6, kerrDelta(r, a));
+    const h =
+      stepScale *
+      Math.min(0.005 * r, (0.0025 * r * r) / Math.max(0.5, bAbs), 0.35 * D + 1e-4);
+
+    const k1r = rdot, k1v = accel(r, rdot);
+    const k2r = rdot + (h / 2) * k1v, k2v = accel(Math.max(1e-6, r + (h / 2) * k1r), k2r);
+    const k3r = rdot + (h / 2) * k2v, k3v = accel(Math.max(1e-6, r + (h / 2) * k2r), k3r);
+    const k4r = rdot + h * k3v, k4v = accel(Math.max(1e-6, r + h * k3r), k4r);
+
+    const rNext = r + (h / 6) * (k1r + 2 * k2r + 2 * k3r + k4r);
+    const vNext = rdot + (h / 6) * (k1v + 2 * k2v + 2 * k3v + k4v);
+    // φ by the same weighting, from the r's the stages actually visited.
+    const p1 = phiDot(r);
+    const p2 = phiDot(Math.max(1e-6, r + (h / 2) * k1r));
+    const p3 = phiDot(Math.max(1e-6, r + (h / 2) * k2r));
+    const p4 = phiDot(Math.max(1e-6, r + h * k3r));
+    const dphi = (h / 6) * (p1 + 2 * p2 + 2 * p3 + p4);
+
+    if (!Number.isFinite(rNext) || !Number.isFinite(vNext) || !Number.isFinite(dphi)) {
+      captured = rNext <= horizon * 1.01;
+      truncated = !captured;
+      break;
+    }
+    r = rNext;
+    rdot = vNext;
+    phi += dphi;
+    if (r <= 0) { captured = true; truncated = false; break; }
+  }
+
+  // THE BEND IS MEASURED AGAINST THE ASYMPTOTES, NOT AGAINST π.
+  //
+  // π is the angle a straight line sweeps between its ends at INFINITY. This
+  // integration runs between two finite radii, where a straight line sweeps
+  // 2·arccos(b/r) instead — so comparing against π reported every weak-field
+  // ray as bending by nothing at all, which is a plausible-looking wrong
+  // answer and the worst kind. arcsin(b/r) at each end is the piece of the
+  // asymptote outside the integrated arc; adding both back recovers the true
+  // deflection, and the result then stops depending on where the ray started,
+  // which is the check that it is right.
+  // A RAY THAT RAN OUT OF STEPS INSIDE THE PHOTON ORBIT IS CAPTURED, and saying
+  // otherwise is the worst failure this function could have.
+  //
+  // Near the extremal limit a prograde ray skims a gap between the photon orbit
+  // and the horizon that is thousandths of r_g wide, where Δ → 0 forces tiny
+  // steps; the integration hits its cap still inbound. Reporting "escaped"
+  // there would be a numerical artefact presented as physics. But nothing
+  // inbound below the photon orbit can turn around — the effective potential has
+  // its only maximum there — so this is a theorem about the path, not a guess
+  // about the integration, and the ray is reported captured on those grounds.
+  let decidedBy: 'integration' | 'threshold' = 'integration';
+  if (truncated && rdot < 0) {
+    const rPh = 2 * (1 + Math.cos((2 / 3) * Math.acos(sense === 'prograde' ? -a : a)));
+    if (r < rPh) { captured = true; truncated = false; }
+  }
+  if (truncated) {
+    // Still circling when the sweep ran out. The exact thresholds settle it.
+    const crit = criticalImpact(a);
+    captured = b > crit.retrograde && b < crit.prograde;
+    decidedBy = 'threshold';
+  }
+
+  const tail = (rr: number) => Math.asin(Math.min(1, bAbs / rr));
+  const swept = Math.abs(phi);
+  const deflection = captured ? 0 : Math.max(0, swept + tail(start) + tail(r) - Math.PI);
+  return {
+    b, spin: a, sense, captured, deflection, periapsis,
+    windings: swept / (2 * Math.PI),
+    points: pts,
+    truncated,
+    decidedBy,
+  };
+}
+
+// ════════════════════════════════════════════════════════════════════
+// KERR ORBITS — what the disc actually does
+// ════════════════════════════════════════════════════════════════════
+//
+// Everything a disc does — how fast it goes round, how bright its near side is,
+// how red its light arrives — follows from the orbital motion, and the orbital
+// motion in Kerr is not Kepler's. The closed forms below are exact for circular
+// equatorial orbits and reduce to the familiar ones at a★ = 0, which is what
+// the tests check rather than assume.
+
+export interface CircularOrbit {
+  /** radius, m */
+  r: number;
+  /** which way round, relative to the spin */
+  sense: 'prograde' | 'retrograde';
+  /** coordinate angular velocity, rad/s. Signed with the sense. */
+  omega: number;
+  /** coordinate period, s */
+  period: number;
+  /** the dragging of inertial frames at this radius, rad/s */
+  drag: number;
+  /**
+   * Orbital speed as measured by a LOCAL observer who is not rotating with the
+   * geometry (a ZAMO), as a fraction of c. This is the β that belongs in a
+   * Doppler factor; the coordinate speed Ωr does not, and using it was the old
+   * approximation's largest error near the hole.
+   */
+  beta: number;
+  /** the lapse: how slowly a local clock runs, relative to infinity */
+  lapse: number;
+  /** 1 + z for light from this orbit, ignoring the path it takes out */
+  redshift: number;
+  /** false inside the ISCO for this sense — there is no circular orbit there */
+  stable: boolean;
+  /** false inside the photon orbit — there is no orbit of any kind */
+  exists: boolean;
+}
+
+/**
+ * A circular equatorial orbit, in full.
+ *
+ * Ω = ±1/(r^{3/2} ± a) in geometric units — which IS Kepler's third law when
+ * a = 0, one of the few places general relativity leaves an elementary result
+ * alone, and is not once the hole spins: co-rotating gas at the same radius
+ * goes round faster than counter-rotating gas, and the difference is what makes
+ * a disc's inner edge depend on which way it turns.
+ *
+ * The frame dragging ω = 2ar/(r⁴ + a²r² + 2a²r) is the angular velocity of a
+ * locally non-rotating observer. Inside the ergosphere it exceeds what any
+ * static observer could manage, which is the statement that nothing can stand
+ * still there.
+ *
+ * Returns `exists: false` rather than a number where no circular orbit exists,
+ * because there is no honest value to return inside the photon orbit.
+ */
+export function circularOrbit(
+  bh: BlackHole,
+  rMetres: number,
+  sense: 'prograde' | 'retrograde' = 'prograde'
+): CircularOrbit {
+  const a = bh.spin;
+  const s = sense === 'prograde' ? 1 : -1;
+  const r = Math.max(1e-9, rMetres / bh.rg); // in r_g
+  const rate = PHYS.c / bh.rg; // one r_g of light-travel time, inverted
+
+  const sqrtR = Math.sqrt(r);
+  const denom = r * sqrtR + s * a;
+  const omegaGeo = Math.abs(denom) < 1e-12 ? 0 : s / denom;
+
+  // The dragging of inertial frames, equatorial.
+  const A = r ** 4 + a * a * r * r + 2 * a * a * r;
+  const dragGeo = A > 0 ? (2 * a * r) / A : 0;
+
+  // u^t for the orbit: (1 + s a r^{-3/2}) / √(1 − 3/r + 2 s a r^{-3/2}).
+  // The radicand vanishes AT the photon orbit — which is exactly what "light
+  // is the only thing that can orbit here" means — so its sign is the test for
+  // whether a material circular orbit exists at all.
+  const radicand = 1 - 3 / r + (2 * s * a) / (r * sqrtR);
+  const exists = radicand > 1e-9;
+  const ut = exists ? (1 + (s * a) / (r * sqrtR)) / Math.sqrt(radicand) : Number.POSITIVE_INFINITY;
+
+  // The lapse, equatorial: α = r√Δ/√A.
+  const D = kerrDelta(r, a);
+  const lapse = D > 0 && A > 0 ? (r * Math.sqrt(D)) / Math.sqrt(A) : 0;
+
+  // Speed relative to the local non-rotating frame: β = (Ω − ω)√(A)/(r α) · r/…
+  // written out: the proper circumference of the orbit is √(A)/r, and the ZAMO
+  // measures the gas covering it at (Ω − ω) per unit of ITS time, which runs at
+  // the lapse. Both factors matter: dropping the lapse understates the speed
+  // near the hole, which is where all the beaming happens.
+  const beta =
+    lapse > 0 && A > 0
+      ? Math.min(0.999999, (Math.abs(omegaGeo - dragGeo) * Math.sqrt(A)) / (r * lapse))
+      : 0;
+
+  const iscoR = sense === 'prograde' ? bh.isco / bh.rg : bh.iscoRetro / bh.rg;
+
+  return {
+    r: rMetres,
+    sense,
+    omega: omegaGeo * rate,
+    period: omegaGeo === 0 ? Number.POSITIVE_INFINITY : (2 * Math.PI) / Math.abs(omegaGeo * rate),
+    drag: dragGeo * rate,
+    beta,
+    lapse,
+    redshift: exists ? ut : Number.POSITIVE_INFINITY,
+    stable: exists && r >= iscoR - 1e-9,
+    exists,
+  };
+}
+
 /**
  * Coordinate orbital period of a circular orbit at radius r.
  *
- * T = 2π√(r³/GM), exactly Kepler's third law — which is true in Schwarzschild
- * coordinates as well as in Newton's theory, and is one of the few places
- * general relativity leaves an elementary result alone.
+ * Kerr, and therefore spin-dependent — at a★ = 0 it is 2π√(r³/GM) exactly,
+ * which is what every caller written before the hole could spin was getting.
  */
-export function orbitPeriod(bh: BlackHole, r: number): number {
-  return 2 * Math.PI * Math.sqrt(r ** 3 / (PHYS.G * bh.M));
+export function orbitPeriod(
+  bh: BlackHole,
+  r: number,
+  sense: 'prograde' | 'retrograde' = 'prograde'
+): number {
+  return circularOrbit(bh, r, sense).period;
+}
+
+/** The dragging of inertial frames at radius r, rad/s. Zero when a★ = 0. */
+export function frameDragging(bh: BlackHole, r: number): number {
+  return circularOrbit(bh, r).drag;
 }
 
 /**
  * Gravitational redshift of light emitted at r and received far away.
  *
- * 1 + z = 1/√(1 − r_s/r). Returns Infinity at the horizon, which is not a bug
- * to smooth over: it is the statement that the horizon is where light can no
- * longer get out, and a readout that says ∞ there is telling the truth.
+ * 1 + z = 1/√(1 − r_s/r), for a source HELD STILL at r. Returns Infinity at the
+ * Schwarzschild radius, which is not a bug to smooth over: it is the statement
+ * that light can no longer get out, and a readout that says ∞ there is telling
+ * the truth. For gas in orbit use `circularOrbit().redshift` instead — a static
+ * source and an orbiting one at the same radius are reddened differently, and
+ * the difference is most of what makes a disc image lopsided.
  */
 export function redshift(bh: BlackHole, r: number): number {
   const x = 1 - bh.rs / r;
@@ -435,107 +861,110 @@ export function deflectionWeak(bh: BlackHole, b: number): number {
   return (4 * PHYS.G * bh.M) / (PHYS.c * PHYS.c * b);
 }
 
-export interface PhotonPath {
-  /** the impact parameter it was fired with, in r_g */
-  b: number;
-  /** true when it crossed the horizon instead of escaping */
-  captured: boolean;
-  /** how far it was bent, in radians — 0 when captured */
-  deflection: number;
-  /** closest approach, in r_g; Infinity if it never turned */
-  periapsis: number;
-  /** the path itself, in r_g, as (x, y) with the hole at the origin */
-  points: { x: number; y: number }[];
-}
-
 /**
- * A photon's actual path past the hole, by integrating the null geodesic.
+ * The outline of the shadow on a distant observer's sky.
  *
- * THE EQUATION. With u = r_g/r and φ the azimuth, a light ray in Schwarzschild
- * spacetime obeys
+ * WHY THIS IS NOT A CIRCLE. The old code drew one of radius √27 r_g and held it
+ * there at every spin, with a comment admitting that a spinning hole's shadow
+ * is not a circle. It is not: co-rotating light escapes from closer in, so the
+ * silhouette is pushed in on one side and bulges on the other — flat-edged at
+ * the extremal limit, which is the single most recognisable prediction of the
+ * Kerr metric and the thing an image of one is compared against.
  *
- *     d²u/dφ² + u = 3u²
+ * The curve is the standard one (Bardeen 1973): for each spherical photon orbit
+ * of radius r,
  *
- * — Newton's straight line is the same equation without the 3u² on the right,
- * so the entire bending of light is that one term. RK4 on the pair (u, u′),
- * stepping in φ from far away until the ray either crosses the horizon (u ≥ ½)
- * or gets back out to where it started.
+ *     ξ(r) = −(r³ − 3r² + a²r + a²) / (a(r − 1))
+ *     η(r) = −r³(r³ − 6r² + 9r − 4a²) / (a²(r − 1)²)
  *
- * WHY NOT THE FORMULA. There is a closed form in elliptic integrals, and it is
- * both slower to evaluate and useless for drawing: what the picture needs is
- * the path, not the endpoint. Integrating gives both, and the deflection it
- * reports can be checked against 4GM/bc² in the weak field — which the tests do,
- * because an integrator that silently loses accuracy is worse than no
- * integrator at all.
+ * and the observer at inclination i sees that orbit at
  *
- * `b` is the impact parameter in units of r_g. Below √27 ≈ 5.196 the photon is
- * captured; just above it, the ray loops the hole one or more times before
- * escaping, which is what produces the photon ring in a real image.
+ *     α = −ξ/sin i,   β = ±√(η + a²cos²i − ξ²cot²i)
+ *
+ * in units of r_g on the sky. Only the r where β² ≥ 0 are on the rim. At a★ = 0
+ * the expressions are 0/0 and the limit is the circle of radius √27, which is
+ * returned directly.
  */
-export function photonPath(b: number, opts?: { steps?: number; maxTurn?: number }): PhotonPath {
-  const steps = opts?.steps ?? 3000;
-  const maxTurn = opts?.maxTurn ?? 8 * Math.PI;
-  const dphi = maxTurn / steps;
-  // Far enough out that the 3u² term is negligible there, and always outside
-  // the ray's own turning point — a fixed 40 r_g cannot integrate a ray whose
-  // closest approach is 50.
-  const start = Math.max(40, 6 * Math.abs(b));
-  let u = 1 / start;
-  // (du/dφ)² = 1/b² − u²(1 − 2u), taken POSITIVE: u is 1/r, so a ray heading
-  // inward has r falling and therefore u rising. Starting it negative sends the
-  // photon straight back out along the way it came, and every ray then reports
-  // a deflection of zero — which looks like a physics result and is a sign.
-  const rad = 1 / (b * b) - u * u * (1 - 2 * u);
-  if (rad <= 0) {
-    // Fired from outside its own turning point: it is already receding.
-    return { b, captured: false, deflection: 0, periapsis: start, points: [] };
-  }
-  let up = Math.sqrt(rad);
+export function kerrShadow(
+  aIn: number,
+  inclination = Math.PI / 2,
+  n = 180
+): { points: { alpha: number; beta: number }[]; alphaMin: number; alphaMax: number; betaMax: number; circular: boolean } {
+  const a = clampSpin(aIn);
+  const i = Math.min(Math.PI - 1e-3, Math.max(1e-3, inclination));
 
-  const d2u = (uu: number) => 3 * uu * uu - uu;
-  const pts: { x: number; y: number }[] = [];
-  let phi = 0;
-  let periapsis = start;
-  let captured = false;
-  let rEnd = start;
-
-  for (let i = 0; i < steps; i++) {
-    const r = 1 / u;
-    rEnd = r;
-    if (r < periapsis) periapsis = r;
-    pts.push({ x: r * Math.cos(phi), y: r * Math.sin(phi) });
-
-    // Crossing the horizon ends the ray. 2 r_g in these units is u = 0.5.
-    if (u >= 0.5) { captured = true; break; }
-    // Past the turning point and climbing away again (u falling): once it is
-    // back out beyond where it started, the rest of the ray is a straight line
-    // off the edge of the picture.
-    if (r > start && up < 0) break;
-
-    // RK4 on (u, u′).
-    const k1u = up,                 k1p = d2u(u);
-    const k2u = up + (dphi / 2) * k1p, k2p = d2u(u + (dphi / 2) * k1u);
-    const k3u = up + (dphi / 2) * k2p, k3p = d2u(u + (dphi / 2) * k2u);
-    const k4u = up + dphi * k3p,       k4p = d2u(u + dphi * k3u);
-    u += (dphi / 6) * (k1u + 2 * k2u + 2 * k3u + k4u);
-    up += (dphi / 6) * (k1p + 2 * k2p + 2 * k3p + k4p);
-    phi += dphi;
-    if (!Number.isFinite(u) || u <= 0) break;
+  if (a < 1e-4) {
+    const points = Array.from({ length: n + 1 }, (_, k) => {
+      const th = (k / n) * Math.PI * 2;
+      return { alpha: B_CRIT * Math.cos(th), beta: B_CRIT * Math.sin(th) };
+    });
+    return { points, alphaMin: -B_CRIT, alphaMax: B_CRIT, betaMax: B_CRIT, circular: true };
   }
 
-  // THE BEND IS MEASURED AGAINST THE ASYMPTOTES, NOT AGAINST π.
+  const rPro = 2 * (1 + Math.cos((2 / 3) * Math.acos(-a)));
+  const rRet = 2 * (1 + Math.cos((2 / 3) * Math.acos(a)));
+  const si = Math.sin(i);
+  const cot = Math.cos(i) / si;
+
+  const xiOf = (r: number) => -(r ** 3 - 3 * r * r + a * a * r + a * a) / (a * (r - 1));
+  const etaOf = (r: number) =>
+    -(r ** 3 * (r ** 3 - 6 * r * r + 9 * r - 4 * a * a)) / (a * a * (r - 1) ** 2);
+
+  // LOOKING DOWN THE SPIN AXIS, WHERE THE PARAMETRISATION GIVES UP.
   //
-  // π is the angle a straight line sweeps between its ends at INFINITY. This
-  // integration runs between two finite radii, where a straight line sweeps
-  // 2·arccos(b/r) instead — so comparing against π reported every weak-field
-  // ray as bending by nothing at all, which is a plausible-looking wrong
-  // answer and the worst kind. arcsin(b/r) at each end is the piece of the
-  // asymptote outside the integrated arc; adding both back recovers the true
-  // deflection, and the result then stops depending on where the ray started,
-  // which is the check that it is right.
-  const tail = (r: number) => Math.asin(Math.min(1, b / r));
-  const deflection = captured ? 0 : Math.max(0, phi + tail(start) + tail(rEnd) - Math.PI);
-  return { b, captured, deflection, periapsis, points: pts };
+  // α = −ξ/sin i and the ξ²cot²i term both diverge as i → 0, so sampling the
+  // curve there returns a handful of stray points rather than a shadow. The
+  // physics is not singular at all: seen along the axis the shadow is CIRCULAR
+  // again, and its radius is set by the one spherical photon orbit with no
+  // angular momentum about the axis (ξ = 0), giving √(η + a★²). Smaller than the
+  // edge-on √27, which is the other thing a reader should be able to see.
+  if (i < 0.05 || i > Math.PI - 0.05) {
+    let lo = rPro + 1e-6;
+    let hi = rRet - 1e-6;
+    for (let k = 0; k < 80; k++) {
+      const mid = (lo + hi) / 2;
+      if (xiOf(mid) > 0) lo = mid;
+      else hi = mid;
+    }
+    const r0 = (lo + hi) / 2;
+    const R = Math.sqrt(Math.max(0, etaOf(r0) + a * a));
+    const points = Array.from({ length: n + 1 }, (_, k) => {
+      const th = (k / n) * Math.PI * 2;
+      return { alpha: R * Math.cos(th), beta: R * Math.sin(th) };
+    });
+    return { points, alphaMin: -R, alphaMax: R, betaMax: R, circular: true };
+  }
+
+  const upper: { alpha: number; beta: number }[] = [];
+  const lower: { alpha: number; beta: number }[] = [];
+  for (let k = 0; k <= n; k++) {
+    // Sampled in r across the spherical photon orbits, which is what
+    // parametrises the rim. Endpoints nudged in: r = 1 is a pole of both
+    // expressions at the extremal limit.
+    const r = rPro + ((rRet - rPro) * k) / n;
+    if (Math.abs(r - 1) < 1e-6) continue;
+    const xi = xiOf(r);
+    const eta = etaOf(r);
+    const b2 = eta + a * a * Math.cos(i) ** 2 - xi * xi * cot * cot;
+    if (!(b2 >= 0) || !Number.isFinite(xi)) continue;
+    const alpha = -xi / si;
+    const beta = Math.sqrt(b2);
+    upper.push({ alpha, beta });
+    lower.push({ alpha, beta: -beta });
+  }
+  if (!upper.length) {
+    // Nothing on the rim: at this inclination the parametrisation degenerates.
+    // Say so by returning an empty curve rather than a circle that is not one.
+    return { points: [], alphaMin: 0, alphaMax: 0, betaMax: 0, circular: false };
+  }
+  const points = [...upper, ...lower.reverse(), upper[0]];
+  return {
+    points,
+    alphaMin: Math.min(...points.map((p) => p.alpha)),
+    alphaMax: Math.max(...points.map((p) => p.alpha)),
+    betaMax: Math.max(...points.map((p) => p.beta)),
+    circular: false,
+  };
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -896,21 +1325,38 @@ export function projectile(i: ProjectileInput): Projectile {
  * but sits a little outside it, at r = (49/36)·r_in, which is a detail worth
  * keeping because it is visible.
  */
-export function discTemperature(bh: BlackHole, r: number, mdot: number): number {
-  if (r <= bh.isco) return 0;
+export function discTemperature(
+  bh: BlackHole,
+  r: number,
+  mdot: number,
+  sense: 'prograde' | 'retrograde' = 'prograde'
+): number {
+  const rIn = sense === 'prograde' ? bh.isco : bh.iscoRetro;
+  if (r <= rIn) return 0;
   const sigma = 5.670374419e-8;
-  const br = 1 - Math.sqrt(bh.isco / r);
+  const br = 1 - Math.sqrt(rIn / r);
   const t4 = ((3 * PHYS.G * bh.M * mdot) / (8 * Math.PI * sigma * r ** 3)) * br;
   return t4 > 0 ? Math.pow(t4, 0.25) : 0;
 }
 
 /** Accretion rate, in kg/s, that radiates a given fraction of the Eddington luminosity. */
-export function eddingtonRate(bh: BlackHole, fraction = 0.1): number {
+export function eddingtonRate(
+  bh: BlackHole,
+  fraction = 0.1,
+  sense: 'prograde' | 'retrograde' = 'prograde'
+): number {
   // L_Edd = 4πGMm_p c / σ_T, and Ṁ = L / ηc².
   const mp = 1.67262192369e-27;
   const sigmaT = 6.6524587321e-29;
   const lEdd = (4 * Math.PI * PHYS.G * bh.M * mp * PHYS.c) / sigmaT;
-  return (fraction * lEdd) / (Math.max(0.01, bh.efficiency) * PHYS.c * PHYS.c);
+  // The EFFICIENCY of the disc's own sense of rotation: a retrograde disc
+  // radiates 3.8% of what falls in where a prograde one at the Thorne limit
+  // radiates 32%, so the accretion rate that produces a given luminosity is
+  // nearly ten times larger. Taking the prograde number for a retrograde disc —
+  // which is what happened before this argument existed — made a retrograde disc
+  // far too bright for its rate.
+  const eta = sense === 'prograde' ? bh.efficiency : bh.efficiencyRetro;
+  return (fraction * lEdd) / (Math.max(0.01, eta) * PHYS.c * PHYS.c);
 }
 
 /**
@@ -937,9 +1383,19 @@ export function doppler(beta: number, cosTheta: number): { delta: number; boost:
 }
 
 /** Orbital speed as a fraction of c for a circular orbit at r (Schwarzschild). */
-export function orbitalBeta(bh: BlackHole, r: number): number {
-  // v = √(GM/r) in these coordinates; at the ISCO of a still hole that is c/√6.
-  return Math.min(0.999, Math.sqrt((PHYS.G * bh.M) / r) / PHYS.c);
+export function orbitalBeta(
+  bh: BlackHole,
+  r: number,
+  sense: 'prograde' | 'retrograde' = 'prograde'
+): number {
+  // THE SPEED A LOCAL OBSERVER MEASURES, not the coordinate speed.
+  //
+  // This used to return √(GM/r)/c — the Newtonian speed in coordinates, which is
+  // the one number in a Doppler factor that must NOT be a coordinate speed. At
+  // the ISCO of a still hole it gave c/√6 = 0.41 where the right answer is
+  // exactly c/2, so the beaming was understated by a fifth at the very place all
+  // of it happens. circularOrbit does it properly, in Kerr, for either sense.
+  return circularOrbit(bh, r, sense).beta;
 }
 
 /**
@@ -977,12 +1433,19 @@ export function observedTemperature(
   bh: BlackHole,
   r: number,
   mdot: number,
-  cosTheta: number
+  cosTheta: number,
+  sense: 'prograde' | 'retrograde' = 'prograde'
 ): { T: number; boost: number } {
-  const emitted = discTemperature(bh, r, mdot);
-  const grav = Math.sqrt(Math.max(0, 1 - bh.rs / r));
-  const { delta, boost } = doppler(orbitalBeta(bh, r), cosTheta);
-  return { T: emitted * delta * grav, boost: boost * grav ** 4 };
+  const emitted = discTemperature(bh, r, mdot, sense);
+  // The LAPSE, not √(1 − r_s/r): the Kerr gravitational factor, which is the
+  // Schwarzschild one at a★ = 0 and is not at any other spin. Paired with the
+  // locally measured orbital speed in the Doppler factor, the two make up the
+  // standard g-factor for a Keplerian emitter — with light bending along the way
+  // out deliberately not applied, which the science block states as an
+  // assumption rather than leaving for a reader to discover.
+  const o = circularOrbit(bh, r, sense);
+  const { delta, boost } = doppler(o.beta, cosTheta);
+  return { T: emitted * delta * o.lapse, boost: boost * o.lapse ** 4 };
 }
 
 /** `blackbodyRGB` as a CSS colour, with an alpha for how bright it is. */

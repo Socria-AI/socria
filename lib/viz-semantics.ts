@@ -24,6 +24,7 @@
 // words a person would actually use.
 
 import type { VizEntity } from './viz-model';
+import { modelSummary, SURFACE_SCIENCE } from './surface-science';
 import type { VizObject, VizScene, Tone } from './logos-viz';
 
 /** The black hole, as it is actually drawn (components/surfaces/BlackHoleSurface.tsx). */
@@ -45,13 +46,18 @@ export const BLACK_HOLE_ENTITIES: VizEntity[] = [
   {
     id: 'shadow',
     type: 'boundary',
-    label: 'Shadow (capture radius)',
+    label: 'Shadow (capture outline)',
     meaning:
-      'How large the hole looks to a distant observer — √27 GM/c², about 2.6 Schwarzschild radii. It is bigger than the horizon because light passing near is bent into it.',
+      'How large the hole looks to a distant observer, and what shape. Bigger than the horizon, because light passing near is bent into it: √27 GM/c² — about 2.6 Schwarzschild radii — in every direction when the hole is still. Once it spins it is NOT a circle; co-rotating light escapes from closer in, so one side is pushed in toward 2 GM/c² and the other bulges to 7.',
     from: 'closed-form',
-    depends: ['m', 'spin'],
-    appearance: 'a faint dashed circle noticeably wider than the black ball',
-    relations: ['A ray aimed inside this radius cannot get back out.'],
+    model: 'Kerr shadow curve (Bardeen 1973), from the spherical photon orbits',
+    depends: ['m', 'spin', 'tilt'],
+    appearance:
+      'a faint dashed outline noticeably wider than the black ball — a circle at zero spin, and flat-edged on one side at high spin',
+    relations: [
+      'A ray aimed inside it cannot get back out, and the threshold differs by which way round the ray goes.',
+      'It is not a surface: nothing is there. It is where light that came too close never came back.',
+    ],
   },
   {
     id: 'disc',
@@ -60,14 +66,16 @@ export const BLACK_HOLE_ENTITIES: VizEntity[] = [
     meaning:
       'The gas spiralling in, drawn as fourteen flared rings between the innermost stable orbit and the outer radius you set. The SHAPE is drawn geometry; the colour and brightness are computed.',
     from: 'closed-form',
-    model: 'Shakura–Sunyaev temperature profile, with Doppler beaming and gravitational redshift applied per patch',
+    model:
+      'Shakura–Sunyaev temperature profile, with the Kerr lapse and the locally measured orbital speed in the Doppler factor, per patch',
     depends: ['tilt', 'outer', 'edd', 'm', 'spin'],
     appearance:
       'the broad pale-blue ellipse, the widest thing on screen — blue because the computed temperature near the inner edge is of order 10⁵ K and that temperature is converted to its blackbody colour; the side coming toward you is brighter because of relativistic beaming, not because of lighting',
     layer: 'disc',
     relations: [
-      'Its inner edge sits at the ISCO, so spin moves it.',
+      'Its inner edge sits at the ISCO for its own sense of rotation, so spin moves it — and a disc running against the spin starts much further out and radiates a tenth as much.',
       'It is not a solid object and it is not to scale in thickness.',
+      'The image is not ray-traced: you are not seeing the far side lensed over the top of the hole, which a real image of one shows.',
     ],
   },
   {
@@ -75,8 +83,9 @@ export const BLACK_HOLE_ENTITIES: VizEntity[] = [
     type: 'body',
     label: 'Gas parcels',
     meaning:
-      'Sample parcels of the disc, each carried round at the Keplerian rate for its own radius and dragged faster by spin. They are a sample of the flow, not a count of anything.',
+      'Sample parcels of the disc, each carried round at the Kerr orbital rate for its own radius — Ω = ±1/(r̃^{3/2} ± a★), which is Kepler’s law when the hole is still and is not once it spins. They reverse direction when the disc does. How many there are and where they start is a choice about legibility; only the rate is computed.',
     from: 'closed-form',
+    model: 'Kerr circular-orbit angular velocity',
     depends: ['matter', 'outer', 'spin'],
     appearance: 'small dots moving within the disc, coloured like the ring they sit in',
     layer: 'matter',
@@ -86,24 +95,28 @@ export const BLACK_HOLE_ENTITIES: VizEntity[] = [
     type: 'trajectory',
     label: 'Light rays',
     meaning:
-      'Photon paths, each one integrated as a null geodesic — d²u/dφ² + u = 3u² by Runge–Kutta — not drawn as a bent curve. Where one ends inside the capture radius it was captured, and it is drawn differently.',
+      'Photon paths, each one integrated as a null geodesic in the metric the figure is titled after — R(r) and φ̇ in Boyer–Lindquist, by Runge–Kutta — not drawn as a bent curve. Half the fan goes round with the hole’s rotation and half against it, because a beam of parallel light passing a spinning hole is exactly that, and the two halves are captured at different aiming distances.',
     from: 'integrated',
-    model: 'Schwarzschild null geodesics in the equatorial plane',
-    depends: ['rays', 'spread', 'bsel'],
+    model: 'Kerr null geodesics in the equatorial plane; Schwarzschild is the a = 0 case of the same integration',
+    depends: ['rays', 'spread', 'bsel', 'spin', 'm'],
     appearance:
       'the dark olive-green curves sweeping past the hole; a captured one is rust-coloured and dashed, and the one nearest your chosen aiming distance is drawn heavier',
     layer: 'rays',
-    relations: ['A moving dot runs along each path to show its direction.'],
+    relations: [
+      'A moving dot runs along each path to show its direction — not the speed of light.',
+      'Within a few hundredths of the critical aiming distance the number of loops diverges, so the drawn path can stop unfinished; the capture verdict then comes from the exact threshold, and the readout says so.',
+    ],
   },
   {
     id: 'photon',
     type: 'boundary',
     label: 'Photon sphere',
     meaning:
-      'Where light can orbit — 1.5 Schwarzschild radii for a non-spinning hole. Drawn as two great circles so it reads as a sphere.',
+      'Where light can orbit. At zero spin that is 1.5 Schwarzschild radii in any plane, and it is drawn as two great circles because it really is a sphere. Once the hole spins there is no single radius — light going round with the rotation orbits far closer in than light going against it — so the two equatorial orbits are drawn instead, and the sphere is not, because there is not one.',
     from: 'closed-form',
-    depends: ['m'],
-    appearance: 'the gold dashed circle',
+    model: 'r_ph = 2r_g[1 + cos(⅔ arccos(∓a★))], both senses',
+    depends: ['m', 'spin'],
+    appearance: 'the gold dashed circle, or two of them at high spin',
     layer: 'photon',
     relations: ['It is INSIDE the capture radius at 2.6 r: the two are different things and are often confused.'],
   },
@@ -244,46 +257,22 @@ export const SURFACE_ENTITIES: Record<string, VizEntity[]> = {
 };
 
 /** What each surface is actually solving, and what it holds fixed. */
+/**
+ * The model behind each surface: its name, what it holds fixed, what it solves.
+ *
+ * DERIVED, NOT WRITTEN HERE. These three arrays used to be typed out beside each
+ * surface, and one of them said the light rays were integrated in Schwarzschild
+ * for exactly as long as that was true — and then for a while after it was not.
+ * A sentence beside the code is a claim nobody re-reads. They now come from the
+ * science blocks in lib/surface-science.ts, which lib/model/science.ts validates
+ * and test/surface-science pins, so a surface cannot disagree with its own model.
+ */
 export const SURFACE_MODEL: Record<
   string,
   { model: string; assumptions: string[]; equations: string[] }
-> = {
-  'black-hole': {
-    model: 'Kerr geometry, equatorial; Shakura–Sunyaev disc',
-    assumptions: [
-      'The light rays are integrated in the Schwarzschild metric, so spin bends the geometry of the marked radii but not the ray paths.',
-      'The disc is optically thick and geometrically thin, and its drawn thickness is for legibility rather than to scale.',
-      'Lengths are in Schwarzschild radii; the mass slider scales all of them together.',
-    ],
-    equations: [
-      'd²u/dφ² + u = 3u² (null geodesics, u = 1/r)',
-      'T(r) from Shakura–Sunyaev with the Eddington rate',
-      'δ = 1/[γ(1 − β cos θ)], brightness ∝ δ⁴',
-    ],
-  },
-  'big-bang': {
-    model: 'FLRW, Friedmann equation with a relativistic degrees-of-freedom staircase',
-    assumptions: [
-      'Homogeneous and isotropic throughout — this is a thermal history, not a structure simulation.',
-      'The drawn sphere is the log of the scale factor, not a size.',
-      'Anything before about a picosecond is extrapolation, and the timeline marks those epochs as speculative rather than hiding them.',
-    ],
-    equations: [
-      'H² = H₀²(Ω_r a⁻⁴ + Ω_m a⁻³ + Ω_Λ)',
-      'T(a) = T₀/a, with g*(T)',
-      'Saha for recombination; last scattering taken separately',
-    ],
-  },
-  orbit: {
-    model: 'Newtonian gravity, integrated',
-    assumptions: [
-      'Point masses with a softening length, so a close pass does not diverge.',
-      'The step SIZE belongs to the setup; the speed control changes how many steps you watch, never how coarsely they are taken.',
-      'The energy-drift readout is the integrator marking its own work.',
-    ],
-    equations: ['a_i = Σ_j Gm_j (r_j − r_i)/(|r_j − r_i|² + ε²)^{3/2}', 'velocity Verlet'],
-  },
-};
+> = Object.fromEntries(
+  Object.entries(SURFACE_SCIENCE).map(([id, meta]) => [id, modelSummary(meta)])
+);
 
 // ── plots ────────────────────────────────────────────────────────────
 //

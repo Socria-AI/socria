@@ -129,6 +129,21 @@ export interface VizModelState {
   assumptions: string[];
   /** the relations being solved, as text */
   equations: string[];
+  /**
+   * The model's own account of itself: coordinates, units, the observer, the
+   * solver and its settings, what each output's fidelity is, what a mark must
+   * NOT be taken for, and the limitations — from lib/model/science.ts via
+   * lib/surface-science.ts.
+   *
+   * SEPARATE FROM `model` AND `assumptions`, which are one line and a short
+   * list. This is the part that lets an answer be specific about HOW something
+   * was obtained: that the rays were integrated by RK4 in Boyer–Lindquist and
+   * checked against the weak-field series, that the grid is a representation of
+   * geometry rather than a surface around the hole, that the disc image does not
+   * ray-trace. A reader asking "why is that there?" is owed that, and a model
+   * with no science block simply has none of it to give.
+   */
+  science?: string[];
   entities: VizEntity[];
   params: VizParamState[];
   layers: VizLayerState[];
@@ -176,6 +191,7 @@ export const VIZ_CAPS = {
   layers: 16,
   assumptions: 10,
   equations: 8,
+  science: 30,
   readouts: 6,
 } as const;
 
@@ -289,6 +305,9 @@ export function sanitizeModelState(raw: unknown): VizModelState | null {
     model: text(r.model, 140),
     assumptions: list(r.assumptions, VIZ_CAPS.assumptions, 200),
     equations: list(r.equations, VIZ_CAPS.equations, 140),
+    ...(Array.isArray(r.science) && r.science.length
+      ? { science: list(r.science, VIZ_CAPS.science, 320) }
+      : {}),
     entities,
     params,
     layers,
@@ -550,6 +569,12 @@ export function vizModelBlock(state: VizModelState | null | undefined): string {
     lines.push(`WHAT IT SOLVES: ${state.equations.join(' · ')}`);
   }
 
+  if (state.science?.length) {
+    lines.push('');
+    lines.push('THE MODEL, IN ITS OWN WORDS — coordinates, solver, what each output is, and what each mark is NOT:');
+    for (const l of state.science) lines.push(bullet(l));
+  }
+
   if (state.selected) {
     const sel = state.entities.find((e) => e.id === state.selected);
     if (sel) {
@@ -570,6 +595,16 @@ export function vizModelBlock(state: VizModelState | null | undefined): string {
   lines.push(
     bullet(
       'Answer from the list above and nothing else. If something they describe is not in it, say you cannot see it in the picture and ask what they are pointing at. Never invent an object, a colour, a value or a behaviour that is not listed — a confident answer about something that is not there is worse than no answer.'
+    )
+  );
+  lines.push(
+    bullet(
+      'Say how something was obtained when it matters, in the model\u2019s own terms: which of these numbers an integrator produced, which follow from a formula, and which are drawn to be legible. Where the model says a mark is NOT something — a coordinate grid is not a surface around the object, a drawn thickness is not to scale — say that plainly if they ask what it is. Never upgrade a drawing to a computation; never describe a computed result as an illustration.'
+    )
+  );
+  lines.push(
+    bullet(
+      'A question about WHY a computed thing came out as it did is answered from the model\u2019s own numbers — the value it was given, the threshold it was compared against, what the solver did. Not from a general account of the subject, and never from a plausible-sounding mechanism the readouts do not support.'
     )
   );
   lines.push(

@@ -31,6 +31,10 @@ import {
   heliumFraction, temperatureAt, kTeV, epochs, speciesAt,
   gravityPreset, gravityRun, gravityStep, energy, recentre, barycentre,
   discTemperature, eddingtonRate, observedTemperature, doppler, orbitalBeta, blackbodyRGB,
+  criticalImpact,
+  kerrShadow,
+  circularOrbit,
+  frameDragging,
 } from './.tmp/logos-physics.mjs';
 import { ELEMENTS, element, bySymbol, elementColour, darkenForPaper, primordial } from './.tmp/elements.mjs';
 import { sanitizeViz, buildFrame, SIM_OBJECTS, VIZ_KINDS } from './.tmp/logos-viz.mjs';
@@ -173,6 +177,122 @@ console.log('\n=== light, actually integrated ===');
   const c = photonPath(12, { steps: 9000, maxTurn: 20 * Math.PI }).deflection;
   okNear('the result does not depend on the step count', a, c, 0.005);
   ok('a path is returned to draw', photonPath(8).points.length > 50);
+}
+
+console.log('\n=== Kerr: the spin is in the light, not only in the labels ===');
+{
+  // THE NUMBERS THIS SECTION PINS ARE THE TEXTBOOK ONES. Each is a value a
+  // physicist would recognise on sight, which is the point: an integrator and a
+  // closed form that agree with each other but not with the literature are two
+  // mistakes, not a check.
+  const crit0 = criticalImpact(0);
+  okNear('at rest the capture threshold is √27 both ways', crit0.prograde, B_CRIT, 1e-12);
+  ok('  with the retrograde one the mirror of it', crit0.retrograde === -crit0.prograde);
+
+  const crit = criticalImpact(0.998);
+  okNear('near the extremal limit co-rotating light survives to 2 r_g', crit.prograde, 2, 0.06);
+  okNear('  while light going the other way is swallowed out at 7', crit.retrograde, -7, 0.01);
+  ok('  which is the asymmetry a spinning hole HAS', Math.abs(crit.retrograde) > 3 * crit.prograde);
+
+  // The integrator against the closed form, at three spins, both senses. This is
+  // the assertion that the rays are computed in the metric the figure claims.
+  for (const a of [0.3, 0.7, 0.95]) {
+    const c = criticalImpact(a);
+    ok(`a★ = ${a}: a co-rotating ray inside the threshold is captured`,
+      photonPath(c.prograde - 0.05, { spin: a }).captured);
+    ok(`  and outside it escapes`, !photonPath(c.prograde + 0.05, { spin: a }).captured);
+    ok(`  a counter-rotating ray inside is captured`,
+      photonPath(c.retrograde + 0.05, { spin: a }).captured);
+    ok(`  and outside it escapes`, !photonPath(c.retrograde - 0.05, { spin: a }).captured);
+    // The same aiming distance, the two senses: one gets out, the other does not.
+    const between = (c.prograde + Math.abs(c.retrograde)) / 2;
+    ok(`  the same b is captured one way round and not the other`,
+      !photonPath(between, { spin: a }).captured && photonPath(-between, { spin: a }).captured);
+  }
+
+  // Spin changes the PATH, not only the verdict.
+  const bendPro = photonPath(8, { spin: 0.9 }).deflection;
+  const bendRet = photonPath(-8, { spin: 0.9 }).deflection;
+  ok('at the same aiming distance the two senses bend by different amounts', Math.abs(bendPro - bendRet) > 1e-3);
+  ok('  and light going against the rotation is bent more', bendRet > bendPro);
+  okNear('  while at a★ = 0 the two are identical',
+    photonPath(8, { spin: 0 }).deflection, photonPath(-8, { spin: 0 }).deflection, 1e-12);
+
+  // What the integrator does when it cannot finish, which is the honest half.
+  const hard = photonPath(criticalImpact(0.9).prograde + 0.0005, { spin: 0.9, maxTurn: 4 * Math.PI });
+  ok('a ray that runs out of sweep says so', hard.truncated || hard.decidedBy === 'threshold');
+  ok('  and its verdict is attributed to the threshold, not to the path',
+    !hard.truncated ? true : hard.decidedBy === 'threshold');
+  ok('an ordinary ray is decided by the integration itself',
+    photonPath(9, { spin: 0.5 }).decidedBy === 'integration');
+  ok('every ray reports which way round it went',
+    photonPath(9, { spin: 0.5 }).sense === 'prograde' && photonPath(-9, { spin: 0.5 }).sense === 'retrograde');
+}
+
+console.log('\n=== Kerr: the shadow, the orbits and the disc ===');
+{
+  const still = kerrShadow(0);
+  ok('with no spin the shadow is a circle', still.circular);
+  okNear('  of √27 r_g', still.alphaMax, B_CRIT, 1e-9);
+  okNear('  in every direction', still.betaMax, B_CRIT, 1e-9);
+
+  const fast = kerrShadow(0.998, Math.PI / 2);
+  ok('spinning, it is not a circle', !fast.circular);
+  okNear('  flat-edged at 2 r_g on the co-rotating side', -fast.alphaMin, 2, 0.06);
+  okNear('  and reaching 7 r_g on the other', fast.alphaMax, 7, 0.01);
+  okNear('  while its height stays about √27', fast.betaMax, B_CRIT, 0.01);
+  ok('  which is the D-shape Bardeen derived', fast.alphaMax + fast.alphaMin > 4);
+  ok('seen down the spin axis it is round again',
+    Math.abs(kerrShadow(0.998, 0.02).alphaMax - Math.abs(kerrShadow(0.998, 0.02).alphaMin)) < 0.2);
+
+  const sun = blackHole(PHYS.Msun, 0);
+  const o = circularOrbit(sun, sun.isco);
+  okNear('at the Schwarzschild ISCO the gas moves at exactly c/2', o.beta, 0.5, 1e-12);
+  okNear('  its clock runs at 1/√2 of infinity’s', o.redshift, Math.SQRT2, 1e-12);
+  okNear('  and the lapse there is √(2/3)', o.lapse, Math.sqrt(2 / 3), 1e-12);
+  ok('  nothing is dragged when nothing spins', o.drag === 0);
+  okNear('  and the period is Kepler’s exactly',
+    o.period, 2 * Math.PI * Math.sqrt(sun.isco ** 3 / (PHYS.G * sun.M)), 1e-12);
+
+  ok('inside the photon orbit there is no circular orbit at all',
+    !circularOrbit(sun, 2.5 * sun.rg).exists);
+  ok('  between the photon orbit and the ISCO there is one, but not a stable one',
+    circularOrbit(sun, 4 * sun.rg).exists && !circularOrbit(sun, 4 * sun.rg).stable);
+  ok('  and outside the ISCO it is stable', circularOrbit(sun, 8 * sun.rg).stable);
+
+  const spun = blackHole(PHYS.Msun, 0.9);
+  ok('frame dragging is there when the hole spins', frameDragging(spun, 6 * spun.rg) > 0);
+  ok('  and falls off with distance', frameDragging(spun, 6 * spun.rg) > frameDragging(spun, 20 * spun.rg));
+  const pro = circularOrbit(spun, 6 * spun.rg, 'prograde');
+  const ret = circularOrbit(spun, 6 * spun.rg, 'retrograde');
+  ok('co-rotating and counter-rotating gas at one radius do not keep the same time',
+    Math.abs(pro.period - ret.period) / pro.period > 0.05);
+  ok('  and they go opposite ways', Math.sign(pro.omega) !== Math.sign(ret.omega));
+
+  // The retrograde disc, which used to be drawn at the right radius with the
+  // wrong temperature because the prograde efficiency was reused for it.
+  const ext = blackHole(PHYS.Msun, 0.998);
+  okNear('the prograde ISCO reaches 1.237 r_g at the Thorne limit', ext.isco / ext.rg, 1.2371, 0.002);
+  okNear('  while a retrograde disc is held out at 9', ext.iscoRetro / ext.rg, 8.9944, 0.002);
+  okNear('  radiating 32% of what falls in one way round', ext.efficiency, 0.3210, 0.01);
+  okNear('  and 3.8% the other', ext.efficiencyRetro, 0.0378, 0.02);
+  ok('  which are different numbers, and now both exist', ext.efficiency > 5 * ext.efficiencyRetro);
+  ok('at rest the two senses agree exactly',
+    Math.abs(sun.isco - sun.iscoRetro) < 1e-6 && Math.abs(sun.efficiency - sun.efficiencyRetro) < 1e-9);
+
+  const mdot = eddingtonRate(ext, 0.1);
+  const mdotRetro = eddingtonRate(ext, 0.1, 'retrograde');
+  ok('a retrograde disc needs far more gas for the same light', mdotRetro > 5 * mdot);
+  const rr = 12 * ext.rg;
+  ok('and one radius is two temperatures, depending which way the disc turns',
+    Math.abs(observedTemperature(ext, rr, mdot, 0, 'prograde').T - observedTemperature(ext, rr, mdot, 0, 'retrograde').T) > 1);
+
+  // Surface gravity and the Hawking temperature now carry the spin.
+  okNear('at rest the surface gravity is c⁴/4GM', sun.surfaceGravity, PHYS.c ** 4 / (4 * PHYS.G * PHYS.Msun), 1e-12);
+  ok('and it falls as the hole spins up', ext.surfaceGravity < 0.2 * sun.surfaceGravity);
+  ok('  taking the Hawking temperature with it', ext.hawkingT < 0.2 * sun.hawkingT);
+  okNear('  which at rest is ħc³/8πGMk_B',
+    sun.hawkingT, (PHYS.hbar * PHYS.c ** 3) / (8 * Math.PI * PHYS.G * PHYS.Msun * PHYS.kB), 1e-9);
 }
 
 console.log('\n=== two bodies, against the solar system ===');
@@ -429,7 +549,26 @@ console.log('\n=== the drawing IS the physics, not a picture beside it ===');
     const at = (id) => f.objects.find((o) => o.id === id);
     const rings = f.objects.filter((o) => /^disk\d+$/.test(o.id));
     const innerEdge = Math.min(...rings.map((r) => Math.max(...r.pts.map((q) => Math.hypot(q.x, q.y)))));
-    okNear(`a★ = ${spin}: the shadow is drawn at √27 r_g`, outer(at('shadow')), bh.shadow / bh.rg, 1e-9);
+    // THE SHADOW IS ONLY A CIRCLE WHEN THE HOLE IS STILL, and this used to
+    // assert the opposite: √27 r_g at every spin, which is what the code drew
+    // and is wrong for any rotating hole. Co-rotating light escapes from closer
+    // in, so the outline is pushed in on one side and bulges on the other, out
+    // to the counter-rotating capture threshold.
+    const crit = criticalImpact(spin);
+    if (spin === 0) {
+      okNear('a★ = 0: the shadow is a circle of √27 r_g', outer(at('shadow')), bh.shadow / bh.rg, 1e-9);
+    } else {
+      okNear(
+        `a★ = ${spin}: the shadow reaches the counter-rotating threshold`,
+        outer(at('shadow')), Math.abs(crit.retrograde), 0.01
+      );
+      const alphas = at('shadow').pts.map((q) => q.x);
+      okNear(
+        `  and is pushed in to the co-rotating one on the other side`,
+        -Math.min(...alphas), crit.prograde, 0.02
+      );
+      ok(`  so it is not a circle`, Math.abs(crit.retrograde) - crit.prograde > 0.5);
+    }
     okNear(`  the horizon at r_+`, outer(at('horizon')), bh.horizon / bh.rg, 1e-9);
     okNear(`  the photon ring at the photon sphere`, outer(at('photonring')), bh.photonSphere / bh.rg, 1e-9);
     okNear(`  and the disk stops at the ISCO`, innerEdge, bh.isco / bh.rg, 1e-9);
@@ -574,7 +713,15 @@ console.log('\n=== what a disc looks like, and why ===');
   ok('the approaching side is brighter', near.boost > far.boost);
   okNear('  by about twelve times at 0.3c', near.boost / far.boost, 11.9, 0.1);
   ok('  and bluer', near.delta > 1 && far.delta < 1);
-  ok('gas at the ISCO of a still hole moves at about c/√6', Math.abs(orbitalBeta(bh, bh.isco) - 1 / Math.sqrt(6)) < 0.02);
+  // EXACTLY c/2, and the old expectation of c/√6 was the mistake.
+  //
+  // √(GM/r)/c at r = 6r_g is 1/√6 = 0.408 — the COORDINATE speed, which is the
+  // one quantity that must not go into a Doppler factor. What a local observer
+  // measures at the Schwarzschild ISCO is v = √(M/(r − 2M)) = c/2 exactly, and
+  // the beaming was understated by a fifth at the very radius where all of it
+  // happens. The assertion now pins the exact value.
+  ok('gas at the ISCO of a still hole moves at exactly c/2, as a local observer measures it',
+    Math.abs(orbitalBeta(bh, bh.isco) - 0.5) < 1e-9, `${orbitalBeta(bh, bh.isco)}`);
 
   // Observed temperature folds in the climb out of the well as well as the
   // motion, so one ring at one emitted temperature is not one colour.

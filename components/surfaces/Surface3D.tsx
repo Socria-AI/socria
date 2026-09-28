@@ -21,6 +21,7 @@
 
 import './surfaces.css';
 import type { VizEntity, VizModelState, VizOp } from '@/lib/viz-model';
+import { scienceLines, type ScienceMeta } from '@/lib/model/science';
 import {
   useCallback,
   useEffect,
@@ -162,6 +163,11 @@ export interface Surface3DProps {
   assumptions?: string[];
   equations?: string[];
   /**
+   * The model's own account of itself (lib/model/science.ts). Turned into lines
+   * once, here, rather than in the render — none of it changes per frame.
+   */
+  science?: ScienceMeta;
+  /**
    * Verbs this view supports beyond the universal ones — slicing, flattening,
    * moving through time, comparing. A surface built by hand has none of them;
    * one backed by a model (lib/model/) has all four, because they are
@@ -211,6 +217,7 @@ export function Surface3D({
   model = '',
   assumptions = [],
   equations = [],
+  science,
   can,
   onOps,
   onRead,
@@ -506,6 +513,7 @@ export function Surface3D({
       model,
       assumptions,
       equations,
+      ...(science ? { science: scienceLines(science) } : {}),
       entities: entities.map((e) => {
         const state = live[e.id];
         return state ? { ...e, state } : e;
