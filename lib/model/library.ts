@@ -516,6 +516,514 @@ export function photonPath(): Model {
   };
 }
 
+// ════════════════════════════════════════════════════════════════════
+// MECHANISMS — parts, not features
+// ════════════════════════════════════════════════════════════════════
+//
+// THE TEST THESE EXIST TO PASS. A single spring–mass–damper and a chain of three
+// are the SAME MODEL with more rows: no new component, no new renderer, no new
+// code path. If the second needed anything the first did not, the grammar would
+// be a pair of demos wearing one name.
+
+/** TEST 11 — one mass, one spring, one damper. The analytic case, so it can be checked. */
+export function oscillator(): Model {
+  return {
+    id: 'oscillator',
+    title: 'A mass on a spring, with damping',
+    domain: 'mechanics',
+    aspect: 'equal',
+    equations: ['m ẍ + c ẋ + k x = F(t)', 'assembled from the parts rather than written out'],
+    assumptions: [
+      'One translational degree of freedom: the mass moves along the axis and nothing else.',
+      'The spring is linear and the damper is viscous — both are the definitions of those parts here, not approximations to a measured one.',
+      'x is displacement from rest, so the drawn rest position is a drawing choice and the displacement is computed.',
+    ],
+    params: [
+      param('m', 'mass', 1, 0.1, 5, 'The mass. It sets how slowly the system responds to the same force.', 0.1),
+      param('k', 'stiffness', 20, 1, 100, 'The spring constant. Raising it raises the natural frequency as √(k/m).', 1),
+      param('c', 'damping', 0.6, 0, 12, 'The damping coefficient. Past 2√(km) the motion stops oscillating at all.', 0.1),
+      param('x0', 'start', 1, -2, 2, 'Where the mass starts, as a displacement from rest.', 0.05),
+      param('f0', 'drive', 0, 0, 20, 'The amplitude of a driving force. At zero the system is left to itself.', 0.5),
+      param('w', 'drive rate', 4, 0.1, 20, 'How fast the driving force oscillates. Near √(k/m) it resonates.', 0.1),
+    ],
+    time: { t: 0, min: 0, max: 20, rate: 1, units: 's' },
+    objects: [
+      {
+        id: 'mech',
+        kind: 'component',
+        label: 'The mechanism',
+        meaning:
+          'One body, one spring to the wall and one damper to the wall, assembled into equations of motion and integrated. Every part below is an object in its own right.',
+        mechanism: {
+          along: 'line',
+          bodies: [{ id: 'm1', mass: 'm', x0: 'x0', v0: 0, label: 'the mass', at: 3 }],
+          springs: [{ id: 'k1', between: ['m1', 'ground'], value: 'k', label: 'the spring' }],
+          dampers: [{ id: 'c1', between: ['m1', 'ground'], value: 'c', label: 'the damper' }],
+          forces: [{ id: 'f1', on: 'm1', expr: 'f0 * sin(w * t)', label: 'the driving force' }],
+          dt: 0.004,
+          steps: 5000,
+        },
+        depends: ['m', 'k', 'c', 'x0', 'f0', 'w'],
+        provenance: { origin: 'computation', detail: 'assembled from the parts, then RK4 on the assembled system' },
+      },
+    ],
+  };
+}
+
+/** TEST 12 — three masses in a chain. The same grammar, four springs, three dampers. */
+export function chain(): Model {
+  return {
+    id: 'chain',
+    title: 'Three masses on springs',
+    domain: 'mechanics',
+    aspect: 'equal',
+    equations: ['M ẍ + C ẋ + K x = F(t) for three coupled degrees of freedom', 'assembled from the parts'],
+    assumptions: [
+      'Three translational degrees of freedom along one axis.',
+      'Every spring and damper is linear; the couplings are what make the modes.',
+      'Displacements are from each body’s own rest position.',
+    ],
+    params: [
+      param('m', 'mass', 1, 0.2, 4, 'All three masses together, so the mode shapes stay legible.', 0.1),
+      param('k', 'stiffness', 30, 1, 120, 'The stiffness of every spring.', 1),
+      param('kc', 'coupling', 12, 0, 80, 'The stiffness of the two springs BETWEEN the masses. At zero they are three independent oscillators.', 1),
+      param('c', 'damping', 0.3, 0, 8, 'The damping on each body.', 0.05),
+      param('x0', 'first start', 1, -2, 2, 'How far the first mass is pulled before release. The others start at rest.', 0.05),
+    ],
+    time: { t: 0, min: 0, max: 24, rate: 1, units: 's' },
+    objects: [
+      {
+        id: 'mech',
+        kind: 'component',
+        label: 'The chain',
+        meaning:
+          'Three bodies, four springs and three dampers. Six states — three displacements and three velocities — which the four-state trajectory primitive could not have expressed at all.',
+        mechanism: {
+          along: 'line',
+          bodies: [
+            { id: 'm1', mass: 'm', x0: 'x0', label: 'first mass', at: 2 },
+            { id: 'm2', mass: 'm', x0: 0, label: 'second mass', at: 4 },
+            { id: 'm3', mass: 'm', x0: 0, label: 'third mass', at: 6 },
+          ],
+          springs: [
+            { id: 'k1', between: ['ground', 'm1'], value: 'k', label: 'wall to first' },
+            { id: 'k2', between: ['m1', 'm2'], value: 'kc', label: 'first to second' },
+            { id: 'k3', between: ['m2', 'm3'], value: 'kc', label: 'second to third' },
+            { id: 'k4', between: ['m3', 'ground'], value: 'k', label: 'third to wall' },
+          ],
+          dampers: [
+            { id: 'c1', between: ['ground', 'm1'], value: 'c', label: 'first damper' },
+            { id: 'c2', between: ['m2', 'ground'], value: 'c', label: 'second damper' },
+            { id: 'c3', between: ['m3', 'ground'], value: 'c', label: 'third damper' },
+          ],
+          dt: 0.004,
+          steps: 6000,
+        },
+        depends: ['m', 'k', 'kc', 'c', 'x0'],
+        provenance: { origin: 'computation', detail: 'assembled from the parts, then RK4 on the assembled system' },
+      },
+    ],
+  };
+}
+
+// ════════════════════════════════════════════════════════════════════
+// SYSTEMS THAT ARE NOT MECHANISMS — the same integrator, no new code
+// ════════════════════════════════════════════════════════════════════
+
+/** TEST 13 — an epidemic. Three states, no geometry, no springs: a system is a system. */
+export function epidemic(): Model {
+  return {
+    id: 'epidemic',
+    title: 'An epidemic, compartment by compartment',
+    domain: 'epidemiology',
+    equations: ['dS/dt = −βSI/N', 'dI/dt = βSI/N − γI', 'dR/dt = γI'],
+    assumptions: [
+      'The population mixes uniformly and is closed: nobody arrives, nobody leaves, and the three compartments always sum to N.',
+      'One infectious period for everybody, with no age structure, no behaviour and no spatial spread.',
+      'This is the textbook SIR model. It is a way of thinking about an epidemic, not a forecast of one.',
+    ],
+    params: [
+      param('beta', 'transmission', 0.4, 0.05, 1.5, 'Contacts per day that would transmit. β/γ is the basic reproduction number.', 0.01),
+      param('gamma', 'recovery', 0.1, 0.02, 0.6, 'The rate of leaving the infectious compartment: 1/γ is the mean infectious period in days.', 0.01),
+      param('i0', 'initial cases', 10, 1, 1000, 'How many are infectious on day zero.', 1),
+      param('n', 'population', 10000, 100, 1e6, 'The size of the closed population.', 100),
+    ],
+    time: { t: 0, min: 0, max: 200, rate: 8, units: 'days' },
+    objects: [
+      {
+        id: 'sir',
+        kind: 'system',
+        label: 'The SIR system',
+        meaning:
+          'Three compartments and the flows between them, integrated. The total is declared as an invariant so the integration can be judged by whether it kept it.',
+        system: {
+          states: [
+            { name: 'S', init: 'n - i0', units: 'people', means: 'still susceptible' },
+            { name: 'I', init: 'i0', units: 'people', means: 'currently infectious' },
+            { name: 'R', init: 0, units: 'people', means: 'recovered or removed' },
+          ],
+          rhs: {
+            S: '0 - beta * S * I / n',
+            I: 'beta * S * I / n - gamma * I',
+            R: 'gamma * I',
+          },
+          observe: { total: 'S + I + R', incidence: 'beta * S * I / n' },
+          invariant: 'total',
+          dt: 0.05,
+          steps: 4000,
+          method: 'rk4',
+        },
+        // The phase plane the epidemiologist reads: susceptible against infectious.
+        defs: { px: 'S', py: 'I' },
+        depends: ['beta', 'gamma', 'i0', 'n'],
+        fidelity: 'numerically-computed',
+        provenance: { origin: 'computation', detail: 'RK4 on the stated compartment equations' },
+      },
+    ],
+  };
+}
+
+/** TEST 14 — an RC–LC circuit. Inertia, restoring and dissipation again, with other names. */
+export function circuit(): Model {
+  return {
+    id: 'circuit',
+    title: 'A driven RLC loop',
+    domain: 'electrical engineering',
+    equations: ['L dq̈ + R q̇ + q/C = V(t)', 'written over the charge and the current'],
+    assumptions: [
+      'Lumped elements: the resistance, inductance and capacitance are each at a point, with no propagation along the wire.',
+      'Linear components at every current — no saturation and no breakdown.',
+      'The same three parts as a mass on a spring, which is why one integrator runs both.',
+    ],
+    params: [
+      param('l', 'inductance', 1, 0.05, 5, 'The inductance, in henries. It plays the part mass plays in a mechanism.', 0.05),
+      param('r', 'resistance', 0.5, 0, 10, 'The resistance, in ohms — the dissipative part.', 0.1),
+      param('cap', 'capacitance', 0.05, 0.005, 1, 'The capacitance, in farads. 1/C is the restoring stiffness.', 0.005),
+      param('v0', 'drive', 1, 0, 10, 'The amplitude of the driving voltage.', 0.1),
+      param('w', 'drive rate', 4, 0.1, 30, 'How fast the source oscillates. Near 1/√(LC) it resonates.', 0.1),
+    ],
+    time: { t: 0, min: 0, max: 20, rate: 1, units: 's' },
+    objects: [
+      {
+        id: 'loop',
+        kind: 'system',
+        label: 'The loop',
+        meaning:
+          'Charge and current as the two states. The equation is the mechanical one with the names changed, which is the point of having one grammar.',
+        system: {
+          states: [
+            { name: 'q', init: 0, units: 'C', means: 'charge on the capacitor' },
+            { name: 'i', init: 0, units: 'A', means: 'current round the loop' },
+          ],
+          rhs: {
+            q: 'i',
+            i: '(v0 * sin(w * t) - r * i - q / cap) / l',
+          },
+          observe: { energy: '0.5 * l * i^2 + 0.5 * q^2 / cap', voltage: 'v0 * sin(w * t)' },
+          dt: 0.002,
+          steps: 8000,
+          method: 'rk4',
+        },
+        defs: { px: 'q', py: 'i' },
+        depends: ['l', 'r', 'cap', 'v0', 'w'],
+        fidelity: 'numerically-computed',
+        provenance: { origin: 'computation', detail: 'RK4 on the loop equation' },
+      },
+    ],
+  };
+}
+
+// ════════════════════════════════════════════════════════════════════
+// ECONOMETRICS — the benchmark, and the method stays the person's
+// ════════════════════════════════════════════════════════════════════
+//
+// SYNTHETIC DATA, SAID SO EVERYWHERE. These carry generated columns with known
+// coefficients, because a benchmark needs an answer to be checked against and
+// because presenting invented numbers as somebody's data would be the exact
+// failure this architecture exists to prevent. Every data block says it is
+// synthetic, and the provenance of every fitted coefficient says which dataset it
+// came from.
+
+/** Deterministic pseudo-random noise, so a benchmark is reproducible. */
+function noise(n: number, scale: number, seed = 7): number[] {
+  let x = seed;
+  return Array.from({ length: n }, () => {
+    x = (x * 1103515245 + 12345) % 2147483648;
+    const u = x / 2147483648;
+    x = (x * 1103515245 + 12345) % 2147483648;
+    const v = x / 2147483648;
+    // Box–Muller, so the noise is normal rather than uniform.
+    return scale * Math.sqrt(-2 * Math.log(Math.max(1e-12, u))) * Math.cos(2 * Math.PI * v);
+  });
+}
+
+/** TEST 15 — the simple linear model. y = β₀ + β₁x + u, fitted to data. */
+export function linearModel(): Model {
+  const n = 120;
+  const x = Array.from({ length: n }, (_, i) => 1 + (9 * i) / (n - 1));
+  const u = noise(n, 1.2, 11);
+  const y = x.map((v, i) => 2.5 + 0.8 * v + u[i]);
+  return {
+    id: 'linear-model',
+    title: 'A simple linear model',
+    domain: 'econometrics',
+    equations: ['y = β₀ + β₁x + u'],
+    assumptions: [
+      'Linear in the parameters, and the errors are uncorrelated with x — which is the assumption that decides whether β₁ is more than an association.',
+      'The data here is SYNTHETIC, generated with β₀ = 2.5 and β₁ = 0.8 so the estimate has a known answer to be checked against.',
+      'The method is declared in the model: ordinary least squares. Changing it is a modelling decision, not a setting.',
+    ],
+    params: [],
+    data: {
+      sample: {
+        label: 'Synthetic sample, generated with β₀ = 2.5, β₁ = 0.8 and normal noise',
+        source: 'generated in lib/model/library.ts — not measured',
+        columns: { x, y },
+      },
+    },
+    objects: [
+      {
+        id: 'fit',
+        kind: 'specification',
+        label: 'y on x',
+        meaning: 'The specification and its estimates: two coefficients, their standard errors, the residuals and R².',
+        estimation: { method: 'ols', y: 'y', x: ['x'], data: 'sample' },
+        fidelity: 'data-derived',
+        provenance: { origin: 'dataset', detail: 'least squares on the synthetic sample' },
+      },
+      {
+        id: 'scatter',
+        kind: 'dataset',
+        label: 'The observations',
+        meaning: 'The sample itself, plotted. Everything the fit knows came from these points.',
+        data: 'sample',
+        // WHICH two columns, said by the model: a table has many possible
+        // scatters and picking one silently would be picking what the figure is
+        // about (see fromData in compile.ts).
+        defs: { x: 'x', y: 'y' },
+        fidelity: 'data-derived',
+      },
+    ],
+  };
+}
+
+/** TEST 16 — several regressors, one of them a control. */
+export function multivariateModel(): Model {
+  const n = 200;
+  const x1 = Array.from({ length: n }, (_, i) => 1 + (9 * i) / (n - 1));
+  const x2 = noise(n, 2, 5).map((v, i) => 4 + v + 0.3 * x1[i]);
+  const u = noise(n, 1, 23);
+  const y = x1.map((v, i) => 1.2 + 0.5 * v - 0.9 * x2[i] + u[i]);
+  return {
+    id: 'multivariate-model',
+    title: 'A multivariate linear model',
+    domain: 'econometrics',
+    equations: ['y = β₀ + β₁x₁ + β₂x₂ + u'],
+    assumptions: [
+      'x₂ is correlated with x₁ by construction, so the two coefficients are not what either would be alone — which is the whole reason for including a control.',
+      'SYNTHETIC data, generated with β = (1.2, 0.5, −0.9).',
+      'Interpreting β₁ as “holding x₂ constant” is a statement about this specification, not about the world.',
+    ],
+    params: [],
+    data: {
+      sample: {
+        label: 'Synthetic sample, β = (1.2, 0.5, −0.9), with x₂ correlated with x₁',
+        source: 'generated in lib/model/library.ts — not measured',
+        columns: { x1, x2, y },
+      },
+    },
+    objects: [
+      {
+        id: 'fit',
+        kind: 'specification',
+        label: 'y on x₁ and x₂',
+        meaning: 'Both regressors at once, with robust standard errors, so the coefficient on x₁ is conditional on x₂.',
+        estimation: { method: 'ols', y: 'y', x: ['x1', 'x2'], data: 'sample', robust: true },
+        fidelity: 'data-derived',
+        provenance: { origin: 'dataset', detail: 'least squares with HC1 standard errors' },
+      },
+      {
+        id: 'simple',
+        kind: 'specification',
+        label: 'y on x₁ alone',
+        meaning:
+          'The same data with x₂ left out, kept so the two can be compared: the coefficient on x₁ moves, and the difference IS the confounding.',
+        estimation: { method: 'ols', y: 'y', x: ['x1'], data: 'sample' },
+        fidelity: 'data-derived',
+        provenance: { origin: 'dataset', detail: 'least squares, one regressor' },
+        relations: [{ to: 'fit', as: 'approximates', why: 'the same question with one fewer control' }],
+      },
+      {
+        id: 'scatter',
+        kind: 'dataset',
+        label: 'y against x₁',
+        meaning:
+          'The raw pair, so the fitted coefficient on x₁ can be compared with what the eye sees — they differ, because the fit holds x₂ constant and the eye cannot.',
+        data: 'sample',
+        defs: { x: 'x1', y: 'y' },
+        fidelity: 'data-derived',
+      },
+    ],
+  };
+}
+
+/** TEST 17 — panel data: the same units through time, with unit effects. */
+export function panelModel(): Model {
+  const units = 12;
+  const periods = 10;
+  const unit: number[] = [];
+  const time: number[] = [];
+  const x: number[] = [];
+  const y: number[] = [];
+  const u = noise(units * periods, 0.6, 31);
+  let row = 0;
+  for (let i = 0; i < units; i++) {
+    // A fixed effect per unit, deliberately correlated with x: pooled least
+    // squares is then biased and the within estimate is not, which is what the
+    // benchmark is for.
+    const alpha = -3 + i * 0.7;
+    for (let t = 0; t < periods; t++) {
+      unit.push(i);
+      time.push(t);
+      const xv = 2 + 0.25 * alpha + 0.4 * t + noise(1, 0.5, 101 + row)[0];
+      x.push(xv);
+      y.push(alpha + 0.6 * xv + u[row]);
+      row++;
+    }
+  }
+  return {
+    id: 'panel-model',
+    title: 'A panel, with unit effects',
+    domain: 'econometrics',
+    equations: ['y_it = α_i + β x_it + u_it'],
+    assumptions: [
+      'Every unit has its own level α_i, and here it is correlated with x by construction — so pooling the data gives a different answer from the within estimate, and the difference is the point.',
+      'SYNTHETIC data, generated with β = 0.6 and a unit effect that rises across units.',
+      'Fixed effects remove what is constant within a unit. They do not remove what varies over time inside a unit, and nothing here claims they do.',
+    ],
+    params: [],
+    data: {
+      sample: {
+        label: 'Synthetic panel: 12 units × 10 periods, β = 0.6, unit effects correlated with x',
+        source: 'generated in lib/model/library.ts — not measured',
+        columns: { unit, time, x, y },
+      },
+    },
+    objects: [
+      {
+        id: 'within',
+        kind: 'specification',
+        label: 'Within units (fixed effects)',
+        meaning:
+          'Each unit’s own mean subtracted from its own rows, then least squares. The coefficient is about variation inside units.',
+        estimation: { method: 'ols-fe', y: 'y', x: ['x'], data: 'sample', unit: 'unit', time: 'time' },
+        fidelity: 'data-derived',
+        provenance: { origin: 'dataset', detail: 'the within transform, then least squares' },
+      },
+      {
+        id: 'pooled',
+        kind: 'specification',
+        label: 'Pooled (no unit effects)',
+        meaning:
+          'The same data with the unit ignored. Kept for the comparison: its coefficient is pulled by the between-unit differences.',
+        estimation: { method: 'ols', y: 'y', x: ['x'], data: 'sample' },
+        fidelity: 'data-derived',
+        provenance: { origin: 'dataset', detail: 'least squares on the pooled rows' },
+        relations: [{ to: 'within', as: 'contradicts', why: 'the two estimates disagree, and which one answers the question is a modelling choice' }],
+      },
+      {
+        id: 'scatter',
+        kind: 'dataset',
+        label: 'Every observation',
+        meaning:
+          'All units and periods together. The cloud slopes more steeply than the within estimate, because it contains the differences between units as well as the variation inside them.',
+        data: 'sample',
+        defs: { x: 'x', y: 'y' },
+        fidelity: 'data-derived',
+      },
+    ],
+  };
+}
+
+/** TEST 18 — a time series, with its own past on the right-hand side. */
+export function timeSeriesModel(): Model {
+  const n = 160;
+  const e = noise(n, 0.8, 47);
+  const y: number[] = [];
+  const t: number[] = [];
+  for (let i = 0; i < n; i++) {
+    t.push(i);
+    const prev = i > 0 ? y[i - 1] : 5;
+    y.push(1 + 0.7 * prev + 0.02 * i + e[i]);
+  }
+  return {
+    id: 'time-series-model',
+    title: 'A series against its own past',
+    domain: 'econometrics',
+    equations: ['y_t = c + φ y_{t−1} + δt + u_t'],
+    assumptions: [
+      'The past enters only through the lag included. Whether one lag is enough is a modelling judgement, and adding another is a different specification.',
+      'SYNTHETIC data, generated with φ = 0.7 and a small trend.',
+      'Nothing here tests for a unit root, for autocorrelation in the residuals, or for a structural break. Those are absent, not passed.',
+    ],
+    params: [],
+    data: {
+      sample: {
+        label: 'Synthetic series of 160 periods, φ = 0.7 with a trend of 0.02 per period',
+        source: 'generated in lib/model/library.ts — not measured',
+        columns: { t, y },
+      },
+    },
+    objects: [
+      {
+        id: 'ar1',
+        kind: 'specification',
+        label: 'One lag and a trend',
+        meaning: 'Least squares with the previous period’s value and the period index as regressors.',
+        estimation: { method: 'ols-lag', y: 'y', x: ['t'], data: 'sample', time: 't', lags: 1 },
+        fidelity: 'data-derived',
+        provenance: { origin: 'dataset', detail: 'least squares on the lagged series' },
+      },
+      {
+        id: 'series',
+        kind: 'series',
+        label: 'The series itself',
+        meaning: 'The observations in order, which is the representation a time series should keep.',
+        data: 'sample',
+        defs: { x: 't', y: 'y' },
+        fidelity: 'data-derived',
+      },
+    ],
+  };
+}
+
+/** TEST 19 — a specification with NO method, waiting on the person. */
+export function openSpecification(): Model {
+  const m = panelModel();
+  return {
+    ...m,
+    id: 'open-specification',
+    title: 'A question with the method still open',
+    assumptions: [
+      'The same panel as the fixed-effects benchmark, with NO method declared.',
+      'This is what a model looks like before the methodological decision has been made: the data is here, the variables are identified, and nothing is estimated.',
+      'Socria will not choose. It lists the candidates, what each one needs and what each one commits you to, and waits.',
+    ],
+    objects: [
+      {
+        id: 'open',
+        kind: 'specification',
+        label: 'y on x — method undecided',
+        meaning:
+          'A specification with no estimator chosen. The choice is the research, so it is the person’s: the alternatives and their assumptions are offered, and nothing is fitted until one is named.',
+        estimation: { y: 'y', x: ['x'], data: 'sample', unit: 'unit', time: 'time' },
+        fidelity: 'conceptual',
+        provenance: { origin: 'user', detail: 'the variables identified; the method not yet chosen' },
+      },
+    ],
+  };
+}
+
 /** Every benchmark, by id — what the bench page lists and the suite walks. */
 export const LIBRARY: { id: string; label: string; build: () => Model; tests: string }[] = [
   { id: 'saddle', label: 'Saddle surface', build: saddle, tests: 'surfaces, axes, level sets, cross-sections' },
@@ -528,6 +1036,15 @@ export const LIBRARY: { id: string; label: string; build: () => Model; tests: st
   { id: 'orbit', label: 'Two-body orbit', build: orbit, tests: 'state evolution, closure as a check on the integrator' },
   { id: 'lorenz', label: 'Lorenz attractor', build: lorenz, tests: 'ODE integration, chaos, initial conditions' },
   { id: 'photon-path', label: 'Light past a mass', build: photonPath, tests: 'polar position map, integrated geodesic' },
+  { id: 'oscillator', label: 'Mass, spring, damper', build: oscillator, tests: 'assembly from parts, two states, the analytic case' },
+  { id: 'chain', label: 'Three masses on springs', build: chain, tests: 'the same grammar at six states — coupling, modes, no new code' },
+  { id: 'epidemic', label: 'An epidemic (SIR)', build: epidemic, tests: 'three states, an invariant, a phase plane, no geometry' },
+  { id: 'circuit', label: 'A driven RLC loop', build: circuit, tests: 'the mechanical equation with other names, on the same integrator' },
+  { id: 'linear-model', label: 'Linear model', build: linearModel, tests: 'least squares against known coefficients, residuals, provenance' },
+  { id: 'multivariate-model', label: 'Multivariate model', build: multivariateModel, tests: 'controls, robust errors, two specifications compared' },
+  { id: 'panel-model', label: 'Panel with unit effects', build: panelModel, tests: 'the within transform against the pooled estimate' },
+  { id: 'time-series-model', label: 'Series with a lag', build: timeSeriesModel, tests: 'lag construction, rows dropped and reported' },
+  { id: 'open-specification', label: 'Method undecided', build: openSpecification, tests: 'the choice stays with the person; nothing is fitted' },
 ];
 
 export function modelById(id: string): Model | null {

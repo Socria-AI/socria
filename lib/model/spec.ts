@@ -19,6 +19,8 @@
 
 import { extentOf, pointsOf, type P3, type Primitive } from './primitives';
 import { buildModel, type Built } from './compile';
+import { expand } from './mechanism';
+import { runFor, seriesOf } from './system';
 import { byKind, overallFidelity, type Fidelity, type Model, type ModelObject } from './schema';
 
 // ── coordinates ─────────────────────────────────────────────────────
@@ -139,6 +141,37 @@ export interface VisualizationSpec {
   partial?: string;
   /** whether the box was made cubic; see Model.aspect */
   aspect: 'equal' | 'fit';
+  /**
+   * Secondary views OF THE SAME COMPUTED STATE.
+   *
+   * THE POINT IS THE WORD 'same'. A mechanism beside a displacement-against-time
+   * plot beside an energy plot is one model shown three ways, and the only way
+   * that is true rather than decorative is if all three come from ONE run — so
+   * they are built here, from the run the main view drew, rather than by
+   * integrating again per panel. Change a parameter and all of them move,
+   * because there is one computation behind them.
+   *
+   * Each panel says which object it belongs to, so selecting it selects that
+   * object and the conversation knows what was selected.
+   */
+  panels?: SpecPanel[];
+}
+
+export interface SpecPanel {
+  id: string;
+  label: string;
+  /** the model object this is a view of */
+  of: string;
+  /** axis names, for the panel's own labels */
+  x: string;
+  y: string;
+  /** the series, in the panel's own units */
+  at: { x: number; y: number }[];
+  /** extent, so the renderer does not have to scan twice */
+  range: { x: [number, number]; y: [number, number] };
+  fidelity: Fidelity;
+  /** what it is, in one line */
+  note: string;
 }
 
 const DEFAULT_BOX: VisualizationSpec['box'] = { x: [-1, 1], y: [-1, 1], z: [-1, 1] };
@@ -191,7 +224,7 @@ export function fitBox(primitives: readonly Primitive[]): VisualizationSpec['box
  * is the difference between a manipulation and a regeneration.
  */
 export function buildSpec(
-  model: Model,
+  modelIn: Model,
   opts?: {
     view?: 'auto' | '2d' | '3d';
     coordinateSystem?: CoordinateSystem;
@@ -201,6 +234,10 @@ export function buildSpec(
     partial?: string;
   }
 ): VisualizationSpec {
+  // Mechanisms become objects first: the representation choice, the notes and the
+  // box all have to see the bodies and springs, not the declaration they came
+  // from. Idempotent, so building twice adds nothing.
+  const model = expand(modelIn);
   const fresh = buildModel(model, { only: opts?.only, detail: opts?.detail });
   const built: Built[] = opts?.only && opts?.keep
     ? [...opts.keep.filter((b) => !opts.only!.includes(b.of)), ...fresh]
@@ -254,6 +291,12 @@ export function buildSpec(
     // picture is only as computed as its least computed part.
     fidelity: overallFidelity(objects.length ? objects : model.objects),
     ...(opts?.partial ? { partial: opts.partial } : {}),
+    // Secondary views of the same computed state. Absent when there is no run,
+    // rather than present and empty.
+    ...(() => {
+      const panels = buildPanels(model);
+      return panels.length ? { panels } : {};
+    })(),
   };
 }
 
@@ -273,6 +316,8 @@ function annotationsFor(model: Model): SpecAnnotation[] {
 
 export type Representation =
   | 'text'
+  /** parts placed by computed state: bodies, springs, dampers, forces */
+  | 'mechanism'
   | 'equation'
   | 'table'
   | 'plot2d'
@@ -336,6 +381,40 @@ export function chooseRepresentation(model: Model): Choice {
       dimensionality: 3,
       why: 'one quantity varies over two others, which is the shape three dimensions exist to show',
       alternatives: ['plot2d', 'table'],
+    };
+  }
+
+  // A MECHANISM IS 2D, AND 3D WOULD BE WORSE. Bodies on a line with springs
+  // between them are read along one axis; a perspective box makes the near
+  // spring longer than the far one and buries the thing the picture is for.
+  // This is the "3D must earn its existence" rule, applied by the model rather
+  // than by a preference.
+  if (has('body') || model.objects.some((o) => !!o.mechanism)) {
+    return {
+      kind: 'mechanism',
+      dimensionality: 2,
+      why: 'the parts lie along one axis and move along it, so the plane shows the whole of the motion and a box would only add perspective error',
+      alternatives: ['plot2d', 'timeline', 'equation'],
+    };
+  }
+
+  // A SYSTEM'S SHAPE IS ITS PHASE PORTRAIT — and how many dimensions that needs
+  // is a fact about the system, not a taste. Two states are a plane curve; three
+  // or more get three axes and a note saying which three (projectionNote).
+  if (has('system')) {
+    const widest = Math.max(
+      ...byKind(model, 'system').map((o) => o.system?.states.length ?? 0),
+      0
+    );
+    const mapped = byKind(model, 'system').some((o) => !!o.defs?.pz);
+    const threeD = mapped || widest >= 3;
+    return {
+      kind: 'simulation',
+      dimensionality: threeD ? 3 : 2,
+      why: threeD
+        ? `the state has ${widest} components, so the path through the first three is a curve in space and the rest are held`
+        : 'the state has two components, so the path through them is a plane curve and the plane is enough',
+      alternatives: threeD ? ['plot2d', 'timeline'] : ['timeline', 'plot2d'],
     };
   }
 
@@ -405,6 +484,57 @@ export function chooseRepresentation(model: Model): Choice {
     why: 'nothing in this model has a geometry, so a picture of it would be decoration',
     alternatives: ['table'],
   };
+}
+
+/**
+ * Secondary series from the runs the main view already computed.
+ *
+ * Bounded deliberately: at most four panels, at most 400 points each, and only
+ * for objects that actually integrated. A model with no dynamics has no panels —
+ * not empty ones.
+ */
+export function buildPanels(model: Model): SpecPanel[] {
+  const out: SpecPanel[] = [];
+  for (const o of model.objects) {
+    if (!o.system) continue;
+    const got = runFor(model, o);
+    if (!got.ok) continue;
+    const run = got.run;
+    // Which series: the states the model declared first, then its observations.
+    // A mechanism's displacements come first because that is what somebody
+    // watching the bodies move is comparing against.
+    const wanted = [
+      ...run.names.filter((n) => n.startsWith('x_')).slice(0, 2),
+      ...run.names.filter((n) => !n.startsWith('x_')).slice(0, 2),
+      ...Object.keys(run.observed).slice(0, 2),
+    ].slice(0, 4);
+    for (const name of wanted) {
+      const s = seriesOf(run, name);
+      if (!s) continue;
+      const stride = Math.max(1, Math.ceil(s.t.length / 400));
+      const at: { x: number; y: number }[] = [];
+      for (let i = 0; i < s.t.length; i += stride) at.push({ x: s.t[i], y: s.v[i] });
+      if (at.length < 2) continue;
+      const ys = at.map((q) => q.y);
+      const meansOf = o.system.states.find((v) => v.name === name)?.means;
+      out.push({
+        id: `${o.id}:${name}`,
+        label: meansOf ? `${name} — ${meansOf}` : name,
+        of: o.id,
+        x: model.time?.units ? `t (${model.time.units})` : 't',
+        y: name,
+        at,
+        range: {
+          x: [at[0].x, at[at.length - 1].x],
+          y: [Math.min(...ys), Math.max(...ys)],
+        },
+        fidelity: 'numerically-computed',
+        note: `${name} against time, from the same run the main view is drawn from`,
+      });
+      if (out.length >= 4) return out;
+    }
+  }
+  return out;
 }
 
 /**

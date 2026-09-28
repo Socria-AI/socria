@@ -421,6 +421,54 @@ export function ModelView({
         }
       }
 
+      // ── SECONDARY VIEWS, ON THE SAME PLATE ────────────────────────
+      //
+      // A mechanism beside its displacement and its energy is one model shown
+      // three ways, and they are only the same model if they come from one run —
+      // which they do: the panels are built from the run the main view was drawn
+      // from (buildPanels in lib/model/spec.ts). The vertical rule in each panel
+      // is the clock, so scrubbing time moves the bodies and the cursor together.
+      //
+      // Insets rather than a second component, because this is how an academic
+      // figure does it and because a panel strip that lives in the chrome would
+      // not be part of the figure a reader exports.
+      const panels = spec.panels ?? [];
+      if (panels.length) {
+        const gap = 10;
+        const pw = (a.W - gap * (panels.length + 1)) / panels.length;
+        const ph = Math.min(96, Math.max(54, a.H * 0.24));
+        const top = a.H - ph - gap;
+        panels.forEach((panel, i) => {
+          const x0 = gap + i * (pw + gap);
+          const [xa, xb] = panel.range.x;
+          const [ya, yb] = panel.range.y;
+          const spanY = Math.max(1e-9, yb - ya);
+          const px = (v: number) => x0 + ((v - xa) / Math.max(1e-9, xb - xa)) * pw;
+          const py = (v: number) => top + ph - ((v - ya) / spanY) * ph;
+          const dd = panel.at
+            .map((q, k) => `${k ? 'L' : 'M'}${px(q.x).toFixed(1)},${py(q.y).toFixed(1)}`)
+            .join(' ');
+          const tNow = spec.time?.t ?? null;
+          const chosen = view.selected === panel.of;
+          put(-1e9, (
+            <g key={`panel${panel.id}`} data-obj={panel.of} className="eng-panel">
+              <rect x={x0} y={top} width={pw} height={ph} className="eng-panel-plate" />
+              {/* zero, where the series crosses it — a displacement's sign is the
+                  thing a reader is looking for */}
+              {ya < 0 && yb > 0 && (
+                <path d={`M${x0},${py(0).toFixed(1)} L${(x0 + pw).toFixed(1)},${py(0).toFixed(1)}`} className="eng-panel-zero" />
+              )}
+              <path d={dd} className={`eng-panel-line${chosen ? ' on' : ''}`} />
+              {tNow !== null && tNow >= xa && tNow <= xb && (
+                <path d={`M${px(tNow).toFixed(1)},${top} L${px(tNow).toFixed(1)},${(top + ph).toFixed(1)}`} className="eng-panel-cursor" />
+              )}
+              <text x={x0 + 4} y={top + 11} className="eng-panel-label">{panel.label}</text>
+              <text x={x0 + pw - 4} y={top + ph - 4} className="eng-panel-axis" textAnchor="end">{panel.x}</text>
+            </g>
+          ));
+        });
+      }
+
       nodes.sort((p, q) => q.z - p.z);
 
       const chosen = spec.notes.find((n) => n.of === (view.selected ?? ''));
@@ -432,6 +480,9 @@ export function ModelView({
         note:
           (slice ? `${slice.note}. ` : '') +
           (chosen?.note ? `${chosen.note}. ` : '') +
+          (spec.panels?.length
+            ? `The ${spec.panels.length} panels below are the same run, not separate ones. `
+            : '') +
           fidelityLine(spec),
         label: `${spec.title}: ${spec.primitives.length} drawn objects in ${spec.dimensionality} dimensions.`,
         live: Object.fromEntries(spec.notes.map((n) => [n.of, n.problem ? `not drawn: ${n.problem}` : n.note])),

@@ -113,6 +113,14 @@ export const OBJECT_KINDS = [
   // statements
   'equation', 'system', 'constraint', 'objective', 'assumption',
   'initial-condition', 'boundary-condition',
+  // mechanism: the parts a dynamic diagram is assembled from. NOT a mechanics
+  // feature — a body is any lumped thing with inertia, a spring any restoring
+  // relation, a damper any dissipative one, and the same three assemble a
+  // circuit, a compartment model or a flow network (see mechanism.ts).
+  'body', 'spring', 'damper', 'force', 'joint', 'component',
+  // estimation: what a fitted model is made of. A coefficient is a number that
+  // CAME FROM data and must never look like one that was chosen.
+  'estimator', 'coefficient', 'residual', 'fitted', 'specification',
   // apparatus
   'axis', 'grid', 'annotation', 'source',
 ] as const;
@@ -214,8 +222,127 @@ export interface ModelObject {
   detail?: number;
   /** which block of Model.data this object draws, for data-derived objects */
   data?: string;
+  /**
+   * A system of ordinary differential equations, with its own named states.
+   *
+   * THE COMPOSABLE PART OF THE SCHEMA. An object is not forced to be a surface
+   * or a trajectory or a dataset; it declares the BLOCK that describes what it
+   * is, and the engine routes on which block is present (solve.ts). A domain
+   * that needs a new kind of computation adds a block and a solver rather than a
+   * component and a renderer — which is the difference between a catalogue of
+   * simulations and an engine.
+   */
+  system?: SystemDecl;
+  /** parts that assemble into equations of motion — see mechanism.ts */
+  mechanism?: MechanismDecl;
+  /** a specification to be fitted to data — see estimate.ts */
+  estimation?: EstimationDecl;
+
   /** anything a domain wants to carry that the engine must not interpret */
   meta?: Record<string, string | number | boolean>;
+}
+
+// ── the declaration blocks ──────────────────────────────────────────
+//
+// Kept here rather than in the modules that read them, so the schema is one
+// file and a model can be validated without loading a solver. Their SEMANTICS
+// live with their code: system.ts, mechanism.ts, estimate.ts.
+
+export interface StateVarDecl {
+  name: string;
+  /** a number, or an expression in the parameters */
+  init: number | string;
+  units?: string;
+  means?: string;
+}
+
+export interface SystemDecl {
+  states: StateVarDecl[];
+  /** name → d(name)/dt */
+  rhs: Record<string, string>;
+  /** integration stops when this turns positive */
+  stop?: string;
+  dt?: number;
+  steps?: number;
+  /** quantities computed from the state at every step */
+  observe?: Record<string, string>;
+  /** a quantity that ought not to change, for the integrator to be judged by */
+  invariant?: string;
+  method?: 'rk4';
+}
+
+export interface BodyDecl {
+  id: string;
+  /** mass, or an expression in the parameters */
+  mass: number | string;
+  /** starting displacement from its rest position */
+  x0?: number | string;
+  /** starting velocity */
+  v0?: number | string;
+  label?: string;
+  /** where it sits when nothing has moved, in model units — for the drawing */
+  at?: number;
+}
+
+export interface LinkDecl {
+  id: string;
+  /** the two things it joins. 'ground' is the fixed world. */
+  between: [string, string];
+  /** stiffness for a spring, damping for a damper */
+  value: number | string;
+  label?: string;
+}
+
+export interface ForceDecl {
+  id: string;
+  /** the body it acts on */
+  on: string;
+  /** an expression in t, the states and the parameters */
+  expr: string;
+  label?: string;
+}
+
+export interface MechanismDecl {
+  /**
+   * What the coordinates mean. 'line' is one translational degree of freedom per
+   * body along an axis, which is what a spring–mass chain is; other topologies
+   * are declared by writing a `system` directly until a grammar for them exists.
+   */
+  along?: 'line';
+  bodies: BodyDecl[];
+  springs?: LinkDecl[];
+  dampers?: LinkDecl[];
+  forces?: ForceDecl[];
+  dt?: number;
+  steps?: number;
+}
+
+export interface EstimationDecl {
+  /**
+   * THE METHOD IS THE PERSON'S CHOICE AND IS NEVER FILLED IN BY US.
+   *
+   * A model with no method declared is not estimated: the router returns the
+   * candidates and what each one assumes, and waits. Choosing the specification
+   * is the intellectual act in empirical work, and a product that picks it and
+   * reports coefficients has taken the reasoning and left the arithmetic.
+   */
+  method?: 'ols' | 'ols-fe' | 'ols-lag';
+  /** the column being explained */
+  y: string;
+  /** the columns explaining it, in order */
+  x: string[];
+  /** which block of Model.data holds the columns */
+  data: string;
+  /** panel: the column identifying the unit */
+  unit?: string;
+  /** panel and time series: the column identifying the period */
+  time?: string;
+  /** time series: how many lags of y to include */
+  lags?: number;
+  /** heteroskedasticity-consistent standard errors instead of classical ones */
+  robust?: boolean;
+  /** whether to fit an intercept. Default true. */
+  intercept?: boolean;
 }
 
 /** A control: a number the reader may move, with the range that owns it. */
@@ -321,6 +448,14 @@ export interface DataBlock {
   /** a series through time */
   t?: number[];
   v?: number[];
+  /**
+   * Named columns — a table, which is how data for a fitted model arrives.
+   *
+   * Separate from the grid and the points because those are GEOMETRY and this is
+   * a dataset: a column called 'gdp' is not an axis and must not be drawn as one
+   * unless a model says to.
+   */
+  columns?: Record<string, number[]>;
   units?: string;
 }
 
@@ -417,6 +552,163 @@ export function sanitizeObject(raw: unknown): ModelObject | null {
     ? r.depends.map((d) => text(d, 48)).filter((d) => ID.test(d)).slice(0, 16)
     : [];
   if (deps.length) out.depends = deps;
+
+  // ── the declaration blocks, sanitised hard ─────────────────────
+  //
+  // A model can be written by a conversation, so every one of these arrives from
+  // outside and every expression in them will be evaluated. Names are bounded
+  // and pattern-checked, counts are capped, and anything unrecognised is dropped
+  // rather than passed through — the evaluator refuses what it does not know,
+  // and this is the layer that stops it ever being asked.
+  const expr = (v: unknown) => text(v, 300);
+  const nameOk = (k: string) => /^[a-z][a-z0-9_]{0,23}$/i.test(k);
+  const initOf = (v: unknown): number | string | null => {
+    const n = num(v);
+    if (n !== null) return n;
+    const e = expr(v);
+    return e ? e : null;
+  };
+
+  const sys = r.system as Record<string, unknown> | undefined;
+  if (sys && typeof sys === 'object' && Array.isArray(sys.states)) {
+    const states: StateVarDecl[] = [];
+    for (const raw of sys.states.slice(0, 24)) {
+      if (!raw || typeof raw !== 'object') continue;
+      const q = raw as Record<string, unknown>;
+      const name = text(q.name, 24);
+      if (!nameOk(name) || states.some((x) => x.name === name)) continue;
+      const init = initOf(q.init);
+      states.push({
+        name,
+        init: init === null ? 0 : init,
+        ...(text(q.units, 24) ? { units: text(q.units, 24) } : {}),
+        ...(text(q.means, 160) ? { means: text(q.means, 160) } : {}),
+      });
+    }
+    const rhs: Record<string, string> = {};
+    if (sys.rhs && typeof sys.rhs === 'object') {
+      for (const [k, v] of Object.entries(sys.rhs as Record<string, unknown>).slice(0, 24)) {
+        const key = text(k, 24);
+        const val = expr(v);
+        if (nameOk(key) && val) rhs[key] = val;
+      }
+    }
+    const observe: Record<string, string> = {};
+    if (sys.observe && typeof sys.observe === 'object') {
+      for (const [k, v] of Object.entries(sys.observe as Record<string, unknown>).slice(0, 8)) {
+        const key = text(k, 24);
+        const val = expr(v);
+        if (nameOk(key) && val) observe[key] = val;
+      }
+    }
+    if (states.length && Object.keys(rhs).length) {
+      const dt = num(sys.dt);
+      const steps = num(sys.steps);
+      out.system = {
+        states,
+        rhs,
+        ...(expr(sys.stop) ? { stop: expr(sys.stop) } : {}),
+        ...(dt !== null && dt > 0 ? { dt: Math.min(10, dt) } : {}),
+        ...(steps !== null && steps > 0 ? { steps: Math.min(20_000, Math.floor(steps)) } : {}),
+        ...(Object.keys(observe).length ? { observe } : {}),
+        ...(expr(sys.invariant) ? { invariant: expr(sys.invariant) } : {}),
+        method: 'rk4',
+      };
+    }
+  }
+
+  const mech = r.mechanism as Record<string, unknown> | undefined;
+  if (mech && typeof mech === 'object' && Array.isArray(mech.bodies)) {
+    const bodies: BodyDecl[] = [];
+    for (const raw of mech.bodies.slice(0, 12)) {
+      if (!raw || typeof raw !== 'object') continue;
+      const q = raw as Record<string, unknown>;
+      const bid = text(q.id, 24);
+      if (!nameOk(bid) || bodies.some((b) => b.id === bid)) continue;
+      const mass = initOf(q.mass);
+      if (mass === null) continue;
+      const at = num(q.at);
+      bodies.push({
+        id: bid,
+        mass,
+        ...(initOf(q.x0) !== null ? { x0: initOf(q.x0) as number | string } : {}),
+        ...(initOf(q.v0) !== null ? { v0: initOf(q.v0) as number | string } : {}),
+        ...(text(q.label, 60) ? { label: text(q.label, 60) } : {}),
+        ...(at !== null ? { at } : {}),
+      });
+    }
+    const links = (v: unknown): LinkDecl[] => {
+      if (!Array.isArray(v)) return [];
+      const kept: LinkDecl[] = [];
+      for (const raw of v.slice(0, 24)) {
+        if (!raw || typeof raw !== 'object') continue;
+        const q = raw as Record<string, unknown>;
+        const lid = text(q.id, 24);
+        const pair = Array.isArray(q.between) ? q.between.map((x) => text(x, 24)) : [];
+        const value = initOf(q.value);
+        if (!nameOk(lid) || pair.length !== 2 || value === null) continue;
+        if (!pair.every((p) => p === 'ground' || nameOk(p))) continue;
+        kept.push({
+          id: lid,
+          between: [pair[0], pair[1]],
+          value,
+          ...(text(q.label, 60) ? { label: text(q.label, 60) } : {}),
+        });
+      }
+      return kept;
+    };
+    const forces: ForceDecl[] = Array.isArray(mech.forces)
+      ? (mech.forces
+          .slice(0, 12)
+          .map((raw) => {
+            if (!raw || typeof raw !== 'object') return null;
+            const q = raw as Record<string, unknown>;
+            const fid = text(q.id, 24);
+            const on = text(q.on, 24);
+            const e = expr(q.expr);
+            if (!nameOk(fid) || !nameOk(on) || !e) return null;
+            return { id: fid, on, expr: e, ...(text(q.label, 60) ? { label: text(q.label, 60) } : {}) };
+          })
+          .filter(Boolean) as ForceDecl[])
+      : [];
+    if (bodies.length) {
+      const dt = num(mech.dt);
+      const steps = num(mech.steps);
+      out.mechanism = {
+        along: 'line',
+        bodies,
+        ...(links(mech.springs).length ? { springs: links(mech.springs) } : {}),
+        ...(links(mech.dampers).length ? { dampers: links(mech.dampers) } : {}),
+        ...(forces.length ? { forces } : {}),
+        ...(dt !== null && dt > 0 ? { dt: Math.min(1, dt) } : {}),
+        ...(steps !== null && steps > 0 ? { steps: Math.min(20_000, Math.floor(steps)) } : {}),
+      };
+    }
+  }
+
+  const est = r.estimation as Record<string, unknown> | undefined;
+  if (est && typeof est === 'object') {
+    const yCol = text(est.y, 40);
+    const xs = Array.isArray(est.x) ? est.x.map((c) => text(c, 40)).filter(Boolean).slice(0, 20) : [];
+    const dataKey2 = text(est.data, 48);
+    const method = est.method;
+    if (yCol && xs.length && ID.test(dataKey2)) {
+      const lags = num(est.lags);
+      out.estimation = {
+        y: yCol,
+        x: xs,
+        data: dataKey2,
+        // An unrecognised method is DROPPED, not guessed at: the router then
+        // reports the choice as open, which is the honest state.
+        ...(method === 'ols' || method === 'ols-fe' || method === 'ols-lag' ? { method } : {}),
+        ...(text(est.unit, 40) ? { unit: text(est.unit, 40) } : {}),
+        ...(text(est.time, 40) ? { time: text(est.time, 40) } : {}),
+        ...(lags !== null && lags > 0 ? { lags: Math.min(12, Math.floor(lags)) } : {}),
+        ...(est.robust === true ? { robust: true } : {}),
+        ...(est.intercept === false ? { intercept: false } : {}),
+      };
+    }
+  }
 
   if (Array.isArray(r.relations)) {
     const rel = r.relations
@@ -623,6 +915,23 @@ export function sanitizeModel(raw: unknown): Model | null {
           .filter((pt) => pt.length === 3 && pt.every((x) => x !== null))
           .slice(0, 20_000) as [number, number, number][];
         if (pts.length) block.points = pts;
+      }
+      // Named columns: a table. Capped in count and in length like the rest, and
+      // every column truncated to the SHORTEST one — a fit over ragged columns
+      // silently pairs the wrong rows, which is a wrong answer with decimals.
+      if (b.columns && typeof b.columns === 'object' && !Array.isArray(b.columns)) {
+        const columns: Record<string, number[]> = {};
+        for (const [name, v] of Object.entries(b.columns as Record<string, unknown>).slice(0, 24)) {
+          const key = text(name, 40);
+          const col = nums(v, 20_000);
+          if (/^[a-z][a-z0-9_]{0,39}$/i.test(key) && col) columns[key] = col;
+        }
+        const keys = Object.keys(columns);
+        if (keys.length) {
+          const shortest = Math.min(...keys.map((k) => columns[k].length));
+          for (const k of keys) columns[k] = columns[k].slice(0, shortest);
+          block.columns = columns;
+        }
       }
       for (const key of ['xs', 'ys', 't', 'v'] as const) if (!block[key]) delete block[key];
       if (Object.keys(block).length) blocks[k] = block;

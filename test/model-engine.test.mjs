@@ -24,6 +24,7 @@ import {
 } from './.tmp/sample.mjs';
 import { buildObject, buildModel, buildSlice, buildContours, buildLevel, scopeOf } from './.tmp/compile.mjs';
 import { buildSpec, chooseRepresentation, toCartesian, fitBox, projectionNote } from './.tmp/spec.mjs';
+import { expand } from './.tmp/mechanism.mjs';
 import { modelStateFrom, applyOps, describeChanges, compare, asProvenance } from './.tmp/model-state.mjs';
 import { LIBRARY, modelById, saddle, lorenz, orbit, pointCharge, torus, volatilitySurface, doublePendulum, photonPath, bivariateGaussian, terrain } from './.tmp/library.mjs';
 import { vizModelBlock, parseVizOps, sanitizeModelState } from './.tmp/viz-model.mjs';
@@ -190,13 +191,24 @@ console.log('\n=== every benchmark compiles, and each exercises something differ
     const m = sanitizeModel(entry.build());
     ok(`${entry.id}: is a model`, !!m, entry.id);
     const spec = buildSpec(m);
+    // A mechanism's parts become objects during the build (expand, in
+    // lib/model/mechanism.ts), so the set of objects a primitive may belong to is
+    // the EXPANDED one. Comparing against the declaration would say a spring's
+    // primitive belongs to nothing, which is the opposite of what is true.
+    const drawnFrom = expand(m);
     const drawn = spec.primitives.length;
-    ok(`  ${entry.id}: draws something`, drawn > 0, `${drawn} primitives`);
+    // A model may legitimately draw nothing: `open-specification` has no method
+    // chosen, so there is no fit and nothing to plot — and the note says exactly
+    // that. What must never happen is drawing something anyway.
+    const refusedOnPurpose = spec.notes.some((n) => /no method has been chosen/.test(n.problem ?? ''));
+    ok(`  ${entry.id}: draws something, or says why not`,
+      drawn > 0 || refusedOnPurpose, `${drawn} primitives`);
     ok(`  ${entry.id}: nothing it could not draw`,
-      spec.notes.every((n) => !n.problem), JSON.stringify(spec.notes.filter((n) => n.problem)));
+      spec.notes.every((n) => !n.problem) || refusedOnPurpose,
+      JSON.stringify(spec.notes.filter((n) => n.problem)));
     ok(`  ${entry.id}: stays inside the budget`, drawn <= LIMITS.primitives);
     ok(`  ${entry.id}: every primitive knows the object it draws`,
-      spec.primitives.every((p) => m.objects.some((o) => o.id === p.of)));
+      spec.primitives.every((p) => drawnFrom.objects.some((o) => o.id === p.of)));
     ok(`  ${entry.id}: the box is finite`,
       [spec.box.x, spec.box.y, spec.box.z].every(([a, b]) => Number.isFinite(a) && Number.isFinite(b) && b > a));
   }

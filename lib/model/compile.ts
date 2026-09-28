@@ -42,6 +42,9 @@ import {
 } from './sample';
 import { LIMITS, type P3, type Primitive } from './primitives';
 import type { Fidelity, Model, ModelObject } from './schema';
+import { runFor, stateAt } from './system';
+import { estimate } from './estimate';
+import { expand, restOf, statesOf } from './mechanism';
 
 /** What compiling one object produced, and what may be said about it. */
 export interface Built {
@@ -314,6 +317,262 @@ export function buildObject(model: Model, o: ModelObject, opts?: { detail?: numb
       };
     }
 
+    // ── a system of differential equations, integrated ─────────────
+    //
+    // ANY NUMBER OF NAMED STATES, which is the whole point of system.ts. What is
+    // DRAWN is a choice the model makes: a position map (px, py, pz) if it has
+    // one, otherwise the first two or three states against each other — the phase
+    // portrait, which is where a dynamical system's shape actually lives. Either
+    // way the curve is the integrator's output, not a sketch of it.
+    case 'system': {
+      if (!o.system) return NOTHING(o, 'a system object with no system declared');
+      const got = runFor(model, o);
+      if (!got.ok) {
+        return NOTHING(
+          o,
+          `not computed: ${got.missing.map((m) => m.what).join(', ')} — supplying ${
+            got.missing.length === 1 ? 'it' : 'them'
+          } would let this run`
+        );
+      }
+      const run = got.run;
+      const known = [...Object.keys(scope), ...run.names, 't'];
+      const mapX = o.defs?.px ? compileExpr(o.defs.px, known) : null;
+      const mapY = o.defs?.py ? compileExpr(o.defs.py, known) : null;
+      const mapZ = o.defs?.pz ? compileExpr(o.defs.pz, known) : null;
+      const mapped = !!(mapX && mapY);
+      const at = (i: number): P3 => {
+        const sc: Record<string, number> = { ...scope, t: run.t[i] };
+        // Both spellings, because the expression grammar is case-insensitive —
+        // see the note on the scope in system.ts.
+        run.names.forEach((n, k) => {
+          sc[n] = run.y[i][k];
+          sc[n.toLowerCase()] = run.y[i][k];
+        });
+        if (mapped) return { x: mapX!.eval(sc), y: mapY!.eval(sc), z: mapZ ? mapZ.eval(sc) : 0 };
+        return { x: run.y[i][0] ?? 0, y: run.y[i][1] ?? 0, z: run.y[i][2] ?? 0 };
+      };
+      const stride = Math.max(1, Math.ceil(run.t.length / LIMITS.runPoints));
+      const pts: P3[] = [];
+      for (let i = 0; i < run.t.length; i += stride) pts.push(at(i));
+      const head = at(run.t.length - 1);
+      const note =
+        `${run.note}; ${run.names.length} states` +
+        (mapped ? ', drawn through the position map this model states' : ', drawn as the first components of the state') +
+        (run.stopped ? `; stopped at the ${run.stopped}` : '');
+      return {
+        of: o.id,
+        primitives: [
+          { p: 'polyline', of: o.id, at: pts, layer, tone: 'primary', width: 1.4 },
+          { p: 'points', of: o.id, at: [head], r: 2.6, layer, tone: 'tension' },
+        ],
+        fidelity: 'numerically-computed',
+        note,
+      };
+    }
+
+    // ── the parts of a mechanism, placed by the computed state ─────
+    //
+    // A body is drawn where the integration says it is at this instant: its rest
+    // position plus its computed displacement. Nothing here moves by a formula
+    // that resembles the motion, which is the difference between an animation of
+    // a mechanism and a mechanism.
+    case 'body':
+    case 'spring':
+    case 'damper':
+    case 'force': {
+      const parentId = typeof o.meta?.mech === 'string' ? o.meta.mech : '';
+      const parent = parentId ? model.objects.find((x) => x.id === parentId) : null;
+      if (!parent?.system) return NOTHING(o, 'a mechanism part whose mechanism is not in this model');
+      const got = runFor(model, parent);
+      if (!got.ok) {
+        return NOTHING(o, `not computed: ${got.missing.map((m) => m.what).join(', ')}`);
+      }
+      const now = stateAt(got.run, scope.t ?? 0);
+      const place = (part: string): number => {
+        if (part === 'ground') return 0;
+        const obj = model.objects.find(
+          (x) => x.meta?.mech === parentId && x.meta?.part === part && x.kind === 'body'
+        );
+        const rest = obj ? restOf(obj) : 0;
+        return rest + (now[statesOf(part).x] ?? 0);
+      };
+
+      if (o.kind === 'body') {
+        const part = String(o.meta?.part ?? '');
+        const x = place(part);
+        // A square, because a body has extent and a dot does not read as one.
+        const h = 0.34;
+        const box: P3[] = [
+          { x: x - h, y: -h, z: 0 },
+          { x: x + h, y: -h, z: 0 },
+          { x: x + h, y: h, z: 0 },
+          { x: x - h, y: h, z: 0 },
+        ];
+        return {
+          of: o.id,
+          primitives: [
+            { p: 'region', of: o.id, at: box, layer, tone: 'primary', alpha: 0.16 },
+            { p: 'polyline', of: o.id, at: [...box, box[0]], layer, tone: 'primary', width: 1.4 },
+          ],
+          fidelity: 'numerically-computed',
+          note: `placed at its rest position plus its computed displacement at t = ${(scope.t ?? 0).toFixed(2)}`,
+        };
+      }
+
+      const from = place(String(o.meta?.from ?? 'ground'));
+      const to = place(String(o.meta?.to ?? 'ground'));
+      if (o.kind === 'spring') {
+        // A zigzag whose LENGTH is the computed separation: it visibly compresses
+        // and extends because the two ends are where the integration puts them.
+        const coils = 7;
+        const lo = Math.min(from, to);
+        const hi = Math.max(from, to);
+        const span = hi - lo;
+        const pts: P3[] = [{ x: lo, y: 0, z: 0 }];
+        const inset = Math.min(0.3, span * 0.15);
+        for (let i = 0; i <= coils; i++) {
+          const f = i / coils;
+          pts.push({ x: lo + inset + f * Math.max(0, span - 2 * inset), y: (i % 2 ? 0.22 : -0.22), z: 0 });
+        }
+        pts.push({ x: hi, y: 0, z: 0 });
+        return {
+          of: o.id,
+          primitives: [{ p: 'polyline', of: o.id, at: pts, layer, tone: 'accent', width: 1.2 }],
+          fidelity: 'numerically-computed',
+          note: `drawn between the computed positions of its two ends; its extension is ${(to - from).toFixed(3)} at this instant`,
+        };
+      }
+      if (o.kind === 'damper') {
+        const lo = Math.min(from, to);
+        const hi = Math.max(from, to);
+        const mid = (lo + hi) / 2;
+        return {
+          of: o.id,
+          primitives: [
+            { p: 'polyline', of: o.id, at: [{ x: lo, y: 0, z: 0 }, { x: mid - 0.12, y: 0, z: 0 }], layer, tone: 'muted', width: 1.2 },
+            {
+              p: 'polyline', of: o.id,
+              at: [
+                { x: mid - 0.12, y: -0.18, z: 0 },
+                { x: mid + 0.12, y: -0.18, z: 0 },
+                { x: mid + 0.12, y: 0.18, z: 0 },
+                { x: mid - 0.12, y: 0.18, z: 0 },
+                { x: mid - 0.12, y: -0.18, z: 0 },
+              ],
+              layer, tone: 'muted', width: 1.1,
+            },
+            { p: 'polyline', of: o.id, at: [{ x: mid + 0.12, y: 0, z: 0 }, { x: hi, y: 0, z: 0 }], layer, tone: 'muted', width: 1.2 },
+          ],
+          fidelity: 'numerically-computed',
+          note: `drawn between the computed positions of its two ends; the rate across it is ${(
+            (now[statesOf(String(o.meta?.to ?? '')).v] ?? 0) - (now[statesOf(String(o.meta?.from ?? '')).v] ?? 0)
+          ).toFixed(3)} at this instant`,
+        };
+      }
+      // A force: an arrow whose LENGTH is the computed value at this instant.
+      const onPart = String(o.meta?.on ?? '');
+      const x = place(onPart);
+      const known2 = [...Object.keys(scope), ...got.run.names, 't'];
+      const exprText = (parent.mechanism?.forces ?? []).find((q) => q.id === o.meta?.part)?.expr ?? '0';
+      const fn = compileExpr(exprText, known2);
+      const value = fn ? fn.eval({ ...scope, ...now }) : 0;
+      return {
+        of: o.id,
+        primitives: [
+          {
+            p: 'vectors', of: o.id,
+            at: [{ x, y: 0.5, z: 0 }],
+            dir: [{ x: value, y: 0, z: 0 }],
+            scale: 0.4,
+            layer, tone: 'tension',
+          },
+        ],
+        fidelity: 'numerically-computed',
+        note: `the force evaluates to ${value.toFixed(3)} at t = ${(scope.t ?? 0).toFixed(2)}, and the arrow is drawn to that value`,
+      };
+    }
+
+    // ── a fitted specification, drawn as what it actually is ───────
+    //
+    // ONE REGRESSOR gets the fitted line over the range of the data, because that
+    // IS the estimate made visible. SEVERAL get a coefficient plot — each estimate
+    // as a point with its interval — because a plane through a cloud in three
+    // dimensions shows two of the regressors and hides the rest, and a
+    // seven-regressor model has no honest surface at all. That is the
+    // "3D must earn its existence" rule deciding a case where it does not.
+    //
+    // A specification with no method chosen draws NOTHING, and says why.
+    case 'specification':
+    case 'estimator': {
+      const got = estimate(model, o);
+      if (!got.ok) {
+        if ('choice' in got) {
+          return NOTHING(
+            o,
+            'no method has been chosen, so nothing is fitted — the alternatives and what each one assumes are offered instead'
+          );
+        }
+        return NOTHING(o, `not fitted: ${got.missing.map((m) => m.what).join(', ')}`);
+      }
+      const fit = got.fit;
+      const decl = o.estimation!;
+      const block = model.data?.[decl.data];
+      const cols = block?.columns ?? {};
+
+      if (decl.x.length === 1 && cols[decl.x[0]] && fit.terms.length === 2) {
+        const xs = cols[decl.x[0]];
+        const lo = Math.min(...xs);
+        const hi = Math.max(...xs);
+        const b0 = fit.terms[0].value;
+        const b1 = fit.terms[1].value;
+        const at: P3[] = [
+          { x: lo, y: b0 + b1 * lo, z: 0 },
+          { x: hi, y: b0 + b1 * hi, z: 0 },
+        ];
+        return {
+          of: o.id,
+          primitives: [{ p: 'polyline', of: o.id, at, layer, tone: 'primary', width: 1.6 }],
+          fidelity: 'data-derived',
+          note: `the fitted line from ${fit.says}: intercept ${b0.toFixed(4)}, slope ${b1.toFixed(4)}`,
+        };
+      }
+
+      // A coefficient plot: value against term, with the interval where the
+      // degrees of freedom support one. Intervals that do not exist are simply
+      // not drawn, which is the honest form of not having them.
+      const pts: P3[] = [];
+      const bars: Primitive[] = [];
+      fit.terms.forEach((t, i) => {
+        const y = fit.terms.length - i;
+        pts.push({ x: t.value, y, z: 0 });
+        if (t.ci95) {
+          bars.push({
+            p: 'polyline', of: o.id,
+            at: [{ x: t.ci95[0], y, z: 0 }, { x: t.ci95[1], y, z: 0 }],
+            layer, tone: 'muted', width: 1.1,
+          });
+        }
+      });
+      return {
+        of: o.id,
+        primitives: [
+          ...bars,
+          { p: 'points', of: o.id, at: pts, r: 3, layer, tone: 'primary' },
+          {
+            p: 'polyline', of: o.id,
+            at: [{ x: 0, y: 0.4, z: 0 }, { x: 0, y: fit.terms.length + 0.6, z: 0 }],
+            layer, tone: 'ghost', width: 0.8, dashed: true,
+          },
+        ],
+        fidelity: 'data-derived',
+        note:
+          `${fit.terms.length} estimates from ${fit.says}, as a coefficient plot rather than a surface — ` +
+          `a plane through ${decl.x.length} regressors would show two of them and hide the rest` +
+          (fit.terms.some((t) => t.ci95) ? '; the bars are 95% intervals on the normal approximation' : '; no intervals, because there are too few degrees of freedom for one'),
+      };
+    }
+
     // ── points: particles, observations, nodes ─────────────────────
     case 'point':
     case 'particle':
@@ -387,7 +646,42 @@ function fromData(model: Model, o: ModelObject, layer?: string): Built {
       fidelity: 'data-derived',
     };
   }
-  return NOTHING(o, 'the data block has no grid, points or series in it');
+
+  // NAMED COLUMNS — a table, which is how data for a fitted model arrives.
+  //
+  // Which two columns are drawn is the MODEL's statement (`defs.x`, `defs.y`),
+  // not a guess: a table of eight columns has twenty-eight possible scatters and
+  // choosing one silently would be choosing what the figure is about. With two
+  // columns and nothing said, there is only one pair, so that one is drawn — and
+  // the note says which.
+  const cols = block.columns;
+  if (cols) {
+    const names = Object.keys(cols);
+    const xn = o.defs?.x && cols[o.defs.x] ? o.defs.x : names.length === 2 ? names[0] : null;
+    const yn = o.defs?.y && cols[o.defs.y] ? o.defs.y : names.length === 2 ? names[1] : null;
+    if (!xn || !yn) {
+      return NOTHING(
+        o,
+        `the block has ${names.length} columns (${names.join(', ')}) and the model does not say which two to draw — name them as defs.x and defs.y`
+      );
+    }
+    const n = Math.min(cols[xn].length, cols[yn].length, LIMITS.points);
+    const at: P3[] = [];
+    for (let i = 0; i < n; i++) at.push({ x: cols[xn][i], y: cols[yn][i], z: 0 });
+    const asSeries = xn === 'time' || xn === 't' || o.kind === 'series';
+    return {
+      of: o.id,
+      primitives: [
+        asSeries
+          ? { p: 'polyline', of: o.id, at, layer, tone: 'primary', width: 1.2 }
+          : { p: 'points', of: o.id, at, r: 1.8, layer, tone: 'accent' },
+      ],
+      note: `${n} observations, ${yn} against ${xn}${asSeries ? ', in order' : ''}`,
+      fidelity: 'data-derived',
+    };
+  }
+
+  return NOTHING(o, 'the data block has no grid, points, series or columns in it');
 }
 
 /**
@@ -449,7 +743,10 @@ export function buildLevel(model: Model, o: ModelObject, level: number): Sampled
  * the primitives it already had. Nothing here regenerates a picture that did
  * not move.
  */
-export function buildModel(model: Model, opts?: { only?: readonly string[]; detail?: number }): Built[] {
+export function buildModel(modelIn: Model, opts?: { only?: readonly string[]; detail?: number }): Built[] {
+  // Mechanisms become objects before anything is drawn, so a body, a spring and a
+  // damper are ordinary model objects by the time the compiler sees them.
+  const model = expand(modelIn);
   const want = opts?.only ? new Set(opts.only) : null;
   const out: Built[] = [];
   let budget = LIMITS.primitives;

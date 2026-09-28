@@ -21,6 +21,10 @@
 // a system where the human is the one doing the thinking.
 
 import type { VizEntity, VizModelState, VizOp, VizProvenance } from '@/lib/viz-model';
+import { expand } from './mechanism';
+import { capabilityOf, route } from './solve';
+import { estimate } from './estimate';
+import { driftOf, runFor, stateAt } from './system';
 import { FIDELITY_SAYS, ORIGIN_SAYS, affectedBy, objectOf, paramOf, setParam, setTime, type ChangeRecord, type Fidelity, type Model } from './schema';
 import type { VisualizationSpec } from './spec';
 
@@ -83,10 +87,15 @@ const KIND_TO_ENTITY: Record<string, VizEntity['type']> = {
  * surface" and would be worse at it for having them.
  */
 export function modelStateFrom(
-  model: Model,
+  modelIn: Model,
   spec: VisualizationSpec,
   opts?: { selected?: string | null; can?: VizModelState['can']; readouts?: string[] }
 ): VizModelState {
+  // The same expansion the compiler does, so the conversation sees every body,
+  // spring and damper as its own object — with its own meaning, its own
+  // dependencies and its own computed state — rather than as anonymous shapes
+  // inside one "mechanism" entity that could answer nothing about them.
+  const model = expand(modelIn);
   const noteOf = new Map(spec.notes.map((n) => [n.of, n]));
 
   const entities: VizEntity[] = model.objects.map((o) => {
@@ -99,6 +108,60 @@ export function modelStateFrom(
     if (o.value !== undefined) bits.push(`= ${o.value}${o.units ? ` ${o.units}` : ''}`);
     if (o.uncertainty?.plusMinus !== undefined) {
       bits.push(`± ${o.uncertainty.plusMinus}${o.uncertainty.says ? ` (${o.uncertainty.says})` : ''}`);
+    }
+
+    // WHY SOMETHING IS NOT THERE, which is as much a fact about the model as
+    // what is. An object a solver would handle but cannot run yet says what it
+    // needs, in the person's terms, rather than being silently absent.
+    const routed = route(model, o);
+    if (routed.status === 'incomplete') {
+      bits.push(
+        `not computed yet — needs ${routed.missing.map((m) => m.what).join(', ')} (${routed.solver.label} would run it)`
+      );
+    } else if (routed.status === 'unsupported' && o.kind !== 'annotation' && o.kind !== 'axis') {
+      bits.push(`nothing here computes this: ${routed.why}`);
+    }
+
+    // A mechanism part's LIVE numbers, read off the run at the clock's instant.
+    if (['body', 'spring', 'damper', 'force'].includes(o.kind) && typeof o.meta?.mech === 'string') {
+      const parent = objectOf(model, o.meta.mech);
+      if (parent?.system) {
+        const got = runFor(model, parent);
+        if (got.ok) {
+          const now = stateAt(got.run, model.time?.t ?? 0);
+          const part = String(o.meta.part ?? '');
+          if (o.kind === 'body') {
+            const x = now[`x_${part}`];
+            const v = now[`v_${part}`];
+            if (x !== undefined) bits.push(`at t = ${(model.time?.t ?? 0).toFixed(2)}: displacement ${x.toFixed(4)} m, velocity ${(v ?? 0).toFixed(4)} m/s`);
+          } else if (o.kind === 'spring' || o.kind === 'damper') {
+            const a = String(o.meta.from ?? '');
+            const b = String(o.meta.to ?? '');
+            const xa = a === 'ground' ? 0 : (now[`x_${a}`] ?? 0);
+            const xb = b === 'ground' ? 0 : (now[`x_${b}`] ?? 0);
+            bits.push(`extension ${(xb - xa).toFixed(4)} m at t = ${(model.time?.t ?? 0).toFixed(2)}`);
+          }
+        }
+      }
+    }
+
+    // A fitted specification's actual numbers, or the choice it is waiting on.
+    if (o.estimation) {
+      const got = estimate(model, o);
+      if (got.ok) {
+        bits.push(
+          `${got.fit.says}: ${got.fit.terms
+            .map((t) => `${t.name} = ${t.value.toFixed(4)} (se ${t.se.toFixed(4)})`)
+            .join(', ')}; R² ${got.fit.r2.toFixed(3)} on ${got.fit.n} observations, ${got.fit.se} standard errors`
+        );
+        for (const w of got.fit.warnings.slice(0, 3)) bits.push(w);
+      } else if ('choice' in got) {
+        bits.push(
+          `no method chosen, so nothing is fitted. ${got.choice.says} Candidates: ${got.choice.candidates
+            .map((c) => c.label)
+            .join('; ')}`
+        );
+      }
     }
 
     const relations: string[] = [];
@@ -134,6 +197,25 @@ export function modelStateFrom(
   const readouts = [...(opts?.readouts ?? [])];
   if (spec.partial) readouts.push(spec.partial);
   readouts.push(`This view: ${FIDELITY_SAYS[spec.fidelity]}.`);
+
+  // WHAT THIS MODEL CAN HONESTLY DO, in the readouts the conversation reads
+  // verbatim. A model that is structural says so; one that is integrating says
+  // so; and what the next level would take is named rather than implied.
+  const cap = capabilityOf(model);
+  readouts.push(cap.says);
+
+  // The integrator marking its own work, where the model declared an invariant.
+  for (const o of model.objects) {
+    if (!o.system?.invariant) continue;
+    const got = runFor(model, o);
+    if (!got.ok) continue;
+    const drift = driftOf(got.run, o.system.invariant);
+    if (drift) {
+      readouts.push(
+        `${o.system.invariant} drifted ${(drift.relative * 100).toFixed(3)}% over the run — the integration's own error, not a result`
+      );
+    }
+  }
 
   return {
     // The id the chat state is keyed by. A hyphen and not a colon: that field

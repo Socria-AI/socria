@@ -167,8 +167,18 @@ function tokenize(src: string, vars: Set<string>): Tok[] | null {
       continue;
     }
     if (/[a-zA-Z]/.test(c)) {
+      // UNDERSCORES ARE PART OF A NAME.
+      //
+      // They were not, and that quietly capped what could be modelled: a state
+      // called x_m1 or i_L or v_C — which is how a mechanism's assembled
+      // equations and every circuit and compartment model name their states —
+      // tokenised as `x`, then an unknown `_`, and the whole expression was
+      // rejected as not plottable. A parameter id may contain an underscore
+      // too (see the id pattern in lib/model/schema.ts), so the same latent
+      // hole was there for any model that used one. A name still has to START
+      // with a letter, so nothing else about the grammar changes.
       let j = i + 1;
-      while (j < src.length && /[a-zA-Z0-9]/.test(src[j])) j++;
+      while (j < src.length && /[a-zA-Z0-9_]/.test(src[j])) j++;
       const word = src.slice(i, j).toLowerCase();
       if (vars.has(word)) toks.push({ t: 'var', v: word });
       else if (word in CONSTS) toks.push({ t: 'num', v: CONSTS[word] });
