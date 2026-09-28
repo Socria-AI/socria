@@ -15,6 +15,8 @@ import { AccountControl } from '@/components/account/AccountControl';
 import { ModelPicker } from '@/components/ModelPicker';
 import { usePlan } from '@/components/usePlan';
 import { OneFoot } from '@/components/OneMark';
+import { OnePrompt } from '@/components/OnePrompt';
+import { useOnePrompt } from '@/components/useOnePrompt';
 import { ModelGlyph } from '@/components/ModelGlyph';
 import { LogosApp } from '@/components/LogosApp';
 import { ProjectSheet } from '@/components/projects/ProjectSheet';
@@ -426,6 +428,86 @@ export default function ChatPage() {
   // What they hold, for the two quiet mentions of One on this page: the
   // sidebar foot and the model menu. Both wait for `known` — see usePlan.
   const planState = usePlan();
+
+  // ── Socria One, said at the two moments it is allowed to be ────────
+  //
+  // Everything about frequency, plan, context and rationing is decided inside
+  // `ask` (lib/one-prompt.ts). This surface only names the moments:
+  //
+  //   'chats-spent'  — Core 4's month ran out mid-turn. They pressed send and
+  //                    it stopped; explaining that is not promotion.
+  //   'welcome-back' — they came back, on the free tier, having used it
+  //                    before. Nobody asked for this one, and it is a
+  //                    deliberate product decision rather than an event; the
+  //                    rules that keep it decent live with the decision.
+  const {
+    prompt: onePrompt,
+    ask: askOne,
+    dismiss: dismissOne,
+    accept: acceptOne,
+  } = useOnePrompt({
+    plan: planState.plan === 'one' ? 'one' : 'free',
+    signedIn: !!isSignedIn,
+    // Conversations rather than Logos sessions: on this surface that is what
+    // "have they been here before" is made of.
+    sessions: conversations.filter((c) => c.messages.length > 0),
+    mapNodes: 0,
+    surface: 'core',
+  });
+  const [oneBusy, setOneBusy] = useState(false);
+  const [oneError, setOneError] = useState<string | null>(null);
+
+  /**
+   * They came back.
+   *
+   * Once everything that decides it is actually known — Clerk has answered,
+   * the plan has answered, and the conversations have loaded — because asking
+   * before any of those is asking on a guess, and the guess is "free, new,
+   * nothing saved", which is the one state this prompt must not fire in.
+   */
+  const welcomed = useRef(false);
+  useEffect(() => {
+    if (welcomed.current) return;
+    if (!isLoaded || hydrating || !planState.known) return;
+    if (!isSignedIn || planState.plan === 'one') return;
+    if (tourOpen || anythingOpen) return;
+    welcomed.current = true;
+    askOne('welcome-back');
+  }, [isLoaded, hydrating, planState.known, planState.plan, isSignedIn, tourOpen, anythingOpen, askOne]);
+
+  /** Checkout, from the prompt. The trigger rides along so the webhook can count it. */
+  const startOneCheckout = useCallback(async () => {
+    if (oneBusy) return;
+    setOneBusy(true);
+    setOneError(null);
+    try {
+      const res = await fetch('/api/stripe/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ trigger: onePrompt?.reason, surface: 'core' }),
+      });
+      if (res.status === 401) {
+        const back = window.location.pathname + window.location.search;
+        window.location.href = '/sign-in?redirect_url=' + encodeURIComponent(back);
+        return;
+      }
+      // They already hold it. Not an error — the server refuses to sell it twice.
+      if (res.status === 409) {
+        setOneError('You already have Socria One.');
+        setOneBusy(false);
+        return;
+      }
+      const json = await res.json().catch(() => null);
+      if (res.ok && json?.url) {
+        window.location.href = json.url;
+        return;
+      }
+      setOneError('Could not reach checkout. Try again.');
+    } catch {
+      setOneError('Could not reach checkout. Try again.');
+    }
+    setOneBusy(false);
+  }, [oneBusy, onePrompt?.reason]);
 
   // Anonymous users get one free thought session. They're "locked out" of
   // starting a new one once that flag is set OR they're already mid-session.
@@ -1564,6 +1646,11 @@ export default function ChatPage() {
 
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
+        // A boundary, not a failure: Core 4's free month is spent. They
+        // pressed send and it stopped, so the answer to "why" is owed
+        // immediately — that is what an entitlement prompt is, and it is the
+        // one kind this system never rations.
+        if (res.status === 429 && body?.upgrade === 'chats') askOne('chats-spent');
         throw new Error(failureText(body, 'Something went wrong'));
       }
 
@@ -2307,6 +2394,24 @@ export default function ChatPage() {
 
       {/* Sidebar — overlay on mobile, static column on desktop */}
       <Tour open={tourOpen} onDone={endTour} />
+      {/* The invitation plate. Nothing opens it directly — see the two asks
+          above, and lib/one-prompt.ts for everything that decides it.
+          `.lg-tokens` carries Logos's palette without its geometry, so the
+          same plate is drawn here as there rather than redrawn for this
+          surface (app/globals.css, "THE TOKENS, SEPARATELY FROM THE
+          SURFACE"). */}
+      <div className="lg-tokens">
+      <OnePrompt
+        view={onePrompt}
+        onDismiss={dismissOne}
+        onAccept={() => {
+          acceptOne();
+          void startOneCheckout();
+        }}
+        busy={oneBusy}
+        error={oneError}
+      />
+      </div>
       <AccountSheet
         open={acctOpen}
         onClose={() => setAcctOpen(false)}

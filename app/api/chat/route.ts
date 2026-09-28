@@ -28,7 +28,7 @@ import { getProject } from '@/lib/mind/store';
 import { extractionContext, type ActivatedSubgraph } from '@/lib/mind/activate';
 import type { MindNode } from '@/lib/mind/types';
 import { prepareTurn, guardReply, fallbackReply, finishTurn, SentenceGate, type PreparedTurn } from '@/lib/core4/turn';
-import { conversationsToday } from '@/lib/core4/store';
+import { conversationsThisMonth } from '@/lib/core4/store';
 import { core4ChatAllowed, limitMessage } from '@/lib/core4/limits';
 import { encodeActivity, type Activity } from '@/lib/core4/activity';
 import { renderDisclosure } from '@/lib/core4/web';
@@ -314,30 +314,33 @@ export async function POST(req: NextRequest) {
         ? body.conversationId
         : null;
     if (socriaModel === 'core-4') {
-      // ── THE DAY'S CHATS ────────────────────────────────────────────
+      // ── THE MONTH'S CONVERSATIONS ──────────────────────────────────
       //
-      // Three Core 4 conversations a day on the free plan, counted as distinct
+      // Two Core 4 conversations a month on the free plan, counted as distinct
       // conversations rather than messages: a thread already counted stays open
-      // however long it runs, and coming back to it tomorrow costs nothing. The
-      // audit found the only server-side gate here was "are you signed in",
-      // which left one free signup with 400 frontier-model turns a day and no
-      // spend ceiling.
+      // however long it runs, and coming back to it next week costs nothing.
+      // The number and the period are the free tier the rest of the product
+      // already sells past (lib/entitlements.ts, `chats: 2` per month), so a
+      // person meets one boundary rather than two differently shaped ones.
       //
       // One indexed read, before any model call. A failed read lets the turn
       // through: a cap that eats somebody's conversation during a database blip
       // is worse than a few turns of overage.
-      const today = userId ? await conversationsToday(userId, now) : { ids: [], ok: false };
+      const month = userId ? await conversationsThisMonth(userId, now) : { ids: [], ok: false };
       const allowance = core4ChatAllowed({
         plan: plan === 'one' ? 'one' : 'free',
-        usedToday: today.ids,
+        usedThisMonth: month.ids,
         conversationId,
-        countOk: today.ok,
+        countOk: month.ok,
       });
       if (!allowance.allowed) {
         return NextResponse.json(
           {
             error: limitMessage(allowance),
-            limit: { model: 'core-4', used: allowance.used, limit: allowance.limit, period: 'day' },
+            limit: { model: 'core-4', used: allowance.used, limit: allowance.limit, period: 'month' },
+            // The same word the rest of the product uses for this boundary, so
+            // the client can raise the Socria One prompt it already has for it.
+            upgrade: 'chats',
           },
           { status: 429 }
         );

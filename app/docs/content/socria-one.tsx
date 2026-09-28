@@ -58,7 +58,8 @@ export function SocriaOne() {
       <p>
         Inside one line of thinking, the free tier is not a trial of Socria —
         it <em>is</em> Socria. What it holds two of is lines of thinking, per
-        calendar month. Its exact shape:
+        calendar month — two in Logos, and two Core 4 conversations, counted
+        the same way and on the same clock. Its exact shape:
       </p>
       <DemoLimitsTable />
       <p className="d-after-table">
@@ -75,7 +76,9 @@ export function SocriaOne() {
           Hitting the month&rsquo;s limit stops <em>new</em> lines of thinking.
           It never hides, deletes, or locks anything you already thought: every
           map you built stays on screen, stays interactive, and stays yours, and
-          the conversations you have already begun keep going.
+          the conversations you have already begun keep going — including the
+          Core 4 ones, for as long as they run and whenever you come back to
+          them. Core 3.1 is open either way.
         </p>
       </Callout>
 

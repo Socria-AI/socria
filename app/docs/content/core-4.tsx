@@ -359,7 +359,16 @@ export function Core4() {
         </p>
       </Callout>
       <p>
-        Core 4 requires signing in. If you want the conversation beside a
+        Core 4 requires signing in, and the free tier holds two Core 4
+        conversations a calendar month — the same count, on the same clock, as
+        the lines of thinking it holds in Logos. The limit is on conversations{' '}
+        <em>started</em>: one you have already begun stays open however long it
+        runs and whenever you come back to it, and{' '}
+        <Link href="/docs/core-3">Core 3.1</Link> is open either way. See{' '}
+        <Link href="/docs/socria-one">Socria One</Link> for the whole table.
+      </p>
+      <p>
+        If you want the conversation beside a
         drawn map of the reasoning rather than inside it, that is{' '}
         <Link href="/docs/logos">Logos</Link>; for how the four compare, see{' '}
         <Link href="/docs/models">The models</Link>.

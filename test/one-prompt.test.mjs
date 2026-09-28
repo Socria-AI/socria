@@ -24,6 +24,9 @@ import {
   reasonForCounter,
   FAMILY,
   PROACTIVE_FLOOR_MS,
+  WELCOME_BACK,
+  WELCOME_GAP_MS,
+  welcomeVariant,
 } from './.tmp/one-prompt.mjs';
 import { COUNTERS, TIERED_COUNTERS } from './.tmp/entitlements.mjs';
 
@@ -420,6 +423,71 @@ console.log('\n=== engagement counts thinking, not placeholders ===');
   ok('two dated sessions clear the bar (so the caller MUST filter empties)', two.sessions === 2 && two.activeDays === 2);
   const filtered = engagementFrom([], 6);
   ok('no sessions with messages → not engaged', decide({ ...base, reason: 'map-shaped', engagement: filtered }).why === 'not-engaged');
+}
+
+console.log('\n=== welcome-back: the one prompt a timer is allowed to raise ===');
+{
+  // It breaks this file's own rule knowingly — see the note on the trigger —
+  // so what is asserted here is the set of rules it does NOT get to break.
+  const back = (over) =>
+    decide({
+      reason: 'welcome-back',
+      plan: 'free',
+      now: NOW,
+      state: { ...EMPTY_PROMPT_STATE },
+      // One kept conversation: they have been here before.
+      engagement: { sessions: 1, activeDays: 1, mapNodes: 0 },
+      ...over,
+    });
+
+  ok('a returning free account sees it', back({}).show === true);
+  ok('  a member never does', back({ plan: 'one' }).why === 'has-one');
+  ok('  nor does a first visit', back({ engagement: { sessions: 0, activeDays: 0, mapNodes: 0 } }).why === 'not-engaged');
+  ok('  nor somebody working through something personal',
+    back({ context: SENSITIVE_CONTEXTS[0] }).why === 'sensitive-context');
+  ok('  and it never stacks on a prompt already open', back({ open: true }).why === 'already-open');
+
+  // Once per tab, once per six hours across tabs. A reload is not a return.
+  ok('once per tab', back({ state: { ...EMPTY_PROMPT_STATE, shownThisSession: 1 } }).why === 'session-cap');
+  ok('  a reload an hour later is not a return',
+    back({ state: { ...EMPTY_PROMPT_STATE, lastWelcomeAt: NOW - 60 * 60 * 1000 } }).why === 'cooldown');
+  ok('  the next morning is', back({ state: { ...EMPTY_PROMPT_STATE, lastWelcomeAt: NOW - WELCOME_GAP_MS - 1 } }).show === true);
+
+  // It does NOT inherit the proactive rationing: the escalating cooldown and
+  // the daily floor exist to protect people from prompts nobody asked for on
+  // evidence of engagement, and silencing this one for six months after two
+  // dismissals is not what was asked for.
+  const dismissedTwice = { ...EMPTY_PROMPT_STATE, dismissals: 2, lastDismissedAt: NOW - DAY_MS };
+  ok('dismissing it is not a six-month answer', back({ state: dismissedTwice }).show === true);
+  ok('  where returning-thinker WOULD be silenced',
+    decide({ reason: 'returning-thinker', plan: 'free', now: NOW, state: dismissedTwice, engagement: engaged }).why === 'cooldown');
+
+  // The copy rotates, and every variant is real copy.
+  ok('there are several variants', WELCOME_BACK.length >= 3);
+  ok('  each with a title and a body',
+    WELCOME_BACK.every((v) => v.title.length > 3 && v.body.length > 40));
+  ok('  they cycle rather than running out',
+    welcomeVariant(0).title === welcomeVariant(WELCOME_BACK.length).title);
+  ok('  consecutive shows differ',
+    WELCOME_BACK.every((_, i) => welcomeVariant(i).title !== welcomeVariant(i + 1).title));
+  ok('  and the decision carries the one they have not seen',
+    back({ state: { ...EMPTY_PROMPT_STATE, welcomes: 1 } }).copy.title === WELCOME_BACK[1].title);
+
+  // None of them may sell the free tier short or manufacture urgency: it is
+  // the same Socria, twice a month, and saying otherwise is a lie that also
+  // happens to be bad for the product.
+  for (const v of WELCOME_BACK) {
+    ok(`"${v.title}" makes no time-limited claim`,
+      // "Nothing here expires" is the opposite of a deadline, so the test
+      // asks about the CLAIM rather than the word.
+      !/today only|hurry|limited time|expires (in|soon|today)|will expire|last chance|\d+% off/i.test(v.body),
+      v.body);
+    ok(`  and does not call the free tier worse`,
+      !/basic|limited version|upgrade to unlock/i.test(v.body), v.body);
+  }
+
+  // An urgent boundary still wins if both fire in the same breath.
+  ok('a spent counter outranks it', bestTrigger(['welcome-back', 'chats-spent']) === 'chats-spent');
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
