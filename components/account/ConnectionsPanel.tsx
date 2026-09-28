@@ -7,6 +7,7 @@ import { useUser } from '@clerk/nextjs';
 import { getOAuthProviderData } from '@clerk/types';
 import type { ExternalAccountResource, OAuthStrategy } from '@clerk/types';
 import { canDisconnectAccount } from '@/lib/account-guards';
+import { oauthOffered } from '@/lib/auth-flow';
 import { Button, Confirm, Note, Panel, Row, Tag, usePanel, useCapabilities } from './kit';
 
 /** "oauth_google" → "Google", falling back to something readable. */
@@ -27,9 +28,15 @@ export function ConnectionsPanel() {
   // Providers this instance offers that are not connected yet. Where the
   // environment could not be read this is empty, so the panel still lists
   // and disconnects what exists — it just cannot offer to add more.
+  //
+  // Minus the ones the product is currently withholding (lib/auth-flow.ts
+  // WITHHELD_OAUTH). The Clerk instance still has Google switched on, and it
+  // is the instance this list is read from — so without this the sign-in page
+  // would have stopped offering a flow that does not complete while the
+  // account page went on offering the same flow to the same people.
   const connectable = useMemo(() => {
     const held = new Set(accounts.map((a) => `oauth_${a.provider}`));
-    return caps.socialStrategies.filter((s) => !held.has(s));
+    return caps.socialStrategies.filter((s) => !held.has(s) && oauthOffered(s));
   }, [accounts, caps.socialStrategies]);
 
   if (!user) return null;

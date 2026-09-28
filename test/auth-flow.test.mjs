@@ -21,6 +21,8 @@ import {
   signInStep,
   signUpNeeds,
   signUpStep,
+  WITHHELD_OAUTH,
+  oauthOffered,
 } from './.tmp/auth-flow.mjs';
 
 let pass = 0, fail = 0;
@@ -175,6 +177,42 @@ ok('one default landing, shared by both doors and the callback', AFTER_AUTH === 
   ok('backup codes last', chooseSecondFactor([backup]) === 'backup_code');
   ok('nothing usable is null', chooseSecondFactor([{ strategy: 'weird' }]) === null);
   ok('absent is null', chooseSecondFactor(undefined) === null && chooseSecondFactor([]) === null);
+}
+
+console.log('\n=== Google is not offered, and nobody is stranded by that ===');
+{
+  const { readFileSync } = await import('node:fs');
+  const { join, dirname } = await import('node:path');
+  const { fileURLToPath } = await import('node:url');
+  const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+  const read = (p) => readFileSync(join(root, p), 'utf8');
+
+  ok('the strategy is withheld in one place', WITHHELD_OAUTH.includes('oauth_google'));
+  ok('  and that place answers the question', oauthOffered('oauth_google') === false);
+  ok('  without withholding anything else', oauthOffered('oauth_apple') === true);
+
+  // The form: no provider button, no handler, no redirect. A button that does
+  // not sign anyone in is the first thing pressed and the last thing tried.
+  const form = read('components/auth/AuthForm.tsx');
+  ok('the sign-in form offers no provider', !/className="provider"/.test(form));
+  ok('  and starts no OAuth redirect', !/authenticateWithRedirect/.test(form));
+  ok('  and does not point at a button that is gone',
+    !/Use the button above/.test(form));
+  ok('  but tells a Google-only account what to actually do',
+    /hellosocria@gmail\.com/.test(form) && /email sign-in/.test(form), '');
+
+  // The account page is the same redirect one screen further along.
+  const panel = read('components/account/ConnectionsPanel.tsx');
+  ok('the account page does not offer to connect it either', /oauthOffered\(s\)/.test(panel));
+  // …while still LISTING what somebody already signs in with. Hiding that
+  // would be hiding their only way in.
+  ok('  and still lists and disconnects what exists',
+    /externalAccounts/.test(panel) && /canDisconnectAccount/.test(panel));
+
+  // The landing strip stays: a redirect in flight when this shipped must not
+  // meet a 404 holding a valid handshake.
+  const cb = read('app/sso-callback/page.tsx');
+  ok('the callback route is still there', /AuthenticateWithRedirectCallback/.test(cb));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

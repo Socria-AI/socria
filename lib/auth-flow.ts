@@ -19,6 +19,30 @@
 // up under the other setting.
 
 /** Where a form currently is. One of these is on screen at a time. */
+/**
+ * OAuth strategies the product does not offer, whatever the instance allows.
+ *
+ * Google is here because the flow was not completing. A sign-in button that
+ * does not sign anyone in is worse than one fewer way in, and the same is
+ * true of "+ Connect Google" on the account page — it is the identical
+ * redirect, one screen further along, and offering it there would put the
+ * broken path back a click away from the people most likely to press it.
+ *
+ * Read by the account page's connected-accounts panel; the sign-in form has
+ * no provider buttons at all now, so it has nothing to filter. Taking a
+ * strategy out of this list is how it comes back, in both places at once.
+ *
+ * EXISTING CONNECTIONS ARE NOT TOUCHED. An account already linked to Google
+ * is still listed, still signs in, and can still be disconnected. Hiding it
+ * would be hiding somebody's only way in.
+ */
+export const WITHHELD_OAUTH: readonly string[] = ['oauth_google'];
+
+/** Is this strategy one the product currently offers? */
+export function oauthOffered(strategy: string): boolean {
+  return !WITHHELD_OAUTH.includes(strategy);
+}
+
 export type AuthStep =
   /** asking who they are */
   | 'identify'
