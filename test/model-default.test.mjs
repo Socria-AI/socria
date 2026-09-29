@@ -25,6 +25,7 @@ import {
   chooseModel,
   lastCoreModel,
   modelWasChosen,
+  offeredModels,
   readStoredModel,
   rememberModel,
   withdrawnTo,
@@ -323,16 +324,38 @@ console.log('\n=== a withdrawn model: still there, not offered, not stranding an
       !MODELS[lastCoreModel()].withdrawn);
   }
 
-  // The picker and the chat page both have to agree, or the model would be
-  // reachable from a menu row or a link that the store then redirects — which
-  // is worse than either, because the person is told two things.
+  // EVERY MENU HAS TO AGREE. There are two: the Core picker beside the
+  // composer, and Logos's own inside its composer. Logos's used to iterate
+  // `Object.keys(SOCRIA_MODELS)` with no filter, so the model that had just
+  // been held back was still one click away on the surface replacing it.
+  // The rule is `offeredModels` and it is in the store; these assert that
+  // neither menu builds its own list again.
   const picker = readFile('components/ModelPicker.tsx');
   const chat = readFile('app/chat/page.tsx');
-  ok('the picker filters withdrawn models out of what it offers',
-    /withdrawn/.test(picker));
+  const logos = readFile('components/LogosApp.tsx');
+  const rollsOwn = (src) => /Object\.keys\(SOCRIA_MODELS\)/.test(src);
+
+  ok('the Core picker takes its list from the store', /offeredModels\(\)/.test(picker));
+  ok('  and does not build one of its own', !rollsOwn(picker));
+  ok('the Logos picker takes the same list', /offeredModels\(\)/.test(logos));
+  ok('  and does not build one of its own', !rollsOwn(logos));
+  ok('offeredModels leaves out everything withdrawn',
+    offeredModels().every((id) => !MODELS[id].withdrawn && !MODELS[id].soon));
+  ok('  and leaves in everything else',
+    offeredModels().length === Object.keys(MODELS).filter(
+      (id) => !MODELS[id].withdrawn && !MODELS[id].soon).length);
+
   ok('the chat page refuses to select one', /withdrawn/.test(chat));
   ok('  and sends a ?model= link for one to the successor',
     /withdrawnTo/.test(chat));
+
+  // The other half of the same bug: Logos assumed WHICH Logos it was. With
+  // two surfaces and one withdrawn, an assumed id means the composer names
+  // the wrong model and ticks the wrong row.
+  ok('the Logos surface is told which one it is', /model = 'logos',/.test(logos));
+  ok('  and /chat tells it', /model=\{model\}/.test(chat));
+  ok('  so "the one you are on" is not a hard-coded id',
+    /if \(next === model\) return;/.test(logos));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

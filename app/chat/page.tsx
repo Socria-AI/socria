@@ -2033,6 +2033,9 @@ export default function ChatPage() {
     return (
       <LogosApp
         initialInput={carriedText}
+        // WHICH Logos. Without this the surface assumed it was Logos 1 — its
+        // composer's model menu named that one, ticked it, and offered it.
+        model={model}
         collab={SOCRIA_MODELS[model].collab ? true : undefined}
         // One rail, both surfaces. Logos used to list only its own sessions,
         // so from inside it the rest of somebody's thinking did not exist and

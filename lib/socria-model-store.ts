@@ -132,6 +132,29 @@ export function readStoredModel(): SocriaModel | null {
 }
 
 /**
+ * Whether a model may be put in front of somebody as a choice.
+ *
+ * ONE RULE, IN ONE PLACE, because there is more than one menu. The Core
+ * picker beside the composer is the obvious one; Logos carries its own, in its
+ * own composer, listing the same registry. They disagreed — Logos's iterated
+ * every key in `SOCRIA_MODELS` with no filter at all — which is how a model
+ * that was held back stayed one click away on the surface that replaced it.
+ *
+ * `withdrawn` is held back and `soon` does not exist yet; neither is a thing
+ * somebody can pick. A model that is merely gated by plan or sign-in IS
+ * offered — it is shown with what it needs, which is the point of showing it.
+ */
+export function isOffered(model: SocriaModel): boolean {
+  const m = SOCRIA_MODELS[model];
+  return !m.withdrawn && !m.soon;
+}
+
+/** Every model a menu may show, in registry order. */
+export function offeredModels(): SocriaModel[] {
+  return (Object.keys(SOCRIA_MODELS) as SocriaModel[]).filter(isOffered);
+}
+
+/**
  * Where somebody goes when the model they were on has been withdrawn.
  *
  * The successor is found STRUCTURALLY rather than by name: a withdrawn Logos
@@ -142,10 +165,9 @@ export function readStoredModel(): SocriaModel | null {
  */
 export function withdrawnTo(model: SocriaModel): SocriaModel | null {
   const from = SOCRIA_MODELS[model];
-  const offered = (Object.keys(SOCRIA_MODELS) as SocriaModel[]).filter(
-    (id) => id !== model && !SOCRIA_MODELS[id].withdrawn && !SOCRIA_MODELS[id].soon
+  const sameKind = offeredModels().find(
+    (id) => id !== model && !!SOCRIA_MODELS[id].logosSurface === !!from.logosSurface
   );
-  const sameKind = offered.find((id) => !!SOCRIA_MODELS[id].logosSurface === !!from.logosSurface);
   return sameKind ?? null;
 }
 

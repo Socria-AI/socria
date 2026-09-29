@@ -76,7 +76,7 @@ import {
   sanitizePersonality,
   type Personality,
 } from '@/lib/logos-personality';
-import { chooseModel, lastCoreModel } from '@/lib/socria-model-store';
+import { chooseModel, lastCoreModel, offeredModels } from '@/lib/socria-model-store';
 import { buildStarters, PENDING_TYPES } from '@/lib/starters';
 import { FirstMap } from '@/components/FirstMap';
 import {
@@ -222,6 +222,11 @@ export function LogosApp({
   // the handover clears as it is read) and hands it down, so it reaches
   // whichever composer actually mounted rather than racing for it.
   initialInput,
+  // WHICH Logos surface this is. It used to be assumed: the composer's model
+  // menu said "Logos", ticked Logos as the current one and offered it as a
+  // choice — from inside Logos 2. One surface telling somebody it was another.
+  // Defaults to 'logos' so a caller that mounts this alone still works.
+  model = 'logos',
   // Logos 2: this surface is a two-seat room. Everything below is unchanged
   // when it is absent — single-player Logos does not know collab exists.
   collab,
@@ -234,6 +239,7 @@ export function LogosApp({
 }: {
   onSwitchModel?: (next: SocriaModel) => void;
   initialInput?: string;
+  model?: SocriaModel;
   collab?: boolean;
   chats?: { id: string; title: string; updatedAt: number }[];
   onOpenChat?: (id: string) => void;
@@ -760,7 +766,10 @@ export function LogosApp({
   // /chat picks it up on mount instead of opening on whatever was there last.
   function pickModel(next: SocriaModel) {
     setModelOpen(false);
-    if (next === 'logos') return;
+    // The one you are already on. Compared against THIS surface rather than
+    // the string 'logos', or picking Logos 2 from inside Logos 2 would count
+    // as a switch and reload the room you are standing in.
+    if (next === model) return;
     switchTo(next);
   }
 
@@ -3107,8 +3116,8 @@ export function LogosApp({
                 aria-expanded={modelOpen}
                 title="Which Socria you're thinking with"
               >
-                <ModelGlyph model="logos" size={14} />
-                <span className="lg-model-name">{SOCRIA_MODELS.logos.short}</span>
+                <ModelGlyph model={model} size={14} />
+                <span className="lg-model-name">{SOCRIA_MODELS[model].short}</span>
                 <svg viewBox="0 0 24 24" width="9" height="9" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden="true">
                   <path d="M6 9l6 6 6-6" />
                 </svg>
@@ -3117,9 +3126,14 @@ export function LogosApp({
                 <>
                   <div className="lg-depth-scrim" onClick={() => setModelOpen(false)} />
                   <div className="lg-depth-menu is-up is-right" role="listbox">
-                    {(Object.keys(SOCRIA_MODELS) as SocriaModel[]).map((id) => {
+                    {/* The same list the Core picker shows, by the same rule —
+                        `offeredModels` is in the store precisely because this
+                        menu and that one are two menus over one registry, and
+                        this one used to iterate every key in it, withdrawn
+                        models included. */}
+                    {offeredModels().map((id) => {
                       const m = SOCRIA_MODELS[id];
-                      const on = id === 'logos';
+                      const on = id === model;
                       return (
                         <button
                           key={id}

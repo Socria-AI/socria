@@ -2959,9 +2959,9 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
   /* the draft on top means the switcher steps aside */
   .logos-root .lg-split.draft-open .lg-mswitch { display: none; }
 
-  /* head: the toggle gets a thumb's worth of room, the subtitle and
-     back-link make way */
-  .logos-root .lg-mrail { width: 32px; height: 32px; color: var(--lg-ink-60); }
+  /* head: the subtitle and the back-link make way. The buttons get their
+     thumb's worth of room below, AFTER the rule that sizes them — a bump
+     written before it is a bump the cascade throws away. */
   .logos-root .lg-head-note, .logos-root .lg-back { display: none; }
 
   /* breathing room follows the phone, and the composer clears the switcher */
@@ -2977,17 +2977,76 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
      stay phone-only: they swap and dim surfaces a desktop shows at once. */
   .logos-root .lg-mswitch, .logos-root .lg-mscrim { display: none; }
 }
-/* the rail's toggle, in the header with the other layout controls */
-.logos-root .lg-mrail {
+/* ---- the header's icon buttons, all of them ----
+   Five controls in this row open something: the rail, the walkthrough, the
+   connections sheet, the working-style sheet, the draft. They were drawn four
+   different ways — 22px circles with a ring, 28px rounded squares without one,
+   a 30px one, and two of them carrying their own `margin-left` on top of the
+   row's gap, so the spacing went 14, 22, 24. In a strip of five buttons ten
+   pixels apart that reads as a screen assembled from parts.
+
+   One idiom, then, and it is the larger of the two that were already here:
+   22px is below the 24px minimum a pointer target is meant to be, and half the
+   row having a permanent ring around it was never saying anything about what
+   those two buttons do. The labelled draft toggle keeps its pill — it carries
+   text and holds a state, which is a different control. */
+.logos-root .lg-mrail,
+.logos-root .lg-guide-open,
+.logos-root .lg-conn-open,
+.logos-root .lg-style-open {
   display: grid; place-items: center;
-  width: 30px; height: 30px; flex: 0 0 auto;
+  width: 28px; height: 28px; flex: 0 0 auto;
+  padding: 0; margin: 0;
   border: none; border-radius: 8px;
   background: transparent; color: var(--lg-ink-40);
-  cursor: pointer; padding: 0;
+  font: inherit;
+  cursor: pointer;
   transition: color 0.18s, background 0.18s;
 }
-.logos-root .lg-mrail:hover { color: var(--lg-primary); background: rgba(53, 70, 32, 0.07); }
+.logos-root .lg-mrail:hover,
+.logos-root .lg-guide-open:hover,
+.logos-root .lg-conn-open:hover,
+.logos-root .lg-style-open:hover {
+  color: var(--lg-primary);
+  background: rgba(53, 70, 32, 0.07);
+}
+/* the rail toggle alone says whether the thing it opens is open */
 .logos-root .lg-mrail[aria-expanded="true"] { color: var(--lg-ink-60); }
+/* On a phone every one of them is hit by the same thumb, so they all grow —
+   not just the hamburger, which is what used to happen. */
+@media (max-width: 900px) {
+  .logos-root .lg-mrail,
+  .logos-root .lg-guide-open,
+  .logos-root .lg-conn-open,
+  .logos-root .lg-style-open {
+    width: 32px; height: 32px;
+    color: var(--lg-ink-60);
+  }
+}
+
+/* ---- and the other half of the pair: the buttons that CLOSE a panel ----
+   Same size, same shape, same tint, so the two families are one family with
+   one distinction — an opener goes green under the pointer, a closer goes
+   ink, because the green is this product's "yes, here" and dismissing
+   something is not that. They were 28px filled and 26px transparent, which
+   was not that distinction; it was just two people writing a close button. */
+.logos-root .lg-x-close,
+.logos-root .lg-draft-close {
+  flex: 0 0 auto;
+  display: grid; place-items: center;
+  width: 28px; height: 28px;
+  padding: 0;
+  border: none; border-radius: 50%;
+  background: transparent;
+  color: var(--lg-ink-40);
+  cursor: pointer;
+  transition: color 0.18s, background 0.18s;
+}
+.logos-root .lg-x-close:hover,
+.logos-root .lg-draft-close:hover {
+  color: var(--lg-ink);
+  background: rgba(35, 36, 31, 0.07);
+}
 
 /* ---------- rail: every line of thinking, with its map ----------
    THE RULES THAT USED TO BE HERE ARE GONE — about 200 lines of `.lg-rail-*`:
@@ -4139,17 +4198,7 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
   color: var(--lg-ink);
   letter-spacing: -0.012em;
 }
-.logos-root .lg-x-close {
-  flex: 0 0 auto;
-  width: 28px; height: 28px;
-  border: none; border-radius: 50%;
-  background: rgba(35, 36, 31, 0.05);
-  color: var(--lg-ink-60);
-  display: grid; place-items: center;
-  cursor: pointer;
-  transition: background 0.2s, color 0.2s;
-}
-.logos-root .lg-x-close:hover { background: rgba(35, 36, 31, 0.1); color: var(--lg-ink); }
+/* .lg-x-close is drawn with .lg-draft-close — see the pair above. */
 
 .logos-root .lg-x-body { flex: 1; min-height: 0; overflow-y: auto; padding: 18px 20px 26px; }
 .logos-root .lg-x-loading { display: flex; flex-direction: column; gap: 12px; padding: 26px 0; color: var(--lg-ink-40); font-size: 13px; }
@@ -4693,17 +4742,7 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
 }
 .logos-root .lg-draft-title::placeholder { color: var(--lg-ink-24); }
 .logos-root .lg-draft-count { font-size: 10.5px; color: var(--lg-ink-24); white-space: nowrap; }
-.logos-root .lg-draft-close {
-  flex: 0 0 auto;
-  width: 26px; height: 26px;
-  display: grid; place-items: center;
-  border: none; border-radius: 50%;
-  background: transparent;
-  color: var(--lg-ink-40);
-  cursor: pointer;
-  transition: color 0.2s, background 0.2s;
-}
-.logos-root .lg-draft-close:hover { color: var(--lg-ink); background: rgba(35, 36, 31, 0.07); }
+/* .lg-draft-close is drawn with .lg-x-close — see the pair above. */
 
 /* a node held beside the writing — context, never content */
 .logos-root .lg-draft-focus {
@@ -5213,19 +5252,10 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
   .logos-root .lgg-merge-a, .logos-root .lgg-merge-b { display: none; }
 }
 
-/* the door back to the walkthrough */
-.logos-root .lg-guide-open {
-  width: 22px; height: 22px;
-  margin-left: 10px;
-  display: inline-grid; place-items: center;
-  border: 1px solid var(--lg-line); border-radius: 50%;
-  background: transparent;
-  font: inherit; font-size: 11px;
-  color: var(--lg-ink-40);
-  cursor: pointer;
-  transition: color 0.2s, border-color 0.2s;
-}
-.logos-root .lg-guide-open:hover { color: var(--lg-primary); border-color: rgba(53,70,32,0.4); }
+/* the door back to the walkthrough. Shape, size and hover come from the
+   header's one icon-button rule; a "?" is a glyph rather than an icon, so
+   the only thing left here is how big to set it. */
+.logos-root .lg-guide-open { font-size: 13px; }
 /* the chat column is narrow with three surfaces open */
 .logos-root .lg-split.draft-open .lg-head-note { display: none; }
 
@@ -5447,15 +5477,8 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
 .logos-root .lgg-ground-doc span { font-size: 11.5px; color: var(--lg-ink); }
 .logos-root .lgg-ground-doc em { display: block; font-style: normal; font-size: 9.5px; color: var(--lg-ink-40); }
 
-/* ── connections: the connect header button, banner, and modal ──── */
-.logos-root .lg-conn-open {
-  width: 22px; height: 22px; margin-left: 8px;
-  display: inline-grid; place-items: center;
-  border: 1px solid var(--lg-line); border-radius: 50%;
-  background: transparent; color: var(--lg-ink-40);
-  cursor: pointer; transition: color 0.2s, border-color 0.2s;
-}
-.logos-root .lg-conn-open:hover { color: var(--lg-primary); border-color: rgba(53,70,32,0.4); }
+/* ── connections: the connect header button, banner, and modal ────
+   The button takes the header's one icon-button rule and adds nothing. */
 
 .logos-root .lg-conn-banner {
   position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
@@ -7098,14 +7121,8 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
 .logos-root .lg-one-chip:hover { background: var(--lg-one-soft); }
 
 /* ── "How should Socria work with you?" ──────────────────────────── */
-/* One textarea, in the product's own cream. A preference, not a dashboard. */
-.logos-root .lg-style-open {
-  width: 28px; height: 28px; flex: 0 0 auto;
-  display: grid; place-items: center;
-  border: none; border-radius: 8px; background: transparent;
-  color: var(--lg-ink-40); cursor: pointer; transition: color 0.2s, background 0.2s;
-}
-.logos-root .lg-style-open:hover { color: var(--lg-primary); background: rgba(53,70,32,0.06); }
+/* One textarea, in the product's own cream. A preference, not a dashboard.
+   The button that opens it takes the header's one icon-button rule. */
 .logos-root .lg-style-scrim { position: fixed; inset: 0; z-index: 85; display: grid; place-items: center; padding: 20px; }
 .logos-root .lg-style-back { position: absolute; inset: 0; background: rgba(35,36,31,0.35); backdrop-filter: blur(2px); }
 .logos-root .lg-style-sheet {
