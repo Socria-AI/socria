@@ -205,7 +205,14 @@ console.log('\n=== every benchmark compiles, and each exercises something differ
     // A model may legitimately draw nothing: `open-specification` has no method
     // chosen, so there is no fit and nothing to plot — and the note says exactly
     // that. What must never happen is drawing something anyway.
-    const refusedOnPurpose = spec.notes.some((n) => /no method has been chosen/.test(n.problem ?? ''));
+    // The wording moved when routing became per-operation: the estimator's
+    // refusal is now the router's "a method, chosen by you" rather than a
+    // sentence the compiler wrote. Both spellings are accepted so the escape
+    // is about the STATE — the person has not chosen an estimator — rather
+    // than about one phrasing of it.
+    const refusedOnPurpose = spec.notes.some((n) =>
+      /no method has been chosen|a method, chosen by you/.test(n.problem ?? '')
+    );
     ok(`  ${entry.id}: draws something, or says why not`,
       drawn > 0 || refusedOnPurpose, `${drawn} primitives`);
     ok(`  ${entry.id}: nothing it could not draw`,

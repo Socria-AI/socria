@@ -131,8 +131,14 @@ export function simulate(
   const fns = names.map((n) => compileExpr(decl.rhs[n], known)!);
   const y0 = states.map((v) => {
     if (typeof v.init === 'number') return v.init;
+    // UNREACHABLE THROUGH readSystem, which refuses a state with no usable
+    // starting value ("a starting value for x"). NaN rather than 0 if a future
+    // path reaches here another way: a run that produces NaN is visibly
+    // broken, and a run that silently starts at the origin is a trajectory
+    // nobody chose, read as a result.
+    if (v.init === undefined) return NaN;
     const e = compileExpr(v.init, known);
-    return e ? e.eval(scope) : 0;
+    return e ? e.eval(scope) : NaN;
   });
 
   // THE SCOPE IS CASE-INSENSITIVE, because the expression grammar is.

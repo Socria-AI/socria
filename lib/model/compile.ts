@@ -43,7 +43,7 @@ import {
 import { LIMITS, type P3, type Primitive } from './primitives';
 import type { Fidelity, Model, ModelObject } from './schema';
 import { runFor, seriesOf, stateAt } from './system';
-import { route } from './solve';
+import { operationsOn, route } from './solve';
 import { bindings, known, symbolTable } from './symbols';
 import { estimate } from './estimate';
 import { restOf, statesOf } from './mechanism';
@@ -132,9 +132,70 @@ export function buildObject(model: Model, o: ModelObject, opts?: { detail?: numb
   // The router already knows, and says so precisely ("a value for β₁"). So it
   // is asked first, and its answer is the problem reported. The renderer does
   // not re-derive the mathematics or re-decide what is missing; it is told.
-  const beforeDrawing = route(model, o, 'evaluate');
-  if (beforeDrawing.status === 'incomplete') {
-    return NOTHING(o, beforeDrawing.missing.map((m) => m.what).join('; '));
+  // Asked about EVERY operation, not just `evaluate`. Asking one operation made
+  // the guard dead for everything that is simulated rather than evaluated: no
+  // registered solver `does: ['evaluate']` for a `system` or a `trajectory`, so
+  // route(…, 'evaluate') came back `unsupported` — which this branch ignores —
+  // and a mechanism with an unbound stiffness went straight past it.
+  //
+  // The rule is: if something CAN run this object, draw; if every solver that
+  // understands it is blocked, say what on. An object nothing understands at
+  // all falls through to its own case, which reports that in its own words.
+  // A PART IS ONLY AS COMPUTABLE AS THE THING IT CAME OUT OF. An expanded body,
+  // spring, damper or gravitating mass is drawn from its carrier's run, so it
+  // must inherit the carrier's verdict — otherwise a mechanism whose stiffness
+  // nobody chose reports the gap on the carrier and then draws its parts
+  // anyway, each captioned "placed at its rest position plus its computed
+  // displacement" off a system that assembled from a fabricated zero.
+  // A KIND THAT IS READ RATHER THAN LOOKED AT NEVER REPORTS A GAP. The guard
+  // runs before the switch, so without this a coefficient or an error term
+  // whose specification was blocked came back as "not drawn: a method, chosen
+  // by you" — reporting a missing picture for something that was never a mark.
+  // Their case below says what they are instead.
+  if (SAID_NOT_DRAWN.has(o.kind)) {
+    const said = SAID_NOT_DRAWN.get(o.kind)!;
+    return {
+      of: o.id,
+      primitives: [],
+      note: typeof o.value === 'number' ? `${said} — ${o.value}${o.units ? ` ${o.units}` : ''}` : said,
+      fidelity: o.fidelity ?? 'conceptual',
+    };
+  }
+
+  // THE OBJECT'S OWN VERDICT WINS WHEN IT HAS ONE, and the carrier's only
+  // stands in when it has none. Inheriting unconditionally was wrong in the
+  // other direction: a specification's response surface has `meta.spec`, so it
+  // picked up the specification's blocked ESTIMATE — an operation it does not
+  // use and does not need — and stopped drawing a plane it could compute
+  // perfectly well. A part inherits because a body has no solver of its own;
+  // a derived surface does not, because it does.
+  const own = operationsOn(model, o);
+  const carrierId = own.length
+    ? null
+    : ['of', 'mech', 'gravity', 'spec'].reduce<string | null>(
+        (found, k) => found ?? (typeof o.meta?.[k] === 'string' ? (o.meta[k] as string) : null),
+        null
+      );
+  const carrier = carrierId ? model.objects.find((x) => x.id === carrierId) : null;
+  const verdicts = carrier ? operationsOn(model, carrier) : own;
+  const anyRunnable = verdicts.some((v) => v.routed.status === 'runnable');
+  const blocked = verdicts.filter((v) => v.routed.status === 'incomplete');
+  if (!anyRunnable && blocked.length) {
+    const seen = new Set<string>();
+    const what: string[] = [];
+    for (const b of blocked) {
+      if (b.routed.status !== 'incomplete') continue;
+      for (const m of b.routed.missing) {
+        if (seen.has(m.what)) continue;
+        seen.add(m.what);
+        what.push(m.what);
+      }
+    }
+    // FRAMED, not just listed. The router's `what` is precise — "dq/dt", "a
+    // stiffness for k1" — and on its own it reads as a label rather than as an
+    // explanation of why the picture is empty. The frame says what happened;
+    // the list says what would fix it.
+    return NOTHING(o, `not computed — it needs ${what.join('; ')}`);
   }
 
   switch (o.kind) {

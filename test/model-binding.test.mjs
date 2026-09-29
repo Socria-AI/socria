@@ -27,7 +27,9 @@ import { buildSpec } from './.tmp/spec.mjs';
 import { buildObject, scopeOf } from './.tmp/compile.mjs';
 import { sanitizeModel } from './.tmp/schema.mjs';
 import { affectedBy } from './.tmp/deps.mjs';
-import { symbolTable, bindings, resolve, machineOf, symbolLines } from './.tmp/symbols.mjs';
+import { symbolTable, bindings, known, resolve, machineOf, symbolLines } from './.tmp/symbols.mjs';
+import { readSystem } from './.tmp/system.mjs';
+import { LIBRARY } from './.tmp/library.mjs';
 import { EMPTY_WORKSPACE, modelFor, openFromProposal, sanitizeWorkspace } from './.tmp/docs.mjs';
 import { applyModelOps } from './.tmp/docs.mjs';
 
@@ -382,6 +384,140 @@ console.log('\n=== 10. an operation nobody can perform says so ===');
   ok('a mechanism CAN be simulated', askFor(dyn, 'simulate').status === 'runnable');
   ok('  and a specification cannot — the verdict is about the model',
     askFor(dyn, 'simulate').status !== askFor(m, 'simulate').status);
+}
+
+console.log('\n=== 11. one identifier grammar ===');
+{
+  // SIX GRAMMARS DISAGREED. The evaluator's is the only one that decides
+  // whether an expression can be computed, so it is now the only one — and a
+  // name it cannot express is refused at the door rather than admitted and
+  // found unusable four layers down.
+  //
+  // What that cost, verified before the fix: a control called `growth-rate`
+  // was reported by symbolTable, known(), bindings() and resolve() as legal,
+  // valued and bindable; compileExpr could never bind it; namesIn saw two
+  // names; the router's diagnosis invented quantities; and affectedBy saw no
+  // edge at all, so moving the slider marked nothing stale.
+  const hyphen = sanitizeModel({
+    id: 'h', title: 'H',
+    params: [{ id: 'growth-rate', label: 'growth rate', value: 0.5, min: 0, max: 2 },
+             { id: 'plain', label: 'plain', value: 1, min: 0, max: 2 }],
+    objects: [],
+  });
+  ok('a name no expression can mention is refused', !hyphen.params.some((p) => p.id === 'growth-rate'));
+  ok('  and a legal one beside it survives', hyphen.params.some((p) => p.id === 'plain'));
+  ok('so known() never lies about what can be bound',
+    known(symbolTable(hyphen)).every((n) => /^[a-z][a-z0-9_]*$/i.test(n)));
+
+  // A MODEL's own id is not a quantity and keeps its hyphens.
+  const slug = sanitizeModel({ id: 'linear-model', title: 'L', params: [], objects: [] });
+  ok('a model id may still be a slug', slug?.id === 'linear-model');
+
+  // Every quantity id in the shipped library already satisfies it — checked so
+  // narrowing the grammar cannot have silently dropped real stored work.
+  let offenders = 0;
+  for (const entry of LIBRARY) {
+    const m = entry.model ?? entry;
+    for (const p of m.params ?? []) if (!/^[a-z][a-z0-9_]*$/i.test(p.id)) offenders++;
+    for (const o of m.objects ?? []) if (!/^[a-z][a-z0-9_]*$/i.test(o.id)) offenders++;
+  }
+  ok('no shipped model loses a quantity to the narrower grammar', offenders === 0, `${offenders}`);
+}
+
+console.log('\n=== 12. two names that differ only in case are one name ===');
+{
+  // THE WORST BUG IN THE AUDIT. The state dedupe compared exactly while the
+  // evaluator is case-insensitive, so `S` and `s` were both kept and then
+  // collapsed into one slot at run time — the integrator solved a DIFFERENT
+  // system from the one declared, with no refusal and no note. Measured: with
+  // S' = -S and a second state s, S lost 0.37 over a step where it should have
+  // lost 63.2.
+  const m = sanitizeModel({
+    id: 'c', title: 'C', params: [],
+    objects: [{ id: 's', kind: 'system', label: 's', system: {
+      states: [{ name: 'S', init: 100 }, { name: 's', init: 1 }],
+      rhs: { S: '0 - S', s: '0 * s' }, dt: 1, steps: 1,
+    } }],
+  });
+  const states = m.objects[0].system.states;
+  ok('the collision is refused at the door', states.length === 1, JSON.stringify(states));
+  ok('  keeping the first, not the last', states[0].name === 'S');
+  ok('  so the system that runs IS the system declared', states[0].init === 100);
+}
+
+console.log('\n=== 13. an initial condition is never invented ===');
+{
+  // readSystem's own docstring: "a system with no initial value for one of its
+  // states cannot be integrated, and the alternative to saying so is picking a
+  // number — which produces a trajectory, and a trajectory is read as a
+  // result." The sanitiser was picking the number, BEFORE readSystem could
+  // object, for eight different spellings of "absent".
+  for (const [label, init] of [
+    ['omitted', undefined], ['null', null], ['NaN', NaN],
+    ['empty', ''], ['spaces', '  '],
+  ]) {
+    const m = sanitizeModel({
+      id: 't', title: 'T', params: [{ id: 'r', label: 'r', value: 0.5, min: 0, max: 2 }],
+      objects: [{ id: 's', kind: 'system', label: 's', system: {
+        states: [{ name: 'x', ...(init !== undefined ? { init } : {}) }], rhs: { x: 'r * x' },
+      } }],
+    });
+    const read = readSystem(m, m.objects[0]);
+    ok(`init ${label}: refused rather than started at zero`, read.ok === false);
+    if (!read.ok) {
+      ok(`  naming the state`, /a starting value for x/.test(JSON.stringify(read.missing)));
+    }
+  }
+  // …and a stated one still runs.
+  const good = sanitizeModel({
+    id: 't', title: 'T', params: [{ id: 'r', label: 'r', value: 0.5, min: 0, max: 2 }],
+    objects: [{ id: 's', kind: 'system', label: 's', system: {
+      states: [{ name: 'x', init: 2 }], rhs: { x: 'r * x' },
+    } }],
+  });
+  ok('a stated starting value still runs', readSystem(good, good.objects[0]).ok === true);
+}
+
+console.log('\n=== 14. the empty-cube guard covers what is SIMULATED too ===');
+{
+  // My own regression: the guard asked route(…, 'evaluate'), and no solver
+  // does `evaluate` on a system or a trajectory — so it was dead for
+  // everything that is simulated rather than evaluated, and a mechanism whose
+  // stiffness nobody chose drew its parts anyway, each captioned "placed at
+  // its rest position plus its computed displacement" off a system assembled
+  // from a fabricated zero.
+  const spring = (value) => buildProposal({
+    id: 'sm', title: 'spring', params: [],
+    objects: [{ id: 'mech', kind: 'component', label: 'the mechanism', mechanism: {
+      bodies: [{ id: 'm1', mass: 1, x0: 1 }],
+      springs: [{ id: 'k1', between: ['m1', 'ground'], ...(value !== null ? { value } : {}) }],
+    } }],
+  }, { at: 1 });
+
+  const un = spring(null);
+  const unSpec = buildSpec(unpack(un.model));
+  ok('an unchosen stiffness draws NOTHING', unSpec.primitives.length === 0,
+    `${unSpec.primitives.length} primitives`);
+  ok('  and the carrier says what is missing',
+    /stiffness for k1/.test(unSpec.notes.find((n) => n.of === 'mech')?.problem ?? ''));
+  ok('  framed as not computed rather than as a label',
+    /not computed/.test(unSpec.notes.find((n) => n.of === 'mech')?.problem ?? ''));
+  ok('  and its PARTS do not draw as computed either',
+    !unSpec.notes.some((n) => n.of.startsWith('mech__') && /computed displacement/.test(n.note ?? '')));
+
+  const got = spring(20);
+  const gotSpec = buildSpec(unpack(got.model));
+  ok('a chosen stiffness draws', gotSpec.primitives.length > 0);
+  ok('  with no gaps', !gotSpec.notes.some((n) => n.problem), JSON.stringify(gotSpec.notes.filter((n) => n.problem)));
+  ok('  and grades dynamic', got.report.capability === 'dynamic');
+
+  // A DERIVED SURFACE KEEPS ITS OWN VERDICT. Inheriting the carrier's
+  // unconditionally was wrong the other way: a specification's response
+  // surface picked up the specification's blocked ESTIMATE — an operation it
+  // does not use — and stopped drawing a plane it could compute.
+  const wage = unpack(buildProposal(adl(), { at: 1 }).model);
+  ok('a response surface is not blocked by its specification',
+    vertices(buildSpec(wage), 'spec__response').length > 0);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

@@ -31,6 +31,8 @@
  * Where a value came from. Answering "where did this number come from?" is a
  * product promise, and a promise needs a field rather than a convention.
  */
+import { NAME, SLUG, collidesWith } from './ids';
+
 export type Origin =
   /** the person typed it, dragged it, or set it */
   | 'user'
@@ -259,8 +261,23 @@ export interface ModelObject {
 
 export interface StateVarDecl {
   name: string;
-  /** a number, or an expression in the parameters */
-  init: number | string;
+  /**
+   * A number, or an expression in the parameters — OR ABSENT.
+   *
+   * Optional, and that is the fix for a fabrication readSystem's own docstring
+   * forbids: "a system with no initial value for one of its states cannot be
+   * integrated, and the alternative to saying so is picking a number — which
+   * produces a trajectory, and a trajectory is read as a result."
+   *
+   * The sanitiser was picking the number. An omitted init, null, NaN, '', a
+   * bare space or an object all became 0 BEFORE readSystem could object, so
+   * the engine drew a flat line at the origin and captioned it Runge–Kutta.
+   * Verified on eight variants, every one of which ran and returned zeros.
+   *
+   * Absent now means the starting value has not been chosen, and readSystem's
+   * existing check reports "a starting value for x".
+   */
+  init?: number | string;
   units?: string;
   means?: string;
 }
@@ -592,7 +609,12 @@ export const MODEL_CAPS = {
   relations: 12,
 } as const;
 
-const ID = /^[a-z0-9][a-z0-9_-]{0,47}$/i;
+// THE ONE GRAMMAR for anything an expression can mention — see lib/model/ids.ts
+// for the six that disagreed and what that cost. A MODEL's own id keeps the
+// permissive form, because it never reaches an evaluator and `linear-model`
+// is a real stored id.
+const ID = NAME;
+const MODEL_ID = SLUG;
 const text = (v: unknown, n: number): string =>
   typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().slice(0, n) : '';
 const num = (v: unknown): number | null =>
@@ -690,11 +712,21 @@ export function sanitizeObject(raw: unknown): ModelObject | null {
       if (!raw || typeof raw !== 'object') continue;
       const q = raw as Record<string, unknown>;
       const name = text(q.name, 24);
-      if (!nameOk(name) || states.some((x) => x.name === name)) continue;
+      // CASE-INSENSITIVE, because the evaluator is. This dedupe compared
+      // exactly, so states named `S` and `s` were both kept — and then
+      // collapsed into one slot at run time, because system.ts writes each
+      // state under both its own spelling and its lowercase one and
+      // compileExpr lowercases every token. The integrator solved a DIFFERENT
+      // system from the one declared: verified, `S' = -S` with a second state
+      // `s` evaluated `-s` instead, so S lost 0.37 over a step where it should
+      // have lost 63.2. No refusal, no note.
+      if (!nameOk(name) || collidesWith(states.map((x) => x.name), name)) continue;
+      // NOT DEFAULTED. See StateVarDecl.init — picking a number here is what
+      // turned "nobody said where this starts" into a computed trajectory.
       const init = initOf(q.init);
       states.push({
         name,
-        init: init === null ? 0 : init,
+        ...(init !== null ? { init } : {}),
         ...(text(q.units, 24) ? { units: text(q.units, 24) } : {}),
         ...(text(q.means, 160) ? { means: text(q.means, 160) } : {}),
       });
@@ -1011,7 +1043,9 @@ export function sanitizeModel(raw: unknown): Model | null {
   const r = raw as Record<string, unknown>;
   const id = text(r.id, 48);
   const title = text(r.title, 90);
-  if (!ID.test(id) || !title) return null;
+  // A MODEL's id, not a quantity's: it never reaches an evaluator, and
+  // `linear-model` and `photon-path` are real stored ids.
+  if (!MODEL_ID.test(id) || !title) return null;
 
   const objects = Array.isArray(r.objects)
     ? (r.objects.map(sanitizeObject).filter(Boolean) as ModelObject[]).slice(0, MODEL_CAPS.objects)
