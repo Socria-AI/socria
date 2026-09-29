@@ -282,8 +282,12 @@ export interface SystemDecl {
 
 export interface BodyDecl {
   id: string;
-  /** mass, or an expression in the parameters */
-  mass: number | string;
+  /**
+   * Mass, or an expression in the parameters — or absent, meaning the body is
+   * there and nobody has said how heavy it is. Same rule as LinkDecl.value:
+   * a part with an unchosen value is a part, not an absence.
+   */
+  mass?: number | string;
   /** starting displacement from its rest position */
   x0?: number | string;
   /** starting velocity */
@@ -297,8 +301,22 @@ export interface LinkDecl {
   id: string;
   /** the two things it joins. 'ground' is the fixed world. */
   between: [string, string];
-  /** stiffness for a spring, damping for a damper */
-  value: number | string;
+  /**
+   * Stiffness for a spring, damping for a damper — OR ABSENT.
+   *
+   * Optional, and that is the fix for a real fabrication. A link with no value
+   * used to be DELETED by the sanitiser, silently: "a mass on a spring,
+   * stiffness to be decided" assembled to v̇ = (0)/(1) — a mass with no forces
+   * on it at all — routed runnable, graded `dynamic`, and drew a motionless
+   * body at `numerically-computed`. The spring the person asked for was gone
+   * without a word, and what they were shown was a computed picture of
+   * nothing.
+   *
+   * Absent now means the connection EXISTS and its value has not been chosen.
+   * readMechanism reports "a stiffness for k1" and the model stands as
+   * `mathematical` until somebody supplies it.
+   */
+  value?: number | string;
   label?: string;
 }
 
@@ -691,12 +709,13 @@ export function sanitizeObject(raw: unknown): ModelObject | null {
       const q = raw as Record<string, unknown>;
       const bid = text(q.id, 24);
       if (!nameOk(bid) || bodies.some((b) => b.id === bid)) continue;
+      // A BODY IS ITS IDENTITY. An unchosen mass is a question, not a reason to
+      // delete the body — readMechanism names it and the model waits.
       const mass = initOf(q.mass);
-      if (mass === null) continue;
       const at = num(q.at);
       bodies.push({
         id: bid,
-        mass,
+        ...(mass !== null ? { mass } : {}),
         ...(initOf(q.x0) !== null ? { x0: initOf(q.x0) as number | string } : {}),
         ...(initOf(q.v0) !== null ? { v0: initOf(q.v0) as number | string } : {}),
         ...(text(q.label, 60) ? { label: text(q.label, 60) } : {}),
@@ -711,13 +730,16 @@ export function sanitizeObject(raw: unknown): ModelObject | null {
         const q = raw as Record<string, unknown>;
         const lid = text(q.id, 24);
         const pair = Array.isArray(q.between) ? q.between.map((x) => text(x, 24)) : [];
+        // A LINK IS ITS TWO ENDS. The value may be missing — see LinkDecl.value
+        // for what deleting it used to produce — so only an unusable id or a
+        // pair that is not two named ends drops the connection.
         const value = initOf(q.value);
-        if (!nameOk(lid) || pair.length !== 2 || value === null) continue;
+        if (!nameOk(lid) || pair.length !== 2) continue;
         if (!pair.every((p) => p === 'ground' || nameOk(p))) continue;
         kept.push({
           id: lid,
           between: [pair[0], pair[1]],
-          value,
+          ...(value !== null ? { value } : {}),
           ...(text(q.label, 60) ? { label: text(q.label, 60) } : {}),
         });
       }
@@ -1074,40 +1096,21 @@ export function byKind(model: Model, ...kinds: ObjectKind[]): ModelObject[] {
 }
 
 /**
- * Everything a change to `ids` reaches.
+ * Everything a change to `ids` reaches — RE-EXPORTED FROM ./deps.
  *
- * THE POINT OF THE WHOLE DEPENDENCY FIELD. Moving one control must not
- * rebuild the picture: it must rebuild the part of the picture that moved.
- * This walks `depends` (a control) and `depends-on` / `derived-from` (an
- * object built out of another) transitively, and is the list the renderer
- * recomputes and the conversation is allowed to say changed.
+ * It lived here and walked `depends` plus three relation types, and it did not
+ * work: `depends` is unvalidated language-model output and is absent from
+ * essentially every real proposal, and the three relations it followed were
+ * not the three the expanders emit. Executed against a standard SIR model,
+ * changing the infection rate recomputed nothing at all.
  *
- * Cycles are normal in a model of a system, so the visited set is the
- * termination condition rather than an assumption of acyclicity.
+ * lib/model/deps.ts derives the graph from the expressions instead — the one
+ * place that cannot drift, because it is what will be evaluated. Re-exported
+ * from here so every existing caller keeps its import.
  */
-export function affectedBy(model: Model, ids: readonly string[]): string[] {
-  const seed = new Set(ids);
-  const out = new Set<string>();
-  let frontier = [...seed];
-  const follows: readonly Relation[] = ['depends-on', 'derived-from', 'parameterizes'];
-
-  while (frontier.length) {
-    const next: string[] = [];
-    for (const o of model.objects) {
-      if (out.has(o.id)) continue;
-      const viaDepends = (o.depends ?? []).some((d) => frontier.includes(d));
-      const viaRelation = (o.relations ?? []).some(
-        (r) => follows.includes(r.as) && frontier.includes(r.to)
-      );
-      if (viaDepends || viaRelation) {
-        out.add(o.id);
-        next.push(o.id);
-      }
-    }
-    frontier = next;
-  }
-  return [...out];
-}
+export { affectedBy } from './deps';
+// …and imported for this module's own use, since two helpers below walk it.
+import { affectedBy } from './deps';
 
 /** What this object rests on: the answer to "why is this here?". */
 export function dependenciesOf(model: Model, id: string): {

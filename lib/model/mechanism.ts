@@ -252,7 +252,19 @@ export function readMechanism(
   const known = [...model.params.map((p) => p.id), 't'];
   const missing: Missing[] = [];
   const check = (value: number | string | undefined, what: string) => {
-    if (value === undefined || typeof value === 'number') return;
+    // UNDEFINED IS MISSING, NOT FINE. This returned early on undefined, so a
+    // part whose value nobody had chosen passed every check — and since the
+    // sanitiser used to delete such a part outright, the two together produced
+    // an assembled system with the connection simply gone. Both halves are
+    // fixed: the part survives sanitising with no value, and it is named here.
+    if (value === undefined) {
+      missing.push({
+        what: `${what} — nobody has chosen one`,
+        unlocks: 'a numerical run; the connection is part of the model either way',
+      });
+      return;
+    }
+    if (typeof value === 'number') return;
     if (!compileExpr(value, known)) {
       missing.push({
         what: `${what} — “${value}” is neither a number nor one of this model's controls`,

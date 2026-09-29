@@ -35,7 +35,7 @@ import {
   unanswered,
 } from './.tmp/ask.mjs';
 import { buildProposal, revalidate } from './.tmp/propose.mjs';
-import { sanitizeModel } from './.tmp/schema.mjs';
+import { affectedBy, sanitizeModel } from './.tmp/schema.mjs';
 import { capabilityOf, missingStructure, route } from './.tmp/solve.mjs';
 import { unpack } from './.tmp/unpack.mjs';
 import { EMPTY_WORKSPACE, addPart, modelFor, openFromProposal, removeObject, sanitizeWorkspace, undo } from './.tmp/docs.mjs';
@@ -675,6 +675,118 @@ console.log('\n=== 15. unknown is never a demo ===');
   ok('  and no picture is invented', !m.viz);
   const made = openFromProposal(EMPTY_WORKSPACE, m.propose, { at: 1 });
   ok('  and the model builds', !!made.doc);
+}
+
+console.log('\n=== 16. a part with no value is a question, not a deletion ===');
+{
+  // THE FABRICATION THIS REPLACES. A spring with no stiffness was DELETED by
+  // the sanitiser. "A mass on a spring, stiffness to be decided" therefore
+  // assembled to v̇ = (0)/(1) — a mass with no forces on it at all — routed
+  // runnable, graded `dynamic`, and drew a motionless body at
+  // `numerically-computed`. The spring was gone without a word and what the
+  // person saw was a computed picture of nothing.
+  const spring = {
+    id: 'sm', title: 'A mass on a spring, stiffness to be decided', params: [],
+    objects: [{ id: 'mech', kind: 'component', label: 'the mechanism',
+      mechanism: { bodies: [{ id: 'm1', mass: 1, x0: 1 }], springs: [{ id: 'k1', between: ['m1', 'ground'] }] } }],
+  };
+  const clean = sanitizeModel(spring);
+  ok('the spring survives sanitising', clean.objects[0].mechanism.springs?.length === 1);
+  ok('  with no value, rather than not at all',
+    clean.objects[0].mechanism.springs[0].value === undefined);
+
+  const b = buildProposal(spring, { at: 1 });
+  ok('it builds — it is still a mechanism', b.ok === true);
+  if (b.ok) {
+    ok('  but it does NOT claim to be dynamic', b.report.capability === 'mathematical',
+      b.report.capability);
+    ok('  and it names the stiffness', /stiffness for k1/.test(JSON.stringify(b.report.missing)));
+    ok('  saying nobody has chosen one', /nobody has chosen one/.test(JSON.stringify(b.report.missing)));
+    ok('  and nothing runs', b.report.solvers.length === 0);
+  }
+
+  // The same rule for a body whose mass nobody gave.
+  const noMass = sanitizeModel({ ...spring, id: 'nm', objects: [{ ...spring.objects[0],
+    mechanism: { bodies: [{ id: 'm1', x0: 1 }], springs: [{ id: 'k1', between: ['m1', 'ground'], value: 5 }] } }] });
+  ok('a body with no mass survives too', noMass.objects[0].mechanism.bodies?.length === 1);
+  const nb = buildProposal({ ...spring, id: 'nm2', objects: [{ ...spring.objects[0],
+    mechanism: { bodies: [{ id: 'm1', x0: 1 }], springs: [{ id: 'k1', between: ['m1', 'ground'], value: 5 }] } }] }, { at: 1 });
+  ok('  and the mass is what is missing', nb.ok && /mass for m1/.test(JSON.stringify(nb.report.missing)),
+    nb.ok ? JSON.stringify(nb.report.missing) : nb.refusal.because);
+}
+
+console.log('\n=== 17. changing something recomputes what it reaches ===');
+{
+  // PART 17. This walked a `depends` array — unvalidated language-model output,
+  // absent from every real proposal — plus three relation types the expanders
+  // never emit. Executed on a standard SIR model, changing the infection rate
+  // recomputed NOTHING. The graph is derived from the expressions now, which
+  // is the one place that cannot drift because it is what gets evaluated.
+
+  const sir = sanitizeModel({
+    id: 'sir', title: 'SIR',
+    params: [{ id: 'beta', label: 'beta', value: 0.3, min: 0, max: 1 },
+             { id: 'gamma', label: 'gamma', value: 0.1, min: 0, max: 1 }],
+    objects: [{ id: 's', kind: 'system', label: 'compartments', system: {
+      states: [{ name: 'S', init: '999' }, { name: 'I', init: '1' }, { name: 'R', init: '0' }],
+      rhs: { S: '0 - beta * S * I / 1000', I: 'beta * S * I / 1000 - gamma * I', R: 'gamma * I' },
+    } }],
+  });
+  ok('the model declares no dependencies at all', sir.objects[0].depends === undefined);
+  ok('and changing the infection rate still reaches the system',
+    affectedBy(sir, ['beta']).includes('s'));
+  ok('  as does the recovery rate', affectedBy(sir, ['gamma']).includes('s'));
+
+  // A CARRIER AND ITS PARTS MOVE TOGETHER. A body is drawn from its carrier's
+  // run, so a change reaching the carrier must reach the body. Before this,
+  // changing the damping reached the damper object and neither the carrier
+  // that owns the integration nor the body whose motion actually changed.
+  const sm = buildProposal({
+    id: 'sm2', title: 'spring-mass',
+    params: [{ id: 'k', label: 'k', value: 20, min: 1, max: 100 },
+             { id: 'c', label: 'c', value: 0.5, min: 0, max: 5 },
+             { id: 'm', label: 'm', value: 1, min: 0.1, max: 5 }],
+    objects: [{ id: 'mech', kind: 'component', label: 'the mechanism', mechanism: {
+      bodies: [{ id: 'm1', mass: 'm', x0: 1 }],
+      springs: [{ id: 'k1', between: ['m1', 'ground'], value: 'k' }],
+      dampers: [{ id: 'c1', between: ['m1', 'ground'], value: 'c' }],
+    } }],
+  }, { at: 1 });
+  ok('the mechanism builds', sm.ok === true);
+  if (sm.ok) {
+    const m = unpack(sm.model);
+    for (const p of ['k', 'c', 'm']) {
+      const reached = affectedBy(m, [p]);
+      ok(`changing ${p} reaches the carrier that owns the run`, reached.includes('mech'),
+        JSON.stringify(reached));
+      ok(`  and the body whose motion changes`, reached.includes('mech__m1'),
+        JSON.stringify(reached));
+    }
+  }
+
+  // Gravity: one mass appears in every other body's acceleration.
+  const g = buildProposal({
+    id: 'g2', title: 'two bodies',
+    params: [{ id: 'ms', label: 'star mass', value: 1, min: 0.1, max: 3 }],
+    objects: [{ id: 'sys', kind: 'system', label: 'the pair', gravity: {
+      units: 'astronomical',
+      bodies: [{ id: 'a', mass: 'ms', x: 0, y: 0, vx: 0, vy: 0 },
+               { id: 'b', mass: 3e-6, x: 1, y: 0, vx: 0, vy: 6.28 }],
+    } }],
+  }, { at: 1 });
+  if (g.ok) {
+    const reached = affectedBy(unpack(g.model), ['ms']);
+    ok('changing one mass reaches every body that feels it',
+      reached.includes('sys__a') && reached.includes('sys__b'), JSON.stringify(reached));
+  }
+
+  // AND IT MUST NOT REACH EVERYTHING. A graph that says "all of it" on every
+  // change is as useless as one that says "none of it", and the old one could
+  // be made to do exactly that by writing a name into `depends`.
+  ok('a name nothing mentions reaches nothing',
+    affectedBy(sir, ['nonexistent']).length === 0);
+  ok('  and an unrelated control reaches nothing',
+    affectedBy(sir, ['unrelated_knob']).length === 0);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
