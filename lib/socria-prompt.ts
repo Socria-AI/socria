@@ -1288,6 +1288,20 @@ export interface ModelConfig {
   logosSurface?: boolean;
   /** Logos 2: two people in one workspace. See lib/collab.ts. */
   collab?: boolean;
+  /**
+   * TEMPORARILY WITHDRAWN — the model exists, answers, and is not offered.
+   *
+   * Different from `soon` (announced, not built) and from `leaving` (on its way
+   * out, still pickable until a date): this is a model that works and is being
+   * held back while its successor is worked on. The picker does not list it, the
+   * remembered-choice resolver will not return it, and anybody whose browser
+   * still holds it is moved on rather than stranded — see lib/socria-model-store.
+   *
+   * A sentence, because the reason belongs beside the switch: whoever turns it
+   * off should say why, and whoever turns it back on should be able to tell
+   * whether the reason still holds. Delete the line to restore the model.
+   */
+  withdrawn?: string;
 }
 
 // ===== Core 4 =====
@@ -1576,6 +1590,12 @@ export const SOCRIA_MODELS: Record<SocriaModel, ModelConfig> = {
     supportsDepth: false,
     requiresAuth: true,
     logosSurface: true,
+    // Held back while Logos 2 is the surface being worked on. Logos 2 is the
+    // same environment with the model workspace in it, so offering both was
+    // offering the older one — and a person who picked it got the surface that
+    // is no longer where the work is going. Nothing about this model changed;
+    // delete this line to offer it again.
+    withdrawn: 'Logos 2 is the surface being worked on; this one is held back while that is true.',
   },
   // Logos 2 — two people in one Logos workspace, thinking together in real
   // time. Socria sits between them as the shared reasoning layer. It is the

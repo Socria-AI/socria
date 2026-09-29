@@ -2842,10 +2842,18 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
 
 .logos-root .lg-split {
   display: grid;
-  grid-template-columns: 232px minmax(360px, 1fr) 1.12fr;
+  /* 280px is not a number chosen here — it is `.app-root .s-bar`'s own width in
+     app-shell.css. The rail in this column IS that rail, so the column is the
+     width the rail is, and the two cannot drift apart. */
+  grid-template-columns: 280px minmax(360px, 1fr) 1.12fr;
   height: 100%;
 }
-.logos-root .lg-split.rail-closed { grid-template-columns: 46px minmax(360px, 1fr) 1.12fr; }
+/* Closing the rail removes its column rather than shrinking it to a sliver.
+   The sliver existed because the old rail kept a collapsed toggle inside it;
+   the Core rail has no such thing, so a 46px column would be 46px of nothing
+   and the surfaces beside it would be 46px narrower for it. */
+.logos-root .lg-split.rail-closed { grid-template-columns: minmax(360px, 1fr) 1.12fr; }
+.logos-root .lg-split.rail-closed .lg-railhost { display: none; }
 /* Three surfaces at once is a lot of room to ask for, so the rail steps
    aside rather than the map being taken away. */
 .logos-root .lg-split.draft-open,
@@ -2854,7 +2862,7 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
      column behind shunts every surface one slot to the left. */
   grid-template-columns: minmax(300px, 0.82fr) 1fr minmax(380px, 1.06fr);
 }
-.logos-root .lg-split.draft-open .lg-rail { display: none; }
+.logos-root .lg-split.draft-open .lg-railhost { display: none; }
 @media (max-width: 1500px) {
   /* Below this the map and the draft can't both be usable — the draft is
      what you opened, so the map folds away and the chat stays. */
@@ -2865,7 +2873,13 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
   .logos-root .lg-split.draft-open .lg-panel { display: none; }
 }
 @media (max-width: 1180px) {
-  .logos-root .lg-split { grid-template-columns: 200px minmax(320px, 1fr) 1.05fr; }
+  /* The rail keeps its width here. It used to shrink to 200px, from a time
+     when it was Logos's own rail and could be made narrow; it is the Core
+     rail now, drawn by rules written for 280px, and 80px off makes the search
+     box, the chip and the two-line titles all slightly wrong on exactly the
+     laptop widths most people use. The conversation gives up the 80px. */
+  .logos-root .lg-split { grid-template-columns: 280px minmax(320px, 1fr) 1.05fr; }
+  .logos-root .lg-split.rail-closed { grid-template-columns: minmax(320px, 1fr) 1.05fr; }
 }
 /* ── mobile: one surface at a time ─────────────────────────────────
    A phone can hold the conversation OR the map well, never both halved.
@@ -2881,20 +2895,36 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
     grid-template-rows: 1fr;
   }
 
-  /* the rail: a drawer over the page, not a row above it */
-  .logos-root .lg-rail {
+  /* the rail: a drawer over the page, not a row above it.
+     The drawer is the HOST, not the `.s-bar` inside it. app-shell.css makes the
+     bar itself fixed below 768px, and this surface folds to one column at 900px
+     — between the two the bar would be a static column the full width of a
+     phone. One element owns the drawer, and it is the one whose breakpoint this
+     surface sets. */
+  .logos-root .lg-railhost {
     position: fixed; z-index: 70;
     left: 0; top: 0; bottom: 0;
     width: min(320px, 86vw);
-    border-right: 1px solid var(--lg-line);
-    background: var(--lg-panel);
+    background: var(--app-paper, var(--lg-panel));
     box-shadow: 0 0 60px rgba(35,36,31,0.25);
     transform: translateX(0);
     transition: transform 0.28s cubic-bezier(0.16,1,0.3,1);
   }
-  .logos-root .lg-split.rail-closed .lg-rail { transform: translateX(-105%); box-shadow: none; }
-  /* rail-closed on desktop shrinks the rail to a sliver; the drawer needs
-     its full contents whenever it slides in */
+  /* rail-closed slides the drawer out; it must NOT also take it out of the
+     grid, or there would be nothing to slide. */
+  .logos-root .lg-split.rail-closed .lg-railhost {
+    display: flex;
+    transform: translateX(-105%);
+    box-shadow: none;
+  }
+  /* Below 768px app-shell hides the bar on `data-open="no"`. Here the host's
+     transform is what says whether the drawer is in view, so the bar stays
+     displayed — otherwise the drawer would slide in empty. */
+  .logos-root .lg-railhost .s-bar[data-open="no"] { display: flex; }
+  /* app-shell shows the bar's × only below 768px, because that is where ITS
+     drawer begins. Ours begins at 900, and between the two the drawer would
+     cover the page with no way out inside it. */
+  .logos-root .lg-railhost .s-close { display: block; }
   .logos-root .lg-mscrim {
     position: fixed; inset: 0; z-index: 69;
     background: rgba(35,36,31,0.32);
@@ -2929,13 +2959,9 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
   /* the draft on top means the switcher steps aside */
   .logos-root .lg-split.draft-open .lg-mswitch { display: none; }
 
-  /* head: the hamburger appears, the subtitle and back-link make room */
-  .logos-root .lg-mrail {
-    display: grid; place-items: center;
-    width: 32px; height: 32px; flex: 0 0 auto;
-    border: none; background: transparent; color: var(--lg-ink-60);
-    cursor: pointer; padding: 0;
-  }
+  /* head: the toggle gets a thumb's worth of room, the subtitle and
+     back-link make way */
+  .logos-root .lg-mrail { width: 32px; height: 32px; color: var(--lg-ink-60); }
   .logos-root .lg-head-note, .logos-root .lg-back { display: none; }
 
   /* breathing room follows the phone, and the composer clears the switcher */
@@ -2944,215 +2970,90 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
   .logos-root .lg-one-note { margin: 0 14px 10px; }
 }
 @media (min-width: 901px) {
-  .logos-root .lg-mrail, .logos-root .lg-mswitch, .logos-root .lg-mscrim { display: none; }
+  /* `.lg-mrail` is NOT in this list any more. It was the phone's hamburger;
+     it is now the rail's toggle at every width, because the rail itself is the
+     Core surface's and that one has no desktop collapse — and Logos, showing
+     three columns and sometimes four, needs one. The switcher and the scrim
+     stay phone-only: they swap and dim surfaces a desktop shows at once. */
+  .logos-root .lg-mswitch, .logos-root .lg-mscrim { display: none; }
 }
-
-/* ---------- rail: every line of thinking, with its map ---------- */
-.logos-root .lg-rail {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  border-right: 1px solid var(--lg-line);
-  background: rgba(250, 248, 242, 0.6);
-}
-.logos-root .lg-rail-top {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  height: 54px;
-  padding: 0 10px;
-  flex: 0 0 auto;
-}
-.logos-root .lg-rail-toggle {
-  width: 26px; height: 26px;
+/* the rail's toggle, in the header with the other layout controls */
+.logos-root .lg-mrail {
   display: grid; place-items: center;
-  border: none; background: transparent;
-  border-radius: 6px;
-  color: var(--lg-ink-40);
-  cursor: pointer;
-  transition: color 0.2s, background 0.2s;
+  width: 30px; height: 30px; flex: 0 0 auto;
+  border: none; border-radius: 8px;
+  background: transparent; color: var(--lg-ink-40);
+  cursor: pointer; padding: 0;
+  transition: color 0.18s, background 0.18s;
 }
-.logos-root .lg-rail-toggle:hover { color: var(--lg-primary); background: rgba(53, 70, 32, 0.07); }
-.logos-root .lg-rail-toggle svg { width: 15px; height: 15px; }
-.logos-root .lg-rail-title {
-  font-size: 10px; font-weight: 600; letter-spacing: 0.16em;
-  text-transform: uppercase; color: var(--lg-ink-40);
-}
-.logos-root .lg-rail-new {
-  flex: 0 0 auto;
-  margin: 0 10px 10px;
-  padding: 8px 11px;
-  text-align: left;
-  border: 1px dashed rgba(53, 70, 32, 0.28);
-  border-radius: 10px;
-  background: transparent;
-  color: var(--lg-ink-60);
-  font: inherit;
-  font-size: 12.5px;
-  cursor: pointer;
-  transition: border-color 0.2s, color 0.2s, background 0.2s;
-}
-.logos-root .lg-rail-new:hover {
-  border-color: var(--lg-primary);
-  color: var(--lg-primary);
-  background: rgba(53, 70, 32, 0.04);
-}
-/* Maps / Chats. Appears only once the list is long enough to need dividing
-   and both sides have something in them, so most people never see it. */
-.logos-root .lg-rail-tabs {
-  flex: 0 0 auto;
-  display: flex;
-  gap: 2px;
-  margin: 0 10px 8px;
-  padding: 2px;
-  border-radius: 9px;
-  background: rgba(35, 36, 31, 0.05);
-}
-.logos-root .lg-rail-tab {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  padding: 5px 6px;
-  border: none;
-  border-radius: 7px;
-  background: transparent;
-  color: var(--lg-ink-40);
-  font: inherit;
-  font-size: 11.5px;
-  cursor: pointer;
-  transition: background 0.18s, color 0.18s, box-shadow 0.18s;
-}
-.logos-root .lg-rail-tab:hover { color: var(--lg-ink-60); }
-.logos-root .lg-rail-tab.is-on {
-  background: #fff;
-  color: var(--lg-ink);
-  box-shadow: 0 1px 2px rgba(35, 36, 31, 0.08);
-}
-.logos-root .lg-rail-tabn {
-  font-size: 10px;
-  font-variant-numeric: tabular-nums;
-  color: var(--lg-ink-24);
-}
-.logos-root .lg-rail-tab.is-on .lg-rail-tabn { color: var(--lg-ink-40); }
+.logos-root .lg-mrail:hover { color: var(--lg-primary); background: rgba(53, 70, 32, 0.07); }
+.logos-root .lg-mrail[aria-expanded="true"] { color: var(--lg-ink-60); }
 
-.logos-root .lg-rail-list { flex: 1; min-height: 0; overflow-y: auto; padding: 0 6px 8px; }
-.logos-root .lg-rail-note {
-  padding: 6px 10px;
-  font-size: 11.5px;
-  line-height: 1.5;
-  color: var(--lg-ink-40);
-  font-style: italic;
-}
-.logos-root .lg-rail-item {
+/* ---------- rail: every line of thinking, with its map ----------
+   THE RULES THAT USED TO BE HERE ARE GONE — about 200 lines of `.lg-rail-*`:
+   a tab bar, map thumbnails, item rows, a rename box, a footer. Logos now
+   shows the Core surface's rail (components/LogosRail.tsx), which is drawn
+   entirely by `.s-*` in app/app-shell.css. Keeping a second, unused set of
+   rail styles is how a surface gets quietly restyled by whichever sheet
+   happens to load second.
+
+   What is left is the HOST. app-shell.css scopes every `.s-*` rule under
+   `.app-root` and will not style anything outside one, so the rail arrives
+   inside `<div class="app-root lg-railhost">`. `.app-root` also carries a page
+   background, a 100svh floor and a margin reset, which belong to a page rather
+   than to one column of this one — so this turns those off and leaves the
+   tokens and the typography, which are the part the rail needs. */
+.logos-root .lg-railhost {
   display: flex;
-  align-items: center;
-  gap: 9px;
-  padding: 7px 8px;
-  border-radius: 9px;
-  cursor: pointer;
-  transition: background 0.18s;
-}
-.logos-root .lg-rail-item:hover { background: rgba(35, 36, 31, 0.045); }
-.logos-root .lg-rail-item.is-active { background: rgba(53, 70, 32, 0.085); }
-.logos-root .lg-thumb {
-  flex: 0 0 auto;
-  width: 42px; height: 28px;
-  border-radius: 6px;
-  background: #fff;
-  border: 1px solid var(--lg-line);
-  display: block;
-  overflow: hidden;
-  color: var(--lg-ink);
-}
-.logos-root .lg-thumb svg { width: 100%; height: 100%; display: block; }
-/* A chat has no map, so its box is empty apart from three lines standing in
-   for what it is: a conversation. Same box, so every title in the rail still
-   starts on the same vertical line, and quiet enough that the real thumbnails
-   beside it stay the thing the eye lands on. */
-.logos-root .lg-thumb.is-chat {
-  display: grid;
-  place-items: center;
-  background: transparent;
-  border-style: dashed;
-  color: var(--lg-ink-24);
-}
-.logos-root .lg-rail-item.is-chat .lg-rail-name { font-weight: 400; }
-.logos-root .lg-rail-meta { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; }
-.logos-root .lg-rail-name {
-  font-size: 12.5px;
-  line-height: 1.3;
-  color: var(--lg-ink);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.logos-root .lg-rail-sub { font-size: 10.5px; color: var(--lg-ink-40); }
-/* Sits exactly where the name was, so renaming does not move the row. */
-.logos-root .lg-rail-rename {
-  width: 100%;
   min-width: 0;
-  margin: -2px 0;
-  padding: 1px 4px;
-  border: 1px solid var(--lg-primary);
-  border-radius: 5px;
-  background: #fff;
-  color: var(--lg-ink);
-  font: inherit;
-  font-size: 12.5px;
-  line-height: 1.3;
-  outline: none;
+  /* `.app-root` sets min-height:100svh, which inside a grid row of a
+     fixed-height split makes this column taller than the screen. */
+  min-height: 0;
+  /* `.app-root` paints two radial washes over the app paper. This column sits
+     on the Logos paper, and the rail paints its own translucent white. */
+  background: none;
+  overflow: hidden;
 }
+/* The bar is 280px wide in app-shell because it is a flex item there; here it
+   is the only child of a grid column, so it takes the column. The column is
+   280px too (see .lg-split above) — this makes them agree at every width
+   rather than at one. */
+.logos-root .lg-railhost .s-bar { width: 100%; }
 
-.logos-root .lg-rail-ren {
-  flex: 0 0 auto;
-  display: grid;
-  place-items: center;
-  border: none; background: transparent;
-  color: var(--lg-ink-24);
-  padding: 3px;
-  cursor: pointer;
-  opacity: 0;
-  transition: opacity 0.18s, color 0.18s;
-}
-.logos-root .lg-rail-item:hover .lg-rail-ren { opacity: 1; }
-.logos-root .lg-rail-ren:hover { color: var(--lg-primary); }
-/* Touch has no hover to reveal them with. */
-@media (hover: none) {
-  .logos-root .lg-rail-ren, .logos-root .lg-rail-del { opacity: 1; }
-}
-.logos-root .lg-rail-del {
-  flex: 0 0 auto;
-  border: none; background: transparent;
-  color: var(--lg-ink-24);
-  font-size: 15px; line-height: 1;
-  padding: 2px 4px;
-  cursor: pointer;
-  opacity: 0;
-  transition: opacity 0.18s, color 0.18s;
-}
-.logos-root .lg-rail-item:hover .lg-rail-del { opacity: 1; }
-.logos-root .lg-rail-del:hover { color: var(--lg-tension); }
-.logos-root .lg-rail-feedback {
-  display: block;
-  margin-top: 6px;
-  font-style: normal;
-  color: var(--lg-primary);
-  text-decoration: none;
-}
-.logos-root .lg-rail-feedback:hover { text-decoration: underline; }
-.logos-root .lg-rail-foot {
-  flex: 0 0 auto;
-  padding: 10px 12px;
-  border-top: 1px solid var(--lg-line);
-  font-size: 10.5px;
-  font-style: italic;
-  color: var(--lg-ink-40);
-}
-@media (max-width: 900px) {
-  .logos-root .lg-rail { border-right: none; border-bottom: 1px solid var(--lg-line); }
-  .logos-root .lg-rail-list { max-height: 30vh; }
+/* ---- the rail, in this surface's ink ----
+   NOTHING about the rail's design changes here. Not a class, not a rule, not a
+   measurement — it is the Core rail and it stays the Core rail. What changes is
+   the four colour tokens it reads, which are redefined on the host to the ones
+   Logos already uses everywhere else on this screen.
+
+   WHY. Logos has its own palette, on purpose: a darker green (#354620 rather
+   than #5e7633) and a warmer black. Dropping a component that reads `--moss-600`
+   into a header that reads `--lg-primary` puts two greens twenty pixels apart,
+   which is how one product ends up looking like two stuck together. A design
+   system's answer to that is not a second component — it is the same component
+   taking its colour from the surface it is on, which is all this does.
+
+   Delete this block and the rail turns /chat's exact greens. Everything else
+   about it is identical either way. */
+.logos-root .lg-railhost {
+  --ink: var(--lg-ink);
+  --ink-70: rgba(35, 36, 31, 0.7);
+  --ink-60: var(--lg-ink-60);
+  --ink-45: rgba(35, 36, 31, 0.45);
+  --ink-16: rgba(35, 36, 31, 0.16);
+  --ink-12: rgba(35, 36, 31, 0.12);
+  /* Core steps its green twice, 600 for marks and 700 for text; Logos has one
+     and uses it for both, so both point at it rather than at an invented
+     shade. The places that stepped from one to the other on hover still change
+     what else they change — a border, a background — so nothing loses its
+     hover, it just stops changing hue as well. */
+  --moss: var(--lg-primary);
+  --moss-600: var(--lg-primary);
+  --moss-700: var(--lg-primary);
+  --moss-50: rgba(53, 70, 32, 0.085);
+  /* The paper under the rail is Logos's, not the app register's. */
+  --app-paper: var(--lg-panel);
+  --app-border: var(--lg-line);
 }
 
 /* ---------- conversation ---------- */

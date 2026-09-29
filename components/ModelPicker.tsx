@@ -54,11 +54,16 @@ import '@/app/app-shell.css';
 // than by a hard-coded id — a new model lands in the right column on its own.
 // A Logos surface (Logos, Logos 2) opens the split screen; everything else is
 // a "how it answers" register.
+// …and a WITHDRAWN model is in neither list. It still exists, still answers, and
+// is simply not offered — which is the difference between holding a surface back
+// and deleting it out from under whoever was using it. See `withdrawn` in
+// lib/socria-prompt.ts, and withdrawnTo() for where its people go.
+const offered = (id: SocriaModel) => !SOCRIA_MODELS[id].withdrawn;
 const ANSWERERS = (Object.keys(SOCRIA_MODELS) as SocriaModel[]).filter(
-  (id) => !SOCRIA_MODELS[id].logosSurface
+  (id) => offered(id) && !SOCRIA_MODELS[id].logosSurface
 );
 const SURFACES = (Object.keys(SOCRIA_MODELS) as SocriaModel[]).filter(
-  (id) => SOCRIA_MODELS[id].logosSurface
+  (id) => offered(id) && SOCRIA_MODELS[id].logosSurface
 );
 
 export function ModelPicker({

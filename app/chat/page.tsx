@@ -36,6 +36,7 @@ import {
   rememberLength,
   rememberModel,
   rememberReadability,
+  withdrawnTo,
 } from '@/lib/socria-model-store';
 import { buildStarters } from '@/lib/starters';
 import {
@@ -191,7 +192,16 @@ function isLogosSurface(m: unknown): boolean {
 
 /** A model id that may actually be selected — real, and not a `soon` teaser. */
 function isSelectable(m: unknown): m is SocriaModel {
-  return typeof m === 'string' && m in SOCRIA_MODELS && !SOCRIA_MODELS[m as SocriaModel].soon;
+  return (
+    typeof m === 'string' &&
+    m in SOCRIA_MODELS &&
+    !SOCRIA_MODELS[m as SocriaModel].soon &&
+    // A withdrawn model cannot be selected — including by a link. Every
+    // ?model=logos link in the product, in an email and in somebody's bookmarks
+    // now lands on the successor rather than on a surface the picker will not
+    // show them; the redirect happens where `want` is applied.
+    !SOCRIA_MODELS[m as SocriaModel].withdrawn
+  );
 }
 
 function readModel(): SocriaModel {
@@ -860,12 +870,28 @@ export default function ChatPage() {
       } catch {}
       setLogosDismissed(true);
       setLogosModalOpen(false);
-      setModel('logos');
-      chooseModel('logos');
+      openLogos();
       return;
     }
     setLogosModalOpen(false);
     router.push('/sign-in?redirect_url=%2Fchat%3Fmodel%3Dlogos');
+  }
+
+  /**
+   * Into the Logos surface — whichever one is currently offered.
+   *
+   * Written as one function rather than two `setModel('logos')` calls because
+   * Logos 1 is WITHDRAWN (see `withdrawn` in lib/socria-prompt.ts) and sending
+   * somebody to a model the picker no longer lists would drop them on a surface
+   * they cannot get back to. withdrawnTo finds the successor structurally, so
+   * turning the flag off restores the old behaviour with no edit here.
+   */
+  function openLogos() {
+    const want: SocriaModel = SOCRIA_MODELS.logos.withdrawn
+      ? (withdrawnTo('logos') ?? 'logos-2')
+      : 'logos';
+    setModel(want);
+    chooseModel(want);
   }
 
   // A valid access key opens the whole product, so it goes straight to Logos.
@@ -876,8 +902,7 @@ export default function ChatPage() {
     } catch {}
     setLogosDismissed(true);
     setLogosModalOpen(false);
-    setModel('logos');
-    chooseModel('logos');
+    openLogos();
     return true;
   }
 
@@ -1956,9 +1981,17 @@ export default function ChatPage() {
       }
     }
 
-    if (!isSelectable(want)) return;
-    setModel(want);
-    chooseModel(want);
+    // A link asking for a withdrawn model lands on its successor rather than
+    // being ignored: the link was somebody's intent to open the environment, and
+    // dropping them on whatever they happened to be on last answers a different
+    // question.
+    const asked =
+      typeof want === 'string' && want in SOCRIA_MODELS && SOCRIA_MODELS[want as SocriaModel].withdrawn
+        ? withdrawnTo(want as SocriaModel)
+        : want;
+    if (!isSelectable(asked)) return;
+    setModel(asked);
+    chooseModel(asked);
     const url = new URL(window.location.href);
     url.searchParams.delete('model');
     window.history.replaceState({}, '', url.pathname + url.search);

@@ -27,6 +27,7 @@ import {
   modelWasChosen,
   readStoredModel,
   rememberModel,
+  withdrawnTo,
 } from './.tmp/socria-model-store.mjs';
 import { SOCRIA_MODELS as MODELS } from './.tmp/socria-prompt.mjs';
 import { readFileSync } from 'node:fs';
@@ -59,7 +60,12 @@ console.log('=== the default, by entitlement ===');
 
   ok('a visitor with no account opens on Core 3.1', auto(false, false) === 'core-3');
   ok('somebody signed in opens on Core 3.1 too', auto(true, false) === 'core-3');
-  ok('a member opens in Logos', auto(true, true) === 'logos');
+  // LOGOS 1 IS WITHDRAWN, so the member's default is its successor. The rule
+  // itself still names `logos`; `autoModel` sends it on. That indirection is
+  // the point — turning a model off is one line in the registry, and this
+  // assertion is what stops somebody "simplifying" it back into a hard pair.
+  ok('a member opens in the Logos surface that is offered', auto(true, true) === 'logos-2');
+  ok('...which is not the withdrawn one', auto(true, true) !== 'logos');
   ok('nobody is landed on a model with a retirement date', auto(false, false) !== 'core-2' && auto(true, false) !== 'core-2');
 
   // The one combination that should not exist, answered safely anyway: a plan
@@ -91,7 +97,14 @@ console.log('\n=== ours versus theirs ===');
   // or the next load would start overriding them again.
   rememberModel('logos');
   ok('a later default does not un-choose', modelWasChosen() === true);
-  ok('...though it still moves the stored model', readStoredModel() === 'logos');
+  // The write lands verbatim; the READ is where a withdrawn model hands over.
+  // Both halves are asserted, because storing the successor instead would lose
+  // what the person actually picked and they would not get it back when the
+  // model returns.
+  ok('...and what was written is what is stored',
+    localStorage.getItem(MODEL_KEY) === 'logos');
+  ok('...while reading it back gives the surface that is offered',
+    readStoredModel() === 'logos-2');
 }
 
 console.log('\n=== what the rule does to each kind of person ===');
@@ -108,7 +121,7 @@ console.log('\n=== what the rule does to each kind of person ===');
   ok('signing in: Core 3.1', opens({ hasAccount: true, isOne: false }) === 'core-3');
 
   fresh();
-  ok('subscribing: Logos', opens({ hasAccount: true, isOne: true }) === 'logos');
+  ok('subscribing: Logos', opens({ hasAccount: true, isOne: true }) === 'logos-2');
 
   // THE ONE THAT MATTERS. A member who deliberately went back to Core must
   // stay there — being returned to Logos on every visit is the product
@@ -132,8 +145,8 @@ console.log('\n=== what the rule does to each kind of person ===');
   // surface away.
   fresh();
   chooseModel('logos');
-  ok('a free person who chose Logos keeps it',
-    opens({ hasAccount: true, isOne: false }) === 'logos');
+  ok('a free person who chose Logos keeps a Logos surface',
+    opens({ hasAccount: true, isOne: false }) === 'logos-2');
 
   // Signing out is the exception the page enforces separately, because the
   // API would bounce every message. Asserted here as the rule it is.
@@ -143,7 +156,7 @@ console.log('\n=== what the rule does to each kind of person ===');
   chooseModel('logos');
   const signedOut = opens({ hasAccount: false, isOne: false });
   ok('a choice they can no longer use is still their choice, until clamped',
-    signedOut === 'logos');
+    signedOut === 'logos-2');
   ok('...and the clamp answers Core 3.1', autoModel({ hasAccount: false, isOne: false }) === 'core-3');
 }
 
@@ -166,7 +179,7 @@ console.log('\n=== the way back out of Logos ===');
   // Core 2 still stores and still returns: it answers until 2 October, and a
   // retirement that took somebody out of a conversation early would be the
   // one thing worse than the retirement.
-  ok('a model with a date on it is still a model', readStoredModel() === 'logos');
+  ok('a model with a date on it is still a model', readStoredModel() === 'logos-2');
 }
 
 console.log('\n=== nothing here throws in a browser that refuses storage ===');
@@ -186,7 +199,7 @@ console.log('\n=== nothing here throws in a browser that refuses storage ===');
   try { rememberModel('core-3'); chooseModel('logos'); } catch { threw = true; }
   ok('and writing survives', threw === false);
   // The rule itself never touches storage, so it still answers.
-  ok('the default is still decided', autoModel({ hasAccount: true, isOne: true }) === 'logos');
+  ok('the default is still decided', autoModel({ hasAccount: true, isOne: true }) === 'logos-2');
 }
 
 console.log('\n=== junk in storage is not a model ===');
@@ -200,7 +213,7 @@ console.log('\n=== junk in storage is not a model ===');
     ok(`"${junk}" is not a stored model`, readStoredModel() === null);
   }
   localStorage.setItem(MODEL_KEY, 'logos');
-  ok('a real one still reads', readStoredModel() === 'logos');
+  ok('a real one still reads', readStoredModel() === 'logos-2');
   // Logos 2 is real and selectable — it must store like any other.
   localStorage.setItem(MODEL_KEY, 'logos-2');
   ok('Logos 2 is a stored model', readStoredModel() === 'logos-2');
@@ -242,6 +255,84 @@ console.log('\n=== the retirement is data, and it is visible ===');
     MODELS['logos'].requiresAuth && MODELS['logos-2'].requiresAuth && MODELS['core-4'].requiresAuth);
   ok('the menu no longer offers Core 2 as the way in, signed out',
     /Core 3\.1 stays open, signed out/.test(picker));
+}
+
+console.log('\n=== a withdrawn model: still there, not offered, not stranding anybody ===');
+{
+  // TEMPORARY, AND THE TESTS SAY SO. Logos 1 is held back while Logos 2 is
+  // the surface being worked on. What is asserted here is the MECHANISM, not
+  // the fact that this particular model is off — so the day the line comes out
+  // of the registry, these tests keep passing and nothing has to be unpicked.
+
+  const held = Object.keys(MODELS).filter((id) => MODELS[id].withdrawn);
+  ok('a withdrawn model says why, in a sentence',
+    held.every((id) => typeof MODELS[id].withdrawn === 'string' && MODELS[id].withdrawn.length > 20));
+  // "Withdrawn" is not "removed" and not "soon". The model is still registered,
+  // still has an engine, and still answers whoever is already inside it; what
+  // it does not do is get OFFERED. `soon` would be the opposite claim — a model
+  // that does not exist yet — so a model must not carry both.
+  ok('and it is still a model: registered, labelled, with an engine',
+    held.every((id) =>
+      typeof MODELS[id].label === 'string' && MODELS[id].label.length > 0 &&
+      typeof MODELS[id].defaultOpenAIModel === 'string' &&
+      MODELS[id].defaultOpenAIModel.length > 0));
+  ok('and withdrawn is not the same claim as soon',
+    held.every((id) => !MODELS[id].soon));
+  // AND IT STILL ANSWERS. Withdrawal is a decision about what gets OFFERED,
+  // made on the client; no API route may read it, or somebody mid-conversation
+  // in a model we turned off would have their next message bounced — which is
+  // taking the work away, not holding the model back.
+  const routes = [
+    'app/api/chat/route.ts',
+    'app/api/logos/chat/route.ts',
+    'app/api/logos/map/route.ts',
+  ];
+  ok('no API route reads the withdrawn flag',
+    routes.every((f) => !/withdrawn/.test(readFile(f))));
+
+  // The successor is found by SHAPE. A withdrawn Logos surface hands over to a
+  // Logos surface; a withdrawn Core would hand over to a Core. Asserted as the
+  // rule rather than as the pair, because the pair is what goes stale.
+  for (const id of held) {
+    const to = withdrawnTo(id);
+    ok(`${id} has a successor`, to !== null);
+    if (to) {
+      ok(`  ${to} is the same kind of surface`,
+        !!MODELS[to].logosSurface === !!MODELS[id].logosSurface);
+      ok('  and it is one that is actually offered',
+        !MODELS[to].withdrawn && !MODELS[to].soon);
+    }
+  }
+
+  // Nothing routes INTO a withdrawn model, by any of the three doors.
+  fresh();
+  ok('the automatic default never lands on one',
+    !MODELS[autoModel({ hasAccount: true, isOne: true })].withdrawn &&
+    !MODELS[autoModel({ hasAccount: true, isOne: false })].withdrawn &&
+    !MODELS[autoModel({ hasAccount: false, isOne: false })].withdrawn);
+
+  for (const id of held) {
+    fresh();
+    chooseModel(id);
+    ok(`a stored ${id} reads back as something offered`,
+      !MODELS[readStoredModel()].withdrawn);
+    ok('  ...and the raw choice is kept, so restoring the model restores them',
+      localStorage.getItem(MODEL_KEY) === id);
+    rememberModel(id);
+    ok('  ...and it never becomes the way back out of Logos',
+      !MODELS[lastCoreModel()].withdrawn);
+  }
+
+  // The picker and the chat page both have to agree, or the model would be
+  // reachable from a menu row or a link that the store then redirects — which
+  // is worse than either, because the person is told two things.
+  const picker = readFile('components/ModelPicker.tsx');
+  const chat = readFile('app/chat/page.tsx');
+  ok('the picker filters withdrawn models out of what it offers',
+    /withdrawn/.test(picker));
+  ok('the chat page refuses to select one', /withdrawn/.test(chat));
+  ok('  and sends a ?model= link for one to the successor',
+    /withdrawnTo/.test(chat));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

@@ -119,10 +119,34 @@ export function rememberLength(v: ReplyLength): void {
 export function readStoredModel(): SocriaModel | null {
   try {
     const raw = localStorage.getItem(MODEL_KEY);
-    return isModel(raw) ? raw : null;
+    if (!isModel(raw)) return null;
+    // A MODEL THAT HAS BEEN WITHDRAWN IS NOT A CHOICE ANY MORE, and reading one
+    // back would strand whoever last picked it on a surface the product no
+    // longer offers. `withdrawnTo` says where they go instead — the successor if
+    // there is one, and the automatic default otherwise.
+    const held = SOCRIA_MODELS[raw].withdrawn;
+    return held ? withdrawnTo(raw) : raw;
   } catch {
     return null;
   }
+}
+
+/**
+ * Where somebody goes when the model they were on has been withdrawn.
+ *
+ * The successor is found STRUCTURALLY rather than by name: a withdrawn Logos
+ * surface hands over to another Logos surface that is offered, because that is
+ * the same kind of experience. With no such successor the answer is null, and
+ * the caller falls back to the automatic default — which is better than a
+ * hand-written pair that goes stale the next time the registry changes.
+ */
+export function withdrawnTo(model: SocriaModel): SocriaModel | null {
+  const from = SOCRIA_MODELS[model];
+  const offered = (Object.keys(SOCRIA_MODELS) as SocriaModel[]).filter(
+    (id) => id !== model && !SOCRIA_MODELS[id].withdrawn && !SOCRIA_MODELS[id].soon
+  );
+  const sameKind = offered.find((id) => !!SOCRIA_MODELS[id].logosSurface === !!from.logosSurface);
+  return sameKind ?? null;
 }
 
 /**
@@ -149,7 +173,11 @@ export function readStoredModel(): SocriaModel | null {
  * without a browser — it is a policy, and policies are what drift.
  */
 export function autoModel(opts: { hasAccount: boolean; isOne: boolean }): SocriaModel {
-  return opts.isOne && opts.hasAccount ? 'logos' : 'core-3';
+  const want: SocriaModel = opts.isOne && opts.hasAccount ? 'logos' : 'core-3';
+  // …unless that model has been withdrawn, in which case its successor. Written
+  // this way rather than by editing the pair above so that turning a model off is
+  // one line in the registry and nothing else — see `withdrawn` there.
+  return SOCRIA_MODELS[want].withdrawn ? (withdrawnTo(want) ?? 'core-3') : want;
 }
 
 /** The Core model to return to when leaving Logos. */
@@ -164,6 +192,7 @@ export function lastCoreModel(): SocriaModel {
       typeof raw === 'string' &&
       raw in SOCRIA_MODELS &&
       !SOCRIA_MODELS[raw as SocriaModel].soon &&
+      !SOCRIA_MODELS[raw as SocriaModel].withdrawn &&
       !SOCRIA_MODELS[raw as SocriaModel].logosSurface
     ) {
       return raw as SocriaModel;

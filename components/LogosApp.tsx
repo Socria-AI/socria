@@ -51,7 +51,6 @@ import {
   startMessage,
 } from '@/lib/first-session';
 import { exportMapPng } from '@/components/MapPoster';
-import { JourneyDebugModal } from '@/components/JourneyDebugModal';
 import { sanitizeUserUnderstanding, type UserUnderstanding } from '@/lib/socria-prompt';
 import { OneLock } from '@/components/OneLock';
 import {
@@ -310,7 +309,6 @@ export function LogosApp({
   const recurrenceSaidRef = useRef<Set<string>>(new Set());
   /** attribution stashed across a sign-in, so a resumed checkout keeps its trigger */
   const resumeRef = useRef<{ trigger?: string; surface?: string; source?: string } | null>(null);
-  const [memoryOpen, setMemoryOpen] = useState(false);
   // The boundary note is dismissible — said once, not nagged.
   const [limitNoteOff, setLimitNoteOff] = useState(false);
   // The extraction wanted to add something and the free map was full.
@@ -876,6 +874,17 @@ export function LogosApp({
   useEffect(() => {
     if (window.innerWidth <= 900) setRailOpen(false);
   }, []);
+
+  /**
+   * Put the drawer away after it has been used — but only where it IS a
+   * drawer. /chat closes its sidebar on every row click because above 768px
+   * the flag does not hide anything; here the same flag also owns a column of
+   * the desktop grid, so closing it unconditionally would collapse the rail
+   * of somebody who just picked a session with a mouse.
+   */
+  const usedRail = () => {
+    if (window.innerWidth <= 900) setRailOpen(false);
+  };
 
   useEffect(() => {
     // Each setting restores in its own try, and that is the point rather than
@@ -2555,35 +2564,11 @@ export function LogosApp({
         error={oneError}
       />
 
-      {/* The contextual prompt. Says what stopped and how to keep going, and
-          nothing else — the full plate above is for when someone goes looking
-          for it. Both end at the same checkout. */}
-      <JourneyDebugModal
-        open={memoryOpen}
-        onClose={() => setMemoryOpen(false)}
-        journey={understanding}
-        plan={plan}
-        signedIn={!!isSignedIn}
-        onForget={async (id) => {
-          try {
-            const res = await fetch('/api/profile/forget', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ id }),
-            });
-            if (res.ok) {
-              const j = await res.json();
-              if (j?.understanding) setUnderstanding(sanitizeUserUnderstanding(j.understanding));
-            }
-          } catch {}
-        }}
-        onForgetAll={async () => {
-          try {
-            const res = await fetch('/api/account/memory', { method: 'DELETE' });
-            if (res.ok) setUnderstanding(null);
-          } catch {}
-        }}
-      />
+      {/* The Thinking Journey sheet used to be mounted here, behind the
+          header's memory button. Both are gone: the rail's footer links to
+          /memory, which holds the Mind Graph AND the Journey with the same
+          per-entry forget this sheet carried. Nothing was dropped on the way
+          past — it is one screen instead of two. */}
 
       <OnePrompt
         view={onePrompt}
@@ -2612,20 +2597,33 @@ export function LogosApp({
           mobileView === 'map' ? ' mv-map' : ''
         }`}
       >
-        <LogosRail
-          sessions={sessions}
-          chats={chats}
-          onOpenChat={onOpenChat}
-          activeId={activeId}
-          open={railOpen}
-          syncing={hydrating}
-          cloud={cloud}
-          onSelect={switchSession}
-          onNew={newSession}
-          onDelete={deleteSession}
-          onRename={renameSession}
-          onToggle={() => setRailOpen((v) => !v)}
-        />
+        {/* The rail is the Core surface's rail, and app-shell.css scopes every
+            `.s-*` rule under `.app-root` — so it arrives inside one. The host
+            is a box in this grid and nothing more: `.app-root`'s own page
+            background and 100svh floor belong to a page, not to one column of
+            this one, and globals.css turns both off for `.lg-railhost`. */}
+        <div className="app-root lg-railhost">
+          <LogosRail
+            sessions={sessions}
+            chats={chats}
+            onOpenChat={onOpenChat}
+            activeId={activeId}
+            open={railOpen}
+            syncing={hydrating}
+            cloud={cloud}
+            onSelect={(id) => {
+              switchSession(id);
+              usedRail();
+            }}
+            onNew={() => {
+              newSession();
+              usedRail();
+            }}
+            onDelete={deleteSession}
+            onRename={renameSession}
+            onToggle={() => setRailOpen((v) => !v)}
+          />
+        </div>
 
         {/* ── Conversation ───────────────────────────────── */}
         <section className="lg-convo" aria-label="Conversation">
@@ -2635,13 +2633,21 @@ export function LogosApp({
                 container — only what is inside it (globals.css, "the header,
                 when the conversation column is narrow"). */}
             <div className="lg-head-row">
-            {/* mobile: the rail lives behind this; on desktop the rail has
-                its own toggle and this button does not exist */}
+            {/* The rail's toggle, and it is HERE rather than in the rail
+                because the rail is the Core surface's and the Core surface's
+                has no desktop collapse. Logos needs one — it shows three
+                columns and the draft makes four — so the control sits with the
+                other layout controls instead of being bolted onto a shared
+                component. On a phone the rail is a drawer and this is the
+                hamburger that brings it back; the × inside the drawer, which
+                app-shell.css shows only at that width, puts it away again. */}
             <button
               type="button"
               className="lg-mrail"
-              onClick={() => setRailOpen(true)}
-              aria-label="Your lines of thinking"
+              onClick={() => setRailOpen((v) => !v)}
+              aria-expanded={railOpen}
+              aria-label={railOpen ? 'Hide your lines of thinking' : 'Your lines of thinking'}
+              title={railOpen ? 'Hide the rail' : 'Your lines of thinking'}
             >
               <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
                 <path d="M4 7h16M4 12h16M4 17h10" />
@@ -2652,21 +2658,16 @@ export function LogosApp({
               <span className="lg-sr">Socria Logos</span>
             </span>
             <span className="lg-head-note">A reasoning environment</span>
-            {/* Logos hears "you've leaned on this before"; this is where it
-                came from, and where it can be forgotten — on every plan. */}
-            {isSignedIn && (
-              <button
-                type="button"
-                className="lg-memory-btn"
-                onClick={() => setMemoryOpen(true)}
-                aria-label="What Socria remembers"
-              >
-                {/* Two labels; the header's width chooses one (globals.css,
-                    "the header, when the conversation column is narrow"). */}
-                <span className="lg-lbl-long">What Socria remembers</span>
-                <span className="lg-lbl-short" aria-hidden="true">Memory</span>
-              </button>
-            )}
+            {/* WHERE THE MEMORY BUTTON WENT. It was here, and it opened the
+                Thinking Journey. /chat moved the same control into the rail's
+                footer as a link to /memory, because /memory IS the Mind Graph
+                — the rows the prompt is actually built from — and the Journey
+                is on that page too, labelled as the older Cores' store and
+                carrying the per-entry forget. Logos now shows the Core rail, so
+                that link is already on this screen; a second control in the
+                header, pointing somewhere else, is how one product ends up
+                telling a person two things about what it remembers. */
+            }
             <button
               type="button"
               className="lg-guide-open"
