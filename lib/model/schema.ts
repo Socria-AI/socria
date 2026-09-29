@@ -235,6 +235,15 @@ export interface ModelObject {
   system?: SystemDecl;
   /** parts that assemble into equations of motion — see mechanism.ts */
   mechanism?: MechanismDecl;
+  /**
+   * Bodies under mutual gravity — see gravity.ts.
+   *
+   * A SOLAR SYSTEM IS THIS BLOCK, and so is Earth and Moon, a binary star, a
+   * three-body figure-eight and a star with five invented planets. There is no
+   * branch anywhere on what the system is called: the assembler writes the
+   * pairwise equations from the bodies it is given, and the integrator runs them.
+   */
+  gravity?: GravityDecl;
   /** a specification to be fitted to data — see estimate.ts */
   estimation?: EstimationDecl;
 
@@ -313,6 +322,46 @@ export interface MechanismDecl {
   springs?: LinkDecl[];
   dampers?: LinkDecl[];
   forces?: ForceDecl[];
+  dt?: number;
+  steps?: number;
+}
+
+export interface GravityBodyDecl {
+  id: string;
+  /** mass, or the id of a control */
+  mass: number | string;
+  /** where it starts, in the declaration's units */
+  x?: number | string;
+  y?: number | string;
+  /** how fast it is going when the clock starts */
+  vx?: number | string;
+  vy?: number | string;
+  label?: string;
+  /** where the numbers came from, per body — a source, a dataset, a default */
+  from?: Origin;
+}
+
+export interface GravityDecl {
+  /**
+   * Bodies that pull on one another. TWO OR MORE, because one body on its own has
+   * nothing to fall toward — see lib/model/gravity.ts, which assembles these into
+   * the same state-space system the integrator already runs.
+   */
+  bodies: GravityBodyDecl[];
+  /** the only law implemented. Named, so another can be added beside it. */
+  law?: 'newton';
+  /**
+   * Which units the numbers are in. Astronomical (AU, solar masses, years) gives
+   * G = 4π² and is what a planetary system should use; SI is for everything else.
+   * Mixing them silently would produce a plausible picture of nothing.
+   */
+  units?: 'astronomical' | 'si';
+  /** override G, for a model working in units of its own */
+  G?: number | string;
+  /** softening length: a numerical device that keeps a close pass finite */
+  softening?: number | string;
+  /** the plane the motion is computed in. Stated rather than assumed. */
+  plane?: 'xy';
   dt?: number;
   steps?: number;
 }
@@ -560,7 +609,10 @@ export function sanitizeObject(raw: unknown): ModelObject | null {
   // and pattern-checked, counts are capped, and anything unrecognised is dropped
   // rather than passed through — the evaluator refuses what it does not know,
   // and this is the layer that stops it ever being asked.
-  const expr = (v: unknown) => text(v, 300);
+  // 1,200 rather than 300: a hand-written three-body right-hand side is already
+  // past 300, and the assemblers generate longer ones still (see the note in
+  // lib/logos-math.ts). Bounded, not unbounded.
+  const expr = (v: unknown) => text(v, 1200);
   const nameOk = (k: string) => /^[a-z][a-z0-9_]{0,23}$/i.test(k);
   const initOf = (v: unknown): number | string | null => {
     const n = num(v);
@@ -681,6 +733,49 @@ export function sanitizeObject(raw: unknown): ModelObject | null {
         ...(links(mech.dampers).length ? { dampers: links(mech.dampers) } : {}),
         ...(forces.length ? { forces } : {}),
         ...(dt !== null && dt > 0 ? { dt: Math.min(1, dt) } : {}),
+        ...(steps !== null && steps > 0 ? { steps: Math.min(20_000, Math.floor(steps)) } : {}),
+      };
+    }
+  }
+
+  const grav = r.gravity as Record<string, unknown> | undefined;
+  if (grav && typeof grav === 'object' && Array.isArray(grav.bodies)) {
+    const bodies: GravityBodyDecl[] = [];
+    for (const raw2 of grav.bodies.slice(0, 12)) {
+      if (!raw2 || typeof raw2 !== 'object') continue;
+      const q = raw2 as Record<string, unknown>;
+      const bid = text(q.id, 24);
+      if (!nameOk(bid) || bodies.some((b) => b.id === bid)) continue;
+      const mass = initOf(q.mass);
+      if (mass === null) continue;
+      const at = (k: string) => initOf(q[k]);
+      // Where this body's numbers came from — a source, a dataset, a default, the
+      // person. Checked against the one list of origins rather than trusted, and
+      // absent rather than guessed: a mass with no stated origin reads as the
+      // model's inference, which is what it is.
+      const origin = q.from && (q.from as string) in ORIGIN_SAYS ? (q.from as Origin) : null;
+      bodies.push({
+        id: bid,
+        mass,
+        ...(at('x') !== null ? { x: at('x') as number | string } : {}),
+        ...(at('y') !== null ? { y: at('y') as number | string } : {}),
+        ...(at('vx') !== null ? { vx: at('vx') as number | string } : {}),
+        ...(at('vy') !== null ? { vy: at('vy') as number | string } : {}),
+        ...(text(q.label, 60) ? { label: text(q.label, 60) } : {}),
+        ...(origin ? { from: origin } : {}),
+      });
+    }
+    if (bodies.length >= 2) {
+      const dt = num(grav.dt);
+      const steps = num(grav.steps);
+      out.gravity = {
+        bodies,
+        law: 'newton',
+        units: grav.units === 'si' ? 'si' : 'astronomical',
+        plane: 'xy',
+        ...(initOf(grav.G) !== null ? { G: initOf(grav.G) as number | string } : {}),
+        ...(initOf(grav.softening) !== null ? { softening: initOf(grav.softening) as number | string } : {}),
+        ...(dt !== null && dt > 0 ? { dt } : {}),
         ...(steps !== null && steps > 0 ? { steps: Math.min(20_000, Math.floor(steps)) } : {}),
       };
     }
