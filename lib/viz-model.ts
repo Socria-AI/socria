@@ -409,8 +409,13 @@ export type VizOp =
   // the model as a whole.
   /** take an object out of the model, reassembling whatever depended on it */
   | { op: 'remove'; of: string }
-  /** put a part in: a body, a spring or a damper between things that exist */
-  | { op: 'add'; kind: 'body' | 'spring' | 'damper'; id: string; between?: [string, string]; value?: number }
+  /**
+   * Put a part in: a body, a spring or a damper between things that exist, or
+   * a VARIABLE — a regressor joining a specification, which is the same verb
+   * because it is the same act. "Add years of experience" to a wage equation
+   * and "add a spring between m1 and m2" both mean: the model gains a term.
+   */
+  | { op: 'add'; kind: 'body' | 'spring' | 'damper' | 'variable'; id: string; between?: [string, string]; value?: number }
   /** change what a part IS — a damper becomes a spring, so the term changes */
   | { op: 'replace'; of: string; becomes: 'spring' | 'damper' }
   /** a copy under its own id, the original untouched */
@@ -569,9 +574,15 @@ export function parseVizOps(reply: string, state: VizModelState | null | undefin
     }
     if (verb === 'add' && bits.length >= 3 && editable) {
       const kind = bits[1].toLowerCase();
-      if (kind !== 'body' && kind !== 'spring' && kind !== 'damper') continue;
+      if (kind !== 'body' && kind !== 'spring' && kind !== 'damper' && kind !== 'variable') continue;
       const id = bits[2];
       if (!/^[a-z][a-z0-9_]{0,23}$/i.test(id)) continue;
+      // add variable experience — a regressor joins the specification. No ends
+      // and no value: where it goes is decided by what the model already says.
+      if (kind === 'variable') {
+        out.push({ op: 'add', kind, id });
+        continue;
+      }
       // add spring k3 m1 m2 40   |   add body m4 2
       const rest = bits.slice(3);
       const nums = rest.filter((b) => Number.isFinite(Number(b))).map(Number);
@@ -798,6 +809,7 @@ export function vizOpsHelp(state: VizModelState): string {
     state.edits ? `remove <object>                  take it OUT of the model — the equations are assembled again without it` : '',
     state.edits ? 'replace <object> with spring|damper   change what a part IS, so its term in the equations changes' : '',
     state.edits ? 'add spring|damper <id> <end> <end> [value]   |   add body <id> [mass]' : '',
+    state.edits ? 'add variable <name>              a regressor joins the specification; the equation gains a term' : '',
     state.edits ? 'duplicate | branch <name>        a copy under its own id; the original is untouched' : '',
     state.edits ? 'undo | redo                      the model’s own history, not the picture’s' : '',
     state.edits ? 'delete                           the model itself goes' : '',

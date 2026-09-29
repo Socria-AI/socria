@@ -37,9 +37,9 @@
 // PURE: models in, models out. No React, no storage, no clock of its own.
 
 import { compare, type Comparison } from './state';
-import { expand } from './mechanism';
+import { unpack } from './unpack';
 import { objectOf, sanitizeModel, setParam, type Model, type ModelObject } from './schema';
-import { buildProposal, revalidate, type BuildReport } from './propose';
+import { buildProposal, revalidate, type BuildReport, type Refusal } from './propose';
 import type { VizModelState, VizOp } from '@/lib/viz-model';
 
 /** How many revisions one document keeps. The oldest is dropped, never the newest. */
@@ -243,7 +243,7 @@ export function removeObject(ws: ModelWorkspace, id: string, objectId: string, a
   // target is resolved against the expanded model and the edit is applied to the
   // declaration. Looking it up in the stored model instead reported "there is
   // nothing called that" for every part, one edit after the first.
-  const target = objectOf(expand(model), objectId);
+  const target = objectOf(unpack(model), objectId);
   if (!target) return no(ws, `${model.title} has nothing called ${objectId}`);
 
   const part = typeof target.meta?.part === 'string' ? target.meta.part : null;
@@ -280,7 +280,7 @@ export function removeObject(ws: ModelWorkspace, id: string, objectId: string, a
     const next: Model = {
       ...model,
       version: (model.version ?? 0) + 1,
-      // The expanded copies go too: they are derived, and expand() will rebuild
+      // The expanded copies go too: they are derived, and unpack() will rebuild
       // exactly the ones the new declaration implies.
       objects: model.objects
         .filter((o) => o.meta?.mech !== carrierId)
@@ -293,6 +293,81 @@ export function removeObject(ws: ModelWorkspace, id: string, objectId: string, a
       says: `${target.label} is out of the model — the governing system is reassembled with one fewer term, and everything recomputes from it`,
       affected: [carrierId],
     };
+  }
+
+  // A PART OF A SPECIFICATION. "Remove education" must change what the model
+  // SAYS — the regressor leaves the specification and the equation is one term
+  // shorter — rather than deleting a derived object that unpack() would put
+  // straight back on the next build. Same rule as a mechanism part above; this
+  // is the specification's half of it.
+  const specOf = typeof target.meta?.spec === 'string' ? target.meta.spec : null;
+  if (specOf) {
+    const carrier = objectOf(model, specOf);
+    if (!carrier?.estimation) return no(ws, `${target.label} belongs to a specification that is not in this model`);
+    const est = carrier.estimation;
+    const role = target.meta?.role;
+    const column = typeof target.meta?.column === 'string' ? target.meta.column : null;
+
+    if (role === 'outcome') {
+      return no(
+        ws,
+        `${target.label} is what this model explains — a specification with nothing on the left is not a specification. Say what the outcome should be instead, and I will change it.`
+      );
+    }
+    if (role === 'coefficient' || role === 'error') {
+      return no(
+        ws,
+        `${target.label} is not something to delete: it is there because the specification has ${
+          role === 'error' ? 'a part it does not explain' : 'that term'
+        }. Remove the variable it belongs to and it goes with it.`
+      );
+    }
+    if (role === 'intercept') {
+      const next: Model = {
+        ...model,
+        version: (model.version ?? 0) + 1,
+        objects: model.objects
+          .filter((o) => o.meta?.spec !== specOf)
+          .map((o) => (o.id === specOf ? { ...o, estimation: { ...est, intercept: false } } : o)),
+        lastChange: { what: 'dropped the intercept', affected: [specOf], at },
+      };
+      return {
+        workspace: patch(ws, id, (d) => revise(d, next, 'the specification is fitted through the origin')),
+        ok: true,
+        says: 'The intercept is out — the specification now passes through the origin, which is a real assumption and rarely the right one. Say so if you want it back.',
+        affected: [specOf],
+      };
+    }
+    if (role === 'regressor' && column) {
+      if (est.x.length === 1) {
+        return no(
+          ws,
+          `${target.label} is the only thing explaining ${est.y}: taking it out would leave a specification with nothing on the right. Add another variable first, or say what should replace it.`
+        );
+      }
+      const next: Model = {
+        ...model,
+        version: (model.version ?? 0) + 1,
+        objects: model.objects
+          // The derived objects go; unpack() rebuilds exactly the ones the new
+          // specification implies, and their ids are positional.
+          .filter((o) => o.meta?.spec !== specOf)
+          .map((o) =>
+            o.id === specOf ? { ...o, estimation: { ...est, x: est.x.filter((c) => c !== column) } } : o
+          ),
+        lastChange: { what: `removed ${column}`, affected: [specOf], at },
+      };
+      return {
+        workspace: patch(ws, id, (d) => revise(d, next, `removed ${column} from the specification`)),
+        ok: true,
+        says: `${column} is out of the specification — ${est.y} is now explained by ${est.x
+          .filter((c) => c !== column)
+          .join(', ')}${
+          est.data ? ', and anything fitted is re-estimated from that' : ', and the coefficients remain symbols until there is data'
+        }`,
+        affected: [specOf],
+      };
+    }
   }
 
   // An ordinary object. Relations pointing at it go with it, because an edge to
@@ -342,7 +417,7 @@ export function replacePart(
   const doc = docOf(ws, id);
   if (!doc) return no(ws, `there is no model called ${id} here`);
   const model = current(doc);
-  const target = objectOf(expand(model), objectId);
+  const target = objectOf(unpack(model), objectId);
   if (!target) return no(ws, `${model.title} has nothing called ${objectId}`);
   const part = typeof target.meta?.part === 'string' ? target.meta.part : null;
   const carrierId = typeof target.meta?.mech === 'string' ? target.meta.mech : null;
@@ -395,12 +470,49 @@ export function replacePart(
 export function addPart(
   ws: ModelWorkspace,
   id: string,
-  spec: { kind: 'body' | 'spring' | 'damper'; partId: string; between?: [string, string]; value?: number | string; mass?: number | string; label?: string },
+  spec: { kind: 'body' | 'spring' | 'damper' | 'variable'; partId: string; between?: [string, string]; value?: number | string; mass?: number | string; label?: string },
   at = 0
 ): EditResult {
   const doc = docOf(ws, id);
   if (!doc) return no(ws, `there is no model called ${id} here`);
   const model = current(doc);
+
+  // A VARIABLE JOINS A SPECIFICATION. The same verb as adding a spring, because
+  // it is the same act: the model gains a term, the equation is written again
+  // with it, and anything fitted is re-estimated. Handled before the mechanism
+  // branch because the two carriers are different objects.
+  if (spec.kind === 'variable') {
+    const carrier = model.objects.find((o) => !!o.estimation);
+    if (!carrier?.estimation) return no(ws, `${model.title} has no specification to add a variable to`);
+    const est = carrier.estimation;
+    const name = spec.partId;
+    if (name === est.y) return no(ws, `${name} is the outcome — it cannot also explain itself`);
+    if (est.x.includes(name)) return no(ws, `${name} is already in the specification`);
+    if (est.x.length >= 20) return no(ws, `this specification already carries ${est.x.length} regressors`);
+    const next: Model = {
+      ...model,
+      version: (model.version ?? 0) + 1,
+      objects: model.objects
+        .filter((o) => o.meta?.spec !== carrier.id)
+        .map((o) => (o.id === carrier.id ? { ...o, estimation: { ...est, x: [...est.x, name] } } : o)),
+      lastChange: { what: `added ${name}`, affected: [carrier.id], at },
+    };
+    // WHETHER THE DATA HAS IT IS A SEPARATE QUESTION, and the estimator answers
+    // it: a column that is not in the block comes back as missing structure
+    // rather than as a silent drop. Saying so here would be guessing at it.
+    const hasData = !!est.data && !!model.data?.[est.data];
+    return {
+      workspace: patch(ws, id, (d) => revise(d, next, `added ${name} to the specification`)),
+      ok: true,
+      says: `${name} is in the specification — ${est.y} is now explained by ${[...est.x, name].join(', ')}${
+        hasData
+          ? ', and the fit is re-estimated with it. If the data has no such column, the model will say so rather than drop it quietly.'
+          : ', with its coefficient a symbol until there is data'
+      }`,
+      affected: [carrier.id],
+    };
+  }
+
   const carrier = model.objects.find((o) => !!o.mechanism);
   if (!carrier?.mechanism) return no(ws, `${model.title} has no mechanism to add to`);
   const mech = carrier.mechanism;
@@ -541,16 +653,29 @@ export function openFromProposal(
   ws: ModelWorkspace,
   proposal: unknown,
   opts?: { at?: number }
-): { workspace: ModelWorkspace; doc: ModelDoc | null; says: string } {
+): {
+  workspace: ModelWorkspace;
+  doc: ModelDoc | null;
+  says: string;
+  /**
+   * The engine's own refusal, when it refused.
+   *
+   * CARRIED OUT RATHER THAN FLATTENED TO A SENTENCE. The caller has to sort the
+   * refusal into a kind — is this missing data, missing structure, or a backend
+   * that does not exist? — and each needs something completely different from
+   * the person. Re-deriving that from prose would be parsing our own English.
+   */
+  refusal?: Refusal;
+} {
   const built = buildProposal(proposal, opts);
-  if (!built.ok) return { workspace: ws, doc: null, says: built.refusal.says };
+  if (!built.ok) return { workspace: ws, doc: null, says: built.refusal.says, refusal: built.refusal };
   const made = open(ws, built.model, { report: built.report });
   return { workspace: made.workspace, doc: made.doc, says: built.report.says };
 }
 
 /** A built model, for the renderer: the current revision, expanded and ready. */
 export function modelFor(doc: ModelDoc): Model {
-  return expand(current(doc));
+  return unpack(current(doc));
 }
 
 /** For a host that has to store it: the workspace, plainly. */

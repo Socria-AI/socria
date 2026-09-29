@@ -18,6 +18,7 @@ import { sanitizeModel } from './.tmp/schema.mjs';
 import { sanitizeViz } from './.tmp/logos-viz.mjs';
 import { sanitizeMap } from './.tmp/logos.mjs';
 import { buildProposal, revalidate, reportLines } from './.tmp/propose.mjs';
+import { unpack } from './.tmp/unpack.mjs';
 import {
   open, remove, use, duplicate, branch, undo, redo, reset, restore,
   setValue, removeObject, replacePart, addPart, applyModelOps,
@@ -115,20 +116,43 @@ console.log('\n=== the on-ramp: validated, routed, and honest about what it did 
     JSON.stringify(built.model.objects.map((o) => o.provenance?.origin)));
   ok('  and says so in words', /not chosen by you/.test(built.model.objects[0].provenance.detail));
 
-  // Refusals, which are the more important half.
+  // A MECHANISM WITH AN UNUSABLE MASS. This used to be REFUSED, and the change
+  // is deliberate: a body, a spring and ground IS a mechanism, and the thing
+  // standing between it and running is one number. Refusing said "I could not
+  // turn that into a model", which is indistinguishable from "I did not
+  // understand you" and loses them the structure they had described.
+  //
+  // So it builds — and the whole weight of the change rests on it building
+  // HONESTLY. The three assertions below are the ones that matter: it must not
+  // claim to compute, it must name the mass, and the mass must not acquire a
+  // value on the way through.
   const noMass = buildProposal(proposal({
     objects: [{
       id: 'mech', kind: 'component', label: 'The mechanism',
       mechanism: { bodies: [{ id: 'm1', mass: 'nope', x0: 1 }], springs: [{ id: 'k1', between: ['m1', 'ground'], value: 'k' }] },
     }],
   }));
-  ok('a proposal whose mass is not a number or a control is refused', !noMass.ok);
-  ok('  and says what would let it build', /mass/i.test(noMass.refusal.says), noMass.refusal.says);
+  ok('a mechanism whose mass is unusable still builds — it is a mechanism', noMass.ok === true,
+    noMass.ok ? '' : noMass.refusal.because);
+  if (noMass.ok) {
+    ok('  but it does NOT claim to compute',
+      noMass.report.capability === 'mathematical', noMass.report.capability);
+    ok('  and it names the mass as what is missing',
+      /mass/i.test(JSON.stringify(noMass.report.missing)), JSON.stringify(noMass.report.missing));
+    ok('  and no value was invented for it',
+      !noMass.report.solvers.length, JSON.stringify(noMass.report.solvers));
+  }
 
   const nothing = buildProposal({ id: 'empty', title: 'Nothing', params: [], objects: [{ id: 'a', kind: 'annotation', label: 'A note' }] });
   ok('a proposal with nothing computable is refused', !nothing.ok);
   ok('  rather than being drawn as though it were a model', !('model' in nothing));
-  ok('  and it offers to hold the structure anyway', /represent it/.test(nothing.refusal.says));
+  // The refusal says what would make it a model, rather than offering to draw
+  // it anyway. The old wording offered to "represent it", which was hollow —
+  // buildProposal refuses, so nothing gets represented — and a person reading
+  // it learned nothing about what to do next.
+  ok('  and the refusal says what would make it one',
+    /equation|system|specification/.test(nothing.refusal.says), nothing.refusal.says);
+  ok('  in terms of what depends on what', /depends on what/.test(nothing.refusal.says));
 
   ok('junk is refused', !buildProposal(null).ok && !buildProposal({ nope: 1 }).ok);
 
@@ -145,8 +169,25 @@ console.log('\n=== the on-ramp: validated, routed, and honest about what it did 
     data: { sample: { label: 'synthetic', columns: { x: [1, 2, 3, 4, 5, 6], y: [2, 4, 6, 8, 10, 12] } } },
     objects: [{ id: 'fit', kind: 'specification', label: 'y on x', estimation: { y: 'y', x: ['x'], data: 'sample' } }],
   });
-  ok('a specification with NO method does not build', !open.ok);
-  ok('  and the refusal hands the choice back', /method/i.test(open.refusal.says), open.refusal.says);
+  // THE METHOD IS STILL THEIRS, and this used to be enforced by refusing to
+  // build at all. It now builds — the specification and their data are a real
+  // thing to hold, and refusing left them holding nothing while being asked a
+  // question — but nothing about the Human-First rule has moved: no estimator
+  // is chosen, no coefficient has a value, and the model does not reach
+  // data-grounded. The choice is handed back as missing structure instead of
+  // as a refusal, which is the same sentence in a place they can act on.
+  ok('a specification with no method still builds', open.ok === true,
+    open.ok ? '' : open.refusal.because);
+  if (open.ok) {
+    ok('  but it is NOT data-grounded, because nothing was fitted',
+      open.report.capability !== 'data-grounded', open.report.capability);
+    ok('  and the choice is handed back',
+      /method/i.test(JSON.stringify(open.report.missing)), JSON.stringify(open.report.missing));
+    ok('  saying the specification is what decides the meaning',
+      /specification decides what the estimate means/.test(JSON.stringify(open.report.missing)));
+    ok('  and no coefficient acquired a value',
+      !unpack(open.model).objects.some((o) => o.kind === 'coefficient' && o.meta?.value !== undefined));
+  }
 
   ok('the report reads as lines', reportLines(built.report).some((l) => /^Model spring_system/.test(l)));
 }

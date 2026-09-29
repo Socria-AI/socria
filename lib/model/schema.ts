@@ -380,8 +380,22 @@ export interface EstimationDecl {
   y: string;
   /** the columns explaining it, in order */
   x: string[];
-  /** which block of Model.data holds the columns */
-  data: string;
+  /**
+   * Which block of Model.data holds the columns — WHEN THERE IS ONE.
+   *
+   * OPTIONAL, AND THAT IS THE POINT. A specification is a statement about what
+   * explains what; it is complete as a statement before any data exists, and
+   * "Wage = β0 + β1·Education + u" is a model somebody can hold, argue with,
+   * add a regressor to and remove one from without a single observation. It
+   * used to be required, so a specification without data could not be
+   * expressed at all — and a request to build one had nowhere to land but a
+   * concept node.
+   *
+   * Absent means SPECIFIED BUT NOT ESTIMATED. The estimator then reports the
+   * data as the missing structure, which is exactly what it is, and nothing
+   * anywhere is allowed to invent it.
+   */
+  data?: string;
   /** panel: the column identifying the unit */
   unit?: string;
   /** panel and time series: the column identifying the period */
@@ -787,12 +801,17 @@ export function sanitizeObject(raw: unknown): ModelObject | null {
     const xs = Array.isArray(est.x) ? est.x.map((c) => text(c, 40)).filter(Boolean).slice(0, 20) : [];
     const dataKey2 = text(est.data, 48);
     const method = est.method;
-    if (yCol && xs.length && ID.test(dataKey2)) {
+    // A SPECIFICATION IS ENOUGH: an outcome and at least one thing explaining
+    // it. The data block is kept when it names one and dropped when it does
+    // not — the specification then exists unfitted, which is a real state and
+    // the one most requests to "build me a model" actually land in. Requiring
+    // it here is what used to make an unfitted model inexpressible.
+    if (yCol && xs.length) {
       const lags = num(est.lags);
       out.estimation = {
         y: yCol,
         x: xs,
-        data: dataKey2,
+        ...(ID.test(dataKey2) ? { data: dataKey2 } : {}),
         // An unrecognised method is DROPPED, not guessed at: the router then
         // reports the choice as open, which is the honest state.
         ...(method === 'ols' || method === 'ols-fe' || method === 'ols-lag' ? { method } : {}),

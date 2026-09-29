@@ -1814,7 +1814,29 @@ export function LogosApp({
             // refusal is as much news as a build: "I can hold the structure but
             // I need a value for the mass" is the useful state, and it would
             // otherwise be invisible.
-            if (json.build?.says) setBuildNote(String(json.build.says).slice(0, 300));
+            //
+            // AND A TURN THAT ASKED FOR A MODEL AND GOT NONE SAYS SO. That case
+            // used to be completely silent: the map came back with a plausible
+            // node on it and nothing told the person that the thing they asked
+            // to be BUILT had not been. The server settles the ask against the
+            // result (lib/model/ask.ts) and names which kind of failure it was,
+            // so what appears here is the actual reason rather than an absence.
+            if (json.build?.says) {
+              const b = json.build;
+              const left: string[] = Array.isArray(b.unanswered) ? b.unanswered : [];
+              const note = [
+                String(b.says),
+                // Built, but not everything they named made it in. Worth saying:
+                // silently dropping a variable somebody asked for is how a model
+                // ends up answering a question nobody put.
+                left.length
+                  ? `You named ${left.join(', ')}, which ${left.length === 1 ? 'is' : 'are'} not in it — say so and I will add ${left.length === 1 ? 'it' : 'them'}.`
+                  : '',
+              ]
+                .filter(Boolean)
+                .join(' ');
+              setBuildNote(note.slice(0, 300));
+            }
           }
         }
       } catch {

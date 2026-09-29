@@ -287,6 +287,30 @@ export interface Capability {
 }
 
 /**
+ * The objects that STATE A RELATIONSHIP FORMALLY.
+ *
+ * ONE LIST, EXPORTED, because two copies of it disagreed and the disagreement
+ * was a bug somebody had to find twice. `capabilityOf` used it to decide
+ * whether a model reaches `mathematical`, and `buildProposal` needs the same
+ * test to decide whether a proposal is a model at all — and the first copy
+ * listed definitions, defs, systems and mechanisms while the second also
+ * counted specifications and gravitating bodies. So a wage equation built, and
+ * then reported itself as `structural`: the on-ramp thought it was formally
+ * stated and the capability ladder did not.
+ *
+ * A DECLARATION IS A FORMAL STATEMENT. `estimation` says what explains what;
+ * `gravity` says what pulls on what; `system` says what changes how; a
+ * `definition` or `defs` says what equals what. All four are mathematics
+ * written down, and none of them needs to compute to be one — which is the
+ * distinction the whole `mathematical` level exists to draw.
+ */
+export function statedFormally(model: Model): ModelObject[] {
+  return model.objects.filter(
+    (o) => !!o.definition || !!o.defs || !!o.system || !!o.mechanism || !!o.estimation || !!o.gravity
+  );
+}
+
+/**
  * What this model can honestly be said to do.
  *
  * NOT A SCORE AND NOT A BADGE. It is the highest level the model's own contents
@@ -314,7 +338,7 @@ export function capabilityOf(model: Model): Capability {
   const by = (kind: SolverKind) =>
     runnable.filter((o) => SOLVERS.find((s) => s.id === o.solver)?.kind === kind);
 
-  const stated = model.objects.filter((o) => !!o.definition || !!o.defs || !!o.system || !!o.mechanism);
+  const stated = statedFormally(model);
   const dynamic = [...by('ode'), ...by('assembly')];
   const grounded = by('estimation').length
     ? by('estimation')

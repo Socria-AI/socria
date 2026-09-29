@@ -19,7 +19,7 @@
 
 import { extentOf, pointsOf, type P3, type Primitive } from './primitives';
 import { buildModel, type Built } from './compile';
-import { expand } from './mechanism';
+import { unpack } from './unpack';
 import { runFor, seriesOf } from './system';
 import { byKind, overallFidelity, type Fidelity, type Model, type ModelObject } from './schema';
 
@@ -237,7 +237,7 @@ export function buildSpec(
   // Mechanisms become objects first: the representation choice, the notes and the
   // box all have to see the bodies and springs, not the declaration they came
   // from. Idempotent, so building twice adds nothing.
-  const model = expand(modelIn);
+  const model = unpack(modelIn);
   const fresh = buildModel(model, { only: opts?.only, detail: opts?.detail });
   const built: Built[] = opts?.only && opts?.keep
     ? [...opts.keep.filter((b) => !opts.only!.includes(b.of)), ...fresh]

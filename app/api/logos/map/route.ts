@@ -29,7 +29,8 @@ import { capMapForFree, depthForPlan } from '@/lib/socria-one';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { enforceRateLimit } from '@/lib/rate-limit';
 import { mayUse } from '@/lib/route-guard';
-import { EMPTY_WORKSPACE, openFromProposal } from '@/lib/model/docs';
+import { EMPTY_WORKSPACE, modelFor, openFromProposal } from '@/lib/model/docs';
+import { settle, unanswered } from '@/lib/model/ask';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -206,20 +207,71 @@ export async function POST(req: NextRequest) {
     // exactly as they were.
     const carried = current.models ?? EMPTY_WORKSPACE;
     let models = carried;
-    let build: { ok: boolean; says: string; id?: string } | null = null;
+    let build: {
+      ok: boolean;
+      says: string;
+      id?: string;
+      /** when it did not build and one was asked for, which kind of failure */
+      failure?: string;
+      /** names the person used that are nowhere in what got built */
+      unanswered?: string[];
+    } | null = null;
     const proposal = next.viz?.propose;
+    let made: ReturnType<typeof openFromProposal> | null = null;
     if (proposal) {
-      const made = openFromProposal(models, proposal, { at: Date.now() });
+      made = openFromProposal(models, proposal, { at: Date.now() });
       models = made.workspace;
-      build = made.doc
-        ? { ok: true, says: made.says, id: made.doc.id }
-        : { ok: false, says: made.says };
       // The proposal has been answered either way; it must not travel on. A
       // scene that still carried one would have the client asking again forever.
       if (next.viz) {
         const { propose: _answered, ...scene } = next.viz;
         next.viz = scene;
       }
+    }
+
+    // ── DID THE TURN GET WHAT IT ASKED FOR? ───────────────────────
+    //
+    // THE FAILURE THIS ANSWERS. A turn that asked for a model to be built and
+    // got none used to be indistinguishable, from the outside, from a turn that
+    // asked a question: a map came back with a plausible node on it and nothing
+    // anywhere recorded that an artifact had been requested and not produced.
+    // The map is very good at its job, which is exactly why the failure was
+    // silent — something always appears.
+    //
+    // So the ask and the RESULT are settled against each other, here, on the
+    // server, where both are known. The result wins: an ask that said
+    // `construct` and a build that refused settles to a named failure, not to a
+    // shrug. See lib/model/ask.ts for the failure kinds and why each one needs
+    // something different from the person.
+    const verdict = settle(next.ask ?? null, {
+      proposed: !!proposal,
+      built: !!made?.doc,
+      because: made?.doc ? undefined : made?.says,
+      missing: made?.refusal?.missing,
+    });
+
+    if (made) {
+      build = made.doc
+        ? {
+            ok: true,
+            says: made.says,
+            id: made.doc.id,
+            // BUILT IS NOT THE SAME AS BUILT WHAT THEY ASKED FOR. A proposal
+            // that quietly dropped a variable the person named still builds,
+            // and before this nothing noticed. It does not block the build —
+            // a model missing one named variable is still a model — it is
+            // something the surface can say.
+            ...(() => {
+              const left = unanswered(next.ask ?? null, modelFor(made!.doc!));
+              return left.length ? { unanswered: left } : {};
+            })(),
+          }
+        : { ok: false, says: made.says, ...(verdict.failure ? { failure: verdict.failure } : {}) };
+    } else if (verdict.wanted) {
+      // ASKED FOR, AND NOTHING WAS EVEN PROPOSED. This is the original bug in
+      // its purest form and it is now reported rather than absorbed: the
+      // extractor read a construction request and returned only a map.
+      build = { ok: false, says: verdict.says, failure: verdict.failure };
     }
 
     const withModels = models.docs.length ? { ...next, models } : next;

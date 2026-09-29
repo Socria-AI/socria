@@ -32,7 +32,7 @@
 //
 // PURE: arrays in, numbers out.
 
-import type { DataBlock, EstimationDecl, Model, ModelObject } from './schema';
+import type { DataBlock, EstimationDecl, Model, ModelObject, Provenance } from './schema';
 import type { Missing } from './system';
 
 /** Cap on what one fit may chew through, because a slider is attached. */
@@ -227,7 +227,7 @@ export function ols(
 
   const names = opts.names ?? [];
   const label = (i: number) => {
-    if (withIntercept && i === 0) return 'intercept';
+    if (withIntercept && i === 0) return INTERCEPT;
     const j = withIntercept ? i - 1 : i;
     return names[j] ?? `x${j + 1}`;
   };
@@ -370,11 +370,23 @@ export function estimate(
   if (!decl) {
     return { ok: false, missing: [{ what: 'a specification', unlocks: 'fitting: which column is the outcome, which are the regressors, and which data block they are in' }] };
   }
-  const block = model.data?.[decl.data];
+  const block = decl.data ? model.data?.[decl.data] : undefined;
   const cols = columnsOf(block);
   const missing: Missing[] = [];
   if (!block) {
-    missing.push({ what: `the data block “${decl.data}”`, unlocks: 'any estimate at all' });
+    // NAMED PRECISELY, because the two cases are different states of the work
+    // and a person reading this should be able to tell which they are in. No
+    // data block at all means the specification is written and nothing has
+    // been measured yet; a named block that is not there means something was
+    // meant to be attached and is not.
+    missing.push(
+      decl.data
+        ? { what: `the data block “${decl.data}”`, unlocks: 'any estimate at all' }
+        : {
+            what: `observations — ${[decl.y, ...decl.x].join(', ')} for each case`,
+            unlocks: 'estimating the coefficients. Until then the specification stands and its coefficients are symbols, which is a real state and not a failure',
+          }
+    );
     return { ok: false, missing };
   }
   const need = (name: string, why: string) => {
@@ -526,4 +538,170 @@ export function compareFits(a: Fit, b: Fit): {
   if (gone.length) bits.push(`dropped ${gone.join(', ')}`);
   bits.push(`R² ${a.r2.toFixed(3)} → ${b.r2.toFixed(3)} on ${a.n} → ${b.n} observations`);
   return { says: bits.join('; '), terms, r2: { from: a.r2, to: b.r2 }, n: { from: a.n, to: b.n } };
+}
+
+// ── a specification as objects ──────────────────────────────────────
+
+/**
+ * Turn a specification into the things it is made of.
+ *
+ * WHY THIS EXISTS. `Wage = β0 + β1·Education + u` has parts, and a person who
+ * asked for a model wants to point at them: select the outcome, inspect a
+ * coefficient, add a regressor, take one away. Before this the whole
+ * specification was ONE object with a declaration inside it — so there was
+ * nothing to select, nothing to rename, and nothing for the map to link to.
+ * A mechanism has had this since it existed (`expand` in mechanism.ts) and so
+ * does a gravitating system (`expandGravity`); this is the same move for the
+ * third kind of declaration, and the pattern is now the rule rather than a
+ * special case: a declaration is a compact way to write down objects, and the
+ * engine unpacks it.
+ *
+ * WHAT IT DELIBERATELY DOES NOT DO. It does not give a coefficient a value.
+ * With no data the coefficients are SYMBOLS — that is what an unfitted
+ * specification is — and a number here would be a fabricated estimate wearing
+ * the engine's stamp. It also never writes a causal relation: a specification
+ * says what is being explained by what, and `causes` is a claim about the
+ * world that no amount of algebra establishes (see CAUSAL_RELATIONS in
+ * schema.ts, which exists for exactly this).
+ *
+ * Idempotent, like the other expanders: expanding twice adds nothing.
+ */
+export function expandEstimation(model: Model): Model {
+  const carriers = model.objects.filter((o) => !!o.estimation);
+  if (!carriers.length) return model;
+
+  const have = new Set(model.objects.map((o) => o.id));
+  const added: ModelObject[] = [];
+  /** a variable the person named, rather than anything Socria chose */
+  const SPOKEN: Provenance = { origin: 'user', detail: 'named in the specification you gave' };
+
+  for (const carrier of carriers) {
+    const decl = carrier.estimation!;
+    const fitted = decl.data ? estimate(model, carrier) : null;
+    const terms = fitted && fitted.ok ? fitted.fit.terms : null;
+    // Where a coefficient's value comes from, said once so every object below
+    // agrees: a fit that ran, or nothing at all.
+    const value = (name: string): number | undefined =>
+      terms?.find((t) => t.name === name)?.value;
+    const from: Provenance = terms
+      ? { origin: 'computation', detail: `least squares on “${decl.data}” (${decl.method})` }
+      : {
+          // NOT 'inference'. Nobody guessed this coefficient — it is a symbol
+          // the specification declares, and reading it as a proposal would
+          // invite somebody to "confirm" a value that does not exist yet.
+          origin: 'equation',
+          detail: 'a symbol in the specification — nothing has been estimated',
+        };
+
+    const put = (o: ModelObject) => {
+      if (!have.has(o.id)) added.push(o);
+    };
+    const wants = decl.intercept !== false;
+
+    // The outcome.
+    put({
+      id: `${carrier.id}__y`,
+      kind: 'variable',
+      label: decl.y,
+      meaning: `the outcome: what this specification explains`,
+      relations: [{ to: carrier.id, as: 'contains', why: 'it is the dependent variable of this specification' }],
+      meta: { spec: carrier.id, role: 'outcome', column: decl.y },
+      provenance: SPOKEN,
+    });
+
+    // Each regressor, and the coefficient that carries it.
+    decl.x.forEach((x, i) => {
+      put({
+        id: `${carrier.id}__x${i}`,
+        kind: 'variable',
+        label: x,
+        meaning: 'an explanatory variable in this specification',
+        relations: [
+          { to: carrier.id, as: 'contains', why: 'it is one of the regressors of this specification' },
+          // NOT `causes`. The specification relates them; whether one causes
+          // the other is a separate claim needing assumptions this model does
+          // not carry.
+          {
+            to: `${carrier.id}__y`,
+            as: 'correlates-with',
+            why: 'the specification relates them; it does not by itself establish that one causes the other',
+          },
+        ],
+        meta: { spec: carrier.id, role: 'regressor', column: x, position: i },
+        provenance: SPOKEN,
+      });
+      const b = `b${wants ? i + 1 : i}`;
+      const beta = coefficientLabel(i, wants);
+      put({
+        id: `${carrier.id}__${b}`,
+        kind: 'coefficient',
+        label: beta,
+        meaning: `how much ${decl.y} differs, in the fitted relationship, per unit of ${x} with the other regressors held where they are`,
+        ...(value(x) !== undefined ? { defs: { value: String(value(x)) } } : {}),
+        relations: [
+          { to: `${carrier.id}__x${i}`, as: 'parameterizes', why: 'it is the coefficient on this variable' },
+        ],
+        meta: { spec: carrier.id, role: 'coefficient', on: x, ...(value(x) !== undefined ? { value: value(x) } : {}) },
+        provenance: from,
+      });
+    });
+
+    if (wants) {
+      put({
+        id: `${carrier.id}__b0`,
+        kind: 'coefficient',
+        label: 'β₀',
+        meaning: `the intercept: fitted ${decl.y} where every regressor is zero, which is only meaningful where that is a case that could occur`,
+        ...(value(INTERCEPT) !== undefined ? { defs: { value: String(value(INTERCEPT)) } } : {}),
+        relations: [{ to: carrier.id, as: 'contains', why: 'it is the intercept of this specification' }],
+        meta: { spec: carrier.id, role: 'intercept', ...(value(INTERCEPT) !== undefined ? { value: value(INTERCEPT) } : {}) },
+        provenance: from,
+      });
+    }
+
+    // The error term — the part of the outcome the specification does not
+    // explain. Named because leaving it out is how a specification starts
+    // reading as a claim that these regressors are the whole story.
+    put({
+      id: `${carrier.id}__u`,
+      kind: 'residual',
+      label: 'u',
+      meaning: `everything about ${decl.y} this specification does not account for`,
+      relations: [{ to: carrier.id, as: 'contains', why: 'it is the error term of this specification' }],
+      meta: { spec: carrier.id, role: 'error' },
+      provenance: { origin: 'equation', detail: 'part of the specification as written' },
+    });
+  }
+
+  if (!added.length) return model;
+  return { ...model, objects: [...model.objects, ...added] };
+}
+
+/**
+ * The name the fit gives the intercept term.
+ *
+ * Referred to by this constant rather than spelled out at each site: it was
+ * written as '(intercept)' where the fit calls it 'intercept', so the expanded
+ * β₀ silently never found its value and stayed a symbol on a model that had
+ * been estimated. A string compared in two places is a constant.
+ */
+export const INTERCEPT = 'intercept';
+
+/** Subscript digits, so β1 and β₀ do not sit in the same line looking unrelated. */
+const SUB = '₀₁₂₃₄₅₆₇₈₉';
+const sub = (n: number): string =>
+  String(n).split('').map((d) => SUB[Number(d)] ?? d).join('');
+
+/** The label a coefficient carries, wherever one is written. */
+export function coefficientLabel(i: number, withIntercept: boolean): string {
+  return `β${sub(withIntercept ? i + 1 : i)}`;
+}
+
+/** The specification written out, for a reader and for the conversation. */
+export function specificationLine(o: ModelObject): string | null {
+  const d = o.estimation;
+  if (!d) return null;
+  const wants = d.intercept !== false;
+  const terms = d.x.map((x, i) => `${coefficientLabel(i, wants)}·${x}`);
+  return `${d.y} = ${[...(wants ? ['β₀'] : []), ...terms, 'u'].join(' + ')}`;
 }

@@ -21,8 +21,8 @@
 // a system where the human is the one doing the thinking.
 
 import type { VizEntity, VizModelState, VizOp, VizProvenance } from '@/lib/viz-model';
-import { expand } from './mechanism';
-import { capabilityOf, route } from './solve';
+import { unpack } from './unpack';
+import { capabilityOf, missingStructure, route } from './solve';
 import { estimate } from './estimate';
 import { driftOf, runFor, stateAt } from './system';
 import { FIDELITY_SAYS, ORIGIN_SAYS, affectedBy, objectOf, paramOf, setParam, setTime, type ChangeRecord, type Fidelity, type Model } from './schema';
@@ -95,7 +95,7 @@ export function modelStateFrom(
   // spring and damper as its own object — with its own meaning, its own
   // dependencies and its own computed state — rather than as anonymous shapes
   // inside one "mechanism" entity that could answer nothing about them.
-  const model = expand(modelIn);
+  const model = unpack(modelIn);
   const noteOf = new Map(spec.notes.map((n) => [n.of, n]));
 
   const entities: VizEntity[] = model.objects.map((o) => {
@@ -217,6 +217,37 @@ export function modelStateFrom(
     }
   }
 
+  // ── WHAT THIS MODEL CURRENTLY IS, AND IS NOT ────────────────────
+  //
+  // The conversation is told this because it is the difference between
+  // "I have specified Wage on Education; nothing is estimated because there is
+  // no data" and "here are your coefficients". The reply used to have no way
+  // to know which of those it was looking at, so it described whichever one
+  // sounded more finished — and a specified model was routinely talked about
+  // as though it had been fitted.
+  //
+  // Reuses `science`, which is already the field for "the model in its own
+  // words", is already capped and sanitised, and is already rendered to the
+  // conversation under a heading that means exactly this.
+  const able = capabilityOf(model);
+  const gaps = missingStructure(model);
+  const status: string[] = [
+    `This model is ${able.level}${able.because.length ? `: ${able.because[able.because.length - 1]}` : ''}.`,
+    ...gaps.map(
+      (g) =>
+        `${g.label} is NOT computed: it needs ${g.missing
+          .map((m) => m.what)
+          .join(', ')}. Say so plainly if asked; do not supply it and do not describe what it would show.`
+    ),
+    ...model.objects
+      .filter((o) => !!o.estimation)
+      .map((o) =>
+        o.estimation!.data
+          ? `“${o.label}” is a specification with data attached${o.estimation!.method ? `, fitted by ${o.estimation!.method}` : ', with no method chosen — the method is theirs to choose'}.`
+          : `“${o.label}” is SPECIFIED BUT NOT ESTIMATED: ${o.estimation!.y} explained by ${o.estimation!.x.join(', ')}, with no observations attached. Its coefficients are symbols. There is no fitted line, no R², no standard error and no p-value, and inventing one would be the worst thing you could do here.`
+      ),
+  ];
+
   return {
     // The id the chat state is keyed by. A hyphen and not a colon: that field
     // is checked against an id pattern on the way back in (lib/viz-model.ts),
@@ -224,6 +255,7 @@ export function modelStateFrom(
     surface: `m-${model.id}`.slice(0, 32),
     title: model.title,
     model: model.domain ? `${model.domain}` : '',
+    science: status,
     assumptions: model.assumptions ?? [],
     equations: model.equations ?? [],
     entities,

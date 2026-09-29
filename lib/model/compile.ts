@@ -44,7 +44,8 @@ import { LIMITS, type P3, type Primitive } from './primitives';
 import type { Fidelity, Model, ModelObject } from './schema';
 import { runFor, stateAt } from './system';
 import { estimate } from './estimate';
-import { expand, restOf, statesOf } from './mechanism';
+import { restOf, statesOf } from './mechanism';
+import { unpack } from './unpack';
 
 /** What compiling one object produced, and what may be said about it. */
 export interface Built {
@@ -517,7 +518,7 @@ export function buildObject(model: Model, o: ModelObject, opts?: { detail?: numb
       }
       const fit = got.fit;
       const decl = o.estimation!;
-      const block = model.data?.[decl.data];
+      const block = decl.data ? model.data?.[decl.data] : undefined;
       const cols = block?.columns ?? {};
 
       if (decl.x.length === 1 && cols[decl.x[0]] && fit.terms.length === 2) {
@@ -746,7 +747,7 @@ export function buildLevel(model: Model, o: ModelObject, level: number): Sampled
 export function buildModel(modelIn: Model, opts?: { only?: readonly string[]; detail?: number }): Built[] {
   // Mechanisms become objects before anything is drawn, so a body, a spring and a
   // damper are ordinary model objects by the time the compiler sees them.
-  const model = expand(modelIn);
+  const model = unpack(modelIn);
   const want = opts?.only ? new Set(opts.only) : null;
   const out: Built[] = [];
   let budget = LIMITS.primitives;

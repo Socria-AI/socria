@@ -35,8 +35,8 @@
 //
 // PURE. No network, no clock of its own (an `at` is passed in), no React.
 
-import { capabilityOf, missingStructure, route, type Capability } from './solve';
-import { expand } from './mechanism';
+import { capabilityOf, missingStructure, route, statedFormally, type Capability } from './solve';
+import { unpack } from './unpack';
 import { sanitizeModel, type Fidelity, type Model, type ModelObject } from './schema';
 import { overallFidelity } from './schema';
 import type { Missing } from './system';
@@ -150,9 +150,9 @@ function attribute(model: Model): Model {
 /**
  * Is anything here actually computable?
  *
- * The bar for building at all: at least one object a real solver would run. A
- * proposal of six annotations is a picture of a model, and drawing it as `built`
- * would say the engine had computed something when it had not.
+ * One half of the bar for building. A proposal of six annotations is a picture
+ * of a model, and drawing it as `built` would say the engine had computed
+ * something when it had not.
  */
 function runnable(model: Model): { of: string; object: string; solver: string }[] {
   const out: { of: string; object: string; solver: string }[] = [];
@@ -162,6 +162,41 @@ function runnable(model: Model): { of: string; object: string; solver: string }[
   }
   return out;
 }
+
+/**
+ * Is anything here actually STATED?
+ *
+ * THE OTHER HALF OF THE BAR, AND THE REASON THIS FUNCTION EXISTS.
+ *
+ * Until this, the only way onto the built path was `runnable.length > 0` — at
+ * least one object a solver would run today. That quietly made COMPUTABILITY the
+ * definition of a model, and it is not one. Asked to build
+ *
+ *     Wage = β₀ + β₁·Education + u
+ *
+ * with no data, the engine found nothing runnable (the estimator correctly
+ * reports the observations as missing) and refused — so a fully specified model
+ * could not exist, and the request had nowhere to land but a concept node on the
+ * Thinking Map. The same refusal met a spring-mass system with a stiffness still
+ * to be chosen, a gravitating pair with no initial velocities, and every causal
+ * structure, none of which compute and all of which are models.
+ *
+ * `capabilityOf` has said so all along: `structural` and `mathematical` are two
+ * of its five levels, and the on-ramp was only letting models on at the third.
+ * This is the test it already uses for `mathematical` — an object that states a
+ * relationship formally, as an equation, a system, a mechanism or a
+ * specification — so the two cannot drift apart.
+ *
+ * WHAT IT DOES NOT ADMIT: prose. A bag of labelled annotations states nothing
+ * formally and still gets refused, which is what keeps `built` meaning
+ * something.
+ *
+ * THE TEST ITSELF LIVES IN solve.ts, deliberately. It was written out here as
+ * well, the two copies drifted within the hour, and the result was a model that
+ * the on-ramp admitted as formally stated and the capability ladder then graded
+ * as `structural` — each half correct about its own list. One list.
+ */
+const stated = statedFormally;
 
 /**
  * A proposal, validated and built — or refused with what is missing.
@@ -193,25 +228,30 @@ export function buildProposal(raw: ModelProposal, opts?: { at?: number }): Built
   // Mechanisms become objects before anything is judged, because a mechanism's
   // computability is a fact about its assembled system and not about its
   // declaration (expand is idempotent — see lib/model/mechanism.ts).
-  const model = attribute(trim(expand(clean)));
+  const model = attribute(trim(unpack(clean)));
 
   const solvers = runnable(model);
   const missing = missingStructure(model);
+  const formal = stated(model);
 
-  if (!solvers.length) {
+  // THE BAR: something computes, OR something is formally stated. The second
+  // clause is what lets a specified-but-unfitted model exist — see `stated`
+  // above for why the first clause alone was wrong. A proposal that is neither
+  // is prose, and prose does not get the engine's stamp.
+  if (!solvers.length && !formal.length) {
     return {
       ok: false,
       refusal: {
         title: model.title,
         because: missing.length
-          ? 'nothing in it can be computed yet'
-          : 'nothing in it is of a kind any solver here computes',
+          ? 'nothing in it is stated formally, and nothing in it can be computed yet'
+          : 'nothing in it is stated formally, and nothing in it is of a kind any solver here computes',
         missing,
         says: missing.length
-          ? `I can hold the structure, but nothing computes yet: ${missing
+          ? `I can hold the structure, but nothing is written down formally and nothing computes yet: ${missing
               .map((m) => `${m.label} needs ${m.missing.map((x) => x.what).join(', ')}`)
               .join('; ')}. Give me those and it runs.`
-          : 'I can hold the structure, but nothing here is something this engine computes. I can still represent it, and say plainly that nothing in it is a computed result.',
+          : 'Nothing in that is written down as a relationship I can hold — no equation, no system, no specification. Tell me what depends on what and I will build it properly rather than drawing a picture of it.',
       },
     };
   }
@@ -268,7 +308,7 @@ export function buildProposal(raw: ModelProposal, opts?: { at?: number }): Built
 export function revalidate(raw: unknown): Model | null {
   const clean = sanitizeModel(raw);
   if (!clean) return null;
-  const model = expand(clean);
+  const model = unpack(clean);
   return runnable(model).length ? clean : null;
 }
 
