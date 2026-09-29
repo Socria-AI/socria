@@ -154,14 +154,38 @@ hypothetical surface down with it.
   loop over an empty list reports a worst error of zero and passes. The suite now
   asserts the vertex count before asserting the values.
 
+## An operation nobody can perform says so
+
+`plan(model)` lists the operations that are live and omits the rest — so asked
+to run a specification forward, it reported `evaluate` and `estimate` and said
+**nothing at all** about simulation. That silence is the empty-cube problem one
+level up: "can you do this?" had no answer rather than an honest no.
+
+`askFor(model, operation)` always answers, with three verdicts:
+
+| | |
+|---|---|
+| `runnable` | evaluate — *"C_t, as the model implies it"* |
+| `blocked` | estimate — *"needs observations — C_t, Y_t, C_lag for each case"* |
+| `unsupported` | simulate — *"a law saying how something CHANGES … A specification relating quantities at one moment is not one: it says what goes with what, not what follows what"* |
+
+The reason is **structural, not a list of nouns**, so it stays true as the
+substrate grows. And the verdict is about the *model*: the same question asked
+of a spring–mass mechanism returns `runnable`.
+
+Verified: for the ADL specification, nothing draws a trajectory, and the
+hypothetical surface is untouched by the refusal.
+
 ## Still open
 
 - **Cross-sections.** *"Hold previous consumption at 50."* `buildSlice` exists
   and the response surface qualifies; the phrasing is not wired.
-- **Recurrence.** `C_t` and `C_(t-1)` are two column names with no index
-  semantics. The model cannot yet express that they are one quantity at two
-  times, so the recursive-dynamics request is **not supported** — and must be
-  reported as a missing capability rather than fabricated.
+- **Recurrence.** `C_t` and `C_(t-1)` are two column names with **no index
+  semantics** — verified: `meta` carries `{role: 'regressor', column: 'C_lag'}`
+  and nothing else. The model cannot express that they are one quantity at two
+  times, so the recursive-dynamics request is genuinely **unsupported**. It is
+  now reported as such rather than met with silence, but the capability itself
+  does not exist.
 - **Attaching data.** `lib/model/*` has no attachment path at all, so
   `missing-data` — the most common blocker in the system — cannot be resolved
   except in prose.

@@ -22,7 +22,7 @@
 
 import { buildProposal } from './.tmp/propose.mjs';
 import { unpack } from './.tmp/unpack.mjs';
-import { route, plan } from './.tmp/solve.mjs';
+import { askFor, route, plan } from './.tmp/solve.mjs';
 import { buildSpec } from './.tmp/spec.mjs';
 import { buildObject, scopeOf } from './.tmp/compile.mjs';
 import { sanitizeModel } from './.tmp/schema.mjs';
@@ -336,6 +336,52 @@ console.log('\n=== 9. what the inspector and the conversation are told ===');
   const unboundModel = unpack(buildProposal(adl({ coefficients: null }), { at: 1 }).model);
   const ul = symbolLines(symbolTable(unboundModel)).join('\n');
   ok('an unbound quantity says so plainly', /NOT BOUND/.test(ul), ul.slice(0, 300));
+}
+
+console.log('\n=== 10. an operation nobody can perform says so ===');
+{
+  // THE RECURRENCE REQUEST. "Starting from C₀ = 40, hold Y at 60 for 12
+  // quarters and show the trajectory." A specification relates quantities at
+  // ONE moment; C_t and C_lag are two column names with no index semantics, so
+  // the model genuinely cannot be run forward.
+  //
+  // What matters is that it SAYS SO. `plan` lists the operations that are live
+  // and omits the rest, which left "can you simulate this?" with no answer at
+  // all — the empty-cube problem one level up.
+  const m = unpack(buildProposal(adl(), { at: 1 }).model);
+
+  const sim = askFor(m, 'simulate');
+  ok('simulate is unsupported for a specification', sim.status === 'unsupported');
+  ok('  and says what such a model would need', /a law saying how something CHANGES/.test(sim.says));
+  ok('  distinguishing relating from following',
+    /what goes with what, not what follows what/.test(sim.says));
+  ok('  carried as missing structure, not only prose', sim.missing.length > 0);
+
+  // NOTHING IS FABRICATED in the meantime.
+  const spec = buildSpec(m);
+  ok('no trajectory is drawn', !spec.primitives.some((p) => /trajectory/.test(p.of)));
+  ok('and the hypothetical surface is untouched by the refusal',
+    vertices(spec, 'spec__response').length > 0);
+
+  // The other two verdicts still come back right.
+  ok('evaluate is runnable', askFor(m, 'evaluate').status === 'runnable');
+  ok('estimate is blocked, not unsupported', askFor(m, 'estimate').status === 'blocked');
+  ok('  which is a different answer from "nothing can do this"',
+    askFor(m, 'estimate').status !== askFor(m, 'simulate').status);
+
+  // …and a model that CAN be simulated says so, so the verdict is about the
+  // model rather than about the operation being unimplemented.
+  const dyn = unpack(buildProposal({
+    id: 'sm', title: 'spring-mass',
+    params: [{ id: 'k', label: 'k', value: 20, min: 1, max: 100 }],
+    objects: [{ id: 'mech', kind: 'component', label: 'the mechanism', mechanism: {
+      bodies: [{ id: 'm1', mass: 1, x0: 1 }],
+      springs: [{ id: 'k1', between: ['m1', 'ground'], value: 'k' }],
+    } }],
+  }, { at: 1 }).model);
+  ok('a mechanism CAN be simulated', askFor(dyn, 'simulate').status === 'runnable');
+  ok('  and a specification cannot — the verdict is about the model',
+    askFor(dyn, 'simulate').status !== askFor(m, 'simulate').status);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

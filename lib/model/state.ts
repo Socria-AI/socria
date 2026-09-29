@@ -22,7 +22,7 @@
 
 import type { VizEntity, VizModelState, VizOp, VizProvenance } from '@/lib/viz-model';
 import { unpack } from './unpack';
-import { capabilityOf, missingStructure, plan, route } from './solve';
+import { OPERATIONS, askFor, capabilityOf, missingStructure, plan, route } from './solve';
 import { estimate } from './estimate';
 import { driftOf, runFor, stateAt } from './system';
 import { FIDELITY_SAYS, ORIGIN_SAYS, affectedBy, objectOf, paramOf, setParam, setTime, type ChangeRecord, type Fidelity, type Model } from './schema';
@@ -239,6 +239,12 @@ export function modelStateFrom(
     // wage equation with two hypothetical coefficients was described as
     // computing nothing while its surface was being drawn.
     ...plan(model).map((p) => `You can ${p.says}.`),
+    // …AND THE ONES NOTHING CAN DO, with what such a model would have to
+    // contain. `plan` lists what is live and omits the rest, so "can you run
+    // this forward?" had no answer at all rather than an honest no.
+    ...OPERATIONS.filter((op) => askFor(model, op).status === 'unsupported')
+      .map((op) => askFor(model, op).says)
+      .slice(0, 4),
     ...gaps.map(
       (g) =>
         `${g.label} is NOT computed: it needs ${g.missing

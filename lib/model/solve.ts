@@ -469,6 +469,76 @@ export interface OperationPlan {
   blocked: { of: string; label: string; solver: string; missing: Missing[] }[];
 }
 
+/**
+ * Can this model be <operation>ed, and if not, what would it take?
+ *
+ * ALWAYS ANSWERS, which `plan` deliberately does not: `plan` lists the
+ * operations that are live for a model, and an operation no solver can attempt
+ * is simply absent from it. That silence is the empty-cube problem one level
+ * up — asked to simulate a specification, the planner listed `evaluate` and
+ * `estimate` and said nothing at all about simulation, so "can you run this
+ * forward?" had no answer rather than an honest no.
+ *
+ * Three verdicts, and the third is the one that was missing: nothing here does
+ * this to a model shaped like that, with what the model would need to acquire.
+ */
+export function askFor(
+  model: Model,
+  operation: Operation
+): { operation: Operation; status: 'runnable' | 'blocked' | 'unsupported'; says: string; missing: Missing[] } {
+  const runnable: string[] = [];
+  const blocked: { label: string; missing: Missing[] }[] = [];
+  for (const o of model.objects) {
+    const r = route(model, o, operation);
+    if (r.status === 'runnable') runnable.push(o.label);
+    else if (r.status === 'incomplete') blocked.push({ label: o.label, missing: r.missing });
+  }
+  if (runnable.length) {
+    return {
+      operation,
+      status: 'runnable',
+      says: `${OPERATION_SAYS[operation]}: ${runnable.join(', ')}.`,
+      missing: [],
+    };
+  }
+  if (blocked.length) {
+    return {
+      operation,
+      status: 'blocked',
+      says: `${OPERATION_SAYS[operation]} — not yet: ${blocked
+        .map((b) => `${b.label} needs ${b.missing.map((x) => x.what).join(', ')}`)
+        .join('; ')}.`,
+      missing: blocked.flatMap((b) => b.missing),
+    };
+  }
+  // NOTHING IN THE MODEL IS EVEN A CANDIDATE. Said with what such a model would
+  // have to contain, because "no" without that is indistinguishable from a bug.
+  const need = NEEDS[operation];
+  return {
+    operation,
+    status: 'unsupported',
+    says: `Nothing in this model can be ${operation}d: ${need}`,
+    missing: [{ what: need, unlocks: OPERATION_SAYS[operation] }],
+  };
+}
+
+/**
+ * What a model would have to contain for an operation to be attemptable.
+ *
+ * Structural, not a list of nouns: "a law saying how something changes" rather
+ * than "a mechanism or a gravity block", because the answer has to stay true as
+ * the substrate grows.
+ */
+const NEEDS: Record<Operation, string> = {
+  evaluate: 'an expression, or a shape read off supplied numbers',
+  simulate:
+    'a law saying how something CHANGES — states and their rates, parts that push and pull, or bodies that attract. A specification relating quantities at one moment is not one: it says what goes with what, not what follows what',
+  estimate: 'a specification and observations to fit it to',
+  read: 'supplied numbers, as a data block',
+  optimise: 'an objective to maximise or minimise, and the constraints on it',
+  rearrange: 'an equation stated symbolically, and a symbolic backend — which is declared here and not implemented',
+};
+
 export function plan(model: Model): OperationPlan[] {
   const out: OperationPlan[] = [];
   for (const op of OPERATIONS) {
