@@ -35,6 +35,7 @@
 // the way into the right-hand side and moving its slider changes the equations
 // rather than requiring a re-assembly.
 
+import { compileExpr } from '@/lib/logos-math';
 import type { BodyDecl, MechanismDecl, Model, ModelObject, SystemDecl } from './schema';
 import type { Missing } from './system';
 
@@ -237,12 +238,33 @@ function layoutOf(mech: MechanismDecl, bodies: readonly BodyDecl[]): MechLayout 
 
 /** Read a mechanism off an object and assemble it, or say what is missing. */
 export function readMechanism(
-  _model: Model,
+  model: Model,
   o: ModelObject
 ): { ok: true; system: SystemDecl; layout: MechLayout } | { ok: false; missing: Missing[] } {
   if (!o.mechanism) {
     return { ok: false, missing: [{ what: 'a mechanism declaration', unlocks: 'assembly into equations of motion' }] };
   }
+  // A VALUE THE MODEL CANNOT EVALUATE IS MISSING, and saying so HERE is what puts
+  // it in the person's terms. `mass: "nope"` assembles perfectly — it is a string
+  // where a string is allowed — and then the assembled equations do not compile,
+  // so the failure surfaced as "a readable expression for dv_m1/dt", which is
+  // true and useless. A mass is a mass; the message should say so.
+  const known = [...model.params.map((p) => p.id), 't'];
+  const missing: Missing[] = [];
+  const check = (value: number | string | undefined, what: string) => {
+    if (value === undefined || typeof value === 'number') return;
+    if (!compileExpr(value, known)) {
+      missing.push({
+        what: `${what} — “${value}” is neither a number nor one of this model's controls`,
+        unlocks: 'a numerical run; it can stay symbolic until then',
+      });
+    }
+  };
+  for (const b of o.mechanism.bodies ?? []) check(b.mass, `a mass for ${b.label ?? b.id}`);
+  for (const sp of o.mechanism.springs ?? []) check(sp.value, `a stiffness for ${sp.label ?? sp.id}`);
+  for (const dp of o.mechanism.dampers ?? []) check(dp.value, `a damping value for ${dp.label ?? dp.id}`);
+  if (missing.length) return { ok: false, missing };
+
   return assemble(o.mechanism);
 }
 

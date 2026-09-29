@@ -430,23 +430,44 @@ console.log('\n=== it extends Logos rather than sitting beside it ===');
       !/blackhole|volatility|pendulum|lorenz|accretion/i.test(code));
   }
 
-  // And a scene carrying a model survives the trip through the extractor's
-  // sanitiser, which is the path a conversation-authored model would take.
+  // ── THE TRUST BOUNDARY ────────────────────────────────────────
+  //
+  // This used to assert that a scene arriving from the extractor could carry a
+  // built model, and that was the hole: `built` means the ENGINE produced and
+  // verified this state, and everything downstream trusts it — the router runs
+  // solvers on it, the renderer draws it as computed, the conversation is told
+  // its numbers are results. A language model writing model-shaped JSON is not
+  // that. So the default path now STRIPS it, and the only way to a built model
+  // is buildProposal on the server (lib/model/propose.ts).
   const { sanitizeViz } = await import('./.tmp/logos-viz.mjs');
-  const scene = sanitizeViz({
+  const asProposal = sanitizeViz({
     kind: 'surface', expr: 'x^2 - y^2', varName: 'x', view: { xMin: -3, xMax: 3 },
     params: [], built: saddle(),
   });
-  ok('a scene may carry a model', !!scene?.built && scene.built.objects.length === 2);
-  const junk = sanitizeViz({
-    kind: 'surface', expr: 'x', varName: 'x', view: { xMin: -1, xMax: 1 }, params: [],
-    built: { id: 'x', title: 'T', objects: [{ id: 'o', kind: 'surface', label: 'O', fidelity: 'simulated' }], params: [] },
+  ok('a model may not present a built model', !asProposal?.built);
+  const proposing = sanitizeViz({
+    kind: 'diagram', view: { xMin: -1, xMax: 1 }, params: [],
+    parts: [{ o: 'hrule', at: 0 }],
+    propose: { id: 'm', title: 'A model', objects: [], params: [] },
   });
-  ok('  and a model that claims a fidelity it did not earn still says so',
-    junk.built.objects[0].fidelity === 'simulated',
-    'the claim is kept as a claim — the compiler is what refuses to honour it');
-  const built = buildObject(junk.built, junk.built.objects[0]);
-  ok('  …while the engine reports what actually happened', built.primitives.length === 0 && !!built.problem);
+  ok('  it may propose one instead', !!proposing?.propose);
+  const stored = sanitizeViz(
+    {
+      kind: 'surface', expr: 'x^2 - y^2', varName: 'x', view: { xMin: -3, xMax: 3 },
+      params: [], built: saddle(),
+    },
+    { trust: 'stored' }
+  );
+  ok('a model from this product’s own storage is kept', !!stored?.built && stored.built.objects.length === 2);
+  const notComputable = sanitizeViz(
+    {
+      kind: 'surface', expr: 'x', varName: 'x', view: { xMin: -1, xMax: 1 }, params: [],
+      built: { id: 'x', title: 'T', objects: [{ id: 'o', kind: 'annotation', label: 'O' }], params: [] },
+    },
+    { trust: 'stored' }
+  );
+  ok('  …and one that no longer computes loses the claim rather than keeping it',
+    !notComputable?.built);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

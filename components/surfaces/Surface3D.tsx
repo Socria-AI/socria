@@ -167,6 +167,8 @@ export interface Surface3DProps {
    * once, here, rather than in the render — none of it changes per frame.
    */
   science?: ScienceMeta;
+  /** the document this is a revision of, when it is one — see VizModelState.edits */
+  edits?: VizModelState['edits'];
   /**
    * Verbs this view supports beyond the universal ones — slicing, flattening,
    * moving through time, comparing. A surface built by hand has none of them;
@@ -218,6 +220,7 @@ export function Surface3D({
   assumptions = [],
   equations = [],
   science,
+  edits,
   can,
   onOps,
   onRead,
@@ -499,9 +502,14 @@ export function Surface3D({
   // reads the current state, and holds the pieces in a ref that every render
   // refreshes. The reply is then answering the picture as it actually stood,
   // not as it stood some number of frames ago.
-  const now = useRef({ vals, on, cam, t, playing, out, selected });
+  // `edits` rides in the ref rather than being captured by the callback: a
+  // document's revision changes as it is edited, and a read that reported the
+  // revision it opened at would tell the conversation the model is one edit
+  // behind — which is exactly the kind of stale claim this whole seam exists to
+  // avoid.
+  const now = useRef({ vals, on, cam, t, playing, out, selected, edits });
   useEffect(() => {
-    now.current = { vals, on, cam, t, playing, out, selected };
+    now.current = { vals, on, cam, t, playing, out, selected, edits };
   });
   const read = useCallback((): VizModelState => {
     const c = now.current;
@@ -514,6 +522,7 @@ export function Surface3D({
       assumptions,
       equations,
       ...(science ? { science: scienceLines(science) } : {}),
+      ...(c.edits ? { edits: c.edits } : {}),
       entities: entities.map((e) => {
         const state = live[e.id];
         return state ? { ...e, state } : e;

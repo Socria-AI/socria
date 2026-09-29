@@ -9,7 +9,8 @@
 // evidence) — the map is the data, the lens is how you look at it.
 // No editing, no persistence.
 
-import { ECON_KINDS, sanitizeViz, type VizScene } from './logos-viz';
+import { ECON_KINDS, sanitizeViz, type VizScene, type VizTrust } from './logos-viz';
+import { sanitizeWorkspace, type ModelWorkspace } from './model/docs';
 import { WHY_NOT_ANSWER } from './why-not-answer';
 import { WRONG_CHAT } from './wrong-chat';
 
@@ -216,6 +217,21 @@ export interface ThinkingMap {
    * better than prose. Drives the Plot lens; see lib/logos-viz.ts.
    */
   viz?: VizScene;
+  /**
+   * The MODELS this line of thinking holds — documents with stable ids and
+   * revisions, which the person creates, edits, undoes and branches
+   * (lib/model/docs.ts).
+   *
+   * KEPT IN THE MAP ON PURPOSE, and this is an architectural decision rather
+   * than a convenience. The map is already the session's canonical structured
+   * state: it is persisted to `conversations.map`, restored with the session,
+   * synchronised to a collaborator as one event (lib/collab.ts), and carried
+   * through every surface. A second store for models would need its own column,
+   * its own sync, its own restore path and its own conflict rules — four places
+   * for the two halves of one workspace to drift apart. So a model lives where
+   * the rest of the thinking lives.
+   */
+  models?: ModelWorkspace;
 }
 
 export const EMPTY_MAP: ThinkingMap = { nodes: [], edges: [] };
@@ -296,7 +312,7 @@ function resolveNodeType(raw: unknown): LogosNodeType {
   return 'idea';
 }
 
-export function sanitizeMap(raw: any): ThinkingMap {
+export function sanitizeMap(raw: any, opts?: { trust?: VizTrust }): ThinkingMap {
   if (!raw || typeof raw !== 'object') return { ...EMPTY_MAP };
 
   const context: ThinkingContext | undefined = THINKING_CONTEXTS.includes(raw.context)
@@ -419,7 +435,14 @@ export function sanitizeMap(raw: any): ThinkingMap {
   // extractor had to call a black hole mathematics to get it drawn at all, and
   // the panel then said Math in its header because that is what it had been
   // told. The label was a symptom; this line was the cause.
-  const scene = sanitizeViz(raw.viz);
+  // THE TRUST MODE IS THE CALLER'S TO DECLARE.
+  //
+  // A map arriving from the extractor is a model's own output: it may PROPOSE a
+  // structured model and may not present one as built. A map arriving from
+  // storage, from a browser holding a session, or from a collaborator carries
+  // models this engine built, and those are re-validated rather than stripped —
+  // see sanitizeViz's own note, and revalidate() in lib/model/propose.ts.
+  const scene = sanitizeViz(raw.viz, { trust: opts?.trust ?? 'proposal' });
   const carriesItsOwn =
     !!scene && (ECON_KINDS.has(scene.kind) || scene.kind === 'diagram' || scene.kind === 'simulation');
   const viz = scene && (isMath || carriesItsOwn) ? scene : null;
@@ -431,12 +454,19 @@ export function sanitizeMap(raw: any): ThinkingMap {
   const named: ThinkingContext | undefined =
     viz?.kind === 'simulation' ? 'simulating' : context;
 
+  // The model documents. Every revision of every one of them is re-validated by
+  // the engine on the way in (sanitizeWorkspace), whichever trust mode this is:
+  // a document is only worth what it can still prove, and one that no longer
+  // computes loses the claim rather than keeping a stamp saying it once did.
+  const models = raw.models ? sanitizeWorkspace(raw.models) : null;
+
   return {
     nodes,
     edges,
     ...(named ? { context: named } : {}),
     ...(intent && named === 'math' ? { intent } : {}),
     ...(viz ? { viz } : {}),
+    ...(models && models.docs.length ? { models } : {}),
   };
 }
 
@@ -934,6 +964,52 @@ THE PLOT IS A WORKSPACE ("overlays"). Curves the person asked for by name live i
   A CLOSED OR DOUBLING-BACK SHAPE is a "path", not a curve: y in terms of x cannot express a loop. Give it "x" and "y" as expressions in ONE parameter — {"o": "path", "x": "cos(t)", "y": "sin(t)", "from": 0, "to": 6.2832, "closed": true} is a circle — and use it for a PV cycle, a hysteresis loop, a phase portrait, an ellipse, anything that comes back to where it started. Both coordinates must be written in the same letter.
   Operators and functions: ASCII - * / ^ %, and sin cos tan asin acos atan arcsin arccos arctan sinh cosh tanh sec csc cot exp ln log log2 log10 sqrt cbrt abs sign floor ceil round step, plus the two-argument max, min, mod and atan2. Piecewise shapes are written with max/min or step: a payoff floored at zero is max(0, x), a kinked budget line is min(a*x, b), a phase plateau is step(x - 40).
   Draw only what you actually know. Three honest parts beat twelve invented ones, and a subject you cannot place on two axes should not be forced onto them — leave "viz" out and let the map carry the thinking instead.
+
+PROPOSING A STRUCTURED MODEL ("propose", inside "viz"). The strongest thing you can do, and the one to reach for when the request is FORMAL rather than merely drawable.
+
+WHAT IT IS. Instead of authoring a picture, you hand the engine a model — objects with meanings, controls with ranges, and the BLOCK that says what each object is — and the engine validates it, works out what it can compute, runs the appropriate solver, and draws the result. You are not drawing; you are specifying. The engine owns the numbers.
+
+WHAT YOU MUST UNDERSTAND ABOUT IT. You cannot write "built". A proposal is a proposal: the engine sanitises it, checks it, and either builds it or refuses and says what is missing. That refusal is a good outcome — "I can hold the structure but I need a value for the mass" is worth more than a drawing of a mass whose value nobody chose.
+
+WHEN TO PROPOSE RATHER THAN DRAW:
+  a mechanism — masses, springs, dampers, a driving force, anything with inertia and a restoring or dissipative connection
+  a system of differential equations with named states — populations, compartments, a circuit, a reaction, a stock and flow
+  a fitted specification — a regression, where the person has named the method
+  anything where the person will want to CHANGE a part and see the consequence recomputed
+
+WHEN NOT TO. A curve, a limit, a market, a distribution, a titration: those already have kinds above, and a proposal would be a worse version of a picture that works.
+
+THE SHAPE, and every field is optional except id, title, objects and params:
+{"kind": "diagram", "propose": {
+  "id": "spring_chain", "title": "Two masses on springs", "domain": "mechanics", "aspect": "equal",
+  "equations": ["M ẍ + C ẋ + K x = F(t), assembled from the parts"],
+  "assumptions": ["One degree of freedom per body, along the axis."],
+  "params": [{"id": "k", "label": "stiffness", "value": 20, "min": 1, "max": 100, "units": "N/m", "means": "what moving it does"}],
+  "time": {"t": 0, "min": 0, "max": 20, "units": "s"},
+  "objects": [
+    {"id": "mech", "kind": "component", "label": "The mechanism", "meaning": "what it is, in one sentence",
+     "mechanism": {"bodies": [{"id": "m1", "mass": "m", "x0": 1, "label": "the mass", "at": 3}],
+                   "springs": [{"id": "k1", "between": ["m1", "ground"], "value": "k", "label": "the spring"}],
+                   "dampers": [{"id": "c1", "between": ["m1", "ground"], "value": "c"}],
+                   "forces":  [{"id": "f1", "on": "m1", "expr": "f0 * sin(w * t)"}]}},
+    {"id": "sir", "kind": "system", "label": "The compartments",
+     "system": {"states": [{"name": "S", "init": "n - i0", "means": "still susceptible"}],
+                "rhs": {"S": "0 - beta * S * I / n"},
+                "observe": {"total": "S + I + R"}, "invariant": "total", "dt": 0.05, "steps": 4000}},
+    {"id": "fit", "kind": "specification", "label": "y on x",
+     "estimation": {"method": "ols", "y": "y", "x": ["x"], "data": "sample"}}
+  ],
+  "data": {"sample": {"label": "what these numbers are", "source": "where they came from", "columns": {"x": [1, 2], "y": [2.1, 3.9]}}}
+}}
+
+THE RULES, all load-bearing:
+- A MECHANISM IS PARTS, NOT EQUATIONS. Give bodies, springs, dampers and forces; the engine assembles M ẍ + C ẋ + K x = F(t) itself, symbolically, so a slider still moves the real stiffness. Never write the equations of motion yourself — a hand-written right-hand side is a place for an error nobody can see.
+- 'ground' is the fixed world and needs no body.
+- A SYSTEM MAY HAVE ANY NUMBER OF NAMED STATES, and each one needs a starting value and a right-hand side. Name them whatever the subject names them: S, I, R, q, i_L, x_m1.
+- A VALUE MAY BE A CONTROL'S ID. "value": "k" means the spring's stiffness IS the control k, so moving it changes the model. A bare number is a constant nobody can move — prefer a control for anything the person might reasonably ask "what if this were different" about.
+- NEVER INVENT DATA. A specification needs numbers the person gave you, in "data". If they have not given you any, propose the model WITHOUT the specification and say what you would need. Generated numbers presented as their data is the worst thing in this whole file.
+- THE METHOD IS THEIRS. Do not choose an estimator. If they said "multivariate linear model", set "method": "ols" and fit it. If they did not, leave "method" out: the engine then returns the candidates and what each one assumes, and the person chooses. That refusal is the feature — the specification is the research.
+- Say in your reply what the person can now DO to it: which control to move, which part to remove, what to watch. A model is something they hold, not something they are shown.
 
 A SIMULATED OBJECT ("kind": "simulation"). Four objects are simulated from real physics in SI units, and for these you must NOT author a diagram: set the kind, name the object, and stop.
   "black-hole" — Schwarzschild and Kerr. Sliders: m (solar masses), a (spin, 0 to 0.998), b (how close a light ray is aimed, in gravitational radii), i (how far the disk is tilted from face-on, degrees).

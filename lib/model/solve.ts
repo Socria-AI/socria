@@ -120,7 +120,16 @@ export const ASSEMBLY: Solver = {
   handles: (_m, o) => !!o.mechanism || o.kind === 'component',
   requires: (m, o) => {
     const read = readMechanism(m, o);
-    return read.ok ? [] : read.missing;
+    if (!read.ok) return read.missing;
+    // ASSEMBLING IS NOT ENOUGH. The parts can be structurally sound and the
+    // assembled equations still unreadable: a mass given as `nope` passes every
+    // structural check, compiles to nothing, and integrates not at all. Before
+    // this line the router called that runnable — so the capability came back
+    // `dynamic`, the picture drew nothing, and the model claimed to be
+    // integrating. The assembled system is checked against the model that will
+    // evaluate it, which is the only check that means anything.
+    const usable = readSystem(m, { ...o, system: read.system });
+    return usable.ok ? [] : usable.missing;
   },
   checkedAgainst: 'the analytic solution of a single damped oscillator, and energy conservation with damping removed',
 };

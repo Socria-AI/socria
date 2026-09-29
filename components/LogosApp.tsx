@@ -98,7 +98,14 @@ import { MAX_CONTEXTS_PER_NODE, sanitizeContexts, type NodeContext } from '@/lib
 import { relevantNodes, type DraftAction, type DraftResponse } from '@/lib/logos-draft';
 import { boundaryNote, limitsFor, type Counter } from '@/lib/entitlements';
 import { failureText } from '@/lib/upstream-error';
-import { parseVizOps, stripVizOps, type VizModelState, type VizOp } from '@/lib/viz-model';
+import { isModelOp, parseVizOps, stripVizOps, type VizModelState, type VizOp } from '@/lib/viz-model';
+import {
+  activeDoc,
+  applyModelOps,
+  editsState,
+  EMPTY_WORKSPACE,
+  modelFor,
+} from '@/lib/model/docs';
 import { DRIFT_DISMISS_LIMIT, readDrift, type DriftVerdict } from '@/lib/topic-drift';
 import {
   MATH_FADE_MS,
@@ -111,6 +118,7 @@ import {
   EMPTY_MAP,
   describeLineage,
   diffMaps,
+  sanitizeMap,
   summarizeDelta,
   type ThinkingMap as TMap,
 } from '@/lib/logos';
@@ -307,6 +315,8 @@ export function LogosApp({
   const [limitNoteOff, setLimitNoteOff] = useState(false);
   // The extraction wanted to add something and the free map was full.
   const [mapCapped, setMapCapped] = useState(false);
+  /** what the engine said about a model built (or refused) this turn */
+  const [buildNote, setBuildNote] = useState<string | null>(null);
   // They have a Stripe customer behind them, so billing can be managed.
   const [oneManageable, setOneManageable] = useState(false);
   // Just came back from a completed checkout.
@@ -640,9 +650,34 @@ export function LogosApp({
     vizRead.current = read;
   }, []);
   const [vizOps, setVizOps] = useState<{ seq: number; ops: VizOp[] } | null>(null);
+  /**
+   * Apply what the reply asked for — and the two kinds of op part company here.
+   *
+   * A VIEW OP changes how the model is looked at (a control, a layer, a slice, the
+   * clock) and goes to the surface, which owns the camera and the frame.
+   *
+   * A MODEL OP changes the model: it removes a part, swaps a damper for a spring,
+   * undoes, branches, deletes. Those cannot go to a renderer, because a renderer
+   * has nothing to remove — the object lives in a document with a stable id and
+   * revisions (lib/model/docs.ts), and the edit produces a new revision that the
+   * whole surface is then rebuilt from. That is the difference between an edit and
+   * a redraw, and this split is where it is enforced.
+   */
   const applyVizOps = useCallback((ops: VizOp[]) => {
     if (!ops.length) return;
-    setVizOps((prev) => ({ seq: (prev?.seq ?? 0) + 1, ops }));
+    const modelOps = ops.filter(isModelOp);
+    const viewOps = ops.filter((o) => !isModelOp(o));
+    if (modelOps.length) {
+      patchActive((sess) => {
+        const map = sess.map ?? EMPTY_MAP;
+        const ws = map.models ?? EMPTY_WORKSPACE;
+        if (!ws.docs.length) return sess;
+        const done = applyModelOps(ws, modelOps, { at: Date.now() });
+        if (!done.changed) return sess;
+        return { ...sess, map: { ...map, models: done.workspace } };
+      });
+    }
+    if (viewOps.length) setVizOps((prev) => ({ seq: (prev?.seq ?? 0) + 1, ops: viewOps }));
   }, []);
 
   /** the fields every Logos generation request carries */
@@ -1439,7 +1474,12 @@ export function LogosApp({
                 id: c.id,
                 title: c.title,
                 messages: Array.isArray(c.messages) ? c.messages : [],
-                map: c.map?.nodes ? c.map : { ...EMPTY_MAP },
+                // RE-VALIDATED ON THE WAY IN, not trusted. A stored map may
+                // carry model documents built on an earlier turn, and they are
+                // worth what they can still prove — sanitizeMap's stored mode
+                // puts every revision back through the engine and drops a model
+                // that no longer computes (lib/model/propose.ts revalidate).
+                map: c.map?.nodes ? sanitizeMap(c.map, { trust: 'stored' }) : { ...EMPTY_MAP },
                 draft:
                   c.draft && typeof c.draft.html === 'string'
                     ? { title: String(c.draft.title ?? ''), html: c.draft.html }
@@ -1752,6 +1792,11 @@ export function LogosApp({
             setDeltaNote(summarizeDelta(delta));
             // The server says whether this line of thinking outgrew a free map.
             setMapCapped(!!json.capped);
+            // …and what the engine did with a model this turn proposed. A
+            // refusal is as much news as a build: "I can hold the structure but
+            // I need a value for the mass" is the useful state, and it would
+            // otherwise be invisible.
+            if (json.build?.says) setBuildNote(String(json.build.says).slice(0, 300));
           }
         }
       } catch {
@@ -3108,7 +3153,20 @@ export function LogosApp({
                   conversation, never chosen from a menu. */}
               {map.context && <em className="lg-panel-context">{CONTEXT_LABEL[map.context]}</em>}
             </span>
-            {deltaNote && !mapping ? (
+            {/* What the engine did with a model this turn proposed — a build or a
+                refusal, in its own words. It outranks the delta line because it
+                is the rarer and more consequential news, and it is dismissed by
+                the next turn rather than by a control. */}
+            {buildNote && !mapping ? (
+              <button
+                type="button"
+                className="lg-panel-delta"
+                title="what the engine said about this model"
+                onClick={() => setBuildNote(null)}
+              >
+                {buildNote}
+              </button>
+            ) : deltaNote && !mapping ? (
               <span className="lg-panel-delta">{deltaNote}</span>
             ) : (
               <span className={`lg-panel-state${mapping ? ' is-working' : ''}`}>

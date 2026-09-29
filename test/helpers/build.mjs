@@ -70,6 +70,8 @@ const MODULES = [
   'lib/model/mechanism.ts',
   'lib/model/estimate.ts',
   'lib/model/solve.ts',
+  'lib/model/propose.ts',
+  'lib/model/docs.ts',
   'lib/model/library.ts',
   'lib/model/science.ts',
   'lib/surface-science.ts',

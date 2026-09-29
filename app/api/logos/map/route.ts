@@ -1,8 +1,16 @@
 // app/api/logos/map/route.ts
-// POST /api/logos/map  → { map } — the rebuilt Thinking Map.
+// POST /api/logos/map  → { map, build? } — the rebuilt Thinking Map, and the
+// model the engine built from this turn's proposal, if there was one.
 //
 // Runs INDEPENDENTLY of the conversational reply (the client fires both in
 // parallel), so the map grows while the answer is still streaming.
+//
+// IT IS ALSO THE ON-RAMP. The extractor may PROPOSE a structured model; this
+// route is the only place a proposal becomes one the engine owns
+// (lib/model/propose.ts buildProposal). Nothing that arrives from a language
+// model is trusted: the proposal is sanitised, validated, checked for missing
+// structure, given a capability level and routed to a solver, and it either
+// builds or is refused with what is missing named in the person's terms.
 
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
@@ -21,6 +29,7 @@ import { capMapForFree, depthForPlan } from '@/lib/socria-one';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { enforceRateLimit } from '@/lib/rate-limit';
 import { mayUse } from '@/lib/route-guard';
+import { EMPTY_WORKSPACE, openFromProposal } from '@/lib/model/docs';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -48,7 +57,10 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json().catch(() => null);
-  const current = sanitizeMap(body?.map);
+  // The map the client is holding is this product's own state — its models were
+  // built by the engine on an earlier turn — so it comes in on the stored path,
+  // where a built model is re-validated rather than stripped.
+  const current = sanitizeMap(body?.map, { trust: 'stored' });
   const messages = Array.isArray(body?.messages) ? body.messages : [];
   // Grounded material attached to nodes — the extractor sees what is attached
   // and to which node, tagged with whose thinking it is.
@@ -170,20 +182,61 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ map: current });
     }
 
+    // The extractor's output is a PROPOSAL: sanitizeMap's default trust mode
+    // strips any `built` it wrote and keeps a `propose` block instead.
     const next = sanitizeMap(parsed);
     // Never let a malformed extraction blank a map the user has built up.
     if (next.nodes.length === 0 && current.nodes.length > 0) {
       return NextResponse.json({ map: current });
     }
+    // ── THE ON-RAMP ───────────────────────────────────────────────
+    //
+    // A proposal reaches the engine HERE, on the server, and only here. The
+    // extractor proposed a structured model; buildProposal sanitises it,
+    // validates it, finds what is missing, works out what it can honestly claim
+    // and routes it to a solver — and either hands back a model the engine owns
+    // or refuses with the missing structure named.
+    //
+    // This is what makes `built` mean what it says. A model that reached the
+    // client without passing through here would be a language model's JSON
+    // wearing the engine's stamp, and everything downstream trusts that stamp.
+    //
+    // Carried forward rather than rebuilt: the documents the person already has
+    // travel with the map, so a turn that proposes nothing leaves their models
+    // exactly as they were.
+    const carried = current.models ?? EMPTY_WORKSPACE;
+    let models = carried;
+    let build: { ok: boolean; says: string; id?: string } | null = null;
+    const proposal = next.viz?.propose;
+    if (proposal) {
+      const made = openFromProposal(models, proposal, { at: Date.now() });
+      models = made.workspace;
+      build = made.doc
+        ? { ok: true, says: made.says, id: made.doc.id }
+        : { ok: false, says: made.says };
+      // The proposal has been answered either way; it must not travel on. A
+      // scene that still carried one would have the client asking again forever.
+      if (next.viz) {
+        const { propose: _answered, ...scene } = next.viz;
+        next.viz = scene;
+      }
+    }
+
+    const withModels = models.docs.length ? { ...next, models } : next;
+
     // A free map stops taking on NEW nodes at its boundary; everything already
     // on it — including anything the extractor has since refined — is kept.
     // `capped` tells the client the thinking outgrew the free map, so it can
     // say so once, quietly, instead of the map just going still.
     if (plan === 'free') {
-      const held = capMapForFree(next, current);
-      return NextResponse.json({ map: held.map, capped: held.capped });
+      const held = capMapForFree(withModels, current);
+      return NextResponse.json({
+        map: { ...held.map, ...(models.docs.length ? { models } : {}) },
+        capped: held.capped,
+        ...(build ? { build } : {}),
+      });
     }
-    return NextResponse.json({ map: next });
+    return NextResponse.json({ map: withModels, ...(build ? { build } : {}) });
   } catch (e) {
     console.error('logos map error:', e);
     return NextResponse.json({ map: current ?? EMPTY_MAP });

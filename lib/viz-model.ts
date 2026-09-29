@@ -163,6 +163,27 @@ export interface VizModelState {
    * is what keeps every existing surface behaving as it did.
    */
   can?: readonly ('slice' | 'view' | 'time' | 'compare')[];
+  /**
+   * Present when what is on screen is a MODEL DOCUMENT rather than a surface:
+   * an id that survives editing, a revision, and what can be undone.
+   *
+   * It is what turns the model's own verbs on (see MODEL_OPS): a document can be
+   * edited, undone and branched; a hand-built working surface cannot, and
+   * offering the verbs there would be offering something that silently does
+   * nothing.
+   */
+  edits?: {
+    id: string;
+    title: string;
+    revision: number;
+    revisions: number;
+    canUndo: boolean;
+    canRedo: boolean;
+    /** the other documents in this workspace, for `use` */
+    others: string[];
+    /** what each revision changed, newest last */
+    log: string[];
+  };
 }
 
 // ── sanitising ───────────────────────────────────────────────────────
@@ -294,6 +315,26 @@ export function sanitizeModelState(raw: unknown): VizModelState | null {
   const selRaw = text(r.selected, 32);
   const selected = selRaw && entities.some((e) => e.id === selRaw) ? selRaw : null;
 
+  const e = r.edits as Record<string, unknown> | undefined;
+  const edits =
+    e && typeof e === 'object'
+      ? (() => {
+          const id = text(e.id, 48);
+          if (!id) return null;
+          const n = (v: unknown, d = 0) => (typeof v === 'number' && Number.isFinite(v) ? Math.floor(v) : d);
+          return {
+            id,
+            title: text(e.title, 90),
+            revision: n(e.revision, 1),
+            revisions: n(e.revisions, 1),
+            canUndo: e.canUndo === true,
+            canRedo: e.canRedo === true,
+            others: Array.isArray(e.others) ? e.others.map((x) => text(x, 48)).filter(Boolean).slice(0, 8) : [],
+            log: Array.isArray(e.log) ? e.log.map((x) => text(x, 160)).filter(Boolean).slice(0, 6) : [],
+          };
+        })()
+      : null;
+
   const CAN = ['slice', 'view', 'time', 'compare'] as const;
   const can = Array.isArray(r.can)
     ? (r.can.filter((c): c is (typeof CAN)[number] => CAN.includes(c as never)) as (typeof CAN)[number][])
@@ -316,6 +357,7 @@ export function sanitizeModelState(raw: unknown): VizModelState | null {
     readouts: list(r.readouts, VIZ_CAPS.readouts, 200),
     selected,
     ...(can.length ? { can } : {}),
+    ...(edits ? { edits } : {}),
   };
 }
 
@@ -353,7 +395,44 @@ export type VizOp =
   /** move to an instant; time is a dimension of the model, not a control */
   | { op: 'time'; value: number }
   /** keep the state as it stands, to put the next one beside it */
-  | { op: 'compare'; on: boolean };
+  | { op: 'compare'; on: boolean }
+  // ── THE MODEL'S OWN VERBS ────────────────────────────────────────
+  //
+  // Everything above changes how a model is LOOKED AT. These change the model,
+  // which is a different kind of act and the one that was missing: "delete the
+  // second spring" has to remove a term from the equations, not hide a shape,
+  // and "undo that" has to restore a previous state of the thing rather than
+  // redraw the last picture. They are applied by lib/model/docs.ts against a
+  // document with a stable id, so the model survives being edited.
+  //
+  // `of` is the object in the model, by the id the state listed. Absent means
+  // the model as a whole.
+  /** take an object out of the model, reassembling whatever depended on it */
+  | { op: 'remove'; of: string }
+  /** put a part in: a body, a spring or a damper between things that exist */
+  | { op: 'add'; kind: 'body' | 'spring' | 'damper'; id: string; between?: [string, string]; value?: number }
+  /** change what a part IS — a damper becomes a spring, so the term changes */
+  | { op: 'replace'; of: string; becomes: 'spring' | 'damper' }
+  /** a copy under its own id, the original untouched */
+  | { op: 'duplicate' }
+  /** the same, named: work that may be thrown away */
+  | { op: 'branch'; name: string }
+  /** back one revision, and forward again */
+  | { op: 'undo' }
+  | { op: 'redo' }
+  /** the model itself goes */
+  | { op: 'delete' }
+  /** show a different model from this workspace */
+  | { op: 'use'; id: string };
+
+/** The ops that change the MODEL rather than the view of it. */
+export const MODEL_OPS: readonly VizOp['op'][] = [
+  'remove', 'add', 'replace', 'duplicate', 'branch', 'undo', 'redo', 'delete', 'use',
+];
+
+export function isModelOp(op: VizOp): boolean {
+  return (MODEL_OPS as readonly string[]).includes(op.op);
+}
 
 export const VIZ_FENCE = 'socria-viz';
 /** No reply needs more than a handful; a long list is a runaway, not an edit. */
@@ -465,6 +544,66 @@ export function parseVizOps(reply: string, state: VizModelState | null | undefin
       if (Number.isFinite(v)) out.push({ op: 'time', value: v });
       continue;
     }
+    // ── the model's own verbs ──────────────────────────────────────
+    //
+    // Gated on `edits`, which is present only when the surface is showing a
+    // MODEL DOCUMENT — something with an id and revisions that can be edited and
+    // undone. A working surface with no document behind it silently ignoring
+    // "delete the damper" would leave the reply describing a change that never
+    // happened, which is the failure this whole gate exists to prevent.
+    const editable = !!state.edits;
+
+    if (verb === 'remove' && bits.length >= 2 && editable) {
+      const id = bits[1];
+      if (entities.has(id)) out.push({ op: 'remove', of: id });
+      continue;
+    }
+    if (verb === 'replace' && bits.length >= 3 && editable) {
+      // `replace k2 with damper` and `replace k2 damper` both read naturally.
+      const id = bits[1];
+      const becomes = (bits[2].toLowerCase() === 'with' ? bits[3] : bits[2])?.toLowerCase();
+      if (entities.has(id) && (becomes === 'spring' || becomes === 'damper')) {
+        out.push({ op: 'replace', of: id, becomes });
+      }
+      continue;
+    }
+    if (verb === 'add' && bits.length >= 3 && editable) {
+      const kind = bits[1].toLowerCase();
+      if (kind !== 'body' && kind !== 'spring' && kind !== 'damper') continue;
+      const id = bits[2];
+      if (!/^[a-z][a-z0-9_]{0,23}$/i.test(id)) continue;
+      // add spring k3 m1 m2 40   |   add body m4 2
+      const rest = bits.slice(3);
+      const nums = rest.filter((b) => Number.isFinite(Number(b))).map(Number);
+      const names = rest.filter((b) => !Number.isFinite(Number(b)));
+      if (kind === 'body') {
+        out.push({ op: 'add', kind, id, ...(nums.length ? { value: nums[0] } : {}) });
+      } else {
+        if (names.length < 2) continue;
+        out.push({
+          op: 'add', kind, id,
+          between: [names[0], names[1]],
+          ...(nums.length ? { value: nums[0] } : {}),
+        });
+      }
+      continue;
+    }
+    if ((verb === 'duplicate' || verb === 'copy') && editable) {
+      out.push({ op: 'duplicate' });
+      continue;
+    }
+    if (verb === 'branch' && editable) {
+      out.push({ op: 'branch', name: bits.slice(1).join(' ').slice(0, 90) || 'A branch' });
+      continue;
+    }
+    if (verb === 'undo' && editable) { out.push({ op: 'undo' }); continue; }
+    if (verb === 'redo' && editable) { out.push({ op: 'redo' }); continue; }
+    if (verb === 'delete' && editable) { out.push({ op: 'delete' }); continue; }
+    if (verb === 'use' && bits.length >= 2 && editable) {
+      out.push({ op: 'use', id: bits[1].slice(0, 48) });
+      continue;
+    }
+
     if (verb === 'compare' && bits.length >= 2 && allows('compare')) {
       const on = /^(on|true|keep|1)$/i.test(bits[1]);
       const off = /^(off|false|clear|0)$/i.test(bits[1]);
@@ -649,9 +788,29 @@ export function vizOpsHelp(state: VizModelState): string {
     (state.can ?? []).includes('view') ? 'view 2d|3d                       the same model, drawn flat or in space' : '',
     (state.can ?? []).includes('time') ? 'time <number>                    move to an instant' : '',
     (state.can ?? []).includes('compare') ? 'compare on|off                   hold this state beside the next one' : '',
+    // ── EDITING THE MODEL ITSELF ─────────────────────────────────
+    //
+    // Only offered when there is a document to edit. These are a different kind
+    // of act from the verbs above and the help text says so, because a model
+    // that thinks "remove" hides something will describe a deletion that did not
+    // happen.
+    state.edits ? '' : '',
+    state.edits ? `remove <object>                  take it OUT of the model — the equations are assembled again without it` : '',
+    state.edits ? 'replace <object> with spring|damper   change what a part IS, so its term in the equations changes' : '',
+    state.edits ? 'add spring|damper <id> <end> <end> [value]   |   add body <id> [mass]' : '',
+    state.edits ? 'duplicate | branch <name>        a copy under its own id; the original is untouched' : '',
+    state.edits ? 'undo | redo                      the model’s own history, not the picture’s' : '',
+    state.edits ? 'delete                           the model itself goes' : '',
+    state.edits && state.edits.others.length ? `use <model>                      others here: ${state.edits.others.join(', ')}` : '',
     '```',
     `At most ${MAX_OPS} lines. Only those ids; anything else is dropped. Values outside a control's range are clamped to it, because the range belongs to the physics and not to the conversation.`,
     'No block at all when they did not ask for a change — an answer to "what is this?" moves nothing.',
+    state.edits
+      ? `THIS IS A MODEL, NOT A PICTURE. It is ${state.edits.id} at revision ${state.edits.revision} of ${state.edits.revisions}${
+          state.edits.canUndo ? ', and the last change can be undone' : ''
+        }. Editing it keeps that id: the same model at a later revision, never a new one. A removal takes the object out of the model and the governing equations are assembled again without it — so say what changed, not what is hidden.`
+      : '',
+    state.edits?.log.length ? `What has been done to it so far: ${state.edits.log.join('; ')}.` : '',
   ];
   return lines.filter(Boolean).join('\n');
 }

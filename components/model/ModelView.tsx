@@ -61,12 +61,23 @@ const d2 = (pts: { x: number; y: number }[]) =>
 
 export function ModelView({
   model: initial,
+  edits,
   fill,
   onRead,
   ops,
   onModel,
 }: {
   model: Model;
+  /**
+   * What document this model is a revision OF, when it is one.
+   *
+   * Passed straight through to the state the conversation reads, which is what
+   * turns the model's own verbs on (lib/viz-model.ts, MODEL_OPS) and what lets a
+   * reply say "the same model, one revision later". A model with no document —
+   * a benchmark opened from the library — simply has none, and the edit verbs
+   * are then not offered rather than offered and ignored.
+   */
+  edits?: VizModelState['edits'];
   fill?: boolean;
   onRead?: (read: (() => VizModelState) | null) => void;
   ops?: { seq: number; ops: VizOp[] } | null;
@@ -500,6 +511,7 @@ export function ModelView({
       assumptions={model.assumptions ?? []}
       equations={model.equations ?? []}
       can={['slice', 'view', 'time', 'compare']}
+      edits={edits}
       onOps={takeOps}
       onRead={onRead}
       ops={ops}

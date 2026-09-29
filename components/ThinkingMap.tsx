@@ -28,6 +28,7 @@ import { TeX, MathText } from './TeX';
 import { MathPlot } from './MathPlot';
 import { SceneSurface, isSimulation } from '@/components/surfaces/SceneSurface';
 import { ModelView } from '@/components/model/ModelView';
+import { activeDoc, editsState, EMPTY_WORKSPACE, modelFor } from '@/lib/model/docs';
 import type { VizModelState, VizOp } from '@/lib/viz-model';
 import { MathViz } from './MathViz';
 import { MatrixLens } from './MatrixLens';
@@ -175,6 +176,11 @@ export function ThinkingMap({
   mapRef.current = map;
 
   const [lens, setLens] = useState<LensId>(initialLens);
+
+  // The model document this line of thinking is holding, if any. Read from the
+  // MAP rather than passed in: the map is the session's canonical state, and a
+  // model is part of the thinking rather than a property of this component.
+  const doc = useMemo(() => activeDoc(map.models ?? EMPTY_WORKSPACE), [map.models]);
   // Once the person picks a lens by hand, stop auto-switching for them.
   const lensManual = useRef(false);
   const [size, setSize] = useState({ w: 800, h: 600 });
@@ -627,7 +633,7 @@ export function ThinkingMap({
             makes it interactive — parameters, a clock, the idea in motion;
             without one it stays the static drawing it has always been. */}
         {lens === 'plot' &&
-          (map.viz ? (
+          (map.viz || doc ? (
             // A SIMULATED OBJECT GETS ITS OWN SURFACE, not the plot renderer.
             //
             // Everything else here is a picture of a formula, and MathViz draws
@@ -646,15 +652,32 @@ export function ThinkingMap({
             // object with a surface of its own; and everything else, which is
             // a figure of an expression and belongs on the plot renderer.
             // The lens learns nothing new for any of them.
-            map.viz.built ? (
+            // A MODEL DOCUMENT FIRST, when this line of thinking holds one.
+            //
+            // Four routes now, and the new one is the important one: a document
+            // has a stable id and revisions, so what is drawn is "this model, at
+            // revision three" rather than the third picture in a row. The
+            // document's state travels to the conversation through `edits`,
+            // which is what lets a reply edit it — remove a part, undo, branch —
+            // instead of describing what removing a part would look like.
+            doc ? (
+              <div className="lg-viz-surface lg-tokens">
+                <ModelView
+                  model={modelFor(doc)}
+                  edits={editsState(map.models ?? EMPTY_WORKSPACE) ?? undefined}
+                  onRead={onVizRead}
+                  ops={vizOps}
+                />
+              </div>
+            ) : map.viz?.built ? (
               <div className="lg-viz-surface lg-tokens">
                 <ModelView model={map.viz.built} onRead={onVizRead} ops={vizOps} />
               </div>
-            ) : isSimulation(map.viz) ? (
+            ) : map.viz && isSimulation(map.viz) ? (
               <div className="lg-viz-surface">
                 <SceneSurface scene={map.viz} onRead={onVizRead} ops={vizOps} />
               </div>
-            ) : (
+            ) : map.viz ? (
               <MathViz
                 scene={map.viz}
                 width={size.w}
@@ -664,7 +687,7 @@ export function ThinkingMap({
                 guarded={guarded}
                 onSceneChange={onViz}
               />
-            )
+            ) : null
           ) : (
             <MathPlot map={map} width={size.w} height={size.h} guarded={guarded} />
           ))}

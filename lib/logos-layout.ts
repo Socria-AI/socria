@@ -177,7 +177,10 @@ export function availableLenses(map: ThinkingMap): LensId[] {
   // withholding the lens that draws it because of the name on the
   // conversation made the economics scenes unreachable in exactly the
   // conversations they exist for.
-  if (map.viz) out.push('plot');
+  // A SCENE OR A MODEL. A model document earns the lens as surely as a scene
+  // does — more surely, since it is the thing the person can edit — and gating
+  // on `viz` alone would have left a built model with nowhere to be drawn.
+  if (map.viz || map.models?.docs.length) out.push('plot');
 
   // The step-by-step readings. A solution chain and a worked Board are about
   // work being DONE — each state of the expression, the move that produced
@@ -189,7 +192,7 @@ export function availableLenses(map: ThinkingMap): LensId[] {
     const chainEdges = map.edges.filter((e) => CHAIN_REL.has(e.relation));
     if (chainNodes.length >= 2 || chainEdges.length >= 1) out.unshift('solve');
     // Without a scene, a plottable node still earns the lens.
-    if (!map.viz && plottableNodes(map).length) out.push('plot');
+    if (!map.viz && !map.models?.docs.length && plottableNodes(map).length) out.push('plot');
     if (map.nodes.length) out.push('board');
   }
 

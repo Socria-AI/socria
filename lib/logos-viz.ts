@@ -27,7 +27,8 @@
 // Nothing in this file touches React, the network, or time. Frames are
 // deterministic, which is what makes the whole surface testable.
 
-import { sanitizeModel, type Model } from './model/schema';
+import type { Model } from './model/schema';
+import { revalidate } from './model/propose';
 import { compileExpr, freeNames, taylorCoeffs, type CompiledExpr } from './logos-math';
 import {
   contourSet,
@@ -602,6 +603,16 @@ export interface VizScene {
    * arrives from outside.
    */
   built?: Model;
+  /**
+   * A structured model a conversation has PROPOSED, not one the engine has
+   * built.
+   *
+   * Never rendered and never trusted: it exists so a model can hand the engine a
+   * candidate and have it validated (buildProposal). On success the server
+   * replaces it with `built`; on refusal it stays, and the refusal says what is
+   * missing — which is a more useful state than a picture nobody can check.
+   */
+  propose?: Record<string, unknown>;
   /** matrix: the 2×2 transformation, rows first: [[a, b], [c, d]] */
   matrix?: [[number, number], [number, number]];
   /** vectors: the arrows themselves; with exactly two, s·u + t·v is offered */
@@ -5313,14 +5324,51 @@ function econFields(kind: VizKind, raw: any): Partial<VizScene> {
   return out;
 }
 
-export function sanitizeViz(raw: any): VizScene | null {
+/**
+ * How much a scene is worth on the way in.
+ *
+ * 'proposal'  it was written by a language model. It may PROPOSE a structured
+ *             model; it may not present one as built. `built` is stripped.
+ * 'stored'    it came back from this product's own storage, a browser holding a
+ *             session, or a collaborator's event. `built` is accepted only by
+ *             being re-validated: re-sanitized and re-routed, and dropped if it
+ *             no longer computes (revalidate, in lib/model/propose.ts).
+ *
+ * THE DEFAULT IS THE SUSPICIOUS ONE. Every call site that omits this is treated
+ * as a model's own output, because that is the call site that existed first and
+ * the one where getting it wrong matters.
+ */
+export type VizTrust = 'proposal' | 'stored';
+
+export function sanitizeViz(raw: any, opts?: { trust?: VizTrust }): VizScene | null {
   if (!raw || typeof raw !== 'object') return null;
   const kind: VizKind | null = VIZ_KINDS.includes(raw.kind) ? raw.kind : null;
   if (!kind) return null;
 
-  // A model travels with the scene and is cleaned by its own sanitiser: the
-  // one that knows what an object, a control and a data block may be.
-  const built = raw.built ? sanitizeModel(raw.built) : null;
+  const trust: VizTrust = opts?.trust ?? 'proposal';
+
+  // ── THE TRUST BOUNDARY ────────────────────────────────────────────
+  //
+  // `built` means the model ENGINE produced and verified this state: the router
+  // ran solvers on it, the renderer draws it as computed, the conversation is
+  // told its numbers are results. A language model writing JSON that looks like
+  // a model is not that, and letting one through would make every downstream
+  // claim a confident lie — so on the proposal path the field is removed
+  // outright, and the only thing that can put one there is buildProposal.
+  //
+  // On the stored path it is re-validated rather than trusted: a model that
+  // arrives claiming to be built has to still BE computable, which is exactly
+  // what the claim says. That is why the stamp does not need to be
+  // cryptographic — the check is the guarantee.
+  const built = trust === 'stored' && raw.built ? revalidate(raw.built) : null;
+
+  // What a model MAY offer: a proposal, carried through untouched in shape and
+  // validated by the engine on the server (lib/model/propose.ts). It is stored
+  // as-is and never drawn: nothing renders a proposal.
+  const propose =
+    trust === 'proposal' && raw.propose && typeof raw.propose === 'object' && !Array.isArray(raw.propose)
+      ? (raw.propose as Record<string, unknown>)
+      : null;
 
   const needsExpr = kindNeedsExpr(kind);
   const expr = typeof raw.expr === 'string' ? raw.expr.trim().slice(0, MAX_EXPR) : '';
@@ -5418,6 +5466,7 @@ export function sanitizeViz(raw: any): VizScene | null {
     varName,
     // Carried through where one arrived and survived its own sanitiser.
     ...(built ? { built } : {}),
+    ...(propose ? { propose } : {}),
     view: {
       xMin,
       xMax,
