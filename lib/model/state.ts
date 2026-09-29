@@ -22,7 +22,7 @@
 
 import type { VizEntity, VizModelState, VizOp, VizProvenance } from '@/lib/viz-model';
 import { unpack } from './unpack';
-import { capabilityOf, missingStructure, route } from './solve';
+import { capabilityOf, missingStructure, plan, route } from './solve';
 import { estimate } from './estimate';
 import { driftOf, runFor, stateAt } from './system';
 import { FIDELITY_SAYS, ORIGIN_SAYS, affectedBy, objectOf, paramOf, setParam, setTime, type ChangeRecord, type Fidelity, type Model } from './schema';
@@ -233,6 +233,12 @@ export function modelStateFrom(
   const gaps = missingStructure(model);
   const status: string[] = [
     `This model is ${able.level}${able.because.length ? `: ${able.because[able.because.length - 1]}` : ''}.`,
+    // WHAT CAN BE DONE WITH IT, OPERATION BY OPERATION — and not one verdict.
+    // A model can be unestimated and evaluable at the same time, and saying
+    // only "nothing computes yet" about such a model is how a correctly built
+    // wage equation with two hypothetical coefficients was described as
+    // computing nothing while its surface was being drawn.
+    ...plan(model).map((p) => `You can ${p.says}.`),
     ...gaps.map(
       (g) =>
         `${g.label} is NOT computed: it needs ${g.missing
@@ -244,7 +250,20 @@ export function modelStateFrom(
       .map((o) =>
         o.estimation!.data
           ? `“${o.label}” is a specification with data attached${o.estimation!.method ? `, fitted by ${o.estimation!.method}` : ', with no method chosen — the method is theirs to choose'}.`
-          : `“${o.label}” is SPECIFIED BUT NOT ESTIMATED: ${o.estimation!.y} explained by ${o.estimation!.x.join(', ')}, with no observations attached. Its coefficients are symbols. There is no fitted line, no R², no standard error and no p-value, and inventing one would be the worst thing you could do here.`
+          : `“${o.label}” is SPECIFIED BUT NOT ESTIMATED: ${o.estimation!.y} explained by ${o.estimation!.x.join(', ')}, with no observations attached. There is no fitted line, no R², no standard error and no p-value, and inventing one would be the worst thing you could do here.`
+      ),
+    // …AND WHAT THE UNESTIMATED MODEL CAN STILL SHOW. A surface drawn at
+    // coefficient values somebody set as hypotheses is a real computation of
+    // what the model says — and describing it as an estimate, a prediction or
+    // a fit would be exactly the lie the sentence above is guarding against.
+    ...model.objects
+      .filter((o) => o.meta?.role === 'response')
+      .map(
+        (o) =>
+          `“${o.label}” is the model's own deterministic component, computed at ${o.meta!.basis}. ` +
+          `It is NOT estimated, NOT a prediction, NOT a fit and NOT a conditional expectation — ` +
+          `reading it as the last of those needs an assumption about the error term nobody here has stated. ` +
+          `Moving a coefficient moves this surface because the surface IS the equation.`
       ),
   ];
 

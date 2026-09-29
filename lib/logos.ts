@@ -1101,6 +1101,10 @@ WHAT TO PUT IN IT, by what they described. These are the blocks that exist, not 
   something explained by something else → "estimation": the outcome, what explains it, and the data IF THEY GAVE YOU ANY
   a shape or a function            → objects with expressions
 
+A SPECIFICATION WITH COEFFICIENT VALUES IS COMPUTABLE, EVEN WITH NO DATA AT ALL. If they give you values — "set β₁ to 2.5 and β₂ to 1.2 and show me how it behaves" — declare each one as a CONTROL in "params", named after the coefficient it is: for a specification with id "spec" and an intercept, the coefficients are spec__b0, spec__b1, spec__b2 in the order the regressors are written. The engine then draws what the equation says over the regressors, at those values, and the person can move them. Also give "over" on the estimation — the range each regressor is worth looking at — because a surface needs a window and inventing one is not yours to do. If they named ranges ("education from 8 to 20"), use theirs.
+
+NOT ESTIMATED IS NOT NOT COMPUTABLE. A value somebody sets as a hypothesis is theirs and is honest; a value you invent so that something draws is not. Never write a coefficient value they did not give you, and never present a hypothetical surface as a fit, a prediction or an estimate.
+
 A SPECIFICATION IS A MODEL BEFORE IT IS FITTED, and this is the one most requests land in. "Wage explained by education" with no data and no method is a complete specification: the outcome, the regressor, an intercept, a slope and an error term. Propose it. Leave "data" out and leave "method" out. The engine builds it as a specified model, says plainly that nothing has been estimated, and names the observations as what is missing. DO NOT withhold the model because it cannot be fitted yet, and DO NOT invent numbers so that it can be — the first loses them the model, the second loses them the truth.
 
 WHEN NOT TO PROPOSE. When they asked a question about a kind of model rather than for one. When the ask is explain, explore, discuss or question. And when a picture already does it: a curve, a limit, a market, a distribution, a titration have kinds above, and a proposal would be a worse version of something that works.
@@ -1124,6 +1128,9 @@ THE SHAPE — a sibling of "nodes", "edges" and "viz". Every field is optional e
                 "observe": {"total": "S + I + R"}, "invariant": "total", "dt": 0.05, "steps": 4000}},
     {"id": "fit", "kind": "specification", "label": "y on x",
      "estimation": {"y": "y", "x": ["x"]}},
+    {"id": "hyp", "kind": "specification", "label": "wage on education and experience",
+     "estimation": {"y": "wage", "x": ["education", "experience"],
+                    "over": {"education": [8, 20], "experience": [0, 30]}}},
     {"id": "fitted", "kind": "specification", "label": "y on x, fitted",
      "estimation": {"method": "ols", "y": "y", "x": ["x"], "data": "sample"}}
   ],

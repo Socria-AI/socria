@@ -424,6 +424,17 @@ export interface EstimationDecl {
   robust?: boolean;
   /** whether to fit an intercept. Default true. */
   intercept?: boolean;
+  /**
+   * The range each regressor is worth looking at over.
+   *
+   * A VIEWING WINDOW, NOT A DATUM. Saying "show me education from 8 to 20"
+   * asserts nothing about anybody's education; it says where to look. It is
+   * kept on the declaration so the deterministic component below has a domain
+   * to be evaluated over, and it is absent rather than guessed — a surface
+   * with no range reports the range as what it is waiting for, which is a
+   * question somebody can answer in one word.
+   */
+  over?: Record<string, [number, number]>;
 }
 
 /** A control: a number the reader may move, with the range that owns it. */
@@ -842,6 +853,19 @@ export function sanitizeObject(raw: unknown): ModelObject | null {
         ...(lags !== null && lags > 0 ? { lags: Math.min(12, Math.floor(lags)) } : {}),
         ...(est.robust === true ? { robust: true } : {}),
         ...(est.intercept === false ? { intercept: false } : {}),
+        ...(() => {
+          const raw = est.over as Record<string, unknown> | undefined;
+          if (!raw || typeof raw !== 'object') return {};
+          const over: Record<string, [number, number]> = {};
+          for (const [k, v] of Object.entries(raw).slice(0, 20)) {
+            if (!Array.isArray(v) || v.length !== 2) continue;
+            const lo = num(v[0]);
+            const hi = num(v[1]);
+            if (lo === null || hi === null || !(hi > lo)) continue;
+            over[k] = [lo, hi];
+          }
+          return Object.keys(over).length ? { over } : {};
+        })(),
       };
     }
   }

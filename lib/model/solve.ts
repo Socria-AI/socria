@@ -34,10 +34,63 @@
 // what is stopping it.
 
 import { estimate } from './estimate';
+import { namesIn } from './deps';
 import { readGravity } from './gravity';
 import { readMechanism } from './mechanism';
 import { readSystem, type Missing } from './system';
 import type { Fidelity, Model, ModelObject } from './schema';
+
+/**
+ * WHAT SOMEBODY WANTS DONE TO A MODEL — as distinct from what the model is,
+ * and from which backend would do it.
+ *
+ * THE FAILURE THIS ANSWERS. Asked for a wage equation with β₁ and β₂ set to
+ * hypothetical values, Logos built the model correctly, refused to pretend it
+ * had been estimated — correctly — and then drew NOTHING, announcing "nothing
+ * in it computes yet".
+ *
+ * That was wrong, and the wrongness was architectural. `capabilityOf(model)`
+ * and `missingStructure(model)` asked ONE question — "can this model compute?"
+ * — and a specification's one registered operation is `estimate`, which needs
+ * observations. So a missing dataset blocked the entire model, including the
+ * part of it that had nothing to do with data: β₀ + β₁·education + β₂·experience
+ * is an ordinary expression, and the sampler sitting right there would have
+ * evaluated it (`handles: true, requires: []`, verified) had anything asked.
+ *
+ * NOT ESTIMATED DOES NOT MEAN NOT COMPUTABLE. A model can be unestimated and
+ * evaluable, unsimulatable and visualisable, incomplete and representable. So
+ * capability is asked PER OPERATION, and one model may be blocked for one and
+ * runnable for another at the same time.
+ *
+ * The same distinction outside econometrics: a symbolic dynamical system is
+ * visualisable and not simulatable while its initial conditions are missing; an
+ * objective is visualisable and not optimisable with no backend; a PDE is
+ * representable and not solvable without boundary conditions.
+ */
+export const OPERATIONS = [
+  /** work out the value of what is written, from the values that are there */
+  'evaluate',
+  /** run it forward through time */
+  'simulate',
+  /** fit it to supplied observations */
+  'estimate',
+  /** arrange supplied numbers as they are */
+  'read',
+  /** find the best point subject to what constrains it */
+  'optimise',
+  /** rearrange the mathematics rather than compute with it */
+  'rearrange',
+] as const;
+export type Operation = (typeof OPERATIONS)[number];
+
+export const OPERATION_SAYS: Record<Operation, string> = {
+  evaluate: 'work out what the model says, from the values it has',
+  simulate: 'run it forward through time',
+  estimate: 'fit it to observations',
+  read: 'show the supplied numbers as they are',
+  optimise: 'find the best point subject to the constraints',
+  rearrange: 'manipulate the expressions symbolically',
+};
 
 export type SolverKind =
   | 'sampling'      // evaluate an expression over a domain
@@ -55,6 +108,16 @@ export interface Solver {
   id: string;
   label: string;
   kind: SolverKind;
+  /**
+   * WHICH OPERATIONS THIS SOLVER OFFERS.
+   *
+   * A solver may offer more than one, and more importantly ONE OBJECT MAY BE
+   * CLAIMED BY DIFFERENT SOLVERS FOR DIFFERENT OPERATIONS — which is the whole
+   * point. A specification is `estimate`d by least squares and `evaluate`d by
+   * the sampler, and asking about the wrong one is what made a model with two
+   * hypothetical coefficients report that nothing in it computed.
+   */
+  does: readonly Operation[];
   /** the fidelity a successful run of THIS solver earns */
   produces: Fidelity;
   /** does it handle this object at all */
@@ -74,6 +137,7 @@ export interface Solver {
 const has = (o: ModelObject, keys: readonly string[]) => keys.some((k) => !!o.defs?.[k]);
 
 export const SAMPLING: Solver = {
+  does: ['evaluate'],
   id: 'sample',
   label: 'Expression sampler',
   kind: 'sampling',
@@ -81,14 +145,40 @@ export const SAMPLING: Solver = {
   method: 'evaluates the stated expression over a bounded grid or parameter range (lib/model/sample.ts)',
   handles: (_m, o) =>
     ['surface', 'volume', 'curve', 'line', 'ray', 'field', 'plane', 'region', 'boundary', 'mesh'].includes(o.kind),
-  requires: (_m, o) => {
-    if (o.definition || has(o, ['z', 'f', 'fx', 'fy', 'fz', 'px', 'py', 'pz'])) return [];
-    return [{ what: 'an expression to evaluate', unlocks: 'drawing this from the mathematics rather than by hand' }];
+  requires: (m, o) => {
+    const wrote = o.definition || has(o, ['z', 'f', 'fx', 'fy', 'fz', 'px', 'py', 'pz']);
+    if (!wrote) {
+      return [{ what: 'an expression to evaluate', unlocks: 'drawing this from the mathematics rather than by hand' }];
+    }
+    // AN EXPRESSION IS ONLY EVALUABLE IF ITS NAMES CAN BE BOUND, and this only
+    // checked that an expression EXISTED. So a wage surface written as
+    // β₀ + β₁·education + β₂·experience with β₀ never given a value came back
+    // `runnable`, and every height on it was NaN — the exact remaining degree
+    // of freedom somebody asked to have named, reported instead as ready.
+    //
+    // The axes are bound by the sampler, the clock by the model, and everything
+    // else must be a control. A name that is none of those is the answer to
+    // "what is still missing", and it is reported with its own name in it.
+    const bound = new Set<string>([
+      'x', 'y', 'z', 'u', 'v', 't',
+      ...m.params.map((p) => p.id.toLowerCase()),
+      ...m.objects.filter((q) => typeof q.value === 'number').map((q) => q.id.toLowerCase()),
+    ]);
+    const free = new Set<string>();
+    for (const e of [o.definition, ...Object.values(o.defs ?? {})]) {
+      for (const n of namesIn(e)) if (!bound.has(n)) free.add(n);
+    }
+    if (!free.size) return [];
+    return [...free].map((n) => ({
+      what: `a value for ${n}`,
+      unlocks: `evaluating ${o.label} — it is the one quantity in the expression nothing has fixed`,
+    }));
   },
   checkedAgainst: 'known closed forms for the benchmark surfaces (test/model-engine)',
 };
 
 export const ODE: Solver = {
+  does: ['simulate'],
   id: 'rk4',
   label: 'ODE integrator (RK4)',
   kind: 'ode',
@@ -112,6 +202,7 @@ export const ODE: Solver = {
 };
 
 export const ASSEMBLY: Solver = {
+  does: ['simulate'],
   id: 'mechanism',
   label: 'Mechanism assembler',
   kind: 'assembly',
@@ -136,6 +227,7 @@ export const ASSEMBLY: Solver = {
 };
 
 export const GRAVITY: Solver = {
+  does: ['simulate'],
   id: 'nbody',
   label: 'Gravitational assembler',
   kind: 'assembly',
@@ -164,6 +256,7 @@ export const GRAVITY: Solver = {
 };
 
 export const ESTIMATION: Solver = {
+  does: ['estimate'],
   id: 'ols',
   label: 'Least-squares estimator',
   kind: 'estimation',
@@ -190,6 +283,7 @@ export const ESTIMATION: Solver = {
 };
 
 export const DATA: Solver = {
+  does: ['read'],
   id: 'data',
   label: 'Data reader',
   kind: 'data',
@@ -214,6 +308,7 @@ export const DATA: Solver = {
  */
 export const FUTURE: Solver[] = [
   {
+    does: ['rearrange'],
     id: 'symbolic',
     label: 'Symbolic algebra',
     kind: 'symbolic',
@@ -224,6 +319,7 @@ export const FUTURE: Solver[] = [
     future: true,
   },
   {
+    does: ['optimise'],
     id: 'optimise',
     label: 'Constrained optimisation',
     kind: 'optimisation',
@@ -234,6 +330,7 @@ export const FUTURE: Solver[] = [
     future: true,
   },
   {
+    does: ['simulate'],
     id: 'monte-carlo',
     label: 'Stochastic simulation',
     kind: 'stochastic',
@@ -244,6 +341,7 @@ export const FUTURE: Solver[] = [
     future: true,
   },
   {
+    does: ['simulate'],
     id: 'pde',
     label: 'Field solver',
     kind: 'pde',
@@ -281,8 +379,15 @@ export type Routed =
  * object carrying a mechanism is assembled rather than sampled even if it also
  * has an expression lying around. A FUTURE solver never reports runnable.
  */
-export function route(model: Model, o: ModelObject): Routed {
+export function route(model: Model, o: ModelObject, operation?: Operation): Routed {
   for (const s of SOLVERS) {
+    // ASKED ABOUT ONE OPERATION AT A TIME, when the caller names one. Without
+    // this, the first solver that claims the object answers for every question
+    // about it — so "can this be evaluated?" was answered by the estimator
+    // saying "I have no data", and a model whose deterministic component the
+    // sampler would have computed went dark. Omitting the operation keeps the
+    // old meaning: the best thing any solver can do with it.
+    if (operation && !s.does.includes(operation)) continue;
     if (!s.handles(model, o)) continue;
     const missing = s.requires(model, o);
     if (s.future) {
@@ -296,9 +401,76 @@ export function route(model: Model, o: ModelObject): Routed {
   }
   return {
     status: 'unsupported',
-    why: `nothing registered computes a ${o.kind}`,
+    why: operation
+      ? `nothing registered ${operation}s a ${o.kind}`
+      : `nothing registered computes a ${o.kind}`,
     wouldNeed: 'a solver that handles this kind of object, registered in lib/model/solve.ts',
   };
+}
+
+/**
+ * EVERY OPERATION THIS OBJECT SUPPORTS, and what each one is waiting for.
+ *
+ * The honest full answer, and the one a reader actually wants: not "can this
+ * compute" but "what can be done with this, and what would each take". A
+ * specification with hypothetical coefficients comes back here as
+ * `evaluate: runnable` and `estimate: incomplete, needs observations` — two
+ * true statements about one object that the single-verdict `route` could only
+ * ever give one of.
+ */
+export function operationsOn(model: Model, o: ModelObject): { operation: Operation; routed: Routed }[] {
+  const out: { operation: Operation; routed: Routed }[] = [];
+  for (const op of OPERATIONS) {
+    if (!SOLVERS.some((s) => s.does.includes(op) && s.handles(model, o))) continue;
+    out.push({ operation: op, routed: route(model, o, op) });
+  }
+  return out;
+}
+
+/**
+ * What the model as a whole can do, per operation.
+ *
+ * `plan(model)` is the capability planner the brief asks for: for THIS model,
+ * for EACH operation, what runs, what is blocked and on what. Nothing here
+ * collapses to one yes or no, because the collapse is what produced an empty
+ * picture beside a correctly built model.
+ */
+export interface OperationPlan {
+  operation: Operation;
+  says: string;
+  /** objects a solver would run right now */
+  runnable: { of: string; label: string; solver: string }[];
+  /** objects a solver understands and cannot run yet, with what is missing */
+  blocked: { of: string; label: string; solver: string; missing: Missing[] }[];
+}
+
+export function plan(model: Model): OperationPlan[] {
+  const out: OperationPlan[] = [];
+  for (const op of OPERATIONS) {
+    const runnable: OperationPlan['runnable'] = [];
+    const blocked: OperationPlan['blocked'] = [];
+    for (const o of model.objects) {
+      const r = route(model, o, op);
+      if (r.status === 'runnable') runnable.push({ of: o.id, label: o.label, solver: r.solver.label });
+      else if (r.status === 'incomplete') {
+        blocked.push({ of: o.id, label: o.label, solver: r.solver.label, missing: r.missing });
+      }
+    }
+    if (!runnable.length && !blocked.length) continue;
+    out.push({
+      operation: op,
+      runnable,
+      blocked,
+      says: runnable.length
+        ? `${OPERATION_SAYS[op]}: ${runnable.length} object${runnable.length === 1 ? '' : 's'} ready${
+            blocked.length ? `, ${blocked.length} waiting on ${blocked[0].missing[0]?.what ?? 'something'}` : ''
+          }`
+        : `${OPERATION_SAYS[op]}: blocked — ${blocked
+            .map((b) => `${b.label} needs ${b.missing.map((x) => x.what).join(', ')}`)
+            .join('; ')}`,
+    });
+  }
+  return out;
 }
 
 // ── what a whole model can honestly claim ───────────────────────────
@@ -443,10 +615,13 @@ export function capabilityOf(model: Model): Capability {
  * the brief and `canCompute` in science.ts, which does the same job for values
  * rather than structure.
  */
-export function missingStructure(model: Model): { of: string; label: string; missing: Missing[] }[] {
+export function missingStructure(
+  model: Model,
+  operation?: Operation
+): { of: string; label: string; missing: Missing[] }[] {
   const out: { of: string; label: string; missing: Missing[] }[] = [];
   for (const o of model.objects) {
-    const r = route(model, o);
+    const r = route(model, o, operation);
     if (r.status === 'incomplete') out.push({ of: o.id, label: o.label, missing: r.missing });
   }
   return out;

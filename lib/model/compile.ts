@@ -179,8 +179,14 @@ export function buildObject(model: Model, o: ModelObject, opts?: { detail?: numb
           fidelity: 'model-derived',
         };
       }
-      const def = o.definition;
-      if (!def) return NOTHING(o, 'a curve needs a definition');
+      // THE SAME SPELLINGS THE ROUTER ACCEPTS. SAMPLING.requires takes
+      // `definition` OR a `defs` entry, so a curve written either way routes
+      // runnable; this read only the first, so the second routed `runnable`
+      // and then refused to draw. `f` is the curve's own name for its
+      // expression and `z` is what a response surface collapses to when there
+      // is one regressor rather than two.
+      const def = o.definition ?? o.defs?.f ?? o.defs?.z;
+      if (!def) return NOTHING(o, 'a curve needs a definition (y = …), parametric components or data');
       const e = compileExpr(def, names(model, ['x']));
       if (!e) return NOTHING(o, `“${def}” would not compile`);
       const n = Math.min(LIMITS.runPoints, detail * 8);

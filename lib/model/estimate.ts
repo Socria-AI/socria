@@ -659,6 +659,131 @@ export function expandEstimation(model: Model): Model {
       });
     }
 
+    // ── THE PART THAT CAN BE EVALUATED WITHOUT ANY DATA AT ALL ─────
+    //
+    // THE FAILURE THIS ANSWERS. A wage equation with β₁ and β₂ set to
+    // hypothetical values built correctly, refused to pretend it had been
+    // estimated — correctly — and then drew nothing, announcing that nothing
+    // in it computed. It was wrong: β₀ + β₁·education + β₂·experience is an
+    // ordinary expression, and the sampler would have evaluated it the moment
+    // anything asked. Nothing asked, because a specification's only registered
+    // operation is `estimate` and `estimate` needs observations.
+    //
+    // NOT ESTIMATED IS NOT NOT COMPUTABLE. So the declaration also produces
+    // the thing it can compute: a surface whose height is what the model says
+    // the outcome is, over the regressors, at whatever coefficient values
+    // exist. It routes to the sampler like any other expression, with no
+    // knowledge anywhere that econometrics was involved.
+    //
+    // WHAT IT IS AND IS NOT. It is the model-implied DETERMINISTIC COMPONENT.
+    // It is not the conditional expectation — that identification needs the
+    // zero-conditional-mean assumption, which nobody here has stated — and it
+    // is not a fit, a prediction or an observation. The label and the meaning
+    // say so, and the fidelity is `model-derived`: computed from the model's
+    // own equation and from nothing measured.
+    //
+    // A COEFFICIENT WITH NO VALUE LEAVES ITS NAME IN THE EXPRESSION. If a
+    // control of that name exists the surface is manipulable through it; if
+    // neither a value nor a control exists, the expression mentions a name the
+    // sampler cannot bind and it reports exactly that one missing degree of
+    // freedom. Nothing is invented to make it draw.
+    const axes = decl.x.slice(0, 2);
+    if (axes.length) {
+      // Each coefficient resolves to a control (manipulable), then to a fitted
+      // or user-set value, and otherwise stays as its own name so the gap is
+      // reported rather than filled.
+      const coefficient = (i: number): string => {
+        const b = `${carrier.id}__b${wants ? i + 1 : i}`;
+        if (model.params.some((p) => p.id === b)) return b;
+        const v = value(decl.x[i]);
+        if (v !== undefined) return String(v);
+        const set = model.objects.find((o) => o.id === b)?.defs?.value;
+        return set ?? b;
+      };
+      const intercept = (): string => {
+        const b = `${carrier.id}__b0`;
+        if (!wants) return '0';
+        if (model.params.some((p) => p.id === b)) return b;
+        const v = value(INTERCEPT);
+        if (v !== undefined) return String(v);
+        const set = model.objects.find((o) => o.id === b)?.defs?.value;
+        if (set) return set;
+        // A FIT THAT RAN AND REPORTED NO INTERCEPT GENUINELY HAS NONE — the
+        // within transform removes it by construction. Leaving the symbol in
+        // would put a name in the expression that nothing can bind, and the
+        // sampler would report a missing value for something that is absent on
+        // purpose rather than waiting to be chosen. Where no fit has run, the
+        // symbol STAYS, because then it really is the remaining degree of
+        // freedom and naming it is the whole point.
+        return terms ? '0' : b;
+      };
+
+      // x and y are the axes; a third regressor and beyond are held at their
+      // own coefficient's value only if somebody said where to hold them, and
+      // otherwise contribute their symbol, which the sampler will report.
+      // `slopeTerms`, NOT `terms`. It was `terms`, which SHADOWED the fit's own
+      // `terms` a hundred lines up — so `intercept()`'s "has a fit run?" test
+      // read an array of regressor strings that is always non-empty, and β₀
+      // silently became 0 on a model nobody had fitted. The remaining degree of
+      // freedom the whole feature exists to name was quietly filled in.
+      const slopeTerms = decl.x.map((name, i) => {
+        const c = coefficient(i);
+        const at = i === 0 ? 'x' : i === 1 ? 'y' : name;
+        return `(${c}) * ${at}`;
+      });
+      const expr = [intercept(), ...slopeTerms].join(' + ');
+      const hypothetical = decl.x.some((_, i) => {
+        const b = `${carrier.id}__b${wants ? i + 1 : i}`;
+        return model.params.some((p) => p.id === b) || !!model.objects.find((o) => o.id === b)?.defs?.value;
+      });
+
+      put({
+        id: `${carrier.id}__response`,
+        kind: axes.length > 1 ? 'surface' : 'curve',
+        label: `${decl.y}, as the model implies it`,
+        meaning:
+          `the model-implied deterministic component: ${specificationLine(carrier)}, ` +
+          `with the error term left out. ` +
+          (slopeTerms.length
+            ? `It is NOT a conditional expectation — that reading needs an assumption about the error nobody here has stated — ` +
+              `and it is not a fit, a prediction or an observation.`
+            : ''),
+        defs: { z: expr },
+        ...(decl.over
+          ? {
+              over: {
+                x: decl.over[decl.x[0]],
+                ...(axes.length > 1 && decl.over[decl.x[1]] ? { y: decl.over[decl.x[1]] } : {}),
+              },
+            }
+          : {}),
+        relations: [
+          { to: carrier.id, as: 'derived-from', why: 'it is what this specification says, with the error term left out' },
+        ],
+        meta: {
+          spec: carrier.id,
+          role: 'response',
+          axes: axes.join(','),
+          // What the reader must be told about these numbers, carried on the
+          // object rather than left to a caption somebody might not write.
+          basis: hypothetical
+            ? 'user-set hypothetical coefficients'
+            : terms
+              ? 'coefficients estimated from the data'
+              : 'coefficients as written in the specification',
+        },
+        fidelity: 'model-derived',
+        provenance: hypothetical
+          ? {
+              origin: 'user',
+              detail: 'drawn at coefficient values you set as hypotheses — nothing here is estimated from data',
+            }
+          : terms
+            ? { origin: 'computation', detail: `drawn at the coefficients least squares produced from “${decl.data}”` }
+            : { origin: 'equation', detail: 'drawn from the specification as written' },
+      });
+    }
+
     // The error term — the part of the outcome the specification does not
     // explain. Named because leaving it out is how a specification starts
     // reading as a claim that these regressors are the whole story.

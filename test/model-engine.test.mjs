@@ -25,6 +25,7 @@ import {
 import { buildObject, buildModel, buildSlice, buildContours, buildLevel, scopeOf } from './.tmp/compile.mjs';
 import { buildSpec, chooseRepresentation, toCartesian, fitBox, projectionNote } from './.tmp/spec.mjs';
 import { expand } from './.tmp/mechanism.mjs';
+import { unpack } from './.tmp/unpack.mjs';
 import { modelStateFrom, applyOps, describeChanges, compare, asProvenance } from './.tmp/model-state.mjs';
 import { LIBRARY, modelById, saddle, lorenz, orbit, pointCharge, torus, volatilitySurface, doublePendulum, photonPath, bivariateGaussian, terrain } from './.tmp/library.mjs';
 import { vizModelBlock, parseVizOps, sanitizeModelState } from './.tmp/viz-model.mjs';
@@ -195,7 +196,11 @@ console.log('\n=== every benchmark compiles, and each exercises something differ
     // lib/model/mechanism.ts), so the set of objects a primitive may belong to is
     // the EXPANDED one. Comparing against the declaration would say a spring's
     // primitive belongs to nothing, which is the opposite of what is true.
-    const drawnFrom = expand(m);
+    // `unpack`, not `expand`. This read `expand(m)` — the MECHANISM expander
+    // alone — so it checked the primitives against a partial expansion and
+    // would have failed for anything a gravity or estimation declaration
+    // produced. Whatever the compiler draws from, this must be the same thing.
+    const drawnFrom = unpack(m);
     const drawn = spec.primitives.length;
     // A model may legitimately draw nothing: `open-specification` has no method
     // chosen, so there is no fit and nothing to plot — and the note says exactly

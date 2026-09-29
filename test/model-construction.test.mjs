@@ -36,7 +36,7 @@ import {
 } from './.tmp/ask.mjs';
 import { buildProposal, revalidate } from './.tmp/propose.mjs';
 import { affectedBy, sanitizeModel } from './.tmp/schema.mjs';
-import { capabilityOf, missingStructure, route } from './.tmp/solve.mjs';
+import { capabilityOf, missingStructure, plan, route } from './.tmp/solve.mjs';
 import { unpack } from './.tmp/unpack.mjs';
 import { EMPTY_WORKSPACE, addPart, modelFor, openFromProposal, removeObject, sanitizeWorkspace, undo } from './.tmp/docs.mjs';
 import { estimate, specificationLine } from './.tmp/estimate.mjs';
@@ -44,6 +44,7 @@ import { sanitizeMap } from './.tmp/logos.mjs';
 import { sanitizeViz } from './.tmp/logos-viz.mjs';
 import { buildSpec } from './.tmp/spec.mjs';
 import { buildModel } from './.tmp/compile.mjs';
+import { modelStateFrom } from './.tmp/model-state.mjs';
 import { forgetRuns, runFor, seriesOf } from './.tmp/system.mjs';
 import { LOGOS_CHAT_PROMPT, buildMapPrompt } from './.tmp/logos.mjs';
 
@@ -863,6 +864,106 @@ console.log('\n=== 18. silence is impossible ===');
     `${lots.length} of ${many.objects.length}`);
   const cut = lots.filter((b) => b.problem && /budget/.test(b.problem));
   ok('  and anything the budget cut off says so', cut.length === 0 || cut.every((b) => /in the model/.test(b.problem)));
+}
+
+console.log('\n=== 19. capability is per operation, not one verdict ===');
+{
+  // THE FAILURE. A wage equation with β₀, β₁, β₂ set as hypotheses built
+  // correctly, refused to pretend it had been estimated — correctly — and drew
+  // NOTHING, announcing "nothing in it computes yet". It was wrong: the
+  // sampler would have evaluated β₀ + β₁·education + β₂·experience the moment
+  // anything asked, and nothing asked, because a specification's one
+  // registered operation is `estimate` and `estimate` needs observations.
+  const wage = (params, over) => ({
+    id: 'wage_model', title: 'Wages on education and experience', domain: 'econometrics',
+    params,
+    objects: [{ id: 'spec', kind: 'specification', label: 'Wage on education and experience',
+      estimation: { y: 'wage', x: ['education', 'experience'], ...(over ? { over } : {}) } }],
+  });
+  const HYP = [
+    { id: 'spec__b0', label: 'β₀', value: 10, min: -20, max: 40, step: 0.5 },
+    { id: 'spec__b1', label: 'β₁ (education)', value: 2.5, min: 0, max: 10, step: 0.1 },
+    { id: 'spec__b2', label: 'β₂ (experience)', value: 1.2, min: 0, max: 10, step: 0.1 },
+  ];
+  const OVER = { education: [8, 20], experience: [0, 30] };
+
+  const b = buildProposal(wage(HYP, OVER), { at: 1 });
+  ok('the model builds', b.ok === true, b.ok ? '' : b.refusal.because);
+  const m = unpack(b.model);
+
+  // THE TWO TRUE STATEMENTS, at the same time, about the same model.
+  const resp = m.objects.find((o) => o.meta?.role === 'response');
+  ok('the deterministic component exists as an object', !!resp);
+  ok('  and it can be EVALUATED now', route(m, resp, 'evaluate').status === 'runnable');
+  ok('  while the specification cannot be ESTIMATED',
+    route(m, m.objects.find((o) => o.id === 'spec'), 'estimate').status === 'incomplete');
+  ok('  and asking about estimation does not answer for evaluation',
+    route(m, resp, 'evaluate').status !== route(m, m.objects.find((o) => o.id === 'spec'), 'estimate').status);
+
+  // The planner says both, per operation.
+  const p = plan(m);
+  const ev = p.find((x) => x.operation === 'evaluate');
+  const es = p.find((x) => x.operation === 'estimate');
+  ok('the plan reports evaluate as ready', !!ev && ev.runnable.length > 0);
+  ok('the plan reports estimate as blocked', !!es && es.blocked.length > 0);
+  ok('  on the observations', /observations/.test(JSON.stringify(es.blocked)));
+  ok('and the model is no longer graded as computing nothing',
+    b.ok && b.report.capability === 'computational', b.ok ? b.report.capability : '');
+
+  // AND IT DRAWS — three dimensions, over the ranges THEY gave.
+  const spec = buildSpec(m);
+  ok('it draws', spec.primitives.length > 0);
+  ok('  in three dimensions', spec.dimensionality === 3);
+  ok('  over the ranges they named',
+    resp.over.x[0] === 8 && resp.over.x[1] === 20 && resp.over.y[1] === 30);
+  ok('  with no problem reported for it', !spec.notes.find((n) => n.of === resp.id)?.problem);
+
+  // NOTHING IS FABRICATED.
+  const flat = JSON.stringify(m);
+  ok('no observations were invented', !m.data || Object.keys(m.data).length === 0);
+  ok('no R², standard error or p-value anywhere', !/r2|rSquared|stderr|pValue/i.test(flat));
+  ok('the surface is model-derived, not data-derived', resp.fidelity === 'model-derived');
+  ok('  and says the values are the person’s hypotheses',
+    resp.provenance.origin === 'user' && /nothing here is estimated from data/.test(resp.provenance.detail));
+  ok('  and refuses to call itself a conditional expectation',
+    /NOT a conditional expectation/.test(resp.meaning));
+
+  // THE REMAINING DEGREE OF FREEDOM IS NAMED, NOT INVENTED.
+  const noB0 = buildProposal(wage(HYP.filter((x) => x.id !== 'spec__b0'), OVER), { at: 1 });
+  const m2 = unpack(noB0.model);
+  const r2 = route(m2, m2.objects.find((o) => o.meta?.role === 'response'), 'evaluate');
+  ok('with β₀ unspecified it is incomplete, not runnable', r2.status === 'incomplete');
+  ok('  and β₀ is what it names', /spec__b0/.test(JSON.stringify(r2.missing)));
+  ok('  described as the one thing nothing has fixed',
+    /nothing has fixed/.test(JSON.stringify(r2.missing)));
+  ok('  and no value was invented for it',
+    !m2.params.some((q) => q.id === 'spec__b0'));
+
+  // MANIPULATION COMES FROM THE EQUATION. The surface IS the expression, so a
+  // change to a coefficient reaches it through the dependency graph rather
+  // than through any visual transform.
+  for (const c of ['spec__b0', 'spec__b1', 'spec__b2']) {
+    ok(`changing ${c} reaches the surface`, affectedBy(m, [c]).includes(resp.id),
+      JSON.stringify(affectedBy(m, [c])));
+  }
+  ok('and the surface is literally the equation',
+    /spec__b1/.test(resp.defs.z) && /spec__b2/.test(resp.defs.z), resp.defs.z);
+
+  // A SPECIFICATION WITH NO VALUES AT ALL still says what it is waiting for,
+  // and does not pretend to draw.
+  const bare = buildProposal(wage([], undefined), { at: 1 });
+  const m3 = unpack(bare.model);
+  const r3 = m3.objects.find((o) => o.meta?.role === 'response');
+  ok('a specification with no values still forms the component', !!r3);
+  ok('  and reports every coefficient as missing',
+    route(m3, r3, 'evaluate').status === 'incomplete');
+
+  // …AND THE CONVERSATION IS TOLD BOTH THINGS.
+  const said = JSON.stringify(modelStateFrom(m, buildSpec(m)).science);
+  ok('chat is told evaluation is ready', /work out what the model says/.test(said), said.slice(0, 200));
+  ok('chat is told estimation is blocked', /fit it to observations: blocked/.test(said));
+  ok('chat is told the surface is not an estimate', /NOT estimated/.test(said));
+  ok('  nor a conditional expectation', /NOT a conditional expectation/.test(said));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
