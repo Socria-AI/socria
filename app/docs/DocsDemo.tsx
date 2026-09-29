@@ -20,6 +20,11 @@ import { ModelPicker } from '@/components/ModelPicker';
 import { SynthesisCard } from '@/components/SynthesisCard';
 import { ChoiceChips } from '@/components/ChoiceChips';
 import type { ThinkingMap } from '@/lib/logos';
+import { ThinkingMap as ThinkingMapView } from '@/components/ThinkingMap';
+import { ModelView } from '@/components/model/ModelView';
+import { buildProposal } from '@/lib/model/propose';
+import { editsState, EMPTY_WORKSPACE, modelFor, openFromProposal } from '@/lib/model/docs';
+import { oscillator } from '@/lib/model/library';
 import type { SocriaModel } from '@/lib/socria-prompt';
 import type { SynthesisData } from '@/lib/synthesis';
 import { SOCRIA_MODELS } from '@/lib/socria-prompt';
@@ -565,6 +570,133 @@ export function DemoChips() {
         <ChoiceChips choices={CHIPS} onPick={setPicked} />
         <p className="d-pickernote" aria-live="polite">
           {picked ? <>Sent as: &ldquo;{picked}&rdquo;</> : 'In the app, picking one sends it as your reply.'}
+        </p>
+      </div>
+    </DocsFrame>
+  );
+}
+
+/* ── Logos 2: two people in one map ───────────────────────────────── */
+//
+// The real ThinkingMap, with a map whose nodes carry a `by` — which is how the
+// component already draws two seats, one colour each. Nothing here is a
+// mock-up of collaboration; it is the map a two-seat room produces, held still.
+
+const TWO_SEATS: ThinkingMap = {
+  context: 'deciding',
+  nodes: [
+    { id: 'goal', type: 'goal', label: 'Ship the pricing change in October', status: 'open',
+      by: { id: 'a', name: 'Mara', seat: 'host' } },
+    { id: 'cheap', type: 'idea', label: 'One flat tier, priced low', status: 'open',
+      by: { id: 'a', name: 'Mara', seat: 'host' } },
+    { id: 'tiers', type: 'idea', label: 'Three tiers, usage-based', status: 'open',
+      by: { id: 'b', name: 'Jonas', seat: 'guest' } },
+    { id: 'churn', type: 'evidence', label: 'Churn is concentrated in the first month', status: 'supported',
+      by: { id: 'b', name: 'Jonas', seat: 'guest' } },
+    { id: 'tension', type: 'tension', label: 'Simple to explain vs. fair to heavy users', status: 'open' },
+    { id: 'assume', type: 'assumption', label: 'Heavy users would pay more if asked', status: 'open',
+      by: { id: 'a', name: 'Mara', seat: 'host' } },
+    { id: 'q', type: 'question', label: 'What does the first month actually cost us?', status: 'open' },
+  ],
+  edges: [
+    { from: 'cheap', to: 'goal', relation: 'supports', strength: 'normal' },
+    { from: 'tiers', to: 'goal', relation: 'supports', strength: 'normal' },
+    { from: 'cheap', to: 'tiers', relation: 'conflicts', strength: 'strong' },
+    { from: 'tension', to: 'cheap', relation: 'relates', strength: 'normal' },
+    { from: 'tension', to: 'tiers', relation: 'relates', strength: 'normal' },
+    { from: 'churn', to: 'tiers', relation: 'supports', strength: 'normal' },
+    { from: 'assume', to: 'tiers', relation: 'supports', strength: 'weak' },
+    { from: 'q', to: 'churn', relation: 'relates', strength: 'normal' },
+  ],
+};
+
+export function DemoTwoSeats() {
+  return (
+    <DocsFrame label="One map, two authors — each node carries whose thought it was" height={420}>
+      <section className="lg-panel" style={{ height: '100%' }}>
+        <header className="lg-panel-head">
+          <span className="lg-panel-title">
+            Thinking Map<em className="lg-panel-context">deciding</em>
+          </span>
+          <span className="lg-panel-state">7 nodes · 2 people</span>
+        </header>
+        <ThinkingMapView map={TWO_SEATS} initialLens="graph" />
+      </section>
+    </DocsFrame>
+  );
+}
+
+/* ── Logos 2: a model, not a picture ─────────────────────────────── */
+//
+// THE REAL ENGINE, IN THE WIKI. The model below goes through the same on-ramp a
+// conversation's proposal does — buildProposal validates it, routes it to the
+// mechanism assembler, and opens it as a document — and ModelView draws what
+// the integrator produced. Move a control and the equations are solved again;
+// the panels underneath are the same run, not second drawings of it.
+//
+// Which is why it is worth having here: every other figure on this site shows
+// an interface. This one shows the thing the interface is over.
+
+const WORKSPACE = (() => {
+  const made = openFromProposal(EMPTY_WORKSPACE, oscillator(), { at: 0 });
+  return made;
+})();
+
+export function DemoModelWorkspace() {
+  const doc = WORKSPACE.doc;
+  if (!doc) {
+    // The on-ramp refusing is a real outcome and the figure says so rather than
+    // pretending — see the refusal example on the Logos 2 page.
+    return (
+      <DocsFrame label="The engine declined to build this model" bare>
+        <div className="d-carddemo">
+          <p className="d-pickernote">{WORKSPACE.says}</p>
+        </div>
+      </DocsFrame>
+    );
+  }
+  return (
+    <DocsFrame label="A model, built by the engine — move a control and it is solved again" height={470}>
+      <ModelView model={modelFor(doc)} edits={editsState(WORKSPACE.workspace) ?? undefined} />
+    </DocsFrame>
+  );
+}
+
+/* ── Logos 2: what the engine says when it cannot build ───────────── */
+//
+// The same on-ramp, given a mechanism whose mass is a word rather than a number
+// or a control. It refuses, and the refusal names the mass — which is the
+// behaviour the whole trust boundary exists to produce, so it is shown as an
+// outcome rather than described as a policy.
+
+const REFUSED = buildProposal({
+  id: 'unfinished',
+  title: 'A mass on a spring',
+  params: [{ id: 'k', label: 'stiffness', value: 20, min: 1, max: 100 }],
+  objects: [
+    {
+      id: 'mech',
+      kind: 'component',
+      label: 'The mechanism',
+      mechanism: {
+        bodies: [{ id: 'm1', mass: 'the mass', x0: 1, label: 'the block' }],
+        springs: [{ id: 'k1', between: ['m1', 'ground'], value: 'k' }],
+      },
+    },
+  ],
+});
+
+export function DemoRefusal() {
+  return (
+    <DocsFrame label="A proposal the engine would not build, and why" bare>
+      <div className="d-carddemo">
+        <p className="d-chipq">
+          {REFUSED.ok ? 'This one built.' : REFUSED.refusal.says}
+        </p>
+        <p className="d-pickernote">
+          {REFUSED.ok
+            ? 'Nothing was missing.'
+            : 'Nothing is drawn. The structure is held, and the model waits for the value rather than inventing one.'}
         </p>
       </div>
     </DocsFrame>

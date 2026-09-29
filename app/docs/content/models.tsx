@@ -1,9 +1,11 @@
 // The comparison page. Checkable against SOCRIA_MODELS in lib/socria-prompt.ts.
 //
-// Logos 2 — the two-person room — is deliberately not in this table yet: it
-// is the same surface and the same model as Logos with a second seat, and a
-// column for it would be four cells of "same as Logos" and one that matters.
-// It gets its own page when the room ships to everyone.
+// Logos 2 IS in the table now, and the reason it was not is worth keeping: a
+// column for the two-seat room alone would have been four cells of "same as
+// Logos" and one that mattered. What changed is the model workspace — objects
+// the engine builds, with identity, revisions and undo — which is a different
+// kind of thing in the workspace rather than a second seat on the same one. See
+// /docs/logos-2.
 
 import Link from 'next/link';
 import { Article, H2, Callout, TableWrap } from '../Article';
@@ -21,12 +23,13 @@ export function Models() {
   return (
     <Article page={page} sections={sections}>
       <p>
-        Socria ships four models behind one switcher, and they are not four
-        sizes of the same thing — they are four different amounts of{' '}
+        Socria ships five models behind one switcher, and they are not five
+        sizes of the same thing — they are five different amounts of{' '}
         <em>machinery around the conversation</em>. Core 2 is a voice. Core 3.1
         is a voice with a memory and a running read of the thread. Core 4 is a
         voice that decides, each turn, which part of the work is yours. Logos
-        is an environment.
+        is an environment. Logos 2 is that environment with a second seat in it
+        and computed models inside it.
       </p>
 
       <H2 id="compare">Side by side</H2>
@@ -39,6 +42,7 @@ export function Models() {
               <th>Core 3.1</th>
               <th>Core 4</th>
               <th>Logos</th>
+              <th>Logos 2</th>
             </tr>
           </thead>
           <tbody>
@@ -48,6 +52,7 @@ export function Models() {
               <td>Assertive pattern-naming with thread memory and adjustable depth</td>
               <td>Contributes by default; holds work back only on a reason you gave</td>
               <td>The conversation plus a live map of your reasoning</td>
+              <td>The same, for two people — and models the engine builds, which you edit and undo</td>
             </tr>
             <tr>
               <td><strong>Account</strong></td>
@@ -55,6 +60,7 @@ export function Models() {
               <td>Sign-in (or an access key)</td>
               <td>Sign-in (or an access key)</td>
               <td>Sign-in (or an access key)</td>
+              <td>Sign-in; both people, for a shared room</td>
             </tr>
             <tr>
               <td><strong>Thinking Depth control</strong></td>
@@ -63,6 +69,7 @@ export function Models() {
               <td>None, deliberately — it judges depth itself, and gives you
                 readability and length instead</td>
               <td>Its own depth control; all four modes</td>
+              <td>Same as Logos</td>
             </tr>
             <tr>
               <td><strong>Memory</strong></td>
@@ -71,6 +78,8 @@ export function Models() {
               <td>A record of the reasoning itself — every claim, objection and
                 decision with whose it is, enforced in code</td>
               <td>The map itself — plus saved lines of thinking</td>
+              <td>The map, the models and their revisions — a model keeps its
+                history, so you can undo an edit rather than regenerate a picture</td>
             </tr>
             <tr>
               <td><strong>Extra surfaces</strong></td>
@@ -78,6 +87,8 @@ export function Models() {
               <td>Synthesis &amp; insight cards, choice chips</td>
               <td>Projects, source cards, exact arithmetic, attachments</td>
               <td>Thinking Map, Board, plots, Draft Space, Research</td>
+              <td>All of Logos, plus the model workspace: mechanisms, systems of
+                equations and fitted specifications, computed by the engine</td>
             </tr>
             <tr>
               <td><strong>Writes prose for you</strong></td>
@@ -85,6 +96,8 @@ export function Models() {
               <td>Only refining material you brought</td>
               <td>Yes, unless the authorship is the point — and it says so when it stops</td>
               <td>Never — even Draft Space&rsquo;s Refine is a proposal that lands only when you apply it</td>
+              <td>Never. It may propose a model, and the engine decides whether
+                it computes — a proposal is never presented as a result</td>
             </tr>
           </tbody>
         </table>
@@ -110,6 +123,12 @@ export function Models() {
 
       <H2 id="choosing">Which one, when</H2>
       <ul>
+        <li>
+          <strong>Logos 2</strong> — you are thinking with somebody else, or the
+          thing you are working through is a <em>system</em> rather than an
+          argument: a mechanism, a set of differential equations, a model fitted
+          to data. See <Link href="/docs/logos-2">its page</Link>.
+        </li>
         <li>
           <strong>Core 2</strong> — you want questions, not machinery.{' '}
           <em>It retires on 2 October</em>, and the model that works with no

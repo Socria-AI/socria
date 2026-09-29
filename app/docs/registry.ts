@@ -72,6 +72,12 @@ export const DOC_PAGES: DocPage[] = [
     group: 'The models',
   },
   {
+    slug: 'logos-2',
+    title: 'Socria Logos 2',
+    blurb: 'Two people in one workspace — and models you own, edit and undo rather than pictures that are redrawn.',
+    group: 'The models',
+  },
+  {
     slug: 'thinking-map',
     title: 'The Thinking Map',
     blurb: 'Node types, relationships, the four lenses, and the four moves a node opens.',

@@ -11,6 +11,7 @@ import { Core2 } from './core-2';
 import { Core3 } from './core-3';
 import { Core4 } from './core-4';
 import { Logos } from './logos';
+import { Logos2 } from './logos-2';
 import { ThinkingMapDoc } from './thinking-map';
 import { Economics } from './economics';
 import { Mathematics } from './mathematics';
@@ -27,6 +28,7 @@ export const CONTENT: Record<string, ComponentType> = {
   'core-3': Core3,
   'core-4': Core4,
   logos: Logos,
+  'logos-2': Logos2,
   'thinking-map': ThinkingMapDoc,
   mathematics: Mathematics,
   economics: Economics,
