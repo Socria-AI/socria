@@ -34,11 +34,11 @@ import {
   settle,
   unanswered,
 } from './.tmp/ask.mjs';
-import { buildProposal } from './.tmp/propose.mjs';
+import { buildProposal, revalidate } from './.tmp/propose.mjs';
 import { sanitizeModel } from './.tmp/schema.mjs';
 import { capabilityOf, missingStructure, route } from './.tmp/solve.mjs';
 import { unpack } from './.tmp/unpack.mjs';
-import { EMPTY_WORKSPACE, addPart, modelFor, openFromProposal, removeObject, undo } from './.tmp/docs.mjs';
+import { EMPTY_WORKSPACE, addPart, modelFor, openFromProposal, removeObject, sanitizeWorkspace, undo } from './.tmp/docs.mjs';
 import { estimate, specificationLine } from './.tmp/estimate.mjs';
 import { sanitizeMap } from './.tmp/logos.mjs';
 import { LOGOS_CHAT_PROMPT, buildMapPrompt } from './.tmp/logos.mjs';
@@ -468,6 +468,73 @@ console.log('\n=== 12. the conversation is told what the model actually is ===')
     const r = route(unpack(built.model), unpack(built.model).objects.find((o) => !!o.estimation));
     ok('the estimator is the solver that would run it', r.status === 'incomplete' && r.solver.id === 'ols');
   }
+}
+
+console.log('\n=== 13. THE PATH, not the engine ===');
+{
+  // WHY THIS SECTION EXISTS, and it is the most valuable one in the file.
+  //
+  // Every assertion above this point called buildProposal directly. They all
+  // passed while the feature was DEAD IN THE PRODUCT, because two rules about
+  // DRAWINGS were deleting the proposal before the engine ever saw it:
+  // sanitizeViz returns null for a partless diagram (right, for a picture) and
+  // sanitizeMap drops a scene whose kind does not carry its own subject when
+  // the work is not mathematical (also about drawings). The prompt's canonical
+  // shape was {"kind":"diagram","propose":{…}} with no parts, so it hit both.
+  //
+  // A test that starts at the engine cannot see that. This one starts where
+  // the server does: the raw JSON an extractor returns.
+
+  const raw = {
+    context: 'analysing',
+    ask: { action: 'construct', artifact: 'model', formal: { outcome: 'wage', inputs: ['education'] } },
+    nodes: [{ id: 'q', type: 'question', label: 'does education raise wages?' }],
+    edges: [],
+    propose: {
+      id: 'wage_education', title: 'Wage on education', domain: 'econometrics',
+      objects: [{ id: 'spec', kind: 'specification', label: 'Wage explained by education',
+                  estimation: { y: 'wage', x: ['education'] } }],
+      params: [],
+    },
+  };
+
+  const m = sanitizeMap(raw);
+  ok('a proposal survives sanitizeMap', !!m.propose);
+  ok('  at the top level, where a model belongs', !!m.propose && !m.viz);
+  ok('  with the ask beside it', m.ask?.action === 'construct');
+  ok('  and the thinking still mapped', m.nodes.length === 1);
+
+  // The legacy inlet: a response in flight may still nest it.
+  const nested = sanitizeMap({
+    ...raw, propose: undefined,
+    viz: { kind: 'diagram', propose: raw.propose },
+  });
+  ok('a proposal nested in a partless diagram is still rescued', !!nested.propose);
+  ok('  and the empty diagram is still not drawn', !nested.viz);
+
+  // …and it reaches the engine from there.
+  const made = openFromProposal(EMPTY_WORKSPACE, m.propose, { at: 1 });
+  ok('the rescued proposal builds', !!made.doc);
+
+  // THE ROUND TRIP. A built model is re-validated on every read — from
+  // storage, from a browser, from a collaborator. revalidate required
+  // computability while buildProposal accepts a formal statement, so a
+  // specified model was built once and destroyed on reload, silently.
+  if (made.doc) {
+    const back = sanitizeWorkspace(made.workspace);
+    ok('a specified model survives the read path', back.docs.length === 1);
+    ok('  keeping its revisions', back.docs[0]?.revisions.length === 1);
+    ok('  and its id', back.docs[0]?.id === made.doc.id);
+
+    // The two halves of the boundary must agree, in both directions.
+    ok('revalidate accepts what buildProposal built',
+      revalidate(modelFor(made.doc)) !== null);
+  }
+
+  // And prose must still be refused by BOTH halves, or the boundary is a sieve.
+  const prose = { id: 'p', title: 'Notes', params: [], objects: [{ id: 'a', kind: 'annotation', label: 'a note' }] };
+  ok('prose is refused on the way in', buildProposal(prose).ok === false);
+  ok('  and on the way back', revalidate(prose) === null);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

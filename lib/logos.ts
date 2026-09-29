@@ -235,6 +235,19 @@ export interface ThinkingMap {
    */
   ask?: TurnAsk;
   /**
+   * A STRUCTURED MODEL THIS TURN PROPOSED, raw and unjudged.
+   *
+   * At the top level rather than inside `viz`, because a model is not a
+   * picture and the two were being decided by the same rules — see the note in
+   * sanitizeMap. It is `unknown` on purpose: nothing may read a field off it
+   * until buildProposal has sanitised it, and buildProposal is the only thing
+   * that may turn it into a model the engine owns.
+   *
+   * Never persisted. The route answers it on the turn it arrives and strips
+   * it, or a client would ask the engine to build the same thing forever.
+   */
+  propose?: unknown;
+  /**
    * The MODELS this line of thinking holds — documents with stable ids and
    * revisions, which the person creates, edits, undoes and branches
    * (lib/model/docs.ts).
@@ -464,6 +477,32 @@ export function sanitizeMap(raw: any, opts?: { trust?: VizTrust }): ThinkingMap 
     !!scene && (ECON_KINDS.has(scene.kind) || scene.kind === 'diagram' || scene.kind === 'simulation');
   const viz = scene && (isMath || carriesItsOwn) ? scene : null;
 
+  // ── A MODEL PROPOSAL IS NOT A PICTURE ────────────────────────────
+  //
+  // IT USED TO RIDE INSIDE ONE, and that was not a tidiness problem — it made
+  // the on-ramp unreachable for the shape the prompt itself asks for. Two
+  // separate rules about DRAWINGS were deleting the proposal before the engine
+  // ever saw it:
+  //
+  //   · sanitizeViz returns null for a `diagram` with no parts, which is right
+  //     for a picture (an empty frame with a title is worse than no picture)
+  //     and fatal for a proposal, because the prompt's canonical shape WAS
+  //     {"kind": "diagram", "propose": {…}} with no parts at all;
+  //   · the line above drops a scene whose kind does not carry its own subject
+  //     when the work is not mathematical — which is a judgement about whether
+  //     to DRAW something, applied to a model.
+  //
+  // Proven on the live path: a specification proposal written exactly as the
+  // prompt describes reached sanitizeMap and came out with no viz and no
+  // proposal. The on-ramp fired for nothing.
+  //
+  // So the proposal is read from the RAW map, before and independently of
+  // anything the drawing rules decide, and it lives at the top level where it
+  // belongs. `viz.propose` is still accepted as an inlet because a response in
+  // flight may use the old shape, and because the prompt takes a turn to
+  // catch up — but nothing downstream reads it there any more.
+  const propose = (raw.propose ?? raw.viz?.propose) as unknown;
+
   // …and then it is named for what it is. A person simulating a black hole is
   // not doing mathematics, and none of the machinery that word turns on — a
   // solution chain, a learning intent, a result to withhold — has anything to
@@ -486,6 +525,9 @@ export function sanitizeMap(raw: any, opts?: { trust?: VizTrust }): ThinkingMap 
     ...(named ? { context: named } : {}),
     ...(intent && named === 'math' ? { intent } : {}),
     ...(ask ? { ask } : {}),
+    // Carried raw and unjudged: buildProposal is the only thing allowed to
+    // decide whether this is a model, and it sanitises what it is given.
+    ...(propose && typeof propose === 'object' ? { propose } : {}),
     ...(viz ? { viz } : {}),
     ...(models && models.docs.length ? { models } : {}),
   };
@@ -878,6 +920,7 @@ Return ONLY JSON, exactly this shape:
 {
   "context": "deciding|writing|creating|researching|learning|planning|brainstorming|reflecting|analysing|math",
   "ask": {"action": "discuss|explore|explain|question|map|construct|modify|remove|compute|simulate|estimate|represent|compare|trace|research|verify", "artifact": "answer|map|model|simulation|plot|diagram|estimate|draft|research|comparison", "topic": "the subject in their words", "domain": "the field, if it is clear", "formal": {"outcome": "what is being explained, or what the model is of", "inputs": ["what explains it"], "states": ["named states, bodies, compartments, stocks"], "parameters": ["named coefficients or constants"], "equations": ["an equation THEY wrote"], "method": "a method THEY named — never one you chose", "data": "data they referred to or supplied"}, "operations": ["manipulate", "run", "fit", "compare"]},
+  "propose": { … a structured model — see PROPOSING A STRUCTURED MODEL below. A SIBLING OF "viz", never inside it },
   "intent": "learning|verification|utility|exploration",  // ONLY for context=math
   "nodes": [{"id": "short_snake_case_id", "type": "<node type>", "label": "a short phrase in their own framing", "status": "open|supported|resolved|revised", "merged": ["label of a node folded into this one"], "tex": "LaTeX for this node, if mathematical", "flag": "error|verified", "note": "a short annotation or repair hint"}],
   "edges": [{"from": "node_id", "to": "node_id", "relation": "supports|conflicts|depends|relates|leads_to|revises|precedes|part_of|transforms_to|implies|justifies|equivalent_to", "strength": "weak|normal|strong", "op": "the operation on a transforms_to edge"}],
@@ -1039,7 +1082,9 @@ THE PLOT IS A WORKSPACE ("overlays"). Curves the person asked for by name live i
   Operators and functions: ASCII - * / ^ %, and sin cos tan asin acos atan arcsin arccos arctan sinh cosh tanh sec csc cot exp ln log log2 log10 sqrt cbrt abs sign floor ceil round step, plus the two-argument max, min, mod and atan2. Piecewise shapes are written with max/min or step: a payoff floored at zero is max(0, x), a kinked budget line is min(a*x, b), a phase plateau is step(x - 40).
   Draw only what you actually know. Three honest parts beat twelve invented ones, and a subject you cannot place on two axes should not be forced onto them — leave "viz" out and let the map carry the thinking instead.
 
-PROPOSING A STRUCTURED MODEL ("propose", inside "viz"). The strongest thing you can do, and the one to reach for when the request is FORMAL rather than merely drawable.
+PROPOSING A STRUCTURED MODEL ("propose", AT THE TOP LEVEL of your JSON — a sibling of "nodes" and "viz", NOT inside "viz"). The strongest thing you can do, and the one to reach for when the request is FORMAL rather than merely drawable.
+
+WHY IT IS NOT INSIDE "viz". A model is not a picture. "viz" is judged by rules about drawings — an empty diagram is discarded, a picture is dropped when the work is not mathematical — and a proposal that lived there was being deleted by those rules before the engine saw it. Write it beside "viz", never within it. A model with no picture is a perfectly good turn.
 
 WHAT IT IS. Instead of authoring a picture, you hand the engine a model — objects with meanings, controls with ranges, and the BLOCK that says what each object is — and the engine validates it, works out what it can compute, runs the appropriate solver, and draws the result. You are not drawing; you are specifying. The engine owns the numbers.
 
@@ -1060,8 +1105,8 @@ A SPECIFICATION IS A MODEL BEFORE IT IS FITTED, and this is the one most request
 
 WHEN NOT TO PROPOSE. When they asked a question about a kind of model rather than for one. When the ask is explain, explore, discuss or question. And when a picture already does it: a curve, a limit, a market, a distribution, a titration have kinds above, and a proposal would be a worse version of something that works.
 
-THE SHAPE, and every field is optional except id, title, objects and params:
-{"kind": "diagram", "propose": {
+THE SHAPE — a sibling of "nodes", "edges" and "viz". Every field is optional except id, title, objects and params:
+"propose": {
   "id": "spring_chain", "title": "Two masses on springs", "domain": "mechanics", "aspect": "equal",
   "equations": ["M ẍ + C ẋ + K x = F(t), assembled from the parts"],
   "assumptions": ["One degree of freedom per body, along the axis."],
@@ -1083,7 +1128,7 @@ THE SHAPE, and every field is optional except id, title, objects and params:
      "estimation": {"method": "ols", "y": "y", "x": ["x"], "data": "sample"}}
   ],
   "data": {"sample": {"label": "what these numbers are", "source": "where they came from", "columns": {"x": [1, 2], "y": [2.1, 3.9]}}}
-}}
+}
 
 THE RULES, all load-bearing:
 - A MECHANISM IS PARTS, NOT EQUATIONS. Give bodies, springs, dampers and forces; the engine assembles M ẍ + C ẋ + K x = F(t) itself, symbolically, so a slider still moves the real stiffness. Never write the equations of motion yourself — a hand-written right-hand side is a place for an error nobody can see.

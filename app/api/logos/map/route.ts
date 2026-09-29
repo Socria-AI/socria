@@ -216,14 +216,18 @@ export async function POST(req: NextRequest) {
       /** names the person used that are nowhere in what got built */
       unanswered?: string[];
     } | null = null;
-    const proposal = next.viz?.propose;
+    // At the top level now, not inside the picture — see sanitizeMap. Read
+    // from the sanitised map so the legacy inlet is already hoisted.
+    const proposal = next.propose;
     let made: ReturnType<typeof openFromProposal> | null = null;
     if (proposal) {
       made = openFromProposal(models, proposal, { at: Date.now() });
       models = made.workspace;
       // The proposal has been answered either way; it must not travel on. A
-      // scene that still carried one would have the client asking again forever.
-      if (next.viz) {
+      // map that still carried one would have the client asking again forever.
+      delete next.propose;
+      // …and the legacy inlet is cleared too, for a scene that still has one.
+      if (next.viz?.propose) {
         const { propose: _answered, ...scene } = next.viz;
         next.viz = scene;
       }

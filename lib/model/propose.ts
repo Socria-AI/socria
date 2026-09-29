@@ -309,7 +309,19 @@ export function revalidate(raw: unknown): Model | null {
   const clean = sanitizeModel(raw);
   if (!clean) return null;
   const model = unpack(clean);
-  return runnable(model).length ? clean : null;
+  // THE SAME BAR AS buildProposal, AND IT HAS TO BE THE SAME BAR.
+  //
+  // This required `runnable` while buildProposal accepts a formal statement,
+  // and the two halves of one boundary disagreeing is not a stylistic problem:
+  // a specification with no data, a mechanism with a stiffness still to be
+  // chosen, a causal structure — every model that builds below `computational`
+  // — passed the gate on the way in and was DESTROYED on the way back out.
+  // Built once, gone on reload, with no error anywhere. Proven on the live
+  // path before it was fixed.
+  //
+  // Written as one expression against the same two predicates so the next
+  // person to move the bar has to move it here as well, or fail a test.
+  return runnable(model).length || stated(model).length ? clean : null;
 }
 
 /** What the conversation is told about a model it is looking at. Bounded. */
