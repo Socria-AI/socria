@@ -285,6 +285,14 @@ export function expandGravity(model: Model): Model {
 
   for (const carrier of carriers) {
     const built = assembleGravity(carrier.gravity!);
+    // A CARRIER THAT WILL NOT ASSEMBLE IS LEFT ALONE, and that is now safe.
+    // It used to be dangerous: with no system on the carrier, the router fell
+    // through to ODE, which could only speak about the assembled right-hand
+    // sides — so a mistyped mass came back as "a readable expression for
+    // dvx0/dt", the internal name of a state nobody wrote. The GRAVITY solver
+    // (lib/model/solve.ts) now asks readGravity, which names the body and the
+    // mass, so the refusal is reported where it can be said properly rather
+    // than smuggled through here.
     if (!built.ok) continue;
     if (!carrier.system) {
       patched.set(carrier.id, { ...carrier, kind: 'system', system: built.system });
@@ -316,10 +324,14 @@ export function expandGravity(model: Model): Model {
             })),
         ],
         meta: {
-          gravity: carrier.id,
-          part: b.id,
+          // `of`/`sx`/`sy` are the GENERAL contract the compiler reads: the
+          // system holding this object's position, and the two states carrying
+          // it. Nothing in the drawing path knows the word gravity.
+          of: carrier.id,
           sx: b.states.x,
           sy: b.states.y,
+          gravity: carrier.id,
+          part: b.id,
           svx: b.states.vx,
           svy: b.states.vy,
           mass: b.mass,

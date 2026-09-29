@@ -267,11 +267,29 @@ export function buildProposal(raw: ModelProposal, opts?: { at?: number }): Built
     lastChange: { what: 'built', affected: model.objects.map((o) => o.id), at },
   };
 
+  // WHAT THE PERSON READS, and it has to survive an empty `solvers`.
+  //
+  // This said `Built as a ${cap.level} model: ${solvers…join(', ')}.`
+  // unconditionally — and the entire point of the bar above is that `solvers`
+  // may be empty while `formal` is not. So every model built below
+  // `computational` — every unfitted specification, every mechanism with a
+  // constant still to choose — announced itself as
+  //
+  //   "Built as a mathematical model: . Not everything computes — …"
+  //
+  // A dangling colon-space-full-stop, on exactly the models the specified-but-
+  // not-computed work exists to make possible. Found by running the engine
+  // rather than by reading it.
   const parts = [
-    `Built as a ${cap.level} model: ${solvers.map((s) => `${s.solver} runs ${s.of}`).join(', ')}.`,
+    solvers.length
+      ? `Built as a ${cap.level} model: ${solvers.map((s) => `${s.solver} runs ${s.of}`).join(', ')}.`
+      : // Nothing runs yet, and saying so plainly is the useful sentence: the
+        // model is real, it is written down formally, and what it is waiting
+        // for is named in the clause that follows.
+        `Built as a ${cap.level} model — ${formal.length === 1 ? 'its structure is' : 'their structures are'} written down, and nothing in it computes yet.`,
     missing.length
-      ? `Not everything computes — ${missing
-          .map((m) => `${m.label} still needs ${m.missing.map((x) => x.what).join(', ')}`)
+      ? `${solvers.length ? 'Not everything computes — ' : 'What it is waiting for: '}${missing
+          .map((m) => `${m.label} needs ${m.missing.map((x) => x.what).join(', ')}`)
           .join('; ')}.`
       : '',
   ].filter(Boolean);

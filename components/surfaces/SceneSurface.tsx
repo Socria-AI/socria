@@ -35,9 +35,17 @@ import { GravitySurface } from './GravitySurface';
  */
 const HAS_SURFACE = new Set(['black-hole', 'big-bang', 'orbit']);
 
-/** True when this scene wants a working surface rather than a plot. */
+/**
+ * True when this scene wants a working surface rather than a plot.
+ *
+ * NO DEFAULT. This read `scene.sim?.object ?? 'black-hole'`, so a simulation
+ * scene with no named object was CLASSIFIED as having a surface — which is
+ * what routed it to the black hole below. A scene with no object wants no
+ * surface, which is the honest reading of "I do not know what this is".
+ */
 export function isSimulation(scene: VizScene | null | undefined): boolean {
-  return !!scene && scene.kind === 'simulation' && HAS_SURFACE.has(scene.sim?.object ?? 'black-hole');
+  const object = scene?.sim?.object;
+  return !!scene && scene.kind === 'simulation' && !!object && HAS_SURFACE.has(object);
 }
 
 export function SceneSurface({
@@ -59,8 +67,17 @@ export function SceneSurface({
   // knows what a black hole is, which is the property that makes the next
   // surface a file and not a change to this one.
   const pass = { initial, fill, onRead, ops };
-  const object = scene.sim?.object ?? 'black-hole';
+  // NAMED, OR NOTHING. The last line here was `return <BlackHoleSurface/>`,
+  // so every object this file did not recognise — and every scene with no
+  // object at all — was rendered as a Kerr black hole, with real
+  // general-relativistic readouts attached to somebody else's subject. The
+  // sanitiser now refuses an unnamed simulation outright and `isSimulation`
+  // above will not route one here; this returns null rather than a subject so
+  // that a future path reaching it another way shows nothing instead of
+  // showing a lie.
+  const object = scene.sim?.object;
   if (object === 'big-bang') return <BigBangSurface {...pass} />;
   if (object === 'orbit') return <GravitySurface {...pass} />;
-  return <BlackHoleSurface {...pass} />;
+  if (object === 'black-hole') return <BlackHoleSurface {...pass} />;
+  return null;
 }

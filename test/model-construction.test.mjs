@@ -41,6 +41,9 @@ import { unpack } from './.tmp/unpack.mjs';
 import { EMPTY_WORKSPACE, addPart, modelFor, openFromProposal, removeObject, sanitizeWorkspace, undo } from './.tmp/docs.mjs';
 import { estimate, specificationLine } from './.tmp/estimate.mjs';
 import { sanitizeMap } from './.tmp/logos.mjs';
+import { sanitizeViz } from './.tmp/logos-viz.mjs';
+import { buildSpec } from './.tmp/spec.mjs';
+import { forgetRuns, runFor, seriesOf } from './.tmp/system.mjs';
 import { LOGOS_CHAT_PROMPT, buildMapPrompt } from './.tmp/logos.mjs';
 
 let pass = 0, fail = 0;
@@ -535,6 +538,143 @@ console.log('\n=== 13. THE PATH, not the engine ===');
   const prose = { id: 'p', title: 'Notes', params: [], objects: [{ id: 'a', kind: 'annotation', label: 'a note' }] };
   ok('prose is refused on the way in', buildProposal(prose).ok === false);
   ok('  and on the way back', revalidate(prose) === null);
+}
+
+console.log('\n=== 14. composition, not a demo: a star and its planets ===');
+{
+  // PART 43 OF THE BRIEF, and the point is that none of this is a named model.
+  // "A star with N planets" is bodies + masses + positions + velocities +
+  // Newtonian gravity, assembled into the same state system the integrator
+  // already runs. There is no solar-system file, no preset, and no branch
+  // anywhere on what the system is called.
+  const star = (planets) => ({
+    id: 'star_sys', title: `A star with ${planets.length} planet${planets.length === 1 ? '' : 's'}`,
+    domain: 'astronomy',
+    time: { t: 0.5, min: 0, max: 12, units: 'yr' },
+    params: [],
+    objects: [{
+      id: 'g', kind: 'system', label: 'the system',
+      gravity: {
+        units: 'astronomical', dt: 0.002, steps: 4000,
+        bodies: [
+          { id: 'star', mass: 1, x: 0, y: 0, vx: 0, vy: 0, label: 'the star' },
+          ...planets,
+        ],
+      },
+    }],
+  });
+
+  const one = buildProposal(star([
+    { id: 'p1', mass: 3e-6, x: 1, y: 0, vx: 0, vy: 6.2832, label: 'planet one' },
+  ]), { at: 1 });
+  ok('a star and one planet builds', one.ok === true, one.ok ? '' : one.refusal.because);
+  ok('  as a dynamic model', one.ok && one.report.capability === 'dynamic');
+  ok('  routed to the gravitational assembler',
+    one.ok && one.report.solvers.some((s) => /Gravitational/.test(s.solver)),
+    one.ok ? JSON.stringify(one.report.solvers) : '');
+
+  // SEVEN planets, from the same primitive and no new code.
+  const seven = buildProposal(star(
+    Array.from({ length: 7 }, (_, i) => {
+      const a = 0.6 + i * 0.7;
+      return { id: `p${i + 1}`, mass: 3e-6, x: a, y: 0, vx: 0, vy: 6.2832 / Math.sqrt(a), label: `planet ${i + 1}` };
+    })
+  ), { at: 1 });
+  ok('and seven planets builds from the same primitive', seven.ok === true,
+    seven.ok ? '' : seven.refusal.because);
+  if (seven.ok) {
+    const m = unpack(seven.model);
+    ok('  every body is an object of its own',
+      ['star', 'p1', 'p4', 'p7'].every((b) => m.objects.some((o) => o.id === `g__${b}`)));
+    ok('  and each says which states carry its position',
+      m.objects.filter((o) => o.meta?.of === 'g').every((o) => !!o.meta.sx && !!o.meta.sy));
+  }
+
+  // THE ORBIT IS COMPUTED, NOT DRAWN. A circular orbit at 1 AU under G = 4π²
+  // must close after exactly one year — that is the whole content of the
+  // astronomical unit system, and it is a fact about the integration rather
+  // than about anything anybody wrote down.
+  if (one.ok) {
+    forgetRuns();
+    const m = unpack(one.model);
+    const run = runFor(m, m.objects.find((o) => o.id === 'g'));
+    ok('the system integrates', run.ok === true);
+    if (run.ok) {
+      const x = seriesOf(run.run, 'x1');
+      const y = seriesOf(run.run, 'y1');
+      const r = x.v.map((v, i) => Math.hypot(v, y.v[i]));
+      ok('  the orbit is circular to 1e-3', Math.max(...r) - Math.min(...r) < 1e-3,
+        `${Math.min(...r)}..${Math.max(...r)}`);
+      const i1 = x.t.findIndex((t) => t >= 1);
+      ok('  and closes after one year', Math.abs(x.v[i1] - 1) < 1e-3 && Math.abs(y.v[i1]) < 1e-3,
+        `(${x.v[i1]}, ${y.v[i1]})`);
+    }
+
+    // AND IT DRAWS. Before the compiler learned that an object may name the
+    // states holding its position, every gravitating body came back as "a
+    // mechanism part whose mechanism is not in this model" — a model that
+    // routed, integrated and graded `dynamic` while drawing nothing at all.
+    const spec = buildSpec(m);
+    const bodies = spec.notes.filter((n) => n.of.startsWith('g__'));
+    ok('  every body draws', bodies.length > 0 && bodies.every((n) => !n.problem),
+      JSON.stringify(bodies.map((n) => n.problem)));
+    ok('  from the integration rather than from a formula',
+      bodies.every((n) => n.fidelity === 'numerically-computed'));
+  }
+
+  // A BAD MASS NAMES THE BODY, not an internal state. This reported "a
+  // readable expression for dvx0/dt — the one given did not compile" until
+  // gravity was registered as a solver of its own: the router was asking the
+  // generic integrator about an assembled right-hand side nobody had written.
+  const bad = buildProposal({
+    id: 'bad', title: 'Two bodies', params: [], objects: [{
+      id: 'g', kind: 'system', label: 'the pair',
+      gravity: { units: 'astronomical', bodies: [
+        { id: 'a', mass: 1, x: 0, y: 0, vx: 0, vy: 0 },
+        { id: 'b', mass: 'nope', x: 1, y: 0, vx: 0, vy: 6.28 },
+      ] },
+    }],
+  }, { at: 1 });
+  ok('a mistyped mass still builds — it is still a system', bad.ok === true);
+  if (bad.ok) {
+    const what = JSON.stringify(bad.report.missing);
+    ok('  and the refusal names the body', /a mass for b/.test(what), what);
+    ok('  not an assembled state nobody wrote', !/dvx|dvy/.test(what), what);
+    ok('  and it does not claim to compute', bad.report.capability !== 'dynamic',
+      bad.report.capability);
+  }
+}
+
+console.log('\n=== 15. unknown is never a demo ===');
+{
+  // PART 2. The named simulation objects are five surfaces somebody wrote. A
+  // request naming something else has no surface, and the honest answer is no
+  // picture — never the nearest one.
+  const sim = (object) => sanitizeViz({ kind: 'simulation', title: 't', ...(object ? { sim: { object } } : {}) });
+  ok('a named object survives', sim('black-hole')?.sim?.object === 'black-hole');
+  ok('an unknown one is refused', sim('solar-system') === null);
+  ok('  and is NOT turned into a black hole', sim('solar-system')?.sim?.object !== 'black-hole');
+  ok('a missing one is refused too', sim(null) === null);
+
+  // …and whatever structure the same turn DID build is untouched, because a
+  // model travels at the top level and not inside the picture.
+  const m = sanitizeMap({
+    context: 'simulating', nodes: [], edges: [],
+    viz: { kind: 'simulation', sim: { object: 'solar-system' }, title: 'the solar system' },
+    propose: {
+      id: 'sol', title: 'The inner planets', params: [], objects: [{
+        id: 'g', kind: 'system', label: 'the system',
+        gravity: { units: 'astronomical', bodies: [
+          { id: 'sun', mass: 1, x: 0, y: 0, vx: 0, vy: 0 },
+          { id: 'earth', mass: 3e-6, x: 1, y: 0, vx: 0, vy: 6.2832 },
+        ] },
+      }],
+    },
+  });
+  ok('the refused picture does not take the model with it', !!m.propose);
+  ok('  and no picture is invented', !m.viz);
+  const made = openFromProposal(EMPTY_WORKSPACE, m.propose, { at: 1 });
+  ok('  and the model builds', !!made.doc);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

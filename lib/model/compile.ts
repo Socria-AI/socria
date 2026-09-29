@@ -42,7 +42,7 @@ import {
 } from './sample';
 import { LIMITS, type P3, type Primitive } from './primitives';
 import type { Fidelity, Model, ModelObject } from './schema';
-import { runFor, stateAt } from './system';
+import { runFor, seriesOf, stateAt } from './system';
 import { estimate } from './estimate';
 import { restOf, statesOf } from './mechanism';
 import { unpack } from './unpack';
@@ -382,6 +382,64 @@ export function buildObject(model: Model, o: ModelObject, opts?: { detail?: numb
     case 'spring':
     case 'damper':
     case 'force': {
+      // ── AN OBJECT THAT SAYS WHICH STATES HOLD ITS POSITION ─────────
+      //
+      // GENERAL, AND DELIBERATELY NOT ABOUT GRAVITY. An object may name the
+      // states carrying its own x and y (`meta.sx`, `meta.sy`) and the system
+      // those states belong to (`meta.of`). Anything that can say that is
+      // drawn where the integration puts it — a gravitating body today, and a
+      // particle, an agent or a node on a moving network with no change here.
+      //
+      // WHY IT EXISTS. The branch below resolves a part through `meta.mech`
+      // and a one-dimensional `x_<part>` state, which is the mechanism
+      // assembler's own convention. Gravitating bodies are four-state and
+      // planar, so every one of them fell through to "a mechanism part whose
+      // mechanism is not in this model" — a model that routed, integrated and
+      // graded `dynamic` while drawing absolutely nothing. The fix is not a
+      // gravity case; it is letting an object state where it is.
+      const holder = typeof o.meta?.of === 'string' ? o.meta.of : null;
+      const sx = typeof o.meta?.sx === 'string' ? o.meta.sx : null;
+      const sy = typeof o.meta?.sy === 'string' ? o.meta.sy : null;
+      if (holder && sx && sy) {
+        const owner = model.objects.find((x) => x.id === holder);
+        if (!owner?.system) return NOTHING(o, `the system holding ${o.label}'s position is not in this model`);
+        const run = runFor(model, owner);
+        if (!run.ok) return NOTHING(o, `not computed: ${run.missing.map((m) => m.what).join(', ')}`);
+        const at = stateAt(run.run, scope.t ?? 0);
+        const x = at[sx];
+        const y = at[sy];
+        if (!Number.isFinite(x) || !Number.isFinite(y)) {
+          return NOTHING(o, `${o.label}'s position did not come out finite at t = ${(scope.t ?? 0).toFixed(2)}`);
+        }
+        // The path it has taken, from the same run — not a drawn ellipse. An
+        // orbit here is the integration's own answer, which is the whole point
+        // of computing it rather than illustrating it.
+        // Read through the same accessor every other series uses, so the two
+        // cannot disagree about what the run contains.
+        const px = seriesOf(run.run, sx);
+        const py = seriesOf(run.run, sy);
+        const trail: P3[] = [];
+        if (px && py) {
+          const n = Math.min(px.v.length, py.v.length);
+          for (let i = 0; i < n; i++) {
+            if (Number.isFinite(px.v[i]) && Number.isFinite(py.v[i])) {
+              trail.push({ x: px.v[i], y: py.v[i], z: 0 });
+            }
+          }
+        }
+        return {
+          of: o.id,
+          primitives: [
+            ...(trail.length > 1
+              ? [{ p: 'polyline' as const, of: o.id, at: trail, layer, tone: 'muted' as const, width: 1 }]
+              : []),
+            { p: 'points' as const, of: o.id, at: [{ x, y, z: 0 }], layer, tone: 'primary' as const, r: 4 },
+          ],
+          fidelity: 'numerically-computed',
+          note: `where the integration puts it at t = ${(scope.t ?? 0).toFixed(2)}, with the path it has taken`,
+        };
+      }
+
       const parentId = typeof o.meta?.mech === 'string' ? o.meta.mech : '';
       const parent = parentId ? model.objects.find((x) => x.id === parentId) : null;
       if (!parent?.system) return NOTHING(o, 'a mechanism part whose mechanism is not in this model');

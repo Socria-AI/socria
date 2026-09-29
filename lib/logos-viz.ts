@@ -3870,13 +3870,27 @@ const SIM_PARAMS: Record<SimObject, VizParam[]> = {
 function simVal(scene: VizScene, vals: Record<string, number>, id: string): number {
   const v = vals[id];
   if (typeof v === 'number' && Number.isFinite(v)) return v;
-  const p = scene.params.find((q) => q.id === id) ?? SIM_PARAMS[simOf(scene)].find((q) => q.id === id);
+  const named = simOf(scene);
+  const p =
+    scene.params.find((q) => q.id === id) ??
+    (named ? SIM_PARAMS[named].find((q) => q.id === id) : undefined);
   return p ? p.value : 0;
 }
 
-function simOf(scene: VizScene): SimObject {
+/**
+ * Which named object this scene is, or null.
+ *
+ * NULL IS A REAL ANSWER. This used to return 'black-hole' for anything it did
+ * not recognise, which meant every caller below was drawing a black hole for
+ * requests that had nothing to do with one. The sanitiser now refuses a
+ * simulation with no recognised object outright, so a scene reaching these
+ * callers always has one — and this stays null-returning anyway, because a
+ * function whose fallback is a subject is a function that will lie again the
+ * next time somebody routes around the sanitiser.
+ */
+function simOf(scene: VizScene): SimObject | null {
   const o = scene.sim?.object;
-  return o && (SIM_OBJECTS as readonly string[]).includes(o) ? o : 'black-hole';
+  return o && (SIM_OBJECTS as readonly string[]).includes(o) ? o : null;
 }
 
 // ── the black hole ──────────────────────────────────────────────────
@@ -4344,8 +4358,14 @@ const SIM_BUILDERS: Record<SimObject, (s: VizScene, v: Record<string, number>, g
   projectile: buildProjectile,
 };
 
-const buildSimulation: Builder = (scene, _fn, vals, _view, guarded) =>
-  SIM_BUILDERS[simOf(scene)](scene, vals, guarded);
+const buildSimulation: Builder = (scene, _fn, vals, _view, guarded) => {
+  const named = simOf(scene);
+  // Unreachable through sanitizeViz, which refuses an unnamed simulation — and
+  // an empty picture rather than somebody else's subject is the answer if a
+  // future path ever reaches here another way.
+  if (!named) return { objects: [], readouts: [], caption: '' };
+  return SIM_BUILDERS[named](scene, vals, guarded);
+};
 
 const KINDS: Record<VizKind, Builder> = {
   function: buildFunction,
@@ -4486,7 +4506,10 @@ const REQUIRED: Record<VizKind, (scene: VizScene) => VizParam[]> = {
    * orbit is not an ellipse. Returning them from here means the declared list
    * can only supply starting VALUES — clamped, below — and never a range.
    */
-  simulation: (sc) => SIM_PARAMS[simOf(sc)].map((p) => ({ ...p })),
+  simulation: (sc) => {
+    const named = simOf(sc);
+    return named ? SIM_PARAMS[named].map((p) => ({ ...p })) : [];
+  },
   // Nothing is implied for a diagram: its controls are the ones the picture
   // is about, and inventing one would put a slider under a drawing that has
   // nothing to move.
@@ -5516,17 +5539,24 @@ export function sanitizeViz(raw: any, opts?: { trust?: VizTrust }): VizScene | n
           })(),
         }
       : {}),
-    // WHICH OBJECT, and that is all that is read. An unknown name is not an
-    // error worth losing the picture over — it becomes the black hole, which
-    // is the one people ask for.
-    ...(kind === 'simulation'
-      ? {
-          sim: {
-            object: (SIM_OBJECTS as readonly string[]).includes(raw?.sim?.object)
-              ? (raw.sim.object as SimObject)
-              : 'black-hole',
-          },
-        }
+    // WHICH OBJECT — and an unknown name is NOT coerced to a known one.
+    //
+    // THE COMMENT THAT USED TO BE HERE said "an unknown name is not an error
+    // worth losing the picture over — it becomes the black hole, which is the
+    // one people ask for." That reasoning is how "simulate the solar system"
+    // came back as a three-body figure-eight and how "simulate a pendulum in
+    // honey" came back as a Kerr black hole with real general-relativistic
+    // readouts. Losing the picture is not the cost; the cost was showing
+    // somebody a different subject and labelling it with theirs.
+    //
+    // So an unrecognised object leaves `sim` UNSET. The scene is then a
+    // simulation with no object, which the refusal below turns into no scene
+    // at all — and the model proposal, which travels at the top level of the
+    // map and not inside the picture, is untouched by any of it. A request to
+    // simulate something this product has no surface for keeps whatever
+    // structure it did manage to build.
+    ...(kind === 'simulation' && (SIM_OBJECTS as readonly string[]).includes(raw?.sim?.object)
+      ? { sim: { object: raw.sim.object as SimObject } }
       : {}),
     ...(kind === 'matrix' ? { matrix: sanitizeMatrix(raw.matrix) ?? undefined } : {}),
     ...(kind === 'vectors' ? { vectors: sanitizeVectors(raw.vectors) ?? undefined } : {}),
@@ -5558,6 +5588,11 @@ export function sanitizeViz(raw: any, opts?: { trust?: VizTrust }): VizScene | n
   // failed its checks — is an empty frame with a title, which is worse than
   // no picture at all: it takes the panel and says nothing.
   if (scene.kind === 'diagram' && !scene.parts?.length) return null;
+  // A SIMULATION IS ITS OBJECT, and the same rule applies. The five named
+  // objects above are surfaces somebody wrote; a name that is not one of them
+  // has no surface, and the honest answer is no picture rather than a picture
+  // of something else. See the note beside `sim` in the literal above.
+  if (scene.kind === 'simulation' && !scene.sim) return null;
 
 
   // The expression must compile over exactly the names we are prepared to

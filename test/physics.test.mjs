@@ -476,10 +476,31 @@ console.log('\n=== the model names the object; the code owns the numbers ===');
   ok('a simulation may have an eccentricity slider', !!ecc && ecc.value === 0.9);
   ok('  but a function still may not', !sanitizeViz({ kind: 'function', expr: 'e*x', view: { xMin: -1, xMax: 1 }, params: [{ id: 'e', min: 0, max: 2, step: 0.1, value: 1 }] }).params.some((p) => p.id === 'e'));
 
-  // An unknown object is not worth losing a picture over.
-  ok('an object nobody implemented becomes the black hole',
-    scene({ sim: { object: 'tesseract' } }).sim.object === 'black-hole');
-  ok('  as does a missing one', scene({}).sim.object === 'black-hole');
+  // AN UNKNOWN OBJECT IS REFUSED, AND THIS ASSERTION USED TO SAY THE OPPOSITE.
+  //
+  // It read "an object nobody implemented becomes the black hole", and the
+  // comment above it said an unknown object "is not worth losing a picture
+  // over". That reasoning is how "simulate the solar system" came back as a
+  // three-body figure-eight and "simulate a pendulum in honey" came back as a
+  // Kerr black hole with real general-relativistic readouts attached to
+  // somebody else's subject. Losing the picture was never the cost; the cost
+  // was showing a different subject under the person's own label.
+  //
+  // The five named objects are surfaces somebody wrote. A name that is not one
+  // of them has no surface, and no picture is the honest answer.
+  ok('an object nobody implemented is refused', scene({ sim: { object: 'tesseract' } }) === null);
+  ok('  as is a missing one', scene({}) === null);
+  ok('  and a named one still survives', scene({ sim: { object: 'orbit' } })?.sim?.object === 'orbit');
+  // The model the request may ALSO have proposed is untouched by any of this:
+  // it travels at the top level of the map, not inside the picture.
+  const withModel = sanitizeMap({
+    context: 'simulating',
+    nodes: [], edges: [],
+    viz: { kind: 'simulation', sim: { object: 'tesseract' }, title: 'a tesseract' },
+    propose: { id: 'x', title: 'A tesseract', params: [], objects: [{ id: 's', kind: 'surface', label: 'it', defs: { z: 'x^2 - y^2' } }] },
+  });
+  ok('  while whatever structure WAS built survives the refusal', !!withModel.propose);
+  ok('  and no picture is invented for it', !withModel.viz);
 
   // Every object draws, with readouts, and none of them carries an expression
   // the model wrote.

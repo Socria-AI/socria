@@ -34,6 +34,7 @@
 // what is stopping it.
 
 import { estimate } from './estimate';
+import { readGravity } from './gravity';
 import { readMechanism } from './mechanism';
 import { readSystem, type Missing } from './system';
 import type { Fidelity, Model, ModelObject } from './schema';
@@ -134,6 +135,34 @@ export const ASSEMBLY: Solver = {
   checkedAgainst: 'the analytic solution of a single damped oscillator, and energy conservation with damping removed',
 };
 
+export const GRAVITY: Solver = {
+  id: 'nbody',
+  label: 'Gravitational assembler',
+  kind: 'assembly',
+  produces: 'numerically-computed',
+  method:
+    'writes the pairwise Newtonian accelerations of every body symbolically, then integrates the resulting state system with RK4 (lib/model/gravity.ts)',
+  handles: (_m, o) => !!o.gravity,
+  requires: (m, o) => {
+    // ASKED OF THE THING THAT UNDERSTANDS IT. Before this solver existed, a
+    // gravitating system was routed by ODE — because expandGravity patches an
+    // assembled `system` onto the carrier — and ODE could only speak about the
+    // assembled equations. A body whose mass was unreadable came back as "a
+    // readable expression for dvx0/dt: the one given did not compile", which
+    // is the internal name of a state nobody wrote, handed to somebody who
+    // mistyped a mass. readGravity says "a mass for body b" instead.
+    const read = readGravity(m, o);
+    if (!read.ok) return read.missing;
+    // Assembling is not enough — the same check ASSEMBLY makes, and for the
+    // same reason: parts can be structurally sound and the assembled system
+    // still unevaluable.
+    const usable = readSystem(m, { ...o, system: read.system });
+    return usable.ok ? [] : usable.missing;
+  },
+  checkedAgainst:
+    'a circular two-body orbit closing on itself, and energy and momentum conservation over a full period (test/model-systems)',
+};
+
 export const ESTIMATION: Solver = {
   id: 'ols',
   label: 'Least-squares estimator',
@@ -227,7 +256,16 @@ export const FUTURE: Solver[] = [
 ];
 
 /** Everything registered, in the order the router considers them. */
-export const SOLVERS: Solver[] = [ASSEMBLY, ODE, ESTIMATION, DATA, SAMPLING, ...FUTURE];
+/**
+ * Everything registered, in the order the router considers them.
+ *
+ * ORDER IS THE MORE SPECIFIC DECLARATION FIRST. A carrier holding a `gravity`
+ * or `mechanism` block also holds the `system` its expander assembled, so a
+ * later ODE entry would happily claim it — and then answer every question
+ * about it in terms of the assembled state names rather than the bodies and
+ * springs the person actually wrote.
+ */
+export const SOLVERS: Solver[] = [GRAVITY, ASSEMBLY, ODE, ESTIMATION, DATA, SAMPLING, ...FUTURE];
 
 // ── routing ─────────────────────────────────────────────────────────
 
