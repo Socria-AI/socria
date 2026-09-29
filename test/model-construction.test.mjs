@@ -43,6 +43,7 @@ import { estimate, specificationLine } from './.tmp/estimate.mjs';
 import { sanitizeMap } from './.tmp/logos.mjs';
 import { sanitizeViz } from './.tmp/logos-viz.mjs';
 import { buildSpec } from './.tmp/spec.mjs';
+import { buildModel } from './.tmp/compile.mjs';
 import { forgetRuns, runFor, seriesOf } from './.tmp/system.mjs';
 import { LOGOS_CHAT_PROMPT, buildMapPrompt } from './.tmp/logos.mjs';
 
@@ -787,6 +788,81 @@ console.log('\n=== 17. changing something recomputes what it reaches ===');
     affectedBy(sir, ['nonexistent']).length === 0);
   ok('  and an unrelated control reaches nothing',
     affectedBy(sir, ['unrelated_knob']).length === 0);
+}
+
+console.log('\n=== 18. silence is impossible ===');
+{
+  // THE CHANGE THIS LOCKS IN. The compiler's default branch returned an empty
+  // Built with no note and NO PROBLEM — so an object of a kind no renderer
+  // handles was simply absent, with nothing anywhere saying why. Twenty-eight
+  // of the forty-eight kinds landed there. A model could be built, routed,
+  // graded and drawn with most of its contents invisible and no account given.
+  const m = sanitizeModel({
+    id: 'mixed', title: 'some of each', params: [], objects: [
+      { id: 'surf', kind: 'surface', label: 'a saddle', defs: { z: 'x^2 - y^2' }, over: { x: [-2, 2], y: [-2, 2] } },
+      { id: 'obj', kind: 'objective', label: 'maximise utility' },
+      { id: 'con', kind: 'constraint', label: 'px·x + py·y ≤ m' },
+      { id: 'note', kind: 'annotation', label: 'a remark' },
+      { id: 'ax', kind: 'axis', label: 'the x axis' },
+    ],
+  });
+  const built = buildModel(m);
+  const by = Object.fromEntries(built.map((b) => [b.of, b]));
+
+  ok('a surface with a definition draws', by.surf.primitives.length > 0);
+  ok('  and says nothing is wrong', !by.surf.problem);
+
+  // A GAP NAMES ITSELF.
+  ok('an objective says nothing draws it yet', !!by.obj.problem);
+  ok('  naming the kind', /objective/.test(by.obj.problem));
+  ok('  with the right article', /draws an objective/.test(by.obj.problem), by.obj.problem);
+  ok('  and says the object is still in the model', /in the model/.test(by.obj.problem));
+  ok('a constraint does the same', /draws a constraint/.test(by.con.problem ?? ''));
+
+  // …BUT A THING THAT IS MEANT TO BE READ IS NOT A GAP.
+  ok('an annotation is not reported as missing', !by.note.problem);
+  ok('  and says what it is', /note on the model/.test(by.note.note));
+  ok('an axis belongs to the frame, not to the objects', !by.ax.problem);
+
+  // THE ROUTER AND THE COMPILER MUST NOT DISAGREE. Every kind a real solver
+  // claims to handle must have a compile case, or the model grades
+  // `computational` and produces no marks — which is the worst of both
+  // answers and is what `series`, `distribution` and a defs-declared surface
+  // all did.
+  for (const [kind, shape] of [
+    ['series', { data: 'd' }],
+    ['distribution', { data: 'd' }],
+    ['dataset', { data: 'd' }],
+  ]) {
+    const one = sanitizeModel({
+      id: 'k', title: kind, params: [],
+      // Points are [x, y, z] triples — the block's own shape, not objects.
+      data: { d: { label: 'numbers', points: [[0, 1, 0], [1, 2, 0], [2, 4, 0]] } },
+      objects: [{ id: 'o', kind, label: kind, ...shape }],
+    });
+    const b = buildModel(one)[0];
+    const r = route(one, one.objects[0]);
+    if (r.status === 'runnable') {
+      ok(`${kind}: the router says runnable and the compiler draws it`,
+        b.primitives.length > 0 && !b.problem, b.problem ?? 'no primitives');
+    }
+  }
+
+  // AND THE BUDGET SAYS SO. The loop breaks when the primitive budget runs
+  // out, and every remaining object used to be dropped with no record — a
+  // large model quietly showed a prefix of itself.
+  const many = sanitizeModel({
+    id: 'many', title: 'a lot', params: [],
+    objects: Array.from({ length: 30 }, (_, i) => ({
+      id: `s${i}`, kind: 'surface', label: `surface ${i}`,
+      defs: { z: 'x^2 - y^2' }, over: { x: [-2, 2], y: [-2, 2] },
+    })),
+  });
+  const lots = buildModel(many);
+  ok('every object is accounted for, drawn or not', lots.length === many.objects.length,
+    `${lots.length} of ${many.objects.length}`);
+  const cut = lots.filter((b) => b.problem && /budget/.test(b.problem));
+  ok('  and anything the budget cut off says so', cut.length === 0 || cut.every((b) => /in the model/.test(b.problem)));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

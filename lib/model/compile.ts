@@ -130,8 +130,15 @@ export function buildObject(model: Model, o: ModelObject, opts?: { detail?: numb
         );
         return { of: o.id, primitives: [out.value], note: out.note, fidelity: 'model-derived' };
       }
-      const def = o.definition;
-      if (!def) return NOTHING(o, 'a surface needs a definition, parametric components or data');
+      // THE ROUTER AND THE COMPILER HAD TO AGREE, AND DID NOT. `SAMPLING.requires`
+      // (solve.ts) accepts EITHER `definition` or a `defs.z`, so a surface
+      // declared the second way routed `runnable` and graded the model
+      // `computational` — and this line then read only `definition`, refused,
+      // and drew nothing. A model that claims to compute and produces no marks
+      // is the worst of both answers. Both spellings are read here, which is
+      // what the router already promised.
+      const def = o.definition ?? o.defs?.z;
+      if (!def) return NOTHING(o, 'a surface needs a definition (z = …), parametric components or data');
       const e = compileExpr(def, names(model, ['x', 'y']));
       if (!e) return NOTHING(o, `“${def}” would not compile`);
       const xr = rangeOf(model, o, 'x', [-3, 3]);
@@ -637,7 +644,14 @@ export function buildObject(model: Model, o: ModelObject, opts?: { detail?: numb
     case 'particle':
     case 'node':
     case 'dataset':
-    case 'measurement': {
+    case 'measurement':
+    // `series` and `distribution` ARE HERE BECAUSE THE ROUTER SAYS THEY ARE.
+    // DATA.handles (solve.ts) lists all four, so both routed `runnable` and
+    // graded a model `computational` — and then fell through to the silent
+    // default and drew nothing. The same disagreement the surface had: the
+    // router promising what the compiler had no case for.
+    case 'series':
+    case 'distribution': {
       if (o.data) return fromData(model, o, layer);
       if (typeof o.value === 'number') {
         return {
@@ -677,10 +691,67 @@ export function buildObject(model: Model, o: ModelObject, opts?: { detail?: numb
     }
 
     // ── things that are said rather than drawn ─────────────────────
-    default:
-      return { of: o.id, primitives: [], note: '', fidelity: o.fidelity ?? 'conceptual' };
+    //
+    // SILENCE IS NOT AN ANSWER, AND THIS BRANCH USED TO BE SILENT. It returned
+    // an empty `Built` with no `note` and, crucially, no `problem` — so an
+    // object of a kind no renderer handles simply was not there, and nothing
+    // anywhere said why. Twenty-eight of the forty-eight kinds land here,
+    // including `region`, `plane`, `boundary`, `mesh`, `series`, `graph`,
+    // `distribution`, `objective` and `constraint`: a model could be built,
+    // routed, graded and drawn with most of its contents invisible and no
+    // account of their absence.
+    //
+    // A `problem` is what makes a gap discoverable — by the reader, by the
+    // conversation (state.ts reads it) and by a test. Two cases, distinguished
+    // because they need different things from different people:
+    default: {
+      // Some kinds are MEANT to be read rather than looked at. Saying those
+      // "have no renderer" would report a gap that is not one — so each is
+      // listed with what it is, and the note carries that rather than a shrug.
+      const said = SAID_NOT_DRAWN.get(o.kind);
+      if (said) {
+        return {
+          of: o.id,
+          primitives: [],
+          note: typeof o.value === 'number' ? `${said} — ${o.value}${o.units ? ` ${o.units}` : ''}` : said,
+          fidelity: o.fidelity ?? 'conceptual',
+        };
+      }
+      return NOTHING(
+        o,
+        `nothing in this engine draws ${/^[aeiou]/.test(o.kind) ? 'an' : 'a'} ${o.kind} yet — the object is in the model and can be inspected, and what is missing is a way to show it`
+      );
+    }
   }
 }
+
+/**
+ * Kinds that are read rather than looked at, and what each one is.
+ *
+ * Small and explicit, so that everything NOT on it reports its absence. The
+ * temptation is to grow this list whenever a kind is noisy; resist it — an
+ * entry here is a promise that a reader wanting to SEE the thing is wrong to
+ * want that, and that is true of very few kinds.
+ *
+ * The specification's parts are here on exactly that test. A coefficient is a
+ * number somebody reads, an error term is a statement about what the model does
+ * not explain, and a named variable appears on a fitted plot as an axis rather
+ * than as a mark of its own. All three are inspectable, carry provenance, and
+ * are what `add variable` and `remove` act on — they are not missing from the
+ * picture, they were never marks.
+ *
+ * Axes and grids are the frame's, drawn by spec.ts rather than as objects.
+ */
+const SAID_NOT_DRAWN = new Map<ModelObject['kind'], string>([
+  ['annotation', 'a note on the model'],
+  ['assumption', 'something the model holds fixed'],
+  ['source', 'where something came from'],
+  ['axis', 'part of the frame; the view draws it'],
+  ['grid', 'part of the frame; the view draws it'],
+  ['variable', 'a named quantity in the specification; on a fitted plot it is an axis'],
+  ['coefficient', 'a number in the fitted relationship'],
+  ['residual', 'what the specification does not explain'],
+]);
 
 /** A data block, as whichever primitive its shape calls for. */
 function fromData(model: Model, o: ModelObject, layer?: string): Built {
@@ -815,10 +886,28 @@ export function buildModel(modelIn: Model, opts?: { only?: readonly string[]; de
     if (built.primitives.length > budget) {
       built.primitives = built.primitives.slice(0, Math.max(0, budget));
       built.note = `${built.note}; truncated to fit the view's budget`;
+      // A TRUNCATION IS A PROBLEM, not a note. It was only a note, so an object
+      // showing half of itself looked exactly like an object showing all of
+      // itself to everything downstream.
+      built.problem = built.problem ?? "more detail than the view's primitive budget allows; what is drawn is part of it";
     }
     budget -= built.primitives.length;
     out.push(built);
     if (budget <= 0) break;
+  }
+
+  // …AND EVERYTHING THE BUDGET CUT OFF ENTIRELY. The loop `break`s when the
+  // budget runs out, so every remaining object was dropped with no record at
+  // all — a large model quietly showed a prefix of itself. Each one now says
+  // so, which costs nothing (they carry no primitives) and is the difference
+  // between "that is the whole model" and "that is as much as fitted".
+  const drawn = new Set(out.map((b) => b.of));
+  for (const o of model.objects) {
+    if (want && !want.has(o.id)) continue;
+    if (drawn.has(o.id)) continue;
+    out.push(
+      NOTHING(o, "the view's primitive budget ran out before this object; it is in the model and is not on the picture")
+    );
   }
   return out;
 }

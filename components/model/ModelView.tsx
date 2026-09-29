@@ -490,7 +490,21 @@ export function ModelView({
         right: selectedLabel ? `selected: ${selectedLabel}` : spec.title,
         note:
           (slice ? `${slice.note}. ` : '') +
-          (chosen?.note ? `${chosen.note}. ` : '') +
+          // THE REASON A THING IS NOT THERE REACHES THE PLATE, and until now it
+          // did not: this concatenated only `.note`, so a selected object the
+          // engine had refused to draw showed whatever note it happened to
+          // carry — often nothing — while the refusal went only to the chat
+          // channel on the line below. Somebody looking at the picture and
+          // wondering where their object was had no way to find out from the
+          // picture.
+          (chosen?.problem ? `Not drawn: ${chosen.problem}. ` : chosen?.note ? `${chosen.note}. ` : '') +
+          // …and how much of the model is absent, at all times rather than only
+          // when something is selected. A picture showing four of eleven
+          // objects looks exactly like a picture showing all four.
+          (() => {
+            const absent = spec.notes.filter((n) => n.problem).length;
+            return absent ? `${absent} of ${spec.notes.length} objects are in the model and not on this picture. ` : '';
+          })() +
           (spec.panels?.length
             ? `The ${spec.panels.length} panels below are the same run, not separate ones. `
             : '') +
