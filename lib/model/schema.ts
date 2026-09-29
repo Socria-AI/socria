@@ -425,6 +425,25 @@ export interface EstimationDecl {
   /** whether to fit an intercept. Default true. */
   intercept?: boolean;
   /**
+   * WHICH CONTROL DRIVES WHICH COEFFICIENT, by the regressor's own name, plus
+   * "intercept" for β₀.
+   *
+   * THE BINDING, DECLARED WHERE THE AUTHOR CAN DECLARE IT. The coefficient
+   * objects (`spec__b1` and so on) do not exist until the expander runs, so
+   * whoever writes a model cannot name a control after one — and the expander
+   * used to resolve a coefficient to a control by exact id equality against
+   * exactly that unwritable convention. The result was an interface showing
+   * β₁ = 0.7 beside an executor asking for a value for `spec__b1`, and an
+   * empty three-dimensional box between them.
+   *
+   *   "coefficients": {"intercept": "b0", "Y_t": "b1", "C_lag": "b2"}
+   *
+   * Nothing is guessed. A regressor with no entry, and no control named after
+   * its canonical id, and no value of its own, is REPORTED as unbound — with
+   * its display name — rather than filled in.
+   */
+  coefficients?: Record<string, string>;
+  /**
    * The range each regressor is worth looking at over.
    *
    * A VIEWING WINDOW, NOT A DATUM. Saying "show me education from 8 to 20"
@@ -853,6 +872,17 @@ export function sanitizeObject(raw: unknown): ModelObject | null {
         ...(lags !== null && lags > 0 ? { lags: Math.min(12, Math.floor(lags)) } : {}),
         ...(est.robust === true ? { robust: true } : {}),
         ...(est.intercept === false ? { intercept: false } : {}),
+        ...(() => {
+          const raw = est.coefficients as Record<string, unknown> | undefined;
+          if (!raw || typeof raw !== 'object') return {};
+          const c: Record<string, string> = {};
+          for (const [k, v] of Object.entries(raw).slice(0, 24)) {
+            const key = text(k, 40);
+            const val = text(v, 48);
+            if (key && ID.test(val)) c[key] = val;
+          }
+          return Object.keys(c).length ? { coefficients: c } : {};
+        })(),
         ...(() => {
           const raw = est.over as Record<string, unknown> | undefined;
           if (!raw || typeof raw !== 'object') return {};

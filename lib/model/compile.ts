@@ -43,6 +43,8 @@ import {
 import { LIMITS, type P3, type Primitive } from './primitives';
 import type { Fidelity, Model, ModelObject } from './schema';
 import { runFor, seriesOf, stateAt } from './system';
+import { route } from './solve';
+import { bindings, known, symbolTable } from './symbols';
 import { estimate } from './estimate';
 import { restOf, statesOf } from './mechanism';
 import { unpack } from './unpack';
@@ -63,16 +65,30 @@ export interface Built {
 
 /** The scope an expression is evaluated in: the controls, plus time. */
 export function scopeOf(model: Model, extra?: Record<string, number>): Record<string, number> {
-  const scope: Record<string, number> = {};
-  for (const p of model.params) scope[p.id.toLowerCase()] = p.value;
+  // EVERY QUANTITY THAT HAS A VALUE, not just the controls.
+  //
+  // This read `model.params` alone, so a coefficient carrying a perfectly good
+  // number — set by an edit, produced by a fit, written into the declaration —
+  // was invisible to every expression in the model. Combined with an expander
+  // that referenced those coefficients by name, it produced the empty cube: an
+  // expression naming three quantities the model knew the values of, and a
+  // scope that had never heard of any of them.
+  const scope: Record<string, number> = bindings(symbolTable(model));
   if (model.time) scope.t = model.time.t;
   for (const [k, v] of Object.entries(extra ?? {})) scope[k.toLowerCase()] = v;
   return scope;
 }
 
-/** The names an expression in this model may use, beyond its own variables. */
+/**
+ * The names an expression in this model may use, beyond its own variables.
+ *
+ * The same table the scope comes from, so "what may be written" and "what can
+ * be evaluated" cannot disagree — which they did, and the disagreement was
+ * silent in one direction: a name the compiler would not accept produced a
+ * refusal, and a name it accepted with no value produced NaN.
+ */
 function names(model: Model, vars: string[]): string[] {
-  return [...new Set([...vars, ...model.params.map((p) => p.id.toLowerCase()), 't'])];
+  return [...new Set([...vars, ...known(symbolTable(model)), 't'])];
 }
 
 /** The extent of a name: what the object says, else a control, else a default. */
@@ -103,6 +119,23 @@ export function buildObject(model: Model, o: ModelObject, opts?: { detail?: numb
   const detail = Math.max(4, Math.min(400, o.detail ?? opts?.detail ?? 48));
   const scope = scopeOf(model);
   const layer = o.layer;
+
+  // ── ASK THE ROUTER BEFORE DRAWING ──────────────────────────────────
+  //
+  // THE EMPTY-CUBE RULE, enforced in the one place it can be. The compiler
+  // used to compile and sample without ever consulting the router, so an
+  // expression naming a quantity nothing had bound compiled fine, evaluated to
+  // NaN at every point, dropped every point as non-finite — and returned a
+  // mesh whose note read "48 × 48 grid". A coordinate box with nothing in it,
+  // captioned as a successful grid.
+  //
+  // The router already knows, and says so precisely ("a value for β₁"). So it
+  // is asked first, and its answer is the problem reported. The renderer does
+  // not re-derive the mathematics or re-decide what is missing; it is told.
+  const beforeDrawing = route(model, o, 'evaluate');
+  if (beforeDrawing.status === 'incomplete') {
+    return NOTHING(o, beforeDrawing.missing.map((m) => m.what).join('; '));
+  }
 
   switch (o.kind) {
     // ── a surface: z = f(x, y), or r(u, v), or a grid of measurements ──

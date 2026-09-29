@@ -1101,7 +1101,18 @@ WHAT TO PUT IN IT, by what they described. These are the blocks that exist, not 
   something explained by something else → "estimation": the outcome, what explains it, and the data IF THEY GAVE YOU ANY
   a shape or a function            → objects with expressions
 
-A SPECIFICATION WITH COEFFICIENT VALUES IS COMPUTABLE, EVEN WITH NO DATA AT ALL. If they give you values — "set β₁ to 2.5 and β₂ to 1.2 and show me how it behaves" — declare each one as a CONTROL in "params", named after the coefficient it is: for a specification with id "spec" and an intercept, the coefficients are spec__b0, spec__b1, spec__b2 in the order the regressors are written. The engine then draws what the equation says over the regressors, at those values, and the person can move them. Also give "over" on the estimation — the range each regressor is worth looking at — because a surface needs a window and inventing one is not yours to do. If they named ranges ("education from 8 to 20"), use theirs.
+A SPECIFICATION WITH COEFFICIENT VALUES IS COMPUTABLE, EVEN WITH NO DATA AT ALL. If they give you values — "set β₁ to 2.5 and β₂ to 1.2 and show me how it behaves" — do two things:
+
+  1. declare a CONTROL in "params" for each value, named however reads well: b0, beta1, income_coef, whatever;
+  2. SAY WHICH CONTROL IS WHICH COEFFICIENT, in "coefficients" on the estimation, keyed by the regressor's own name plus "intercept" for β₀:
+
+     "estimation": {"y": "wage", "x": ["education", "experience"],
+                    "coefficients": {"intercept": "b0", "education": "b1", "experience": "b2"},
+                    "over": {"education": [8, 20], "experience": [0, 30]}}
+
+WHY BOTH. The coefficient objects the engine creates have ids of their own, and you cannot know them — so a control alone is a number with nothing attached to it. The binding is the second line, and without it the engine will say, correctly, that it has a quantity called β₁ and nothing has given it a value. Nothing is guessed from resemblance: a control called "b1" is not assumed to be β₁.
+
+Also give "over" — the range each regressor is worth looking at — because a surface needs a window and inventing one is not yours to do. If they named ranges ("education from 8 to 20"), use theirs.
 
 NOT ESTIMATED IS NOT NOT COMPUTABLE. A value somebody sets as a hypothesis is theirs and is honest; a value you invent so that something draws is not. Never write a coefficient value they did not give you, and never present a hypothetical surface as a fit, a prediction or an estimate.
 
@@ -1130,6 +1141,7 @@ THE SHAPE — a sibling of "nodes", "edges" and "viz". Every field is optional e
      "estimation": {"y": "y", "x": ["x"]}},
     {"id": "hyp", "kind": "specification", "label": "wage on education and experience",
      "estimation": {"y": "wage", "x": ["education", "experience"],
+                    "coefficients": {"intercept": "b0", "education": "b1", "experience": "b2"},
                     "over": {"education": [8, 20], "experience": [0, 30]}}},
     {"id": "fitted", "kind": "specification", "label": "y on x, fitted",
      "estimation": {"method": "ols", "y": "y", "x": ["x"], "data": "sample"}}

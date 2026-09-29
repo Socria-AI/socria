@@ -35,6 +35,7 @@
 
 import { estimate } from './estimate';
 import { namesIn } from './deps';
+import { resolve, symbolTable } from './symbols';
 import { readGravity } from './gravity';
 import { readMechanism } from './mechanism';
 import { readSystem, type Missing } from './system';
@@ -146,6 +147,13 @@ export const SAMPLING: Solver = {
   handles: (_m, o) =>
     ['surface', 'volume', 'curve', 'line', 'ray', 'field', 'plane', 'region', 'boundary', 'mesh'].includes(o.kind),
   requires: (m, o) => {
+    // A SHAPE READ OFF DATA NEEDS NO EXPRESSION. The compiler has always drawn
+    // a surface from a grid of measurements; the router did not know, so it
+    // reported such an object `incomplete` — invisible until the compiler
+    // started asking the router before drawing, at which point a perfectly
+    // good data grid stopped being drawn at all. The router must know what the
+    // compiler can do, or one of them is wrong about the same object.
+    if (o.data && m.data?.[o.data]) return [];
     const wrote = o.definition || has(o, ['z', 'f', 'fx', 'fy', 'fz', 'px', 'py', 'pz']);
     if (!wrote) {
       return [{ what: 'an expression to evaluate', unlocks: 'drawing this from the mathematics rather than by hand' }];
@@ -156,23 +164,40 @@ export const SAMPLING: Solver = {
     // `runnable`, and every height on it was NaN — the exact remaining degree
     // of freedom somebody asked to have named, reported instead as ready.
     //
-    // The axes are bound by the sampler, the clock by the model, and everything
-    // else must be a control. A name that is none of those is the answer to
-    // "what is still missing", and it is reported with its own name in it.
-    const bound = new Set<string>([
-      'x', 'y', 'z', 'u', 'v', 't',
-      ...m.params.map((p) => p.id.toLowerCase()),
-      ...m.objects.filter((q) => typeof q.value === 'number').map((q) => q.id.toLowerCase()),
-    ]);
-    const free = new Set<string>();
+    // The axes are bound by the sampler and the clock by the model; everything
+    // else must be a quantity the symbol table has a value for. Asked through
+    // the table rather than against a hand-built set, so that "what may be
+    // evaluated" is decided in the same place as "what the scope contains".
+    //
+    // The previous version listed params and objects-with-a-numeric-`value`,
+    // which is a THIRD spelling of the binding rule and disagreed with both of
+    // the others — an object whose value lived on `meta` or `defs` counted as
+    // unbound here and as bound in the scope, or the reverse.
+    const table = symbolTable(m);
+    const axes = new Set(['x', 'y', 'z', 'u', 'v', 't', 's']);
+    const mentioned = new Set<string>();
     for (const e of [o.definition, ...Object.values(o.defs ?? {})]) {
-      for (const n of namesIn(e)) if (!bound.has(n)) free.add(n);
+      for (const n of namesIn(e)) if (!axes.has(n)) mentioned.add(n);
     }
-    if (!free.size) return [];
-    return [...free].map((n) => ({
-      what: `a value for ${n}`,
-      unlocks: `evaluating ${o.label} — it is the one quantity in the expression nothing has fixed`,
-    }));
+    const gaps: Missing[] = [];
+    for (const n of mentioned) {
+      const q = resolve(table, n);
+      if (q && q.value !== undefined) continue;
+      // A NAME WITH NOTHING BEHIND IT AT ALL is different from a quantity the
+      // model knows and has not been given a value, and the sentence says which.
+      gaps.push(
+        q
+          ? {
+              what: `a value for ${q.display}${q.display === q.id ? '' : ` (${q.id})`}`,
+              unlocks: `evaluating ${o.label} — the model has this quantity and nothing has given it a number`,
+            }
+          : {
+              what: `something called ${n}`,
+              unlocks: `evaluating ${o.label} — the expression mentions it and this model has no such quantity`,
+            }
+      );
+    }
+    return gaps;
   },
   checkedAgainst: 'known closed forms for the benchmark surfaces (test/model-engine)',
 };

@@ -641,7 +641,16 @@ export function expandEstimation(model: Model): Model {
         relations: [
           { to: `${carrier.id}__x${i}`, as: 'parameterizes', why: 'it is the coefficient on this variable' },
         ],
-        meta: { spec: carrier.id, role: 'coefficient', on: x, ...(value(x) !== undefined ? { value: value(x) } : {}) },
+        meta: {
+          spec: carrier.id,
+          role: 'coefficient',
+          on: x,
+          ...(value(x) !== undefined ? { value: value(x) } : {}),
+          // THE BINDING, CARRIED ON THE QUANTITY. symbolTable reads this to
+          // find the control driving this coefficient, so the inspector, the
+          // conversation, Trace and the evaluator all resolve the same thing.
+          ...(decl.coefficients?.[x] ? { control: decl.coefficients[x] } : {}),
+        },
         provenance: from,
       });
     });
@@ -654,7 +663,12 @@ export function expandEstimation(model: Model): Model {
         meaning: `the intercept: fitted ${decl.y} where every regressor is zero, which is only meaningful where that is a case that could occur`,
         ...(value(INTERCEPT) !== undefined ? { defs: { value: String(value(INTERCEPT)) } } : {}),
         relations: [{ to: carrier.id, as: 'contains', why: 'it is the intercept of this specification' }],
-        meta: { spec: carrier.id, role: 'intercept', ...(value(INTERCEPT) !== undefined ? { value: value(INTERCEPT) } : {}) },
+        meta: {
+        spec: carrier.id,
+        role: 'intercept',
+        ...(value(INTERCEPT) !== undefined ? { value: value(INTERCEPT) } : {}),
+        ...(decl.coefficients?.intercept ? { control: decl.coefficients.intercept } : {}),
+      },
         provenance: from,
       });
     }
@@ -692,17 +706,31 @@ export function expandEstimation(model: Model): Model {
       // Each coefficient resolves to a control (manipulable), then to a fitted
       // or user-set value, and otherwise stays as its own name so the gap is
       // reported rather than filled.
+      // THE THREE DECLARED WAYS A COEFFICIENT GETS A VALUE, in the order that
+      // lets a person override the model — and no fourth, guessing way. The
+      // expression carries whichever name the binding resolves to, so what is
+      // written is what can be evaluated.
       const coefficient = (i: number): string => {
         const b = `${carrier.id}__b${wants ? i + 1 : i}`;
+        // 1. the declaration names a control for this regressor.
+        const named = decl.coefficients?.[decl.x[i]];
+        if (named && model.params.some((p) => p.id === named)) return named;
+        // 2. a control whose id IS the canonical id.
         if (model.params.some((p) => p.id === b)) return b;
+        // 3. a value the fit produced or an edit wrote.
         const v = value(decl.x[i]);
         if (v !== undefined) return String(v);
         const set = model.objects.find((o) => o.id === b)?.defs?.value;
-        return set ?? b;
+        if (set) return set;
+        // Unbound: the canonical name stays in the expression, and the sampler
+        // reports it BY ITS DISPLAY NAME through the symbol table.
+        return b;
       };
       const intercept = (): string => {
         const b = `${carrier.id}__b0`;
         if (!wants) return '0';
+        const named = decl.coefficients?.intercept;
+        if (named && model.params.some((p) => p.id === named)) return named;
         if (model.params.some((p) => p.id === b)) return b;
         const v = value(INTERCEPT);
         if (v !== undefined) return String(v);
@@ -732,9 +760,14 @@ export function expandEstimation(model: Model): Model {
         return `(${c}) * ${at}`;
       });
       const expr = [intercept(), ...slopeTerms].join(' + ');
-      const hypothetical = decl.x.some((_, i) => {
+      const hypothetical = decl.x.some((name, i) => {
         const b = `${carrier.id}__b${wants ? i + 1 : i}`;
-        return model.params.some((p) => p.id === b) || !!model.objects.find((o) => o.id === b)?.defs?.value;
+        const named = decl.coefficients?.[name];
+        return (
+          (!!named && model.params.some((p) => p.id === named)) ||
+          model.params.some((p) => p.id === b) ||
+          !!model.objects.find((o) => o.id === b)?.defs?.value
+        );
       });
 
       put({

@@ -143,6 +143,13 @@ export function referencesOf(o: ModelObject): Set<string> {
 
   if (o.data) out.add(o.data.toLowerCase());
 
+  // THE CONTROL DRIVING THIS QUANTITY. A coefficient bound to a slider does not
+  // mention that slider in any expression — the binding lives on `meta.control`
+  // — so without this the graph could not see that moving the control changes
+  // the coefficient. Verified: `affectedBy(model, ['b1'])` reached the surface
+  // (whose expression names b1) and NOT the coefficient b1 drives.
+  if (typeof o.meta?.control === 'string') out.add(o.meta.control.toLowerCase());
+
   // A declared `depends` is KEPT, as a hint and never as the source of truth.
   // It is whatever a language model chose to write; it may name something that
   // does not exist, and it is absent from essentially every real proposal. It

@@ -934,8 +934,14 @@ console.log('\n=== 19. capability is per operation, not one verdict ===');
   const r2 = route(m2, m2.objects.find((o) => o.meta?.role === 'response'), 'evaluate');
   ok('with β₀ unspecified it is incomplete, not runnable', r2.status === 'incomplete');
   ok('  and β₀ is what it names', /spec__b0/.test(JSON.stringify(r2.missing)));
-  ok('  described as the one thing nothing has fixed',
-    /nothing has fixed/.test(JSON.stringify(r2.missing)));
+  // Named BY ITS DISPLAY NAME, through the symbol table — "a value for β₀
+  // (spec__b0)" rather than a bare internal identifier. A person is owed the
+  // name they used, and the canonical id beside it so the two are known to be
+  // one quantity.
+  ok('  described as a quantity the model has and nothing has valued',
+    /nothing has given it a number/.test(JSON.stringify(r2.missing)), JSON.stringify(r2.missing));
+  ok('  and named as β₀, not only as an internal id',
+    /β₀/.test(JSON.stringify(r2.missing)), JSON.stringify(r2.missing));
   ok('  and no value was invented for it',
     !m2.params.some((q) => q.id === 'spec__b0'));
 

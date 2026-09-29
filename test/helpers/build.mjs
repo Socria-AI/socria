@@ -74,6 +74,7 @@ const MODULES = [
   'lib/model/docs.ts',
   'lib/model/gravity.ts',
   'lib/model/deps.ts',
+  'lib/model/symbols.ts',
   'lib/model/unpack.ts',
   'lib/model/ask.ts',
   'lib/model/library.ts',
