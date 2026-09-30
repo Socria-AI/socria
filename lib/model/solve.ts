@@ -241,6 +241,17 @@ export const SAMPLING: Solver = {
     for (const n of mentioned) {
       const q = resolve(table, n);
       if (q && q.value !== undefined) continue;
+      // A FREE INPUT WITH A RANGE IS BOUND, and the scope binds it — at the
+      // cursor, which sits in the middle of that range until somebody moves it
+      // (compile.ts scopeOf, via inputsOf). Asking for a "value" for it is the
+      // router keeping its own copy of the binding rule and disagreeing with the
+      // compiler, which is the failure this file has now had three times.
+      //
+      // Measured: ∂log_wage/∂educ is β₁ + β₃·female in an interaction model, and
+      // it was reported as needing a value for female while the surface beside it
+      // evaluated that same expression perfectly. A free input with NO range is a
+      // real gap and is reported above, as a RANGE and never as a value.
+      if (q && q.supply === 'input' && q.domain) continue;
       // A NAME WITH NOTHING BEHIND IT AT ALL is different from a quantity the
       // model knows and has not been given a value, and the sentence says which.
       gaps.push(

@@ -125,7 +125,7 @@ export interface Quantity {
    */
   domain?: [number, number];
   /** where the domain came from, so a reader can tell a choice from a default */
-  domainFrom?: 'object' | 'specification' | 'control' | 'data';
+  domainFrom?: 'object' | 'specification' | 'control' | 'data' | 'type';
 }
 
 export interface SymbolTable {
@@ -328,6 +328,19 @@ function domainFor(
   spec: NonNullable<ModelObject['estimation']>,
   column: string
 ): { domain?: [number, number]; domainFrom?: Quantity['domainFrom'] } {
+  // WHAT IT IS CAN SETTLE ITS RANGE, and for one kind it always does.
+  //
+  // A binary variable takes 0 or 1. That is not a window anybody chooses, it is
+  // the quantity's own extent — so demanding a range for it is a category error,
+  // and it is the one that stopped a log-wage relationship in education and a
+  // female indicator from drawing at all. Declared as `binary`, or implied by an
+  // `indicator` term, which says so by its own definition.
+  const kind = spec.kinds?.[column];
+  const term = spec.terms?.[column];
+  if (kind === 'binary' || term?.op === 'indicator') {
+    return { domain: [0, 1], domainFrom: 'type' };
+  }
+
   const own = o.over?.x ?? o.over?.[column];
   if (own) return { domain: own as [number, number], domainFrom: 'object' };
   const stated = spec.over?.[column];

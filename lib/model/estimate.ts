@@ -994,6 +994,10 @@ export function expandEstimation(model: Model): Model {
           const window = (name: string): [number, number] | undefined => {
             const said = decl.over?.[name];
             if (said) return said as [number, number];
+            // A BINARY INPUT'S WINDOW IS ITS OWN EXTENT. Nobody states the range
+            // of an indicator, and demanding one is how a surface over education
+            // and a female dummy came to draw nothing.
+            if (decl.kinds?.[name] === 'binary' || decl.terms?.[name]?.op === 'indicator') return [0, 1];
             const col = block ? columnsOf(block)[name] : undefined;
             const finite = (col ?? []).filter((v) => Number.isFinite(v));
             return finite.length >= 2 ? [Math.min(...finite), Math.max(...finite)] : undefined;

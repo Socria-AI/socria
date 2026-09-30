@@ -264,6 +264,83 @@ console.log('\n=== what a change reaches ===');
     byInput.includes('wage_spec__response__at'), JSON.stringify(byInput));
 }
 
+// ═══ WHAT IT IS CAN SETTLE ITS RANGE ════════════════════════════════
+//
+// A binary variable takes 0 or 1. That is not a window anybody chooses, it is
+// the quantity's own extent — so demanding a range for it is a category error,
+// and it is the one that stopped a log-wage relationship in education and a
+// female indicator from drawing at all.
+console.log('\n=== a binary input needs no range ===');
+{
+  const logwage = (kinds) => ({
+    id: 'lw', title: 'log wage on education and gender', params: [
+      P('c0', 'intercept', 1, 0, 5, 0.1), P('c1', 'education coefficient', 0.08, 0, 0.5, 0.01),
+      P('c2', 'female coefficient', -0.2, -1, 1, 0.05), P('c3', 'interaction coefficient', 0.01, -0.1, 0.1, 0.005)],
+    objects: [{ id: 'spec', kind: 'specification', label: 'log wage on education and gender',
+      estimation: {
+        y: 'log_wage', x: ['educ', 'female', 'educ_female'],
+        terms: { log_wage: { op: 'log', of: 'wage' }, educ_female: { op: 'interact', with: ['educ', 'female'] } },
+        coefficients: { intercept: 'c0', educ: 'c1', female: 'c2', educ_female: 'c3' },
+        ...(kinds ? { kinds } : {}),
+        over: { educ: [8, 20] },
+      } }],
+  });
+
+  // WITHOUT the kind: a free input with no range, refused — correctly, because
+  // nothing has said what it is.
+  const bare = unpack(buildProposal(logwage(null), { at: 1 }).model);
+  ok('an undeclared binary is a free input with no range',
+    withoutDomain(symbolTable(bare)).some((q) => q.display === 'female'));
+  ok('  so nothing is drawn over an invented window',
+    !buildSpec(bare).primitives.some((p) => p.p === 'mesh'));
+
+  // WITH it: the range follows from what it is.
+  const m = unpack(buildProposal(logwage({ female: 'binary' }), { at: 1 }).model);
+  const female = symbolTable(m).by.get('spec__x1');
+  ok('a declared binary has a range without being given one',
+    JSON.stringify(female?.domain) === '[0,1]', JSON.stringify(female?.domain));
+  ok('  and says the range came from what it IS', female?.domainFrom === 'type', String(female?.domainFrom));
+  ok('  so nothing is waiting on a range', withoutDomain(symbolTable(m)).length === 0);
+  const spec = buildSpec(m);
+  const pts = mesh(spec);
+  ok('  and the surface draws', pts.length > 1000, String(pts.length));
+  ok('  over education and the indicator', span(pts, 'x') > 0 && span(pts, 'y') > 0);
+  // log_wage = 1 + 0.08·educ − 0.2·female + 0.01·educ·female
+  const at = pts.reduce((b, p) => (Math.abs(p.x - 16) + Math.abs(p.y - 1) < b.d ? { d: Math.abs(p.x - 16) + Math.abs(p.y - 1), p } : b), { d: Infinity, p: null }).p;
+  ok('  exactly: at educ 16, female 1 it is 2.24',
+    near(at.z, 1 + 0.08 * at.x - 0.2 * at.y + 0.01 * at.x * at.y, 1e-9), JSON.stringify(at));
+  ok('  and nothing reports a missing picture', !spec.notes.some((n) => n.problem),
+    JSON.stringify(spec.notes.filter((n) => n.problem)));
+
+  // AN INDICATOR TERM SAYS SO BY ITS OWN DEFINITION, with no `kinds` entry.
+  const implied = unpack(sanitizeModel({
+    id: 'imp', title: 'a group shift', params: [
+      P('d0', 'intercept', 1, 0, 5, 0.1), P('d1', 'shift', 2, 0, 5, 0.1)],
+    data: { s: { label: 'cases', columns: { y: [1, 2, 3, 4] }, index: { region: ['north', 'south', 'north', 'south'] } } },
+    objects: [{ id: 'sp', kind: 'specification', label: 'y on a region dummy',
+      estimation: { y: 'y', x: ['south'], terms: { south: { op: 'indicator', of: 'region', level: 'south' } },
+        coefficients: { intercept: 'd0', south: 'd1' } } }],
+  }));
+  const dummy = symbolTable(implied).by.get('sp__x0');
+  // AN INDICATOR BUILT FROM A CATEGORICAL COLUMN IS DERIVED FROM IT, not a free
+  // input of its own — which is the better answer than a range, and the same
+  // reasoning that makes exper² derived rather than a third variable. Its values
+  // follow from the column; nobody chooses them or a window for them.
+  ok('an indicator term is derived from the column it reads',
+    dummy?.supply === 'derived', `${dummy?.supply} ${JSON.stringify(dummy?.domain)}`);
+  ok('  so nothing asks for a range for it',
+    !withoutDomain(symbolTable(implied)).some((q) => q.id === 'sp__x0'),
+    JSON.stringify(withoutDomain(symbolTable(implied)).map((q) => q.display)));
+
+  // A FREE INPUT WITH A RANGE IS BOUND, so a slope that mentions another input
+  // is drawable at that input's cursor rather than reported as missing a value.
+  const slope = m.objects.find((o) => o.id === 'spec__response__d_educ');
+  ok('a slope that depends on another input is not reported as missing a value',
+    !buildObject(m, slope).problem, buildObject(m, slope).problem ?? '');
+  ok('  and the router agrees with the scope about what is bound',
+    route(m, slope, 'evaluate').status === 'runnable', route(m, slope, 'evaluate').status);
+}
+
 // ═══ the generic regressions the architecture is judged on ══════════
 //
 // None of these is econometrics. They are the shapes the distinction has to hold

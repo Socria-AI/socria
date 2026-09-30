@@ -1136,6 +1136,14 @@ A TRANSFORMED REGRESSOR IS A "term", NOT ANOTHER VARIABLE. This is the one most 
 
 The engine then knows exper² is a function of exper, draws the surface over educ and exper (TWO axes for THREE regressors), and computes ∂wage/∂exper = β₂ + 2β₃·exper by differentiating it — with no observations, because a derivative is a fact about the expression.
 
+A BINARY VARIABLE NEEDS NO RANGE, AND SAYING SO IS HOW IT GETS ONE. An indicator takes 0 or 1; which two values is not a modelling decision anybody makes, and "what range of female is worth looking at" is not a question. Say what kind it is:
+
+     "kinds": {"female": "binary", "educ": "continuous"}
+
+and the engine gives it 0 to 1 without being asked. Measured, before this existed: a log-wage relationship in education and a female dummy reported "female is a free input — it needs a range" and drew nothing at all.
+
+The kinds are "continuous", "binary", "categorical" and "count". Declare one whenever it is not continuous — it is also what lets the engine refuse an estimator honestly, since a binary OUTCOME is a whole class of model this engine does not fit. An "indicator" term needs no entry: its own definition says it is binary.
+
 THE OPERATIONS, each with an example of what it is built from:
 
   "op": "pow"        {"op": "pow", "of": "exper", "by": 2}            a quadratic, a cubic, a reciprocal power

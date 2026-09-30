@@ -490,6 +490,32 @@ export interface EstimationDecl {
    */
   terms?: Record<string, TermDecl>;
   /**
+   * WHAT KIND OF QUANTITY EACH VARIABLE IS.
+   *
+   * THE GAP THIS FILLS, found by a model that stopped drawing. A log-wage
+   * relationship in education and a female indicator came back saying
+   *
+   *   "female is a FREE INPUT here … it needs a range — say what values of
+   *    female are worth looking at"
+   *
+   * and drew nothing. The demand is correct for a continuous input and absurd
+   * for this one: an indicator takes two values, and which two is not a
+   * modelling decision anybody makes. A SURFACE OVER A RANGE OF FEMALE IS NOT A
+   * THING. Its range follows from what it IS.
+   *
+   * So a variable may say what kind it is, and the kind carries what follows
+   * from it. `binary` is 0 or 1 and needs no range. The others are declared
+   * because they constrain what may be done rather than what may be drawn — the
+   * econometrics digest's chapter on limited dependent variables turns entirely
+   * on an outcome being binary, and an engine that cannot represent that cannot
+   * refuse an estimator honestly either.
+   *
+   * NOT GUESSED FROM A NAME. A column called `female` is not assumed to be an
+   * indicator, because the next one called `female_share` is not. An `indicator`
+   * TERM implies binary without being told, because its own definition says so.
+   */
+  kinds?: Record<string, 'continuous' | 'binary' | 'categorical' | 'count'>;
+  /**
    * Which block of Model.data holds the columns — WHEN THERE IS ONE.
    *
    * OPTIONAL, AND THAT IS THE POINT. A specification is a statement about what
@@ -1198,10 +1224,22 @@ export function sanitizeObject(raw: unknown, drop?: (what: string) => void): Mod
     // it here is what used to make an unfitted model inexpressible.
     if (yCol && xs.length) {
       const lags = num(est.lags);
+      const KINDS = ['continuous', 'binary', 'categorical', 'count'] as const;
+      const kinds: Record<string, (typeof KINDS)[number]> = {};
+      const rawKinds = est.kinds as Record<string, unknown> | undefined;
+      if (rawKinds && typeof rawKinds === 'object') {
+        for (const [k, v] of Object.entries(rawKinds).slice(0, 32)) {
+          const key = text(k, 48);
+          if (ID.test(key) && KINDS.includes(v as (typeof KINDS)[number])) {
+            kinds[key] = v as (typeof KINDS)[number];
+          }
+        }
+      }
       out.estimation = {
         y: yCol,
         x: xs,
         ...(Object.keys(terms).length ? { terms } : {}),
+        ...(Object.keys(kinds).length ? { kinds } : {}),
         ...(ID.test(dataKey2) ? { data: dataKey2 } : {}),
         // An unrecognised method is DROPPED, not guessed at: the router then
         // reports the choice as open, which is the honest state.

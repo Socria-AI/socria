@@ -59,15 +59,30 @@ export function Understand({
   const about = useMemo(() => (selected ? inspectObject(model, selected) : null), [model, selected]);
   const why = useMemo(() => (selected ? whyOf(model, selected) : []), [model, selected]);
 
-  // Only "what is happening now" is open to begin with. A model is deep and a
-  // reader arrives wanting one thing.
+  // CLOSED BY DEFAULT, AND THE WHOLE PANEL — not just its sections.
+  //
+  // The figure is what somebody came to look at. A permanently open panel eats
+  // the picture in a narrow pane, which is how a panel meant to make a model
+  // legible ends up hiding it. So the resting state is one line and a row of
+  // views; everything else is a choice.
+  const [shown, setShown] = useState(false);
   const [open, setOpen] = useState<Record<string, boolean>>({ state: true });
   const toggle = (id: string) => setOpen((o) => ({ ...o, [id]: !o[id] }));
 
   return (
-    <section className="und" aria-label="Understand this model">
-      <p className="und-what">{inspection.what}</p>
-      <p className="und-ran">{transparencyLine(model)}</p>
+    <section className={`und${shown ? ' is-shown' : ''}`} aria-label="Understand this model">
+      <div className="und-bar">
+        <p className="und-what">{inspection.what}</p>
+        <button
+          type="button"
+          className="und-act und-toggle"
+          aria-expanded={shown}
+          onClick={() => setShown((v) => !v)}
+        >
+          {shown ? 'Less' : 'Understand'}
+        </button>
+      </div>
+      {!shown ? null : <p className="und-ran">{transparencyLine(model)}</p>}
 
       {/* ── WHAT ELSE YOU CAN LOOK AT ──────────────────────────────
           Derived from the model's structure and what actually computed, so this
@@ -97,6 +112,8 @@ export function Understand({
         ) : null}
       </div>
 
+      {!shown ? null : (
+      <>
       {/* ── WHAT IS SELECTED, AND WHY IT IS WHAT IT IS ─────────────
           The chain comes from the dependency graph. A reader can follow it back
           to the things somebody supplied. */}
@@ -199,6 +216,8 @@ export function Understand({
           ) : null}
         </div>
       ))}
+      </>
+      )}
     </section>
   );
 }

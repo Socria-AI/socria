@@ -617,8 +617,18 @@ export function ModelView({
     [model, onModel]
   );
 
+  // ── THE PICTURE AND THE UNDERSTAND LAYER, STACKED ──────────────────
+  //
+  // A WRAPPER, AND IT HAD TO BE ONE. The hole this is mounted in
+  // (.lg-viz-surface) is a ROW flex expecting a single child, so returning the
+  // surface and the panel as siblings put them side by side: the panel took its
+  // content width, the surface was squeezed to nothing, and the 3D view
+  // disappeared. Reported, and correctly — the picture is the thing.
+  //
+  // So they stack, the surface takes the room, and the panel is a strip at the
+  // bottom that only opens when somebody opens it.
   return (
-    <>
+    <div className="eng-stack">
     <Surface3D
       title={model.title}
       surface={`m-${model.id}`}
@@ -640,13 +650,14 @@ export function ModelView({
       render={render}
       fill={fill}
     />
-    {/* THE UNDERSTAND LAYER, beside the picture rather than inside it.
+    {/* THE UNDERSTAND LAYER, beneath the picture rather than inside it.
         The picture is one view of the model; so is this. It adds no renderer and
         knows no domain — it is the surface of lib/model/views.ts and
         lib/model/inspect.ts, and its whole job is to put what the model already
-        knows within reach. */}
+        knows within reach. Closed by default: the figure is what somebody came
+        to look at. */}
     <Understand model={model} onSelect={select} onAsk={onAsk} />
-    </>
+    </div>
   );
 }
 
