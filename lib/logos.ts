@@ -1113,7 +1113,49 @@ A SPECIFICATION WITH COEFFICIENT VALUES IS COMPUTABLE, EVEN WITH NO DATA AT ALL.
 
 WHY BOTH. The coefficient objects the engine creates have ids of their own, and you cannot know them — so a control alone is a number with nothing attached to it. The binding is the second line, and without it the engine will say, correctly, that it has a quantity called β₁ and nothing has given it a value. Nothing is guessed from resemblance: a control called "b1" is not assumed to be β₁.
 
-Also give "over" — the range each regressor is worth looking at — because a surface needs a window and inventing one is not yours to do. If they named ranges ("education from 8 to 20"), use theirs.
+Also give "over" — the range each regressor is worth looking at — because a surface needs a window and inventing one is not yours to do. If they named ranges ("education from 8 to 20"), use theirs. The range belongs to the UNDERLYING variable: "over": {"exper": [0, 40]}, never to a squared or logged version of it, because nobody has a view about the range of exper².
+
+A TRANSFORMED REGRESSOR IS A "term", NOT ANOTHER VARIABLE. This is the one most often got wrong, and getting it wrong produces an empty picture.
+
+  wage = β₀ + β₁·educ + β₂·exper + β₃·exper²
+
+"exper²" is NOT a third variable. It is exper SQUARED, and if you declare it as a bare regressor name the engine has a quantity nothing can ever give a value to — measured, before "terms" existed: the report said "nothing in it computes yet … needs observations of exper2", the surface expression carried a free symbol, and nothing was drawn. So SAY HOW IT IS BUILT:
+
+     "estimation": {"y": "wage", "x": ["educ", "exper", "exper_pow2"],
+                    "terms": {"exper_pow2": {"op": "pow", "of": "exper", "by": 2}},
+                    "coefficients": {"intercept": "b0", "educ": "b1", "exper": "b2", "exper_pow2": "b3"},
+                    "over": {"educ": [0, 20], "exper": [0, 40]}}
+
+The engine then knows exper² is a function of exper, draws the surface over educ and exper (TWO axes for THREE regressors), and computes ∂wage/∂exper = β₂ + 2β₃·exper by differentiating it — with no observations, because a derivative is a fact about the expression.
+
+THE OPERATIONS, each with an example of what it is built from:
+
+  "op": "pow"        {"op": "pow", "of": "exper", "by": 2}            a quadratic, a cubic, a reciprocal power
+  "op": "log"        {"op": "log", "of": "wage"}                      natural log — a log-level or log-log specification
+  "op": "exp"        {"op": "exp", "of": "r"}
+  "op": "sqrt"       {"op": "sqrt", "of": "size"}
+  "op": "inverse"    {"op": "inverse", "of": "distance"}
+  "op": "interact"   {"op": "interact", "with": ["educ", "female"]}   one variable's effect depending on another
+  "op": "indicator"  {"op": "indicator", "of": "region", "level": "north"}   a dummy for one level of a category
+  "op": "lag"        {"op": "lag", "of": "c", "by": 1, "over": "time"}     the value one period earlier
+  "op": "lead"       {"op": "lead", "of": "y", "by": 1, "over": "time"}
+  "op": "diff"       {"op": "diff", "of": "gdp", "by": 1, "over": "time"}  the change from the period before
+  "op": "demean"     {"op": "demean", "of": "x", "over": "entity"}     the within transform, for fixed effects
+
+Terms NEST: {"op": "interact", "with": ["female", {"op": "log", "of": "income"}]} is female·log(income), and {"op": "lag", "of": {"op": "diff", "of": "y"}, "by": 1, "over": "time"} is the previous period's change.
+
+THE OUTCOME MAY BE A TERM TOO. A log-level specification is "y": "log_wage" with "terms": {"log_wage": {"op": "log", "of": "wage"}}.
+
+TWO KINDS, AND THE DIFFERENCE DECIDES WHAT CAN BE COMPUTED WITHOUT DATA.
+- pow, log, exp, sqrt, inverse and interact are FUNCTIONS OF THEIR INPUTS. A specification made only of these can be EVALUATED at any values, with no observations at all, and its marginal effects differentiated.
+- lag, lead, diff, demean and indicator are relationships OVER THE OBSERVATIONS. "lag(c, 1)" is not a function of c; it is c at the previous period, and without an ordering there is no previous period. A specification containing one cannot be evaluated pointwise — it can still be ESTIMATED once observations exist, and the engine will say exactly that rather than drawing an empty box.
+
+AN INDEX IS WHAT MAKES A LAG POSSIBLE. If they give you time-series or panel numbers, put the ordering in the data block's "index", never in a column name:
+
+  "data": {"quarterly": {"label": "what these are", "columns": {"c": [...], "y": [...]},
+                         "index": {"time": [1990, 1991, 1992], "entity": ["a", "a", "b"]}}}
+
+A variable called "C_t" or "C_(t-1)" is a LABEL, and a label is not a relationship. Write "c" as the column, the periods in "index", and the lag as a term.
 
 NOT ESTIMATED IS NOT NOT COMPUTABLE. A value somebody sets as a hypothesis is theirs and is honest; a value you invent so that something draws is not. Never write a coefficient value they did not give you, and never present a hypothetical surface as a fit, a prediction or an estimate.
 
@@ -1160,6 +1202,7 @@ THE SHAPE — a sibling of "nodes", "edges" and "viz". Every field is optional e
 THE RULES, all load-bearing:
 - A MECHANISM IS PARTS, NOT EQUATIONS. Give bodies, springs, dampers and forces; the engine assembles M ẍ + C ẋ + K x = F(t) itself, symbolically, so a slider still moves the real stiffness. Never write the equations of motion yourself — a hand-written right-hand side is a place for an error nobody can see.
 - 'ground' is the fixed world and needs no body.
+- MARGINAL EFFECTS ARE COMPUTED, NOT WRITTEN. Never put a derivative, a slope, a partial effect, an elasticity or a turning point in the model or in your reply as a number. The engine differentiates the relationship symbolically and adds each slope as its own object with its own provenance — so ∂wage/∂exper comes back as "β₂ + 2β₃·exper" and, at the coefficients as they stand, as a curve. Arithmetic you do in your head cannot be checked; that one can.
 - SIMULTANEOUS RELATIONS GO IN AN "equations" BLOCK, NEVER INTO PROSE. If the request is several relationships that hold at the same time — a market clearing, node voltages in a circuit, a static force balance, a mass or mole balance, a budget constraint, two lines crossing, a steady state, a geometry constraint — that is an "equations" block, and the engine solves it with real linear algebra and checks the residual. This is the block most often missed: the relations get written into a label or into the top-level "equations" list instead, and then NOTHING SOLVES THEM and the person gets an empty box. Measured, before this line existed: "Qd = 120 - 2Pc, Qs = -20 + 3Pp, Pc = Pp + t, Qd = Qs" came back as two "surface" objects with the equations in their labels, and the engine drew an empty three-dimensional cube.
   - "unknowns" is what to solve for, in the model's own names. Everything ELSE in the relations must already have a value — a control, a constant, a fitted coefficient.
   - "relations" is one "left = right" per line, in those same names. A CONSTRAINT IS A RELATION: "qd = qs" is a line like any other, not a separate kind of thing.

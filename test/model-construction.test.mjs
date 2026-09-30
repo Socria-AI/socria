@@ -859,9 +859,13 @@ console.log('\n=== 18. silence is impossible ===');
       defs: { z: 'x^2 - y^2' }, over: { x: [-2, 2], y: [-2, 2] },
     })),
   });
+  // OVER THE EXPANDED MODEL, because that is what buildModel compiles. Thirty
+  // surfaces over x and y now also carry their sixty slopes — marginal effects
+  // are expanded like any other declaration — so the count to compare against is
+  // the unpacked one, not the stored one.
   const lots = buildModel(many);
-  ok('every object is accounted for, drawn or not', lots.length === many.objects.length,
-    `${lots.length} of ${many.objects.length}`);
+  ok('every object is accounted for, drawn or not', lots.length === unpack(many).objects.length,
+    `${lots.length} of ${unpack(many).objects.length}`);
   const cut = lots.filter((b) => b.problem && /budget/.test(b.problem));
   ok('  and anything the budget cut off says so', cut.length === 0 || cut.every((b) => /in the model/.test(b.problem)));
 }

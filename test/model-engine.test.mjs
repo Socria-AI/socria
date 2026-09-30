@@ -341,7 +341,12 @@ console.log('\n=== manipulation is local, and it says what it reached ===');
   const m = sanitizeModel(bivariateGaussian());
   const spec = buildSpec(m);
   const state = modelStateFrom(m, spec);
-  ok('the conversation is handed every object', state.entities.length === m.objects.length);
+  // OVER THE EXPANDED MODEL. The entity list is what the conversation reads, and
+  // it is built from the unpacked model — so a surface's differentiated slopes
+  // are in it, which is the point: a reader should be able to ask about
+  // ∂f/∂x. The stored model does not carry them.
+  ok('the conversation is handed every object', state.entities.length === unpack(m).objects.length,
+    `${state.entities.length} vs ${unpack(m).objects.length}`);
   ok('  with what each one is', state.entities[0].meaning.length > 20);
   ok('  and how it was actually produced', state.entities[0].relations.some((r) => /How it was produced/.test(r)));
   ok('  and where its numbers came from', state.entities[0].relations.some((r) => /Where it came from/.test(r)));

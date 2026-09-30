@@ -32,6 +32,7 @@
  * product promise, and a promise needs a field rather than a convention.
  */
 import { NAME, SLUG, collidesWith } from './ids';
+import type { TermDecl, TermOp } from './terms';
 
 export type Origin =
   /** the person typed it, dragged it, or set it */
@@ -450,8 +451,44 @@ export interface EstimationDecl {
   method?: 'ols' | 'ols-fe' | 'ols-lag';
   /** the column being explained */
   y: string;
-  /** the columns explaining it, in order */
+  /** the columns explaining it, in order. A name here may be a TERM — see `terms`. */
   x: string[];
+  /**
+   * HOW A REGRESSOR IS BUILT, when it is not simply a column of the data.
+   *
+   * THE HOLE THIS FILLS, measured exactly. `x` was a list of column names, so
+   * the only way to write `wage = β₀ + β₁·educ + β₂·exper + β₃·exper²` was to
+   * declare a third, independent regressor called `exper2` — and nothing could
+   * ever bind it, because there is no such quantity. The engine then asked for
+   * observations of `exper2`, the response surface carried a free symbol, and
+   * the picture was empty:
+   *
+   *   says             : "nothing in it computes yet … needs observations —
+   *                       wage, educ, exper, exper2 for each case"
+   *   response surface : b0 + (b1) * x + (b2) * y + (b3) * exper2
+   *   primitives drawn : 0
+   *
+   * `exper²` is not a variable. It is a TRANSFORMATION of `exper`, and this is
+   * where that is said:
+   *
+   *   x: ['educ', 'exper', 'exper_pow2'],
+   *   terms: { exper_pow2: { op: 'pow', of: 'exper', by: 2 } }
+   *
+   * ADDITIVE ON PURPOSE. A regressor with no entry here is a plain column,
+   * exactly as before, so nothing that worked stops working — and the
+   * coefficient binding stays keyed on the regressor's own name, which is the
+   * convention the binding fix established.
+   *
+   * The outcome may be a term too (`terms: { log_wage: … }` with `y:
+   * 'log_wage'`), which is how a log-level specification is stated.
+   *
+   * See lib/model/terms.ts for the operations and, more importantly, for the
+   * distinction that decides what can be computed without data: a POINTWISE
+   * term is an expression and needs nothing but its inputs; a term OVER THE
+   * SAMPLE — a lag, a difference, a within-group mean — is a relationship
+   * between observations and cannot exist without them and an index.
+   */
+  terms?: Record<string, TermDecl>;
   /**
    * Which block of Model.data holds the columns — WHEN THERE IS ONE.
    *
@@ -631,7 +668,53 @@ export interface DataBlock {
    * unless a model says to.
    */
   columns?: Record<string, number[]>;
+  /**
+   * THE INDEX COLUMNS: what makes an observation locatable.
+   *
+   * A LAG IS NOT A NAME, IT IS A POSITION. The digest is explicit from chapter
+   * 10 on: "Time-indexed variables and lag operators must be structural, not
+   * string hacks", and chapters 13–14 add entity indexing on top. A column of
+   * numbers with no ordering has no previous value, so `lag(c, 1)` over it is
+   * not a quantity that is missing a number — it is a relationship with nothing
+   * to hold between.
+   *
+   * Keyed by DIMENSION rather than by role, so `time`, `entity`, `firm`,
+   * `region`, `cohort` and `wave` are all the same kind of thing and a term
+   * names which one it runs over. Values may be strings, because an entity is
+   * usually a name and a period is often a label.
+   *
+   *   index: { time: [1990, 1991, 1992, …], entity: ['a', 'a', 'a', 'b', …] }
+   */
+  index?: Record<string, (number | string)[]>;
   units?: string;
+}
+
+/** The coordinate letters a sampler binds for a shape, whatever the model calls its own. */
+export const COORDINATES: readonly string[] = ['x', 'y', 'z', 'u', 'v', 's', 'w', 't'];
+
+/**
+ * THE NAMES A RELATIONSHIP IS SAMPLED OVER, taken from the model where it says.
+ *
+ * `x`, `y` and `z` are COORDINATES, and they were also the only names an
+ * expression could use — so `Q = 100 − 2P` over a range of P did not compile and
+ * the author had to rename their own variable to `x` before the engine would
+ * evaluate it. A display name must not become an execution identity, and neither
+ * must a coordinate: the model's own name for a quantity is the name its
+ * mathematics is written in.
+ *
+ * `over` is where a model states its windows, so it is also where it states its
+ * variables: `over: {p: [0, 50]}` is a curve in `p`. Only when the model names
+ * EXACTLY as many as the shape needs, because a partial naming is ambiguous about
+ * which axis is which and guessing the order is how a picture comes out
+ * transposed.
+ *
+ * Lives here, in the leaf, because the ROUTER and the COMPILER both have to agree
+ * about it — and every time those two have had their own copy of a rule, they
+ * have disagreed and the disagreement has been silent.
+ */
+export function sampledOver(o: ModelObject, want: number, fallback: readonly string[]): string[] {
+  const named = Object.keys(o.over ?? {}).filter((k) => !COORDINATES.includes(k));
+  return named.length === want ? named : [...fallback];
 }
 
 /** What one manipulation did, so the conversation can say it without guessing. */
@@ -1019,6 +1102,61 @@ export function sanitizeObject(raw: unknown, drop?: (what: string) => void): Mod
   if (est && typeof est === 'object') {
     const yCol = text(est.y, 40);
     const xs = Array.isArray(est.x) ? capped(est.x.map((c) => text(c, 40)).filter(Boolean), MODEL_CAPS.regressors, `regressors in ${id}`, drop) : [];
+
+    // ── HOW EACH REGRESSOR IS BUILT ─────────────────────────────────
+    //
+    // Recursive, and bounded: a term's source may be another term — `lag` of a
+    // `diff`, an `interact` of a `log` with an indicator — which is what the
+    // digest's chapters 6, 7, 11, 13 and 14 actually ask for. The depth cap is
+    // there because this arrives from a language model and a self-referential
+    // structure would otherwise spin.
+    const TERM_OPS: readonly TermOp[] = [
+      'ref', 'pow', 'log', 'exp', 'sqrt', 'inverse', 'interact', 'lag', 'lead', 'diff', 'demean', 'indicator',
+    ];
+    const termOf = (raw: unknown, depth = 0): TermDecl | null => {
+      if (depth > 4 || !raw || typeof raw !== 'object') return null;
+      const q = raw as Record<string, unknown>;
+      const op = TERM_OPS.includes(q.op as TermOp) ? (q.op as TermOp) : null;
+      if (!op) return null;
+      const src = (v: unknown): string | TermDecl | null => {
+        const nm = text(v, 48);
+        if (nm && ID.test(nm)) return nm;
+        return termOf(v, depth + 1);
+      };
+      const of = q.of === undefined ? null : src(q.of);
+      const withList = Array.isArray(q.with)
+        ? (q.with.map((v) => src(v)).filter(Boolean) as (string | TermDecl)[]).slice(0, 4)
+        : [];
+      // A term with nothing to act on is not a term. Refused here rather than
+      // admitted and reported empty later.
+      if (op === 'interact' ? withList.length < 2 : !of) return null;
+      const by = num(q.by);
+      const over = text(q.over, 40);
+      const level = text(q.level, 40);
+      return {
+        op,
+        ...(of ? { of } : {}),
+        ...(withList.length ? { with: withList } : {}),
+        ...(by !== null ? { by } : {}),
+        ...(over && ID.test(over) ? { over } : {}),
+        ...(level ? { level } : {}),
+        ...(text(q.label, 60) ? { label: text(q.label, 60) } : {}),
+      };
+    };
+    const terms: Record<string, TermDecl> = {};
+    if (est.terms && typeof est.terms === 'object') {
+      for (const [k, v] of capped(
+        Object.entries(est.terms as Record<string, unknown>),
+        MODEL_CAPS.regressors + 4,
+        `terms in ${id}`,
+        drop
+      )) {
+        const key = text(k, 48);
+        if (!ID.test(key)) continue;
+        const t = termOf(v);
+        if (t) terms[key] = t;
+      }
+    }
     const dataKey2 = text(est.data, 48);
     const method = est.method;
     // A SPECIFICATION IS ENOUGH: an outcome and at least one thing explaining
@@ -1031,6 +1169,7 @@ export function sanitizeObject(raw: unknown, drop?: (what: string) => void): Mod
       out.estimation = {
         y: yCol,
         x: xs,
+        ...(Object.keys(terms).length ? { terms } : {}),
         ...(ID.test(dataKey2) ? { data: dataKey2 } : {}),
         // An unrecognised method is DROPPED, not guessed at: the router then
         // reports the choice as open, which is the honest state.
@@ -1317,6 +1456,30 @@ export function sanitizeModel(raw: unknown): Model | null {
           for (const k of keys) columns[k] = columns[k].slice(0, shortest);
           block.columns = columns;
         }
+      }
+      // THE INDEX COLUMNS, which make an observation locatable rather than
+      // merely present. Strings are kept, because an entity is usually a name.
+      // Truncated to the same length as the data columns, for the same reason:
+      // a lag taken along an index that is longer than the data pairs the wrong
+      // rows, and a wrong pairing here is a wrong answer with decimals.
+      if (b.index && typeof b.index === 'object' && !Array.isArray(b.index)) {
+        const index: Record<string, (number | string)[]> = {};
+        const rows = block.columns ? Object.values(block.columns)[0]?.length : undefined;
+        for (const [name, v] of capped(
+          Object.entries(b.index as Record<string, unknown>),
+          6,
+          `index dimensions in ${k}`,
+          drop
+        )) {
+          const key = text(name, 40);
+          if (!/^[a-z][a-z0-9_]{0,39}$/i.test(key) || !Array.isArray(v)) continue;
+          const col = v
+            .map((q) => (typeof q === 'number' && Number.isFinite(q) ? q : text(q, 40)))
+            .filter((q) => q !== '')
+            .slice(0, 20_000);
+          if (col.length) index[key] = rows === undefined ? col : col.slice(0, rows);
+        }
+        if (Object.keys(index).length) block.index = index;
       }
       for (const key of ['xs', 'ys', 't', 'v'] as const) if (!block[key]) delete block[key];
       if (Object.keys(block).length) blocks[k] = block;

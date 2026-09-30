@@ -35,6 +35,7 @@
 //
 // PURE.
 
+import { expandMarginals } from './derive';
 import { expandEquations } from './equations';
 import { expandEstimation } from './estimate';
 import { expandGravity } from './gravity';
@@ -52,5 +53,9 @@ export function unpack(model: Model): Model {
   // solved system's knowns come from the symbol table, so everything that
   // produces a valued quantity — a fitted coefficient, a control — has to be
   // in place before the solve reads them.
-  return expandEquations(expandEstimation(expandGravity(expandMechanism(model))));
+  // `equations` runs last of the SOLVERS' expanders; `marginals` runs after all
+  // of them, because a slope is differentiated from a relationship that one of
+  // them wrote — the response surface a specification produces does not exist
+  // until expandEstimation has run.
+  return expandMarginals(expandEquations(expandEstimation(expandGravity(expandMechanism(model)))));
 }

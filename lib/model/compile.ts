@@ -41,13 +41,14 @@ import {
   type Sampled,
 } from './sample';
 import { LIMITS, type P3, type Primitive } from './primitives';
-import type { Fidelity, Model, ModelObject } from './schema';
+import { sampledOver, type Fidelity, type Model, type ModelObject } from './schema';
 import { runFor, seriesOf, stateAt } from './system';
 import { operationsOn, route } from './solve';
-import { bindings, known, symbolTable } from './symbols';
+import { bindings, known, symbolTable, unbound } from './symbols';
 import { estimate } from './estimate';
 import { restOf, statesOf } from './mechanism';
 import { figureFor, solutionFor, type Figure } from './equations';
+import { namesIn } from './deps';
 import { unpack } from './unpack';
 
 /** What compiling one object produced, and what may be said about it. */
@@ -234,6 +235,39 @@ export function buildObject(model: Model, o: ModelObject, opts?: { detail?: numb
         what.push(said);
       }
     }
+    // ── BUT WHAT IT PRODUCED COUNTS AS WHAT IT DID ──────────────────
+    //
+    // A SPECIFICATION WITH NO DATA IS NOT A MODEL THAT DOES NOT COMPUTE.
+    //
+    // `wage = β₀ + β₁·educ + β₂·exper + β₃·exper²` with the person's own
+    // coefficients has exactly one blocked operation — ESTIMATE, which needs
+    // observations — and the response surface expanded out of it EVALUATES
+    // perfectly. The guard reported the blocked estimate on the carrier anyway,
+    // so the picture carried "not computed — it needs observations" underneath a
+    // surface that had just been computed from 2401 evaluated points.
+    //
+    // The rule the econometrics digest states plainly: a model must not globally
+    // become "not computable" because one possible operation requires data. So an
+    // object whose own derived parts RUN is reported by what they did; the
+    // operation that is still blocked is named in the note rather than as the
+    // reason the picture is empty, and `askFor(model, 'estimate')` still answers
+    // blocked, which is where that question belongs.
+    const mine = model.objects.filter(
+      (x) => x.id !== o.id && ['of', 'spec', 'mech', 'gravity'].some((k) => x.meta?.[k] === o.id)
+    );
+    const produced = mine.filter((x) => operationsOn(model, x).some((v) => v.routed.status === 'runnable'));
+    if (produced.length) {
+      return {
+        of: o.id,
+        primitives: [],
+        note:
+          `${produced.length === 1 ? 'what it says is' : 'what it says is'} drawn as ${produced
+            .map((x) => x.label)
+            .join(', ')}. Still waiting on ${what.join('; ')}`,
+        fidelity: o.fidelity ?? 'model-derived',
+      };
+    }
+
     // FRAMED, not just listed. The router's `what` is precise — "dq/dt", "a
     // stiffness for k1" — and on its own it reads as a label rather than as an
     // explanation of why the picture is empty. The frame says what happened;
@@ -258,6 +292,28 @@ export function buildObject(model: Model, o: ModelObject, opts?: { detail?: numb
           ? `${o.label} = ${Number(value.toPrecision(6))}${o.units ? ` ${o.units}` : ''} — solved, and marked on the figure its system draws`
           : `${o.label} — an unknown of this system; the relations as written do not determine it`,
       fidelity: o.fidelity ?? 'conceptual',
+    };
+  }
+
+  // ── A CONSTANT SLOPE IS A NUMBER TO READ ───────────────────────────
+  //
+  // ∂wage/∂educ in a model linear in education IS β₁, everywhere. There is no
+  // curve to draw and no gap to report: drawing a flat line would be true and
+  // would hide the very thing that makes it worth saying — that a LINEAR term has
+  // a constant marginal effect and a squared one does not. Reported with its
+  // value, evaluated from the coefficients as they currently stand, so moving β₁
+  // moves this number.
+  if (o.meta?.role === 'marginal' && o.meta?.constant === true) {
+    const expr = typeof o.meta.expr === 'string' ? (o.meta.expr as string) : (o.definition ?? '');
+    const e = expr ? compileExpr(expr, names(model, ['x', 'y', 'z'])) : null;
+    const at = e ? e.eval(scope) : NaN;
+    return {
+      of: o.id,
+      primitives: [],
+      note: Number.isFinite(at)
+        ? `${o.label} = ${Number(at.toPrecision(6))}${o.units ? ` ${o.units}` : ''} — constant: ${expr}, differentiated symbolically and the same at every value`
+        : `${o.label} = ${expr} — constant, and not a number yet: ${unbound(symbolTable(model), namesIn(expr)).map((q) => q.display).join(', ') || 'something it names has no value'}`,
+      fidelity: o.fidelity ?? 'model-derived',
     };
   }
 
@@ -305,11 +361,12 @@ export function buildObject(model: Model, o: ModelObject, opts?: { detail?: numb
       // what the router already promised.
       const def = o.definition ?? o.defs?.z;
       if (!def) return NOTHING(o, 'a surface needs a definition (z = …), parametric components or data');
-      const e = compileExpr(def, names(model, ['x', 'y']));
+      const [vx, vy] = sampledOver(o, 2, ['x', 'y']);
+      const e = compileExpr(def, names(model, [vx, vy, 'x', 'y']));
       if (!e) return NOTHING(o, `“${def}” would not compile`);
-      const xr = rangeOf(model, o, 'x', [-3, 3]);
-      const yr = rangeOf(model, o, 'y', [-3, 3]);
-      const out = surfaceMesh(o.id, (x, y) => e.eval({ ...scope, x, y }), xr, yr, detail, {
+      const xr = rangeOf(model, o, vx, [-3, 3]);
+      const yr = rangeOf(model, o, vy, [-3, 3]);
+      const out = surfaceMesh(o.id, (x, y) => e.eval({ ...scope, x, y, [vx]: x, [vy]: y }), xr, yr, detail, {
         layer,
         tone: 'accent',
       });
@@ -338,7 +395,7 @@ export function buildObject(model: Model, o: ModelObject, opts?: { detail?: numb
     case 'curve':
     case 'line':
     case 'ray': {
-      const xr = rangeOf(model, o, 'x', [-3, 3]);
+      const xr = rangeOf(model, o, sampledOver(o, 1, ['x'])[0], [-3, 3]);
       if (o.defs?.px && o.defs?.py) {
         const ex = compileExpr(o.defs.px, names(model, ['s']));
         const ey = compileExpr(o.defs.py, names(model, ['s']));
@@ -386,13 +443,17 @@ export function buildObject(model: Model, o: ModelObject, opts?: { detail?: numb
       // is one regressor rather than two.
       const def = o.definition ?? o.defs?.f ?? o.defs?.z;
       if (!def) return NOTHING(o, 'a curve needs a definition (y = …), parametric components or data');
-      const e = compileExpr(def, names(model, ['x']));
+      const [vx] = sampledOver(o, 1, ['x']);
+      const e = compileExpr(def, names(model, [vx, 'x']));
       if (!e) return NOTHING(o, `“${def}” would not compile`);
       const n = Math.min(LIMITS.runPoints, detail * 8);
       const at: P3[] = [];
       for (let i = 0; i <= n; i++) {
         const x = xr.min + ((xr.max - xr.min) * i) / n;
-        const y = e.eval({ ...scope, x });
+        // Bound under BOTH the model's own name and the coordinate, so an
+        // expression written either way evaluates and neither becomes the only
+        // legal spelling.
+        const y = e.eval({ ...scope, x, [vx]: x });
         if (Number.isFinite(y)) at.push({ x, y, z: 0 });
       }
       if (at.length < 2) {

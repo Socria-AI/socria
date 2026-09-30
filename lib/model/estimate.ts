@@ -34,6 +34,17 @@
 
 import type { DataBlock, EstimationDecl, Model, ModelObject, Provenance } from './schema';
 import type { Missing } from './system';
+import {
+  basesOf,
+  isPointwise,
+  termColumn,
+  termExpr,
+  termLabel,
+  termNeeds,
+  type Sample,
+  type TermDecl,
+} from './terms';
+import { parse, print, rename, substitute, type Expr } from './expr';
 
 /** Cap on what one fit may chew through, because a slider is attached. */
 export const FIT_CAPS = { rows: 20_000, terms: 24 } as const;
@@ -85,6 +96,12 @@ export interface Fit {
 
 export const UNSUPPORTED = [
   'instrumental variables and two-stage least squares',
+  // NAMED BECAUSE THE BOOK HAS A CHAPTER ON IT AND THE ENGINE HAS NOTHING.
+  // A whole class of outcome — binary, censored, truncated, selected — for which
+  // least squares is the wrong shape, and the list said nothing about it. An
+  // honesty list that omits a class is worse than no list: it reads as coverage.
+  'logit, probit and other probability-link models for a binary outcome',
+  'Tobit and other censored or truncated outcome models, and sample-selection corrections',
   'clustered, Newey–West or Driscoll–Kraay standard errors',
   'random effects and GLS',
   'ARIMA, unit-root and cointegration testing',
@@ -336,6 +353,56 @@ export interface MethodChoice {
 
 // ── reading columns out of a data block ─────────────────────────────
 
+/**
+ * Every regressor and outcome that is a TERM, resolved into a column.
+ *
+ * WHERE THIS SITS AND WHY. Before the missing-column checks, so that the rest of
+ * the estimator sees a plain table and nothing downstream has to know a
+ * transformation was involved — the same move `unpack` makes for declarations.
+ * A term that cannot be built is reported as missing structure with the term's
+ * OWN reason ("these observations carry no time index, so there is no ordering
+ * along which to take c(−1)"), which is a different thing from a column being
+ * absent and reads like it.
+ */
+function resolveTerms(
+  decl: NonNullable<ModelObject['estimation']>,
+  block: DataBlock | undefined,
+  cols: Record<string, number[]>
+): Missing[] {
+  const terms = decl.terms;
+  if (!terms || !block) return [];
+  const base = Object.values(cols)[0]?.length ?? 0;
+  if (!base) return [];
+  const sample: Sample = {
+    columns: cols,
+    ...(block.index ? { index: block.index } : {}),
+    n: base,
+  };
+  const out: Missing[] = [];
+  for (const name of [decl.y, ...decl.x]) {
+    const t = terms[name];
+    if (!t) continue;
+    // A term whose name is also a column in the data: the DATA WINS, because
+    // somebody supplied the built column and overruling it with our own
+    // arithmetic would be quietly substituting a different variable.
+    if (cols[name]?.length) continue;
+    const built = termColumn(t, sample);
+    if (!built.ok) {
+      out.push({
+        what: `${termLabel(t)}`,
+        because: `“${name}” is ${termLabel(t)}, and ${built.why}`,
+        unlocks: 'the fit: a regressor that cannot be built is not a column that is merely absent',
+      });
+      continue;
+    }
+    // `null` becomes NaN so the estimator's own row-dropping handles it and
+    // says how many rows went — a lag's first observation has no predecessor,
+    // and a zero there would be an observation nobody made.
+    cols[name] = built.built.values.map((v) => (v === null ? NaN : v));
+  }
+  return out;
+}
+
 function columnsOf(block: DataBlock | undefined): Record<string, number[]> {
   const out: Record<string, number[]> = {};
   if (!block) return out;
@@ -373,6 +440,10 @@ export function estimate(
   const block = decl.data ? model.data?.[decl.data] : undefined;
   const cols = columnsOf(block);
   const missing: Missing[] = [];
+  // Terms first: `exper_pow2` is not a column somebody forgot, it is `exper`
+  // squared, and it exists as soon as `exper` does.
+  missing.push(...resolveTerms(decl, block, cols));
+  if (missing.length) return { ok: false, missing };
   if (!block) {
     // NAMED PRECISELY, because the two cases are different states of the work
     // and a person reading this should be able to tell which they are in. No
@@ -600,15 +671,64 @@ export function expandEstimation(model: Model): Model {
     // agrees: a fit that ran, or nothing at all.
     const value = (name: string): number | undefined =>
       terms?.find((t) => t.name === name)?.value;
-    const from: Provenance = terms
-      ? { origin: 'computation', detail: `least squares on “${decl.data}” (${decl.method})` }
-      : {
+    // ── THREE STATES, NOT TWO, AND PER COEFFICIENT ──────────────────
+    //
+    // THE ONE THAT WAS MISSING IS THE ONE THAT MATTERS MOST. This was a single
+    // provenance for the whole specification with two branches — a fit ran, or
+    // nothing has been estimated — so a coefficient the PERSON supplied as a
+    // hypothesis was labelled `origin: 'equation'`: "a symbol in the
+    // specification". β₃ = −0.03, typed in by somebody as a supposition, came
+    // back reading as something that follows from an equation.
+    //
+    // The econometrics digest puts this first in its list of distinctions to
+    // keep — user assumptions, hypothetical parameter values, observed data,
+    // estimated quantities, derived quantities — and it is the whole epistemic
+    // point: a number somebody supposed and a number a fit produced are
+    // different KINDS of claim, and the second is the only one that may carry a
+    // standard error.
+    //
+    // PER COEFFICIENT, because a model may have some of each: a slope somebody
+    // fixed by assumption alongside others estimated from the same data is an
+    // ordinary thing to do, and one provenance for the specification cannot say
+    // so.
+    const boundTo = (name: string): string | undefined => {
+      const control = decl.coefficients?.[name];
+      return control && model.params.some((q) => q.id === control) ? control : undefined;
+    };
+    const fromFor = (name: string): { provenance: Provenance; fidelity: ModelObject['fidelity'] } => {
+      if (terms) {
+        return {
+          provenance: { origin: 'computation', detail: `least squares on “${decl.data}” (${decl.method})` },
+          // EARNED FROM DATA. This field was absent altogether, so a coefficient
+          // estimated from observations graded `conceptual` by default and
+          // dragged the whole view's label down with it.
+          fidelity: 'data-derived',
+        };
+      }
+      const control = boundTo(name);
+      if (control) {
+        const p = model.params.find((q) => q.id === control);
+        return {
+          provenance: {
+            origin: 'user',
+            detail: `a value you set as a hypothesis — the control ${control}${
+              p ? ` is at ${p.value}` : ''
+            }. Nothing has been estimated, so this carries no standard error, no interval and no significance`,
+          },
+          fidelity: 'model-derived',
+        };
+      }
+      return {
+        provenance: {
           // NOT 'inference'. Nobody guessed this coefficient — it is a symbol
           // the specification declares, and reading it as a proposal would
           // invite somebody to "confirm" a value that does not exist yet.
           origin: 'equation',
-          detail: 'a symbol in the specification — nothing has been estimated',
-        };
+          detail: 'a symbol in the specification — nothing has been estimated and nothing has been supposed',
+        },
+        fidelity: 'conceptual',
+      };
+    };
 
     const put = (o: ModelObject) => {
       if (!have.has(o.id)) added.push(o);
@@ -668,7 +788,8 @@ export function expandEstimation(model: Model): Model {
           // conversation, Trace and the evaluator all resolve the same thing.
           ...(decl.coefficients?.[x] ? { control: decl.coefficients[x] } : {}),
         },
-        provenance: from,
+        provenance: fromFor(x).provenance,
+        fidelity: fromFor(x).fidelity,
       });
     });
 
@@ -686,7 +807,8 @@ export function expandEstimation(model: Model): Model {
         ...(value(INTERCEPT) !== undefined ? { value: value(INTERCEPT) } : {}),
         ...(decl.coefficients?.intercept ? { control: decl.coefficients.intercept } : {}),
       },
-        provenance: from,
+        provenance: fromFor(INTERCEPT).provenance,
+        fidelity: fromFor(INTERCEPT).fidelity,
       });
     }
 
@@ -718,7 +840,33 @@ export function expandEstimation(model: Model): Model {
     // neither a value nor a control exists, the expression mentions a name the
     // sampler cannot bind and it reports exactly that one missing degree of
     // freedom. Nothing is invented to make it draw.
-    const axes = decl.x.slice(0, 2);
+    // ── THE AXES ARE THE BASE VARIABLES, NOT THE REGRESSORS ─────────
+    //
+    // THIS LINE WAS THE FAILURE. It read `decl.x.slice(0, 2)` — the first two
+    // REGRESSORS — so for `wage = β₀ + β₁·educ + β₂·exper + β₃·exper²` the axes
+    // came out as educ and exper and the third regressor, `exper²`, was treated
+    // as a quantity to be HELD at some value. There is no such quantity to hold:
+    // it is `exper` squared, and it varies with the axis it was excluded from.
+    // The expression kept its name, nothing could bind it, and the surface drew
+    // nothing while the report asked for observations of it.
+    //
+    // A regressor is a TERM over base variables (lib/model/terms.ts). The axes
+    // are the distinct BASES; every term is then written as a function of those,
+    // so a quadratic, an interaction and a log all collapse onto the same two
+    // axes instead of demanding one each. Three regressors over two variables is
+    // a surface over two variables.
+    const termOf = (name: string): TermDecl => decl.terms?.[name] ?? { op: 'ref', of: name };
+    const bases: string[] = [];
+    for (const name of decl.x) {
+      for (const b of basesOf(termOf(name))) if (!bases.includes(b)) bases.push(b);
+    }
+    // A TERM OVER THE SAMPLE CANNOT BE DRAWN POINTWISE, and saying so is the
+    // honest answer rather than an empty box. `lag(c, 1)` is not a function of
+    // `c`; it is the value of `c` at the previous period, and a surface over
+    // values of `c` has no previous period to reach for. The specification still
+    // stands and can still be ESTIMATED once observations exist.
+    const overSample = decl.x.filter((name) => !isPointwise(termOf(name)));
+    const axes = overSample.length ? [] : bases.slice(0, 2);
     if (axes.length) {
       // Each coefficient resolves to a control (manipulable), then to a fitted
       // or user-set value, and otherwise stays as its own name so the gap is
@@ -771,10 +919,21 @@ export function expandEstimation(model: Model): Model {
       // read an array of regressor strings that is always non-empty, and β₀
       // silently became 0 on a model nobody had fitted. The remaining degree of
       // freedom the whole feature exists to name was quietly filled in.
+      // EACH TERM, WRITTEN OVER THE AXES, STRUCTURALLY.
+      //
+      // The rename goes through the expression tree (lib/model/expr.ts rename),
+      // not through the string: `exper` is a substring of `experience`, `x`
+      // appears inside `exp`, and a regex that gets one model right gets the
+      // next one wrong. Renaming a leaf of a tree cannot.
+      const onto: Record<string, string> = {};
+      axes.forEach((b, i) => { onto[b.toLowerCase()] = i === 0 ? 'x' : 'y'; });
       const slopeTerms = decl.x.map((name, i) => {
         const c = coefficient(i);
-        const at = i === 0 ? 'x' : i === 1 ? 'y' : name;
-        return `(${c}) * ${at}`;
+        const t = termOf(name);
+        const raw = termExpr(t) ?? name;
+        const tree = parse(raw, bases);
+        const written = tree ? print(rename(tree, onto)) : name;
+        return `(${c}) * (${written})`;
       });
       const expr = [intercept(), ...slopeTerms].join(' + ');
 
@@ -786,7 +945,7 @@ export function expandEstimation(model: Model): Model {
       // correct — but nothing anywhere SAID it: "wage, as the model implies it"
       // over education and experience, with tenure quietly fixed at whatever a
       // slider happened to read. A slice presented as the whole surface.
-      const held = decl.x.slice(2).map((name) => {
+      const held = bases.slice(2).map((name) => {
         const p = model.params.find((q) => q.id.toLowerCase() === name.toLowerCase());
         if (p) return `${name} at ${p.value}${p.units ? ` ${p.units}` : ''} (the control ${p.id})`;
         const v = value(name);
@@ -818,11 +977,14 @@ export function expandEstimation(model: Model): Model {
               `and it is not a fit, a prediction or an observation.`
             : ''),
         defs: { z: expr },
+        // The window belongs to the BASE variable — `over: {exper: [0, 40]}` —
+        // because that is the quantity a person has an opinion about. Nobody has
+        // a view on the range of `exper²`.
         ...(decl.over
           ? {
               over: {
-                x: decl.over[decl.x[0]],
-                ...(axes.length > 1 && decl.over[decl.x[1]] ? { y: decl.over[decl.x[1]] } : {}),
+                ...(decl.over[axes[0]] ? { x: decl.over[axes[0]] } : {}),
+                ...(axes.length > 1 && decl.over[axes[1]] ? { y: decl.over[axes[1]] } : {}),
               },
             }
           : {}),
@@ -833,7 +995,11 @@ export function expandEstimation(model: Model): Model {
           spec: carrier.id,
           role: 'response',
           axes: axes.join(','),
-          ...(held.length ? { held: decl.x.slice(2).join(','), heldSays: held.join('; ') } : {}),
+          // WHAT THE OUTCOME IS CALLED, so a slope differentiated from this
+          // reads "∂wage / ∂exper" rather than "∂wage, as the model implies it
+          // / ∂y". The label is a sentence for a reader; this is the name.
+          outcome: decl.y,
+          ...(held.length ? { held: bases.slice(2).join(','), heldSays: held.join('; ') } : {}),
           // What the reader must be told about these numbers, carried on the
           // object rather than left to a caption somebody might not write.
           basis: hypothetical

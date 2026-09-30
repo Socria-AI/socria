@@ -39,8 +39,9 @@ import { namesIn } from './deps';
 import { bindings, resolve, symbolTable } from './symbols';
 import { readGravity } from './gravity';
 import { readMechanism } from './mechanism';
+import { expressionOf, marginalOf } from './derive';
 import { readSystem, type Missing } from './system';
-import type { Fidelity, Model, ModelObject } from './schema';
+import { COORDINATES, sampledOver, type Fidelity, type Model, type ModelObject } from './schema';
 
 /**
  * WHAT SOMEBODY WANTS DONE TO A MODEL — as distinct from what the model is,
@@ -72,6 +73,18 @@ import type { Fidelity, Model, ModelObject } from './schema';
 export const OPERATIONS = [
   /** work out the value of what is written, from the values that are there */
   'evaluate',
+  /**
+   * differentiate what is written, and get a slope.
+   *
+   * A DISTINCT OPERATION, not a flavour of evaluate, and the econometrics digest
+   * is the reason it is here: from chapter 6 on, a quadratic term exists so that
+   * a marginal effect is NOT a coefficient and an interaction exists so that an
+   * effect is not a single number. Both are questions about a derivative, and a
+   * system that can only evaluate can answer neither. It needs no observations —
+   * a derivative is a fact about the expression — which is exactly why it must
+   * not be lumped in with `estimate`.
+   */
+  'derive',
   /** run it forward through time */
   'simulate',
   /** fit it to supplied observations */
@@ -89,6 +102,7 @@ export type Operation = (typeof OPERATIONS)[number];
 
 export const OPERATION_SAYS: Record<Operation, string> = {
   evaluate: 'work out what the model says, from the values it has',
+  derive: 'differentiate what it says, and get a slope',
   simulate: 'run it forward through time',
   estimate: 'fit it to observations',
   read: 'show the supplied numbers as they are',
@@ -178,7 +192,17 @@ export const SAMPLING: Solver = {
     // the others — an object whose value lived on `meta` or `defs` counted as
     // unbound here and as bound in the scope, or the reverse.
     const table = symbolTable(m);
-    const axes = new Set(['x', 'y', 'z', 'u', 'v', 't', 's']);
+    // THE SAMPLER'S OWN VARIABLES, which include whatever the model called them.
+    // A fixed set of coordinate letters here meant `Q = 100 − 2P` over a range of
+    // P was reported as needing "something called p" — a demand for a value for
+    // the very quantity the curve varies. The router and the compiler read the
+    // same rule from the same place now (schema.ts sampledOver), because every
+    // time those two have kept their own copy they have disagreed in silence.
+    const axes = new Set([
+      ...COORDINATES,
+      ...sampledOver(o, 1, []),
+      ...sampledOver(o, 2, []),
+    ]);
     const mentioned = new Set<string>();
     for (const e of [o.definition, ...Object.values(o.defs ?? {})]) {
       for (const n of namesIn(e)) if (!axes.has(n)) mentioned.add(n);
@@ -320,6 +344,48 @@ export const ALGEBRA: Solver = {
     'systems with a known closed-form answer, a rank-deficient system, a contradictory one and a nonlinear one (test/model-algebra)',
 };
 
+/**
+ * Differentiation, by the rules, over the expression tree.
+ *
+ * REGISTERED LIKE ANY OTHER SOLVER, which is the point: `derive` goes through
+ * `route`, `operationsOn`, `plan` and `askFor` exactly as `evaluate` and
+ * `estimate` do, so "what is ∂wage/∂exper?" is answered by the same readiness
+ * machinery that answers "can this be fitted?" — and answered YES on a model
+ * with no data, because a derivative needs none.
+ *
+ * It is `kind: 'symbolic'`, and it is the first solver of that kind that is not
+ * `future: true`. The `rearrange` entry beside it still is: differentiating an
+ * expression and solving one for a variable are different jobs, and only one of
+ * them is implemented.
+ */
+export const CALCULUS: Solver = {
+  does: ['derive'],
+  id: 'differentiate',
+  label: 'Symbolic differentiator',
+  kind: 'symbolic',
+  produces: 'model-derived',
+  method:
+    'parses the expression into a tree and applies the derivative rules to it — exact where a derivative exists, and refused by name where one does not, which is the case for floor, sign, round, a remainder and the two-argument functions (lib/model/expr.ts)',
+  handles: (_m, o) => !!expressionOf(o) && !!o.over,
+  requires: (m, o) => {
+    const axes = ['x', 'y', 'z'].filter((k) => !!o.over?.[k]);
+    const bad: Missing[] = [];
+    for (const axis of axes) {
+      const got = marginalOf(m, o, axis);
+      if (!got.ok) {
+        bad.push({
+          what: 'a differentiable expression',
+          because: got.why,
+          unlocks: 'the marginal effect — how much the outcome moves per unit of that input',
+        });
+      }
+    }
+    return bad;
+  },
+  checkedAgainst:
+    'derivatives worked out by hand for polynomials, logs, products, quotients, chains and interactions, and named refusals for the step functions (test/model-calculus)',
+};
+
 export const ESTIMATION: Solver = {
   does: ['estimate'],
   id: 'ols',
@@ -428,7 +494,13 @@ export const FUTURE: Solver[] = [
  * about it in terms of the assembled state names rather than the bodies and
  * springs the person actually wrote.
  */
-export const SOLVERS: Solver[] = [ALGEBRA, GRAVITY, ASSEMBLY, ODE, ESTIMATION, DATA, SAMPLING, ...FUTURE];
+// ORDER IS THE ANSWER TO "WHAT IS THE BEST THING ANY SOLVER CAN DO WITH THIS?",
+// which is what `route` returns when no operation is named — so CALCULUS sits
+// AFTER SAMPLING. Put earlier, it claimed every expression-bearing object and the
+// build report read "Symbolic differentiator runs spec__response" for a surface
+// that the sampler had evaluated. Differentiating a relationship is a secondary
+// thing to do with it; working out what it says is the primary one.
+export const SOLVERS: Solver[] = [ALGEBRA, GRAVITY, ASSEMBLY, ODE, ESTIMATION, DATA, SAMPLING, CALCULUS, ...FUTURE];
 
 // ── routing ─────────────────────────────────────────────────────────
 
@@ -571,6 +643,8 @@ export function askFor(
  */
 const NEEDS: Record<Operation, string> = {
   evaluate: 'an expression, or a shape read off supplied numbers',
+  derive:
+    'a relationship written as an expression, and the inputs to take the slope with respect to. NOT observations: a derivative is a fact about the expression, so a quadratic whose coefficients somebody supplied as hypotheses has a marginal effect whether or not anything was ever measured',
   simulate:
     'a law saying how something CHANGES — states and their rates, parts that push and pull, or bodies that attract. A specification relating quantities at one moment is not one: it says what goes with what, not what follows what',
   estimate: 'a specification and observations to fit it to',

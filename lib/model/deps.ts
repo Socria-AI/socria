@@ -229,9 +229,22 @@ export function affectedBy(model: Model, ids: readonly string[]): string[] {
       if (out.has(o.id)) continue;
       const mine = refs.get(o.id)!;
       const viaExpression = frontier.some((f) => mine.has(f));
-      const viaRelation = (o.relations ?? []).some(
-        (r) => FOLLOWED.includes(r.as) && frontier.includes(r.to.toLowerCase())
-      );
+      // AN OBJECT THAT STATES ITS OWN MATHEMATICS DEPENDS ON WHAT IT STATES.
+      //
+      // The relation edge is for objects with no mathematics of their own — a
+      // body placed by its carrier's run, a spring drawn from it. An object that
+      // carries an expression already declares its dependencies IN the
+      // expression, and following the relation as well over-reports.
+      //
+      // Measured: ∂wage/∂educ is `b1`, and moving β₃ marked it stale — because
+      // it is `derived-from` the surface, and the surface names β₃. The brief
+      // that asked for this was explicit: changing β₃ must invalidate the
+      // marginal effects INVOLVING β₃ and not the others. It is one edge, and
+      // it is the difference between a dependency graph and a broadcast.
+      const statesItsOwn = !!o.definition || !!(o.defs && Object.keys(o.defs).length);
+      const viaRelation =
+        !statesItsOwn &&
+        (o.relations ?? []).some((r) => FOLLOWED.includes(r.as) && frontier.includes(r.to.toLowerCase()));
       if (viaExpression || viaRelation) reached(o.id);
     }
     frontier = next;

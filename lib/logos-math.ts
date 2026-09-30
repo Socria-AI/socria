@@ -96,7 +96,7 @@ const RIGHT = new Set(['^', 'u-']);
  * en dashes constantly, because that is what a minus sign looks like in
  * prose, and "20 − 5*x" was rejected outright while "20 - 5*x" drew fine.
  */
-function normalizeExpr(raw: string): string {
+export function normalizeExpr(raw: string): string {
   let s = raw.trim();
   // strip a leading "y =" / "f(x) =" so we evaluate the right-hand side
   s = s.replace(/^\s*[a-zA-Z]\w*\s*(\([^)]*\))?\s*=\s*/, '');
