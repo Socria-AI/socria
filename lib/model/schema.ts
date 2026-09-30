@@ -591,6 +591,16 @@ export interface Model {
   version?: number;
   /** what changed to get here, for "what did that do?" */
   lastChange?: ChangeRecord;
+  /**
+   * WHAT THE SANITISER REMOVED, in the person's terms.
+   *
+   * A trust boundary has to bound unbounded input, but trimming a declaration is
+   * an edit to the model and an unrecorded one is indistinguishable from the
+   * model never having said it. Every cap in `sanitizeModel` writes a line here,
+   * the build report carries them, and the conversation reads them — so "why are
+   * there only twelve planets?" has an answer.
+   */
+  dropped?: string[];
 }
 
 /**
@@ -641,10 +651,67 @@ export const MODEL_CAPS = {
   objects: 400,
   params: 40,
   layers: 24,
+  /** the PROSE equation list a reader sees. Nothing solves these. */
   equations: 12,
   assumptions: 12,
   relations: 12,
+  // ── the caps the SOLVERS also have to know about ──────────────────
+  //
+  // THESE USED TO BE MAGIC NUMBERS AT THE CALL SITES, and they disagreed with
+  // the solvers by a factor of two. The sanitiser trimmed a system to 24 states
+  // and a gravity block to 12 bodies; lib/model/system.ts capped the run at 24
+  // states while lib/model/gravity.ts admitted 12 bodies, which in the plane is
+  // 48. Three numbers for one quantity, none of them aware of the others.
+  //
+  // system.ts now takes STATE_CAP from here and gravity.ts derives BODY_CAP from
+  // that, so the chain is one number: a nine-planet system is 36 states and runs.
+  /** states the integrator will run — lib/model/system.ts STATE_CAP is this */
+  states: 64,
+  /**
+   * States the sanitiser KEEPS, deliberately above the run cap.
+   *
+   * Trimming to exactly the run cap would mean a system that is merely too big
+   * arrives at the integrator looking like one that fits, and runs — a different
+   * system, silently. Keeping more lets readSystem refuse it with its own true
+   * count. The cap still exists, for input that is not a model at all.
+   */
+  statesKept: 96,
+  /** bodies one mechanism or gravity block may declare, before the solver's own cap */
+  bodies: 24,
+  /** springs, dampers or forces per mechanism */
+  parts: 24,
+  /** derived observations riding along with a run */
+  observe: 8,
+  /** unknowns in one equations block */
+  unknowns: 24,
+  /** relations in one equations block — the ones that are actually solved */
+  solveRelations: 24,
+  /** regressors in one specification */
+  regressors: 20,
+  /** keys in `defs`, `over`, `meta` and `depends` */
+  keys: 16,
 } as const;
+
+/**
+ * Take at most `cap`, AND SAY SO when there were more.
+ *
+ * SILENT TRUNCATION IS AN EDIT TO THE MODEL. Every cap below used to be a bare
+ * `.slice(0, n)`, so a thirty-body system became a twelve-body one and a
+ * seventy-state system became a twenty-four-state one with nothing anywhere
+ * recording it — and the forces in an n-body system are pairwise, so removing
+ * bodies changes how every remaining one moves. The model that ran was not the
+ * model that was proposed, and "the model is the source of truth" cannot survive
+ * the sanitiser quietly rewriting it.
+ *
+ * The caps stay, because this is a trust boundary and unbounded input has to be
+ * bounded somewhere. What changes is that the trim is RECORDED, on the model, in
+ * the person's terms — and the solvers refuse a declaration over their own cap
+ * rather than running a smaller one.
+ */
+function capped<T>(list: readonly T[], cap: number, what: string, drop?: (s: string) => void): T[] {
+  if (list.length > cap) drop?.(`${what}: ${list.length} given, ${cap} kept`);
+  return list.slice(0, cap);
+}
 
 // THE ONE GRAMMAR for anything an expression can mention — see lib/model/ids.ts
 // for the six that disagreed and what that cost. A MODEL's own id keeps the
@@ -657,7 +724,7 @@ const text = (v: unknown, n: number): string =>
 const num = (v: unknown): number | null =>
   typeof v === 'number' && Number.isFinite(v) ? v : null;
 
-export function sanitizeObject(raw: unknown): ModelObject | null {
+export function sanitizeObject(raw: unknown, drop?: (what: string) => void): ModelObject | null {
   if (!raw || typeof raw !== 'object') return null;
   const r = raw as Record<string, unknown>;
   const id = text(r.id, 48);
@@ -697,7 +764,7 @@ export function sanitizeObject(raw: unknown): ModelObject | null {
     // initial conditions is ten, and a cap that silently drops the last two
     // leaves a trajectory starting somewhere nobody asked for. Found by the
     // suite, which is what the orbit benchmark is there to do.
-    for (const [k, v] of Object.entries(r.defs as Record<string, unknown>).slice(0, 16)) {
+    for (const [k, v] of capped(Object.entries(r.defs as Record<string, unknown>), MODEL_CAPS.keys, `definitions on ${id}`, drop)) {
       const key = text(k, 16);
       const val = text(v, 300);
       if (/^[a-z][a-z0-9]{0,15}$/i.test(key) && val) defs[key] = val;
@@ -707,7 +774,7 @@ export function sanitizeObject(raw: unknown): ModelObject | null {
 
   if (r.over && typeof r.over === 'object' && !Array.isArray(r.over)) {
     const over: Record<string, [number, number]> = {};
-    for (const [k, v] of Object.entries(r.over as Record<string, unknown>).slice(0, 8)) {
+    for (const [k, v] of capped(Object.entries(r.over as Record<string, unknown>), MODEL_CAPS.observe, `extents on ${id}`, drop)) {
       const key = text(k, 16);
       if (!/^[a-z][a-z0-9]{0,15}$/i.test(key) || !Array.isArray(v) || v.length !== 2) continue;
       const a = num(v[0]);
@@ -719,7 +786,7 @@ export function sanitizeObject(raw: unknown): ModelObject | null {
   }
 
   const deps = Array.isArray(r.depends)
-    ? r.depends.map((d) => text(d, 48)).filter((d) => ID.test(d)).slice(0, 16)
+    ? capped(r.depends.map((d) => text(d, 48)).filter((d) => ID.test(d)), MODEL_CAPS.keys, `dependencies on ${id}`, drop)
     : [];
   if (deps.length) out.depends = deps;
 
@@ -745,7 +812,7 @@ export function sanitizeObject(raw: unknown): ModelObject | null {
   const sys = r.system as Record<string, unknown> | undefined;
   if (sys && typeof sys === 'object' && Array.isArray(sys.states)) {
     const states: StateVarDecl[] = [];
-    for (const raw of sys.states.slice(0, 24)) {
+    for (const raw of capped(sys.states, MODEL_CAPS.statesKept, `states in ${id}`, drop)) {
       if (!raw || typeof raw !== 'object') continue;
       const q = raw as Record<string, unknown>;
       const name = text(q.name, 24);
@@ -770,7 +837,7 @@ export function sanitizeObject(raw: unknown): ModelObject | null {
     }
     const rhs: Record<string, string> = {};
     if (sys.rhs && typeof sys.rhs === 'object') {
-      for (const [k, v] of Object.entries(sys.rhs as Record<string, unknown>).slice(0, 24)) {
+      for (const [k, v] of capped(Object.entries(sys.rhs as Record<string, unknown>), MODEL_CAPS.statesKept, `right-hand sides in ${id}`, drop)) {
         const key = text(k, 24);
         const val = expr(v);
         if (nameOk(key) && val) rhs[key] = val;
@@ -778,7 +845,7 @@ export function sanitizeObject(raw: unknown): ModelObject | null {
     }
     const observe: Record<string, string> = {};
     if (sys.observe && typeof sys.observe === 'object') {
-      for (const [k, v] of Object.entries(sys.observe as Record<string, unknown>).slice(0, 8)) {
+      for (const [k, v] of capped(Object.entries(sys.observe as Record<string, unknown>), MODEL_CAPS.observe, `observations in ${id}`, drop)) {
         const key = text(k, 24);
         const val = expr(v);
         if (nameOk(key) && val) observe[key] = val;
@@ -803,7 +870,7 @@ export function sanitizeObject(raw: unknown): ModelObject | null {
   const mech = r.mechanism as Record<string, unknown> | undefined;
   if (mech && typeof mech === 'object' && Array.isArray(mech.bodies)) {
     const bodies: BodyDecl[] = [];
-    for (const raw of mech.bodies.slice(0, 12)) {
+    for (const raw of capped(mech.bodies, MODEL_CAPS.bodies, `bodies in ${id}`, drop)) {
       if (!raw || typeof raw !== 'object') continue;
       const q = raw as Record<string, unknown>;
       const bid = text(q.id, 24);
@@ -824,7 +891,7 @@ export function sanitizeObject(raw: unknown): ModelObject | null {
     const links = (v: unknown): LinkDecl[] => {
       if (!Array.isArray(v)) return [];
       const kept: LinkDecl[] = [];
-      for (const raw of v.slice(0, 24)) {
+      for (const raw of capped(v, MODEL_CAPS.parts, `connections in ${id}`, drop)) {
         if (!raw || typeof raw !== 'object') continue;
         const q = raw as Record<string, unknown>;
         const lid = text(q.id, 24);
@@ -845,8 +912,7 @@ export function sanitizeObject(raw: unknown): ModelObject | null {
       return kept;
     };
     const forces: ForceDecl[] = Array.isArray(mech.forces)
-      ? (mech.forces
-          .slice(0, 12)
+      ? (capped(mech.forces, MODEL_CAPS.parts, `forces in ${id}`, drop)
           .map((raw) => {
             if (!raw || typeof raw !== 'object') return null;
             const q = raw as Record<string, unknown>;
@@ -876,7 +942,7 @@ export function sanitizeObject(raw: unknown): ModelObject | null {
   const grav = r.gravity as Record<string, unknown> | undefined;
   if (grav && typeof grav === 'object' && Array.isArray(grav.bodies)) {
     const bodies: GravityBodyDecl[] = [];
-    for (const raw2 of grav.bodies.slice(0, 12)) {
+    for (const raw2 of capped(grav.bodies, MODEL_CAPS.bodies, `gravitating bodies in ${id}`, drop)) {
       if (!raw2 || typeof raw2 !== 'object') continue;
       const q = raw2 as Record<string, unknown>;
       const bid = text(q.id, 24);
@@ -919,10 +985,10 @@ export function sanitizeObject(raw: unknown): ModelObject | null {
   const eqs = r.equations as Record<string, unknown> | undefined;
   if (eqs && typeof eqs === 'object') {
     const unknowns = Array.isArray(eqs.unknowns)
-      ? eqs.unknowns.map((u) => text(u, 48)).filter((u) => ID.test(u)).slice(0, 24)
+      ? capped(eqs.unknowns.map((u) => text(u, 48)).filter((u) => ID.test(u)), MODEL_CAPS.unknowns, `unknowns in ${id}`, drop)
       : [];
     const relations = Array.isArray(eqs.relations)
-      ? eqs.relations.map((e) => expr(e)).filter((e) => e.includes('=')).slice(0, 24)
+      ? capped(eqs.relations.map((e) => expr(e)).filter((e) => e.includes('=')), MODEL_CAPS.solveRelations, `relations in ${id}`, drop)
       : [];
     // BOTH OR NEITHER. Unknowns with nothing relating them, or relations with
     // nothing named to solve for, is not a system — and admitting half of one
@@ -952,7 +1018,7 @@ export function sanitizeObject(raw: unknown): ModelObject | null {
   const est = r.estimation as Record<string, unknown> | undefined;
   if (est && typeof est === 'object') {
     const yCol = text(est.y, 40);
-    const xs = Array.isArray(est.x) ? est.x.map((c) => text(c, 40)).filter(Boolean).slice(0, 20) : [];
+    const xs = Array.isArray(est.x) ? capped(est.x.map((c) => text(c, 40)).filter(Boolean), MODEL_CAPS.regressors, `regressors in ${id}`, drop) : [];
     const dataKey2 = text(est.data, 48);
     const method = est.method;
     // A SPECIFICATION IS ENOUGH: an outcome and at least one thing explaining
@@ -1052,7 +1118,7 @@ export function sanitizeObject(raw: unknown): ModelObject | null {
   // would be a way to put anything into a model.
   if (r.meta && typeof r.meta === 'object' && !Array.isArray(r.meta)) {
     const meta: Record<string, string | number | boolean> = {};
-    for (const [k, v] of Object.entries(r.meta as Record<string, unknown>).slice(0, 16)) {
+    for (const [k, v] of capped(Object.entries(r.meta as Record<string, unknown>), MODEL_CAPS.keys, `metadata on ${id}`, drop)) {
       const key = text(k, 24);
       if (!/^[a-z][a-z0-9_-]{0,23}$/i.test(key)) continue;
       if (typeof v === 'number' && Number.isFinite(v)) meta[key] = v;
@@ -1117,11 +1183,36 @@ export function sanitizeModel(raw: unknown): Model | null {
   // `linear-model` and `photon-path` are real stored ids.
   if (!MODEL_ID.test(id) || !title) return null;
 
+  // WHAT THIS SANITISER REMOVED, CARRIED ON THE MODEL.
+  //
+  // `map(sanitizeObject)` was also passing the array index as the second
+  // argument, which was harmless only for as long as sanitizeObject took one
+  // parameter — the compiler caught it the moment it took two. Written out, so
+  // it cannot quietly bind something else again.
+  const notes: string[] = [];
+  const drop = (what: string) => {
+    if (notes.length < 12 && !notes.includes(what)) notes.push(what);
+  };
+  // A `dropped` record already on the input survives, because a model is
+  // re-sanitised on every save and the second pass has nothing left to trim —
+  // so recomputing it would erase the account of the first.
+  if (Array.isArray(r.dropped)) {
+    for (const d of r.dropped) {
+      const t = text(d, 160);
+      if (t) drop(t);
+    }
+  }
+
   const objects = Array.isArray(r.objects)
-    ? (r.objects.map(sanitizeObject).filter(Boolean) as ModelObject[]).slice(0, MODEL_CAPS.objects)
+    ? capped(
+        r.objects.map((o) => sanitizeObject(o, drop)).filter(Boolean) as ModelObject[],
+        MODEL_CAPS.objects,
+        'objects',
+        drop
+      )
     : [];
   const params = Array.isArray(r.params)
-    ? (r.params.map(sanitizeParam).filter(Boolean) as ModelParam[]).slice(0, MODEL_CAPS.params)
+    ? capped(r.params.map(sanitizeParam).filter(Boolean) as ModelParam[], MODEL_CAPS.params, 'controls', drop)
     : [];
 
   // A relation to an object that is not in the model is not a relation. It
@@ -1135,7 +1226,7 @@ export function sanitizeModel(raw: unknown): Model | null {
     }
   }
 
-  const model: Model = { id, title, objects, params };
+  const model: Model = { id, title, objects, params, ...(notes.length ? { dropped: notes } : {}) };
   const domain = text(r.domain, 60);
   if (domain) model.domain = domain;
   if (r.aspect === 'equal' || r.aspect === 'fit') model.aspect = r.aspect;

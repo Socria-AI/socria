@@ -40,15 +40,23 @@
 
 import { compileExpr } from '@/lib/logos-math';
 import type { GravityDecl, GravityBodyDecl, Model, ModelObject, SystemDecl } from './schema';
-import type { Missing } from './system';
+import { STATE_CAP, type Missing } from './system';
 
 /** G in AU³ / (M☉ · yr²). Exactly 4π² for a circular orbit of one AU in one year. */
 export const G_ASTRO = 4 * Math.PI * Math.PI;
 /** G in m³ / (kg · s²) — CODATA 2018. */
 export const G_SI = 6.6743e-11;
 
-/** How many bodies one system may carry. Pairwise cost is n², and so is the expression. */
-export const BODY_CAP = 12;
+/**
+ * How many bodies one system may carry.
+ *
+ * DERIVED FROM THE STATE CAP, because four states per body in the plane is the
+ * arithmetic that connects them and two constants chosen independently is how
+ * they came to disagree: 12 bodies is 48 states against a cap of 24, and the
+ * seventh body made the integrator throw. Pairwise cost is n² and so is the
+ * expression, so the state cap is the binding constraint either way.
+ */
+export const BODY_CAP = Math.floor(STATE_CAP / 4);
 
 export interface GravityLayout {
   bodies: {
@@ -85,7 +93,25 @@ export function assembleGravity(
   decl: GravityDecl
 ): { ok: true; system: SystemDecl; layout: GravityLayout } | { ok: false; missing: Missing[] } {
   const missing: Missing[] = [];
-  const bodies = (decl.bodies ?? []).slice(0, BODY_CAP);
+  // OVER THE CAP IS A REFUSAL. This SLICED, so a fifteen-body system was
+  // integrated as a twelve-body one with nothing anywhere saying three bodies
+  // had been dropped — a different system, presented as the one that was asked
+  // for. The forces are pairwise, so removing a body changes every other body's
+  // motion; there is no reading on which this is a smaller version of the same
+  // thing.
+  const bodies = decl.bodies ?? [];
+  if (bodies.length > BODY_CAP) {
+    return {
+      ok: false,
+      missing: [
+        {
+          what: `at most ${BODY_CAP} bodies — this system has ${bodies.length}`,
+          unlocks:
+            'a run: the forces are pairwise, so dropping the extra bodies would change how every remaining one moves rather than showing fewer of them',
+        },
+      ],
+    };
+  }
   if (bodies.length < 2) {
     return {
       ok: false,

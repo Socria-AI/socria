@@ -432,6 +432,11 @@ export function unanswered(ask: TurnAsk | null, model: Model): string[] {
     add(o.label);
     const col = o.meta?.column;
     if (typeof col === 'string') add(col);
+    // AN UNKNOWN IS A NAME THE MODEL HOLDS. Asked for a model in Qd, Qs, Pc and
+    // Pp, a model whose equations block names all four was reporting every one
+    // of them as unanswered — because the solved objects that carry those labels
+    // do not exist until the declaration is expanded, and this runs before that.
+    for (const u of o.equations?.unknowns ?? []) add(u);
   }
   for (const p of model.params) {
     add(p.id);

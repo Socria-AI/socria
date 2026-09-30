@@ -491,7 +491,24 @@ export function estimate(
     names: xNames,
   });
   if (!fitted.ok) {
-    return { ok: false, missing: [{ what: 'a fit', unlocks: fitted.why }] };
+    // THE REASON GOES IN `what`, BECAUSE `what` IS THE HALF THAT IS SHOWN.
+    //
+    // This said `what: 'a fit'` and put the real explanation in `unlocks` — and
+    // the pre-draw guard (compile.ts) reports `what` and discards `unlocks`, so
+    // the picture read "not computed — it needs a fit", which answers "why is
+    // there no fit?" with "because it needs a fit". The estimator already knows
+    // the specific obstruction: one observation cannot identify two
+    // coefficients, a regressor with no variation, columns of different lengths.
+    return {
+      ok: false,
+      missing: [
+        {
+          what: 'a fit',
+          because: fitted.why,
+          unlocks: 'the coefficients, their standard errors and the fitted relationship',
+        },
+      ],
+    };
   }
   const fit = fitted.fit;
   if (droppedWhy && decl.method === 'ols-lag') {
@@ -760,6 +777,22 @@ export function expandEstimation(model: Model): Model {
         return `(${c}) * ${at}`;
       });
       const expr = [intercept(), ...slopeTerms].join(' + ');
+
+      // A THIRD REGRESSOR IS HELD, AND THE PICTURE HAS TO SAY SO.
+      //
+      // Two axes and four regressors means the other two sit at some value while
+      // the surface is drawn, and only the first two vary. The expression already
+      // carries their own names — so a control of that name holds them, which is
+      // correct — but nothing anywhere SAID it: "wage, as the model implies it"
+      // over education and experience, with tenure quietly fixed at whatever a
+      // slider happened to read. A slice presented as the whole surface.
+      const held = decl.x.slice(2).map((name) => {
+        const p = model.params.find((q) => q.id.toLowerCase() === name.toLowerCase());
+        if (p) return `${name} at ${p.value}${p.units ? ` ${p.units}` : ''} (the control ${p.id})`;
+        const v = value(name);
+        if (v !== undefined) return `${name} at ${v}`;
+        return `${name} — which nothing has given a value, so this cannot be drawn until something does`;
+      });
       const hypothetical = decl.x.some((name, i) => {
         const b = `${carrier.id}__b${wants ? i + 1 : i}`;
         const named = decl.coefficients?.[name];
@@ -777,6 +810,9 @@ export function expandEstimation(model: Model): Model {
         meaning:
           `the model-implied deterministic component: ${specificationLine(carrier)}, ` +
           `with the error term left out. ` +
+          (held.length
+            ? `Only ${axes.join(' and ')} vary here; ${held.join('; ')}. It is a SLICE of the relationship, not the whole of it. `
+            : '') +
           (slopeTerms.length
             ? `It is NOT a conditional expectation — that reading needs an assumption about the error nobody here has stated — ` +
               `and it is not a fit, a prediction or an observation.`
@@ -797,6 +833,7 @@ export function expandEstimation(model: Model): Model {
           spec: carrier.id,
           role: 'response',
           axes: axes.join(','),
+          ...(held.length ? { held: decl.x.slice(2).join(','), heldSays: held.join('; ') } : {}),
           // What the reader must be told about these numbers, carried on the
           // object rather than left to a caption somebody might not write.
           basis: hypothetical

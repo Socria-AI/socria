@@ -361,11 +361,24 @@ export function trajectoryLine(
     typeof pick === 'function'
       ? pick
       : (y: readonly number[]) => ({ x: y[pick[0]] ?? 0, y: y[pick[1]] ?? 0, z: y[pick[2]] ?? 0 });
-  const pts = run.y.map((y, i) => take(y, run.t[i])).filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y) && Number.isFinite(p.z));
+  const all = run.y.map((y, i) => take(y, run.t[i]));
+  const pts = all.filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y) && Number.isFinite(p.z));
   const kept = thin(pts, LIMITS.runPoints);
+  // POINTS ALONG THE PATH, NOT STATES. This said `${pts.length} states`, which
+  // on a two-state system integrated for three thousand steps read "3001
+  // states" — the step count wearing the state count's name, in a note whose
+  // whole job is to say what the engine did.
+  //
+  // And the points that had NO value are counted rather than quietly filtered:
+  // a run that diverged halfway drew half a curve and reported the half as the
+  // whole.
+  const lost = all.length - pts.length;
   return {
     value: { p: 'polyline', of, at: kept, ...opts },
-    note: kept.length < pts.length ? `${pts.length} states, drawn as ${kept.length}` : `${pts.length} states`,
+    note:
+      `${pts.length} point${pts.length === 1 ? '' : 's'} along the path` +
+      (kept.length < pts.length ? `, drawn as ${kept.length}` : '') +
+      (lost ? `; ${lost} of ${all.length} steps had no finite position and were left out` : ''),
   };
 }
 

@@ -92,13 +92,50 @@ function names(model: Model, vars: string[]): string[] {
   return [...new Set([...vars, ...known(symbolTable(model)), 't'])];
 }
 
-/** The extent of a name: what the object says, else a control, else a default. */
-function rangeOf(model: Model, o: ModelObject, name: string, fallback: [number, number]): Range {
+/** Where an extent came from. A window the engine picked is not a modelling choice. */
+type Extent = Range & { from: 'object' | 'control' | 'engine' };
+
+/**
+ * The extent of a name: what the object says, else a control, else a default.
+ *
+ * IT SAYS WHICH. The fallback here — [-3, 3] for a surface, [0, 2π] for a
+ * parameter — is a rendering decision, and a note reading "48 × 48 grid" gave a
+ * reader no way to tell a window the model chose from one this function invented.
+ * On a paraboloid that is harmless; on a quantity measured in thousands it is the
+ * difference between a picture of the model and a picture of the origin.
+ */
+function rangeOf(model: Model, o: ModelObject, name: string, fallback: [number, number]): Extent {
   const own = o.over?.[name];
-  if (own) return { min: own[0], max: own[1] };
+  if (own) return { min: own[0], max: own[1], from: 'object' };
   const p = model.params.find((q) => q.id.toLowerCase() === name.toLowerCase());
-  if (p) return { min: p.min, max: p.max };
-  return { min: fallback[0], max: fallback[1] };
+  if (p) return { min: p.min, max: p.max, from: 'control' };
+  return { min: fallback[0], max: fallback[1], from: 'engine' };
+}
+
+/** The clause a note carries when the ENGINE chose a window rather than the model. */
+function windowSays(named: readonly (readonly [string, Extent])[]): string {
+  const mine = named.filter(([, r]) => r.from === 'engine');
+  if (!mine.length) return '';
+  const each = mine.map(([n, r]) => `${n} from ${Number(r.min.toPrecision(4))} to ${Number(r.max.toPrecision(4))}`);
+  return `; over ${each.join(' and ')} — an extent this engine chose, which the model does not state`;
+}
+
+/**
+ * How much of a sampled thing actually had a value, said out loud.
+ *
+ * WHY A COUNT AND NOT A BOOLEAN. `sqrt(-1 - x² - y²)` compiles perfectly and has
+ * no value anywhere, so the sampler returned a mesh of 2304 nulls, the note read
+ * "48 × 48 grid" and the fidelity read `model-derived`. An empty picture,
+ * captioned as a successful computation — the empty-cube failure again, reached
+ * through a valid expression instead of an unbound symbol. Nothing upstream can
+ * catch it: the router's job is to know whether the expression compiles, and it
+ * does compile.
+ */
+function sampledSays(finite: number, total: number): string {
+  if (!total) return '';
+  if (!finite) return '';
+  if (finite === total) return '';
+  return `; ${total - finite} of ${total} sample points had no value and were left out`;
 }
 
 const NOTHING = (o: ModelObject, why: string): Built => ({
@@ -187,16 +224,21 @@ export function buildObject(model: Model, o: ModelObject, opts?: { detail?: numb
     for (const b of blocked) {
       if (b.routed.status !== 'incomplete') continue;
       for (const m of b.routed.missing) {
-        if (seen.has(m.what)) continue;
-        seen.add(m.what);
-        what.push(m.what);
+        // THE SENTENCE WINS WHERE THERE IS ONE. Naming the missing thing is the
+        // right frame for "a stiffness for k1"; it is circular for "a fit", and
+        // the estimator's own account of why — one observation for two
+        // coefficients, collinear regressors — was being dropped on the floor.
+        const said = m.because ?? `it needs ${m.what}`;
+        if (seen.has(said)) continue;
+        seen.add(said);
+        what.push(said);
       }
     }
     // FRAMED, not just listed. The router's `what` is precise — "dq/dt", "a
     // stiffness for k1" — and on its own it reads as a label rather than as an
     // explanation of why the picture is empty. The frame says what happened;
     // the list says what would fix it.
-    return NOTHING(o, `not computed — it needs ${what.join('; ')}`);
+    return NOTHING(o, `not computed — ${what.join('; ')}`);
   }
 
   // ── A SOLVED UNKNOWN IS ALREADY ON THE FIGURE ──────────────────────
@@ -271,7 +313,25 @@ export function buildObject(model: Model, o: ModelObject, opts?: { detail?: numb
         layer,
         tone: 'accent',
       });
-      return { of: o.id, primitives: [out.value], note: out.note, fidelity: 'model-derived', z: out.z };
+      const cells = out.value.rows.flat();
+      const finite = cells.filter(Boolean).length;
+      if (!finite) {
+        return NOTHING(
+          o,
+          `not computed — “${def}” compiles but has no value anywhere in the window drawn (${
+            Number(xr.min.toPrecision(4))
+          } to ${Number(xr.max.toPrecision(4))} by ${Number(yr.min.toPrecision(4))} to ${
+            Number(yr.max.toPrecision(4))
+          }), so there is nothing to draw. Either the expression is not real over that region or the region is the wrong one`
+        );
+      }
+      return {
+        of: o.id,
+        primitives: [out.value],
+        note: out.note + windowSays([['x', xr], ['y', yr]]) + sampledSays(finite, cells.length),
+        fidelity: 'model-derived',
+        z: out.z,
+      };
     }
 
     // ── a curve: y = f(x), or r(t) ────────────────────────────────
@@ -296,10 +356,25 @@ export function buildObject(model: Model, o: ModelObject, opts?: { detail?: numb
           };
           if (Number.isFinite(p.x) && Number.isFinite(p.y) && Number.isFinite(p.z)) at.push(p);
         }
+        // A LINE NEEDS TWO POINTS. This returned a polyline with an empty `at`
+        // and the note "0 samples of the parameter", graded `model-derived` and
+        // carrying no problem — a primitive that draws nothing, presented as a
+        // successful sampling. Same shape as the all-null mesh, one kind over.
+        if (at.length < 2) {
+          return NOTHING(
+            o,
+            `not computed — the components compile but produce fewer than two points over ${
+              Number(sr.min.toPrecision(4))
+            } to ${Number(sr.max.toPrecision(4))}, so there is no curve to draw`
+          );
+        }
         return {
           of: o.id,
           primitives: [{ p: 'polyline', of: o.id, at, layer, tone: 'primary' }],
-          note: `${at.length} samples of the parameter`,
+          note:
+            `${at.length} samples of the parameter` +
+            windowSays([['s', sr]]) +
+            sampledSays(at.length, n + 1),
           fidelity: 'model-derived',
         };
       }
@@ -320,10 +395,18 @@ export function buildObject(model: Model, o: ModelObject, opts?: { detail?: numb
         const y = e.eval({ ...scope, x });
         if (Number.isFinite(y)) at.push({ x, y, z: 0 });
       }
+      if (at.length < 2) {
+        return NOTHING(
+          o,
+          `not computed — “${def}” compiles but has a value at fewer than two points between ${
+            Number(xr.min.toPrecision(4))
+          } and ${Number(xr.max.toPrecision(4))}, so there is no curve to draw. Either it is not real over that range or the range is the wrong one`
+        );
+      }
       return {
         of: o.id,
         primitives: [{ p: 'polyline', of: o.id, at, layer, tone: 'primary' }],
-        note: `${at.length} samples over x`,
+        note: `${at.length} samples over x` + windowSays([['x', xr]]) + sampledSays(at.length, n + 1),
         fidelity: 'model-derived',
       };
     }
@@ -355,7 +438,18 @@ export function buildObject(model: Model, o: ModelObject, opts?: { detail?: numb
         Math.max(4, Math.min(24, Math.round(detail / 4))),
         { layer, tone: 'muted' }
       );
-      return { of: o.id, primitives: [out.value], note: out.note, fidelity: 'model-derived' };
+      if (!out.value.at.length) {
+        return NOTHING(
+          o,
+          `not computed — the components compile but the field has no value anywhere in the window drawn, so there are no arrows to place`
+        );
+      }
+      return {
+        of: o.id,
+        primitives: [out.value],
+        note: out.note + windowSays([['x', xr], ['y', yr], ...(zr ? ([['z', zr]] as const) : [])]),
+        fidelity: 'model-derived',
+      };
     }
 
     // ── a trajectory: a system integrated forward ──────────────────
@@ -373,7 +467,25 @@ export function buildObject(model: Model, o: ModelObject, opts?: { detail?: numb
     // is, which is the thing this whole design refuses to do.
     case 'trajectory': {
       const keys = ['dx', 'dy', 'dz', 'dw'] as const;
-      const ds = keys.map((k) => o.defs?.[k]).filter(Boolean) as string[];
+      // POSITIONAL, WITH NO HOLES. This was `.filter(Boolean)`, which COMPACTED
+      // the list: a model giving dx and dz and no dy ran as a two-state system in
+      // which dz had silently become the second component, and dz's expression
+      // mentions z — a state that no longer existed. Verified: it ran, drew a
+      // curve and reported no problem. The components ARE the state, so a gap is
+      // a different system and not a smaller one.
+      const given = keys.map((k) => o.defs?.[k] ?? null);
+      const depth = given.findIndex((d) => !d);
+      const ds = (depth === -1 ? given : given.slice(0, depth)) as string[];
+      // The gap is reported BEFORE the count, because "you gave dx and dz" is a
+      // more useful thing to hear than "you need dx and dy".
+      const gap = given.findIndex((d, i) => !!d && i >= ds.length);
+      if (gap >= 0) {
+        return NOTHING(
+          o,
+          `not computed — this states ${keys[gap]} but not ${keys[ds.length]}, and the components are the state in order. ` +
+            `Either give ${keys[ds.length]} or move ${keys[gap]}'s law to it; renumbering them here would be running a different system`
+        );
+      }
       if (ds.length < 2) return NOTHING(o, 'a trajectory needs at least dx and dy');
       const vars = ['x', 'y', 'z', 'w'];
       const fns = ds.map((d) => compileExpr(d, names(model, vars)));
@@ -384,7 +496,13 @@ export function buildObject(model: Model, o: ModelObject, opts?: { detail?: numb
       // impossible to state — and a trajectory whose start does not move with
       // the controls is a trajectory nobody can experiment with. So an
       // expression wins, then a fixed extent, then a control of that name.
-      const start = ['x0', 'y0', 'z0', 'w0'].map((k) => {
+      //
+      // AND A FOURTH WAY IS NOT "1". The fallback was `p ? p.value : 1`, so a
+      // trajectory nobody gave a start to began at (1, 1) and drew a curve read
+      // as a result — the same invention `StateVarDecl.init` was fixed for, in
+      // the other integrator. There is no number here that is better than the
+      // question, so the question is what comes back.
+      const start = ['x0', 'y0', 'z0', 'w0'].map((k): number | null => {
         const expr = o.defs?.[k];
         if (expr) {
           const e = compileExpr(expr, names(model, vars));
@@ -394,9 +512,18 @@ export function buildObject(model: Model, o: ModelObject, opts?: { detail?: numb
         const fromOver = o.over?.[k];
         if (fromOver) return fromOver[0];
         const p = model.params.find((q) => q.id.toLowerCase() === k);
-        return p ? p.value : 1;
+        return p ? p.value : null;
       });
-      const y0 = start.slice(0, ds.length);
+      const unstarted = ['x0', 'y0', 'z0', 'w0'].filter((k, i) => i < ds.length && start[i] === null);
+      if (unstarted.length) {
+        return NOTHING(
+          o,
+          `not computed — it needs ${unstarted
+            .map((k) => `a starting value for ${k[0]}`)
+            .join(' and ')}. A path has to begin somewhere, and choosing where would be choosing the path`
+        );
+      }
+      const y0 = start.slice(0, ds.length) as number[];
       const dt = typeof o.meta?.dt === 'number' ? (o.meta.dt as number) : 0.01;
       const steps = Math.min(200_000, typeof o.meta?.steps === 'number' ? (o.meta.steps as number) : 3000);
       const stateOf = (y: readonly number[], t: number) => ({

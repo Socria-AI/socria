@@ -251,6 +251,69 @@ produces the right numbers and cannot say how close it came is not a solve.
 | delete | drop `Pc = Pp + t` → underdetermined, values gone, gap stated, undo recomputes |
 | hardcoding | `algebra.ts` and `equations.ts` contain no `supply`, `demand`, `tax`, `price`, `equilibrium` or `domain ===` outside comments |
 
+## What was stopping it working at all
+
+The solver, the equation IR, the figure and the representation rule were all in
+place, and the capability was **unreachable from the product**. Eleven defects,
+every one found by running the engine rather than reading it.
+
+### The on-ramp had never heard of the block
+
+`lib/logos.ts` lists the blocks a proposal may carry — `mechanism`, `gravity`,
+`system`, `estimation` — and stopped there. Nothing ever emitted an `equations`
+block, so nothing was ever solved. Worse, the shape example showed a top-level
+`"equations": [...]` field which is **prose for a reader**, inviting exactly the
+mistake the original failure made: the relations written where nothing reads them.
+
+Worse still, one line read:
+
+> *WHEN NOT TO PROPOSE … when a picture already does it: a curve, a limit, **a
+> market**, a distribution, a titration have kinds above, and a proposal would be
+> a worse version of something that works.*
+
+The prompt was telling the model not to propose for the exact case in the brief.
+The block is now documented with a worked example, the prose list is marked as
+prose, the market exemption is gone, and `test/logos-models.test.mjs` asserts all
+of it so it cannot regress.
+
+### `statedFormally` did not list `equations`
+
+So a system of three relations in four unknowns — a person halfway through
+building one — had no runnable solver and no formal statement either.
+`buildProposal` refused it outright and `revalidate` destroyed it on reload. The
+same defect a specification had before *"a specification is a model before it is
+fitted"*, repeated one declaration later. A system of equations is a model before
+it is solvable, and an underdetermined one is exactly the model whose missing
+relationship the engine should be naming.
+
+### `set` never reached the document
+
+`applyModelOps` has a `case 'set'` whose comment says moving a control should be
+undoable — and `MODEL_OPS` did not list `set`, so the op went only to the view.
+A reply saying "set the tax to 20" moved the slider and the document never heard;
+undo could not undo it and a reload reverted it. It now goes to both: the document
+records it, and a surface with no document behind it keeps working sliders.
+
+## And eight more, all the same disease
+
+Every one of these is the engine producing something other than what the model
+says, with nothing recording the difference.
+
+| | what it did | what it does |
+|---|---|---|
+| **the run cache** | keyed on the model id, object id, version and controls — not on the equations or the initial conditions. Five n-body systems of 2, 6, 7, 9 and 12 bodies, each built fresh, **all** reported "8 states" and drew the two-body orbit. `buildProposal` stamps version 1 on every fresh proposal, so a server that builds two models the extractor called `market` hands the second the first's numbers. | keyed on a digest of the declaration — states, initial values, right-hand sides, stop, observables, step — plus the whole scope minus the clock |
+| **the state cap** | 24 in `system.ts` against 12 bodies × 4 states in `gravity.ts`. Six bodies fitted; the seventh threw `Cannot read properties of null (reading 'eval')`, because `simulate` **sliced** the state list and rebuilt its name list from the slice, so every right-hand side naming body 7 stopped compiling and `compileExpr(...)!` handed back null | `STATE_CAP` is 64 (a nine-planet system is 36 and runs), `BODY_CAP` is derived from it, over the cap is **refused with the count**, and the non-null assertion is gone |
+| **the sanitiser** | trimmed a 30-body declaration to 12 and a 70-state system to 24, recording neither. Forces are pairwise, so removing bodies changes how every remaining one moves: the model that ran was not the model proposed | every cap goes through `capped()`, which writes a line to `Model.dropped`; the report says *"Trimmed on the way in: …"* and the conversation is told. The sanitiser keeps more than the solvers will run, so a merely-too-big system reaches the solver's own refusal |
+| **a trajectory's start** | defaulted to `1`. The library's own double pendulum declared its two starting **angles** as controls and left the angular velocities to the engine — so the flagship chaos benchmark had been flinging both arms at 1 rad/s instead of releasing them from rest | refused by name: *"it needs a starting value for x and a starting value for y. A path has to begin somewhere, and choosing where would be choosing the path."* The library model now states `y0: '0'`, `w0: '0'` |
+| **a trajectory's components** | `['dx','dy','dz','dw'].filter(Boolean)` **compacted** the list, so a model giving `dx` and `dz` ran `dz` as the second component — whose expression names a state that no longer existed. It ran, drew a curve and reported no problem | positional with no holes; a gap names both the one given and the one missing |
+| **an all-NaN surface** | `sqrt(-1 - x² - y²)` compiles perfectly and has no value anywhere. The sampler returned a mesh of 2304 nulls, the note read "48 × 48 grid" and the fidelity read `model-derived` — an empty picture captioned as a computation. Nothing upstream can catch it: the router's job is whether the expression compiles, and it does | refused, naming the window it looked in. A curve with fewer than two points likewise. A **partial** one draws and says how many samples had no value |
+| **an extent** | `[-3, 3]` and `[0, 2π]` are rendering decisions, and the note gave a reader no way to tell them from a window the model chose | `rangeOf` returns where the extent came from, and the note says *"an extent this engine chose, which the model does not state"* |
+| **a note** | called the step count the state count: a two-state system integrated for 3000 steps reported "3001 states". Non-finite steps were silently filtered, so a run that diverged halfway drew half a curve and reported the half as the whole | *"3001 points along the path"*, and the dropped steps are counted |
+| **a refusal** | the estimator put *"1 observations cannot identify 2 coefficients"* in `unlocks` and `'a fit'` in `what` — and every reader shows `what`. The picture read *"not computed — it needs a fit"*, which answers "why is there no fit?" with "because it needs a fit" | `Missing.because` carries the sentence where naming the thing is circular; the reader prefers it, and *"it needs a stiffness for k1"* still reads as it did |
+| **a response surface** | two axes and four regressors means the other two are **held** while the surface is drawn — and nothing said so. *"wage, as the model implies it"* over education and experience, with tenure quietly fixed at whatever a slider read | names what is held and at what, says *"It is a SLICE of the relationship, not the whole of it"*, and says when a held regressor has no value at all |
+
+`test/model-honesty.test.mjs`, 89 assertions, covers all of them.
+
 ## What is still not there
 
 - **Nonlinear systems.** Refused by name. A Newton solver is the obvious next

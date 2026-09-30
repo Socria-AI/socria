@@ -59,6 +59,8 @@ export interface BuildReport {
   fidelity: Fidelity;
   /** one line a reply can use without inventing anything */
   says: string;
+  /** what the sanitiser removed from the proposal, when it removed anything */
+  dropped?: string[];
 }
 
 export interface Refusal {
@@ -292,6 +294,11 @@ export function buildProposal(raw: ModelProposal, opts?: { at?: number }): Built
           .map((m) => `${m.label} needs ${m.missing.map((x) => x.what).join(', ')}`)
           .join('; ')}.`
       : '',
+    // WHAT WAS TRIMMED ON THE WAY IN, said out loud. The sanitiser bounds
+    // unbounded input — that is its job — but a bound applied silently is
+    // indistinguishable from the proposal never having contained the thing, and
+    // the reply would then describe a model with more in it than was built.
+    built.dropped?.length ? `Trimmed on the way in: ${built.dropped.join('; ')}.` : '',
   ].filter(Boolean);
 
   return {
@@ -306,6 +313,7 @@ export function buildProposal(raw: ModelProposal, opts?: { at?: number }): Built
       missing,
       fidelity,
       says: parts.join(' '),
+      ...(built.dropped?.length ? { dropped: built.dropped } : {}),
     },
   };
 }

@@ -30,8 +30,26 @@ import { integrate } from './sample';
 import { scopeOf } from './compile';
 import type { Model, ModelObject, StateVarDecl, SystemDecl as Decl } from './schema';
 
-/** How many named states one system may carry. Beyond this, the picture is the problem. */
-export const STATE_CAP = 24;
+/**
+ * How many named states one system may carry.
+ *
+ * SIZED BY WHAT THE ASSEMBLERS PRODUCE, not by taste. A gravitating system in
+ * the plane is four states per body (x, y, vx, vy), so the twelve bodies
+ * lib/model/gravity.ts admits are 48 — and this was 24. Six bodies fitted; the
+ * seventh did not, and what happened then is the reason this comment is long:
+ * `simulate` SLICED the state list down to the cap and rebuilt its name list
+ * from the slice, so every right-hand side mentioning body 7 no longer compiled,
+ * `compileExpr(...)!` handed back null, and the integrator threw an uncaught
+ * TypeError. Measured: 2 and 6 bodies drew; 7, 9 and 12 threw
+ * `Cannot read properties of null (reading 'eval')`.
+ *
+ * Two changes, and the cap is only one of them: it is now large enough for
+ * everything the assemblers can build (48 < 64), and going over it is REFUSED by
+ * readSystem rather than truncated — a system with more states than can be run is
+ * not a smaller system, it is one that does not run, and saying so is the only
+ * honest answer.
+ */
+export const STATE_CAP = 64;
 /** How many steps any one run may take. Bounded, because a slider is attached to it. */
 export const STEP_CAP = 20_000;
 /** How many derived observations may ride along with a run. */
@@ -59,10 +77,21 @@ export interface Run {
 }
 
 export interface Missing {
-  /** what is absent */
+  /** what is absent, as a noun phrase: it is read after "it needs" */
   what: string;
   /** what it would let us do */
   unlocks: string;
+  /**
+   * The obstruction as a SENTENCE, when naming the missing thing is circular.
+   *
+   * "It needs a fit" answers "why is there no fit?" with "because it needs a
+   * fit" — which is what the estimator's refusal read like, because the real
+   * account ("one observation cannot identify two coefficients", "the regressors
+   * are collinear") sat in `unlocks`, and every reader of a refusal shows `what`
+   * and drops `unlocks`. Where a solver has a sentence, it puts it here and the
+   * reader prefers it.
+   */
+  because?: string;
 }
 
 /**
@@ -83,6 +112,23 @@ export function readSystem(
   if (!decl || !Array.isArray(decl.states) || !decl.states.length) {
     return { ok: false, missing: [{ what: 'the state variables', unlocks: 'anything at all: a system with no state has nothing to evolve' }] };
   }
+  // OVER THE CAP IS A REFUSAL, NOT A TRUNCATION. Checked here rather than in
+  // `simulate` so that the router, the capability grade and the pre-draw guard
+  // all see it, and the person is told the number rather than shown two thirds
+  // of their system integrated as though it were the whole.
+  if (decl.states.length > STATE_CAP) {
+    return {
+      ok: false,
+      missing: [
+        {
+          what: `a system of at most ${STATE_CAP} states — this one has ${decl.states.length}`,
+          unlocks:
+            'a run: beyond that the integration is too large to keep under a slider, and running part of it would be running a different system',
+        },
+      ],
+    };
+  }
+
   const names = decl.states.map((v) => v.name);
   const scope = scopeOf(model);
   const known = [...Object.keys(scope), ...names, 't'];
@@ -123,12 +169,30 @@ export function simulate(
   if (!read.ok) return read;
   const decl = read.decl;
 
-  const states = decl.states.slice(0, STATE_CAP);
+  // EVERY STATE, because readSystem has already refused a system with more than
+  // the cap. Slicing here was the bug: it rebuilt `known` from the survivors, so
+  // a right-hand side referring to a dropped state stopped compiling.
+  const states = decl.states;
   const names = states.map((v) => v.name);
   const scope = scopeOf(model);
   const known = [...Object.keys(scope), ...names, 't'];
 
-  const fns = names.map((n) => compileExpr(decl.rhs[n], known)!);
+  // NO NON-NULL ASSERTION. readSystem checks that every right-hand side compiles
+  // over this same name list, so a null here means the two disagree — which is
+  // exactly the class of bug the assertion hid. It is reported rather than
+  // dereferenced.
+  const compiled = names.map((n) => compileExpr(decl.rhs[n], known));
+  const uncompiled = names.filter((_, i) => !compiled[i]);
+  if (uncompiled.length) {
+    return {
+      ok: false,
+      missing: uncompiled.map((n) => ({
+        what: `a readable expression for d${n}/dt over ${names.length} states`,
+        unlocks: 'integration; the one given does not compile against the names this system declares',
+      })),
+    };
+  }
+  const fns = compiled as NonNullable<(typeof compiled)[number]>[];
   const y0 = states.map((v) => {
     if (typeof v.init === 'number') return v.init;
     // UNREACHABLE THROUGH readSystem, which refuses a state with no usable
@@ -279,9 +343,57 @@ export function driftOf(run: Run, name: string): { from: number; to: number; rel
 
 const RUNS = new Map<string, { ok: true; run: Run } | { ok: false; missing: Missing[] }>();
 
+/**
+ * A short, stable digest of a string. FNV-1a, which is enough for a cache key.
+ *
+ * Deterministic and dependency-free on purpose: a key built from Math.random or
+ * an object's identity would make the cache useless, and one built from a
+ * timestamp would make it wrong in the other direction.
+ */
+function digest(s: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return h.toString(36);
+}
+
+/**
+ * THE KEY IS EVERYTHING THE RUN DEPENDS ON, and it used to be a small subset.
+ *
+ * It was `${model.id}:${o.id}:${version}:${params}` — which leaves out the
+ * equations, the initial conditions, the step, the stopping condition, the
+ * observables, and every valued quantity that is not a control. Two models with
+ * the same id and version and no controls between them were therefore THE SAME
+ * KEY, and the second one silently received the first one's trajectory.
+ *
+ * Reproduced before the fix: five gravitating systems of 2, 6, 7, 9 and 12
+ * bodies, each built fresh, every one of them reporting "8 states" and drawing
+ * the two-body orbit. And `buildProposal` stamps version 1 on every fresh
+ * proposal, so a long-lived server that builds two different models the language
+ * model happened to call `market` hands the second one the first one's numbers.
+ *
+ * Now: the declaration itself, digested, plus the scope the expressions are
+ * evaluated in — minus the clock, because integrating once covers every instant
+ * the reader can scrub to, and that independence is the whole reason for a cache.
+ */
 function keyOf(model: Model, o: ModelObject): string {
-  const params = model.params.map((p) => `${p.id}=${p.value}`).join(',');
-  return `${model.id}:${o.id}:${model.version ?? 0}:${params}`;
+  const decl = o.system;
+  const scope = scopeOf(model);
+  delete scope.t;
+  const shape = JSON.stringify({
+    states: (decl?.states ?? []).map((v) => [v.name, v.init]),
+    rhs: decl?.rhs ?? {},
+    stop: decl?.stop ?? '',
+    observe: decl?.observe ?? {},
+    dt: decl?.dt ?? '',
+    steps: decl?.steps ?? '',
+    scope: Object.keys(scope)
+      .sort()
+      .map((k) => [k, scope[k]]),
+  });
+  return `${model.id}:${o.id}:${digest(shape)}`;
 }
 
 export function runFor(

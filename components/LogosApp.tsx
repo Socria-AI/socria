@@ -669,7 +669,21 @@ export function LogosApp({
    */
   const applyVizOps = useCallback((ops: VizOp[]) => {
     if (!ops.length) return;
-    const modelOps = ops.filter(isModelOp);
+    // `set` GOES TO BOTH, and that is not a hedge.
+    //
+    // applyModelOps has a `case 'set'` whose comment says moving a control is a
+    // change to the model that should be undoable — and MODEL_OPS did not list
+    // `set`, so it never arrived: a reply saying "set the tax to 20" moved the
+    // slider in the view and the document never heard about it. Undo could not
+    // undo it and a reload reverted it.
+    //
+    // It goes to the view as well because a surface with no document behind it —
+    // a model built straight from a proposal, a benchmark from the library — has
+    // nothing for applyModelOps to write to, and dropping the op there would
+    // take working sliders away. Applying it twice is harmless: setValue to a
+    // value a control already has is a no-op, and ModelView resyncs from the
+    // document's own revision when one exists.
+    const modelOps = ops.filter((o) => isModelOp(o) || o.op === 'set');
     const viewOps = ops.filter((o) => !isModelOp(o));
     if (modelOps.length) {
       patchActive((sess) => {

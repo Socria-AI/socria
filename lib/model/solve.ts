@@ -651,8 +651,26 @@ export interface Capability {
  * distinction the whole `mathematical` level exists to draw.
  */
 export function statedFormally(model: Model): ModelObject[] {
+  // EVERY DECLARATION BLOCK, AND `equations` WAS MISSING FROM THIS LIST.
+  //
+  // What that cost, measured: a system of four relations with only three of them
+  // written down — a person halfway through building one — had no runnable
+  // solver and no formal statement either, so buildProposal refused it outright
+  // ("nothing in it is stated formally, and nothing in it can be computed yet")
+  // and revalidate DESTROYED it on reload. The same defect a specification had
+  // before "a specification is a model before it is fitted", repeated one
+  // declaration later: a system of equations is a model before it is solvable,
+  // and an underdetermined one is exactly the model whose missing relationship
+  // the engine should be naming.
   return model.objects.filter(
-    (o) => !!o.definition || !!o.defs || !!o.system || !!o.mechanism || !!o.estimation || !!o.gravity
+    (o) =>
+      !!o.definition ||
+      !!o.defs ||
+      !!o.system ||
+      !!o.mechanism ||
+      !!o.estimation ||
+      !!o.gravity ||
+      !!o.equations
   );
 }
 

@@ -99,6 +99,10 @@ export function modelStateFrom(
   const model = unpack(modelIn);
   const noteOf = new Map(spec.notes.map((n) => [n.of, n]));
 
+  // WHAT THE SANITISER REMOVED, told to the conversation. Without this, "why are
+  // there only twenty-four planets?" has no answer anywhere the reply can reach.
+  const trimmed = (model.dropped ?? []).slice(0, 6);
+
   const entities: VizEntity[] = model.objects.map((o) => {
     const n = noteOf.get(o.id);
     const fidelity = n?.fidelity ?? o.fidelity ?? 'conceptual';
@@ -117,7 +121,9 @@ export function modelStateFrom(
     const routed = route(model, o);
     if (routed.status === 'incomplete') {
       bits.push(
-        `not computed yet — needs ${routed.missing.map((m) => m.what).join(', ')} (${routed.solver.label} would run it)`
+        `not computed yet — ${routed.missing
+          .map((m) => m.because ?? `needs ${m.what}`)
+          .join('; ')} (${routed.solver.label} would run it)`
       );
     } else if (routed.status === 'unsupported' && o.kind !== 'annotation' && o.kind !== 'axis') {
       bits.push(`nothing here computes this: ${routed.why}`);
@@ -212,6 +218,12 @@ export function modelStateFrom(
   // so; and what the next level would take is named rather than implied.
   const cap = capabilityOf(model);
   readouts.push(cap.says);
+
+  if (trimmed.length) {
+    readouts.push(
+      `TRIMMED ON THE WAY IN, so the model here has less in it than was proposed: ${trimmed.join('; ')}. Say so if it comes up rather than describing what was asked for.`
+    );
+  }
 
   // The integrator marking its own work, where the model declared an invariant.
   for (const o of model.objects) {

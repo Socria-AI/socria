@@ -505,8 +505,37 @@ console.log('\n=== the live path, read from the source ===');
   ok('  and told never to invent data', /NEVER INVENT DATA/.test(logos));
   ok('  and that the method is the person’s', /THE METHOD IS THEIRS/.test(logos));
 
+  // THE BLOCK THE PROMPT DID NOT MENTION.
+  //
+  // lib/model/algebra.ts, lib/model/equations.ts and the ALGEBRA solver were all
+  // in place and the capability was UNREACHABLE FROM THE PRODUCT, because the
+  // on-ramp's list of blocks ran mechanism / gravity / system / estimation and
+  // stopped. Nothing ever emitted an `equations` block, so nothing was ever
+  // solved — and the top-level prose `equations` list sat there inviting the
+  // relations to be written where nothing reads them.
+  ok('the extractor is told about the equations block', /"equations": what to solve for/.test(logos));
+  ok('  with a worked example it can copy',
+    /"equations": \{"unknowns": \["qd", "qs", "pc", "pp"\]/.test(logos), '');
+  ok('  told that a constraint is a relation like any other', /A CONSTRAINT IS A RELATION/.test(logos));
+  ok('  told to make the parameters controls', /Make the parameters CONTROLS/.test(logos));
+  ok('  told NOT to solve it itself', /DO NOT SOLVE IT YOURSELF/.test(logos));
+  ok('  told an incomplete system is still worth proposing',
+    /AN INCOMPLETE SYSTEM IS STILL WORTH PROPOSING/.test(logos));
+  ok('  and the prose list is marked as prose', /PROSE FOR A READER ONLY\. Nothing solves these/.test(logos));
+  // …and the line that told it NOT to propose for a market is gone.
+  ok('a market is no longer exempted from being a model',
+    !/a curve, a limit, a market, a distribution/.test(logos));
+  ok('  and the reversal is explained rather than silently deleted',
+    /THAT EXEMPTION USED TO INCLUDE "a market"/.test(logos));
+
   const app = read('components/LogosApp.tsx');
-  ok('the client splits model ops from view ops', /const modelOps = ops\.filter\(isModelOp\)/.test(app));
+  ok('the client splits model ops from view ops',
+    /const modelOps = ops\.filter\(\(o\) => isModelOp\(o\) \|\| o\.op === 'set'\)/.test(app));
+  // `set` GOES TO BOTH, and the reason is in the comment beside it: the document
+  // has to record a control being moved so that undo can undo it, and a surface
+  // with no document behind it still needs its sliders to work.
+  ok('  including set, which the document has to record', /o\.op === 'set'/.test(app));
+  ok('  and the view still gets it', /const viewOps = ops\.filter\(\(o\) => !isModelOp\(o\)\)/.test(app));
   ok('  and applies the model ones to the document', /applyModelOps\(ws, modelOps/.test(app));
   ok('  a stored session is re-validated on load', /sanitizeMap\(c\.map, \{ trust: 'stored' \}\)/.test(app));
   ok('  and what the engine said is shown', /setBuildNote\(/.test(app) && /\{buildNote\}/.test(app));

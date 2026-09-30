@@ -333,6 +333,16 @@ export function doublePendulum(): Model {
           dy: dOmega1,
           dz: 'w',
           dw: dOmega2,
+          // RELEASED FROM REST, and stated so rather than left to a default.
+          //
+          // These two were absent, and the engine filled them in with 1 — so the
+          // flagship chaos benchmark had been integrating a pendulum flung at 1
+          // rad/s on both arms rather than the one this model describes, whose
+          // assumptions say it is sensitive to its starting ANGLES. Found when
+          // the engine stopped inventing initial conditions; the angles are the
+          // controls, the velocities are zero, and now the model says both.
+          y0: '0',
+          w0: '0',
           // The state is angles; a position is not an angle. The map from one
           // to the other is stated here, in the model, and evaluated per step.
           px: 'sin(x) + sin(z)',

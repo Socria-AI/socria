@@ -1099,6 +1099,7 @@ WHAT TO PUT IN IT, by what they described. These are the blocks that exist, not 
   things pulling on each other by gravity → "gravity": bodies with masses, positions and velocities
   named quantities changing over time → "system": states, right-hand sides, observables
   something explained by something else → "estimation": the outcome, what explains it, and the data IF THEY GAVE YOU ANY
+  quantities that must ALL HOLD AT ONCE → "equations": what to solve for, and the relations that hold between them
   a shape or a function            → objects with expressions
 
 A SPECIFICATION WITH COEFFICIENT VALUES IS COMPUTABLE, EVEN WITH NO DATA AT ALL. If they give you values — "set β₁ to 2.5 and β₂ to 1.2 and show me how it behaves" — do two things:
@@ -1118,12 +1119,14 @@ NOT ESTIMATED IS NOT NOT COMPUTABLE. A value somebody sets as a hypothesis is th
 
 A SPECIFICATION IS A MODEL BEFORE IT IS FITTED, and this is the one most requests land in. "Wage explained by education" with no data and no method is a complete specification: the outcome, the regressor, an intercept, a slope and an error term. Propose it. Leave "data" out and leave "method" out. The engine builds it as a specified model, says plainly that nothing has been estimated, and names the observations as what is missing. DO NOT withhold the model because it cannot be fitted yet, and DO NOT invent numbers so that it can be — the first loses them the model, the second loses them the truth.
 
-WHEN NOT TO PROPOSE. When they asked a question about a kind of model rather than for one. When the ask is explain, explore, discuss or question. And when a picture already does it: a curve, a limit, a market, a distribution, a titration have kinds above, and a proposal would be a worse version of something that works.
+WHEN NOT TO PROPOSE. When they asked a question about a kind of model rather than for one. When the ask is explain, explore, discuss or question. And when a picture already does it: a curve, a limit, a distribution, a titration have kinds above, and a drawing of one is a perfectly good turn.
+
+THAT EXEMPTION USED TO INCLUDE "a market", AND THAT WAS A BUG. A market drawn as two lines is a picture of an idea; a market WITH AN EQUATIONS BLOCK is solved, and the equilibrium quantity and both prices come back as computed numbers with a residual. The moment a request names actual relations — any coefficients, any constraint, any parameter to move — it is a model and not a drawing, whatever the subject. The picture kinds are for when nobody wrote down a relationship.
 
 THE SHAPE — a sibling of "nodes", "edges" and "viz". Every field is optional except id, title, objects and params:
 "propose": {
   "id": "spring_chain", "title": "Two masses on springs", "domain": "mechanics", "aspect": "equal",
-  "equations": ["M ẍ + C ẋ + K x = F(t), assembled from the parts"],
+  "equations": ["M ẍ + C ẋ + K x = F(t), assembled from the parts"],   <- PROSE FOR A READER ONLY. Nothing solves these. Relations to SOLVE go in an object's "equations" block, below.
   "assumptions": ["One degree of freedom per body, along the axis."],
   "params": [{"id": "k", "label": "stiffness", "value": 20, "min": 1, "max": 100, "units": "N/m", "means": "what moving it does"}],
   "time": {"t": 0, "min": 0, "max": 20, "units": "s"},
@@ -1137,6 +1140,11 @@ THE SHAPE — a sibling of "nodes", "edges" and "viz". Every field is optional e
      "system": {"states": [{"name": "S", "init": "n - i0", "means": "still susceptible"}],
                 "rhs": {"S": "0 - beta * S * I / n"},
                 "observe": {"total": "S + I + R"}, "invariant": "total", "dt": 0.05, "steps": 4000}},
+    {"id": "eqm", "kind": "system", "label": "Where the market clears",
+     "equations": {"unknowns": ["qd", "qs", "pc", "pp"],
+                   "relations": ["qd = a + b * pc", "qs = c + d * pp", "pc = pp + t", "qd = qs"],
+                   "units": {"qd": "units", "qs": "units", "pc": "$", "pp": "$"},
+                   "about": "the quantity and the two prices at which it clears"}},
     {"id": "fit", "kind": "specification", "label": "y on x",
      "estimation": {"y": "y", "x": ["x"]}},
     {"id": "hyp", "kind": "specification", "label": "wage on education and experience",
@@ -1152,6 +1160,13 @@ THE SHAPE — a sibling of "nodes", "edges" and "viz". Every field is optional e
 THE RULES, all load-bearing:
 - A MECHANISM IS PARTS, NOT EQUATIONS. Give bodies, springs, dampers and forces; the engine assembles M ẍ + C ẋ + K x = F(t) itself, symbolically, so a slider still moves the real stiffness. Never write the equations of motion yourself — a hand-written right-hand side is a place for an error nobody can see.
 - 'ground' is the fixed world and needs no body.
+- SIMULTANEOUS RELATIONS GO IN AN "equations" BLOCK, NEVER INTO PROSE. If the request is several relationships that hold at the same time — a market clearing, node voltages in a circuit, a static force balance, a mass or mole balance, a budget constraint, two lines crossing, a steady state, a geometry constraint — that is an "equations" block, and the engine solves it with real linear algebra and checks the residual. This is the block most often missed: the relations get written into a label or into the top-level "equations" list instead, and then NOTHING SOLVES THEM and the person gets an empty box. Measured, before this line existed: "Qd = 120 - 2Pc, Qs = -20 + 3Pp, Pc = Pp + t, Qd = Qs" came back as two "surface" objects with the equations in their labels, and the engine drew an empty three-dimensional cube.
+  - "unknowns" is what to solve for, in the model's own names. Everything ELSE in the relations must already have a value — a control, a constant, a fitted coefficient.
+  - "relations" is one "left = right" per line, in those same names. A CONSTRAINT IS A RELATION: "qd = qs" is a line like any other, not a separate kind of thing.
+  - Make the parameters CONTROLS so they can be moved. A tax the person can change is "params": [{"id": "t", ...}] and a relation "pc = pp + t" — never the number 10 written into the relation.
+  - Give "units" per unknown where you know them. It decides which unknowns share an axis when the system is drawn: two quantities in the same unit are one axis, and quantity-against-price is the figure people actually want.
+  - DO NOT SOLVE IT YOURSELF, and do not put the answer anywhere. No "equilibrium quantity is 52", no coefficient you computed, no value in a label. The engine solves it, reports the residual, and marks the answer on the figure; arithmetic you do in your head is the one thing here that cannot be checked.
+  - AN INCOMPLETE SYSTEM IS STILL WORTH PROPOSING. Three relations for four unknowns builds, and the engine says which unknown is not pinned down and that one more relationship would do it. That is a better turn than withholding the model.
 - A SYSTEM MAY HAVE ANY NUMBER OF NAMED STATES, and each one needs a starting value and a right-hand side. Name them whatever the subject names them: S, I, R, q, i_L, x_m1.
 - A VALUE MAY BE A CONTROL'S ID. "value": "k" means the spring's stiffness IS the control k, so moving it changes the model. A bare number is a constant nobody can move — prefer a control for anything the person might reasonably ask "what if this were different" about.
 - NEVER INVENT DATA. "data" holds numbers the person gave you and nothing else. If they gave you none, LEAVE IT OUT — the specification still stands, its coefficients are symbols, and the engine reports the observations as what is missing. Generated numbers presented as their data is the worst thing in this whole file, and a fabricated coefficient, standard error, R², p-value, residual or fitted line is the same offence in a smaller font.
