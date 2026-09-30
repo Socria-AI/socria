@@ -461,10 +461,18 @@ export const DATA: Solver = {
   kind: 'data',
   produces: 'data-derived',
   method: 'arranges supplied numbers — a grid, a set of points, a series, named columns — without altering them',
-  handles: (_m, o) => ['dataset', 'series', 'measurement', 'distribution'].includes(o.kind),
+  // `point` and `particle` ARE HERE BECAUSE THE COMPILER DRAWS THEM. A point
+  // carrying a value is a mark — compile.ts puts it at that value — and the
+  // router did not claim the kind at all, so it reported that nothing in the
+  // engine could do anything with an object that draws perfectly well. The same
+  // disagreement the surface had, and the series had: the router must know what
+  // the compiler can do, or one of them is wrong about the same object.
+  handles: (_m, o) => ['dataset', 'series', 'measurement', 'distribution', 'point', 'particle'].includes(o.kind),
   requires: (m, o) => {
     if (o.data && m.data?.[o.data]) return [];
     if (o.defs || o.definition) return [];
+    // A VALUE IS NUMBERS. One of them, which is all a point needs.
+    if (typeof o.value === 'number') return [];
     return [{ what: 'the numbers, as a data block', unlocks: 'showing the data rather than a picture of what it might look like' }];
   },
 };

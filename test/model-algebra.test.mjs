@@ -253,16 +253,26 @@ const crossing = () => ({
     ],
   });
   const wasSpec = buildSpec(before);
-  ok('the old shape chose three dimensions', wasSpec.dimensionality === 3);
-  ok('  and drew nothing', wasSpec.primitives.length === 0);
-  ok('  which is the empty cube, reproduced', wasSpec.dimensionality === 3 && !wasSpec.primitives.length);
-  ok('  …and at least now says why', wasSpec.notes.every((n) => n.of === 'demand' || n.of === 'supply' ? !!n.problem : true));
+  // THE SHAPE THAT PRODUCED THE EMPTY CUBE, AND WHAT IT DOES NOW.
+  //
+  // It chose `surface3d` in THREE dimensions from the object kinds alone and drew
+  // nothing — a coordinate box with an empty interior, captioned as a deliberate
+  // illustration. The representation now comes from what can actually be shown,
+  // so the same input gets no extent claimed for it at all.
+  ok('the old shape still draws nothing', wasSpec.primitives.length === 0);
+  ok('  but no longer claims three dimensions for it', wasSpec.dimensionality === 2,
+    String(wasSpec.dimensionality));
+  ok('  so the empty cube is not reachable from here', !(wasSpec.dimensionality === 3 && !wasSpec.primitives.length));
+  ok('  and it says why', wasSpec.notes.every((n) => n.of === 'demand' || n.of === 'supply' ? !!n.problem : true));
 
   // THE NEW SHAPE. The same relationships, written as relations.
   const m = unpack(buildProposal(crossing(), { at: 1 }).model);
   const choice = chooseRepresentation(m);
   ok('an equation system chooses the plane', choice.dimensionality === 2, JSON.stringify(choice));
-  ok('  and says why in terms of the structure', /lines in the plane/.test(choice.why), choice.why);
+  // The sentence comes from whichever view the registry chose, and both are about
+  // the same thing: relations read as lines in a plane.
+  ok('  and says why in terms of the structure',
+    /lines in the plane|line in the plane|relations that hold at once/.test(choice.why), choice.why);
 
   // FOUR UNKNOWNS IS STILL THE PLANE. The rule under test is that the number of
   // variables does not set the number of visual dimensions.

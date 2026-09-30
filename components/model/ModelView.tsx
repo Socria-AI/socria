@@ -28,7 +28,7 @@ import { boxLines, place, type Camera, type Frame3, type Pt2 } from '@/lib/logos
 import { contour } from '@/lib/model/sample';
 import type { P3, Primitive } from '@/lib/model/primitives';
 import { buildSlice } from '@/lib/model/compile';
-import { inputsOf } from '@/lib/model/derive';
+import { inputsAwaiting, inputsOf } from '@/lib/model/derive';
 import { Understand } from './Understand';
 import { buildSpec, type VisualizationSpec } from '@/lib/model/spec';
 import { modelStateFrom, applyOps, type ViewState } from '@/lib/model/state';
@@ -146,14 +146,31 @@ export function ModelView({
   // FUNCTION, moving education changes WHERE ON it you are reading. Both write
   // to the model, because the model is authoritative and this is a projection.
   const inputs = useMemo(() => inputsOf(model), [model]);
+  // …and the ones that cannot be moved yet, shown rather than omitted. The thing
+  // standing between this model and a picture was invisible in the one place a
+  // person would look for it.
+  const awaiting = useMemo(() => inputsAwaiting(model), [model]);
 
   const groups = useMemo(
     () => [
-      ...(inputs.length
+      ...(inputs.length || awaiting.length
         ? [{
             id: 'inputs',
             label: 'Inputs',
-            ctls: inputs.map((q) => ({
+            ctls: [
+              ...awaiting.map((q) => ({
+                // A CONTROL WITH NOWHERE TO GO, and that is the point: it is
+                // present, named, and its help says what it is waiting for. A
+                // range is a modelling decision and the engine will not make it.
+                id: `wait:${q.id}`,
+                label: q.label,
+                min: 0,
+                max: 1,
+                step: 1,
+                read: () => 'needs a range',
+                help: q.why,
+              })),
+              ...inputs.map((q) => ({
               id: `at:${q.id}`,
               label: q.label,
               min: q.min,
@@ -161,7 +178,8 @@ export function ModelView({
               step: (q.max - q.min) / 100,
               read: (v: number) => `${Number(v.toPrecision(4))}${q.units ? ` ${q.units}` : ''}`,
               help: `a free input: the relationship is evaluated over it, and moving this reads it at a different point rather than changing it`,
-            })),
+              })),
+            ],
           }]
         : []),
       {
@@ -582,8 +600,26 @@ export function ModelView({
           // when something is selected. A picture showing four of eleven
           // objects looks exactly like a picture showing all four.
           (() => {
-            const absent = spec.notes.filter((n) => n.problem).length;
-            return absent ? `${absent} of ${spec.notes.length} objects are in the model and not on this picture. ` : '';
+            // THE DENOMINATOR WAS EVERY NOTE, and most notes are for things that
+            // were never marks: a coefficient, a solved value, a slope that is a
+            // number, an error term. "2 of 12 objects are not on this picture"
+            // read as ten drawn when none were. The count that means something is
+            // how many were REFUSED, and separately how many are read rather than
+            // looked at.
+            const refused = spec.notes.filter((n) => n.problem);
+            const drewNothing = spec.notes.filter(
+              (n) => !n.problem && !spec.primitives.some((p) => p.of === n.of)
+            );
+            const bits: string[] = [];
+            if (refused.length) {
+              bits.push(
+                `${refused.length} object${refused.length === 1 ? ' is' : 's are'} in the model and could not be drawn`
+              );
+            }
+            if (drewNothing.length) {
+              bits.push(`${drewNothing.length} are read rather than looked at`);
+            }
+            return bits.length ? `${bits.join('; ')}. ` : '';
           })() +
           (spec.panels?.length
             ? `The ${spec.panels.length} panels below are the same run, not separate ones. `
@@ -679,6 +715,13 @@ const SAYS: Record<string, string> = {
  * floor and then says what the rest of it is.
  */
 function fidelityLine(spec: VisualizationSpec): string {
+  // NOTHING DRAWN IS NOT "DRAWN TO MAKE THE IDEA LEGIBLE". An empty frame
+  // captioned as a deliberate illustration is the most misleading sentence this
+  // component can print: it reads as a choice somebody made rather than as a
+  // computation that did not happen.
+  if (!spec.primitives.length) {
+    return 'Nothing is drawn here yet — the notes above say what each object is waiting for.';
+  }
   const kinds = [...new Set(spec.notes.filter((n) => !n.problem).map((n) => n.fidelity))];
   const floor = SAYS[spec.fidelity] ?? SAYS.conceptual;
   const others = kinds.filter((k) => k !== spec.fidelity);

@@ -32,7 +32,7 @@
 
 import { derivativeOf, namesOf as namesIn, parse, print, rename, substitute, type Expr } from './expr';
 import type { Model, ModelObject } from './schema';
-import { known, symbolTable } from './symbols';
+import { known, symbolTable, withoutDomain } from './symbols';
 import { basesOf, isPointwise, termExpr, termLabel, type TermDecl } from './terms';
 
 /** The expression an object carries, whichever way it says it. */
@@ -372,6 +372,22 @@ export function expandReadouts(model: Model): Model {
   const kept = model.objects.map((o) => made.get(o.id) ?? o);
   const fresh = [...made.entries()].filter(([id]) => !model.objects.some((o) => o.id === id));
   return { ...model, objects: [...kept, ...fresh.map(([, o]) => o)] };
+}
+
+/**
+ * Free inputs that have NO range, and so cannot be moved yet.
+ *
+ * SHOWN RATHER THAN OMITTED. A relationship in education and a female indicator
+ * offered one slider and said nothing about the second input at all — so the
+ * thing standing between the model and a picture was invisible in the one place
+ * a person would look for it. An input awaiting a range is an input.
+ */
+export function inputsAwaiting(model: Model): { id: string; label: string; why: string }[] {
+  return withoutDomain(symbolTable(model)).map((q) => ({
+    id: q.id,
+    label: q.display,
+    why: `no range yet — say what values of ${q.display} are worth looking at, or what kind of quantity it is. It does not need observations.`,
+  }));
 }
 
 /** Every free input this model states, with its range and where it is standing. */

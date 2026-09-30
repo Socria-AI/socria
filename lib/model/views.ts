@@ -50,6 +50,7 @@ import type { Fidelity, Model, ModelObject } from './schema';
 export type ViewFamily =
   | 'surface'
   | 'curve'
+  | 'scatter'
   | 'contour'
   | 'slice'
   | 'field'
@@ -93,6 +94,17 @@ export interface ViewSpec {
   fidelity: Fidelity;
   /** what a person can do in it */
   can: ViewGesture[];
+  /**
+   * Does this view put MARKS IN A FRAME, or is it something read?
+   *
+   * The distinction the frame turns on, and it is not the same as the family: a
+   * surface, a curve, a field and a trajectory occupy extent; an equation, a
+   * table, a model's own account and A CONSTANT SLOPE do not. A frame claimed for
+   * a view with no marks is an empty box — the most confident thing this engine
+   * can draw and the least honest — so the representation chooser asks this
+   * rather than carrying its own list of which families count.
+   */
+  marks: boolean;
   /** true for the one the engine would choose on its own */
   primary?: boolean;
   /**
@@ -108,6 +120,41 @@ export interface Unavailable {
   /** what the model would have to contain or compute */
   wouldNeed: string;
 }
+
+/**
+ * The families that occupy extent. Everything else is read rather than looked at.
+ *
+ * One table, applied once in `add`, so a new family declares this by being in the
+ * set or not — and no caller keeps its own copy of the question.
+ */
+const OCCUPIES_EXTENT = new Set<ViewFamily>([
+  'surface', 'curve', 'scatter', 'contour', 'slice', 'field', 'trajectory',
+  'phase', 'mechanism', 'timeline', 'animation', 'residual', 'interval', 'network',
+]);
+
+/**
+ * What kind of thing gets what kind of view, for anything the branches above
+ * did not already claim.
+ *
+ * Deliberately a MAP rather than a chain of conditions: a kind that is not here
+ * gets no view and that is visible, where a missing `if` is not.
+ */
+const FAMILY_OF_KIND: Partial<Record<ModelObject['kind'], ViewFamily>> = {
+  series: 'timeline',
+  distribution: 'distribution',
+  dataset: 'scatter',
+  measurement: 'scatter',
+  point: 'scatter',
+  particle: 'scatter',
+  scalar: 'table',
+  vector: 'field',
+  region: 'surface',
+  plane: 'surface',
+  boundary: 'curve',
+  mesh: 'surface',
+  node: 'network',
+  graph: 'network',
+};
 
 const RUNS = (m: Model, o: ModelObject) => route(m, o, 'simulate').status === 'runnable';
 const DRAWS = (m: Model, o: ModelObject) => route(m, o, 'evaluate').status === 'runnable';
@@ -129,8 +176,9 @@ export function worth(m: Model, o: ModelObject): Fidelity {
  */
 export function viewsFor(model: Model): ViewSpec[] {
   const out: ViewSpec[] = [];
-  const add = (v: ViewSpec) => {
-    if (!out.some((x) => x.id === v.id)) out.push(v);
+  const add = (v: Omit<ViewSpec, 'marks'> & { marks?: boolean }) => {
+    if (out.some((x) => x.id === v.id)) return;
+    out.push({ ...v, marks: v.marks ?? OCCUPIES_EXTENT.has(v.family) });
   };
   const table = symbolTable(model);
 
@@ -242,6 +290,11 @@ export function viewsFor(model: Model): ViewSpec[] {
       add({
         id: `derivative:${o.id}`, family: 'derivative', label: o.label, of: o.id,
         dimensionality: 2,
+        // A CONSTANT SLOPE IS A NUMBER. ∂y/∂x in a model linear in x is β₁
+        // everywhere: there is nothing to plot, and claiming a frame for it is
+        // how an empty box came to be drawn beside a relationship that could not
+        // be evaluated at all.
+        marks: !o.meta?.constant,
         because: 'the relationship was differentiated symbolically, so its slope exists as a quantity',
         shows: o.meta?.constant
           ? 'the slope, which does not vary — the same everywhere'
@@ -287,7 +340,48 @@ export function viewsFor(model: Model): ViewSpec[] {
         shows: 'the relations as written, and the values that satisfy them',
         fidelity: worth(model, o), can: ['select'],
       });
+      // AND THE FIGURE, WHEN IT SOLVES. A solved system is lines in a plane —
+      // each relation drawn from its own coefficients, the solution a point, an
+      // offset between two quantities on one axis a segment. That IS marks, and
+      // the registry had no entry for it: so a market that solved perfectly and
+      // drew its own figure was counted as having nothing to show, and the frame
+      // chooser dropped to the equation view over a picture that was there.
+      if (route(model, o, 'solve').status === 'runnable') {
+        add({
+          id: `curve:${o.id}`, family: 'curve', label: o.label, of: o.id, dimensionality: 2,
+          because: 'the relations solve, so each one is a line in the plane of the quantities they relate',
+          shows: 'the relations as lines, the values that satisfy them as a point, and any offset between quantities sharing an axis as a segment',
+          fidelity: worth(model, o), can: ['select', 'point'], primary: true,
+        });
+      }
     }
+  }
+
+  // ── ANYTHING ELSE THAT DRAWS, SO THE REGISTRY CANNOT SILENTLY OMIT ──
+  //
+  // THE FAILURE THIS CLOSES, and it is the empty-frame failure in the other
+  // direction. A series with numbers in it draws — the DATA solver reads it
+  // straight off the block — and no branch above covers a `series`, so the
+  // registry reported NOTHING available and the frame chooser, which now trusts
+  // the registry, claimed no extent for a picture that was there.
+  //
+  // A registry that enumerates by hand omits by hand. So the last word belongs to
+  // the ROUTER: if something can run this object, it has a view, and its family
+  // comes from what kind of thing it is. A kind added to the schema tomorrow gets
+  // a view without anybody remembering to come here.
+  for (const o of model.objects) {
+    if (out.some((v) => v.of === o.id)) continue;
+    const ops = operationsOn(model, o).filter((v) => v.routed.status === 'runnable');
+    if (!ops.length) continue;
+    const family = FAMILY_OF_KIND[o.kind];
+    if (!family) continue;
+    add({
+      id: `${family}:${o.id}`, family, label: o.label, of: o.id,
+      dimensionality: 2,
+      because: `${ops[0].routed.status === 'runnable' ? (ops[0].routed as { solver: { label: string } }).solver.label : 'a solver'} runs this object`,
+      shows: o.meaning ?? `${o.label}, as this model holds it`,
+      fidelity: worth(model, o), can: ['select', 'point'], primary: true,
+    });
   }
 
   // ── views of the MODEL rather than of one object ────────────────

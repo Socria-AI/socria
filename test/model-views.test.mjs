@@ -20,12 +20,15 @@
 import { LIBRARY, modelById } from './.tmp/library.mjs';
 import { unpack } from './.tmp/unpack.mjs';
 import { buildProposal } from './.tmp/propose.mjs';
-import { buildSpec } from './.tmp/spec.mjs';
+import { buildSpec, chooseRepresentation } from './.tmp/spec.mjs';
+import { buildObject } from './.tmp/compile.mjs';
 import { sanitizeModel } from './.tmp/schema.mjs';
 import { viewsFor, unavailable, primaryView, viewLines } from './.tmp/views.mjs';
+import { operationsOn } from './.tmp/solve.mjs';
 import { inspectModel, inspectObject, whyOf, whyLines, whatChanged, computationFacts, transparencyLine } from './.tmp/inspect.mjs';
 import { modelStateFrom } from './.tmp/model-state.mjs';
 import { EMPTY_WORKSPACE, applyModelOps, modelFor, openFromProposal } from './.tmp/docs.mjs';
+import { inputsAwaiting } from './.tmp/derive.mjs';
 
 let pass = 0, fail = 0;
 const ok = (n, c, x = '') => (c ? pass++ : (fail++, console.log('FAIL', n, x)));
@@ -270,6 +273,137 @@ console.log('\n=== linked selection ===');
   ok('selecting something absent is refused', !ghost.changed);
   // …and it survives a save.
   ok('the selection survives a reload', sanitizeModel(doc()).selected === 'sp__y');
+}
+
+// ═══ A FRAME IS NEVER CLAIMED FOR SOMETHING THAT CANNOT BE DRAWN ════
+//
+// THE FAILURE THIS IS WRITTEN AGAINST, reported from the live product and
+// reproduced exactly: a log-wage relationship whose second input had no range
+// came back as an EMPTY 3D CARTESIAN CUBE. `viewsFor` had it right — the surface
+// refuses, so only structure, sensitivity, equation and text were available — and
+// `chooseRepresentation` looked at OBJECT KINDS, saw a `surface`, and returned
+// surface3d in three dimensions anyway. Two answers to one question, disagreeing
+// exactly where it mattered.
+//
+// An empty box is the most confident thing this engine can draw and the least
+// honest.
+console.log('\n=== the frame comes from what can be shown ===');
+{
+  const halfSpecified = unpack(buildProposal({
+    id: 'half', title: 'one input has no range', params: [
+      { id: 'a0', label: 'β₀', value: 1, min: 0, max: 5, step: 0.1 },
+      { id: 'a1', label: 'β₁', value: 2, min: 0, max: 5, step: 0.1 },
+      { id: 'a2', label: 'β₂', value: 3, min: 0, max: 5, step: 0.1 }],
+    objects: [{ id: 'sp', kind: 'specification', label: 'y on x and z',
+      estimation: { y: 'y', x: ['x', 'z'], coefficients: { intercept: 'a0', x: 'a1', z: 'a2' },
+        over: { x: [0, 10] } } }],
+  }, { at: 1 }).model);
+
+  const choice = chooseRepresentation(halfSpecified);
+  const spec = buildSpec(halfSpecified);
+  ok('nothing draws', spec.primitives.length === 0, String(spec.primitives.length));
+  ok('  so the frame is NOT three dimensions', choice.dimensionality === 2, String(choice.dimensionality));
+  ok('  and not a surface', choice.kind !== 'surface3d', choice.kind);
+  ok('  the spec agrees', spec.dimensionality === 2, String(spec.dimensionality));
+  ok('  and the chooser agrees with the registry',
+    choice.kind === (primaryView(halfSpecified)?.family === 'equation' ? 'equation' : choice.kind),
+    `${choice.kind} vs ${primaryView(halfSpecified)?.family}`);
+  ok('  the input with no range is still named as an input',
+    inputsAwaiting(halfSpecified).some((q) => q.label === 'z'),
+    JSON.stringify(inputsAwaiting(halfSpecified)));
+  ok('    and says a range is what it needs, not observations',
+    /does not need observations/.test(inputsAwaiting(halfSpecified)[0]?.why ?? ''),
+    inputsAwaiting(halfSpecified)[0]?.why);
+
+  // …and the moment it CAN be drawn, three dimensions are legitimate again.
+  const whole = unpack(buildProposal({
+    id: 'whole', title: 'both inputs have ranges', params: [
+      { id: 'a0', label: 'β₀', value: 1, min: 0, max: 5, step: 0.1 },
+      { id: 'a1', label: 'β₁', value: 2, min: 0, max: 5, step: 0.1 },
+      { id: 'a2', label: 'β₂', value: 3, min: 0, max: 5, step: 0.1 }],
+    objects: [{ id: 'sp', kind: 'specification', label: 'y on x and z',
+      estimation: { y: 'y', x: ['x', 'z'], coefficients: { intercept: 'a0', x: 'a1', z: 'a2' },
+        over: { x: [0, 10], z: [0, 10] } } }],
+  }, { at: 1 }).model);
+  ok('with both ranges it draws', buildSpec(whole).primitives.length > 0);
+  ok('  and three dimensions are legitimate', chooseRepresentation(whole).dimensionality === 3);
+  ok('  with no input left waiting', inputsAwaiting(whole).length === 0);
+
+  // EVERY library model still gets a frame it can fill.
+  for (const e of LIBRARY) {
+    const m = unpack(e.build());
+    const sp = buildSpec(m);
+    ok(`${e.id}: never an empty frame with extent claimed`,
+      sp.primitives.length > 0 || sp.dimensionality === 2,
+      `${sp.primitives.length} primitives in ${sp.dimensionality}D`);
+  }
+}
+
+// ═══ THE REGISTRY CANNOT SILENTLY OMIT SOMETHING THAT DRAWS ═════════
+//
+// The empty-frame failure in the other direction, and the one that made the
+// frame chooser dangerous to trust: a series with numbers in it DRAWS — the data
+// solver reads it straight off the block — and no branch enumerated a `series`,
+// so the registry reported nothing available and no extent was claimed for a
+// picture that was there. A registry that enumerates by hand omits by hand.
+console.log('\n=== nothing that draws is missing from the registry ===');
+{
+  // THE INVARIANT, STATED PRECISELY. Not "every object that draws is a view" —
+  // a spring is a mark INSIDE the mechanism's view and a centre marker is a mark
+  // inside the orbit's, and offering "a view of the spring" would be wrong. What
+  // must hold is that an object that draws and is NOT a part of something else is
+  // reachable as a view of its own, because otherwise the registry has a picture
+  // it cannot name and the frame chooser has no reason to claim extent for it.
+  const isPart = (o) =>
+    ['mech', 'gravity', 'spec', 'of'].some((k) => typeof o.meta?.[k] === 'string') ||
+    (o.relations ?? []).some((r) => r.as === 'contains');
+  for (const e of LIBRARY) {
+    const m = unpack(e.build());
+    const all = viewsFor(m);
+    const standalone = m.objects.filter(
+      (o) => !isPart(o) && buildObject(m, o).primitives.length > 0
+    );
+    const orphans = standalone.filter((o) => !all.some((v) => v.of === o.id));
+    ok(`${e.id}: every standalone object that draws has a view`, orphans.length === 0,
+      JSON.stringify(orphans.map((o) => `${o.id}:${o.kind}`)));
+  }
+  // …and the frame follows: anything that produces marks gets extent claimed.
+  for (const e of LIBRARY) {
+    const m = unpack(e.build());
+    const sp = buildSpec(m);
+    if (!sp.primitives.length) continue;
+    ok(`${e.id}: a picture that exists gets a frame`, viewsFor(m).some((v) => v.marks),
+      JSON.stringify(viewsFor(m).map((v) => `${v.family}:${v.marks}`)));
+  }
+  // A series with numbers, specifically — the one that was missing.
+  const series = unpack(sanitizeModel({
+    id: 'ser', title: 'readings over time', params: [],
+    data: { d: { label: 'readings', t: [0, 1, 2, 3], v: [1, 4, 9, 16] } },
+    objects: [{ id: 'v', kind: 'series', label: 'the reading', data: 'd' }],
+  }));
+  ok('a series with numbers has a view', viewsFor(series).some((v) => v.of === 'v'),
+    JSON.stringify(viewsFor(series).map((v) => v.family)));
+  ok('  which occupies extent', viewsFor(series).some((v) => v.of === 'v' && v.marks));
+  ok('  and it draws', buildSpec(series).primitives.length > 0);
+
+  // A SOLVED EQUATION SYSTEM DRAWS ITS FIGURE, and the registry says so.
+  const market = unpack(buildProposal({
+    id: 'mkt', title: 'where it clears', params: [
+      { id: 'a', label: 'a', value: 120, min: 0, max: 300, step: 1 },
+      { id: 'b', label: 'b', value: -2, min: -10, max: 0, step: 0.1 },
+      { id: 'c', label: 'c', value: -20, min: -100, max: 100, step: 1 },
+      { id: 'd', label: 'd', value: 3, min: 0, max: 10, step: 0.1 }],
+    objects: [{ id: 'eq', kind: 'system', label: 'where it clears', equations: {
+      unknowns: ['qd', 'qs', 'pc', 'pp'],
+      relations: ['qd = a + b * pc', 'qs = c + d * pp', 'pc = pp', 'qd = qs'],
+      units: { qd: 'units', qs: 'units', pc: 'currency', pp: 'currency' } } }],
+  }, { at: 1 }).model);
+  ok('a solved system offers its figure', viewsFor(market).some((v) => v.of === 'eq' && v.marks),
+    JSON.stringify(viewsFor(market).map((v) => `${v.family}:${v.marks}`)));
+  ok('  and the relations as written, separately',
+    viewsFor(market).some((v) => v.of === 'eq' && v.family === 'equation' && !v.marks));
+  ok('  and the frame is claimed, because there is something in it',
+    buildSpec(market).primitives.length > 0 && chooseRepresentation(market).dimensionality === 2);
 }
 
 // ═══ what changed, what recomputed, what did not ════════════════════

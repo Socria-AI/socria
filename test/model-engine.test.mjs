@@ -306,10 +306,22 @@ console.log('\n=== 3D has to earn it ===');
       { id: 'n1', kind: 'node', label: 'A' }, { id: 'n2', kind: 'node', label: 'B' }, { id: 'n3', kind: 'node', label: 'C' },
     ],
   }).kind === 'graph');
-  ok('a series against time is a timeline', why({
+  // A SERIES WITH NUMBERS IS A TIMELINE; ONE WITHOUT IS NOT A FRAME.
+  //
+  // This asserted `timeline` for a series object with no data at all — which is
+  // an empty timeline, and claiming a frame for something with nothing in it is
+  // the empty-cube failure in miniature. The representation now comes from what
+  // can actually be SHOWN, so a series draws as a timeline once it has numbers
+  // and otherwise gets no extent claimed for it.
+  ok('a series with numbers is a timeline', why({
     id: 's', title: 'S', params: [],
-    objects: [{ id: 'v', kind: 'series', label: 'v' }],
+    data: { d: { label: 'readings', t: [0, 1, 2, 3], v: [1, 4, 9, 16] } },
+    objects: [{ id: 'v', kind: 'series', label: 'v', data: 'd' }],
   }).kind === 'timeline');
+  ok('  and a series with none claims no frame', why({
+    id: 's2', title: 'S', params: [],
+    objects: [{ id: 'v', kind: 'series', label: 'v' }],
+  }).dimensionality === 2);
   ok('a model with no geometry gets no picture', why({
     id: 'n', title: 'N', params: [], objects: [{ id: 'a', kind: 'assumption', label: 'A' }],
   }).kind === 'text');

@@ -19,6 +19,7 @@
 
 import { extentOf, pointsOf, type P3, type Primitive } from './primitives';
 import { buildModel, buildObject, figureOf, type Built } from './compile';
+import { viewsFor, type ViewFamily } from './views';
 import { unpack } from './unpack';
 import { runFor, seriesOf } from './system';
 import { byKind, overallFidelity, worstFidelity, type Fidelity, type Model, type ModelObject } from './schema';
@@ -387,7 +388,68 @@ export interface Choice {
  * override it — "show this in 3D" is a legitimate request — and the override
  * is remembered on the spec rather than argued with.
  */
+/** A view family, in the older vocabulary the frame speaks. */
+const AS_REPRESENTATION: Partial<Record<ViewFamily, Representation>> = {
+  surface: 'surface3d',
+  curve: 'plot2d',
+  contour: 'plot2d',
+  slice: 'plot2d',
+  derivative: 'plot2d',
+  residual: 'plot2d',
+  interval: 'plot2d',
+  field: 'field',
+  trajectory: 'simulation',
+  phase: 'plot2d',
+  timeline: 'timeline',
+  animation: 'simulation',
+  mechanism: 'mechanism',
+  network: 'graph',
+  structure: 'graph',
+  matrix: 'table',
+  table: 'table',
+  equation: 'equation',
+  distribution: 'plot2d',
+  diagnostic: 'table',
+  sensitivity: 'table',
+  text: 'text',
+};
+
 export function chooseRepresentation(model: Model): Choice {
+  // ── THE REGISTRY DECIDES, BECAUSE IT KNOWS WHAT CAN ACTUALLY BE DRAWN ──
+  //
+  // THIS FUNCTION AND `primaryView` WERE TWO ANSWERS TO ONE QUESTION, and they
+  // disagreed exactly where it mattered. A log-wage relationship whose second
+  // input had no range: `viewsFor` correctly offered only structure, sensitivity,
+  // equation and text — the surface refuses, because a surface over a quantity
+  // with no range is not a thing — while this function looked at OBJECT KINDS,
+  // saw a `surface`, and returned `surface3d` in three dimensions.
+  //
+  // The result was an EMPTY 3D CARTESIAN CUBE. The same failure this whole line
+  // of work began with, arrived at from the opposite direction: not because
+  // nothing could compute, but because the frame was chosen by what the model
+  // CONTAINS rather than by what it can SHOW.
+  //
+  // So the registry chooses. It is derived from structure AND from the operation
+  // planner, which is the difference. The kind-based rules below remain as the
+  // floor — they still decide between several drawable views, and they still
+  // carry the sentences a reader can argue with.
+  const drawable = viewsFor(model).filter((v) => !v.notDrawnYet);
+  const nothingDraws = !drawable.some((v) => v.marks);
+  if (nothingDraws) {
+    const best = drawable.find((v) => v.primary) ?? drawable[0];
+    const family = best?.family ?? 'text';
+    return {
+      kind: AS_REPRESENTATION[family] ?? 'text',
+      // NEVER THREE DIMENSIONS FOR SOMETHING WITH NO EXTENT. An empty box is the
+      // most confident thing this engine can draw and the least honest.
+      dimensionality: 2,
+      why:
+        best?.because ??
+        'nothing in this model can be drawn yet, so the statement of it is what there is to look at',
+      alternatives: drawable.slice(0, 3).map((v) => AS_REPRESENTATION[v.family] ?? 'text'),
+    };
+  }
+
   const has = (...k: Parameters<typeof byKind>[1][]) => byKind(model, ...k).length > 0;
   const count = (k: Parameters<typeof byKind>[1]) => byKind(model, k).length;
 
