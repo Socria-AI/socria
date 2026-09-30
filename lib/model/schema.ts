@@ -248,6 +248,16 @@ export interface ModelObject {
   gravity?: GravityDecl;
   /** a specification to be fitted to data — see estimate.ts */
   estimation?: EstimationDecl;
+  /**
+   * A SYSTEM OF EQUATIONS TO BE SOLVED — see algebra.ts.
+   *
+   * The fourth declaration, and the one the engine had no way to express at
+   * all: `system` is states and their RATES (an ODE), and there was nothing for
+   * quantities related by equations that hold at once. A market with a tax, a
+   * resistive circuit, a static force balance, a mass balance, two lines
+   * crossing — all of them are this, and all of them came back `unsupported`.
+   */
+  equations?: EquationsDecl;
 
   /** anything a domain wants to carry that the engine must not interpret */
   meta?: Record<string, string | number | boolean>;
@@ -399,6 +409,33 @@ export interface GravityDecl {
   plane?: 'xy';
   dt?: number;
   steps?: number;
+}
+
+export interface EquationsDecl {
+  /**
+   * What to solve for. Everything else in the equations must already have a
+   * value — a control, a constant, a fitted coefficient — and the symbol table
+   * decides which is which, so there is no second opinion about what is known.
+   */
+  unknowns: string[];
+  /** each one `left = right`, in the model's own names */
+  relations: string[];
+  /**
+   * What each unknown is measured in, where the author knows.
+   *
+   * NOT DECORATION: it decides which unknowns share an axis when the system is
+   * read as a figure. Two quantities in the same unit are commensurable and
+   * belong on one axis; two in different units never are, however the algebra
+   * happens to relate them. Where units are absent the figure falls back on the
+   * algebraic form of the relations, which is a weaker signal — see
+   * `axesFor` in lib/model/equations.ts.
+   */
+  units?: Record<string, string>;
+  /**
+   * What the person is investigating, when the relations alone do not say.
+   * Free text for a reader; the solver never branches on it.
+   */
+  about?: string;
 }
 
 export interface EstimationDecl {
@@ -879,6 +916,39 @@ export function sanitizeObject(raw: unknown): ModelObject | null {
     }
   }
 
+  const eqs = r.equations as Record<string, unknown> | undefined;
+  if (eqs && typeof eqs === 'object') {
+    const unknowns = Array.isArray(eqs.unknowns)
+      ? eqs.unknowns.map((u) => text(u, 48)).filter((u) => ID.test(u)).slice(0, 24)
+      : [];
+    const relations = Array.isArray(eqs.relations)
+      ? eqs.relations.map((e) => expr(e)).filter((e) => e.includes('=')).slice(0, 24)
+      : [];
+    // BOTH OR NEITHER. Unknowns with nothing relating them, or relations with
+    // nothing named to solve for, is not a system — and admitting half of one
+    // produces an object that routes somewhere and answers nothing.
+    if (unknowns.length && relations.length) {
+      // Units are kept only for unknowns that exist, so a stray key cannot
+      // quietly create a group of its own in the figure.
+      const named = new Set(unknowns);
+      const rawUnits = eqs.units as Record<string, unknown> | undefined;
+      const units: Record<string, string> = {};
+      if (rawUnits && typeof rawUnits === 'object') {
+        for (const [k, v] of Object.entries(rawUnits)) {
+          const key = text(k, 48);
+          const unit = text(v, 24);
+          if (named.has(key) && unit) units[key] = unit;
+        }
+      }
+      out.equations = {
+        unknowns: [...new Set(unknowns.map((u) => u))],
+        relations,
+        ...(Object.keys(units).length ? { units } : {}),
+        ...(text(eqs.about, 160) ? { about: text(eqs.about, 160) } : {}),
+      };
+    }
+  }
+
   const est = r.estimation as Record<string, unknown> | undefined;
   if (est && typeof est === 'object') {
     const yCol = text(est.y, 40);
@@ -1223,12 +1293,25 @@ export function dependenciesOf(model: Model, id: string): {
  * computed". Used for the one-line label a view carries.
  */
 export function overallFidelity(objects: readonly ModelObject[]): Fidelity {
+  return worstFidelity(objects.map((o) => o.fidelity ?? 'conceptual'));
+}
+
+/**
+ * The most modest of a set of fidelities.
+ *
+ * Separated from `overallFidelity` because the honest input is often not what
+ * the objects CLAIM but what the compiler EARNED — see spec.ts, where the
+ * view's label is the worst of what actually drew rather than the worst of what
+ * was declared. A model whose author wrote no fidelity at all is not thereby
+ * conceptual, and calling it that put "drawn to make the idea legible, not
+ * computed" under a figure whose every mark came out of a solver.
+ */
+export function worstFidelity(fidelities: readonly Fidelity[]): Fidelity {
   const rank: Fidelity[] = [
     'conceptual', 'data-derived', 'model-derived', 'simulated', 'numerically-computed',
   ];
   let worst: Fidelity | null = null;
-  for (const o of objects) {
-    const f = o.fidelity ?? 'conceptual';
+  for (const f of fidelities) {
     if (worst === null || rank.indexOf(f) < rank.indexOf(worst)) worst = f;
   }
   return worst ?? 'conceptual';

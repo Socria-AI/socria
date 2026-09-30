@@ -18,10 +18,10 @@
 // anyone can see when it chose badly.
 
 import { extentOf, pointsOf, type P3, type Primitive } from './primitives';
-import { buildModel, type Built } from './compile';
+import { buildModel, figureOf, type Built } from './compile';
 import { unpack } from './unpack';
 import { runFor, seriesOf } from './system';
-import { byKind, overallFidelity, type Fidelity, type Model, type ModelObject } from './schema';
+import { byKind, overallFidelity, worstFidelity, type Fidelity, type Model, type ModelObject } from './schema';
 
 // ── coordinates ─────────────────────────────────────────────────────
 
@@ -189,7 +189,13 @@ export function aspectOf(model: Model): 'equal' | 'fit' {
   const graph = model.objects.some(
     (o) => (o.kind === 'surface' || o.kind === 'volume') && !!o.definition && !o.defs?.px
   );
-  return graph ? 'fit' : 'equal';
+  // TWO DIFFERENT KINDS OF QUANTITY ON THE TWO AXES IS NOT A GEOMETRY. An
+  // equation system's axes are groups of unknowns — quantity against price,
+  // current against voltage — and forcing them to the same scale makes one of
+  // them unreadable while saying nothing true about either. Equal scales are for
+  // pictures where a length is a length.
+  const relations = model.objects.some((o) => !!o.equations);
+  return graph || relations ? 'fit' : 'equal';
 }
 
 /** The box made cubic about its own centre, for geometry. */
@@ -259,7 +265,8 @@ export function buildSpec(
     ...(b.problem ? { problem: b.problem } : {}),
   }));
 
-  const objects = model.objects.filter((o) => built.some((b) => b.of === o.id && b.primitives.length));
+  const drew = built.filter((b) => b.primitives.length);
+  const objects = model.objects.filter((o) => drew.some((b) => b.of === o.id));
   const aspect = aspectOf(model);
   const box = fitBox(primitives);
   return {
@@ -289,7 +296,18 @@ export function buildSpec(
     notes,
     // The label the view carries is the modest one of everything IN it: a
     // picture is only as computed as its least computed part.
-    fidelity: overallFidelity(objects.length ? objects : model.objects),
+    //
+    // EARNED, NOT DECLARED. This read each object's own `fidelity` field, which
+    // most authors and most expanders never set — so a figure whose every mark
+    // came out of a solver was captioned "drawn to make the idea legible, not
+    // computed", which is the exact sentence that made a correct computation
+    // look like a decoration. The compiler already returns what it actually did
+    // for each object (Built.fidelity, assigned by the code path taken), and
+    // that is what the caption is now made of. Objects that drew nothing do not
+    // vote: their absence is reported as a `problem`, not as a fidelity.
+    fidelity: drew.length
+      ? worstFidelity(drew.map((b) => b.fidelity))
+      : overallFidelity(objects.length ? objects : model.objects),
     ...(opts?.partial ? { partial: opts.partial } : {}),
     // Secondary views of the same computed state. Absent when there is no run,
     // rather than present and empty.
@@ -303,6 +321,17 @@ export function buildSpec(
 function axisNamesFor(model: Model): [string, string, string] {
   const axes = byKind(model, 'axis');
   const pick = (n: number, fallback: string) => axes[n]?.label ?? fallback;
+  // AN EQUATION SYSTEM NAMES ITS OWN AXES, and it is the only thing that can:
+  // the axes are groups of unknowns the algebra put together, so `x` and `y`
+  // would be labels for something the model has better names for. Explicit
+  // `axis` objects still win, because those are somebody's decision.
+  if (!axes.length) {
+    const fig = figureOf(model);
+    if (fig) {
+      const name = (g: { label: string; units?: string }) => (g.units ? `${g.label} (${g.units})` : g.label);
+      return [name(fig.h), name(fig.v), pick(2, 'z')];
+    }
+  }
   return [pick(0, 'x'), pick(1, 'y'), pick(2, 'z')];
 }
 
@@ -371,6 +400,33 @@ export function chooseRepresentation(model: Model): Choice {
       dimensionality: has('surface') ? 3 : 2,
       why: 'the quantities are located on the Earth, so the map is the coordinate system rather than a decoration',
       alternatives: ['plot2d', 'table'],
+    };
+  }
+
+  // A SYSTEM OF EQUATIONS IS READ IN THE PLANE. Several unknowns related to
+  // each other is not several spatial dimensions — the relationships are what
+  // there is to see, and each one is a line or a curve in whichever two
+  // quantities the person is investigating. Three dimensions add a third axis
+  // nothing varies along.
+  //
+  // This is the "the number of variables does not determine the number of
+  // visual dimensions" rule, applied by the structure rather than by a count.
+  //
+  // IT YIELDS TO SOMETHING GENUINELY THREE-DIMENSIONAL, and only to that: a
+  // surface that will actually evaluate is one quantity varying over two others,
+  // which is what the third axis is for. A surface object with nothing to
+  // evaluate is not — and that was the shape of the original failure, three
+  // dimensions chosen from a kind label over two `surface` objects that had no
+  // expression between them.
+  const drawableSurface = model.objects.some(
+    (o) => (o.kind === 'surface' || o.kind === 'volume') && (!!o.definition || !!o.defs?.z || !!o.data)
+  );
+  if (!drawableSurface && model.objects.some((o) => !!o.equations)) {
+    return {
+      kind: 'plot2d',
+      dimensionality: 2,
+      why: 'quantities related to one another by equations: the relationships are lines in the plane, and a third axis would be one nothing varies along',
+      alternatives: ['table', 'equation'],
     };
   }
 

@@ -418,6 +418,16 @@ export type VizOp =
   | { op: 'add'; kind: 'body' | 'spring' | 'damper' | 'variable'; id: string; between?: [string, string]; value?: number }
   /** change what a part IS — a damper becomes a spring, so the term changes */
   | { op: 'replace'; of: string; becomes: 'spring' | 'damper' }
+  /**
+   * Add or drop one RELATION in a system of equations.
+   *
+   * The same act as adding a spring, one level up: a relation is a term in what
+   * the system determines, so removing `Pc = Pp + t` does not hide a line — it
+   * leaves the system with one fewer independent relationship, which is
+   * something the solver must then report rather than something a picture can
+   * paper over. `is` is the relation's own text; `drop` removes it.
+   */
+  | { op: 'relate'; of: string; is: string; drop?: boolean }
   /** a copy under its own id, the original untouched */
   | { op: 'duplicate' }
   /** the same, named: work that may be thrown away */
@@ -432,7 +442,7 @@ export type VizOp =
 
 /** The ops that change the MODEL rather than the view of it. */
 export const MODEL_OPS: readonly VizOp['op'][] = [
-  'remove', 'add', 'replace', 'duplicate', 'branch', 'undo', 'redo', 'delete', 'use',
+  'remove', 'add', 'replace', 'relate', 'duplicate', 'branch', 'undo', 'redo', 'delete', 'use',
 ];
 
 export function isModelOp(op: VizOp): boolean {
@@ -569,6 +579,18 @@ export function parseVizOps(reply: string, state: VizModelState | null | undefin
       const becomes = (bits[2].toLowerCase() === 'with' ? bits[3] : bits[2])?.toLowerCase();
       if (entities.has(id) && (becomes === 'spring' || becomes === 'damper')) {
         out.push({ op: 'replace', of: id, becomes });
+      }
+      continue;
+    }
+    // relate eq pc = pp + t   |   unrelate eq pc = pp + t
+    //
+    // PARSED FROM THE LINE, NOT FROM `bits`, because `bits` splits on `=` and an
+    // equation is mostly made of one. The carrier is named first and everything
+    // after it is the relation, whitespace normalised.
+    if (editable && /^(un)?relate\s/i.test(line)) {
+      const m = /^(un)?relate\s+([a-z][a-z0-9_]{0,47})\s+(.+)$/i.exec(line);
+      if (m && entities.has(m[2]) && m[3].includes('=')) {
+        out.push({ op: 'relate', of: m[2], is: m[3].replace(/\s+/g, ' ').trim(), ...(m[1] ? { drop: true } : {}) });
       }
       continue;
     }

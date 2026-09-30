@@ -24,6 +24,7 @@ import type { VizEntity, VizModelState, VizOp, VizProvenance } from '@/lib/viz-m
 import { unpack } from './unpack';
 import { OPERATIONS, askFor, capabilityOf, missingStructure, plan, route } from './solve';
 import { estimate } from './estimate';
+import { equationLines, solutionFor } from './equations';
 import { driftOf, runFor, stateAt } from './system';
 import { FIDELITY_SAYS, ORIGIN_SAYS, affectedBy, objectOf, paramOf, setParam, setTime, type ChangeRecord, type Fidelity, type Model } from './schema';
 import type { VisualizationSpec } from './spec';
@@ -143,6 +144,14 @@ export function modelStateFrom(
           }
         }
       }
+    }
+
+    // A SYSTEM OF EQUATIONS: the relations, the answer, and the residual that
+    // makes the answer checkable — so "what is the equilibrium quantity?" is
+    // answered from the solve rather than from the reply's own arithmetic, and
+    // "why is it empty?" is answered by the same sentence the figure carries.
+    if (o.equations) {
+      for (const line of equationLines(o, solutionFor(model, o))) bits.push(line);
     }
 
     // A fitted specification's actual numbers, or the choice it is waiting on.

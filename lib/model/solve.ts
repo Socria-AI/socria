@@ -34,8 +34,9 @@
 // what is stopping it.
 
 import { estimate } from './estimate';
+import { solveSystem } from './algebra';
 import { namesIn } from './deps';
-import { resolve, symbolTable } from './symbols';
+import { bindings, resolve, symbolTable } from './symbols';
 import { readGravity } from './gravity';
 import { readMechanism } from './mechanism';
 import { readSystem, type Missing } from './system';
@@ -79,6 +80,8 @@ export const OPERATIONS = [
   'read',
   /** find the best point subject to what constrains it */
   'optimise',
+  /** find the values that satisfy a set of equations at once */
+  'solve',
   /** rearrange the mathematics rather than compute with it */
   'rearrange',
 ] as const;
@@ -90,6 +93,7 @@ export const OPERATION_SAYS: Record<Operation, string> = {
   estimate: 'fit it to observations',
   read: 'show the supplied numbers as they are',
   optimise: 'find the best point subject to the constraints',
+  solve: 'find the values that satisfy the equations at once',
   rearrange: 'manipulate the expressions symbolically',
 };
 
@@ -280,6 +284,42 @@ export const GRAVITY: Solver = {
     'a circular two-body orbit closing on itself, and energy and momentum conservation over a full period (test/model-systems)',
 };
 
+export const ALGEBRA: Solver = {
+  does: ['solve'],
+  id: 'linear',
+  label: 'Linear system solver',
+  kind: 'symbolic',
+  produces: 'model-derived',
+  method:
+    'reads each equation into a row by evaluating it at the unit vectors, checks it really is linear, then solves by Gaussian elimination with partial pivoting and validates the residual (lib/model/algebra.ts)',
+  handles: (_m, o) => !!o.equations,
+  requires: (m, o) => {
+    const decl = o.equations!;
+    const got = solveSystem(decl.relations, decl.unknowns, bindings(symbolTable(m)));
+    if (got.status === 'solved' || got.status === 'overdetermined-consistent') return [];
+    // EACH OUTCOME IS A DIFFERENT THING TO TELL SOMEBODY, and flattening them
+    // into "it did not work" is what a refusal must never do. An
+    // underdetermined system needs one more relationship; an inconsistent one
+    // needs a relationship REMOVED or corrected; a nonlinear one needs a
+    // backend this engine does not have.
+    return [
+      {
+        what:
+          got.status === 'underdetermined'
+            ? `one more relationship — ${got.says}`
+            : got.status === 'inconsistent'
+              ? `the equations to agree — ${got.says}`
+              : got.status === 'nonlinear'
+                ? `a nonlinear solver — ${got.says}`
+                : got.says,
+        unlocks: 'the values that satisfy all of them at once, and everything derived from those',
+      },
+    ];
+  },
+  checkedAgainst:
+    'systems with a known closed-form answer, a rank-deficient system, a contradictory one and a nonlinear one (test/model-algebra)',
+};
+
 export const ESTIMATION: Solver = {
   does: ['estimate'],
   id: 'ols',
@@ -388,7 +428,7 @@ export const FUTURE: Solver[] = [
  * about it in terms of the assembled state names rather than the bodies and
  * springs the person actually wrote.
  */
-export const SOLVERS: Solver[] = [GRAVITY, ASSEMBLY, ODE, ESTIMATION, DATA, SAMPLING, ...FUTURE];
+export const SOLVERS: Solver[] = [ALGEBRA, GRAVITY, ASSEMBLY, ODE, ESTIMATION, DATA, SAMPLING, ...FUTURE];
 
 // ── routing ─────────────────────────────────────────────────────────
 
@@ -536,6 +576,7 @@ const NEEDS: Record<Operation, string> = {
   estimate: 'a specification and observations to fit it to',
   read: 'supplied numbers, as a data block',
   optimise: 'an objective to maximise or minimise, and the constraints on it',
+  solve: 'a set of equations and the unknowns to solve them for — quantities related to each other, rather than one written in terms of the rest',
   rearrange: 'an equation stated symbolically, and a symbolic backend — which is declared here and not implemented',
 };
 

@@ -22,7 +22,7 @@
 // of either.
 
 import './model-view.css';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Surface3D, snap, type RenderArgs, type SurfaceRender } from '@/components/surfaces/Surface3D';
 import { boxLines, place, type Camera, type Frame3, type Pt2 } from '@/lib/logos-viz3d';
 import { contour } from '@/lib/model/sample';
@@ -90,6 +90,23 @@ export function ModelView({
   const [model, setModel] = useState<Model>(initial);
   const [view, setView] = useState<ViewState>({});
   const [held, setHeld] = useState<Model | null>(null);
+
+  // …BUT THE DOCUMENT OUTRANKS IT WHEN THE DOCUMENT MOVES.
+  //
+  // `initial` is recomputed by the host on every render, so this cannot key on
+  // its identity — that would reset the model mid-drag. It keys on the model's
+  // id and version, which change exactly when the host hands over a DIFFERENT
+  // revision: a reply that set a control, removed a part, dropped a relation, or
+  // undid any of those. Without this the seeded copy was kept forever, so an
+  // edit applied to the document left the picture showing the revision before
+  // it and the two disagreed with no way to tell which was current.
+  const stamp = `${initial.id}@${initial.version ?? 0}`;
+  const shown = useRef(stamp);
+  useEffect(() => {
+    if (shown.current === stamp) return;
+    shown.current = stamp;
+    setModel(initial);
+  }, [stamp, initial]);
 
   const spec = useMemo(
     () => buildSpec(model, { view: view.as ?? 'auto' }),
@@ -237,7 +254,17 @@ export function ModelView({
         ));
       }
 
-      for (const prim of spec.primitives) {
+      // INDEXED, BECAUSE ONE OBJECT MAY DRAW SEVERAL MARKS OF THE SAME KIND.
+      //
+      // The keys here were `${kind}${prim.of}`, which assumed at most one mesh,
+      // one polyline and one label per object. A solved system of equations
+      // breaks that assumption properly: its carrier emits a line per relation,
+      // a segment per offset and a label for each, all with the same `of`. React
+      // would then see repeated keys and keep one of each, so a figure with two
+      // relations drew one line — a wrong picture produced by a key collision
+      // rather than by any mistake in the geometry.
+      for (let pi = 0; pi < spec.primitives.length; pi++) {
+        const prim = spec.primitives[pi];
         if (!on(prim)) continue;
         const stroke = strokeOf(prim);
         const dim = view.selected && view.selected !== prim.of;
@@ -261,7 +288,7 @@ export function ModelView({
                 }
               }
               put(0, (
-                <g key={`m${prim.of}`} data-obj={prim.of} opacity={dim ? 0.35 : 1}>
+                <g key={`m${pi}`} data-obj={prim.of} opacity={dim ? 0.35 : 1}>
                   {levels.map((l, i) =>
                     l.p === 'polyline' ? (
                       <path key={i} d={d2(l.at.map(at))} fill="none" stroke={stroke} strokeWidth={1} />
@@ -297,7 +324,7 @@ export function ModelView({
             // The visible copy takes no pointer events, so the two never
             // fight over a click.
             put(mid ? at(mid).depth : 0, (
-              <g key={`m${prim.of}`} data-obj={prim.of} opacity={dim ? 0.3 : 1}>
+              <g key={`m${pi}`} data-obj={prim.of} opacity={dim ? 0.3 : 1}>
                 <g className="eng-hit">
                   {paths.map((dd, i) => (
                     <path key={i} d={dd} />
@@ -319,7 +346,7 @@ export function ModelView({
             const depth = pts.reduce((s, p) => s + p.depth, 0) / pts.length;
             const dd = d2(pts);
             put(depth, (
-              <g key={`l${prim.of}${pts.length}${prim.at[0]?.x ?? 0}`} data-obj={prim.of}>
+              <g key={`l${pi}`} data-obj={prim.of}>
                 <path className="eng-hit" d={dd} />
                 <path
                   d={dd}
@@ -338,7 +365,7 @@ export function ModelView({
 
           case 'points': {
             put(0, (
-              <g key={`p${prim.of}`} data-obj={prim.of} opacity={dim ? 0.3 : 1}>
+              <g key={`p${pi}`} data-obj={prim.of} opacity={dim ? 0.3 : 1}>
                 {prim.at.map((p, i) => {
                   const q = at(p);
                   return (
@@ -352,7 +379,7 @@ export function ModelView({
 
           case 'vectors': {
             put(0, (
-              <g key={`v${prim.of}`} data-obj={prim.of} opacity={dim ? 0.3 : 1}>
+              <g key={`v${pi}`} data-obj={prim.of} opacity={dim ? 0.3 : 1}>
                 {prim.at.map((p, i) => {
                   const dir = prim.dir[i];
                   const tip = {
@@ -385,7 +412,7 @@ export function ModelView({
             const pts = prim.at.map(at);
             put(0, (
               <path
-                key={`r${prim.of}`}
+                key={`r${pi}`}
                 data-obj={prim.of}
                 d={`${d2(pts)} Z`}
                 fill={stroke}
@@ -400,7 +427,7 @@ export function ModelView({
           case 'label': {
             const q = at(prim.at);
             put(-1e9, (
-              <text key={`t${prim.of}`} data-obj={prim.of} className="sfx-l" x={snap(q.x)} y={snap(q.y)} textAnchor={prim.anchor ?? 'middle'}>
+              <text key={`t${pi}`} data-obj={prim.of} className="sfx-l" x={snap(q.x)} y={snap(q.y)} textAnchor={prim.anchor ?? 'middle'}>
                 {prim.text}
               </text>
             ));

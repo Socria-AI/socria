@@ -47,6 +47,7 @@ import { operationsOn, route } from './solve';
 import { bindings, known, symbolTable } from './symbols';
 import { estimate } from './estimate';
 import { restOf, statesOf } from './mechanism';
+import { figureFor, solutionFor, type Figure } from './equations';
 import { unpack } from './unpack';
 
 /** What compiling one object produced, and what may be said about it. */
@@ -197,6 +198,35 @@ export function buildObject(model: Model, o: ModelObject, opts?: { detail?: numb
     // the list says what would fix it.
     return NOTHING(o, `not computed — it needs ${what.join('; ')}`);
   }
+
+  // ── A SOLVED UNKNOWN IS ALREADY ON THE FIGURE ──────────────────────
+  //
+  // Keyed on the ROLE, not the kind: what makes `eq__pc` something to read
+  // rather than something to draw is that it is one of the values satisfying a
+  // system, and its system draws and labels the point. Without this, a model
+  // that had just solved correctly and drawn the answer reported four missing
+  // pictures — "nothing in this engine draws a scalar yet" — one per unknown.
+  if (o.meta?.role === 'solution') {
+    const value = typeof o.meta.value === 'number' ? o.meta.value : null;
+    return {
+      of: o.id,
+      primitives: [],
+      note:
+        value !== null
+          ? `${o.label} = ${Number(value.toPrecision(6))}${o.units ? ` ${o.units}` : ''} — solved, and marked on the figure its system draws`
+          : `${o.label} — an unknown of this system; the relations as written do not determine it`,
+      fidelity: o.fidelity ?? 'conceptual',
+    };
+  }
+
+  // ── A SOLVED SYSTEM OF EQUATIONS, AS THE FIGURE IT IS ──────────────
+  //
+  // BEFORE THE SWITCH, because the declaration outranks the kind label. A
+  // carrier of equations may call itself a `system`, a `region` or anything
+  // else; what decides how it is drawn is that it carries relations and they
+  // have an answer. This is the same precedence the representation chooser
+  // uses, and the two have to agree or the plane and its contents disagree.
+  if (o.equations) return buildFigure(model, o, layer);
 
   switch (o.kind) {
     // ── a surface: z = f(x, y), or r(u, v), or a grid of measurements ──
@@ -852,6 +882,112 @@ const SAID_NOT_DRAWN = new Map<ModelObject['kind'], string>([
   ['coefficient', 'a number in the fitted relationship'],
   ['residual', 'what the specification does not explain'],
 ]);
+
+/**
+ * A system of equations, drawn from its own rows.
+ *
+ * NOTHING HERE PLACES A CURVE. Every mark below is computed: a line from a
+ * row's coefficients, a point from the solution, a segment from an offset
+ * between two unknowns on one axis. The plane the marks live in is chosen by
+ * lib/model/equations.ts figureFor, from which unknowns are the same kind of
+ * quantity — not from how many there are.
+ *
+ * WHAT IT REFUSES TO DO. If the system does not solve, this returns nothing and
+ * says what is missing; the router has usually caught that first, and this is
+ * the second line. If the answer exists but every unknown shares one axis, it
+ * returns no marks and says so — the values are on the objects and can be read,
+ * and a plane with one axis is not a figure.
+ */
+function buildFigure(model: Model, o: ModelObject, layer?: string): Built {
+  const got = solutionFor(model, o);
+  if (!got?.values) {
+    return NOTHING(o, `not computed — ${got?.says ?? 'the relations did not reduce to an answer'}`);
+  }
+  const checked = `residual ${(got.residual ?? 0).toExponential(1)} — the answer was checked against the equations`;
+  const fig = figureFor(model, o, got);
+  if (!fig) {
+    return {
+      of: o.id,
+      primitives: [],
+      note:
+        `${got.says}; ${checked}. Not plotted: the unknowns here are all the same kind of quantity, ` +
+        `so there is no second axis to plot them against — the values are on the objects and can be read.`,
+      fidelity: 'model-derived',
+    };
+  }
+
+  const primitives: Primitive[] = [];
+  const at3 = (x: number, y: number): P3 => ({ x, y, z: 0 });
+  const show = (v: number) => Number(v.toPrecision(6));
+
+  for (const L of fig.loci) {
+    primitives.push({ p: 'polyline', of: o.id, at: L.at.map((q) => at3(q.x, q.y)), layer, tone: 'primary', width: 1.4 });
+    const end = L.at[L.at.length - 1];
+    primitives.push({ p: 'label', of: o.id, at: at3(end.x, end.y), text: L.from, anchor: 'end', layer, tone: 'primary' });
+  }
+
+  for (const g of fig.gaps) {
+    const ends: [P3, P3] =
+      g.along === 'v' ? [at3(g.at, g.lo), at3(g.at, g.hi)] : [at3(g.lo, g.at), at3(g.hi, g.at)];
+    primitives.push({ p: 'polyline', of: o.id, at: ends, layer, tone: 'tension', width: 1.2, dashed: true });
+    primitives.push({
+      p: 'label',
+      of: o.id,
+      at: at3((ends[0].x + ends[1].x) / 2, (ends[0].y + ends[1].y) / 2),
+      text: `${g.between[0]} − ${g.between[1]} = ${show(g.size)}`,
+      anchor: 'start',
+      layer,
+      tone: 'tension',
+    });
+  }
+
+  if (fig.points.length) {
+    primitives.push({
+      p: 'points',
+      of: o.id,
+      at: fig.points.map((q) => at3(q.x, q.y)),
+      r: 3,
+      layer,
+      tone: 'accent',
+    });
+    for (const q of fig.points) {
+      primitives.push({
+        p: 'label',
+        of: o.id,
+        at: at3(q.x, q.y),
+        text: `${q.h} = ${show(q.x)}, ${q.v} = ${show(q.y)}`,
+        anchor: 'start',
+        layer,
+        tone: 'accent',
+      });
+    }
+  }
+
+  const note =
+    `${got.says}; ${checked}. ` +
+    `${fig.loci.length} relation${fig.loci.length === 1 ? '' : 's'} drawn as ${fig.loci.length === 1 ? 'a line' : 'lines'} from their own coefficients, ` +
+    `${fig.points.length} solution point${fig.points.length === 1 ? '' : 's'}` +
+    (fig.gaps.length ? `, ${fig.gaps.length} offset${fig.gaps.length === 1 ? '' : 's'} between quantities sharing an axis` : '') +
+    `. ${fig.why}.` +
+    (fig.offPlane.length ? ` Not in this plane: ${fig.offPlane.join('; ')}.` : '');
+
+  return { of: o.id, primitives, note, fidelity: 'model-derived' };
+}
+
+/** The figure a model's equation system reads as, for the frame and the axes. */
+export function figureOf(model: Model): Figure | null {
+  // Unpacked FIRST and then used throughout: a solve's knowns come from the
+  // symbol table, and a coefficient a fit produced is only in that table after
+  // expansion. Reading the objects from the unpacked model and the knowns from
+  // the folded one gave two different answers to "what is bound".
+  const full = unpack(model);
+  for (const o of full.objects) {
+    if (!o.equations) continue;
+    const fig = figureFor(full, o);
+    if (fig) return fig;
+  }
+  return null;
+}
 
 /** A data block, as whichever primitive its shape calls for. */
 function fromData(model: Model, o: ModelObject, layer?: string): Built {

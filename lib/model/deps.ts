@@ -132,6 +132,15 @@ export function referencesOf(o: ModelObject): Set<string> {
     add(o.gravity.softening);
   }
 
+  // A SYSTEM OF EQUATIONS refers to everything its relations mention, and to
+  // its own unknowns. Without this a control appearing only inside the
+  // relations reached nothing: verified, changing the tax in a market with a
+  // tax marked NOTHING stale, so the equilibrium on screen stayed the old one.
+  if (o.equations) {
+    for (const r of o.equations.relations) add(r);
+    for (const u of o.equations.unknowns) out.add(u.toLowerCase());
+  }
+
   // A specification refers to its columns and its data block by name.
   if (o.estimation) {
     out.add(o.estimation.y.toLowerCase());

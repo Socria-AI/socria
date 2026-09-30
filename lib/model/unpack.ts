@@ -35,6 +35,7 @@
 //
 // PURE.
 
+import { expandEquations } from './equations';
 import { expandEstimation } from './estimate';
 import { expandGravity } from './gravity';
 import { expand as expandMechanism } from './mechanism';
@@ -47,5 +48,9 @@ import type { Model } from './schema';
  * unchanged by identity when it finds no carriers.
  */
 export function unpack(model: Model): Model {
-  return expandEstimation(expandGravity(expandMechanism(model)));
+  // `equations` runs LAST, and that is the one ordering constraint here: a
+  // solved system's knowns come from the symbol table, so everything that
+  // produces a valued quantity — a fitted coefficient, a control — has to be
+  // in place before the solve reads them.
+  return expandEquations(expandEstimation(expandGravity(expandMechanism(model))));
 }

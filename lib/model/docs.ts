@@ -36,6 +36,8 @@
 //
 // PURE: models in, models out. No React, no storage, no clock of its own.
 
+import { solveSystem } from './algebra';
+import { bindings, symbolTable } from './symbols';
 import { compare, type Comparison } from './state';
 import { unpack } from './unpack';
 import { objectOf, sanitizeModel, setParam, type Model, type ModelObject } from './schema';
@@ -215,6 +217,89 @@ export function setValue(ws: ModelWorkspace, id: string, param: string, value: n
     says: `${param} is now ${next.params.find((q) => q.id === param)?.value}${p.units ? ` ${p.units}` : ''}${
       affected.length ? `, and ${affected.length} thing${affected.length === 1 ? '' : 's'} recompute` : ''
     }`,
+    affected,
+  };
+}
+
+/**
+ * Add or drop ONE RELATION in a system of equations.
+ *
+ * THE SAME VERB AS ADDING A SPRING, one level up. A relation is a term in what
+ * the system determines, so dropping `Pc = Pp + t` does not hide a line: it
+ * leaves four unknowns with three independent relationships, and the only honest
+ * response is to stop reporting an equilibrium and say which unknown is now
+ * free. That is what the reply below carries, computed by the solver rather than
+ * described in prose — and because it goes through `revise`, undo restores the
+ * relation and the next build solves again.
+ *
+ * SANITISED LIKE ANY OTHER INPUT. The relation text arrives from a reply, so the
+ * edited model is put back through `sanitizeModel`, which is the one filter that
+ * decides what an expression may contain. A relation it refuses is refused here.
+ */
+export function setRelation(
+  ws: ModelWorkspace,
+  id: string,
+  objectId: string,
+  relation: string,
+  drop: boolean,
+  at = 0
+): EditResult {
+  const doc = docOf(ws, id);
+  if (!doc) return no(ws, `there is no model called ${id} here`);
+  const model = current(doc);
+
+  // The person may name the carrier or any of the unknowns it solved for, and
+  // both mean the same system — `eq__pc` exists only after expansion.
+  const target = objectOf(unpack(model), objectId);
+  const carrierId = target && typeof target.meta?.of === 'string' ? (target.meta.of as string) : objectId;
+  const carrier = objectOf(model, carrierId);
+  if (!carrier?.equations) return no(ws, `${model.title} has no system of equations called ${objectId}`);
+
+  const tidy = (e: string) => e.replace(/\s+/g, ' ').trim();
+  const want = tidy(relation);
+  const decl = carrier.equations;
+  const has = decl.relations.findIndex((r) => tidy(r) === want);
+
+  if (drop && has < 0) {
+    return no(
+      ws,
+      `${carrier.label} does not contain “${want}”. What it relates: ${decl.relations.map((r) => tidy(r)).join('; ')}`
+    );
+  }
+  if (!drop && has >= 0) return no(ws, `${carrier.label} already relates “${want}”`);
+  if (!drop && !want.includes('=')) return no(ws, `“${want}” is not an equation: it needs one = sign`);
+  if (drop && decl.relations.length <= 1) {
+    return no(ws, `“${want}” is the only relation here: a system with nothing in it is not a system`);
+  }
+
+  const relations = drop ? decl.relations.filter((_, i) => i !== has) : [...decl.relations, want];
+  const edited: Model = {
+    ...model,
+    version: (model.version ?? 0) + 1,
+    objects: model.objects.map((o) => (o.id === carrier.id ? { ...o, equations: { ...decl, relations } } : o)),
+  };
+  const next = sanitizeModel(edited);
+  if (!next) return no(ws, `“${want}” is not something this engine can hold as a relation`);
+  const kept = objectOf(next, carrier.id)?.equations?.relations ?? [];
+  if (kept.length !== relations.length) {
+    return no(ws, `“${want}” is not something this engine can hold as a relation`);
+  }
+
+  // WHAT THE SYSTEM NOW IS, from the solver rather than from a guess. This is
+  // the sentence the brief asks for: not "that changed something" but which
+  // unknown stopped being determined, and what would determine it again.
+  const after = solveSystem(relations, decl.unknowns, bindings(symbolTable(next)));
+  const affected = [carrier.id, ...decl.unknowns.map((u) => `${carrier.id}__${u}`)];
+  const said = `${drop ? 'dropped' : 'added'} “${want}”`;
+  return {
+    workspace: patch(ws, id, (d) => revise(d, { ...next, lastChange: { what: carrier.id, affected, at } }, said)),
+    ok: true,
+    says:
+      `${carrier.label} now holds ${relations.length} relation${relations.length === 1 ? '' : 's'}: ` +
+      `${relations.map((r) => tidy(r)).join('; ')}. ` +
+      (after.values
+        ? `Solved: ${after.says}.`
+        : `Not solved: ${after.says}. The previous answer no longer holds and is not being shown as though it did.`),
     affected,
   };
 }
@@ -733,6 +818,14 @@ export function applyModelOps(
       case 'replace': {
         if (!doc) break;
         const r = replacePart(out, doc.id, op.of, op.becomes, at);
+        out = r.workspace;
+        said.push(r.says);
+        changed = changed || r.ok;
+        break;
+      }
+      case 'relate': {
+        if (!doc) break;
+        const r = setRelation(out, doc.id, op.of, op.is, !!op.drop, at);
         out = r.workspace;
         said.push(r.says);
         changed = changed || r.ok;
