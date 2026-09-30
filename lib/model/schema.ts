@@ -682,6 +682,25 @@ export interface Model {
    * what a picture looks like near a pixel.
    */
   selected?: string;
+  /**
+   * WHICH REPRESENTATION IS OPEN, by the id `viewsFor` gives it.
+   *
+   * CANONICAL FOR THE SAME REASON THE SELECTION IS. A model can be looked at as
+   * a surface, its level sets, a cross-section, a table of its values, the
+   * relationships it states or its own dependency graph, and which of those
+   * somebody is currently looking at is a fact about this session that the
+   * conversation can read, a reply can set, `undo` can undo, and a saved
+   * document can come back to. Held in a component it would be none of those:
+   * the row of views would be a menu whose choices the rest of the system could
+   * not see.
+   *
+   * IT IS NOT A CLAIM ABOUT THE MODEL. Unset means "whichever the engine would
+   * choose", which is what `primaryView` answers — so a model that never
+   * mentions this still opens on its best representation, and a model whose
+   * structure changes under an open view falls back rather than showing an
+   * empty frame for a view that no longer exists.
+   */
+  view?: string;
   /** bumped by every manipulation; see compare() */
   version?: number;
   /** what changed to get here, for "what did that do?" */
@@ -860,6 +879,8 @@ function capped<T>(list: readonly T[], cap: number, what: string, drop?: (s: str
 // is a real stored id.
 const ID = NAME;
 const MODEL_ID = SLUG;
+/** `family:object` and `family:data:key` — see Model.view. */
+const VIEW_ID = /^[A-Za-z_][A-Za-z0-9_]*(:[A-Za-z_][A-Za-z0-9_]*){1,3}$/;
 const text = (v: unknown, n: number): string =>
   typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().slice(0, n) : '';
 const num = (v: unknown): number | null =>
@@ -1559,6 +1580,14 @@ export function sanitizeModel(raw: unknown): Model | null {
 
   const sel = text(r.selected, 48);
   if (sel && ID.test(sel)) model.selected = sel;
+
+  // A VIEW ID IS NOT AN EXPRESSION ID. `viewsFor` composes ids as
+  // `family:object` and `family:data:key`, so the one grammar for anything an
+  // evaluator sees would reject every one of them. This is the grammar for THAT
+  // — segments of the ordinary id shape joined by colons — and it is checked
+  // rather than trusted, because it arrives from outside like everything else.
+  const vw = text(r.view, 96);
+  if (vw && VIEW_ID.test(vw)) model.view = vw;
 
   // The cursor for each free input, clamped to nothing here: the domain that
   // bounds it lives on the specification, and re-clamping against a stale copy

@@ -43,11 +43,21 @@ const ORIGIN_MARK: Record<string, string> = {
 export function Understand({
   model,
   onSelect,
+  onView,
   onAsk,
 }: {
   model: Model;
   /** selecting is canonical: it writes to the model, not to this component */
   onSelect?: (id: string | null) => void;
+  /**
+   * OPENING A VIEW, and this is what the row of views was missing.
+   *
+   * It writes `Model.view` — canonical, like the selection — so choosing "level
+   * sets" changes what is drawn rather than only changing what is highlighted.
+   * Before this the buttons selected the view's object and left the figure
+   * exactly as it was, which is a menu of one dish however long the menu.
+   */
+  onView?: (id: string) => void;
   /** hand the object's IDENTITY to the conversation — never a description of pixels */
   onAsk?: (id: string) => void;
 }) {
@@ -56,6 +66,10 @@ export function Understand({
   const missing = useMemo(() => unavailable(model), [model]);
   const change = useMemo(() => whatChanged(model), [model]);
   const selected = model.selected ?? null;
+  // WHICH VIEW IS OPEN, read from the model and not from this component — and
+  // defaulted to the one the engine would choose, so the row always shows a
+  // current view rather than showing none until somebody clicks.
+  const current = model.view && views.some((v) => v.id === model.view) ? model.view : (views.find((v) => v.primary)?.id ?? views[0]?.id ?? null);
   const about = useMemo(() => (selected ? inspectObject(model, selected) : null), [model, selected]);
   const why = useMemo(() => (selected ? whyOf(model, selected) : []), [model, selected]);
 
@@ -94,12 +108,20 @@ export function Understand({
           <button
             key={v.id}
             type="button"
-            className={`und-view${v.notDrawnYet ? ' is-declared' : ''}${v.primary ? ' is-primary' : ''}`}
-            title={`${v.shows}\n\nAvailable because ${v.because}.${v.notDrawnYet ? '\n\nDeclared; no renderer yet.' : ''}`}
-            onClick={() => v.of && onSelect?.(v.of)}
+            className={`und-view${current === v.id ? ' is-current' : ''}${v.primary ? ' is-primary' : ''}`}
+            aria-pressed={current === v.id}
+            data-view={v.id}
+            title={`${v.shows}\n\nAvailable because ${v.because}.`}
+            // ONE CALL. Opening a view of an object also selects it — so the
+            // inspector and the conversation are about the thing on screen —
+            // but that happens in ONE revision of the model, in the handler.
+            // Calling onView and then onSelect from here looked equivalent and
+            // was not: each computed its next model from the same captured one,
+            // so the second silently discarded the first and the view never
+            // changed. See ModelView openView.
+            onClick={() => onView?.(v.id)}
           >
             {v.label}
-            {v.notDrawnYet ? <span className="und-soon">declared</span> : null}
           </button>
         ))}
         {missing.length ? (

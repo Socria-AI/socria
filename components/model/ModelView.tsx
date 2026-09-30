@@ -30,6 +30,9 @@ import type { P3, Primitive } from '@/lib/model/primitives';
 import { buildSlice } from '@/lib/model/compile';
 import { inputsAwaiting, inputsOf } from '@/lib/model/derive';
 import { Understand } from './Understand';
+import { panelMarks } from './panelMarks';
+import { frameFor, panelFor, viewById } from '@/lib/model/viewdata';
+import { unpack } from '@/lib/model/unpack';
 import { buildSpec, type VisualizationSpec } from '@/lib/model/spec';
 import { modelStateFrom, applyOps, type ViewState } from '@/lib/model/state';
 import { objectOf, setParam, setTime, type Model } from '@/lib/model/schema';
@@ -119,10 +122,49 @@ export function ModelView({
     setModel(initial);
   }, [stamp, initial]);
 
-  const spec = useMemo(
-    () => buildSpec(model, { view: view.as ?? 'auto' }),
-    [model, view.as]
+  // ── WHICH REPRESENTATION IS OPEN ───────────────────────────────────
+  //
+  // `Model.view` is canonical (schema.ts), so this reads it rather than holding
+  // its own copy — and falls back to nothing when it names a view this model no
+  // longer offers, which happens the moment a parameter change makes a fit stop
+  // running. Unset means "whichever the engine would choose", which is what
+  // buildSpec already does.
+  // ── THE MODEL AS THE COMPILER SEES IT ──────────────────────────────
+  //
+  // `unpack` is what turns a mechanism into bodies, a specification into a
+  // response surface and coefficients, an equation system into its solution and
+  // a relationship into its slopes. `buildSpec` has always done it; the registry
+  // and the inspector had not — so the PICTURE was drawn from twelve objects
+  // while the row of views and the account beside it were derived from one, and
+  // a saddle's own derivatives were missing from the list of things you could
+  // look at although they were sitting in the figure.
+  //
+  // The stated model stays canonical: edits, selection and the open view are
+  // written to `model`, which is what a document holds. This is the projection
+  // everything that only READS should read.
+  const full = useMemo(() => unpack(model), [model]);
+
+  const openv = useMemo(() => (model.view ? viewById(full, model.view) : null), [full, model.view]);
+
+  // A READ VIEW: its content, derived by lib/model/viewdata.ts and set into the
+  // same frame by panelMarks. Null for a view that puts marks in the frame.
+  const panel = useMemo(
+    () => (openv && !openv.marks ? panelFor(full, openv.id) : null),
+    [full, openv]
   );
+
+  const spec = useMemo(() => {
+    // A FRAME VIEW REPLACES THE PICTURE; A READ VIEW DOES NOT TOUCH IT. The
+    // panel is drawn instead of the primitives below, but the spec still has to
+    // exist — the box, the layers and the entities the conversation reads all
+    // come from it, and a read view is a different way of looking at the same
+    // computed state rather than a different state.
+    if (openv?.marks) {
+      const only = frameFor(full, openv.id);
+      if (only) return only;
+    }
+    return buildSpec(model, { view: view.as ?? 'auto' });
+  }, [model, full, view.as, openv]);
   const frame = useMemo(() => frameOf(spec), [spec]);
 
   // A cross-section, computed from the definition rather than read off the
@@ -267,9 +309,79 @@ export function ModelView({
     [model, onModel, inputs]
   );
 
+  // ── SELECTION IS CANONICAL, AND IT IS WHAT "THIS" MEANS ────────────
+  //
+  // Written into the model rather than into this component, so the picture, the
+  // panels, the inspector and the conversation all mean the same thing by it —
+  // and so "ask about this" is handed an identity rather than a description of
+  // what a picture looks like near a pixel.
+  const select = useCallback(
+    (id: string | null) => {
+      const next: Model = id
+        ? { ...model, version: (model.version ?? 0) + 1, selected: id }
+        : (() => {
+            const { selected: _gone, ...rest } = model;
+            return { ...rest, version: (model.version ?? 0) + 1 } as Model;
+          })();
+      setModel(next);
+      setView((v) => ({ ...v, selected: id }));
+      onModel?.(next);
+    },
+    [model, onModel]
+  );
+
+  // ── OPENING A REPRESENTATION IS CANONICAL TOO ──────────────────────
+  //
+  // The row of views wrote nothing: clicking "level sets" selected the surface
+  // and left the figure exactly as it was. It writes here now, into the model,
+  // for the same reason the selection does — a reply can open a view, `undo`
+  // undoes it, and a saved document comes back to the view it was left in.
+  //
+  // ONE WRITE PER CLICK, AND THAT IS NOT A DETAIL. The first version of this
+  // had the button call `onView` and then `onSelect`, which looked right and did
+  // not work: both handlers computed their next model from the SAME captured
+  // `model`, so the second overwrote the first and the view was lost every time.
+  // The browser found it; no test in test/ could, because none of them render.
+  // Opening a view of an object therefore selects it HERE, in one revision.
+  const openView = useCallback(
+    (id: string) => {
+      const v = viewById(full, id);
+      const next: Model = {
+        ...model,
+        version: (model.version ?? 0) + 1,
+        view: id,
+        ...(v?.of ? { selected: v.of } : {}),
+      };
+      setModel(next);
+      setView((s) => (v?.of ? { ...s, selected: v.of } : s));
+      onModel?.(next);
+    },
+    [model, full, onModel]
+  );
+
   const render = useCallback(
     (a: RenderArgs): SurfaceRender => {
       sync(a.vals, a.t);
+
+      // ── A VIEW THAT IS READ TAKES THE WHOLE FRAME ────────────────
+      //
+      // Not a corner of it, and not a second surface beside it: the frame is
+      // where the current representation goes, and for a table or a dependency
+      // graph the current representation is text and rules. The chrome around
+      // it — the controls, the clock, the fidelity line, the selection — is the
+      // same chrome, because it belongs to the model and not to the picture.
+      if (panel) {
+        const set = panelMarks(panel, a, select);
+        return {
+          content: set.content,
+          left: set.left ?? openv?.label ?? '',
+          right: set.right ?? '',
+          note: `${openv?.label ?? 'This view'} — ${set.note}`,
+          label: `${openv?.label ?? 'A view'}. ${set.label}`,
+          live: {},
+        };
+      }
+
       const flat = spec.dimensionality === 2;
       const nodes: { z: number; node: React.ReactNode }[] = [];
       const on = (prim: Primitive) => !prim.layer || a.layers[prim.layer] !== false;
@@ -629,28 +741,7 @@ export function ModelView({
         live: Object.fromEntries(spec.notes.map((n) => [n.of, n.problem ? `not drawn: ${n.problem}` : n.note])),
       };
     },
-    [spec, frame, slice, view.selected, view.slice, model, sync]
-  );
-
-  // ── SELECTION IS CANONICAL, AND IT IS WHAT "THIS" MEANS ────────────
-  //
-  // Written into the model rather than into this component, so the picture, the
-  // panels, the inspector and the conversation all mean the same thing by it —
-  // and so "ask about this" is handed an identity rather than a description of
-  // what a picture looks like near a pixel.
-  const select = useCallback(
-    (id: string | null) => {
-      const next: Model = id
-        ? { ...model, version: (model.version ?? 0) + 1, selected: id }
-        : (() => {
-            const { selected: _gone, ...rest } = model;
-            return { ...rest, version: (model.version ?? 0) + 1 } as Model;
-          })();
-      setModel(next);
-      setView((v) => ({ ...v, selected: id }));
-      onModel?.(next);
-    },
-    [model, onModel]
+    [spec, frame, slice, view.selected, view.slice, model, sync, panel, openv, select]
   );
 
   // ── THE PICTURE AND THE UNDERSTAND LAYER, STACKED ──────────────────
@@ -692,7 +783,7 @@ export function ModelView({
         lib/model/inspect.ts, and its whole job is to put what the model already
         knows within reach. Closed by default: the figure is what somebody came
         to look at. */}
-    <Understand model={model} onSelect={select} onAsk={onAsk} />
+    <Understand model={full} onSelect={select} onView={openView} onAsk={onAsk} />
     </div>
   );
 }

@@ -127,6 +127,29 @@ export interface Unavailable {
  * One table, applied once in `add`, so a new family declares this by being in the
  * set or not — and no caller keeps its own copy of the question.
  */
+/**
+ * THE FAMILIES SOMETHING ACTUALLY RENDERS, and the only place that is recorded.
+ *
+ * `notDrawnYet` used to be a literal typed onto each declaration by hand, which
+ * is the failure this codebase keeps making in different clothes: two copies of
+ * one rule, drifting. A table said "declared; no renderer yet" for weeks after
+ * the table renderer existed, and a residual view said nothing of the sort while
+ * quietly drawing the surface it was a residual OF.
+ *
+ * So the flag is DERIVED from this, lib/model/viewdata.ts renders exactly these,
+ * and adding a renderer is adding a name here. A family absent from this set
+ * reports itself declared-but-not-drawn and the frame keeps the picture it had
+ * rather than clearing it for something nothing can draw.
+ */
+export const RENDERED = new Set<ViewFamily>([
+  // frames — the compiler's own geometry, narrowed to the object
+  'surface', 'curve', 'scatter', 'field', 'trajectory', 'timeline', 'mechanism', 'network',
+  // frames — computed here from what already ran
+  'contour', 'slice', 'residual', 'interval',
+  // read
+  'equation', 'table', 'matrix', 'structure', 'derivative', 'sensitivity', 'diagnostic', 'text',
+]);
+
 const OCCUPIES_EXTENT = new Set<ViewFamily>([
   'surface', 'curve', 'scatter', 'contour', 'slice', 'field', 'trajectory',
   'phase', 'mechanism', 'timeline', 'animation', 'residual', 'interval', 'network',
@@ -178,7 +201,12 @@ export function viewsFor(model: Model): ViewSpec[] {
   const out: ViewSpec[] = [];
   const add = (v: Omit<ViewSpec, 'marks'> & { marks?: boolean }) => {
     if (out.some((x) => x.id === v.id)) return;
-    out.push({ ...v, marks: v.marks ?? OCCUPIES_EXTENT.has(v.family) });
+    const marks = v.marks ?? OCCUPIES_EXTENT.has(v.family);
+    // DERIVED, NEVER DECLARED. See RENDERED above for what a hand-written flag
+    // cost. A view of a family nothing renders is still listed — the answer to
+    // "what else could I look at" is meant to be complete — it just says so.
+    const notDrawnYet = RENDERED.has(v.family) ? undefined : true;
+    out.push({ ...v, marks, ...(notDrawnYet ? { notDrawnYet } : {}) });
   };
   const table = symbolTable(model);
 
@@ -212,12 +240,17 @@ export function viewsFor(model: Model): ViewSpec[] {
         id: `table:${o.id}`, family: 'table', label: `${o.label} — values`, of: o.id, dimensionality: 2,
         because: 'a sampled relationship has values, and a number is sometimes what is wanted',
         shows: 'the computed value at a grid of inputs, and at the point currently selected',
-        fidelity: f, can: ['select', 'point'], notDrawnYet: true,
+        fidelity: f, can: ['select', 'point'],
       });
     }
 
     // ── a quantity over one other ─────────────────────────────────
-    if (['curve', 'line', 'ray'].includes(o.kind) && DRAWS(model, o)) {
+    //
+    // A MARGINAL IS NOT LISTED AS A PLAIN CURVE. It is a curve, and its own
+    // branch below says what it is — so both branches firing offered the same
+    // picture twice under two names, one of which ("∂z/∂x") explained it and
+    // one of which did not.
+    if (['curve', 'line', 'ray'].includes(o.kind) && o.meta?.role !== 'marginal' && DRAWS(model, o)) {
       add({
         id: `curve:${o.id}`, family: 'curve', label: o.label, of: o.id, dimensionality: 2,
         because: 'a quantity varies over one other, and it evaluates',
@@ -228,7 +261,7 @@ export function viewsFor(model: Model): ViewSpec[] {
         id: `table:${o.id}`, family: 'table', label: `${o.label} — values`, of: o.id, dimensionality: 2,
         because: 'a sampled relationship has values',
         shows: 'the computed value at each sampled input',
-        fidelity: f, can: ['select', 'point'], notDrawnYet: true,
+        fidelity: f, can: ['select', 'point'],
       });
     }
 
@@ -326,7 +359,7 @@ export function viewsFor(model: Model): ViewSpec[] {
             id: `diagnostic:${o.id}`, family: 'diagnostic', label: `${o.label} — diagnostics`, of: o.id, dimensionality: 2,
             because: 'the fit reported something a reader should know before trusting it',
             shows: 'the warnings, the rows left out and why',
-            fidelity: 'data-derived', can: ['select'], notDrawnYet: true,
+            fidelity: 'data-derived', can: ['select'],
           });
         }
       }
@@ -392,13 +425,13 @@ export function viewsFor(model: Model): ViewSpec[] {
       id: `table:data:${key}`, family: 'table', label: block.label ?? key, of: '', dimensionality: 2,
       because: 'the model carries observations, and a table is what they are',
       shows: 'the supplied numbers, as given — never a fitted line standing in for them',
-      fidelity: 'data-derived', can: ['select', 'point'], notDrawnYet: true,
+      fidelity: 'data-derived', can: ['select', 'point'],
     });
     add({
       id: `matrix:data:${key}`, family: 'matrix', label: `${block.label ?? key} — design`, of: '', dimensionality: 2,
       because: 'the columns a specification uses form a matrix, and its shape is what identification turns on',
       shows: 'the rows and columns a fit would run on, including any built from transformations',
-      fidelity: 'data-derived', can: ['select'], notDrawnYet: true,
+      fidelity: 'data-derived', can: ['select'],
     });
   }
 
@@ -421,7 +454,7 @@ export function viewsFor(model: Model): ViewSpec[] {
       id: 'structure:model', family: 'structure', label: 'What depends on what', of: '', dimensionality: 2,
       because: `${wired.length} object${wired.length === 1 ? '' : 's'} in this model rest on something else in it`,
       shows: 'the dependency graph the engine actually uses — what a change reaches, and what it does not',
-      fidelity: 'model-derived', can: ['select'], notDrawnYet: true,
+      fidelity: 'model-derived', can: ['select'],
     });
   }
 
@@ -435,7 +468,7 @@ export function viewsFor(model: Model): ViewSpec[] {
       id: 'sensitivity:model', family: 'sensitivity', label: 'Sensitivity to the parameters', of: '', dimensionality: 2,
       because: `${movable.length} parameter${movable.length === 1 ? '' : 's'} can be moved, and the relationship can be differentiated with respect to them`,
       shows: 'how much each output moves per unit of each parameter — differentiated, not measured by nudging',
-      fidelity: 'model-derived', can: ['select'], notDrawnYet: true,
+      fidelity: 'model-derived', can: ['select'],
     });
   }
 

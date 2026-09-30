@@ -8,6 +8,7 @@
     "vercel-build": "node scripts/check-env.mjs --soft && next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
+    "verify:views": "node scripts/verify-views.mjs",
     "test": "node test/run.mjs",
     "probe:mind": "node scripts/mind-probe.mjs",
     "doctor:mind": "node scripts/mind-doctor.mjs",
@@ -44,6 +45,7 @@
     "@types/react-dom": "^18.3.0",
     "autoprefixer": "^10.4.20",
     "esbuild": "^0.25.6",
+    "playwright-core": "^1.63.0",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.13",
     "typescript": "^5.6.0"

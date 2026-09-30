@@ -138,6 +138,21 @@ export function withTermsSubstituted(
  * expression. It is NOT `data-derived` — no observation is involved — and it is
  * not `conceptual`, because it was not drawn to make an idea legible.
  */
+/**
+ * WHAT TO CALL THE THING BEING DIFFERENTIATED.
+ *
+ * A model object's label is written for a reader, and a reader is often best
+ * served by the whole relationship — "z = a·x² − b·y²". Put inside a ∂ that
+ * reads "∂z = a·x² − b·y² / ∂x", which is not an expression, is not a name, and
+ * does not fit a button. So: what the model says the outcome is, else the
+ * left-hand side of a label that states an equation, else the label.
+ */
+function outcomeName(o: ModelObject): string {
+  if (typeof o.meta?.outcome === 'string') return o.meta.outcome as string;
+  const eq = o.label.split(/\s=\s/)[0].trim();
+  return eq && eq.length < o.label.length ? eq : o.label;
+}
+
 export function expandMarginals(model: Model): Model {
   const add: ModelObject[] = [];
   const have = new Set(model.objects.map((o) => o.id));
@@ -155,7 +170,7 @@ export function expandMarginals(model: Model): Model {
     // ∂z/∂y. A response surface records this; anything else falls back to the
     // axis letter, which is still true.
     const namedAxes = typeof o.meta?.axes === 'string' ? String(o.meta.axes).split(',').map((s) => s.trim()) : [];
-    const outcome = typeof o.meta?.outcome === 'string' ? (o.meta.outcome as string) : o.label;
+    const outcome = outcomeName(o);
 
     for (const [i, axis] of axes.entries()) {
       const got = marginalOf(model, o, axis);
@@ -347,7 +362,7 @@ export function expandReadouts(model: Model): Model {
       onto[axis] = name;
       at[name] = cursorFor(model, name, o.over![axis] as [number, number]);
     });
-    const outcome = typeof o.meta?.outcome === 'string' ? (o.meta.outcome as string) : o.label;
+    const outcome = outcomeName(o);
     const where = Object.entries(at).map(([k, v]) => `${k} = ${Number(v.toPrecision(6))}`);
 
     made.set(id, {

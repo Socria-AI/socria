@@ -67,3 +67,75 @@ path.eng-hit {
   fill: rgba(35, 36, 31, 0.38);
 }
 .eng-panel { cursor: pointer; }
+
+/* ── A VIEW THAT IS READ, IN THE SAME FRAME ────────────────────────────
+   Set by components/model/panelMarks.tsx from content derived in
+   lib/model/viewdata.ts. Editorial, not tabular: a rule under the headings,
+   no zebra stripes, no cell borders, numbers in the text face the rest of
+   the figure uses. Deliberately NOT the .eng-panel family above, which is
+   the secondary-plot plate — two things called panel is how one stylesheet
+   ends up styling the other's marks. */
+/* NOT UPPERCASED, and that is a correctness rule rather than a taste one: these
+   headings are the model's own names — `lwage`, `∂z / ∂x`, `educ` — and a name
+   an evaluator reads is case-sensitive. Small caps here printed ∂Z / ∂X, which
+   is a different symbol. Weight and colour do the work instead. */
+.eng-read-head {
+  font-family: var(--sans, system-ui);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  fill: rgba(35, 36, 31, 0.5);
+}
+.eng-read-rule {
+  fill: none;
+  stroke: var(--eng-line, rgba(35, 36, 31, 0.14));
+  stroke-width: 0.8;
+}
+.eng-read-cell {
+  font-family: var(--sans, system-ui);
+  font-size: 11.5px;
+  fill: rgba(35, 36, 31, 0.86);
+}
+.eng-read-key {
+  font-family: var(--sans, system-ui);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  fill: rgba(35, 36, 31, 0.5);
+}
+.eng-read-math {
+  font-family: var(--mono, ui-monospace, "SFMono-Regular", Menlo, monospace);
+  font-size: 12.5px;
+  fill: var(--eng-primary, #354620);
+}
+.eng-read-none {
+  font-family: var(--sans, system-ui);
+  font-size: 12px;
+  font-style: italic;
+  fill: rgba(35, 36, 31, 0.52);
+}
+.eng-read-node {
+  font-family: var(--sans, system-ui);
+  font-size: 11px;
+  fill: rgba(35, 36, 31, 0.86);
+}
+.eng-read-edge {
+  fill: none;
+  stroke: rgba(35, 36, 31, 0.26);
+  stroke-width: 0.9;
+}
+.eng-read .is-link {
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: rgba(35, 36, 31, 0.24);
+  text-underline-offset: 2px;
+}
+.eng-read .is-link:hover {
+  fill: var(--eng-tension, #9c5b3c);
+}
+
+@media (prefers-color-scheme: dark) {
+  .eng-read-head, .eng-read-key { fill: rgba(240, 238, 232, 0.5); }
+  .eng-read-cell, .eng-read-node { fill: rgba(240, 238, 232, 0.86); }
+  .eng-read-none { fill: rgba(240, 238, 232, 0.52); }
+  .eng-read-edge { stroke: rgba(240, 238, 232, 0.26); }
+  .eng-read .is-link { text-decoration-color: rgba(240, 238, 232, 0.24); }
+}

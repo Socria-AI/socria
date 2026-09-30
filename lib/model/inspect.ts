@@ -94,6 +94,19 @@ const section = (id: Section['id'], label: string, summary: string, facts: Fact[
  * The sections are the progressive disclosure: a reader opens the ones they
  * want, and a section that does not apply is not there to open.
  */
+/**
+ * A number a person reads, not a number a machine stored.
+ *
+ * A domain read off supplied data is a floating-point extreme — a column's
+ * minimum came out as “−3.016598715849769”, and seventeen digits of a bound
+ * nobody chose is noise that makes a real fact unreadable. Four significant
+ * figures, and nothing is rounded anywhere a value is USED: this is the reading
+ * layer.
+ */
+function sig(v: number | undefined): string {
+  return v === undefined || !Number.isFinite(v) ? String(v) : String(Number(v.toPrecision(4)));
+}
+
 export function inspectModel(model: Model): Inspection {
   const cap = capabilityOf(model);
   const table = symbolTable(model);
@@ -120,7 +133,7 @@ export function inspectModel(model: Model): Inspection {
   for (const q of inputsOf(model)) {
     state.push({
       label: q.label,
-      value: `at ${q.at}${q.units ? ` ${q.units}` : ''}, over ${q.min} to ${q.max}`,
+      value: `at ${sig(q.at)}${q.units ? ` ${q.units}` : ''}, over ${sig(q.min)} to ${sig(q.max)}`,
       of: q.id,
     });
   }
@@ -156,7 +169,7 @@ export function inspectModel(model: Model): Inspection {
       value:
         `${SUPPLY_SAYS[q.supply]}` +
         (q.value !== undefined ? `, = ${q.value}${q.units ? ` ${q.units}` : ''}` : '') +
-        (q.domain ? `, over ${q.domain[0]} to ${q.domain[1]} (${q.domainFrom})` : '') +
+        (q.domain ? `, over ${sig(q.domain[0])} to ${sig(q.domain[1])} (${q.domainFrom})` : '') +
         (q.control ? `, driven by ${q.control}` : ''),
       of: q.id,
       origin: q.origin,
@@ -357,7 +370,7 @@ export function inspectObject(model: Model, id: string): Inspection | null {
   if (q) what.push({ label: 'Supplies', value: SUPPLY_SAYS[q.supply], of: q.id });
   if (q?.value !== undefined) what.push({ label: 'Value', value: `${q.value}${q.units ? ` ${q.units}` : ''}` });
   if (q?.domain) what.push({ label: 'Range', value: `${q.domain[0]} to ${q.domain[1]}, from the ${q.domainFrom}` });
-  if (p) what.push({ label: 'Control', value: `${p.value}${p.units ? ` ${p.units}` : ''}, over ${p.min} to ${p.max}` });
+  if (p) what.push({ label: 'Control', value: `${sig(p.value)}${p.units ? ` ${p.units}` : ''}, over ${sig(p.min)} to ${sig(p.max)}` });
   const expr = o ? expressionOf(o) : null;
   if (expr) what.push({ label: 'Says', value: expr });
   if (o?.provenance) {

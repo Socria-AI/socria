@@ -1299,8 +1299,12 @@ export function buildSlice(
   axis: 'x' | 'y',
   at: number
 ): Sampled<Primitive[]> | null {
-  if (o.kind !== 'surface' || !o.definition) return null;
-  const e = compileExpr(o.definition, names(model, ['x', 'y']));
+  // Same reader as buildContours: a surface states its mathematics in
+  // `definition` OR in `defs.z`, and reading only the first meant a response
+  // surface had no cross-section either.
+  const expr = surfaceExpr(o);
+  if (o.kind !== 'surface' || !expr) return null;
+  const e = compileExpr(expr, names(model, ['x', 'y']));
   if (!e) return null;
   const scope = scopeOf(model);
   const along = rangeOf(model, o, axis === 'x' ? 'y' : 'x', [-3, 3]);
@@ -1310,10 +1314,20 @@ export function buildSlice(
   return { value: out.value, note: out.note };
 }
 
+/** What a surface says, however it says it. One place, so every reader agrees. */
+function surfaceExpr(o: ModelObject): string | null {
+  return o.definition ?? o.defs?.z ?? null;
+}
+
 /** Level sets of a surface object, as contours at its own scale. */
 export function buildContours(model: Model, o: ModelObject, count = 8): Sampled<Primitive[]> | null {
-  if (o.kind !== 'surface' || !o.definition) return null;
-  const e = compileExpr(o.definition, names(model, ['x', 'y']));
+  // `definition` OR `defs.z`, because a response surface states its mathematics
+  // in the second and this read only the first — so every surface built from a
+  // specification returned no contours at all, silently, and the level-set view
+  // fell back to drawing the surface it was supposed to be the plan of.
+  const expr = surfaceExpr(o);
+  if (o.kind !== 'surface' || !expr) return null;
+  const e = compileExpr(expr, names(model, ['x', 'y']));
   if (!e) return null;
   const scope = scopeOf(model);
   const xr = rangeOf(model, o, 'x', [-3, 3]);
@@ -1325,8 +1339,9 @@ export function buildContours(model: Model, o: ModelObject, count = 8): Sampled<
 
 /** One contour at a named level — "show me where this equals 3". */
 export function buildLevel(model: Model, o: ModelObject, level: number): Sampled<Primitive[]> | null {
-  if (o.kind !== 'surface' || !o.definition) return null;
-  const e = compileExpr(o.definition, names(model, ['x', 'y']));
+  const expr = surfaceExpr(o);
+  if (o.kind !== 'surface' || !expr) return null;
+  const e = compileExpr(expr, names(model, ['x', 'y']));
   if (!e) return null;
   const scope = scopeOf(model);
   const xr = rangeOf(model, o, 'x', [-3, 3]);
