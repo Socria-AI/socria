@@ -279,3 +279,118 @@ export function marginalLines(model: Model): string[] {
         : `${o.label} = ${o.meta?.expr}${o.meta?.constant ? ' (constant)' : ' (varies)'} — ${o.provenance?.detail ?? ''}`
     );
 }
+
+/**
+ * WHERE A FREE INPUT CURRENTLY SITS, given the model's cursor and its domain.
+ *
+ * The middle of the stated range until somebody moves it. That default is about
+ * LOOKING, not about the model: the range is the modelling claim and the engine
+ * may never invent one, but where inside it you are standing is a view question
+ * with a defensible answer.
+ */
+export function cursorFor(model: Model, name: string, domain: [number, number]): number {
+  const set = model.at?.[name] ?? model.at?.[name.toLowerCase()];
+  if (typeof set === 'number' && Number.isFinite(set)) {
+    return Math.min(Math.max(set, Math.min(...domain)), Math.max(...domain));
+  }
+  return (domain[0] + domain[1]) / 2;
+}
+
+/**
+ * WHAT THE RELATIONSHIP SAYS AT THE POINT SOMEBODY IS STANDING ON.
+ *
+ * THE OPERATION THE BRIEF CALLS PREDICT, and the thing the person originally
+ * asked for in so many words: "compute predicted wage directly from the specified
+ * equation". A surface answers it everywhere at once, which is not the same as
+ * answering it — you cannot read a number off a mesh.
+ *
+ * It is a DERIVED quantity: computed from the parameters and the cursor, with no
+ * observation anywhere near it, and it moves when either moves. The distinction
+ * the brief insists on is exactly visible here — changing β₃ changes the
+ * FUNCTION and so changes this; changing the education cursor changes WHERE ON
+ * the function this is read, and changes it too, for a different reason.
+ */
+export function expandReadouts(model: Model): Model {
+  // REPLACED, NOT SKIPPED — the second expander for which that is true, and for
+  // the same reason as the first (lib/model/equations.ts).
+  //
+  // A readout is derived from the parameters AND from where the cursor is
+  // standing, so an existing one is not "already done", it is "done from the
+  // state as it was". And `buildProposal` stores the EXPANDED model, so the
+  // readout is already present in the document from the moment it is opened:
+  // skipping by id meant moving the education cursor to 12 left the readout
+  // reading "wage at education = 10" on a document that had faithfully recorded
+  // the move.
+  const made = new Map<string, ModelObject>();
+
+  for (const o of model.objects) {
+    const raw = expressionOf(o);
+    if (!raw || !o.over) continue;
+    if (o.meta?.role === 'marginal' || o.meta?.role === 'readout') continue;
+    const axes = ['x', 'y', 'z'].filter((k) => !!o.over?.[k]);
+    if (!axes.length) continue;
+    const named = typeof o.meta?.axes === 'string' ? String(o.meta.axes).split(',').map((s) => s.trim()) : [];
+    // ONLY FOR NAMED INPUTS. A surface over anonymous coordinates has no point
+    // worth reading off: "f at x = 0" is not a fact anybody asked for, and a
+    // readout for every library surface would be noise rather than an answer.
+    if (named.length !== axes.length) continue;
+
+    const id = `${o.id}__at`.slice(0, 48);
+    if (made.has(id)) continue;
+
+    const tree = parse(raw, [...known(symbolTable(model)), ...axes]);
+    if (!tree) continue;
+    const onto: Record<string, string> = {};
+    const at: Record<string, number> = {};
+    axes.forEach((axis, i) => {
+      const name = (named[i] || axis).toLowerCase();
+      onto[axis] = name;
+      at[name] = cursorFor(model, name, o.over![axis] as [number, number]);
+    });
+    const outcome = typeof o.meta?.outcome === 'string' ? (o.meta.outcome as string) : o.label;
+    const where = Object.entries(at).map(([k, v]) => `${k} = ${Number(v.toPrecision(6))}`);
+
+    made.set(id, {
+      id,
+      kind: 'scalar',
+      label: `${outcome} at ${where.join(', ')}`,
+      meaning:
+        `what the relationship gives at the point currently selected. ` +
+        `Computed from the coefficients and from where each input is standing — no observation is involved, and this is not a prediction about anything measured.`,
+      definition: print(rename(tree, onto)),
+      relations: [{ to: o.id, as: 'derived-from', why: 'it is this relationship read at one point' }],
+      fidelity: 'model-derived',
+      provenance: {
+        origin: 'computation',
+        detail: `evaluated from “${raw}” at ${where.join(', ')} — the expression sampler, at one point rather than over a grid`,
+      },
+      meta: { of: o.id, role: 'readout', at: where.join(', '), outcome },
+    });
+  }
+
+  if (!made.size) return model;
+  const kept = model.objects.map((o) => made.get(o.id) ?? o);
+  const fresh = [...made.entries()].filter(([id]) => !model.objects.some((o) => o.id === id));
+  return { ...model, objects: [...kept, ...fresh.map(([, o]) => o)] };
+}
+
+/** Every free input this model states, with its range and where it is standing. */
+export function inputsOf(model: Model): { id: string; label: string; min: number; max: number; at: number; units?: string }[] {
+  const table = symbolTable(model);
+  const out: { id: string; label: string; min: number; max: number; at: number; units?: string }[] = [];
+  for (const q of table.by.values()) {
+    if (q.supply !== 'input' || !q.domain) continue;
+    const name = (typeof q.means === 'string' ? q.id : q.id).toLowerCase();
+    const column = q.display.toLowerCase();
+    const [lo, hi] = q.domain;
+    out.push({
+      id: column,
+      label: q.display,
+      min: Math.min(lo, hi),
+      max: Math.max(lo, hi),
+      at: cursorFor(model, column, q.domain),
+      ...(q.units ? { units: q.units } : {}),
+    });
+  }
+  return out;
+}

@@ -45,10 +45,52 @@
 //
 // PURE. No evaluation, no clock, no React.
 
+import { NAME } from './ids';
 import type { Model, ModelObject, Origin, Fidelity } from './schema';
 
 /** What a quantity is FOR, which decides how it may be bound and shown. */
 export type SymbolRole = 'parameter' | 'coefficient' | 'variable' | 'state' | 'constant';
+
+/**
+ * WHAT SUPPLIES THIS QUANTITY'S VALUES — which is not the same question as what
+ * kind of thing it is, and is the one the engine kept getting wrong.
+ *
+ * THE FAILURE, reproduced before this existed. A wage relationship with the
+ * person's own coefficients, asked to be evaluated over education and
+ * experience:
+ *
+ *   says        : "needs observations — wage, education, experience, exper_pow2
+ *                  for each case"
+ *   surface over: null
+ *   sampled over: x ∈ [−3, 3], y ∈ [−3, 3]      ← invented by the engine
+ *   box         : ±11.99 in x and y, so the mesh occupied a quarter of it
+ *
+ * Education from minus three to three years, inside a box four times too wide.
+ * Two mistakes with one cause: NOTHING DISTINGUISHED A FREE INPUT FROM AN
+ * OBSERVED VARIABLE. A regressor was a column name, so the only way to have
+ * values for it was a dataset — and when the picture needed a window anyway, the
+ * engine invented one rather than asking for the thing it actually needed.
+ *
+ * A FREE INPUT NEEDS A DOMAIN, NOT A DATASET. Evaluating z = f(x, y) at
+ * chosen values of x and y is a different operation from estimating f's
+ * coefficients from observations of x, y and z, and the inputs play a different
+ * role in each. This is the distinction, made explicit:
+ *
+ *   parameter  a quantity the expression USES. β₁ = 2.5. Fixed or manipulable;
+ *              moving it changes the function itself.
+ *   input      a quantity the expression is evaluated OVER. Free. It needs a
+ *              RANGE. Moving it selects a point or a slice within the function.
+ *   observed   a quantity whose values come from a dataset. ESTIMATE needs
+ *              these; EVALUATE never does.
+ *   derived    a quantity computed from others — a fitted coefficient, a solved
+ *              unknown, a predicted outcome, a marginal effect.
+ *
+ * It is not an econometrics distinction. It is the difference between the
+ * argument of a function and a measurement of it, and it applies to a demand
+ * curve, a stress-strain law, a dose-response relationship and a payoff surface
+ * identically.
+ */
+export type Supply = 'parameter' | 'input' | 'observed' | 'derived' | 'unbound';
 
 export interface Quantity {
   /** the one identity: stable, and what every subsystem keys on */
@@ -72,6 +114,18 @@ export interface Quantity {
   control?: string;
   /** what it is, for a reader and for the missing-structure sentence */
   means?: string;
+  /** WHAT SUPPLIES ITS VALUES — see Supply. Derived from the model's structure. */
+  supply: Supply;
+  /**
+   * The range a FREE INPUT is evaluated over, when the model states one.
+   *
+   * ABSENT IS A REAL STATE and the one the failure above turned into a guess: an
+   * input with no domain is not an input to be sampled over [−3, 3], it is an
+   * input whose range nobody has chosen, and choosing it is a modelling act.
+   */
+  domain?: [number, number];
+  /** where the domain came from, so a reader can tell a choice from a default */
+  domainFrom?: 'object' | 'specification' | 'control' | 'data';
 }
 
 export interface SymbolTable {
@@ -131,6 +185,7 @@ export function symbolTable(model: Model): SymbolTable {
       origin: 'user',
       boundBy: 'control',
       control: p.id,
+      supply: 'parameter',
       ...(p.means ? { means: p.means } : {}),
     });
   }
@@ -144,7 +199,20 @@ export function symbolTable(model: Model): SymbolTable {
     put({
       id: o.id,
       display: o.label || o.id,
-      machine: machineOf(o.id),
+      // A FREE INPUT'S OWN NAME IS ITS EXECUTION IDENTITY.
+      //
+      // The object is `wage_spec__x0` and the quantity is `education`, and an
+      // expression that reads a value at a point writes `education` — because
+      // that is what it is called. Keying only on the object id meant the
+      // readout "wage at education = 12" compiled over a name list that did not
+      // contain `education`, evaluated to NaN, and reported the input it was
+      // standing on as a quantity with no value.
+      //
+      // This is the same rule as everywhere else in this file, applied one step
+      // further: a display name is not an execution identity, and neither is an
+      // internal id — the CANONICAL name is, and for a column of a
+      // specification the canonical name is the column.
+      machine: columnName(o) ?? machineOf(o.id),
       role,
       ...(bound.value !== undefined ? { value: bound.value } : {}),
       ...(o.units ? { units: o.units } : {}),
@@ -152,11 +220,148 @@ export function symbolTable(model: Model): SymbolTable {
       ...(o.fidelity ? { fidelity: o.fidelity } : {}),
       boundBy: bound.how,
       ...(bound.control ? { control: bound.control } : {}),
+      ...supplyOf(model, o),
       ...(o.meaning ? { means: o.meaning } : {}),
     });
   }
 
   return { by, fromMachine, fromDisplay };
+}
+
+/**
+ * WHAT SUPPLIES THIS OBJECT'S VALUES, AND OVER WHAT RANGE — from the structure.
+ *
+ * DERIVED, NEVER DECLARED, for the same reason fidelity is: a model that could
+ * announce its own roles would announce the flattering ones. Every branch below
+ * reads something the model already says.
+ *
+ * The order is the order of certainty. A quantity a computation produced is
+ * derived whatever else it looks like; one whose values are in an attached
+ * dataset is observed; a regressor of a specification with NO data is a FREE
+ * INPUT, because that is exactly what it is — the relationship is stated over it
+ * and nobody has measured it.
+ */
+function supplyOf(model: Model, o: ModelObject): { supply: Supply; domain?: [number, number]; domainFrom?: Quantity['domainFrom'] } {
+  const role = typeof o.meta?.role === 'string' ? (o.meta.role as string) : '';
+
+  // 1. PRODUCED BY A COMPUTATION. A fitted coefficient, a solved unknown, a
+  //    predicted outcome, a marginal effect.
+  if (['response', 'marginal', 'solution'].includes(role)) return { supply: 'derived' };
+  if (o.provenance?.origin === 'computation' || o.fidelity === 'data-derived') return { supply: 'derived' };
+
+  // 2. A COEFFICIENT IS A PARAMETER, valued or not. It is a quantity the
+  //    expression USES, and moving it changes the function — which is the
+  //    definition. Whether anything has given it a number yet is a separate
+  //    question, answered by `boundBy`.
+  if (role === 'coefficient' || role === 'intercept') return { supply: 'parameter' };
+
+  // 3. THE VALUES ARE IN A DATASET. Observed: what ESTIMATE needs and EVALUATE
+  //    never does.
+  const column = typeof o.meta?.column === 'string' ? (o.meta.column as string) : o.id;
+  const carrier = typeof o.meta?.spec === 'string' ? (o.meta.spec as string) : null;
+  const spec = carrier ? model.objects.find((x) => x.id === carrier)?.estimation : undefined;
+  const block = spec?.data ? model.data?.[spec.data] : undefined;
+  const measured = block?.columns?.[column];
+  if (measured || block?.index?.[column]) {
+    // OBSERVATIONS CARRY THEIR OWN DOMAIN, and it is the right one. A fitted
+    // relationship is drawn over the range of the data it was fitted to — that
+    // is not a window the engine invented, it is the extent of what was actually
+    // measured, and drawing outside it is extrapolation nobody asked for.
+    //
+    // Without this the response surface of every fitted model in the library
+    // started refusing for want of a range, on data whose range is right there.
+    const finite = (measured ?? []).filter((v) => Number.isFinite(v));
+    return {
+      supply: 'observed',
+      ...(finite.length >= 2
+        ? { domain: [Math.min(...finite), Math.max(...finite)] as [number, number], domainFrom: 'data' as const }
+        : {}),
+    };
+  }
+
+  // 4. THE OUTCOME IS DERIVED, NOT AN INPUT. `wage_hat` is what the relationship
+  //    COMPUTES; it is the left-hand side. Classifying it as a free input asked
+  //    for a range to evaluate wage over, which is the question backwards — and
+  //    with a dataset attached it is observed, which is case 3 above.
+  if (role === 'outcome') return { supply: 'derived' };
+
+  // 5. A REGRESSOR THAT IS A TERM IS DERIVED FROM ITS BASES. `exper²` is not a
+  //    quantity anybody supplies or chooses a range for; it is `exper` squared,
+  //    and `exper` is the free input. Asking for a domain for `exper²` is the
+  //    same category error as asking for observations of it.
+  if (spec?.terms?.[column]) return { supply: 'derived' };
+
+  // 6. A VARIABLE OF A SPECIFICATION WITH NO DATA IS A FREE INPUT. The
+  //    relationship is stated over it and nothing has measured it, which is a
+  //    complete and ordinary state — and the one the engine used to call
+  //    "needs observations".
+  if (spec && ['regressor', 'variable', 'input'].includes(role)) {
+    return { supply: 'input', ...domainFor(model, o, spec, column) };
+  }
+
+  // 4. A QUANTITY AN EXPRESSION IS EVALUATED OVER, said by the object's own
+  //    window. `over: {p: [0, 50]}` is a curve in p, so p is a free input.
+  if (o.over && Object.keys(o.over).length && (o.kind === 'variable' || o.kind === 'measurement')) {
+    const own = Object.entries(o.over)[0];
+    return { supply: 'input', domain: own[1] as [number, number], domainFrom: 'object' };
+  }
+
+  // 5. Anything with a value that nothing above claimed is a parameter: a
+  //    constant, a coefficient somebody set, a quantity written into the model.
+  const has = o.value !== undefined || o.defs?.value !== undefined || typeof o.meta?.value === 'number';
+  return { supply: has || o.kind === 'parameter' || o.kind === 'constant' ? 'parameter' : 'unbound' };
+}
+
+/**
+ * The range a free input is evaluated over, and where it came from.
+ *
+ * THREE STATED SOURCES AND NO FOURTH. The object's own window, the
+ * specification's `over` map, or a control of that name — all three are things
+ * somebody wrote down. There is deliberately no invented default: a window the
+ * engine picks for a quantity the model has NAMED is a modelling decision taken
+ * on the person's behalf, and picking [−3, 3] for education is how a wage
+ * surface came to be drawn over minus three years of schooling.
+ */
+function domainFor(
+  model: Model,
+  o: ModelObject,
+  spec: NonNullable<ModelObject['estimation']>,
+  column: string
+): { domain?: [number, number]; domainFrom?: Quantity['domainFrom'] } {
+  const own = o.over?.x ?? o.over?.[column];
+  if (own) return { domain: own as [number, number], domainFrom: 'object' };
+  const stated = spec.over?.[column];
+  if (stated) return { domain: stated as [number, number], domainFrom: 'specification' };
+  const p = model.params.find((q) => q.id.toLowerCase() === column.toLowerCase());
+  if (p) return { domain: [p.min, p.max], domainFrom: 'control' };
+  return {};
+}
+
+/**
+ * Every FREE INPUT in this model, with its domain or the absence of one.
+ *
+ * What the readiness layer asks for, what the conversation lists, and what the
+ * interface turns into a control — from one place, so all three agree.
+ */
+export function freeInputs(table: SymbolTable): Quantity[] {
+  return [...table.by.values()].filter((q) => q.supply === 'input');
+}
+
+/** The free inputs nothing has given a range to. A domain is missing, not data. */
+export function withoutDomain(table: SymbolTable): Quantity[] {
+  return freeInputs(table).filter((q) => !q.domain);
+}
+
+/**
+ * The column a quantity IS, when it is one — a legal identifier or nothing.
+ *
+ * Only for objects a specification named, because those are the ones whose
+ * canonical name is the column rather than the generated id.
+ */
+function columnName(o: ModelObject): string | null {
+  const column = typeof o.meta?.column === 'string' ? (o.meta.column as string) : null;
+  if (!column) return null;
+  return NAME.test(column) ? column.toLowerCase() : null;
 }
 
 /** Which objects are quantities. A surface is not; a coefficient is. */

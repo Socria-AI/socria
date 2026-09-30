@@ -24,7 +24,9 @@ import type { VizEntity, VizModelState, VizOp, VizProvenance } from '@/lib/viz-m
 import { unpack } from './unpack';
 import { OPERATIONS, askFor, capabilityOf, missingStructure, plan, route } from './solve';
 import { estimate } from './estimate';
+import { inputsOf } from './derive';
 import { equationLines, solutionFor } from './equations';
+import { symbolTable, withoutDomain } from './symbols';
 import { driftOf, runFor, stateAt } from './system';
 import { FIDELITY_SAYS, ORIGIN_SAYS, affectedBy, objectOf, paramOf, setParam, setTime, type ChangeRecord, type Fidelity, type Model } from './schema';
 import type { VisualizationSpec } from './spec';
@@ -218,6 +220,29 @@ export function modelStateFrom(
   // so; and what the next level would take is named rather than implied.
   const cap = capabilityOf(model);
   readouts.push(cap.says);
+
+  // ── THE FREE INPUTS, NAMED AS SUCH ────────────────────────────────
+  //
+  // So the conversation can answer "what can I move?" with the two kinds it
+  // actually has, and never say a free input needs observations. A quantity the
+  // relationship is evaluated OVER needs a RANGE; a quantity whose values come
+  // from a dataset needs the dataset; and only the second is what ESTIMATE waits
+  // for.
+  const free = inputsOf(model);
+  if (free.length) {
+    readouts.push(
+      `FREE INPUTS — the relationship is evaluated over these, and they need RANGES rather than observations: ` +
+        free.map((q) => `${q.label} over ${q.min} to ${q.max}, currently at ${q.at}${q.units ? ` ${q.units}` : ''}`).join('; ') +
+        `. Move one with "at ${free[0].label} <value>" to read the relationship at a different point; that changes where you are looking, not what the model says.`
+    );
+  }
+  const noRange = withoutDomain(symbolTable(model));
+  if (noRange.length) {
+    readouts.push(
+      `THESE ARE FREE INPUTS WITH NO RANGE: ${noRange.map((q) => q.display).join(', ')}. ` +
+        `They need a range to evaluate over — say what values are worth looking at. They do NOT need observations, and saying they do would be wrong.`
+    );
+  }
 
   if (trimmed.length) {
     readouts.push(

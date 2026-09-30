@@ -47,6 +47,7 @@ import { operationsOn, route } from './solve';
 import { bindings, known, symbolTable, unbound } from './symbols';
 import { estimate } from './estimate';
 import { restOf, statesOf } from './mechanism';
+import { inputsOf } from './derive';
 import { figureFor, solutionFor, type Figure } from './equations';
 import { namesIn } from './deps';
 import { unpack } from './unpack';
@@ -76,6 +77,18 @@ export function scopeOf(model: Model, extra?: Record<string, number>): Record<st
   // expression naming three quantities the model knew the values of, and a
   // scope that had never heard of any of them.
   const scope: Record<string, number> = bindings(symbolTable(model));
+  // WHERE EACH FREE INPUT CURRENTLY SITS. An expression naming `education`
+  // evaluates at the cursor, which is what makes "predicted wage at twelve years
+  // of schooling" a computed number rather than a sentence.
+  //
+  // EVERY free input, not only the ones somebody has moved: an input with a
+  // stated range and no cursor sits in the middle of it, which is a fact about
+  // where you are looking rather than about the model. Binding only `model.at`
+  // left the readout unevaluable until the first drag.
+  for (const q of inputsOf(model)) scope[q.id.toLowerCase()] = q.at;
+  for (const [k, v] of Object.entries(model.at ?? {})) {
+    if (Number.isFinite(v)) scope[k.toLowerCase()] = v;
+  }
   if (model.time) scope.t = model.time.t;
   for (const [k, v] of Object.entries(extra ?? {})) scope[k.toLowerCase()] = v;
   return scope;
@@ -154,7 +167,7 @@ const NOTHING = (o: ModelObject, why: string): Built => ({
  * serve any subject that produces that kind of thing. Adding a kind means one
  * branch here; adding a domain means none.
  */
-export function buildObject(model: Model, o: ModelObject, opts?: { detail?: number }): Built {
+export function buildObject(model: Model, o: ModelObject, opts?: { detail?: number; panel?: boolean }): Built {
   const detail = Math.max(4, Math.min(400, o.detail ?? opts?.detail ?? 48));
   const scope = scopeOf(model);
   const layer = o.layer;
@@ -216,7 +229,19 @@ export function buildObject(model: Model, o: ModelObject, opts?: { detail?: numb
         null
       );
   const carrier = carrierId ? model.objects.find((x) => x.id === carrierId) : null;
-  const verdicts = carrier ? operationsOn(model, carrier) : own;
+  // DERIVE DOES NOT DRAW THIS OBJECT, so it does not vote on whether this object
+  // can be drawn.
+  //
+  // A relationship with unbound coefficients is not evaluable — every height is
+  // NaN — but it is perfectly DIFFERENTIABLE, because a derivative is a fact
+  // about the expression and needs no values at all. Once `derive` joined the
+  // operations, one runnable operation masked the other's gap: a specification
+  // whose β₀ nobody had given a number sailed past this gate and came back as
+  // "compiles but has a value at fewer than two points", when what it needed was
+  // a value for β₀ and the router had said so.
+  //
+  // The gate is about MARKS. A slope is drawn in its own panel, not here.
+  const verdicts = (carrier ? operationsOn(model, carrier) : own).filter((v) => v.operation !== 'derive');
   const anyRunnable = verdicts.some((v) => v.routed.status === 'runnable');
   const blocked = verdicts.filter((v) => v.routed.status === 'incomplete');
   if (!anyRunnable && blocked.length) {
@@ -255,7 +280,14 @@ export function buildObject(model: Model, o: ModelObject, opts?: { detail?: numb
     const mine = model.objects.filter(
       (x) => x.id !== o.id && ['of', 'spec', 'mech', 'gravity'].some((k) => x.meta?.[k] === o.id)
     );
-    const produced = mine.filter((x) => operationsOn(model, x).some((v) => v.routed.status === 'runnable'));
+    // …AND "PRODUCED" MEANS DREW, WHICH DERIVE DOES NOT. Same exclusion as the
+    // gate above, for the same reason: a specification whose coefficients nobody
+    // has given values is differentiable and not evaluable, and without this the
+    // carrier announced "what it says is drawn as …" over a surface that had
+    // drawn nothing — hiding the sentence that named the decision still to make.
+    const produced = mine.filter((x) =>
+      operationsOn(model, x).some((v) => v.operation !== 'derive' && v.routed.status === 'runnable')
+    );
     if (produced.length) {
       return {
         of: o.id,
@@ -303,7 +335,20 @@ export function buildObject(model: Model, o: ModelObject, opts?: { detail?: numb
   // a constant marginal effect and a squared one does not. Reported with its
   // value, evaluated from the coefficients as they currently stand, so moving β₁
   // moves this number.
-  if (o.meta?.role === 'marginal' && o.meta?.constant === true) {
+  // A VARYING SLOPE IS DRAWN IN ITS OWN PANEL (spec.ts buildPanels), not in the
+  // main frame, because it is a different quantity against a shared axis and one
+  // box cannot be honest about both. `partOfScene` is false for it here; the
+  // panel builder calls buildObject directly to get the curve.
+  if (o.meta?.role === 'marginal' && o.meta?.constant !== true && !o.meta?.undrawable && !opts?.panel) {
+    return {
+      of: o.id,
+      primitives: [],
+      note: `${o.label} = ${o.meta?.expr} — differentiated symbolically, and shown on its own axes beside the relationship rather than inside its box`,
+      fidelity: o.fidelity ?? 'model-derived',
+    };
+  }
+
+  if ((o.meta?.role === 'marginal' && o.meta?.constant === true) || o.meta?.role === 'readout') {
     const expr = typeof o.meta.expr === 'string' ? (o.meta.expr as string) : (o.definition ?? '');
     const e = expr ? compileExpr(expr, names(model, ['x', 'y', 'z'])) : null;
     const at = e ? e.eval(scope) : NaN;
@@ -311,7 +356,9 @@ export function buildObject(model: Model, o: ModelObject, opts?: { detail?: numb
       of: o.id,
       primitives: [],
       note: Number.isFinite(at)
-        ? `${o.label} = ${Number(at.toPrecision(6))}${o.units ? ` ${o.units}` : ''} — constant: ${expr}, differentiated symbolically and the same at every value`
+        ? o.meta?.role === 'readout'
+          ? `${o.label} = ${Number(at.toPrecision(6))}${o.units ? ` ${o.units}` : ''} — evaluated from ${expr} at the point currently selected`
+          : `${o.label} = ${Number(at.toPrecision(6))}${o.units ? ` ${o.units}` : ''} — constant: ${expr}, differentiated symbolically and the same at every value`
         : `${o.label} = ${expr} — constant, and not a number yet: ${unbound(symbolTable(model), namesIn(expr)).map((q) => q.display).join(', ') || 'something it names has no value'}`,
       fidelity: o.fidelity ?? 'model-derived',
     };

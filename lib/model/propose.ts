@@ -35,7 +35,7 @@
 //
 // PURE. No network, no clock of its own (an `at` is passed in), no React.
 
-import { capabilityOf, missingStructure, route, statedFormally, type Capability } from './solve';
+import { capabilityOf, missingStructure, plan, route, statedFormally, type Capability } from './solve';
 import { unpack } from './unpack';
 import { sanitizeModel, type Fidelity, type Model, type ModelObject } from './schema';
 import { overallFidelity } from './schema';
@@ -261,6 +261,28 @@ export function buildProposal(raw: ModelProposal, opts?: { at?: number }): Built
   const cap = capabilityOf(model);
   const fidelity = overallFidelity(model.objects);
 
+  /**
+   * One sentence per operation that is blocked, in the operations' own order.
+   *
+   * `plan` already knows this — it is the capability planner — so this reads it
+   * rather than re-deriving anything. Operations with nothing blocked say
+   * nothing; the one at the top of the list is the one a person is most likely
+   * to have meant.
+   */
+  function byOperation(m: Model): string[] {
+    const out: string[] = [];
+    for (const p of plan(m)) {
+      if (!p.blocked.length) continue;
+      const what = [
+        ...new Set(p.blocked.flatMap((b) => b.missing.map((x) => x.because ?? `it needs ${x.what}`))),
+      ];
+      out.push(
+        `${p.operation.toUpperCase()} is waiting on ${what.length === 1 ? 'one thing' : `${what.length} things`}: ${what.join('; ')}.`
+      );
+    }
+    return out;
+  }
+
   // What produced it, recorded on the model itself so a round trip can be told
   // from a fresh build and a reader can be told which.
   const built: Model = {
@@ -289,11 +311,27 @@ export function buildProposal(raw: ModelProposal, opts?: { at?: number }): Built
         // model is real, it is written down formally, and what it is waiting
         // for is named in the clause that follows.
         `Built as a ${cap.level} model — ${formal.length === 1 ? 'its structure is' : 'their structures are'} written down, and nothing in it computes yet.`,
-    missing.length
-      ? `${solvers.length ? 'Not everything computes — ' : 'What it is waiting for: '}${missing
-          .map((m) => `${m.label} needs ${m.missing.map((x) => x.what).join(', ')}`)
-          .join('; ')}.`
-      : '',
+    // ── WHAT IS MISSING, GROUPED BY THE OPERATION THAT WANTS IT ─────
+    //
+    // A FLAT LIST CONFLATES TWO DIFFERENT KINDS OF ABSENCE. Measured, on a wage
+    // relationship with the person's own coefficients and no stated ranges:
+    //
+    //   "Not everything computes — wage on education and experience needs
+    //    observations — wage, education, experience, exper_pow2 for each case;
+    //    wage, as the model implies it needs a range for education, a range for
+    //    experience."
+    //
+    // The headline is the dataset, and the dataset is required by ESTIMATE — an
+    // operation nobody asked for. What EVALUATE actually needed was a range, and
+    // it is second in a sentence that opens by saying nothing computes.
+    //
+    // The digest states the rule plainly: a model must not globally become "not
+    // computable" because one possible operation requires data. So the missing
+    // things are grouped by the operation that wants them, in the order the
+    // operations are listed — evaluate and derive before estimate — and an
+    // operation that is merely UNAVAILABLE is named as unavailable rather than
+    // as a deficiency of the model.
+    ...byOperation(model),
     // WHAT WAS TRIMMED ON THE WAY IN, said out loud. The sanitiser bounds
     // unbounded input — that is its job — but a bound applied silently is
     // indistinguishable from the proposal never having contained the thing, and

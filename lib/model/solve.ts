@@ -191,6 +191,36 @@ export const SAMPLING: Solver = {
     // which is a THIRD spelling of the binding rule and disagreed with both of
     // the others — an object whose value lived on `meta` or `defs` counted as
     // unbound here and as bound in the scope, or the reverse.
+    // ── A NAMED INPUT NEEDS A DOMAIN, AND NOBODY MAY INVENT ONE ─────
+    //
+    // `meta.axes` records that this object's coordinates stand for NAMED
+    // quantities: `x` is education, `y` is experience. A window the engine picks
+    // is a reasonable rendering default for an anonymous coordinate and is a
+    // MODELLING DECISION for a named quantity — and taken silently it produced a
+    // wage surface over education from minus three to three years, inside a box
+    // four times wider than the mesh in it.
+    //
+    // So the range is asked for, by name, as a DOMAIN. Never as observations:
+    // evaluating a function over a range of education and estimating its
+    // coefficients from measurements of education are different operations, and
+    // only the second needs a dataset.
+    const named = typeof o.meta?.axes === 'string' ? String(o.meta.axes).split(',').map((n) => n.trim()) : [];
+    if (named.length) {
+      const letters = ['x', 'y', 'z'];
+      const noRange = named
+        .map((label, i) => ({ label, letter: letters[i] }))
+        .filter(({ letter }) => letter && !o.over?.[letter]);
+      if (noRange.length) {
+        return noRange.map(({ label }) => ({
+          what: `a range for ${label}`,
+          because:
+            `${label} is a FREE INPUT here: the relationship is evaluated over it, so it needs a range — ` +
+            `say what values of ${label} are worth looking at. It does not need observations; nothing has to have been measured for this to be computed.`,
+          unlocks: `evaluating the relationship over ${named.join(' and ')}, which needs no data at all`,
+        }));
+      }
+    }
+
     const table = symbolTable(m);
     // THE SAMPLER'S OWN VARIABLES, which include whatever the model called them.
     // A fixed set of coordinate letters here meant `Q = 100 − 2P` over a range of

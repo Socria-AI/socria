@@ -428,6 +428,16 @@ export type VizOp =
    * paper over. `is` is the relation's own text; `drop` removes it.
    */
   | { op: 'relate'; of: string; is: string; drop?: boolean }
+  /**
+   * Move a FREE INPUT to a point inside its range.
+   *
+   * NOT `set`, and the difference is the whole distinction. `set` moves a
+   * PARAMETER, which changes the function — a different wage relationship.
+   * `at` moves an INPUT, which changes where on the same function you are
+   * standing. Both are canonical and both are undoable; only the first changes
+   * what the model claims.
+   */
+  | { op: 'at'; id: string; value: number }
   /** a copy under its own id, the original untouched */
   | { op: 'duplicate' }
   /** the same, named: work that may be thrown away */
@@ -442,7 +452,7 @@ export type VizOp =
 
 /** The ops that change the MODEL rather than the view of it. */
 export const MODEL_OPS: readonly VizOp['op'][] = [
-  'remove', 'add', 'replace', 'relate', 'duplicate', 'branch', 'undo', 'redo', 'delete', 'use',
+  'remove', 'add', 'replace', 'relate', 'at', 'duplicate', 'branch', 'undo', 'redo', 'delete', 'use',
 ];
 
 export function isModelOp(op: VizOp): boolean {
@@ -592,6 +602,13 @@ export function parseVizOps(reply: string, state: VizModelState | null | undefin
       if (m && entities.has(m[2]) && m[3].includes('=')) {
         out.push({ op: 'relate', of: m[2], is: m[3].replace(/\s+/g, ' ').trim(), ...(m[1] ? { drop: true } : {}) });
       }
+      continue;
+    }
+    // at education 12  |  at exper 10
+    if (verb === 'at' && bits.length >= 3 && editable) {
+      const id = bits[1];
+      const v = Number(bits[2]);
+      if (/^[a-z][a-z0-9_]{0,47}$/i.test(id) && Number.isFinite(v)) out.push({ op: 'at', id, value: v });
       continue;
     }
     if (verb === 'add' && bits.length >= 3 && editable) {

@@ -667,6 +667,9 @@ export function expandEstimation(model: Model): Model {
     const decl = carrier.estimation!;
     const fitted = decl.data ? estimate(model, carrier) : null;
     const terms = fitted && fitted.ok ? fitted.fit.terms : null;
+    // The observations, when there are any — read once here so the window the
+    // surface is drawn over and the columns the fit ran on come from one place.
+    const block = decl.data ? model.data?.[decl.data] : undefined;
     // Where a coefficient's value comes from, said once so every object below
     // agrees: a fit that ran, or nothing at all.
     const value = (name: string): number | undefined =>
@@ -980,14 +983,25 @@ export function expandEstimation(model: Model): Model {
         // The window belongs to the BASE variable — `over: {exper: [0, 40]}` —
         // because that is the quantity a person has an opinion about. Nobody has
         // a view on the range of `exper²`.
-        ...(decl.over
-          ? {
-              over: {
-                ...(decl.over[axes[0]] ? { x: decl.over[axes[0]] } : {}),
-                ...(axes.length > 1 && decl.over[axes[1]] ? { y: decl.over[axes[1]] } : {}),
-              },
-            }
-          : {}),
+        //
+        // AND WHERE THERE ARE OBSERVATIONS, THEY CARRY THEIR OWN WINDOW. A fitted
+        // relationship is drawn over the range of the data it was fitted to: that
+        // is not a window the engine invented, it is the extent of what was
+        // measured, and going outside it is extrapolation nobody asked for. The
+        // stated `over` still wins, because somebody saying which range matters
+        // outranks the accident of what happened to be collected.
+        ...(() => {
+          const window = (name: string): [number, number] | undefined => {
+            const said = decl.over?.[name];
+            if (said) return said as [number, number];
+            const col = block ? columnsOf(block)[name] : undefined;
+            const finite = (col ?? []).filter((v) => Number.isFinite(v));
+            return finite.length >= 2 ? [Math.min(...finite), Math.max(...finite)] : undefined;
+          };
+          const x = window(axes[0]);
+          const y = axes.length > 1 ? window(axes[1]) : undefined;
+          return x || y ? { over: { ...(x ? { x } : {}), ...(y ? { y } : {}) } } : {};
+        })(),
         relations: [
           { to: carrier.id, as: 'derived-from', why: 'it is what this specification says, with the error term left out' },
         ],

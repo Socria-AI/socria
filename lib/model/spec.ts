@@ -18,7 +18,7 @@
 // anyone can see when it chose badly.
 
 import { extentOf, pointsOf, type P3, type Primitive } from './primitives';
-import { buildModel, figureOf, type Built } from './compile';
+import { buildModel, buildObject, figureOf, type Built } from './compile';
 import { unpack } from './unpack';
 import { runFor, seriesOf } from './system';
 import { byKind, overallFidelity, worstFidelity, type Fidelity, type Model, type ModelObject } from './schema';
@@ -186,8 +186,17 @@ const DEFAULT_BOX: VisualizationSpec['box'] = { x: [-1, 1], y: [-1, 1], z: [-1, 
  */
 export function aspectOf(model: Model): 'equal' | 'fit' {
   if (model.aspect) return model.aspect;
+  // A GRAPH IS A GRAPH WHICHEVER WAY IT SAYS SO.
+  //
+  // This read `definition` only, and a response surface states its mathematics in
+  // `defs.z` — so z = f(education, experience) was treated as GEOMETRY and its box
+  // was made cubic. Measured: a mesh spanning 6 units in education and 22 in wage
+  // came back in a box ±11.99 on every axis, and the surface rendered as a narrow
+  // vertical sheet occupying a quarter of it. Equal scales are for pictures where
+  // a length is a length; education, experience and currency are three different
+  // quantities and forcing them to one scale says nothing true about any of them.
   const graph = model.objects.some(
-    (o) => (o.kind === 'surface' || o.kind === 'volume') && !!o.definition && !o.defs?.px
+    (o) => (o.kind === 'surface' || o.kind === 'volume') && (!!o.definition || !!o.defs?.z) && !o.defs?.px
   );
   // TWO DIFFERENT KINDS OF QUANTITY ON THE TWO AXES IS NOT A GEOMETRY. An
   // equation system's axes are groups of unknowns — quantity against price,
@@ -551,6 +560,40 @@ export function chooseRepresentation(model: Model): Choice {
  */
 export function buildPanels(model: Model): SpecPanel[] {
   const out: SpecPanel[] = [];
+
+  // ── A MARGINAL EFFECT IS A DIFFERENT PLOT, NOT ANOTHER MARK ───────
+  //
+  // ∂wage/∂exper is a curve in currency-per-year against experience. The surface
+  // it came from is currency against education and experience. They share one
+  // axis and nothing else, and drawing both in one frame put them in one box:
+  // measured, a surface spanning 20 units of education came back in a box 43.2
+  // wide, because the slope curve reached out to experience = 40 along the same
+  // x. The mesh then filled under half its own frame.
+  //
+  // The digest's rule, and it is about truthfulness rather than tidiness:
+  // "linked views can be more truthful" than one scene. So a slope goes in its
+  // own panel, with its own extent, beside the surface rather than inside it.
+  for (const o of model.objects) {
+    if (o.meta?.role !== 'marginal' || o.meta?.constant === true || o.meta?.undrawable) continue;
+    const built = buildObject(model, o, { panel: true });
+    const line = built.primitives.find((p) => p.p === 'polyline');
+    if (!line || line.at.length < 2) continue;
+    const at = line.at.map((q) => ({ x: q.x, y: q.y }));
+    const ys = at.map((q) => q.y);
+    out.push({
+      id: `${o.id}:slope`,
+      label: o.label,
+      of: o.id,
+      x: String(o.meta?.wrt ?? 'x'),
+      y: o.label,
+      at,
+      range: { x: [at[0].x, at[at.length - 1].x], y: [Math.min(...ys), Math.max(...ys)] },
+      fidelity: 'model-derived',
+      note: `${o.meta?.expr} — differentiated symbolically from the relationship this is drawn beside, and plotted on its own axes because it is a different quantity`,
+    });
+    if (out.length >= 4) return out;
+  }
+
   for (const o of model.objects) {
     if (!o.system) continue;
     const got = runFor(model, o);

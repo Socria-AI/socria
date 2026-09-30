@@ -239,8 +239,16 @@ console.log('\n=== D. functional form, and the failure that started this ===');
   ok('D: ∂wage/∂educ is constant', dEduc?.meta?.constant === true);
   ok('D:   and reads as its value', /= 2\.5/.test(buildObject(m, dEduc).note), buildObject(m, dEduc).note);
   // At exper = 10, β₂ + 2β₃·exper = 1.2 − 0.6 = 0.6.
-  const slope = vertices(buildSpec(m), 'spec__response__d_exper');
-  const s10 = slope.reduce((bst, p) => (Math.abs(p.x - 10) < Math.abs(bst.x - 10) ? p : bst));
+  //
+  // READ FROM ITS OWN PANEL. A slope is a different quantity against a shared
+  // axis — currency-per-year against experience, beside currency against
+  // education and experience — so it is plotted on its own axes rather than
+  // inside the surface's box, which it was distorting.
+  const panel = (buildSpec(m).panels ?? []).find((p) => p.of === 'spec__response__d_exper');
+  ok('D: the slope is its own panel, not a mark in the surface\'s box', !!panel,
+    JSON.stringify((buildSpec(m).panels ?? []).map((p) => p.of)));
+  const slope = panel?.at ?? [];
+  const s10 = slope.reduce((bst, p) => (Math.abs(p.x - 10) < Math.abs(bst.x - 10) ? p : bst), { x: Infinity, y: NaN });
   ok('D: the slope at exper ≈ 10 is 1.2 − 0.06·exper',
     near(s10.y, 1.2 - 0.06 * s10.x, 1e-9), JSON.stringify(s10));
   ok('D: derive is a first-class operation', askFor(m, 'derive').status === 'runnable');

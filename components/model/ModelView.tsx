@@ -28,6 +28,7 @@ import { boxLines, place, type Camera, type Frame3, type Pt2 } from '@/lib/logos
 import { contour } from '@/lib/model/sample';
 import type { P3, Primitive } from '@/lib/model/primitives';
 import { buildSlice } from '@/lib/model/compile';
+import { inputsOf } from '@/lib/model/derive';
 import { buildSpec, type VisualizationSpec } from '@/lib/model/spec';
 import { modelStateFrom, applyOps, type ViewState } from '@/lib/model/state';
 import { objectOf, setParam, setTime, type Model } from '@/lib/model/schema';
@@ -126,8 +127,33 @@ export function ModelView({
     return null;
   }, [model, view.slice]);
 
+  // ── FREE INPUTS ARE CONTROLS TOO, AND DIFFERENT ONES ──────────────
+  //
+  // The interface offered sliders for the coefficients and none for education
+  // and experience — although a wage relationship is evaluated OVER those, and
+  // the reply had just promised they would be adjustable. They are a different
+  // kind of control and belong in their own group: moving β₁ changes the
+  // FUNCTION, moving education changes WHERE ON it you are reading. Both write
+  // to the model, because the model is authoritative and this is a projection.
+  const inputs = useMemo(() => inputsOf(model), [model]);
+
   const groups = useMemo(
     () => [
+      ...(inputs.length
+        ? [{
+            id: 'inputs',
+            label: 'Inputs',
+            ctls: inputs.map((q) => ({
+              id: `at:${q.id}`,
+              label: q.label,
+              min: q.min,
+              max: q.max,
+              step: (q.max - q.min) / 100,
+              read: (v: number) => `${Number(v.toPrecision(4))}${q.units ? ` ${q.units}` : ''}`,
+              help: `a free input: the relationship is evaluated over it, and moving this reads it at a different point rather than changing it`,
+            })),
+          }]
+        : []),
       {
         id: 'model',
         label: 'Model',
@@ -149,8 +175,11 @@ export function ModelView({
     [model.layers]
   );
   const initialVals = useMemo(
-    () => Object.fromEntries(initial.params.map((p) => [p.id, p.value])),
-    [initial.params]
+    () => ({
+      ...Object.fromEntries(initial.params.map((p) => [p.id, p.value])),
+      ...Object.fromEntries(inputsOf(initial).map((q) => [`at:${q.id}`, q.at])),
+    }),
+    [initial]
   );
 
   const entities: VizEntity[] = useMemo(
@@ -181,6 +210,20 @@ export function ModelView({
         const v = vals[p.id];
         if (typeof v === 'number' && v !== p.value) next = setParam(next, p.id, v);
       }
+      // A free input's cursor, written into canonical state. Prefixed `at:` so a
+      // control for an input and a control for a parameter of the same name
+      // cannot collide — an id is a promise about identity and two different
+      // kinds of quantity must not share one.
+      for (const q of inputs) {
+        const v = vals[`at:${q.id}`];
+        if (typeof v === 'number' && v !== q.at) {
+          next = {
+            ...next,
+            version: (next.version ?? 0) + 1,
+            at: { ...(next.at ?? {}), [q.id]: Math.min(q.max, Math.max(q.min, v)) },
+          };
+        }
+      }
       if (model.time && t !== model.time.t) next = setTime(next, Math.min(model.time.max, t));
       if (next !== model) {
         lastVals.current = vals;
@@ -193,7 +236,7 @@ export function ModelView({
         });
       }
     },
-    [model, onModel]
+    [model, onModel, inputs]
   );
 
   const render = useCallback(

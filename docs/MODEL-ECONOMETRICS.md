@@ -213,6 +213,92 @@ difference-in-differences estimate is not a new estimator, it is least squares o
 two indicators and their interaction, and it came out to 7.000000 with no code
 that knows what a difference in differences is.
 
+## The second failure: a domain is not a dataset
+
+The wage model then reached the live path with terms, computed geometry and
+manipulable coefficients — and still said **"education and experience needs
+observations"**, and still drew a narrow vertical sheet. Reproduced:
+
+```
+says        : "needs observations — wage, education, experience, exper_pow2 …"
+surface over: null
+sampled over: x ∈ [−3, 3], y ∈ [−3, 3]      ← invented by the engine
+box         : ±11.99 on x and y, so the mesh filled a quarter of it
+```
+
+Education from minus three to three years, inside a box four times too wide.
+**Nothing distinguished a free input from an observed variable.** A regressor was
+a column name, so the only way to have values was a dataset — and when the picture
+needed a window anyway, the engine invented one instead of asking for the thing it
+actually needed.
+
+### Four supply roles, derived from structure
+
+`Quantity.supply` on the symbol table — never declared, for the same reason
+fidelity is never declared:
+
+| | | |
+|---|---|---|
+| `parameter` | used **by** the relationship | β₁ = 2.5. Moving it changes the function |
+| `input` | the relationship is evaluated **over** it | education. Needs a **range**. Moving it changes where you are reading |
+| `observed` | its values come from a dataset | what ESTIMATE needs and EVALUATE never does |
+| `derived` | computed from other objects | the outcome, a fitted coefficient, a slope, a value at a point |
+
+A **fitted** coefficient is `derived` and a **supposed** one is `parameter` — both
+are used by the relationship, and the difference that matters is whether you may
+move it. A number a fit produced is not yours to drag.
+
+### A domain comes from four stated places, and never from the engine
+
+The object's own window, the specification's `over`, a control of that name, or —
+where there are observations — **the range of the data itself**, which is not an
+invented window but the extent of what was measured. Absent all four, `SAMPLE` is
+`incomplete` and asks:
+
+> *a range for education — education is a FREE INPUT here: the relationship is
+> evaluated over it, so it needs a range. It does not need observations; nothing
+> has to have been measured for this to be computed.*
+
+### The report is per operation
+
+The status line was a flat list, so the headline was a dataset that only ESTIMATE
+wants. It now reads from `plan()`: **EVALUATE is waiting on … ESTIMATE is waiting
+on …**, in the operations' own order.
+
+### A free input is a control, and a different kind
+
+`Model.at` is canonical: where each input is standing, saved, undoable, defaulting
+to the middle of the stated range (a question about *looking*, not about the
+model). The `at` verb joins the edit grammar beside `set`, ModelView gains an
+**Inputs** group, and the relationship gains a readout — the value at the point
+currently selected, which is the PREDICT operation and what the person asked for
+in so many words.
+
+### Three more bugs this exposed
+
+- **A graph is a graph whichever way it says so.** `aspectOf` read `definition`
+  only, and a response surface states its mathematics in `defs.z` — so the box was
+  made cubic and the surface rendered as a sheet.
+- **A slope is a different plot.** ∂wage/∂exper is currency-per-year against
+  experience; the surface is currency against education and experience. Sharing
+  one box made a 20-unit mesh sit in a 43-unit frame. Slopes are panels now.
+- **`derive` does not draw, so it does not vote on whether something can be
+  drawn.** A relationship with unbound coefficients is not evaluable and is
+  perfectly differentiable — and one runnable operation was masking the other's
+  gap, turning "it needs a value for β₀" into "compiles but has a value at fewer
+  than two points".
+
+### The acceptance test
+
+`test/model-inputs.test.mjs`, 83 assertions. β₀–β₃ classify as parameters,
+education and experience as free inputs, wage and exper² as derived; EVALUATE
+needs no dataset; both domains sample; the box fits the mesh; the value at
+education 12 / experience 10 is **44**, at β₃ = −0.06 is **41**, and undo restores
+it; ESTIMATE stays blocked; nothing observed is invented. Plus the generic
+regressions: `z = x + y`, `z = x² + y²`, `z = a·x + b·y` with manipulable a and b,
+`y = a·x` with one input, and `z = a·x` with no range — which reports **DOMAIN
+REQUIRED**, not observations.
+
 ## What remains unsupported, precisely
 
 - **IV / 2SLS and identification.** Needs instrument/endogenous/exogenous roles on

@@ -624,6 +624,22 @@ export interface Model {
    * fidelity, that it is data-derived.
    */
   data?: Record<string, DataBlock>;
+  /**
+   * WHERE EACH FREE INPUT CURRENTLY SITS, by the input's own name.
+   *
+   * A PARAMETER AND A FREE INPUT ARE MANIPULATED DIFFERENTLY, and the engine had
+   * only one kind of control. Moving β₁ changes the FUNCTION; moving education
+   * selects a POINT WITHIN it. Both have to be canonical — the model is
+   * authoritative and a view is a projection of it — so the cursor lives here and
+   * not in the interface, survives a save, and is what `undo` undoes.
+   *
+   * It is not a window. The window (`over`, the domain) is the modelling claim
+   * about what range is worth looking at, and the engine may never invent one.
+   * This is where inside that range somebody is currently standing, which has a
+   * defensible default — the middle — because it is a question about looking
+   * rather than about the model.
+   */
+  at?: Record<string, number>;
   /** bumped by every manipulation; see compare() */
   version?: number;
   /** what changed to get here, for "what did that do?" */
@@ -1485,6 +1501,19 @@ export function sanitizeModel(raw: unknown): Model | null {
       if (Object.keys(block).length) blocks[k] = block;
     }
     if (Object.keys(blocks).length) model.data = blocks;
+  }
+
+  // The cursor for each free input, clamped to nothing here: the domain that
+  // bounds it lives on the specification, and re-clamping against a stale copy
+  // is how two truths about one range come to disagree.
+  if (r.at && typeof r.at === 'object' && !Array.isArray(r.at)) {
+    const at: Record<string, number> = {};
+    for (const [k, v] of capped(Object.entries(r.at as Record<string, unknown>), MODEL_CAPS.params, 'input cursors', drop)) {
+      const key = text(k, 48);
+      const value = num(v);
+      if (ID.test(key) && value !== null) at[key] = value;
+    }
+    if (Object.keys(at).length) model.at = at;
   }
 
   const v = num(r.version);

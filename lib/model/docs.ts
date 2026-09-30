@@ -37,6 +37,8 @@
 // PURE: models in, models out. No React, no storage, no clock of its own.
 
 import { solveSystem } from './algebra';
+import { inputsOf } from './derive';
+import { affectedBy } from './deps';
 import { bindings, symbolTable } from './symbols';
 import { compare, type Comparison } from './state';
 import { unpack } from './unpack';
@@ -217,6 +219,55 @@ export function setValue(ws: ModelWorkspace, id: string, param: string, value: n
     says: `${param} is now ${next.params.find((q) => q.id === param)?.value}${p.units ? ` ${p.units}` : ''}${
       affected.length ? `, and ${affected.length} thing${affected.length === 1 ? '' : 's'} recompute` : ''
     }`,
+    affected,
+  };
+}
+
+/**
+ * Move a FREE INPUT to a point inside its range.
+ *
+ * A DIFFERENT VERB FROM `set`, because it is a different act. `set` moves a
+ * parameter and changes the FUNCTION — a different relationship. This moves the
+ * cursor and changes WHERE ON the same relationship you are reading, which is
+ * what a free input is for. Both produce a revision, because both are changes to
+ * canonical state that a person may want to undo; the model is authoritative and
+ * the view is a projection of it.
+ *
+ * Clamped to the input's own domain, because a point outside the range somebody
+ * stated is not a point on this model.
+ */
+export function setInput(ws: ModelWorkspace, id: string, input: string, value: number, at = 0): EditResult {
+  const doc = docOf(ws, id);
+  if (!doc) return no(ws, `there is no model called ${id} here`);
+  const model = current(doc);
+  const inputs = inputsOf(unpack(model));
+  const target = inputs.find((q) => q.id.toLowerCase() === input.toLowerCase());
+  if (!target) {
+    return no(
+      ws,
+      inputs.length
+        ? `${model.title} has no free input called ${input}. It has ${inputs.map((q) => q.label).join(', ')}`
+        : `${model.title} has no free inputs — nothing in it is evaluated over a range somebody named`
+    );
+  }
+  const next = Math.min(target.max, Math.max(target.min, value));
+  if (next === target.at) {
+    return no(ws, `${target.label} is already ${next}${target.units ? ` ${target.units}` : ''}`);
+  }
+  const edited: Model = {
+    ...model,
+    version: (model.version ?? 0) + 1,
+    at: { ...(model.at ?? {}), [target.id]: next },
+    lastChange: { what: target.id, from: target.at, to: next, affected: affectedBy(unpack(model), [target.id]), at },
+  };
+  const affected = edited.lastChange?.affected ?? [];
+  return {
+    workspace: patch(ws, id, (d) => revise(d, edited, `${target.label} → ${next}`)),
+    ok: true,
+    says:
+      `${target.label} is now ${next}${target.units ? ` ${target.units}` : ''}` +
+      (next !== value ? `, which is as far as the range you gave goes` : '') +
+      `. The relationship has not changed — this is where on it you are reading`,
     affected,
   };
 }
@@ -818,6 +869,14 @@ export function applyModelOps(
       case 'replace': {
         if (!doc) break;
         const r = replacePart(out, doc.id, op.of, op.becomes, at);
+        out = r.workspace;
+        said.push(r.says);
+        changed = changed || r.ok;
+        break;
+      }
+      case 'at': {
+        if (!doc) break;
+        const r = setInput(out, doc.id, op.id, op.value, at);
         out = r.workspace;
         said.push(r.says);
         changed = changed || r.ok;

@@ -475,8 +475,16 @@ console.log('\n=== one model, several views, ONE computation ===');
   ok('changing a parameter changes the panel as well as the mechanism',
     Math.abs(xPanel2.at[10].y - xPanel.at[10].y) > 1e-6);
 
-  ok('a model with no dynamics has no panels, rather than empty ones',
-    (buildSpec(modelById('saddle')).panels ?? []).length === 0);
+  // PANELS ARE SECONDARY VIEWS, AND A SLOPE IS ONE. A model with no dynamics has
+  // no TIME panels; it may still have a panel per marginal effect, because a
+  // slope is a different quantity against a shared axis and sharing one box with
+  // the surface distorted both. What must not appear is an empty panel.
+  const saddlePanels = buildSpec(modelById('saddle')).panels ?? [];
+  ok('a model with no dynamics has no time panels',
+    !saddlePanels.some((p) => p.x === 't' || p.x.startsWith('t (')), JSON.stringify(saddlePanels.map((p) => p.x)));
+  ok('  and no panel is empty', saddlePanels.every((p) => p.at.length >= 2));
+  ok('  each one says what it is and how it was produced',
+    saddlePanels.every((p) => !!p.label && !!p.note && !!p.fidelity));
   ok('the panel count is bounded', (buildSpec(expand(chain())).panels ?? []).length <= 4);
 }
 
