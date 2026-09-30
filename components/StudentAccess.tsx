@@ -34,16 +34,14 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useClerk, useUser } from '@clerk/nextjs';
 import type { EmailAddressResource } from '@clerk/types';
 import {
+  ReverifyCancelled,
   clerkMessage,
   looksUnreachable,
   needsReverification,
-  reverificationOpener,
+  withReverification,
 } from '@/lib/clerk-errors';
 import { emailMatchesHosts } from '@/lib/socria-edu';
 import type { PlanState } from './usePlan';
-
-/** The person closed the reverification modal rather than completing it. */
-class ReverifyCancelled extends Error {}
 
 export function StudentAccess({ state }: { state: PlanState }) {
   const { isLoaded, user } = useUser();
@@ -96,39 +94,8 @@ export function StudentAccess({ state }: { state: PlanState }) {
    * real refusal and the person should see it rather than watch a modal
    * reopen for ever.
    */
-  const withReverification = useCallback(
-    async <T,>(op: () => Promise<T>): Promise<T> => {
-      try {
-        return await op();
-      } catch (e) {
-        if (!needsReverification(e)) throw e;
-        // Found by name across the versions we know, then by shape. clerk-js
-        // ships from Clerk's CDN independently of the pinned SDK, and this
-        // method has already been renamed once under us — see
-        // lib/clerk-errors.ts. Where it genuinely does not exist the original
-        // refusal is the honest thing to show, with the way out named below.
-        const open = reverificationOpener(clerk);
-        if (!open) throw e;
-        await new Promise<void>((resolve, reject) => {
-          // Clerk calls exactly one of these, but a build that called both —
-          // or neither and then one late — would settle a promise twice and
-          // leave the button spinning for ever. Settle once, whatever it does.
-          let done = false;
-          const once = (f: () => void) => () => {
-            if (done) return;
-            done = true;
-            f();
-          };
-          open({
-            afterVerification: once(() => resolve()),
-            afterVerificationCancelled: once(() =>
-              reject(new ReverifyCancelled('verification cancelled')),
-            ),
-          });
-        });
-        return await op();
-      }
-    },
+  const reverify = useCallback(
+    <T,>(op: () => Promise<T>): Promise<T> => withReverification(clerk, op),
     [clerk],
   );
 
@@ -172,19 +139,19 @@ export function StudentAccess({ state }: { state: PlanState }) {
     try {
       // Reuse the one already on the account when there is one; Clerk refuses
       // a duplicate, and this is the same address either way.
-      const resource = await withReverification(async () =>
+      const resource = await reverify(async () =>
         unverified && unverified.emailAddress.toLowerCase() === address
           ? unverified
           : user.createEmailAddress({ email: address }),
       );
-      await withReverification(() => resource.prepareVerification({ strategy: 'email_code' }));
+      await reverify(() => resource.prepareVerification({ strategy: 'email_code' }));
       setPending(resource);
       setNote(`Six-digit code sent to ${address}.`);
     } catch (e) {
       setErr(failure(e, 'Could not send the code. Try again.'));
     }
     setBusy(null);
-  }, [busy, user, email, hosts, student, unverified, withReverification, failure]);
+  }, [busy, user, email, hosts, student, unverified, reverify, failure]);
 
   const check = useCallback(async () => {
     if (busy || !pending) return;
@@ -193,7 +160,7 @@ export function StudentAccess({ state }: { state: PlanState }) {
     setBusy('check');
     setErr(null);
     try {
-      await withReverification(() => pending.attemptVerification({ code: entered }));
+      await reverify(() => pending.attemptVerification({ code: entered }));
       // Clerk's local copy of the user still says unverified until it is
       // reloaded, and the server is the one that decides anyway — so reload,
       // then ask.
@@ -206,7 +173,7 @@ export function StudentAccess({ state }: { state: PlanState }) {
       setErr(failure(e, 'That code was not accepted. Check it and try again.'));
     }
     setBusy(null);
-  }, [busy, pending, code, user, state, withReverification, failure]);
+  }, [busy, pending, code, user, state, reverify, failure]);
 
   const start = useCallback(() => {
     setPending(null);

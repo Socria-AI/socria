@@ -124,15 +124,50 @@ export interface ReverifyProps {
 }
 
 /**
- * Bound so it can be called detached; null when this build of clerk-js has
- * no such thing, which is the caller's cue to show the refusal instead.
+ * THE OBJECT THAT ACTUALLY HAS THE METHOD, not the one that forwards to it.
+ *
+ * `useClerk()` does not return clerk-js. It returns IsomorphicClerk, a wrapper
+ * that exists so a component can call `openSignIn` before the browser bundle
+ * has finished loading — and it defines EVERY method as its own property in
+ * its constructor, whether or not the loaded build has it:
+ *
+ *     this.__experimental_openUserVerification = (props) => {
+ *       if (this.clerkjs && loaded) this.clerkjs.__experimental_openUserVerification(props);
+ *       else this.preopenUserVerification = props;
+ *     };
+ *
+ * So `typeof clerk.__experimental_openUserVerification === 'function'` is TRUE
+ * on a wrapper whose inner clerk-js renamed that method a year ago, every
+ * feature check passes, and the failure arrives at the call:
+ *
+ *     TypeError: this.clerkjs.__experimental_openUserVerification is not a function
+ *
+ * which is what a person hit trying to verify their email address. The pinned
+ * SDK (@clerk/nextjs 5.7, which knows only the old name) and the CDN bundle
+ * (which knows only the new one) are two versions of one API, and the wrapper
+ * hides the disagreement behind a property that always exists.
+ *
+ * The fix is to resolve the name against the LOADED instance. The wrapper is
+ * kept, last, because before clerk-js loads it is the only thing there and
+ * queueing the call is the right behaviour.
  */
-export function reverificationOpener(
-  clerk: unknown
-): ((props: ReverifyProps) => void) | null {
-  if (!clerk || typeof clerk !== 'object') return null;
-  const c = clerk as Record<string, unknown>;
+function instancesOf(clerk: unknown): Record<string, unknown>[] {
+  const out: Record<string, unknown>[] = [];
+  const push = (v: unknown) => {
+    if (v && typeof v === 'object' && !out.includes(v as Record<string, unknown>)) {
+      out.push(v as Record<string, unknown>);
+    }
+  };
+  const c = clerk && typeof clerk === 'object' ? (clerk as Record<string, unknown>) : null;
+  push(c?.clerkjs);
+  if (typeof window !== 'undefined') push((window as unknown as { Clerk?: unknown }).Clerk);
+  push(c);
+  return out;
+}
 
+/** Every opener this object exposes, best first, each bound to its own owner. */
+function openersOn(c: Record<string, unknown>): ((p: ReverifyProps) => void)[] {
+  const out: ((p: ReverifyProps) => void)[] = [];
   const bound = (v: unknown) =>
     typeof v === 'function'
       ? ((v as (p: ReverifyProps) => void).bind(c) as (p: ReverifyProps) => void)
@@ -140,7 +175,7 @@ export function reverificationOpener(
 
   for (const name of REVERIFY_OPENERS) {
     const fn = bound(c[name]);
-    if (fn) return fn;
+    if (fn) out.push(fn);
   }
 
   // Nothing we have a name for. Look for the shape instead: a private method
@@ -150,8 +185,108 @@ export function reverificationOpener(
   for (const key of Object.keys(c)) {
     if (/^__[a-z]+_open[A-Za-z]*erification$/.test(key)) {
       const fn = bound(c[key]);
-      if (fn) return fn;
+      if (fn && !out.includes(fn)) out.push(fn);
     }
   }
-  return null;
+  return out;
+}
+
+/** The exact shape of a wrapper forwarding to a method its inner build dropped. */
+function isMissingMethod(e: unknown): boolean {
+  return (
+    e instanceof TypeError && /is not a function/i.test(typeof e.message === 'string' ? e.message : '')
+  );
+}
+
+/**
+ * Bound so it can be called detached; null when no build in reach has such a
+ * thing, which is the caller's cue to show the refusal instead.
+ *
+ * The returned function tries the candidates in order and moves on ONLY when
+ * one fails with "is not a function" — the forwarding failure above, and
+ * nothing else. A refusal Clerk throws for a real reason is not retried
+ * against a different method; it is the answer.
+ */
+export function reverificationOpener(
+  clerk: unknown
+): ((props: ReverifyProps) => void) | null {
+  const all: ((p: ReverifyProps) => void)[] = [];
+  for (const inst of instancesOf(clerk)) all.push(...openersOn(inst));
+  if (!all.length) return null;
+  if (all.length === 1) return all[0];
+
+  return (props: ReverifyProps) => {
+    let last: unknown = null;
+    for (const fn of all) {
+      try {
+        fn(props);
+        return;
+      } catch (e) {
+        if (!isMissingMethod(e)) throw e;
+        last = e;
+      }
+    }
+    throw last;
+  };
+}
+
+/** The person closed the reverification box rather than completing it. */
+export class ReverifyCancelled extends Error {
+  constructor(message = 'verification cancelled') {
+    super(message);
+    this.name = 'ReverifyCancelled';
+  }
+}
+
+/**
+ * RUN IT; IF CLERK ASKS THE PERSON TO PROVE THEMSELVES, LET THEM, THEN RUN IT
+ * AGAIN. One implementation, because there were two.
+ *
+ * The account panels and the student panel each had their own copy of this,
+ * and they had already drifted: one settled its promise once however Clerk
+ * called back, the other could settle twice and leave a button spinning; one
+ * went through `reverificationOpener` and the other reached for a method name
+ * by hand — and it was the hand-written one that broke. A rule kept in two
+ * places is a rule that is right in one of them.
+ *
+ * Retried ONCE, not in a loop: a freshly verified session that is still
+ * refused is a real refusal, and the person should read it rather than watch a
+ * box reopen for ever.
+ */
+export async function withReverification<T>(
+  clerk: unknown,
+  op: () => Promise<T>
+): Promise<T> {
+  try {
+    return await op();
+  } catch (e) {
+    if (!needsReverification(e)) throw e;
+    const open = reverificationOpener(clerk);
+    // Genuinely absent. The original refusal is the honest thing to show, and
+    // describeFailure names the way out (sign out and back in).
+    if (!open) throw e;
+    await new Promise<void>((resolve, reject) => {
+      // Clerk calls exactly one of these, but a build that called both — or
+      // neither and then one late — would settle twice and leave the button
+      // spinning for ever. Settle once, whatever it does.
+      let done = false;
+      const once = (f: () => void) => () => {
+        if (done) return;
+        done = true;
+        f();
+      };
+      const cancel = once(() => reject(new ReverifyCancelled()));
+      try {
+        open({ afterVerification: once(resolve), afterVerificationCancelled: cancel });
+      } catch {
+        // Every opener in reach failed to open anything. Not a cancellation
+        // and not a reason to hang: give the caller back Clerk's own refusal.
+        if (!done) {
+          done = true;
+          reject(e);
+        }
+      }
+    });
+    return await op();
+  }
 }

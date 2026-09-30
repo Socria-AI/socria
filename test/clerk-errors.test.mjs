@@ -17,6 +17,8 @@ import {
   clerkMessage,
   looksUnreachable,
   reverificationOpener,
+  withReverification,
+  ReverifyCancelled,
 } from './.tmp/clerk-errors.mjs';
 
 let pass = 0, fail = 0;
@@ -226,6 +228,149 @@ console.log('\n=== finding the box that says "prove it is you" ===');
   }
   ok('a non-function under the right name is refused',
     reverificationOpener({ __internal_openReverification: 'nope' }) === null);
+}
+
+
+// ═══ THE WRAPPER THAT LIES ══════════════════════════════════════════
+//
+// The bug this section exists for, reported from production:
+//
+//   this.clerkjs.__experimental_openUserVerification is not a function
+//
+// `useClerk()` does not return clerk-js. It returns IsomorphicClerk, which
+// defines EVERY method as its own property in its constructor and forwards to
+// whatever bundle the CDN loaded. So the old name is present on the wrapper,
+// every feature check passes, and the failure arrives at the call — on the one
+// screen where somebody is verifying their email address.
+console.log('\n=== the wrapper that has the method and the instance that does not ===');
+{
+  /** @clerk/clerk-react 5.12's IsomorphicClerk, reduced to what matters. */
+  const isomorphic = (inner) => ({
+    clerkjs: inner,
+    // Assigned in the constructor whether or not `inner` has it — this is the
+    // property that made every check pass.
+    __experimental_openUserVerification(props) {
+      this.clerkjs.__experimental_openUserVerification(props);
+    },
+    __experimental_closeUserVerification() {},
+  });
+
+  // clerk-js as it ships today: renamed, and the old name simply gone.
+  let opened = null;
+  const modernInner = {
+    __internal_openReverification(props) { opened = props; },
+    __internal_closeReverification() {},
+    handleEmailLinkVerification() {},
+  };
+
+  const wrapper = isomorphic(modernInner);
+
+  // THE REGRESSION, STATED DIRECTLY. Before the fix this resolved the
+  // wrapper's own stale property and threw on the call.
+  const open = reverificationOpener(wrapper);
+  ok('a wrapper over a renamed build still yields an opener', typeof open === 'function');
+  let threw = null;
+  try { open({ afterVerification: () => {} }); } catch (e) { threw = e; }
+  ok('  and calling it does not throw', threw === null, String(threw));
+  ok('  and it is the loaded build that opened the box', opened !== null);
+
+  // …and the queue still works before clerk-js has loaded, which is the whole
+  // reason the wrapper defines these properties in the first place.
+  let queued = null;
+  const notLoaded = { clerkjs: null, __experimental_openUserVerification(p) { queued = p; } };
+  const pre = reverificationOpener(notLoaded);
+  ok('before clerk-js loads, the wrapper is used', typeof pre === 'function');
+  if (pre) pre({ afterVerification: () => {} });
+  ok('  and the call is queued rather than lost', queued !== null);
+
+  // A refusal Clerk raises for a REAL reason must not be swallowed by trying
+  // the next candidate — only "is not a function" means "wrong name".
+  const angry = {
+    clerkjs: { __internal_openReverification() { throw new Error('no session'); } },
+    __experimental_openUserVerification() { throw new Error('should not be reached'); },
+  };
+  let real = null;
+  try { reverificationOpener(angry)({}); } catch (e) { real = e; }
+  ok('a real refusal is not retried against another name', real?.message === 'no session', String(real));
+}
+
+// ═══ run it, prove it is you, run it again ══════════════════════════
+console.log('\n=== the one implementation of getting past the wall ===');
+{
+  const stepUp = () => Object.assign(new Error('clerk'), {
+    errors: [{ code: 'session_step_up_verification_required', longMessage: 'Prove it is you.' }],
+  });
+  const clerk = (onOpen) => ({
+    clerkjs: { __internal_openReverification: onOpen },
+  });
+
+  // The happy path: refused, verified, run again, and ONLY once more.
+  {
+    let calls = 0;
+    const got = await withReverification(
+      clerk((p) => p.afterVerification()),
+      async () => { calls++; if (calls === 1) throw stepUp(); return 'done'; },
+    );
+    ok('it retries after verification', got === 'done');
+    ok('  exactly twice, never in a loop', calls === 2, String(calls));
+  }
+
+  // Still refused after verifying: the person reads the refusal.
+  {
+    let calls = 0;
+    let out = null;
+    try {
+      await withReverification(clerk((p) => p.afterVerification()), async () => { calls++; throw stepUp(); });
+    } catch (e) { out = e; }
+    ok('a still-refused operation is not retried again', calls === 2, String(calls));
+    ok('  and the refusal is what comes back', needsReverification(out));
+  }
+
+  // Cancelled.
+  {
+    let out = null;
+    try {
+      await withReverification(clerk((p) => p.afterVerificationCancelled()), async () => { throw stepUp(); });
+    } catch (e) { out = e; }
+    ok('cancelling raises the cancellation', out instanceof ReverifyCancelled);
+  }
+
+  // Clerk calling back twice must not settle twice, which is what left a
+  // button spinning for ever in the copy that had no guard.
+  {
+    let calls = 0;
+    const both = clerk((p) => { p.afterVerification(); p.afterVerificationCancelled(); });
+    const got = await withReverification(both, async () => { calls++; if (calls === 1) throw stepUp(); return 'ok'; });
+    ok('a double callback settles once', got === 'ok');
+  }
+
+  // A failure that is not a reverification wall passes straight through.
+  {
+    let out = null;
+    try {
+      await withReverification(clerk(() => {}), async () => { throw Object.assign(new Error('x'), { errors: [{ code: 'form_identifier_exists' }] }); });
+    } catch (e) { out = e; }
+    ok('an ordinary refusal is untouched', out?.errors?.[0]?.code === 'form_identifier_exists');
+  }
+
+  // No opener anywhere: the original refusal, not a hang and not a new error.
+  {
+    let out = null;
+    try {
+      await withReverification({ signOut() {} }, async () => { throw stepUp(); });
+    } catch (e) { out = e; }
+    ok('with no opener the refusal itself comes back', needsReverification(out));
+  }
+
+  // Every opener in reach throws the forwarding TypeError: still not a hang.
+  {
+    const broken = { __experimental_openUserVerification() { throw new TypeError('x is not a function'); } };
+    let out = null;
+    try {
+      await withReverification(broken, async () => { throw stepUp(); });
+    } catch (e) { out = e; }
+    ok('a box that cannot open gives back the refusal', needsReverification(out));
+  }
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

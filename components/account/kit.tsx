@@ -19,10 +19,20 @@ import {
   type ReactNode,
 } from 'react';
 import { useClerk, useUser } from '@clerk/nextjs';
-import { clerkMessage, looksUnreachable, needsReverification } from '@/lib/clerk-errors';
+import {
+  ReverifyCancelled,
+  clerkMessage,
+  looksUnreachable,
+  needsReverification,
+  withReverification,
+} from '@/lib/clerk-errors';
 
-/** The person closed the reverification modal rather than completing it. */
-export class ReverifyCancelled extends Error {}
+// ReverifyCancelled is RE-EXPORTED, not redefined. It used to be declared here
+// and again in the student panel, so two classes of the same name existed and
+// an `instanceof` check on one never matched the other — a cancellation raised
+// in one place and read in the other would have been reported as an unknown
+// failure. One class, exported from the module that throws it.
+export { ReverifyCancelled };
 
 /**
  * Run an operation, and if Clerk asks the person to prove themselves first,
@@ -30,43 +40,19 @@ export class ReverifyCancelled extends Error {}
  *
  * Sensitive operations — adding an email, changing a password, turning off
  * two-factor — are refused on a session that has not proved itself recently.
- * This mirrors what clerk-js does inside its own components: match the error,
- * open the verification modal with no level so Clerk decides what the account
- * needs, wait, retry once. Once, not in a loop: a freshly verified session
- * that is still refused is a real refusal, and the person should read it
- * rather than watch a modal reopen for ever.
+ *
+ * THE RULE ITSELF LIVES IN lib/clerk-errors.ts and this is the React binding
+ * for it. It used to be written out here, reaching for
+ * `__experimental_openUserVerification` by name — which exists on the wrapper
+ * `useClerk()` returns whether or not the loaded clerk-js has it, so the
+ * feature check passed and the call threw
+ * “this.clerkjs.__experimental_openUserVerification is not a function”
+ * at somebody verifying their email address.
  */
 export function useReverification() {
   const clerk = useClerk();
-
   return useCallback(
-    async <T,>(op: () => Promise<T>): Promise<T> => {
-      try {
-        return await op();
-      } catch (e) {
-        if (!needsReverification(e)) throw e;
-        const open = (
-          clerk as unknown as {
-            __experimental_openUserVerification?: (p: {
-              afterVerification?: () => void;
-              afterVerificationCancelled?: () => void;
-            }) => void;
-          }
-        ).__experimental_openUserVerification;
-        // Still flagged experimental in the SDK, and absent from older
-        // clerk-js builds. Where it is missing the original refusal is the
-        // honest thing to show — with the way out named, in describeFailure.
-        if (typeof open !== 'function') throw e;
-        await new Promise<void>((resolve, reject) => {
-          open({
-            afterVerification: () => resolve(),
-            afterVerificationCancelled: () =>
-              reject(new ReverifyCancelled('verification cancelled')),
-          });
-        });
-        return await op();
-      }
-    },
+    <T,>(op: () => Promise<T>): Promise<T> => withReverification(clerk, op),
     [clerk],
   );
 }
