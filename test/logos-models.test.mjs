@@ -530,7 +530,13 @@ console.log('\n=== the live path, read from the source ===');
 
   const app = read('components/LogosApp.tsx');
   ok('the client splits model ops from view ops',
-    /const modelOps = ops\.filter\(\(o\) => isModelOp\(o\) \|\| o\.op === 'set'\)/.test(app));
+    /const modelOps = ops\.filter\(\(o\) => isModelOp\(o\) \|\| o\.op === 'set' \|\| o\.op === 'select'\)/.test(app));
+  // SELECTION IS CANONICAL TOO. Linked views stay in step by reading one
+  // selection rather than by messaging each other, and "ask about this" has to
+  // be handed an identity — so it reaches the document as well as the view, and
+  // coalesces in the history so clicking around does not fill undo with clicks.
+  ok('  including select, so every view means the same thing by "this"',
+    /o\.op === 'select'/.test(app));
   // `set` GOES TO BOTH, and the reason is in the comment beside it: the document
   // has to record a control being moved so that undo can undo it, and a surface
   // with no document behind it still needs its sliders to work.

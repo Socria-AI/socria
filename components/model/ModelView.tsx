@@ -29,6 +29,7 @@ import { contour } from '@/lib/model/sample';
 import type { P3, Primitive } from '@/lib/model/primitives';
 import { buildSlice } from '@/lib/model/compile';
 import { inputsOf } from '@/lib/model/derive';
+import { Understand } from './Understand';
 import { buildSpec, type VisualizationSpec } from '@/lib/model/spec';
 import { modelStateFrom, applyOps, type ViewState } from '@/lib/model/state';
 import { objectOf, setParam, setTime, type Model } from '@/lib/model/schema';
@@ -67,6 +68,7 @@ export function ModelView({
   onRead,
   ops,
   onModel,
+  onAsk,
 }: {
   model: Model;
   /**
@@ -84,6 +86,14 @@ export function ModelView({
   ops?: { seq: number; ops: VizOp[] } | null;
   /** so a host can keep the manipulated model — a session, a comparison */
   onModel?: (model: Model) => void;
+  /**
+   * "Ask about this", carrying the object's CANONICAL IDENTITY.
+   *
+   * The host turns it into a turn of conversation. What it is handed is an id
+   * the model owns — never a pixel, never a screenshot, never a guess about what
+   * the reader was looking at.
+   */
+  onAsk?: (id: string) => void;
 }) {
   // THE MODEL IS THE STATE. The frame holds the camera and the clock; this
   // holds the thing being looked at, so a control moved in the chrome and a
@@ -586,7 +596,29 @@ export function ModelView({
     [spec, frame, slice, view.selected, view.slice, model, sync]
   );
 
+  // ── SELECTION IS CANONICAL, AND IT IS WHAT "THIS" MEANS ────────────
+  //
+  // Written into the model rather than into this component, so the picture, the
+  // panels, the inspector and the conversation all mean the same thing by it —
+  // and so "ask about this" is handed an identity rather than a description of
+  // what a picture looks like near a pixel.
+  const select = useCallback(
+    (id: string | null) => {
+      const next: Model = id
+        ? { ...model, version: (model.version ?? 0) + 1, selected: id }
+        : (() => {
+            const { selected: _gone, ...rest } = model;
+            return { ...rest, version: (model.version ?? 0) + 1 } as Model;
+          })();
+      setModel(next);
+      setView((v) => ({ ...v, selected: id }));
+      onModel?.(next);
+    },
+    [model, onModel]
+  );
+
   return (
+    <>
     <Surface3D
       title={model.title}
       surface={`m-${model.id}`}
@@ -608,6 +640,13 @@ export function ModelView({
       render={render}
       fill={fill}
     />
+    {/* THE UNDERSTAND LAYER, beside the picture rather than inside it.
+        The picture is one view of the model; so is this. It adds no renderer and
+        knows no domain — it is the surface of lib/model/views.ts and
+        lib/model/inspect.ts, and its whole job is to put what the model already
+        knows within reach. */}
+    <Understand model={model} onSelect={select} onAsk={onAsk} />
+    </>
   );
 }
 

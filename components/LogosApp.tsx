@@ -683,7 +683,12 @@ export function LogosApp({
     // take working sliders away. Applying it twice is harmless: setValue to a
     // value a control already has is a no-op, and ModelView resyncs from the
     // document's own revision when one exists.
-    const modelOps = ops.filter((o) => isModelOp(o) || o.op === 'set');
+    // `select` joins `set` in going to both. It is CANONICAL — linked views stay
+    // in step by reading one selection rather than by messaging each other, and
+    // "ask about this" has to be handed an identity — and it is also what the
+    // view highlights, so it goes to the view too. It coalesces in the document's
+    // history, so clicking around does not fill undo with clicks.
+    const modelOps = ops.filter((o) => isModelOp(o) || o.op === 'set' || o.op === 'select');
     const viewOps = ops.filter((o) => !isModelOp(o));
     if (modelOps.length) {
       patchActive((sess) => {
@@ -3278,6 +3283,16 @@ export function LogosApp({
             onFocus={(node) => setDraftFocus(node)}
             grounded={groundedCounts}
             onAddContext={openAddContext}
+            // ASK ABOUT THIS: the selection is already canonical on the model, so
+            // the turn carries the object's IDENTITY and the reply reasons about
+            // the object — its provenance, its dependency chain, what it rests on
+            // — rather than about what a picture looks like near a pixel. The
+            // composer is seeded rather than sent, because the question is still
+            // the person's to ask.
+            onAskAbout={(id, label) => {
+              setInput((cur) => (cur.trim() ? cur : `About ${label} — why is it what it is?`));
+              applyVizOps([{ op: 'select', id }]);
+            }}
             guarded={guarded}
             onViz={(viz) =>
               patchActive((s) => ({ ...s, map: { ...(s.map ?? EMPTY_MAP), viz } }))

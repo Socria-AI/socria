@@ -1,0 +1,254 @@
+/* components/model/understand.css
+ *
+ * The Understand layer's own styles, travelling with the component for the same
+ * reason the renderer's do: a panel whose sections cannot be opened is a
+ * different component depending on which page imported which file.
+ *
+ * EDITORIAL, NOT A DASHBOARD. Hairlines, one weight of rule, small caps for
+ * labels, the page's own ink. This is an instrument somebody reads, and the
+ * model is what the eye should land on — so nothing here competes with the
+ * figure above it.
+ */
+
+.und {
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--lg-ink, #23241f);
+  border-top: 1px solid var(--lg-ink-12, rgba(35, 36, 31, 0.12));
+  padding-top: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.und-what {
+  margin: 0;
+  font-weight: 500;
+}
+
+.und-ran {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--lg-ink-56, rgba(35, 36, 31, 0.56));
+}
+
+/* ── the views row ─────────────────────────────────────────────── */
+.und-views {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.375rem;
+}
+
+.und-views-label,
+.und-sec-label,
+.und-fact-label {
+  font-size: 0.6875rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lg-ink-56, rgba(35, 36, 31, 0.56));
+}
+
+.und-view {
+  font: inherit;
+  font-size: 0.75rem;
+  background: none;
+  border: 1px solid var(--lg-ink-12, rgba(35, 36, 31, 0.12));
+  border-radius: 2px;
+  padding: 0.125rem 0.5rem;
+  cursor: pointer;
+  color: inherit;
+}
+
+.und-view:hover,
+.und-view:focus-visible {
+  border-color: var(--lg-ink-32, rgba(35, 36, 31, 0.32));
+}
+
+.und-view.is-primary {
+  border-color: var(--lg-ink-32, rgba(35, 36, 31, 0.32));
+}
+
+/* Declared without a renderer: present, and visibly not the same thing as
+   available. Hiding it would make the list read as a complete catalogue. */
+.und-view.is-declared {
+  border-style: dashed;
+  color: var(--lg-ink-56, rgba(35, 36, 31, 0.56));
+}
+
+.und-soon {
+  margin-left: 0.375rem;
+  font-size: 0.625rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+
+.und-missing {
+  font-size: 0.6875rem;
+  color: var(--lg-ink-40, rgba(35, 36, 31, 0.4));
+  cursor: help;
+  border-bottom: 1px dotted currentColor;
+}
+
+/* ── what is selected ──────────────────────────────────────────── */
+.und-selected {
+  border-left: 2px solid var(--lg-ink-24, rgba(35, 36, 31, 0.24));
+  padding-left: 0.625rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.und-selected-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.und-selected-what {
+  font-weight: 500;
+}
+
+.und-selected-acts {
+  display: flex;
+  gap: 0.5rem;
+  flex: none;
+}
+
+.und-act {
+  font: inherit;
+  font-size: 0.6875rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: none;
+  border: none;
+  border-bottom: 1px solid currentColor;
+  padding: 0;
+  cursor: pointer;
+  color: var(--lg-ink-56, rgba(35, 36, 31, 0.56));
+}
+
+.und-act:hover,
+.und-act:focus-visible {
+  color: var(--lg-ink, #23241f);
+}
+
+.und-selected-sec,
+.und-why {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+/* ── the chain ─────────────────────────────────────────────────── */
+.und-step {
+  margin: 0;
+  font-size: 0.75rem;
+}
+
+.und-arrow {
+  margin-right: 0.25rem;
+  color: var(--lg-ink-40, rgba(35, 36, 31, 0.4));
+}
+
+.und-step-name {
+  font: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: inherit;
+  border-bottom: 1px solid var(--lg-ink-24, rgba(35, 36, 31, 0.24));
+  margin-right: 0.375rem;
+}
+
+.und-step-says {
+  color: var(--lg-ink-56, rgba(35, 36, 31, 0.56));
+}
+
+/* ── the sections ──────────────────────────────────────────────── */
+.und-sec {
+  border-top: 1px solid var(--lg-ink-08, rgba(35, 36, 31, 0.08));
+}
+
+.und-sec-head {
+  font: inherit;
+  width: 100%;
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  background: none;
+  border: none;
+  padding: 0.375rem 0;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+}
+
+.und-sec-sum {
+  flex: 1;
+  font-size: 0.75rem;
+  color: var(--lg-ink-56, rgba(35, 36, 31, 0.56));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.und-sec-mark {
+  flex: none;
+  color: var(--lg-ink-40, rgba(35, 36, 31, 0.4));
+}
+
+.und-sec-body {
+  padding: 0 0 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.und-fact {
+  margin: 0;
+  font-size: 0.75rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  align-items: baseline;
+}
+
+.und-fact-label.is-link {
+  font-family: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  border-bottom: 1px solid var(--lg-ink-24, rgba(35, 36, 31, 0.24));
+}
+
+.und-fact-value {
+  flex: 1;
+  min-width: 12rem;
+}
+
+/* Provenance is never buried: it rides beside the fact it is about. */
+.und-origin {
+  font-size: 0.6875rem;
+  color: var(--lg-ink-40, rgba(35, 36, 31, 0.4));
+  font-style: italic;
+  flex: none;
+}
+
+.und-changed {
+  margin: 0;
+  font-size: 0.75rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  align-items: baseline;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .und-sec-body { animation: und-in 140ms ease-out; }
+  @keyframes und-in { from { opacity: 0; } to { opacity: 1; } }
+}

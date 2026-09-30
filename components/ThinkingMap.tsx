@@ -104,6 +104,7 @@ export function ThinkingMap({
   onFocus,
   grounded,
   onAddContext,
+  onAskAbout,
   guarded,
   lensLimit,
   onLocked,
@@ -131,6 +132,14 @@ export function ThinkingMap({
   grounded?: Record<string, number>;
   /** open the Add-context picker for this node */
   onAddContext?: (node: MapNodeRef) => void;
+  /**
+   * "Ask about this", carrying a model object's CANONICAL IDENTITY.
+   *
+   * The host turns it into a turn of conversation. What travels is an id the
+   * model owns — so the reply reasons about the object, its provenance and its
+   * dependency chain, rather than about what a picture looks like near a pixel.
+   */
+  onAskAbout?: (id: string, label: string) => void;
   /** Answer Guard is on — the board must not reveal a withheld result */
   guarded?: boolean;
   /**
@@ -667,6 +676,11 @@ export function ThinkingMap({
                   edits={editsState(map.models ?? EMPTY_WORKSPACE) ?? undefined}
                   onRead={onVizRead}
                   ops={vizOps}
+                  onAsk={(id) => {
+                    const m = modelFor(doc);
+                    const o = m.objects.find((x) => x.id === id);
+                    onAskAbout?.(id, o?.label ?? id);
+                  }}
                 />
               </div>
             ) : map.viz?.built ? (

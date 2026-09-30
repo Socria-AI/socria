@@ -154,6 +154,28 @@ export interface VizModelState {
   /** what the reader last clicked, if anything — what "this" means */
   selected: string | null;
   /**
+   * EVERY REPRESENTATION THIS MODEL CAN HONESTLY OFFER, and what each would show.
+   *
+   * So "what else can I look at?" is answered from the model's structure and its
+   * computed results rather than from a language model's idea of what charts
+   * exist — and so the interface can offer them without knowing any domain.
+   * Derived in lib/model/views.ts; absent for a surface with no model behind it.
+   */
+  views?: {
+    id: string;
+    family: string;
+    label: string;
+    of: string;
+    dimensionality: 2 | 3;
+    because: string;
+    shows: string;
+    fidelity: string;
+    primary?: boolean;
+    notDrawnYet?: boolean;
+  }[];
+  /** what is NOT available, and what it would take — the half that keeps the other honest */
+  unavailable?: { family: string; wouldNeed: string }[];
+  /**
    * Verbs this view supports beyond the universal ones.
    *
    * A working surface offers the controls it was built with and nothing else;

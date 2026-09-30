@@ -25,6 +25,8 @@ import { unpack } from './unpack';
 import { OPERATIONS, askFor, capabilityOf, missingStructure, plan, route } from './solve';
 import { estimate } from './estimate';
 import { inputsOf } from './derive';
+import { inspectObject, inspectionLines, whyLines, whatChanged } from './inspect';
+import { unavailable, viewsFor } from './views';
 import { equationLines, solutionFor } from './equations';
 import { symbolTable, withoutDomain } from './symbols';
 import { driftOf, runFor, stateAt } from './system';
@@ -228,6 +230,54 @@ export function modelStateFrom(
   // relationship is evaluated OVER needs a RANGE; a quantity whose values come
   // from a dataset needs the dataset; and only the second is what ESTIMATE waits
   // for.
+  // ── WHAT ELSE CAN BE LOOKED AT, AND WHAT "THIS" IS ───────────────
+  //
+  // The conversation is handed the model's OWN account of its representations
+  // and of whatever is selected — structured, from lib/model/views.ts and
+  // lib/model/inspect.ts — so "why is this happening?" is answered from the
+  // dependency graph and "what else can I see?" from the registry. Neither is a
+  // description of a picture, and neither is available to be invented.
+  const available = viewsFor(model);
+  if (available.length) {
+    readouts.push(
+      `REPRESENTATIONS AVAILABLE for this model, from its structure and what actually computed — offer these rather than inventing chart names: ` +
+        available.map((v) => `${v.label} (${v.family}${v.notDrawnYet ? ', declared but not rendered yet' : ''}): ${v.shows}`).join('; ')
+    );
+    const missing = unavailable(model);
+    if (missing.length) {
+      readouts.push(
+        `NOT AVAILABLE, and what each would take: ` +
+          missing.map((u) => `${u.family} — ${u.wouldNeed}`).join('; ')
+      );
+    }
+  }
+
+  const chosen = model.selected;
+  if (chosen) {
+    const about = inspectObject(model, chosen);
+    if (about) {
+      readouts.push(
+        `SELECTED — this is what "this" means: ${about.what}. ` +
+          inspectionLines(about, 24).slice(1).join(' | ')
+      );
+      const chain = whyLines(model, chosen);
+      if (chain.length > 1) {
+        readouts.push(
+          `WHY IT IS WHAT IT IS, from the dependency graph rather than from a story: ` + chain.join(' ')
+        );
+      }
+    }
+  }
+
+  const change = whatChanged(model);
+  if (change) {
+    readouts.push(
+      `WHAT CHANGED: ${change.what}${change.from !== undefined ? ` from ${change.from} to ${change.to}` : ''}. ` +
+        `Recomputed: ${change.reached.map((r) => r.label).join(', ') || 'nothing'}. ` +
+        `Unchanged: ${change.untouched.map((r) => r.label).slice(0, 6).join(', ') || 'nothing else'}.`
+    );
+  }
+
   const free = inputsOf(model);
   if (free.length) {
     readouts.push(
@@ -345,7 +395,23 @@ export function modelStateFrom(
       ? { clock: { t: model.time.t, playing: !!model.time.playing, rate: model.time.rate ?? 1 } }
       : {}),
     readouts,
-    selected: opts?.selected ?? null,
+    ...(available.length
+      ? {
+          views: available.map((v) => ({
+            id: v.id, family: v.family, label: v.label, of: v.of,
+            dimensionality: v.dimensionality, because: v.because, shows: v.shows,
+            fidelity: v.fidelity,
+            ...(v.primary ? { primary: true } : {}),
+            ...(v.notDrawnYet ? { notDrawnYet: true } : {}),
+          })),
+          unavailable: unavailable(model),
+        }
+      : {}),
+    // THE MODEL'S SELECTION IS THE SELECTION. A caller may override it — a view
+    // that has a hover of its own, a test — but the canonical one is the
+    // default, because that is what makes every projection mean the same thing
+    // by "this".
+    selected: opts?.selected ?? model.selected ?? null,
     can: opts?.can ?? ['slice', 'view', 'time', 'compare'],
   };
 }

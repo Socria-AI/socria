@@ -640,6 +640,22 @@ export interface Model {
    * rather than about the model.
    */
   at?: Record<string, number>;
+  /**
+   * WHAT IS CURRENTLY SELECTED, by canonical object id.
+   *
+   * CANONICAL, AND THAT IS THE WHOLE POINT OF LINKED VIEWS. A surface, a
+   * cross-section, a table, a slope and an inspector are projections of ONE
+   * model; clicking a point in any of them means the same thing, and the way
+   * they stay in step is that they all read this rather than messaging each
+   * other. It lives here and not in a view's own state for the same reason the
+   * input cursors do: a view is a projection, and a projection cannot own the
+   * thing it projects.
+   *
+   * It is also what "this" means when somebody asks about it. Chat is handed the
+   * selected object's IDENTITY and its structured context — not a description of
+   * what a picture looks like near a pixel.
+   */
+  selected?: string;
   /** bumped by every manipulation; see compare() */
   version?: number;
   /** what changed to get here, for "what did that do?" */
@@ -1502,6 +1518,9 @@ export function sanitizeModel(raw: unknown): Model | null {
     }
     if (Object.keys(blocks).length) model.data = blocks;
   }
+
+  const sel = text(r.selected, 48);
+  if (sel && ID.test(sel)) model.selected = sel;
 
   // The cursor for each free input, clamped to nothing here: the domain that
   // bounds it lives on the specification, and re-clamping against a stale copy

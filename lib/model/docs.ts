@@ -63,7 +63,18 @@ export interface ModelDoc {
   /** what the engine said when it was built */
   report?: BuildReport;
   /** a one-line history a reader can follow: what each revision changed */
-  log: { at: number; said: string }[];
+  log: {
+    at: number;
+    said: string;
+    /**
+     * What KIND of change this was, when it is one that coalesces.
+     *
+     * Present only for selection and cursor moves, which happen continuously and
+     * must not leave undo stepping through a drag one frame at a time. Its
+     * absence means a structural edit, and those never merge.
+     */
+    kind?: string;
+  }[];
 }
 
 export interface ModelWorkspace {
@@ -82,13 +93,68 @@ export const canUndo = (doc: ModelDoc): boolean => doc.at > 0;
 export const canRedo = (doc: ModelDoc): boolean => doc.at < doc.revisions.length - 1;
 
 /** Append a revision, with the sentence that says what it was. */
-function revise(doc: ModelDoc, model: Model, said: string): ModelDoc {
+function revise(doc: ModelDoc, model: Model, said: string, opts?: { coalesce?: string }): ModelDoc {
   // An edit made after an undo discards the revisions that were ahead: they are a
   // future that did not happen, and keeping them would make redo mean two things.
   const kept = doc.revisions.slice(0, doc.at + 1);
+
+  // COALESCED, FOR THE CHANGES A DRAG MAKES A HUNDRED OF.
+  //
+  // Selection and the input cursors are canonical state — a view is a projection
+  // and cannot own what it projects — but they are also changed continuously.
+  // Appending a revision per frame would leave undo stepping back through a drag
+  // one pixel at a time, which is not what anybody means by undoing. So a change
+  // of the SAME KIND, immediately after one of that kind, replaces the top
+  // revision instead of appending: the history keeps where you ended up and not
+  // every point you passed through.
+  //
+  // Structural edits never coalesce. Removing a spring twice is two removals.
+  const top = doc.log[doc.log.length - 1];
+  if (opts?.coalesce && top?.kind === opts.coalesce && doc.at === doc.revisions.length - 1 && doc.revisions.length > 1) {
+    const revisions = [...doc.revisions.slice(0, -1), model];
+    const log = [...doc.log.slice(0, -1), { at: revisions.length - 1, said, kind: opts.coalesce }];
+    return { ...doc, revisions, at: revisions.length - 1, log };
+  }
+
   const revisions = [...kept, model].slice(-REVISION_CAP);
-  const log = [...doc.log.slice(-(REVISION_CAP * 2)), { at: revisions.length - 1, said }];
+  const log = [
+    ...doc.log.slice(-(REVISION_CAP * 2)),
+    { at: revisions.length - 1, said, ...(opts?.coalesce ? { kind: opts.coalesce } : {}) },
+  ];
   return { ...doc, revisions, at: revisions.length - 1, log };
+}
+
+/**
+ * SELECT AN OBJECT — canonically, so every view means the same thing by "this".
+ *
+ * NOT AN EDIT, and coalesced accordingly: clicking around a model should not
+ * leave undo walking back through every click. But it IS canonical, because
+ * linked views stay in step by reading one selection rather than by messaging
+ * each other, and because "ask about this" has to be handed an IDENTITY.
+ */
+export function selectObject(ws: ModelWorkspace, id: string, objectId: string | null, at = 0): EditResult {
+  const doc = docOf(ws, id);
+  if (!doc) return no(ws, `there is no model called ${id} here`);
+  const model = current(doc);
+  if (objectId === null) {
+    if (!model.selected) return no(ws, 'nothing was selected');
+    const { selected: _gone, ...rest } = model;
+    return {
+      workspace: patch(ws, id, (d) => revise(d, { ...rest, version: (model.version ?? 0) + 1 }, 'selection cleared', { coalesce: 'select' })),
+      ok: true, says: 'nothing is selected now', affected: [],
+    };
+  }
+  const target = objectOf(unpack(model), objectId);
+  if (!target) return no(ws, `${model.title} has nothing called ${objectId}`);
+  if (model.selected === target.id) return no(ws, `${target.label} is already selected`);
+  return {
+    workspace: patch(ws, id, (d) =>
+      revise(d, { ...model, version: (model.version ?? 0) + 1, selected: target.id }, `selected ${target.label}`, { coalesce: 'select' })
+    ),
+    ok: true,
+    says: `${target.label} is selected — ${target.meaning ?? target.kind}`,
+    affected: [],
+  };
 }
 
 // ── create, read, delete ────────────────────────────────────────────
@@ -262,7 +328,7 @@ export function setInput(ws: ModelWorkspace, id: string, input: string, value: n
   };
   const affected = edited.lastChange?.affected ?? [];
   return {
-    workspace: patch(ws, id, (d) => revise(d, edited, `${target.label} → ${next}`)),
+    workspace: patch(ws, id, (d) => revise(d, edited, `${target.label} → ${next}`, { coalesce: `at:${target.id}` })),
     ok: true,
     says:
       `${target.label} is now ${next}${target.units ? ` ${target.units}` : ''}` +
@@ -869,6 +935,14 @@ export function applyModelOps(
       case 'replace': {
         if (!doc) break;
         const r = replacePart(out, doc.id, op.of, op.becomes, at);
+        out = r.workspace;
+        said.push(r.says);
+        changed = changed || r.ok;
+        break;
+      }
+      case 'select': {
+        if (!doc) break;
+        const r = selectObject(out, doc.id, op.id, at);
         out = r.workspace;
         said.push(r.says);
         changed = changed || r.ok;
