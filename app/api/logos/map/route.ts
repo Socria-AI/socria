@@ -30,6 +30,7 @@ import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { enforceRateLimit } from '@/lib/rate-limit';
 import { mayUse } from '@/lib/route-guard';
 import { EMPTY_WORKSPACE, modelFor, openFromProposal } from '@/lib/model/docs';
+import { wantedSimulation, correctionNote } from '@/lib/model/wants';
 import { settle, unanswered } from '@/lib/model/ask';
 
 export const runtime = 'nodejs';
@@ -186,6 +187,39 @@ export async function POST(req: NextRequest) {
     // The extractor's output is a PROPOSAL: sanitizeMap's default trust mode
     // strips any `built` it wrote and keeps a `propose` block instead.
     const next = sanitizeMap(parsed);
+
+    // ── WHAT THEY PLAINLY ASKED FOR, WHEN THE EXTRACTOR MISSED IT ──
+    //
+    // "Generate me a black hole" came back as a map node of kind `concept`
+    // called "Black hole creation", beside a paragraph explaining that making
+    // one would require collapsing a massive star beyond its Schwarzschild
+    // radius — while this engine ships a Kerr black hole with real geodesics,
+    // a shadow from the critical impact parameter, and sliders for mass and
+    // spin. The prompt's rule for a construction ends in a list of verbs that
+    // does not contain "generate", so the turn was not one.
+    //
+    // The engine does not need to be told. SIM_OBJECTS is the list of what it
+    // can simulate; naming one and asking for it in any making register is a
+    // construction, and lib/model/wants.ts decides that HERE rather than
+    // hoping a sentence in a prompt is read the right way.
+    //
+    // IT ONLY EVER ADDS. A turn that already produced a scene is a turn that
+    // was understood, and this leaves it alone.
+    const lastSaid = [...kept].reverse().find((m: any) => m.role === 'user');
+    const wants = next.viz ? null : wantedSimulation(lastSaid?.content);
+    if (wants) {
+      next.viz = { kind: 'simulation', sim: { object: wants.object } } as typeof next.viz;
+      next.ask = {
+        ...(next.ask ?? {}),
+        action: 'construct',
+        artifact: 'simulation',
+        topic: next.ask?.topic || wants.named,
+      } as typeof next.ask;
+      // Said out loud rather than done silently: a correction nobody can see is
+      // the engine overruling the reading of somebody's words without telling
+      // them, and if it is wrong they cannot tell why.
+      console.info('logos map: %s', correctionNote(wants));
+    }
     // Never let a malformed extraction blank a map the user has built up.
     if (next.nodes.length === 0 && current.nodes.length > 0) {
       return NextResponse.json({ map: current });

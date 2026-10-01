@@ -952,7 +952,8 @@ WHAT MAKES IT A CONSTRUCTION. Any of these, and more than one is decisive:
 - they write an equation, or ask for one
 - they name parts of a system: masses, springs, compartments, bodies, stocks, flows, coefficients, constraints, initial conditions
 - they ask to MANIPULATE, RUN, FIT, PLOT or CHANGE the thing afterwards — you cannot manipulate an explanation
-- they say create, build, construct, set up, define, model, simulate, plot, fit, estimate AND there is something specific to make
+- they say create, build, construct, generate, make, set up, define, model, simulate, render, draw, plot, fit, estimate AND there is something specific to make
+- THEY NAME SOMETHING THIS ENGINE SIMULATES — a black hole, the big bang, an orbit, an oscillator or a pendulum, a projectile — and ask for it in any register at all. "Generate me a black hole" is a construction. It is not a question about astrophysics, and it is never answered by explaining that making one would require collapsing a star: the engine has a Kerr black hole with real geodesics and sliders, and the person is asking for THAT. The same goes for every object in the simulation list further down. A question ABOUT one of them — "what is a black hole", "how do they form" — is still a question.
 
 WHAT IS NOT A CONSTRUCTION, whatever words are in it: a question about what a kind of model is; a worry about a model they have; a request for reasons, causes or considerations; thinking out loud about whether to model something at all.
 
