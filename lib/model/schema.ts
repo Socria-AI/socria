@@ -1206,16 +1206,35 @@ export function sanitizeObject(raw: unknown, drop?: (what: string) => void): Mod
       const withList = Array.isArray(q.with)
         ? (q.with.map((v) => src(v)).filter(Boolean) as (string | TermDecl)[]).slice(0, 4)
         : [];
+
+      // AN INTERACTION IS ITS OPERANDS, HOWEVER THEY ARE SPELT.
+      //
+      // `with: ['educ', 'female']` is the canonical form and the only one this
+      // accepted — so `{op: 'interact', of: 'educ', with: ['female']}`, which
+      // is how anybody writes "educ interacted with female" and how the
+      // extractor actually wrote it, was refused. The term vanished, the
+      // interaction column became a free input nobody could give a range to,
+      // and a fully specified wage model drew an empty frame with
+      // "educ_x_female — needs a range" under it.
+      //
+      // `of` is simply the first operand when it is there. Both spellings mean
+      // the same product, and one grammar that accepts both is better than two
+      // that disagree about which is real.
+      const operands: (string | TermDecl)[] =
+        op === 'interact' ? [...(of ? [of] : []), ...withList].slice(0, 4) : withList;
       // A term with nothing to act on is not a term. Refused here rather than
       // admitted and reported empty later.
-      if (op === 'interact' ? withList.length < 2 : !of) return null;
+      if (op === 'interact' ? operands.length < 2 : !of) return null;
       const by = num(q.by);
       const over = text(q.over, 40);
       const level = text(q.level, 40);
       return {
         op,
-        ...(of ? { of } : {}),
-        ...(withList.length ? { with: withList } : {}),
+        // An interaction carries its operands in `with` and nothing in `of`,
+        // whichever way they arrived — so everything downstream (basesOf,
+        // termExpr, termLabel) reads one shape.
+        ...(of && op !== 'interact' ? { of } : {}),
+        ...(op === 'interact' ? { with: operands } : withList.length ? { with: withList } : {}),
         ...(by !== null ? { by } : {}),
         ...(over && ID.test(over) ? { over } : {}),
         ...(level ? { level } : {}),
@@ -1231,9 +1250,22 @@ export function sanitizeObject(raw: unknown, drop?: (what: string) => void): Mod
         drop
       )) {
         const key = text(k, 48);
-        if (!ID.test(key)) continue;
+        if (!ID.test(key)) {
+          drop?.(`a term in ${id} has a name an expression cannot contain: ${String(k).slice(0, 40)}`);
+          continue;
+        }
         const t = termOf(v);
-        if (t) terms[key] = t;
+        // NOT IN SILENCE. A refused term used to disappear with no record, so
+        // the column it defined turned into a free input the person was asked
+        // to supply a range for — and nothing anywhere said the transformation
+        // had been thrown away. Whatever else is wrong, it is now visible.
+        if (!t) {
+          drop?.(
+            `a term in ${id} was not understood and is not in the model: ${key} — ${JSON.stringify(v).slice(0, 80)}`
+          );
+          continue;
+        }
+        terms[key] = t;
       }
     }
     const dataKey2 = text(est.data, 48);

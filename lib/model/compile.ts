@@ -292,10 +292,14 @@ export function buildObject(model: Model, o: ModelObject, opts?: { detail?: numb
       return {
         of: o.id,
         primitives: [],
+        // WORDED SO IT DOES NOT READ AS A FAILURE. "Still waiting on it needs
+        // observations" is both ungrammatical and the wrong impression: the
+        // picture is THERE, and what is waiting is a different operation on the
+        // same model. A person who has just watched their surface appear should
+        // not be told it is pending.
         note:
-          `${produced.length === 1 ? 'what it says is' : 'what it says is'} drawn as ${produced
-            .map((x) => x.label)
-            .join(', ')}. Still waiting on ${what.join('; ')}`,
+          `what it says is drawn as ${produced.map((x) => x.label).join(', ')}. ` +
+          `Fitting it is a separate question, and would need ${what.join('; ')}`,
         fidelity: o.fidelity ?? 'model-derived',
       };
     }

@@ -1143,6 +1143,10 @@ A BINARY VARIABLE NEEDS NO RANGE, AND SAYING SO IS HOW IT GETS ONE. An indicator
 
 and the engine gives it 0 to 1 without being asked. Measured, before this existed: a log-wage relationship in education and a female dummy reported "female is a free input — it needs a range" and drew nothing at all.
 
+A VARIABLE WHOSE NAME IS A YES-OR-NO IS BINARY, AND SAYING SO IS YOUR JOB. female, male, married, union, urban, employed, treated, smoker, anything spelt is_… or has_… or …_dummy — if the quantity answers yes or no, it goes in "kinds" as binary. The engine cannot tell from the name and will not guess; left out, the person is asked what range of "female" is worth looking at, which is not a question anyone can answer.
+
+AND WHEN THEY GIVE YOU THE NUMBERS, BIND THEM. "β0=1, β1=0.08, β2=−0.2" means those are the coefficients. Put each one in "parameters" so it becomes a control, name it the ordinary way — β₀, β₁, b0, b1 — and the engine binds it to the right term by that name. A specification whose coefficients are all stated is one that EVALUATES: it draws immediately and has no need of data. Asking "what are you aiming to explore with this model?" when every number is already on the table is the turn doing nothing with what it was given.
+
 The kinds are "continuous", "binary", "categorical" and "count". Declare one whenever it is not continuous — it is also what lets the engine refuse an estimator honestly, since a binary OUTCOME is a whole class of model this engine does not fit. An "indicator" term needs no entry: its own definition says it is binary.
 
 THE OPERATIONS, each with an example of what it is built from:
