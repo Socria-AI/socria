@@ -10,6 +10,12 @@ import {
   useUser,
 } from '@clerk/nextjs';
 import '../app-shell.css';
+import {
+  moveNote,
+  moves,
+  surfaceForModel,
+  type Placeable,
+} from '@/lib/conversation-surface';
 import { Logo } from '@/components/Logo';
 import { AccountControl } from '@/components/account/AccountControl';
 import { ModelPicker } from '@/components/ModelPicker';
@@ -317,6 +323,8 @@ export default function ChatPage() {
   /** A chat waiting to go into the folder being named from its menu. */
   const pendingMove = useRef<string | null>(null);
   const [input, setInput] = useState('');
+  /** what to say when the picker has just moved this conversation to another surface */
+  const [moveSaid, setMoveSaid] = useState<string | null>(null);
   /** the sentence written during onboarding, for whichever composer mounts */
   const [carriedText, setCarriedText] = useState('');
 
@@ -803,6 +811,12 @@ export default function ChatPage() {
     rememberModel(next);
   }, [isLoaded, planState.known, planState.plan, hasAccount]);
 
+  // The note is about the conversation it moved. Opening another one clears
+  // it, or it would sit over a thread it has nothing to do with.
+  useEffect(() => {
+    setMoveSaid(null);
+  }, [activeId]);
+
   function pickModel(next: SocriaModel) {
     const config = SOCRIA_MODELS[next];
     // Gated model, and the user hasn't signed in or unlocked with the key:
@@ -819,6 +833,39 @@ export default function ChatPage() {
       router.push(config.href);
       return;
     }
+
+    // ── THE PICKER IS A SWITCHER, AND IT TAKES THE CONVERSATION WITH IT ──
+    //
+    // Choosing a model used to change only which engine answered next. If the
+    // new model lived on the other surface the conversation did not come — it
+    // stayed behind on a surface the new one could not even see, because
+    // `kind` was a gate rather than a memory. Somebody with four model
+    // specifications typed into Core chats could not open one of them where
+    // models are drawn.
+    //
+    // So: picking a model moves the conversation you are in. Its messages, its
+    // title, its map, its draft and its Project are untouched — see
+    // lib/conversation-surface.ts — and `kind` records where it now lives, so
+    // coming back to it later opens it where you left it.
+    const open = conversations.find((c) => c.id === activeId);
+    if (open && moves(open as Placeable, config)) {
+      const to = surfaceForModel(config);
+      setConversations((list) =>
+        list.map((c) => (c.id === open.id ? ({ ...c, kind: to } as typeof c) : c))
+      );
+      if (mode === 'cloud') {
+        void fetch('/api/conversations', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: open.id, kind: to }),
+        }).catch(() => {});
+      }
+      // Said, because a thread arriving on a different surface is the most
+      // disorienting thing this control can do and they may have been browsing.
+      const note = moveNote(open as Placeable, config);
+      if (note) setMoveSaid(note);
+    }
+
     setModel(next);
     chooseModel(next);
   }
@@ -2928,6 +2975,26 @@ export default function ChatPage() {
                 </SignedOut>
               </div>
             ) : null}
+
+            {/* THE CONVERSATION CAME WITH YOU, said once. A thread arriving on
+                a different surface is the most disorienting thing the picker
+                can do, and the person who pressed it may have been browsing
+                models rather than asking for a move. The line names what
+                happened and what was not touched; dismissing it is the only
+                thing it asks for. */}
+            {moveSaid && (
+              <div className="my-4 flex items-start gap-3 rounded-xl border border-moss-200/70 bg-moss-50/40 p-3 text-[13px] text-ink/80" role="status">
+                <span className="flex-1">{moveSaid}</span>
+                <button
+                  type="button"
+                  className="px-1 text-ink/40 hover:text-ink"
+                  aria-label="Dismiss"
+                  onClick={() => setMoveSaid(null)}
+                >
+                  ×
+                </button>
+              </div>
+            )}
 
             {oneWelcome && (
               <div className="my-4 flex items-start gap-3 rounded-xl border border-moss-200/70 bg-moss-50/40 p-3 text-[13px] text-ink/80" role="status">

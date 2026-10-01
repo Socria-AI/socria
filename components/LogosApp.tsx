@@ -118,6 +118,7 @@ import {
   summarizeDelta,
   type ThinkingMap as TMap,
 } from '@/lib/logos';
+import { owesExtraction } from '@/lib/conversation-surface';
 import type { ExploreResult, NodeMode } from '@/lib/logos-explore';
 import {
   emptySession,
@@ -1445,8 +1446,21 @@ export function LogosApp({
           const res = await fetch('/api/conversations', { cache: 'no-store' });
           if (res.ok) {
             const json = await res.json();
+            // ── EVERY CONVERSATION, NOT ONLY THE ONES THAT STARTED HERE ──
+            //
+            // This read `.filter(c => c.kind === 'logos')`, which made `kind` a
+            // GATE: a conversation begun in Core was not merely unopened on
+            // this surface, it was ABSENT — and somebody who had typed four
+            // model specifications into Core chats could not open any of them
+            // on the surface that draws models.
+            //
+            // lib/session-rail.ts had already settled the principle for the
+            // rail — "the surface is an implementation detail of how it
+            // started" — and this loader never got it. `kind` is a memory of
+            // where a conversation was last left (lib/conversation-surface.ts),
+            // not a wall around it, so every one of them loads here and the
+            // picker decides which surface opens the one you are in.
             list = (json.conversations || [])
-              .filter((c: any) => c.kind === 'logos')
               .map((c: any) => ({
                 id: c.id,
                 title: c.title,
@@ -1545,6 +1559,23 @@ export function LogosApp({
     setLimitNoteOff(false);
     setError(null);
     setStreaming('');
+
+    // ── A CONVERSATION ARRIVING HERE WITH A HISTORY AND NO MAP ──────
+    //
+    // Every conversation can be opened on this surface now, which means most
+    // of them arrive having been talked through somewhere else. Starting them
+    // blank would show an empty map under a thread twenty turns long and read
+    // as the map being broken.
+    //
+    // So the extractor runs once, over everything already said — which is what
+    // refreshMap does anyway, since it always sends the whole conversation.
+    // ONCE: `owesExtraction` is false the moment a map has nodes, because
+    // re-running would overwrite anything moved, renamed or deleted by hand and
+    // the extractor cannot tell which of those were theirs.
+    const opened = sessionsRef.current.find((x) => x.id === id);
+    if (opened && owesExtraction({ messages: opened.messages, map: opened.map }, { logosSurface: true })) {
+      refreshMap();
+    }
   }
 
   function newSession() {

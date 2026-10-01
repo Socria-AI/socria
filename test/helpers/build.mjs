@@ -99,6 +99,7 @@ const MODULES = [
   'lib/link-preview.ts',
   'lib/support-faq.ts',
   'lib/model/wants.ts',
+  'lib/conversation-surface.ts',
   'lib/viz-semantics.ts',
   'lib/why-not-answer.ts',
   'lib/wrong-chat.ts',

@@ -264,6 +264,47 @@ export async function PATCH(req: NextRequest) {
   if (typeof id === 'string' && id && body && 'projectId' in body && body.title === undefined) {
     return moveToProject(userId, id, body.projectId);
   }
+  // ── MOVING A CONVERSATION BETWEEN SURFACES ──────────────────────
+  //
+  // `kind` is where a conversation was last left, not a wall around it
+  // (lib/conversation-surface.ts). Moving it is its own narrow operation and
+  // deliberately NOT a PUT: a PUT carries the whole conversation, so a client
+  // holding a stale copy would write its own messages back over whatever has
+  // been said since. This touches one column.
+  //
+  // NOTHING ELSE CHANGES. The messages, the title, the map, the draft, the
+  // contexts and the project all stay exactly as they are — a move is a change
+  // of where a conversation opens, not of what it is.
+  if (typeof id === 'string' && id && body && 'kind' in body && body.title === undefined) {
+    const kind = body.kind === 'logos' ? 'logos' : 'chat';
+    try {
+      const { error, count } = await supabaseAdmin()
+        .from('conversations')
+        .update({ kind }, { count: 'exact' })
+        .eq('id', id)
+        .eq('user_id', userId);
+      if (error) {
+        // A database that predates the `kind` column cannot record where a
+        // conversation was left. Named, because the alternative is a move that
+        // silently does not stick and a surface that keeps forgetting.
+        console.error('PATCH conversation kind error:', error);
+        return NextResponse.json(
+          {
+            error: missingColumn(error)
+              ? 'This database has no `kind` column, so where a conversation is left cannot be recorded — run supabase/schema.sql.'
+              : 'Could not move it',
+          },
+          { status: 500 }
+        );
+      }
+      if (!count) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+      return NextResponse.json({ ok: true, kind });
+    } catch (e: any) {
+      console.error('PATCH conversation kind threw:', e);
+      return NextResponse.json({ error: 'Could not move it' }, { status: 500 });
+    }
+  }
+
   const raw = body?.title;
   if (typeof id !== 'string' || !id || typeof raw !== 'string') {
     return NextResponse.json({ error: 'Invalid rename' }, { status: 400 });
