@@ -20,7 +20,6 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { SignedIn, SignedOut, ClerkLoaded, ClerkLoading } from '@clerk/nextjs';
-import { AccountControl } from '@/components/account/AccountControl';
 import { CARRY_KEY } from '@/lib/onboarding-script';
 import { Button, Label, InkMark } from './ds';
 
@@ -68,14 +67,19 @@ export function Mast({
               {p.t}
             </Link>
           ))}
-        {/* The prototype had no auth chrome — it was a standalone export with
-            nowhere to sign in to. Dropping it here would have quietly removed
-            the only way into an account from the front page, so it is kept,
-            wrapped in ClerkLoaded so nothing flickers between states. */}
-        {/* The slot is never empty. Without this the nav rendered with no
-            Sign in link, then inserted one when Clerk resolved and shifted
-            the whole right-hand side — and with JavaScript off it never
-            appeared at all, so the masthead had no way into an account. */}
+        {/* NO ACCOUNT PILL HERE. The masthead used to carry the full control —
+            the reader's name beside their picture — and it was the loudest
+            thing on a page whose whole argument is about their thinking rather
+            than about them. The design's own masthead has never had one: Sign
+            in, and the way in. This is that, with the one addition a real
+            product needs over a standalone export — somebody already signed in
+            is not shown a Sign in link, they are shown the way to their
+            account, in the same quiet weight as every other item in the nav.
+
+            THE SLOT IS NEVER EMPTY, which is why ClerkLoading has its own
+            branch. Without it the nav rendered with nothing there, inserted a
+            link when Clerk resolved and shifted the whole right-hand side —
+            and with JavaScript off it never appeared at all. */}
         <ClerkLoading>
           <Link href="/sign-in" className="hs auth">
             Sign in
@@ -88,14 +92,9 @@ export function Mast({
             </Link>
           </SignedOut>
           <SignedIn>
-            {/* Socria's own, not Clerk's. The journal is a reading surface,
-                so it links to /account rather than opening a sheet over an
-                article — see AccountControl. It carries its own stylesheet,
-                so it needs no scope wrapper here; it used to have one, and
-                this page does not load the sheet that wrapper pointed at. */}
-            <span className="auth-btn">
-              <AccountControl href="/account" />
-            </span>
+            <Link href="/account" className="hs auth">
+              Account
+            </Link>
           </SignedIn>
         </ClerkLoaded>
         <Link href={cta ? cta.href : '/chat'} className="go">

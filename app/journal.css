@@ -879,8 +879,10 @@ html.anim-off .jr-root .app.plot .pane-map .edges, html:not(.js) .jr-root .app.p
    to. These match the nav's own type so the addition reads as part of the
    design rather than bolted to it. */
 .jr-root .mast nav a.hs.auth { font-variant: inherit; }
-.jr-root .mast nav .auth-btn { display: inline-flex; align-items: center; margin-left: 2px; }
-.jr-root .mast nav .auth-btn .cl-userButtonTrigger { width: 28px; height: 28px; }
+/* `.auth-btn` is gone with the account pill it wrapped — the masthead now
+   carries a plain Account link in the same weight as the rest of the nav, and
+   a rule for an element nothing renders is a rule the next person has to read
+   before working out it does nothing. */
 @media (max-width: 640px) { .jr-root .mast nav a.hs.auth { display: inline-flex; } }
 
 /* ---------- Issue No. 1 · Logos — the page's own deeper set ----------
