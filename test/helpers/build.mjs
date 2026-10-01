@@ -97,6 +97,7 @@ const MODULES = [
   'lib/workspace/impact.ts',
   'lib/workspace/portable.ts',
   'lib/link-preview.ts',
+  'lib/support-faq.ts',
   'lib/viz-semantics.ts',
   'lib/why-not-answer.ts',
   'lib/wrong-chat.ts',

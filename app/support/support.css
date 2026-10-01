@@ -1,0 +1,134 @@
+/* app/support/support.css — Support.
+ *
+ * Ported from the design project's support.css, plus the handful of rules it
+ * inherited from that project's quiet.css (the head, the chips, the grain).
+ *
+ * EVERYTHING IS SCOPED TO `.sp-root`, and the tokens are defined there rather
+ * than taken from globals — the same thing app/(legal)/legal.css does, for the
+ * same reason. The design's sheet styled bare selectors and leaned on a
+ * `:root` the standalone page owned; imported as-is it would restyle the
+ * product and overwrite the palette. A page that cannot be imported safely is
+ * not ported, however faithfully it was copied.
+ */
+
+.sp-root {
+  --paper: #f4f1e8;
+  --ink: #20201b;
+  --ink-70: rgba(32, 32, 27, 0.7);
+  --ink-60: rgba(32, 32, 27, 0.6);
+  --ink-45: rgba(32, 32, 27, 0.45);
+  --ink-16: rgba(32, 32, 27, 0.16);
+  --ink-12: rgba(32, 32, 27, 0.12);
+  --moss: #5e7633;
+  --moss-700: #465a26;
+  --forest-2: #354620;
+  --mustard: #e8b62c;
+  --border: rgba(53, 70, 32, 0.16);
+  --edge: clamp(18px, 5vw, 44px);
+  --radius-pill: 999px;
+  --tracking-label: 0.18em;
+  --tracking-cover: -0.035em;
+  --type-standfirst: clamp(1.05rem, 1.9vw, 1.35rem);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+
+  min-height: 100svh;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans), Inter, system-ui, sans-serif;
+}
+
+/* ── the quiet register's head and chips ──────────────────────────── */
+.sp-root .qwrap { position: relative; z-index: 2; width: min(1180px, 92vw); margin: 0 auto }
+.sp-root .qhead { padding: clamp(48px,9vh,110px) var(--edge) clamp(26px,4vh,44px) }
+.sp-root .qhead h1 { font-family: var(--font-serif), 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: clamp(2.4rem,6.6vw,5rem); letter-spacing: var(--tracking-cover); margin: 16px 0 0; line-height: .98 }
+.sp-root .qhead h1 .em { font-style: italic; color: var(--moss-700) }
+.sp-root .qhead .deck { margin-top: 20px; font-family: var(--font-serif), 'Instrument Serif', Georgia, serif; font-style: italic; font-size: var(--type-standfirst); color: var(--ink-70); max-width: 40ch; line-height: 1.3 }
+.sp-root .lbl { font-family: var(--font-sans), Inter, system-ui, sans-serif; font-size: .68rem; font-weight: 600; letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--ink-45) }
+.sp-root .lbl.moss { color: var(--moss-700) }
+.sp-root .chip { display: inline-flex; align-items: center; gap: .55em; padding: 9px 17px; border-radius: var(--radius-pill); border: 1px solid var(--ink); background: transparent; color: var(--ink); font-family: var(--font-sans), Inter, system-ui, sans-serif; font-size: .88rem; font-weight: 500; cursor: pointer; transition: background .22s, color .22s, border-color .22s, transform .22s }
+.sp-root .chip:hover { transform: translateY(-1px); background: rgba(32,32,27,.05) }
+.sp-root .chip .ct { font-size: .74rem; color: var(--ink-45); transition: color .22s }
+.sp-root .chip.on { background: var(--forest-2); border-color: var(--forest-2); color: var(--paper) }
+.sp-root .chip.on:hover { background: var(--forest-2) }
+.sp-root .chip.on .ct { color: rgba(244,241,232,.55) }
+
+/* ── the search ───────────────────────────────────────────────────── */
+.sp-root .sp-search { padding: 0 var(--edge); position: relative; z-index: 2 }
+.sp-root .sp-search .qwrap { display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--ink); padding-bottom: 12px }
+.sp-root .sp-search input { flex: 1; min-width: 0; font-family: var(--font-serif), 'Instrument Serif', Georgia, serif; font-size: clamp(1.3rem,2.6vw,1.8rem);
+  color: var(--ink); background: none; border: none; outline: none; padding: 6px 0 }
+.sp-root .sp-search input::placeholder { color: var(--ink-45); font-style: italic }
+.sp-root .sp-search .clear { font-family: var(--font-sans), Inter, system-ui, sans-serif; font-size: 11.5px; color: var(--ink-60); background: none; border: none;
+  border-bottom: 1px solid var(--ink-16); padding: 0 0 1px; cursor: pointer }
+.sp-root .sp-search .clear:hover { color: var(--ink); border-color: var(--ink) }
+.sp-root .sp-search .hint { font-family: var(--font-sans), Inter, system-ui, sans-serif; font-size: 11.5px; color: var(--ink-45); white-space: nowrap }
+
+.sp-root .sp-topics { padding: clamp(16px,2.6vh,24px) var(--edge) 0; position: relative; z-index: 2 }
+.sp-root .sp-topics .row { display: flex; flex-wrap: wrap; gap: 10px }
+
+.sp-root .sp-body { padding: clamp(22px,4vh,40px) var(--edge) clamp(60px,10vh,110px); position: relative; z-index: 2 }
+.sp-root .sp-grid { display: grid; grid-template-columns: minmax(0,1fr) minmax(260px,320px); gap: clamp(28px,5vw,72px); align-items: start }
+@media (max-width: 900px) { .sp-root .sp-grid { grid-template-columns: 1fr } }
+
+/* a topic is a numbered section, the way a spread is numbered */
+.sp-root .sp-sec { margin-bottom: clamp(30px,5vh,48px) }
+.sp-root .sp-sec .sh { display: flex; align-items: baseline; gap: 14px; padding-bottom: 10px; border-bottom: 1.5px solid var(--ink) }
+.sp-root .sp-sec .sh .rn { font-family: var(--font-serif), 'Instrument Serif', Georgia, serif; font-style: italic; font-size: 1.25rem; color: var(--moss-700); min-width: 1.8ch }
+.sp-root .sp-sec .sh h2 { font-family: var(--font-serif), 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: clamp(1.45rem,2.6vw,1.9rem); letter-spacing: -.015em; margin: 0; line-height: 1.1 }
+.sp-root .sp-sec .sh .ct { margin-left: auto; font-family: var(--font-sans), Inter, system-ui, sans-serif; font-size: 11.5px; color: var(--ink-45) }
+
+/* a question, and its answer when asked */
+.sp-root .qa { border-bottom: 1px solid var(--ink-12) }
+.sp-root .qa > button { display: flex; align-items: baseline; gap: 14px; width: 100%; text-align: left; background: none; border: none;
+  cursor: pointer; padding: 15px 2px; color: var(--ink); transition: color .2s }
+.sp-root .qa > button:hover { color: var(--moss-700) }
+.sp-root .qa > button .q { flex: 1; font-size: 15.5px; line-height: 1.45 }
+.sp-root .qa > button .tw { font-family: var(--font-sans), Inter, system-ui, sans-serif; font-size: 15px; color: var(--ink-45); flex: 0 0 auto;
+  transition: transform .35s var(--ease-out-expo) }
+.sp-root .qa[data-open="true"] > button .tw { transform: rotate(45deg); color: var(--moss-700) }
+.sp-root .qa .a { padding: 0 2px 18px; max-width: 62ch }
+.sp-root .qa .a p { margin: 0 0 .75em; font-size: 14.5px; line-height: 1.66; color: var(--ink-70) }
+.sp-root .qa .a p:last-child { margin-bottom: 0 }
+.sp-root .qa .a em { font-style: italic; color: var(--moss-700) }
+.sp-root .qa .a a { color: var(--moss-700); border-bottom: 1px solid var(--ink-16); text-decoration: none }
+.sp-root .qa .a a:hover { border-color: var(--moss-700) }
+.sp-root .qa .a .steps { margin: 0 0 .75em; padding: 0; list-style: none; counter-reset: s }
+.sp-root .qa .a .steps li { counter-increment: s; position: relative; padding-left: 26px; font-size: 14.5px; line-height: 1.6; color: var(--ink-70); margin: 5px 0 }
+.sp-root .qa .a .steps li::before { content: counter(s, lower-roman) "."; position: absolute; left: 0;
+  font-family: var(--font-serif), 'Instrument Serif', Georgia, serif; font-style: italic; color: var(--moss-700) }
+.sp-root mark.hl { background: rgba(232,182,44,.28); color: inherit; border-radius: 2px; padding: 0 1px }
+
+.sp-root .sp-none { padding: clamp(30px,6vh,60px) 0; max-width: 46ch }
+.sp-root .sp-none h2 { font-family: var(--font-serif), 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: clamp(1.5rem,3vw,2.1rem); margin: 0; line-height: 1.12 }
+.sp-root .sp-none p { margin: 10px 0 0; font-size: 14.5px; line-height: 1.62; color: var(--ink-70) }
+
+/* the side: status, and a person */
+.sp-root .sp-side { position: sticky; top: 24px; display: flex; flex-direction: column; gap: 18px }
+@media (max-width: 900px) { .sp-root .sp-side { position: static } }
+.sp-root .sp-card { border: 1px solid var(--border); background: #fff; border-radius: 14px; padding: 18px 20px }
+.sp-root .sp-card h3 { font-family: var(--font-serif), 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: 1.3rem; margin: 8px 0 0; line-height: 1.15 }
+.sp-root .sp-card p { margin: 8px 0 0; font-size: 13.5px; line-height: 1.6; color: var(--ink-70) }
+.sp-root .sp-card p em { font-style: italic; color: var(--moss-700) }
+.sp-root .sp-card .addr { font-family: var(--font-sans), Inter, system-ui, sans-serif; font-size: 13px; color: var(--moss-700); text-decoration: none;
+  border-bottom: 1px solid var(--ink-16); padding-bottom: 1px }
+.sp-root .sp-card .addr:hover { border-color: var(--moss-700) }
+.sp-root .sp-status { display: flex; flex-direction: column; gap: 0; margin-top: 10px }
+.sp-root .sp-status div { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--ink-12); font-size: 13px; color: var(--ink) }
+.sp-root .sp-status div:first-child { border-top: none }
+.sp-root .sp-status .dt { width: 8px; height: 8px; border-radius: 50%; background: var(--moss); box-shadow: 0 0 0 3px rgba(94,118,51,.14); flex: 0 0 auto }
+.sp-root .sp-status .dt.note { background: var(--mustard); box-shadow: 0 0 0 3px rgba(232,182,44,.2) }
+.sp-root .sp-status .st { margin-left: auto; font-size: 11.5px; color: var(--ink-45) }
+.sp-root .sp-status .st.warn { color: #6b520b }
+
+/* writing to a person */
+.sp-root .sp-form { display: flex; flex-direction: column; gap: 10px; margin-top: 12px }
+.sp-root .sp-form label { font-family: var(--font-sans), Inter, system-ui, sans-serif; font-size: 9.5px; font-weight: 600; letter-spacing: .22em; text-transform: uppercase; color: var(--ink-45) }
+.sp-root .sp-form select, .sp-root .sp-form input, .sp-root .sp-form textarea { width: 100%; font-family: var(--font-sans), Inter, system-ui, sans-serif; font-size: 13.5px; color: var(--ink);
+  background: var(--paper); border: 1px solid var(--ink-16); border-radius: 10px; padding: 9px 12px; outline: none }
+.sp-root .sp-form textarea { min-height: 96px; resize: vertical; line-height: 1.55 }
+.sp-root .sp-form select:focus, .sp-root .sp-form input:focus, .sp-root .sp-form textarea:focus { border-color: var(--moss) }
+.sp-root .sp-form .note { font-family: var(--font-serif), 'Instrument Serif', Georgia, serif; font-style: italic; font-size: 12.5px; color: var(--ink-45); margin: 0 }
+.sp-root .sp-form .send { align-self: flex-start; display: inline-flex; align-items: center; gap: .5em; padding: 9px 18px; border-radius: var(--radius-pill);
+  background: var(--ink); color: var(--paper); border: none; font-family: var(--font-sans), Inter, system-ui, sans-serif; font-size: 13.5px; font-weight: 500; cursor: pointer; text-decoration: none; transition: background .2s }
+.sp-root .sp-form .send:hover { background: var(--moss) }
+.sp-root .sp-form .send[aria-disabled="true"] { opacity: .45; pointer-events: none }

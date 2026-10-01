@@ -27,6 +27,7 @@ const LINKS: { href: string; label: string }[] = [
   { href: '/explore', label: 'Explore' },
   { href: '/blog', label: 'Blog' },
   { href: '/docs', label: 'Docs' },
+  { href: '/support', label: 'Support' },
   { href: '/privacy', label: 'Privacy' },
   { href: '/terms', label: 'Terms' },
   { href: '/security', label: 'Security' },
