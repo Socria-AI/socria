@@ -1,4 +1,11 @@
-node_modules/
+# NO TRAILING SLASH, and that is the whole point of this line.
+#
+# `node_modules/` matches a DIRECTORY. It does not match a symlink called
+# node_modules — which is exactly what a git worktree gets when you point it at
+# the real install to avoid a second one, and exactly what `git add -A` then
+# committed into a merge: a 120000 entry pointing at an absolute path on one
+# machine. Without the slash it matches either.
+node_modules
 .next/
 out/
 build/
