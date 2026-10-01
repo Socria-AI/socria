@@ -27,6 +27,8 @@ import {
   Progress,
   Count,
   Mast,
+  Door,
+  AskSlip,
   Turn,
   Silence,
   Reading,
@@ -38,7 +40,15 @@ import {
   Label,
   InkMark,
 } from './parts';
-import { Button, Logo, Transcript, DefinitionEntry, LogosNode, type NodeType } from './ds';
+import {
+  Button,
+  Logo,
+  Transcript,
+  DefinitionEntry,
+  ContrastPair,
+  LogosNode,
+  type NodeType,
+} from './ds';
 import { Stage } from './Stage';
 import { initJournal } from './drivers';
 
@@ -187,26 +197,16 @@ export function JournalIssue() {
       <Grain />
       <Progress />
       <Count />
-      <Mast current="journal" cta={{ href: '/chat', t: 'Ask Socria' }} />
+      <AskSlip />
+      <Mast current="journal" cta={{ href: '/chat', t: 'Try Socria' }} />
 
-      {/* COVER */}
-      <section className="cover" data-screen-label="Cover">
-        <div className="wrap">
-          <Label tone="moss">Issue No. 4 · Watch it think · MMXXVI</Label>
-          <h1 data-split="">
-            <span className="b">AI gets stronger.</span>
-            <span className="b em">Humans should too.</span>
-          </h1>
-          <p className="st rv d2">
-            What follows is not a pitch. It is the product, live, doing the only thing it does —
-            and then eight questions about what you just watched.
-          </p>
-          <div className="begin">
-            <span className="lbl">Begin</span>
-            <span className="ln" />
-          </div>
-        </div>
-      </section>
+      {/* THE DOOR — the composer is the cover.
+          It REPLACES the cover rather than sitting above it: both are a
+          full-height opening carrying the same `begin` rail, and two of those
+          back to back is the page introducing itself twice. The headline it
+          displaces is not lost — it closes the issue, which is where it was
+          always going. */}
+      <Door issue="Issue No. 4 · Core 4 · MMXXVI" />
 
       <Turn
         i="i"
@@ -226,6 +226,70 @@ export function JournalIssue() {
       </Turn>
 
       <Stage />
+
+      {/* WHAT IT IS — one screen, after the stage. Shorter than a spread,
+          because a definition that needs a full screen is an argument wearing
+          a definition's clothes. */}
+      <section className="about" id="about" data-screen-label="What it is">
+        <div className="wrap">
+          <Label tone="moss">What it is</Label>
+          <DefinitionEntry
+            word="Socria"
+            pos="noun · human-first AI"
+            gloss={
+              <>
+                A reasoning environment built so the part worth keeping stays yours. It does the
+                research, the calculation and the critique in full, surfaces the assumptions under
+                what you said and names the tensions you have not resolved — but{' '}
+                <em>never hands you the conclusion.</em>
+              </>
+            }
+            coda={
+              <>
+                It doesn&rsquo;t think for you.
+                <br />
+                <em>It helps you think more clearly.</em>
+              </>
+            }
+          />
+        </div>
+      </section>
+
+      {/* WHERE IT DIFFERS — a category distinction, not a comparison table.
+          No grid of ticks and no competitor column: the pair carries the
+          argument, and the prose is generous about the alternatives because
+          the position is about the trade rather than about the tools. */}
+      <section className="differs" id="differs" data-screen-label="Where it differs">
+        <div className="wrap">
+          <Label tone="moss">Where it differs</Label>
+          <h2 className="rv">
+            Not a better answer. <span className="em">A different question.</span>
+          </h2>
+          <div className="rv d1 pair-holder">
+            <ContrastPair
+              theirLabel="What most assistants are built to ask"
+              theirQuestion="How good an answer can we give you?"
+              ourLabel="What Socria is built to ask"
+              ourQuestion="How much clearer can your own thinking get?"
+            />
+          </div>
+          <div className="cols rv d2">
+            <p>
+              Claude, ChatGPT and Gemini are very good at the thing they are built for — finding
+              you the best available answer, fast, across almost any subject. Most of the time that
+              is exactly what you want, and this is not an argument against it.
+            </p>
+            <p>
+              Core 4 does that work too — the research, the calculation, the verification, the
+              critique — <em>in full.</em> What it holds back is the one step that would have made
+              you more capable for having taken it: the conclusion. That step is the whole product.
+            </p>
+          </div>
+          <p className="differs-close rv d2">
+            We are not against the machine. <span className="em">Only against the trade.</span>
+          </p>
+        </div>
+      </section>
 
       <Turn
         i="ii"
@@ -523,11 +587,19 @@ export function JournalIssue() {
           <div className="rv" style={{ marginBottom: '28px' }}>
             <Logo size="lg" showWordmark={false} onDark markSrc="/socria-mark.png" />
           </div>
+          {/* THE HEADLINE THE DOOR DISPLACED, where it was always going.
+              It opened the issue when a cover opened it; with the composer as
+              the cover, the argument is better made after somebody has watched
+              the thing refuse to answer than before. And it unsays a
+              duplication: the close read "Think For Yourself." directly above
+              a colophon that says the same words. */}
           <h2 data-split="">
-            Think For <span className="em">Yourself.</span>
+            <span className="b">AI gets stronger.</span>
+            <span className="b em">Humans should too.</span>
           </h2>
           <p className="coda rv d2">
-            Bring the question you have been carrying. It will not answer it — and that is the point.
+            Which is the whole argument. Bring the question you have been carrying — it will not
+            answer it, and that is the point.
           </p>
           <p className="said rv d2">
             <span data-readtime="">under a minute</span>, and I never gave you an answer.{' '}

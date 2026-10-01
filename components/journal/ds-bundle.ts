@@ -1750,4 +1750,48 @@ function _SpecTable({
   }, v)))));
 }
 
-export { _Logo, _Label, _Button, _InkMark, _InsightCard, _Message, _SynthesisCard, _Transcript, _DefinitionEntry, _Composer, _GuardBar, _LogosNode, _OneLock, _OneMark, _SpecTable };
+function _ContrastPair({
+  theirLabel = 'Most of the industry asks:',
+  theirQuestion,
+  ourLabel = 'We ask:',
+  ourQuestion
+}) {
+  const label = accent => ({
+    display: 'block',
+    marginBottom: 10,
+    fontFamily: 'var(--font-sans)',
+    fontSize: 'var(--doc-label)',
+    fontWeight: 500,
+    letterSpacing: 'var(--doc-tracking-caps)',
+    textTransform: 'uppercase',
+    color: accent ? 'var(--doc-accent)' : 'var(--doc-muted)'
+  });
+  const q = accent => ({
+    margin: 0,
+    fontFamily: 'var(--font-serif)',
+    fontWeight: 400,
+    fontSize: 'var(--doc-question)',
+    lineHeight: 1.16,
+    letterSpacing: 'var(--doc-tracking-title)',
+    maxWidth: '26ch',
+    color: accent ? 'var(--doc-turn)' : 'var(--doc-ink)'
+  });
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 26,
+      margin: '30px 0'
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+    style: label(false)
+  }, theirLabel), /*#__PURE__*/React.createElement("p", {
+    style: q(false)
+  }, theirQuestion)), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+    style: label(true)
+  }, ourLabel), /*#__PURE__*/React.createElement("p", {
+    style: q(true)
+  }, ourQuestion)));
+}
+
+export { _Logo, _Label, _Button, _InkMark, _InsightCard, _Message, _SynthesisCard, _Transcript, _DefinitionEntry, _Composer, _GuardBar, _LogosNode, _OneLock, _OneMark, _SpecTable, _ContrastPair };

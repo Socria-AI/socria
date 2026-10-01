@@ -1094,3 +1094,108 @@ html.anim-off .jr-root .board .fix, html:not(.js) .jr-root .board .fix{opacity:1
 .jr-root.one-issue .invite .cta:hover{background:#fff;color:#0f2430;transform:translateY(-2px)}
 .jr-root.one-issue .invite .quiet{font-family:var(--font-serif);font-style:italic;font-size:1.12rem;color:#b8cdd9;border-bottom:1px solid #b8cdd9;padding-bottom:2px}
 .jr-root.one-issue .invite .colophon .it{color:#b8cdd9}
+
+/* ═══ Copy 8 · the door, the ask slip, what it is, where it differs ═══
+ *
+ * Ported from the design project's issue.css (v84). Scoped to `.jr-root` like
+ * everything above it; `@keyframes` and the print rule are the two things that
+ * cannot be, so they keep their own names and `dcar` is prefixed `jr-` rather
+ * than left to collide with whatever else in the app might one day want a
+ * caret. */
+
+/* ── the door ───────────────────────────────────────────────────────
+   The composer IS the cover, so it takes cover scale: the placeholder is set
+   in the display serif at the size the headline used to be. Everything else
+   on the screen is smaller than it, deliberately. */
+.jr-root .door{min-height:100svh;display:flex;align-items:center;padding:clamp(80px,12vh,140px) var(--edge) clamp(56px,8vh,90px);position:relative}
+.jr-root .door .wrap{width:var(--measure);margin:0 auto;position:relative}
+.jr-root .door-ask{margin-top:clamp(18px,3.4vh,34px);border-bottom:2px solid var(--ink);padding-bottom:14px;position:relative}
+/* the typed question sits exactly where the placeholder would, so the handover
+   to the reader's own typing is invisible */
+.jr-root .door-ghost{position:absolute;left:0;top:0;right:0;pointer-events:none;
+  font-family:var(--font-serif);font-weight:400;font-size:clamp(2rem,6.2vw,4.4rem);line-height:1.04;
+  letter-spacing:-.03em;color:var(--ink-25)}
+.jr-root .door-ghost .car{display:inline-block;width:2px;height:.82em;margin-left:.04em;vertical-align:-.08em;
+  background:var(--moss);animation:jr-dcar 1.05s steps(1) infinite}
+@keyframes jr-dcar{50%{opacity:0}}
+@media(prefers-reduced-motion:reduce){.jr-root .door-ghost{display:none}}
+.jr-root .door-ask:focus-within .door-ghost{display:none}
+.jr-root .door-ask textarea{display:block;width:100%;border:none;background:none;resize:none;outline:none;padding:0;
+  font-family:var(--font-serif);font-weight:400;font-size:clamp(2rem,6.2vw,4.4rem);line-height:1.04;
+  letter-spacing:-.03em;color:var(--ink);overflow:hidden;max-height:46svh;
+  min-height:2.08em}
+/* the type steps down as the question lengthens, so it stays whole without a
+   scrollbar; the component sets data-len, the stylesheet decides what it means */
+.jr-root .door-ask textarea[data-len="m"]{font-size:clamp(1.6rem,4.6vw,3.1rem)}
+.jr-root .door-ask textarea[data-len="l"]{font-size:clamp(1.35rem,3.4vw,2.3rem)}
+.jr-root .door-ask textarea[data-len="xl"]{font-size:clamp(1.15rem,2.6vw,1.75rem)}
+.jr-root .door-ask textarea::placeholder{color:var(--ink-70)}
+.jr-root .door-ask textarea:focus::placeholder{color:var(--ink-45)}
+.jr-root .door-row{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap;margin-top:clamp(14px,2.4vh,24px)}
+/* and the masthead pill is filled rather than outlined, so it reads as the
+   action it is at every scroll position */
+.jr-root .mast nav a.go{background:var(--ink);color:var(--paper);border:none;
+  border-radius:var(--radius-pill);padding:9px 20px}
+.jr-root .mast nav a.go:hover{background:var(--moss);border-color:var(--moss);color:var(--paper)}
+.jr-root .door-note{font-family:var(--font-serif);font-style:italic;font-size:.94rem;color:var(--ink-45);max-width:34ch;line-height:1.4}
+.jr-root .door-under{margin-top:clamp(16px,2.6vh,26px);font-size:clamp(1rem,1.5vw,1.16rem);line-height:1.6;
+  color:var(--ink-70);max-width:48ch}
+.jr-root .door-alt a{color:var(--moss-700);border-bottom:1px solid var(--moss);padding-bottom:1px}
+.jr-root .door-alt a:hover{color:var(--moss)}
+@media(max-width:620px){.jr-root .door-row{justify-content:flex-start}.jr-root .door-note{order:2;max-width:none}}
+.jr-root .cover .begin,.jr-root .door .begin{margin-top:clamp(34px,6vh,60px);display:flex;align-items:center;gap:14px;transition:opacity .5s}
+.jr-root .cover .begin .ln,.jr-root .door .begin .ln{width:54px;height:1px;background:var(--ink-12);position:relative;overflow:hidden}
+
+/* v2 is six spreads — short enough that a reading rail is furniture */
+.jr-root .rail{display:none}
+
+/* the ask slip — the system's own fixed affordance, bottom right after 700px */
+.jr-root .ask-slip{position:fixed;right:22px;bottom:22px;z-index:70;display:inline-flex;align-items:center;gap:.6em;
+  padding:13px 20px;border-radius:var(--radius-pill);background:var(--ink);color:var(--paper);
+  font-family:var(--font-serif);font-style:italic;font-size:1.1rem;text-decoration:none;
+  box-shadow:0 14px 28px -16px rgba(35,36,31,.4);opacity:0;pointer-events:none;
+  /* NO opacity transition, and that is the design's own choice rather than an
+     omission: the slip snaps in and slides, so it is unambiguously present the
+     moment it is usable. Adding one made it readable at 0.43 opacity, which is
+     a thing you can see and cannot press. */
+  transform:translateY(14px);transition:transform .45s var(--ease-out-expo),background .2s}
+.jr-root .ask-slip.on{opacity:1;pointer-events:auto;transform:none}
+.jr-root .ask-slip:hover{background:var(--moss);color:var(--paper)}
+.jr-root .ask-slip .ar{transition:transform .2s}
+.jr-root .ask-slip:hover .ar{transform:translateX(3px)}
+@media print{.jr-root .ask-slip{display:none}}
+
+/* ── what it is ─────────────────────────────────────────────────────
+   One screen, after the stage. Shorter than a spread, because a definition
+   that needs a full screen is an argument wearing a definition's clothes. */
+.jr-root .about{padding:clamp(64px,11vh,120px) var(--edge);position:relative;z-index:2;
+  border-top:1px solid var(--ink-12);border-bottom:1px solid var(--ink-12)}
+.jr-root .about .wrap{width:var(--measure);margin:0 auto}
+.jr-root .about .wrap > div{margin-top:clamp(16px,2.6vh,26px)}
+
+/* ── where it differs ───────────────────────────────────────────────
+   A category distinction, not a comparison table: no grid of ticks, no
+   competitor column. The pair carries the argument and the prose is generous
+   about the alternatives, because the position is about the trade rather than
+   about the tools. */
+.jr-root .differs{padding:clamp(64px,11vh,120px) var(--edge);position:relative;z-index:2;
+  border-bottom:1px solid var(--ink-12)}
+.jr-root .differs .wrap{width:var(--measure);margin:0 auto}
+.jr-root .differs h2{font-family:var(--font-serif);font-weight:400;font-size:clamp(1.9rem,5vw,3.4rem);
+  line-height:1.04;letter-spacing:-.03em;margin:clamp(14px,2.4vh,24px) 0 0;max-width:22ch}
+.jr-root .differs h2 .em{font-style:italic;color:var(--moss-700)}
+.jr-root .pair-holder{margin-top:clamp(26px,4.4vh,44px);--doc-question:clamp(1.3rem,2.6vw,1.95rem);--doc-label:.72rem}
+.jr-root .pair-holder > div{display:grid!important;align-items:start;
+  grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:clamp(20px,3vw,48px)}
+.jr-root .pair-holder > div > div{min-width:0}
+.jr-root .pair-holder > div p{max-width:none!important}
+.jr-root .pair-holder > div > div:first-child > span{color:rgba(32,32,27,.72)!important}
+.jr-root .pair-holder > div > div:last-child > span{color:var(--moss-700)!important}
+.jr-root .differs .cols{margin-top:clamp(26px,4.4vh,44px);display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:clamp(20px,3vw,48px)}
+.jr-root .differs .cols p{font-size:var(--type-body);line-height:var(--leading-prose);color:var(--ink-70);max-width:46ch}
+.jr-root .differs .cols p em{font-style:italic;color:var(--ink)}
+.jr-root .differs-close{margin:clamp(28px,4.6vh,48px) 0 0;padding-top:clamp(18px,3vh,28px);
+  border-top:1px solid var(--ink-12);font-family:var(--font-serif);
+  font-size:clamp(1.4rem,3vw,2.1rem);line-height:1.2;letter-spacing:-.015em}
+.jr-root .differs-close .em{font-style:italic;color:var(--moss-700)}

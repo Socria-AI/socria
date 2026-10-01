@@ -16,11 +16,13 @@
 // nothing throws, the page just arrives static. Grep drivers.ts before
 // touching a className.
 
-import type { ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { SignedIn, SignedOut, ClerkLoaded, ClerkLoading } from '@clerk/nextjs';
 import { AccountControl } from '@/components/account/AccountControl';
-import { Label, InkMark } from './ds';
+import { CARRY_KEY } from '@/lib/onboarding-script';
+import { Button, Label, InkMark } from './ds';
 
 /* Where the issue system's pages actually live in the app.
  *
@@ -441,5 +443,233 @@ export function DepthFig() {
         </text>
       </svg>
     </Fig>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   THE DOOR — the issue opens on a composer, not on a headline.
+   ═══════════════════════════════════════════════════════════════════ */
+
+/**
+ * The questions that type themselves, until somebody types their own.
+ *
+ * Four, and they are deliberately uneven: one about the reader, one decision,
+ * one about their own argument, one piece of work. The point is that the box
+ * takes any of them — a cover that only suited one kind of question would be
+ * a headline wearing a composer's clothes.
+ */
+const DOOR_ASKS = [
+  'When did you last change your mind?',
+  'Should I take the job?',
+  'Is my argument actually any good?',
+  'Help me check my working.',
+];
+
+/**
+ * THE COMPOSER IS THE COVER.
+ *
+ * The first screen of the issue is the thing the product does, with the
+ * reader's own question in it, rather than an argument that they should try
+ * it. Pressing it carries the sentence into /chat and opens already asking.
+ *
+ * HOW THE SENTENCE TRAVELS, and why not in the URL. `/onboarding` already has
+ * exactly this handover — one key in sessionStorage, read once and cleared by
+ * `takeCarried` on the chat's own mount — so this writes the same key rather
+ * than adding a second mechanism with its own bugs. A query parameter was the
+ * obvious alternative and is the wrong one here: the note under this box
+ * promises that nothing is sent anywhere until they press it, and a question
+ * in a URL is in their history, in the referer and in any log the navigation
+ * touches before they have decided anything.
+ */
+export function Door({
+  issue = 'Issue No. 4 · Core 4 · MMXXVI',
+  to = '/chat',
+}: {
+  issue?: string;
+  to?: string;
+}) {
+  const router = useRouter();
+  const [v, setV] = useState('');
+  const [ghost, setGhost] = useState('');
+  const [typing, setTyping] = useState(false);
+  const field = useRef<HTMLTextAreaElement | null>(null);
+
+  /* Cover-scale type in a fixed two-row box hid the end of anything longer
+     than about seventy characters, and a scrollbar inside display type is
+     worse than the bug. So the box grows to its content and the type steps
+     down as the question lengthens — but the sizing lives in the stylesheet
+     and this only reports the length, because an inline font-size did not
+     take and a scrollHeight read before layout wrote height:0 and never
+     recovered. */
+  const grow = useCallback((el: HTMLTextAreaElement | null) => {
+    if (!el) return;
+    const n = el.value.length;
+    el.dataset.len = n > 190 ? 'xl' : n > 110 ? 'l' : n > 58 ? 'm' : 's';
+    el.style.height = 'auto';
+    /* never collapse: if the box has not been laid out yet, leave the CSS
+       min-height standing rather than writing a zero */
+    if (el.scrollHeight > 0) el.style.height = `${el.scrollHeight}px`;
+  }, []);
+
+  useEffect(() => {
+    const el = field.current;
+    grow(el);
+    /* re-measure once layout and the display face have settled */
+    const r = requestAnimationFrame(() => grow(el));
+    if (document.fonts?.ready) void document.fonts.ready.then(() => grow(el));
+    return () => cancelAnimationFrame(r);
+  }, [v, grow]);
+
+  /* the questions type themselves, one after another, until you type your own */
+  useEffect(() => {
+    if (v) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    let i = 0;
+    let k = 0;
+    let dir = 1;
+    let stop = false;
+    let timer: ReturnType<typeof setTimeout>;
+    const step = () => {
+      if (stop) return;
+      const q = DOOR_ASKS[i];
+      k += dir;
+      if (k >= q.length) {
+        dir = -1;
+        setGhost(q);
+        setTyping(true);
+        timer = setTimeout(step, 2600);
+        return;
+      }
+      if (k <= 0) {
+        dir = 1;
+        i = (i + 1) % DOOR_ASKS.length;
+        k = 0;
+      }
+      setGhost(q.slice(0, Math.max(0, k)));
+      setTyping(true);
+      timer = setTimeout(step, dir > 0 ? 38 + Math.random() * 34 : 17);
+    };
+    timer = setTimeout(step, 600);
+    return () => {
+      stop = true;
+      clearTimeout(timer);
+    };
+  }, [v]);
+
+  /* warm the chat while they read this screen, so pressing it is a navigation
+     to something already parsed rather than a cold start. Next's own
+     prefetch, not a <link>: the destination is a route, and the router knows
+     how to fetch one. */
+  useEffect(() => {
+    router.prefetch(to);
+  }, [router, to]);
+
+  const go = () => {
+    const q = v.trim();
+    if (q) {
+      // The same one-shot handover /onboarding uses; see takeCarried.
+      try {
+        sessionStorage.setItem(
+          CARRY_KEY,
+          JSON.stringify({ text: q.slice(0, 2000), intent: null, q: '', n: '' })
+        );
+      } catch {
+        /* a private window with storage blocked still gets to the chat — it
+           just arrives empty, which is the chat's own empty state and asks. */
+      }
+    }
+    router.push(to);
+  };
+
+  return (
+    <section className="door" data-screen-label="The door">
+      <div className="wrap">
+        <Label tone="moss">{issue}</Label>
+        <form
+          className="door-ask"
+          onSubmit={(e) => {
+            e.preventDefault();
+            go();
+          }}
+        >
+          {!v && typing && (
+            <span className="door-ghost" aria-hidden="true">
+              {ghost}
+              <i className="car" />
+            </span>
+          )}
+          <textarea
+            ref={field}
+            rows={2}
+            value={v}
+            spellCheck={false}
+            aria-label="Ask Socria"
+            enterKeyHint="go"
+            placeholder={typing ? '' : DOOR_ASKS[0]}
+            onChange={(e) => {
+              setV(e.target.value);
+              grow(e.target);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                go();
+              }
+            }}
+          />
+          <div className="door-row">
+            <span className="door-note">
+              Nothing here is sent anywhere until you press it. Your reasoning is yours.
+            </span>
+            <Button onClick={go} variant="primary" size="xl" arrow>
+              Try Socria — free
+            </Button>
+          </div>
+        </form>
+        <p className="door-under rv d2">
+          Type the thing you have not been able to settle, and Socria opens already asking about it.
+          <span className="door-alt">
+            {' '}
+            Or <a href="#stage">watch it work first</a>.
+          </span>
+        </p>
+        <div className="begin">
+          <span className="lbl">The issue</span>
+          <span className="ln" />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/**
+ * The way in, once the door is off screen.
+ *
+ * Fixed, bottom right, and absent until 700px of scroll — the door IS the
+ * invitation above that, and two of them at once would be the page asking
+ * twice. Hidden from assistive technology and taken out of the tab order
+ * while it is invisible, because a thing that cannot be seen but can be
+ * focused is a trap rather than an affordance.
+ */
+export function AskSlip({ to = '/chat' }: { to?: string }) {
+  const [show, setShow] = useState(false);
+  useEffect(() => {
+    const on = () => setShow((window.scrollY || document.documentElement.scrollTop) > 700);
+    window.addEventListener('scroll', on, { passive: true });
+    on();
+    return () => window.removeEventListener('scroll', on);
+  }, []);
+  return (
+    <Link
+      className={`ask-slip${show ? ' on' : ''}`}
+      href={to}
+      aria-hidden={show ? undefined : 'true'}
+      tabIndex={show ? 0 : -1}
+    >
+      Try Socria{' '}
+      <span className="ar" aria-hidden="true">
+        →
+      </span>
+    </Link>
   );
 }

@@ -92,3 +92,17 @@ export const SpecTable = B._SpecTable as C<{
   head?: [string, string];
   rows?: [string, string][];
 }>;
+/**
+ * The question the industry asks, set against the question Socria asks.
+ *
+ * Two labelled questions in a column, the second in the accent — which is the
+ * whole argument of the "Where it differs" section compressed into one
+ * component: not a better answer, a different question. Both labels default,
+ * because the component was written to be usable with only the two questions.
+ */
+export const ContrastPair = B._ContrastPair as C<{
+  theirLabel?: string;
+  theirQuestion?: React.ReactNode;
+  ourLabel?: string;
+  ourQuestion?: React.ReactNode;
+}>;
