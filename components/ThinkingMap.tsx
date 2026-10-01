@@ -559,6 +559,13 @@ export function ThinkingMap({
   }, []);
 
   const dim = (on: boolean) => (related && !on ? ' is-dim' : '');
+
+  /** The node types on screen, in the order they first appear — see the key below. */
+  const legendTypes = useMemo(() => {
+    const seen: string[] = [];
+    for (const n of map.nodes) if (n.type && !seen.includes(n.type)) seen.push(n.type);
+    return seen.slice(0, 8);
+  }, [map.nodes]);
   const caption =
     staticLayout?.caption ?? LENSES.find((l) => l.id === lens)!.caption;
 
@@ -586,8 +593,21 @@ export function ThinkingMap({
 
   return (
     <div className="lg-map-wrap">
+      {/* ── THE PLATE'S TOP BAR, from the design project's Copy 8 ────────
+          The lenses used to float bare above the figure with nothing holding
+          them, so the panel began with a row of pills and no statement of what
+          you were looking at. The design puts them on a rule under a bar that
+          names the lens and asks its question — the caption that was already
+          written for every lens and was printed at the FOOT of the panel,
+          where it arrived after the thing it was meant to introduce. */}
       {lenses.length > 1 && (
-        <div className="lg-lenses" role="tablist" aria-label="Map lens">
+        <div className="mp-top">
+          <span className="l">{LENSES.find((l) => l.id === lens)?.label ?? 'Map'}</span>
+          <span className="st">{caption}</span>
+        </div>
+      )}
+      {lenses.length > 1 && (
+        <div className="mp-tabs" role="tablist" aria-label="Map lens">
           {LENSES.filter((l) => lenses.includes(l.id)).map((l) => (
             <button
               key={l.id}
@@ -597,6 +617,7 @@ export function ThinkingMap({
               className={`lg-lens${lens === l.id ? ' is-on' : ''}${
                 lensLocked(l.id) ? ' is-locked' : ''
               }`}
+              data-lens={l.id}
               onClick={() => {
                 if (lensLocked(l.id)) {
                   onLocked?.();
@@ -1068,7 +1089,38 @@ export function ThinkingMap({
         </div>
       )}
 
-      {map.nodes.length > 0 && <p className="lg-caption">{caption}</p>}
+      {/* THE CAPTION MOVED UP, into the bar — it introduces the lens, and an
+          introduction that arrives after the thing is a label. It stays here
+          for the one case the bar does not cover: a plan that offers a single
+          lens, where there are no tabs and so no bar to put it in. */}
+      {map.nodes.length > 0 && lenses.length <= 1 && <p className="lg-caption">{caption}</p>}
+
+      {/* ── THE KEY, which this map has never carried ─────────────────
+          Every node is coloured by its TYPE and nothing said what the colours
+          meant: a reader had to infer the scheme from the nodes themselves.
+          
+          IT KEYS THIS MAP, NOT THE SCHEME. There are fifteen node types and a
+          legend listing all of them would be a glossary; what is useful is the
+          five or six actually on screen. So it is derived from the map, and
+          changes as the map does.
+          
+          AND THE SWATCH TAKES ITS COLOUR FROM THE NODE RULE — `lg-node` plus
+          `lg-node-<type>`, the same classes the card carries — rather than
+          from a hex written out again here. A legend with its own copy of the
+          palette is a legend that will one day describe a colour the map
+          stopped using, which is worse than no legend at all. */}
+      {map.nodes.length > 0 && lens === 'graph' && legendTypes.length > 0 && (
+        <div className="mp-bot">
+          <div className="mp-legend">
+            {legendTypes.map((t) => (
+              <span key={t}>
+                <i className={`lg-node lg-node-${t}`} />
+                {t}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

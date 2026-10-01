@@ -8555,3 +8555,110 @@ html.anim-off .logos-root.is-firstmap-node .lg-node, html:not(.js) .logos-root.i
 .logos-root .lg-node-by{width:8px;height:8px;border-radius:50%;flex:0 0 auto;margin-left:auto}
 /* Why a room refused — a wrong code, a full room, or not signed in. */
 .logos-root .lg-collab-err{font-family:var(--font-sans);font-size:11.5px;color:var(--lg-vermilion,#D8402F)}
+
+/* ═══ Logos 2 · the map plate's chrome, from Copy 8 ═══════════════════
+ *
+ * Ported from the design project's app.css. Scoped to `.logos-root`, which is
+ * where the app's own `--lg-*` tokens live — and the design's sheet already
+ * targets those by name ("these now sit on the app's own Logos scope rather
+ * than on anything invented here"), so this is the same stylesheet arriving in
+ * the place it was written for.
+ *
+ * CHROME ONLY. The plate's BEHAVIOUR stays dev's: the lenses, the renderer,
+ * the model engine and the inspector are all the real ones. What comes across
+ * is the frame around them — a top bar instead of tabs floating bare above the
+ * figure, the tabs as pills on a rule, and the legend, which dev's map has
+ * never had.
+ *
+ * TWO TOKENS THE DESIGN NAMES AND THIS SCOPE DOES NOT: --node-idea-bg and
+ * --shadow-node-hover. Defined here from the values they hold in the design
+ * rather than left to resolve to nothing, because a `background: var(--x)` with
+ * no --x is not a fallback, it is an invisible element. */
+.logos-root {
+  --node-idea-bg: rgba(94, 118, 51, 0.1);
+  --shadow-node-hover: 0 10px 26px -14px rgba(32, 32, 27, 0.4);
+}
+
+/* the bar above the figure: what you are looking at, and what can be done to it */
+.logos-root .mp-top {
+  display: flex; align-items: baseline; gap: 10px;
+  padding: 12px 16px 8px; background: var(--lg-panel);
+}
+/* on the map the panel writes its own header, so the plate keeps only the close */
+.logos-root .mp-top.bare { padding: 8px 12px 0; justify-content: flex-end; }
+.logos-root .mp-top .l {
+  font-size: 9.5px; font-weight: 600; letter-spacing: var(--tracking-label); text-transform: uppercase;
+  color: rgba(35, 36, 31, 0.72); margin-right: auto; white-space: nowrap;
+  min-width: 0; overflow: hidden; text-overflow: ellipsis;
+}
+.logos-root .mp-top .ctx {
+  margin-left: 9px; padding-left: 9px; border-left: 1px solid var(--lg-line);
+  font-weight: 500; letter-spacing: 0.16em; color: var(--lg-accent); opacity: 0.85;
+}
+.logos-root .mp-top .st {
+  margin-left: auto; font-size: 11px; letter-spacing: 0.1em;
+  color: rgba(35, 36, 31, 0.72); white-space: nowrap;
+}
+.logos-root .mp-key {
+  font-size: 11px; color: rgba(35, 36, 31, 0.72); border: 1px solid var(--lg-line);
+  background: #fff; border-radius: 999px; padding: 4px 10px; white-space: nowrap;
+  flex: 0 0 auto; cursor: pointer; transition: border-color 0.2s, color 0.2s;
+}
+.logos-root .mp-key:hover { border-color: var(--lg-ink); color: var(--lg-ink); }
+.logos-root .mp-key[aria-pressed="true"] { background: var(--lg-ink); border-color: var(--lg-ink); color: var(--lg-panel); }
+.logos-root .mp-x { font-size: 1.2rem; line-height: 1; color: var(--lg-ink-40); padding: 0 2px; background: none; border: none; cursor: pointer; }
+.logos-root .mp-x:hover { color: var(--lg-ink); }
+
+/* the tabs, as pills on a rule rather than floating above the figure */
+.logos-root .mp-tabs {
+  display: flex; gap: 2px; flex-wrap: wrap; padding: 6px 10px;
+  border-bottom: 1px solid var(--lg-line); background: var(--lg-panel);
+}
+.logos-root .mp-tabs button {
+  flex: 0 0 auto; white-space: nowrap; font-size: 11px; color: rgba(35, 36, 31, 0.72);
+  padding: 4px 10px; border-radius: 999px; border: 1px solid transparent; background: none;
+  font: inherit; font-size: 11px; cursor: pointer; transition: background 0.18s, color 0.18s;
+}
+.logos-root .mp-tabs button:hover { color: var(--lg-ink); }
+.logos-root .mp-tabs button[aria-selected="true"] { background: var(--lg-primary); color: var(--lg-panel); }
+
+/* the key to what the shapes mean — which the map has never carried, so the
+   colours were a convention a reader had to infer from the nodes themselves */
+.logos-root .mp-bot {
+  padding: 9px 14px; border-top: 1px solid var(--ink-16); background: rgba(241, 238, 228, 0.86);
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+}
+.logos-root .mp-legend {
+  flex: 1 0 100%; display: flex; align-items: center; gap: 13px; flex-wrap: wrap;
+  font-size: 11px; color: var(--ink-60);
+}
+.logos-root .mp-legend span { display: inline-flex; align-items: center; gap: 0.4em; }
+/* The swatch IS a node, shrunk to a dot — it carries `lg-node lg-node-<type>`
+   and takes its background and border from the same rule the card does, so the
+   key cannot describe a colour the map has stopped using. Everything a node
+   sets that a 9px dot must not inherit is overridden here, once. */
+.logos-root .mp-legend i {
+  width: 10px; height: 10px; border-radius: 50%; border-width: 1.4px; flex: 0 0 auto;
+  padding: 0; margin: 0; min-width: 0; min-height: 0; box-shadow: none; font-size: 0;
+  position: static; display: inline-block; cursor: default; transform: none;
+}
+.logos-root .mp-legend span { text-transform: lowercase; }
+
+/* the seam: asking the picture, and the line it answers with */
+.logos-root .mp-seam {
+  display: flex; gap: 6px; flex-wrap: wrap; padding: 8px 13px;
+  border-top: 1px solid var(--lg-line); background: var(--lg-panel);
+}
+.logos-root .mp-ask {
+  font-family: var(--font-serif); font-style: italic; font-size: 12px; color: var(--lg-primary);
+  border: 1px solid rgba(53, 70, 32, 0.4); background: #fff; border-radius: 999px; padding: 5px 13px;
+  cursor: pointer; white-space: nowrap; transition: background 0.18s, border-color 0.18s;
+}
+.logos-root .mp-ask:hover { background: var(--node-idea-bg); border-color: var(--lg-primary); }
+.logos-root .mp-top .mp-ask { font-size: 11px; padding: 4px 10px; }
+.logos-root .mp-said {
+  position: absolute; left: 14px; right: 14px; bottom: 12px; z-index: 22; margin: 0; padding: 10px 13px;
+  border-radius: 10px; background: #fff; border: 1px solid var(--lg-line); box-shadow: var(--shadow-node-hover);
+  font-family: var(--font-serif); font-style: italic; font-size: 12.5px; line-height: 1.45;
+  color: rgba(35, 36, 31, 0.78);
+}
