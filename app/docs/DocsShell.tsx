@@ -69,6 +69,11 @@ export function DocsShell({ children }: { children: React.ReactNode }) {
         <span className="d-foot-links">
           <Link href="/logos">What Logos is</Link>
           <Link href="/one">Socria One</Link>
+          {/* A third copy of the site's links — see the note in
+              components/BlogShell.tsx. The docs are where somebody lands when
+              they are already confused, so leaving support out of this one was
+              the worst place to leave it out of. */}
+          <Link href="/support">Support</Link>
           <Link href="/privacy">Privacy</Link>
           <Link href="/terms">Terms</Link>
           <Link href="/security">Security</Link>

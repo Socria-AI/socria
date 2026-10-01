@@ -31,6 +31,7 @@ export function LegalShell({ children }: { children: React.ReactNode }) {
       <footer className="lg-foot">
         <span>Socria — Human-First AI</span>
         <Link href="/docs">Docs</Link>
+        <Link href="/support">Support</Link>
         <Link href="/chat">Open Socria</Link>
       </footer>
     </div>

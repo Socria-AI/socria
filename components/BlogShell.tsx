@@ -128,6 +128,13 @@ export function BlogFooter() {
           <Link href="/#logos">What&rsquo;s new: Logos</Link>
           <Link href="/blog">Blog</Link>
           <Link href="/docs">Docs</Link>
+          {/* The one page a stuck person looks for. This list is a SECOND copy
+              of the site's links — components/Colophon.tsx is the first, and
+              carries them on every other public surface — so a page added
+              there has to be added here by hand or the blog quietly stops
+              being a way to the rest of the site. Worth collapsing into the
+              Colophon; not while the footer's own layout is load-bearing. */}
+          <Link href="/support">Support</Link>
           <Link href="/chat">Try Socria</Link>
           <Link href="/privacy">Privacy</Link>
           <Link href="/terms">Terms</Link>
