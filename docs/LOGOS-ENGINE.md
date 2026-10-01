@@ -113,9 +113,10 @@ where it ends.
 - **Comparison as a view.** `compare()` computes what differs between two
   states of one model; drawing them side by side, overlaid or as a difference
   is not built.
-- **Collaboration on a model.** Logos's multiplayer is untouched and unaware
-  of models; shared model state is a Logos 2 problem and the schema is shaped
-  to allow it (`version`, `lastChange`).
+- **Collaboration on a model.** The two-seat room is parked (lib/rooms-flag.ts,
+  docs/LOGOS-ROOMS-PARKED.md) and unaware of models; shared model state is a
+  problem for when it ships, and the schema is shaped to allow it (`version`,
+  `lastChange`).
 - **Export.** A model is already a serialisable document; nothing writes one
   to a file yet.
 

@@ -74,7 +74,7 @@ export const DOC_PAGES: DocPage[] = [
   {
     slug: 'logos-2',
     title: 'Socria Logos 2',
-    blurb: 'Two people in one workspace — and models you own, edit and undo rather than pictures that are redrawn.',
+    blurb: 'Models you own, edit and undo — built by the engine from what you say, rather than pictures that are redrawn.',
     group: 'The models',
   },
   {

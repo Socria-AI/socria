@@ -264,7 +264,7 @@ export function ModelPicker({
 
             {/* The Logos surfaces below a rule, because picking one is not the
                 same kind of choice: the map opens beside the conversation.
-                Logos 2 is a second seat in that same room. */}
+                Logos 2 is that surface with the model workspace in it. */}
             <div className="mp-rule" />
             {SURFACES.map(row)}
 

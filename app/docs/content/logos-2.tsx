@@ -1,26 +1,25 @@
-// Socria Logos 2 — the two-seat room, and the model workspace.
+// Socria Logos 2 — the model workspace.
 //
-// TWO THINGS EARNED THIS PAGE, and the second is the newer one. Logos 2 began
-// as the room with a second seat, and for a while a page would have been four
-// paragraphs of "the same as Logos, with somebody else in it" — which is why
-// the comparison table said it was deliberately absent. What changed is that a
-// MODEL became a thing the person owns: built by the engine rather than drawn by
-// a language model, with an id that survives being edited, revisions, undo and
-// branches. That is not "Logos with a second seat"; it is a different kind of
-// object in the workspace, and it needs saying.
+// WHAT THIS PAGE SAYS, AND WHAT IT NO LONGER SAYS. Logos 2 began as the room
+// with a second seat, and this page opened with two sections on it. The room
+// is not in the product: its code is in the tree, parked behind a server flag
+// (lib/rooms-flag.ts) until it ships, and a page describing a door that is not
+// on the wall is the fastest way to lose a reader's trust. So the two-seat
+// sections are gone from here, and the page is about the thing that IS
+// reachable — a MODEL as something the person owns: built by the engine rather
+// than drawn by a language model, with an id that survives being edited,
+// revisions, undo and branches.
 //
-// The figures are the real components — the map a two-seat room produces, and a
-// model that goes through the same on-ramp a conversation's proposal does.
+// The figures are the real components — a model that goes through the same
+// on-ramp a conversation's proposal does.
 
 import Link from 'next/link';
 import { Article, H2, Callout, Defs, Def } from '../Article';
-import { DemoModelWorkspace, DemoRefusal, DemoTwoSeats } from '../DocsDemo';
+import { DemoModelWorkspace, DemoRefusal } from '../DocsDemo';
 import { docPage } from '../registry';
 
 const page = docPage('logos-2')!;
 const sections = [
-  { id: 'two', heading: 'Two people, one map' },
-  { id: 'between', heading: 'What Socria does between you' },
   { id: 'models', heading: 'Models you own' },
   { id: 'onramp', heading: 'Where a model comes from' },
   { id: 'editing', heading: 'Editing one' },
@@ -35,42 +34,10 @@ export function Logos2() {
         Logos 2 is the same surface as{' '}
         <Link href="/docs/logos">Logos</Link> — the conversation and the{' '}
         <Link href="/docs/thinking-map">Thinking Map</Link>, side by side — with
-        two things added. A second seat, so two people can think in one
-        workspace. And a <em>model workspace</em>: structured, computed objects
-        that you own, edit and undo, rather than pictures that are generated
-        again each time you ask for a change.
+        one thing added: a <em>model workspace</em>. Structured, computed
+        objects that you own, edit and undo, rather than pictures that are
+        generated again each time you ask for a change.
       </p>
-
-      <H2 id="two">Two people, one map</H2>
-      <p>
-        Share a line of thinking and the other person arrives in the same room,
-        not a copy of it. You both talk to Socria; you both see the map take
-        shape; and every node it draws carries <em>whose thought it was</em>.
-        The colours are seats rather than people — host and guest — so the map
-        stays readable when neither of you is reading your own name.
-      </p>
-      <DemoTwoSeats />
-      <p>
-        The map is the shared object: one extraction, sent to both of you, so
-        there is never a moment where your structure and theirs have quietly
-        diverged. Sessions, lenses, the four moves on a node and everything else
-        on the Logos page work exactly as they do alone.
-      </p>
-
-      <H2 id="between">What Socria does between you</H2>
-      <p>
-        With two people in the room Socria becomes the layer between them, and
-        the boundary tightens rather than loosens. It names things neither of you
-        has said out loud: where your reasoning connects, where it{' '}
-        <em>disagrees</em>, what each of you is assuming, and which question is
-        still open for both. It does not take a side, does not pick a winner and
-        does not conclude on your behalf.
-      </p>
-      <Callout tag="A disagreement is not a fault">
-        A disagreement between two people is not a problem for Socria to solve.
-        It is usually the most useful thing in the room, and the job is to make
-        it precise — not to resolve it while you are both watching.
-      </Callout>
 
       <H2 id="models">Models you own</H2>
       <p>
@@ -237,8 +204,8 @@ export function Logos2() {
         </li>
       </ul>
       <Callout tag="Getting to it">
-        Logos 2 needs an account, and the two-seat room needs both people signed
-        in. Everything on this page is the same surface as Logos — see{' '}
+        Logos 2 needs an account. Everything on this page is the same surface
+        as Logos — see{' '}
         <Link href="/docs/logos">that page</Link> for the conversation, the
         lenses and the moves, and{' '}
         <Link href="/docs/accounts-data">accounts and data</Link> for what is

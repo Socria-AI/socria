@@ -76,9 +76,9 @@ export function Overview() {
         </li>
         <li>
           <strong><Link href="/docs/logos-2">Logos 2</Link></strong> — the same
-          environment with a second seat, so two people think in one workspace;
-          and the model workspace, where a mechanism or a system of equations is
-          built by the engine rather than drawn, and is yours to edit and undo.
+          environment with a model workspace, where a mechanism, a system of
+          equations or a wage specification is built by the engine rather than
+          drawn, and is yours to edit and undo.
         </li>
       </ul>
       <p>
