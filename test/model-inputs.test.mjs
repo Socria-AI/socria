@@ -109,25 +109,33 @@ console.log('\n=== the four supply roles ===');
     supplyOf(unpack(buildProposal(wage(DOMAINS), { at: 1 }).model), 'wage_spec__b1') === 'parameter');
 }
 
-// ═══ a domain is required; observations are not ═════════════════════
-console.log('\n=== readiness asks for a RANGE, never for data ===');
+// ═══ a range is assumed and SAID; observations are never asked for ═════
+console.log('\n=== readiness assumes a RANGE, says so, and never asks for data ===');
 {
+  // THE RULE CHANGED HERE, ON PURPOSE. This block used to assert that a named
+  // input with no range left EVALUATE incomplete and the frame empty — "the
+  // engine does not invent [-3, 3] for a named quantity". The objection was
+  // right about the silence and the window, and wrong about the remedy: in
+  // the product the declaration it waited for comes from a language model,
+  // and every time it forgot, a person got a blank picture captioned "needs a
+  // range". So a missing range is now an ASSUMED window, 0 to 10, carried on
+  // the slider, the inspector and the picture's note — visible, and therefore
+  // fixable. See lib/model/kinds.ts.
   const bare = unpack(buildProposal(wage(null), { at: 1 }).model);
   const resp = bare.objects.find((o) => o.id === 'wage_spec__response');
   const r = route(bare, resp, 'evaluate');
-  ok('with no range, EVALUATE is incomplete', r.status === 'incomplete', r.status);
-  const said = JSON.stringify(r.missing);
-  ok('  and asks for a range, by name', /a range for education/.test(said), said.slice(0, 160));
-  ok('  and for the other one too', /a range for experience/.test(said));
-  // It never ASKS for observations. The sentence mentions them only to say they
-  // are not needed, which is the point.
-  ok('  NEVER for observations', r.missing.every((x) => !/observation/i.test(x.what)),
-    JSON.stringify(r.missing.map((x) => x.what)));
-  ok('  saying so explicitly', /does not need observations/.test(said));
-  ok('  and it draws nothing rather than over an invented window',
-    buildObject(bare, resp).primitives.length === 0);
-  ok('  the engine does not invent [-3, 3] for a named quantity',
-    !buildSpec(bare).primitives.some((p) => p.p === 'mesh'));
+  ok('with no range, EVALUATE still runs', r.status === 'runnable', r.status);
+  const table = symbolTable(bare);
+  ok('  over an assumed window, and the table says so',
+    freeInputs(table).every((q) => q.domainFrom === 'assumed' && q.domain[0] === 0 && q.domain[1] === 10),
+    JSON.stringify(freeInputs(table).map((q) => [q.display, q.domain, q.domainFrom])));
+  ok('  the response object carries the assumption in words',
+    /education has no stated range and is drawn over 0 to 10/.test(String(resp.meta?.assumed)), String(resp.meta?.assumed));
+  ok('  and so does the picture', /education has no stated range/.test(buildSpec(bare).notes.find((n) => n.of === 'wage_spec')?.note ?? ''),
+    buildSpec(bare).notes.find((n) => n.of === 'wage_spec')?.note);
+  ok('  and the surface DRAWS', buildSpec(bare).primitives.some((p) => p.p === 'mesh'));
+  // It never ASKS for observations.
+  ok('  NEVER for observations', !/observation/i.test(JSON.stringify(r.missing ?? [])));
 
   // ESTIMATE still asks for observations, because that is what estimate needs.
   ok('ESTIMATE still asks for observations', /observations/.test(askFor(bare, 'estimate').says));
@@ -139,12 +147,13 @@ console.log('\n=== readiness asks for a RANGE, never for data ===');
     return s.indexOf('EVALUATE') < s.indexOf('ESTIMATE');
   })());
 
-  // …and the conversation is told which kind of thing is missing.
+  // …and the conversation is told what was assumed, so it never presents the
+  // engine's default as the person's choice.
   const st = modelStateFrom(bare, buildSpec(bare), {});
-  ok('the conversation is told these are free inputs with no range',
-    st.readouts.some((x) => /FREE INPUTS WITH NO RANGE/.test(x)), '');
-  ok('  and told not to say they need observations',
-    st.readouts.some((x) => /do NOT need observations/.test(x)));
+  ok('the conversation is told the ranges were assumed',
+    st.readouts.some((x) => /READ OR ASSUMED BY THE ENGINE/.test(x) && /education has no stated range/.test(x)), JSON.stringify(st.readouts));
+  ok('  and that free inputs need ranges rather than observations',
+    st.readouts.some((x) => /need RANGES rather than observations/.test(x)));
 }
 
 // ═══ with domains: a genuine two-input surface ══════════════════════
@@ -286,13 +295,25 @@ console.log('\n=== a binary input needs no range ===');
       } }],
   });
 
-  // WITHOUT the kind: a free input with no range, refused — correctly, because
-  // nothing has said what it is.
+  // WITHOUT the kind: the NAME says it. `female` is an indicator by every
+  // convention in the subject, and reading it as one — and saying so — is
+  // what stopped this model drawing an empty frame in the product. A declared
+  // kind still wins (below).
   const bare = unpack(buildProposal(logwage(null), { at: 1 }).model);
-  ok('an undeclared binary is a free input with no range',
-    withoutDomain(symbolTable(bare)).some((q) => q.display === 'female'));
-  ok('  so nothing is drawn over an invented window',
-    !buildSpec(bare).primitives.some((p) => p.p === 'mesh'));
+  const fem = symbolTable(bare).by.get('spec__x1');
+  ok('an undeclared `female` is read as an indicator from its name',
+    JSON.stringify(fem?.domain) === '[0,1]' && fem?.domainFrom === 'name', JSON.stringify([fem?.domain, fem?.domainFrom]));
+  ok('  nothing is waiting on a range', withoutDomain(symbolTable(bare)).length === 0);
+  ok('  and the surface draws', buildSpec(bare).primitives.some((p) => p.p === 'mesh'));
+  ok('  with the reading said on the picture',
+    /female is read as an indicator/.test(buildSpec(bare).notes.find((n) => n.of === 'spec')?.note ?? ''));
+  ok('  a declared continuous kind turns the reading off',
+    symbolTable(unpack(buildProposal(logwage({ female: 'continuous' }), { at: 1 }).model)).by.get('spec__x1')?.domainFrom === 'assumed');
+  ok('  and `female_share` is not an indicator', (() => {
+    const m = unpack(sanitizeModel({ id: 'fs', title: 't', params: [],
+      objects: [{ id: 'sp', kind: 'specification', label: 'l', estimation: { y: 'y', x: ['female_share'] } }] }));
+    return symbolTable(m).by.get('sp__x0')?.domainFrom === 'assumed';
+  })());
 
   // WITH it: the range follows from what it is.
   const m = unpack(buildProposal(logwage({ female: 'binary' }), { at: 1 }).model);

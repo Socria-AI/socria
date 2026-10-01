@@ -503,7 +503,7 @@ console.log('\n=== nothing that worked before stopped working ===');
     const st = modelStateFrom(built, spec, {});
     ok(`  ${entry.id} is describable to the conversation`, st.entities.length > 0 && st.readouts.length > 0);
   }
-  ok('the library is nineteen benchmarks', LIBRARY.length === 19, `${LIBRARY.length}`);
+  ok('the library is twenty benchmarks', LIBRARY.length === 20, `${LIBRARY.length}`);
   ok('a four-state trajectory still works the old way',
     buildSpec(modelById('double-pendulum')).primitives.some((p) => p.p === 'polyline'));
   ok('the state cap is stated rather than implied', STATE_CAP >= 12);

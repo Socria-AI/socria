@@ -36,6 +36,7 @@ import { restsOn, affectedBy } from './deps';
 import { capabilityOf, operationsOn, plan, route, type Operation } from './solve';
 import { ORIGIN_SAYS, type Fidelity, type Model, type ModelObject, type Origin } from './schema';
 import { freeInputs, symbolTable, withoutDomain, type Supply } from './symbols';
+import { DOMAIN_FROM_SAYS } from './kinds';
 import { inputsOf } from './derive';
 import { runFor } from './system';
 import { viewsFor, unavailable, worth } from './views';
@@ -138,7 +139,12 @@ export function inspectModel(model: Model): Inspection {
     });
   }
   for (const p of model.params) {
-    state.push({ label: p.label, value: `${p.value}${p.units ? ` ${p.units}` : ''}`, of: p.id, origin: 'user' });
+    state.push({
+      label: p.label,
+      value: `${p.value}${p.units ? ` ${p.units}` : ''}${p.assumed === 'value' ? ' — a placeholder, not yet set' : ''}`,
+      of: p.id,
+      origin: p.assumed === 'value' ? 'inference' : 'user',
+    });
   }
   if (model.time) {
     state.push({ label: 'Clock', value: `t = ${model.time.t} of ${model.time.min}–${model.time.max}${model.time.units ? ` ${model.time.units}` : ''}` });
@@ -169,7 +175,7 @@ export function inspectModel(model: Model): Inspection {
       value:
         `${SUPPLY_SAYS[q.supply]}` +
         (q.value !== undefined ? `, = ${q.value}${q.units ? ` ${q.units}` : ''}` : '') +
-        (q.domain ? `, over ${sig(q.domain[0])} to ${sig(q.domain[1])} (${q.domainFrom})` : '') +
+        (q.domain ? `, over ${sig(q.domain[0])} to ${sig(q.domain[1])} (from ${q.domainFrom ? DOMAIN_FROM_SAYS[q.domainFrom] : 'nowhere'})` : '') +
         (q.control ? `, driven by ${q.control}` : ''),
       of: q.id,
       origin: q.origin,
@@ -369,7 +375,7 @@ export function inspectObject(model: Model, id: string): Inspection | null {
   if (o) what.push({ label: 'Kind', value: o.kind, of: o.id });
   if (q) what.push({ label: 'Supplies', value: SUPPLY_SAYS[q.supply], of: q.id });
   if (q?.value !== undefined) what.push({ label: 'Value', value: `${q.value}${q.units ? ` ${q.units}` : ''}` });
-  if (q?.domain) what.push({ label: 'Range', value: `${q.domain[0]} to ${q.domain[1]}, from the ${q.domainFrom}` });
+  if (q?.domain) what.push({ label: 'Range', value: `${q.domain[0]} to ${q.domain[1]}, from ${q.domainFrom ? DOMAIN_FROM_SAYS[q.domainFrom] : 'nowhere'}` });
   if (p) what.push({ label: 'Control', value: `${sig(p.value)}${p.units ? ` ${p.units}` : ''}, over ${sig(p.min)} to ${sig(p.max)}` });
   const expr = o ? expressionOf(o) : null;
   if (expr) what.push({ label: 'Says', value: expr });

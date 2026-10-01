@@ -32,7 +32,7 @@
 
 import { derivativeOf, namesOf as namesIn, parse, print, rename, substitute, type Expr } from './expr';
 import type { Model, ModelObject } from './schema';
-import { known, symbolTable, withoutDomain } from './symbols';
+import { known, symbolTable, withoutDomain, type Quantity } from './symbols';
 import { basesOf, isPointwise, termExpr, termLabel, type TermDecl } from './terms';
 
 /** The expression an object carries, whichever way it says it. */
@@ -406,9 +406,20 @@ export function inputsAwaiting(model: Model): { id: string; label: string; why: 
 }
 
 /** Every free input this model states, with its range and where it is standing. */
-export function inputsOf(model: Model): { id: string; label: string; min: number; max: number; at: number; units?: string }[] {
+export interface FreeInput {
+  id: string;
+  label: string;
+  min: number;
+  max: number;
+  at: number;
+  units?: string;
+  /** where the range came from — `name` and `assumed` are the engine's readings, and the slider says so */
+  from?: Quantity['domainFrom'];
+}
+
+export function inputsOf(model: Model): FreeInput[] {
   const table = symbolTable(model);
-  const out: { id: string; label: string; min: number; max: number; at: number; units?: string }[] = [];
+  const out: FreeInput[] = [];
   for (const q of table.by.values()) {
     if (q.supply !== 'input' || !q.domain) continue;
     const name = (typeof q.means === 'string' ? q.id : q.id).toLowerCase();
@@ -419,8 +430,15 @@ export function inputsOf(model: Model): { id: string; label: string; min: number
       label: q.display,
       min: Math.min(lo, hi),
       max: Math.max(lo, hi),
-      at: cursorFor(model, column, q.domain),
+      // AN INDICATOR IS READ AT 0 OR 1, never at 0.5. The cursor's default is
+      // the middle of the range, which for a dummy is a point that does not
+      // exist; it starts in the base group, and a move snaps to the other.
+      at: (() => {
+        const c = cursorFor(model, column, q.domain);
+        return q.domainFrom === 'type' || q.domainFrom === 'name' ? (c > 0.5 ? 1 : 0) : c;
+      })(),
       ...(q.units ? { units: q.units } : {}),
+      ...(q.domainFrom ? { from: q.domainFrom } : {}),
     });
   }
   return out;

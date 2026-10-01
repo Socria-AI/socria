@@ -97,14 +97,18 @@ console.log('\n=== ii. the coefficients they gave are the coefficients it uses =
   }
   ok('  and names no w__b* anywhere', !/w__b\d/.test(r?.defs?.z ?? ''), r?.defs?.z);
 
-  // AND IT IS NOT GUESSED. Controls that look like coefficients but were
-  // never declared stay unbound — see model-binding.test.mjs §3, which is the
-  // decision this must not quietly reverse.
+  // AND WITHOUT THE DECLARATION, THE NOTATION BINDS. b0, b1, b2, b3 are not
+  // names that resemble coefficients; they ARE the coefficients' names, the
+  // way every text and every slider writes them. The prompt had promised this
+  // for weeks while the engine refused it — see lib/model/binding.ts. What is
+  // still never done is matching by resemblance: model-binding.test.mjs §3.
   const undeclared = unpack(SAID());
   const u = undeclared.objects.find((o) => o.id === 'w__response');
-  ok('without the declaration nothing is bound', /w__b\d/.test(u?.defs?.z ?? ''), u?.defs?.z);
-  ok('  so the gap is named rather than filled',
-    buildSpec(undeclared).notes.some((n) => /needs a value/.test(n.problem ?? '')),
+  for (const b of ['b0', 'b1', 'b2', 'b3']) {
+    ok(`  without the declaration, ${b} binds by notation`, new RegExp(`\\b${b}\\b`).test(u?.defs?.z ?? ''), u?.defs?.z);
+  }
+  ok('  and nothing is left unbound', !/w__b\d/.test(u?.defs?.z ?? ''), u?.defs?.z);
+  ok('  so nothing is reported missing', !buildSpec(undeclared).notes.some((n) => n.problem),
     JSON.stringify(buildSpec(undeclared).notes.filter((n) => n.problem)));
 }
 
@@ -140,17 +144,28 @@ console.log('\n=== iii. and then the picture actually draws ===');
     !/Still waiting/.test(carrier?.note ?? ''), carrier?.note);
 }
 
-console.log('\n=== and the binary is still only binary because it was declared ===');
+console.log('\n=== and without the declaration, the binary is read from its name — and said ===');
 {
-  // The engine does not guess from the name, and must not start: `female`
-  // being an indicator is a fact about the model, not about English.
+  // THE RULE CHANGED. This used to assert the opposite: "the engine does not
+  // guess from the name, and must not start". In the product the `kinds`
+  // declaration comes from a language model, it forgot, and the person saw an
+  // empty frame with "FEMALE — needs a range" under it. `female` is an
+  // indicator by every convention in the subject; reading it as one is not a
+  // guess, it is literacy — and the reading is SAID on the slider and the
+  // picture, and a declared kind overrides it. See lib/model/kinds.ts.
   const m = unpack(SAID({
     kinds: undefined,
     coefficients: { intercept: 'b0', educ: 'b1', female: 'b2', educ_x_female: 'b3' },
   }));
-  ok('without the kind, it asks — rather than inventing a range',
-    inputsAwaiting(m).some((q) => /female/.test(q.label ?? q.id)),
+  ok('without the kind, nothing waits on a range', inputsAwaiting(m).length === 0,
     inputsAwaiting(m).map((q) => q.label ?? q.id).join(' '));
+  ok('  female is 0 or 1, by its name',
+    inputsOf(m).some((q) => q.id === 'female' && q.min === 0 && q.max === 1 && q.from === 'name'),
+    JSON.stringify(inputsOf(m)));
+  ok('  and the picture says that is a reading, not a declaration',
+    /female is read as an indicator \(0 or 1\) from its name/.test(buildSpec(m).notes.find((n) => n.of === 'w')?.note ?? ''),
+    buildSpec(m).notes.find((n) => n.of === 'w')?.note);
+  ok('  THE FRAME IS NOT EMPTY', buildSpec(m).primitives.length > 0);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

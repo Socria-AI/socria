@@ -286,6 +286,29 @@ export function modelStateFrom(
         `. Move one with "at ${free[0].label} <value>" to read the relationship at a different point; that changes where you are looking, not what the model says.`
     );
   }
+  // WHAT THE ENGINE READ OR ASSUMED, so the reply says it rather than
+  // describing an assumed window as a chosen one, or a placeholder as a value.
+  const read = free.filter((q) => q.from === 'name' || q.from === 'assumed');
+  if (read.length) {
+    readouts.push(
+      `READ OR ASSUMED BY THE ENGINE, NOT STATED: ` +
+        read
+          .map((q) =>
+            q.from === 'name'
+              ? `${q.label} is read as an indicator (0 or 1) from its name`
+              : `${q.label} has no stated range and is drawn over ${q.min} to ${q.max}`
+          )
+          .join('; ') +
+        `. Say so, and invite them to change it; do not present these as their choices.`
+    );
+  }
+  const placeholders = model.params.filter((p) => p.assumed === 'value');
+  if (placeholders.length) {
+    readouts.push(
+      `PLACEHOLDER COEFFICIENTS: ${placeholders.map((p) => `${p.label} at ${p.value}`).join(', ')}. ` +
+        `Nothing has given these a value; the picture is the SHAPE the specification implies, not numbers anybody chose. Never report a value read off it as a result. Ask for the values, or invite them to move the sliders.`
+    );
+  }
   const noRange = withoutDomain(symbolTable(model));
   if (noRange.length) {
     readouts.push(

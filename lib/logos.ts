@@ -821,6 +821,199 @@ export function summarizeDelta(d: MapDelta): string | null {
 
 // ===== Map extraction =====
 
+/**
+ * HOW TO PROPOSE A MODEL — the extractor's rules, in one place.
+ *
+ * Lifted out of buildMapPrompt so the SECOND PASS can use the same words: when
+ * a turn asked for something to be built and the extractor returned a map with
+ * no proposal, the route asks once more with buildProposePrompt, which is these
+ * rules and nothing else. Two copies of the rules would have drifted within the
+ * week, and a proposal written to one set and validated against the other is
+ * the kind of bug this file has had before.
+ */
+const PROPOSAL_RULES = `PROPOSING A STRUCTURED MODEL ("propose", AT THE TOP LEVEL of your JSON — a sibling of "nodes" and "viz", NOT inside "viz"). The strongest thing you can do, and the one to reach for when the request is FORMAL rather than merely drawable.
+
+WHY IT IS NOT INSIDE "viz". A model is not a picture. "viz" is judged by rules about drawings — an empty diagram is discarded, a picture is dropped when the work is not mathematical — and a proposal that lived there was being deleted by those rules before the engine saw it. Write it beside "viz", never within it. A model with no picture is a perfectly good turn.
+
+WHAT IT IS. Instead of authoring a picture, you hand the engine a model — objects with meanings, controls with ranges, and the BLOCK that says what each object is — and the engine validates it, works out what it can compute, runs the appropriate solver, and draws the result. You are not drawing; you are specifying. The engine owns the numbers.
+
+WHAT YOU MUST UNDERSTAND ABOUT IT. You cannot write "built". A proposal is a proposal: the engine sanitises it, checks it, and either builds it or refuses and says what is missing. That refusal is a good outcome — "I can hold the structure but I need a value for the mass" is worth more than a drawing of a mass whose value nobody chose.
+
+WHEN TO PROPOSE: WHENEVER "ask.action" IS construct OR modify AND THE ARTIFACT IS A MODEL OR A SIMULATION. That is the rule, and it is about what they asked for rather than about the subject.
+
+This used to be a list of subjects — a mechanism, a system of equations, "a regression where the person has named the method" — and that list was the bug. Asked to build a wage equation with education as the regressor and no method named, the subject list said no, so nothing was proposed and a concept node came back instead. The subject does not decide; the ask does.
+
+WHAT TO PUT IN IT, by what they described. These are the blocks that exist, not a menu of things Logos knows about:
+  parts that push and pull        → "mechanism": bodies, springs, dampers, forces
+  things pulling on each other by gravity → "gravity": bodies with masses, positions and velocities
+  named quantities changing over time → "system": states, right-hand sides, observables
+  something explained by something else → "estimation": the outcome, what explains it, and the data IF THEY GAVE YOU ANY
+  quantities that must ALL HOLD AT ONCE → "equations": what to solve for, and the relations that hold between them
+  a shape or a function            → objects with expressions
+
+A SPECIFICATION WITH COEFFICIENT VALUES IS COMPUTABLE, EVEN WITH NO DATA AT ALL. If they give you values — "set β₁ to 2.5 and β₂ to 1.2 and show me how it behaves" — the simplest correct form is the NUMBERS THEMSELVES in "coefficients", keyed by the regressor's own name plus "intercept" for β₀:
+
+     "estimation": {"y": "wage", "x": ["education", "experience"],
+                    "coefficients": {"intercept": 1, "education": 0.08, "experience": 0.02},
+                    "over": {"education": [8, 20], "experience": [0, 30]}}
+
+The engine turns each number into a control with that value. If you would rather declare the controls yourself, put them in "params" (that key, not "parameters"; "value" is enough, "min"/"max" are welcome) and either name them in "coefficients" — {"intercept": "b0", "education": "b1"} — or simply call them by the notation: b0, b1, b2 or beta0, beta1, or label them β₀, β₁. THE ENGINE BINDS THE STANDARD NOTATION TO THE SLOT IT NAMES: b1 is the coefficient on the FIRST regressor in "x", b2 on the second. It does not bind anything that merely resembles a coefficient name ("coef", "slope", "b1x"), so when in doubt write the "coefficients" map.
+
+A COEFFICIENT YOU LEAVE OUT IS A PLACEHOLDER, NOT A FAILURE. The engine draws the relationship anyway — at 0 for an intercept and 1 for a slope — and marks each as a placeholder on its slider, in the picture's note and in what you are told about the model. So never invent a number to make it draw; leave it out, and tell the person the shape is drawn at placeholders until they give the values.
+
+ALWAYS GIVE "over". This is not optional and it is the single most common way a model comes out empty.
+
+A regressor with no data attached is a FREE INPUT: the relationship is evaluated OVER it. It needs a RANGE, not observations. If you leave the range out the engine draws it over 0 to 10 and says on the picture that it assumed so — a legible default, and a worse one than the range the quantity actually spans. Measured, before "over" was asked for: a wage surface drawn over minus three years of education.
+
+  "over": {"education": [0, 20], "experience": [0, 40]}
+
+If they named ranges, use theirs. If they did not, choose what the QUANTITY plausibly spans — years of schooling from nothing to a doctorate, a working life from nothing to forty years, a price from zero to well past where demand dies — and say in your reply what you chose and that they can change it. A stated exploratory range they can argue with is worth far more than a refusal, and infinitely more than a silent [-3, 3].
+
+The range belongs to the UNDERLYING variable: "over": {"exper": [0, 40]}, never to a squared or logged version of it, because nobody has a view about the range of exper².
+
+A TRANSFORMED REGRESSOR IS A "term", NOT ANOTHER VARIABLE. This is the one most often got wrong, and getting it wrong produces an empty picture.
+
+  wage = β₀ + β₁·educ + β₂·exper + β₃·exper²
+
+"exper²" is NOT a third variable. It is exper SQUARED, and if you declare it as a bare regressor name the engine has a quantity nothing can ever give a value to — measured, before "terms" existed: the report said "nothing in it computes yet … needs observations of exper2", the surface expression carried a free symbol, and nothing was drawn. So SAY HOW IT IS BUILT:
+
+     "estimation": {"y": "wage", "x": ["educ", "exper", "exper_pow2"],
+                    "terms": {"exper_pow2": {"op": "pow", "of": "exper", "by": 2}},
+                    "coefficients": {"intercept": "b0", "educ": "b1", "exper": "b2", "exper_pow2": "b3"},
+                    "over": {"educ": [0, 20], "exper": [0, 40]}}
+
+The engine then knows exper² is a function of exper, draws the surface over educ and exper (TWO axes for THREE regressors), and computes ∂wage/∂exper = β₂ + 2β₃·exper by differentiating it — with no observations, because a derivative is a fact about the expression.
+
+A BINARY VARIABLE NEEDS NO RANGE. An indicator takes 0 or 1, and "what range of female is worth looking at" is not a question. Say what kind it is:
+
+     "kinds": {"female": "binary", "educ": "continuous"}
+
+The engine reads the OBVIOUS ones from their names when you forget — female, male, married, union, urban, treated, anything spelt is_… or has_… or …_dummy — and says on the picture that it did. It does not read anything else from a name, so declare "kinds" for an indicator with an unconventional name, and declare "continuous" for a conventional name that is not one (a share, a rate).
+
+A CONTINUOUS INPUT WITH NO "over" IS DRAWN OVER 0 TO 10, and the picture says the range was assumed. That is a worse picture than one over the range the quantity actually spans, so give "over" — but it is a picture, and the person can change it.
+
+The kinds are "continuous", "binary", "categorical" and "count". Declare one whenever it is not continuous — it is also what lets the engine refuse an estimator honestly, since a binary OUTCOME is a whole class of model this engine does not fit. An "indicator" term needs no entry: its own definition says it is binary.
+
+THE OPERATIONS, each with an example of what it is built from:
+
+  "op": "pow"        {"op": "pow", "of": "exper", "by": 2}            a quadratic, a cubic, a reciprocal power
+  "op": "log"        {"op": "log", "of": "wage"}                      natural log — a log-level or log-log specification
+  "op": "exp"        {"op": "exp", "of": "r"}
+  "op": "sqrt"       {"op": "sqrt", "of": "size"}
+  "op": "inverse"    {"op": "inverse", "of": "distance"}
+  "op": "interact"   {"op": "interact", "with": ["educ", "female"]}   one variable's effect depending on another
+  "op": "indicator"  {"op": "indicator", "of": "region", "level": "north"}   a dummy for one level of a category
+  "op": "lag"        {"op": "lag", "of": "c", "by": 1, "over": "time"}     the value one period earlier
+  "op": "lead"       {"op": "lead", "of": "y", "by": 1, "over": "time"}
+  "op": "diff"       {"op": "diff", "of": "gdp", "by": 1, "over": "time"}  the change from the period before
+  "op": "demean"     {"op": "demean", "of": "x", "over": "entity"}     the within transform, for fixed effects
+
+Terms NEST: {"op": "interact", "with": ["female", {"op": "log", "of": "income"}]} is female·log(income), and {"op": "lag", "of": {"op": "diff", "of": "y"}, "by": 1, "over": "time"} is the previous period's change.
+
+THE OUTCOME MAY BE A TERM TOO. A log-level specification is "y": "log_wage" with "terms": {"log_wage": {"op": "log", "of": "wage"}}.
+
+TWO KINDS, AND THE DIFFERENCE DECIDES WHAT CAN BE COMPUTED WITHOUT DATA.
+- pow, log, exp, sqrt, inverse and interact are FUNCTIONS OF THEIR INPUTS. A specification made only of these can be EVALUATED at any values, with no observations at all, and its marginal effects differentiated.
+- lag, lead, diff, demean and indicator are relationships OVER THE OBSERVATIONS. "lag(c, 1)" is not a function of c; it is c at the previous period, and without an ordering there is no previous period. A specification containing one cannot be evaluated pointwise — it can still be ESTIMATED once observations exist, and the engine will say exactly that rather than drawing an empty box.
+
+AN INDEX IS WHAT MAKES A LAG POSSIBLE. If they give you time-series or panel numbers, put the ordering in the data block's "index", never in a column name:
+
+  "data": {"quarterly": {"label": "what these are", "columns": {"c": [...], "y": [...]},
+                         "index": {"time": [1990, 1991, 1992], "entity": ["a", "a", "b"]}}}
+
+A variable called "C_t" or "C_(t-1)" is a LABEL, and a label is not a relationship. Write "c" as the column, the periods in "index", and the lag as a term.
+
+NOT ESTIMATED IS NOT NOT COMPUTABLE. A value somebody sets as a hypothesis is theirs and is honest; a value you invent so that something draws is not. Never write a coefficient value they did not give you, and never present a hypothetical surface as a fit, a prediction or an estimate.
+
+A SPECIFICATION IS A MODEL BEFORE IT IS FITTED, and this is the one most requests land in. "Wage explained by education" with no data and no method is a complete specification: the outcome, the regressor, an intercept, a slope and an error term. Propose it. Leave "data" out and leave "method" out. The engine builds it as a specified model, says plainly that nothing has been estimated, and names the observations as what is missing. DO NOT withhold the model because it cannot be fitted yet, and DO NOT invent numbers so that it can be — the first loses them the model, the second loses them the truth.
+
+WHEN NOT TO PROPOSE. When they asked a question about a kind of model rather than for one. When the ask is explain, explore, discuss or question. And when a picture already does it: a curve, a limit, a distribution, a titration have kinds above, and a drawing of one is a perfectly good turn.
+
+THAT EXEMPTION USED TO INCLUDE "a market", AND THAT WAS A BUG. A market drawn as two lines is a picture of an idea; a market WITH AN EQUATIONS BLOCK is solved, and the equilibrium quantity and both prices come back as computed numbers with a residual. The moment a request names actual relations — any coefficients, any constraint, any parameter to move — it is a model and not a drawing, whatever the subject. The picture kinds are for when nobody wrote down a relationship.
+
+THE SHAPE — a sibling of "nodes", "edges" and "viz". Every field is optional except id, title, objects and params:
+"propose": {
+  "id": "spring_chain", "title": "Two masses on springs", "domain": "mechanics", "aspect": "equal",
+  "equations": ["M ẍ + C ẋ + K x = F(t), assembled from the parts"],   <- PROSE FOR A READER ONLY. Nothing solves these. Relations to SOLVE go in an object's "equations" block, below.
+  "assumptions": ["One degree of freedom per body, along the axis."],
+  "params": [{"id": "k", "label": "stiffness", "value": 20, "min": 1, "max": 100, "units": "N/m", "means": "what moving it does"}],
+  "time": {"t": 0, "min": 0, "max": 20, "units": "s"},
+  "objects": [
+    {"id": "mech", "kind": "component", "label": "The mechanism", "meaning": "what it is, in one sentence",
+     "mechanism": {"bodies": [{"id": "m1", "mass": "m", "x0": 1, "label": "the mass", "at": 3}],
+                   "springs": [{"id": "k1", "between": ["m1", "ground"], "value": "k", "label": "the spring"}],
+                   "dampers": [{"id": "c1", "between": ["m1", "ground"], "value": "c"}],
+                   "forces":  [{"id": "f1", "on": "m1", "expr": "f0 * sin(w * t)"}]}},
+    {"id": "sir", "kind": "system", "label": "The compartments",
+     "system": {"states": [{"name": "S", "init": "n - i0", "means": "still susceptible"}],
+                "rhs": {"S": "0 - beta * S * I / n"},
+                "observe": {"total": "S + I + R"}, "invariant": "total", "dt": 0.05, "steps": 4000}},
+    {"id": "eqm", "kind": "system", "label": "Where the market clears",
+     "equations": {"unknowns": ["qd", "qs", "pc", "pp"],
+                   "relations": ["qd = a + b * pc", "qs = c + d * pp", "pc = pp + t", "qd = qs"],
+                   "units": {"qd": "units", "qs": "units", "pc": "$", "pp": "$"},
+                   "about": "the quantity and the two prices at which it clears"}},
+    {"id": "fit", "kind": "specification", "label": "y on x",
+     "estimation": {"y": "y", "x": ["x"]}},
+    {"id": "hyp", "kind": "specification", "label": "wage on education and experience",
+     "estimation": {"y": "wage", "x": ["education", "experience"],
+                    "coefficients": {"intercept": "b0", "education": "b1", "experience": "b2"},
+                    "over": {"education": [8, 20], "experience": [0, 30]}}},
+    {"id": "fitted", "kind": "specification", "label": "y on x, fitted",
+     "estimation": {"method": "ols", "y": "y", "x": ["x"], "data": "sample"}}
+  ],
+  "data": {"sample": {"label": "what these numbers are", "source": "where they came from", "columns": {"x": [1, 2], "y": [2.1, 3.9]}}}
+}
+
+THE RULES, all load-bearing:
+- A MECHANISM IS PARTS, NOT EQUATIONS. Give bodies, springs, dampers and forces; the engine assembles M ẍ + C ẋ + K x = F(t) itself, symbolically, so a slider still moves the real stiffness. Never write the equations of motion yourself — a hand-written right-hand side is a place for an error nobody can see.
+- 'ground' is the fixed world and needs no body.
+- FOUR KINDS OF QUANTITY, AND THEY ARE NOT INTERCHANGEABLE. The engine works them out from what you write, and writing the wrong thing is how a model comes out asking for the wrong input.
+    A PARAMETER is used BY the relationship. β₁ = 2.5. Declare it in "params" with a range; moving it changes the function itself.
+    A FREE INPUT is what the relationship is evaluated OVER. education, experience, price, dose, time. It needs a RANGE in "over" — never a dataset. Moving it reads the relationship at a different point.
+    An OBSERVED variable's values come from a "data" block. Only ESTIMATE needs these.
+    A DERIVED quantity is computed: the outcome, a fitted coefficient, a solved unknown, a marginal effect, a value read at a point. Never write one down — the engine produces it.
+  So: coefficients in "params", inputs in "over", measurements in "data", and nothing else. A model whose inputs are in "over" computes with no data at all; one whose inputs are nowhere is drawn over an assumed 0 to 10, and says so.
+- MARGINAL EFFECTS ARE COMPUTED, NOT WRITTEN. Never put a derivative, a slope, a partial effect, an elasticity or a turning point in the model or in your reply as a number. The engine differentiates the relationship symbolically and adds each slope as its own object with its own provenance — so ∂wage/∂exper comes back as "β₂ + 2β₃·exper" and, at the coefficients as they stand, as a curve. Arithmetic you do in your head cannot be checked; that one can.
+- SIMULTANEOUS RELATIONS GO IN AN "equations" BLOCK, NEVER INTO PROSE. If the request is several relationships that hold at the same time — a market clearing, node voltages in a circuit, a static force balance, a mass or mole balance, a budget constraint, two lines crossing, a steady state, a geometry constraint — that is an "equations" block, and the engine solves it with real linear algebra and checks the residual. This is the block most often missed: the relations get written into a label or into the top-level "equations" list instead, and then NOTHING SOLVES THEM and the person gets an empty box. Measured, before this line existed: "Qd = 120 - 2Pc, Qs = -20 + 3Pp, Pc = Pp + t, Qd = Qs" came back as two "surface" objects with the equations in their labels, and the engine drew an empty three-dimensional cube.
+  - "unknowns" is what to solve for, in the model's own names. Everything ELSE in the relations must already have a value — a control, a constant, a fitted coefficient.
+  - "relations" is one "left = right" per line, in those same names. A CONSTRAINT IS A RELATION: "qd = qs" is a line like any other, not a separate kind of thing.
+  - Make the parameters CONTROLS so they can be moved. A tax the person can change is "params": [{"id": "t", ...}] and a relation "pc = pp + t" — never the number 10 written into the relation.
+  - Give "units" per unknown where you know them. It decides which unknowns share an axis when the system is drawn: two quantities in the same unit are one axis, and quantity-against-price is the figure people actually want.
+  - DO NOT SOLVE IT YOURSELF, and do not put the answer anywhere. No "equilibrium quantity is 52", no coefficient you computed, no value in a label. The engine solves it, reports the residual, and marks the answer on the figure; arithmetic you do in your head is the one thing here that cannot be checked.
+  - AN INCOMPLETE SYSTEM IS STILL WORTH PROPOSING. Three relations for four unknowns builds, and the engine says which unknown is not pinned down and that one more relationship would do it. That is a better turn than withholding the model.
+- A SYSTEM MAY HAVE ANY NUMBER OF NAMED STATES, and each one needs a starting value and a right-hand side. Name them whatever the subject names them: S, I, R, q, i_L, x_m1.
+- A VALUE MAY BE A CONTROL'S ID. "value": "k" means the spring's stiffness IS the control k, so moving it changes the model. A bare number is a constant nobody can move — prefer a control for anything the person might reasonably ask "what if this were different" about.
+- NEVER INVENT DATA. "data" holds numbers the person gave you and nothing else. If they gave you none, LEAVE IT OUT — the specification still stands, its coefficients are symbols, and the engine reports the observations as what is missing. Generated numbers presented as their data is the worst thing in this whole file, and a fabricated coefficient, standard error, R², p-value, residual or fitted line is the same offence in a smaller font.
+- THE METHOD IS THEIRS. Do not choose an estimator. If they said "multivariate linear model", set "method": "ols" and fit it. If they did not, leave "method" out: the engine then returns the candidates and what each one assumes, and the person chooses. That refusal is the feature — the specification is the research.
+- A SPECIFICATION RELATES; IT DOES NOT ESTABLISH CAUSE. Say that education and wages are related in the model, and say what the coefficient means in the fitted relationship. Do not say more years of education LEAD TO higher wages: that is a claim about the world which needs assumptions this model does not carry, and the engine will not write it either.
+- Say in your reply what the person can now DO to it: which control to move, which part to remove, what to watch. A model is something they hold, not something they are shown.`;
+
+/**
+ * The prompt for the second pass: a construction was asked for and nothing was
+ * proposed. Only the proposal is wanted — no map, no picture — and the ask is
+ * repeated so the model knows what it is building.
+ */
+export function buildProposePrompt(ask: { topic?: string; artifact?: string; action?: string; formal?: unknown } | null): string {
+  const what = [
+    ask?.topic ? `the subject, in their words: ${ask.topic}` : '',
+    ask?.artifact ? `the artifact they asked for: ${ask.artifact}` : '',
+    ask?.formal ? `what they said about it: ${JSON.stringify(ask.formal).slice(0, 600)}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
+  return `A person asked for something to be BUILT, and the previous pass over this conversation returned no proposal. That was a fault. This pass exists only to propose the model.
+
+${what || 'Read what they asked to build from the conversation.'}
+
+Return ONLY JSON of exactly this shape — a proposal and nothing else, no "nodes", no "edges", no "viz":
+{"propose": { … }}
+
+If what they asked for genuinely cannot be written as objects with expressions, a mechanism, a gravity block, a system of states, a specification or an equations block, return {"propose": null, "because": "one sentence saying what kind of thing it is and why none of those holds it"}. Prefer a partial model to none: a system with a state whose rule you are unsure of is still a model, and the engine will say what is missing.
+
+${PROPOSAL_RULES}`;
+}
+
 export function buildMapPrompt(current: ThinkingMap, grounded = ''): string {
   const currentBlock =
     current.nodes.length > 0
@@ -1083,167 +1276,7 @@ THE PLOT IS A WORKSPACE ("overlays"). Curves the person asked for by name live i
   Operators and functions: ASCII - * / ^ %, and sin cos tan asin acos atan arcsin arccos arctan sinh cosh tanh sec csc cot exp ln log log2 log10 sqrt cbrt abs sign floor ceil round step, plus the two-argument max, min, mod and atan2. Piecewise shapes are written with max/min or step: a payoff floored at zero is max(0, x), a kinked budget line is min(a*x, b), a phase plateau is step(x - 40).
   Draw only what you actually know. Three honest parts beat twelve invented ones, and a subject you cannot place on two axes should not be forced onto them — leave "viz" out and let the map carry the thinking instead.
 
-PROPOSING A STRUCTURED MODEL ("propose", AT THE TOP LEVEL of your JSON — a sibling of "nodes" and "viz", NOT inside "viz"). The strongest thing you can do, and the one to reach for when the request is FORMAL rather than merely drawable.
-
-WHY IT IS NOT INSIDE "viz". A model is not a picture. "viz" is judged by rules about drawings — an empty diagram is discarded, a picture is dropped when the work is not mathematical — and a proposal that lived there was being deleted by those rules before the engine saw it. Write it beside "viz", never within it. A model with no picture is a perfectly good turn.
-
-WHAT IT IS. Instead of authoring a picture, you hand the engine a model — objects with meanings, controls with ranges, and the BLOCK that says what each object is — and the engine validates it, works out what it can compute, runs the appropriate solver, and draws the result. You are not drawing; you are specifying. The engine owns the numbers.
-
-WHAT YOU MUST UNDERSTAND ABOUT IT. You cannot write "built". A proposal is a proposal: the engine sanitises it, checks it, and either builds it or refuses and says what is missing. That refusal is a good outcome — "I can hold the structure but I need a value for the mass" is worth more than a drawing of a mass whose value nobody chose.
-
-WHEN TO PROPOSE: WHENEVER "ask.action" IS construct OR modify AND THE ARTIFACT IS A MODEL OR A SIMULATION. That is the rule, and it is about what they asked for rather than about the subject.
-
-This used to be a list of subjects — a mechanism, a system of equations, "a regression where the person has named the method" — and that list was the bug. Asked to build a wage equation with education as the regressor and no method named, the subject list said no, so nothing was proposed and a concept node came back instead. The subject does not decide; the ask does.
-
-WHAT TO PUT IN IT, by what they described. These are the blocks that exist, not a menu of things Logos knows about:
-  parts that push and pull        → "mechanism": bodies, springs, dampers, forces
-  things pulling on each other by gravity → "gravity": bodies with masses, positions and velocities
-  named quantities changing over time → "system": states, right-hand sides, observables
-  something explained by something else → "estimation": the outcome, what explains it, and the data IF THEY GAVE YOU ANY
-  quantities that must ALL HOLD AT ONCE → "equations": what to solve for, and the relations that hold between them
-  a shape or a function            → objects with expressions
-
-A SPECIFICATION WITH COEFFICIENT VALUES IS COMPUTABLE, EVEN WITH NO DATA AT ALL. If they give you values — "set β₁ to 2.5 and β₂ to 1.2 and show me how it behaves" — do two things:
-
-  1. declare a CONTROL in "params" for each value, named however reads well: b0, beta1, income_coef, whatever;
-  2. SAY WHICH CONTROL IS WHICH COEFFICIENT, in "coefficients" on the estimation, keyed by the regressor's own name plus "intercept" for β₀:
-
-     "estimation": {"y": "wage", "x": ["education", "experience"],
-                    "coefficients": {"intercept": "b0", "education": "b1", "experience": "b2"},
-                    "over": {"education": [8, 20], "experience": [0, 30]}}
-
-WHY BOTH. The coefficient objects the engine creates have ids of their own, and you cannot know them — so a control alone is a number with nothing attached to it. The binding is the second line, and without it the engine will say, correctly, that it has a quantity called β₁ and nothing has given it a value. Nothing is guessed from resemblance: a control called "b1" is not assumed to be β₁.
-
-ALWAYS GIVE "over". This is not optional and it is the single most common way a model comes out empty.
-
-A regressor with no data attached is a FREE INPUT: the relationship is evaluated OVER it. It needs a RANGE, not observations — and the engine will not invent one, because picking the range a quantity is worth looking at is a modelling decision and it is not ours. Measured, on a wage relationship with no "over": the engine fell back to [-3, 3] for education, drew a surface over minus three years of schooling, and the box came out four times wider than the mesh so the picture was a narrow vertical sheet.
-
-  "over": {"education": [0, 20], "experience": [0, 40]}
-
-If they named ranges, use theirs. If they did not, choose what the QUANTITY plausibly spans — years of schooling from nothing to a doctorate, a working life from nothing to forty years, a price from zero to well past where demand dies — and say in your reply what you chose and that they can change it. A stated exploratory range they can argue with is worth far more than a refusal, and infinitely more than a silent [-3, 3].
-
-The range belongs to the UNDERLYING variable: "over": {"exper": [0, 40]}, never to a squared or logged version of it, because nobody has a view about the range of exper².
-
-A TRANSFORMED REGRESSOR IS A "term", NOT ANOTHER VARIABLE. This is the one most often got wrong, and getting it wrong produces an empty picture.
-
-  wage = β₀ + β₁·educ + β₂·exper + β₃·exper²
-
-"exper²" is NOT a third variable. It is exper SQUARED, and if you declare it as a bare regressor name the engine has a quantity nothing can ever give a value to — measured, before "terms" existed: the report said "nothing in it computes yet … needs observations of exper2", the surface expression carried a free symbol, and nothing was drawn. So SAY HOW IT IS BUILT:
-
-     "estimation": {"y": "wage", "x": ["educ", "exper", "exper_pow2"],
-                    "terms": {"exper_pow2": {"op": "pow", "of": "exper", "by": 2}},
-                    "coefficients": {"intercept": "b0", "educ": "b1", "exper": "b2", "exper_pow2": "b3"},
-                    "over": {"educ": [0, 20], "exper": [0, 40]}}
-
-The engine then knows exper² is a function of exper, draws the surface over educ and exper (TWO axes for THREE regressors), and computes ∂wage/∂exper = β₂ + 2β₃·exper by differentiating it — with no observations, because a derivative is a fact about the expression.
-
-A BINARY VARIABLE NEEDS NO RANGE, AND SAYING SO IS HOW IT GETS ONE. An indicator takes 0 or 1; which two values is not a modelling decision anybody makes, and "what range of female is worth looking at" is not a question. Say what kind it is:
-
-     "kinds": {"female": "binary", "educ": "continuous"}
-
-and the engine gives it 0 to 1 without being asked. Measured, before this existed: a log-wage relationship in education and a female dummy reported "female is a free input — it needs a range" and drew nothing at all.
-
-A VARIABLE WHOSE NAME IS A YES-OR-NO IS BINARY, AND SAYING SO IS YOUR JOB. female, male, married, union, urban, employed, treated, smoker, anything spelt is_… or has_… or …_dummy — if the quantity answers yes or no, it goes in "kinds" as binary. The engine cannot tell from the name and will not guess; left out, the person is asked what range of "female" is worth looking at, which is not a question anyone can answer.
-
-AND WHEN THEY GIVE YOU THE NUMBERS, BIND THEM. "β0=1, β1=0.08, β2=−0.2" means those are the coefficients. Put each one in "parameters" so it becomes a control, name it the ordinary way — β₀, β₁, b0, b1 — and the engine binds it to the right term by that name. A specification whose coefficients are all stated is one that EVALUATES: it draws immediately and has no need of data. Asking "what are you aiming to explore with this model?" when every number is already on the table is the turn doing nothing with what it was given.
-
-The kinds are "continuous", "binary", "categorical" and "count". Declare one whenever it is not continuous — it is also what lets the engine refuse an estimator honestly, since a binary OUTCOME is a whole class of model this engine does not fit. An "indicator" term needs no entry: its own definition says it is binary.
-
-THE OPERATIONS, each with an example of what it is built from:
-
-  "op": "pow"        {"op": "pow", "of": "exper", "by": 2}            a quadratic, a cubic, a reciprocal power
-  "op": "log"        {"op": "log", "of": "wage"}                      natural log — a log-level or log-log specification
-  "op": "exp"        {"op": "exp", "of": "r"}
-  "op": "sqrt"       {"op": "sqrt", "of": "size"}
-  "op": "inverse"    {"op": "inverse", "of": "distance"}
-  "op": "interact"   {"op": "interact", "with": ["educ", "female"]}   one variable's effect depending on another
-  "op": "indicator"  {"op": "indicator", "of": "region", "level": "north"}   a dummy for one level of a category
-  "op": "lag"        {"op": "lag", "of": "c", "by": 1, "over": "time"}     the value one period earlier
-  "op": "lead"       {"op": "lead", "of": "y", "by": 1, "over": "time"}
-  "op": "diff"       {"op": "diff", "of": "gdp", "by": 1, "over": "time"}  the change from the period before
-  "op": "demean"     {"op": "demean", "of": "x", "over": "entity"}     the within transform, for fixed effects
-
-Terms NEST: {"op": "interact", "with": ["female", {"op": "log", "of": "income"}]} is female·log(income), and {"op": "lag", "of": {"op": "diff", "of": "y"}, "by": 1, "over": "time"} is the previous period's change.
-
-THE OUTCOME MAY BE A TERM TOO. A log-level specification is "y": "log_wage" with "terms": {"log_wage": {"op": "log", "of": "wage"}}.
-
-TWO KINDS, AND THE DIFFERENCE DECIDES WHAT CAN BE COMPUTED WITHOUT DATA.
-- pow, log, exp, sqrt, inverse and interact are FUNCTIONS OF THEIR INPUTS. A specification made only of these can be EVALUATED at any values, with no observations at all, and its marginal effects differentiated.
-- lag, lead, diff, demean and indicator are relationships OVER THE OBSERVATIONS. "lag(c, 1)" is not a function of c; it is c at the previous period, and without an ordering there is no previous period. A specification containing one cannot be evaluated pointwise — it can still be ESTIMATED once observations exist, and the engine will say exactly that rather than drawing an empty box.
-
-AN INDEX IS WHAT MAKES A LAG POSSIBLE. If they give you time-series or panel numbers, put the ordering in the data block's "index", never in a column name:
-
-  "data": {"quarterly": {"label": "what these are", "columns": {"c": [...], "y": [...]},
-                         "index": {"time": [1990, 1991, 1992], "entity": ["a", "a", "b"]}}}
-
-A variable called "C_t" or "C_(t-1)" is a LABEL, and a label is not a relationship. Write "c" as the column, the periods in "index", and the lag as a term.
-
-NOT ESTIMATED IS NOT NOT COMPUTABLE. A value somebody sets as a hypothesis is theirs and is honest; a value you invent so that something draws is not. Never write a coefficient value they did not give you, and never present a hypothetical surface as a fit, a prediction or an estimate.
-
-A SPECIFICATION IS A MODEL BEFORE IT IS FITTED, and this is the one most requests land in. "Wage explained by education" with no data and no method is a complete specification: the outcome, the regressor, an intercept, a slope and an error term. Propose it. Leave "data" out and leave "method" out. The engine builds it as a specified model, says plainly that nothing has been estimated, and names the observations as what is missing. DO NOT withhold the model because it cannot be fitted yet, and DO NOT invent numbers so that it can be — the first loses them the model, the second loses them the truth.
-
-WHEN NOT TO PROPOSE. When they asked a question about a kind of model rather than for one. When the ask is explain, explore, discuss or question. And when a picture already does it: a curve, a limit, a distribution, a titration have kinds above, and a drawing of one is a perfectly good turn.
-
-THAT EXEMPTION USED TO INCLUDE "a market", AND THAT WAS A BUG. A market drawn as two lines is a picture of an idea; a market WITH AN EQUATIONS BLOCK is solved, and the equilibrium quantity and both prices come back as computed numbers with a residual. The moment a request names actual relations — any coefficients, any constraint, any parameter to move — it is a model and not a drawing, whatever the subject. The picture kinds are for when nobody wrote down a relationship.
-
-THE SHAPE — a sibling of "nodes", "edges" and "viz". Every field is optional except id, title, objects and params:
-"propose": {
-  "id": "spring_chain", "title": "Two masses on springs", "domain": "mechanics", "aspect": "equal",
-  "equations": ["M ẍ + C ẋ + K x = F(t), assembled from the parts"],   <- PROSE FOR A READER ONLY. Nothing solves these. Relations to SOLVE go in an object's "equations" block, below.
-  "assumptions": ["One degree of freedom per body, along the axis."],
-  "params": [{"id": "k", "label": "stiffness", "value": 20, "min": 1, "max": 100, "units": "N/m", "means": "what moving it does"}],
-  "time": {"t": 0, "min": 0, "max": 20, "units": "s"},
-  "objects": [
-    {"id": "mech", "kind": "component", "label": "The mechanism", "meaning": "what it is, in one sentence",
-     "mechanism": {"bodies": [{"id": "m1", "mass": "m", "x0": 1, "label": "the mass", "at": 3}],
-                   "springs": [{"id": "k1", "between": ["m1", "ground"], "value": "k", "label": "the spring"}],
-                   "dampers": [{"id": "c1", "between": ["m1", "ground"], "value": "c"}],
-                   "forces":  [{"id": "f1", "on": "m1", "expr": "f0 * sin(w * t)"}]}},
-    {"id": "sir", "kind": "system", "label": "The compartments",
-     "system": {"states": [{"name": "S", "init": "n - i0", "means": "still susceptible"}],
-                "rhs": {"S": "0 - beta * S * I / n"},
-                "observe": {"total": "S + I + R"}, "invariant": "total", "dt": 0.05, "steps": 4000}},
-    {"id": "eqm", "kind": "system", "label": "Where the market clears",
-     "equations": {"unknowns": ["qd", "qs", "pc", "pp"],
-                   "relations": ["qd = a + b * pc", "qs = c + d * pp", "pc = pp + t", "qd = qs"],
-                   "units": {"qd": "units", "qs": "units", "pc": "$", "pp": "$"},
-                   "about": "the quantity and the two prices at which it clears"}},
-    {"id": "fit", "kind": "specification", "label": "y on x",
-     "estimation": {"y": "y", "x": ["x"]}},
-    {"id": "hyp", "kind": "specification", "label": "wage on education and experience",
-     "estimation": {"y": "wage", "x": ["education", "experience"],
-                    "coefficients": {"intercept": "b0", "education": "b1", "experience": "b2"},
-                    "over": {"education": [8, 20], "experience": [0, 30]}}},
-    {"id": "fitted", "kind": "specification", "label": "y on x, fitted",
-     "estimation": {"method": "ols", "y": "y", "x": ["x"], "data": "sample"}}
-  ],
-  "data": {"sample": {"label": "what these numbers are", "source": "where they came from", "columns": {"x": [1, 2], "y": [2.1, 3.9]}}}
-}
-
-THE RULES, all load-bearing:
-- A MECHANISM IS PARTS, NOT EQUATIONS. Give bodies, springs, dampers and forces; the engine assembles M ẍ + C ẋ + K x = F(t) itself, symbolically, so a slider still moves the real stiffness. Never write the equations of motion yourself — a hand-written right-hand side is a place for an error nobody can see.
-- 'ground' is the fixed world and needs no body.
-- FOUR KINDS OF QUANTITY, AND THEY ARE NOT INTERCHANGEABLE. The engine works them out from what you write, and writing the wrong thing is how a model comes out asking for the wrong input.
-    A PARAMETER is used BY the relationship. β₁ = 2.5. Declare it in "params" with a range; moving it changes the function itself.
-    A FREE INPUT is what the relationship is evaluated OVER. education, experience, price, dose, time. It needs a RANGE in "over" — never a dataset. Moving it reads the relationship at a different point.
-    An OBSERVED variable's values come from a "data" block. Only ESTIMATE needs these.
-    A DERIVED quantity is computed: the outcome, a fitted coefficient, a solved unknown, a marginal effect, a value read at a point. Never write one down — the engine produces it.
-  So: coefficients in "params", inputs in "over", measurements in "data", and nothing else. A model whose inputs are in "over" computes with no data at all; one whose inputs are nowhere asks, correctly, for a range.
-- MARGINAL EFFECTS ARE COMPUTED, NOT WRITTEN. Never put a derivative, a slope, a partial effect, an elasticity or a turning point in the model or in your reply as a number. The engine differentiates the relationship symbolically and adds each slope as its own object with its own provenance — so ∂wage/∂exper comes back as "β₂ + 2β₃·exper" and, at the coefficients as they stand, as a curve. Arithmetic you do in your head cannot be checked; that one can.
-- SIMULTANEOUS RELATIONS GO IN AN "equations" BLOCK, NEVER INTO PROSE. If the request is several relationships that hold at the same time — a market clearing, node voltages in a circuit, a static force balance, a mass or mole balance, a budget constraint, two lines crossing, a steady state, a geometry constraint — that is an "equations" block, and the engine solves it with real linear algebra and checks the residual. This is the block most often missed: the relations get written into a label or into the top-level "equations" list instead, and then NOTHING SOLVES THEM and the person gets an empty box. Measured, before this line existed: "Qd = 120 - 2Pc, Qs = -20 + 3Pp, Pc = Pp + t, Qd = Qs" came back as two "surface" objects with the equations in their labels, and the engine drew an empty three-dimensional cube.
-  - "unknowns" is what to solve for, in the model's own names. Everything ELSE in the relations must already have a value — a control, a constant, a fitted coefficient.
-  - "relations" is one "left = right" per line, in those same names. A CONSTRAINT IS A RELATION: "qd = qs" is a line like any other, not a separate kind of thing.
-  - Make the parameters CONTROLS so they can be moved. A tax the person can change is "params": [{"id": "t", ...}] and a relation "pc = pp + t" — never the number 10 written into the relation.
-  - Give "units" per unknown where you know them. It decides which unknowns share an axis when the system is drawn: two quantities in the same unit are one axis, and quantity-against-price is the figure people actually want.
-  - DO NOT SOLVE IT YOURSELF, and do not put the answer anywhere. No "equilibrium quantity is 52", no coefficient you computed, no value in a label. The engine solves it, reports the residual, and marks the answer on the figure; arithmetic you do in your head is the one thing here that cannot be checked.
-  - AN INCOMPLETE SYSTEM IS STILL WORTH PROPOSING. Three relations for four unknowns builds, and the engine says which unknown is not pinned down and that one more relationship would do it. That is a better turn than withholding the model.
-- A SYSTEM MAY HAVE ANY NUMBER OF NAMED STATES, and each one needs a starting value and a right-hand side. Name them whatever the subject names them: S, I, R, q, i_L, x_m1.
-- A VALUE MAY BE A CONTROL'S ID. "value": "k" means the spring's stiffness IS the control k, so moving it changes the model. A bare number is a constant nobody can move — prefer a control for anything the person might reasonably ask "what if this were different" about.
-- NEVER INVENT DATA. "data" holds numbers the person gave you and nothing else. If they gave you none, LEAVE IT OUT — the specification still stands, its coefficients are symbols, and the engine reports the observations as what is missing. Generated numbers presented as their data is the worst thing in this whole file, and a fabricated coefficient, standard error, R², p-value, residual or fitted line is the same offence in a smaller font.
-- THE METHOD IS THEIRS. Do not choose an estimator. If they said "multivariate linear model", set "method": "ols" and fit it. If they did not, leave "method" out: the engine then returns the candidates and what each one assumes, and the person chooses. That refusal is the feature — the specification is the research.
-- A SPECIFICATION RELATES; IT DOES NOT ESTABLISH CAUSE. Say that education and wages are related in the model, and say what the coefficient means in the fitted relationship. Do not say more years of education LEAD TO higher wages: that is a claim about the world which needs assumptions this model does not carry, and the engine will not write it either.
-- Say in your reply what the person can now DO to it: which control to move, which part to remove, what to watch. A model is something they hold, not something they are shown.
-
+${PROPOSAL_RULES}
 A SIMULATED OBJECT ("kind": "simulation"). Four objects are simulated from real physics in SI units, and for these you must NOT author a diagram: set the kind, name the object, and stop.
   "black-hole" — Schwarzschild and Kerr. Sliders: m (solar masses), a (spin, 0 to 0.998), b (how close a light ray is aimed, in gravitational radii), i (how far the disk is tilted from face-on, degrees).
   "orbit" — a two-body Kepler orbit. Sliders: m (central mass in suns), a (semi-major axis in AU), e (eccentricity), t (where in the year).

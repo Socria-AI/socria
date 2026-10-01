@@ -25,7 +25,7 @@ import { unpack } from './.tmp/unpack.mjs';
 import { askFor, route, plan } from './.tmp/solve.mjs';
 import { buildSpec } from './.tmp/spec.mjs';
 import { buildObject, scopeOf } from './.tmp/compile.mjs';
-import { sanitizeModel } from './.tmp/schema.mjs';
+import { sanitizeModel, setParam } from './.tmp/schema.mjs';
 import { affectedBy } from './.tmp/deps.mjs';
 import { symbolTable, bindings, known, resolve, machineOf, symbolLines } from './.tmp/symbols.mjs';
 import { readSystem } from './.tmp/system.mjs';
@@ -149,25 +149,70 @@ console.log('\n=== 2. THE ACCEPTANCE TEST: a real computed plane ===');
     r.provenance.origin === 'user' && /estimated from data/i.test(r.provenance.detail));
 }
 
-console.log('\n=== 3. the binding is DECLARED, never guessed ===');
+console.log('\n=== 3. the binding is DECLARED, never guessed — and a gap is a placeholder, not a blank ===');
 {
-  // No declaration, and no control named after the canonical id: unbound, and
-  // reported. NOT fuzzily matched to `b1` because it looks similar.
-  const m = unpack(buildProposal(adl({ coefficients: null }), { at: 1 }).model);
+  // THREE declared ways and no fourth: the coefficients map, the canonical id,
+  // and the standard NOTATION (b1, beta_1, β₁ — exact, after normalising case,
+  // underscores and subscripts). What never binds is resemblance: `beta`,
+  // `b1x`, `coef`, `slope`. lib/model/binding.ts.
+  const odd = adl({
+    coefficients: null,
+    params: [
+      { id: 'beta', label: 'a coefficient', value: 5, min: -20, max: 40 },
+      { id: 'b1x', label: 'nearly β₁', value: 0.7, min: 0, max: 2 },
+      { id: 'coef', label: 'the other one', value: 0.2, min: 0, max: 1 },
+    ],
+  });
+  const m = unpack(buildProposal(odd, { at: 1 }).model);
   const r = m.objects.find((o) => o.meta?.role === 'response');
-  const routed = route(m, r, 'evaluate');
-  ok('an unbound coefficient is incomplete', routed.status === 'incomplete');
-  ok('  and nothing was matched by resemblance',
-    !bindings(symbolTable(m)).spec__b1);
-  ok('  the gap naming the quantity the person sees',
-    /β₁/.test(JSON.stringify(routed.missing)), JSON.stringify(routed.missing));
+  ok('nothing was matched by resemblance',
+    !/\b(beta|b1x|coef)\b/.test(r?.defs?.z ?? ''), r?.defs?.z);
 
-  // THE EMPTY-CUBE RULE: no geometry, and a stated reason.
+  // THE GAP IS FILLED WITH A PLACEHOLDER, AND SAID. This used to be the
+  // empty-cube rule — "no geometry, and a stated reason" — and the stated
+  // reason was the whole of what a person got: a blank frame captioned "β₁
+  // needs a value". Now sanitizeModel writes a control for the unbound slot
+  // (0 for the intercept, 1 for a slope, marked assumed: 'value'), the
+  // surface draws at it, and every sentence about the picture says so.
+  for (const id of ['spec__b0', 'spec__b1', 'spec__b2']) {
+    const p = m.params.find((q) => q.id === id);
+    ok(`  ${id} is a placeholder control`, !!p && p.assumed === 'value', JSON.stringify(p));
+  }
+  ok('  at 0 for the intercept and 1 for a slope',
+    m.params.find((q) => q.id === 'spec__b0')?.value === 0 && m.params.find((q) => q.id === 'spec__b1')?.value === 1);
+  ok('  the response binds to them', /spec__b1/.test(r?.defs?.z ?? '') && route(m, r, 'evaluate').status === 'runnable',
+    `${r?.defs?.z} / ${route(m, r, 'evaluate').status}`);
   const spec = buildSpec(m);
-  ok('NOTHING is drawn for it', vertices(spec, r.id).length === 0);
-  const note = spec.notes.find((n) => n.of === r.id);
-  ok('  and the picture says why', !!note?.problem, JSON.stringify(note));
-  ok('  rather than reporting a grid it did not compute', !/grid/.test(note?.note ?? ''));
+  ok('  and the surface DRAWS', vertices(spec, r.id).length > 0);
+  ok('  the carrier says they are placeholders',
+    /β₀, β₁, β₂ are placeholders/.test(spec.notes.find((n) => n.of === 'spec')?.note ?? ''),
+    spec.notes.find((n) => n.of === 'spec')?.note);
+  ok('  the response says its basis is placeholders', /placeholder/.test(String(r?.meta?.basis)), String(r?.meta?.basis));
+  ok('  and the coefficient is attributed as a placeholder, not a hypothesis',
+    /PLACEHOLDER/.test(m.objects.find((o) => o.id === 'spec__b1')?.provenance?.detail ?? ''));
+  ok('  the on-ramp reply names them',
+    /β₀, β₁, β₂ have no value yet/.test(buildProposal(odd, { at: 1 }).report.says), buildProposal(odd, { at: 1 }).report.says);
+  // A second sanitise adds nothing — the placeholder is a stored control now.
+  const again = sanitizeModel(buildProposal(odd, { at: 1 }).model);
+  ok('  sanitising again is idempotent', again.params.length === buildProposal(odd, { at: 1 }).model.params.length);
+  // Moving the placeholder makes it the person's.
+  const moved = setParam(buildProposal(odd, { at: 1 }).model, 'spec__b1', 0.4);
+  ok('  moving it clears the placeholder mark', moved.params.find((q) => q.id === 'spec__b1')?.assumed === undefined);
+
+  // THE NOTATION binds, exactly — see interaction-model.test.mjs for b0…b3;
+  // here the spelled-out forms, by id and by label.
+  const notation = unpack(buildProposal(adl({
+    coefficients: null,
+    params: [
+      { id: 'beta_0', label: 'Intercept', value: 5, min: -20, max: 40 },
+      { id: 'Beta1', label: 'Income coefficient', value: 0.7, min: 0, max: 2 },
+      { id: 'c_lag_coef', label: 'β₂', value: 0.2, min: 0, max: 1 },
+    ],
+  }), { at: 1 }).model);
+  const nr = notation.objects.find((o) => o.meta?.role === 'response');
+  ok('beta_0, Beta1 and a control LABELLED β₂ bind by notation',
+    /\bbeta_0\b/.test(nr?.defs?.z ?? '') && /\bBeta1\b/.test(nr?.defs?.z ?? '') && /\bc_lag_coef\b/.test(nr?.defs?.z ?? ''), nr?.defs?.z);
+  ok('  and no placeholder was written for them', !notation.params.some((p) => p.assumed === 'value'));
 
   // The OTHER declared route: a control whose id IS the canonical id.
   const canonical = unpack(buildProposal(adl({

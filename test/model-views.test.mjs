@@ -28,7 +28,7 @@ import { operationsOn } from './.tmp/solve.mjs';
 import { inspectModel, inspectObject, whyOf, whyLines, whatChanged, computationFacts, transparencyLine } from './.tmp/inspect.mjs';
 import { modelStateFrom } from './.tmp/model-state.mjs';
 import { EMPTY_WORKSPACE, applyModelOps, modelFor, openFromProposal } from './.tmp/docs.mjs';
-import { inputsAwaiting } from './.tmp/derive.mjs';
+import { inputsAwaiting, inputsOf } from './.tmp/derive.mjs';
 
 let pass = 0, fail = 0;
 const ok = (n, c, x = '') => (c ? pass++ : (fail++, console.log('FAIL', n, x)));
@@ -103,7 +103,10 @@ console.log('\n=== the registry answers differently per model family ===');
 
   // EVERY model has the floor: its own account of itself.
   for (const e of LIBRARY) {
-    const m = unpack(e.build());
+    // Through the sanitiser, as the bench and the browser put it — the
+    // sanitiser writes placeholder controls now, and a raw build is not the
+    // model anybody sees.
+    const m = unpack(sanitizeModel(e.build()));
     ok(`${e.id} offers at least its own account`, fam(m).has('text'));
     ok(`  ${e.id} names a primary view`, !!primaryView(m), e.id);
     ok(`  ${e.id} says why each is available`, viewsFor(m).every((v) => !!v.because && !!v.shows));
@@ -122,7 +125,7 @@ console.log('\n=== the honest half ===');
   ok('nothing is listed as unavailable that IS available',
     missing.every((u) => !fam(saddle).has(u.family)), JSON.stringify(missing.map((u) => u.family)));
   ok('a distribution is honestly unavailable everywhere',
-    LIBRARY.every((e) => unavailable(unpack(e.build())).some((u) => u.family === 'distribution')));
+    LIBRARY.every((e) => unavailable(unpack(sanitizeModel(e.build()))).some((u) => u.family === 'distribution')));
   ok('  and says the backend does not exist',
     /this engine does not have/.test(missing.find((u) => u.family === 'distribution')?.wouldNeed ?? ''));
 }
@@ -130,14 +133,14 @@ console.log('\n=== the honest half ===');
 // ═══ a view declared without a renderer says so ═════════════════════
 console.log('\n=== declared is not the same as drawn ===');
 {
-  const all = LIBRARY.flatMap((e) => viewsFor(unpack(e.build())));
+  const all = LIBRARY.flatMap((e) => viewsFor(unpack(sanitizeModel(e.build()))));
   const declared = all.filter((v) => v.notDrawnYet);
   ok('some views are declared and not yet rendered', declared.length > 0);
   ok('  and every one of them says so rather than looking available',
     declared.every((v) => v.notDrawnYet === true));
   ok('  while the primary one always has a renderer',
     LIBRARY.every((e) => {
-      const p = primaryView(unpack(e.build()));
+      const p = primaryView(unpack(sanitizeModel(e.build())));
       return !p || !p.notDrawnYet;
     }));
 }
@@ -146,7 +149,7 @@ console.log('\n=== declared is not the same as drawn ===');
 console.log('\n=== the inspector shows only what is there ===');
 {
   for (const e of LIBRARY) {
-    const m = unpack(e.build());
+    const m = unpack(sanitizeModel(e.build()));
     const i = inspectModel(m);
     ok(`${e.id}: says what it is`, !!i.what && i.what.includes(m.title));
     ok(`  ${e.id}: no section is empty`, i.sections.every((s) => s.facts.length > 0),
@@ -277,16 +280,14 @@ console.log('\n=== linked selection ===');
 
 // ═══ A FRAME IS NEVER CLAIMED FOR SOMETHING THAT CANNOT BE DRAWN ════
 //
-// THE FAILURE THIS IS WRITTEN AGAINST, reported from the live product and
-// reproduced exactly: a log-wage relationship whose second input had no range
-// came back as an EMPTY 3D CARTESIAN CUBE. `viewsFor` had it right — the surface
-// refuses, so only structure, sensitivity, equation and text were available — and
-// `chooseRepresentation` looked at OBJECT KINDS, saw a `surface`, and returned
-// surface3d in three dimensions anyway. Two answers to one question, disagreeing
-// exactly where it mattered.
-//
-// An empty box is the most confident thing this engine can draw and the least
-// honest.
+// THE FAILURE THIS WAS WRITTEN AGAINST, from the live product: a log-wage
+// relationship whose second input had no range came back as an EMPTY 3D
+// CARTESIAN CUBE. The rule then was that nothing drew and the frame had to say
+// so in two dimensions. THE RULE IS NOW DIFFERENT, and the cube is still
+// forbidden: a missing range is an ASSUMED window (lib/model/kinds.ts), said on
+// the slider and on the picture, and the surface draws over it — so the frame
+// is three dimensions because there is a surface in it, which is the only
+// honest reason for a cube.
 console.log('\n=== the frame comes from what can be shown ===');
 {
   const halfSpecified = unpack(buildProposal({
@@ -301,19 +302,17 @@ console.log('\n=== the frame comes from what can be shown ===');
 
   const choice = chooseRepresentation(halfSpecified);
   const spec = buildSpec(halfSpecified);
-  ok('nothing draws', spec.primitives.length === 0, String(spec.primitives.length));
-  ok('  so the frame is NOT three dimensions', choice.dimensionality === 2, String(choice.dimensionality));
-  ok('  and not a surface', choice.kind !== 'surface3d', choice.kind);
-  ok('  the spec agrees', spec.dimensionality === 2, String(spec.dimensionality));
-  ok('  and the chooser agrees with the registry',
-    choice.kind === (primaryView(halfSpecified)?.family === 'equation' ? 'equation' : choice.kind),
-    `${choice.kind} vs ${primaryView(halfSpecified)?.family}`);
-  ok('  the input with no range is still named as an input',
-    inputsAwaiting(halfSpecified).some((q) => q.label === 'z'),
-    JSON.stringify(inputsAwaiting(halfSpecified)));
-  ok('    and says a range is what it needs, not observations',
-    /does not need observations/.test(inputsAwaiting(halfSpecified)[0]?.why ?? ''),
-    inputsAwaiting(halfSpecified)[0]?.why);
+  ok('it draws', spec.primitives.length > 0, String(spec.primitives.length));
+  ok('  as a surface, in three dimensions', choice.dimensionality === 3 && choice.kind === 'surface3d', `${choice.dimensionality} ${choice.kind}`);
+  ok('  the spec agrees', spec.dimensionality === 3, String(spec.dimensionality));
+  ok('  the registry agrees', primaryView(halfSpecified)?.family === 'surface', String(primaryView(halfSpecified)?.family));
+  ok('  nothing is waiting on a range', inputsAwaiting(halfSpecified).length === 0, JSON.stringify(inputsAwaiting(halfSpecified)));
+  ok('  z is over an assumed window, and says so',
+    inputsOf(halfSpecified).some((q) => q.id === 'z' && q.from === 'assumed' && q.min === 0 && q.max === 10),
+    JSON.stringify(inputsOf(halfSpecified)));
+  ok('  and the picture says the range was assumed',
+    /z has no stated range and is drawn over 0 to 10/.test(spec.notes.find((n) => n.of === 'sp')?.note ?? ''),
+    spec.notes.find((n) => n.of === 'sp')?.note);
 
   // …and the moment it CAN be drawn, three dimensions are legitimate again.
   const whole = unpack(buildProposal({
@@ -331,7 +330,7 @@ console.log('\n=== the frame comes from what can be shown ===');
 
   // EVERY library model still gets a frame it can fill.
   for (const e of LIBRARY) {
-    const m = unpack(e.build());
+    const m = unpack(sanitizeModel(e.build()));
     const sp = buildSpec(m);
     ok(`${e.id}: never an empty frame with extent claimed`,
       sp.primitives.length > 0 || sp.dimensionality === 2,
@@ -358,7 +357,7 @@ console.log('\n=== nothing that draws is missing from the registry ===');
     ['mech', 'gravity', 'spec', 'of'].some((k) => typeof o.meta?.[k] === 'string') ||
     (o.relations ?? []).some((r) => r.as === 'contains');
   for (const e of LIBRARY) {
-    const m = unpack(e.build());
+    const m = unpack(sanitizeModel(e.build()));
     const all = viewsFor(m);
     const standalone = m.objects.filter(
       (o) => !isPart(o) && buildObject(m, o).primitives.length > 0
@@ -369,7 +368,7 @@ console.log('\n=== nothing that draws is missing from the registry ===');
   }
   // …and the frame follows: anything that produces marks gets extent claimed.
   for (const e of LIBRARY) {
-    const m = unpack(e.build());
+    const m = unpack(sanitizeModel(e.build()));
     const sp = buildSpec(m);
     if (!sp.primitives.length) continue;
     ok(`${e.id}: a picture that exists gets a frame`, viewsFor(m).some((v) => v.marks),

@@ -332,6 +332,15 @@ export function buildProposal(raw: ModelProposal, opts?: { at?: number }): Built
     // operation that is merely UNAVAILABLE is named as unavailable rather than
     // as a deficiency of the model.
     ...byOperation(model),
+    // WHAT STANDS IN FOR A NUMBER NOBODY GAVE, said out loud. The picture
+    // draws at placeholders so that it draws; the reply must not let that read
+    // as a model with coefficients in it.
+    (() => {
+      const ph = built.params.filter((p) => p.assumed === 'value');
+      return ph.length
+        ? `${ph.map((p) => p.label).join(', ')} ${ph.length === 1 ? 'has' : 'have'} no value yet and ${ph.length === 1 ? 'is' : 'are'} drawn at ${ph.length === 1 ? 'a placeholder' : 'placeholders'} — say what ${ph.length === 1 ? 'it is' : 'they are'} and the picture becomes yours.`
+        : '';
+    })(),
     // WHAT WAS TRIMMED ON THE WAY IN, said out loud. The sanitiser bounds
     // unbounded input — that is its job — but a bound applied silently is
     // indistinguishable from the proposal never having contained the thing, and

@@ -187,11 +187,14 @@ export function ModelView({
   // kind of control and belong in their own group: moving β₁ changes the
   // FUNCTION, moving education changes WHERE ON it you are reading. Both write
   // to the model, because the model is authoritative and this is a projection.
-  const inputs = useMemo(() => inputsOf(model), [model]);
+  // FROM THE EXPANDED MODEL. A specification's inputs are objects the expander
+  // creates, so a model stored unexpanded — a benchmark, a fresh proposal —
+  // offered no input sliders at all, and the Inputs group simply did not exist.
+  const inputs = useMemo(() => inputsOf(full), [full]);
   // …and the ones that cannot be moved yet, shown rather than omitted. The thing
   // standing between this model and a picture was invisible in the one place a
   // person would look for it.
-  const awaiting = useMemo(() => inputsAwaiting(model), [model]);
+  const awaiting = useMemo(() => inputsAwaiting(full), [full]);
 
   const groups = useMemo(
     () => [
@@ -217,9 +220,19 @@ export function ModelView({
               label: q.label,
               min: q.min,
               max: q.max,
-              step: (q.max - q.min) / 100,
-              read: (v: number) => `${Number(v.toPrecision(4))}${q.units ? ` ${q.units}` : ''}`,
-              help: `a free input: the relationship is evaluated over it, and moving this reads it at a different point rather than changing it`,
+              // An indicator is 0 or 1, not 0.37 — the handle snaps.
+              step: q.from === 'name' || q.from === 'type' ? 1 : (q.max - q.min) / 100,
+              read: (v: number) =>
+                `${Number(v.toPrecision(4))}${q.units ? ` ${q.units}` : ''}${
+                  q.from === 'assumed' ? ' (range assumed)' : q.from === 'name' ? ' (0 or 1, by name)' : ''
+                }`,
+              // WHAT THE ENGINE READ RATHER THAN WAS TOLD, on the control itself.
+              help:
+                q.from === 'assumed'
+                  ? `no range was given for ${q.label}, so it is drawn over ${q.min} to ${q.max} — say what range matters`
+                  : q.from === 'name'
+                    ? `${q.label} is read as an indicator (0 or 1) from its name — declare its kind to say otherwise`
+                    : `a free input: the relationship is evaluated over it, and moving this reads it at a different point rather than changing it`,
               })),
             ],
           }]
@@ -233,7 +246,9 @@ export function ModelView({
           min: p.min,
           max: p.max,
           step: p.step ?? (p.max - p.min) / 100,
-          read: (v: number) => `${Number(v.toPrecision(4))}${p.units ? ` ${p.units}` : ''}`,
+          // A placeholder reads as one on the slider, until it is moved.
+          read: (v: number) =>
+            `${Number(v.toPrecision(4))}${p.units ? ` ${p.units}` : ''}${p.assumed === 'value' ? ' (placeholder)' : ''}`,
           ...(p.means ? { help: p.means } : {}),
         })),
       },
@@ -247,7 +262,10 @@ export function ModelView({
   const initialVals = useMemo(
     () => ({
       ...Object.fromEntries(initial.params.map((p) => [p.id, p.value])),
-      ...Object.fromEntries(inputsOf(initial).map((q) => [`at:${q.id}`, q.at])),
+      // Expanded, for the same reason `inputs` is: the inputs of a stored,
+      // unexpanded specification do not exist until unpack runs, and a slider
+      // whose initial value was never set reads its minimum.
+      ...Object.fromEntries(inputsOf(unpack(initial)).map((q) => [`at:${q.id}`, q.at])),
     }),
     [initial]
   );
@@ -733,6 +751,22 @@ export function ModelView({
             }
             return bits.length ? `${bits.join('; ')}. ` : '';
           })() +
+          // WHAT STANDS IN, said on the picture itself and not only on the
+          // selected object: placeholder coefficients, and ranges the engine
+          // read from a name or assumed. A drawn shape must never read as a
+          // drawn claim.
+          (() => {
+            const ph = model.params.filter((p) => p.assumed === 'value').map((p) => p.label);
+            const read = inputs.filter((q) => q.from === 'name' || q.from === 'assumed');
+            return (
+              (ph.length ? `${ph.join(', ')} ${ph.length === 1 ? 'is a placeholder' : 'are placeholders'} — the shape is drawn, the numbers are not yet anybody's. ` : '') +
+              (read.length
+                ? `${read
+                    .map((q) => (q.from === 'name' ? `${q.label} read as 0 or 1 from its name` : `${q.label} over an assumed ${q.min}–${q.max}`))
+                    .join('; ')}. `
+                : '')
+            );
+          })() +
           (spec.panels?.length
             ? `The ${spec.panels.length} panels below are the same run, not separate ones. `
             : '') +
@@ -741,7 +775,7 @@ export function ModelView({
         live: Object.fromEntries(spec.notes.map((n) => [n.of, n.problem ? `not drawn: ${n.problem}` : n.note])),
       };
     },
-    [spec, frame, slice, view.selected, view.slice, model, sync, panel, openv, select]
+    [spec, frame, slice, view.selected, view.slice, model, sync, panel, openv, select, inputs]
   );
 
   // ── THE PICTURE AND THE UNDERSTAND LAYER, STACKED ──────────────────

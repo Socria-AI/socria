@@ -350,11 +350,13 @@ const nbody = (n, id = 'grav') => ({
   ok('  naming which two vary', /Only education and experience vary here/.test(resp.meaning), '');
   ok('  and it still draws', buildSpec(withHold).primitives.length > 0);
 
-  // …and where the held regressor has no value, that is what is said.
+  // …and where the held regressor has no control, it stands at its cursor —
+  // mid-way through its range, which here is assumed and said.
   const noHold = wage(false);
   const resp2 = noHold.objects.find((o) => o.id === 'spec__response');
-  ok('a held regressor with no value says so',
-    /nothing has given a value/.test(resp2.meta.heldSays ?? ''), resp2.meta.heldSays ?? '');
+  ok('a held regressor with no control says where it stands',
+    /tenure at its cursor, mid-way between 0 and 10/.test(resp2.meta.heldSays ?? ''), resp2.meta.heldSays ?? '');
+  ok('  and that its range was assumed', /tenure has no stated range/.test(resp2.meta.assumed ?? ''), resp2.meta.assumed ?? '');
 
   // A two-regressor specification is the whole surface and claims nothing else.
   const two = unpack(sanitizeModel({ id: 'w2', title: 'Wage', params: [

@@ -299,6 +299,20 @@ export function buildObject(model: Model, o: ModelObject, opts?: { detail?: numb
         // not be told it is pending.
         note:
           `what it says is drawn as ${produced.map((x) => x.label).join(', ')}. ` +
+          // WHAT THE ENGINE SUPPLIED, SAID ON THE PICTURE: placeholder
+          // coefficients and ranges it read or assumed (estimate.ts writes
+          // both on the response object). A drawn line whose numbers are
+          // placeholders must not read as a drawn claim.
+          (() => {
+            const ph = produced
+              .flatMap((x) => (typeof x.meta?.placeholders === 'string' ? x.meta.placeholders.split(',') : []))
+              .map((id) => model.params.find((p) => p.id === id)?.label ?? id);
+            const assumed = produced.map((x) => x.meta?.assumed).filter((a): a is string => typeof a === 'string');
+            return (
+              (ph.length ? `${ph.join(', ')} ${ph.length === 1 ? 'is a placeholder' : 'are placeholders'} — set ${ph.length === 1 ? 'it' : 'them'} in the Model tab. ` : '') +
+              (assumed.length ? `${assumed.join('; ')}. ` : '')
+            );
+          })() +
           `Fitting it is a separate question, and would need ${what.join('; ')}`,
         fidelity: o.fidelity ?? 'model-derived',
       };

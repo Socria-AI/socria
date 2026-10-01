@@ -45,6 +45,8 @@ import {
   type TermDecl,
 } from './terms';
 import { parse, print, rename, substitute, type Expr } from './expr';
+import { controlFor, isPlaceholder, labelForSlot } from './binding';
+import { domainSays, inputDomain } from './kinds';
 
 /** Cap on what one fit may chew through, because a slider is attached. */
 export const FIT_CAPS = { rows: 20_000, terms: 24 } as const;
@@ -660,6 +662,14 @@ export function expandEstimation(model: Model): Model {
 
   const have = new Set(model.objects.map((o) => o.id));
   const added: ModelObject[] = [];
+  // THE RESPONSE SURFACE IS REBUILT EVERY PASS. Expansion is idempotent for
+  // the coefficient and variable objects — they may carry values an edit
+  // wrote, and regenerating them would lose those. The response is different:
+  // nothing writes onto it, and everything it says — its window, its basis,
+  // which coefficients are placeholders, what was assumed — is a function of
+  // the model NOW. Kept from the first pass, it told a person who had just set
+  // β₁ that the picture was still drawn at placeholders.
+  const refreshed = new Map<string, ModelObject>();
   /** a variable the person named, rather than anything Socria chose */
   const SPOKEN: Provenance = { origin: 'user', detail: 'named in the specification you gave' };
 
@@ -694,10 +704,16 @@ export function expandEstimation(model: Model): Model {
     // fixed by assumption alongside others estimated from the same data is an
     // ordinary thing to do, and one provenance for the specification cannot say
     // so.
-    const boundTo = (name: string): string | undefined => {
-      const control = decl.coefficients?.[name];
-      return control && model.params.some((q) => q.id === control) ? control : undefined;
-    };
+    const wants = decl.intercept !== false;
+    const slotOf = (name: string): number =>
+      name === INTERCEPT ? 0 : decl.x.indexOf(name) + (wants ? 1 : 0);
+    // THE THREE DECLARED WAYS, FROM ONE PLACE. lib/model/binding.ts controlFor —
+    // the coefficients map, the canonical id, the standard notation (b1, β₁).
+    // Read here for provenance and below for the expression, so the sentence
+    // about where β₁ came from and the number the surface is drawn at cannot
+    // disagree.
+    const boundTo = (name: string): string | undefined =>
+      controlFor(model.params, decl, carrier.id, slotOf(name))?.id;
     const fromFor = (name: string): { provenance: Provenance; fidelity: ModelObject['fidelity'] } => {
       if (terms) {
         return {
@@ -711,6 +727,18 @@ export function expandEstimation(model: Model): Model {
       const control = boundTo(name);
       if (control) {
         const p = model.params.find((q) => q.id === control);
+        // A PLACEHOLDER IS NOT A HYPOTHESIS. Nobody supposed 1; the engine put
+        // it there so the line would draw, and the sentence has to say so or
+        // the slider reads as a value somebody chose.
+        if (isPlaceholder(p)) {
+          return {
+            provenance: {
+              origin: 'inference',
+              detail: `a PLACEHOLDER — nothing has given this coefficient a value, so the control ${control} stands at ${p!.value} until you set it. Not a hypothesis, not an estimate`,
+            },
+            fidelity: 'conceptual',
+          };
+        }
         return {
           provenance: {
             origin: 'user',
@@ -735,8 +763,8 @@ export function expandEstimation(model: Model): Model {
 
     const put = (o: ModelObject) => {
       if (!have.has(o.id)) added.push(o);
+      else if (o.id.endsWith('__response')) refreshed.set(o.id, o);
     };
-    const wants = decl.intercept !== false;
 
     // The outcome.
     put({
@@ -788,8 +816,9 @@ export function expandEstimation(model: Model): Model {
           ...(value(x) !== undefined ? { value: value(x) } : {}),
           // THE BINDING, CARRIED ON THE QUANTITY. symbolTable reads this to
           // find the control driving this coefficient, so the inspector, the
-          // conversation, Trace and the evaluator all resolve the same thing.
-          ...(decl.coefficients?.[x] ? { control: decl.coefficients[x] } : {}),
+          // conversation, Trace and the evaluator all resolve the same thing —
+          // whichever of the three declared ways found it.
+          ...(boundTo(x) ? { control: boundTo(x) } : {}),
         },
         provenance: fromFor(x).provenance,
         fidelity: fromFor(x).fidelity,
@@ -808,7 +837,7 @@ export function expandEstimation(model: Model): Model {
         spec: carrier.id,
         role: 'intercept',
         ...(value(INTERCEPT) !== undefined ? { value: value(INTERCEPT) } : {}),
-        ...(decl.coefficients?.intercept ? { control: decl.coefficients.intercept } : {}),
+        ...(boundTo(INTERCEPT) ? { control: boundTo(INTERCEPT) } : {}),
       },
         provenance: fromFor(INTERCEPT).provenance,
         fidelity: fromFor(INTERCEPT).fidelity,
@@ -880,12 +909,10 @@ export function expandEstimation(model: Model): Model {
       // written is what can be evaluated.
       const coefficient = (i: number): string => {
         const b = `${carrier.id}__b${wants ? i + 1 : i}`;
-        // 1. the declaration names a control for this regressor.
-        const named = decl.coefficients?.[decl.x[i]];
-        if (named && model.params.some((p) => p.id === named)) return named;
-        // 2. a control whose id IS the canonical id.
-        if (model.params.some((p) => p.id === b)) return b;
-        // 3. a value the fit produced or an edit wrote.
+        // 1–2 (and the notation, 3): a control, found the one declared way.
+        const bound = boundTo(decl.x[i]);
+        if (bound) return bound;
+        // 4. a value the fit produced or an edit wrote.
         const v = value(decl.x[i]);
         if (v !== undefined) return String(v);
         const set = model.objects.find((o) => o.id === b)?.defs?.value;
@@ -897,9 +924,8 @@ export function expandEstimation(model: Model): Model {
       const intercept = (): string => {
         const b = `${carrier.id}__b0`;
         if (!wants) return '0';
-        const named = decl.coefficients?.intercept;
-        if (named && model.params.some((p) => p.id === named)) return named;
-        if (model.params.some((p) => p.id === b)) return b;
+        const bound = boundTo(INTERCEPT);
+        if (bound) return bound;
         const v = value(INTERCEPT);
         if (v !== undefined) return String(v);
         const set = model.objects.find((o) => o.id === b)?.defs?.value;
@@ -953,17 +979,26 @@ export function expandEstimation(model: Model): Model {
         if (p) return `${name} at ${p.value}${p.units ? ` ${p.units}` : ''} (the control ${p.id})`;
         const v = value(name);
         if (v !== undefined) return `${name} at ${v}`;
-        return `${name} — which nothing has given a value, so this cannot be drawn until something does`;
+        // An input with a range stands at its cursor — the middle of the range
+        // until somebody moves it (derive.ts cursorFor).
+        const d = inputDomain(model, decl, name, undefined, block);
+        return `${name} at its cursor, mid-way between ${d.domain[0]} and ${d.domain[1]} unless you move it`;
       });
+      const bound = [...(wants ? [INTERCEPT] : []), ...decl.x].map((name) => boundTo(name));
       const hypothetical = decl.x.some((name, i) => {
         const b = `${carrier.id}__b${wants ? i + 1 : i}`;
-        const named = decl.coefficients?.[name];
-        return (
-          (!!named && model.params.some((p) => p.id === named)) ||
-          model.params.some((p) => p.id === b) ||
-          !!model.objects.find((o) => o.id === b)?.defs?.value
-        );
+        return !!boundTo(name) || !!model.objects.find((o) => o.id === b)?.defs?.value;
       });
+      // EVERY control bound is a placeholder: the picture is a shape, not a
+      // claim, and the basis line has to say which.
+      const placeholders = bound.filter((id) => id && isPlaceholder(model.params.find((p) => p.id === id)));
+      const allPlaceholders = placeholders.length > 0 && placeholders.length === bound.filter(Boolean).length;
+      // WHAT THE ENGINE READ RATHER THAN WAS TOLD, about the inputs — said on
+      // the object so the picture's note, the inspector and the conversation all
+      // carry the same sentence.
+      const assumed = bases
+        .map((name) => domainSays(name, inputDomain(model, decl, name, undefined, block)))
+        .filter((x): x is string => !!x);
 
       put({
         id: `${carrier.id}__response`,
@@ -991,20 +1026,13 @@ export function expandEstimation(model: Model): Model {
         // stated `over` still wins, because somebody saying which range matters
         // outranks the accident of what happened to be collected.
         ...(() => {
-          const window = (name: string): [number, number] | undefined => {
-            const said = decl.over?.[name];
-            if (said) return said as [number, number];
-            // A BINARY INPUT'S WINDOW IS ITS OWN EXTENT. Nobody states the range
-            // of an indicator, and demanding one is how a surface over education
-            // and a female dummy came to draw nothing.
-            if (decl.kinds?.[name] === 'binary' || decl.terms?.[name]?.op === 'indicator') return [0, 1];
-            const col = block ? columnsOf(block)[name] : undefined;
-            const finite = (col ?? []).filter((v) => Number.isFinite(v));
-            return finite.length >= 2 ? [Math.min(...finite), Math.max(...finite)] : undefined;
-          };
+          // ONE RULE WITH THE SYMBOL TABLE — lib/model/kinds.ts inputDomain. This
+          // was a second copy of it, and the two agreed by luck.
+          const window = (name: string): [number, number] =>
+            inputDomain(model, decl, name, undefined, block).domain;
           const x = window(axes[0]);
           const y = axes.length > 1 ? window(axes[1]) : undefined;
-          return x || y ? { over: { ...(x ? { x } : {}), ...(y ? { y } : {}) } } : {};
+          return { over: { x, ...(y ? { y } : {}) } };
         })(),
         relations: [
           { to: carrier.id, as: 'derived-from', why: 'it is what this specification says, with the error term left out' },
@@ -1018,19 +1046,36 @@ export function expandEstimation(model: Model): Model {
           // / ∂y". The label is a sentence for a reader; this is the name.
           outcome: decl.y,
           ...(held.length ? { held: bases.slice(2).join(','), heldSays: held.join('; ') } : {}),
+          ...(assumed.length ? { assumed: assumed.join('; ') } : {}),
+          ...(placeholders.length ? { placeholders: placeholders.join(',') } : {}),
           // What the reader must be told about these numbers, carried on the
           // object rather than left to a caption somebody might not write.
-          basis: hypothetical
-            ? 'user-set hypothetical coefficients'
-            : terms
-              ? 'coefficients estimated from the data'
-              : 'coefficients as written in the specification',
+          basis: allPlaceholders
+            ? 'placeholder coefficients — none has been given a value'
+            : placeholders.length
+              ? 'user-set hypothetical coefficients, some still placeholders'
+              : hypothetical
+                ? 'user-set hypothetical coefficients'
+                : terms
+                  ? 'coefficients estimated from the data'
+                  : 'coefficients as written in the specification',
         },
+        // Still MODEL-DERIVED at placeholders: every height IS evaluated from
+        // the relationship. What is provisional is the numbers, and that is
+        // carried by `basis`, `placeholders` and the provenance — not by
+        // demoting a computed mesh to "drawn to make the idea legible".
         fidelity: 'model-derived',
-        provenance: hypothetical
+        provenance: allPlaceholders
+          ? {
+              origin: 'inference',
+              detail: 'drawn at PLACEHOLDER coefficients — the shape of the relationship, not its numbers. Set the coefficients and it becomes yours',
+            }
+          : hypothetical
           ? {
               origin: 'user',
-              detail: 'drawn at coefficient values you set as hypotheses — nothing here is estimated from data',
+              detail: placeholders.length
+                ? 'drawn at coefficient values you set as hypotheses — and at placeholders where you set none. Nothing here is estimated from data'
+                : 'drawn at coefficient values you set as hypotheses — nothing here is estimated from data',
             }
           : terms
             ? { origin: 'computation', detail: `drawn at the coefficients least squares produced from “${decl.data}”` }
@@ -1052,8 +1097,8 @@ export function expandEstimation(model: Model): Model {
     });
   }
 
-  if (!added.length) return model;
-  return { ...model, objects: [...model.objects, ...added] };
+  if (!added.length && !refreshed.size) return model;
+  return { ...model, objects: [...model.objects.map((o) => refreshed.get(o.id) ?? o), ...added] };
 }
 
 /**
@@ -1066,14 +1111,9 @@ export function expandEstimation(model: Model): Model {
  */
 export const INTERCEPT = 'intercept';
 
-/** Subscript digits, so β1 and β₀ do not sit in the same line looking unrelated. */
-const SUB = '₀₁₂₃₄₅₆₇₈₉';
-const sub = (n: number): string =>
-  String(n).split('').map((d) => SUB[Number(d)] ?? d).join('');
-
-/** The label a coefficient carries, wherever one is written. */
+/** The label a coefficient carries, wherever one is written — one spelling, from lib/model/binding.ts. */
 export function coefficientLabel(i: number, withIntercept: boolean): string {
-  return `β${sub(withIntercept ? i + 1 : i)}`;
+  return labelForSlot(withIntercept ? i + 1 : i);
 }
 
 /** The specification written out, for a reader and for the conversation. */

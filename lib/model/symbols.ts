@@ -46,6 +46,7 @@
 // PURE. No evaluation, no clock, no React.
 
 import { NAME } from './ids';
+import { inputDomain, type DomainFrom } from './kinds';
 import type { Model, ModelObject, Origin, Fidelity } from './schema';
 
 /** What a quantity is FOR, which decides how it may be bound and shown. */
@@ -124,8 +125,8 @@ export interface Quantity {
    * input whose range nobody has chosen, and choosing it is a modelling act.
    */
   domain?: [number, number];
-  /** where the domain came from, so a reader can tell a choice from a default */
-  domainFrom?: 'object' | 'specification' | 'control' | 'data' | 'type';
+  /** where the domain came from, so a reader can tell a choice from a default — see lib/model/kinds.ts */
+  domainFrom?: DomainFrom;
 }
 
 export interface SymbolTable {
@@ -315,12 +316,13 @@ function supplyOf(model: Model, o: ModelObject): { supply: Supply; domain?: [num
 /**
  * The range a free input is evaluated over, and where it came from.
  *
- * THREE STATED SOURCES AND NO FOURTH. The object's own window, the
- * specification's `over` map, or a control of that name — all three are things
- * somebody wrote down. There is deliberately no invented default: a window the
- * engine picks for a quantity the model has NAMED is a modelling decision taken
- * on the person's behalf, and picking [−3, 3] for education is how a wage
- * surface came to be drawn over minus three years of schooling.
+ * ONE RULE, SHARED WITH THE EXPANDER — lib/model/kinds.ts inputDomain. It
+ * always answers now: a declared kind, a written window, a control, the data,
+ * the NAME (an indicator by convention is read as 0 or 1 and says so), and
+ * otherwise an assumed window that is said wherever it is shown. The refusal
+ * this used to end in — "nobody may invent one" — produced an empty frame in
+ * the product every time the extractor forgot a `kinds` or an `over`, and a
+ * stated default a person can see and change is worth more than a blank.
  */
 function domainFor(
   model: Model,
@@ -328,26 +330,8 @@ function domainFor(
   spec: NonNullable<ModelObject['estimation']>,
   column: string
 ): { domain?: [number, number]; domainFrom?: Quantity['domainFrom'] } {
-  // WHAT IT IS CAN SETTLE ITS RANGE, and for one kind it always does.
-  //
-  // A binary variable takes 0 or 1. That is not a window anybody chooses, it is
-  // the quantity's own extent — so demanding a range for it is a category error,
-  // and it is the one that stopped a log-wage relationship in education and a
-  // female indicator from drawing at all. Declared as `binary`, or implied by an
-  // `indicator` term, which says so by its own definition.
-  const kind = spec.kinds?.[column];
-  const term = spec.terms?.[column];
-  if (kind === 'binary' || term?.op === 'indicator') {
-    return { domain: [0, 1], domainFrom: 'type' };
-  }
-
-  const own = o.over?.x ?? o.over?.[column];
-  if (own) return { domain: own as [number, number], domainFrom: 'object' };
-  const stated = spec.over?.[column];
-  if (stated) return { domain: stated as [number, number], domainFrom: 'specification' };
-  const p = model.params.find((q) => q.id.toLowerCase() === column.toLowerCase());
-  if (p) return { domain: [p.min, p.max], domainFrom: 'control' };
-  return {};
+  const d = inputDomain(model, spec, column, o.over);
+  return { domain: d.domain, domainFrom: d.from };
 }
 
 /**

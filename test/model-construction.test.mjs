@@ -124,9 +124,13 @@ console.log('\n=== 2. a specification exists before it is fitted ===');
   ok('the error term is an object', has('spec__u'));
 
   const b1 = model.objects.find((o) => o.id === 'spec__b1');
-  ok('a coefficient with no data has NO value', b1.defs === undefined && b1.meta.value === undefined);
-  ok('  and says it is a symbol', /symbol/.test(b1.provenance.detail));
-  ok('  and is not attributed to anybody', b1.provenance.origin === 'equation');
+  ok('a coefficient with no data has NO fitted value', b1.defs === undefined && b1.meta.value === undefined);
+  // …and stands at a PLACEHOLDER control, so the relationship draws. It says
+  // so, and it is attributed to nobody's judgement — see lib/model/binding.ts.
+  ok('  and is driven by a placeholder control', b1.meta.control === 'spec__b1' &&
+    clean.params.find((q) => q.id === 'spec__b1')?.assumed === 'value', JSON.stringify(clean.params));
+  ok('  and says it is a placeholder', /PLACEHOLDER/.test(b1.provenance.detail), b1.provenance.detail);
+  ok('  and is not attributed to anybody', b1.provenance.origin === 'inference');
 
   const y = model.objects.find((o) => o.id === 'spec__y');
   ok('a variable they named is attributed to them', y.provenance.origin === 'user');
@@ -151,8 +155,10 @@ console.log('\n=== 3. the on-ramp builds it ===');
   const built = buildProposal(WAGE_SPEC, { at: 1 });
   ok('THE ORIGINAL REQUEST NOW BUILDS', built.ok === true, built.ok ? '' : built.refusal.because);
   if (built.ok) {
-    ok('  and it is honest about what it is', built.report.capability === 'mathematical');
-    ok('  not claiming to compute', built.report.capability !== 'computational');
+    // It computes now — at placeholders — and the honesty is in SAYING so,
+    // which the report does, rather than in refusing to draw.
+    ok('  and it is honest about what it is', built.report.capability === 'computational', built.report.capability);
+    ok('  saying its coefficients are placeholders', /β₀, β₁ have no value yet/.test(built.report.says), built.report.says);
     ok('  and names what is missing', built.report.missing.length > 0);
     const what = built.report.missing.flatMap((m) => m.missing.map((x) => x.what)).join(' ');
     const unlocks = built.report.missing.flatMap((m) => m.missing.map((x) => x.unlocks)).join(' ');
@@ -464,8 +470,10 @@ console.log('\n=== 12. the conversation is told what the model actually is ===')
   ok('it builds', built.ok === true);
   if (built.ok) {
     const cap = capabilityOf(unpack(built.model));
-    ok('the model knows what it is', cap.level === 'mathematical');
-    ok('  and what it is not', cap.short.some((s) => s.level === 'computational'));
+    // With placeholder coefficients the deterministic component EVALUATES, so
+    // the model computes — at placeholders, which every sentence about it says.
+    ok('the model knows what it is', cap.level === 'computational', cap.level);
+    ok('  and that its numbers are placeholders', built.model.params.every((p) => p.assumed === 'value'));
     const gaps = missingStructure(unpack(built.model));
     ok('  and what is standing in the way', gaps.length > 0);
     ok('  named as observations', /observations/.test(JSON.stringify(gaps)));
@@ -932,22 +940,21 @@ console.log('\n=== 19. capability is per operation, not one verdict ===');
   ok('  and refuses to call itself a conditional expectation',
     /NOT a conditional expectation/.test(resp.meaning));
 
-  // THE REMAINING DEGREE OF FREEDOM IS NAMED, NOT INVENTED.
+  // THE REMAINING DEGREE OF FREEDOM IS NAMED, AND STOOD IN FOR. It used to be
+  // named and left empty — the frame with it. Now the sanitiser writes a
+  // placeholder control for it (0 for an intercept), the surface draws, and
+  // the placeholder is named as one everywhere the picture is described.
   const noB0 = buildProposal(wage(HYP.filter((x) => x.id !== 'spec__b0'), OVER), { at: 1 });
   const m2 = unpack(noB0.model);
-  const r2 = route(m2, m2.objects.find((o) => o.meta?.role === 'response'), 'evaluate');
-  ok('with β₀ unspecified it is incomplete, not runnable', r2.status === 'incomplete');
-  ok('  and β₀ is what it names', /spec__b0/.test(JSON.stringify(r2.missing)));
-  // Named BY ITS DISPLAY NAME, through the symbol table — "a value for β₀
-  // (spec__b0)" rather than a bare internal identifier. A person is owed the
-  // name they used, and the canonical id beside it so the two are known to be
-  // one quantity.
-  ok('  described as a quantity the model has and nothing has valued',
-    /nothing has given it a number/.test(JSON.stringify(r2.missing)), JSON.stringify(r2.missing));
-  ok('  and named as β₀, not only as an internal id',
-    /β₀/.test(JSON.stringify(r2.missing)), JSON.stringify(r2.missing));
-  ok('  and no value was invented for it',
-    !m2.params.some((q) => q.id === 'spec__b0'));
+  const resp2 = m2.objects.find((o) => o.meta?.role === 'response');
+  const r2 = route(m2, resp2, 'evaluate');
+  ok('with β₀ unspecified it still runs', r2.status === 'runnable', r2.status);
+  const ph = m2.params.find((q) => q.id === 'spec__b0');
+  ok('  at a placeholder for β₀, at 0', ph?.assumed === 'value' && ph.value === 0, JSON.stringify(ph));
+  ok('  which the response names as a placeholder', /spec__b0/.test(String(resp2.meta.placeholders)), String(resp2.meta.placeholders));
+  ok('  and the basis says some are still placeholders', /some still placeholders/.test(String(resp2.meta.basis)), String(resp2.meta.basis));
+  ok('  and the reply names it as β₀', /β₀ has no value yet/.test(noB0.report.says), noB0.report.says);
+  ok('  and no FITTED value was invented for it', m2.objects.find((o) => o.id === 'spec__b0')?.meta?.value === undefined);
 
   // MANIPULATION COMES FROM THE EQUATION. The surface IS the expression, so a
   // change to a coefficient reaches it through the dependency graph rather
@@ -959,14 +966,19 @@ console.log('\n=== 19. capability is per operation, not one verdict ===');
   ok('and the surface is literally the equation',
     /spec__b1/.test(resp.defs.z) && /spec__b2/.test(resp.defs.z), resp.defs.z);
 
-  // A SPECIFICATION WITH NO VALUES AT ALL still says what it is waiting for,
-  // and does not pretend to draw.
+  // A SPECIFICATION WITH NO VALUES AT ALL draws its SHAPE at placeholders,
+  // over assumed windows, and says both — it does not pretend the numbers are
+  // anybody's.
   const bare = buildProposal(wage([], undefined), { at: 1 });
   const m3 = unpack(bare.model);
   const r3 = m3.objects.find((o) => o.meta?.role === 'response');
   ok('a specification with no values still forms the component', !!r3);
-  ok('  and reports every coefficient as missing',
-    route(m3, r3, 'evaluate').status === 'incomplete');
+  ok('  every coefficient is a placeholder', m3.params.length === 3 && m3.params.every((q) => q.assumed === 'value'));
+  ok('  the basis says so', /placeholder coefficients/.test(String(r3.meta.basis)), String(r3.meta.basis));
+  ok('  the ranges are said to be assumed', /no stated range/.test(String(r3.meta.assumed)), String(r3.meta.assumed));
+  ok('  and still model-derived — every height is evaluated', r3.fidelity === 'model-derived');
+  ok('  with the provisional numbers carried by provenance', r3.provenance.origin === 'inference' && /PLACEHOLDER/.test(r3.provenance.detail));
+  ok('  and it draws', buildSpec(m3).primitives.length > 0);
 
   // …AND THE CONVERSATION IS TOLD BOTH THINGS.
   const said = JSON.stringify(modelStateFrom(m, buildSpec(m)).science);

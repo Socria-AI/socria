@@ -22,7 +22,7 @@
 // this product refuses; a stated form exercises the same primitives and lies
 // about nothing.
 
-import type { Model } from './schema';
+import { sanitizeModel, type Model } from './schema';
 
 const param = (
   id: string,
@@ -1034,6 +1034,46 @@ export function openSpecification(): Model {
   };
 }
 
+/**
+ * THE SCREENSHOT, AS A FIXTURE. A log-wage specification in education, a female
+ * indicator and their interaction, exactly as the extractor delivered it on the
+ * live product: no coefficient values, no `kinds`, a range for education only.
+ * It drew an empty frame with "FEMALE — needs a range" under it. Now the
+ * indicator is read from its name and said, the coefficients are placeholders
+ * and said, and the surface draws — and scripts/verify-views.mjs clicks every
+ * view of it in a real browser.
+ */
+export function wageInteraction(): Model {
+  return {
+    id: 'wage-interaction',
+    title: 'Log wage on education and gender interaction',
+    domain: 'econometrics',
+    equations: ['log(wage) = β₀ + β₁·educ + β₂·female + β₃·(educ × female) + u'],
+    assumptions: [
+      'Nothing here is estimated: no data is attached, and no coefficient has been given a value.',
+      'female is read as an indicator from its name. Declare kinds: {female: "continuous"} to say otherwise.',
+      'The coefficients are placeholders until you set them; the picture is the SHAPE the specification implies, not a claim about wages.',
+    ],
+    params: [],
+    objects: [
+      {
+        id: 'w',
+        kind: 'specification',
+        label: 'log wage',
+        meaning: 'A log-level wage specification where the return to a year of schooling may differ by gender — the interaction term is that difference.',
+        estimation: {
+          y: 'lwage',
+          x: ['educ', 'female', 'educ_x_female'],
+          terms: { educ_x_female: { op: 'interact', with: ['educ', 'female'] } },
+          over: { educ: [0, 20] },
+        },
+        fidelity: 'conceptual',
+        provenance: { origin: 'user', detail: 'the specification as typed, with nothing bound' },
+      },
+    ],
+  };
+}
+
 /** Every benchmark, by id — what the bench page lists and the suite walks. */
 export const LIBRARY: { id: string; label: string; build: () => Model; tests: string }[] = [
   { id: 'saddle', label: 'Saddle surface', build: saddle, tests: 'surfaces, axes, level sets, cross-sections' },
@@ -1055,8 +1095,15 @@ export const LIBRARY: { id: string; label: string; build: () => Model; tests: st
   { id: 'panel-model', label: 'Panel with unit effects', build: panelModel, tests: 'the within transform against the pooled estimate' },
   { id: 'time-series-model', label: 'Series with a lag', build: timeSeriesModel, tests: 'lag construction, rows dropped and reported' },
   { id: 'open-specification', label: 'Method undecided', build: openSpecification, tests: 'the choice stays with the person; nothing is fitted' },
+  { id: 'wage-interaction', label: 'Wage × gender, unbound', build: wageInteraction, tests: 'placeholders, an indicator read from its name, drawn with no data and no values' },
 ];
 
 export function modelById(id: string): Model | null {
-  return LIBRARY.find((m) => m.id === id)?.build() ?? null;
+  const raw = LIBRARY.find((m) => m.id === id)?.build() ?? null;
+  // SANITISED, like everything else. The bench page and the browser walk put a
+  // benchmark through sanitizeModel on the way in — a model arriving from a
+  // conversation or a saved project does — and the sanitiser now does real
+  // work (placeholder controls for unbound coefficients). A test walking the
+  // raw build saw a different model from the one on screen.
+  return raw ? (sanitizeModel(raw) ?? raw) : null;
 }

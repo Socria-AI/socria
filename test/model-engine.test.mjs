@@ -59,7 +59,11 @@ console.log('=== the schema holds what a model is, and refuses what it is not ==
   ok('  a malformed id is dropped', dirty.objects.length === 2);
   ok('  a relation to nothing is dropped', !dirty.objects[1].relations);
   ok('  a value outside its range is clamped', dirty.params[0].value === 1);
-  ok('  an empty range is not a control', dirty.params.length === 1);
+  // An empty range used to make the control vanish. A control with a VALUE is
+  // never thrown away now — the range around it is assumed, and said.
+  ok('  an empty range is widened around the value, not dropped',
+    dirty.params.length === 2 && dirty.params[1].assumed === 'range' && dirty.params[1].min < 1 && dirty.params[1].max > 1,
+    JSON.stringify(dirty.params[1]));
 
   ok('every kind and relation is a stable noun',
     OBJECT_KINDS.every((k) => /^[a-z-]+$/.test(k)) && RELATIONS.every((r) => /^[a-z-]+$/.test(r)));

@@ -32,6 +32,7 @@
  * product promise, and a promise needs a field rather than a convention.
  */
 import { NAME, SLUG, collidesWith } from './ids';
+import { canonicalCoefficientId, labelForSlot, placeholdersFor, slotsOf } from './binding';
 import type { TermDecl, TermOp } from './terms';
 
 export type Origin =
@@ -586,6 +587,17 @@ export interface ModelParam {
   means?: string;
   /** a value the reader has pinned — a held variable in a cross-section */
   held?: boolean;
+  /**
+   * WHAT THE ENGINE SUPPLIED RATHER THAN WAS GIVEN, so every surface can say so.
+   *
+   * `value`: a placeholder — nothing gave this control a number, and it stands
+   * at 0 (an intercept) or 1 (a slope) so the relationship draws. Cleared the
+   * moment somebody moves it (setParam). `range`: the number is theirs, the
+   * slider's span around it is not — a control arriving with a value and no
+   * min/max used to be thrown away in silence, and the coefficient it carried
+   * went unbound. See lib/model/binding.ts.
+   */
+  assumed?: 'value' | 'range';
 }
 
 export interface ModelLayer {
@@ -886,7 +898,12 @@ const text = (v: unknown, n: number): string =>
 const num = (v: unknown): number | null =>
   typeof v === 'number' && Number.isFinite(v) ? v : null;
 
-export function sanitizeObject(raw: unknown, drop?: (what: string) => void): ModelObject | null {
+export function sanitizeObject(
+  raw: unknown,
+  drop?: (what: string) => void,
+  /** a control the object's own declaration implies — a numeric coefficient becomes one */
+  want?: (p: ModelParam) => void
+): ModelObject | null {
   if (!raw || typeof raw !== 'object') return null;
   const r = raw as Record<string, unknown>;
   const id = text(r.id, 48);
@@ -1306,10 +1323,39 @@ export function sanitizeObject(raw: unknown, drop?: (what: string) => void): Mod
           const raw = est.coefficients as Record<string, unknown> | undefined;
           if (!raw || typeof raw !== 'object') return {};
           const c: Record<string, string> = {};
+          const slots = slotsOf({ x: xs, intercept: est.intercept === false ? false : undefined });
           for (const [k, v] of Object.entries(raw).slice(0, 24)) {
             const key = text(k, 40);
+            if (!key) continue;
+            // A NUMBER IS A VALUE, AND A VALUE IS A CONTROL. "coefficients":
+            // {"educ": 0.08} used to be dropped because 0.08 is not an id — so the
+            // one place the prompt invites a person's numbers refused them. It
+            // becomes the control for that slot, with the number as its value and
+            // the range around it assumed (and said).
+            const n = num(v);
+            if (n !== null) {
+              const slot = slots.find((x) => x.regressor === key)?.slot;
+              if (slot === undefined) {
+                drop?.(`a coefficient in ${id} names no regressor of it and is not in the model: ${key}`);
+                continue;
+              }
+              const cid = canonicalCoefficientId(id, slot);
+              const label = labelForSlot(slot);
+              want?.({
+                id: cid,
+                label,
+                value: n,
+                ...spanAround(n),
+                step: 0.01,
+                assumed: 'range',
+                means: `${label} = ${n}, as you gave it; the slider's range around it is assumed`,
+              });
+              c[key] = cid;
+              continue;
+            }
             const val = text(v, 48);
-            if (key && ID.test(val)) c[key] = val;
+            if (ID.test(val)) c[key] = val;
+            else drop?.(`a coefficient binding in ${id} was not understood and is not in the model: ${key} — ${String(v).slice(0, 40)}`);
           }
           return Object.keys(c).length ? { coefficients: c } : {};
         })(),
@@ -1403,21 +1449,57 @@ export function sanitizeObject(raw: unknown, drop?: (what: string) => void): Mod
   return out;
 }
 
-export function sanitizeParam(raw: unknown): ModelParam | null {
+/** The slider span around a number nobody gave a range for: wide enough to double it either way, never narrower than ±1. */
+export function spanAround(value: number): { min: number; max: number } {
+  const half = Math.max(Math.abs(value) * 2, 1);
+  return { min: value - half, max: value + half };
+}
+
+export function sanitizeParam(raw: unknown, drop?: (what: string) => void): ModelParam | null {
   if (!raw || typeof raw !== 'object') return null;
   const r = raw as Record<string, unknown>;
   const id = text(r.id, 48);
-  const value = num(r.value);
-  const min = num(r.min);
-  const max = num(r.max);
-  if (!ID.test(id) || value === null || min === null || max === null || max <= min) return null;
+  if (!ID.test(id)) {
+    drop?.(`a control had no usable id and is not in the model: ${String(r.id ?? r.label ?? '?').slice(0, 40)}`);
+    return null;
+  }
+  const given = num(r.value);
+  let min = num(r.min);
+  let max = num(r.max);
+  const ranged = min !== null && max !== null && max > min;
+  // A CONTROL WITH A VALUE AND NO RANGE WAS THROWN AWAY, SILENTLY. The
+  // extractor writes {"id": "b1", "value": 0.08} often enough that this was
+  // the commonest way a stated coefficient went missing — and with it the
+  // binding, the surface, the whole picture. The value is the thing somebody
+  // chose; the span of a slider is not a modelling decision, and it is said
+  // (`assumed: 'range'`).
+  let assumed: ModelParam['assumed'] | undefined =
+    r.assumed === 'value' || r.assumed === 'range' ? r.assumed : undefined;
+  let value: number;
+  if (given !== null && !ranged) {
+    ({ min, max } = spanAround(given));
+    value = given;
+    assumed = assumed ?? 'range';
+  } else if (given === null && ranged) {
+    // A range and no value: it stands in the middle until somebody sets it.
+    value = (min! + max!) / 2;
+    assumed = 'value';
+  } else if (given === null && !ranged) {
+    // A name alone. Still a control — a placeholder at 1, wide, and said.
+    value = 1;
+    ({ min, max } = spanAround(10));
+    assumed = 'value';
+  } else {
+    value = given!;
+  }
   const out: ModelParam = {
     id,
     label: text(r.label, 48) || id,
-    value: Math.min(max, Math.max(min, value)),
-    min,
-    max,
+    value: Math.min(max!, Math.max(min!, value)),
+    min: min!,
+    max: max!,
   };
+  if (assumed) out.assumed = assumed;
   const step = num(r.step);
   if (step !== null && step > 0) out.step = step;
   const units = text(r.units, 24);
@@ -1465,17 +1547,39 @@ export function sanitizeModel(raw: unknown): Model | null {
     }
   }
 
+  // Controls a declaration implies — a numeric coefficient — arrive here from
+  // sanitizeObject and join the list, after the ones the author wrote.
+  const implied: ModelParam[] = [];
   const objects = Array.isArray(r.objects)
     ? capped(
-        r.objects.map((o) => sanitizeObject(o, drop)).filter(Boolean) as ModelObject[],
+        r.objects.map((o) => sanitizeObject(o, drop, (p) => implied.push(p))).filter(Boolean) as ModelObject[],
         MODEL_CAPS.objects,
         'objects',
         drop
       )
     : [];
-  const params = Array.isArray(r.params)
-    ? capped(r.params.map(sanitizeParam).filter(Boolean) as ModelParam[], MODEL_CAPS.params, 'controls', drop)
+  const written = Array.isArray(r.params)
+    ? (r.params.map((p) => sanitizeParam(p, drop)).filter(Boolean) as ModelParam[])
     : [];
+  const params = capped(
+    [...written, ...implied.filter((p) => !written.some((w) => w.id === p.id))],
+    MODEL_CAPS.params,
+    'controls',
+    drop
+  );
+  // ── A COEFFICIENT NOTHING BINDS GETS A PLACEHOLDER CONTROL ──────
+  //
+  // Here, on the stored model, so the slider persists, an edit to it persists,
+  // and the expander binds it through the ordinary canonical-id path. A second
+  // sanitise finds the control already present and adds nothing. See
+  // lib/model/binding.ts for the rule and the reason.
+  for (const p of placeholdersFor({ objects, params })) {
+    if (params.length >= MODEL_CAPS.params) {
+      drop?.(`${p.label} has no value and no room is left for a placeholder control`);
+      continue;
+    }
+    params.push(p);
+  }
 
   // A relation to an object that is not in the model is not a relation. It
   // would draw an edge to nowhere and answer a question with a dangling id.
@@ -1727,7 +1831,13 @@ export function setParam(model: Model, id: string, value: number, at = 0): Model
   return {
     ...model,
     version: (model.version ?? 0) + 1,
-    params: model.params.map((q) => (q.id === id ? { ...q, value: next } : q)),
+    // A placeholder somebody moved is theirs now; an assumed RANGE stays
+    // assumed, because moving the handle says nothing about the span.
+    params: model.params.map((q) => {
+      if (q.id !== id) return q;
+      const { assumed, ...rest } = q;
+      return assumed === 'value' ? { ...rest, value: next } : { ...q, value: next };
+    }),
     lastChange: {
       what: id,
       from: p.value,
