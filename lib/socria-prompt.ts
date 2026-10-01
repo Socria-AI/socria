@@ -1281,13 +1281,9 @@ export interface ModelConfig {
    * they were in the middle of.
    */
   leaving?: string;
-  /**
-   * This model opens the Logos surface (a Thinking Map beside the chat).
-   * Both Logos and Logos 2 set it; Logos 2 adds `collab` on top.
-   */
+  /** This model opens the Logos surface (a Thinking Map beside the chat). */
   logosSurface?: boolean;
-  /** Logos 2: two people in one workspace. See lib/collab.ts. */
-  collab?: boolean;
+
   /**
    * TEMPORARILY WITHDRAWN — the model exists, answers, and is not offered.
    *
@@ -1597,21 +1593,29 @@ export const SOCRIA_MODELS: Record<SocriaModel, ModelConfig> = {
     // delete this line to offer it again.
     withdrawn: 'Logos 2 is the surface being worked on; this one is held back while that is true.',
   },
-  // Logos 2 — two people in one Logos workspace, thinking together in real
-  // time. Socria sits between them as the shared reasoning layer. It is the
-  // same surface and the same model as Logos; `collab` is what turns the room
-  // into a two-seat one. See lib/collab.ts.
+  // Logos 2 — the Logos surface with the representation engine in it: models
+  // the engine builds as objects in the workspace, with identity, revisions and
+  // undo.
+  //
+  // IT USED TO BE THE ROOM. Two people in one workspace with Socria between
+  // them, and `collab` was the flag that turned it into a two-seat one. The
+  // rooms were cut on the way to production — not disabled, removed, down to
+  // the tables and their RLS — and the production cut deleted this entry with
+  // them. But the NAME had moved on: by then Logos 2 meant the model
+  // workspace, and Logos 1 is withdrawn in favour of it (just above), so
+  // taking the entry out left the product with no Logos surface at all.
+  //
+  // So it is back, without the room, and described as what it now is.
   'logos-2': {
     id: 'logos-2',
     label: 'Socria Logos 2',
     short: 'Logos 2',
     description:
-      'Think together. Two people, one Thinking Map, Socria between you — naming the connections, the disagreements and the open questions.',
+      'The conversation beside a live map of your reasoning — and models the engine builds from what you say, which you can read, adjust and undo.',
     defaultOpenAIModel: 'gpt-5.6-sol',
     supportsDepth: false,
     requiresAuth: true,
     logosSurface: true,
-    collab: true,
   },
   // Core 4 — built, and selectable. It carried `soon` while it was an
   // announcement, which made the picker grey it out; that flag came off when

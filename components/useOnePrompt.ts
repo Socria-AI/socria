@@ -57,6 +57,11 @@ function readLocal(): PromptState {
       // Local, not per tab: the floor under the session cap. Two tabs used to
       // be two prompts.
       lastProactiveAt: Number(j.lastProactiveAt) || 0,
+      // How many welcome-backs this person has seen, which picks the variant,
+      // and when the last one was. Local rather than per tab: the point of
+      // both is to survive the tab closing.
+      welcomes: Number(j.welcomes) || 0,
+      lastWelcomeAt: Number(j.lastWelcomeAt) || 0,
       // Neither of these is persisted here; sessionStorage owns both.
       shownThisSession: 0,
       shownTriggers: [],
@@ -75,6 +80,8 @@ function writeLocal(s: PromptState) {
         lastDismissedAt: s.lastDismissedAt,
         lastShownAt: s.lastShownAt,
         lastProactiveAt: s.lastProactiveAt,
+        welcomes: s.welcomes,
+        lastWelcomeAt: s.lastWelcomeAt,
       })
     );
   } catch {
@@ -268,6 +275,12 @@ export function useOnePrompt({
       lastShownAt: Date.now(),
       lastProactiveAt: proactive ? Date.now() : state.current.lastProactiveAt,
       shownThisSession: state.current.shownThisSession + (proactive ? 1 : 0),
+      // The count IS the variant, so it moves when one is shown and never
+      // when one is suppressed — otherwise a person who is being correctly
+      // left alone would come back to the fourth line having never read the
+      // first three.
+      welcomes: reason === 'welcome-back' ? state.current.welcomes + 1 : state.current.welcomes,
+      lastWelcomeAt: reason === 'welcome-back' ? Date.now() : state.current.lastWelcomeAt,
       // 'asked' is the Socria One button, which is answered every time and
       // so is never remembered as having been said.
       shownTriggers:

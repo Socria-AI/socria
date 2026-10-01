@@ -1,11 +1,11 @@
 // The comparison page. Checkable against SOCRIA_MODELS in lib/socria-prompt.ts.
 //
-// Logos 2 IS in the table now, and the reason it was not is worth keeping: a
-// column for the two-seat room alone would have been four cells of "same as
-// Logos" and one that mattered. What changed is the model workspace — objects
-// the engine builds, with identity, revisions and undo — which is a different
-// kind of thing in the workspace rather than a second seat on the same one. See
-// /docs/logos-2.
+// Logos 2 IS in the table, and what it is has changed under the name: it
+// was a two-seat room, and the room is gone (see the production cut on
+// main). What earns it a column now is the model workspace — objects the
+// engine builds, with identity, revisions and undo — which is a different
+// kind of thing in the workspace rather than a second seat on the same
+// one. See /docs/logos-2.
 
 import Link from 'next/link';
 import { Article, H2, Callout, TableWrap } from '../Article';
@@ -28,8 +28,8 @@ export function Models() {
         <em>machinery around the conversation</em>. Core 2 is a voice. Core 3.1
         is a voice with a memory and a running read of the thread. Core 4 is a
         voice that decides, each turn, which part of the work is yours. Logos
-        is an environment. Logos 2 is that environment with a second seat in it
-        and computed models inside it.
+        is an environment. Logos 2 is that environment with computed
+        models inside it.
       </p>
 
       <H2 id="compare">Side by side</H2>
@@ -52,7 +52,7 @@ export function Models() {
               <td>Assertive pattern-naming with thread memory and adjustable depth</td>
               <td>Contributes by default; holds work back only on a reason you gave</td>
               <td>The conversation plus a live map of your reasoning</td>
-              <td>The same, for two people — and models the engine builds, which you edit and undo</td>
+              <td>The same, plus models the engine builds, which you edit and undo</td>
             </tr>
             <tr>
               <td><strong>Account</strong></td>
@@ -60,7 +60,7 @@ export function Models() {
               <td>Sign-in (or an access key)</td>
               <td>Sign-in (or an access key)</td>
               <td>Sign-in (or an access key)</td>
-              <td>Sign-in; both people, for a shared room</td>
+              <td>Sign-in (or an access key)</td>
             </tr>
             <tr>
               <td><strong>Thinking Depth control</strong></td>

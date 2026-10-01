@@ -579,8 +579,13 @@ export function DemoChips() {
 /* ── Logos 2: two people in one map ───────────────────────────────── */
 //
 // The real ThinkingMap, with a map whose nodes carry a `by` — which is how the
-// component already draws two seats, one colour each. Nothing here is a
-// mock-up of collaboration; it is the map a two-seat room produces, held still.
+// component draws two seats, one colour each.
+//
+// THE ROOM THAT MADE THESE MAPS IS GONE (cut on the way to production). The
+// `by` field is not: a node still records whose it is, and the Mind Graph and
+// the workspace both read that. So this stays as what it now is — the drawing
+// of attribution, held still — rather than a demonstration of a feature
+// nobody can reach.
 
 const TWO_SEATS: ThinkingMap = {
   context: 'deciding',

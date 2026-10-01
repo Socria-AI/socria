@@ -196,7 +196,7 @@ export function ModelPicker({
           ) : gated ? (
             <span className="need">Sign in</span>
           ) : surface ? (
-            <span className="tag">{m.collab ? 'think together' : 'a different surface'}</span>
+            <span className="tag">a different surface</span>
           ) : null}
         </span>
         {/* The headline says what it DOES; the name is the footnote. That

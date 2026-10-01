@@ -24,11 +24,9 @@ const ok = (n, c, x = '') => (c ? (pass++, console.log('  ok   ' + n)) : (fail++
 
 const tables = [...schema.matchAll(/create table if not exists (\w+)/g)].map((m) => m[1]);
 
-// Rooms are shared between two people, so they are NOT removed by a flat
-// "delete every row with your user_id on it" — purgeUserFromRooms expresses
-// the real semantics (see supabase/schema.sql). They must still be reachable
-// by BOTH routes, just not through OWNED_TABLES.
-const SHARED = new Set(['logos_rooms', 'logos_room_members', 'logos_room_events']);
+// Every table this product has is owned by exactly one person now: the shared
+// Logos 2 rooms, which were the one exception, are not in this release.
+const SHARED = new Set([]);
 
 // The actual contents of the OWNED_TABLES literal, not just "the file
 // mentions this word". An earlier version of this test matched anywhere in
@@ -45,8 +43,6 @@ console.log('=== the delete loop is real ===');
 ok('OWNED_TABLES is parsed', ownedTables.length > 0, 'could not find the literal');
 ok('the loop iterates it', /for \(const table of OWNED_TABLES\)/.test(del));
 ok('and deletes scoped to the user', /\.from\(table\)\s*\.delete\(\)\s*\.eq\('user_id', userId\)/.test(del));
-ok('the room purge is called, not just imported', /await purgeUserFromRooms\(userId/.test(del));
-ok('a purge failure stops the deletion', /failedAt: 'logos_rooms'/.test(del));
 
 console.log('=== the export reports its own failures ===');
 ok('every read records an error', (exp.match(/error: \w+Err/g) || []).length >= 9,

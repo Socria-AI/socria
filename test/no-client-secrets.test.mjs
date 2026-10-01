@@ -49,7 +49,7 @@ for (const v of BURNED) {
 }
 
 console.log('\n=== the server-only modules stay server-only ===');
-const SERVER_ONLY = ['lib/access-codes-server.ts', 'lib/route-guard.ts', 'lib/logos-rooms-server.ts'];
+const SERVER_ONLY = ['lib/access-codes-server.ts', 'lib/route-guard.ts'];
 for (const m of SERVER_ONLY) {
   const src = readFileSync(join(root, m), 'utf8');
   ok(`${m} declares server-only`, /^import 'server-only';/m.test(src));

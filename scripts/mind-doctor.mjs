@@ -91,15 +91,15 @@ const COLUMNS = [
   ['mind_sources', 'project_id', 'which Project a file was added to'],
 ];
 
-// Not the Mind Graph, but they landed in schema.sql in the same week and go
-// missing for the same reason — a database that predates both. Checked here
-// because a deployment missing one is almost always missing the other, and
-// finding that out two weeks later by trying to share a Logos room is worse
-// than a line of output now.
+// Not the Mind Graph, but it landed in schema.sql in the same week and goes
+// missing for the same reason — a database that predates both.
+//
+// THE THREE logos_room_* TABLES USED TO BE HERE and are not any more. They were
+// dropped with the rooms, schema and RLS together, so a doctor that still
+// checked for them reported three tables missing on a correctly migrated
+// database — which is the exact failure this script exists to prevent, pointed
+// the wrong way.
 const NEIGHBOURS = [
-  ['logos_rooms', 'Logos 2 rooms'],
-  ['logos_room_members', 'who is in a Logos 2 room'],
-  ['logos_room_events', 'what was said in one'],
   ['lifecycle_emails', 'email preferences — an unsubscribe cannot be recorded without it'],
 ];
 

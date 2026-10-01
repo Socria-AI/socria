@@ -46,18 +46,6 @@ import {
 } from '@/lib/auth-flow';
 import type { AuthKind } from '@/lib/auth-links';
 
-function GoogleGlyph() {
-  // The design's own mark: an open ring with a bar, drawn in the stroke
-  // weight the rest of the register uses rather than Google's four-colour
-  // logo, which is the one thing on the page that would not be Socria's.
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M20.5 12a8.5 8.5 0 1 1-2.6-6.1" />
-      <path d="M12.4 12h8.1" />
-    </svg>
-  );
-}
-
 export function AuthForm({
   kind,
   redirectTo,
@@ -131,40 +119,24 @@ export function AuthForm({
     setBusy(false);
   };
 
-  // ── Google ────────────────────────────────────────────────────────
+  // ── GOOGLE IS NOT OFFERED HERE ────────────────────────────────────
   //
-  // authenticateWithRedirect leaves the page, so there is nothing to await
-  // and no success branch: either the browser navigates or the call throws.
-  async function google() {
-    if (!ready) return;
-    setBusy(true);
-    setErr(null);
-    const complete = redirectTo ?? (kind === 'sign-up' ? '/onboarding' : AFTER_AUTH);
-    try {
-      const flow = kind === 'sign-in' ? signIn : signUp;
-      await flow?.authenticateWithRedirect({
-        strategy: 'oauth_google',
-        redirectUrl: '/sso-callback',
-        redirectUrlComplete: complete,
-      });
-    } catch (e) {
-      fail(e, 'Could not reach Google. Try again, or use your email.');
-    }
-  }
-
-  // Backing out of Google — pressing Back, or closing the consent screen —
-  // returns to this page with `busy` still true from the redirect that never
-  // happened, so every control was disabled and the only way forward was a
-  // reload. A restored page is a fresh one.
-  useEffect(() => {
-    const revive = () => setBusy(false);
-    window.addEventListener('pageshow', revive);
-    window.addEventListener('focus', revive);
-    return () => {
-      window.removeEventListener('pageshow', revive);
-      window.removeEventListener('focus', revive);
-    };
-  }, []);
+  // The button and its handler are gone: the flow was not completing, and a
+  // sign-in button that does not sign anyone in is worse than one fewer way
+  // in — it is the first thing somebody presses and the last thing they try.
+  // Email is the whole of it now, and it was always the path most people
+  // took anyway.
+  //
+  // WHAT IS DELIBERATELY LEFT STANDING. /sso-callback stays a real route, so
+  // anybody who was mid-redirect when this shipped still lands and finishes
+  // rather than meeting a 404 holding a valid session. An account that was
+  // CREATED with Google still signs in by email code, because Clerk holds the
+  // verified address — and the one case where it cannot is answered below,
+  // with something a person can actually act on.
+  //
+  // Bringing it back is this block, the button, and taking `oauth_google` out
+  // of WITHHELD_OAUTH in lib/auth-flow.ts, which is what also keeps it out of
+  // the account page's "connect an account" row.
 
   // ── the email step ────────────────────────────────────────────────
   // NOTE ON HOW THESE ARE FIRED. The design system's <Button> renders
@@ -191,11 +163,14 @@ export function AuthForm({
         const chosen = chooseFactor(res.supportedFirstFactors as never);
         setFactor(chosen);
         if (!chosen) {
-          // An account that has no password and no mailable address is an
-          // OAuth-only account. Saying which button to press is the whole
-          // job here; an empty form is where people give up.
+          // No password and no mailable address: an account made with Google,
+          // back when that was offered. There is no button to point at any
+          // more, so this must point at a person instead — telling somebody
+          // their account signs in with a method the page no longer has is
+          // the exact shape of being stranded.
           setErr(
-            'This account signs in with Google. Use the button above.'
+            'This account was made with Google sign-in, which Socria no longer ' +
+              'offers. Email hellosocria@gmail.com and we will move it to email sign-in.'
           );
           setBusy(false);
           return;
@@ -414,16 +389,6 @@ export function AuthForm({
     <div className="stack">
       {step === 'identify' && (
         <>
-          <button type="button" className="provider" onClick={google} disabled={!ready || busy}>
-            <GoogleGlyph /> Continue with Google
-          </button>
-
-          <div className="row-split">
-            <hr className="rule" />
-            <span>or</span>
-            <hr className="rule" />
-          </div>
-
           <form className="stack" onSubmit={identify}>
             <div className="field">
               <label htmlFor="auth-email">Your email</label>

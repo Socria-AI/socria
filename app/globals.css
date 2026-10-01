@@ -7431,7 +7431,7 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
 
    On a phone it is a bottom sheet — thumb-reachable, covering the least of
    what someone was reading. On a wider screen it centres. */
-.logos-root .lg-op-scrim {
+:is(.logos-root, .lg-tokens) .lg-op-scrim {
   --op-blue-0: var(--one-blue-0);
   --op-blue-1: var(--one-blue-1);
   --op-blue-2: var(--one-blue-2);
@@ -7443,13 +7443,13 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
   position: fixed; inset: 0; z-index: 95;
   display: flex; align-items: flex-end; justify-content: center;
 }
-.logos-root .lg-op-back {
+:is(.logos-root, .lg-tokens) .lg-op-back {
   position: absolute; inset: 0;
   background: rgba(15, 36, 48, 0.5);
   backdrop-filter: blur(3px);
   animation: lgOpFade 0.2s ease both;
 }
-.logos-root .lg-op-sheet {
+:is(.logos-root, .lg-tokens) .lg-op-sheet {
   position: relative; z-index: 1;
   width: 100%; max-width: 100%;
   max-height: 88vh; overflow-y: auto;
@@ -7464,21 +7464,21 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
   animation: lgOpUp 0.26s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 /* the inner rule, drawn just inside the plate */
-.logos-root .lg-op-sheet::before {
+:is(.logos-root, .lg-tokens) .lg-op-sheet::before {
   content: ""; position: absolute; inset: 9px;
   border: 1px solid rgba(240, 234, 216, 0.14);
   border-radius: 8px 8px 0 0;
   pointer-events: none;
 }
 /* the same faint grain the magazine pages carry */
-.logos-root .lg-op-sheet::after {
+:is(.logos-root, .lg-tokens) .lg-op-sheet::after {
   content: ""; position: absolute; inset: 0; pointer-events: none;
   border-radius: inherit; opacity: 0.5; mix-blend-mode: overlay;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
 }
 @media (min-width: 640px) {
-  .logos-root .lg-op-scrim { align-items: center; padding: 24px; }
-  .logos-root .lg-op-sheet {
+  :is(.logos-root, .lg-tokens) .lg-op-scrim { align-items: center; padding: 24px; }
+  :is(.logos-root, .lg-tokens) .lg-op-sheet {
     width: min(452px, 100%);
     padding: 38px 40px 30px;
     border: 1px solid rgba(240, 234, 216, 0.22);
@@ -7486,11 +7486,11 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
     box-shadow: 0 60px 140px -60px rgba(0, 0, 0, 0.85);
     animation: lgOpIn 0.24s cubic-bezier(0.16, 1, 0.3, 1) both;
   }
-  .logos-root .lg-op-sheet::before { inset: 10px; border-radius: 0; }
+  :is(.logos-root, .lg-tokens) .lg-op-sheet::before { inset: 10px; border-radius: 0; }
 }
 
 /* eyebrow — the cover's tracked micro-label */
-.logos-root .lg-op-eyebrow {
+:is(.logos-root, .lg-tokens) .lg-op-eyebrow {
   position: relative; z-index: 1;
   margin: 0 0 18px;
   font-size: 9.5px; font-weight: 600;
@@ -7501,23 +7501,23 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
    room to spare and wraps on a 320px one. Tightening rather than shortening
    keeps the same words on every device. */
 @media (max-width: 379px) {
-  .logos-root .lg-op-eyebrow { font-size: 8.5px; letter-spacing: 0.2em; }
+  :is(.logos-root, .lg-tokens) .lg-op-eyebrow { font-size: 8.5px; letter-spacing: 0.2em; }
 }
 
 /* the monogram in its ring */
-.logos-root .lg-op-mono {
+:is(.logos-root, .lg-tokens) .lg-op-mono {
   position: relative; z-index: 1;
   width: 46px; height: 46px; border-radius: 50%;
   border: 1px solid rgba(240, 234, 216, 0.3);
   display: grid; place-items: center; margin: 0 auto 18px;
 }
-.logos-root .lg-op-mono span {
+:is(.logos-root, .lg-tokens) .lg-op-mono span {
   font-family: var(--op-serif); font-style: italic;
   font-size: 21px; line-height: 1; color: var(--op-pale);
   transform: translateY(-1px);
 }
 
-.logos-root .lg-op-title {
+:is(.logos-root, .lg-tokens) .lg-op-title {
   position: relative; z-index: 1;
   margin: 0;
   font-family: var(--op-serif);
@@ -7527,19 +7527,19 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
 }
 
 /* price, set as the cover sets it: serif amount, tracked period */
-.logos-root .lg-op-price {
+:is(.logos-root, .lg-tokens) .lg-op-price {
   position: relative; z-index: 1;
   margin: 11px 0 0;
   display: flex; align-items: baseline; gap: 9px; justify-content: center;
 }
-.logos-root .lg-op-amt { font-family: var(--op-serif); font-size: 21px; }
-.logos-root .lg-op-per {
+:is(.logos-root, .lg-tokens) .lg-op-amt { font-family: var(--op-serif); font-size: 21px; }
+:is(.logos-root, .lg-tokens) .lg-op-per {
   font-size: 9.5px; letter-spacing: 0.24em; text-transform: uppercase;
   color: rgba(240, 234, 216, 0.5); font-weight: 600;
 }
 
 /* the standfirst voice — serif italic, held to a narrow measure */
-.logos-root .lg-op-body {
+:is(.logos-root, .lg-tokens) .lg-op-body {
   position: relative; z-index: 1;
   /* 38ch keeps the longest body in the table to four lines. The cover's
      standfirst runs to two; five ragged centred lines stops reading as a
@@ -7550,7 +7550,7 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
   color: var(--op-pale);
 }
 
-.logos-root .lg-op-err {
+:is(.logos-root, .lg-tokens) .lg-op-err {
   position: relative; z-index: 1;
   margin: 16px auto 0; max-width: 36ch; padding: 9px 12px;
   border: 1px solid rgba(184, 205, 217, 0.35); border-radius: 2px;
@@ -7558,14 +7558,14 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
   font-size: 12.5px; line-height: 1.5; color: var(--op-pale);
 }
 
-.logos-root .lg-op-actions {
+:is(.logos-root, .lg-tokens) .lg-op-actions {
   position: relative; z-index: 1;
   margin-top: 24px; padding-top: 22px;
   border-top: 1px solid rgba(240, 234, 216, 0.16);
   display: flex; flex-direction: column; align-items: center; gap: 14px;
 }
 /* the cream pill */
-.logos-root .lg-op-go {
+:is(.logos-root, .lg-tokens) .lg-op-go {
   display: inline-flex; align-items: center; justify-content: center; gap: 0.55em;
   min-height: 48px; padding: 0 30px; max-width: 100%;
   border: none; border-radius: 999px;
@@ -7574,23 +7574,23 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
   cursor: pointer;
   transition: background 0.25s, transform 0.25s;
 }
-.logos-root .lg-op-go:hover:not(:disabled) { background: #fff; transform: translateY(-2px); }
-.logos-root .lg-op-go:disabled { opacity: 0.6; cursor: default; }
-.logos-root .lg-op-go:focus-visible { outline: 2px solid var(--op-pale); outline-offset: 3px; }
-.logos-root .lg-op-go .ar { transition: transform 0.2s; }
-.logos-root .lg-op-go:hover:not(:disabled) .ar { transform: translateX(3px); }
+:is(.logos-root, .lg-tokens) .lg-op-go:hover:not(:disabled) { background: #fff; transform: translateY(-2px); }
+:is(.logos-root, .lg-tokens) .lg-op-go:disabled { opacity: 0.6; cursor: default; }
+:is(.logos-root, .lg-tokens) .lg-op-go:focus-visible { outline: 2px solid var(--op-pale); outline-offset: 3px; }
+:is(.logos-root, .lg-tokens) .lg-op-go .ar { transition: transform 0.2s; }
+:is(.logos-root, .lg-tokens) .lg-op-go:hover:not(:disabled) .ar { transform: translateX(3px); }
 /* the quiet way out, in the cover's secondary voice */
-.logos-root .lg-op-not {
+:is(.logos-root, .lg-tokens) .lg-op-not {
   border: none; background: transparent; cursor: pointer; padding: 2px 0;
   font-family: var(--op-serif); font-style: italic; font-size: 16px;
   color: var(--op-pale);
   border-bottom: 1px solid rgba(184, 205, 217, 0.4);
   transition: color 0.2s, border-color 0.2s;
 }
-.logos-root .lg-op-not:hover { color: var(--op-cream); border-bottom-color: var(--op-cream); }
-.logos-root .lg-op-not:focus-visible { outline: 2px solid var(--op-pale); outline-offset: 3px; }
+:is(.logos-root, .lg-tokens) .lg-op-not:hover { color: var(--op-cream); border-bottom-color: var(--op-cream); }
+:is(.logos-root, .lg-tokens) .lg-op-not:focus-visible { outline: 2px solid var(--op-pale); outline-offset: 3px; }
 
-.logos-root .lg-op-foot {
+:is(.logos-root, .lg-tokens) .lg-op-foot {
   position: relative; z-index: 1;
   /* Stacked by default. On a narrow sheet these two never fit on one line,
      and wrapping a row leaves the separator orphaned at the end of the first
@@ -7600,16 +7600,16 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
   margin: 22px 0 0;
   font-size: 11.5px; line-height: 1.5; color: rgba(240, 234, 216, 0.42);
 }
-.logos-root .lg-op-dot { display: none; }
+:is(.logos-root, .lg-tokens) .lg-op-dot { display: none; }
 @media (min-width: 640px) {
-  .logos-root .lg-op-foot { flex-direction: row; flex-wrap: wrap; gap: 7px; }
-  .logos-root .lg-op-dot { display: inline; opacity: 0.55; }
+  :is(.logos-root, .lg-tokens) .lg-op-foot { flex-direction: row; flex-wrap: wrap; gap: 7px; }
+  :is(.logos-root, .lg-tokens) .lg-op-dot { display: inline; opacity: 0.55; }
 }
-.logos-root .lg-op-more {
+:is(.logos-root, .lg-tokens) .lg-op-more {
   color: var(--op-pale); text-decoration: none;
   border-bottom: 1px solid transparent; transition: border-color 0.2s;
 }
-.logos-root .lg-op-more:hover { border-bottom-color: rgba(184, 205, 217, 0.55); }
+:is(.logos-root, .lg-tokens) .lg-op-more:hover { border-bottom-color: rgba(184, 205, 217, 0.55); }
 
 @keyframes lgOpFade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes lgOpUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: none; } }
@@ -7618,10 +7618,10 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
 /* Someone who has asked for less motion gets none of the above. The sheet
    still appears; it simply does not travel to get there. */
 @media (prefers-reduced-motion: reduce) {
-  .logos-root .lg-op-sheet,
-  .logos-root .lg-op-back { animation: none; }
-  .logos-root .lg-op-go:hover:not(:disabled) { transform: none; }
-  .logos-root .lg-op-go .ar { transition: none; }
+  :is(.logos-root, .lg-tokens) .lg-op-sheet,
+  :is(.logos-root, .lg-tokens) .lg-op-back { animation: none; }
+  :is(.logos-root, .lg-tokens) .lg-op-go:hover:not(:disabled) { transform: none; }
+  :is(.logos-root, .lg-tokens) .lg-op-go .ar { transition: none; }
 }
 
 /* ── Phones and touch ───────────────────────────────────────────────

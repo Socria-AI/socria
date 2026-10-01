@@ -92,6 +92,8 @@ export const TRIGGER_REASONS = [
   'returning-thinker',
   // low — they pressed the button that says Socria One
   'asked',
+  // low — they came back. See WELCOME_BACK and the branch in decide().
+  'welcome-back',
 ] as const;
 export type TriggerReason = (typeof TRIGGER_REASONS)[number];
 
@@ -116,6 +118,57 @@ export interface TriggerSpec {
   title: string;
   /** Only for triggers with no counter; otherwise boundaryNote() supplies it. */
   body?: string;
+}
+
+/**
+ * What the welcome-back prompt says, in rotation.
+ *
+ * FOUR THINGS THAT ARE ALL TRUE, rather than one thing said four times. Each
+ * one is a different reason the count matters — what is carried between
+ * conversations, what the free tier actually is, what happens to the work
+ * already done — and none of them is a countdown, a discount, or a claim that
+ * the free tier is worse at thinking. It is not: it is the same Socria, twice
+ * a month.
+ *
+ * The person picking these up in sequence should feel like they are being told
+ * something, not measured. If a line here ever reads as pressure, it is the
+ * wrong line.
+ */
+export const WELCOME_BACK: readonly { title: string; body: string }[] = [
+  {
+    title: 'Pick it back up',
+    body:
+      'Your free month holds two lines of thinking. Socria One holds as many ' +
+      'as you have, and carries what it learns about how you reason from each ' +
+      'one into the next.',
+  },
+  {
+    title: 'What stays between conversations',
+    body:
+      'The free tier gives you the whole of Socria twice a month. What Socria ' +
+      'One adds is continuity: your positions, what you have already settled, ' +
+      'and how you tend to think, carried forward instead of restarting.',
+  },
+  {
+    title: 'Where this goes next',
+    body:
+      'Long work is where this product earns its place — a decision that runs ' +
+      'for weeks, a question you keep returning to. Socria One is the version ' +
+      'without a count on it.',
+  },
+  {
+    title: 'Everything you have made stays yours',
+    body:
+      'Nothing here expires and nothing is taken back: every conversation and ' +
+      'every map you have made stays open on the free tier. Socria One is ' +
+      'simply more of them, and more carried between them.',
+  },
+];
+
+/** Which one this time. Cycles, so nobody is shown the same line twice running. */
+export function welcomeVariant(shown: number): { title: string; body: string } {
+  const n = Number.isFinite(shown) && shown > 0 ? Math.floor(shown) : 0;
+  return WELCOME_BACK[n % WELCOME_BACK.length];
 }
 
 /**
@@ -231,6 +284,33 @@ export const TRIGGERS: Record<TriggerReason, TriggerSpec> = {
       'between lines of thinking, and carries it into Logos.',
   },
 
+  /**
+   * They came back, and they are still on the free tier.
+   *
+   * THIS ONE BREAKS THIS FILE'S OWN RULE, KNOWINGLY. Everything above is built
+   * on "a prompt is only ever shown because the PERSON did something that made
+   * it relevant — never because time passed, never because a session started".
+   * This is shown because a session started. It is a product decision taken
+   * deliberately, so the honest thing is to say so here rather than to dress
+   * the timer up as an event.
+   *
+   * What it keeps of the original rule, because those parts were never about
+   * frequency: a member is never sold to, nothing is shown in a reflective
+   * conversation, it never stacks on top of something else, never interrupts
+   * a first visit — somebody who has not used the product yet is being asked
+   * to buy something they have not seen — and once per tab, once per six
+   * hours, so a reload is not a second ask.
+   *
+   * The copy rotates (WELCOME_BACK). Four sentences that say four different
+   * true things beats one sentence a person learns to stop reading.
+   */
+  'welcome-back': {
+    category: 'proactive',
+    intent: 'low',
+    title: WELCOME_BACK[0].title,
+    body: WELCOME_BACK[0].body,
+  },
+
   'returning-thinker': {
     category: 'proactive',
     intent: 'medium',
@@ -268,12 +348,19 @@ function fill(text: string): string {
   return text;
 }
 
-/** Title and body for a trigger, with the boundary worded in only one place. */
-export function copyFor(reason: TriggerReason): PromptCopy {
+/**
+ * Title and body for a trigger, with the boundary worded in only one place.
+ *
+ * `shown` is how many welcome-backs this person has already seen, and it is
+ * read by that trigger alone — every other prompt says one thing because it is
+ * the answer to one question.
+ */
+export function copyFor(reason: TriggerReason, shown = 0): PromptCopy {
   const spec = TRIGGERS[reason];
+  const variant = reason === 'welcome-back' ? welcomeVariant(shown) : null;
   return {
-    title: spec.title,
-    body: spec.counter ? boundaryNote(spec.counter) : fill(spec.body ?? ''),
+    title: variant?.title ?? spec.title,
+    body: variant ? variant.body : spec.counter ? boundaryNote(spec.counter) : fill(spec.body ?? ''),
     // One action. "Continue" rather than "Upgrade", because what they are
     // doing is continuing — the transaction is incidental to it.
     primary:
@@ -371,6 +458,14 @@ function saidAlready(state: PromptState, reason: TriggerReason): boolean {
 /** No proactive prompt within this of the last one, whatever tab showed it. */
 export const PROACTIVE_FLOOR_MS = DAY_MS;
 
+/**
+ * The floor under welcome-back: a reload, a second tab, or coming back from
+ * the checkout page is not "coming back". Six hours is long enough that it
+ * takes a real absence to see it twice in a day, short enough that somebody
+ * who works in the morning and again at night is greeted both times.
+ */
+export const WELCOME_GAP_MS = 6 * 60 * 60 * 1000;
+
 // ── the decision ────────────────────────────────────────────────────
 
 export interface PromptState {
@@ -390,6 +485,10 @@ export interface PromptState {
   lastProactiveAt: number;
   /** proactive prompts shown in this browser session */
   shownThisSession: number;
+  /** how many welcome-backs this person has been shown, all time — the variant */
+  welcomes: number;
+  /** when the last welcome-back was shown, in any tab */
+  lastWelcomeAt: number;
   /**
    * Which triggers have already been explained in this browser session.
    *
@@ -408,6 +507,8 @@ export const EMPTY_PROMPT_STATE: PromptState = {
   lastShownAt: 0,
   lastProactiveAt: 0,
   shownThisSession: 0,
+  welcomes: 0,
+  lastWelcomeAt: 0,
   shownTriggers: [],
 };
 
@@ -496,6 +597,33 @@ export function decide(input: DecideInput): Decision {
     return yes();
   }
 
+  // ── they came back ────────────────────────────────────────────────
+  //
+  // Its own rationing, and not the one below: the proactive rules there exist
+  // to ration prompts NOBODY asked for and nothing prompted, and this is one
+  // of those — but it is a product decision to show it on return rather than
+  // on evidence of engagement, so it needs the rules that keep it decent and
+  // not the ones that would silence it for six months after two dismissals.
+  //
+  // What it keeps: never to a member (above), never stacked (above), never in
+  // a reflective conversation, never on a first visit, once per tab, and at
+  // most once every six hours across tabs.
+  if (reason === 'welcome-back') {
+    if (saidAlready(state, reason)) return no('said-already');
+    if (state.shownThisSession >= 1) return no('session-cap');
+    if (state.lastWelcomeAt > 0 && now - state.lastWelcomeAt < WELCOME_GAP_MS) {
+      return no('cooldown');
+    }
+    if (input.context && SENSITIVE_CONTEXTS.includes(input.context)) {
+      return no('sensitive-context');
+    }
+    // A FIRST VISIT IS NOT A RETURN. Somebody with nothing saved has not used
+    // the product yet, and asking them to buy it is asking them to buy
+    // something they have not seen. One kept conversation is the whole bar.
+    if (!input.engagement || input.engagement.sessions < 1) return no('not-engaged');
+    return yes();
+  }
+
   // 'asked' is proactive by category but is a button press: it bypasses the
   // rationing for the same reason entitlement prompts do, and it is not
   // subject to the once-per-tab rule either — pressing a button labelled
@@ -540,7 +668,7 @@ export function decide(input: DecideInput): Decision {
       reason,
       category: spec.category,
       intent: spec.intent,
-      copy: copyFor(reason),
+      copy: copyFor(reason, state.welcomes),
     };
   }
 }
