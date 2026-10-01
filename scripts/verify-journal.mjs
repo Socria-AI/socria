@@ -112,6 +112,25 @@ ok('  and the type steps down for a longer question', after.size < parseFloat(st
 ok('  and the box grew rather than scrolling', after.height > 40, `${after.height}px`);
 await page.screenshot({ path: `${SHOTS}/02-door-typed.png` });
 
+// ── the Door's one way past it ──────────────────────────────────────
+// "Or watch it work first" is the escape for somebody not ready to type, and
+// it was a link to nothing: the anchor it names lives on the design's own
+// <span id="stage"> and I ported the link without it. A dead anchor does not
+// throw — the page simply does not move.
+{
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.waitForTimeout(300);
+  await page.click('.jr-root .door-alt a');
+  await page.waitForTimeout(900);
+  const got = await page.evaluate(() => {
+    const e = document.querySelector('.jr-root .stage-sec');
+    const r = e?.getBoundingClientRect();
+    return { y: Math.round(window.scrollY), inView: !!r && r.top < innerHeight && r.bottom > 0 };
+  });
+  ok('"watch it work first" goes somewhere', got.y > 200, `${got.y}px`);
+  ok('  and that somewhere is the stage', got.inView, JSON.stringify(got));
+}
+
 // ── the slip appears once the door is behind you ────────────────────
 await page.evaluate(() => window.scrollTo(0, 1400));
 await page.waitForTimeout(500);
@@ -134,6 +153,13 @@ ok('the definition is the one the design wrote', /never hands you the conclusion
 ok('the pair asks both questions', /How good an answer/.test(copy.differs) && /How much clearer/.test(copy.differs));
 ok('and it names the alternatives rather than scoring them', /Claude, ChatGPT and Gemini/.test(copy.differs) && !/✓|✗/.test(copy.differs));
 ok('the displaced headline closes the issue', /AI gets stronger/.test(copy.close), copy.close);
+  // The two ways on, in the design's own words.
+  const ways = await page.$$eval('.jr-root .close .row a', (as) => as.map((a) => `${a.textContent.trim()}|${a.getAttribute('href')}`));
+  // The arrow is inside the anchor's own text, so this matches the words and
+  // the destination rather than assuming they are adjacent.
+  ok('the close offers the free tier by name',
+    ways.some((w) => /Try Socria — free/.test(w) && w.endsWith('|/chat')), ways.join(' · '));
+  ok('  and reading on about Logos', ways.some((w) => /about Logos\|\/logos/.test(w)), ways.join(' · '));
 
 // The two new sections, in the frame, revealed.
 await page.evaluate(() => document.querySelector('.jr-root #differs')?.scrollIntoView());

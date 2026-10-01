@@ -225,6 +225,13 @@ export function JournalIssue() {
         When did you last change your mind?
       </Turn>
 
+      {/* THE ANCHOR THE DOOR POINTS AT. "Or watch it work first" is the one
+          way past the composer for somebody not ready to type, and it was a
+          link to nothing: the id lives on the design's own `<span id="stage">`
+          immediately before the Stage, and I ported the link without it. A
+          dead anchor does not fail — the page simply does not move, which
+          reads as the link being broken on purpose. */}
+      <span id="stage" />
       <Stage />
 
       {/* WHAT IT IS — one screen, after the stage. Shorter than a spread,
@@ -605,12 +612,19 @@ export function JournalIssue() {
             <span data-readtime="">under a minute</span>, and I never gave you an answer.{' '}
             <em>Good.</em>
           </p>
+          {/* THE TWO WAYS ON, in the design's own words. "Open Core 4" names
+              the engine to somebody who has just been told what Core 4 is and
+              may not yet want it by name; "Try Socria — free" says what it
+              costs, which is the question anybody who has read this far is
+              actually holding. The second goes to Logos rather than to One —
+              the issue has already made the argument, and the next thing to
+              read about is the environment, not the price. */}
           <div className="row rv d2">
             <Button as="a" href="/chat" variant="primary" size="xl" onDark arrow>
-              Open Core 4
+              Try Socria — free
             </Button>
-            <Button as="a" href="/one" variant="link" onDark>
-              or read the One issue
+            <Button as="a" href="/logos" variant="link" onDark>
+              or read on about Logos
             </Button>
           </div>
 
