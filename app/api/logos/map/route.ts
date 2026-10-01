@@ -17,6 +17,7 @@ import OpenAI from 'openai';
 import { auth } from '@clerk/nextjs/server';
 import {
   buildMapPrompt,
+  buildProposePrompt,
   sanitizeMap,
   LOGOS_MODEL,
   LOGOS_FALLBACK_MODEL,
@@ -252,7 +253,46 @@ export async function POST(req: NextRequest) {
     } | null = null;
     // At the top level now, not inside the picture — see sanitizeMap. Read
     // from the sanitised map so the legacy inlet is already hoisted.
-    const proposal = next.propose;
+    let proposal = next.propose;
+    // ── THE SECOND PASS ───────────────────────────────────────────
+    //
+    // "Model a pulsar" came back as a concept node and a paragraph asking
+    // which aspect of a pulsar they were interested in. The ask was read
+    // correctly — construct, a model — and the extractor, busy with the map,
+    // proposed nothing; the route then reported "nothing was proposed — that
+    // is a fault here" and left it at that. Reporting a fault is not fixing
+    // it. So when the turn wanted a construction and no proposal came, ask
+    // once more, for the proposal alone (lib/logos.ts buildProposePrompt),
+    // and run the on-ramp on what comes back. One retry, never more, and the
+    // engine still validates every word of it.
+    const wantedButNone = !proposal && settle(next.ask ?? null, { proposed: false, built: false }).wanted;
+    let secondPass = false;
+    if (wantedButNone) {
+      try {
+        const again = await openai.chat.completions.create({
+          model: configured,
+          temperature: 0,
+          max_tokens: CEILING,
+          response_format: { type: 'json_object' },
+          messages: [
+            { role: 'system', content: buildProposePrompt(next.ask ?? null) },
+            { role: 'user', content: transcript },
+          ],
+        });
+        const text = again.choices?.[0]?.message?.content;
+        const got = text ? JSON.parse(text) : null;
+        const p = got && typeof got === 'object' ? (got.propose ?? null) : null;
+        if (p && typeof p === 'object') {
+          proposal = p;
+          secondPass = true;
+          console.info('logos map: construction asked for and not proposed — proposed on the second pass');
+        } else {
+          console.info('logos map: second pass declined to propose:', String(got?.because ?? '').slice(0, 160));
+        }
+      } catch (e) {
+        console.warn('logos map: second pass failed', e);
+      }
+    }
     let made: ReturnType<typeof openFromProposal> | null = null;
     if (proposal) {
       made = openFromProposal(models, proposal, { at: Date.now() });
@@ -303,6 +343,7 @@ export async function POST(req: NextRequest) {
               const left = unanswered(next.ask ?? null, modelFor(made!.doc!));
               return left.length ? { unanswered: left } : {};
             })(),
+            ...(secondPass ? { secondPass: true } : {}),
           }
         : { ok: false, says: made.says, ...(verdict.failure ? { failure: verdict.failure } : {}) };
     } else if (verdict.wanted) {
