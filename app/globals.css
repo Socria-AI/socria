@@ -8606,7 +8606,9 @@ html.anim-off .logos-root.is-firstmap-node .lg-node, html:not(.js) .logos-root.i
 }
 .logos-root .mp-key:hover { border-color: var(--lg-ink); color: var(--lg-ink); }
 .logos-root .mp-key[aria-pressed="true"] { background: var(--lg-ink); border-color: var(--lg-ink); color: var(--lg-panel); }
-.logos-root .mp-x { font-size: 1.2rem; line-height: 1; color: var(--lg-ink-40); padding: 0 2px; background: none; border: none; cursor: pointer; }
+.logos-root .mp-x { font-size: 1.2rem; line-height: 1; color: var(--lg-ink-40); padding: 0 2px; background: none; border: none; cursor: pointer; flex: 0 0 auto; }
+/* with a surface up the caption slot holds "a working surface" and the close sits after it */
+.logos-root .mp-top .st + .mp-x { margin-left: 10px; }
 .logos-root .mp-x:hover { color: var(--lg-ink); }
 
 /* the tabs, as pills on a rule rather than floating above the figure */

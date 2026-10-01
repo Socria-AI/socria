@@ -568,6 +568,21 @@ export function ThinkingMap({
   }, [map.nodes]);
   const caption =
     staticLayout?.caption ?? LENSES.find((l) => l.id === lens)!.caption;
+  /** Where the surface's close goes: the map, or the first lens the reader may open that is not the surface. */
+  const closeTo = lenses.find((l) => l !== 'plot' && !lensLocked(l)) ?? null;
+  /** The model on the plate when the plot lens is showing one — the design's "working surface". */
+  const surfaceTitle =
+    lens !== 'plot'
+      ? null
+      : doc
+        ? modelFor(doc).title
+        : map.viz?.built?.title
+          ? map.viz.built.title
+          : map.viz && isSimulation(map.viz)
+            ? String(map.viz.sim?.object ?? 'simulation').replace(/-/g, ' ')
+            : map.viz
+              ? 'Plot'
+              : null;
 
   const cards: Placed[] =
     lens === 'graph'
@@ -602,8 +617,41 @@ export function ThinkingMap({
           where it arrived after the thing it was meant to introduce. */}
       {lenses.length > 1 && (
         <div className="mp-top">
-          <span className="l">{LENSES.find((l) => l.id === lens)?.label ?? 'Map'}</span>
-          <span className="st">{caption}</span>
+          {surfaceTitle ? (
+            // A WORKING SURFACE, named as the design names it: "{what} surface ·
+            // a working surface", with the design's close — which here means
+            // back to the map, since the map is what the plate is when no
+            // surface is up. The lens tabs stay, because they are how the
+            // surfaces are reached; the design's select was the same control.
+            <>
+              <span className="l">{surfaceTitle} surface</span>
+              <span className="st">a working surface</span>
+              {/* Only where there is somewhere to close TO: a plan that clips
+                  the lenses to this one has no map behind the surface, and a
+                  close that bounced straight back would be a dead button. */}
+              {closeTo && (
+                <button
+                  type="button"
+                  className="mp-x"
+                  aria-label="Close the surface"
+                  title="Back to the map"
+                  onClick={() => {
+                    lensManual.current = true;
+                    setLens(closeTo);
+                    setFocused(null);
+                    setMenu(null);
+                  }}
+                >
+                  ×
+                </button>
+              )}
+            </>
+          ) : (
+            <>
+              <span className="l">{LENSES.find((l) => l.id === lens)?.label ?? 'Map'}</span>
+              <span className="st">{caption}</span>
+            </>
+          )}
         </div>
       )}
       {lenses.length > 1 && (
