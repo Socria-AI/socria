@@ -134,7 +134,7 @@ export const CONTEXT_LABEL: Record<ThinkingContext, string> = {
   brainstorming: 'Exploring',
   reflecting: 'Reflecting',
   analysing: 'Analysing',
-  math: 'Math',
+  math: 'Graphing',
   simulating: 'Simulating',
 };
 

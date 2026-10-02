@@ -38,6 +38,12 @@ export interface LogosSession {
   draft?: LogosDraft;
   /** grounded material, keyed by the node it grounds */
   contexts?: NodeContexts;
+  /**
+   * The Project this line of thinking is filed under, if any. The same field
+   * a Core chat carries (app/chat/page.tsx) — the two kinds share a table and
+   * a rail, so they share the folder. Null and absent both mean unfiled.
+   */
+  projectId?: string | null;
   updatedAt: number;
 }
 
@@ -104,6 +110,7 @@ export function loadLocal(): LogosSession[] {
             ? { title: String(s.draft.title ?? ''), html: s.draft.html }
             : undefined,
         contexts: sanitizeContexts(s.contexts),
+        projectId: typeof s.projectId === 'string' ? s.projectId : null,
         updatedAt: Number(s.updatedAt) || 0,
       }));
   } catch {

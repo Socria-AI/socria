@@ -157,6 +157,7 @@ const MODULES = [
   'lib/file-extract.ts',
   'lib/first-session.ts',
   'components/MapPoster.tsx',
+  'components/LogosRail.tsx',
   'lib/lifecycle.ts',
   'lib/email.ts',
   'lib/socria-prompt.ts',
@@ -200,6 +201,9 @@ export async function buildAll() {
         // tsconfig says jsx: preserve, which Node cannot load; the one .tsx
         // module under test (the poster) is bundled with the automatic runtime.
         jsx: 'automatic',
+        // A component carries its stylesheet (the rail imports app-shell.css);
+        // under test the markup is what is checked, so the sheet is nothing.
+        loader: { '.css': 'empty' },
         // `server-only` is a guard, not code: its whole job is to throw when
         // resolved for a browser. esbuild picks the browser condition by
         // default even at platform:'node', so a server-only module under test
@@ -210,14 +214,23 @@ export async function buildAll() {
         // See test/helpers/server-only-shim.mjs: the marker package throws
         // when resolved outside a server component, which would stop a
         // server-only module being tested at all.
-        alias: { 'server-only': join(here, 'server-only-shim.mjs') },
+        alias: {
+          'server-only': join(here, 'server-only-shim.mjs'),
+          // Next's link and image need Next's runtime; a component under test
+          // needs an anchor and an img. See the two shims beside this file.
+          'next/link': join(here, 'next-link-shim.mjs'),
+          'next/image': join(here, 'next-image-shim.mjs'),
+        },
         // undici uses dynamic require() internally, which does not survive
         // being bundled into ESM. It is a real dependency at runtime, so let
         // Node resolve it there instead of inlining it.
         // Both use dynamic require() internally, which does not survive
         // being bundled into ESM. They are real dependencies at runtime, so
         // Node resolves them there.
-        external: ['undici', 'openai', 'unpdf'],
+        // React itself stays external too: a component bundled WITH its own
+        // copy of React cannot be rendered by the react-dom in node_modules —
+        // two Reacts, and every hook throws. The same for Next's primitives.
+        external: ['undici', 'openai', 'unpdf', 'react', 'react/jsx-runtime', 'react-dom'],
         logLevel: 'error',
       })
     )

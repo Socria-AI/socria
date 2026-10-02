@@ -62,6 +62,14 @@ export interface Section {
 export interface Inspection {
   /** what the thing being inspected IS, in one sentence */
   what: string;
+  /**
+   * How far it got and what computed it — "Computational · Mathematical —
+   * evaluated from the relationships this model states". Set apart from
+   * `what` so a title can be set as a title and the grade as a grade; folded
+   * into one sentence they read as "wage model — computational. MATHEMATICAL
+   * — evaluated…", two dashes and a shout in the middle of a name.
+   */
+  grade?: string;
   /** the model or object id this is about */
   of: string;
   sections: Section[];
@@ -81,6 +89,13 @@ const FIDELITY_SAYS: Record<Fidelity, string> = {
   'data-derived': 'DATA-DERIVED — read from or fitted to the supplied observations',
   simulated: 'SIMULATED — produced by stepping a model forward',
   'numerically-computed': 'NUMERICALLY COMPUTED — an integrator or solver ran and this is its output',
+};
+
+/** "MATHEMATICAL — evaluated…" as a line a person reads: "Mathematical — evaluated…". */
+const sentence = (s: string): string => {
+  const [tag, ...rest] = s.split(' — ');
+  const t = tag.charAt(0).toUpperCase() + tag.slice(1).toLowerCase();
+  return rest.length ? `${t} — ${rest.join(' — ')}` : t;
 };
 
 /** Kinds that are read rather than computed — they do not set the floor. */
@@ -258,7 +273,8 @@ export function inspectModel(model: Model): Inspection {
   );
 
   return {
-    what: `${model.title} — ${cap.level}. ${FIDELITY_SAYS[earned(model).best]}`,
+    what: model.title,
+    grade: `${sentence(cap.level)} · ${sentence(FIDELITY_SAYS[earned(model).best])}`,
     of: model.id,
     sections: sections.filter(Boolean) as Section[],
   };

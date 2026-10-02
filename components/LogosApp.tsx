@@ -20,7 +20,7 @@ import { ExplorePanel } from '@/components/ExplorePanel';
 import { emptyWorkspace, update as wsUpdate } from '@/lib/workspace/store';
 import { bridgeSurfaces, projectMap, projectMind } from '@/lib/workspace/adapters';
 import { trace } from '@/lib/workspace/trace';
-import { LogosRail } from '@/components/LogosRail';
+import { LogosRail, type RailProject } from '@/components/LogosRail';
 import { AttachmentList, LogosComposer, type Draft } from '@/components/LogosComposer';
 import { DraftSpace, type DraftHandle, type DraftSelection } from '@/components/DraftSpace';
 import { DraftResponsePanel } from '@/components/DraftResponsePanel';
@@ -232,12 +232,27 @@ export function LogosApp({
   // then the rail is exactly what it was.
   chats,
   onOpenChat,
+  // The person's Projects, and the three things a folder can do that only the
+  // host knows how to do: open a chat in one, open its settings, make one.
+  // Filing a LINE OF THINKING is this surface's own business (moveSession),
+  // because the session is this surface's state; filing a chat row goes back
+  // to the host, whose state the chat is.
+  projects,
+  onProjectSettings,
+  onCreateProject,
+  onMoveChat,
 }: {
   onSwitchModel?: (next: SocriaModel) => void;
   initialInput?: string;
   model?: SocriaModel;
-  chats?: { id: string; title: string; updatedAt: number }[];
+  chats?: { id: string; title: string; updatedAt: number; projectId?: string | null }[];
   onOpenChat?: (id: string) => void;
+  /** undefined until the host has loaded them — the rail shows no folders before that */
+  projects?: RailProject[];
+  onProjectSettings?: (id: string) => void;
+  /** make a Project; resolves to its id, or null if it could not be made */
+  onCreateProject?: (name: string) => Promise<string | null>;
+  onMoveChat?: (id: string, projectId: string | null) => void;
 } = {}) {
   const { isLoaded, isSignedIn, user } = useUser();
   const [unlocked, setUnlocked] = useState(false);
@@ -1504,6 +1519,7 @@ export function LogosApp({
                     ? { title: String(c.draft.title ?? ''), html: c.draft.html }
                     : undefined,
                 contexts: sanitizeContexts(c.contexts),
+                projectId: typeof c.projectId === 'string' ? c.projectId : null,
                 updatedAt: Number(c.updatedAt) || 0,
               }));
           }
@@ -1559,6 +1575,19 @@ export function LogosApp({
     };
   }, [hasAccess, authSettled, isSignedIn]);
 
+  // A Project that no longer exists unfiles what was in it. The server moves
+  // a deleted Project's conversations out; this is the same fact on the client,
+  // so the next save of one of them does not file it back under a folder that
+  // is gone. Only once the host has actually loaded the list — `undefined` is
+  // "not yet", and clearing against an empty list that merely had not arrived
+  // would unfile everything on every load.
+  useEffect(() => {
+    if (!projects) return;
+    const live = new Set(projects.map((p) => p.id));
+    if (!sessionsRef.current.some((s) => s.projectId && !live.has(s.projectId))) return;
+    applySessions(sessionsRef.current.map((s) => (s.projectId && !live.has(s.projectId) ? { ...s, projectId: null } : s)));
+  }, [projects, applySessions]);
+
   // The counts belong to a conversation as much as to a month, so they are
   // re-read whenever the conversation on screen changes.
   useEffect(() => {
@@ -1610,7 +1639,7 @@ export function LogosApp({
     }
   }
 
-  function newSession() {
+  function newSession(projectId: string | null = null) {
     // The month's count is the server's, and it is spent when a line of
     // thinking BEGINS rather than when an empty one is created — so opening
     // Logos and closing it again costs nothing. Everything already open stays
@@ -1619,10 +1648,41 @@ export function LogosApp({
       ask('chats-spent');
       return;
     }
-    const fresh = emptySession();
+    // Begun inside a folder, it is filed there from its first save: the
+    // session carries its Project and persist() sends it with everything else.
+    const fresh = projectId ? { ...emptySession(), projectId } : emptySession();
     applySessions([fresh, ...sessionsRef.current]);
     switchSession(fresh.id);
     // A brand-new empty session isn't worth a round trip until it has content.
+  }
+
+  /**
+   * File a line of thinking under a Project, or take it out of one.
+   *
+   * The same PATCH a Core chat uses (app/api/conversations/route.ts,
+   * moveToProject), so the server re-ties what the session taught in the
+   * Mind Graph the same way. Optimistic, and put back if the server refuses.
+   * `updatedAt` is left alone: filing is not thinking, and the rail is
+   * ordered by thinking.
+   */
+  async function moveSession(id: string, projectId: string | null) {
+    const current = sessionsRef.current.find((s) => s.id === id);
+    if (!current || (current.projectId ?? null) === projectId) return;
+    const before = sessionsRef.current;
+    applySessions(before.map((s) => (s.id === id ? { ...s, projectId } : s)));
+    // Not saved yet: its first save will carry the folder with it.
+    if (!cloud || !current.messages.length) return;
+    try {
+      const res = await fetch('/api/conversations', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, projectId }),
+      });
+      if (!res.ok) throw new Error('refused');
+    } catch {
+      applySessions(before);
+      setError('That line of thinking could not be moved.');
+    }
   }
 
   /**
@@ -2669,6 +2729,15 @@ export function LogosApp({
             onDelete={deleteSession}
             onRename={renameSession}
             onToggle={() => setRailOpen((v) => !v)}
+            projects={projects}
+            onNewInProject={(pid) => {
+              newSession(pid);
+              usedRail();
+            }}
+            onProjectSettings={onProjectSettings}
+            onCreateProject={onCreateProject}
+            onMoveSession={(id, pid) => void moveSession(id, pid)}
+            onMoveChat={onMoveChat}
           />
         </div>
 
@@ -3202,20 +3271,7 @@ export function LogosApp({
                   conversation, never chosen from a menu. */}
               {map.context && <em className="lg-panel-context">{CONTEXT_LABEL[map.context]}</em>}
             </span>
-            {/* What the engine did with a model this turn proposed — a build or a
-                refusal, in its own words. It outranks the delta line because it
-                is the rarer and more consequential news, and it is dismissed by
-                the next turn rather than by a control. */}
-            {buildNote && !mapping ? (
-              <button
-                type="button"
-                className="lg-panel-delta is-build"
-                title="what the engine said about this model"
-                onClick={() => setBuildNote(null)}
-              >
-                {buildNote}
-              </button>
-            ) : deltaNote && !mapping ? (
+            {deltaNote && !mapping ? (
               <span className="lg-panel-delta">{deltaNote}</span>
             ) : (
               <span className={`lg-panel-state${mapping ? ' is-working' : ''}`}>
@@ -3238,6 +3294,19 @@ export function LogosApp({
               Save as image
             </button>
           </header>
+          {/* What the engine did with a model this turn proposed — a build or a
+              refusal, in its own words. A LINE OF ITS OWN under the head, not
+              a label in the title row: it is a sentence, sometimes three, and
+              set beside "THINKING MAP · GRAPHING" it wrapped down the side of
+              the panel in capitals. Dismissed by the next turn, or by hand. */}
+          {buildNote && !mapping && (
+            <p className="lg-panel-note" role="status">
+              <span className="lg-panel-note-text">{buildNote}</span>
+              <button type="button" className="lg-panel-note-x" aria-label="Dismiss" onClick={() => setBuildNote(null)}>
+                ×
+              </button>
+            </p>
+          )}
           {firstMapNote && (
             <div className="lg-guard lg-share-note" role="note">
               <span className="lg-guard-dot" aria-hidden="true" />

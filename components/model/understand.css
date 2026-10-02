@@ -72,6 +72,17 @@
   white-space: nowrap;
 }
 
+/* The grade — how far the model got and what computed it — set after the
+   title as a quieter, smaller thing, never as part of the name. */
+.und-grade {
+  margin-left: 0.6em;
+  padding-left: 0.6em;
+  border-left: 1px solid var(--lg-ink-12, rgba(35, 36, 31, 0.12));
+  font-weight: 400;
+  font-size: 0.75rem;
+  color: var(--lg-ink-56, rgba(35, 36, 31, 0.56));
+}
+
 /* Open, the line may wrap: there is room for it then. */
 .und.is-shown .und-what {
   white-space: normal;

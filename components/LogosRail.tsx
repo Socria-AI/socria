@@ -17,11 +17,8 @@
 // surface on that conversation — because that is a fact about the sessions rather
 // than a reason to draw a different sidebar.
 //
-// THREE deliberate differences from /chat's copy, each because the control has
+// TWO deliberate differences from /chat's copy, each because the control has
 // nothing to act on here:
-//   · no Projects section and no import row — Projects are a Core-side structure
-//     this rail has no handle on, and showing an empty folder list would be
-//     showing a control that does nothing;
 //   · the row that opens a session is a button, not a link — in Logos, opening
 //     a line of thinking is a swap in place, so there is nowhere to navigate;
 //   · the collapse control is NOT in this rail. `.s-close` is mobile-only in
@@ -29,12 +26,18 @@
 //     columns, so it needs one) lives in the Logos header beside the other
 //     layout controls. Chrome the Core rail does not have does not get added to
 //     it here.
+//
+// PROJECTS ARE HERE TOO, when the host hands them down. A Project is a folder
+// of conversations, and a line of thinking is a conversation — the two kinds
+// share a table, a rail and now a folder. The folder's own actions are the
+// Core rail's (new in this project, settings, move to), and what "new" makes
+// is a line of thinking, because that is what this surface makes.
 
 import { useMemo, useState } from 'react';
 import { FEEDBACK_URL } from '@/lib/feedback';
 import Link from 'next/link';
 import { Logo } from './Logo';
-import { ModelGlyph } from './ModelGlyph';
+import { MapGlyph } from './MapGlyph';
 import { relTime, type LogosSession } from '@/lib/logos-sessions';
 import {
   cleanTitle,
@@ -47,6 +50,32 @@ import {
 // the host wraps this in one. Imported here for the same reason ModelPicker
 // imports it: a component that needs a stylesheet should carry it.
 import '@/app/app-shell.css';
+
+/** A Project, as a rail needs it: a folder of conversations. The same shape /chat keeps. */
+export interface RailProject {
+  id: string;
+  name: string;
+  archived: boolean;
+  updatedAt: number;
+}
+
+const FOLDER_ICON = (
+  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h4.2l1.8 2h9A1.5 1.5 0 0 1 21 9.5v8A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5z" />
+  </svg>
+);
+const PLUS_ICON = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
+);
+const DOTS_ICON = (
+  <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.7" /><circle cx="12" cy="12" r="1.7" /><circle cx="19" cy="12" r="1.7" /></svg>
+);
+const MOVE_ICON = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h4.2l1.8 2h9A1.5 1.5 0 0 1 21 9.5v8A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5z" />
+    <path d="M10 13.5h5M13 11.5l2 2-2 2" />
+  </svg>
+);
 
 export function LogosRail({
   sessions,
@@ -61,6 +90,12 @@ export function LogosRail({
   onDelete,
   onRename,
   onToggle,
+  projects,
+  onNewInProject,
+  onProjectSettings,
+  onCreateProject,
+  onMoveSession,
+  onMoveChat,
 }: {
   sessions: LogosSession[];
   /**
@@ -68,7 +103,22 @@ export function LogosRail({
    * is mounted somewhere that has no chats to offer, in which case the rail
    * is exactly what it was.
    */
-  chats?: { id: string; title: string; updatedAt: number }[];
+  chats?: { id: string; title: string; updatedAt: number; projectId?: string | null }[];
+  /**
+   * The person's Projects. Undefined where there are none to offer — a host
+   * that has not loaded them, or nobody signed in — and then there is no
+   * Projects section at all, rather than an empty one.
+   */
+  projects?: RailProject[];
+  /** start a line of thinking inside this Project */
+  onNewInProject?: (projectId: string) => void;
+  onProjectSettings?: (projectId: string) => void;
+  /** make a Project; resolves to its id, or null if it could not be made */
+  onCreateProject?: (name: string) => Promise<string | null>;
+  /** file a line of thinking under a Project (null takes it out) */
+  onMoveSession?: (id: string, projectId: string | null) => void;
+  /** file a Core chat — the host's state, so the host does it */
+  onMoveChat?: (id: string, projectId: string | null) => void;
   activeId: string | null;
   open: boolean;
   syncing: boolean;
@@ -88,6 +138,14 @@ export function LogosRail({
   // open editors in a list is a way to lose the one you meant.
   const [renaming, setRenaming] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState('');
+  /** Which folders are open. */
+  const [openFolders, setOpenFolders] = useState<string[]>([]);
+  /** The name being typed for a new folder; null when not making one. */
+  const [folderDraft, setFolderDraft] = useState<string | null>(null);
+  /** The row whose "Move to" menu is open. */
+  const [moving, setMoving] = useState<string | null>(null);
+  /** A row waiting to go into the folder being named from its menu. */
+  const [pendingMove, setPendingMove] = useState<{ kind: 'logos' | 'chat'; id: string } | null>(null);
 
   const allRail = useMemo(
     () =>
@@ -105,9 +163,37 @@ export function LogosRail({
   // cannot disagree about what a search finds or how rows are grouped.
   const railSearchable = shouldShowSearch(allRail);
   const railFiltering = railSearchable && (!!query || mapsOnly);
-  const railHits = railFiltering ? searchRail(allRail, query, mapsOnly) : allRail;
+  // A row in a folder is shown in its folder, not also in the dated list —
+  // unless the person is searching, when every row is a candidate wherever
+  // it lives. A row whose Project no longer exists is simply unfiled.
+  const live = useMemo(() => new Set((projects ?? []).map((p) => p.id)), [projects]);
+  const filed = (item: { projectId?: string | null }) => !!item.projectId && live.has(item.projectId);
+  const railHits = railFiltering ? searchRail(allRail, query, mapsOnly) : allRail.filter((i) => !filed(i));
   const railGroups = groupRail(railHits);
   const railHasMaps = allRail.some((i) => i.nodes > 0);
+  const canFile = !!projects && (!!onMoveSession || !!onMoveChat);
+
+  const toggleFolder = (id: string) =>
+    setOpenFolders((o) => (o.includes(id) ? o.filter((x) => x !== id) : [...o, id]));
+
+  const move = (item: { kind: 'logos' | 'chat'; id: string }, pid: string | null) => {
+    setMoving(null);
+    if (item.kind === 'logos') onMoveSession?.(item.id, pid);
+    else onMoveChat?.(item.id, pid);
+    if (pid) setOpenFolders((o) => (o.includes(pid) ? o : [...o, pid]));
+  };
+
+  const createFolder = async () => {
+    const name = (folderDraft ?? '').replace(/\s+/g, ' ').trim();
+    const carry = pendingMove;
+    setFolderDraft(null);
+    setPendingMove(null);
+    if (!name || !onCreateProject) return;
+    const id = await onCreateProject(name);
+    if (!id) return;
+    setOpenFolders((o) => [...o, id]);
+    if (carry) move(carry, id);
+  };
 
   const commitRename = (id: string) => {
     const next = cleanTitle(renameDraft);
@@ -133,7 +219,7 @@ export function LogosRail({
         <div key={rowKey} className="s-row">
           {item.nodes ? (
             <span className="s-glyph" aria-hidden="true">
-              <ModelGlyph model="logos" size={14} />
+              <MapGlyph size={14} />
             </span>
           ) : (
             <span className="s-gap" aria-hidden="true" />
@@ -159,21 +245,23 @@ export function LogosRail({
       );
     }
 
-    // A line of thinking with a map carries the Logos mark; anything else
+    // A line of thinking with a map carries a small map; anything else
     // carries the gap, so every title starts on the same vertical line. The
     // same rule /chat's rail uses — it is how the two kinds are told apart.
     const mark = item.nodes ? (
       <span className="s-glyph" aria-hidden="true">
-        <ModelGlyph model="logos" size={14} />
+        <MapGlyph size={14} />
       </span>
     ) : (
       <span className="s-gap" aria-hidden="true" />
     );
     const count = item.nodes ? <span className="n">{item.nodes}</span> : null;
+    const fileable = canFile && (isChat ? !!onMoveChat : !!onMoveSession);
+    const inProject = filed(item) ? item.projectId! : null;
 
     return (
+      <div key={rowKey}>
       <div
-        key={rowKey}
         className={`s-row${!isChat && item.id === activeId ? ' on' : ''}`}
       >
         <button
@@ -196,39 +284,141 @@ export function LogosRail({
         {/* Rename and delete belong to the surface that owns the row: a chat's
             live where the chat does, and a destructive button on somebody
             else's row is a way to lose something from a screen that cannot
-            show you what you lost. */}
-        {!isChat && (
+            show you what you lost. Filing is different — a folder is a fact
+            about the list, not the conversation — so either kind can be moved
+            from here when the host has given this rail a way to do it. */}
+        {(!isChat || fileable) && (
           <span className="s-act">
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                startRename();
-              }}
-              aria-label={`Rename ${item.title}`}
-              title="Rename"
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 20h9" />
-                <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
-              </svg>
-            </button>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onDelete(item.id);
-              }}
-              aria-label={`Delete ${item.title}`}
-              title="Delete"
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M4 7h16" />
-                <path d="M9 7V5h6v2" />
-                <path d="M6 7l1 13h10l1-13" />
-              </svg>
-            </button>
+            {!isChat && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  startRename();
+                }}
+                aria-label={`Rename ${item.title}`}
+                title="Rename"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 20h9" />
+                  <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                </svg>
+              </button>
+            )}
+            {fileable && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setMoving((m) => (m === rowKey ? null : rowKey));
+                }}
+                aria-label={`Move ${item.title} to a project`}
+                aria-expanded={moving === rowKey}
+                title="Move to project"
+              >
+                {MOVE_ICON}
+              </button>
+            )}
+            {!isChat && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete(item.id);
+                }}
+                aria-label={`Delete ${item.title}`}
+                title="Delete"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M4 7h16" />
+                  <path d="M9 7V5h6v2" />
+                  <path d="M6 7l1 13h10l1-13" />
+                </svg>
+              </button>
+            )}
           </span>
+        )}
+      </div>
+      {moving === rowKey && projects && (
+        <div className="s-move" role="menu" aria-label="Move to a project">
+          <p>Move to</p>
+          {projects.filter((pr) => !pr.archived).map((pr) => (
+            <button
+              key={pr.id}
+              type="button"
+              role="menuitem"
+              aria-current={inProject === pr.id}
+              onClick={() => move({ kind: item.kind, id: item.id }, pr.id)}
+            >
+              {pr.name}
+            </button>
+          ))}
+          {inProject && (
+            <button type="button" role="menuitem" onClick={() => move({ kind: item.kind, id: item.id }, null)}>
+              Out of the project
+            </button>
+          )}
+          {onCreateProject && (
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setPendingMove({ kind: item.kind, id: item.id });
+                setMoving(null);
+                setFolderDraft('');
+              }}
+            >
+              New project…
+            </button>
+          )}
+        </div>
+      )}
+      </div>
+    );
+  };
+
+  /** A folder, and — when open — the rows in it: lines of thinking and chats alike. */
+  const folderRow = (pr: RailProject) => {
+    const kids = allRail.filter((i) => i.projectId === pr.id);
+    const open = openFolders.includes(pr.id);
+    return (
+      <div key={`p-${pr.id}`}>
+        <div className="s-row s-fold">
+          <button type="button" className="s-open" aria-expanded={open} onClick={() => toggleFolder(pr.id)} title={pr.name}>
+            <span className="chev" aria-hidden="true">{open ? '▾' : '▸'}</span>
+            <span className="s-glyph" aria-hidden="true">{FOLDER_ICON}</span>
+            <span className="t">{pr.name}</span>
+            {kids.length > 0 && <span className="n">{kids.length}</span>}
+          </button>
+          <span className="s-act">
+            {onNewInProject && (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onNewInProject(pr.id); }}
+                aria-label={`New line of thinking in ${pr.name}`}
+                title="New line of thinking in this project"
+              >
+                {PLUS_ICON}
+              </button>
+            )}
+            {onProjectSettings && (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onProjectSettings(pr.id); }}
+                aria-label={`${pr.name} settings`}
+                title="Project settings"
+              >
+                {DOTS_ICON}
+              </button>
+            )}
+          </span>
+        </div>
+        {open && (
+          <div className="s-kids">
+            {kids.length
+              ? kids.map(renderRow)
+              : <p className="s-none">Nothing here yet. <em>Start one with +.</em></p>}
+          </div>
         )}
       </div>
     );
@@ -282,7 +472,7 @@ export function LogosRail({
               {railHasMaps && (
                 <button className="chip" aria-pressed={mapsOnly} onClick={() => setMapsOnly((v) => !v)}>
                   <span className="s-glyph" aria-hidden="true">
-                    <ModelGlyph model="logos" size={13} />
+                    <MapGlyph size={13} />
                   </span>
                   Maps only
                 </button>
@@ -298,6 +488,56 @@ export function LogosRail({
       )}
 
       <div className="s-list">
+        {/* Projects: folders, above the dated list. Hidden while searching — a
+            search looks through every row wherever it is filed, and the
+            folders would show the same rows twice. */}
+        {projects && !syncing && !railFiltering && (
+          <section className="s-proj" aria-label="Projects">
+            <div className="s-proj-h">
+              <p className="s-when">Projects</p>
+              {onCreateProject && (
+                <button
+                  type="button"
+                  onClick={() => { setPendingMove(null); setFolderDraft(''); }}
+                  aria-label="New project"
+                  title="New project"
+                >
+                  +
+                </button>
+              )}
+            </div>
+            {folderDraft !== null && (
+              <div className="s-row s-new-proj">
+                <span className="s-glyph" aria-hidden="true">{FOLDER_ICON}</span>
+                <input
+                  autoFocus
+                  className="s-rename"
+                  value={folderDraft}
+                  maxLength={80}
+                  placeholder="Name the project"
+                  aria-label="New project name"
+                  onChange={(e) => setFolderDraft(e.target.value)}
+                  onBlur={() => void createFolder()}
+                  onKeyDown={(e) => {
+                    e.stopPropagation();
+                    if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                    if (e.key === 'Escape') { setPendingMove(null); setFolderDraft(null); }
+                  }}
+                />
+              </div>
+            )}
+            {projects.filter((pr) => !pr.archived).map(folderRow)}
+            {!projects.length && folderDraft === null && (
+              <p className="s-none">Group your thinking into a project, and Socria keeps <em>its</em> context in view.</p>
+            )}
+            {projects.some((pr) => pr.archived) && (
+              <details className="s-arch">
+                <summary>Archived · {projects.filter((pr) => pr.archived).length}</summary>
+                {projects.filter((pr) => pr.archived).map(folderRow)}
+              </details>
+            )}
+          </section>
+        )}
         {syncing && !allRail.length ? (
           <p className="s-none">Loading sessions…</p>
         ) : !allRail.length ? (

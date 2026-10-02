@@ -23,7 +23,7 @@ import { usePlan } from '@/components/usePlan';
 import { OneFoot } from '@/components/OneMark';
 import { OnePrompt } from '@/components/OnePrompt';
 import { useOnePrompt } from '@/components/useOnePrompt';
-import { ModelGlyph } from '@/components/ModelGlyph';
+import { MapGlyph } from '@/components/MapGlyph';
 import { LogosApp } from '@/components/LogosApp';
 import { ProjectSheet } from '@/components/projects/ProjectSheet';
 import { FEEDBACK_URL } from '@/lib/feedback';
@@ -299,7 +299,7 @@ export default function ChatPage() {
   // interleaved by when you last touched it, not filed under the model that
   // produced it. Which one it was is a mark on the row, not a heading.
   const [logosSessions, setLogosSessions] = useState<
-    { id: string; title: string; nodes: number; updatedAt: number }[]
+    { id: string; title: string; nodes: number; updatedAt: number; projectId?: string | null }[]
   >([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   /**
@@ -310,6 +310,8 @@ export default function ChatPage() {
   const [projectEntry, setProjectEntry] = useState<{ id: string; name: string } | null>(null);
   /** The person's Projects — the folders in the rail. Signed-in only. */
   const [projects, setProjects] = useState<RailProject[]>([]);
+  /** true once the list has actually been fetched — Logos files nothing against a list that has not arrived */
+  const [projectsLoaded, setProjectsLoaded] = useState(false);
   /** Which folders are open. */
   const [openFolders, setOpenFolders] = useState<string[]>([]);
   /** The name being typed for a new folder; null when not making one. */
@@ -600,6 +602,7 @@ export default function ChatPage() {
                 title: c.title,
                 nodes: c.map?.nodes?.length ?? 0,
                 updatedAt: Number(c.updatedAt) || 0,
+                projectId: typeof c.projectId === 'string' ? c.projectId : null,
               }))
           );
           setConversations(list);
@@ -1062,7 +1065,7 @@ export default function ChatPage() {
   // A chat in a folder is shown in its folder, not also in the dated list —
   // unless the person is searching, when every chat is a candidate wherever
   // it lives. A chat whose Project no longer exists is simply unfiled.
-  const filed = (c: Conversation) => !!c.projectId && projects.some((p) => p.id === c.projectId);
+  const filed = (c: { projectId?: string | null }) => !!c.projectId && projects.some((p) => p.id === c.projectId);
   const allRail = [
     ...conversations.map((c) => ({
       kind: 'chat' as const,
@@ -1070,19 +1073,11 @@ export default function ChatPage() {
       title: c.title,
       updatedAt: c.updatedAt,
       nodes: 0,
+      projectId: c.projectId ?? null,
     })),
-    ...logosSessions.map((s) => ({ kind: 'logos' as const, ...s })),
+    ...logosSessions.map((s) => ({ kind: 'logos' as const, ...s, projectId: s.projectId ?? null })),
   ].sort((a, b) => b.updatedAt - a.updatedAt);
-  const sessionRail = [
-    ...conversations.filter((c) => !filed(c)).map((c) => ({
-      kind: 'chat' as const,
-      id: c.id,
-      title: c.title,
-      updatedAt: c.updatedAt,
-      nodes: 0,
-    })),
-    ...logosSessions.map((s) => ({ kind: 'logos' as const, ...s })),
-  ].sort((a, b) => b.updatedAt - a.updatedAt);
+  const sessionRail = allRail.filter((r) => !filed(r));
 
   // ...but once the list is long, "which of these has the map I drew" is a
   // question the ordering cannot answer. Two filters answer it — type a word,
@@ -1923,7 +1918,7 @@ export default function ChatPage() {
   // it is just a folder — make one, open it, start a chat in it, move chats
   // in and out.
   const loadProjects = useCallback(async () => {
-    if (!isSignedIn) { setProjects([]); return; }
+    if (!isSignedIn) { setProjects([]); setProjectsLoaded(false); return; }
     try {
       const res = await fetch('/api/projects', { cache: 'no-store' });
       if (!res.ok) return;
@@ -1931,6 +1926,7 @@ export default function ChatPage() {
       // A deployment without the table answers with a storage fault: no
       // folders, and chats stay in the ordinary list where they work.
       setProjects(j.storage?.ok === false ? [] : (j.projects ?? []));
+      setProjectsLoaded(true);
     } catch {}
   }, [isSignedIn]);
   useEffect(() => { void loadProjects(); }, [loadProjects]);
@@ -1946,12 +1942,8 @@ export default function ChatPage() {
   const toggleFolder = (id: string) =>
     setOpenFolders((o) => (o.includes(id) ? o.filter((x) => x !== id) : [...o, id]));
 
-  async function createFolder() {
-    const name = (folderDraft ?? '').replace(/\s+/g, ' ').trim();
-    setFolderDraft(null);
-    const carry = pendingMove.current;
-    pendingMove.current = null;
-    if (!name) return;
+  /** Make a Project by name; its id, or null when it could not be made (said in the error line). */
+  async function createProject(name: string): Promise<string | null> {
     try {
       const res = await fetch('/api/projects', {
         method: 'POST',
@@ -1961,11 +1953,23 @@ export default function ChatPage() {
       const j = await res.json().catch(() => null);
       if (!res.ok) throw new Error(j?.error || 'That project could not be created.');
       await loadProjects();
-      setOpenFolders((o) => [...o, j.project.id]);
-      if (carry) await moveChat(carry, j.project.id);
+      return j.project.id as string;
     } catch (e: any) {
       setError(e?.message || 'That project could not be created.');
+      return null;
     }
+  }
+
+  async function createFolder() {
+    const name = (folderDraft ?? '').replace(/\s+/g, ' ').trim();
+    setFolderDraft(null);
+    const carry = pendingMove.current;
+    pendingMove.current = null;
+    if (!name) return;
+    const id = await createProject(name);
+    if (!id) return;
+    setOpenFolders((o) => [...o, id]);
+    if (carry) await moveChat(carry, id);
   }
 
   /**
@@ -1991,6 +1995,28 @@ export default function ChatPage() {
   async function moveChat(id: string, pid: string | null) {
     setMoving(null);
     const c = conversations.find((x) => x.id === id);
+    // A line of thinking is a conversation in the same table, so it files the
+    // same way; only the list it is put back into on failure differs.
+    const lg = c ? undefined : logosSessions.find((x) => x.id === id);
+    if (lg) {
+      if ((lg.projectId ?? null) === pid) return;
+      const was = logosSessions;
+      setLogosSessions((ls) => ls.map((x) => (x.id === id ? { ...x, projectId: pid } : x)));
+      if (pid) setOpenFolders((o) => (o.includes(pid) ? o : [...o, pid]));
+      try {
+        const res = await fetch('/api/conversations', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id, projectId: pid }),
+        });
+        const j = await res.json().catch(() => null);
+        if (!res.ok) throw new Error(j?.error || 'That line of thinking could not be moved.');
+      } catch (e: any) {
+        setLogosSessions(was);
+        setError(e?.message || 'That line of thinking could not be moved.');
+      }
+      return;
+    }
     if (!c || (c.projectId ?? null) === pid) return;
     const before = conversations;
     setConversations((cs) => cs.map((x) => (x.id === id ? { ...x, projectId: pid } : x)));
@@ -2165,6 +2191,24 @@ export default function ChatPage() {
   // a state change here — Logos pushing /chat would only re-render itself.
   if (isLogosSurface(model))
     return (
+      <>
+      {/* The Project settings sheet is the page's, not a surface's — it has
+          to be reachable from the Logos rail's folders too. */}
+      {sheet && (
+        <ProjectSheet
+          id={sheet}
+          onClose={() => setSheet(null)}
+          onChanged={() => void loadProjects()}
+          onDeleted={() => {
+            const gone = sheet;
+            setConversations((cs) => cs.map((c) => (c.projectId === gone ? { ...c, projectId: null } : c)));
+            setLogosSessions((ls) => ls.map((s) => (s.projectId === gone ? { ...s, projectId: null } : s)));
+            if (projectEntry?.id === gone) setProjectEntry(null);
+            setSheet(null);
+            void loadProjects();
+          }}
+        />
+      )}
       <LogosApp
         initialInput={carriedText}
         // WHICH Logos. Without this the surface assumed it was Logos 1 — its
@@ -2178,7 +2222,15 @@ export default function ChatPage() {
           id: c.id,
           title: c.title,
           updatedAt: c.updatedAt,
+          projectId: c.projectId ?? null,
         }))}
+        // The same folders, in the same rail. Undefined until they have been
+        // fetched, so Logos never files anything against a list that has not
+        // arrived; its own sessions it files itself, a chat row comes back here.
+        projects={isSignedIn && projectsLoaded ? projects : undefined}
+        onProjectSettings={(id) => setSheet(id)}
+        onCreateProject={createProject}
+        onMoveChat={(id, pid) => void moveChat(id, pid)}
         // Opening one is the same swap the "Socria chat" button makes, with a
         // destination: back to whichever Core model they came from, on that
         // conversation. A navigation would work and would throw away the
@@ -2196,6 +2248,7 @@ export default function ChatPage() {
           chooseModel(next);
         }}
       />
+      </>
     );
 
   /** One row of the rail — the dated list and the inside of folders alike. */
@@ -2213,7 +2266,7 @@ export default function ChatPage() {
         <div key={rowKey} className="s-row">
           {item.nodes ? (
             <span className="s-glyph" aria-hidden="true">
-              <ModelGlyph model="logos" size={14} />
+              <MapGlyph size={14} />
             </span>
           ) : (
             <span className="s-gap" aria-hidden="true" />
@@ -2238,18 +2291,21 @@ export default function ChatPage() {
       );
     }
 
+    // A row with a map carries a small map — the thing that tells a line of
+    // thinking from a chat is the fact that it grew one, not the model's brand.
     const mark = item.nodes ? (
       <span className="s-glyph" aria-hidden="true">
-        <ModelGlyph model="logos" size={14} />
+        <MapGlyph size={14} />
       </span>
     ) : (
       <span className="s-gap" aria-hidden="true" />
     );
     const count = item.nodes ? <span className="n">{item.nodes}</span> : null;
 
-    const convo = item.kind === 'chat' ? conversations.find((c) => c.id === item.id) : undefined;
-    // Folders exist only for a signed-in person, and only Core chats go in them.
-    const fileable = !!isSignedIn && item.kind === 'chat';
+    const inProject = filed(item) ? item.projectId : null;
+    // Folders exist only for a signed-in person. Either kind goes in them:
+    // a line of thinking is a conversation in the same table.
+    const fileable = !!isSignedIn;
     return (
       <div key={rowKey}>
       <div
@@ -2358,13 +2414,13 @@ export default function ChatPage() {
               key={pr.id}
               type="button"
               role="menuitem"
-              aria-current={convo?.projectId === pr.id}
+              aria-current={inProject === pr.id}
               onClick={() => void moveChat(item.id, pr.id)}
             >
               {pr.name}
             </button>
           ))}
-          {convo?.projectId && (
+          {inProject && (
             <button type="button" role="menuitem" onClick={() => void moveChat(item.id, null)}>
               Out of the project
             </button>
@@ -2388,9 +2444,7 @@ export default function ChatPage() {
 
   /** A folder, and — when open — the chats in it. */
   const folderRow = (pr: RailProject) => {
-    const kids = conversations
-      .filter((c) => c.projectId === pr.id)
-      .sort((a, b) => b.updatedAt - a.updatedAt);
+    const kids = allRail.filter((r) => r.projectId === pr.id);
     const open = openFolders.includes(pr.id);
     return (
       <div key={`p-${pr.id}`}>
@@ -2437,7 +2491,7 @@ export default function ChatPage() {
         {open && (
           <div className="s-kids">
             {kids.length
-              ? kids.map((c) => renderRow({ kind: 'chat', id: c.id, title: c.title, updatedAt: c.updatedAt, nodes: 0 }))
+              ? kids.map(renderRow)
               : <p className="s-none">No chats yet. <em>Start one with +.</em></p>}
           </div>
         )}
@@ -2614,7 +2668,7 @@ export default function ChatPage() {
                     onClick={() => setMapsOnly((v) => !v)}
                   >
                     <span className="s-glyph" aria-hidden="true">
-                      <ModelGlyph model="logos" size={13} />
+                      <MapGlyph size={13} />
                     </span>
                     Maps only
                   </button>

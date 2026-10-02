@@ -4467,21 +4467,47 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
   animation: lgFade 0.4s ease both;
 }
 /* The engine's own sentence about a build is prose — "ESTIMATE IS WAITING ON
-   ONE THING: IT NEEDS OBSERVATIONS" was a label's dress on a paragraph. */
-.logos-root .lg-panel-delta.is-build {
-  text-transform: none;
-  letter-spacing: 0.01em;
-  font-size: 11.5px;
+   ONE THING: IT NEEDS OBSERVATIONS" was a label's dress on a paragraph, and
+   set in the title row it wrapped five lines deep beside the panel's name. So
+   it is a note under the head: a serif line with a hairline of accent at its
+   left, the width of the panel, dismissed with the × or by the next turn. */
+.logos-root .lg-panel-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0 32px 10px;
+  padding: 7px 0 7px 12px;
+  border-left: 2px solid var(--lg-accent);
   font-family: var(--serif);
   font-style: italic;
-  line-height: 1.35;
-  text-align: left;
+  font-size: 12.5px;
+  line-height: 1.45;
+  letter-spacing: 0.005em;
+  color: rgba(35, 36, 31, 0.72);
+  animation: lgFade 0.4s ease both;
+}
+.logos-root .lg-panel-note-text {
+  flex: 1;
+  min-width: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.logos-root .lg-panel-note-x {
+  flex: none;
+  margin-top: -2px;
   background: none;
   border: none;
-  padding: 0;
+  padding: 0 2px;
+  font: inherit;
+  font-style: normal;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--lg-ink-40);
   cursor: pointer;
-  max-width: 48em;
 }
+.logos-root .lg-panel-note-x:hover { color: var(--lg-ink); }
 
 /* ── the action menu on a card ───────────────────────────────────── */
 .logos-root .lg-node.is-open { border-color: var(--lg-primary); }

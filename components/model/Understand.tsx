@@ -86,7 +86,10 @@ export function Understand({
   return (
     <section className={`und${shown ? ' is-shown' : ''}`} aria-label="Understand this model">
       <div className="und-bar">
-        <p className="und-what">{inspection.what}</p>
+        <p className="und-what">
+          {inspection.what}
+          {inspection.grade ? <span className="und-grade">{inspection.grade}</span> : null}
+        </p>
         <button
           type="button"
           className="und-act und-toggle"
