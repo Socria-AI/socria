@@ -321,7 +321,7 @@ export function buildProposal(raw: ModelProposal, opts?: { at?: number }): Built
   // rather than by reading it.
   const parts = [
     solvers.length
-      ? `Built as a ${cap.level} model: ${solvers.map((s) => `${s.solver} runs ${s.of}`).join(', ')}.`
+      ? `Built as a ${cap.level} model: ${solvers.map((s) => `${s.solver} runs ${s.object}`).join(', ')}.`
       : // Nothing runs yet, and saying so plainly is the useful sentence: the
         // model is real, it is written down formally, and what it is waiting
         // for is named in the clause that follows.
@@ -416,7 +416,7 @@ export function revalidate(raw: unknown): Model | null {
 export function reportLines(report: BuildReport, limit = 8): string[] {
   const lines = [
     `Model ${report.id} — “${report.title}”, ${report.capability}, ${report.fidelity}.`,
-    ...report.solvers.map((s) => `${s.of} (${s.object}): computed by ${s.solver}`),
+    ...report.solvers.map((s) => `${s.object}: computed by ${s.solver}`),
     ...report.missing.map((m) => `${m.label}: needs ${m.missing.map((x) => x.what).join(', ')}`),
   ];
   return lines.slice(0, limit);

@@ -122,13 +122,15 @@ path.eng-hit {
   stroke: rgba(35, 36, 31, 0.26);
   stroke-width: 0.9;
 }
-.eng-read .is-link {
+/* SVG text only — the HTML panels below mark a whole row or entry, and an
+   underline across a table is a table of links, which it is not. */
+.eng-read text.is-link {
   cursor: pointer;
   text-decoration: underline;
   text-decoration-color: rgba(35, 36, 31, 0.24);
   text-underline-offset: 2px;
 }
-.eng-read .is-link:hover {
+.eng-read text.is-link:hover {
   fill: var(--eng-tension, #9c5b3c);
 }
 
@@ -137,5 +139,101 @@ path.eng-hit {
   .eng-read-cell, .eng-read-node { fill: rgba(240, 238, 232, 0.86); }
   .eng-read-none { fill: rgba(240, 238, 232, 0.52); }
   .eng-read-edge { stroke: rgba(240, 238, 232, 0.26); }
-  .eng-read .is-link { text-decoration-color: rgba(240, 238, 232, 0.24); }
+  .eng-read text.is-link { text-decoration-color: rgba(240, 238, 232, 0.24); }
+}
+
+/* ── THE READ VIEWS, AS HTML INSIDE THE FRAME ─────────────────────────
+   Set by components/model/panelMarks.tsx through a <foreignObject>, so a
+   table has columns and wraps and scrolls. Editorial rather than tabular: a
+   hairline under the headings, a serif for the name of the thing, numbers in
+   tabular figures so they line up, mathematics in the mono face the figure's
+   own labels use. The names are the model's own and are never uppercased —
+   `lwage` and `LWAGE` are different symbols to an evaluator. */
+.eng-read-html {
+  box-sizing: border-box;
+  overflow: auto;
+  padding: 18px 22px 20px;
+  font-family: var(--sans, system-ui);
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: rgba(35, 36, 31, 0.86);
+  -webkit-font-smoothing: antialiased;
+  scrollbar-width: thin;
+}
+.eng-read-html.is-none { display: flex; align-items: center; justify-content: center; text-align: center; }
+.eng-read-html .eng-read-none {
+  margin: 0; max-width: 34em; font-family: var(--serif, Georgia, serif); font-style: italic;
+  font-size: 14px; line-height: 1.5; color: rgba(35, 36, 31, 0.56); fill: none;
+}
+
+/* a table */
+/* As wide as its contents: a column of three numbers spread across the
+   whole frame reads as three unrelated things. A grouped table of words
+   takes the width, because its last column is a remark that wants the edge. */
+.eng-read-table { border-collapse: collapse; width: auto; min-width: 46%; }
+.eng-read-table.is-grouped { width: 100%; }
+.eng-read-table.is-numeric th, .eng-read-table.is-numeric td { padding-right: 34px; }
+.eng-read-table th, .eng-read-table td { padding: 5px 22px 5px 0; vertical-align: top; text-align: left; }
+.eng-read-table th:last-child, .eng-read-table td:last-child { padding-right: 0; }
+.eng-read-table thead th {
+  font-family: var(--sans, system-ui); font-size: 10px; font-weight: 500; letter-spacing: 0.08em;
+  color: rgba(35, 36, 31, 0.5); padding-top: 0; padding-bottom: 7px;
+  border-bottom: 1px solid var(--eng-line, rgba(35, 36, 31, 0.16)); white-space: nowrap;
+}
+.eng-read-table tbody tr:first-child td, .eng-read-table tbody tr:first-child th { padding-top: 10px; }
+.eng-read-table tbody + tbody tr:first-child td, .eng-read-table tbody + tbody tr:first-child th {
+  border-top: 1px solid var(--eng-line, rgba(35, 36, 31, 0.1));
+}
+.eng-read-table .eng-read-group {
+  font-family: var(--serif, Georgia, serif); font-weight: 400; font-size: 14px; line-height: 1.3;
+  letter-spacing: -0.005em; color: rgba(35, 36, 31, 0.92); min-width: 10em; max-width: 18em;
+}
+.eng-read-table td.is-text { max-width: 20em; }
+.eng-read-table td.is-math, .eng-read-table th.is-math { white-space: nowrap; }
+.eng-read-table td.is-math {
+  font-family: var(--mono, ui-monospace, "SFMono-Regular", Menlo, monospace); font-size: 12px;
+  color: var(--eng-primary, #354620);
+}
+.eng-read-table td.is-number, .eng-read-table th.is-number {
+  text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.eng-read-table td.is-number { font-family: var(--mono, ui-monospace, "SFMono-Regular", Menlo, monospace); font-size: 12px; }
+.eng-read-table td.is-note { color: rgba(35, 36, 31, 0.5); font-style: italic; font-family: var(--serif, Georgia, serif); font-size: 12.5px; white-space: nowrap; }
+.eng-read-table tr.is-link { cursor: pointer; }
+.eng-read-table tr.is-link:hover td, .eng-read-table tr.is-link:hover th { color: var(--eng-tension, #9c5b3c); }
+
+/* an equation list */
+.eng-read-eqs { margin: 0; display: flex; flex-direction: column; gap: 14px; }
+.eng-read-eq { display: grid; grid-template-columns: minmax(8em, 14em) 1fr; gap: 2px 18px; align-items: baseline; }
+.eng-read-eq.is-link { cursor: pointer; }
+.eng-read-eq.is-link:hover dt, .eng-read-eq.is-link:hover dd { color: var(--eng-tension, #9c5b3c); }
+.eng-read-eqs .eng-read-key {
+  margin: 0; font-family: var(--serif, Georgia, serif); font-size: 14px; line-height: 1.3;
+  color: rgba(35, 36, 31, 0.86); letter-spacing: -0.005em; fill: none;
+}
+.eng-read-eqs .eng-read-math {
+  margin: 0; font-family: var(--mono, ui-monospace, "SFMono-Regular", Menlo, monospace); font-size: 12.5px;
+  line-height: 1.5; color: var(--eng-primary, #354620); overflow-wrap: anywhere; fill: none;
+}
+@media (max-width: 720px) { .eng-read-eq { grid-template-columns: 1fr; } }
+
+/* sections of facts */
+.eng-read-section { margin: 0 0 18px; }
+.eng-read-section:last-child { margin-bottom: 0; }
+.eng-read-html .eng-read-head {
+  margin: 0 0 7px; font-family: var(--sans, system-ui); font-size: 10px; font-weight: 500; letter-spacing: 0.08em;
+  color: rgba(35, 36, 31, 0.5); padding-bottom: 5px; border-bottom: 1px solid var(--eng-line, rgba(35, 36, 31, 0.12)); fill: none;
+}
+.eng-read-facts { margin: 0; display: grid; grid-template-columns: minmax(9em, 15em) 1fr; gap: 5px 18px; }
+.eng-read-fact { display: contents; }
+.eng-read-fact dt { font-family: var(--serif, Georgia, serif); font-size: 13.5px; color: rgba(35, 36, 31, 0.6); }
+.eng-read-fact dd { margin: 0; overflow-wrap: anywhere; }
+.eng-read-fact.is-link dt, .eng-read-fact.is-link dd { cursor: pointer; }
+.eng-read-fact.is-link:hover dt, .eng-read-fact.is-link:hover dd { color: var(--eng-tension, #9c5b3c); }
+
+@media (prefers-color-scheme: dark) {
+  .eng-read-html { color: rgba(240, 238, 232, 0.86); }
+  .eng-read-html .eng-read-none, .eng-read-table thead th, .eng-read-html .eng-read-head, .eng-read-fact dt,
+  .eng-read-table td.is-note { color: rgba(240, 238, 232, 0.52); }
+  .eng-read-table .eng-read-group, .eng-read-eqs .eng-read-key { color: rgba(240, 238, 232, 0.92); }
 }

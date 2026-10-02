@@ -3209,7 +3209,7 @@ export function LogosApp({
             {buildNote && !mapping ? (
               <button
                 type="button"
-                className="lg-panel-delta"
+                className="lg-panel-delta is-build"
                 title="what the engine said about this model"
                 onClick={() => setBuildNote(null)}
               >

@@ -443,6 +443,11 @@ export function Surface3D({
     const el = stage.current;
     if (!el) return;
     const onWheel = (e: WheelEvent) => {
+      // A READ VIEW SCROLLS. The stage claims the wheel for the camera, which
+      // is right over a surface and wrong over a table of forty rows: the
+      // table could never be scrolled, and the wheel zoomed a camera that has
+      // nothing to look at.
+      if ((e.target as Element | null)?.closest?.('.eng-read-html')) return;
       e.preventDefault();
       setCam((c) => ({
         ...c,

@@ -36,9 +36,21 @@ import type { Model, ModelObject } from './schema';
 import { RENDERED, viewsFor, type ViewSpec } from './views';
 
 /** What a view that is READ rather than looked at contains. */
+/** How a table column should be set: words, a number, an expression, or a quiet remark. */
+export type ColumnKind = 'text' | 'number' | 'math' | 'note';
+
 export type PanelContent =
   | { kind: 'equation'; rows: { label: string; body: string; of?: string }[] }
-  | { kind: 'table'; columns: string[]; rows: string[][]; note: string }
+  | {
+      kind: 'table';
+      columns: string[];
+      rows: string[][];
+      note: string;
+      /** per column, how to set it; absent means words */
+      kinds?: ColumnKind[];
+      /** per row, the object it is about, so a row can be selected like a mark */
+      refs?: (string | undefined)[];
+    }
   | { kind: 'structure'; nodes: { id: string; label: string; of: string }[]; edges: { from: string; to: string; why: string }[] }
   | { kind: 'text'; what: string; sections: Section[] }
   | { kind: 'none'; why: string };
@@ -207,12 +219,81 @@ export function panelFor(model: Model, id: string): PanelContent | null {
  * interaction term is for and hiding it would hide that.
  */
 function asWritten(o: ModelObject, expr: string): string {
+  return namedExpr(o, expr);
+}
+
+/**
+ * An expression with the model's own names in it, for a reader.
+ *
+ * THE SAME INVERSION, FOR EVERY OBJECT THAT RENAMED. A response surface is
+ * evaluated over `x` and `y` because that is what a sampler binds, and records
+ * in `meta.axes` that `x` is education and `y` is experience. A marginal
+ * records in `meta.wrt` that `x` is the variable it was taken with respect to.
+ * Both were being printed as written for the evaluator — "y^2", "2 * x" — in
+ * a table whose other rows said "experience^2", so one column named the
+ * variables and the next used letters for them. Printed, never compiled.
+ */
+export function namedExpr(o: ModelObject, expr: string): string {
+  const onto: Record<string, string> = {};
+  const axes = typeof o.meta?.axes === 'string' ? String(o.meta.axes).split(',').map((s) => s.trim()).filter(Boolean) : [];
+  if (axes[0] && axes[0] !== 'x') onto.x = axes[0];
+  if (axes[1] && axes[1] !== 'y') onto.y = axes[1];
   const wrt = typeof o.meta?.wrt === 'string' ? (o.meta.wrt as string) : null;
-  if (o.meta?.role !== 'marginal' || !wrt || wrt === 'x') return expr;
+  if (o.meta?.role === 'marginal' && wrt && wrt !== 'x') onto.x = wrt;
+  if (!Object.keys(onto).length) return expr;
   // Parsed against the names the string itself contains, so nothing about the
   // model's symbol table is needed to re-letter something only going to be read.
   const tree = parse(expr, expr.match(/[A-Za-z_][A-Za-z0-9_]*/g) ?? []);
-  return tree ? print(rename(tree, { x: wrt })) : expr;
+  return tree ? print(rename(tree, onto)) : expr;
+}
+
+/**
+ * Mathematics set for reading: a dot for a product, a raised figure for a
+ * small power, a real minus. DISPLAY ONLY — the string this comes from is the
+ * one the evaluator reads, and nothing here is ever parsed back.
+ */
+export function pretty(expr: string): string {
+  // The assembler's scaffolding first — written so the evaluator never
+  // misreads precedence, and read by nobody: a name in its own parentheses,
+  // a rest position of zero subtracted, doubled parentheses, a plus before a
+  // minus. Each is a textual identity for display and would be wrong to
+  // apply to anything that is evaluated.
+  // The outermost pair goes only when it IS a pair: "(a + b) / (m)" begins
+  // with "(" and ends with ")" and they are not each other's match.
+  const unwrap = (s: string): string => {
+    if (!s.startsWith('(') || !s.endsWith(')')) return s;
+    let depth = 0;
+    for (let i = 0; i < s.length; i++) {
+      if (s[i] === '(') depth++;
+      else if (s[i] === ')') depth--;
+      if (depth === 0 && i < s.length - 1) return s;
+    }
+    return s.slice(1, -1);
+  };
+  const tidy = (s: string): string => {
+    let out = s;
+    for (let i = 0; i < 4; i++) {
+      const next = unwrap(
+        out
+          .replace(/\(([A-Za-z_][A-Za-z0-9_]*|\d+(?:\.\d+)?)\)/g, '$1')
+          .replace(/\(([A-Za-z_][A-Za-z0-9_]*) - 0\)/g, '$1')
+          .replace(/\(\(([^()]*)\)\)/g, '($1)')
+          .replace(/\+\s*-\s*/g, '- ')
+      );
+      if (next === out) break;
+      out = next;
+    }
+    return out;
+  };
+  return tidy(expr)
+    .replace(/\s*\*\s*/g, ' · ')
+    .replace(/\^2\b/g, '²')
+    .replace(/\^3\b/g, '³')
+    .replace(/\s*-\s*/g, ' − ')
+    .replace(/^ − /, '−')
+    .replace(/\( − /g, '(−')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 /** Every relationship this model states, as written. */
@@ -225,8 +306,8 @@ function equationRows(model: Model, only: ModelObject | null): { label: string; 
       continue;
     }
     const expr = o.definition ?? o.defs?.z ?? o.defs?.f;
-    if (expr) out.push({ label: o.label, body: asWritten(o, expr), of: o.id });
-    for (const [k, v] of Object.entries(o.system?.rhs ?? {})) out.push({ label: `d${k}/dt`, body: v, of: o.id });
+    if (expr) out.push({ label: o.label, body: pretty(asWritten(o, expr)), of: o.id });
+    for (const [k, v] of Object.entries(o.system?.rhs ?? {})) out.push({ label: `d${k}/dt`, body: pretty(v), of: o.id });
     if (o.estimation) {
       out.push({
         label: o.label,
@@ -271,6 +352,7 @@ function tableFor(model: Model, o: ModelObject | null, v: ViewSpec): PanelConten
       kind: 'table',
       columns: [...index, ...columns],
       rows,
+      kinds: [...index.map(() => 'text' as const), ...columns.map(() => 'number' as const)],
       note: `${block.columns[columns[0]]?.length ?? 0} observations, as supplied${rows.length < (block.columns[columns[0]]?.length ?? 0) ? `; the first ${rows.length} shown` : ''}`,
     };
   }
@@ -285,7 +367,7 @@ function tableFor(model: Model, o: ModelObject | null, v: ViewSpec): PanelConten
       for (let i = 0; i < got.run.t.length; i += stride) {
         rows.push([String(Number(got.run.t[i].toPrecision(5))), ...names.map((_, k) => String(Number((got.run.y[i][k] ?? NaN).toPrecision(5))))]);
       }
-      return { kind: 'table', columns: ['t', ...names], rows, note: got.run.note };
+      return { kind: 'table', columns: ['t', ...names], rows, kinds: ['t', ...names].map(() => 'number' as const), note: got.run.note };
     }
   }
 
@@ -301,6 +383,7 @@ function tableFor(model: Model, o: ModelObject | null, v: ViewSpec): PanelConten
         kind: 'table',
         columns: [axes[0] ?? 'x', axes[1] ?? 'y', o.label],
         rows: pts.map((p) => [p.x, p.y, p.z].map((q) => String(Number(q.toPrecision(6))))),
+        kinds: ['number', 'number', 'number'],
         note: `${built.note}; the first ${pts.length} of the grid`,
       };
     }
@@ -310,6 +393,7 @@ function tableFor(model: Model, o: ModelObject | null, v: ViewSpec): PanelConten
         kind: 'table',
         columns: [axes[0] ?? 'x', o.label],
         rows: pts.map((p) => [p.x, p.y].map((q) => String(Number(q.toPrecision(6))))),
+        kinds: ['number', 'number'],
         note: `${built.note}; the first ${pts.length} samples`,
       };
     }
@@ -323,7 +407,7 @@ function tableFor(model: Model, o: ModelObject | null, v: ViewSpec): PanelConten
     .slice(0, 40)
     .map((q) => [q.display, String(q.value), q.units ?? '', q.supply]);
   return rows.length
-    ? { kind: 'table', columns: ['quantity', 'value', 'units', 'supplies'], rows, note: 'every quantity this model currently has a number for' }
+    ? { kind: 'table', columns: ['quantity', 'value', 'units', 'supplies'], rows, kinds: ['text', 'number', 'note', 'note'], note: 'every quantity this model currently has a number for' }
     : { kind: 'none', why: 'nothing in this model has a number yet' };
 }
 
@@ -498,6 +582,7 @@ function sensitivityFor(model: Model): PanelContent {
   const table = symbolTable(model);
   const movable = [...table.by.values()].filter((q) => q.supply === 'parameter' && q.boundBy === 'control');
   const rows: string[][] = [];
+  const refs: string[] = [];
   for (const o of model.objects) {
     if (!(o.definition || o.defs?.z || o.defs?.f)) continue;
     for (const q of movable) {
@@ -507,11 +592,19 @@ function sensitivityFor(model: Model): PanelContent {
       // this object" — but a row per parameter per object that says 0 is noise,
       // and the dependency graph already says which reach which.
       if (got.got.expr === '0') continue;
-      rows.push([o.label, q.display, got.got.expr, got.got.constant ? 'the same everywhere' : 'varies over the inputs']);
+      rows.push([o.label, q.display, pretty(namedExpr(o, got.got.expr)), got.got.constant ? 'the same everywhere' : 'varies over the inputs']);
+      refs.push(o.id);
     }
   }
   return rows.length
-    ? { kind: 'table', columns: ['output', 'parameter', 'per unit of it', 'where'], rows: rows.slice(0, 40), note: 'differentiated symbolically with respect to each control, not measured by nudging one' }
+    ? {
+        kind: 'table',
+        columns: ['output', 'parameter', 'per unit of it', 'where'],
+        rows: rows.slice(0, 40),
+        refs: refs.slice(0, 40),
+        kinds: ['text', 'text', 'math', 'note'],
+        note: 'differentiated symbolically with respect to each control, not measured by nudging one',
+      }
     : { kind: 'none', why: 'nothing here can be differentiated with respect to a control that can be moved' };
 }
 

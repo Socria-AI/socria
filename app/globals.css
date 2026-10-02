@@ -4466,6 +4466,22 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
   color: var(--lg-accent);
   animation: lgFade 0.4s ease both;
 }
+/* The engine's own sentence about a build is prose — "ESTIMATE IS WAITING ON
+   ONE THING: IT NEEDS OBSERVATIONS" was a label's dress on a paragraph. */
+.logos-root .lg-panel-delta.is-build {
+  text-transform: none;
+  letter-spacing: 0.01em;
+  font-size: 11.5px;
+  font-family: var(--serif);
+  font-style: italic;
+  line-height: 1.35;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  max-width: 48em;
+}
 
 /* ── the action menu on a card ───────────────────────────────────── */
 .logos-root .lg-node.is-open { border-color: var(--lg-primary); }
