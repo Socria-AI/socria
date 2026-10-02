@@ -897,6 +897,20 @@ const text = (v: unknown, n: number): string =>
   typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().slice(0, n) : '';
 const num = (v: unknown): number | null =>
   typeof v === 'number' && Number.isFinite(v) ? v : null;
+/** An expression as written, with a stated left-hand side ("y =", "f(x) =") removed; refused and recorded when it is too long to keep whole. */
+const expression = (v: unknown, n: number, what: string, drop?: (s: string) => void): string => {
+  if (typeof v !== 'string') return '';
+  const whole = v.replace(/\s+/g, ' ').trim();
+  if (!whole) return '';
+  if (whole.length > n) {
+    drop?.(`${what} is ${whole.length} characters, longer than the ${n} an expression may be, and is not in the model`);
+    return '';
+  }
+  // One stated side only — `a = b = c` and `==` are left alone.
+  const m = whole.match(/^([a-z][a-z0-9_]*)\s*(\([^()]*\))?\s*=(?!=)\s*(.+)$/i);
+  if (m && !/=/.test(m[3])) return m[3].trim();
+  return whole;
+};
 
 export function sanitizeObject(
   raw: unknown,
@@ -909,9 +923,14 @@ export function sanitizeObject(
   const id = text(r.id, 48);
   const label = text(r.label, 80);
   if (!ID.test(id) || !label) return null;
-  const kind = (OBJECT_KINDS as readonly string[]).includes(r.kind as string)
-    ? (r.kind as ObjectKind)
-    : 'annotation';
+  const known = (OBJECT_KINDS as readonly string[]).includes(r.kind as string);
+  // AN UNKNOWN KIND IS SAID. It became an annotation in silence, so a typo —
+  // `surfce` — produced a note on the model instead of a surface, and nothing
+  // anywhere said why there was no picture.
+  if (!known && r.kind !== undefined) {
+    drop?.(`${id} has a kind this engine does not know (${String(r.kind).slice(0, 24)}) and is kept as an annotation`);
+  }
+  const kind = known ? (r.kind as ObjectKind) : 'annotation';
   const out: ModelObject = { id, kind, label };
 
   const opt = <K extends keyof ModelObject>(k: K, v: ModelObject[K]) => {
@@ -919,7 +938,12 @@ export function sanitizeObject(
   };
   opt('meaning', text(r.meaning, 300) as ModelObject['meaning']);
   opt('domain', text(r.domain, 60) as ModelObject['domain']);
-  opt('definition', text(r.definition, 200) as ModelObject['definition']);
+  // AN EXPRESSION IS NOT TRUNCATED. `text()` slices to 200, and a polynomial
+  // cut mid-term still compiles — to a different function, drawn with no
+  // account anywhere. Too long is refused and recorded. And "y = x^2" or
+  // "f(x) = x^2" is how people and extractors write a definition; the
+  // evaluator wants the right-hand side, so that is what is kept.
+  opt('definition', expression(r.definition, 200, `the definition of ${id}`, drop) as ModelObject['definition']);
   opt('units', text(r.units, 24) as ModelObject['units']);
   opt('appearance', text(r.appearance, 160) as ModelObject['appearance']);
   opt('state', text(r.state, 160) as ModelObject['state']);
@@ -945,7 +969,7 @@ export function sanitizeObject(
     // suite, which is what the orbit benchmark is there to do.
     for (const [k, v] of capped(Object.entries(r.defs as Record<string, unknown>), MODEL_CAPS.keys, `definitions on ${id}`, drop)) {
       const key = text(k, 16);
-      const val = text(v, 300);
+      const val = expression(v, 300, `${key} on ${id}`, drop);
       if (/^[a-z][a-z0-9]{0,15}$/i.test(key) && val) defs[key] = val;
     }
     if (Object.keys(defs).length) out.defs = defs;
@@ -955,11 +979,25 @@ export function sanitizeObject(
     const over: Record<string, [number, number]> = {};
     for (const [k, v] of capped(Object.entries(r.over as Record<string, unknown>), MODEL_CAPS.observe, `extents on ${id}`, drop)) {
       const key = text(k, 16);
-      if (!/^[a-z][a-z0-9]{0,15}$/i.test(key) || !Array.isArray(v) || v.length !== 2) continue;
+      if (!/^[a-z][a-z0-9_]{0,15}$/i.test(key) || !Array.isArray(v) || v.length !== 2) {
+        drop?.(`an extent on ${id} was not understood and is not in the model: ${String(k).slice(0, 16)} — ${JSON.stringify(v).slice(0, 40)}`);
+        continue;
+      }
       const a = num(v[0]);
       const b = num(v[1]);
-      if (a === null || b === null || b <= a) continue;
-      over[key] = [a, b];
+      // A REVERSED OR EMPTY WINDOW IS NOT A WINDOW, and it used to vanish in
+      // silence — so `over: {x: [5, -5]}` drew over the engine's own default
+      // with nothing anywhere saying the stated range had been thrown away.
+      // Reversed is read the way it was meant; empty is refused and recorded.
+      if (a === null || b === null) {
+        drop?.(`an extent on ${id} is not two numbers and is not in the model: ${key}`);
+        continue;
+      }
+      if (a === b) {
+        drop?.(`an extent on ${id} is empty and is not in the model: ${key} from ${a} to ${b}`);
+        continue;
+      }
+      over[key] = a < b ? [a, b] : [b, a];
     }
     if (Object.keys(over).length) out.over = over;
   }
@@ -1561,12 +1599,20 @@ export function sanitizeModel(raw: unknown): Model | null {
   const written = Array.isArray(r.params)
     ? (r.params.map((p) => sanitizeParam(p, drop)).filter(Boolean) as ModelParam[])
     : [];
-  const params = capped(
-    [...written, ...implied.filter((p) => !written.some((w) => w.id === p.id))],
-    MODEL_CAPS.params,
-    'controls',
-    drop
-  );
+  // ONE CONTROL PER NAME, and names are case-insensitive to the evaluator:
+  // `k` and `K` are one symbol in a scope, so the later one silently overwrote
+  // the earlier one's value. The first is kept and the rest are recorded.
+  const seenParam = new Set<string>();
+  const unique = [...written, ...implied].filter((p) => {
+    const key = p.id.toLowerCase();
+    if (seenParam.has(key)) {
+      drop?.(`a second control named ${p.id} is not in the model — ${key} is already a control`);
+      return false;
+    }
+    seenParam.add(key);
+    return true;
+  });
+  const params = capped(unique, MODEL_CAPS.params, 'controls', drop);
   // ── A COEFFICIENT NOTHING BINDS GETS A PLACEHOLDER CONTROL ──────
   //
   // Here, on the stored model, so the slider persists, an edit to it persists,
@@ -1642,6 +1688,26 @@ export function sanitizeModel(raw: unknown): Model | null {
         const out = v.map(num).filter((x): x is number => x !== null).slice(0, cap);
         return out.length ? out : undefined;
       };
+      // COLUMNS ARE ROWS. Compacting each column on its own — dropping its
+      // nulls — shifted every later value against the other columns, so one
+      // missing x paired 4 with 30, and the fit was wrong with decimals. A row
+      // with a hole anywhere is dropped from every column, and counted.
+      const table = (raw: Record<string, unknown>): { columns: Record<string, number[]>; dropped: number } | null => {
+        const cols: Record<string, (number | null)[]> = {};
+        for (const [name, v] of Object.entries(raw).slice(0, 24)) {
+          const key = text(name, 40);
+          if (!/^[a-z][a-z0-9_]{0,39}$/i.test(key) || !Array.isArray(v)) continue;
+          cols[key] = v.slice(0, 20_000).map(num);
+        }
+        const keys = Object.keys(cols);
+        if (!keys.length) return null;
+        const length = Math.min(...keys.map((k) => cols[k].length));
+        const whole = Array.from({ length }, (_, i) => i).filter((i) => keys.every((k) => cols[k][i] !== null));
+        if (!whole.length) return null;
+        const columns: Record<string, number[]> = {};
+        for (const k of keys) columns[k] = whole.map((i) => cols[k][i] as number);
+        return { columns, dropped: length - whole.length };
+      };
       const block: DataBlock = {};
       const label = text(b.label, 80);
       if (label) block.label = label;
@@ -1671,17 +1737,10 @@ export function sanitizeModel(raw: unknown): Model | null {
       // every column truncated to the SHORTEST one — a fit over ragged columns
       // silently pairs the wrong rows, which is a wrong answer with decimals.
       if (b.columns && typeof b.columns === 'object' && !Array.isArray(b.columns)) {
-        const columns: Record<string, number[]> = {};
-        for (const [name, v] of Object.entries(b.columns as Record<string, unknown>).slice(0, 24)) {
-          const key = text(name, 40);
-          const col = nums(v, 20_000);
-          if (/^[a-z][a-z0-9_]{0,39}$/i.test(key) && col) columns[key] = col;
-        }
-        const keys = Object.keys(columns);
-        if (keys.length) {
-          const shortest = Math.min(...keys.map((k) => columns[k].length));
-          for (const k of keys) columns[k] = columns[k].slice(0, shortest);
-          block.columns = columns;
+        const got = table(b.columns as Record<string, unknown>);
+        if (got) {
+          if (got.dropped) drop?.(`${got.dropped} row${got.dropped === 1 ? '' : 's'} of ${k} had a missing value and ${got.dropped === 1 ? 'is' : 'are'} left out of every column`);
+          block.columns = got.columns;
         }
       }
       // THE INDEX COLUMNS, which make an observation locatable rather than
@@ -1714,6 +1773,24 @@ export function sanitizeModel(raw: unknown): Model | null {
     if (Object.keys(blocks).length) model.data = blocks;
   }
 
+  // THE LAST CHANGE SURVIVES A ROUND TRIP. It was dropped here, so after any
+  // save the inspector's "Changed:" line vanished and nothing could tell a
+  // revision what moved. Bounded like everything else.
+  if (r.lastChange && typeof r.lastChange === 'object') {
+    const lc = r.lastChange as Record<string, unknown>;
+    const what = text(lc.what, 80);
+    const scalar = (v: unknown): number | string | boolean | undefined =>
+      typeof v === 'number' && Number.isFinite(v) ? v : typeof v === 'boolean' ? v : typeof v === 'string' ? v.slice(0, 80) : undefined;
+    if (what) {
+      model.lastChange = {
+        what,
+        ...(scalar(lc.from) !== undefined ? { from: scalar(lc.from) } : {}),
+        ...(scalar(lc.to) !== undefined ? { to: scalar(lc.to) } : {}),
+        affected: Array.isArray(lc.affected) ? lc.affected.map((a) => text(a, 48)).filter((a) => ID.test(a)).slice(0, 64) : [],
+        at: typeof lc.at === 'number' && Number.isFinite(lc.at) ? lc.at : 0,
+      };
+    }
+  }
   const sel = text(r.selected, 48);
   if (sel && ID.test(sel)) model.selected = sel;
 
@@ -1740,6 +1817,11 @@ export function sanitizeModel(raw: unknown): Model | null {
 
   const v = num(r.version);
   if (v !== null) model.version = Math.max(0, Math.floor(v));
+  // THE ACCOUNT OF WHAT WAS CUT, ATTACHED LAST. `dropped` was written onto the
+  // model when the objects and controls were assembled — before the data,
+  // the time and the rest were read — so a row left out of a data block for a
+  // missing value was counted and never said.
+  if (notes.length) model.dropped = [...notes];
   return model;
 }
 

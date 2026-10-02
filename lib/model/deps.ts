@@ -61,17 +61,22 @@ const NAME = /[a-z][a-z0-9_]*/gi;
  */
 const LANGUAGE = new Set([
   'sin', 'cos', 'tan', 'asin', 'acos', 'atan', 'atan2', 'sinh', 'cosh', 'tanh',
-  'exp', 'log', 'ln', 'log10', 'sqrt', 'abs', 'sign', 'floor', 'ceil', 'round',
-  'min', 'max', 'pow', 'mod', 'hypot',
+  'arcsin', 'arccos', 'arctan', 'asinh', 'acosh', 'atanh', 'arcsinh', 'arccosh', 'arctanh',
+  'sec', 'csc', 'cot',
+  'exp', 'log', 'ln', 'log2', 'log10', 'lg', 'logbase', 'sqrt', 'cbrt', 'abs', 'sign', 'floor', 'ceil', 'round',
+  'step', 'heaviside', 'min', 'max', 'pow', 'mod', 'hypot',
   'pi', 'e', 'tau', 'inf',
 ]);
+
+/** A number with an exponent, which is not a name: `1e3` used to yield the name `e3`. */
+const EXPONENT = /\b\d+(?:\.\d+)?e[+-]?\d+\b/gi;
 
 /** Every name an expression mentions, by the model's own grammar. */
 export function namesIn(expr: unknown): string[] {
   if (typeof expr === 'number') return [];
   if (typeof expr !== 'string' || !expr) return [];
   const out = new Set<string>();
-  for (const m of expr.match(NAME) ?? []) {
+  for (const m of expr.replace(EXPONENT, ' ').match(NAME) ?? []) {
     const w = m.toLowerCase();
     if (!LANGUAGE.has(w)) out.add(w);
   }
@@ -208,6 +213,24 @@ export function affectedBy(model: Model, ids: readonly string[]): string[] {
 
   const out = new Set<string>();
   let frontier = [...lower];
+
+  // THE CLOCK. Nothing writes `t` into an expression a body is drawn from —
+  // mechanism parts and gravity bodies are placed at stateAt(run, t), and a
+  // system or trajectory is a function of t by construction — so setTime
+  // reported `affected: []` on a free spring-mass system while everything
+  // moved. Objects whose place depends on the clock are reached directly.
+  if (lower.includes('t')) {
+    for (const o of model.objects) {
+      const clocked =
+        !!o.system || !!o.mechanism || !!o.gravity || o.kind === 'trajectory' ||
+        typeof o.meta?.mech === 'string' || typeof o.meta?.gravity === 'string' ||
+        (typeof o.meta?.of === 'string' && model.objects.some((c) => c.id === o.meta?.of && (!!c.system || !!c.mechanism || !!c.gravity)));
+      if (clocked && !out.has(o.id)) {
+        out.add(o.id);
+        frontier.push(o.id.toLowerCase());
+      }
+    }
+  }
 
   while (frontier.length) {
     const next: string[] = [];

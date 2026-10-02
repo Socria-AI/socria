@@ -521,3 +521,151 @@ export function parametricSurface(
     note: `${res} × ${res} in (u, v)`,
   };
 }
+
+// ── curves: where to break the line ─────────────────────────────────
+
+export interface Segmented {
+  /** the runs of consecutive samples that belong to one stroke */
+  segments: P3[][];
+  /** x positions where the curve was broken because it blew up — poles */
+  poles: number[];
+  /** the vertical window kept when the poles made the full extent unreadable, and how many samples fell outside it */
+  clipped: { y: [number, number]; dropped: number } | null;
+}
+
+/**
+ * WHERE A CURVE IS NOT ONE LINE.
+ *
+ * `1/x` over [−2, 2] used to come back as a single polyline: 384 finite
+ * samples, joined in order, so the two branches were connected by a vertical
+ * stroke through the pole and the box stretched to ±100 to hold the samples
+ * nearest it — the whole curve flattened into the axis to make room for a line
+ * that is not part of the function. `tan(x)` did the same at every half-π.
+ *
+ * Two things, both decided from the samples alone:
+ *
+ *   · A BREAK where a sample had no value (the function is undefined there),
+ *     or where two neighbours jump by far more than the curve moves anywhere
+ *     else AND change sign — the signature of a pole. A step keeps its riser
+ *     (no sign change needed, and a riser is how a step is drawn); a steep
+ *     smooth function (exp) keeps its line (no sign change).
+ *   · A CLIP, only when a pole was found: the vertical extent is cut to the
+ *     central nine-tenths of the samples, padded by half, so the picture shows
+ *     the curve rather than the approach to infinity. Samples outside it are
+ *     dropped from the stroke and counted, and the note says so.
+ */
+export function segmentsOf(samples: readonly (P3 | null)[]): Segmented {
+  const finite = samples.filter((p): p is P3 => !!p);
+  if (finite.length < 2) return { segments: finite.length ? [finite] : [], poles: [], clipped: null };
+  // The typical step between neighbours, robustly: the median |Δy|.
+  const steps: number[] = [];
+  for (let i = 1; i < samples.length; i++) {
+    const a = samples[i - 1], b = samples[i];
+    if (a && b) steps.push(Math.abs(b.y - a.y));
+  }
+  const sorted = [...steps].sort((u, v) => u - v);
+  const median = sorted[Math.floor(sorted.length / 2)] ?? 0;
+  const yAll = finite.map((p) => p.y).sort((u, v) => u - v);
+  const span = (yAll[yAll.length - 1] ?? 0) - (yAll[0] ?? 0);
+  const poleStep = Math.max(median * 50, span * 0.5, 1e-9);
+  // The robust vertical window: the central nine-tenths, padded by half.
+  const lo = yAll[Math.floor(yAll.length * 0.05)];
+  const hi = yAll[Math.min(yAll.length - 1, Math.floor(yAll.length * 0.95))];
+  const pad = Math.max((hi - lo) * 0.5, 1e-9);
+  const window: [number, number] = [lo - pad, hi + pad];
+  const outside = (p: P3) => p.y < window[0] || p.y > window[1];
+
+  const poles: number[] = [];
+  const segments: P3[][] = [];
+  let run: P3[] = [];
+  for (let i = 0; i < samples.length; i++) {
+    const p = samples[i];
+    if (!p) {
+      // A GAP — one, however many samples wide. If the curve was blowing up on
+      // its way in or out, it is a pole: 1/x at 0 is undefined exactly there
+      // and enormous either side. log(x) over [−10, 10] is undefined for half
+      // its range, which is one gap and (at most) one pole, not two hundred.
+      const before = run[run.length - 1];
+      let j = i;
+      while (j < samples.length && !samples[j]) j++;
+      const after = samples[j] as P3 | undefined;
+      if ((before && outside(before)) || (after && outside(after))) {
+        poles.push(before && after ? (before.x + after.x) / 2 : (before ?? after)!.x);
+      }
+      if (run.length) segments.push(run);
+      run = [];
+      i = j - 1;
+      continue;
+    }
+    const prev = run[run.length - 1];
+    // A JUMP WITH A SIGN CHANGE between two finite neighbours, at least one of
+    // them far outside the curve's own scale: tan at π/2 is never undefined on
+    // the grid, it just leaps from +huge to −huge. A step from 0 to 1 is not
+    // this — it changes sign only in the trivial sense and stays in scale —
+    // and keeps its riser, which is how a step is drawn.
+    if (
+      prev &&
+      Math.abs(p.y - prev.y) > poleStep &&
+      Math.sign(p.y) * Math.sign(prev.y) < 0 &&
+      (outside(p) || outside(prev))
+    ) {
+      poles.push((prev.x + p.x) / 2);
+      segments.push(run);
+      run = [];
+    }
+    run.push(p);
+  }
+  if (run.length) segments.push(run);
+  // A pole at −1.11e−16 is a pole at 0: snapped relative to the x extent, so
+  // the note reads as a person would write it.
+  const xs = finite.map((p) => p.x);
+  const xSpan = Math.max(1e-300, Math.max(...xs) - Math.min(...xs));
+  for (let i = 0; i < poles.length; i++) if (Math.abs(poles[i]) < 1e-9 * xSpan) poles[i] = 0;
+  if (!poles.length) return { segments: segments.filter((s) => s.length >= 2), poles, clipped: null };
+
+  let dropped = 0;
+  const kept = segments
+    .map((seg) => seg.filter((p) => { const in_ = !outside(p); if (!in_) dropped++; return in_; }))
+    .filter((seg) => seg.length >= 2);
+  return { segments: kept, poles, clipped: dropped ? { y: window, dropped } : null };
+}
+
+/**
+ * WHERE A SURFACE IS NOT ONE SHEET: clip the heights near a pole.
+ *
+ * The mesh analogue of segmentsOf. `1/(x·y)` over [−2, 2]² sampled to ±144
+ * beside the axes, so the box was ±155 tall and the whole surface lay flat on
+ * its floor with four spikes at the corners of the hole. Nothing was wrong
+ * with any number; the picture was unreadable because the extent was owned by
+ * the approach to infinity.
+ *
+ * The rule: a robust vertical window (central nine-tenths of the finite
+ * heights, padded by half); if the full span is far beyond it AND the mesh has
+ * holes or sign-flipping neighbours — the signature of a pole rather than of
+ * a merely steep sheet — cells outside the window are cut out, and the count
+ * is reported so the note can say so. exp(x + y) keeps every cell.
+ */
+export function clipMesh(rows: readonly (readonly (P3 | null)[])[]): { rows: (P3 | null)[][]; clipped: { z: [number, number]; dropped: number; poles: boolean } | null } {
+  const cells = rows.flat().filter((p): p is P3 => !!p);
+  const copy = rows.map((r) => [...r]);
+  if (cells.length < 4) return { rows: copy, clipped: null };
+  const zs = cells.map((p) => p.z).sort((a, b) => a - b);
+  const lo = zs[Math.floor(zs.length * 0.05)];
+  const hi = zs[Math.min(zs.length - 1, Math.floor(zs.length * 0.95))];
+  const pad = Math.max((hi - lo) * 0.5, 1e-9);
+  const window: [number, number] = [lo - pad, hi + pad];
+  const span = zs[zs.length - 1] - zs[0];
+  if (!(span > (hi - lo) * 4)) return { rows: copy, clipped: null };
+  const holes = rows.flat().some((p) => !p);
+  let flips = false;
+  for (const r of rows) {
+    for (let i = 1; i < r.length && !flips; i++) {
+      const a = r[i - 1], b = r[i];
+      if (a && b && Math.sign(a.z) * Math.sign(b.z) < 0 && (a.z < window[0] || a.z > window[1] || b.z < window[0] || b.z > window[1])) flips = true;
+    }
+  }
+  if (!holes && !flips) return { rows: copy, clipped: null };
+  let dropped = 0;
+  const out = rows.map((r) => r.map((p) => { if (p && (p.z < window[0] || p.z > window[1])) { dropped++; return null; } return p; }));
+  return { rows: out, clipped: dropped ? { z: window, dropped, poles: true } : null };
+}

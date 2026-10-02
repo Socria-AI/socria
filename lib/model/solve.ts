@@ -162,9 +162,20 @@ export const SAMPLING: Solver = {
   kind: 'sampling',
   produces: 'model-derived',
   method: 'evaluates the stated expression over a bounded grid or parameter range (lib/model/sample.ts)',
-  handles: (_m, o) =>
-    ['surface', 'volume', 'curve', 'line', 'ray', 'field', 'plane', 'region', 'boundary', 'mesh'].includes(o.kind),
+  // ONLY WHAT THE COMPILER DRAWS. This claimed plane, region, boundary and
+  // mesh as well, and compile.ts has no branch for any of them — so a model
+  // made of one routed `runnable`, was graded `computational`, the reply said
+  // "Expression sampler runs it", and the frame was empty with a note that
+  // nothing draws a region yet. Three true statements and one picture that
+  // contradicted all of them. The kinds nothing draws are unsupported, and
+  // the router says so (the fall-through below).
+  handles: (_m, o) => ['surface', 'volume', 'curve', 'line', 'ray', 'field'].includes(o.kind),
   requires: (m, o) => {
+    // A FIELD IS ITS COMPONENTS. `definition` alone is not a field, and the
+    // compiler refuses one without fx and fy — so the router must too.
+    if (o.kind === 'field' && !(o.defs?.fx && o.defs?.fy)) {
+      return [{ what: 'the components fx and fy (and fz for three dimensions)', unlocks: 'drawing the arrows from the mathematics' }];
+    }
     // A SHAPE READ OFF DATA NEEDS NO EXPRESSION. The compiler has always drawn
     // a surface from a grid of measurements; the router did not know, so it
     // reported such an object `incomplete` — invisible until the compiler
@@ -172,9 +183,26 @@ export const SAMPLING: Solver = {
     // good data grid stopped being drawn at all. The router must know what the
     // compiler can do, or one of them is wrong about the same object.
     if (o.data && m.data?.[o.data]) return [];
-    const wrote = o.definition || has(o, ['z', 'f', 'fx', 'fy', 'fz', 'px', 'py', 'pz']);
+    // WHAT EACH KIND ACTUALLY NEEDS, as the compiler reads it. `has` with
+    // "any of these keys" let a surface written as `defs.f` and a curve with
+    // only `px` route runnable, and the compiler then refused both.
+    const all = (keys: readonly string[]) => keys.every((k) => !!o.defs?.[k]);
+    const wrote =
+      o.kind === 'surface' || o.kind === 'volume'
+        ? !!o.definition || !!o.defs?.z || all(['px', 'py', 'pz'])
+        : o.kind === 'field'
+          ? all(['fx', 'fy'])
+          : !!o.definition || !!o.defs?.f || !!o.defs?.z || all(['px', 'py']);
     if (!wrote) {
-      return [{ what: 'an expression to evaluate', unlocks: 'drawing this from the mathematics rather than by hand' }];
+      return [
+        {
+          what:
+            o.kind === 'surface' || o.kind === 'volume'
+              ? 'a definition (z = …), or all three parametric components px, py, pz'
+              : 'a definition (y = …), or both parametric components px and py',
+          unlocks: 'drawing this from the mathematics rather than by hand',
+        },
+      ];
     }
     // AN EXPRESSION IS ONLY EVALUABLE IF ITS NAMES CAN BE BOUND, and this only
     // checked that an expression EXISTED. So a wage surface written as
@@ -228,18 +256,32 @@ export const SAMPLING: Solver = {
     // the very quantity the curve varies. The router and the compiler read the
     // same rule from the same place now (schema.ts sampledOver), because every
     // time those two have kept their own copy they have disagreed in silence.
-    const axes = new Set([
-      ...COORDINATES,
-      ...sampledOver(o, 1, []),
-      ...sampledOver(o, 2, []),
-    ]);
+    // LOWERCASED, like everything the evaluator binds. `over: {P: …}` with
+    // `100 - 2*P` was reported as needing "something called p" because this
+    // set held `P` and namesIn lowercases.
+    const axes = new Set(
+      [...COORDINATES, ...sampledOver(o, 1, []), ...sampledOver(o, 2, [])].map((a) => a.toLowerCase())
+    );
     const mentioned = new Set<string>();
     for (const e of [o.definition, ...Object.values(o.defs ?? {})]) {
       for (const n of namesIn(e)) if (!axes.has(n)) mentioned.add(n);
     }
     const gaps: Missing[] = [];
     for (const n of mentioned) {
-      const q = resolve(table, n);
+      // BY MACHINE SYMBOL ONLY. `resolve` also matches display labels, so a
+      // control with id `rate` and label `r` made `exp(r*x)` route runnable —
+      // and the compiler, which binds machine symbols, refused it. A label
+      // that is not the id is reported as exactly that, with the id to write.
+      const q = table.by.get(table.fromMachine.get(n.toLowerCase()) ?? '');
+      const byLabel = !q ? resolve(table, n) : undefined;
+      if (byLabel && byLabel.machine !== n.toLowerCase()) {
+        gaps.push({
+          what: `the name ${byLabel.id} where the expression says ${n}`,
+          because: `“${n}” is the label of ${byLabel.id}, not its name — write ${byLabel.id} in the expression`,
+          unlocks: `evaluating ${o.label}`,
+        });
+        continue;
+      }
       if (q && q.value !== undefined) continue;
       // A FREE INPUT WITH A RANGE IS BOUND, and the scope binds it — at the
       // cursor, which sits in the middle of that range until somebody moves it
@@ -278,16 +320,31 @@ export const ODE: Solver = {
   kind: 'ode',
   produces: 'numerically-computed',
   method: 'fourth-order Runge–Kutta at a fixed step, with an optional stopping condition (lib/model/system.ts)',
-  handles: (_m, o) => o.kind === 'system' || !!o.system || o.kind === 'trajectory',
+  // NOT AN EQUATION SYSTEM. `kind: 'system'` is shared by a dynamical system
+  // and a set of simultaneous relations, and claiming both meant every refused
+  // equation system also carried "it needs a system declaration: the states
+  // and how each one changes" — the integrator's requirement, in front of the
+  // solver's real reason. A system with an `equations` block and no `system`
+  // block is the algebra solver's.
+  handles: (_m, o) => !!o.system || o.kind === 'trajectory' || (o.kind === 'system' && !o.equations),
   requires: (m, o) => {
     if (o.system) {
       const read = readSystem(m, o);
       return read.ok ? [] : read.missing;
     }
     if (o.kind === 'trajectory') {
-      return has(o, ['dx', 'dy'])
-        ? []
-        : [{ what: 'right-hand sides for the state', unlocks: 'integration' }];
+      // BOTH, not either: the compiler needs dx and dy, and `has` meant "any".
+      if (o.defs?.dx && o.defs?.dy) return [];
+      const given = ['dx', 'dy', 'dz', 'dw'].filter((k) => !!o.defs?.[k]);
+      const missing = ['dx', 'dy'].filter((k) => !o.defs?.[k]);
+      return [
+        {
+          what: given.length
+            ? `a right-hand side ${missing.join(' and ')} — it states ${given.join(' and ')} but not ${missing.join(' or ')}`
+            : 'right-hand sides dx and dy for the state',
+          unlocks: 'integration',
+        },
+      ];
     }
     return [{ what: 'a system declaration: the states and how each one changes', unlocks: 'integration through time' }];
   },
@@ -470,8 +527,10 @@ export const DATA: Solver = {
   handles: (_m, o) => ['dataset', 'series', 'measurement', 'distribution', 'point', 'particle'].includes(o.kind),
   requires: (m, o) => {
     if (o.data && m.data?.[o.data]) return [];
-    if (o.defs || o.definition) return [];
-    // A VALUE IS NUMBERS. One of them, which is all a point needs.
+    // AN EXPRESSION IS NOT DATA. `defs`/`definition` used to count, so a
+    // distribution written as "x" routed runnable, the reply said "Data reader
+    // runs it", and the compiler drew nothing for want of numbers. The data
+    // reader reads data; a point may carry its one number; nothing else.
     if (typeof o.value === 'number') return [];
     return [{ what: 'the numbers, as a data block', unlocks: 'showing the data rather than a picture of what it might look like' }];
   },

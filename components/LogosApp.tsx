@@ -97,6 +97,7 @@ import { failureText } from '@/lib/upstream-error';
 import { isModelOp, parseVizOps, stripVizOps, type VizModelState, type VizOp } from '@/lib/viz-model';
 import {
   activeDoc,
+  adopt,
   applyModelOps,
   editsState,
   EMPTY_WORKSPACE,
@@ -648,6 +649,12 @@ export function LogosApp({
     vizRead.current = read;
   }, []);
   const [vizOps, setVizOps] = useState<{ seq: number; ops: VizOp[] } | null>(null);
+  /** the latest map extraction asked for; older answers are dropped */
+  const mapSeqRef = useRef(0);
+  /** patchSession, reachable from callbacks defined before it */
+  const patchSessionRef = useRef<((id: string | null, fn: (s: LogosSession) => LogosSession, save?: boolean) => void) | null>(null);
+  /** the trailing save after a surface edit */
+  const adoptSaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   /**
    * Apply what the reply asked for — and the two kinds of op part company here.
    *
@@ -661,7 +668,7 @@ export function LogosApp({
    * whole surface is then rebuilt from. That is the difference between an edit and
    * a redraw, and this split is where it is enforced.
    */
-  const applyVizOps = useCallback((ops: VizOp[]) => {
+  const applyVizOps = useCallback((ops: VizOp[], into: string | null = activeIdRef.current) => {
     if (!ops.length) return;
     // `set` GOES TO BOTH, and that is not a hedge.
     //
@@ -685,12 +692,19 @@ export function LogosApp({
     const modelOps = ops.filter((o) => isModelOp(o) || o.op === 'set' || o.op === 'select');
     const viewOps = ops.filter((o) => !isModelOp(o));
     if (modelOps.length) {
-      patchActive((sess) => {
+      patchSessionRef.current?.(into, (sess) => {
         const map = sess.map ?? EMPTY_MAP;
         const ws = map.models ?? EMPTY_WORKSPACE;
         if (!ws.docs.length) return sess;
         const done = applyModelOps(ws, modelOps, { at: Date.now() });
-        if (!done.changed) return sess;
+        // A REFUSAL IS SAID. The engine's own words — "m1 is the only body"
+        // — were thrown away here, while the reply, written "as though the
+        // change has already happened", said it was removed. The note slot
+        // carries what the engine actually did.
+        if (!done.changed) {
+          if (done.said.length) setBuildNote(done.said.join(' ').slice(0, 300));
+          return sess;
+        }
         return { ...sess, map: { ...map, models: done.workspace } };
       });
     }
@@ -1418,10 +1432,18 @@ export function LogosApp({
     [cloud]
   );
 
-  /** Update the active session and save it. */
-  const patchActive = useCallback(
-    (fn: (s: LogosSession) => LogosSession, save = true) => {
-      const id = activeIdRef.current;
+  /**
+   * Update ONE session, by id, and save it.
+   *
+   * BY ID, because a reply lands when it lands. The landed turn and the ops
+   * the reply carried used to be written into whichever session was active at
+   * that moment — so a reader who clicked another line of thinking while a
+   * reply streamed got session A's transcript written into session B, and
+   * persisted there. Everything that belongs to the session that was SENT
+   * patches that session.
+   */
+  const patchSession = useCallback(
+    (id: string | null, fn: (s: LogosSession) => LogosSession, save = true) => {
       if (!id) return;
       const current = sessionsRef.current.find((s) => s.id === id);
       if (!current) return;
@@ -1432,6 +1454,12 @@ export function LogosApp({
       if (save) void persist(updated);
     },
     [applySessions, persist]
+  );
+  patchSessionRef.current = patchSession;
+  /** Update the active session and save it. */
+  const patchActive = useCallback(
+    (fn: (s: LogosSession) => LogosSession, save = true) => patchSession(activeIdRef.current, fn, save),
+    [patchSession]
   );
 
   // Load the session list once access resolves.
@@ -1559,6 +1587,10 @@ export function LogosApp({
     setLimitNoteOff(false);
     setError(null);
     setStreaming('');
+    // The engine's note and the last reply's ops belong to the session they
+    // were made in; carried over, the ops replayed onto the next surface.
+    setBuildNote(null);
+    setVizOps(null);
 
     // ── A CONVERSATION ARRIVING HERE WITH A HISTORY AND NO MAP ──────
     //
@@ -1696,6 +1728,13 @@ export function LogosApp({
   // ── map ────────────────────────────────────────────────────────────
   function refreshMap(contextsOverride?: Record<string, NodeContext[]>) {
     const forSession = activeIdRef.current;
+    // SEQUENCED. Two extractions in flight — a send and a focus-thread send,
+    // or a switch and a send — could resolve out of order and the older map
+    // overwrote the newer, models included.
+    const seq = ++mapSeqRef.current;
+    // What was SENT, so the echo can be told from news: the server hands the
+    // request-time workspace back unchanged when the turn proposed nothing.
+    const sentModels = JSON.stringify(mapRef.current.models ?? null);
     setMapping(true);
     void (async () => {
       try {
@@ -1716,7 +1755,7 @@ export function LogosApp({
           const json = await res.json();
           // A map that arrives after the reader has moved on belongs to a
           // different line of thinking — drop it rather than cross the wires.
-          if (json?.map && activeIdRef.current === forSession) {
+          if (json?.map && activeIdRef.current === forSession && seq === mapSeqRef.current) {
             // A crossing observed in this tab — never a level. Hydrating a
             // saved session with nine nodes is not a map taking shape, so the
             // first extraction of an existing session does not count; a map
@@ -1785,7 +1824,17 @@ export function LogosApp({
               if (json.map.viz && json.map.viz.overlays === undefined && s.map?.viz?.overlays?.length) {
                 viz = { ...json.map.viz, overlays: s.map.viz.overlays };
               }
-              const map = { ...json.map, ...(viz ? { viz } : {}) };
+              // THE SERVER'S MODELS ARE AN ECHO UNLESS IT BUILT SOMETHING.
+              // The route returns the workspace it was sent; by the time it
+              // returns, the reply's ops have usually edited the live one —
+              // "remove the damper" updated the picture, then reverted when
+              // the extraction landed. The live workspace wins over an echo
+              // of what was sent; a workspace the server changed wins over
+              // both.
+              const echoed = JSON.stringify(json.map.models ?? null) === sentModels;
+              const models = echoed ? s.map?.models : json.map.models;
+              const map = { ...json.map, ...(viz ? { viz } : {}), ...(models ? { models } : {}) };
+              if (!models) delete (map as { models?: unknown }).models;
               return { ...s, map, contexts };
             });
             setChanged(new Set(delta.changed));
@@ -1818,6 +1867,10 @@ export function LogosApp({
                 .filter(Boolean)
                 .join(' ');
               setBuildNote(note.slice(0, 300));
+            } else {
+              // A turn with no build dismisses the last one's note — it was
+              // never cleared, so "built …" outranked the delta line forever.
+              setBuildNote(null);
             }
           }
         }
@@ -2322,11 +2375,12 @@ export function LogosApp({
       // unknown ids dropped, numbers clamped to the ranges the physics owns.
       // Applied before the text lands so the picture and the sentence that
       // describes it change together.
-      applyVizOps(parseVizOps(acc, sentViz));
+      applyVizOps(parseVizOps(acc, sentViz), sid);
       acc = stripVizOps(acc);
       setStreaming('');
       const landed: Msg[] = [...next, { role: 'assistant', content: acc }];
-      patchActive((s) => ({ ...s, messages: landed }));
+      // Into the session that SENT, which may no longer be the active one.
+      patchSession(sid, (s) => ({ ...s, messages: landed }));
       chronRef.current = [...chronRef.current, { role: 'assistant', content: acc }];
       if (u && u.entries.length) recurrenceSaidRef.current.add(sid);
       // A thought completed. The proactive check runs from an effect rather
@@ -3238,6 +3292,23 @@ export function LogosApp({
             }
             onVizRead={takeViz}
             vizOps={vizOps}
+            // A slider, a cursor, a selection or an open view goes into the
+            // document (lib/model/docs.ts adopt — coalesced, so a drag is one
+            // revision). The state lands at once; the save trails the drag.
+            onModelEdited={(docId, m) => {
+              patchActive((s) => {
+                const map = s.map ?? EMPTY_MAP;
+                const ws = map.models;
+                if (!ws) return s;
+                const next = adopt(ws, docId, m, Date.now());
+                return next === ws ? s : { ...s, map: { ...map, models: next } };
+              }, false);
+              if (adoptSaveRef.current) clearTimeout(adoptSaveRef.current);
+              adoptSaveRef.current = setTimeout(() => {
+                const cur = sessionsRef.current.find((x) => x.id === activeIdRef.current);
+                if (cur) void persist(cur);
+              }, 700);
+            }}
           />
           <FirstMap state={firstMap} onSkip={endFirstMap} onFinish={endFirstMap} />
           <ExplorePanel

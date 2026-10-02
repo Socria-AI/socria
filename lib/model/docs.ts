@@ -451,6 +451,38 @@ export function removeObject(ws: ModelWorkspace, id: string, objectId: string, a
   const part = typeof target.meta?.part === 'string' ? target.meta.part : null;
   const carrierId = typeof target.meta?.mech === 'string' ? target.meta.mech : null;
 
+  // A BODY OF A GRAVITATING SYSTEM. This path did not exist: a gravity body
+  // fell through to "an ordinary object", the expanded copy was deleted, the
+  // declaration kept the body, and the reply said "moon is out of the model"
+  // while the next unpack put it straight back with all its states.
+  const gravityOf = typeof target.meta?.gravity === 'string' ? target.meta.gravity : null;
+  if (part && gravityOf) {
+    const carrier = objectOf(model, gravityOf);
+    if (!carrier?.gravity) return no(ws, `${target.label} belongs to a gravitating system that is not in this model`);
+    const bodies = (carrier.gravity.bodies ?? []).filter((b) => b.id !== part);
+    if (bodies.length < 2) {
+      return no(ws, `${target.label} is one of only two bodies: a gravitating system with one body has nothing to attract, so this would not be a model any more`);
+    }
+    const next: Model = {
+      ...model,
+      version: (model.version ?? 0) + 1,
+      objects: model.objects
+        .filter((o) => o.meta?.gravity !== gravityOf)
+        .map((o) => {
+          if (o.id !== gravityOf) return o;
+          const { system: _assembled, ...rest } = { ...o, gravity: { ...carrier.gravity!, bodies } };
+          return rest as ModelObject;
+        }),
+      lastChange: { what: `removed ${part}`, affected: [gravityOf], at },
+    };
+    return {
+      workspace: patch(ws, id, (d) => revise(d, next, `removed ${target.label} from the gravitating system`)),
+      ok: true,
+      says: `${target.label} is out of the model — the system is reassembled with ${bodies.length} bodies, and everything recomputes from it`,
+      affected: [gravityOf],
+    };
+  }
+
   if (part && carrierId) {
     const carrier = objectOf(model, carrierId);
     if (!carrier?.mechanism) return no(ws, `${target.label} belongs to a mechanism that is not in this model`);
@@ -552,8 +584,11 @@ export function removeObject(ws: ModelWorkspace, id: string, objectId: string, a
         version: (model.version ?? 0) + 1,
         objects: model.objects
           // The derived objects go; unpack() rebuilds exactly the ones the new
-          // specification implies, and their ids are positional.
-          .filter((o) => o.meta?.spec !== specOf)
+          // specification implies, and their ids are positional. INCLUDING
+          // the marginals and readouts hanging off the response, which carry
+          // `meta.of` rather than `meta.spec` and used to survive — so a
+          // removed regressor kept its ∂wage/∂educ.
+          .filter((o) => o.meta?.spec !== specOf && !o.id.startsWith(`${specOf}__`))
           .map((o) =>
             o.id === specOf ? { ...o, estimation: { ...est, x: est.x.filter((c) => c !== column) } } : o
           ),
@@ -727,8 +762,18 @@ export function addPart(
   if (taken.has(spec.partId)) return no(ws, `there is already a part called ${spec.partId}`);
 
   let nextMech = mech;
+  // NOTHING IS INVENTED. A body without a mass and a spring without a
+  // stiffness used to get 1, routed runnable, and the reply said "k2 is in the
+  // model — everything recomputes" about a number nobody chose. Asked for
+  // instead, which is what readMechanism does for the same gap.
+  if (spec.kind === 'body' && spec.mass === undefined) {
+    return no(ws, `a body needs a mass — say what ${spec.partId} weighs (a number, or the name of a control) and it goes in`);
+  }
+  if (spec.kind !== 'body' && spec.value === undefined) {
+    return no(ws, `a ${spec.kind} needs a ${spec.kind === 'spring' ? 'stiffness' : 'coefficient'} — say what ${spec.partId}'s is (a number, or the name of a control) and it goes in`);
+  }
   if (spec.kind === 'body') {
-    const mass = spec.mass ?? 1;
+    const mass = spec.mass!;
     const lastAt = Math.max(0, ...(mech.bodies ?? []).map((b) => b.at ?? 0));
     nextMech = {
       ...mech,
@@ -741,7 +786,7 @@ export function addPart(
     if (!between.every((e) => bodies.has(e))) {
       return no(ws, `a ${spec.kind} cannot attach to ${between.filter((e) => !bodies.has(e)).join(' or ')} — there is nothing there`);
     }
-    const link = { id: spec.partId, between, value: spec.value ?? 1, ...(spec.label ? { label: spec.label } : {}) };
+    const link = { id: spec.partId, between, value: spec.value!, ...(spec.label ? { label: spec.label } : {}) };
     nextMech =
       spec.kind === 'spring'
         ? { ...mech, springs: [...(mech.springs ?? []), link] }
@@ -828,6 +873,11 @@ export function sanitizeWorkspace(raw: unknown): ModelWorkspace {
         return {
           at: typeof e?.at === 'number' ? Math.max(0, Math.floor(e.at)) : 0,
           said: typeof e?.said === 'string' ? e.said.slice(0, 160) : '',
+          // `kind` is what coalescing keys on. Dropped here, every selection
+          // and cursor move after a round trip became its own revision, and
+          // with eight kept the built revision was evicted — so "reset" no
+          // longer meant "as built".
+          ...(typeof e?.kind === 'string' && /^[a-z][a-z0-9_-]{0,23}$/i.test(e.kind) ? { kind: e.kind } : {}),
         };
       })
       .filter((l) => l.said);
@@ -878,6 +928,40 @@ export function openFromProposal(
 /** A built model, for the renderer: the current revision, expanded and ready. */
 export function modelFor(doc: ModelDoc): Model {
   return unpack(current(doc));
+}
+
+/**
+ * Take a model the view changed — a slider, an input cursor, a selection, an
+ * open view — into the document it belongs to.
+ *
+ * THE DOCUMENT NEVER HEARD FROM THE SURFACE. ModelView kept every slider move,
+ * cursor, selection and open view in its own useState; nothing wrote them to
+ * the workspace, so a reload or a switch of lens put the model back to its
+ * last revision, undo could not reach them, and the chat was told a state the
+ * document did not hold. This is the write path: a change of the same kind
+ * replaces the top revision (revise's coalescing), so a drag is one revision
+ * and not a hundred; a change to the clock is not kept at all, because where
+ * the playhead is is not part of the model.
+ */
+export function adopt(ws: ModelWorkspace, id: string, model: Model, at = 0): ModelWorkspace {
+  const doc = docOf(ws, id);
+  if (!doc) return ws;
+  const was = current(doc);
+  if (was === model || (was.version ?? 0) === (model.version ?? 0)) return ws;
+  const what = model.lastChange?.what ?? '';
+  if (what === 'time') return ws;
+  const clean = sanitizeModel({ ...model, lastChange: model.lastChange ? { ...model.lastChange, at } : undefined });
+  if (!clean) return ws;
+  const kind = what === 'view' ? 'view' : what === 'select' ? 'select' : model.at && what.startsWith('at ') ? 'input' : 'control';
+  const said =
+    kind === 'control' && model.lastChange
+      ? `${model.lastChange.what} to ${String(model.lastChange.to)}`
+      : kind === 'input'
+        ? what
+        : kind === 'view'
+          ? `opened ${String(model.lastChange?.to ?? model.view ?? 'a view')}`
+          : `selected ${String(model.lastChange?.to ?? model.selected ?? 'nothing')}`;
+  return patch(ws, id, (d) => revise(d, clean, said, { coalesce: kind }));
 }
 
 /** For a host that has to store it: the workspace, plainly. */

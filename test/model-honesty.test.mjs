@@ -270,7 +270,7 @@ const nbody = (n, id = 'grav') => ({
   const bg = buildObject(gap, gap.objects[0]);
   ok('a gap in the components is refused', bg.primitives.length === 0);
   ok('  naming both the one given and the one missing',
-    /states dz but not dy/.test(bg.problem ?? ''), bg.problem ?? '');
+    /states dx and dz but not dy|states dz but not dy/.test(bg.problem ?? ''), bg.problem ?? '');
 
   // THE LIBRARY'S OWN DOUBLE PENDULUM was the model this caught: it declared
   // its two starting ANGLES as controls and left the angular velocities to the

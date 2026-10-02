@@ -116,10 +116,14 @@ export const UNSUPPORTED = [
 function solve(A: number[][], b: number[]): number[] | null {
   const n = A.length;
   const M = A.map((row, i) => [...row, b[i]]);
+  // SCALED, as algebra.ts scales its own. An absolute 1e-12 called a
+  // regressor measured in 1e-7 units collinear — and would let a large-scale
+  // nearly collinear pair through.
+  const scale = Math.max(1e-300, ...A.flat().map((v) => Math.abs(v)).filter(Number.isFinite));
   for (let c = 0; c < n; c++) {
     let piv = c;
     for (let r = c + 1; r < n; r++) if (Math.abs(M[r][c]) > Math.abs(M[piv][c])) piv = r;
-    if (Math.abs(M[piv][c]) < 1e-12) return null;
+    if (Math.abs(M[piv][c]) < 1e-12 * scale) return null;
     [M[c], M[piv]] = [M[piv], M[c]];
     for (let r = 0; r < n; r++) {
       if (r === c) continue;
@@ -198,15 +202,26 @@ export function ols(
   const n = yy.length;
   if (n <= cols) return { ok: false, why: `only ${n} usable observations for ${cols} coefficients` };
 
+  // COLUMNS SCALED TO UNIT SIZE BEFORE ANYTHING IS SOLVED. A regressor
+  // measured in 1e-7 beside an intercept of 1 made X′X conditioned at 1e13,
+  // and the elimination called it collinear — numerically true in the raw
+  // units and false about the data. Each column is divided by its largest
+  // entry, the normal equations are solved in those units, and the
+  // coefficients and their covariance are scaled back at the end. The fit,
+  // the residuals and every statistic are identical; only the arithmetic is
+  // survivable.
+  const colScale = Array.from({ length: cols }, (_, a) => Math.max(1e-300, ...design.map((r) => Math.abs(r[a]))));
+  const D = design.map((r) => r.map((v, a) => v / colScale[a]));
   const XtX: number[][] = Array.from({ length: cols }, (_, a) =>
-    Array.from({ length: cols }, (_, b) => design.reduce((s, r) => s + r[a] * r[b], 0))
+    Array.from({ length: cols }, (_, b) => D.reduce((s, r) => s + r[a] * r[b], 0))
   );
-  const Xty = Array.from({ length: cols }, (_, a) => design.reduce((s, r, i) => s + r[a] * yy[i], 0));
-  const beta = solve(
+  const Xty = Array.from({ length: cols }, (_, a) => D.reduce((s, r, i) => s + r[a] * yy[i], 0));
+  const betaScaled = solve(
     XtX.map((r) => [...r]),
     [...Xty]
   );
-  if (!beta) {
+  const beta = betaScaled ? betaScaled.map((b, a) => b / colScale[a]) : null;
+  if (!beta || !betaScaled) {
     return {
       ok: false,
       why: 'the regressors are collinear — two or more carry the same information, so they have no separate coefficients',
@@ -230,7 +245,7 @@ export function ols(
     const meat: number[][] = Array.from({ length: cols }, () => Array(cols).fill(0));
     for (let i = 0; i < n; i++) {
       const e2 = residuals[i] ** 2;
-      for (let a = 0; a < cols; a++) for (let b = 0; b < cols; b++) meat[a][b] += e2 * design[i][a] * design[i][b];
+      for (let a = 0; a < cols; a++) for (let b = 0; b < cols; b++) meat[a][b] += e2 * D[i][a] * D[i][b];
     }
     const scale = df > 0 ? n / df : 1;
     cov = inv.map((_row, a) =>
@@ -243,6 +258,8 @@ export function ols(
   } else {
     cov = inv.map((row) => row.map((v) => v * sigma2));
   }
+  // Back to the data's own units.
+  cov = cov.map((row, a) => row.map((v, b) => v / (colScale[a] * colScale[b])));
 
   const names = opts.names ?? [];
   const label = (i: number) => {

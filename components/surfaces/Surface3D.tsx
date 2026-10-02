@@ -59,6 +59,8 @@ export interface SurfaceGroup {
 export interface SurfaceLayer {
   id: string;
   label: string;
+  /** declared off: starts hidden */
+  on?: boolean;
 }
 
 export interface RenderArgs {
@@ -193,6 +195,13 @@ export interface Surface3DProps {
    * border and ignore the height it was handed.
    */
   fill?: boolean;
+  /** the host's selection, when the host owns it; the frame mirrors it and reports clicks through onSelect */
+  selected?: string | null;
+  onSelect?: (id: string | null) => void;
+  /** the model's clock, when the host moved it (a reply's "time 3"); the frame follows rather than overwriting it */
+  time?: number;
+  /** what the model says about itself that the picture's own captions do not — placeholders, assumed ranges, what is not estimated */
+  notes?: string[];
 }
 
 // THE VIEWBOX IS THE PIXEL BOX, 1:1, and that is not a detail.
@@ -222,17 +231,45 @@ export function Surface3D({
   science,
   edits,
   can,
+  selected: selectedProp,
+  onSelect,
+  time: timeProp,
+  notes = [],
   onOps,
   onRead,
   ops = null,
 }: Surface3DProps & Pick<SurfaceProps, 'onRead' | 'ops'>) {
   const [vals, setVals] = useState<Record<string, number>>(initial);
+  // RE-SEEDED WHEN THE DOCUMENT MOVES. `vals` was seeded once, so when a new
+  // revision arrived (a reply's edit, an undo, another document) the frame
+  // kept the old handle positions and ModelView's sync wrote them straight
+  // back over the revision: the document said k = 3 and the picture drew
+  // k = 8. `initial` changes identity exactly when the host hands over a
+  // different revision (ModelView keys it on id@version).
+  const seeded = useRef(initial);
+  useEffect(() => {
+    if (seeded.current === initial) return;
+    seeded.current = initial;
+    setVals(initial);
+  }, [initial]);
   const [cam, setCam] = useState<Cam>(initialCam);
+  // A layer declared off starts off. Every layer began on, so "Level sets"
+  // declared `on: false` drew anyway.
   const [on, setOn] = useState<Record<string, boolean>>(
-    () => Object.fromEntries(layers.map((l) => [l.id, true]))
+    () => Object.fromEntries(layers.map((l) => [l.id, l.on !== false]))
   );
   const [group, setGroup] = useState(groups[0]?.id ?? '');
   const [t, setT] = useState(0);
+  // THE HOST'S CLOCK WINS WHEN IT MOVES. A reply's "time 3" set model.time.t
+  // and the frame's own `t` stayed where it was — and wrote itself back on
+  // the next frame. Followed here, and only on a change the frame did not
+  // make itself (its own ticks come back equal).
+  const tSeen = useRef(timeProp);
+  useEffect(() => {
+    if (timeProp === undefined || timeProp === tSeen.current) return;
+    tSeen.current = timeProp;
+    setT((v) => (Math.abs(v - timeProp) > 1e-9 ? timeProp : v));
+  }, [timeProp]);
   const [playing, setPlaying] = useState(animated);
   const [full, setFull] = useState(false);
   /**
@@ -243,7 +280,22 @@ export function Surface3D({
    * one thing the conversation could not resolve. Held here, beside the state
    * it belongs to, and sent with the next message.
    */
-  const [selected, setSelected] = useState<string | null>(null);
+  const [selected, setSelectedLocal] = useState<string | null>(selectedProp ?? null);
+  // ONE SELECTION. The frame held its own, ModelView held `view.selected` and
+  // the model held `selected`, and none of them told the others: a click on a
+  // mark did not reach the inspector, a pick in the inspector did not dim the
+  // picture, and "what is this?" resolved to whichever the frame last saw.
+  // When a host owns the selection, the frame mirrors it and reports clicks.
+  useEffect(() => {
+    if (selectedProp !== undefined) setSelectedLocal(selectedProp);
+  }, [selectedProp]);
+  const setSelected = useCallback(
+    (id: string | null) => {
+      setSelectedLocal(id);
+      onSelect?.(id);
+    },
+    [onSelect]
+  );
   // The panel's own height, which the reader drags. Stored rather than derived
   // so it survives a re-render and a full-screen round trip.
   const [tall, setTall] = useState(460);
@@ -445,7 +497,7 @@ export function Surface3D({
   const reset = useCallback(() => {
     setVals(initial);
     setCam(initialCam);
-    setOn(Object.fromEntries(layers.map((l) => [l.id, true])));
+    setOn(Object.fromEntries(layers.map((l) => [l.id, l.on !== false])));
     setT(0);
     setSelected(null);
     // Deliberately NOT the panel height or full screen: those are the
@@ -460,7 +512,11 @@ export function Surface3D({
   // the ranges. So this applies them and does not second-guess them — except
   // for the camera distance, whose limits belong to THIS surface and are not
   // in the state at all.
-  const seen = useRef(-1);
+  // STARTS AT WHATEVER IS ALREADY THERE. Seeded at −1, a surface that mounted
+  // with the host's last batch still in state replayed it: drag k to 2, switch
+  // lens and back, and "set k 5" from three turns ago ran again — and a new
+  // session's surface replayed the previous session's ops.
+  const seen = useRef(ops?.seq ?? -1);
   useEffect(() => {
     if (!ops || ops.seq === seen.current) return;
     seen.current = ops.seq;
@@ -507,28 +563,36 @@ export function Surface3D({
   // revision it opened at would tell the conversation the model is one edit
   // behind — which is exactly the kind of stale claim this whole seam exists to
   // avoid.
-  const now = useRef({ vals, on, cam, t, playing, out, selected, edits });
+  // EVERYTHING THE CONVERSATION READS, BEHIND ONE REF. `read` was a stable
+  // callback that closed over `entities`, `groups`, `title` and the rest from
+  // the FIRST render, on the claim that they do not change for the life of a
+  // surface. In ModelView they change with every revision, and the instance
+  // survives a switch to another document — so the chat was told the first
+  // model's title, entities and controls, and validated edits against ids
+  // that no longer existed.
+  const now = useRef({ vals, on, cam, t, playing, out, selected, edits, groups, entities, title, model, assumptions, equations, layers, animated, can, science, surface, initial, notes });
   useEffect(() => {
-    now.current = { vals, on, cam, t, playing, out, selected, edits };
+    now.current = { vals, on, cam, t, playing, out, selected, edits, groups, entities, title, model, assumptions, equations, layers, animated, can, science, surface, initial, notes };
   });
   const read = useCallback((): VizModelState => {
     const c = now.current;
     const live = c.out.live ?? {};
-    const ctls = groups.flatMap((g) => g.ctls);
+    const ctls = c.groups.flatMap((g) => g.ctls);
     return {
-      surface,
-      title,
-      model,
-      assumptions,
-      equations,
-      ...(science ? { science: scienceLines(science) } : {}),
+      surface: c.surface,
+      title: c.title,
+      model: c.model,
+      assumptions: c.assumptions,
+      equations: c.equations,
+      ...(c.science ? { science: scienceLines(c.science) } : {}),
       ...(c.edits ? { edits: c.edits } : {}),
-      entities: entities.map((e) => {
+      entities: c.entities.map((e) => {
         const state = live[e.id];
         return state ? { ...e, state } : e;
       }),
       params: ctls.map((ctl) => {
-        const v = c.vals[ctl.id] ?? ctl.min;
+        // A control the revision added reads the model's value, not its minimum.
+        const v = c.vals[ctl.id] ?? c.initial[ctl.id] ?? ctl.min;
         return {
           id: ctl.id,
           label: ctl.label,
@@ -539,19 +603,21 @@ export function Surface3D({
           ...(ctl.help ? { means: ctl.help } : {}),
         };
       }),
-      layers: layers.map((l) => ({ id: l.id, label: l.label, on: c.on[l.id] !== false })),
+      layers: c.layers.map((l) => ({ id: l.id, label: l.label, on: c.on[l.id] !== false })),
       camera: { ...c.cam },
-      ...(animated
+      ...(c.animated
         ? { clock: { t: c.t, playing: c.playing, rate: c.vals.rate ?? 1 } }
         : {}),
-      readouts: [c.out.left, c.out.right, c.out.note].filter(Boolean) as string[],
+      // The model's own notes first: a placeholder coefficient or an assumed
+      // range is the thing a reply must not misstate, and the caption cap is
+      // six lines.
+      readouts: [...c.notes.slice(0, 3), c.out.left, c.out.right, c.out.note].filter(Boolean) as string[],
       selected: c.selected,
-      ...(can?.length ? { can } : {}),
+      ...(c.can?.length ? { can: c.can } : {}),
     };
-    // Everything read inside comes from the ref or from props that do not
-    // change for the life of a surface, so this function is stable — which is
-    // what lets the effect below register it once instead of on every frame.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Everything read inside comes from the ref, so this function is stable —
+    // which is what lets the effect below register it once instead of on
+    // every frame.
   }, []);
   useEffect(() => {
     onRead?.(read);
@@ -704,10 +770,10 @@ export function Surface3D({
                 min={c.min}
                 max={c.max}
                 step={c.step}
-                value={vals[c.id] ?? c.min}
+                value={vals[c.id] ?? initial[c.id] ?? c.min}
                 onChange={(e) => setVals((v) => ({ ...v, [c.id]: +e.target.value }))}
               />
-              <span className="v">{c.read(vals[c.id] ?? c.min)}</span>
+              <span className="v">{c.read(vals[c.id] ?? initial[c.id] ?? c.min)}</span>
             </label>
           ))}
           {layers.length > 0 && active?.id === groups[groups.length - 1]?.id && (

@@ -77,6 +77,11 @@ export function panelMarks(
             <g key={`${r.label}-${i}`} transform={`translate(${PAD}, ${PAD + i * LINE * 2})`}>
               <text
                 className={`eng-read-key${r.of && onSelect ? ' is-link' : ''}`}
+                // PICKED BY THE FRAME, like every mark: the stage captures the
+                // pointer on press, which retargets the click away from this
+                // element, so a React onClick here never fired and the release
+                // on "empty paper" cleared the selection instead.
+                data-obj={r.of ?? undefined}
                 onClick={r.of && onSelect ? () => onSelect(r.of!) : undefined}
               >
                 {fit(r.label, Math.floor(chars * 0.5))}
@@ -146,6 +151,7 @@ export function panelMarks(
               x={PAD + (l.head ? 0 : 12)}
               y={PAD + i * LINE}
               className={`${l.head ? 'eng-read-head' : 'eng-read-cell'}${l.of && onSelect ? ' is-link' : ''}`}
+              data-obj={l.of ?? undefined}
               onClick={l.of && onSelect ? () => onSelect(l.of!) : undefined}
             >
               {fit(l.text, chars)}
@@ -247,6 +253,7 @@ export function panelMarks(
               x={p.x}
               y={p.y + 4}
               className={`eng-read-node${onSelect ? ' is-link' : ''}`}
+              data-obj={n.of}
               onClick={onSelect ? () => onSelect(n.of) : undefined}
             >
               {fit(n.label, per)}

@@ -101,6 +101,18 @@ export const PROPOSAL_CAPS = {
 function trim(model: Model): Model {
   const objects = model.objects.slice(0, PROPOSAL_CAPS.objects);
   const params = model.params.slice(0, PROPOSAL_CAPS.params);
+  // SAID, LIKE EVERY OTHER CUT. The sanitiser records what it removes; this
+  // sliced in silence, so a proposal of eighty curves became sixty with no
+  // account anywhere — and the reply described a model with more in it.
+  const dropped = [
+    ...(model.dropped ?? []),
+    ...(model.objects.length > objects.length
+      ? [`${model.objects.length - objects.length} of ${model.objects.length} proposed objects, beyond the ${PROPOSAL_CAPS.objects} a proposal may carry`]
+      : []),
+    ...(model.params.length > params.length
+      ? [`${model.params.length - params.length} of ${model.params.length} proposed controls, beyond the ${PROPOSAL_CAPS.params} a proposal may carry`]
+      : []),
+  ];
   const data = model.data
     ? Object.fromEntries(
         Object.entries(model.data).map(([k, block]) => [
@@ -119,7 +131,7 @@ function trim(model: Model): Model {
         ])
       )
     : undefined;
-  return { ...model, objects, params, ...(data ? { data } : {}) };
+  return { ...model, objects, params, ...(data ? { data } : {}), ...(dropped.length ? { dropped } : {}) };
 }
 
 /**
@@ -230,7 +242,10 @@ export function buildProposal(raw: ModelProposal, opts?: { at?: number }): Built
   // Mechanisms become objects before anything is judged, because a mechanism's
   // computability is a fact about its assembled system and not about its
   // declaration (expand is idempotent — see lib/model/mechanism.ts).
-  const model = attribute(trim(unpack(clean)));
+  // TRIMMED BEFORE EXPANSION: the cap is on what was PROPOSED, and counting
+  // the expander's own derived objects against it said "100 of 160" about a
+  // proposal of eighty.
+  const model = attribute(unpack(trim(clean)));
 
   const solvers = runnable(model);
   const missing = missingStructure(model);

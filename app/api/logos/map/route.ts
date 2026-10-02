@@ -207,7 +207,10 @@ export async function POST(req: NextRequest) {
     // IT ONLY EVER ADDS. A turn that already produced a scene is a turn that
     // was understood, and this leaves it alone.
     const lastSaid = [...kept].reverse().find((m: any) => m.role === 'user');
-    const wants = next.viz ? null : wantedSimulation(lastSaid?.content);
+    // ONLY WHEN NOTHING ELSE ANSWERED THE TURN. A proposal is the engine's
+    // business; injecting a canned scene beside one meant a refused "mass on
+    // a spring" showed the stock oscillator instead of the refusal.
+    const wants = next.viz || next.propose ? null : wantedSimulation(lastSaid?.content);
     if (wants) {
       next.viz = { kind: 'simulation', sim: { object: wants.object } } as typeof next.viz;
       next.ask = {

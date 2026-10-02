@@ -197,7 +197,17 @@ export function aspectOf(model: Model): 'equal' | 'fit' {
   // a length is a length; education, experience and currency are three different
   // quantities and forcing them to one scale says nothing true about any of them.
   const graph = model.objects.some(
-    (o) => (o.kind === 'surface' || o.kind === 'volume') && (!!o.definition || !!o.defs?.z) && !o.defs?.px
+    (o) =>
+      ((o.kind === 'surface' || o.kind === 'volume') && (!!o.definition || !!o.defs?.z) && !o.defs?.px) ||
+      // y = f(x) IS A GRAPH TOO. A curve stated as an expression was treated
+      // as geometry, so its box was made square about the larger extent:
+      // y = 2x + 3 over five units of x sat in the middle half of its frame,
+      // and exp(x) over [0, 100] was a box 10⁴³ wide with the curve invisible
+      // against its left edge. A parametric curve (px, py) is a shape and keeps
+      // equal scales.
+      ((o.kind === 'curve' || o.kind === 'line' || o.kind === 'ray') &&
+        (!!o.definition || !!o.defs?.f || !!o.defs?.z) &&
+        !o.defs?.px)
   );
   // TWO DIFFERENT KINDS OF QUANTITY ON THE TWO AXES IS NOT A GEOMETRY. An
   // equation system's axes are groups of unknowns — quantity against price,

@@ -474,7 +474,10 @@ export type VizOp =
 
 /** The ops that change the MODEL rather than the view of it. */
 export const MODEL_OPS: readonly VizOp['op'][] = [
-  'remove', 'add', 'replace', 'relate', 'at', 'duplicate', 'branch', 'undo', 'redo', 'delete', 'use',
+  // `reset` is here because the document has a reset (docs.ts applyModelOps)
+  // and a reply's "reset it" never reached it: only the frame's controls went
+  // back, and a removed part stayed removed.
+  'remove', 'add', 'replace', 'relate', 'at', 'duplicate', 'branch', 'undo', 'redo', 'delete', 'use', 'reset',
 ];
 
 export function isModelOp(op: VizOp): boolean {

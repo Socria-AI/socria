@@ -100,7 +100,10 @@ export function inputDomain(
   if (p) return { domain: [p.min, p.max], from: 'control' };
   const col = block?.columns?.[column];
   const finite = (col ?? []).filter((v) => Number.isFinite(v));
-  if (finite.length >= 2) return { domain: [Math.min(...finite), Math.max(...finite)], from: 'data' };
+  // A CONSTANT COLUMN HAS NO EXTENT. [12, 12] is not a window to draw over.
+  if (finite.length >= 2 && Math.max(...finite) > Math.min(...finite)) {
+    return { domain: [Math.min(...finite), Math.max(...finite)], from: 'data' };
+  }
   if (kind === undefined && impliedKind(column) === 'binary') return { domain: [0, 1], from: 'name' };
   return { domain: ASSUMED_WINDOW, from: 'assumed' };
 }

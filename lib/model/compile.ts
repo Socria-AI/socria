@@ -28,6 +28,8 @@
 import { compileExpr } from '@/lib/logos-math';
 import type { Range } from '@/lib/logos-viz3d';
 import {
+  clipMesh,
+  segmentsOf,
   contour,
   crossSection,
   dataSurface,
@@ -431,10 +433,16 @@ export function buildObject(model: Model, o: ModelObject, opts?: { detail?: numb
       if (!e) return NOTHING(o, `“${def}” would not compile`);
       const xr = rangeOf(model, o, vx, [-3, 3]);
       const yr = rangeOf(model, o, vy, [-3, 3]);
-      const out = surfaceMesh(o.id, (x, y) => e.eval({ ...scope, x, y, [vx]: x, [vy]: y }), xr, yr, detail, {
+      // Bound under the LOWERCASED name: the evaluator looks names up in
+      // lowercase, so `over: {P: …}` bound `P` and read `p` as unbound.
+      const out = surfaceMesh(o.id, (x, y) => e.eval({ ...scope, x, y, [vx.toLowerCase()]: x, [vy.toLowerCase()]: y }), xr, yr, detail, {
         layer,
         tone: 'accent',
       });
+      // ONE SHEET PER BRANCH, as for curves: heights near a pole are cut out
+      // rather than allowed to own the box (sample.ts clipMesh).
+      const cut = clipMesh(out.value.rows);
+      out.value.rows = cut.rows;
       const cells = out.value.rows.flat();
       const finite = cells.filter(Boolean).length;
       if (!finite) {
@@ -450,9 +458,17 @@ export function buildObject(model: Model, o: ModelObject, opts?: { detail?: numb
       return {
         of: o.id,
         primitives: [out.value],
-        note: out.note + windowSays([['x', xr], ['y', yr]]) + sampledSays(finite, cells.length),
+        note:
+          out.note +
+          windowSays([['x', xr], ['y', yr]]) +
+          sampledSays(finite, cells.length) +
+          (cut.clipped
+            ? `; the height is clipped to ${Number(cut.clipped.z[0].toPrecision(3))} to ${Number(
+                cut.clipped.z[1].toPrecision(3)
+              )} near a pole so the surface is readable, leaving ${cut.clipped.dropped} cells nearest it undrawn`
+            : ''),
         fidelity: 'model-derived',
-        z: out.z,
+        z: cut.clipped ? { min: cut.clipped.z[0], max: cut.clipped.z[1] } : out.z,
       };
     }
 
@@ -512,16 +528,17 @@ export function buildObject(model: Model, o: ModelObject, opts?: { detail?: numb
       const e = compileExpr(def, names(model, [vx, 'x']));
       if (!e) return NOTHING(o, `“${def}” would not compile`);
       const n = Math.min(LIMITS.runPoints, detail * 8);
-      const at: P3[] = [];
+      const samples: (P3 | null)[] = [];
       for (let i = 0; i <= n; i++) {
         const x = xr.min + ((xr.max - xr.min) * i) / n;
         // Bound under BOTH the model's own name and the coordinate, so an
         // expression written either way evaluates and neither becomes the only
         // legal spelling.
-        const y = e.eval({ ...scope, x, [vx]: x });
-        if (Number.isFinite(y)) at.push({ x, y, z: 0 });
+        const y = e.eval({ ...scope, x, [vx.toLowerCase()]: x });
+        samples.push(Number.isFinite(y) ? { x, y, z: 0 } : null);
       }
-      if (at.length < 2) {
+      const finite = samples.filter(Boolean).length;
+      if (finite < 2) {
         return NOTHING(
           o,
           `not computed — “${def}” compiles but has a value at fewer than two points between ${
@@ -529,10 +546,28 @@ export function buildObject(model: Model, o: ModelObject, opts?: { detail?: numb
           } and ${Number(xr.max.toPrecision(4))}, so there is no curve to draw. Either it is not real over that range or the range is the wrong one`
         );
       }
+      // ONE STROKE PER BRANCH. A curve with a pole is not one line, and joining
+      // its branches drew a vertical stroke through x = 0 on 1/x and stretched
+      // the box to hold it (sample.ts segmentsOf).
+      const seg = segmentsOf(samples);
+      if (!seg.segments.length) {
+        return NOTHING(o, `not computed — “${def}” has values but no two neighbouring samples form a stroke`);
+      }
+      const poleSays = seg.poles.length
+        ? `; broken at ${seg.poles.length === 1 ? 'a pole' : `${seg.poles.length} poles`} near x = ${seg.poles
+            .slice(0, 4)
+            .map((x) => Number(x.toPrecision(3)))
+            .join(', ')}${seg.poles.length > 4 ? ', …' : ''}` +
+          (seg.clipped
+            ? `; the vertical extent is clipped to ${Number(seg.clipped.y[0].toPrecision(3))} to ${Number(
+                seg.clipped.y[1].toPrecision(3)
+              )} so the curve is readable, leaving ${seg.clipped.dropped} samples nearest the pole${seg.poles.length === 1 ? '' : 's'} undrawn`
+            : '')
+        : '';
       return {
         of: o.id,
-        primitives: [{ p: 'polyline', of: o.id, at, layer, tone: 'primary' }],
-        note: `${at.length} samples over x` + windowSays([['x', xr]]) + sampledSays(at.length, n + 1),
+        primitives: seg.segments.map((at) => ({ p: 'polyline' as const, of: o.id, at, layer, tone: 'primary' as const })),
+        note: `${finite} samples over x` + windowSays([['x', xr]]) + sampledSays(finite, n + 1) + poleSays,
         fidelity: 'model-derived',
       };
     }
@@ -683,6 +718,22 @@ export function buildObject(model: Model, o: ModelObject, opts?: { detail?: numb
       const px = o.defs?.px ? compileExpr(o.defs.px, names(model, [...vars, 't'])) : null;
       const py = o.defs?.py ? compileExpr(o.defs.py, names(model, [...vars, 't'])) : null;
       const pz = o.defs?.pz ? compileExpr(o.defs.pz, names(model, [...vars, 't'])) : null;
+      // A MAP THAT WAS STATED AND WOULD NOT COMPILE IS A PROBLEM, not a
+      // reason to draw the raw state instead. A pendulum whose px named an
+      // undefined `theta` was drawn as angle-against-velocity with the note
+      // "drawn as the first components of the state", which is a picture of
+      // the wrong thing presented as the model's own.
+      const stated = (['px', 'py', 'pz'] as const).filter((k) => !!o.defs?.[k]);
+      const failed = stated.filter((k) => (k === 'px' ? !px : k === 'py' ? !py : !pz));
+      if (failed.length) {
+        return NOTHING(
+          o,
+          `not computed — the position map ${failed.map((k) => `${k} = “${o.defs![k]}”`).join(', ')} would not compile over ${[...vars, 't'].join(', ')}, so the path cannot be placed. Fix the map, or remove it to draw the state components themselves`
+        );
+      }
+      if (o.defs?.stop && !stopExpr) {
+        return NOTHING(o, `not computed — the stopping condition “${o.defs.stop}” would not compile, so the integration has no end it can honour`);
+      }
       const mapped = !!(px && py);
       const place = mapped
         ? (y: readonly number[], t: number) => {

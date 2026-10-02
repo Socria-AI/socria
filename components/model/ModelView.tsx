@@ -120,6 +120,9 @@ export function ModelView({
     if (shown.current === stamp) return;
     shown.current = stamp;
     setModel(initial);
+    // …and the view's selection follows the revision: an object a reply
+    // removed used to stay selected, and everything else dimmed to nothing.
+    setView((v) => ({ ...v, selected: initial.selected ?? null }));
   }, [stamp, initial]);
 
   // ── WHICH REPRESENTATION IS OPEN ───────────────────────────────────
@@ -253,10 +256,14 @@ export function ModelView({
         })),
       },
     ],
-    [model.params]
+    // `inputs` and `awaiting` are read above, so they are dependencies: a
+    // revision that changes objects without touching the params reference
+    // used to leave the Inputs group stale.
+    [model.params, inputs, awaiting]
   );
+  // `on` travels too: a layer the model declares off starts off.
   const layers = useMemo(
-    () => (model.layers ?? []).map((l) => ({ id: l.id, label: l.label })),
+    () => (model.layers ?? []).map((l) => ({ id: l.id, label: l.label, ...(l.on === false ? { on: false } : {}) })),
     [model.layers]
   );
   const initialVals = useMemo(
@@ -270,9 +277,18 @@ export function ModelView({
     [initial]
   );
 
-  const entities: VizEntity[] = useMemo(
-    () => modelStateFrom(model, spec).entities,
-    [model, spec]
+  const told = useMemo(() => modelStateFrom(model, spec), [model, spec]);
+  const entities: VizEntity[] = told.entities;
+  // WHAT THE CONVERSATION MUST NOT MISSTATE, lifted out of the model state the
+  // frame never saw: placeholders, ranges the engine read or assumed, a
+  // specification that is not estimated. Everything else in `readouts` the
+  // picture's own captions already carry.
+  const notes = useMemo(
+    () =>
+      told.readouts
+        .filter((s) => /^(PLACEHOLDER COEFFICIENTS|READ OR ASSUMED BY THE ENGINE|SPECIFIED BUT NOT|THESE ARE FREE INPUTS WITH NO RANGE)/.test(s))
+        .map((s) => s.slice(0, 200)),
+    [told]
   );
 
   /** Ops the frame does not own: slice, flatten, time, compare. */
@@ -291,12 +307,30 @@ export function ModelView({
   // everything downstream reads the model, and the model knows what depends
   // on what.
   const lastVals = useRef<Record<string, number>>(initialVals);
+  /** the last clock value the frame itself wrote into the model */
+  const syncedT = useRef<number | undefined>(initial.time?.t);
+  // THE HOST'S CLOCK, ONLY WHEN THE HOST MOVED IT. Passing model.time.t
+  // straight through made the frame follow its own ticks a render late, and
+  // the clock crawled back toward zero. A value the frame wrote is not news
+  // to it; a value an op wrote is.
+  const hostTime = model.time && model.time.t !== syncedT.current ? model.time.t : undefined;
   const sync = useCallback(
     (vals: Record<string, number>, t: number) => {
       let next = model;
       for (const p of model.params) {
         const v = vals[p.id];
         if (typeof v === 'number' && v !== p.value) next = setParam(next, p.id, v);
+      }
+      // A PLACEHOLDER PUT BACK IS A PLACEHOLDER AGAIN. Moving one makes it
+      // the person's (setParam clears the mark); "Reset all" returns it to
+      // the value nobody chose, and the mark returns with it — otherwise the
+      // slider read "1" where the revision reads "1 (placeholder)".
+      if (next !== model) {
+        const restored = next.params.map((p) => {
+          const was = initial.params.find((q) => q.id === p.id);
+          return was?.assumed === 'value' && !p.assumed && p.value === was.value ? { ...p, assumed: 'value' as const } : p;
+        });
+        if (restored.some((p, i) => p !== next.params[i])) next = { ...next, params: restored };
       }
       // A free input's cursor, written into canonical state. Prefixed `at:` so a
       // control for an input and a control for a parameter of the same name
@@ -312,7 +346,12 @@ export function ModelView({
           };
         }
       }
-      if (model.time && t !== model.time.t) next = setTime(next, Math.min(model.time.max, t));
+      if (model.time && t !== model.time.t) {
+        next = setTime(next, Math.min(model.time.max, t));
+        // The frame's own tick, remembered, so it is not handed back to the
+        // frame as a host change on the next render.
+        syncedT.current = Math.min(model.time.max, t);
+      }
       if (next !== model) {
         lastVals.current = vals;
         // Deferred: the frame is mid-render when this runs, and React will
@@ -792,12 +831,23 @@ export function ModelView({
     <div className="eng-stack">
     <Surface3D
       title={model.title}
-      surface={`m-${model.id}`}
+      // At most 32 characters, which is what sanitizeModelState accepts: a longer
+      // id made the whole picture state unreadable to the chat, which then fell
+      // back to describing the old scene and offered no edit verbs.
+      surface={`m-${model.id}`.slice(0, 32)}
       entities={entities}
       model={model.domain ?? ''}
       assumptions={model.assumptions ?? []}
       equations={model.equations ?? []}
-      can={['slice', 'view', 'time', 'compare']}
+      // Not `compare`: the op is accepted and sets a flag nothing reads, so a
+      // reply described a comparison that never appeared. Offered again when
+      // something draws it.
+      can={['slice', 'view', 'time']}
+      // The selection is the model's; the frame mirrors it and reports clicks.
+      selected={view.selected ?? model.selected ?? null}
+      onSelect={select}
+      time={hostTime}
+      notes={notes}
       edits={edits}
       onOps={takeOps}
       onRead={onRead}

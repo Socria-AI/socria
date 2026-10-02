@@ -146,6 +146,13 @@ export function linearize(
     if (!Number.isFinite(two) || Math.abs(two - k - 2 * c) > tolerance(Math.abs(c) + Math.abs(k) + 1)) {
       return { problem: `“${equation}” is not linear in ${u}, and this solver does linear systems` };
     }
+    // …AND ON THE OTHER SIDE OF ZERO. abs(x), max(0, x) and sqrt(x²) are
+    // linear on 0, 1, 2 and not at −1; probing only non-negative points let
+    // abs(x) = −3 come back "solved, x = −3, residual 0".
+    const minus = at({ [u]: -1.3 });
+    if (!Number.isFinite(minus) || Math.abs(minus - k + 1.3 * c) > tolerance(Math.abs(c) + Math.abs(k) + 1)) {
+      return { problem: `“${equation}” is not linear in ${u} (it bends on the other side of zero), and this solver does linear systems` };
+    }
     coefficients.push(c);
   }
 
@@ -326,5 +333,29 @@ export function solveSystem(
     }
     rows.push(got.row);
   }
-  return solveLinear(rows, unknowns);
+  const solved = solveLinear(rows, unknowns);
+  // CHECKED AGAINST THE EQUATIONS AS WRITTEN, not against the rows read off
+  // them. A relation like min(3p, 30) passes every linearity probe on a
+  // stretch where it is linear and is then "solved" at 72, above its own cap.
+  // The only check that cannot be fooled is evaluating the originals.
+  if (solved.status === 'solved' || solved.status === 'overdetermined-consistent') {
+    const scope: Record<string, number> = { ...knowns };
+    for (const u of unknowns) scope[u.toLowerCase()] = solved.values?.[u] ?? NaN;
+    for (const e of equations) {
+      const halves = e.split('=');
+      if (halves.length !== 2) continue;
+      const fn = compileExpr(`(${halves[0].trim()}) - (${halves[1].trim()})`, [...unknowns, ...Object.keys(knowns)]);
+      const r = fn ? fn.eval(scope) : NaN;
+      const scale = Math.max(1, ...Object.values(solved.values ?? {}).map((v) => Math.abs(v)));
+      if (!Number.isFinite(r) || Math.abs(r) > tolerance(scale) * 1e4) {
+        return {
+          status: 'nonlinear',
+          unknowns: [...unknowns],
+          rank: solved.rank,
+          says: `“${e}” does not hold at the values a linear solve gives (off by ${Number.isFinite(r) ? r.toPrecision(3) : 'NaN'}): it is not linear over the range that matters, and this solver does linear systems`,
+        };
+      }
+    }
+  }
+  return solved;
 }

@@ -131,7 +131,10 @@ export function leadLens(lenses: LensId[], hasViz: boolean): LensId | null {
  * quantitative all the same.
  */
 function isQuantitative(map: ThinkingMap): boolean {
-  return map.context === 'math' || !!map.viz;
+  // A built model counts: a map carrying a document and no scene led with the
+  // concept graph, so the build note said "built" while the surface was a tab
+  // away.
+  return map.context === 'math' || !!map.viz || !!map.models?.docs?.length;
 }
 
 // ── which lenses have anything to show ──────────────────────────────

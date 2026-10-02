@@ -29,6 +29,7 @@ import { MathPlot } from './MathPlot';
 import { SceneSurface, isSimulation } from '@/components/surfaces/SceneSurface';
 import { ModelView } from '@/components/model/ModelView';
 import { activeDoc, editsState, EMPTY_WORKSPACE, modelFor } from '@/lib/model/docs';
+import type { Model } from '@/lib/model/schema';
 import type { VizModelState, VizOp } from '@/lib/viz-model';
 import { MathViz } from './MathViz';
 import { MatrixLens } from './MatrixLens';
@@ -105,6 +106,7 @@ export function ThinkingMap({
   grounded,
   onAddContext,
   onAskAbout,
+  onModelEdited,
   guarded,
   lensLimit,
   onLocked,
@@ -140,6 +142,8 @@ export function ThinkingMap({
    * dependency chain, rather than about what a picture looks like near a pixel.
    */
   onAskAbout?: (id: string, label: string) => void;
+  /** a change the surface made to a document's model — a slider, a cursor, a selection, an open view */
+  onModelEdited?: (docId: string, model: Model) => void;
   /** Answer Guard is on — the board must not reveal a withheld result */
   guarded?: boolean;
   /**
@@ -745,6 +749,10 @@ export function ThinkingMap({
                   edits={editsState(map.models ?? EMPTY_WORKSPACE) ?? undefined}
                   onRead={onVizRead}
                   ops={vizOps}
+                  // THE DOCUMENT HEARS ABOUT EVERY CHANGE THE SURFACE MAKES.
+                  // Without this a slider, a cursor or a selection lived only
+                  // in the view and was gone on reload (lib/model/docs.ts adopt).
+                  onModel={(m) => onModelEdited?.(doc.id, m)}
                   onAsk={(id) => {
                     const m = modelFor(doc);
                     const o = m.objects.find((x) => x.id === id);

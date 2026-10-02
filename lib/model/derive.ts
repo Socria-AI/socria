@@ -155,6 +155,12 @@ function outcomeName(o: ModelObject): string {
 
 export function expandMarginals(model: Model): Model {
   const add: ModelObject[] = [];
+  const replaced = new Map<string, ModelObject>();
+  /** a marginal that already exists is replaced in place; a new one is appended */
+  const emit = (o: ModelObject) => {
+    if (model.objects.some((x) => x.id === o.id)) replaced.set(o.id, o);
+    else add.push(o);
+  };
   const have = new Set(model.objects.map((o) => o.id));
 
   for (const o of model.objects) {
@@ -176,14 +182,18 @@ export function expandMarginals(model: Model): Model {
       const got = marginalOf(model, o, axis);
       const called = namedAxes[i] || axis;
       const id = `${o.id}__d_${called.toLowerCase().replace(/[^a-z0-9_]/g, '_')}`.slice(0, 48);
-      if (have.has(id)) continue;
+      // REBUILT, NOT KEPT. A stored marginal carried the coefficient literal
+      // and the axis names of the pass that made it; after a regressor was
+      // removed or a coefficient re-bound it still said the old thing. The
+      // readouts and the response surface are rebuilt every pass for the same
+      // reason; marginals were the last derived objects that were not.
       have.add(id);
 
       if (!got.ok) {
         // REFUSED, AND KEPT AS AN OBJECT. A slope that cannot be produced is a
         // fact about the model worth having in it — the alternative is silence,
         // and silence about a derivative reads as "there isn't one".
-        add.push({
+        emit({
           id,
           kind: 'annotation',
           label: `∂${outcome} / ∂${called}`,
@@ -241,7 +251,7 @@ export function expandMarginals(model: Model): Model {
         .filter((n) => n !== 'x' && !legal.includes(n));
       const drawable = !m.constant && free.length === 0 && !!parse(written, legal);
       if (!m.constant && !drawable) {
-        add.push({
+        emit({
           id,
           kind: 'annotation',
           label: `∂${outcome} / ∂${called}`,
@@ -257,7 +267,7 @@ export function expandMarginals(model: Model): Model {
         continue;
       }
 
-      add.push({
+      emit({
         id,
         // A CONSTANT SLOPE IS A NUMBER AND A VARYING ONE IS A CURVE, and the
         // difference is the whole content of "a quadratic term makes the
@@ -280,8 +290,8 @@ export function expandMarginals(model: Model): Model {
     }
   }
 
-  if (!add.length) return model;
-  return { ...model, objects: [...model.objects, ...add] };
+  if (!add.length && !replaced.size) return model;
+  return { ...model, objects: [...model.objects.map((o) => replaced.get(o.id) ?? o), ...add] };
 }
 
 /** One line per marginal effect, for the inspector, Trace and the conversation. */
@@ -422,8 +432,13 @@ export function inputsOf(model: Model): FreeInput[] {
   const out: FreeInput[] = [];
   for (const q of table.by.values()) {
     if (q.supply !== 'input' || !q.domain) continue;
-    const name = (typeof q.means === 'string' ? q.id : q.id).toLowerCase();
-    const column = q.display.toLowerCase();
+    // THE MACHINE SYMBOL, NOT THE LABEL. This keyed the control on
+    // `q.display.toLowerCase()`, so a variable labelled "Price" over `p` put
+    // `price: 25` into the evaluation scope while the expression named `p` —
+    // and the curve routed runnable, then drew nothing. A display name is not
+    // an execution identity (symbols.ts says so at the top), and this was the
+    // one place that forgot.
+    const column = q.machine;
     const [lo, hi] = q.domain;
     out.push({
       id: column,
