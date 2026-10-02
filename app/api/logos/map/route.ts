@@ -32,6 +32,7 @@ import { enforceRateLimit } from '@/lib/rate-limit';
 import { mayUse } from '@/lib/route-guard';
 import { EMPTY_WORKSPACE, modelFor, openFromProposal } from '@/lib/model/docs';
 import { wantedSimulation, correctionNote } from '@/lib/model/wants';
+import { dropRemoved } from '@/lib/map-edit';
 import { settle, unanswered } from '@/lib/model/ask';
 
 export const runtime = 'nodejs';
@@ -187,7 +188,7 @@ export async function POST(req: NextRequest) {
 
     // The extractor's output is a PROPOSAL: sanitizeMap's default trust mode
     // strips any `built` it wrote and keeps a `propose` block instead.
-    const next = sanitizeMap(parsed);
+    let next = sanitizeMap(parsed);
 
     // ── WHAT THEY PLAINLY ASKED FOR, WHEN THE EXTRACTOR MISSED IT ──
     //
@@ -228,6 +229,10 @@ export async function POST(req: NextRequest) {
     if (next.nodes.length === 0 && current.nodes.length > 0) {
       return NextResponse.json({ map: current });
     }
+    // What the person took off the map stays off, whatever the extractor made
+    // of the transcript that still mentions it. The client does this too; the
+    // server does it so a map read from here is already honest.
+    next = dropRemoved(next, current.removed) as typeof next;
     // ── THE ON-RAMP ───────────────────────────────────────────────
     //
     // A proposal reaches the engine HERE, on the server, and only here. The

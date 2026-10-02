@@ -110,6 +110,7 @@ const MODULES = [
   'lib/auth-links.ts',
   'lib/auth-flow.ts',
   'lib/session-rail.ts',
+  'lib/map-edit.ts',
   'lib/logos-connect.ts',
   'lib/access-codes-server.ts',
   'lib/local-data.ts',

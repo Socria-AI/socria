@@ -120,6 +120,7 @@ import {
   type ThinkingMap as TMap,
 } from '@/lib/logos';
 import { owesExtraction } from '@/lib/conversation-surface';
+import { applyMapEdits, dropRemoved, readMapCommand, type MapEdit } from '@/lib/map-edit';
 import type { ExploreResult, NodeMode } from '@/lib/logos-explore';
 import {
   emptySession,
@@ -1895,7 +1896,9 @@ export function LogosApp({
               const models = echoed ? s.map?.models : json.map.models;
               const map = { ...json.map, ...(viz ? { viz } : {}), ...(models ? { models } : {}) };
               if (!models) delete (map as { models?: unknown }).models;
-              return { ...s, map, contexts };
+              // What the person took off stays off, whatever the extractor
+              // made of a transcript that still mentions it (lib/map-edit.ts).
+              return { ...s, map: dropRemoved(map, s.map?.removed), contexts };
             });
             setChanged(new Set(delta.changed));
             setDeltaNote(summarizeDelta(delta));
@@ -2296,9 +2299,55 @@ export function LogosApp({
     void send(input, ready);
   }
 
+  /**
+   * The person edits the map by hand — from a card's menu, a key, or a
+   * sentence in the conversation. Applied here, deterministically, and saved;
+   * no model is consulted about whether to do what they asked. A removal is
+   * remembered on the map (`removed`) so the next extraction cannot undo it.
+   */
+  function editMap(edits: MapEdit[]): string | null {
+    const current = sessionsRef.current.find((x) => x.id === activeIdRef.current);
+    if (!current) return null;
+    const out = applyMapEdits(current.map, edits);
+    if (!out.applied.length) {
+      if (out.refused.length) setError(out.refused[0]);
+      return null;
+    }
+    const liveIds = new Set(out.map.nodes.map((n) => n.id));
+    patchActive((s) => {
+      // Grounding keyed on a removed node would linger invisibly.
+      const contexts = Object.fromEntries(Object.entries(s.contexts ?? {}).filter(([id]) => liveIds.has(id)));
+      return { ...s, map: out.map, contexts };
+    });
+    const said = out.applied.map((a) => a.said).join(' ');
+    setChanged(new Set(out.applied.flatMap((a) => ('id' in a.edit ? [a.edit.id] : [a.edit.from, a.edit.to]))));
+    setDeltaNote(said);
+    return said;
+  }
+
   async function send(text: string, atts: Attachment[] = []) {
     const content = text.trim();
     if ((!content && !atts.length) || busy || !activeIdRef.current) return;
+
+    // A COMMAND TO THE MAP IS NOT A QUESTION FOR LOGOS. "Remove the node about
+    // rent" used to go to the model, which answered in prose while the node
+    // stayed. It is read here, against the map's own labels, and done — with
+    // what was done written into the conversation so the record is complete
+    // and the extractor sees it too. A sentence that is not plainly a command
+    // is not touched (lib/map-edit.ts decides, and errs toward sending).
+    if (!atts.length) {
+      const cmd = readMapCommand(content, mapRef.current);
+      if (cmd) {
+        setError(null);
+        setInput('');
+        const said = 'edits' in cmd ? editMap(cmd.edits) ?? cmd.said : cmd.refused;
+        const turn: Msg = { role: 'user', content };
+        const reply: Msg = { role: 'assistant', content: said };
+        patchActive((s) => ({ ...s, messages: [...s.messages, turn, reply] }));
+        chronRef.current = [...chronRef.current, turn, reply];
+        return;
+      }
+    }
 
     // The month's chats are spent and this turn would BEGIN one.
     //
@@ -3345,6 +3394,7 @@ export function LogosApp({
             onFocus={(node) => setDraftFocus(node)}
             grounded={groundedCounts}
             onAddContext={openAddContext}
+            onEdit={(edit) => editMap([edit])}
             // ASK ABOUT THIS: the selection is already canonical on the model, so
             // the turn carries the object's IDENTITY and the reply reasons about
             // the object — its provenance, its dependency chain, what it rests on

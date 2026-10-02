@@ -14,6 +14,7 @@
 // a fixed height; everything inside then styles itself normally.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { applyMapEdits } from '@/lib/map-edit';
 import { ThinkingMap } from '@/components/ThinkingMap';
 import { MathBoard } from '@/components/MathBoard';
 import { LogosMark } from '@/components/LogosMark';
@@ -58,6 +59,7 @@ function Frame({
 
 /** The whole thing: conversation on the left, live map on the right. */
 export function DemoSplit() {
+  const [demo, setDemo] = useState(DEMO_MAP);
   return (
     <Frame label="The conversation and its map, side by side — as it actually runs" height={470}>
       <div className="lg-split lg-demo-split" style={{ height: '100%' }}>
@@ -94,9 +96,11 @@ export function DemoSplit() {
             <span className="lg-panel-title">
               Thinking Map<em className="lg-panel-context">deciding</em>
             </span>
-            <span className="lg-panel-state">7 nodes</span>
+            <span className="lg-panel-state">{demo.nodes.length} nodes</span>
           </header>
-          <ThinkingMap map={DEMO_MAP} initialLens="graph" />
+          {/* Editable, as the product's is: right-click a card, or press
+              Delete on one, and it goes — the same edit path (lib/map-edit.ts). */}
+          <ThinkingMap map={demo} initialLens="graph" onEdit={(e) => setDemo((m) => applyMapEdits(m, [e]).map)} />
         </section>
       </div>
     </Frame>

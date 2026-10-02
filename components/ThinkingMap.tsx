@@ -22,6 +22,7 @@ import {
 } from 'react';
 import type { ThinkingMap as TMap, LogosRelation } from '@/lib/logos';
 import { MODE_META, NODE_MODES, type NodeMode } from '@/lib/logos-explore';
+import type { MapEdit } from '@/lib/map-edit';
 import { NodeGlyph } from './NodeGlyph';
 import { StatusMark } from './StatusMark';
 import { TeX, MathText } from './TeX';
@@ -83,7 +84,7 @@ const SEPARATION_PASSES = 3;
 const TRIM_W = 84;
 const TRIM_H = 26;
 // Roughly the action menu's height — only used to decide which side to open on.
-const MENU_H = 246;
+const MENU_H = 330;
 
 function boxExit(dx: number, dy: number): number {
   const tx = dx === 0 ? Infinity : TRIM_W / Math.abs(dx);
@@ -105,6 +106,7 @@ export function ThinkingMap({
   onFocus,
   grounded,
   onAddContext,
+  onEdit,
   onAskAbout,
   onModelEdited,
   guarded,
@@ -134,6 +136,8 @@ export function ThinkingMap({
   grounded?: Record<string, number>;
   /** open the Add-context picker for this node */
   onAddContext?: (node: MapNodeRef) => void;
+  /** the person edits the map by hand — remove a card, change its status (lib/map-edit.ts) */
+  onEdit?: (edit: MapEdit) => void;
   /**
    * "Ask about this", carrying a model object's CANONICAL IDENTITY.
    *
@@ -931,6 +935,23 @@ export function ThinkingMap({
                 onMouseLeave={() => setHovered(null)}
                 onFocus={() => setHovered(p.id)}
                 onBlur={() => setHovered(null)}
+                // A right-click is the same press: the card's menu is the
+                // card's menu, and the browser's own has nothing to offer here.
+                onContextMenu={(ev) => {
+                  ev.preventDefault();
+                  if (menu?.id === p.id) return;
+                  ev.currentTarget.click();
+                }}
+                onKeyDown={(ev) => {
+                  // Delete on a focused card takes it off the map, the same
+                  // edit the menu offers — so a keyboard can do what a mouse can.
+                  if ((ev.key === 'Delete' || ev.key === 'Backspace') && onEdit) {
+                    ev.preventDefault();
+                    ev.stopPropagation();
+                    setMenu(null);
+                    onEdit({ op: 'remove', id: p.id });
+                  }
+                }}
                 onClick={(ev) => {
                   ev.stopPropagation();
                   setFocused(p.id);
@@ -1079,6 +1100,37 @@ export function ThinkingMap({
                     <span className="lg-act-label">Hold in view</span>
                     <span className="lg-act-blurb">Keep this beside the draft</span>
                   </button>
+                )}
+                {/* The map is theirs to edit. Settle or reopen a card, or take
+                    it off — a removal stays removed (lib/map-edit.ts). */}
+                {onEdit && (
+                  <>
+                    <span className="lg-act-sep" role="separator" />
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="lg-act lg-act-status"
+                      onClick={() => {
+                        setMenu(null);
+                        onEdit({ op: 'status', id: node.id, status: node.status === 'resolved' ? 'open' : 'resolved' });
+                      }}
+                    >
+                      <span className="lg-act-label">{node.status === 'resolved' ? 'Reopen' : 'Mark resolved'}</span>
+                      <span className="lg-act-blurb">{node.status === 'resolved' ? 'It is open again' : 'Settled, and kept'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="lg-act lg-act-remove"
+                      onClick={() => {
+                        setMenu(null);
+                        onEdit({ op: 'remove', id: node.id });
+                      }}
+                    >
+                      <span className="lg-act-label">Remove from map</span>
+                      <span className="lg-act-blurb">Gone, and it stays gone</span>
+                    </button>
+                  </>
                 )}
               </div>
             );

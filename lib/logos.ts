@@ -235,6 +235,15 @@ export interface ThinkingMap {
    */
   ask?: TurnAsk;
   /**
+   * LABELS THE PERSON TOOK OFF THE MAP BY HAND, as lib/map-edit.ts keys them.
+   *
+   * The extractor rebuilds the map from a transcript that still contains
+   * whatever put a node there, so a removal has to be remembered or it comes
+   * back next turn. The extractor is told; the client enforces it regardless
+   * (dropRemoved). An edit the person made is not a suggestion.
+   */
+  removed?: string[];
+  /**
    * A STRUCTURED MODEL THIS TURN PROPOSED, raw and unjudged.
    *
    * At the top level rather than inside `viz`, because a model is not a
@@ -518,10 +527,17 @@ export function sanitizeMap(raw: any, opts?: { trust?: VizTrust }): ThinkingMap 
   // Null when unreadable rather than defaulted — see sanitizeAsk for why a
   // default here would reintroduce the exact bug this field exists to fix.
   const ask = sanitizeAsk(raw.ask);
+  // What the person removed by hand: plain lowercase keys, never anything else.
+  const removed = (Array.isArray(raw.removed) ? raw.removed : [])
+    .filter((r: unknown): r is string => typeof r === 'string')
+    .map((r: string) => r.replace(/\s+/g, ' ').trim().toLowerCase().slice(0, MAX_LABEL))
+    .filter(Boolean)
+    .slice(-40);
 
   return {
     nodes,
     edges,
+    ...(removed.length ? { removed } : {}),
     ...(named ? { context: named } : {}),
     ...(intent && named === 'math' ? { intent } : {}),
     ...(ask ? { ask } : {}),
@@ -1045,6 +1061,13 @@ ${
     ? `Last read as: ${current.context}. Keep it there unless the conversation has genuinely moved.`
     : 'Not yet established — read it from the conversation.';
 
+  // What the person removed by hand. The transcript still contains whatever
+  // put it there; this is the only place the extractor learns it was taken
+  // off on purpose. The client drops a match on arrival in any case.
+  const removedBlock = current.removed?.length
+    ? `\nREMOVED BY THE PERSON — they took these off the map themselves. Do not put them back, under this wording or another, even though the conversation still mentions them:\n${current.removed.map((r) => `  - ${r}`).join('\n')}\n`
+    : '';
+
   /**
    * The scene already on screen, shown so it can be EDITED.
    *
@@ -1096,7 +1119,7 @@ Someone who says "more guns" wants the position along the frontier MOVED, not a 
 
   return `You extract the STRUCTURE of a person's thinking from a conversation and maintain it as a small graph. You never talk to the user.
 
-${currentBlock}
+${currentBlock}${removedBlock}
 
 Thinking context: ${contextLine}
 ${vizBlock}

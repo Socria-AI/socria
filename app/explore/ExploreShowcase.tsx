@@ -15,6 +15,7 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { ThinkingMap } from '@/components/ThinkingMap';
+import { applyMapEdits } from '@/lib/map-edit';
 import { LENSES, availableLenses, leadLens } from '@/lib/logos-layout';
 import { LogosMark } from '@/components/LogosMark';
 import { KINDS, SCENARIOS, type Kind, type Scenario } from './scenarios';
@@ -86,6 +87,11 @@ function Thread({ scenario }: { scenario: Scenario }) {
 }
 
 function Exhibit({ scenario }: { scenario: Scenario }) {
+  // The running product's map is editable — right-click a card, press
+  // Delete on one — so the exhibit is too, through the same edit path
+  // (lib/map-edit.ts). What is shown is what runs.
+  const [edited, setEdited] = useState<Scenario['map'] | null>(null);
+  const map = edited ?? scenario.map;
   // Which lens this opens on is DERIVED, never asserted.
   //
   // <ThinkingMap> chooses its own opening lens — leadLens() picks the one
@@ -117,7 +123,7 @@ function Exhibit({ scenario }: { scenario: Scenario }) {
         <p className="exp-case-who">{scenario.who}</p>
       </div>
 
-      {scenario.map ? (
+      {map ? (
         <>
           {lensMeta && (
             <p className="ui-lensblurb">
@@ -135,9 +141,9 @@ function Exhibit({ scenario }: { scenario: Scenario }) {
                       <em className="lg-panel-context">{scenario.contextLabel}</em>
                     )}
                   </span>
-                  <span className="lg-panel-state">{scenario.map.nodes.length} nodes</span>
+                  <span className="lg-panel-state">{map.nodes.length} nodes</span>
                 </header>
-                <ThinkingMap map={scenario.map} initialLens={lens ?? 'graph'} />
+                <ThinkingMap map={map} initialLens={lens ?? 'graph'} onEdit={(e) => setEdited((m) => applyMapEdits(m ?? map, [e]).map)} />
               </section>
             </div>
           </Frame>
