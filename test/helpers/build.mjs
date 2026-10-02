@@ -160,6 +160,7 @@ const MODULES = [
   'lib/first-session.ts',
   'components/MapPoster.tsx',
   'components/LogosRail.tsx',
+  'components/Logos2Cover.tsx',
   'lib/lifecycle.ts',
   'lib/email.ts',
   'lib/socria-prompt.ts',

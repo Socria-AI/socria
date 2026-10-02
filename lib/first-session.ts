@@ -24,7 +24,7 @@
 //   goes out under their name without their hand on it is not their thinking,
 //   and the map it draws is not theirs either.
 //
-//   NOT THE TOUR'S STORY. The TryLogosModal tour assembles a map from a job
+//   NOT THE COVER'S STORY. The Logos 2 cover shows a model built from a saddle; the old tour assembled a map from a job
 //   offer and a raise. Someone who watched that and then meets the same
 //   sentence on the intro learns that Socria knows one story. These four are
 //   other people.

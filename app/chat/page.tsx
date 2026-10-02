@@ -72,8 +72,8 @@ import {
   searchRail,
   shouldShowSearch,
 } from '@/lib/session-rail';
-import { TryCore4Pill } from '@/components/TryCore4Pill';
-import { TryLogosModal } from '@/components/TryLogosModal';
+import { TryLogos2Pill } from '@/components/TryLogos2Pill';
+import { Logos2Cover } from '@/components/Logos2Cover';
 import { IntroCore4Modal } from '@/components/IntroCore4Modal';
 import { RichText } from '@/components/RichText';
 import { splitInline } from '@/lib/rich-text';
@@ -1033,7 +1033,7 @@ export default function ChatPage() {
       return;
     }
     setLogosModalOpen(false);
-    router.push('/sign-in?redirect_url=%2Fchat%3Fmodel%3Dlogos');
+    router.push('/sign-in?redirect_url=%2Fchat%3Fmodel%3Dlogos-2');
   }
 
   /**
@@ -2609,12 +2609,16 @@ export default function ChatPage() {
         onStart={handleCore4IntroStart}
         isSignedIn={hasAccount}
       />
-      <TryLogosModal
+      {/* The Logos 2 cover: the one introduction the chat keeps for the
+          environment. Opened by the pill, and by picking Logos 2 without an
+          account. The same card is the gate on the Logos surface itself. */}
+      <Logos2Cover
+        as="modal"
         open={logosModalOpen}
         onClose={handleLogosModalClose}
-        onTry={handleLogosModalTry}
+        onStart={handleLogosModalTry}
         onUnlock={handleLogosModalUnlock}
-        isSignedIn={!!isSignedIn}
+        isSignedIn={hasAccount}
       />
       <InsightShareModal
         open={!!shareInsight}
@@ -2949,13 +2953,15 @@ export default function ChatPage() {
               </span>
             )}
             <div className="hidden sm:block">
-              {/* The standing invitation is Core 4's now. It stays until they
-                  say "don't show again" in the modal itself, and disappears on
-                  the model it is inviting them to. */}
-              <TryCore4Pill
+              {/* The standing invitation is Logos 2's: the surface a person
+                  would not guess from a text box. It stays until they say
+                  "don't show again" on the cover itself, and disappears on
+                  the surface it is inviting them to. Core 4's introduction is
+                  still one press away in the picker. */}
+              <TryLogos2Pill
                 currentModel={model}
-                visible={!core4Dismissed}
-                onOpen={() => setCore4IntroOpen(true)}
+                visible={!logosDismissed}
+                onOpen={() => setLogosModalOpen(true)}
               />
             </div>
             <SignedOut>

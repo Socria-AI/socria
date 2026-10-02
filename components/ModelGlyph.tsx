@@ -12,7 +12,7 @@
 // once (the button and its menu row) — so they're keyed off useId().
 
 import { useId } from 'react';
-import type { SocriaModel } from '@/lib/socria-prompt';
+import { SOCRIA_MODELS, type SocriaModel } from '@/lib/socria-prompt';
 import { LogosMark } from './LogosMark';
 
 export function ModelGlyph({
@@ -30,7 +30,9 @@ export function ModelGlyph({
   // The brain is open line-work and narrower than it is tall, so at the same
   // nominal size it reads smaller than a solid ring. Give it a little back so
   // the three marks sit at the same visual weight in a row.
-  if (model === 'logos')
+  // Any Logos surface, by the registry rather than by name: Logos 2 was
+  // falling through to Core 3.1's ring, so the composer chip said "○ Logos 2".
+  if (SOCRIA_MODELS[model]?.logosSurface)
     return <LogosMark size={Math.round(size * 1.22)} className={className} />;
 
   if (model === 'core-2') {

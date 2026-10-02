@@ -120,6 +120,7 @@ import {
 } from '@/lib/logos';
 import { owesExtraction } from '@/lib/conversation-surface';
 import { FirstRunIntro } from '@/components/onboarding/FirstRunIntro';
+import { Logos2Cover } from '@/components/Logos2Cover';
 import { useFirstRun } from '@/components/useFirstRun';
 import { wantsIntro } from '@/lib/first-run';
 import { computationFacts, whatChanged } from '@/lib/model/inspect';
@@ -267,9 +268,6 @@ export function LogosApp({
   // Don't hang behind Clerk: if it never initializes (preview builds), fall
   // through to the key gate rather than showing nothing forever.
   const [authSettled, setAuthSettled] = useState(false);
-  const [keyInput, setKeyInput] = useState('');
-  const [keyOpen, setKeyOpen] = useState(false);
-  const [keyError, setKeyError] = useState(false);
 
   const [sessions, setSessions] = useState<LogosSession[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -324,7 +322,7 @@ export function LogosApp({
   /** which opening or scenario this tab began from, for the activation event */
   const startIdRef = useRef<string | null>(null);
   /** where the sign-in gate should bring them back to — set on mount, so the query survives */
-  const [gateHref, setGateHref] = useState('/sign-in?redirect_url=%2Fchat%3Fmodel%3Dlogos');
+  const [gateHref, setGateHref] = useState('/sign-in?redirect_url=%2Fchat%3Fmodel%3Dlogos-2');
   /** what Socria knows about this person, for the prompt and the viewer (accounts only) */
   const [understanding, setUnderstanding] = useState<UserUnderstanding | null>(null);
   const understandingRef = useRef<UserUnderstanding | null>(null);
@@ -1820,8 +1818,8 @@ export function LogosApp({
   // The gate is judged by the server, not here. Comparing a typed code
   // against a constant in this file is what put both codes in the public
   // bundle; the page now forwards what was typed and keeps only the answer.
-  async function submitKey() {
-    const typed = keyInput.trim();
+  async function unlockWith(code: string): Promise<boolean> {
+    const typed = code.trim();
     let scope: 'core' | 'one' | null = null;
     try {
       const res = await fetch('/api/access/unlock', {
@@ -1834,11 +1832,7 @@ export function LogosApp({
     } catch {
       /* offline, or the gate is not configured — treated as a wrong code */
     }
-    if (!scope) {
-      setKeyError(true);
-      return;
-    }
-    setKeyError(false);
+    if (!scope) return false;
     setUnlocked(true);
     try {
       localStorage.setItem(KEY_STORAGE, '1');
@@ -1846,6 +1840,7 @@ export function LogosApp({
     // The One code opens everything at once, and a signed-in redemption is
     // written to the account so it follows them.
     if (scope === 'one') void takeOne(typed);
+    return true;
   }
 
   // ── map ────────────────────────────────────────────────────────────
@@ -2670,72 +2665,15 @@ export function LogosApp({
 
 
   if (!hasAccess) {
+    // THE COVER IS THE GATE. The same card the chat opens from its pill —
+    // the real ModelView on an engine-built model, the terms read from the
+    // plan table, the way in — so the two doors into Logos 2 say the same
+    // thing in the same words. The access key stays behind its disclosure.
     return (
       <div className="logos-root">
-        <div className="lg-gate">
-          {authSettled && (
-            <div className="lg-gate-card">
-              <span className="lg-word">
-                <LogosMark size={44} />
-                <span className="lg-sr">Socria Logos</span>
-              </span>
-              <h1>A reasoning environment.</h1>
-              <p>
-                A split screen: you talk on the left, and a map of your
-                reasoning is drawn on the right. Sign in to open it.
-              </p>
-              {/* Logos is open to anyone with an account, so signing in is the
-                  way in and leads. The access key stays for people without one
-                  — comped members, anyone handed a code — but it no longer
-                  fronts the screen as though this were invite-only. */}
-              <a className="lg-gate-go" href={gateHref}>
-                Sign in to open Logos
-              </a>
-              <button
-                type="button"
-                className="lg-gate-toggle"
-                aria-expanded={keyOpen}
-                onClick={() => setKeyOpen((v) => !v)}
-              >
-                Have an access key?
-              </button>
-              <div className="lg-gate-row" hidden={!keyOpen}>
-                <input
-                  type="text"
-                  autoCapitalize="characters"
-                  autoCorrect="off"
-                  spellCheck={false}
-                  placeholder="Access key"
-                  value={keyInput}
-                  onChange={(e) => {
-                    setKeyInput(e.target.value);
-                    if (keyError) setKeyError(false);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      submitKey();
-                    }
-                  }}
-                  className={keyError ? 'is-error' : undefined}
-                  aria-invalid={keyError}
-                  aria-label="Access key"
-                />
-                <button type="button" onClick={submitKey}>
-                  Enter
-                </button>
-              </div>
-              {keyError && (
-                <span className="lg-gate-error" role="alert">
-                  That key isn&rsquo;t right.
-                </span>
-              )}
-              <p className="lg-gate-fine">
-                Free to start — two lines of thinking, and the whole loop.
-              </p>
-            </div>
-          )}
-        </div>
+        {authSettled && (
+          <Logos2Cover as="gate" isSignedIn={false} primaryHref={gateHref} onUnlock={unlockWith} />
+        )}
       </div>
     );
   }
