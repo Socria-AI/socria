@@ -462,7 +462,7 @@ console.log('\n=== one model, several views, ONE computation ===');
   // directly and comparing values.
   const sys = m.objects.find((o) => o.id === 'mech');
   const run = runFor(m, sys).run;
-  const xPanel = panels.find((p) => p.y === 'x_m1');
+  const xPanel = panels.find((p) => p.state === 'x_m1');
   ok('the displacement panel exists', !!xPanel);
   const sample = xPanel.at[10];
   const fromRun = stateAt(run, sample.x).x_m1;
@@ -471,7 +471,7 @@ console.log('\n=== one model, several views, ONE computation ===');
   // And they move together: one parameter change, every view different.
   const stiff = expand({ ...oscillator(), params: oscillator().params.map((p) => (p.id === 'k' ? { ...p, value: 90 } : p)) });
   const spec2 = buildSpec({ ...stiff, time: { ...stiff.time, t: 4 } });
-  const xPanel2 = (spec2.panels ?? []).find((p) => p.y === 'x_m1');
+  const xPanel2 = (spec2.panels ?? []).find((p) => p.state === 'x_m1');
   ok('changing a parameter changes the panel as well as the mechanism',
     Math.abs(xPanel2.at[10].y - xPanel.at[10].y) > 1e-6);
 

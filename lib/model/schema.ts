@@ -442,6 +442,13 @@ export interface EquationsDecl {
 
 export interface EstimationDecl {
   /**
+   * What the outcome and each regressor are measured in, by column name:
+   * `{ wage: '$/hour', educ: 'years' }`. Read through lib/model/units.ts, so the
+   * implied response is in the outcome's units and ∂wage/∂educ in "$/hour per
+   * year" without anybody writing either down. Absent names print alone.
+   */
+  units?: Record<string, string>;
+  /**
    * THE METHOD IS THE PERSON'S CHOICE AND IS NEVER FILLED IN BY US.
    *
    * A model with no method declared is not estimated: the router returns the
@@ -652,6 +659,17 @@ export interface Model {
   params: ModelParam[];
   layers?: ModelLayer[];
   time?: ModelTime;
+  /**
+   * WHAT EACH NAMED QUANTITY IS MEASURED IN, by its canonical name.
+   *
+   * The one dictionary every surface reads through (lib/model/units.ts): an
+   * axis, a slider, a table head and the inspector all print "educ (years)"
+   * because this says `educ: 'years'`, and print "educ" alone when it does not.
+   * A parameter's or an object's own `units` still wins for itself; this is
+   * for the names that are not objects — the columns a specification is over,
+   * the inputs a relationship is evaluated at. Never filled in by the engine.
+   */
+  units?: Record<string, string>;
   /**
    * Measured or supplied numbers, by name.
    *
@@ -1343,9 +1361,19 @@ export function sanitizeObject(
           }
         }
       }
+      // Units by column: a short word per name the declaration actually uses.
+      const estUnits: Record<string, string> = {};
+      if (est.units && typeof est.units === 'object') {
+        for (const [k, v] of Object.entries(est.units as Record<string, unknown>).slice(0, 24)) {
+          const key = text(k, 48);
+          const unit = text(v, 24);
+          if (key && ID.test(key) && unit) estUnits[key] = unit;
+        }
+      }
       out.estimation = {
         y: yCol,
         x: xs,
+        ...(Object.keys(estUnits).length ? { units: estUnits } : {}),
         ...(Object.keys(terms).length ? { terms } : {}),
         ...(Object.keys(kinds).length ? { kinds } : {}),
         ...(ID.test(dataKey2) ? { data: dataKey2 } : {}),
@@ -1642,6 +1670,17 @@ export function sanitizeModel(raw: unknown): Model | null {
   const domain = text(r.domain, 60);
   if (domain) model.domain = domain;
   if (r.aspect === 'equal' || r.aspect === 'fit') model.aspect = r.aspect;
+  // The dictionary of units, by canonical name: short names, short words,
+  // bounded. Read through lib/model/units.ts by every surface that prints one.
+  if (r.units && typeof r.units === 'object' && !Array.isArray(r.units)) {
+    const units: Record<string, string> = {};
+    for (const [k, v] of Object.entries(r.units as Record<string, unknown>).slice(0, 48)) {
+      const key = text(k, 48);
+      const unit = text(v, 24);
+      if (key && unit) units[key] = unit;
+    }
+    if (Object.keys(units).length) model.units = units;
+  }
   const list = (v: unknown, n: number, each: number) =>
     Array.isArray(v) ? v.map((x) => text(x, each)).filter(Boolean).slice(0, n) : [];
   const eq = list(r.equations, MODEL_CAPS.equations, 200);

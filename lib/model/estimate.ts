@@ -47,6 +47,7 @@ import {
 import { parse, print, rename, substitute, type Expr } from './expr';
 import { controlFor, isPlaceholder, labelForSlot } from './binding';
 import { domainSays, inputDomain } from './kinds';
+import { unitOf } from './units';
 
 /** Cap on what one fit may chew through, because a slider is attached. */
 export const FIT_CAPS = { rows: 20_000, terms: 24 } as const;
@@ -1021,6 +1022,9 @@ export function expandEstimation(model: Model): Model {
         id: `${carrier.id}__response`,
         kind: axes.length > 1 ? 'surface' : 'curve',
         label: `${decl.y}, as the model implies it`,
+        // In the outcome's units, when the model says what those are: the
+        // response IS the outcome with the error left out.
+        ...(unitOf(model, decl.y) ? { units: unitOf(model, decl.y) } : {}),
         meaning:
           `the model-implied deterministic component: ${specificationLine(carrier)}, ` +
           `with the error term left out. ` +

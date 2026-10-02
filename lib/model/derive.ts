@@ -33,6 +33,7 @@
 import { derivativeOf, namesOf as namesIn, parse, print, rename, substitute, type Expr } from './expr';
 import type { Model, ModelObject } from './schema';
 import { known, symbolTable, withoutDomain, type Quantity } from './symbols';
+import { perUnit, unitOf, unitOfObject } from './units';
 import { basesOf, isPointwise, termExpr, termLabel, type TermDecl } from './terms';
 
 /** The expression an object carries, whichever way it says it. */
@@ -267,6 +268,9 @@ export function expandMarginals(model: Model): Model {
         continue;
       }
 
+      // THE SLOPE'S UNITS FOLLOW THE MATHEMATICS: the outcome's per the
+      // input's — "$/hour per year" — and nothing when either is unknown.
+      const slopeUnits = perUnit(unitOfObject(model, o) ?? unitOf(model, outcome), unitOf(model, called));
       emit({
         id,
         // A CONSTANT SLOPE IS A NUMBER AND A VARYING ONE IS A CURVE, and the
@@ -275,6 +279,7 @@ export function expandMarginals(model: Model): Model {
         // be true and would hide the point.
         kind: m.constant ? 'scalar' : 'curve',
         label: `∂${outcome} / ∂${called}`,
+        ...(slopeUnits ? { units: slopeUnits } : {}),
         meaning:
           `the marginal effect of ${called}: how much ${outcome} changes per unit of ${called}. ` +
           (m.constant
@@ -375,10 +380,12 @@ export function expandReadouts(model: Model): Model {
     const outcome = outcomeName(o);
     const where = Object.entries(at).map(([k, v]) => `${k} = ${Number(v.toPrecision(6))}`);
 
+    const readUnits = unitOfObject(model, o) ?? unitOf(model, outcome);
     made.set(id, {
       id,
       kind: 'scalar',
       label: `${outcome} at ${where.join(', ')}`,
+      ...(readUnits ? { units: readUnits } : {}),
       meaning:
         `what the relationship gives at the point currently selected. ` +
         `Computed from the coefficients and from where each input is standing — no observation is involved, and this is not a prediction about anything measured.`,

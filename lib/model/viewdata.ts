@@ -34,6 +34,7 @@ import { symbolTable } from './symbols';
 import type { Primitive } from './primitives';
 import type { Model, ModelObject } from './schema';
 import { RENDERED, viewsFor, type ViewSpec } from './views';
+import { unitOf, unitOfObject, withUnit } from './units';
 
 /** What a view that is READ rather than looked at contains. */
 /** How a table column should be set: words, a number, an expression, or a quiet remark. */
@@ -108,7 +109,11 @@ export function frameFor(model: Model, id: string): VisualizationSpec | null {
     return reframe(model, o, {
       primitives: built.primitives,
       box: { x: xr, y: extent(ys), z: [0, 1] },
-      axisNames: [typeof o.meta.wrt === 'string' ? o.meta.wrt : 'x', o.label, ''],
+      axisNames: [
+        withUnit(typeof o.meta.wrt === 'string' ? o.meta.wrt : 'x', unitOf(model, typeof o.meta.wrt === 'string' ? o.meta.wrt : '')),
+        withUnit(o.label, o.units),
+        '',
+      ],
       note: built.note,
       fidelity: built.fidelity,
     });
@@ -381,7 +386,7 @@ function tableFor(model: Model, o: ModelObject | null, v: ViewSpec): PanelConten
       const pts = mesh.rows.flat().filter(Boolean).slice(0, 40) as { x: number; y: number; z: number }[];
       return {
         kind: 'table',
-        columns: [axes[0] ?? 'x', axes[1] ?? 'y', o.label],
+        columns: [withUnit(axes[0] ?? 'x', unitOf(model, axes[0])), withUnit(axes[1] ?? 'y', unitOf(model, axes[1])), withUnit(o.label, unitOfObject(model, o))],
         rows: pts.map((p) => [p.x, p.y, p.z].map((q) => String(Number(q.toPrecision(6))))),
         kinds: ['number', 'number', 'number'],
         note: `${built.note}; the first ${pts.length} of the grid`,
@@ -391,7 +396,7 @@ function tableFor(model: Model, o: ModelObject | null, v: ViewSpec): PanelConten
       const pts = line.at.slice(0, 40);
       return {
         kind: 'table',
-        columns: [axes[0] ?? 'x', o.label],
+        columns: [withUnit(axes[0] ?? 'x', unitOf(model, axes[0])), withUnit(o.label, unitOfObject(model, o))],
         rows: pts.map((p) => [p.x, p.y].map((q) => String(Number(q.toPrecision(6))))),
         kinds: ['number', 'number'],
         note: `${built.note}; the first ${pts.length} samples`,
@@ -437,7 +442,11 @@ function residualFrame(model: Model, o: ModelObject): VisualizationSpec | null {
   return reframe(model, o, {
     primitives: prims,
     box: { x: bx, y: by, z: [0, 1] },
-    axisNames: [`fitted ${o.estimation?.y ?? o.label}`, 'residual', ''],
+    axisNames: [
+      withUnit(`fitted ${o.estimation?.y ?? o.label}`, unitOf(model, o.estimation?.y)),
+      withUnit('residual', unitOf(model, o.estimation?.y)),
+      '',
+    ],
     note: `${residuals.length} residuals from the fit that ran (${got.fit.method}, σ = ${Number(got.fit.sigma.toPrecision(4))}) — what the relationship does not account for at each observation`,
     fidelity: 'data-derived',
   });

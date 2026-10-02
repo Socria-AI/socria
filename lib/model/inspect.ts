@@ -391,7 +391,7 @@ export function inspectObject(model: Model, id: string): Inspection | null {
   if (o) what.push({ label: 'Kind', value: o.kind, of: o.id });
   if (q) what.push({ label: 'Supplies', value: SUPPLY_SAYS[q.supply], of: q.id });
   if (q?.value !== undefined) what.push({ label: 'Value', value: `${q.value}${q.units ? ` ${q.units}` : ''}` });
-  if (q?.domain) what.push({ label: 'Range', value: `${q.domain[0]} to ${q.domain[1]}, from ${q.domainFrom ? DOMAIN_FROM_SAYS[q.domainFrom] : 'nowhere'}` });
+  if (q?.domain) what.push({ label: 'Range', value: `${q.domain[0]} to ${q.domain[1]}${q.units ? ` ${q.units}` : ''}, from ${q.domainFrom ? DOMAIN_FROM_SAYS[q.domainFrom] : 'nowhere'}` });
   if (p) what.push({ label: 'Control', value: `${sig(p.value)}${p.units ? ` ${p.units}` : ''}, over ${sig(p.min)} to ${sig(p.max)}` });
   const expr = o ? expressionOf(o) : null;
   if (expr) what.push({ label: 'Says', value: expr });

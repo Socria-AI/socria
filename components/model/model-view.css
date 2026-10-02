@@ -16,6 +16,34 @@
   vector-effect: non-scaling-stroke;
 }
 
+/* The scale: round numbers along one edge of the cage, and each axis's name
+   in its units, in the quietest ink the figure uses. A box with no numbers is
+   geometry; these are what make it a quantity. */
+.eng-tick path {
+  fill: none;
+  stroke: var(--lg-ink-24, rgba(35, 36, 31, 0.3));
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.eng-tick text {
+  font-family: var(--sans, system-ui);
+  font-size: 8.5px;
+  font-variant-numeric: tabular-nums;
+  fill: rgba(35, 36, 31, 0.5);
+  pointer-events: none;
+}
+.eng-axis {
+  font-family: var(--sans, system-ui);
+  font-size: 9px;
+  letter-spacing: 0.02em;
+  fill: rgba(35, 36, 31, 0.62);
+  pointer-events: none;
+}
+@media (prefers-color-scheme: dark) {
+  .eng-tick text { fill: rgba(240, 238, 232, 0.5); }
+  .eng-axis { fill: rgba(240, 238, 232, 0.62); }
+}
+
 /* The hit area for a stroke-only mark: wide, transparent, behind the visible
    line. Selection is how a question gets an antecedent, and a wireframe
    nobody can click is a wireframe nobody can ask about. */

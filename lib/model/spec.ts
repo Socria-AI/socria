@@ -23,6 +23,8 @@ import { viewsFor, type ViewFamily } from './views';
 import { unpack } from './unpack';
 import { runFor, seriesOf } from './system';
 import { byKind, overallFidelity, worstFidelity, type Fidelity, type Model, type ModelObject } from './schema';
+import { unitOf, unitOfObject, withUnit } from './units';
+import { primaryView } from './views';
 
 // ── coordinates ─────────────────────────────────────────────────────
 
@@ -163,7 +165,9 @@ export interface SpecPanel {
   label: string;
   /** the model object this is a view of */
   of: string;
-  /** axis names, for the panel's own labels */
+  /** the state or observable this is a series of, by its canonical name */
+  state: string;
+  /** axis names, for the panel's own labels — in units, where the model says */
   x: string;
   y: string;
   /** the series, in the panel's own units */
@@ -351,8 +355,39 @@ function axisNamesFor(model: Model): [string, string, string] {
       const name = (g: { label: string; units?: string }) => (g.units ? `${g.label} (${g.units})` : g.label);
       return [name(fig.h), name(fig.v), pick(2, 'z')];
     }
+    // THE DRAWN OBJECT NAMES ITS OWN AXES. A relationship evaluated over
+    // named inputs — a response over educ and female, a curve over price —
+    // is drawn over those names and in those units, read from the model
+    // (lib/model/units.ts). A shape sampled over a parameter (a torus over s
+    // and u) has coordinate axes, and keeps the letters.
+    const o = drawnObject(model);
+    if (o) {
+      const graph = !!(o.defs?.z || o.defs?.f || o.definition || o.meta?.axes);
+      if (graph) {
+        const names =
+          typeof o.meta?.axes === 'string'
+            ? String(o.meta.axes).split(',').map((n) => n.trim()).filter(Boolean)
+            : Object.keys(o.over ?? {});
+        const named = (n: string) => withUnit(n, unitOf(model, n));
+        const outcome = typeof o.meta?.outcome === 'string' ? String(o.meta.outcome) : null;
+        const ownUnits = unitOfObject(model, o);
+        if (o.kind === 'surface' || o.kind === 'volume') {
+          return [named(names[0] ?? 'x'), named(names[1] ?? 'y'), outcome ? withUnit(outcome, ownUnits) : withUnit('z', ownUnits)];
+        }
+        if (o.kind === 'curve' || o.kind === 'line' || o.kind === 'ray') {
+          return [named(names[0] ?? 'x'), outcome ? withUnit(outcome, ownUnits) : withUnit('y', ownUnits), 'z'];
+        }
+      }
+    }
   }
   return [pick(0, 'x'), pick(1, 'y'), pick(2, 'z')];
+}
+
+/** The object the primary view is of, when there is one. */
+function drawnObject(model: Model): ModelObject | null {
+  const v = primaryView(model);
+  if (!v?.of) return null;
+  return model.objects.find((o) => o.id === v.of) ?? null;
 }
 
 function annotationsFor(model: Model): SpecAnnotation[] {
@@ -652,12 +687,16 @@ export function buildPanels(model: Model): SpecPanel[] {
     if (!line || line.at.length < 2) continue;
     const at = line.at.map((q) => ({ x: q.x, y: q.y }));
     const ys = at.map((q) => q.y);
+    const wrt = String(o.meta?.wrt ?? 'x');
     out.push({
       id: `${o.id}:slope`,
       label: o.label,
       of: o.id,
-      x: String(o.meta?.wrt ?? 'x'),
-      y: o.label,
+      state: o.id,
+      // In units: the input's on x, the slope's own — the outcome's per the
+      // input's, as derive.ts worked it out — on y.
+      x: withUnit(wrt, unitOf(model, wrt)),
+      y: withUnit(o.label, o.units),
       at,
       range: { x: [at[0].x, at[at.length - 1].x], y: [Math.min(...ys), Math.max(...ys)] },
       fidelity: 'model-derived',
@@ -688,12 +727,14 @@ export function buildPanels(model: Model): SpecPanel[] {
       if (at.length < 2) continue;
       const ys = at.map((q) => q.y);
       const meansOf = o.system.states.find((v) => v.name === name)?.means;
+      const stateUnits = o.system.states.find((v) => v.name === name)?.units ?? unitOf(model, name);
       out.push({
         id: `${o.id}:${name}`,
         label: meansOf ? `${name} — ${meansOf}` : name,
         of: o.id,
-        x: model.time?.units ? `t (${model.time.units})` : 't',
-        y: name,
+        state: name,
+        x: withUnit('t', model.time?.units),
+        y: withUnit(name, stateUnits),
         at,
         range: {
           x: [at[0].x, at[at.length - 1].x],

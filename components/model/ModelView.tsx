@@ -25,6 +25,7 @@ import './model-view.css';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Surface3D, snap, type RenderArgs, type SurfaceRender } from '@/components/surfaces/Surface3D';
 import { boxLines, place, type Camera, type Frame3, type Pt2 } from '@/lib/logos-viz3d';
+import { niceTicks, tickLabel } from '@/lib/model/units';
 import { contour } from '@/lib/model/sample';
 import type { P3, Primitive } from '@/lib/model/primitives';
 import { buildSlice } from '@/lib/model/compile';
@@ -455,10 +456,19 @@ export function ModelView({
       const cam: Camera = { yaw: a.cam.yaw, pitch: a.cam.pitch };
       const zoom = 3.4 / Math.max(0.6, a.cam.dist);
       const pad = 28;
+      // The secondary panels sit along the bottom of the frame (drawn below);
+      // their strip is known here so nothing with numbers on it is put under it.
+      const panels = spec.panels ?? [];
+      const panelGap = 10;
+      const panelH = panels.length ? Math.min(96, Math.max(54, a.H * 0.24)) : 0;
+      const panelTop = panels.length ? a.H - panelH - panelGap : a.H;
+      // Flat, the floor of the plot is the bottom of the frame — or the top of
+      // the panel strip, so the x axis and its numbers are not under it.
+      const floor = panels.length ? panelTop - panelGap - 14 : a.H - pad;
       const sx = (x: number) =>
         pad + ((x - spec.box.x[0]) / (spec.box.x[1] - spec.box.x[0])) * (a.W - pad * 2);
       const sy = (y: number) =>
-        a.H - pad - ((y - spec.box.y[0]) / (spec.box.y[1] - spec.box.y[0])) * (a.H - pad * 2);
+        floor - ((y - spec.box.y[0]) / (spec.box.y[1] - spec.box.y[0])) * (floor - pad);
       const centre = { x: a.W / 2, y: a.H / 2 };
       const spread = Math.min(a.W, a.H) * 0.42 * zoom;
       const at = (p: P3): Pt2 & { depth: number } => {
@@ -474,6 +484,14 @@ export function ModelView({
 
       // The box. In three dimensions it is the cube the projection implies;
       // flat, it is two rules, because a rectangle around a plot is furniture.
+      //
+      // AND THE NUMBERS ON IT. A box with no scale is geometry; a reader
+      // cannot tell twenty years of schooling from two, or a wage from a log
+      // of one. Each axis gets round ticks along one edge of the cage — the
+      // edge nearest the viewer for x and y, the leftmost post for z — and its
+      // name, in its units, from the spec (lib/model/units.ts). Flat, the two
+      // rules carry the same ticks and names.
+      const nameOf = (i: 0 | 1 | 2) => spec.axisNames[i] ?? '';
       if (!flat) {
         const box = boxLines(frame, cam).map((line) =>
           line.map((q) => ({ x: centre.x + q.x * spread, y: centre.y - q.y * spread }))
@@ -485,11 +503,124 @@ export function ModelView({
             ))}
           </g>
         ));
+        // The edge each axis is read along, chosen on the page rather than in
+        // the model: x and y along their lowest edge, z along the leftmost.
+        const bx = spec.box;
+        const corners = (ax: 'x' | 'y' | 'z'): [P3, P3][] => {
+          const lo = { x: bx.x[0], y: bx.y[0], z: bx.z[0] };
+          const hi = { x: bx.x[1], y: bx.y[1], z: bx.z[1] };
+          const others = (['x', 'y', 'z'] as const).filter((k) => k !== ax);
+          const out: [P3, P3][] = [];
+          for (const a0 of [lo, hi]) for (const b0 of [lo, hi]) {
+            const base: P3 = { x: 0, y: 0, z: 0 };
+            base[others[0]] = a0[others[0]];
+            base[others[1]] = b0[others[1]];
+            out.push([{ ...base, [ax]: lo[ax] }, { ...base, [ax]: hi[ax] }]);
+          }
+          return out;
+        };
+        const marks: React.ReactNode[] = [];
+        const centreOnPage = at({ x: (bx.x[0] + bx.x[1]) / 2, y: (bx.y[0] + bx.y[1]) / 2, z: (bx.z[0] + bx.z[1]) / 2 });
+        (['x', 'y', 'z'] as const).forEach((ax, i) => {
+          const edges = corners(ax).map((e) => ({ e, p0: at(e[0]), p1: at(e[1]) }));
+          // The lowest edge for x and y, the leftmost post for z — but never
+          // one that lies under the panel strip, where its numbers would be
+          // covered. Among the uncovered, the same preference; if every edge
+          // is covered, the highest one.
+          const midY = (q: (typeof edges)[number]) => (q.p0.y + q.p1.y) / 2;
+          const clear = edges.filter((q) => Math.max(q.p0.y, q.p1.y) < panelTop - 16);
+          const pool = clear.length ? clear : edges;
+          const pick = pool.reduce((best, cur) => {
+            const score = (q: typeof cur) =>
+              ax === 'z' ? -(q.p0.x + q.p1.x) / 2 : clear.length ? midY(q) : -midY(q);
+            return score(cur) > score(best) ? cur : best;
+          });
+          const dx = pick.p1.x - pick.p0.x;
+          const dy = pick.p1.y - pick.p0.y;
+          const len = Math.hypot(dx, dy) || 1;
+          // Outward: perpendicular to the edge, pointing away from the box.
+          let nx = -dy / len, ny = dx / len;
+          const mx = (pick.p0.x + pick.p1.x) / 2, my = (pick.p0.y + pick.p1.y) / 2;
+          if ((mx - centreOnPage.x) * nx + (my - centreOnPage.y) * ny < 0) { nx = -nx; ny = -ny; }
+          const lo = bx[ax][0], hi = bx[ax][1];
+          const ticks = len < 60 ? [] : niceTicks(lo, hi, len < 140 ? 2 : 3);
+          for (const v of ticks) {
+            const q = at({ ...pick.e[0], [ax]: v });
+            marks.push(
+              <g key={`tk-${ax}-${v}`} className="eng-tick">
+                <path d={`M${q.x.toFixed(1)},${q.y.toFixed(1)} L${(q.x + nx * 4).toFixed(1)},${(q.y + ny * 4).toFixed(1)}`} />
+                <text x={(q.x + nx * 10).toFixed(1)} y={(q.y + ny * 10 + 3).toFixed(1)} textAnchor={nx > 0.3 ? 'start' : nx < -0.3 ? 'end' : 'middle'}>
+                  {tickLabel(v)}
+                </text>
+              </g>
+            );
+          }
+          // The name goes PAST THE END of its edge, the way an axis is read,
+          // rather than beside its middle — where three names on three edges
+          // of one cage met each other and the z post's own numbers.
+          const name = nameOf(i as 0 | 1 | 2);
+          if (name && len >= 40) {
+            const ux = dx / len, uy = dy / len;
+            // The end of the edge that is further from the box's centre on the
+            // page is the one with room beyond it.
+            const endIsP1 = Math.hypot(pick.p1.x - centreOnPage.x, pick.p1.y - centreOnPage.y) >= Math.hypot(pick.p0.x - centreOnPage.x, pick.p0.y - centreOnPage.y);
+            const end = endIsP1 ? pick.p1 : pick.p0;
+            // The vertical post's far end is the top of the frame, where a name
+            // past it is clipped; z is named beside its middle instead, on the
+            // outward side, where its numbers already are.
+            const vertical = ax === 'z';
+            const ox = vertical ? 0 : endIsP1 ? ux : -ux;
+            const oy = vertical ? 0 : endIsP1 ? uy : -uy;
+            // …and clear of them: the widest tick label sets how far out.
+            const widest = ticks.reduce((w, v) => Math.max(w, tickLabel(v).length), 1);
+            // The tick labels sit 10px out and run `widest` characters back
+            // from there; the name starts a gap beyond that.
+            const clearance = 10 + widest * 5.8 + 10;
+            const tx = vertical ? mx + nx * clearance : end.x + ox * 10 + nx * 6;
+            const ty = (vertical ? my + ny * clearance : end.y + oy * 10 + ny * 6) + 3;
+            marks.push(
+              <text
+                key={`ax-${ax}`}
+                className="eng-axis"
+                x={tx.toFixed(1)}
+                y={ty.toFixed(1)}
+                textAnchor={vertical ? (nx > 0.3 ? 'start' : nx < -0.3 ? 'end' : 'middle') : ox > 0.3 ? 'start' : ox < -0.3 ? 'end' : 'middle'}
+              >
+                {name}
+              </text>
+            );
+          }
+        });
+        put(1e9 - 1, <g key="scale">{marks}</g>);
       } else {
         put(1e9, (
           <g key="axes" className="eng-box">
-            <path d={`M${pad},${a.H - pad} L${a.W - pad},${a.H - pad}`} />
-            <path d={`M${pad},${pad} L${pad},${a.H - pad}`} />
+            <path d={`M${pad},${floor} L${a.W - pad},${floor}`} />
+            <path d={`M${pad},${pad} L${pad},${floor}`} />
+          </g>
+        ));
+        const xt = niceTicks(spec.box.x[0], spec.box.x[1], a.W > 420 ? 5 : 3);
+        const yt = niceTicks(spec.box.y[0], spec.box.y[1], a.H > 260 ? 4 : 2);
+        put(1e9 - 1, (
+          <g key="scale">
+            {xt.map((v) => (
+              <g key={`x${v}`} className="eng-tick">
+                <path d={`M${sx(v).toFixed(1)},${floor} L${sx(v).toFixed(1)},${floor + 4}`} />
+                <text x={sx(v).toFixed(1)} y={floor + 14} textAnchor="middle">{tickLabel(v)}</text>
+              </g>
+            ))}
+            {yt.map((v) => (
+              <g key={`y${v}`} className="eng-tick">
+                <path d={`M${pad - 4},${sy(v).toFixed(1)} L${pad},${sy(v).toFixed(1)}`} />
+                <text x={pad - 7} y={(sy(v) + 3).toFixed(1)} textAnchor="end">{tickLabel(v)}</text>
+              </g>
+            ))}
+            {nameOf(0) && (
+              <text className="eng-axis" x={a.W - pad} y={floor + 24} textAnchor="end">{nameOf(0)}</text>
+            )}
+            {nameOf(1) && (
+              <text className="eng-axis" x={pad + 6} y={pad - 8} textAnchor="start">{nameOf(1)}</text>
+            )}
           </g>
         ));
       }
@@ -710,12 +841,11 @@ export function ModelView({
       // Insets rather than a second component, because this is how an academic
       // figure does it and because a panel strip that lives in the chrome would
       // not be part of the figure a reader exports.
-      const panels = spec.panels ?? [];
       if (panels.length) {
-        const gap = 10;
+        const gap = panelGap;
         const pw = (a.W - gap * (panels.length + 1)) / panels.length;
-        const ph = Math.min(96, Math.max(54, a.H * 0.24));
-        const top = a.H - ph - gap;
+        const ph = panelH;
+        const top = panelTop;
         panels.forEach((panel, i) => {
           const x0 = gap + i * (pw + gap);
           const [xa, xb] = panel.range.x;

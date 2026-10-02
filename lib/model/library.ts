@@ -549,13 +549,15 @@ export function oscillator(): Model {
       'x is displacement from rest, so the drawn rest position is a drawing choice and the displacement is computed.',
     ],
     params: [
-      param('m', 'mass', 1, 0.1, 5, 'The mass. It sets how slowly the system responds to the same force.', 0.1),
-      param('k', 'stiffness', 20, 1, 100, 'The spring constant. Raising it raises the natural frequency as √(k/m).', 1),
-      param('c', 'damping', 0.6, 0, 12, 'The damping coefficient. Past 2√(km) the motion stops oscillating at all.', 0.1),
-      param('x0', 'start', 1, -2, 2, 'Where the mass starts, as a displacement from rest.', 0.05),
-      param('f0', 'drive', 0, 0, 20, 'The amplitude of a driving force. At zero the system is left to itself.', 0.5),
-      param('w', 'drive rate', 4, 0.1, 20, 'How fast the driving force oscillates. Near √(k/m) it resonates.', 0.1),
+      { ...param('m', 'mass', 1, 0.1, 5, 'The mass. It sets how slowly the system responds to the same force.', 0.1), units: 'kg' },
+      { ...param('k', 'stiffness', 20, 1, 100, 'The spring constant. Raising it raises the natural frequency as √(k/m).', 1), units: 'N/m' },
+      { ...param('c', 'damping', 0.6, 0, 12, 'The damping coefficient. Past 2√(km) the motion stops oscillating at all.', 0.1), units: 'N·s/m' },
+      { ...param('x0', 'start', 1, -2, 2, 'Where the mass starts, as a displacement from rest.', 0.05), units: 'm' },
+      { ...param('f0', 'drive', 0, 0, 20, 'The amplitude of a driving force. At zero the system is left to itself.', 0.5), units: 'N' },
+      { ...param('w', 'drive rate', 4, 0.1, 20, 'How fast the driving force oscillates. Near √(k/m) it resonates.', 0.1), units: 'rad/s' },
     ],
+    // The states a mechanism integrates, in SI: a position and a velocity.
+    units: { x: 'm', v: 'm/s' },
     time: { t: 0, min: 0, max: 20, rate: 1, units: 's' },
     objects: [
       {
@@ -1055,6 +1057,9 @@ export function wageInteraction(): Model {
       'The coefficients are placeholders until you set them; the picture is the SHAPE the specification implies, not a claim about wages.',
     ],
     params: [],
+    // What the columns are measured in. lwage is a log and has no unit; the
+    // indicator has none either. Only educ is dimensioned, and it says so.
+    units: { educ: 'years' },
     objects: [
       {
         id: 'w',

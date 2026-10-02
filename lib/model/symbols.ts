@@ -47,6 +47,7 @@
 
 import { NAME } from './ids';
 import { inputDomain, type DomainFrom } from './kinds';
+import { unitOf } from './units';
 import type { Model, ModelObject, Origin, Fidelity } from './schema';
 
 /** What a quantity is FOR, which decides how it may be bound and shown. */
@@ -216,7 +217,13 @@ export function symbolTable(model: Model): SymbolTable {
       machine: columnName(o) ?? machineOf(o.id),
       role,
       ...(bound.value !== undefined ? { value: bound.value } : {}),
-      ...(o.units ? { units: o.units } : {}),
+      // Its own units first; otherwise what the model says about the name it
+      // stands for — a specification's column, the dictionary — so an input
+      // the engine made from a declaration still prints "educ (years)".
+      ...(() => {
+        const u = o.units ?? unitOf(model, columnName(o) ?? o.id) ?? (o.label ? unitOf(model, o.label) : undefined);
+        return u ? { units: u } : {};
+      })(),
       ...(o.provenance?.origin ? { origin: o.provenance.origin } : {}),
       ...(o.fidelity ? { fidelity: o.fidelity } : {}),
       boundBy: bound.how,
