@@ -80,6 +80,25 @@ export interface ViewSpec {
   id: string;
   family: ViewFamily;
   label: string;
+  /**
+   * WHAT THIS IS A VIEW OF, in the model's own words — the object's label, a
+   * data block's, or '' for a view of the whole model.
+   *
+   * Split out of `label` because a reader was being made to read it four times.
+   * A surface offers four views and every label began with the same thirty
+   * characters: "log_wage, as the model implies it", "… — level sets", "… —
+   * cross-section", "… — values". The subject is said once and the ways of
+   * looking at it are named beside it (`variant`), which is a fact about the
+   * registry rather than a trick of the renderer — anything listing views can
+   * group them the same way.
+   */
+  subject: string;
+  /**
+   * THIS WAY OF LOOKING AT THE SUBJECT, in a word or two: "Surface", "Level
+   * sets", "Cross-section", "Values". Derived from the family unless a branch
+   * says otherwise, so a family added tomorrow is named rather than blank.
+   */
+  variant: string;
   /** the model object this is a view of; '' when it is a view of the model */
   of: string;
   dimensionality: 2 | 3;
@@ -150,6 +169,37 @@ export const RENDERED = new Set<ViewFamily>([
   'equation', 'table', 'matrix', 'structure', 'derivative', 'sensitivity', 'diagnostic', 'text',
 ]);
 
+/**
+ * What each family is CALLED when the thing it is a view of has already been
+ * named. Two words at most: these sit side by side under one subject, and a
+ * sentence there is the problem this exists to fix.
+ */
+const FAMILY_TITLE: Record<ViewFamily, string> = {
+  surface: 'Surface',
+  curve: 'Curve',
+  scatter: 'Points',
+  contour: 'Level sets',
+  slice: 'Cross-section',
+  field: 'Field',
+  trajectory: 'Path',
+  phase: 'Phase portrait',
+  mechanism: 'Mechanism',
+  timeline: 'Against time',
+  animation: 'Over time',
+  table: 'Values',
+  matrix: 'Design',
+  equation: 'The relations',
+  derivative: 'Slope',
+  sensitivity: 'Sensitivity',
+  residual: 'Residuals',
+  interval: 'Coefficients',
+  distribution: 'Distribution',
+  network: 'Structure',
+  structure: 'Dependencies',
+  diagnostic: 'Diagnostics',
+  text: 'Account',
+};
+
 const OCCUPIES_EXTENT = new Set<ViewFamily>([
   'surface', 'curve', 'scatter', 'contour', 'slice', 'field', 'trajectory',
   'phase', 'mechanism', 'timeline', 'animation', 'residual', 'interval', 'network',
@@ -199,14 +249,48 @@ export function worth(m: Model, o: ModelObject): Fidelity {
  */
 export function viewsFor(model: Model): ViewSpec[] {
   const out: ViewSpec[] = [];
-  const add = (v: Omit<ViewSpec, 'marks'> & { marks?: boolean }) => {
+
+  // ── WHAT TO CALL THE THING A VIEW IS OF ──────────────────────────
+  //
+  // Its own label, QUALIFIED WHEN THE LABEL ALONE DOES NOT IDENTIFY IT. A model
+  // holding two specifications — "y on x₁ and x₂" and "y on x₁ alone" — gives
+  // both implied responses the same name, "y, as the model implies it", and
+  // both their slopes the same name again. Printing that twice over two
+  // different sets of views asks a reader to tell two identical labels apart by
+  // what happens to sit under them. The specification each belongs to is on the
+  // object (`meta.spec`, or the response it was differentiated from), so the
+  // name says it when, and only when, it is needed.
+  const seen = new Map<string, number>();
+  for (const o of model.objects) seen.set(o.label, (seen.get(o.label) ?? 0) + 1);
+  const subjectOf = (id: string): string => {
+    const o = model.objects.find((x) => x.id === id);
+    if (!o) return id;
+    if ((seen.get(o.label) ?? 0) < 2) return o.label;
+    const specId =
+      (o.meta?.spec as string | undefined) ??
+      (model.objects.find((x) => x.id === (o.meta?.of as string | undefined))?.meta?.spec as string | undefined);
+    const spec = specId ? model.objects.find((x) => x.id === specId) : null;
+    return spec ? `${o.label} · ${spec.label}` : o.label;
+  };
+  const add = (
+    v: Omit<ViewSpec, 'marks' | 'subject' | 'variant'> & {
+      marks?: boolean;
+      subject?: string;
+      variant?: string;
+    }
+  ) => {
     if (out.some((x) => x.id === v.id)) return;
     const marks = v.marks ?? OCCUPIES_EXTENT.has(v.family);
     // DERIVED, NEVER DECLARED. See RENDERED above for what a hand-written flag
     // cost. A view of a family nothing renders is still listed — the answer to
     // "what else could I look at" is meant to be complete — it just says so.
     const notDrawnYet = RENDERED.has(v.family) ? undefined : true;
-    out.push({ ...v, marks, ...(notDrawnYet ? { notDrawnYet } : {}) });
+    // The object's own name is the subject, found rather than repeated at
+    // every call site; a view of the model itself has no subject, and the
+    // renderer says so once for the whole group.
+    const subject = v.subject ?? (v.of ? subjectOf(v.of) : '');
+    const variant = v.variant ?? FAMILY_TITLE[v.family];
+    out.push({ ...v, subject, variant, marks, ...(notDrawnYet ? { notDrawnYet } : {}) });
   };
   const table = symbolTable(model);
 
@@ -382,6 +466,7 @@ export function viewsFor(model: Model): ViewSpec[] {
       if (route(model, o, 'solve').status === 'runnable') {
         add({
           id: `curve:${o.id}`, family: 'curve', label: o.label, of: o.id, dimensionality: 2,
+          variant: 'Figure',
           because: 'the relations solve, so each one is a line in the plane of the quantities they relate',
           shows: 'the relations as lines, the values that satisfy them as a point, and any offset between quantities sharing an axis as a segment',
           fidelity: worth(model, o), can: ['select', 'point'], primary: true,
@@ -422,13 +507,15 @@ export function viewsFor(model: Model): ViewSpec[] {
   for (const [key, block] of data) {
     if (!block.columns || !Object.keys(block.columns).length) continue;
     add({
-      id: `table:data:${key}`, family: 'table', label: block.label ?? key, of: '', dimensionality: 2,
+      id: `table:data:${key}`, family: 'table', label: block.label ?? key, of: '',
+      subject: block.label ?? key, dimensionality: 2,
       because: 'the model carries observations, and a table is what they are',
       shows: 'the supplied numbers, as given — never a fitted line standing in for them',
       fidelity: 'data-derived', can: ['select', 'point'],
     });
     add({
-      id: `matrix:data:${key}`, family: 'matrix', label: `${block.label ?? key} — design`, of: '', dimensionality: 2,
+      id: `matrix:data:${key}`, family: 'matrix', label: `${block.label ?? key} — design`, of: '',
+      subject: block.label ?? key, dimensionality: 2,
       because: 'the columns a specification uses form a matrix, and its shape is what identification turns on',
       shows: 'the rows and columns a fit would run on, including any built from transformations',
       fidelity: 'data-derived', can: ['select'],
@@ -517,6 +604,42 @@ export function unavailable(model: Model): Unavailable[] {
   want('animation', 'a clock on the model and a run that covers it');
   want('derivative', 'a relationship written as an expression, and an input to take the slope with respect to');
   return out;
+}
+
+/**
+ * The views, gathered under what they are views OF.
+ *
+ * Here rather than in the panel because it is a statement about the registry:
+ * two views share a group exactly when they are two ways of looking at the
+ * same thing, and that is what makes it safe to print the subject once and the
+ * variants beside it. Views of the MODEL — its dependency graph, its
+ * relationships, its account of itself — have no subject and come last, since
+ * they are what is left when you stop looking at any one thing.
+ *
+ * Order within a group is the registry's: the primary first.
+ */
+export interface ViewGroup {
+  /** the model's own words for the thing, or '' for the model itself */
+  subject: string;
+  views: ViewSpec[];
+}
+
+export function groupViews(views: readonly ViewSpec[]): ViewGroup[] {
+  // KEYED ON THE OBJECT, not on the name. Two specifications in one model can
+  // imply responses with identical labels, and merging those would offer
+  // "Surface" and "Curve" side by side as though they were two ways of looking
+  // at one thing when they are views of two different things. Data blocks and
+  // the model's own views carry no object, so they key on their subject — ''
+  // for the model, which is what puts those last.
+  const by = new Map<string, ViewGroup>();
+  for (const v of views) {
+    const key = v.of || v.subject;
+    const held = by.get(key);
+    if (held) held.views.push(v);
+    else by.set(key, { subject: v.subject, views: [v] });
+  }
+  const groups = [...by.values()];
+  return [...groups.filter((g) => g.subject), ...groups.filter((g) => !g.subject)];
 }
 
 /** The one the engine would open first, or null when nothing draws. */

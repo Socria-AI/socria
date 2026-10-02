@@ -23,7 +23,7 @@ import { buildProposal } from './.tmp/propose.mjs';
 import { buildSpec, chooseRepresentation } from './.tmp/spec.mjs';
 import { buildObject } from './.tmp/compile.mjs';
 import { sanitizeModel } from './.tmp/schema.mjs';
-import { viewsFor, unavailable, primaryView, viewLines } from './.tmp/views.mjs';
+import { viewsFor, unavailable, primaryView, viewLines, groupViews } from './.tmp/views.mjs';
 import { operationsOn } from './.tmp/solve.mjs';
 import { inspectModel, inspectObject, whyOf, whyLines, whatChanged, computationFacts, transparencyLine } from './.tmp/inspect.mjs';
 import { modelStateFrom } from './.tmp/model-state.mjs';
@@ -59,6 +59,94 @@ const CONCEPTUAL = () => unpack(sanitizeModel({
       fidelity: 'conceptual', provenance: { origin: 'user', detail: 'stated' } },
   ],
 }));
+
+// ═══ a reader should not read the subject four times ════════════════
+//
+// WHAT THIS IS ABOUT. A fitted specification offered four views of one
+// quantity and every label began with the same thirty characters —
+// "log_wage, as the model implies it", "… — level sets", "… — cross-section",
+// "… — values". Eleven buttons over three wrapped rows, and the only thing
+// telling four of them apart was the last word. So the registry now says what
+// each view is OF and which way of looking it is, and the panel can print the
+// subject once. The failure to guard against is a variant that is a sentence,
+// a subject that disagrees with the object's own label, or a group that puts
+// two different things together.
+console.log('\n=== every view says what it is of, and which way of looking it is ===');
+{
+  for (const e of LIBRARY) {
+    const m = M(e.id);
+    const vs = viewsFor(m);
+    ok(`${e.id}: every view names a way of looking`, vs.every((v) => !!v.variant), JSON.stringify(vs.filter((v) => !v.variant).map((v) => v.id)));
+    // Two words at most: these sit side by side under one subject.
+    ok(`  ${e.id}: and does it in two words`, vs.every((v) => v.variant.split(/\s+/).length <= 2 && v.variant.length <= 18),
+      JSON.stringify(vs.map((v) => v.variant).filter((t) => t.split(/\s+/).length > 2 || t.length > 18)));
+    // A view OF an object is a view of THAT object, by its own label —
+    // qualified, when the label alone does not identify it.
+    const byId = new Map(m.objects.map((o) => [o.id, o.label]));
+    const shared = new Set(m.objects.map((o) => o.label).filter((l, i, all) => all.indexOf(l) !== i));
+    ok(`  ${e.id}: the subject is the object's own name`,
+      vs.every((v) => !v.of || v.subject === byId.get(v.of) || v.subject.startsWith(`${byId.get(v.of)} · `)),
+      JSON.stringify(vs.filter((v) => v.of && !v.subject.startsWith(byId.get(v.of))).map((v) => [v.id, v.subject])));
+    ok(`  ${e.id}: and is qualified only where the name is ambiguous`,
+      vs.every((v) => !v.of || v.subject === byId.get(v.of) || shared.has(byId.get(v.of))),
+      JSON.stringify(vs.filter((v) => v.of && v.subject !== byId.get(v.of) && !shared.has(byId.get(v.of))).map((v) => [v.id, v.subject])));
+    // Grouping loses nothing and invents nothing.
+    const gs = groupViews(vs);
+    ok(`  ${e.id}: grouping keeps every view, once`,
+      gs.reduce((n, g) => n + g.views.length, 0) === vs.length &&
+        new Set(gs.flatMap((g) => g.views.map((v) => v.id))).size === vs.length);
+    ok(`  ${e.id}: a group is one subject`, gs.every((g) => g.views.every((v) => v.subject === g.subject)));
+    // The model's own views are what is left when you stop looking at any one
+    // thing, so they come last.
+    const atModel = gs.findIndex((g) => !g.subject);
+    ok(`  ${e.id}: views of the model itself come last`, atModel === -1 || atModel === gs.length - 1, `${atModel} of ${gs.length}`);
+    // Within a group the variants tell the views apart — that is the whole
+    // point of printing the subject once.
+    ok(`  ${e.id}: variants within a group are distinct`,
+      gs.every((g) => new Set(g.views.map((v) => v.variant)).size === g.views.length || !g.subject),
+      JSON.stringify(gs.filter((g) => g.subject && new Set(g.views.map((v) => v.variant)).size !== g.views.length).map((g) => [g.subject, g.views.map((v) => v.variant)])));
+  }
+
+  // THE CASE FROM THE SCREENSHOT. A surface's four views are one subject and
+  // four short ways of looking at it.
+  const saddle = M('saddle');
+  const sg = groupViews(viewsFor(saddle)).find((g) => g.views.some((v) => v.family === 'surface'));
+  ok('a surface is one subject with several ways of looking at it', sg.views.length >= 4, `${sg?.views.length}`);
+  ok('  the subject said once', sg.subject === saddle.objects.find((o) => o.kind === 'surface').label);
+  ok('  and the ways of looking named shortly',
+    ['Surface', 'Level sets', 'Cross-section', 'Values'].every((t) => sg.views.some((v) => v.variant === t)),
+    JSON.stringify(sg.views.map((v) => v.variant)));
+  // What the row used to print, four times over.
+  ok('  none of the variants repeats the subject', sg.views.every((v) => !v.variant.includes(sg.subject)));
+
+  // The model's own views keep their sentences: there is no repeated name to
+  // lift out of "What this is", and "Account" would be worse.
+  const model = groupViews(viewsFor(saddle)).find((g) => !g.subject);
+  ok('the model group keeps its own labels', model.views.some((v) => v.label === 'What this is'));
+  ok('  and has no subject to print', model.subject === '');
+
+  // TWO SPECIFICATIONS, ONE NAME. A model holding two of them implies two
+  // responses with identical labels; they are different objects and must not
+  // be merged, nor printed as two identical captions over different offers.
+  const two = M('multivariate-model');
+  const tg = groupViews(viewsFor(two)).filter((g) => g.subject.startsWith('y, as the model implies it'));
+  ok('two specifications are two groups', tg.length === 2, `${tg.length}`);
+  ok('  told apart by the specification each belongs to',
+    new Set(tg.map((g) => g.subject)).size === 2 && tg.every((g) => / · /.test(g.subject)),
+    JSON.stringify(tg.map((g) => g.subject)));
+  ok('  and their views are not mixed together',
+    tg.every((g) => new Set(g.views.map((v) => v.of)).size === 1),
+    JSON.stringify(tg.map((g) => g.views.map((v) => v.of))));
+  ok('  while a model with one specification is not qualified at all',
+    groupViews(viewsFor(M('wage-interaction'))).every((g) => !/ · /.test(g.subject)),
+    JSON.stringify(groupViews(viewsFor(M('wage-interaction'))).map((g) => g.subject)));
+
+  // A FITTED SPECIFICATION — the model in the screenshot.
+  const fit = M('wage-interaction');
+  const fgs = groupViews(viewsFor(fit));
+  const widest = Math.max(...fgs.map((g) => (g.views.length > 1 && g.subject ? Math.max(...g.views.map((v) => v.variant.length)) : Math.max(...g.views.map((v) => v.label.length)))));
+  ok('nothing a reader has to read is longer than a short phrase', widest <= 32, `${widest}`);
+}
 
 // ═══ every representation is DERIVED, never listed ══════════════════
 console.log('\n=== the registry answers differently per model family ===');

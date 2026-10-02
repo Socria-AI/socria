@@ -27,6 +27,7 @@
 import { useMemo, useState } from 'react';
 import type { Model } from '@/lib/model/schema';
 import { inspectModel, inspectObject, transparencyLine, whatChanged, whyOf } from '@/lib/model/inspect';
+import { groupViews, type ViewSpec } from '@/lib/model/views';
 import { unavailable, viewsFor } from '@/lib/model/views';
 import './understand.css';
 
@@ -63,6 +64,10 @@ export function Understand({
 }) {
   const inspection = useMemo(() => inspectModel(model), [model]);
   const views = useMemo(() => viewsFor(model), [model]);
+  // Gathered under what they are views OF (lib/model/views.ts). Four buttons
+  // that each began "log_wage, as the model implies it" are one subject and
+  // four ways of looking at it; saying the subject once is the whole fix.
+  const groups = useMemo(() => groupViews(views), [views]);
   const missing = useMemo(() => unavailable(model), [model]);
   const change = useMemo(() => whatChanged(model), [model]);
   const selected = model.selected ?? null;
@@ -82,6 +87,34 @@ export function Understand({
   const [shown, setShown] = useState(false);
   const [open, setOpen] = useState<Record<string, boolean>>({ state: true });
   const toggle = (id: string) => setOpen((o) => ({ ...o, [id]: !o[id] }));
+
+  /**
+   * One offer. The text is the caller's — the view's own label when it stands
+   * alone, its variant when the subject has already been said — and everything
+   * else about it is the same wherever it appears.
+   */
+  const viewChip = (v: ViewSpec, text: string) => (
+    <button
+      key={v.id}
+      type="button"
+      className={`und-view${current === v.id ? ' is-current' : ''}${v.primary ? ' is-primary' : ''}`}
+      aria-pressed={current === v.id}
+      data-view={v.id}
+      // The subject rides in the tooltip for a chip that no longer prints it,
+      // so hovering still says what this is a view of.
+      title={`${v.subject ? `${v.subject}\n` : ''}${v.shows}\n\nAvailable because ${v.because}.`}
+      // ONE CALL. Opening a view of an object also selects it — so the
+      // inspector and the conversation are about the thing on screen — but
+      // that happens in ONE revision of the model, in the handler. Calling
+      // onView and then onSelect from here looked equivalent and was not: each
+      // computed its next model from the same captured one, so the second
+      // silently discarded the first and the view never changed. See
+      // ModelView openView.
+      onClick={() => onView?.(v.id)}
+    >
+      {text}
+    </button>
+  );
 
   return (
     <section className={`und${shown ? ' is-shown' : ''}`} aria-label="Understand this model">
@@ -107,26 +140,26 @@ export function Understand({
           fitted specification without any of them being known here. */}
       <div className="und-views">
         <span className="und-views-label">Views</span>
-        {views.map((v) => (
-          <button
-            key={v.id}
-            type="button"
-            className={`und-view${current === v.id ? ' is-current' : ''}${v.primary ? ' is-primary' : ''}`}
-            aria-pressed={current === v.id}
-            data-view={v.id}
-            title={`${v.shows}\n\nAvailable because ${v.because}.`}
-            // ONE CALL. Opening a view of an object also selects it — so the
-            // inspector and the conversation are about the thing on screen —
-            // but that happens in ONE revision of the model, in the handler.
-            // Calling onView and then onSelect from here looked equivalent and
-            // was not: each computed its next model from the same captured one,
-            // so the second silently discarded the first and the view never
-            // changed. See ModelView openView.
-            onClick={() => onView?.(v.id)}
-          >
-            {v.label}
-          </button>
-        ))}
+        {groups.map((g) => {
+          // ONE view of a thing says the thing's name — the subject, which is
+          // the label qualified exactly when the label alone does not identify
+          // it, so two slopes from two specifications are told apart rather
+          // than printed twice identically. SEVERAL views say the name once
+          // and then the ways of looking at it, joined so they read as one
+          // control rather than four unrelated offers. Views of the model
+          // itself keep their sentences — there is no repeated name to lift
+          // out of them, and "What this is" is better than "Account".
+          if (g.views.length === 1) return viewChip(g.views[0], g.subject || g.views[0].label);
+          const terse = !!g.subject;
+          return (
+            <span className="und-group" key={g.subject || 'model'}>
+              <span className="und-of" title={g.subject || undefined}>
+                {g.subject || 'The model'}
+              </span>
+              <span className="und-set">{g.views.map((v) => viewChip(v, terse ? v.variant : v.label))}</span>
+            </span>
+          );
+        })}
         {missing.length ? (
           <span
             className="und-missing"
