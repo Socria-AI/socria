@@ -80,8 +80,12 @@ console.log('\n=== who is asked, and who is not ===');
     /CORE4_INTRO_DISMISS_KEY = 'socria\.core4IntroDontShowAgain\.v1'/.test(chat));
   ok('  which is a different key from the Logos invitation’s',
     /LOGOS_INTRO_DISMISS_KEY = 'socria\.logosIntroDontShowAgain\.v1'/.test(chat));
-  ok('somebody already on Core 4 is not sold Core 4', /here !== 'core-4'/.test(chat));
-  ok('nobody on a Logos surface is interrupted by it', /!isLogosSurface\(here\)/.test(chat));
+  // THE ANNOUNCEMENT NO LONGER OPENS ITSELF. A first visit is taught by the
+  // first reply (lib/first-run.ts); the modal is reached from the pill and
+  // the picker, and only there.
+  ok('the announcement no longer opens itself', /THE ANNOUNCEMENT NO LONGER OPENS ITSELF/.test(chat)
+    && !/if \(!dismissed && here !== 'core-4'/.test(chat));
+  ok('  the dismissals are still read, for the pill', /setCore4Dismissed\(localStorage\.getItem\(CORE4_INTRO_DISMISS_KEY\) === '1'\)/.test(chat));
   ok('it takes the slot the Logos invitation had',
     /setCore4IntroOpen\(true\)/.test(chat) && !/if \(!dismissed && !isLogosSurface\(readModel\(\)\)\) \{\s*setLogosModalOpen\(true\)/.test(chat));
 
@@ -99,18 +103,20 @@ console.log('\n=== who is asked, and who is not ===');
   ok('  and anything else still opens the Logos one', /else setLogosModalOpen\(true\)/.test(chat));
 }
 
-console.log('\n=== the onboarding beat sets the thing it teaches ===');
+console.log('\n=== the beginning is the premise and the thought, then the product ===');
 {
-  ok('there is a fifth beat', /\[0, 1, 2, 3, 4\]\.map/.test(onboarding) && /beat === 4/.test(onboarding));
-  ok('it uses the real dials', /import \{ Dial \} from '@\/components\/ModelPicker'/.test(onboarding));
-  ok('  and writes through the shared store, not a second copy of the keys',
-    /rememberReadability\(v\)/.test(onboarding) && /rememberLength\(v\)/.test(onboarding)
-      && !/socria\.readability\.v1/.test(onboarding));
-  ok('  reading back what was already set', /setReadability\(readReadability\(\)\)/.test(onboarding));
-  ok('a dial moved on the way past is kept even if they leave immediately',
-    onboarding.indexOf('rememberReadability(v)') < onboarding.indexOf('const pickLength') + 400);
-  ok('it lands them on the model it just taught', /router\.push\('\/chat\?model=core-4'\)/.test(onboarding));
-  ok('  and no longer on a surface the last beat did not set up', !/router\.push\('\/chat\?model=logos'\)/.test(onboarding));
+  // The five-beat sequence — intents, a rehearsed reply, a drawn map, the
+  // dials — is gone. What a new account meets is the same two beats every
+  // surface shows a first-time visitor (components/onboarding/FirstRunIntro.tsx),
+  // and then the real product with their sentence in its composer.
+  ok('the onboarding is the shared first-run screen', /FirstRunIntro/.test(onboarding));
+  ok('  with no dials of its own', !/import \{ Dial \}/.test(onboarding) && !/rememberReadability/.test(onboarding));
+  ok('  and no rehearsed reply', !/resolveScript/.test(onboarding));
+  ok('it carries the sentence rather than asking for it twice', /carry\(/.test(onboarding));
+  ok('it lands them in the chat', /router\.push\(toLogos \? '\/chat\?model=logos-2' : '\/chat'\)/.test(onboarding));
+  ok('  or in Logos when that is where they were going', /params\?\.get\('to'\) === 'logos'/.test(onboarding));
+  ok('  and never on a withdrawn surface', !/router\.push\('\/chat\?model=logos'\)/.test(onboarding));
+  ok('the premise is recorded once, skipped or not', /reach\('socria\.intro', \{ skipped: true \}\)/.test(onboarding));
 
   // The chat and the onboarding must agree about where a preference lives.
   const store = read('lib/socria-model-store.ts');

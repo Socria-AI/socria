@@ -27,7 +27,7 @@ export const SOCRIA_PREFIX = 'socria.';
  * motion. Keeping them means a shared machine does not re-run onboarding at
  * the next person, and they say nothing about who was here.
  */
-const KEEP = new Set<string>(['socria.tour.v1', 'socria.hints.seen.v1']);
+const KEEP = new Set<string>(['socria.tour.v1', 'socria.hints.seen.v1', 'socria.firstrun.v1']);
 
 function sweep(store: Storage): number {
   let removed = 0;

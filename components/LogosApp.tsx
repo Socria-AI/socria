@@ -82,7 +82,6 @@ import {
   isRunning as fmRunning,
   shouldStart as fmShouldStart,
   IDLE as FM_IDLE,
-  ONBOARDING_KEY,
   type State as FirstMapState,
 } from '@/lib/onboarding';
 import { billingError, billingLine } from '@/lib/billing-message';
@@ -120,6 +119,14 @@ import {
   type ThinkingMap as TMap,
 } from '@/lib/logos';
 import { owesExtraction } from '@/lib/conversation-surface';
+import { FirstRunIntro } from '@/components/onboarding/FirstRunIntro';
+import { useFirstRun } from '@/components/useFirstRun';
+import { wantsIntro } from '@/lib/first-run';
+import { computationFacts, whatChanged } from '@/lib/model/inspect';
+import { viewsFor } from '@/lib/model/views';
+import { affectedBy } from '@/lib/model/deps';
+import { readSeen, markSeen } from '@/lib/hints';
+import { byId as fmById, type Shape as FirstMapShape } from '@/lib/onboarding';
 import { applyMapEdits, dropRemoved, readMapCommand, type MapEdit } from '@/lib/map-edit';
 import type { ExploreResult, NodeMode } from '@/lib/logos-explore';
 import {
@@ -603,29 +610,81 @@ export function LogosApp({
   const mapRef = useRef<TMap>(EMPTY_MAP);
   mapRef.current = map;
 
-  // ── the first map ──
-  // Read once, from storage, so a person who has been through this never
-  // meets it again on any device where they finished it.
+  // ── the first model ──
+  // What this person has already been taught, on every surface (lib/first-run.ts):
+  // the Logos sequence runs once per person, on their own first map or model,
+  // and never again on any device the record has been merged with.
+  const firstRun = useFirstRun({ signedIn: !!isSignedIn, surface: 'logos' });
   const [firstMap, setFirstMap] = useState<FirstMapState>(FM_IDLE);
-  const [fmDone, setFmDone] = useState(true); // assume done until storage says otherwise
-  useEffect(() => {
-    try {
-      setFmDone(localStorage.getItem(ONBOARDING_KEY) === 'done');
-    } catch {
-      // No storage is not a reason to teach somebody the product twice a day.
-      setFmDone(true);
-    }
-  }, []);
+  const fmDone = !firstRun.ready || firstRun.has('logos.aha');
+  const fmSkipped = useRef(false);
   const endFirstMap = useCallback(() => {
     setFirstMap(fmFinish());
-    try {
-      localStorage.setItem(ONBOARDING_KEY, 'done');
-    } catch {}
-    setFmDone(true);
-  }, []);
-  const signalFirstMap = useCallback((sig: Parameters<typeof fmAdvance>[1]) => {
-    setFirstMap((cur) => fmAdvance(cur, sig));
-  }, []);
+    firstRun.reach('logos.aha', { skipped: fmSkipped.current });
+  }, [firstRun]);
+  const skipFirstMap = useCallback(() => {
+    fmSkipped.current = true;
+    endFirstMap();
+  }, [endFirstMap]);
+  /**
+   * What is on screen, as the sequence needs it: a model or only a map, what
+   * can be moved and what it is called, whether anything actually computed.
+   * Read from the canonical model — the cue names a parameter because the
+   * model calls it one, and mentions a backend because one ran.
+   */
+  const fmShape: FirstMapShape = useMemo(() => {
+    const doc = map.models ? activeDoc(map.models) : null;
+    if (!doc) return { model: false, controls: 0, nodes: map.nodes?.length ?? 0 };
+    const m = modelFor(doc);
+    const params = m.params ?? [];
+    const first = computationFacts(m)[0];
+    const computed = first
+      ? {
+          operation: first.label.split(' — ')[0].toLowerCase().replace(/^./, (c) => c.toUpperCase()),
+          backend: first.value.split(';')[0].replace(/\s*\([^)]*\)\s*$/, '').trim(),
+        }
+      : null;
+    return {
+      model: true,
+      controls: params.length,
+      control: params[0] ? { label: params[0].label, kind: 'parameter' as const } : null,
+      computed,
+      nodes: map.nodes?.length ?? 0,
+    };
+  }, [map.models, map.nodes?.length]);
+  const fmShapeRef = useRef(fmShape);
+  fmShapeRef.current = fmShape;
+  const signalFirstMap = useCallback(
+    (sig: Parameters<typeof fmAdvance>[1]) => {
+      // The record is told what the person did, whether or not the sequence
+      // is running — a milestone is a fact about them, not about a card.
+      if (sig === 'map-drew' || sig === 'model-built') firstRun.reach('logos.model');
+      if (sig === 'control-moved') firstRun.reach('logos.manipulated');
+      if (sig === 'node-pressed') firstRun.reach('logos.inspected');
+      if (sig === 'asked') firstRun.reach('logos.asked');
+      if (sig === 'action-taken') firstRun.reach('logos.inspected');
+      setFirstMap((cur) => fmAdvance(cur, sig, fmShapeRef.current));
+    },
+    [firstRun]
+  );
+  // The emergence: on for a few seconds when the sequence opens, so the
+  // person watches their language become structure once, then the map is
+  // still. A fact about the moment, not an idle animation.
+  const [emerging, setEmerging] = useState(false);
+  const ahaSaid = useRef(false);
+  useEffect(() => {
+    if (firstMap.at === 'became') {
+      firstRun.reach('logos.first');
+      setEmerging(true);
+      const t = setTimeout(() => setEmerging(false), 3200);
+      return () => clearTimeout(t);
+    }
+    if (firstMap.at === 'release' && !ahaSaid.current) {
+      ahaSaid.current = true;
+      track('logos_aha_reached', { surface: 'logos', object: fmShapeRef.current.model ? 'model' : 'map' });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [firstMap.at]);
 
   // The Answer Guard is one shared state: on only while LEARNING math and the
   // person hasn't chosen to reveal this session's solution. Every surface reads
@@ -872,9 +931,12 @@ export function LogosApp({
     if (fmRunning(firstMap) || fmDone) return;
     if (
       fmShouldStart({
-        signedIn: !!isSignedIn,
+        // An account or the typed access key: either is a person who can
+        // keep the map and act on it, which is what the sequence needs.
+        signedIn: !!isSignedIn || unlocked,
         completed: fmDone,
         nodes: map.nodes?.length ?? 0,
+        model: fmShape.model,
         // LogosGuide auto-opens on a first visit and is a modal. Two
         // onboardings on screen at once is worse than either alone, and the
         // guide comes first by nature — it runs on an empty state, this runs
@@ -883,9 +945,9 @@ export function LogosApp({
         composing: input.trim().length > 0,
       })
     ) {
-      setFirstMap((cur) => fmAdvance(cur, 'map-drew'));
+      signalFirstMap(fmShape.model ? 'model-built' : 'map-drew');
     }
-  }, [map.nodes?.length, isSignedIn, fmDone, busy, guideOpen, input, firstMap]);
+  }, [map.nodes?.length, fmShape.model, isSignedIn, unlocked, fmDone, busy, guideOpen, input, firstMap, signalFirstMap]);
 
   const logosStarters = buildStarters(
     {
@@ -1093,12 +1155,12 @@ export function LogosApp({
 
   const hasAccess = unlocked || !!isSignedIn;
 
-  useEffect(() => {
-    if (!hasAccess) return;
-    try {
-      if (localStorage.getItem(GUIDE_SEEN_KEY) !== '1') setGuideOpen(true);
-    } catch {}
-  }, [hasAccess]);
+  // THE GUIDE NO LONGER OPENS ITSELF. A modal of miniature demonstrations
+  // before a word has been said was Logos explaining itself in place of
+  // doing the thing; the first map does the explaining now (the sequence
+  // below), on the person's own words. The guide stays behind the "?" in
+  // the header for anyone who wants the walk-through.
+  void GUIDE_SEEN_KEY;
 
   function closeGuide() {
     setGuideOpen(false);
@@ -2393,6 +2455,8 @@ export function LogosApp({
     };
     const sent = turn;
     const before = messages;
+    // The first thought, anywhere — once, ever (lib/first-run.ts).
+    firstRun.reach('socria.thought');
     const next = [...before, sent];
     patchActive((s) => ({ ...s, messages: next }), false);
     chronRef.current = [...chronRef.current, sent];
@@ -2549,6 +2613,62 @@ export function LogosApp({
     }
   }
 
+  // ── FOUND ALONG THE WAY ─────────────────────────────────────────
+  // One capability, said once, when its value is legible on screen — never
+  // on a timer, never during the first-model sequence, never two at once.
+  // Each is a real fact about the model on screen: a backend that ran, a
+  // second view that exists, a selection with dependents, a change the
+  // inspector can list, a card with evidence behind it. Dismissals live with
+  // the hints (lib/hints.ts), so the account sheet's "Show hints again"
+  // brings these back too.
+  const [foundSeen, setFoundSeen] = useState<string[]>([]);
+  useEffect(() => {
+    setFoundSeen(readSeen(window.localStorage));
+  }, []);
+  const found = useMemo<{ id: 'trace' | 'views' | 'dependencies' | 'compare' | 'evidence'; kicker: string; text: string } | null>(() => {
+    if (!firstRun.ready || fmRunning(firstMap) || !fmDone || busy || mapping) return null;
+    const doc = map.models ? activeDoc(map.models) : null;
+    const m = doc ? modelFor(doc) : null;
+    // Eligibility is the dismissal, not the milestone: the milestone is
+    // reached the moment a note is shown (for analytics, once), and gating on
+    // it here made each note disqualify itself as it appeared and the next
+    // one take its place — four notes reached, none ever read.
+    const can = (id: string, _milestone: 'found.trace' | 'found.views' | 'found.dependencies' | 'found.compare' | 'found.evidence') =>
+      !foundSeen.includes(id);
+    if (m) {
+      if (m.selected && can('dependencies', 'found.dependencies')) {
+        const n = affectedBy(m, [m.selected]).filter((id) => id !== m.selected).length;
+        if (n >= 3) return { id: 'dependencies', kicker: 'Dependencies', text: `${n} parts of your model depend on this. Understand traces them.` };
+      }
+      if (can('compare', 'found.compare') && whatChanged(m)) {
+        return { id: 'compare', kicker: 'Changed', text: 'See what changed — Understand lists what moved, and what did not.' };
+      }
+      if (can('trace', 'found.trace') && computationFacts(m).length) {
+        return { id: 'trace', kicker: 'Computed', text: 'Computed from your model. Understand shows what ran, and on what.' };
+      }
+      if (can('views', 'found.views') && viewsFor(m).length > 1) {
+        return { id: 'views', kicker: 'Views', text: 'There is another way to see this — the row of views under the picture.' };
+      }
+    }
+    if (can('evidence', 'found.evidence')) {
+      const backed = map.edges.some((e) => e.relation === 'supports') && map.nodes.some((n) => n.status === 'supported');
+      if (backed) return { id: 'evidence', kicker: 'Evidence', text: 'See where this came from — press the supported card and choose Trace.' };
+    }
+    return null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map.models, map.nodes, map.edges, foundSeen, firstMap, fmDone, busy, mapping, firstRun.ready, firstRun.state]);
+  const foundShown = useRef<string | null>(null);
+  useEffect(() => {
+    if (!found || foundShown.current === found.id) return;
+    foundShown.current = found.id;
+    firstRun.reach(`found.${found.id}` as const);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [found?.id]);
+  const dismissFound = (id: string) => {
+    setFoundSeen(markSeen(window.localStorage, id));
+  };
+
+
   if (!hasAccess) {
     return (
       <div className="logos-root">
@@ -2620,8 +2740,40 @@ export function LogosApp({
     );
   }
 
+  // THE PREMISE, for a person with nothing here yet and nothing carried in.
+  // The record is shared with the chat, so a Core veteran opening Logos is
+  // not shown it, and a Logos-first person is not shown it again by the chat.
+  const introWanted =
+    firstRun.ready &&
+    wantsIntro(firstRun.state, {
+      work: sessions.filter((x) => x.messages.length > 0 || !!x.map?.nodes?.length).length,
+      carried: !!initialInput || !!pendingStart,
+      hydrated: !hydrating,
+    });
+  const fmAnchor = fmRunning(firstMap) ? byIdAnchor(firstMap.at as 'became' | 'changed' | 'release', fmShape) : null;
+
   return (
-    <div className="logos-root">
+    <div
+      className={`logos-root${fmAnchor === 'control' ? ' is-firstmap-control' : ''}${
+        fmAnchor === 'node' || fmAnchor === 'map' ? ' is-firstmap-node' : ''
+      }`}
+    >
+      {introWanted && (
+        <LogosIntroOnce
+          onStart={(text) => {
+            firstRun.reach('socria.intro');
+            setInput(text);
+            requestAnimationFrame(() => {
+              const ta = document.querySelector<HTMLTextAreaElement>('.lg-composer textarea');
+              if (ta) {
+                ta.focus();
+                ta.setSelectionRange(ta.value.length, ta.value.length);
+              }
+            });
+          }}
+          onSkip={() => firstRun.reach('socria.intro', { skipped: true })}
+        />
+      )}
       <LogosGuide open={guideOpen} onClose={closeGuide} />
       {styleOpen && (
         <div className="lg-style-scrim" role="dialog" aria-modal="true" aria-label="How should Socria work with you?">
@@ -3356,7 +3508,24 @@ export function LogosApp({
               </button>
             </p>
           )}
-          {firstMapNote && (
+          {/* The first-model sequence, in flow under the head rather than
+              floating over the figure: its last cue points at the Understand
+              bar, which a card pinned to the bottom of the pane was covering. */}
+          <FirstMap state={firstMap} shape={fmShape} onSkip={skipFirstMap} onFinish={endFirstMap} />
+          {found && !buildNote && !mapping && (
+            <p className="lg-found" role="note">
+              <span className="lg-found-text">
+                <b>{found.kicker}</b>
+                {found.text}
+              </span>
+              <button type="button" className="lg-found-x" aria-label="Dismiss" onClick={() => dismissFound(found.id)}>
+                ×
+              </button>
+            </p>
+          )}
+          {/* The share nudge waits for the sequence: two notes about the
+              same first map, stacked, is the product talking over itself. */}
+          {firstMapNote && !fmRunning(firstMap) && (
             <div className="lg-guard lg-share-note" role="note">
               <span className="lg-guard-dot" aria-hidden="true" />
               <span className="lg-guard-text">{FIRST_MAP_NOTE}</span>
@@ -3403,8 +3572,13 @@ export function LogosApp({
             // the person's to ask.
             onAskAbout={(id, label) => {
               setInput((cur) => (cur.trim() ? cur : `About ${label} — why is it what it is?`));
-              applyVizOps([{ op: 'select', id }]);
+              // Selecting what is already selected is not an edit, and the
+              // op's refusal ("… is already selected") is not news.
+              const doc = mapRef.current.models ? activeDoc(mapRef.current.models) : null;
+              if (!doc || modelFor(doc).selected !== id) applyVizOps([{ op: 'select', id }]);
+              signalFirstMap('asked');
             }}
+            emerging={emerging}
             guarded={guarded}
             onViz={(viz) =>
               patchActive((s) => ({ ...s, map: { ...(s.map ?? EMPTY_MAP), viz } }))
@@ -3415,6 +3589,17 @@ export function LogosApp({
             // document (lib/model/docs.ts adopt — coalesced, so a drag is one
             // revision). The state lands at once; the save trails the drag.
             onModelEdited={(docId, m) => {
+              // What kind of touch this was, read off the model rather than
+              // guessed: a value moved, or something selected / a view opened.
+              const was = sessionsRef.current.find((x) => x.id === activeIdRef.current)?.map?.models?.docs.find((d) => d.id === docId);
+              const prev = was ? modelFor(was) : null;
+              if (prev) {
+                const moved =
+                  (prev.params ?? []).some((p) => (m.params ?? []).find((q) => q.id === p.id)?.value !== p.value) ||
+                  JSON.stringify(prev.at ?? {}) !== JSON.stringify(m.at ?? {});
+                if (moved) signalFirstMap('control-moved');
+                else if ((m.selected ?? null) !== (prev.selected ?? null) && m.selected) signalFirstMap('node-pressed');
+              }
               patchActive((s) => {
                 const map = s.map ?? EMPTY_MAP;
                 const ws = map.models;
@@ -3429,7 +3614,6 @@ export function LogosApp({
               }, 700);
             }}
           />
-          <FirstMap state={firstMap} onSkip={endFirstMap} onFinish={endFirstMap} />
           <ExplorePanel
             open={explore.open}
             mode={explore.mode}
@@ -3535,4 +3719,21 @@ export function LogosApp({
       </div>
     </div>
   );
+}
+
+
+/** Which element a beat points at, for the pulse on the root. */
+function byIdAnchor(at: 'became' | 'changed' | 'release', shape: FirstMapShape): 'map' | 'control' | 'node' | 'panel' {
+  return fmById(at, shape).anchor;
+}
+
+/**
+ * The first-run screen over Logos — and its own "started" event, fired once
+ * per showing rather than per render.
+ */
+function LogosIntroOnce({ onStart, onSkip }: { onStart: (text: string) => void; onSkip: () => void }) {
+  useEffect(() => {
+    track('socria_intro_started', { surface: 'logos' });
+  }, []);
+  return <FirstRunIntro surface="logos" onStart={onStart} onSkip={onSkip} />;
 }

@@ -1201,3 +1201,8 @@ html.anim-off .jr-root .board .fix, html:not(.js) .jr-root .board .fix{opacity:1
   border-top:1px solid var(--ink-12);font-family:var(--font-serif);
   font-size:clamp(1.4rem,3vw,2.1rem);line-height:1.2;letter-spacing:-.015em}
 .jr-root .differs-close .em{font-style:italic;color:var(--moss-700)}
+
+/* A row of the design system's cards inside a figure: the three a sentence
+   becomes, side by side, wrapping on a phone. */
+.jr-root .map-row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start}
+.jr-root .map-row > *{flex:1 1 220px;max-width:320px}

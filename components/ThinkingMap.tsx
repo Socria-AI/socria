@@ -107,6 +107,7 @@ export function ThinkingMap({
   grounded,
   onAddContext,
   onEdit,
+  emerging,
   onAskAbout,
   onModelEdited,
   guarded,
@@ -138,6 +139,13 @@ export function ThinkingMap({
   onAddContext?: (node: MapNodeRef) => void;
   /** the person edits the map by hand — remove a card, change its status (lib/map-edit.ts) */
   onEdit?: (edit: MapEdit) => void;
+  /**
+   * The first map, arriving: cards rise one after another and the lines
+   * between them draw. A fact about this moment (the person's language has
+   * just become structure), not decoration — it is on for a few seconds the
+   * first time and never again. Reduced motion turns it off.
+   */
+  emerging?: boolean;
   /**
    * "Ask about this", carrying a model object's CANONICAL IDENTITY.
    *
@@ -326,7 +334,11 @@ export function ThinkingMap({
   // nothing is locked; where a plan does clip them, it keeps the lead first
   // and then the rest in order, so the reading that IS the answer is never
   // the one withheld and nobody is dropped onto a tab they cannot open.
-  const lead = leadLens(lenses, !!map.viz);
+  // A built model is a picture of its own: it leads the same way a scene
+  // does. Without this a map carrying a document and no scene opened on the
+  // concept graph, and the first-model sequence asked for a value to be
+  // moved on a surface that was a tab away.
+  const lead = leadLens(lenses, !!map.viz || !!map.models?.docs?.length);
   const open = useMemo(() => {
     if (lensLimit === null || lensLimit === undefined) return null;
     const ordered = [
@@ -615,7 +627,7 @@ export function ThinkingMap({
       : (staticLayout?.connectors ?? []);
 
   return (
-    <div className="lg-map-wrap">
+    <div className={`lg-map-wrap${emerging ? ' is-emerging' : ''}`}>
       {/* ── THE PLATE'S TOP BAR, from the design project's Copy 8 ────────
           The lenses used to float bare above the figure with nothing holding
           them, so the panel began with a row of pills and no statement of what
@@ -856,6 +868,7 @@ export function ThinkingMap({
                 className={`lg-conn lg-conn-${c.relation} lg-str-${c.strength ?? 'normal'}${dim(on)}${
                   related && on ? ' is-lit' : ''
                 }`}
+                style={{ '--i': connectors.indexOf(c) } as React.CSSProperties}
               >
                 <path
                   ref={
@@ -912,9 +925,13 @@ export function ThinkingMap({
               }
               className={`lg-node-pos${dim(on)}${menuFor === p.id ? ' is-menu' : ''}`}
               style={
-                lens === 'graph'
-                  ? undefined
-                  : { transform: `translate(-50%, -50%) translate(${p.x}px, ${p.y}px)` }
+                {
+                  // Its place in the sequence, for the emergence.
+                  '--i': cards.indexOf(p),
+                  ...(lens === 'graph'
+                    ? {}
+                    : { transform: `translate(-50%, -50%) translate(${p.x}px, ${p.y}px)` }),
+                } as React.CSSProperties
               }
             >
               <button

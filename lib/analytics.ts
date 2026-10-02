@@ -46,6 +46,28 @@ export const EVENTS = [
   // from an opening, the Explore page, or their own words.
   'logos_session_started',
   'first_map_shaped',
+  // First run, shape only (lib/first-run.ts). Each fires once per person per
+  // milestone — `reach()` says whether a milestone was fresh, and only a fresh
+  // one is reported, so a refresh cannot double-count. 'surface' says where.
+  'socria_intro_started',
+  'socria_intro_completed',
+  'first_thought_submitted',
+  'core_first_experience_started',
+  'core_first_experience_completed',
+  'core_aha_reached',
+  'logos_first_experience_started',
+  'logos_first_model_created',
+  'logos_first_manipulation',
+  'logos_first_object_inspected',
+  'logos_first_ask_this',
+  'logos_first_experience_completed',
+  'logos_aha_reached',
+  'onboarding_skipped',
+  'progressive_trace_discovered',
+  'progressive_view_discovered',
+  'progressive_dependencies_discovered',
+  'progressive_compare_discovered',
+  'progressive_evidence_discovered',
 ] as const;
 export type AnalyticsEvent = (typeof EVENTS)[number];
 
@@ -93,6 +115,10 @@ export interface EventProps {
   tenure?: string;
   /** Stripe's cancellation_details.feedback enum, never the free-text comment */
   feedback?: string;
+  /** which beat of a first-run sequence, e.g. 'premise' | 'intent' — a step name, never words typed */
+  step?: string;
+  /** the KIND of thing a first-run beat pointed at — 'parameter' | 'assumption' | 'view' — never its label */
+  object?: string;
 }
 
 const ALLOWED_KEYS = new Set<keyof EventProps>([
@@ -112,6 +138,8 @@ const ALLOWED_KEYS = new Set<keyof EventProps>([
   'opening',
   'tenure',
   'feedback',
+  'step',
+  'object',
 ]);
 
 /**

@@ -54,6 +54,9 @@ import {
 import { DRIFT_DISMISS_LIMIT, readDrift, type DriftVerdict } from '@/lib/topic-drift';
 import { readStart, startMessage } from '@/lib/first-session';
 import { takeCarried } from '@/lib/onboarding-script';
+import { FirstRunIntro } from '@/components/onboarding/FirstRunIntro';
+import { useFirstRun } from '@/components/useFirstRun';
+import { wantsCoreLine, wantsIntro } from '@/lib/first-run';
 import { Tour } from '@/components/Tour';
 import { FindPanel } from '@/components/FindPanel';
 import { Hint, useSeenHints } from '@/components/Hint';
@@ -329,6 +332,12 @@ export default function ChatPage() {
   const [moveSaid, setMoveSaid] = useState<string | null>(null);
   /** the sentence written during onboarding, for whichever composer mounts */
   const [carriedText, setCarriedText] = useState('');
+  /** they arrived with a sentence from the first-run screen — it has just been read */
+  const carriedRef = useRef(false);
+  // What this person has already been taught, on every surface (lib/first-run.ts).
+  const firstRun = useFirstRun({ signedIn: !!isSignedIn, surface: 'core' });
+  /** the conversation Core's one line is shown under, if any */
+  const [coreLine, setCoreLine] = useState<string | null>(null);
 
   // ── the first-run tour ──
   // Held off for anybody who has just come through /onboarding: that walks
@@ -415,23 +424,13 @@ export default function ChatPage() {
   // means the tour simply waits, and opens when the screen is free.
   const anythingOpen =
     logosModalOpen || core4IntroOpen || acctOpen || importOpen || !!shareInsight;
-  useEffect(() => {
-    if (!isLoaded || !isSignedIn || tourOpen || anythingOpen) return;
-    try {
-      if (
-        shouldRunTour({
-          done: localStorage.getItem(TOUR_KEY) === '1',
-          signedIn: true,
-          justOnboarded: justOnboarded.current,
-          blocked: false,
-        })
-      ) {
-        setTourOpen(true);
-      }
-    } catch {
-      /* no storage: teach nobody twice a day */
-    }
-  }, [isLoaded, isSignedIn, tourOpen, anythingOpen]);
+  // THE FURNITURE TOUR NO LONGER RUNS ON ITS OWN. Chat is a familiar
+  // interaction; what a first visit has to teach is why Core answers the way
+  // it does, and that is taught by the first reply (see `coreLine`). The tour
+  // stays reachable from the account sheet for anyone who wants the furniture
+  // named, and lib/tour.ts still decides it would be allowed.
+  void shouldRunTour;
+  void justOnboarded;
   const [journey, setJourney] = useState<UserUnderstanding | null>(null);
   // Freshest journey, immune to stale closures (the cadence update fires from
   // async flows that captured an older render).
@@ -549,9 +548,23 @@ export default function ChatPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
 
+  // DON'T HANG BEHIND CLERK. If it never initialises — a blocked script, a
+  // preview build, a flaky network — the page used to wait forever: no
+  // conversations, no empty state, a rail saying "Loading sessions…" under a
+  // composer that still worked. After a few seconds the browser's own copy is
+  // loaded as signed-out; when Clerk does arrive the effect runs again on the
+  // real answer, which is what it always did when sign-in state flipped.
+  const [authTimedOut, setAuthTimedOut] = useState(false);
+  useEffect(() => {
+    if (isLoaded) return;
+    const t = setTimeout(() => setAuthTimedOut(true), 4000);
+    return () => clearTimeout(t);
+  }, [isLoaded]);
+  const authSettled = isLoaded || authTimedOut;
+
   // Load conversations whenever auth state resolves or flips.
   useEffect(() => {
-    if (!isLoaded) return;
+    if (!authSettled) return;
     let cancelled = false;
 
     async function hydrate() {
@@ -635,13 +648,27 @@ export default function ChatPage() {
       }
 
       if (!cancelled) setHydrating(false);
+      // A conversation that was answered twice is a person who continued past
+      // a first reply — Core's line has nothing left to say to them, and the
+      // hints it holds back may come.
+      if (!cancelled) {
+        const seasoned = (list: { messages: { role: string }[] }[]) =>
+          list.some((c) => c.messages.filter((m) => m.role === 'assistant').length >= 2);
+        setConversations((cs) => {
+          if (seasoned(cs)) {
+            firstRun.reach('core.first');
+            firstRun.reach('core.aha');
+          }
+          return cs;
+        });
+      }
     }
 
     hydrate();
     return () => {
       cancelled = true;
     };
-  }, [isLoaded, isSignedIn, user?.id]);
+  }, [authSettled, isSignedIn, user?.id]);
 
   // Persist active id locally for anonymous users.
   useEffect(() => {
@@ -936,17 +963,17 @@ export default function ChatPage() {
   // surface (a modal about the chat, over the map, is an interruption about
   // something else). Both dismissals are still read, so nobody who has said no
   // to either is asked again.
+  // THE ANNOUNCEMENT NO LONGER OPENS ITSELF. A modal about the model, over
+  // the chat, before a word has been exchanged, was the product explaining
+  // itself in place of behaving. The dismissals are still read — the pill
+  // beside the composer and the picker open the introduction on request, and
+  // nobody who said "don't show again" is shown it that way either.
   useEffect(() => {
     if (!isLoaded || autoOpenChecked) return;
     setAutoOpenChecked(true);
     try {
       setLogosDismissed(localStorage.getItem(LOGOS_INTRO_DISMISS_KEY) === '1');
-      const dismissed = localStorage.getItem(CORE4_INTRO_DISMISS_KEY) === '1';
-      setCore4Dismissed(dismissed);
-      const here = readModel();
-      if (!dismissed && here !== 'core-4' && !isLogosSurface(here)) {
-        setCore4IntroOpen(true);
-      }
+      setCore4Dismissed(localStorage.getItem(CORE4_INTRO_DISMISS_KEY) === '1');
     } catch {}
   }, [isLoaded, autoOpenChecked]);
 
@@ -1663,6 +1690,19 @@ export default function ChatPage() {
     setConversations(withUser);
     if (mode === 'local') saveLocal(withUser);
 
+    // The first thought, anywhere — once, ever (lib/first-run.ts). And if
+    // Core's one line is on screen, continuing past it is the thing it was
+    // waiting for: the difference has been read and used.
+    firstRun.reach('socria.thought');
+    if (coreLine) setCoreLine(null);
+    // Continuing a conversation that has already answered once IS the aha —
+    // whether or not the line is still on screen (a refresh loses the line,
+    // which is a moment, not a state; it must not lose the fact).
+    if (working.find((c) => c.id === workingId)?.messages.some((m) => m.role === 'assistant')) {
+      firstRun.reach('core.first');
+      firstRun.reach('core.aha');
+    }
+
     setInput('');
     // Once, here, on the message as sent — never while typing, and judged
     // against the conversation as it was a moment ago. The reply proceeds
@@ -1826,6 +1866,16 @@ export default function ChatPage() {
 
       const updated = withAssistant.find((c) => c.id === workingId)!;
       await persistConversation(updated, withAssistant);
+
+      // CORE'S ONE LINE, under the first reply they have ever had. Real
+      // reply, real engine; the line only says what to read it against.
+      if (
+        updated.messages.filter((m) => m.role === 'assistant').length === 1 &&
+        wantsCoreLine(firstRun.state, { replies: 1, streaming: false })
+      ) {
+        setCoreLine(workingId!);
+        track('core_first_experience_started', { surface: 'core' });
+      }
 
       // Anonymous user just finished one full exchange — they've used their
       // free session. Any new-session attempt from here on opens the sign-in.
@@ -2063,9 +2113,18 @@ export default function ChatPage() {
     // taught ninety seconds ago and are left alone.
     const carried = takeCarried(sessionStorage);
     if (carried) {
+      carriedRef.current = true;
       setCarriedText(carried.text);
       setInput(carried.text);
       requestAnimationFrame(() => textareaRef.current?.focus());
+      // Written for Logos — on the Logos page's own door — so it opens there,
+      // with the sentence in that composer. Logos needs an account; a browser
+      // without one meets Logos's own gate, which says so, and the sentence is
+      // kept in the chat's composer behind it.
+      if (carried.surface === 'logos') {
+        setModel('logos-2');
+        chooseModel('logos-2');
+      }
     }
     // The tour decision moved out of this mount effect — see the effect
     // below. It ran here with `blocked: false` hard-coded, so on a first
@@ -2174,10 +2233,13 @@ export default function ChatPage() {
   // time, so eligibility is about what is ON SCREEN. pickHint returns at most
   // one, in HINT_ORDER, and never one already dismissed.
   const seenHints = useSeenHints();
+  // Not during the first exchange: Core's one line is the only thing said
+  // under a first reply. The furniture hints wait until it has been read.
+  const settledIn = firstRun.has('core.first');
   const liveHint = pickHint(
     [
-      ...(hasMessages ? ['picker'] : []),
-      ...(!isLogosSurface(model) && hasMessages ? ['logos'] : []),
+      ...(hasMessages && settledIn ? ['picker'] : []),
+      ...(!isLogosSurface(model) && hasMessages && settledIn ? ['logos'] : []),
       ...(messages.length >= 6 ? ['find'] : []),
     ],
     seenHints
@@ -2499,8 +2561,31 @@ export default function ChatPage() {
     );
   };
 
+  // THE PREMISE, for a person with nothing yet — signed in or not. The record
+  // says whether it has been read; a person with work on screen has met the
+  // product whatever the record says; a sentence carried from the first-run
+  // screen means it was read a moment ago.
+  const showIntro =
+    firstRun.ready &&
+    authSettled &&
+    wantsIntro(firstRun.state, {
+      work: conversations.filter((c) => c.messages.length > 0).length + logosSessions.length,
+      carried: carriedRef.current,
+      hydrated: !hydrating,
+    });
+
   return (
     <div className="flex h-dvh">
+      {showIntro && (
+        <IntroOnce
+          onStart={(text) => {
+            firstRun.reach('socria.intro');
+            setInput(text);
+            requestAnimationFrame(() => textareaRef.current?.focus());
+          }}
+          onSkip={() => firstRun.reach('socria.intro', { skipped: true })}
+        />
+      )}
       {sheet && (
         <ProjectSheet
           id={sheet}
@@ -3119,6 +3204,27 @@ export default function ChatPage() {
               />
             )}
 
+            {/* Core's one line, once, under the first reply. Not a modal, not
+                a card: it names what to read the reply against, and goes
+                when they continue or press ×. */}
+            {coreLine && coreLine === activeId && !sending && !streamed && (
+              <p className="core-first" role="note">
+                <span>
+                  You&rsquo;ll still do the thinking. <em>Core helps you see what you&rsquo;re missing.</em>
+                </span>
+                <button
+                  type="button"
+                  aria-label="Dismiss"
+                  onClick={() => {
+                    setCoreLine(null);
+                    firstRun.reach('core.first');
+                  }}
+                >
+                  ×
+                </button>
+              </p>
+            )}
+
             {/* Auto-synthesis — a depth-paced interactive synthesis card,
                 shown after the reply. Dismiss to keep chatting; it re-
                 generates as the conversation grows. */}
@@ -3548,4 +3654,16 @@ function renderAnimated(text: string): React.ReactNode {
     });
   });
   return out;
+}
+
+
+/**
+ * The first-run screen, mounted over the chat — and its own "started" event,
+ * fired once per showing rather than per render.
+ */
+function IntroOnce({ onStart, onSkip }: { onStart: (text: string) => void; onSkip: () => void }) {
+  useEffect(() => {
+    track('socria_intro_started', { surface: 'core' });
+  }, []);
+  return <FirstRunIntro surface="core" onStart={onStart} onSkip={onSkip} />;
 }

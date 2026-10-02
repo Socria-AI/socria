@@ -55,6 +55,12 @@ create table if not exists user_profiles (
 alter table user_profiles
   add column if not exists understanding jsonb not null default '{}'::jsonb;
 
+-- What this person has already been taught (lib/first-run.ts): milestone →
+-- first reached. Merged as a union with the browser's copy, so a second
+-- device never re-runs a first-run sequence. Safe to re-run.
+alter table user_profiles
+  add column if not exists first_run jsonb not null default '{}'::jsonb;
+
 
 -- Per-user OAuth connections for Logos "Add context" (Google, Notion).
 -- The token bundle is stored encrypted in `secret` (AES-256-GCM via

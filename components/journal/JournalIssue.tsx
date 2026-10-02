@@ -34,7 +34,6 @@ import {
   Reading,
   Fig,
   TradeFig,
-  GuardType,
   Refusal,
   PrintLink,
   Label,
@@ -160,32 +159,6 @@ function GroundFig() {
   );
 }
 
-function GuardFig() {
-  return (
-    <Fig n="III" caption="The answer, arriving too early." claim="Held at the line."
-      keys={[
-        ['machine', 'The answer'],
-        ['person', 'You'],
-      ]}
-    >
-      <svg viewBox="0 0 640 190" role="img" aria-label="The answer travels toward you and stops at a moss line.">
-        <path className="l-machine draw" style={{ '--len': 280, '--dly': '.2s' } as never} d="M46,95 L282,95" />
-        <path className="l-machine pop" style={{ '--dly': '1.1s' } as never} d="M268,86 L284,95 L268,104" fill="none" />
-        <line className="pop" style={{ '--dly': '1.3s' } as never} x1="318" y1="26" x2="318" y2="164" stroke="var(--person)" strokeWidth="2.4" />
-        <text className="fl machine" x="46" y="76">
-          The answer
-        </text>
-        <text className="fl person pop" style={{ '--dly': '1.5s' } as never} x="338" y="76">
-          Your turn to reach it
-        </text>
-        <circle className="pop" style={{ '--dly': '1.7s' } as never} cx="556" cy="95" r="6" fill="var(--person)" />
-        <text className="fl faint pop" style={{ '--dly': '1.9s' } as never} x="556" y="124" textAnchor="middle">
-          You
-        </text>
-      </svg>
-    </Fig>
-  );
-}
 
 export function JournalIssue() {
   useEffect(() => {
@@ -206,7 +179,7 @@ export function JournalIssue() {
           back to back is the page introducing itself twice. The headline it
           displaces is not lost — it closes the issue, which is where it was
           always going. */}
-      <Door issue="Issue No. 4 · Core 4 · MMXXVI" />
+      <Door issue="Issue No. 4 · Logos 2 · MMXXVI" />
 
       <Turn
         i="i"
@@ -287,9 +260,11 @@ export function JournalIssue() {
               is exactly what you want, and this is not an argument against it.
             </p>
             <p>
-              Core 4 does that work too — the research, the calculation, the verification, the
+              Logos 2 does that work too — the research, the calculation, the verification, the
               critique — <em>in full.</em> What it holds back is the one step that would have made
-              you more capable for having taken it: the conclusion. That step is the whole product.
+              you more capable for having taken it: the conclusion. And it draws the rest beside
+              you, as a model you can move, so that step is yours to take with the structure in
+              view.
             </p>
           </div>
           <p className="differs-close rv d2">
@@ -383,65 +358,71 @@ export function JournalIssue() {
 
       <Reading
         n="II"
-        name="The refusal"
+        name="The model"
         id="refusal"
         tint
         title={
           <>
-            Introducing <span className="em">Core 4.</span>
+            Introducing <span className="em">Logos 2.</span>
           </>
         }
-        deck="The engine underneath all of this, and the first one built so that the part worth keeping stays yours. You watched it decline twice — once in prose, once on the Board."
+        deck="The environment underneath the conversation: say what you are thinking, and it becomes a model beside you — one you can read, move, compute where it can be computed, and ask about by name."
       >
         <div className="cols">
           <p className="drop">
-            <span className="kick">Core 4</span>Every turn, Socria decides which part of the thinking
-            is worth keeping with you and does everything else in full. Not a setting, not a mood, and
-            not something you can talk it out of: the decision is made before a word is generated, and
-            the reply is read against it before it reaches you.
+            <span className="kick">Logos 2</span>Every message you send is read twice. Once by the
+            conversation, which answers you. Once by an engine that asks what structure is in it —
+            a claim, the assumption under it, a quantity, a relationship between two quantities —
+            and draws that beside you. Not a picture of your thinking: a model of it, made of the
+            same objects the conversation knows by name.
           </p>
           <p>
-            It is not withholding for its own sake, and it is not a tutor. Ask for a fact and you get
-            the fact. Ask for the calculation, the sources, the verification, the format fix, the
-            comparison — all of it, at length, immediately. What it will not do is hand back the one
-            thing you came to be able to do.
+            Touch it and it answers. Move a value and whatever depends on it moves; the picture,
+            the readouts and the inspector recompute from the model rather than being redrawn.
+            Where a backend can actually run — an expression sampler, a solver, an integrator, an
+            estimator on your own observations — it runs, and the model says which one did and on
+            what. Where nothing can run, it says that too, and shows you the structure instead of
+            pretending.
           </p>
           <p>
-            So it tells you where to look, and where not to bother looking. It gives you the method
-            and works it through a problem that is not yours. It finds the assumption holding your
-            argument up. And then it stops, because the last step is the one that makes you better at
-            this.
+            And you can ask. Select anything on it — a parameter, a curve, a card — and the
+            conversation receives the object itself: what it is, where it came from, what rests on
+            it. Not a description of what the screen looks like near your cursor. The thing.
           </p>
-          <p className="breakout">
-            Not yet. You&rsquo;re one step away — what does dividing both sides by three do here?
-          </p>
+          <p className="breakout">Change the model, and Logos updates what depends on it.</p>
           <p>
-            The difference between those two behaviours is the difference between a tool that makes
-            you capable and a tool that makes you a customer.{' '}
-            <span className="jargon">Directionally correct. We can iterate post-launch.</span> No:
-            this one is load-bearing, and it shipped first.
+            That is the whole of it. Talk, and it becomes a model. Move it, and the consequences
+            are real. Ask about it, and Socria knows what you mean.{' '}
+            <span className="jargon">AI-generated interactive visualisations.</span> No: a model
+            you can be wrong in, and find out.
           </p>
         </div>
         <div className="fig" style={{ marginTop: 'clamp(24px,4vh,40px)' }}>
           <Transcript
             lines={[
-              { who: 'you', text: 'Just tell me x.' },
               {
-                who: 'socria',
-                text: "Not yet. You're one step away — what does dividing both sides by three do here?",
+                who: 'you',
+                text: 'I do not know whether the Berlin offer is worth it. The rent is rising faster than the salary would.',
               },
-              { who: 'you', text: '…it isolates x. Fine. x is 13.' },
               {
                 who: 'socria',
-                text: 'It is. And you got there — which is the only version of that sentence worth having.',
+                text: 'Two quantities and a relationship you have already stated: the salary, the rent, and the rate each is moving. They are beside you now — move the rent’s rate and watch the year it overtakes the raise.',
+              },
+              { who: 'you', text: '…at nine percent it overtakes in year three. That was the number I was afraid of.' },
+              {
+                who: 'socria',
+                text: 'It is. And now it is a number on a model you can argue with, rather than a feeling.',
               },
             ]}
           />
         </div>
-        <GuardFig />
-        <GuardType answer="Divide by three: x = 13.">
-          Not yet. You&rsquo;re one step away — what does dividing both sides by three do here?
-        </GuardType>
+        <div className="fig" style={{ marginTop: 'clamp(18px,3vh,28px)' }}>
+          <div className="map-row" role="img" aria-label="Three cards drawn from the sentence: the claim, the assumption under it, and the question.">
+            <LogosNode type="claim" label="The rent is rising faster than the salary would" />
+            <LogosNode type="assumption" label="A raise is what makes a move worth it" state="focused" />
+            <LogosNode type="question" label="In which year does rent overtake the raise?" />
+          </div>
+        </div>
       </Reading>
 
       <Turn

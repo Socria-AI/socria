@@ -1,140 +1,99 @@
-// The first map, and the four ways a coach-mark sequence ruins somebody's day.
-//
-// The bug in something like this is never the arrow. It is showing up twice,
-// showing up for the wrong person, showing up over an empty map, or refusing
-// to die. So that is what this suite is about.
+// The first model, and the four ways a coach-mark sequence ruins somebody's
+// day: showing up twice, for the wrong person, over an empty map, or refusing
+// to die. And the fifth, which this version is about: pointing at a thing by
+// a name the canonical model did not give it, or claiming a computation that
+// never ran.
 
 import {
-  STEPS, byId, advance, shouldStart, finish, isRunning, indexOf,
-  IDLE, DONE, ONBOARDING_KEY,
+  STEPS, byId, planFor, advance, shouldStart, finish, isRunning, indexOf,
+  IDLE, DONE, ONBOARDING_KEY, DEFAULT_SHAPE,
 } from './.tmp/onboarding.mjs';
 
 let pass = 0, fail = 0;
 const ok = (n, c, x = '') => (c ? pass++ : (fail++, console.log('FAIL', n, x)));
 
 const READY = { signedIn: true, completed: false, nodes: 5, busy: false, composing: false };
+const MAP = { model: false, controls: 0, nodes: 5 };
+const MODEL = { model: true, controls: 2, control: { label: 'a', kind: 'parameter' }, computed: { operation: 'Evaluate', backend: 'the expression sampler' }, nodes: 2 };
+const MODEL_STILL = { model: true, controls: 0, control: null, computed: null, nodes: 2 };
 
 console.log('=== it opens for the right person, at the right moment ===');
 {
   ok('a new signed-in person with a real map', shouldStart(READY));
-
   // THE ONE THAT MATTERS: never twice.
   ok('never for someone who has done it', !shouldStart({ ...READY, completed: true }));
-
   ok('not signed out', !shouldStart({ ...READY, signedIn: false }));
-
   // Pointing at a map that is still being drawn points at nothing.
   ok('not while a reply is streaming', !shouldStart({ ...READY, busy: true }));
-
   // NEVER INTERRUPT A SENTENCE.
   ok('not while they are typing', !shouldStart({ ...READY, composing: true }));
-
-  // Two boxes is not a map, and "look what Socria drew" over two boxes
-  // undersells the thing it is selling.
-  for (const n of [0, 1, 2, 3]) {
-    ok(`not over ${n} nodes`, !shouldStart({ ...READY, nodes: n }));
-  }
-  for (const n of [4, 5, 9, 40]) {
-    ok(`yes over ${n} nodes`, shouldStart({ ...READY, nodes: n }));
-  }
+  // Two boxes is not a map.
+  for (const n of [0, 1, 2, 3]) ok(`not over ${n} nodes`, !shouldStart({ ...READY, nodes: n }));
+  for (const n of [4, 5, 9, 40]) ok(`yes over ${n} nodes`, shouldStart({ ...READY, nodes: n }));
+  ok('a model document is a shape by itself', shouldStart({ ...READY, nodes: 1, model: true }));
 }
 
-console.log('\n=== it advances on what they DID, never on a clock ===');
+console.log('=== the plan is written for what is actually there ===');
 {
-  let s = IDLE;
-  ok('idle until the map appears', !isRunning(s));
-
-  // Only the map can open it. A card pressed beforehand is somebody using
-  // the product, and interrupting that to explain it would be absurd.
-  ok('a stray press does not open it', advance(IDLE, 'node-pressed').at === 'idle');
-  ok('a stray action does not open it', advance(IDLE, 'action-taken').at === 'idle');
-
-  s = advance(s, 'map-drew');
-  ok('the map opens it', s.at === 'drawn');
-  ok('and it is running', isRunning(s));
-
-  // The wrong signal must not skip a beat the person never saw.
-  ok('the map drawing again changes nothing', advance(s, 'map-drew').at === 'drawn');
-  ok('an action out of order changes nothing', advance(s, 'action-taken').at === 'drawn');
-
-  s = advance(s, 'node-pressed');
-  ok('pressing a card moves on', s.at === 'press');
-  ok('pressing a second card does not', advance(s, 'node-pressed').at === 'press');
-
-  s = advance(s, 'action-taken');
-  ok('choosing an action moves on', s.at === 'opens');
-  ok('the last beat holds', advance(s, 'action-taken').at === 'opens');
-  ok('...and holds against everything', advance(advance(s, 'map-drew'), 'node-pressed').at === 'opens');
+  const m = planFor(MODEL);
+  ok('three beats', m.length === 3 && STEPS.length === 3);
+  ok('the first beat is the one sentence', m[0].title === 'This is your thinking becoming a model.' && planFor(MAP)[0].title === m[0].title);
+  ok('on a model with a control, the cue names it and points at it', /move a\./.test(m[0].cue) && m[0].anchor === 'control', m[0].cue);
+  ok('  and never calls a parameter an assumption', !/assumption/i.test(m[0].cue + m[0].body));
+  ok('on a map, the cue is to press a card', /Press any card/.test(planFor(MAP)[0].cue) && planFor(MAP)[0].anchor === 'map');
+  ok('a model with nothing to move asks to open something', /open it/.test(planFor(MODEL_STILL)[0].cue));
+  ok('the second beat on a model is the consequence line', m[1].title === 'Change the model, and Logos updates what depends on it.');
+  ok('  and names the computation only because one ran', /Evaluate ran again on the expression sampler/.test(m[1].body), m[1].body);
+  ok('  a model nothing computed says nothing about computing', !/ran|computed/i.test(planFor(MODEL_STILL)[1].body), planFor(MODEL_STILL)[1].body);
+  ok('  and asks for Ask about this next', /Ask about this/.test(m[1].cue));
+  ok('the second beat on a map is that every card opens', planFor(MAP)[1].title === 'Every card opens.');
+  ok('the last beat releases', m[2].title === 'Now keep thinking.' && m[2].cue === '' && planFor(MAP)[2].title === 'Now keep thinking.');
+  ok('byId reads the plan for the shape', byId('became', MODEL).anchor === 'control' && byId('became', MAP).anchor === 'map');
+  ok('the default shape is a map', DEFAULT_SHAPE.model === false);
+  ok('no copy names a feature', !STEPS.some((s) => /Thinking Map|Logos 2|Core 4/.test(s.body + s.title)));
+  ok('no congratulations', !m.some((s) => /congrat|complete!|mastered/i.test(s.title + s.body)));
 }
 
-console.log('\n=== it dies when asked, from anywhere ===');
+console.log('=== it advances only on what the person did ===');
 {
-  for (const from of [IDLE, { at: 'drawn' }, { at: 'press' }, { at: 'opens' }]) {
-    ok(`skip from ${from.at}`, advance(from, 'skip').at === 'done');
-  }
-  ok('finishing is done', finish().at === 'done');
-  ok('done is not running', !isRunning(DONE));
+  ok('a card pressed before there is a map is nothing', advance(IDLE, 'node-pressed').at === 'idle');
+  ok('the map drawing opens it', advance(IDLE, 'map-drew').at === 'became');
+  ok('a model built opens it', advance(IDLE, 'model-built', MODEL).at === 'became');
 
-  // AND IT STAYS DEAD. Every signal against a finished sequence.
-  for (const sig of ['map-drew', 'node-pressed', 'action-taken', 'skip']) {
-    ok(`${sig} cannot resurrect it`, advance(DONE, sig).at === 'done');
-  }
+  // On a model with controls: move → changed; ask → release.
+  let s = advance(IDLE, 'model-built', MODEL);
+  ok('pressing a card does not skip the move on a model with controls', advance(s, 'node-pressed', MODEL).at === 'became');
+  s = advance(s, 'control-moved', MODEL);
+  ok('moving a value is the second beat', s.at === 'changed');
+  ok('moving it again is not a new thing', advance(s, 'control-moved', MODEL).at === 'changed');
+  ok('asking about something releases', advance(s, 'asked', MODEL).at === 'release');
+  ok("a card's own action is asking too", advance(s, 'action-taken', MODEL).at === 'release');
+
+  // On a map: press → changed; action → release.
+  let t = advance(IDLE, 'map-drew', MAP);
+  ok('on a map a control cannot be moved, so it does not advance', advance(t, 'control-moved', MAP).at === 'became');
+  t = advance(t, 'node-pressed', MAP);
+  ok('a card pressed is the second beat', t.at === 'changed');
+  ok('pressing another card is not a new thing', advance(t, 'node-pressed', MAP).at === 'changed');
+  ok('asked does not release a map sequence (there is no object to ask about)', advance(t, 'asked', MAP).at === 'changed');
+  ok('choosing an action releases', advance(t, 'action-taken', MAP).at === 'release');
+
+  // A model with nothing to move: opening anything is the second beat.
+  const u = advance(IDLE, 'model-built', MODEL_STILL);
+  ok('a still model advances on a press or an ask', advance(u, 'node-pressed', MODEL_STILL).at === 'changed' && advance(u, 'asked', MODEL_STILL).at === 'changed');
+
+  ok('the last beat stays until finished', advance({ at: 'release' }, 'action-taken').at === 'release');
+  ok('finish is done', finish().at === 'done');
+  ok('skip from anywhere is done', ['idle', 'became', 'changed', 'release'].every((at) => advance({ at }, 'skip').at === 'done'));
+  ok('done stays done', advance(DONE, 'map-drew').at === 'done');
 }
 
-console.log('\n=== the copy has to earn its interruption ===');
+console.log('=== bookkeeping ===');
 {
-  ok('exactly three beats', STEPS.length === 3, String(STEPS.length));
-  ok('a fourth would be a tour', STEPS.length < 4);
-
-  const ids = STEPS.map((s) => s.id);
-  ok('no duplicate steps', new Set(ids).size === ids.length);
-  ok('they run drawn → press → opens',
-    JSON.stringify(ids) === JSON.stringify(['drawn', 'press', 'opens']), JSON.stringify(ids));
-
-  for (const s of STEPS) {
-    ok(`${s.id}: has a title`, !!s.title && s.title.length <= 40, s.title);
-    ok(`${s.id}: the body is short`, s.body.length > 20 && s.body.length <= 220, String(s.body.length));
-    ok(`${s.id}: says what to do`, !!s.cue && s.cue.length <= 40, s.cue);
-    ok(`${s.id}: has somewhere to point`, ['map', 'node', 'panel'].includes(s.anchor), s.anchor);
-
-    // It must not teach the noun before the motion. A person does not need
-    // the phrase "Thinking Map" to use one.
-    ok(`${s.id}: no jargon in the title`, !/thinking map|logos|node|entity/i.test(s.title), s.title);
-    // It talks to a person about their own reasoning.
-    ok(`${s.id}: speaks to them`, /\byou|your\b/i.test(s.body + s.cue), s.body);
-  }
-
-  ok('byId finds each one', STEPS.every((s) => byId(s.id) === s));
-  ok('an unknown id does not throw', !!byId('nonsense'));
-}
-
-console.log('\n=== the progress dots ===');
-{
-  ok('idle has no index', indexOf(IDLE) === -1);
-  ok('done has no index', indexOf(DONE) === -1);
-  ok('first is 0', indexOf({ at: 'drawn' }) === 0);
-  ok('second is 1', indexOf({ at: 'press' }) === 1);
-  ok('last is 2', indexOf({ at: 'opens' }) === 2);
-}
-
-console.log('\n=== the flag ===');
-{
-  ok('the key is versioned', /v\d+$/.test(ONBOARDING_KEY), ONBOARDING_KEY);
-  ok('and namespaced', ONBOARDING_KEY.startsWith('socria.'), ONBOARDING_KEY);
-}
-
-console.log('\n=== a full run, the way a person does it ===');
-{
-  let s = IDLE;
-  const seen = [];
-  s = advance(s, 'map-drew'); seen.push(s.at);
-  s = advance(s, 'node-pressed'); seen.push(s.at);
-  s = advance(s, 'action-taken'); seen.push(s.at);
-  s = finish(); seen.push(s.at);
-  ok('drawn → press → opens → done',
-    JSON.stringify(seen) === JSON.stringify(['drawn', 'press', 'opens', 'done']), JSON.stringify(seen));
-  // And the next session does not start it again.
-  ok('it will not start again', !shouldStart({ ...READY, completed: true }));
+  ok('idle and done are not running', !isRunning(IDLE) && !isRunning(DONE));
+  ok('the three beats are', ['became', 'changed', 'release'].every((at) => isRunning({ at })));
+  ok('indexOf counts the beats', indexOf({ at: 'became' }) === 0 && indexOf({ at: 'changed' }) === 1 && indexOf({ at: 'release' }) === 2 && indexOf(IDLE) === -1);
+  ok('the legacy key is still named, for the record that reads it', ONBOARDING_KEY === 'socria.firstmap.v1');
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

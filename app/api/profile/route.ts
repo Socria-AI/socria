@@ -1,6 +1,6 @@
 // app/api/profile/route.ts
-// GET /api/profile → { profile: string | null } for the signed-in user
-// PUT /api/profile → save { profile } (empty string clears it)
+// GET /api/profile → { profile, understanding, firstRun } for the signed-in user
+// PUT /api/profile → save any of { profile, understanding, firstRun } (partial)
 //
 // Backs the "import your history from other AIs" feature: the pasted profile
 // is stored per user so it follows them across devices. Anonymous users keep
@@ -15,6 +15,7 @@ import {
   sanitizeUserUnderstanding,
   hasJourneyContent,
 } from '@/lib/socria-prompt';
+import { mergeFirstRun, parseFirstRun } from '@/lib/first-run';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -27,12 +28,21 @@ export async function GET() {
   try {
     let { data, error } = await supabaseAdmin()
       .from('user_profiles')
-      .select('profile, understanding')
+      .select('profile, understanding, first_run')
       .eq('user_id', userId)
       .maybeSingle();
-    // Deploy-order tolerance: if the understanding column hasn't been added
-    // to the database yet (42703 undefined column), fall back to
-    // profile-only so existing sync keeps working.
+    // Deploy-order tolerance: a column that hasn't been added to the database
+    // yet (42703 undefined column) narrows the select rather than failing it,
+    // so existing sync keeps working. first_run is the newest and goes first.
+    if (error && (error as any).code === '42703') {
+      const retry = await supabaseAdmin()
+        .from('user_profiles')
+        .select('profile, understanding')
+        .eq('user_id', userId)
+        .maybeSingle();
+      data = retry.data as any;
+      error = retry.error;
+    }
     if (error && (error as any).code === '42703') {
       const retry = await supabaseAdmin()
         .from('user_profiles')
@@ -62,6 +72,9 @@ export async function GET() {
         understanding && (hasJourneyContent(understanding) || understanding.updatedAt > 0)
           ? understanding
           : null,
+      // What they have been taught, as the account remembers it. Absent
+      // (null) when the column is not there yet; the client then keeps its own.
+      firstRun: (data as any)?.first_run !== undefined ? parseFirstRun((data as any).first_run) : null,
     });
   } catch (e: any) {
     console.error('GET profile error:', e);
@@ -109,9 +122,33 @@ export async function PUT(req: NextRequest) {
       const held = sanitizeUserUnderstanding((cur as { understanding?: unknown } | null)?.understanding);
       row.understanding = { ...incoming, entries: held.entries, forgotten: held.forgotten };
     }
-    const { error } = await supabaseAdmin()
+    if ('firstRun' in b) {
+      // A UNION, never a replacement: the earliest time per milestone wins,
+      // so a stale tab or an older device cannot un-teach the account.
+      const incoming = parseFirstRun(b.firstRun);
+      const { data: cur, error: readError } = await supabaseAdmin()
+        .from('user_profiles')
+        .select('first_run')
+        .eq('user_id', userId)
+        .maybeSingle();
+      if (readError && (readError as any).code === '42703') {
+        // The column is not there yet. Nothing to write; the browser keeps it.
+        delete row.first_run;
+      } else if (readError) {
+        console.error('PUT profile: could not read the current first run', readError);
+        return NextResponse.json({ error: readError.message }, { status: 500 });
+      } else {
+        row.first_run = mergeFirstRun(parseFirstRun((cur as { first_run?: unknown } | null)?.first_run), incoming);
+      }
+    }
+    let { error } = await supabaseAdmin()
       .from('user_profiles')
       .upsert(row, { onConflict: 'user_id' });
+    if (error && (error as any).code === '42703' && 'first_run' in row) {
+      // Same tolerance on the write: without the column, write the rest.
+      delete row.first_run;
+      ({ error } = await supabaseAdmin().from('user_profiles').upsert(row, { onConflict: 'user_id' }));
+    }
     if (error) {
       console.error('PUT profile error:', error);
       return NextResponse.json({ error: error.message }, { status: 500 });
