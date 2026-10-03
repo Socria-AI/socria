@@ -896,7 +896,20 @@ export function sanitizeWorkspace(raw: unknown): ModelWorkspace {
       log,
     });
   }
-  const active = typeof r.active === 'string' && docs.some((d) => d.id === r.active) ? r.active : (docs[docs.length - 1]?.id ?? null);
+  // AN EXPLICIT null IS A CHOICE, NOT A GAP. The plot lens draws the active
+  // document before any scene, so when a turn is answered by one of the
+  // engine's own simulations — "generate black hole" after a saddle — the
+  // route clears the pointer and the surface shows what was just asked for.
+  // Defaulting null back to the newest document undid that on the very next
+  // round trip and put the saddle back over the black hole. Nothing else
+  // writes null while documents exist (open, select, branch and close all
+  // name one), so only an absent or unknown pointer falls back to the newest.
+  const active =
+    typeof r.active === 'string' && docs.some((d) => d.id === r.active)
+      ? r.active
+      : r.active === null && 'active' in r
+        ? null
+        : (docs[docs.length - 1]?.id ?? null);
   return { docs, active };
 }
 

@@ -3808,6 +3808,18 @@ const buildFlow: Builder = (scene, _fn, vals, view, guarded) => {
 export const SIM_OBJECTS = ['black-hole', 'big-bang', 'orbit', 'oscillator', 'projectile'] as const;
 export type SimObject = (typeof SIM_OBJECTS)[number];
 
+/**
+ * The simulated objects that have a working surface of their own — a camera,
+ * depth, the physics in three dimensions — rather than a plot.
+ *
+ * ONE LIST, READ BY BOTH SIDES. The renderer decides from it which scenes get
+ * a surface (components/surfaces/SceneSurface.tsx), and the map route decides
+ * from it which bare requests the engine answers itself (lib/model/wants.ts).
+ * Two copies would let the route promise a surface the renderer then drew as
+ * a plot.
+ */
+export const SURFACE_OBJECTS: readonly SimObject[] = ['black-hole', 'big-bang', 'orbit'];
+
 export interface SimSpec {
   object: SimObject;
 }

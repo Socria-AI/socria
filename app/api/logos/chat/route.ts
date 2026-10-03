@@ -53,6 +53,7 @@ import {
   visibleEntries,
 } from '@/lib/person-memory';
 import { mayUse } from '@/lib/route-guard';
+import { wantedSimulation, bareRequest, hasSurface, simulationBlock } from '@/lib/model/wants';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -300,6 +301,17 @@ export async function POST(req: NextRequest) {
 
     const vizState = sanitizeModelState(body?.vizState);
 
+    // A BARE REQUEST FOR ONE OF THE ENGINE'S OWN SURFACES. The map route
+    // answers "generate black hole" with the Kerr surface every time
+    // (lib/model/wants.ts answersOutright), and this reply runs in parallel
+    // with it — so without being told, the reply answered a request to make a
+    // black hole by asking which aspect of black holes they wanted to
+    // understand. It is told the one thing it cannot see, and only on the turn
+    // where that thing is certain to be on screen.
+    const asked = focusLabel ? null : wantedSimulation(last.content);
+    const opening =
+      asked && hasSurface(asked.object) && bareRequest(last.content, asked) ? simulationBlock(asked) : '';
+
     const guided =
       system +
       guidanceBlock(resolveDepth(body?.depth), resolveGuard(body?.guard), 'chat') +
@@ -327,7 +339,10 @@ export async function POST(req: NextRequest) {
             body?.viz ? sanitizeViz(body.viz) : null,
             body?.vizValues && typeof body.vizValues === 'object' ? body.vizValues : undefined
           )) +
-      memoryBlock +
+      opening +
+      // ONCE. This was appended twice, so everything Socria remembers about
+      // the person reached the model as two identical blocks — twice the
+      // tokens, and twice the weight against the guidance above it.
       memoryBlock;
 
     const openai = new OpenAI({ apiKey });

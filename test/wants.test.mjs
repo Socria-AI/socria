@@ -10,8 +10,18 @@
 // does not depend on a prompt being read the right way — and the first
 // assertion in it is the sentence that was reported.
 
-import { wantedSimulation, correctionNote, SIM_WORDS } from './.tmp/wants.mjs';
-import { SIM_OBJECTS } from './.tmp/logos-viz.mjs';
+import {
+  wantedSimulation,
+  correctionNote,
+  SIM_WORDS,
+  bareRequest,
+  hasSurface,
+  answersOutright,
+  answersInstead,
+  isThatSimulation,
+  simulationBlock,
+} from './.tmp/wants.mjs';
+import { SIM_OBJECTS, SURFACE_OBJECTS } from './.tmp/logos-viz.mjs';
 
 let pass = 0, fail = 0;
 const ok = (n, c, x = '') => (c ? pass++ : (fail++, console.log('FAIL', n, x)));
@@ -99,6 +109,99 @@ console.log('\n=== nothing it is handed can make it throw ===');
   ok('an over-long message is declined rather than scanned', wantedSimulation('black hole generate ' + 'x'.repeat(3000)) === null);
   // A regex metacharacter in an alias would be a live pattern without escaping.
   ok('aliases are matched literally', wantedSimulation('generate me a black.hole') === null);
+}
+
+console.log('\n=== polite forms of the request are requests ===');
+{
+  // "Can you make me a black hole?" is the most ordinary way to ask for one,
+  // and it opened with "can you" and ended with "?" — read as a question.
+  for (const said of [
+    'generate black hole',
+    'can you make me a black hole?',
+    'could you please simulate a black hole?',
+    'hey, can you show me a black hole?',
+    'please generate a black hole',
+    'black hole simulation',
+  ]) {
+    ok(`“${said}” → black-hole`, wantedSimulation(said)?.object === 'black-hole', JSON.stringify(wantedSimulation(said)));
+  }
+  // …and the questions stay questions.
+  for (const said of ['can you explain how to model a black hole?', 'how do I simulate a black hole?', 'could you tell me about black holes?']) {
+    ok(`“${said}” is still a question`, wantedSimulation(said) === null, JSON.stringify(wantedSimulation(said)));
+  }
+}
+
+console.log('\n=== a bare request asks for the object and nothing else ===');
+{
+  const BARE = [
+    'generate black hole',
+    'generate me a black hole',
+    'can you make me a black hole?',
+    'show me a 3d black hole',
+    'black hole simulation',
+    'simulate a supermassive spinning black hole',
+    'simulate the big bang',
+    'simulate an orbit',
+  ];
+  for (const said of BARE) {
+    const w = wantedSimulation(said);
+    ok(`“${said}” is bare`, !!w && bareRequest(said, w), JSON.stringify(w));
+  }
+  const OWN = [
+    'simulate light bending around a black hole',
+    'simulate a black hole of 10 solar masses',
+    'model the orbit of mars around the sun',
+    'build me a pendulum with a 2 kg bob',
+    'make a black hole and show me how the shadow depends on spin and inclination of the observer',
+  ];
+  for (const said of OWN) {
+    const w = wantedSimulation(said);
+    ok(`“${said}” says something of its own`, !!w && !bareRequest(said, w), JSON.stringify(w));
+  }
+  ok('nothing it is handed makes it throw', [null, 7, {}, ''].every((x) => bareRequest(x, { object: 'black-hole', named: 'black hole', asked: 'make' }) === false));
+}
+
+console.log('\n=== which simulations have a surface of their own ===');
+{
+  ok('every surface object is a simulation the engine ships', SURFACE_OBJECTS.every((o) => SIM_OBJECTS.includes(o)), SURFACE_OBJECTS.join(','));
+  ok('the black hole, the universe and an orbit do', ['black-hole', 'big-bang', 'orbit'].every(hasSurface));
+  ok('an oscillator and a projectile are graphs, and are plotted', !hasSurface('oscillator') && !hasSurface('projectile'));
+}
+
+console.log('\n=== OUTRIGHT: a bare request for a surface is answered by it ===');
+{
+  const bh = wantedSimulation('generate black hole');
+  ok('a bare black hole, nothing drawn: the surface answers', answersOutright(bh, true, null));
+  ok('  whatever the extractor drew instead', answersOutright(bh, true, { kind: 'diagram' }));
+  ok('  but not when it already drew exactly that', !answersOutright(bh, true, { kind: 'simulation', sim: { object: 'black-hole' } }));
+  ok('a request with something of its own is left to the engine', !answersOutright(bh, false, null));
+  const osc = wantedSimulation('make a pendulum');
+  ok('a bare oscillator is left to the engine: it can build one properly', !answersOutright(osc, true, null));
+  ok('nothing asked, nothing answered', !answersOutright(null, true, null));
+  ok('isThatSimulation reads the object', isThatSimulation({ kind: 'simulation', sim: { object: 'orbit' } }, wantedSimulation('simulate an orbit')));
+}
+
+console.log('\n=== INSTEAD: after the engine has tried ===');
+{
+  const w = wantedSimulation('make a pendulum');
+  const none = { scene: false, proposed: false, built: false, missing: 0 };
+  ok('nothing proposed, nothing drawn: the simulation answers', answersInstead(w, false, none));
+  ok('a proposal that wrote nothing down: the simulation answers', answersInstead(w, false, { ...none, proposed: true }));
+  ok('a refusal naming what their own system lacks stands', !answersInstead(w, false, { ...none, proposed: true, missing: 1 }));
+  ok('  unless they described nothing for it to lack', answersInstead(w, true, { ...none, proposed: true, missing: 1 }));
+  ok('a model that built is the answer', !answersInstead(w, true, { ...none, proposed: true, built: true }));
+  ok('a scene the extractor drew is the answer', !answersInstead(w, true, { ...none, scene: true }));
+  ok('no named simulation, no stand-in', !answersInstead(null, true, none));
+}
+
+console.log('\n=== what the reply is told on a turn the surface answers ===');
+{
+  const b = simulationBlock(wantedSimulation('generate black hole'));
+  ok('it says what is opening', /Logos is opening its own simulation/.test(b) && /Kerr black hole/.test(b), b);
+  ok('  and what can be moved', /mass and spin/.test(b));
+  ok('  and not to ask which aspect first', /Do not ask what they want to understand/.test(b));
+  ok('every surface has a brief', SURFACE_OBJECTS.every((o) => simulationBlock({ object: o, named: o, asked: 'make' }).length > 0));
+  ok('a plotted simulation has none (the reply is never told about it)', simulationBlock({ object: 'oscillator', named: 'spring', asked: 'make' }) === '');
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

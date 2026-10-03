@@ -1012,7 +1012,18 @@ THE RULES, all load-bearing:
  * proposed. Only the proposal is wanted — no map, no picture — and the ask is
  * repeated so the model knows what it is building.
  */
-export function buildProposePrompt(ask: { topic?: string; artifact?: string; action?: string; formal?: unknown } | null): string {
+export function buildProposePrompt(
+  ask: { topic?: string; artifact?: string; action?: string; formal?: unknown } | null,
+  opts?: {
+    /**
+     * The engine's reason, when the first pass DID propose and what it
+     * proposed wrote nothing down — "Black hole simulation" with no equation,
+     * no system, no specification in it. That is the same fault as proposing
+     * nothing, and it gets the same second chance, told what was wrong.
+     */
+    refused?: string;
+  }
+): string {
   const what = [
     ask?.topic ? `the subject, in their words: ${ask.topic}` : '',
     ask?.artifact ? `the artifact they asked for: ${ask.artifact}` : '',
@@ -1020,7 +1031,10 @@ export function buildProposePrompt(ask: { topic?: string; artifact?: string; act
   ]
     .filter(Boolean)
     .join('\n');
-  return `A person asked for something to be BUILT, and the previous pass over this conversation returned no proposal. That was a fault. This pass exists only to propose the model.
+  const before = opts?.refused
+    ? `A person asked for something to be BUILT, and the previous pass over this conversation proposed a model the engine refused: ${opts.refused.slice(0, 240)}. It named the thing and wrote nothing down — no expression, no mechanism, no system, no specification, no equations. That was a fault. This pass exists only to propose the model again, stated formally this time.`
+    : 'A person asked for something to be BUILT, and the previous pass over this conversation returned no proposal. That was a fault. This pass exists only to propose the model.';
+  return `${before}
 
 ${what || 'Read what they asked to build from the conversation.'}
 

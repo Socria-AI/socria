@@ -18,7 +18,7 @@
 // them (lib/logos-viz.ts OWNS_RANGES). So a conversation can say where to
 // begin and cannot say what is possible.
 
-import type { VizScene } from '@/lib/logos-viz';
+import { SURFACE_OBJECTS, type VizScene } from '@/lib/logos-viz';
 import type { SurfaceProps } from './Surface3D';
 import { BlackHoleSurface } from './BlackHoleSurface';
 import { BigBangSurface } from './BigBangSurface';
@@ -33,7 +33,7 @@ import { GravitySurface } from './GravitySurface';
  * on the plot renderer, which suits them. A black hole, a universe and an
  * orbiting system are objects in space, and they do not.
  */
-const HAS_SURFACE = new Set(['black-hole', 'big-bang', 'orbit']);
+const HAS_SURFACE = new Set<string>(SURFACE_OBJECTS);
 
 /**
  * True when this scene wants a working surface rather than a plot.

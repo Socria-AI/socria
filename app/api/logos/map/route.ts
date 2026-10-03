@@ -22,6 +22,7 @@ import {
   LOGOS_MODEL,
   LOGOS_FALLBACK_MODEL,
   EMPTY_MAP,
+  type ThinkingMap,
 } from '@/lib/logos';
 import { renderMessageForModel, sanitizeAttachments } from '@/lib/logos-attachments';
 import { renderContextsForMap, sanitizeContexts } from '@/lib/logos-sources';
@@ -31,7 +32,15 @@ import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { enforceRateLimit } from '@/lib/rate-limit';
 import { mayUse } from '@/lib/route-guard';
 import { EMPTY_WORKSPACE, modelFor, openFromProposal } from '@/lib/model/docs';
-import { wantedSimulation, correctionNote } from '@/lib/model/wants';
+import {
+  wantedSimulation,
+  correctionNote,
+  bareRequest,
+  answersOutright,
+  answersInstead,
+  isThatSimulation,
+  type Wanted,
+} from '@/lib/model/wants';
 import { dropRemoved } from '@/lib/map-edit';
 import { settle, unanswered } from '@/lib/model/ask';
 
@@ -39,6 +48,31 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const MAX_HISTORY = 16;
+
+/**
+ * The map, answered by the engine's own simulation of what was named.
+ *
+ * Named for what it is — `simulating`, as sanitizeMap names a scene the
+ * extractor drew itself — so the panel does not head a Kerr black hole with
+ * "Graphing" because the extractor had called the turn mathematics.
+ */
+function withSimulation(map: ThinkingMap, w: Wanted): ThinkingMap {
+  const { intent: _notMath, ...rest } = map;
+  return {
+    ...rest,
+    // The surface draws the active document before any scene; the turn asked
+    // for this, so no document is active. The documents themselves stay.
+    ...(map.models?.active ? { models: { ...map.models, active: null } } : {}),
+    viz: { kind: 'simulation', sim: { object: w.object } } as ThinkingMap['viz'],
+    context: 'simulating',
+    ask: {
+      ...(map.ask ?? {}),
+      action: 'construct',
+      artifact: 'simulation',
+      topic: map.ask?.topic || w.named,
+    } as ThinkingMap['ask'],
+  };
+}
 
 /** Appended to the retry after a truncated response: map only, no picture. */
 const NO_PICTURE = `
@@ -106,6 +140,24 @@ export async function POST(req: NextRequest) {
   // Nothing to extract from — hand back what we already have.
   if (!transcript) return NextResponse.json({ map: current });
 
+  // ── WHAT THEY NAMED, DECIDED BEFORE ANY MODEL IS ASKED ───────────
+  //
+  // Whether the person asked for one of the simulations this product ships is
+  // a fact about their words, decidable in code (lib/model/wants.ts). It is
+  // read once, here, so that every way this route can end — a full
+  // extraction, a refusal, a model that errored or returned nothing — can
+  // still give them the thing they plainly asked for.
+  const lastSaid = [...kept].reverse().find((m: any) => m.role === 'user');
+  const said = lastSaid?.content;
+  const wanted = wantedSimulation(said);
+  const bare = !!wanted && bareRequest(said, wanted);
+  /** A map that failed to extract still answers a named simulation. */
+  const salvage = (map: ThinkingMap): ThinkingMap => {
+    if (!wanted || isThatSimulation(map.viz, wanted)) return map;
+    console.info('logos map: extraction failed; %s', correctionNote(wanted));
+    return withSimulation(map, wanted);
+  };
+
   try {
     const openai = new OpenAI({ apiKey });
     const configured =
@@ -169,7 +221,7 @@ export async function POST(req: NextRequest) {
     const raw = completion.choices?.[0]?.message?.content;
     if (!raw) {
       console.warn('logos map: empty completion');
-      return NextResponse.json({ map: current });
+      return NextResponse.json({ map: salvage(current) });
     }
 
     let parsed: any;
@@ -183,51 +235,53 @@ export async function POST(req: NextRequest) {
         completion.choices?.[0]?.finish_reason,
         raw.slice(0, 200)
       );
-      return NextResponse.json({ map: current });
+      return NextResponse.json({ map: salvage(current) });
     }
 
     // The extractor's output is a PROPOSAL: sanitizeMap's default trust mode
     // strips any `built` it wrote and keeps a `propose` block instead.
     let next = sanitizeMap(parsed);
 
-    // ── WHAT THEY PLAINLY ASKED FOR, WHEN THE EXTRACTOR MISSED IT ──
+    // ── WHAT THEY PLAINLY ASKED FOR ───────────────────────────────
     //
     // "Generate me a black hole" came back as a map node of kind `concept`
     // called "Black hole creation", beside a paragraph explaining that making
     // one would require collapsing a massive star beyond its Schwarzschild
     // radius — while this engine ships a Kerr black hole with real geodesics,
     // a shadow from the critical impact parameter, and sliders for mass and
-    // spin. The prompt's rule for a construction ends in a list of verbs that
-    // does not contain "generate", so the turn was not one.
+    // spin. Then, on main, "generate black hole" came back with a one-node
+    // map and the on-ramp's refusal in the panel: the extractor had proposed
+    // a "Black hole simulation" with nothing formal in it, and a proposal —
+    // any proposal — used to stop the engine reaching for its own.
     //
-    // The engine does not need to be told. SIM_OBJECTS is the list of what it
-    // can simulate; naming one and asking for it in any making register is a
-    // construction, and lib/model/wants.ts decides that HERE rather than
-    // hoping a sentence in a prompt is read the right way.
-    //
-    // IT ONLY EVER ADDS. A turn that already produced a scene is a turn that
-    // was understood, and this leaves it alone.
-    const lastSaid = [...kept].reverse().find((m: any) => m.role === 'user');
-    // ONLY WHEN NOTHING ELSE ANSWERED THE TURN. A proposal is the engine's
-    // business; injecting a canned scene beside one meant a refused "mass on
-    // a spring" showed the stock oscillator instead of the refusal.
-    const wants = next.viz || next.propose ? null : wantedSimulation(lastSaid?.content);
-    if (wants) {
-      next.viz = { kind: 'simulation', sim: { object: wants.object } } as typeof next.viz;
-      next.ask = {
-        ...(next.ask ?? {}),
-        action: 'construct',
-        artifact: 'simulation',
-        topic: next.ask?.topic || wants.named,
-      } as typeof next.ask;
-      // Said out loud rather than done silently: a correction nobody can see is
-      // the engine overruling the reading of somebody's words without telling
-      // them, and if it is wrong they cannot tell why.
-      console.info('logos map: %s', correctionNote(wants));
+    // The rules are in lib/model/wants.ts, where a suite holds them. Here they
+    // are applied at the two points they belong to: OUTRIGHT, before anything
+    // is built, for a bare request the engine's own surface answers better
+    // than any proposal could; and INSTEAD, after the engine has genuinely
+    // tried, for a named simulation where nothing drew and nothing built.
+    let bySimulation = false;
+    const answer = (w: Wanted) => {
+      next = withSimulation(next, w);
+      bySimulation = true;
+      // Said out loud rather than done silently: a correction nobody can see
+      // is the engine overruling the reading of somebody's words without
+      // telling them, and if it is wrong they cannot tell why.
+      console.info('logos map: %s', correctionNote(w));
+    };
+    if (wanted && answersOutright(wanted, bare, next.viz)) {
+      answer(wanted);
+      // Answered. A proposal beside it would be built into a second model
+      // competing with the one they asked for — the "canned scene beside a
+      // proposal" the sign-off removed, from the other side.
+      delete next.propose;
     }
+    // The extractor drew exactly what they named. That is an answer too, and
+    // nothing below should report the turn as having failed.
+    const answeredByScene = () => bySimulation || isThatSimulation(next.viz, wanted);
+
     // Never let a malformed extraction blank a map the user has built up.
     if (next.nodes.length === 0 && current.nodes.length > 0) {
-      return NextResponse.json({ map: current });
+      return NextResponse.json({ map: salvage(current) });
     }
     // What the person took off the map stays off, whatever the extractor made
     // of the transcript that still mentions it. The client does this too; the
@@ -258,24 +312,36 @@ export async function POST(req: NextRequest) {
       failure?: string;
       /** names the person used that are nowhere in what got built */
       unanswered?: string[];
+      /** built from the second pass rather than the first */
+      secondPass?: boolean;
     } | null = null;
     // At the top level now, not inside the picture — see sanitizeMap. Read
     // from the sanitised map so the legacy inlet is already hoisted.
     let proposal = next.propose;
+    let made: ReturnType<typeof openFromProposal> | null = proposal
+      ? openFromProposal(models, proposal, { at: Date.now() })
+      : null;
     // ── THE SECOND PASS ───────────────────────────────────────────
     //
     // "Model a pulsar" came back as a concept node and a paragraph asking
     // which aspect of a pulsar they were interested in. The ask was read
     // correctly — construct, a model — and the extractor, busy with the map,
-    // proposed nothing; the route then reported "nothing was proposed — that
-    // is a fault here" and left it at that. Reporting a fault is not fixing
-    // it. So when the turn wanted a construction and no proposal came, ask
-    // once more, for the proposal alone (lib/logos.ts buildProposePrompt),
-    // and run the on-ramp on what comes back. One retry, never more, and the
-    // engine still validates every word of it.
-    const wantedButNone = !proposal && settle(next.ask ?? null, { proposed: false, built: false }).wanted;
+    // proposed nothing. So when the turn wanted a construction and no
+    // proposal came, ask once more, for the proposal alone (lib/logos.ts
+    // buildProposePrompt), and run the on-ramp on what comes back.
+    //
+    // AND WHEN WHAT CAME WROTE NOTHING DOWN. A proposal that names the thing
+    // and states nothing formally — no expression, no system, no
+    // specification — is refused as prose, and that is the same fault as no
+    // proposal at all: the extractor did not do the work. It used to end the
+    // turn with the refusal, because the retry only fired for "nothing
+    // proposed". It gets the same second chance now, told why the first was
+    // refused. One retry, never more, and the engine still validates every
+    // word of it.
+    const wantedBuild = settle(next.ask ?? null, { proposed: false, built: false }).wanted;
+    const prose = !!made && !made.doc && !(made.refusal?.missing?.length);
     let secondPass = false;
-    if (wantedButNone) {
+    if (!answeredByScene() && ((!proposal && wantedBuild) || prose)) {
       try {
         const again = await openai.chat.completions.create({
           model: configured,
@@ -283,7 +349,10 @@ export async function POST(req: NextRequest) {
           max_tokens: CEILING,
           response_format: { type: 'json_object' },
           messages: [
-            { role: 'system', content: buildProposePrompt(next.ask ?? null) },
+            {
+              role: 'system',
+              content: buildProposePrompt(next.ask ?? null, prose && made?.refusal ? { refused: made.refusal.because } : undefined),
+            },
             { role: 'user', content: transcript },
           ],
         });
@@ -292,8 +361,13 @@ export async function POST(req: NextRequest) {
         const p = got && typeof got === 'object' ? (got.propose ?? null) : null;
         if (p && typeof p === 'object') {
           proposal = p;
+          made = openFromProposal(models, p, { at: Date.now() });
           secondPass = true;
-          console.info('logos map: construction asked for and not proposed — proposed on the second pass');
+          console.info(
+            'logos map: %s — proposed on the second pass, %s',
+            prose ? 'the first proposal wrote nothing down' : 'construction asked for and not proposed',
+            made.doc ? 'and it built' : 'and it was refused'
+          );
         } else {
           console.info('logos map: second pass declined to propose:', String(got?.because ?? '').slice(0, 160));
         }
@@ -301,10 +375,8 @@ export async function POST(req: NextRequest) {
         console.warn('logos map: second pass failed', e);
       }
     }
-    let made: ReturnType<typeof openFromProposal> | null = null;
     if (proposal) {
-      made = openFromProposal(models, proposal, { at: Date.now() });
-      models = made.workspace;
+      if (made?.doc) models = made.workspace;
       // The proposal has been answered either way; it must not travel on. A
       // map that still carried one would have the client asking again forever.
       delete next.propose;
@@ -313,6 +385,23 @@ export async function POST(req: NextRequest) {
         const { propose: _answered, ...scene } = next.viz;
         next.viz = scene;
       }
+    }
+
+    // ── AND IF THE ENGINE TRIED AND NOTHING CAME OF IT ────────────
+    //
+    // A named simulation answers the turn rather than a refusal that has
+    // nothing in it worth reading — see answersInstead for exactly when.
+    if (
+      !answeredByScene() &&
+      wanted &&
+      answersInstead(wanted, bare, {
+        scene: !!next.viz,
+        proposed: !!proposal,
+        built: !!made?.doc,
+        missing: made?.refusal?.missing?.length ?? 0,
+      })
+    ) {
+      answer(wanted);
     }
 
     // ── DID THE TURN GET WHAT IT ASKED FOR? ───────────────────────
@@ -329,31 +418,37 @@ export async function POST(req: NextRequest) {
     // `construct` and a build that refused settles to a named failure, not to a
     // shrug. See lib/model/ask.ts for the failure kinds and why each one needs
     // something different from the person.
+    //
+    // A TURN THE SIMULATION ANSWERED DID NOT FAIL. It asked for a thing and
+    // the thing is on screen; a refusal of a proposal nobody needed, shown
+    // beside it, is exactly the note that made this look broken.
     const verdict = settle(next.ask ?? null, {
       proposed: !!proposal,
-      built: !!made?.doc,
+      built: !!made?.doc || answeredByScene(),
       because: made?.doc ? undefined : made?.says,
       missing: made?.refusal?.missing,
     });
 
-    if (made) {
-      build = made.doc
-        ? {
-            ok: true,
-            says: made.says,
-            id: made.doc.id,
-            // BUILT IS NOT THE SAME AS BUILT WHAT THEY ASKED FOR. A proposal
-            // that quietly dropped a variable the person named still builds,
-            // and before this nothing noticed. It does not block the build —
-            // a model missing one named variable is still a model — it is
-            // something the surface can say.
-            ...(() => {
-              const left = unanswered(next.ask ?? null, modelFor(made!.doc!));
-              return left.length ? { unanswered: left } : {};
-            })(),
-            ...(secondPass ? { secondPass: true } : {}),
-          }
-        : { ok: false, says: made.says, ...(verdict.failure ? { failure: verdict.failure } : {}) };
+    if (made?.doc) {
+      build = {
+        ok: true,
+        says: made.says,
+        id: made.doc.id,
+        // BUILT IS NOT THE SAME AS BUILT WHAT THEY ASKED FOR. A proposal
+        // that quietly dropped a variable the person named still builds,
+        // and before this nothing noticed. It does not block the build —
+        // a model missing one named variable is still a model — it is
+        // something the surface can say.
+        ...(() => {
+          const left = unanswered(next.ask ?? null, modelFor(made!.doc!));
+          return left.length ? { unanswered: left } : {};
+        })(),
+        ...(secondPass ? { secondPass: true } : {}),
+      };
+    } else if (answeredByScene()) {
+      build = null;
+    } else if (made) {
+      build = { ok: false, says: made.says, ...(verdict.failure ? { failure: verdict.failure } : {}) };
     } else if (verdict.wanted) {
       // ASKED FOR, AND NOTHING WAS EVEN PROPOSED. This is the original bug in
       // its purest form and it is now reported rather than absorbed: the
@@ -361,6 +456,11 @@ export async function POST(req: NextRequest) {
       build = { ok: false, says: verdict.says, failure: verdict.failure };
     }
 
+    // A SIMULATION ANSWERED, SO IT IS WHAT THE SURFACE SHOWS. The plot lens
+    // draws the active model document before any scene, so a person who built
+    // a saddle and then asked for a black hole kept looking at the saddle.
+    // Their documents are kept; none of them is the one on screen.
+    if (bySimulation && models.active) models = { ...models, active: null };
     const withModels = models.docs.length ? { ...next, models } : next;
 
     // A free map stops taking on NEW nodes at its boundary; everything already
@@ -378,6 +478,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ map: withModels, ...(build ? { build } : {}) });
   } catch (e) {
     console.error('logos map error:', e);
-    return NextResponse.json({ map: current ?? EMPTY_MAP });
+    return NextResponse.json({ map: salvage(current ?? EMPTY_MAP) });
   }
 }
