@@ -10,6 +10,7 @@ const sections = [
   { id: 'deciding', heading: 'Making a decision' },
   { id: 'learning', heading: 'Learning something' },
   { id: 'math', heading: 'Working through math' },
+  { id: 'systems', heading: 'Building a model of something' },
   { id: 'writing', heading: 'Writing something that matters' },
   { id: 'research', heading: 'Testing an idea against evidence' },
   { id: 'quick', heading: 'Just thinking out loud' },
@@ -27,7 +28,7 @@ export function UseCases() {
 
       <H2 id="deciding">Making a decision</H2>
       <p>
-        <strong>Use Logos.</strong> A decision is exactly the kind of thinking
+        <strong>Use <Link href="/docs/logos-2">Logos 2</Link>.</strong> A decision is exactly the kind of thinking
         that benefits from being seen: the reasons, the assumptions holding
         them together, and the tensions between them. Talk the decision
         through and the <Link href="/docs/thinking-map">Thinking Map</Link>{' '}
@@ -45,7 +46,7 @@ export function UseCases() {
 
       <H2 id="learning">Learning something</H2>
       <p>
-        <strong>Use Logos.</strong> Say you are studying, or ask to be
+        <strong>Use Logos 2.</strong> Say you are studying, or ask to be
         taught, and the map turns to concepts and misconceptions as you build
         them. When the learning is mathematical, the{' '}
         <Link href="/docs/mathematics">Answer Guard</Link> also arms: from
@@ -63,7 +64,7 @@ export function UseCases() {
 
       <H2 id="math">Working through math</H2>
       <p>
-        <strong>Use Logos.</strong> When the conversation turns mathematical,
+        <strong>Use Logos 2.</strong> When the conversation turns mathematical,
         the map does too: givens, unknowns, equation steps, mistakes and
         results become typed nodes with real LaTeX, and three extra lenses
         appear — the <strong>Solution</strong> chain, which follows the work
@@ -77,9 +78,48 @@ export function UseCases() {
         page.
       </p>
 
+      <H2 id="systems">Building a model of something</H2>
+      <p>
+        <strong>Use <Link href="/docs/logos-2">Logos 2</Link>.</strong> When
+        what you are thinking about is a <em>system</em> — a shape, something
+        that moves, quantities that change over time, a relationship in data —
+        say so in a sentence and the engine builds a model of it beside the
+        conversation: controls you can drag, axes with numbers and units, and
+        a row of views that read the same model different ways.
+      </p>
+      <ul>
+        <li>
+          <strong>Studying calculus or physics:</strong> &ldquo;Model a saddle,
+          z = a·x² − b·y²&rdquo;, &ldquo;Model a mass on a spring with
+          damping&rdquo;, &ldquo;Why is a double pendulum
+          unpredictable?&rdquo;
+        </li>
+        <li>
+          <strong>Economics and econometrics:</strong> &ldquo;wage = β₀ +
+          β₁·educ + β₂·exper + u&rdquo; — then read the slope in $/hour per
+          year, the residuals and the coefficients.
+        </li>
+        <li>
+          <strong>Epidemics, circuits, chaos:</strong> &ldquo;How does lowering
+          the transmission rate flatten the curve?&rdquo;, &ldquo;Model a
+          driven RLC circuit&rdquo;, &ldquo;Show me the Lorenz system&rdquo;.
+        </li>
+        <li>
+          <strong>Objects in space:</strong> &ldquo;Generate a black
+          hole&rdquo;, &ldquo;Simulate the big bang&rdquo;, &ldquo;Simulate an
+          orbit&rdquo;.
+        </li>
+      </ul>
+      <p>
+        Then change it by saying so — &ldquo;make the damping zero&rdquo;,
+        &ldquo;undo that&rdquo; — or select a part and ask about it. Pictures
+        of each, and more to ask for, are on the{' '}
+        <Link href="/docs/logos-2#gallery">Logos 2 page</Link>.
+      </p>
+
       <H2 id="writing">Writing something that matters</H2>
       <p>
-        <strong>Think in Logos, then open{' '}
+        <strong>Think in Logos 2, then open{' '}
         <Link href="/docs/drafts-grounding">Draft Space</Link>.</strong> Draft
         Space is the one surface built for prose — and you write it. The page
         starts blank, with your map alongside lighting the reasoning each
@@ -101,9 +141,8 @@ export function UseCases() {
 
       <H2 id="quick">Just thinking out loud</H2>
       <p>
-        <strong>Core 2</strong> if you want a calm question-asker with no
-        machinery at all — it works signed out, free.{' '}
-        <strong>Core 3.1</strong> if the thread is one you will come back to:
+        <strong>Core 3.1</strong> if you want no machinery and no account —
+        it works signed out — or if the thread is one you will come back to:
         it holds memory across the conversation, periodically synthesizes what
         you have worked out, and keeps a running picture of how you tend to
         think. <strong><Link href="/docs/core-4">Core 4</Link></strong> if the
@@ -111,7 +150,7 @@ export function UseCases() {
         piece of research, a plan you need the load-bearing assumption of. It
         contributes rather than quizzes, keeps a record of what you have
         settled so nothing is re-litigated, and holds an answer back only for
-        a reason you gave it in your own words. Either way, if the thinking starts to sprawl, open Logos and give
+        a reason you gave it in your own words. Either way, if the thinking starts to sprawl, open Logos 2 and give
         it a line of thinking of its own — chat and Logos sessions sit in one
         list, interleaved by when you last touched them, whichever model made
         them.

@@ -6,7 +6,7 @@
 //   Core 2    a plain outlined circle — the quiet one
 //   Core 3.1  the same circle, polished: a gradient ring with a slow sweep
 //             of light across it; it is the one that notices language
-//   Logos     the brain, the same mark the Logos header carries
+//   Logos 2   the neuron, the same mark the Logos header carries
 //
 // Gradients need ids that are unique per instance — two of these render at
 // once (the button and its menu row) — so they're keyed off useId().
@@ -27,13 +27,13 @@ export function ModelGlyph({
   const uid = useId().replace(/:/g, '');
   const cls = className ? `socria-glyph ${className}` : 'socria-glyph';
 
-  // The brain is open line-work and narrower than it is tall, so at the same
-  // nominal size it reads smaller than a solid ring. Give it a little back so
-  // the three marks sit at the same visual weight in a row.
+  // The neuron is open line-work that reaches to its corners, so at the same
+  // nominal size it reads lighter than a solid ring. Give it a little back so
+  // the marks sit at the same visual weight in a row.
   // Any Logos surface, by the registry rather than by name: Logos 2 was
   // falling through to Core 3.1's ring, so the composer chip said "○ Logos 2".
   if (SOCRIA_MODELS[model]?.logosSurface)
-    return <LogosMark size={Math.round(size * 1.22)} className={className} />;
+    return <LogosMark size={Math.round(size * 1.15)} className={className} />;
 
   if (model === 'core-2') {
     return (

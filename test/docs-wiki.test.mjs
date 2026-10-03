@@ -18,6 +18,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DOC_PAGES, DOC_GROUPS, docPage, neighbors } from './.tmp/registry.mjs';
+import { offeredModels } from './.tmp/socria-model-store.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (p) => readFileSync(join(root, p), 'utf8');
@@ -117,9 +118,15 @@ console.log('\n=== the models page names every model a reader can pick ===');
   const models = read('app/docs/content/models.tsx');
   for (const name of ['Core 2', 'Core 3.1', 'Core 4', 'Logos'])
     ok(`${name} is on the comparison page`, models.includes(name));
-  ok('and the page no longer says there are three', !/three models/.test(models));
+  // The count a page states is the count the menu offers — read from the
+  // registry, so the next retirement or launch fails here until the prose
+  // catches up, in either direction.
+  const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven'];
+  const n = WORDS[offeredModels().length];
+  const said = (src) => [...src.matchAll(/\b(two|three|four|five|six|seven) models\b/gi)].map((m) => m[1].toLowerCase());
+  ok(`the page says there are ${n}, as the menu offers`, said(models).length > 0 && said(models).every((w) => w === n), said(models).join(','));
   const overview = read('app/docs/content/overview.tsx');
-  ok('the overview counts them the same way', !/Three models share/.test(overview));
+  ok('the overview counts them the same way', said(overview).length > 0 && said(overview).every((w) => w === n), said(overview).join(','));
   ok('  and links to Core 4', overview.includes('/docs/core-4'));
 }
 

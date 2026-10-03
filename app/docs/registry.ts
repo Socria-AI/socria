@@ -44,13 +44,13 @@ export const DOC_PAGES: DocPage[] = [
   {
     slug: 'models',
     title: 'The models',
-    blurb: 'Core 2, Core 3.1, Core 4 and Logos side by side — what each is for and how to switch.',
+    blurb: 'Core 3.1, Core 4 and Logos 2 side by side — what each is for and how to switch.',
     group: 'The models',
   },
   {
     slug: 'core-2',
     title: 'Socria Core 2',
-    blurb: 'Calm, restrained Socratic questioning. Free, no account needed.',
+    blurb: 'Calm, restrained Socratic questioning. Retired on 2 October; Core 3.1 took its place.',
     group: 'The models',
   },
   {
@@ -68,13 +68,13 @@ export const DOC_PAGES: DocPage[] = [
   {
     slug: 'logos',
     title: 'Socria Logos',
-    blurb: 'The full reasoning environment: the conversation and a live map of your thinking, side by side.',
+    blurb: 'The original reasoning environment — the conversation and a live map side by side. Superseded by Logos 2.',
     group: 'The models',
   },
   {
     slug: 'logos-2',
     title: 'Socria Logos 2',
-    blurb: 'Models you own, edit and undo — built by the engine from what you say, rather than pictures that are redrawn.',
+    blurb: 'The conversation, a live map, and models the engine builds from what you say — what you can build, what to ask for, and what you can do with one.',
     group: 'The models',
   },
   {

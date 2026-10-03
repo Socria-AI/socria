@@ -289,6 +289,10 @@ export function LogosApp({
   // learning sessions the person has chosen to reveal the solution for.
   const [depth, setDepth] = useState<ThinkingDepth>('balanced');
   const [depthOpen, setDepthOpen] = useState(false);
+  // Depth modes are the model's to have, not the surface's: Logos 2 is
+  // registered without them (supportsDepth: false), so the composer shows no
+  // depth control and every request goes at the one depth it answers at.
+  const depthOn = !!SOCRIA_MODELS[model]?.supportsDepth;
   const [modelOpen, setModelOpen] = useState(false);
   const router = useRouter();
 
@@ -786,7 +790,10 @@ export function LogosApp({
 
   /** the fields every Logos generation request carries */
   const guidance = () => ({
-    depth: depthRef.current,
+    // A surface with no depth modes answers at the one depth it has. The
+    // stored depth is shared with the Core chat, so without this a "Deep"
+    // chosen on Core 3.1 rode along into Logos with no control to see it by.
+    depth: depthOn ? depthRef.current : ('balanced' as ThinkingDepth),
     guard: guardRef.current,
     style: styleRef.current,
     persona: personaRef.current,
@@ -2719,9 +2726,9 @@ export function LogosApp({
           <div className="lg-style-sheet">
             <h2 className="lg-style-title">Socria Personality</h2>
             <p className="lg-style-sub">
-              How Socria communicates while it thinks with you. Depth stays
-              separate — it decides how far the thinking goes; this decides how
-              it sounds on the way.
+              How Socria communicates while it thinks with you. How far the
+              thinking goes is Logos&rsquo;s to judge; this decides how it
+              sounds on the way.
             </p>
 
             <div className="lg-persona-grid">
@@ -3307,6 +3314,7 @@ export function LogosApp({
                 Socria One
               </button>
             )}
+            {depthOn && (
             <div className="lg-depth">
               <button
                 type="button"
@@ -3346,6 +3354,7 @@ export function LogosApp({
                 </>
               )}
             </div>
+            )}
 
             {/* Logos is itself one of the models, so this is the same switch
                 the Core chat carries — picking another one navigates there. */}

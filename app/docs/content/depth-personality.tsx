@@ -48,8 +48,10 @@ export function DepthPersonality() {
 
       <H2 id="depth">Thinking Depth</H2>
       <p>
-        The depth control sits beside the box you type in — in Logos and in
-        Core 3.1 (Core 2 has no depth machinery). Four registers:
+        The depth control sits beside the box you type in, in Core 3.1. Core 4
+        and Logos 2 have none: Core 4 judges how far to go itself, and Logos 2
+        answers at one depth and puts the effort into the map and the model.
+        Four registers:
       </p>
       <TableWrap>
         <table>

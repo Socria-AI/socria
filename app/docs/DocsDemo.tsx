@@ -505,14 +505,14 @@ export function DemoCollege() {
 
 /* ── the model picker, as it sits beside the chat box ─────────────── */
 export function DemoModelPicker() {
-  const [model, setModel] = useState<SocriaModel>('core-2');
+  const [model, setModel] = useState<SocriaModel>('core-3');
   return (
     <DocsFrame label="The model switcher — open it, pick one" bare>
       <div className="d-pickerdemo">
         <ModelPicker value={model} onChange={setModel} isSignedIn />
         <p className="d-pickernote">
-          {model === 'logos'
-            ? 'In the app this swaps the whole surface into Logos, in place.'
+          {SOCRIA_MODELS[model].logosSurface
+            ? `In the app this swaps the whole surface into ${SOCRIA_MODELS[model].short}, in place.`
             : `Selected: ${SOCRIA_MODELS[model].label}.`}
         </p>
       </div>

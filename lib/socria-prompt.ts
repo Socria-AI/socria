@@ -1549,10 +1549,11 @@ export function fallbackOpenAIModel(model: SocriaModel): string | null {
 }
 
 export const SOCRIA_MODELS: Record<SocriaModel, ModelConfig> = {
-  // Core 2 retires on 2 October. It was the model that needed no account, and
-  // that job has moved to Core 3.1 (requiresAuth: false below) — which is the
-  // only honest way to retire it, since removing it otherwise would have left
-  // a signed-out visitor with nothing at all.
+  // Core 2 retired on 2 October. It was the model that needed no account, and
+  // that job moved to Core 3.1 (requiresAuth: false below). Past its date it
+  // is withdrawn rather than deleted: it still answers for a conversation that
+  // was on it, nobody is offered it, and anybody whose browser still holds it
+  // is moved on to Core 3.1 (lib/socria-model-store.ts withdrawnTo).
   'core-2': {
     id: 'core-2',
     label: 'Socria Core 2',
@@ -1561,7 +1562,7 @@ export const SOCRIA_MODELS: Record<SocriaModel, ModelConfig> = {
     defaultOpenAIModel: 'gpt-4o-mini',
     supportsDepth: false,
     requiresAuth: false,
-    leaving: 'until Oct 2',
+    withdrawn: 'Retired on 2 October; Core 3.1 is open to everyone in its place.',
   },
   // Open without an account from the day Core 2's retirement was announced.
   // The free tier had to move somewhere, and moving it to the model Socria is

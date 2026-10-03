@@ -46,17 +46,13 @@ export function Overview() {
         right, kept in step with each other.
       </p>
       <DemoSplit />
-      <p>Four models share that address:</p>
+      <p>Three models share that address:</p>
       <ul>
-        <li>
-          <strong><Link href="/docs/core-2">Core 2</Link></strong> — calm,
-          restrained Socratic questioning in plain prose. <em>Retiring 2
-          October</em>; Core 3.1 is what a signed-out visitor opens on now.
-        </li>
         <li>
           <strong><Link href="/docs/core-3">Core 3.1</Link></strong> — the
           conversation that remembers: thread memory, periodic syntheses of
-          what you have worked out, and a running model of how you think.
+          what you have worked out, and a running model of how you think. It
+          is open with no account.
         </li>
         <li>
           <strong><Link href="/docs/core-4">Core 4</Link></strong> — the model
@@ -66,30 +62,31 @@ export function Overview() {
           work stops circling.
         </li>
         <li>
-          <strong><Link href="/docs/logos">Logos</Link></strong> — the full
+          <strong><Link href="/docs/logos-2">Logos 2</Link></strong> — the
           reasoning environment. The conversation runs beside a live{' '}
           <Link href="/docs/thinking-map">Thinking Map</Link> that draws your
-          claims, assumptions, tensions and evidence as you talk, with{' '}
-          <Link href="/docs/mathematics">mathematics support</Link>, a{' '}
+          claims, assumptions, tensions and evidence as you talk — and when
+          what you describe is a system, the engine builds a model of it you
+          can move, read, edit and undo: a surface, a mechanism, a set of
+          equations, a fitted relationship, or a simulation of a black hole.
+          With <Link href="/docs/mathematics">mathematics support</Link>, a{' '}
           <Link href="/docs/drafts-grounding">Draft Space</Link>, and research
           grounded in real sources.
         </li>
-        <li>
-          <strong><Link href="/docs/logos-2">Logos 2</Link></strong> — the same
-          environment with a model workspace, where a mechanism, a system of
-          equations or a wage specification is built by the engine rather than
-          drawn, and is yours to edit and undo.
-        </li>
       </ul>
       <p>
-        Core 2, Core 3.1 and Core 4 are chat models: different depths of
-        attention, and in Core 4&rsquo;s case a different question — not how
-        deep to go, but whose work this is. Logos is a different kind of thing
-        — an environment — and it is the
-        centerpiece of <Link href="/docs/socria-one">Socria One</Link>, the
-        {priceWithPeriod()} plan. Its free tier is not a trial of Logos but Logos
-        itself, twice a month: what Socria One sells is how many lines of
-        thinking you get and what is carried between them, never a better
+        <Link href="/docs/core-2">Core 2</Link> retired on 2 October, and the
+        original <Link href="/docs/logos">Logos</Link> has given way to Logos 2.
+      </p>
+      <p>
+        Core 3.1 and Core 4 are chat models: different depths of attention,
+        and in Core 4&rsquo;s case a different question — not how deep to go,
+        but whose work this is. Logos 2 is a different kind of thing — an
+        environment — and it is the centerpiece of{' '}
+        <Link href="/docs/socria-one">Socria One</Link>, the{' '}
+        {priceWithPeriod()} plan. Its free tier is not a trial of Logos 2 but
+        Logos 2 itself, twice a month: what Socria One sells is how many lines
+        of thinking you get and what is carried between them, never a better
         version of any one of them.
       </p>
 

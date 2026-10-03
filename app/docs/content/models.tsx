@@ -23,14 +23,23 @@ export function Models() {
   return (
     <Article page={page} sections={sections}>
       <p>
-        Socria ships five models behind one switcher, and they are not five
-        sizes of the same thing — they are five different amounts of{' '}
-        <em>machinery around the conversation</em>. Core 2 is a voice. Core 3.1
-        is a voice with a memory and a running read of the thread. Core 4 is a
-        voice that decides, each turn, which part of the work is yours. Logos
-        is an environment. Logos 2 is that environment with computed
-        models inside it.
+        Socria ships three models behind one switcher, and they are not three
+        sizes of the same thing — they are three different amounts of{' '}
+        <em>machinery around the conversation</em>. Core 3.1 is a voice with a
+        memory and a running read of the thread. Core 4 is a voice that
+        decides, each turn, which part of the work is yours. Logos 2 is an
+        environment: the conversation beside a live map of your reasoning,
+        with models the engine builds inside it.
       </p>
+      <Callout tag="Retired">
+        <p>
+          <Link href="/docs/core-2">Core 2</Link> retired on 2 October; Core 3.1
+          took over as the model that needs no account. The original{' '}
+          <Link href="/docs/logos">Logos</Link> is no longer offered — Logos 2
+          is the same surface with the model workspace in it, and anybody on
+          the original is moved there.
+        </p>
+      </Callout>
 
       <H2 id="compare">Side by side</H2>
       <TableWrap>
@@ -38,64 +47,55 @@ export function Models() {
           <thead>
             <tr>
               <th></th>
-              <th>Core 2</th>
               <th>Core 3.1</th>
               <th>Core 4</th>
-              <th>Logos</th>
               <th>Logos 2</th>
             </tr>
           </thead>
           <tbody>
             <tr>
               <td><strong>In a sentence</strong></td>
-              <td>Calm, restrained Socratic questioning in plain prose</td>
               <td>Assertive pattern-naming with thread memory and adjustable depth</td>
               <td>Contributes by default; holds work back only on a reason you gave</td>
-              <td>The conversation plus a live map of your reasoning</td>
-              <td>The same, plus models the engine builds, which you edit and undo</td>
+              <td>The conversation plus a live map of your reasoning, and models
+                the engine builds, which you move, read, edit and undo</td>
             </tr>
             <tr>
               <td><strong>Account</strong></td>
-              <td>Not required — one free session signed out</td>
+              <td>Not required</td>
               <td>Sign-in (or an access key)</td>
-              <td>Sign-in (or an access key)</td>
-              <td>Sign-in (or an access key)</td>
-              <td>Sign-in (or an access key)</td>
+              <td>Sign-in (or an access key). Two lines of thinking a month free,
+                then <Link href="/docs/socria-one">Socria One</Link></td>
             </tr>
             <tr>
-              <td><strong>Thinking Depth control</strong></td>
-              <td>—</td>
+              <td><strong>Thinking depth</strong></td>
               <td>All four modes</td>
               <td>None, deliberately — it judges depth itself, and gives you
                 readability and length instead</td>
-              <td>Its own depth control; all four modes</td>
-              <td>Same as Logos</td>
+              <td>None — no depth modes. It answers at one depth and puts the
+                effort into the map and the model</td>
             </tr>
             <tr>
               <td><strong>Memory</strong></td>
-              <td>None beyond the visible thread</td>
               <td>Thread memory, syntheses, insights, a cross-conversation journey</td>
               <td>A record of the reasoning itself — every claim, objection and
                 decision with whose it is, enforced in code</td>
-              <td>The map itself — plus saved lines of thinking</td>
               <td>The map, the models and their revisions — a model keeps its
                 history, so you can undo an edit rather than regenerate a picture</td>
             </tr>
             <tr>
               <td><strong>Extra surfaces</strong></td>
-              <td>—</td>
               <td>Synthesis &amp; insight cards, choice chips</td>
               <td>Projects, source cards, exact arithmetic, attachments</td>
-              <td>Thinking Map, Board, plots, Draft Space, Research</td>
-              <td>All of Logos, plus the model workspace: mechanisms, systems of
-                equations and fitted specifications, computed by the engine</td>
+              <td>Thinking Map, Board, plots, Draft Space, Research, and the
+                model workspace: surfaces, mechanisms, systems of equations,
+                fitted specifications and three simulations — a black hole, the
+                expanding universe, an orbit</td>
             </tr>
             <tr>
               <td><strong>Writes prose for you</strong></td>
               <td>Only refining material you brought</td>
-              <td>Only refining material you brought</td>
               <td>Yes, unless the authorship is the point — and it says so when it stops</td>
-              <td>Never — even Draft Space&rsquo;s Refine is a proposal that lands only when you apply it</td>
               <td>Never. It may propose a model, and the engine decides whether
                 it computes — a proposal is never presented as a result</td>
             </tr>
@@ -105,18 +105,18 @@ export function Models() {
 
       <H2 id="switching">Switching between them</H2>
       <p>
-        The model picker sits bottom-right, beside the chat box. Picking Logos
-        does not navigate anywhere: the whole surface swaps in place inside{' '}
-        <code>/chat</code>, because Logos is a model, not a destination — and
-        leaving Logos returns you to whichever Core model you were on before,
-        not to a default.
+        The model picker sits bottom-right, beside the chat box. Picking
+        Logos 2 does not navigate anywhere: the whole surface swaps in place
+        inside <code>/chat</code>, because Logos 2 is a model, not a
+        destination — and leaving it returns you to whichever Core model you
+        were on before, not to a default.
       </p>
       <p>
-        Your choice is remembered per browser. In the sidebar, chat and Logos
-        sessions sit in one list ordered by when you last touched each; Logos
-        sessions carry the Logos mark, and opening one switches you into
-        Logos. The way back is the <em>Socria chat</em> button in the Logos
-        header, which returns you to whichever Core model you were on.
+        Your choice is remembered per browser. In the sidebar, chats and lines
+        of thinking sit in one list ordered by when you last touched each;
+        lines of thinking carry a small map mark, and opening one switches you
+        into Logos 2. The way back is the <em>Socria chat</em> button in the
+        Logos 2 header — <em>Chat</em> on a narrower screen — which returns you to whichever Core model you were on.
       </p>
       <DemoModelPicker />
 
@@ -124,21 +124,10 @@ export function Models() {
       <H2 id="choosing">Which one, when</H2>
       <ul>
         <li>
-          <strong>Logos 2</strong> — you are thinking with somebody else, or the
-          thing you are working through is a <em>system</em> rather than an
-          argument: a mechanism, a set of differential equations, a model fitted
-          to data. See <Link href="/docs/logos-2">its page</Link>.
-        </li>
-        <li>
-          <strong>Core 2</strong> — you want questions, not machinery.{' '}
-          <em>It retires on 2 October</em>, and the model that works with no
-          account at all is Core 3.1 from now on.
-        </li>
-        <li>
-          <strong>Core 3.1</strong> — a thread you will return to. It notices
-          your language, names patterns without hedging, asks at most one
-          question per turn, and periodically hands you a structured synthesis
-          of what you have actually worked out.
+          <strong>Core 3.1</strong> — a thread you will return to, or no
+          account at all. It notices your language, names patterns without
+          hedging, asks at most one question per turn, and periodically hands
+          you a structured synthesis of what you have actually worked out.
         </li>
         <li>
           <strong><Link href="/docs/core-4">Core 4</Link></strong> — long,
@@ -151,9 +140,11 @@ export function Models() {
           continuous with.
         </li>
         <li>
-          <strong>Logos</strong> — thinking with structure: decisions,
-          learning, math, anything where seeing the reasoning matters as much
-          as having it.
+          <strong><Link href="/docs/logos-2">Logos 2</Link></strong> — thinking
+          with structure, or thinking about a <em>system</em>: decisions,
+          learning, math, and anything you would rather move than read about —
+          a surface, a mechanism, a set of differential equations, a model
+          fitted to data, a black hole.
         </li>
       </ul>
       <Callout tag="Under the hood">

@@ -216,11 +216,12 @@ function isSelectable(m: unknown): m is SocriaModel {
 }
 
 function readModel(): SocriaModel {
-  if (typeof window === 'undefined') return 'core-2';
-  // Core 2 only until we know better. The automatic default needs Clerk and
-  // the plan route to have answered, and guessing before they do would show
-  // somebody Logos and then take it away again.
-  return readStoredModel() ?? 'core-2';
+  if (typeof window === 'undefined') return 'core-3';
+  // Core 3.1 only until we know better — the model open to everyone, now that
+  // Core 2 has retired. The automatic default needs Clerk and the plan route
+  // to have answered, and guessing before they do would show somebody Logos
+  // and then take it away again.
+  return readStoredModel() ?? 'core-3';
 }
 
 function readDepth(): ThinkingDepth {
@@ -398,7 +399,7 @@ export default function ChatPage() {
   const [driftDismissals, setDriftDismissals] = useState(0);
   const [hydrating, setHydrating] = useState(true);
   const [usedFree, setUsedFree] = useState(false);
-  const [model, setModel] = useState<SocriaModel>('core-2');
+  const [model, setModel] = useState<SocriaModel>('core-3');
   const [depth, setDepth] = useState<ThinkingDepth>('balanced');
   const [readability, setReadability] = useState<Readability>('standard');
   const [replyLength, setReplyLength] = useState<ReplyLength>('standard');

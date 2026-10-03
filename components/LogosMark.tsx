@@ -1,14 +1,14 @@
-// The Logos mark: a brain seen from above, drawn as separated strokes rather
-// than one closed outline — the gaps are the point, since the thing it stands
-// for is thinking in pieces that haven't joined up yet.
+// The Logos 2 mark: a neuron — a broken ring for the cell body, five
+// dendrites branching off it, and one axon running down to its terminals.
+// Every stroke is separate and the ring is broken into six arcs; the gaps are
+// the point, since the thing it stands for is thinking in pieces that are
+// still connecting up.
 //
-// Traced in the original artwork's 1080 coordinate space and then cropped by
-// viewBox, so the proportions and stroke weight stay exactly as drawn. The two
-// mid-branches are deliberately not mirrored: the right one starts lower than
-// the left in the original, and that asymmetry is what keeps it from reading
-// like a piece of clip art.
+// Traced from the 2000 px master and kept in that trace's coordinate space,
+// so the proportions and the stroke weight stay as drawn; the viewBox crops
+// it square around the mark. Left and right are mirror images about x = 966.
 
-const VB = { x: 280, y: 245, w: 550, h: 626 };
+const VB = { x: 60, y: 80, w: 1812, h: 1812 };
 const RATIO = VB.w / VB.h;
 
 export function LogosMark({
@@ -27,37 +27,40 @@ export function LogosMark({
       viewBox={`${VB.x} ${VB.y} ${VB.w} ${VB.h}`}
       fill="none"
       stroke="currentColor"
-      strokeWidth="22"
+      strokeWidth="66"
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
       focusable="false"
     >
-      {/* longitudinal fissure, broken just below the middle */}
-      <path d="M553 258 C 551 350 549 470 548 588" />
-      <path d="M551 601 C 550 690 548 764 547 838" />
+      {/* the cell body: a ring broken into six arcs */}
+      <path d="M882 675 A190 190 0 0 1 1050 675" />
+      <path d="M808 735 A190 190 0 0 0 778 805" />
+      <path d="M1122 735 A190 190 0 0 1 1153 805" />
+      <path d="M778 895 A190 190 0 0 0 918 1037" />
+      <path d="M1153 895 A190 190 0 0 1 1012 1037" />
 
-      {/* left hemisphere: four arcs with air between them */}
-      <path d="M497 256 C 448 266 398 300 360 383" />
-      <path d="M352 415 C 336 465 310 520 303 578" />
-      <path d="M293 622 C 291 682 303 738 352 772" />
-      <path d="M392 782 C 414 818 458 846 528 860" />
+      {/* upper dendrites, each forking in two */}
+      <path d="M803 657 C 740 575 690 505 618 425" />
+      <path d="M600 357 C 555 270 531 200 531 135" />
+      <path d="M561 397 C 480 366 400 357 318 366" />
+      <path d="M1129 657 C 1192 575 1242 505 1314 425" />
+      <path d="M1332 357 C 1377 270 1401 200 1401 135" />
+      <path d="M1371 397 C 1452 366 1532 357 1614 366" />
 
-      {/* right hemisphere */}
-      <path d="M613 256 C 662 266 712 300 750 383" />
-      <path d="M758 415 C 774 465 800 520 807 578" />
-      <path d="M817 622 C 819 682 807 738 758 772" />
-      <path d="M718 782 C 696 818 652 846 582 860" />
+      {/* side dendrites */}
+      <path d="M714 860 C 590 880 500 915 406 983" />
+      <path d="M127 955 C 210 945 280 945 346 970" />
+      <path d="M357 1035 C 295 1095 250 1165 222 1236" />
+      <path d="M1218 860 C 1342 880 1432 915 1526 983" />
+      <path d="M1805 955 C 1722 945 1652 945 1586 970" />
+      <path d="M1575 1035 C 1637 1095 1682 1165 1710 1236" />
 
-      {/* folds, left */}
-      <path d="M432 372 C 458 402 490 448 518 500" />
-      <path d="M352 497 C 400 520 452 550 485 578 C 492 612 494 650 495 690" />
-      <path d="M348 700 C 370 678 404 652 437 632" />
-
-      {/* folds, right */}
-      <path d="M678 372 C 652 402 620 448 592 500" />
-      <path d="M748 520 C 706 538 656 556 625 578 C 618 612 616 650 615 690" />
-      <path d="M762 700 C 740 678 706 652 673 632" />
+      {/* the axon, and its three terminals */}
+      <path d="M965 1108 C 940 1280 990 1400 965 1525" />
+      <path d="M965 1600 L 965 1826" />
+      <path d="M916 1590 C 865 1670 812 1735 742 1802" />
+      <path d="M1014 1590 C 1065 1670 1118 1735 1190 1802" />
     </svg>
   );
 }

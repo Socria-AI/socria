@@ -32,8 +32,7 @@ export function SocriaOne() {
         What it opens is <em>volume and continuity</em>: as many lines of thinking
         in a month as you have, kept with their full history, and a Socria that
         carries what it learns about how you reason from each one into the next —
-        into Logos as well as Core. Core 2 is not part of the paywall at all — it
-        stays free, account or no account.
+        into Logos 2 as well as Core. Core 3.1 needs no account at all.
       </p>
       <p>
         What it deliberately does <em>not</em> open is anything inside a single

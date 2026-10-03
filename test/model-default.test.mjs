@@ -90,8 +90,8 @@ console.log('\n=== ours versus theirs ===');
   ok('...but is still not a choice', modelWasChosen() === false);
 
   // What THEY write outranks it from then on.
-  chooseModel('core-2');
-  ok('a chosen model is stored', readStoredModel() === 'core-2');
+  chooseModel('core-4');
+  ok('a chosen model is stored', readStoredModel() === 'core-4');
   ok('...and is marked as chosen', modelWasChosen() === true);
 
   // And the flag is sticky: a later default write must not quietly clear it,
@@ -174,9 +174,9 @@ console.log('\n=== the way back out of Logos ===');
   ok('Logos is not remembered as the Core model', lastCoreModel() === 'core-3');
 
   fresh();
-  rememberModel('core-2');
+  rememberModel('core-4');
   rememberModel('logos');
-  ok('and a default write behaves the same way', lastCoreModel() === 'core-2');
+  ok('and a default write behaves the same way', lastCoreModel() === 'core-4');
   // Core 2 still stores and still returns: it answers until 2 October, and a
   // retirement that took somebody out of a conversation early would be the
   // one thing worse than the retirement.
@@ -228,32 +228,26 @@ console.log('\n=== leaving a logos surface returns to a Core model ===');
   ok('nor does plain Logos', lastCoreModel() === 'core-3');
 }
 
-console.log('\n=== the retirement is data, and it is visible ===');
+console.log('\n=== the retirement is data, and it has happened ===');
 {
-  // A date that lives only in a paragraph somewhere is a date the person
-  // working in that model never reads. It is a field on the model, the picker
-  // renders it in both places somebody looks, and the page that explains the
-  // model says it too.
-  const picker = readFile('components/ModelPicker.tsx');
+  // Core 2 carried a leaving date until 2 October, shown in the picker. Past
+  // the date it is withdrawn: still able to answer a conversation that was on
+  // it, offered to nobody, and nobody whose browser holds it is stranded.
   const docs = readFile('app/docs/content/core-2.tsx');
-  ok('Core 2 carries a leaving date', typeof MODELS['core-2'].leaving === 'string' && /Oct 2/.test(MODELS['core-2'].leaving));
-  ok('nothing else is leaving', Object.values(MODELS).filter((m) => m.leaving).length === 1);
-  ok('the row shows it', /m\.leaving \? \(/.test(picker));
-  ok('  and it outranks the sign-in prompt and the surface tag',
-    picker.indexOf('m.leaving ? (') < picker.indexOf('gated ? ('));
-  ok('the button shows it too, so no menu has to be opened',
-    /current\.leaving && <span className="left">/.test(picker));
-  ok('the model’s own page says the date', /retires on 2 October/.test(docs));
+  ok('Core 2 is withdrawn, with the reason beside the switch', typeof MODELS['core-2'].withdrawn === 'string' && /2 October/.test(MODELS['core-2'].withdrawn));
+  ok('  and offered to nobody', !offeredModels().includes('core-2'));
+  ok('nothing is leaving any more', Object.values(MODELS).filter((m) => m.leaving).length === 0);
+  ok('the model’s own page says it retired', /retired on 2 October/.test(docs));
   ok('  and where the free tier went', /Core 3\.1/.test(docs));
 
   // The other half of the same change: Core 3.1 is what a signed-out visitor
   // now opens on, so it cannot require an account.
   ok('Core 3.1 needs no account', MODELS['core-3'].requiresAuth === false);
-  ok('Core 2 still answers until the date', MODELS['core-2'].requiresAuth === false && !MODELS['core-2'].soon);
+  ok('Core 2 still answers a conversation that was on it', MODELS['core-2'].requiresAuth === false && !MODELS['core-2'].soon);
   ok('the surfaces that keep something still need one',
     MODELS['logos'].requiresAuth && MODELS['core-4'].requiresAuth);
   ok('the menu no longer offers Core 2 as the way in, signed out',
-    /Core 3\.1 stays open, signed out/.test(picker));
+    /Core 3\.1 stays open, signed out/.test(readFile('components/ModelPicker.tsx')));
 }
 
 console.log('\n=== a withdrawn model: still there, not offered, not stranding anybody ===');
