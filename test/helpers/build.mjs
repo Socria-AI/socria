@@ -99,6 +99,7 @@ const MODULES = [
   'lib/link-preview.ts',
   'lib/support-faq.ts',
   'lib/model/wants.ts',
+  'lib/mind/ar.ts',
   'lib/model/binding.ts',
   'lib/model/kinds.ts',
   'lib/model/units.ts',

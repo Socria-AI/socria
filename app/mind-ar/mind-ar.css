@@ -1,0 +1,53 @@
+/* /mind-ar — the Mind Graph, floating over the camera. Scoped to .mar-root. */
+.mar-root{position:fixed;inset:0;overflow:hidden;background:radial-gradient(1200px 700px at 30% 20%,#2c3a1b,#12170b 70%);color:#f4f1e8;
+  font-family:Inter,system-ui,sans-serif;touch-action:none;user-select:none;-webkit-user-select:none}
+.mar-root .mar-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .4s}
+.mar-root.has-camera .mar-video{opacity:1}
+.mar-root .mar-video.is-mirrored{transform:scaleX(-1)}
+/* a scrim, so labels read over a bright room */
+.mar-root.has-camera::before{content:"";position:absolute;inset:0;background:rgba(10,14,6,.28);pointer-events:none;z-index:1}
+.mar-root .mar-canvas{position:absolute;inset:0;width:100%;height:100%;z-index:2;cursor:grab}
+.mar-root .mar-canvas:active{cursor:grabbing}
+
+.mar-root .mar-top{position:absolute;z-index:3;top:0;left:0;right:0;display:flex;align-items:center;gap:14px;
+  padding:max(12px,env(safe-area-inset-top)) 16px 12px;background:linear-gradient(rgba(10,14,6,.6),transparent)}
+.mar-root .mar-back{color:#f4f1e8;text-decoration:none;font-size:13px;opacity:.85;white-space:nowrap}
+.mar-root .mar-title{display:flex;flex-direction:column;min-width:0;flex:1}
+.mar-root .mar-title strong{font-family:"Source Serif 4",Georgia,serif;font-weight:500;font-size:17px}
+.mar-root .mar-title span{font-size:12px;opacity:.75;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mar-root .mar-badge{font-size:10px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:#e8b62c;
+  border:1px solid rgba(232,182,44,.5);border-radius:999px;padding:3px 9px;white-space:nowrap}
+
+.mar-root .mar-intro{position:absolute;z-index:3;left:50%;bottom:calc(96px + env(safe-area-inset-bottom));transform:translateX(-50%);
+  width:min(440px,calc(100% - 32px));text-align:center;background:rgba(18,23,11,.72);backdrop-filter:blur(10px);
+  border:1px solid rgba(244,241,232,.14);border-radius:16px;padding:18px 18px 14px}
+.mar-root .mar-intro p{margin:0 0 12px;font-size:14px;line-height:1.5}
+.mar-root .mar-intro .mar-fine{margin:10px 0 0;font-size:11.5px;opacity:.6}
+.mar-root .mar-go{background:#f4f1e8;color:#1e2612;border:0;border-radius:999px;padding:11px 22px;font-size:15px;font-weight:600;cursor:pointer}
+
+.mar-root .mar-zoom{position:absolute;z-index:3;right:16px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:8px}
+.mar-root .mar-zoom button{width:44px;height:44px;border-radius:50%;border:1px solid rgba(244,241,232,.25);
+  background:rgba(18,23,11,.6);backdrop-filter:blur(8px);color:#f4f1e8;font-size:22px;line-height:1;cursor:pointer}
+.mar-root .mar-zoom .is-fit{font-size:17px}
+
+.mar-root .mar-tools{position:absolute;z-index:3;left:0;right:0;bottom:0;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;
+  padding:12px 16px max(14px,env(safe-area-inset-bottom));background:linear-gradient(transparent,rgba(10,14,6,.6))}
+.mar-root .mar-tools button{border:1px solid rgba(244,241,232,.28);background:rgba(18,23,11,.55);backdrop-filter:blur(8px);
+  color:#f4f1e8;border-radius:999px;padding:9px 15px;font-size:13px;cursor:pointer}
+.mar-root .mar-tools button[aria-pressed="true"]{background:#e8b62c;border-color:#e8b62c;color:#1e2612}
+
+.mar-root .mar-note{position:absolute;z-index:3;left:50%;top:calc(70px + env(safe-area-inset-top));transform:translateX(-50%);margin:0;
+  width:max-content;max-width:calc(100% - 32px);font-size:13px;background:rgba(18,23,11,.75);border-radius:10px;padding:8px 12px}
+
+.mar-root .mar-card{position:absolute;z-index:4;left:16px;bottom:calc(76px + env(safe-area-inset-bottom));width:min(360px,calc(100% - 92px));
+  max-height:50vh;overflow:auto;background:rgba(244,241,232,.96);color:#20201b;border-radius:16px;padding:16px 18px;
+  box-shadow:0 20px 50px -20px rgba(0,0,0,.6)}
+.mar-root .mar-card h2{font-family:"Source Serif 4",Georgia,serif;font-weight:500;font-size:20px;line-height:1.25;margin:4px 0 8px}
+.mar-root .mar-card p{font-size:14px;line-height:1.5;margin:0 0 10px;color:rgba(32,32,27,.75)}
+.mar-root .mar-type{font-size:10.5px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;filter:brightness(.7)}
+.mar-root .mar-card ul{list-style:none;margin:0;padding:0;border-top:1px solid rgba(32,32,27,.1)}
+.mar-root .mar-card li button{display:block;width:100%;text-align:left;background:none;border:0;border-bottom:1px solid rgba(32,32,27,.08);
+  padding:8px 0;font-size:13.5px;color:#20201b;cursor:pointer}
+.mar-root .mar-card li em{font-style:normal;color:#5e7633;margin-right:6px}
+.mar-root .mar-x{position:absolute;right:10px;top:8px;background:none;border:0;font-size:22px;color:rgba(32,32,27,.5);cursor:pointer}
+@media (max-width:620px){.mar-root .mar-card{width:calc(100% - 84px)}}
