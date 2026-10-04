@@ -24,6 +24,7 @@ import { OneFoot } from '@/components/OneMark';
 import { OnePrompt } from '@/components/OnePrompt';
 import { useOnePrompt } from '@/components/useOnePrompt';
 import { MapGlyph } from '@/components/MapGlyph';
+import { NodeTile } from '@/components/NodeTile';
 import { LogosApp } from '@/components/LogosApp';
 import { ProjectSheet } from '@/components/projects/ProjectSheet';
 import { FEEDBACK_URL } from '@/lib/feedback';
@@ -2327,13 +2328,7 @@ export default function ChatPage() {
     if (renaming === rowKey) {
       return (
         <div key={rowKey} className="s-row">
-          {item.nodes ? (
-            <span className="s-glyph" aria-hidden="true">
-              <MapGlyph size={14} />
-            </span>
-          ) : (
-            <span className="s-gap" aria-hidden="true" />
-          )}
+          {item.nodes ? <NodeTile count={item.nodes} seed={item.id} /> : <span className="s-gap" aria-hidden="true" />}
           <input
             autoFocus
             className="s-rename"
@@ -2357,9 +2352,7 @@ export default function ChatPage() {
     // A row with a map carries a small map — the thing that tells a line of
     // thinking from a chat is the fact that it grew one, not the model's brand.
     const mark = item.nodes ? (
-      <span className="s-glyph" aria-hidden="true">
-        <MapGlyph size={14} />
-      </span>
+      <NodeTile count={item.nodes} seed={item.id} />
     ) : (
       <span className="s-gap" aria-hidden="true" />
     );

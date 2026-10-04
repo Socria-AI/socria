@@ -38,6 +38,7 @@ import { FEEDBACK_URL } from '@/lib/feedback';
 import Link from 'next/link';
 import { Logo } from './Logo';
 import { MapGlyph } from './MapGlyph';
+import { NodeTile } from './NodeTile';
 import { relTime, type LogosSession } from '@/lib/logos-sessions';
 import {
   cleanTitle,
@@ -217,13 +218,7 @@ export function LogosRail({
     if (renaming === rowKey) {
       return (
         <div key={rowKey} className="s-row">
-          {item.nodes ? (
-            <span className="s-glyph" aria-hidden="true">
-              <MapGlyph size={14} />
-            </span>
-          ) : (
-            <span className="s-gap" aria-hidden="true" />
-          )}
+          {item.nodes ? <NodeTile count={item.nodes} seed={item.id} /> : <span className="s-gap" aria-hidden="true" />}
           <input
             autoFocus
             className="s-rename"
@@ -249,9 +244,7 @@ export function LogosRail({
     // carries the gap, so every title starts on the same vertical line. The
     // same rule /chat's rail uses — it is how the two kinds are told apart.
     const mark = item.nodes ? (
-      <span className="s-glyph" aria-hidden="true">
-        <MapGlyph size={14} />
-      </span>
+      <NodeTile count={item.nodes} seed={item.id} />
     ) : (
       <span className="s-gap" aria-hidden="true" />
     );

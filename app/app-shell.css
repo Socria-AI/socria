@@ -203,6 +203,20 @@
 .app-root .s-row:hover{background:rgba(31,31,31,.04);color:var(--ink)}
 .app-root .s-row.on{background:rgba(94,118,51,.09);color:var(--ink)}
 .app-root .s-row .s-glyph, .app-root .s-row .s-gap{width:14px;flex:0 0 auto;margin-top:1px;color:var(--moss-600)}
+/* A line of thinking's mark: a small square with its map in it — one dot per
+   node, joined to the first. Chats keep the same width of gap, so every title
+   starts on one vertical line whichever kind the row is. */
+.app-root .s-row .s-gap{width:22px}
+.app-root .s-row{align-items:flex-start}
+.app-root .s-tile{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;margin-top:-2px;
+  border-radius:6px;background:rgba(94,118,51,.07);box-shadow:inset 0 0 0 1px rgba(94,118,51,.2);color:var(--moss-600)}
+.app-root .s-tile svg{display:block}
+.app-root .s-tile-edge{stroke:currentColor;stroke-width:.8;opacity:.42;stroke-linecap:round}
+.app-root .s-tile-edge.is-faint{opacity:.2}
+.app-root .s-tile-hub{fill:currentColor}
+.app-root .s-tile-node{fill:currentColor;opacity:.78}
+.app-root .s-row:hover .s-tile{background:rgba(94,118,51,.11)}
+.app-root .s-row.on .s-tile{background:#fff;box-shadow:inset 0 0 0 1px rgba(94,118,51,.38);color:var(--moss-700)}
 .app-root .s-glyph{display:inline-flex;align-items:center}
 .app-root .s-glyph svg{display:block}
 .app-root .s-row .t{flex:1;min-width:0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}

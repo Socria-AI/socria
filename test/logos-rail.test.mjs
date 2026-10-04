@@ -47,7 +47,8 @@ const render = (props) => renderToStaticMarkup(h(LogosRail, { ...base, ...props 
 // ── the mark ────────────────────────────────────────────────────────
 {
   const html = render({ sessions: [session('lg1', 'A map', 3), session('lg2', 'No map', 0)], chats: [chat('c1', 'A chat')] });
-  ok('a session with a map carries the map glyph', html.includes('map-glyph'));
+  ok('a session with a map carries a square tile of its map', html.includes('s-tile'));
+  ok('  drawn with one dot per node', (html.match(/s-tile-(hub|node)/g) || []).length === 3, String((html.match(/s-tile-(hub|node)/g) || []).length));
   ok('  and not the Logos brain', !html.includes('lg-mark'), html.slice(0, 200));
   ok('  with its node count', /<span class="n">3<\/span>/.test(html));
   ok('a session without a map carries the gap', (html.match(/s-gap/g) || []).length === 2);
