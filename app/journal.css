@@ -771,9 +771,9 @@ html.anim-off .jr-root .aside-note, html:not(.js) .jr-root .aside-note{opacity:1
 @keyframes gt-blink{50%{opacity:0}}
 @media(prefers-reduced-motion:reduce),print{.jr-root .guard-type .gt-caret{display:none;animation:none}}
 
-/* ── stage.css ────────────────────────────────────────────── */
+/* ── stage.css (Copy 11: two acts, the Thinking Map then the Board) ──── */
 /* ===== the stage — the product, scroll-driven, inside a minimal Socria window ===== */
-.jr-root .stage-sec{position:relative;z-index:2;height:calc(var(--steps,14) * 46vh + 100svh)}
+.jr-root .stage-sec{position:relative;z-index:2;height:calc(var(--steps,14) * 40vh + 100svh)}
 .jr-root .stage-sec .pin{position:sticky;top:0;height:100svh;display:flex;flex-direction:column;justify-content:center;padding:clamp(56px,7vh,80px) var(--edge) clamp(18px,3vh,30px)}
 .jr-root .stage-sec .cue{display:flex;justify-content:space-between;align-items:baseline;gap:16px;flex-wrap:wrap;margin:0 auto 12px;width:min(1180px,100%)}
 .jr-root .stage-sec .cue .lbl{font-family:var(--font-sans);font-size:.66rem;font-weight:600;letter-spacing:var(--tracking-label);text-transform:uppercase;color:var(--ink-45)}
@@ -790,14 +790,22 @@ html.anim-off .jr-root .aside-note, html:not(.js) .jr-root .aside-note{opacity:1
 .jr-root .app .bar .nm{font-family:var(--font-serif);font-size:1.05rem;line-height:1}
 .jr-root .app .bar .model{display:inline-flex;align-items:center;gap:.5em;font-family:var(--font-sans);font-size:.68rem;font-weight:600;letter-spacing:var(--tracking-label);text-transform:uppercase;color:var(--ink-45);padding-left:12px;border-left:1px solid var(--border)}
 .jr-root .app .bar .model i{width:7px;height:7px;border-radius:50%;background:var(--moss);box-shadow:0 0 0 3px rgba(94,118,51,.14)}
-.jr-root .app .bar .model .m-core, .jr-root .app .bar .model .m-logos{transition:opacity .4s}
-.jr-root .app .bar .model .m-logos{display:none}
+.jr-root .app .bar .model .m-logos, .jr-root .app .bar .model .m-board{display:none}
 .jr-root .app.logos .bar .model .m-core{display:none}
 .jr-root .app.logos .bar .model .m-logos{display:inline}
+.jr-root .app.logos.board .bar .model .m-logos, .jr-root .app.logos.calc .bar .model .m-logos{display:none}
+.jr-root .app.logos.board .bar .model .m-board, .jr-root .app.logos.calc .bar .model .m-board{display:inline}
 .jr-root .app .bar .r{font-family:var(--font-serif);font-style:italic;font-size:.9rem;color:var(--ink-45)}
 .jr-root .app .body{display:grid;grid-template-columns:1fr 0fr;min-height:0;transition:grid-template-columns .9s var(--ease-out-expo)}
-.jr-root .app.logos .body{grid-template-columns:1fr .92fr}
-@media(max-width:820px){.jr-root .app.logos .body{grid-template-columns:1fr}.jr-root .app .pane-map{display:none}}
+.jr-root .app.logos .body{grid-template-columns:1fr 1fr}
+/* on a phone the pane goes under the conversation rather than disappearing:
+   the map and the Board are the argument, not a desktop extra */
+@media(max-width:820px){
+  .jr-root .app{height:clamp(520px,82svh,780px)}
+  .jr-root .app .body, .jr-root .app.logos .body{grid-template-columns:1fr;grid-template-rows:minmax(0,1fr) 0fr;transition:grid-template-rows .9s var(--ease-out-expo)}
+  .jr-root .app.logos .body{grid-template-rows:minmax(0,.9fr) minmax(0,1.1fr)}
+  .jr-root .app .bar .r{display:none}
+}
 
 /* chat pane */
 .jr-root .pane-chat{min-height:0;display:grid;grid-template-rows:minmax(0,1fr) auto;background:
@@ -809,37 +817,69 @@ html.anim-off .jr-root .aside-note, html:not(.js) .jr-root .aside-note{opacity:1
 .jr-root .pane-chat .foot{padding:6px clamp(14px,2.2vw,26px) clamp(12px,1.8vw,20px)}
 .jr-root .thread .guard{max-width:none;align-self:stretch}
 
-/* map / board pane */
-.jr-root .pane-map{min-width:0;border-left:1px solid var(--border);position:relative;overflow:hidden;
-  background-image:radial-gradient(circle,rgba(53,70,32,.18) 1px,transparent 1px);background-size:26px 26px;background-color:#f3f0e6}
-.jr-root .pane-map .ph{position:absolute;left:14px;top:12px;font-family:var(--font-sans);font-size:.62rem;font-weight:600;letter-spacing:var(--tracking-label);text-transform:uppercase;color:var(--ink-45)}
+/* the Logos pane: two tabs, two layers in one cell, crossfading */
+.jr-root .pane-map{min-width:0;min-height:0;border-left:1px solid var(--border);position:relative;overflow:hidden;
+  display:grid;grid-template-rows:auto minmax(0,1fr);background-color:#f3f0e6}
+@media(max-width:820px){.jr-root .pane-map{border-left:none;border-top:1px solid var(--border)}}
+.jr-root .ptabs{display:flex;align-items:center;gap:4px;padding:8px 10px;border-bottom:1px solid var(--border);background:rgba(244,241,232,.9);position:relative;z-index:3}
+.jr-root .ptabs button{font-family:var(--font-sans);font-size:12px;padding:6px 13px;border-radius:999px;border:1px solid transparent;
+  background:none;color:var(--ink-60,rgba(32,32,27,.6));cursor:pointer;transition:background .25s,color .25s,border-color .25s}
+.jr-root .ptabs button:hover{color:var(--ink)}
+.jr-root .ptabs button[aria-selected="true"]{background:#fff;border-color:var(--ink-16,rgba(32,32,27,.16));color:var(--ink)}
+.jr-root .ptabs .pn{margin-left:auto;font-family:var(--font-serif);font-style:italic;font-size:.85rem;color:var(--ink-45)}
+.jr-root .layer{grid-row:2;grid-column:1;position:relative;min-height:0;transition:opacity .5s var(--ease-standard),visibility .5s}
+.jr-root .layer-map{background-image:radial-gradient(circle,rgba(53,70,32,.18) 1px,transparent 1px);background-size:26px 26px}
+.jr-root .app:not(.board) .layer-board, .jr-root .app:not(.calc) .layer-calc, .jr-root .app.board .layer-map, .jr-root .app.calc .layer-map{opacity:0;visibility:hidden}
+
+/* the map */
 .jr-root .pane-map .edges{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
 .jr-root .pane-map .edges path{fill:none;stroke-width:1.4}
 .jr-root .pane-map .e-person{stroke:rgba(94,118,51,.7)}
 .jr-root .pane-map .e-question{stroke:#E8B62C;stroke-dasharray:5 5}
 .jr-root .pane-map .e-evidence{stroke:#3A6EA5}
 .jr-root .pane-map .mapnode{position:absolute;max-width:min(52%,230px)}
-.jr-root .pane-map .plot{position:absolute;inset:0;display:none;flex-direction:column;padding:clamp(14px,2.4vw,28px);background:#f3f0e6}
-.jr-root .app.plot .pane-map .plot{display:flex}
-.jr-root .app.plot .pane-map .edges, .jr-root .app.plot .pane-map .mapnode, .jr-root .app.plot .pane-map .ph{display:none}
-.jr-root .plot .bt{font-family:var(--font-sans);font-size:.62rem;font-weight:600;letter-spacing:var(--tracking-label);text-transform:uppercase;color:var(--ink-45)}
-.jr-root .plot svg{display:block;width:100%;height:auto;max-height:calc(100% - 60px);margin:auto 0;overflow:visible}
-.jr-root .plot .ax{stroke:var(--ink-25);stroke-width:1}
-.jr-root .plot .fn{fill:none;stroke:var(--moss);stroke-width:2.2;stroke-linecap:round}
-.jr-root .plot .lvl{fill:none;stroke:#E8B62C;stroke-width:1.6;stroke-dasharray:6 5}
-.jr-root .plot .gap{fill:none;stroke:var(--ink-45);stroke-width:1.4;stroke-dasharray:3 4}
-.jr-root .plot .drop{fill:none;stroke:var(--moss);stroke-width:1.2;stroke-dasharray:3 4;opacity:.7}
-.jr-root .plot .pt.q{fill:#F4F1E8;stroke:#E8B62C;stroke-width:2;stroke-dasharray:3 3}
-.jr-root .plot .pt.hollow{fill:none;stroke:var(--ink-45);stroke-width:1.4}
-.jr-root .plot .pt.p{fill:var(--moss);stroke:var(--moss)}
-.jr-root .plot .pl{font-family:var(--font-sans);font-size:10.5px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;fill:var(--ink-45)}
-.jr-root .plot .pl.person{fill:var(--moss-700)}.jr-root .plot .pl.question{fill:#a37c12}.jr-root .plot .pl.faint{fill:var(--ink-45)}
-.jr-root .plot .note{font-family:var(--font-serif);font-style:italic;color:var(--moss-700);font-size:1rem;margin-top:8px}
-/* the plot paints in: the function draws, the points settle */
-.jr-root .stage-sec.live .plot .st.on .fn{stroke-dasharray:420;stroke-dashoffset:420;animation:fn-draw 1.1s var(--ease-standard) both}
+
+/* the Board: the working above, the plot of it below */
+.jr-root .layer-board{display:block;padding:clamp(12px,2vw,22px) clamp(14px,2.4vw,26px) clamp(10px,1.6vw,16px);
+}
+
+/* the working compresses on a short screen so the plot keeps the height */
+.jr-root .work{font-family:"STIX Two Text",var(--font-serif);font-size:clamp(.9rem,min(1.9vw,2.5vh),1.45rem);line-height:1.62;color:var(--ink)}
+.jr-root .work .row{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;position:relative}
+.jr-root .work .row .no{font-family:var(--font-sans);font-size:.55em;color:var(--ink-45);width:1.4ch;flex:0 0 auto}
+.jr-root .work .wrong{position:relative;display:inline-block}
+.jr-root .work .wrong .ring{position:absolute;left:-10px;top:-2px;width:calc(100% + 20px);height:calc(100% + 4px);overflow:visible;pointer-events:none}
+/* "ring" is also a Tailwind utility (a blue 3px box-shadow), and this app
+   loads Tailwind; the hand-drawn ring around the mistake must not get one. */
+.jr-root .work .wrong .ring{box-shadow:none;--tw-ring-shadow:0 0 #0000;--tw-ring-offset-shadow:0 0 #0000}
+.jr-root .work .wrong .ring path{fill:none;stroke:#E8B62C;stroke-width:2.2;stroke-linecap:round;stroke-dasharray:330;stroke-dashoffset:330}
+.jr-root .work .wrong .strike{position:absolute;left:-4%;top:46%;width:108%;height:.5em;overflow:visible;pointer-events:none}
+.jr-root .work .wrong .strike path{fill:none;stroke:var(--ink);stroke-width:2.2;stroke-linecap:round;stroke-dasharray:130;stroke-dashoffset:130}
+.jr-root .work .st.on .ring path, .jr-root .work .ring.on path{stroke-dashoffset:0;transition:stroke-dashoffset .9s ease .1s}
+.jr-root .work .strike.on path{stroke-dashoffset:0;transition:stroke-dashoffset .6s ease .15s}
+.jr-root .work .fix{font-family:"Kalam",cursive;color:var(--moss-700);font-size:.92em}
+.jr-root .work .hand{font-family:"Kalam",cursive;color:#6b520b;font-size:.72em}
+
+.jr-root .plotbox{min-height:0;display:flex;flex-direction:column;border-top:1px solid var(--border);padding-top:6px}
+.jr-root .plotbox svg{display:block;width:100%;height:100%;min-height:0;flex:1;overflow:visible}
+.jr-root .plotbox .gl{stroke:rgba(32,32,27,.06);stroke-width:1}
+.jr-root .plotbox .ax{stroke:var(--ink-25);stroke-width:1}
+.jr-root .plotbox .tk{font-family:var(--font-sans);font-size:10px;fill:var(--ink-45)}
+.jr-root .plotbox .fn{fill:none;stroke:var(--moss);stroke-width:2.4;stroke-linecap:round}
+.jr-root .plotbox .lvl{fill:none;stroke:#E8B62C;stroke-width:1.6;stroke-dasharray:6 5}
+.jr-root .plotbox .gap{fill:none;stroke:var(--ink-45);stroke-width:1.4;stroke-dasharray:3 4}
+.jr-root .plotbox .drop{fill:none;stroke:var(--moss);stroke-width:1.2;stroke-dasharray:3 4;opacity:.7}
+.jr-root .plotbox .pt.q{fill:#F4F1E8;stroke:#E8B62C;stroke-width:2;stroke-dasharray:3 3}
+.jr-root .plotbox .pt.hollow{fill:none;stroke:var(--ink-45);stroke-width:1.4}
+.jr-root .plotbox .pt.p{fill:var(--moss);stroke:var(--moss)}
+.jr-root .plotbox .pl{font-family:var(--font-sans);font-size:10.5px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;fill:var(--ink-45)}
+.jr-root .plotbox .pl.person{fill:var(--moss-700)}.jr-root .plotbox .pl.question{fill:#6b520b}.jr-root .plotbox .pl.faint{fill:var(--ink-45)}
+/* the hint the act turns on is argument, not metadata */
+.jr-root .plotbox .pl.hint{fill:rgba(32,32,27,.72)}
+.jr-root .plotbox .pnote{font-family:var(--font-serif);font-style:italic;color:var(--moss-700);font-size:.98rem;margin-top:4px}
+.jr-root .stage-sec.live .plotbox .st.on .fn{stroke-dasharray:420;stroke-dashoffset:420;animation:fn-draw 1.1s var(--ease-standard) both}
 @keyframes fn-draw{to{stroke-dashoffset:0}}
-/* once you answer, the wrong guess steps back */
-.jr-root .app.plot .plot .st[data-step="12"].on ~ .st[data-step="9"] .pt.q{opacity:.3}
+
 /* step gating — only once the driver is alive; default is the finished state */
 @keyframes st-rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
 @keyframes nd-in{from{opacity:0;scale:.92}to{opacity:1;scale:1}}
@@ -848,31 +888,185 @@ html.anim-off .jr-root .aside-note, html:not(.js) .jr-root .aside-note{opacity:1
 .jr-root .stage-sec.live .mapnode.st.on{animation:nd-in .55s var(--ease-out-expo) both}
 .jr-root .stage-sec.live .edges path.st{transition:opacity .5s}
 .jr-root .stage-sec.live .edges path.st:not(.on){display:block!important;opacity:0}
-.jr-root .stage-sec.live .plot .st:not(.on){display:block!important;visibility:hidden}
-.jr-root .stage-sec.live .plot .st.on{visibility:visible}
-html.anim-off .jr-root .stage-sec.live .st, html:not(.js) .jr-root .stage-sec.live .st{display:revert!important;visibility:visible!important;opacity:1!important;animation:none!important}
+.jr-root .stage-sec.live .layer-board .st:not(.on){display:revert!important;visibility:hidden}
+.jr-root .stage-sec.live .layer-board .row.st:not(.on){display:flex!important}
+.jr-root .stage-sec.live .layer-board .st.on{visibility:visible}
+.jr-root .stage-sec.live .layer-board svg.st:not(.on){display:block!important}
+html.anim-off .jr-root .stage-sec:not(.scrub).live .st{display:revert!important;visibility:visible!important;opacity:1!important;animation:none!important;transition:none!important}
+html.anim-off .jr-root .stage-sec:not(.scrub) .edges path{opacity:1!important;transition:none!important}
+html.anim-off .jr-root .stage-sec:not(.scrub).live .htable .hr.st, html.anim-off .jr-root .stage-sec:not(.scrub) .htable .hr{display:grid!important}
 /* frozen timeline: the finished conversation beside the finished map, no transition to stall on */
-html.anim-off .jr-root .app .body, html:not(.js) .jr-root .app .body{transition:none;grid-template-columns:1fr .92fr}
-html.anim-off .jr-root .app .bar .model .m-core, html:not(.js) .jr-root .app .bar .model .m-core{display:none}
-html.anim-off .jr-root .app .bar .model .m-logos, html:not(.js) .jr-root .app .bar .model .m-logos{display:inline}
-/* The one rule the `html:not(.js)` pass missed, because it is nested inside a
-   single-line @media and the transform read the media query's brace as the
-   selector's. Without the twin, a no-JS phone got the Stage as two columns —
-   the conversation squeezed into half the width beside an empty dotted pane. */
-@media(max-width:820px){
-  html.anim-off .jr-root .app .body,
-  html:not(.js) .jr-root .app .body{grid-template-columns:1fr}
-}
-/* frozen: the map is the state worth showing; the plot yields to it */
-html.anim-off .jr-root .app.plot .pane-map .plot, html:not(.js) .jr-root .app.plot .pane-map .plot{display:none}
-html.anim-off .jr-root .app.plot .pane-map .edges, html:not(.js) .jr-root .app.plot .pane-map .edges, html.anim-off .jr-root .app.plot .pane-map .mapnode, html:not(.js) .jr-root .app.plot .pane-map .mapnode, html.anim-off .jr-root .app.plot .pane-map .ph, html:not(.js) .jr-root .app.plot .pane-map .ph{display:block}
+html.anim-off .jr-root .stage-sec:not(.scrub) .app .body{transition:none}
+html.anim-off .jr-root .stage-sec:not(.scrub) .app .bar .model .m-core{display:none}
+html.anim-off .jr-root .stage-sec:not(.scrub) .app .bar .model .m-logos{display:inline}
+@media(max-width:820px){html.anim-off .jr-root .stage-sec:not(.scrub) .app .body{grid-template-columns:1fr}}
+/* frozen: the finished state is both acts at once — the map, and the Board under it.
+   Unpinned, exactly as reduced-motion does, so nothing has to fit a 100svh pin. */
+html.anim-off .jr-root .stage-sec:not(.scrub){height:auto}
+html.anim-off .jr-root .stage-sec:not(.scrub) .pin{position:static;height:auto}
+html.anim-off .jr-root .stage-sec:not(.scrub) .app{flex:none;height:auto}
+html.anim-off .jr-root .stage-sec:not(.scrub) .app .body{grid-template-columns:1fr 1fr}
+html.anim-off .jr-root .stage-sec:not(.scrub) .thread{overflow:visible}
+html.anim-off .jr-root .stage-sec:not(.scrub) .pane-map{grid-template-rows:auto 400px auto;align-content:start}
+html.anim-off .jr-root .stage-sec:not(.scrub) .ptabs button{display:none}
+html.anim-off .jr-root .stage-sec:not(.scrub) .layer{opacity:1!important;visibility:visible!important;transition:none!important}
+html.anim-off .jr-root .stage-sec:not(.scrub) .layer-map{grid-row:2}
+html.anim-off .jr-root .stage-sec:not(.scrub) .layer-board{grid-row:3;border-top:1px solid var(--border);min-height:460px}
+html.anim-off .jr-root .stage-sec:not(.scrub) .work .ring path, html.anim-off .jr-root .stage-sec:not(.scrub) .work .strike path{stroke-dashoffset:0}
+@media(max-width:820px){html.anim-off .jr-root .stage-sec:not(.scrub) .app .body{grid-template-columns:1fr;grid-template-rows:auto auto}}
 @media(prefers-reduced-motion:reduce){.jr-root .stage-sec{height:auto}.jr-root .stage-sec .pin{position:static;height:auto}}
 
-/* progress ticks under the window */
-.jr-root .stage-sec .ticks{width:min(1180px,100%);margin:12px auto 0;display:flex;gap:6px}
+/* the two acts under the window, as two equal halves */
+.jr-root .stage-sec .acts{width:min(1180px,100%);margin:12px auto 0;display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+.jr-root .stage-sec .act{display:flex;flex-direction:column;gap:6px}
+.jr-root .stage-sec .act .an{font-family:var(--font-sans);font-size:.62rem;font-weight:600;letter-spacing:var(--tracking-label);text-transform:uppercase;color:var(--ink-45)}
+.jr-root .stage-sec .ticks{display:flex;gap:5px}
 .jr-root .stage-sec .ticks i{flex:1;height:2px;background:var(--ink-12);position:relative;overflow:hidden}
 .jr-root .stage-sec .ticks i b{position:absolute;inset:0;background:var(--moss);transform:scaleX(0);transform-origin:left;display:block}
 .jr-root .stage-sec .ticks i.on b{transform:scaleX(1);transition:transform .35s var(--ease-out-expo)}
+
+.jr-root .layer-board .bdin{display:grid;grid-template-rows:auto minmax(0,1fr);gap:6px;height:100%}
+
+/* print: unpinned and stacked, both layers showing */
+@media print{
+  .jr-root .stage-sec{height:auto}
+  .jr-root .stage-sec .pin{position:static;height:auto}
+  .jr-root .app{flex:none;height:auto;break-inside:avoid}
+  .jr-root .app .body{grid-template-columns:1fr 1fr!important}
+  .jr-root .pane-map{grid-template-rows:auto 400px auto;align-content:start}
+  .jr-root .ptabs button{display:none}
+  .jr-root .layer{opacity:1!important;visibility:visible!important;transition:none!important}
+  .jr-root .layer-map{grid-row:2}
+  .jr-root .layer-board{grid-row:3;border-top:1px solid var(--border);min-height:460px}
+  .jr-root .thread{overflow:visible}
+  .jr-root .stage-sec .st{display:revert!important;visibility:visible!important;opacity:1!important;animation:none!important;transition:none!important}
+  .jr-root .stage-sec .edges path{opacity:1!important;transition:none!important}
+  .jr-root .stage-sec .htable .hr.st, .jr-root .stage-sec .htable .hr{display:grid!important}
+  .jr-root .work .ring path, .jr-root .work .strike path{stroke-dashoffset:0}
+}
+
+/* ---------- Act III · calculus on the Board ----------
+   The curve is moss because it is yours; the secant is mustard because it is
+   still a question; the tangent turns moss because it is the answer you
+   reached. The code, not decoration. */
+.jr-root .layer-calc{padding:clamp(10px,1.8vw,20px) clamp(14px,2.4vw,26px) clamp(10px,1.6vw,16px)}
+.jr-root .calcin{display:grid;grid-template-rows:minmax(0,1fr) auto;gap:8px;height:100%}
+.jr-root .calcplot{min-height:0;display:flex}
+.jr-root .calcplot svg{display:block;width:100%;height:100%;min-height:0;overflow:visible}
+.jr-root .calcplot .gl{stroke:rgba(32,32,27,.06);stroke-width:1}
+.jr-root .calcplot .ax, .jr-root .dplot .ax{stroke:var(--ink-25);stroke-width:1}
+.jr-root .calcplot .tk, .jr-root .dplot .tk{font-family:var(--font-sans);font-size:10px;fill:var(--ink-45)}
+.jr-root .calcplot .curve{fill:none;stroke:var(--moss);stroke-width:2.6;stroke-linecap:round}
+.jr-root .calcplot .sline{fill:none;stroke:#E8B62C;stroke-width:1.8;stroke-dasharray:6 5}
+.jr-root .calcplot .tline{fill:none;stroke:var(--moss-700);stroke-width:2.2}
+.jr-root .calcplot .rise{fill:none;stroke:#6b520b;stroke-width:1;stroke-dasharray:2 3}
+.jr-root .calcplot .pt.q{fill:#F4F1E8;stroke:#E8B62C;stroke-width:2}
+.jr-root .calcplot .pt.p, .jr-root .dplot .pt.p{fill:var(--moss);stroke:var(--moss)}
+.jr-root .calcplot .pl, .jr-root .dplot .pl{font-family:var(--font-sans);font-size:10.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase}
+.jr-root .calcplot .pl.person, .jr-root .dplot .pl.person{fill:var(--moss-700)}
+.jr-root .calcplot .pl.question{fill:#6b520b}
+/* the trail: where the live line has been, faint */
+.jr-root .calcplot .trail{fill:none;stroke:#E8B62C;stroke-width:1.2;stroke-dasharray:4 5;opacity:.35}
+.jr-root .calcplot .pt.q{transition:opacity .4s}
+.jr-root .stage-sec.live .calcplot .st.on .curve{stroke-dasharray:640;stroke-dashoffset:640;animation:fn-draw 1.2s var(--ease-standard) both}
+
+.jr-root .calcfoot{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,.75fr);gap:clamp(10px,1.8vw,18px);
+  border-top:1px solid var(--border);padding-top:8px;align-items:end}
+/* the table runs sideways — h across the top, slope under it — so it costs
+   two lines of height and the plot keeps the rest */
+.jr-root .htable{display:flex;align-items:stretch;font-variant-numeric:tabular-nums;min-width:0}
+.jr-root .htable .hr{display:grid;grid-template-rows:auto auto;gap:2px;padding:0 7px;border-left:1px solid var(--ink-12);
+  font-family:"STIX Two Text",var(--font-serif);font-size:clamp(.82rem,min(1.5vw,2.3vh),1.02rem);color:var(--ink);text-align:center}
+.jr-root .htable .hr span:first-child{color:var(--ink-70)}
+.jr-root .htable .hr.hd{border-left:none;padding-left:0;text-align:left;font-family:var(--font-sans);font-size:9.5px;font-weight:600;
+  letter-spacing:.2em;text-transform:uppercase;color:var(--ink-45);align-content:space-between}
+.jr-root .htable .hr.hd span:first-child{color:var(--ink-45)}
+.jr-root .htable .hr.lim{color:var(--moss-700);border-left:1.5px solid var(--moss);font-style:italic}
+.jr-root .htable .hr.lim span:first-child{color:var(--moss-700)}
+.jr-root .stage-sec.live .htable .hr.st.on{display:grid!important}
+.jr-root .dplot{display:flex;flex-direction:column;gap:2px;min-width:0}
+.jr-root .dplot .dt{font-family:var(--font-sans);font-size:9.5px;font-weight:600;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-45)}
+.jr-root .dplot svg{display:block;width:100%;height:auto;max-height:clamp(52px,11vh,110px);overflow:visible}
+.jr-root .dplot .dline{fill:none;stroke:var(--moss);stroke-width:1.8;stroke-dasharray:5 4}
+
+/* frozen and print: a fourth row, the calculus Board, under the other two */
+html.anim-off .jr-root .stage-sec:not(.scrub) .pane-map{grid-template-rows:auto 400px auto auto}
+html.anim-off .jr-root .stage-sec:not(.scrub) .layer-calc{grid-row:4;border-top:1px solid var(--border);min-height:480px}
+
+@media print{.jr-root .pane-map{grid-template-rows:auto 400px auto auto}.jr-root .layer-calc{grid-row:4;border-top:1px solid var(--border);min-height:480px}}
+
+/* ---------- motion, per figure ----------
+   Each figure moves the way its argument moves: map edges draw between the
+   nodes they join, the plot's line draws, the answer travels from your 13 to
+   5 along y = 27, and the derivative line draws through the slopes you found. */
+@keyframes edge-draw{from{stroke-dasharray:1;stroke-dashoffset:1}to{stroke-dasharray:1;stroke-dashoffset:0}}
+.jr-root .stage-sec.live .edges path.st.on{animation:edge-draw .9s var(--ease-out-expo) both}
+.jr-root .stage-sec.live .edges path.st.on.e-question{animation:none}
+@keyframes fly-in{from{transform:translateX(172.8px)}to{transform:none}}
+.jr-root .stage-sec.live .plotbox .st.on .fly{animation:fly-in 1.3s var(--ease-out-expo) both}
+@keyframes lvl-draw{from{stroke-dashoffset:360}to{stroke-dashoffset:0}}
+.jr-root .stage-sec.live .plotbox .st.on .lvl{stroke-dasharray:6 5;animation:lvl-draw 1s var(--ease-standard) both}
+.jr-root .stage-sec.live .plotbox .st.on .gap{animation:edge-draw .7s var(--ease-out-expo) both}
+@keyframes pop{from{opacity:0;transform:scale(.4)}to{opacity:1;transform:none}}
+.jr-root .stage-sec.live .st.on .pt{transform-box:fill-box;transform-origin:center}
+.jr-root .stage-sec.live .plotbox .st.on .pt.q, .jr-root .stage-sec.live .dplot .st.on .pt{animation:pop .5s var(--ease-out-expo) both}
+.jr-root .stage-sec.live .dplot .st.on .dline{stroke-dasharray:240;stroke-dashoffset:240;animation:fn-draw 1.1s var(--ease-standard) both}
+.jr-root .stage-sec.live .htable .hr.st.on{animation:st-rise .45s var(--ease-out-expo) both}
+@media(prefers-reduced-motion:reduce){.jr-root .stage-sec .st{animation:none!important}}
+
+/* frozen and print: the calculus plot is the finished tangent, whatever the
+   live secant was last drawn as */
+html.anim-off .jr-root .stage-sec:not(.scrub) .calcplot [data-live="q"], html.anim-off .jr-root .stage-sec:not(.scrub) .calcplot [data-live="rise"]{display:none}
+html.anim-off .jr-root .stage-sec:not(.scrub) .calcplot [data-live="line"]{stroke:var(--moss-700);stroke-width:2.2;stroke-dasharray:none}
+@media print{
+  .jr-root .calcplot [data-live="q"], .jr-root .calcplot [data-live="rise"]{display:none}
+  .jr-root .calcplot [data-live="line"]{stroke:var(--moss-700);stroke-width:2.2;stroke-dasharray:none}
+}
+
+/* scrubbed by the driver: every entrance, draw and crossfade is set inline
+   from the scroll position, so CSS motion is switched off inside the stage */
+.jr-root .stage-sec.scrub, .jr-root .stage-sec.scrub *{animation:none!important}
+.jr-root .stage-sec.scrub .st, .jr-root .stage-sec.scrub .layer, .jr-root .stage-sec.scrub .app .body, .jr-root .stage-sec.scrub path, .jr-root .stage-sec.scrub circle{transition:none!important}
+@media(min-width:821px){.jr-root .stage-sec.scrub .app .body{grid-template-columns:1fr 0fr}}
+@media(max-width:820px){.jr-root .stage-sec.scrub .app .body{grid-template-columns:1fr}}
+
+/* reduced motion: the same finished stack as the frozen fallback */
+.jr-root .stage-sec.static.live .st{display:revert!important;visibility:visible!important;opacity:1!important;animation:none!important;transition:none!important}
+.jr-root .stage-sec.static .edges path{opacity:1!important;transition:none!important}
+.jr-root .stage-sec.static.live .htable .hr.st, .jr-root .stage-sec.static .htable .hr{display:grid!important}
+.jr-root .stage-sec.static .app .body{transition:none}
+.jr-root .stage-sec.static .app .bar .model .m-core{display:none}
+.jr-root .stage-sec.static .app .bar .model .m-logos{display:inline}
+.jr-root .stage-sec.static .app .body{grid-template-columns:1fr}
+.jr-root .stage-sec.static{height:auto}
+.jr-root .stage-sec.static .pin{position:static;height:auto}
+.jr-root .stage-sec.static .app{flex:none;height:auto}
+.jr-root .stage-sec.static .app .body{grid-template-columns:1fr 1fr}
+.jr-root .stage-sec.static .thread{overflow:visible}
+.jr-root .stage-sec.static .pane-map{grid-template-rows:auto 400px auto;align-content:start}
+.jr-root .stage-sec.static .ptabs button{display:none}
+.jr-root .stage-sec.static .layer{opacity:1!important;visibility:visible!important;transition:none!important}
+.jr-root .stage-sec.static .layer-map{grid-row:2}
+.jr-root .stage-sec.static .layer-board{grid-row:3;border-top:1px solid var(--border);min-height:460px}
+.jr-root .stage-sec.static .work .ring path, .jr-root .stage-sec.static .work .strike path{stroke-dashoffset:0}
+.jr-root .stage-sec.static .pane-map{grid-template-rows:auto 400px auto auto}
+.jr-root .stage-sec.static .layer-calc{grid-row:4;border-top:1px solid var(--border);min-height:480px}
+.jr-root .stage-sec.static .calcplot [data-live="q"], .jr-root .stage-sec.static .calcplot [data-live="rise"]{display:none}
+.jr-root .stage-sec.static .calcplot [data-live="line"]{stroke:var(--moss-700);stroke-width:2.2;stroke-dasharray:none}
+@media(max-width:820px){.jr-root .stage-sec.static .app .body{grid-template-columns:1fr;grid-template-rows:auto auto}}
+.jr-root .stage-sec.static .app .bar .model .m-core, .jr-root .stage-sec.static .app .bar .model .m-logos{display:none}
+.jr-root .stage-sec.static .app .bar .model .m-board{display:inline}
+
+/* the stage's own door: the window header offers the real thing */
+.jr-root .app .bar .open-it{display:inline-flex;align-items:center;gap:.45em;font-family:var(--font-sans);
+  font-size:12px;font-style:normal;color:var(--moss-700);text-decoration:none;white-space:nowrap;
+  border:1px solid rgba(94,118,51,.4);border-radius:var(--radius-pill);padding:5px 12px;
+  transition:background .2s,border-color .2s}
+.jr-root .app .bar .open-it:hover{background:rgba(94,118,51,.09);border-color:var(--moss);color:var(--moss-700)}
+.jr-root .app .bar .open-it .ar{transition:transform .2s}
+.jr-root .app .bar .open-it:hover .ar{transform:translateX(3px)}
+@media(max-width:620px){.jr-root .app .bar .open-it{padding:4px 9px;font-size:11px}}
+
 
 /* ── the auth chrome in the masthead ──────────────────────────────────
    Not in the prototype: it was a standalone export with nowhere to sign in
@@ -901,25 +1095,25 @@ html.anim-off .jr-root .app.plot .pane-map .edges, html:not(.js) .jr-root .app.p
 .jr-root .lg-move h3{font-size:clamp(1.3rem,2vw,1.7rem)}
 .jr-root .lg-move p{font-size:.94rem;color:var(--ink-70);line-height:1.5}
 .jr-root .lg-move svg{width:44px;height:44px;overflow:visible;margin-top:auto;fill:none;stroke:var(--moss);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
-.jr-root .board{margin-top:clamp(24px,4vh,42px);background:linear-gradient(172deg,#232f14,#1a2410);border:9px solid #3d3428;padding:clamp(24px,3.6vw,48px);color:rgba(240,234,216,.88);box-shadow:inset 0 0 60px rgba(0,0,0,.5)}
-.jr-root .board .bt{font-family:var(--font-sans);font-size:.66rem;font-weight:600;letter-spacing:var(--tracking-label);text-transform:uppercase;color:rgba(240,234,216,.55)}
-.jr-root .board .eq{font-family:var(--font-math),Georgia,serif;font-size:clamp(1.4rem,2.8vw,2.2rem);line-height:1.9;margin-top:12px}
-.jr-root .board .eq .row{display:block;width:fit-content}
-.jr-root .board .strike{position:relative;display:inline-block}
-.jr-root .board .strike svg{position:absolute;left:-4%;top:46%;width:108%;height:.5em;overflow:visible}
-.jr-root .board .strike svg path{fill:none;stroke:rgba(240,234,216,.9);stroke-width:2.6;stroke-linecap:round;stroke-dasharray:130;stroke-dashoffset:130}
-.jr-root .reading.in .board .strike svg path{stroke-dashoffset:0;transition:stroke-dashoffset .7s ease 1s}
+.jr-root .board:not(.app){margin-top:clamp(24px,4vh,42px);background:linear-gradient(172deg,#232f14,#1a2410);border:9px solid #3d3428;padding:clamp(24px,3.6vw,48px);color:rgba(240,234,216,.88);box-shadow:inset 0 0 60px rgba(0,0,0,.5)}
+.jr-root .board:not(.app) .bt{font-family:var(--font-sans);font-size:.66rem;font-weight:600;letter-spacing:var(--tracking-label);text-transform:uppercase;color:rgba(240,234,216,.55)}
+.jr-root .board:not(.app) .eq{font-family:var(--font-math),Georgia,serif;font-size:clamp(1.4rem,2.8vw,2.2rem);line-height:1.9;margin-top:12px}
+.jr-root .board:not(.app) .eq .row{display:block;width:fit-content}
+.jr-root .board:not(.app) .strike{position:relative;display:inline-block}
+.jr-root .board:not(.app) .strike svg{position:absolute;left:-4%;top:46%;width:108%;height:.5em;overflow:visible}
+.jr-root .board:not(.app) .strike svg path{fill:none;stroke:rgba(240,234,216,.9);stroke-width:2.6;stroke-linecap:round;stroke-dasharray:130;stroke-dashoffset:130}
+.jr-root .reading.in .board:not(.app) .strike svg path{stroke-dashoffset:0;transition:stroke-dashoffset .7s ease 1s}
 /* The struck error and its fix start hidden and are revealed by the reading
    coming into view. Both have a print fallback below, and neither is the only
    thing standing between somebody and the working — the equation above them
    is plain text. */
-.jr-root .board .fix{font-style:italic;color:var(--sage);margin-left:.7em;opacity:0}
-.jr-root .reading.in .board .fix{opacity:1;transition:opacity .7s ease 1.6s}
-.jr-root .board .note{font-family:var(--font-hand),cursive;font-size:1.05rem;color:rgba(240,234,216,.6);margin-top:14px}
-@media print{.jr-root .board .strike svg path{stroke-dashoffset:0}.jr-root .board .fix{opacity:1}}
+.jr-root .board:not(.app) .fix{font-style:italic;color:var(--sage);margin-left:.7em;opacity:0}
+.jr-root .reading.in .board:not(.app) .fix{opacity:1;transition:opacity .7s ease 1.6s}
+.jr-root .board:not(.app) .note{font-family:var(--font-hand),cursive;font-size:1.05rem;color:rgba(240,234,216,.6);margin-top:14px}
+@media print{.jr-root .board:not(.app) .strike svg path{stroke-dashoffset:0}.jr-root .board:not(.app) .fix{opacity:1}}
 /* Same rule as everywhere else here: if the reveal never runs, show it. */
-html.anim-off .jr-root .board .strike svg path, html:not(.js) .jr-root .board .strike svg path{stroke-dashoffset:0}
-html.anim-off .jr-root .board .fix, html:not(.js) .jr-root .board .fix{opacity:1}
+html.anim-off .jr-root .board:not(.app) .strike svg path, html:not(.js) .jr-root .board:not(.app) .strike svg path{stroke-dashoffset:0}
+html.anim-off .jr-root .board:not(.app) .fix, html:not(.js) .jr-root .board:not(.app) .fix{opacity:1}
 
 /* the close section's two actions */
 .jr-root .btn-xl{display:inline-flex;align-items:center;gap:10px;background:var(--sage);color:var(--forest-2);font-weight:500;padding:16px 30px;border-radius:2px;font-size:1.02rem}

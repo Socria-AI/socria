@@ -520,37 +520,101 @@ function runJournal() {
   })();
 
 
-  /* ── the stage: fourteen steps of Core 3.1 → Logos → the Board ───── */
+  /* ── the stage: two acts, the Thinking Map then the Board (Copy 11) ──
+     Scrubbed by hand from the scroll position: every entrance, draw and
+     crossfade is set inline, because a CSS clock can sit still in a throttled
+     tab while the page itself scrolls perfectly well. Step counts must match
+     components/journal/Stage.tsx. */
+  const STAGE_STEPS = 13, STAGE_ACT2 = 7;
   function driveStage(){
     const sec = document.querySelector(".stage-sec");
     if(!sec) return;
     const app = sec.querySelector(".app");
-    const items = [].slice.call(sec.querySelectorAll(".st[data-step]"));
-    const ticks = [].slice.call(sec.querySelectorAll(".ticks i"));
-    const steps = +sec.style.getPropertyValue("--steps") || 14;
+    const body = app.querySelector(".body");
     const reduce = window.SocriaIssue && window.SocriaIssue.reduce;
-    let alive = 0, live = false, last = -1;
-    function apply(step){
-      if(step === last) return; last = step;
-      items.forEach(el => el.classList.toggle("on", +el.dataset.step <= step));
-      ticks.forEach(t => t.classList.toggle("on", +t.dataset.step <= step));
-      app.classList.toggle("logos", step >= 4);
-      app.classList.toggle("plot", step >= 9);
-      sec.classList.toggle("deep", step >= 1);
+    if(reduce){ sec.classList.add("static"); return }  /* the finished stack, not a collapsed pane */
+    sec.classList.add("live", "scrub");
+
+    const items = [].slice.call(sec.querySelectorAll(".st[data-step]"));
+    const ticks = [].slice.call(sec.querySelectorAll(".acts i[data-step]"));
+    const tabs = [].slice.call(sec.querySelectorAll(".ptabs button"));
+    const L = { map: sec.querySelector(".layer-map"), board: sec.querySelector(".layer-board") };
+    const narrow = () => matchMedia("(max-width:820px)").matches;
+    const clamp = v => Math.max(0, Math.min(1, v));
+    const ease = u => u * u * (3 - 2 * u);
+
+    /* how each kind of piece moves */
+    const DRAW = [[".fn", 420], [".lvl", 360], [".curve", 640], [".dline", 240], [".gap", 1], [".drop", 1]];
+    function place(el, u){
+      const k = el.classList;
+      el.style.opacity = k.contains("trail") ? (u * .35).toFixed(3) : u.toFixed(3);
+      if(el.closest(".thread")) el.style.transform = u < 1 ? "translateY(" + ((1 - u) * 14).toFixed(1) + "px)" : "";
+      if(k.contains("mapnode")) el.style.scale = (.92 + .08 * u).toFixed(3);
+      if(el.tagName === "path" && el.closest(".edges")){
+        if(!k.contains("e-question")){ el.style.strokeDasharray = "1"; el.style.strokeDashoffset = (1 - u).toFixed(3) }
+      }
+      if(k.contains("ring"))   { const p = el.querySelector("path"); p.style.strokeDashoffset = ((1 - u) * 330).toFixed(1) }
+      if(k.contains("strike")) { const p = el.querySelector("path"); p.style.strokeDashoffset = ((1 - u) * 130).toFixed(1) }
+      DRAW.forEach(([sel, len]) => el.querySelectorAll(sel).forEach(p => {
+        if(len === 1){ p.setAttribute("pathLength", "1"); p.style.strokeDasharray = "1" }
+        else p.style.strokeDasharray = sel === ".lvl" ? "6 5" : String(len);
+        p.style.strokeDashoffset = sel === ".lvl" ? ((1 - u) * 360).toFixed(1) : ((1 - u) * len).toFixed(1);
+      }));
+      el.querySelectorAll(".fly").forEach(p => p.style.transform = "translateX(" + ((1 - u) * 172.8).toFixed(1) + "px)");
+      el.querySelectorAll(".pt").forEach(p => { p.style.transformBox = "fill-box"; p.style.transformOrigin = "center";
+        if(!p.classList.contains("fly")) p.style.transform = "scale(" + (.4 + .6 * u).toFixed(3) + ")" });
     }
-    function tick(){
-      alive++;
-      if(reduce) return;
+
+    let manual = null, lastAct = -1, last = -1;
+    function layer(el, o){ el.style.opacity = o.toFixed(3); el.style.visibility = o < .02 ? "hidden" : "visible"; el.style.pointerEvents = o > .5 ? "" : "none" }
+    tabs.forEach(t => t.addEventListener("click", () => {
+      manual = t.dataset.v === "board" ? "board" : "map";
+      last = -1; frame();
+    }));
+
+    function frame(){
       const r = sec.getBoundingClientRect(), vh = innerHeight;
       const total = sec.offsetHeight - vh;
-      const p = total > 0 ? Math.max(0, Math.min(1, -r.top / total)) : 1;
-      /* stage only once the driver has proven itself, and only while the stage is in view */
-      if(!live && alive >= 2 && r.height > 0){ live = true; sec.classList.add("live"); }
-      if(live) apply(Math.min(steps - 1, Math.floor(p * steps)));
+      const fp = (total > 0 ? clamp(-r.top / total) : 1) * STAGE_STEPS;
+      if(Math.abs(fp - last) < .002) return;
+      last = fp;
+
+      /* each piece arrives over the first half of its own step */
+      items.forEach(el => {
+        const u = ease(clamp((fp - +el.dataset.step) / .5));
+        el.classList.toggle("on", u > 0);
+        place(el, u);
+      });
+      ticks.forEach(t => t.classList.toggle("on", fp >= +t.dataset.step));
+
+      /* the pane opens as Logos arrives */
+      const w = ease(clamp((fp - 2.6) / .9));
+      if(narrow()){
+        body.style.gridTemplateColumns = "1fr";
+        body.style.gridTemplateRows = "minmax(0," + (1 - .1 * w).toFixed(3) + "fr) minmax(0," + (1.1 * w).toFixed(3) + "fr)";
+      } else {
+        body.style.gridTemplateRows = "";
+        body.style.gridTemplateColumns = "1fr " + w.toFixed(3) + "fr";
+      }
+      app.classList.toggle("logos", fp >= 3);
+      sec.classList.toggle("deep", fp >= 1);
+
+      /* the two layers crossfade at the act boundary */
+      const act = fp >= STAGE_ACT2 ? 2 : 1;
+      if(act !== lastAct){ manual = null; lastAct = act }
+      let m, bo;
+      if(manual){ m = manual === "map" ? 1 : 0; bo = manual === "board" ? 1 : 0 }
+      else { const bm = ease(clamp((fp - (STAGE_ACT2 - .35)) / .7)); m = 1 - bm; bo = bm }
+      layer(L.map, m); layer(L.board, bo);
+      const onBoard = (manual ? manual !== "map" : act > 1);
+      app.classList.toggle("board", onBoard && (manual ? manual === "board" : act === 2));
+      tabs.forEach(t => t.setAttribute("aria-selected", (t.dataset.v === "board") === onBoard ? "true" : "false"));
+
     }
-    setInterval(tick, 90);
-    addEventListener("scroll", tick, {passive:true});
-    tick();
+    addEventListener("scroll", frame, { passive:true });
+    addEventListener("resize", () => { last = -1; frame() }, { passive:true });
+    setInterval(frame, 120);
+    frame();
   }
 
   /* ── the refusal: the answer, held at the line ────────────────────── */
