@@ -28,7 +28,7 @@ import { LogosGuide, GUIDE_SEEN_KEY } from '@/components/LogosGuide';
 import { LogosMark } from '@/components/LogosMark';
 import { AccountControl } from '@/components/account/AccountControl';
 import { AccountSheet } from '@/components/account/AccountSheet';
-import { ModelGlyph } from '@/components/ModelGlyph';
+import { ModelPicker } from '@/components/ModelPicker';
 import { SocriaOneModal } from '@/components/SocriaOneModal';
 import { OnePrompt } from '@/components/OnePrompt';
 import { useOnePrompt } from '@/components/useOnePrompt';
@@ -73,7 +73,7 @@ import {
   sanitizePersonality,
   type Personality,
 } from '@/lib/logos-personality';
-import { chooseModel, lastCoreModel, offeredModels } from '@/lib/socria-model-store';
+import { chooseModel, lastCoreModel } from '@/lib/socria-model-store';
 import { buildStarters, PENDING_TYPES } from '@/lib/starters';
 import { FirstMap } from '@/components/FirstMap';
 import {
@@ -293,7 +293,6 @@ export function LogosApp({
   // registered without them (supportsDepth: false), so the composer shows no
   // depth control and every request goes at the one depth it answers at.
   const depthOn = !!SOCRIA_MODELS[model]?.supportsDepth;
-  const [modelOpen, setModelOpen] = useState(false);
   const router = useRouter();
 
   // ── Socria One ────────────────────────────────────────────────────
@@ -872,7 +871,6 @@ export function LogosApp({
   // not a setting. Write the choice where the Core chat reads it, then go —
   // /chat picks it up on mount instead of opening on whatever was there last.
   function pickModel(next: SocriaModel) {
-    setModelOpen(false);
     // The one you are already on. Compared against THIS surface rather than
     // the string 'logos', or picking Logos 2 from inside Logos 2 would count
     // as a switch and reload the room you are standing in.
@@ -3356,57 +3354,14 @@ export function LogosApp({
             </div>
             )}
 
-            {/* Logos is itself one of the models, so this is the same switch
-                the Core chat carries — picking another one navigates there. */}
-            <div className="lg-model">
-              <button
-                type="button"
-                className="lg-model-btn"
-                onClick={() => setModelOpen((v) => !v)}
-                aria-haspopup="listbox"
-                aria-expanded={modelOpen}
-                title="Which Socria you're thinking with"
-              >
-                <ModelGlyph model={model} size={14} />
-                <span className="lg-model-name">{SOCRIA_MODELS[model].short}</span>
-                <svg viewBox="0 0 24 24" width="9" height="9" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden="true">
-                  <path d="M6 9l6 6 6-6" />
-                </svg>
-              </button>
-              {modelOpen && (
-                <>
-                  <div className="lg-depth-scrim" onClick={() => setModelOpen(false)} />
-                  <div className="lg-depth-menu is-up is-right" role="listbox">
-                    {/* The same list the Core picker shows, by the same rule —
-                        `offeredModels` is in the store precisely because this
-                        menu and that one are two menus over one registry, and
-                        this one used to iterate every key in it, withdrawn
-                        models included. */}
-                    {offeredModels().map((id) => {
-                      const m = SOCRIA_MODELS[id];
-                      const on = id === model;
-                      return (
-                        <button
-                          key={id}
-                          type="button"
-                          role="option"
-                          aria-selected={on}
-                          className={`lg-depth-opt${on ? ' is-on' : ''}`}
-                          onClick={() => pickModel(id)}
-                        >
-                          <span className="lg-depth-opt-label">
-                            <ModelGlyph model={id} size={14} />
-                            {m.short}
-                            {!on && <span className="lg-model-go" aria-hidden="true"> →</span>}
-                          </span>
-                          <span className="lg-depth-opt-desc">{m.description}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </>
-              )}
-            </div>
+            {/* Logos is itself one of the models, so this is THE SAME SWITCH
+                the Core chat carries — the same component, so the button, the
+                sheet, the order and the words are one design on both
+                surfaces. This was a menu of its own, and it drifted: a
+                different button, a different list order, glyphs instead of
+                the "how it answers" sheet. Picking another model navigates
+                there; Logos 2 has no axes of its own to show beneath it. */}
+            <ModelPicker value={model} onChange={pickModel} isSignedIn={!!isSignedIn || unlocked} />
           </div>
         </section>
 
