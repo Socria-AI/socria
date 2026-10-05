@@ -23,13 +23,14 @@ export function Models() {
   return (
     <Article page={page} sections={sections}>
       <p>
-        Socria ships three models behind one switcher, and they are not three
-        sizes of the same thing — they are three different amounts of{' '}
+        Socria ships four models behind one switcher, and they are not four
+        sizes of the same thing — they are different amounts of{' '}
         <em>machinery around the conversation</em>. Core 3.1 is a voice with a
         memory and a running read of the thread. Core 4 is a voice that
         decides, each turn, which part of the work is yours. Logos 2 is an
         environment: the conversation beside a live map of your reasoning,
-        with models the engine builds inside it.
+        with models the engine builds inside it. Logos 3 is that environment
+        with a second seat.
       </p>
       <Callout tag="Retired">
         <p>
@@ -50,6 +51,7 @@ export function Models() {
               <th>Core 3.1</th>
               <th>Core 4</th>
               <th>Logos 2</th>
+              <th>Logos 3</th>
             </tr>
           </thead>
           <tbody>
@@ -59,6 +61,8 @@ export function Models() {
               <td>Contributes by default; holds work back only on a reason you gave</td>
               <td>The conversation plus a live map of your reasoning, and models
                 the engine builds, which you move, read, edit and undo</td>
+              <td>Logos 2 for two people at once, with Socria as the layer between
+                them</td>
             </tr>
             <tr>
               <td><strong>Account</strong></td>
@@ -66,6 +70,7 @@ export function Models() {
               <td>Sign-in (or an access key)</td>
               <td>Sign-in (or an access key). Two lines of thinking a month free,
                 then <Link href="/docs/socria-one">Socria One</Link></td>
+              <td>Sign-in, for both people</td>
             </tr>
             <tr>
               <td><strong>Thinking depth</strong></td>
@@ -74,6 +79,7 @@ export function Models() {
                 readability and length instead</td>
               <td>None — no depth modes. It answers at one depth and puts the
                 effort into the map and the model</td>
+              <td>None, as Logos 2</td>
             </tr>
             <tr>
               <td><strong>Memory</strong></td>
@@ -82,6 +88,8 @@ export function Models() {
                 decision with whose it is, enforced in code</td>
               <td>The map, the models and their revisions — a model keeps its
                 history, so you can undo an edit rather than regenerate a picture</td>
+              <td>The room keeps its own record, each line with who wrote it; a
+                shared room is saved to neither account and never feeds memory</td>
             </tr>
             <tr>
               <td><strong>Extra surfaces</strong></td>
@@ -91,6 +99,8 @@ export function Models() {
                 model workspace: surfaces, mechanisms, systems of equations,
                 fitted specifications and three simulations — a black hole, the
                 expanding universe, an orbit</td>
+              <td>All of Logos 2, plus the room: an invite, two seats, every line
+                and every idea marked with whose it is</td>
             </tr>
             <tr>
               <td><strong>Writes prose for you</strong></td>
@@ -98,6 +108,7 @@ export function Models() {
               <td>Yes, unless the authorship is the point — and it says so when it stops</td>
               <td>Never. It may propose a model, and the engine decides whether
                 it computes — a proposal is never presented as a result</td>
+              <td>Never — and between two people it never takes a side either</td>
             </tr>
           </tbody>
         </table>
@@ -145,6 +156,11 @@ export function Models() {
           learning, math, and anything you would rather move than read about —
           a surface, a mechanism, a set of differential equations, a model
           fitted to data, a black hole.
+        </li>
+        <li>
+          <strong><Link href="/docs/logos-3">Logos 3</Link></strong> — the same,
+          with somebody else: a decision two people share, a disagreement worth
+          making precise, a plan you are building together.
         </li>
       </ul>
       <Callout tag="Under the hood">

@@ -1,4 +1,4 @@
-// Logos 3 — Logos 2 with the room back in it. Dev only.
+// Logos 3 — Logos 2 with the room back in it.
 //
 // The room was parked for the production cut (docs/LOGOS-ROOMS-PARKED.md).
 // This holds the wiring that brought it back: a model that is offered on dev
@@ -38,29 +38,29 @@ console.log('=== the model ===');
   ok('Logos 2 stays single-player', !SOCRIA_MODELS['logos-2'].collab);
 }
 
-console.log('\n=== dev only ===');
+console.log('\n=== offered everywhere, production included ===');
 {
-  withEnv({ NEXT_PUBLIC_VERCEL_ENV: 'preview', VERCEL_ENV: 'preview' }, () => {
-    ok('offered on a preview (dev) deployment', isOffered('logos-3') && offeredModels().includes('logos-3'));
-  });
-  withEnv({ NEXT_PUBLIC_VERCEL_ENV: undefined, VERCEL_ENV: undefined, NODE_ENV: 'development' }, () => {
-    ok('offered locally', isOffered('logos-3'));
-  });
-  withEnv({ NEXT_PUBLIC_VERCEL_ENV: 'production', VERCEL_ENV: 'production' }, () => {
-    ok('NOT offered on production', !isOffered('logos-3') && !offeredModels().includes('logos-3'));
-    ok('  and anybody holding it there goes to Logos 2', withdrawnTo('logos-3') === 'logos-2', String(withdrawnTo('logos-3')));
-  });
-  ok('/chat will not open it by link where it is not offered', /isOffered\(m as SocriaModel\)/.test(read('app/chat/page.tsx')));
+  for (const env of ['production', 'preview']) {
+    withEnv({ NEXT_PUBLIC_VERCEL_ENV: env, VERCEL_ENV: env }, () => {
+      ok(`offered on ${env}`, isOffered('logos-3') && offeredModels().includes('logos-3'));
+    });
+  }
+  ok('it is not marked dev-only any more', !SOCRIA_MODELS['logos-3'].devOnly);
+  ok('/chat opens a ?model= link by the same rule as the menus', /isOffered\(m as SocriaModel\)/.test(read('app/chat/page.tsx')));
+  // The mechanism stays, for the next model that needs it.
+  ok('a dev-only model would still be held back on production', /!\(m\.devOnly && isProduction\(\)\)/.test(read('lib/socria-model-store.ts')));
 }
 
 console.log('\n=== the room switch ===');
 {
+  withEnv({ LOGOS_ROOMS: undefined, NEXT_PUBLIC_VERCEL_ENV: 'production', VERCEL_ENV: 'production' }, () => ok('on by default on production', roomsEnabled()));
   withEnv({ LOGOS_ROOMS: undefined, NEXT_PUBLIC_VERCEL_ENV: 'preview', VERCEL_ENV: 'preview' }, () => ok('on by default on dev', roomsEnabled()));
-  withEnv({ LOGOS_ROOMS: undefined, NEXT_PUBLIC_VERCEL_ENV: 'production', VERCEL_ENV: 'production' }, () => ok('off by default on production', !roomsEnabled()));
-  withEnv({ LOGOS_ROOMS: 'on', NEXT_PUBLIC_VERCEL_ENV: 'production', VERCEL_ENV: 'production' }, () => ok('production only by saying so', roomsEnabled()));
-  withEnv({ LOGOS_ROOMS: 'off', NEXT_PUBLIC_VERCEL_ENV: 'preview', VERCEL_ENV: 'preview' }, () => ok('and dev can be switched off', !roomsEnabled()));
-  for (const r of ['app/api/logos/room/route.ts', 'app/api/logos/room/join/route.ts', 'app/api/logos/room/leave/route.ts', 'app/api/logos/room/events/route.ts'])
-    ok(`${r.split('/').slice(-2).join('/')} still answers only behind the switch`, /roomsEnabled\(\)/.test(read(r)));
+  withEnv({ LOGOS_ROOMS: 'off', NEXT_PUBLIC_VERCEL_ENV: 'production', VERCEL_ENV: 'production' }, () => ok('LOGOS_ROOMS=off turns it off, anywhere', !roomsEnabled()));
+  for (const r of ['app/api/logos/room/route.ts', 'app/api/logos/room/join/route.ts', 'app/api/logos/room/leave/route.ts', 'app/api/logos/room/events/route.ts']) {
+    const src = read(r);
+    ok(`${r.split('/').slice(-2).join('/')} answers only behind the switch`, /roomsEnabled\(\)/.test(src));
+    ok(`  and only to a signed-in person`, /const \{ userId \} = auth\(\);/.test(src) && /Unauthorized/.test(src));
+  }
 }
 
 console.log('\n=== the invite ===');

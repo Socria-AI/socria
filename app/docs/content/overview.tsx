@@ -46,7 +46,7 @@ export function Overview() {
         right, kept in step with each other.
       </p>
       <DemoSplit />
-      <p>Three models share that address:</p>
+      <p>Four models share that address:</p>
       <ul>
         <li>
           <strong><Link href="/docs/core-3">Core 3.1</Link></strong> — the
@@ -73,6 +73,12 @@ export function Overview() {
           <Link href="/docs/drafts-grounding">Draft Space</Link>, and research
           grounded in real sources.
         </li>
+        <li>
+          <strong><Link href="/docs/logos-3">Logos 3</Link></strong> — Logos 2
+          for two people at once: one map, one set of models, and Socria as the
+          layer between you, naming the connections and the disagreements
+          without taking a side.
+        </li>
       </ul>
       <p>
         <Link href="/docs/core-2">Core 2</Link> retired on 2 October, and the
@@ -81,8 +87,8 @@ export function Overview() {
       <p>
         Core 3.1 and Core 4 are chat models: different depths of attention,
         and in Core 4&rsquo;s case a different question — not how deep to go,
-        but whose work this is. Logos 2 is a different kind of thing — an
-        environment — and it is the centerpiece of{' '}
+        but whose work this is. Logos 2 and Logos 3 are a different kind of
+        thing — an environment — and it is the centerpiece of{' '}
         <Link href="/docs/socria-one">Socria One</Link>, the{' '}
         {priceWithPeriod()} plan. Its free tier is not a trial of Logos 2 but
         Logos 2 itself, twice a month: what Socria One sells is how many lines

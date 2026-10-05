@@ -1632,8 +1632,8 @@ export const SOCRIA_MODELS: Record<SocriaModel, ModelConfig> = {
   // Logos 3 — Logos 2 with the room back in it: two people in one line of
   // thinking, one Thinking Map and one model workspace, Socria as the layer
   // between them. The room was parked for the production cut (see
-  // docs/LOGOS-ROOMS-PARKED.md); this is it wired back in, DEV ONLY until it
-  // has been lived with. Same surface, same engine; `collab` is the difference.
+  // docs/LOGOS-ROOMS-PARKED.md), wired back in on dev, and shipped from there.
+  // Same surface, same engine; `collab` is the difference.
   'logos-3': {
     id: 'logos-3',
     label: 'Socria Logos 3',
@@ -1645,7 +1645,6 @@ export const SOCRIA_MODELS: Record<SocriaModel, ModelConfig> = {
     requiresAuth: true,
     logosSurface: true,
     collab: true,
-    devOnly: true,
   },
   // Core 4 — built, and selectable. It carried `soon` while it was an
   // announcement, which made the picker grey it out; that flag came off when

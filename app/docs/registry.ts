@@ -44,7 +44,7 @@ export const DOC_PAGES: DocPage[] = [
   {
     slug: 'models',
     title: 'The models',
-    blurb: 'Core 3.1, Core 4 and Logos 2 side by side — what each is for and how to switch.',
+    blurb: 'Core 3.1, Core 4, Logos 2 and Logos 3 side by side — what each is for and how to switch.',
     group: 'The models',
   },
   {
@@ -75,6 +75,12 @@ export const DOC_PAGES: DocPage[] = [
     slug: 'logos-2',
     title: 'Socria Logos 2',
     blurb: 'The conversation, a live map, and models the engine builds from what you say — what you can build, what to ask for, and what you can do with one.',
+    group: 'The models',
+  },
+  {
+    slug: 'logos-3',
+    title: 'Socria Logos 3',
+    blurb: 'Think together: two people in one line of thinking, one map and one set of models, with Socria between you.',
     group: 'The models',
   },
   {

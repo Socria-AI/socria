@@ -1,12 +1,12 @@
 # The two-seat room: parked, not deleted
 
-> **Update — it is back, as Logos 3, on dev.** The wiring below has been done:
-> the `logos-3` model (`collab: true`, `devOnly: true` in `lib/socria-prompt.ts`)
-> mounts the hook and the bar, the chat route answers as the layer between two
-> people, and the routes are on by default everywhere but production
-> (`lib/rooms-flag.ts`; `LOGOS_ROOMS=off` turns them off, `=on` turns them on in
-> production). Logos 3 is not offered on production. **Step 1 still applies:**
-> `supabase/rooms.sql` must be applied to the dev database for a room to open.
+> **Update — shipped, as Logos 3.** The wiring below has been done: the
+> `logos-3` model (`collab: true` in `lib/socria-prompt.ts`) mounts the hook
+> and the bar, the chat route answers as the layer between two people, and the
+> routes are on by default (`lib/rooms-flag.ts`; `LOGOS_ROOMS=off` turns them
+> off). Logos 3 is offered on every deployment, production included, and has
+> its own docs page (`/docs/logos-3`). **Step 1 still applies to every
+> database:** `supabase/rooms.sql` must be applied for a room to open.
 > `test/logos3.test.mjs` holds the wiring.
 
 The multiplayer room — two people in one Logos line of thinking, Socria as
