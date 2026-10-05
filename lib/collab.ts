@@ -1,6 +1,7 @@
 // lib/collab.ts
 //
-// Logos 2 — two people, one map. The part that has no browser in it.
+// Logos 3 — two people, one map. The part that has no browser in it.
+// (It was Logos 2's, before the room was parked; Logos 3 is where it lives now.)
 //
 // WHAT THIS IS. A shared line of thinking is an ordinary Logos session that
 // two people are inside at once. Everything either of them does — a message,
@@ -423,7 +424,7 @@ export function signTurns(messages: readonly LogosMsg[]): { role: 'user' | 'assi
 
 /** Where a guest lands. The model is set so /chat opens the right surface. */
 export function joinUrl(origin: string, code: string): string {
-  return `${origin.replace(/\/$/, '')}/chat?model=logos-2&join=${encodeURIComponent(code)}`;
+  return `${origin.replace(/\/$/, '')}/chat?model=logos-3&join=${encodeURIComponent(code)}`;
 }
 
 /** Read a join code off a URL, or null. Tolerant of what people paste. */

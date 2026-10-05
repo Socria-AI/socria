@@ -20,6 +20,7 @@
 // "open on their best surface" becomes "override what they asked for", which
 // is worse than the bug.
 
+import { isProduction } from './environment';
 import { SOCRIA_MODELS, type Readability, type ReplyLength, type SocriaModel } from './socria-prompt';
 
 export const MODEL_KEY = 'socria.model.v1';
@@ -124,8 +125,8 @@ export function readStoredModel(): SocriaModel | null {
     // back would strand whoever last picked it on a surface the product no
     // longer offers. `withdrawnTo` says where they go instead — the successor if
     // there is one, and the automatic default otherwise.
-    const held = SOCRIA_MODELS[raw].withdrawn;
-    return held ? withdrawnTo(raw) : raw;
+    // A dev-only model read back on production is held back the same way.
+    return isOffered(raw) ? raw : withdrawnTo(raw);
   } catch {
     return null;
   }
@@ -146,7 +147,9 @@ export function readStoredModel(): SocriaModel | null {
  */
 export function isOffered(model: SocriaModel): boolean {
   const m = SOCRIA_MODELS[model];
-  return !m.withdrawn && !m.soon;
+  // A dev-only model is offered everywhere but production, and held back
+  // there exactly as a withdrawn one is.
+  return !m.withdrawn && !m.soon && !(m.devOnly && isProduction());
 }
 
 /** Every model a menu may show, in registry order. */

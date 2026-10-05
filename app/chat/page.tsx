@@ -33,7 +33,7 @@ import { forRequest, wordsOnly } from '@/lib/chat-attachments';
 import { ACCEPT_ATTR } from '@/lib/file-kinds';
 import { AttachmentChips, PaperclipIcon, useChatAttachments } from '@/components/ChatAttachments';
 import { failureText } from '@/lib/upstream-error';
-import {
+import { isOffered,
   MODEL_KEY,
   autoModel,
   chooseModel,
@@ -207,12 +207,13 @@ function isSelectable(m: unknown): m is SocriaModel {
   return (
     typeof m === 'string' &&
     m in SOCRIA_MODELS &&
-    !SOCRIA_MODELS[m as SocriaModel].soon &&
     // A withdrawn model cannot be selected — including by a link. Every
     // ?model=logos link in the product, in an email and in somebody's bookmarks
     // now lands on the successor rather than on a surface the picker will not
-    // show them; the redirect happens where `want` is applied.
-    !SOCRIA_MODELS[m as SocriaModel].withdrawn
+    // show them; the redirect happens where `want` is applied. The same rule
+    // as the menus (`isOffered`), so a dev-only model is not reachable by
+    // link on production either.
+    isOffered(m as SocriaModel)
   );
 }
 

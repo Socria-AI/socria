@@ -53,6 +53,7 @@ import {
   visibleEntries,
 } from '@/lib/person-memory';
 import { mayUse } from '@/lib/route-guard';
+import { collabBlock, type Seat } from '@/lib/collab';
 import { wantedSimulation, bareRequest, hasSurface, simulationBlock } from '@/lib/model/wants';
 
 export const runtime = 'nodejs';
@@ -139,6 +140,25 @@ export async function POST(req: NextRequest) {
       )
       .slice(-MAX_HISTORY);
 
+    // Two people, or one? A shared Logos 3 room passes `collab.people` — the
+    // two display names — and each human turn carries a `by`. When both are
+    // present, every human line is prefixed with its author's name so the
+    // model always knows who said what; alone, nothing changes. Names only —
+    // never who is signed in, never an id — and cleaned like every other
+    // field that arrives from a browser.
+    const cleanPerson = (v: unknown) =>
+      typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().slice(0, 40) : '';
+    const collabPeople: { name: string; seat: Seat }[] = (() => {
+      const people = (body?.collab as { people?: unknown } | undefined)?.people;
+      if (!Array.isArray(people)) return [];
+      return people
+        .filter((p): p is Record<string, unknown> => !!p && typeof p === 'object')
+        .map((p) => ({ name: cleanPerson(p.name), seat: (p.seat === 'host' ? 'host' : 'guest') as Seat }))
+        .filter((p) => p.name)
+        .slice(0, 2);
+    })();
+    const twoPeople = collabPeople.length >= 2;
+
     // Attachments are flattened into the text the model reads. Only the turn
     // being answered carries a long note in full.
     const clean = kept
@@ -147,9 +167,10 @@ export async function POST(req: NextRequest) {
           { role: m.role, content: m.content, attachments: sanitizeAttachments(m.attachments) },
           i === kept.length - 1
         );
+        const name = twoPeople && m.role === 'user' ? cleanPerson(m.by?.name) : '';
         return {
           role: m.role as 'user' | 'assistant',
-          content: rendered,
+          content: name && rendered ? `${name}: ${rendered}` : rendered,
         };
       })
       .filter((m) => m.content.trim());
@@ -340,6 +361,11 @@ export async function POST(req: NextRequest) {
             body?.vizValues && typeof body.vizValues === 'object' ? body.vizValues : undefined
           )) +
       opening +
+      // Logos 3: when two people are in the room, Socria becomes the layer
+      // between them — it names both, surfaces the connections, the
+      // disagreements, the assumptions and the open questions between what
+      // each said, and does not take a side or conclude (lib/collab.ts).
+      (twoPeople ? collabBlock(collabPeople) : '') +
       // ONCE. This was appended twice, so everything Socria remembers about
       // the person reached the model as two identical blocks — twice the
       // tokens, and twice the weight against the guidance above it.

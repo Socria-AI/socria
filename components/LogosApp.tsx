@@ -29,6 +29,9 @@ import { LogosMark } from '@/components/LogosMark';
 import { AccountControl } from '@/components/account/AccountControl';
 import { AccountSheet } from '@/components/account/AccountSheet';
 import { ModelPicker } from '@/components/ModelPicker';
+import { CollabBar } from '@/components/CollabBar';
+import { useLogosCollab } from '@/components/useLogosCollab';
+import { cleanName, joinCodeFrom } from '@/lib/collab';
 import { SocriaOneModal } from '@/components/SocriaOneModal';
 import { OnePrompt } from '@/components/OnePrompt';
 import { useOnePrompt } from '@/components/useOnePrompt';
@@ -1493,8 +1496,50 @@ export function LogosApp({
     [cloud]
   );
 
+  // ── Logos 3 — two people in one line of thinking ──────────────────
+  //
+  // The whole of the room lives in this hook and the bar it feeds; the rest
+  // of this surface calls it at three points (a message sent, a map
+  // extracted, the request that tells Socria who is in the room) and is
+  // otherwise untouched. On a model without `collab` the hook is disabled
+  // and none of this runs. Restored from the parked room — see
+  // docs/LOGOS-ROOMS-PARKED.md for why each guard below exists.
+  const collab = !!SOCRIA_MODELS[model]?.collab;
+  const joinCode = useMemo(
+    () => (typeof window === 'undefined' ? null : joinCodeFrom(window.location.search)),
+    []
+  );
+  /** every session id that has ever been a shared room in this tab */
+  const sharedIdsRef = useRef<Set<string>>(new Set());
+  const room = useLogosCollab({
+    enabled: collab,
+    identity: { id: user?.id || '', name: cleanName(user?.firstName || user?.username, 'You') },
+    joinCode,
+    getSession: () => sessionsRef.current.find((x) => x.id === activeIdRef.current) ?? null,
+    setSession: (shared) => {
+      sharedIdsRef.current.add(shared.id);
+      // A guest with no session of its own adopts the host's; both then keep
+      // the shared session as the active one, merged by the reducer.
+      applySessions(
+        sessionsRef.current.some((x) => x.id === shared.id)
+          ? sessionsRef.current.map((x) => (x.id === shared.id ? shared : x))
+          : [shared, ...sessionsRef.current]
+      );
+      if (activeIdRef.current !== shared.id) setActiveId(shared.id);
+    },
+  });
+  const roomRef = useRef(room);
+  roomRef.current = room;
+
   const persist = useCallback(
     async (s: LogosSession) => {
+      // A SHARED ROOM IS NOT SAVED TO ANYBODY'S CONVERSATION ROW. The host's
+      // client holds the merged session — both people's words — and saving it
+      // would put the guest's thinking under the host's account, where the
+      // guest could neither export nor delete it. The room's own event log is
+      // the shared record, and every row in it carries who wrote it. The same
+      // after leaving: the session still in memory is the merged one.
+      if (roomRef.current?.active || sharedIdsRef.current.has(s.id)) return;
       if (!cloud) {
         saveLocal(sessionsRef.current);
         return;
@@ -1960,7 +2005,16 @@ export function LogosApp({
               if (!models) delete (map as { models?: unknown }).models;
               // What the person took off stays off, whatever the extractor
               // made of a transcript that still mentions it (lib/map-edit.ts).
-              return { ...s, map: dropRemoved(map, s.map?.removed), contexts };
+              const kept = dropRemoved(map, s.map?.removed);
+              // Shared: the host draws, both see it. onLocalMap returns the
+              // map with each node attributed to whoever it was drawn from,
+              // so the local view shows the same author dots the other
+              // person sees; alone it returns the map unchanged.
+              const shown =
+                roomRef.current.active && sharedIdsRef.current.has(s.id)
+                  ? roomRef.current.onLocalMap(kept as TMap)
+                  : kept;
+              return { ...s, map: shown, contexts };
             });
             setChanged(new Set(delta.changed));
             setDeltaNote(summarizeDelta(delta));
@@ -2453,7 +2507,11 @@ export function LogosApp({
       content,
       ...(atts.length ? { attachments: atts } : {}),
     };
-    const sent = turn;
+    // In a shared room — and in the room's own session — the turn is stamped
+    // with who wrote it and broadcast to the other person before anything
+    // else happens. Alone, it is the turn unchanged and nothing is sent.
+    const inShared = roomRef.current.active && sharedIdsRef.current.has(activeIdRef.current ?? '');
+    const sent = inShared ? roomRef.current.onLocalMessage(turn) : turn;
     const before = messages;
     // The first thought, anywhere — once, ever (lib/first-run.ts).
     firstRun.reach('socria.thought');
@@ -2510,6 +2568,11 @@ export function LogosApp({
           // Read here, at the moment of sending, so the reply is answering the
           // picture as it actually stands rather than as it opened.
           ...(sentViz ? { vizState: sentViz } : {}),
+          // Two people in the room: their names, so Socria answers as the
+          // layer between them. Names only — never who is signed in.
+          ...(inShared && roomRef.current.people.length >= 2
+            ? { collab: { people: roomRef.current.people } }
+            : {}),
         }),
       });
       if (res.status === 402) {
@@ -2569,7 +2632,12 @@ export function LogosApp({
         isSignedIn &&
         userTurns >= JOURNEY_EVERY_TURNS &&
         userTurns % JOURNEY_EVERY_TURNS === 0 &&
-        mapRef.current.context !== 'reflecting'
+        mapRef.current.context !== 'reflecting' &&
+        // NEVER from a shared room. The understanding pass reads the whole
+        // conversation and writes what it concludes into this account's
+        // permanent profile — in a room it would fold the other person's
+        // words into a private record they cannot see, export or delete.
+        !sharedIdsRef.current.has(sid)
       ) {
         void (async () => {
           try {
@@ -2887,7 +2955,7 @@ export function LogosApp({
 
         {/* ── Conversation ───────────────────────────────── */}
         <section className="lg-convo" aria-label="Conversation">
-          <header className="lg-head">
+          <header className={`lg-head${collab ? ' lg-head-collab' : ''}`}>
             {/* The header measures itself; this row is what it arranges. They
                 are two elements because a container query cannot restyle the
                 container — only what is inside it (globals.css, "the header,
@@ -2996,6 +3064,8 @@ export function LogosApp({
                 whichever model is remembered, and that is still Logos — so a
                 bare href back to it re-rendered this and looked like a dead
                 button. Hand back the Core model they came from. */}
+            {/* Logos 3: who is here, and how to bring someone in. */}
+            {collab && <CollabBar room={room} />}
             <button type="button" className="lg-back" onClick={leaveForChat} aria-label="Back to Socria chat">
               <span className="lg-lbl-long">Socria chat</span>
               <span className="lg-lbl-short" aria-hidden="true">Chat</span> <span aria-hidden="true">→</span>

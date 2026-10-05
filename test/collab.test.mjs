@@ -174,7 +174,7 @@ const ev = (kind, by, extra) => ({ id: eventId(++t, () => 0.5), at: t, by: byOf(
 // ── the link ──────────────────────────────────────────────────────────
 {
   const u = joinUrl('https://socria.app/', 'ABCDEFGH');
-  ok('the link opens the right surface', u === 'https://socria.app/chat?model=logos-2&join=ABCDEFGH');
+  ok('the link opens the right surface', u === 'https://socria.app/chat?model=logos-3&join=ABCDEFGH');
   // The length here must match what the server issues, or every invite
   // link silently fails to open — which is exactly what an earlier CODE_LEN
   // of 6 did once the server moved to 8.

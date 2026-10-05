@@ -1245,7 +1245,7 @@ It should feel like a conversation that develops naturally, accumulates insight,
 
 // ===== Public API =====
 
-export type SocriaModel = 'core-2' | 'core-3' | 'logos' | 'logos-2' | 'core-4';
+export type SocriaModel = 'core-2' | 'core-3' | 'logos' | 'logos-2' | 'logos-3' | 'core-4';
 export type ThinkingDepth = 'quick' | 'balanced' | 'deep' | 'abstract';
 
 export interface ModelConfig {
@@ -1283,6 +1283,17 @@ export interface ModelConfig {
   leaving?: string;
   /** This model opens the Logos surface (a Thinking Map beside the chat). */
   logosSurface?: boolean;
+  /**
+   * Two people in one workspace, Socria between them — the "think together"
+   * room (lib/collab.ts). Turns the Logos surface into a two-seat one.
+   */
+  collab?: boolean;
+  /**
+   * Built and offered on dev, preview and local deployments only. Production
+   * does not list it, and anybody whose browser holds it there is moved on to
+   * its successor like a withdrawn model (lib/socria-model-store.ts).
+   */
+  devOnly?: boolean;
 
   /**
    * TEMPORARILY WITHDRAWN — the model exists, answers, and is not offered.
@@ -1617,6 +1628,24 @@ export const SOCRIA_MODELS: Record<SocriaModel, ModelConfig> = {
     supportsDepth: false,
     requiresAuth: true,
     logosSurface: true,
+  },
+  // Logos 3 — Logos 2 with the room back in it: two people in one line of
+  // thinking, one Thinking Map and one model workspace, Socria as the layer
+  // between them. The room was parked for the production cut (see
+  // docs/LOGOS-ROOMS-PARKED.md); this is it wired back in, DEV ONLY until it
+  // has been lived with. Same surface, same engine; `collab` is the difference.
+  'logos-3': {
+    id: 'logos-3',
+    label: 'Socria Logos 3',
+    short: 'Logos 3',
+    description:
+      'Think together. Two people, one map and one set of models, Socria between you — naming the connections, the disagreements and the open questions.',
+    defaultOpenAIModel: 'gpt-5.6-sol',
+    supportsDepth: false,
+    requiresAuth: true,
+    logosSurface: true,
+    collab: true,
+    devOnly: true,
   },
   // Core 4 — built, and selectable. It carried `soon` while it was an
   // announcement, which made the picker grey it out; that flag came off when

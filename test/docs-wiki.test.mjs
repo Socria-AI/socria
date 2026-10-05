@@ -19,6 +19,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DOC_PAGES, DOC_GROUPS, docPage, neighbors } from './.tmp/registry.mjs';
 import { offeredModels } from './.tmp/socria-model-store.mjs';
+import { SOCRIA_MODELS } from './.tmp/socria-prompt.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (p) => readFileSync(join(root, p), 'utf8');
@@ -122,7 +123,8 @@ console.log('\n=== the models page names every model a reader can pick ===');
   // registry, so the next retirement or launch fails here until the prose
   // catches up, in either direction.
   const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven'];
-  const n = WORDS[offeredModels().length];
+  // The docs are production's: a dev-only model is not one a reader can pick.
+  const n = WORDS[offeredModels().filter((id) => !SOCRIA_MODELS[id].devOnly).length];
   const said = (src) => [...src.matchAll(/\b(two|three|four|five|six|seven) models\b/gi)].map((m) => m[1].toLowerCase());
   ok(`the page says there are ${n}, as the menu offers`, said(models).length > 0 && said(models).every((w) => w === n), said(models).join(','));
   const overview = read('app/docs/content/overview.tsx');

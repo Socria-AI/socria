@@ -17,6 +17,17 @@
 // NOT NEXT_PUBLIC_, deliberately: a client-readable flag would advertise the
 // endpoints before the surface could use them.
 
+//
+// LOGOS 3 PUT THE ROOM BACK, ON DEV. Outside production the routes are on by
+// default, so the dev and preview deployments can think together without an
+// environment change; LOGOS_ROOMS=off turns them off there. Production stays
+// off unless LOGOS_ROOMS=on is set explicitly — Logos 3 is not offered there.
+
+import { isProduction } from './environment';
+
 export function roomsEnabled(): boolean {
-  return process.env.LOGOS_ROOMS === 'on';
+  const v = process.env.LOGOS_ROOMS;
+  if (v === 'on') return true;
+  if (v === 'off') return false;
+  return !isProduction();
 }
