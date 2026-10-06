@@ -299,7 +299,7 @@ function ImageTile({ a, large, onOpen, onRemove }: { a: Item; large: boolean; on
         <button
           type="button"
           onClick={onRemove}
-          className="absolute -right-2 -top-2 grid h-6 w-6 place-items-center rounded-full border border-ink/15 bg-white text-ink/60 shadow-sm hover:text-ink"
+          className="absolute -right-2 -top-2 grid h-6 w-6 place-items-center rounded-full border border-ink/15 bg-surface text-ink/60 shadow-sm hover:text-ink"
           aria-label={`Remove ${a.name || 'image'}`}
         >
           ×
@@ -356,7 +356,7 @@ export function AttachmentChips({
           <div
             key={a.id ?? i}
             className={`relative max-w-full rounded-xl border px-2.5 py-1.5 text-left ${
-              a.status === 'error' ? 'border-red-300 bg-red-50' : 'border-ink/15 bg-white'
+              a.status === 'error' ? 'border-red-300 bg-red-50' : 'border-ink/15 bg-surface'
             }`}
           >
             <div className="flex items-center gap-2 min-w-0">

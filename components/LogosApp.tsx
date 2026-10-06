@@ -125,6 +125,7 @@ import {
 import { arrangementsFor, factsFrom, suggestLayout, suggestViews, type LayoutSuggestion } from '@/lib/workspace/surfaces';
 import { describeFocus, type Focus } from '@/lib/workspace/focus';
 import { briefOf } from '@/lib/representation';
+import { useThemeGuard } from '@/components/account/ThemePicker';
 import { LENSES, type LensId } from '@/lib/logos-layout';
 
 /** Where a person's own Logos 3 arrangement is kept: this browser, never the session. */
@@ -324,6 +325,8 @@ export function LogosApp({
 
   // ── Socria One ────────────────────────────────────────────────────
   const [plan, setPlan] = useState<Plan>('free');
+  // The server has answered — until then a One theme is trusted, not reset.
+  const [planKnown, setPlanKnown] = useState(false);
   const [oneOpen, setOneOpen] = useState(false);
   const [oneReason, setOneReason] = useState<string | undefined>();
   // Research runs already spent, per session id.
@@ -372,6 +375,7 @@ export function LogosApp({
   // Just came back from a completed checkout.
   const [oneWelcome, setOneWelcome] = useState(false);
   const one = plan === 'one';
+  useThemeGuard(one, planKnown);
   // THE ACCOUNT, FROM HERE TOO.
   //
   // This surface had no account control at all — no sheet, no sign-out, no
@@ -1373,6 +1377,7 @@ export function LogosApp({
       const json = await res.json();
       if (json?.plan === 'one' || json?.plan === 'free') {
         setPlan(json.plan);
+        setPlanKnown(true);
         try {
           if (json.plan === 'one') localStorage.setItem(ONE_KEY_STORAGE, '1');
           else localStorage.removeItem(ONE_KEY_STORAGE);

@@ -28,7 +28,7 @@
   overflow: hidden;
   display: grid;
   place-items: center;
-  box-shadow: 0 14px 34px -20px rgba(35, 36, 31, 0.5);
+  box-shadow: 0 14px 34px -20px rgba(var(--lg-ink-rgb, 35, 36, 31), 0.5);
 }
 .av-big .tex { position: absolute; inset: 0; pointer-events: none; }
 .av-big .ring {

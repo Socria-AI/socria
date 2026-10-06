@@ -27,31 +27,36 @@ const config: Config = {
         // ── the ground ────────────────────────────────────────────
         // The app runs a step cooler than the page. Both are warm; neither
         // is ever pure white.
+        // THEMED. The app's colours are variables (app/themes.css) so a reader's
+        // theme reaches every utility; the fallback IS the paper value, so with
+        // no theme set nothing differs by a single pixel.
         paper: {
-          DEFAULT: '#F5F3EB', // the chat
-          2: '#ece8da',
+          DEFAULT: 'rgb(var(--c-paper, 245 243 235) / <alpha-value>)', // the chat
+          2: 'rgb(var(--c-paper-2, 236 232 218) / <alpha-value>)',
           journal: '#F4F1E8', // the page
         },
 
         // ── ink, in four steps and no others ──────────────────────
         ink: {
-          DEFAULT: '#1F1F1F',
-          70: 'rgba(31, 31, 31, 0.7)',
-          45: 'rgba(31, 31, 31, 0.45)',
-          25: 'rgba(31, 31, 31, 0.25)',
-          12: 'rgba(31, 31, 31, 0.12)', // hairlines only, never text
+          DEFAULT: 'rgb(var(--c-ink, 31 31 31) / <alpha-value>)',
+          70: 'rgb(var(--c-ink, 31 31 31) / 0.7)',
+          45: 'rgb(var(--c-ink, 31 31 31) / 0.45)',
+          25: 'rgb(var(--c-ink, 31 31 31) / 0.25)',
+          12: 'rgb(var(--c-ink, 31 31 31) / 0.12)', // hairlines only, never text
         },
+        // A raised surface: the composer, a card, a chip. White on paper.
+        surface: 'rgb(var(--c-surface, 255 255 255) / <alpha-value>)',
 
         // ── the person ────────────────────────────────────────────
         // Your thinking, your call. 600 above 16px; 700 for anything smaller.
         moss: {
-          DEFAULT: '#5e7633',
-          50: '#f4f6ee',
-          100: '#e4eada',
-          200: '#cad5b6',
-          600: '#5e7633',
-          700: '#475a28',
-          800: '#38481f',
+          DEFAULT: 'rgb(var(--c-moss-600, 94 118 51) / <alpha-value>)',
+          50: 'rgb(var(--c-moss-50, 244 246 238) / <alpha-value>)',
+          100: 'rgb(var(--c-moss-100, 228 234 218) / <alpha-value>)',
+          200: 'rgb(var(--c-moss-200, 202 213 182) / <alpha-value>)',
+          600: 'rgb(var(--c-moss-600, 94 118 51) / <alpha-value>)',
+          700: 'rgb(var(--c-moss-700, 71 90 40) / <alpha-value>)',
+          800: 'rgb(var(--c-moss-800, 56 72 31) / <alpha-value>)',
         },
         // Emphasis on forest only — it fails on paper at every size.
         sage: {
@@ -91,7 +96,7 @@ const config: Config = {
           pale: '#b8cdd9', // emphasis on One
         },
 
-        border: '#e7e2d3',
+        border: 'rgb(var(--c-border, 231 226 211) / <alpha-value>)',
       },
       fontFamily: {
         // Anything *said*. 400 only — emphasis is italic, moss, one step

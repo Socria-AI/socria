@@ -1,6 +1,7 @@
 // app/chat/page.tsx
 'use client';
 
+import { useThemeGuard } from '@/components/account/ThemePicker';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
@@ -451,6 +452,7 @@ export default function ChatPage() {
   // What they hold, for the two quiet mentions of One on this page: the
   // sidebar foot and the model menu. Both wait for `known` — see usePlan.
   const planState = usePlan();
+  useThemeGuard(planState.plan === 'one', planState.known);
 
   // ── Socria One, said at the two moments it is allowed to be ────────
   //
@@ -3360,7 +3362,7 @@ export default function ChatPage() {
                   <button
                     type="button"
                     onClick={() => setSheet(pid)}
-                    className="rounded-full border border-ink/15 bg-white/70 px-2.5 py-0.5 text-ink/80 hover:border-ink/40"
+                    className="rounded-full border border-ink/15 bg-surface/70 px-2.5 py-0.5 text-ink/80 hover:border-ink/40"
                     title="Project settings"
                   >
                     {name}
@@ -3382,7 +3384,7 @@ export default function ChatPage() {
             })()}
             {drift && drift.from === activeId && (
               <div
-                className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-ink/12 bg-white/70 px-3 py-2 text-[12.5px] text-ink/70"
+                className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-ink/12 bg-surface/70 px-3 py-2 text-[12.5px] text-ink/70"
                 role="note"
               >
                 <span className="min-w-0 flex-1 font-serif italic">
@@ -3452,7 +3454,7 @@ export default function ChatPage() {
               </div>
             )}
             <div
-              className={`flex items-end gap-3 rounded-2xl border bg-white px-4 py-3 focus-within:border-moss-600 transition-colors ${
+              className={`flex items-end gap-3 rounded-2xl border bg-surface px-4 py-3 focus-within:border-moss-600 transition-colors ${
                 dragging ? 'border-moss-600 ring-2 ring-moss-200' : 'border-ink/15'
               }`}
               onDragOver={(e) => {

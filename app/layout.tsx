@@ -6,6 +6,9 @@ import { Analytics } from '@vercel/analytics/react';
 import './globals.css';
 import './tour.css';
 import './account-sheet.css';
+import './themes.css';
+import { THEME_BOOT } from '@/lib/theme';
+import { ThemeScope } from '@/components/ThemeScope';
 import {
   clerkConfigured,
   clerkKeyMismatch,
@@ -163,7 +166,7 @@ export default function RootLayout({
         },
       }}
     >
-      <html lang="en" className={`${serif.variable} ${sans.variable} ${hand.variable} ${stix.variable}`}>
+      <html lang="en" suppressHydrationWarning className={`${serif.variable} ${sans.variable} ${hand.variable} ${stix.variable}`}>
         <head>
           {/* THE REVEAL CONTRACT, KEPT WITHOUT JAVASCRIPT.
              *
@@ -188,8 +191,11 @@ export default function RootLayout({
               __html: "document.documentElement.classList.add('js')",
             }}
           />
+          {/* The reader's theme, before first paint (lib/theme.ts). */}
+          <script dangerouslySetInnerHTML={{ __html: THEME_BOOT }} />
         </head>
         <body className="paper-bg antialiased">
+          <ThemeScope />
           {children}
           {/* Non-production only, so the real site never carries it. */}
           {!isProduction() && (

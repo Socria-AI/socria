@@ -29,6 +29,7 @@ import { HINTS_CHANGED } from '@/components/Hint';
 import { StudentAccess } from '@/components/StudentAccess';
 import type { PlanState } from '@/components/usePlan';
 import { clearSocriaLocalData } from '@/lib/local-data';
+import { ThemePicker } from './ThemePicker';
 
 export function AccountSheet({
   open,
@@ -152,6 +153,11 @@ export function AccountSheet({
                   {isOne ? 'Manage membership' : 'Continue with One →'}
                 </Link>
               </div>
+            </div>
+
+            <div className="sec">
+              <span className="lbl">Theme</span>
+              <ThemePicker isOne={isOne} onUpgrade={onClose} />
             </div>
 
             {/* The university programme.

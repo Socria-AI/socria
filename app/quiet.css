@@ -51,7 +51,7 @@
 .q-root .qfilters{padding:0 var(--edge)}
 .q-root .qfilters .row{display:flex;flex-wrap:wrap;gap:10px;padding-bottom:clamp(18px,3vh,30px);border-bottom:1px solid var(--ink)}
 .q-root .chip{display:inline-flex;align-items:center;gap:.55em;padding:9px 17px;border-radius:var(--radius-pill);border:1px solid var(--ink);background:transparent;color:var(--ink);font-family:var(--font-sans);font-size:.88rem;font-weight:500;cursor:pointer;transition:background .22s,color .22s,border-color .22s,transform .22s}
-.q-root .chip:hover{transform:translateY(-1px);background:rgba(32,32,27,.05)}
+.q-root .chip:hover{transform:translateY(-1px);background:rgba(var(--shadow-rgb, 32, 32, 27), .05)}
 .q-root .chip .ct{font-size:.74rem;color:var(--ink-45);transition:color .22s}
 .q-root .chip.on{background:var(--forest-2);border-color:var(--forest-2);color:var(--paper)}
 .q-root .chip.on:hover{background:var(--forest-2)}

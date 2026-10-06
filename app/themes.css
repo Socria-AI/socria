@@ -1,0 +1,102 @@
+/* app/themes.css — the reader's theme (lib/theme.ts), as variables only.
+ *
+ * Every app surface already reads its colours from variables: the root
+ * palette (--paper, --ink…), the Logos tokens (--lg-*), the app register
+ * (--app-*), Tailwind's paper/ink/moss/surface (tailwind.config.ts), and the
+ * literal ink and moss triples the stylesheets once wrote out by hand, now
+ * --ink-rgb, --lg-ink-rgb, --lg-primary-rgb, --moss-rgb. A theme re-declares
+ * those and nothing else. Paper is the absence of a theme: every variable
+ * falls back to the paper value, so the default is exactly what it was.
+ *
+ * `data-theme` is only set on the app's own routes (ThemeScope), so the
+ * journal, the docs and the marketing pages keep their paper whatever the
+ * reader chose for the place they think in.
+ */
+
+/* ── White: the app on a clean white ground ─────────────────────────── */
+html[data-theme="white"] {
+  --paper: #FFFFFF; --paper-2: #F3F3F1; --border: #E6E6E2;
+  --app-paper: #FFFFFF; --app-border: #E6E6E2;
+  --surface: #FFFFFF;
+  --c-paper: 255 255 255; --c-paper-2: 243 243 241; --c-surface: 255 255 255; --c-border: 230 230 226;
+}
+html[data-theme="white"] :is(.logos-root, .lg-tokens) { --lg-paper: #FFFFFF; --lg-panel: #FAFAF8; }
+html[data-theme="white"] .app-root { --app-paper: #FFFFFF; --app-border: #E6E6E2; }
+html[data-theme="white"] .app-root:not(.app-inline) { background: #FFFFFF; }
+
+/* ── Dark: warm, low glare, the same moss turned up to be read on it ─── */
+html[data-theme="dark"] {
+  --paper: #191A17; --paper-2: #22231F; --border: #34352E;
+  --ink: #ECE9DF;
+  --ink-rgb: 236, 233, 223; --lg-ink-rgb: 236, 233, 223; --lg-primary-rgb: 169, 194, 122; --moss-rgb: 143, 174, 92; --shadow-rgb: 0, 0, 0;
+  --ink-70: rgba(236, 233, 223, 0.7); --ink-60: rgba(236, 233, 223, 0.6); --ink-45: rgba(236, 233, 223, 0.45);
+  --ink-40: rgba(236, 233, 223, 0.4); --ink-25: rgba(236, 233, 223, 0.25); --ink-16: rgba(236, 233, 223, 0.16); --ink-12: rgba(236, 233, 223, 0.12);
+  --moss: #8FAE5C; --moss-50: #262C1E; --moss-100: #2E3622; --moss-200: #404E2C; --moss-600: #8FAE5C; --moss-700: #A9C27A; --moss-800: #BED296;
+  --accent: #8FAE5C; --accent-700: #A9C27A;
+  --app-paper: #191A17; --app-border: #34352E;
+  --surface: #25261F;
+  --c-paper: 25 26 23; --c-paper-2: 34 35 31; --c-ink: 236 233 223; --c-surface: 37 38 31; --c-border: 52 53 46;
+  --c-moss-50: 38 44 30; --c-moss-100: 46 54 34; --c-moss-200: 64 78 44; --c-moss-600: 143 174 92; --c-moss-700: 169 194 122; --c-moss-800: 190 210 150;
+}
+html[data-theme="dark"] :is(.logos-root, .lg-tokens) {
+  --lg-paper: #191A17; --lg-panel: #1E1F1B;
+  --lg-primary: #A9C27A; --lg-accent: #8FB3C4; --lg-secondary: #C9B47E; --lg-tension: #D18A68;
+  --lg-ink: #ECE9DF; --lg-ink-60: rgba(236, 233, 223, 0.6); --lg-ink-40: rgba(236, 233, 223, 0.4); --lg-ink-24: rgba(236, 233, 223, 0.24);
+  --lg-line: rgba(236, 233, 223, 0.12);
+  --lg-one: #8FB3C4; --lg-one-soft: rgba(143, 179, 196, 0.12); --lg-one-line: rgba(143, 179, 196, 0.35);
+  --node-idea-bg: rgba(143, 174, 92, 0.14);
+}
+html[data-theme="dark"] .app-root { --app-paper: #191A17; --app-border: #34352E; }
+
+/* ── Socria One: the One blue, with cream ink and the pale blue as the accent ─ */
+html[data-theme="one"] {
+  --paper: #13293A; --paper-2: #183245; --border: #2A4A5E;
+  --ink: #F0EAD8;
+  --ink-rgb: 240, 234, 216; --lg-ink-rgb: 240, 234, 216; --lg-primary-rgb: 184, 205, 217; --moss-rgb: 184, 205, 217; --shadow-rgb: 3, 12, 18;
+  --ink-70: rgba(240, 234, 216, 0.7); --ink-60: rgba(240, 234, 216, 0.6); --ink-45: rgba(240, 234, 216, 0.45);
+  --ink-40: rgba(240, 234, 216, 0.4); --ink-25: rgba(240, 234, 216, 0.25); --ink-16: rgba(240, 234, 216, 0.16); --ink-12: rgba(240, 234, 216, 0.12);
+  --moss: #B8CDD9; --moss-50: #1D3A4D; --moss-100: #244458; --moss-200: #34586E; --moss-600: #B8CDD9; --moss-700: #C8DAE4; --moss-800: #DCE8EF;
+  --accent: #B8CDD9; --accent-700: #C8DAE4;
+  --app-paper: #13293A; --app-border: #2A4A5E;
+  --surface: #1B3749;
+  --c-paper: 19 41 58; --c-paper-2: 24 50 69; --c-ink: 240 234 216; --c-surface: 27 55 73; --c-border: 42 74 94;
+  --c-moss-50: 29 58 77; --c-moss-100: 36 68 88; --c-moss-200: 52 88 110; --c-moss-600: 184 205 217; --c-moss-700: 200 218 228; --c-moss-800: 220 232 239;
+}
+html[data-theme="one"] :is(.logos-root, .lg-tokens) {
+  --lg-paper: #13293A; --lg-panel: #16303F;
+  --lg-primary: #B8CDD9; --lg-accent: #E5D3A1; --lg-secondary: #E5D3A1; --lg-tension: #E39A7A;
+  --lg-ink: #F0EAD8; --lg-ink-60: rgba(240, 234, 216, 0.62); --lg-ink-40: rgba(240, 234, 216, 0.42); --lg-ink-24: rgba(240, 234, 216, 0.26);
+  --lg-line: rgba(240, 234, 216, 0.13);
+  --lg-one: #E5D3A1; --lg-one-soft: rgba(229, 211, 161, 0.12); --lg-one-line: rgba(229, 211, 161, 0.35);
+  --node-idea-bg: rgba(184, 205, 217, 0.12);
+}
+html[data-theme="one"] .app-root { --app-paper: #13293A; --app-border: #2A4A5E; }
+
+/* ── what both dark grounds need besides variables ─────────────────── */
+html:is([data-theme="dark"], [data-theme="one"]) body { background-color: var(--paper); color: var(--ink); }
+html:is([data-theme="dark"], [data-theme="one"]) .paper-bg { background-image: none; }
+html:is([data-theme="dark"], [data-theme="one"]) .app-root:not(.app-inline) { background: var(--app-paper); }
+html:is([data-theme="dark"], [data-theme="one"]) :is(input, textarea, select)::placeholder { color: var(--ink-40); }
+
+/* The map's cards carry a pale tint per type on paper; on a dark ground every
+   card is the raised surface, and the type keeps its glyph, its label and its
+   border style. A decision stays the one filled card. */
+html:is([data-theme="dark"], [data-theme="one"]) .logos-root .lg-node:not(.lg-node-decision) {
+  background: var(--surface); border-color: var(--lg-line); color: var(--lg-ink);
+}
+
+html:is([data-theme="dark"], [data-theme="one"]) .logos-root .lg-node.is-focused { border-color: var(--lg-primary); }
+html:is([data-theme="dark"], [data-theme="one"]) .logos-root .lg-zoom { background: var(--surface); border-color: var(--lg-line); }
+/* the rail and the sheets laid a white veil over paper; on a dark ground, none */
+html:is([data-theme="dark"], [data-theme="one"]) .app-root .s-bar { background: rgba(255, 255, 255, 0.02); }
+html:is([data-theme="dark"], [data-theme="one"]) .acct-sheet .footbar { background: rgba(255, 255, 255, 0.03); }
+html:is([data-theme="dark"], [data-theme="one"]) .acct-sheet .scrim { background: rgba(0, 0, 0, 0.55); }
+/* The mark is a dark drawing on a transparent ground; on a dark one it is drawn light. */
+html:is([data-theme="dark"], [data-theme="one"]) :is(.app-root, .logos-root, .acct-sheet) img[src*="socria-mark"] { filter: invert(1) brightness(0.92); }
+/* A decision is the one filled card. On a dark ground it is filled with a wash
+   of the accent and keeps light ink, so its words stay readable. */
+html:is([data-theme="dark"], [data-theme="one"]) .logos-root .lg-node.lg-node-decision {
+  background: rgba(var(--lg-primary-rgb), 0.22); border-color: rgba(var(--lg-primary-rgb), 0.6); color: var(--lg-ink);
+}
+html:is([data-theme="dark"], [data-theme="one"]) .logos-root .lg-node.lg-node-decision :is(.lg-node-label, .lg-node-type) { color: var(--lg-ink); }
+html:is([data-theme="dark"], [data-theme="one"]) .logos-root .lg-node.lg-node-decision .lg-node-attached { background: rgba(255, 255, 255, 0.1); color: var(--lg-ink-60); }
