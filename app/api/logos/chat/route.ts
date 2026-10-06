@@ -54,6 +54,7 @@ import {
 } from '@/lib/person-memory';
 import { mayUse } from '@/lib/route-guard';
 import { collabBlock, type Seat } from '@/lib/collab';
+import { focusBlock, sanitizeFocus } from '@/lib/workspace/focus';
 import { wantedSimulation, bareRequest, hasSurface, simulationBlock } from '@/lib/model/wants';
 
 export const runtime = 'nodejs';
@@ -361,6 +362,11 @@ export async function POST(req: NextRequest) {
             body?.vizValues && typeof body.vizValues === 'object' ? body.vizValues : undefined
           )) +
       opening +
+      // Logos 3: what they have selected in the workspace — a parameter, a
+      // part of a model, an idea on the map — described from canonical state,
+      // so "why is this negative?" is about the thing they are looking at.
+      // Not on a focused node thread, which is already about one node.
+      (focusLabel ? '' : focusBlock(sanitizeFocus(body?.focus))) +
       // Logos 3: when two people are in the room, Socria becomes the layer
       // between them — it names both, surfaces the connections, the
       // disagreements, the assumptions and the open questions between what

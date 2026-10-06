@@ -101,10 +101,34 @@ import {
   activeDoc,
   adopt,
   applyModelOps,
+  current as currentRevision,
+  docOf,
   editsState,
   EMPTY_WORKSPACE,
   modelFor,
+  redo as redoDoc,
+  restore as restoreDoc,
+  undo as undoDoc,
 } from '@/lib/model/docs';
+import type { Model } from '@/lib/model/schema';
+import { Workspace } from '@/components/workspace/Workspace';
+import { InspectorPanel, ModelPanel, ParamsPanel, TracePanel } from '@/components/workspace/panels';
+import {
+  addPanel,
+  configurePanel,
+  panelsOf,
+  presetLayout,
+  PRESETS,
+  sanitizeLayout,
+  type PanelNode,
+  type WorkspaceLayout,
+} from '@/lib/workspace/tiling';
+import { factsFrom, suggestLayout, suggestViews, type LayoutSuggestion } from '@/lib/workspace/surfaces';
+import { describeFocus, type Focus } from '@/lib/workspace/focus';
+import { LENSES, type LensId } from '@/lib/logos-layout';
+
+/** Where a person's own Logos 3 arrangement is kept: this browser, never the session. */
+const WS_KEY = 'socria.logos3.workspace.v1';
 import { DRIFT_DISMISS_LIMIT, readDrift, type DriftVerdict } from '@/lib/topic-drift';
 import {
   MATH_FADE_MS,
@@ -2568,6 +2592,12 @@ export function LogosApp({
           // Read here, at the moment of sending, so the reply is answering the
           // picture as it actually stands rather than as it opened.
           ...(sentViz ? { vizState: sentViz } : {}),
+          // Logos 3: what they have selected in the workspace, described from
+          // canonical state — so "why is this negative?" is about β₂.
+          ...(() => {
+            const brief = workspaceOn ? describeFocus(focusRef.current, mapRef.current) : null;
+            return brief ? { focus: brief } : {};
+          })(),
           // Two people in the room: their names, so Socria answers as the
           // layer between them. Names only — never who is signed in.
           ...(inShared && roomRef.current.people.length >= 2
@@ -2737,6 +2767,63 @@ export function LogosApp({
   };
 
 
+  // ── LOGOS 3: THE COMPOSABLE WORKSPACE ───────────────────────────────
+  //
+  // On a model with `workspace`, the conversation, the map and the model stop
+  // being fixed columns and become panels the person arranges (lib/workspace/
+  // tiling.ts). Everything below is the arrangement and the person's focus —
+  // never the intellectual state, which stays in the session: the layout is
+  // kept per browser and never travels with a line of thinking or into a
+  // shared room, and focus is ephemeral and never written into a model.
+  const workspaceOn = !!SOCRIA_MODELS[model]?.workspace;
+  const [wsLayout, setWsLayout] = useState<WorkspaceLayout | null>(null);
+  const [focus, setFocus] = useState<Focus>(null);
+  const focusRef = useRef<Focus>(null);
+  focusRef.current = focus;
+  const [wsDismissed, setWsDismissed] = useState<Set<string>>(() => new Set());
+  const wsFacts = useMemo(() => factsFrom(map), [map]);
+  const presetCtx = useMemo(() => {
+    const d = wsFacts.docs.find((x) => x.id === wsFacts.activeDoc) ?? wsFacts.docs[wsFacts.docs.length - 1];
+    return { docs: wsFacts.docs.map((x) => x.id), views: d?.views ?? [], hasViz: !!wsFacts.viz };
+  }, [wsFacts]);
+  useEffect(() => {
+    if (!workspaceOn || wsLayout) return;
+    let saved: WorkspaceLayout | null = null;
+    try {
+      saved = sanitizeLayout(JSON.parse(localStorage.getItem(WS_KEY) || 'null'));
+    } catch {}
+    // A conceptual line of thinking starts from the map; one with a model, from the model.
+    setWsLayout(saved && saved.root ? saved : presetLayout(presetCtx.docs.length || presetCtx.hasViz ? 'model' : 'think', presetCtx));
+  }, [workspaceOn, wsLayout, presetCtx]);
+  const wsSaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const changeLayout = useCallback((next: WorkspaceLayout) => {
+    setWsLayout(next);
+    if (wsSaveRef.current) clearTimeout(wsSaveRef.current);
+    wsSaveRef.current = setTimeout(() => {
+      try {
+        localStorage.setItem(WS_KEY, JSON.stringify(next));
+      } catch {}
+    }, 250);
+  }, []);
+  const wsViews = useMemo(() => (wsLayout ? suggestViews(wsFacts, wsLayout) : []), [wsFacts, wsLayout]);
+  const lastSaid = useMemo(() => [...messages].reverse().find((x) => x.role === 'user')?.content ?? '', [messages]);
+  const wsSuggestion = useMemo(
+    () => (workspaceOn && wsLayout ? suggestLayout(wsFacts, wsLayout, lastSaid, wsDismissed) : null),
+    [workspaceOn, wsFacts, wsLayout, lastSaid, wsDismissed]
+  );
+  // Stable seams for the memoised panels: they hold a ref, so a reply
+  // streaming into the conversation does not redraw a model.
+  const modelEditedRef = useRef<(docId: string, m: Model) => void>(() => {});
+  const stableModelEdited = useCallback((docId: string, m: Model) => modelEditedRef.current(docId, m), []);
+  const askAboutRef = useRef<(id: string, label: string) => void>(() => {});
+  const stableAskAbout = useCallback((id: string, label: string) => askAboutRef.current(id, label), []);
+  const docHistoryRef = useRef<(docId: string, op: 'undo' | 'redo' | number) => void>(() => {});
+  const stableUndo = useCallback((docId: string) => docHistoryRef.current(docId, 'undo'), []);
+  const stableRedo = useCallback((docId: string) => docHistoryRef.current(docId, 'redo'), []);
+  const stableRestore = useCallback((docId: string, at: number) => docHistoryRef.current(docId, at), []);
+  const askLabelRef = useRef<(label: string) => void>(() => {});
+  const stableAskLabel = useCallback((label: string) => askLabelRef.current(label), []);
+
   if (!hasAccess) {
     // THE COVER IS THE GATE. The same card the chat opens from its pill —
     // the real ModelView on an engine-built model, the terms read from the
@@ -2763,198 +2850,178 @@ export function LogosApp({
     });
   const fmAnchor = fmRunning(firstMap) ? byIdAnchor(firstMap.at as 'became' | 'changed' | 'release', fmShape) : null;
 
-  return (
-    <div
-      className={`logos-root${fmAnchor === 'control' ? ' is-firstmap-control' : ''}${
-        fmAnchor === 'node' || fmAnchor === 'map' ? ' is-firstmap-node' : ''
-      }`}
-    >
-      {introWanted && (
-        <LogosIntroOnce
-          onStart={(text) => {
-            firstRun.reach('socria.intro');
-            setInput(text);
-            requestAnimationFrame(() => {
-              const ta = document.querySelector<HTMLTextAreaElement>('.lg-composer textarea');
-              if (ta) {
-                ta.focus();
-                ta.setSelectionRange(ta.value.length, ta.value.length);
-              }
-            });
-          }}
-          onSkip={() => firstRun.reach('socria.intro', { skipped: true })}
-        />
-      )}
-      <LogosGuide open={guideOpen} onClose={closeGuide} />
-      {styleOpen && (
-        <div className="lg-style-scrim" role="dialog" aria-modal="true" aria-label="How should Socria work with you?">
-          <div className="lg-style-back" onClick={() => setStyleOpen(false)} aria-hidden="true" />
-          <div className="lg-style-sheet">
-            <h2 className="lg-style-title">Socria Personality</h2>
-            <p className="lg-style-sub">
-              How Socria communicates while it thinks with you. How far the
-              thinking goes is Logos&rsquo;s to judge; this decides how it
-              sounds on the way.
-            </p>
+  // ── ONE WRITE PATH FOR EVERY SURFACE ─────────────────────────────
+  // A slider, a cursor, a selection or an open view goes into the document
+  // (lib/model/docs.ts adopt — coalesced, so a drag is one revision), whether
+  // it was moved on the map's plot lens, in a Logos 3 model panel or in the
+  // Parameters panel. Every view of the model reads the document, so every
+  // view follows. The state lands at once; the save trails the drag.
+  function handleModelEdited(docId: string, m: Model) {
+    // What kind of touch this was, read off the model rather than
+    // guessed: a value moved, or something selected / a view opened.
+    const was = sessionsRef.current.find((x) => x.id === activeIdRef.current)?.map?.models?.docs.find((d) => d.id === docId);
+    const prev = was ? modelFor(was) : null;
+    if (prev) {
+      const moved =
+        (prev.params ?? []).some((p) => (m.params ?? []).find((q) => q.id === p.id)?.value !== p.value) ||
+        JSON.stringify(prev.at ?? {}) !== JSON.stringify(m.at ?? {});
+      if (moved) signalFirstMap('control-moved');
+      else if ((m.selected ?? null) !== (prev.selected ?? null) && m.selected) signalFirstMap('node-pressed');
+    }
+    patchActive((s) => {
+      const map = s.map ?? EMPTY_MAP;
+      const ws = map.models;
+      if (!ws) return s;
+      const next = adopt(ws, docId, m, Date.now());
+      return next === ws ? s : { ...s, map: { ...map, models: next } };
+    }, false);
+    if (adoptSaveRef.current) clearTimeout(adoptSaveRef.current);
+    adoptSaveRef.current = setTimeout(() => {
+      const cur = sessionsRef.current.find((x) => x.id === activeIdRef.current);
+      if (cur) void persist(cur);
+    }, 700);
+    // The workspace follows a canonical selection: selecting a part of the
+    // model in any view makes it what the inspector and the conversation mean
+    // by "this".
+    const wasSel = (() => {
+      const d = sessionsRef.current.find((x) => x.id === activeIdRef.current)?.map?.models?.docs.find((x) => x.id === docId);
+      return d ? (modelFor(d).selected ?? null) : null;
+    })();
+    if ((m.selected ?? null) !== wasSel) {
+      if (m.selected) setFocus({ kind: 'object', doc: docId, id: m.selected });
+      else setFocus((f) => (f && f.kind === 'object' && f.doc === docId ? null : f));
+    }
+  }
+  modelEditedRef.current = handleModelEdited;
 
-            <div className="lg-persona-grid">
-              {PERSONALITY_DIMENSIONS.map((d) => (
-                <PersonalityDial
-                  key={d.id}
-                  dimension={d}
-                  value={personaDraft[d.id] ?? d.options[0].id}
-                  onChange={(next) =>
-                    setPersonaDraft((prev) => ({ ...prev, [d.id]: next }))
-                  }
-                />
-              ))}
-            </div>
-            {!isDefaultPersonality(personaDraft) && (
-              <button
-                type="button"
-                className="lg-persona-reset"
-                onClick={() => setPersonaDraft(DEFAULT_PERSONALITY)}
-              >
-                Reset to Socria defaults
-              </button>
+  // ASK ABOUT THIS — from the map's plot lens or any model panel: the turn
+  // carries the object's identity, and the composer is seeded, never sent.
+  function handleAskAbout(id: string, label: string) {
+    setInput((cur) => (cur.trim() ? cur : `About ${label} — why is it what it is?`));
+    // Selecting what is already selected is not an edit, and the
+    // op's refusal ("… is already selected") is not news.
+    const doc = mapRef.current.models ? activeDoc(mapRef.current.models) : null;
+    if (!doc || modelFor(doc).selected !== id) applyVizOps([{ op: 'select', id }]);
+    signalFirstMap('asked');
+  }
+  askAboutRef.current = handleAskAbout;
+
+  // UNDO, REDO, RETURN TO A POINT — the model's own history, from the Trace
+  // panel. Each is a document verb (lib/model/docs.ts), so it is the same
+  // history the conversation's "undo that" walks.
+  docHistoryRef.current = (docId, op) => {
+    patchActive((s) => {
+      const mp = s.map ?? EMPTY_MAP;
+      const ws = mp.models;
+      if (!ws) return s;
+      const next = op === 'undo' ? undoDoc(ws, docId) : op === 'redo' ? redoDoc(ws, docId) : restoreDoc(ws, docId, op);
+      return next === ws ? s : { ...s, map: { ...mp, models: next } };
+    });
+  };
+  // "Ask about this" from the inspector: the composer is seeded, never sent,
+  // and the conversation opens if it was closed — the person asked for it.
+  askLabelRef.current = (label) => {
+    setInput((cur) => (cur.trim() ? cur : `About ${label} — why is it what it is?`));
+    if (wsLayout && !panelsOf(wsLayout).some((x) => x.type === 'chat')) changeLayout(addPanel(wsLayout, { type: 'chat' }).layout);
+  };
+
+  // ── THE WORKSPACE'S PANELS ───────────────────────────────────────
+  //
+  // Each panel draws a surface over the session's own state. Which model a
+  // panel shows is its config's `doc`, or the active one; the first model
+  // panel follows the model's canonical open view, and any other — or one
+  // given a view of its own — pins its representation, so two panels can show
+  // one model two ways while sharing its parameters and its selection.
+  const wsDocs = map.models?.docs ?? [];
+  const wsActiveDoc = map.models ? (activeDoc(map.models) ?? wsDocs[wsDocs.length - 1] ?? null) : null;
+  const panelDoc = (p: PanelNode) => (p.config?.doc && map.models ? docOf(map.models, p.config.doc) : wsActiveDoc);
+  const firstOf = (t: PanelNode['type']) => (wsLayout ? panelsOf(wsLayout).find((x) => x.type === t)?.id ?? null : null);
+  const focusBrief = workspaceOn ? describeFocus(focus, map) : null;
+
+  function renderPanel(p: PanelNode) {
+    switch (p.type) {
+      case 'chat':
+        return (
+          <div className="lg-convo lg-convo-panel">
+            {focusBrief && (
+              <div className="ws-chat-focus" role="status">
+                <span>About</span>
+                <strong>{focusBrief.label}</strong>
+                <span>{focusBrief.of}</span>
+                <button type="button" aria-label="Clear what the conversation is about" onClick={() => setFocus(null)}>×</button>
+              </div>
             )}
-
-            <h3 className="lg-style-title2">How should Socria work with you?</h3>
-            <p className="lg-style-sub">
-              In your own words, layered over the settings above — whatever they
-              don&rsquo;t say.
-            </p>
-            <textarea
-              className="lg-style-input"
-              value={styleDraftText}
-              onChange={(e) => setStyleDraftText(e.target.value)}
-              maxLength={MAX_STYLE}
-              rows={6}
-              placeholder={
-                'Talk casually with me. Keep responses concise.\nChallenge my assumptions more, and ask fewer questions.\nFor math, act like a lab instructor.'
-              }
-            />
-            <p className="lg-style-tip">
-              For one conversation, just ask in the chat — &ldquo;be more
-              casual&rdquo;, &ldquo;fewer questions&rdquo; — and Socria adapts on
-              the spot. Say &ldquo;remember this&rdquo; and it updates these
-              instructions itself; what&rsquo;s written here is remembered.
-            </p>
-            <p className="lg-style-note">
-              This shapes Socria&rsquo;s personality, not its principles — your
-              thinking, your authorship and the learning guard stay yours on
-              every setting.
-            </p>
-            <div className="lg-style-row">
-              <button type="button" className="lg-style-save" onClick={saveStyle}>
-                Save
-              </button>
-              {styleDraftText.trim() && (
-                <button
-                  type="button"
-                  className="lg-style-clear"
-                  onClick={() => setStyleDraftText('')}
-                >
-                  Clear
-                </button>
-              )}
-              <button type="button" className="lg-style-cancel" onClick={() => setStyleOpen(false)}>
-                Cancel
-              </button>
-            </div>
+            {convoBody}
           </div>
-        </div>
-      )}
-
-      {/* The account, over the map — the same sheet /chat opens, so there is
-          one account surface in the product rather than two that drift. */}
-      <AccountSheet
-        open={acctOpen}
-        onClose={() => setAcctOpen(false)}
-        isOne={one}
-      />
-
-      <SocriaOneModal
-        open={oneOpen}
-        onClose={() => setOneOpen(false)}
-        onUnlock={takeOne}
-        reason={oneReason}
-        busy={oneBusy}
-        error={oneError}
-      />
-
-      {/* The Thinking Journey sheet used to be mounted here, behind the
-          header's memory button. Both are gone: the rail's footer links to
-          /memory, which holds the Mind Graph AND the Journey with the same
-          per-entry forget this sheet carried. Nothing was dropped on the way
-          past — it is one screen instead of two. */}
-
-      <OnePrompt
-        view={onePrompt}
-        onDismiss={dismissPrompt}
-        onAccept={() => {
-          acceptPrompt();
-          void takeOne('');
-        }}
-        busy={oneBusy}
-        error={oneError}
-      />
-
-      <ConnectionsModal
-        open={connOpen}
-        authHeaders={keyHeaders}
-        onClose={() => setConnOpen(false)}
-        onChanged={() => setConnEpoch((n) => n + 1)}
-      />
-      {connBanner && (
-        <div className="lg-conn-banner" role="status">
-          {connBanner}
-        </div>
-      )}
-      <div
-        className={`lg-split${railOpen ? '' : ' rail-closed'}${draftOpen ? ' draft-open' : ''}${
-          mobileView === 'map' ? ' mv-map' : ''
-        }`}
-      >
-        {/* The rail is the Core surface's rail, and app-shell.css scopes every
-            `.s-*` rule under `.app-root` — so it arrives inside one. The host
-            is a box in this grid and nothing more: `.app-root`'s own page
-            background and 100svh floor belong to a page, not to one column of
-            this one, and globals.css turns both off for `.lg-railhost`. */}
-        <div className="app-root lg-railhost">
-          <LogosRail
-            sessions={sessions}
-            chats={chats}
-            onOpenChat={onOpenChat}
-            activeId={activeId}
-            open={railOpen}
-            syncing={hydrating}
-            cloud={cloud}
-            onSelect={(id) => {
-              switchSession(id);
-              usedRail();
-            }}
-            onNew={() => {
-              newSession();
-              usedRail();
-            }}
-            onDelete={deleteSession}
-            onRename={renameSession}
-            onToggle={() => setRailOpen((v) => !v)}
-            projects={projects}
-            onNewInProject={(pid) => {
-              newSession(pid);
-              usedRail();
-            }}
-            onProjectSettings={onProjectSettings}
-            onCreateProject={onCreateProject}
-            onMoveSession={(id, pid) => void moveSession(id, pid)}
-            onMoveChat={onMoveChat}
+        );
+      case 'map':
+        return <div className="lg-panel lg-panel-in">{mapBody({ lens: p.config?.lens, primary: p.id === firstOf('map') })}</div>;
+      case 'model': {
+        const doc = panelDoc(p);
+        const primary = p.id === firstOf('model');
+        const pinned = p.config?.view !== undefined || !primary;
+        return (
+          <ModelPanel
+            doc={doc}
+            edits={map.models ? (editsState(map.models) ?? undefined) : undefined}
+            viz={doc ? null : (map.viz ?? null)}
+            pinnedView={pinned ? (p.config?.view ?? null) : undefined}
+            onPinView={pinned ? (id) => changeLayout(configurePanel(wsLayout!, p.id, { view: id ?? undefined })) : undefined}
+            onModel={stableModelEdited}
+            onAsk={stableAskAbout}
+            onRead={primary ? takeViz : undefined}
+            ops={primary ? vizOps : null}
           />
-        </div>
+        );
+      }
+      case 'params':
+        return <ParamsPanel doc={panelDoc(p)} focus={focus} onModel={stableModelEdited} onFocus={setFocus} />;
+      case 'inspector':
+        return <InspectorPanel map={map} doc={panelDoc(p)} focus={focus} onFocus={setFocus} onAsk={stableAskLabel} />;
+      case 'trace':
+        return <TracePanel doc={panelDoc(p)} onUndo={stableUndo} onRedo={stableRedo} onRestore={stableRestore} />;
+    }
+  }
 
-        {/* ── Conversation ───────────────────────────────── */}
-        <section className="lg-convo" aria-label="Conversation">
+  function panelTitle(p: PanelNode): { title: string; sub?: string } {
+    const doc = panelDoc(p);
+    const docTitle = doc ? currentRevision(doc).title : undefined;
+    switch (p.type) {
+      case 'chat':
+        return { title: 'Conversation' };
+      case 'map': {
+        const lens = p.config?.lens ? LENSES.find((l) => l.id === p.config!.lens)?.label : null;
+        return { title: 'Thinking Map', sub: lens ?? (map.context ? CONTEXT_LABEL[map.context] : undefined) };
+      }
+      case 'model': {
+        const v = p.config?.view && doc ? wsFacts.docs.find((d) => d.id === doc.id)?.views.find((x) => x.id === p.config!.view) : null;
+        return { title: doc ? 'Model' : map.viz?.kind === 'simulation' ? 'Simulation' : 'Model', sub: v ? `${docTitle} · ${v.variant}` : docTitle };
+      }
+      case 'params':
+        return { title: 'Parameters', sub: docTitle };
+      case 'inspector':
+        return { title: 'Inspector', sub: focusBrief?.label };
+      case 'trace':
+        return { title: 'Trace', sub: docTitle };
+    }
+  }
+
+  function acceptSuggestion(sg: LayoutSuggestion) {
+    if (!wsLayout) return;
+    let next = wsLayout;
+    for (const a of sg.action) next = addPanel(next, a).layout;
+    changeLayout(next);
+    setWsDismissed((d) => new Set(d).add(sg.id));
+  }
+
+  // ── THE SURFACES, AS NAMED PIECES ─────────────────────────────────
+  //
+  // The conversation's header, the conversation itself and the map are the
+  // same JSX they always were. Logos 2 sets them in its two fixed columns
+  // exactly as before; Logos 3 hands them to the workspace as panels, beside
+  // the model, its parameters, the inspector and the trace — all drawn over
+  // the one session this component holds. Nothing here copies state.
+  const convoHead = (
           <header className={`lg-head${collab ? ' lg-head-collab' : ''}`}>
             {/* The header measures itself; this row is what it arranges. They
                 are two elements because a container query cannot restyle the
@@ -3075,6 +3142,9 @@ export function LogosApp({
             )}
             </div>
           </header>
+  );
+  const convoBody = (
+    <>
 
           <div className="lg-thread">
             {messages.length === 0 && !streaming && (
@@ -3433,10 +3503,10 @@ export function LogosApp({
                 there; Logos 2 has no axes of its own to show beneath it. */}
             <ModelPicker value={model} onChange={pickModel} isSignedIn={!!isSignedIn || unlocked} />
           </div>
-        </section>
-
-        {/* ── Thinking Map ───────────────────────────────── */}
-        <section className="lg-panel" aria-label="Thinking map">
+    </>
+  );
+  const mapBody = ({ lens, primary }: { lens?: string; primary: boolean }) => (
+    <>
           <header className="lg-panel-head">
             <span className="lg-panel-title">
               Thinking Map
@@ -3517,6 +3587,9 @@ export function LogosApp({
             </div>
           )}
           <ThinkingMap
+            key={`tm-${lens ?? ''}`}
+            initialLens={lens as LensId | undefined}
+            onSelectNode={(id) => setFocus({ kind: 'node', id })}
             map={map}
             onAction={(mode, node) => {
               signalFirstMap('action-taken');
@@ -3542,14 +3615,7 @@ export function LogosApp({
             // — rather than about what a picture looks like near a pixel. The
             // composer is seeded rather than sent, because the question is still
             // the person's to ask.
-            onAskAbout={(id, label) => {
-              setInput((cur) => (cur.trim() ? cur : `About ${label} — why is it what it is?`));
-              // Selecting what is already selected is not an edit, and the
-              // op's refusal ("… is already selected") is not news.
-              const doc = mapRef.current.models ? activeDoc(mapRef.current.models) : null;
-              if (!doc || modelFor(doc).selected !== id) applyVizOps([{ op: 'select', id }]);
-              signalFirstMap('asked');
-            }}
+            onAskAbout={stableAskAbout}
             emerging={emerging}
             guarded={guarded}
             onViz={(viz) =>
@@ -3560,32 +3626,9 @@ export function LogosApp({
             // A slider, a cursor, a selection or an open view goes into the
             // document (lib/model/docs.ts adopt — coalesced, so a drag is one
             // revision). The state lands at once; the save trails the drag.
-            onModelEdited={(docId, m) => {
-              // What kind of touch this was, read off the model rather than
-              // guessed: a value moved, or something selected / a view opened.
-              const was = sessionsRef.current.find((x) => x.id === activeIdRef.current)?.map?.models?.docs.find((d) => d.id === docId);
-              const prev = was ? modelFor(was) : null;
-              if (prev) {
-                const moved =
-                  (prev.params ?? []).some((p) => (m.params ?? []).find((q) => q.id === p.id)?.value !== p.value) ||
-                  JSON.stringify(prev.at ?? {}) !== JSON.stringify(m.at ?? {});
-                if (moved) signalFirstMap('control-moved');
-                else if ((m.selected ?? null) !== (prev.selected ?? null) && m.selected) signalFirstMap('node-pressed');
-              }
-              patchActive((s) => {
-                const map = s.map ?? EMPTY_MAP;
-                const ws = map.models;
-                if (!ws) return s;
-                const next = adopt(ws, docId, m, Date.now());
-                return next === ws ? s : { ...s, map: { ...map, models: next } };
-              }, false);
-              if (adoptSaveRef.current) clearTimeout(adoptSaveRef.current);
-              adoptSaveRef.current = setTimeout(() => {
-                const cur = sessionsRef.current.find((x) => x.id === activeIdRef.current);
-                if (cur) void persist(cur);
-              }, 700);
-            }}
+            onModelEdited={stableModelEdited}
           />
+          {primary && (<>
           <ExplorePanel
             open={explore.open}
             mode={explore.mode}
@@ -3624,7 +3667,231 @@ export function LogosApp({
             onConnect={() => setConnOpen(true)}
             onClose={() => setCtxPanel((c) => ({ ...c, open: false }))}
           />
-        </section>
+          </>)}
+    </>
+  );
+
+  return (
+    <div
+      className={`logos-root${fmAnchor === 'control' ? ' is-firstmap-control' : ''}${
+        fmAnchor === 'node' || fmAnchor === 'map' ? ' is-firstmap-node' : ''
+      }`}
+    >
+      {introWanted && (
+        <LogosIntroOnce
+          onStart={(text) => {
+            firstRun.reach('socria.intro');
+            setInput(text);
+            requestAnimationFrame(() => {
+              const ta = document.querySelector<HTMLTextAreaElement>('.lg-composer textarea');
+              if (ta) {
+                ta.focus();
+                ta.setSelectionRange(ta.value.length, ta.value.length);
+              }
+            });
+          }}
+          onSkip={() => firstRun.reach('socria.intro', { skipped: true })}
+        />
+      )}
+      <LogosGuide open={guideOpen} onClose={closeGuide} />
+      {styleOpen && (
+        <div className="lg-style-scrim" role="dialog" aria-modal="true" aria-label="How should Socria work with you?">
+          <div className="lg-style-back" onClick={() => setStyleOpen(false)} aria-hidden="true" />
+          <div className="lg-style-sheet">
+            <h2 className="lg-style-title">Socria Personality</h2>
+            <p className="lg-style-sub">
+              How Socria communicates while it thinks with you. How far the
+              thinking goes is Logos&rsquo;s to judge; this decides how it
+              sounds on the way.
+            </p>
+
+            <div className="lg-persona-grid">
+              {PERSONALITY_DIMENSIONS.map((d) => (
+                <PersonalityDial
+                  key={d.id}
+                  dimension={d}
+                  value={personaDraft[d.id] ?? d.options[0].id}
+                  onChange={(next) =>
+                    setPersonaDraft((prev) => ({ ...prev, [d.id]: next }))
+                  }
+                />
+              ))}
+            </div>
+            {!isDefaultPersonality(personaDraft) && (
+              <button
+                type="button"
+                className="lg-persona-reset"
+                onClick={() => setPersonaDraft(DEFAULT_PERSONALITY)}
+              >
+                Reset to Socria defaults
+              </button>
+            )}
+
+            <h3 className="lg-style-title2">How should Socria work with you?</h3>
+            <p className="lg-style-sub">
+              In your own words, layered over the settings above — whatever they
+              don&rsquo;t say.
+            </p>
+            <textarea
+              className="lg-style-input"
+              value={styleDraftText}
+              onChange={(e) => setStyleDraftText(e.target.value)}
+              maxLength={MAX_STYLE}
+              rows={6}
+              placeholder={
+                'Talk casually with me. Keep responses concise.\nChallenge my assumptions more, and ask fewer questions.\nFor math, act like a lab instructor.'
+              }
+            />
+            <p className="lg-style-tip">
+              For one conversation, just ask in the chat — &ldquo;be more
+              casual&rdquo;, &ldquo;fewer questions&rdquo; — and Socria adapts on
+              the spot. Say &ldquo;remember this&rdquo; and it updates these
+              instructions itself; what&rsquo;s written here is remembered.
+            </p>
+            <p className="lg-style-note">
+              This shapes Socria&rsquo;s personality, not its principles — your
+              thinking, your authorship and the learning guard stay yours on
+              every setting.
+            </p>
+            <div className="lg-style-row">
+              <button type="button" className="lg-style-save" onClick={saveStyle}>
+                Save
+              </button>
+              {styleDraftText.trim() && (
+                <button
+                  type="button"
+                  className="lg-style-clear"
+                  onClick={() => setStyleDraftText('')}
+                >
+                  Clear
+                </button>
+              )}
+              <button type="button" className="lg-style-cancel" onClick={() => setStyleOpen(false)}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* The account, over the map — the same sheet /chat opens, so there is
+          one account surface in the product rather than two that drift. */}
+      <AccountSheet
+        open={acctOpen}
+        onClose={() => setAcctOpen(false)}
+        isOne={one}
+      />
+
+      <SocriaOneModal
+        open={oneOpen}
+        onClose={() => setOneOpen(false)}
+        onUnlock={takeOne}
+        reason={oneReason}
+        busy={oneBusy}
+        error={oneError}
+      />
+
+      {/* The Thinking Journey sheet used to be mounted here, behind the
+          header's memory button. Both are gone: the rail's footer links to
+          /memory, which holds the Mind Graph AND the Journey with the same
+          per-entry forget this sheet carried. Nothing was dropped on the way
+          past — it is one screen instead of two. */}
+
+      <OnePrompt
+        view={onePrompt}
+        onDismiss={dismissPrompt}
+        onAccept={() => {
+          acceptPrompt();
+          void takeOne('');
+        }}
+        busy={oneBusy}
+        error={oneError}
+      />
+
+      <ConnectionsModal
+        open={connOpen}
+        authHeaders={keyHeaders}
+        onClose={() => setConnOpen(false)}
+        onChanged={() => setConnEpoch((n) => n + 1)}
+      />
+      {connBanner && (
+        <div className="lg-conn-banner" role="status">
+          {connBanner}
+        </div>
+      )}
+      <div
+        className={`lg-split${workspaceOn ? ' is-ws' : ''}${railOpen ? '' : ' rail-closed'}${draftOpen ? ' draft-open' : ''}${
+          mobileView === 'map' ? ' mv-map' : ''
+        }`}
+      >
+        {/* The rail is the Core surface's rail, and app-shell.css scopes every
+            `.s-*` rule under `.app-root` — so it arrives inside one. The host
+            is a box in this grid and nothing more: `.app-root`'s own page
+            background and 100svh floor belong to a page, not to one column of
+            this one, and globals.css turns both off for `.lg-railhost`. */}
+        <div className="app-root lg-railhost">
+          <LogosRail
+            sessions={sessions}
+            chats={chats}
+            onOpenChat={onOpenChat}
+            activeId={activeId}
+            open={railOpen}
+            syncing={hydrating}
+            cloud={cloud}
+            onSelect={(id) => {
+              switchSession(id);
+              usedRail();
+            }}
+            onNew={() => {
+              newSession();
+              usedRail();
+            }}
+            onDelete={deleteSession}
+            onRename={renameSession}
+            onToggle={() => setRailOpen((v) => !v)}
+            projects={projects}
+            onNewInProject={(pid) => {
+              newSession(pid);
+              usedRail();
+            }}
+            onProjectSettings={onProjectSettings}
+            onCreateProject={onCreateProject}
+            onMoveSession={(id, pid) => void moveSession(id, pid)}
+            onMoveChat={onMoveChat}
+          />
+        </div>
+
+        {workspaceOn && wsLayout ? (
+          <div className="lg-ws-col">
+            {convoHead}
+            <Workspace
+              layout={wsLayout}
+              onLayout={changeLayout}
+              render={renderPanel}
+              titleOf={panelTitle}
+              views={wsViews}
+              presets={PRESETS}
+              onPreset={(id) => changeLayout(presetLayout(id, presetCtx))}
+              onReset={() => changeLayout(presetLayout(wsLayout.preset ?? (wsFacts.docs.length ? 'model' : 'think'), presetCtx))}
+              suggestion={wsSuggestion}
+              onAccept={acceptSuggestion}
+              onDismiss={(s) => setWsDismissed((d) => new Set(d).add(s.id))}
+            />
+          </div>
+        ) : (
+          <>
+            {/* ── Conversation ───────────────────────────────── */}
+            <section className="lg-convo" aria-label="Conversation">
+              {convoHead}
+              {convoBody}
+            </section>
+
+            {/* ── Thinking Map ───────────────────────────────── */}
+            <section className="lg-panel" aria-label="Thinking map">
+              {mapBody({ primary: true })}
+            </section>
+          </>
+        )}
 
         {/* ── Draft ──────────────────────────────────────── */}
         {draftOpen && (

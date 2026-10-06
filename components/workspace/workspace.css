@@ -1,0 +1,214 @@
+/* components/workspace/workspace.css — the Logos 3 workspace shell and its panels.
+   Quiet by design: hairline structure, small caps titles, chrome that appears on
+   hover or focus, and the content given every pixel it can have. Scoped under
+   .logos-root, so nothing leaks into any other surface. */
+
+.logos-root .ws-root { display: flex; flex-direction: column; min-height: 0; min-width: 0; height: 100%; position: relative; }
+
+/* ── the bar: presets, a suggestion, + View ─────────────────────────── */
+.logos-root .ws-bar {
+  display: flex; align-items: center; gap: 14px; min-height: 36px;
+  padding: 0 14px; border-bottom: 1px solid var(--lg-line);
+  font-family: var(--lg-sans); font-size: 12px; color: var(--lg-ink-60);
+}
+.logos-root .ws-presets { display: flex; gap: 2px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+.logos-root .ws-presets button {
+  background: none; border: 0; padding: 6px 9px; border-radius: 6px; cursor: pointer;
+  font: inherit; color: var(--lg-ink-60); white-space: nowrap;
+}
+.logos-root .ws-presets button:hover { color: var(--lg-ink); background: rgba(31,31,31,0.04); }
+.logos-root .ws-presets button.is-on { color: var(--lg-primary); }
+.logos-root .ws-bar-r { margin-left: auto; display: flex; align-items: center; gap: 4px; }
+.logos-root .ws-add { position: relative; }
+.logos-root .ws-add-btn, .logos-root .ws-reset {
+  background: none; border: 0; padding: 6px 10px; border-radius: 6px; cursor: pointer;
+  font: inherit; color: var(--lg-ink-60);
+}
+.logos-root .ws-add-btn { color: var(--lg-primary); font-weight: 500; }
+.logos-root .ws-add-btn:hover, .logos-root .ws-reset:hover { background: rgba(31,31,31,0.04); color: var(--lg-ink); }
+.logos-root .ws-suggest {
+  display: flex; align-items: center; gap: 8px; min-width: 0;
+  font-family: var(--serif); font-style: italic; font-size: 13.5px; color: var(--lg-ink);
+}
+.logos-root .ws-suggest span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.logos-root .ws-suggest button {
+  font-family: var(--lg-sans); font-style: normal; font-size: 12px; cursor: pointer;
+  border-radius: 999px; padding: 3px 10px; border: 1px solid transparent; background: none; color: var(--lg-ink-60);
+}
+.logos-root .ws-suggest .ws-suggest-go { border-color: rgba(94,118,51,0.4); color: var(--lg-primary); }
+.logos-root .ws-suggest .ws-suggest-go:hover { background: rgba(94,118,51,0.08); }
+
+/* ── the stage: splits, cells, hairline dividers ─────────────────────── */
+.logos-root .ws-stage { flex: 1; min-height: 0; min-width: 0; display: flex; position: relative; }
+.logos-root .ws-stage > * { flex: 1; min-width: 0; min-height: 0; }
+.logos-root .ws-split { display: flex; min-width: 0; min-height: 0; flex: 1; }
+.logos-root .ws-split.is-row { flex-direction: row; }
+.logos-root .ws-split.is-col { flex-direction: column; }
+.logos-root .ws-cell { display: flex; min-width: 0; min-height: 0; }
+.logos-root .ws-cell > * { flex: 1; min-width: 0; min-height: 0; }
+.logos-root .ws-divider { flex: 0 0 1px; background: var(--lg-line); position: relative; z-index: 4; outline: none; }
+.logos-root .ws-divider::after { content: ""; position: absolute; transition: background 0.15s; }
+.logos-root .ws-divider.is-row { cursor: col-resize; }
+.logos-root .ws-divider.is-row::after { inset: 0 -4px; }
+.logos-root .ws-divider.is-col { cursor: row-resize; }
+.logos-root .ws-divider.is-col::after { inset: -4px 0; }
+.logos-root .ws-divider:hover::after,
+.logos-root .ws-divider:focus-visible::after,
+.logos-root .ws-divider.is-active::after { background: rgba(94,118,51,0.22); }
+
+/* ── a panel ─────────────────────────────────────────────────────────── */
+.logos-root .ws-panel { display: flex; flex-direction: column; min-width: 0; min-height: 0; position: relative; background: var(--lg-paper); }
+.logos-root .ws-head {
+  display: flex; align-items: baseline; gap: 10px; flex: 0 0 auto;
+  padding: 9px 12px 7px 16px; position: relative; user-select: none;
+}
+.logos-root .ws-head[draggable="true"] { cursor: grab; }
+.logos-root .ws-title {
+  font-family: var(--lg-sans); font-size: 10px; font-weight: 600; letter-spacing: 0.16em;
+  text-transform: uppercase; color: var(--lg-ink-40);
+}
+.logos-root .ws-title-sub {
+  font-family: var(--serif); font-style: italic; font-size: 13px; color: var(--lg-ink-60);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+}
+.logos-root .ws-acts { margin-left: auto; display: flex; gap: 2px; opacity: 0; transition: opacity 0.15s; }
+.logos-root .ws-panel:hover > .ws-head .ws-acts,
+.logos-root .ws-head:focus-within .ws-acts,
+.logos-root .ws-panel.is-max > .ws-head .ws-acts { opacity: 1; }
+.logos-root .ws-act {
+  background: none; border: 0; cursor: pointer; color: var(--lg-ink-40);
+  font-size: 13px; line-height: 1; padding: 4px 6px; border-radius: 5px;
+}
+.logos-root .ws-act:hover, .logos-root .ws-act:focus-visible { color: var(--lg-ink); background: rgba(31,31,31,0.05); }
+.logos-root .ws-body { flex: 1; min-height: 0; min-width: 0; display: flex; flex-direction: column; overflow: hidden; position: relative; }
+.logos-root .ws-body > * { flex: 1; min-height: 0; }
+.logos-root .ws-panel.is-max { flex: 1; }
+
+/* drop zones while a panel is being moved */
+.logos-root .ws-drop { position: absolute; inset: 0; z-index: 6; pointer-events: none; }
+.logos-root .ws-drop span { position: absolute; inset: 0; background: rgba(94,118,51,0.10); border: 1px solid rgba(94,118,51,0.45); opacity: 0; transition: all 0.12s; }
+.logos-root .ws-drop.is-left span { opacity: 1; right: 50%; }
+.logos-root .ws-drop.is-right span { opacity: 1; left: 50%; }
+.logos-root .ws-drop.is-top span { opacity: 1; bottom: 50%; }
+.logos-root .ws-drop.is-bottom span { opacity: 1; top: 50%; }
+.logos-root .ws-drop.is-center span { opacity: 1; inset: 18%; border-radius: 8px; }
+
+/* ── menus ───────────────────────────────────────────────────────────── */
+.logos-root .ws-menu {
+  position: absolute; z-index: 40; right: 8px; top: calc(100% + 2px);
+  width: min(360px, 80vw); max-height: min(440px, 70vh); overflow: auto;
+  background: var(--lg-panel); border: 1px solid var(--lg-line); border-radius: 10px;
+  box-shadow: 0 18px 50px -24px rgba(31,31,31,0.45); padding: 6px;
+  font-family: var(--lg-sans);
+}
+.logos-root .ws-menu-small { width: 200px; }
+.logos-root .ws-menu-k { margin: 6px 8px 4px; font-size: 9.5px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--lg-ink-40); }
+.logos-root .ws-menu-k.is-sub { margin-top: 10px; }
+.logos-root .ws-menu-row {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 1px; width: 100%;
+  background: none; border: 0; text-align: left; cursor: pointer; padding: 7px 8px; border-radius: 7px;
+  font: inherit; font-size: 13px; color: var(--lg-ink);
+}
+.logos-root .ws-menu-row:hover, .logos-root .ws-menu-row:focus-visible { background: rgba(94,118,51,0.08); }
+.logos-root .ws-menu-row.is-open { color: var(--lg-ink-60); }
+.logos-root .ws-menu-row.is-close { color: var(--lg-tension); }
+.logos-root .ws-menu-w { font-family: var(--serif); font-style: italic; font-size: 12.5px; color: var(--lg-ink-60); }
+
+/* ── empty states ────────────────────────────────────────────────────── */
+.logos-root .ws-empty, .logos-root .ws-blank { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 24px; text-align: center; color: var(--lg-ink-60); }
+.logos-root .ws-empty p, .logos-root .ws-blank > p { margin: 0; font-family: var(--serif); font-size: 17px; color: var(--lg-ink); }
+.logos-root .ws-empty .ws-empty-sub { font-family: var(--lg-sans); font-size: 13px; color: var(--lg-ink-60); max-width: 34ch; }
+.logos-root .ws-blank-list { display: grid; gap: 4px; margin-top: 10px; width: min(380px, 90%); }
+.logos-root .ws-blank-list button { display: flex; flex-direction: column; align-items: flex-start; background: none; border: 1px solid var(--lg-line); border-radius: 8px; padding: 9px 12px; cursor: pointer; font-family: var(--lg-sans); font-size: 13px; color: var(--lg-ink); text-align: left; }
+.logos-root .ws-blank-list em { font-family: var(--serif); font-size: 12.5px; color: var(--lg-ink-60); }
+
+/* ── narrow screens: tabs, one surface at a time ─────────────────────── */
+.logos-root .ws-root.is-narrow .ws-tabs { display: flex; gap: 2px; overflow-x: auto; padding: 6px 10px; border-bottom: 1px solid var(--lg-line); scrollbar-width: none; }
+.logos-root .ws-tabs button { background: none; border: 0; padding: 6px 10px; border-radius: 999px; font-family: var(--lg-sans); font-size: 12.5px; color: var(--lg-ink-60); white-space: nowrap; cursor: pointer; }
+.logos-root .ws-tabs button[aria-selected="true"] { background: rgba(94,118,51,0.1); color: var(--lg-primary); }
+
+/* ── the panels' own content ─────────────────────────────────────────── */
+.logos-root .ws-model { display: flex; flex-direction: column; min-height: 0; height: 100%; }
+.logos-root .ws-model > * { flex: 1; min-height: 0; }
+.logos-root .ws-sub { margin: 0 0 6px; font-family: var(--serif); font-style: italic; font-size: 13.5px; color: var(--lg-ink-60); }
+.logos-root .ws-h { margin: 14px 0 4px; font-family: var(--lg-sans); font-size: 9.5px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--lg-ink-40); }
+.logos-root .ws-params, .logos-root .ws-insp, .logos-root .ws-trace { overflow: auto; padding: 4px 16px 18px; font-family: var(--lg-sans); }
+.logos-root .ws-ctl { display: grid; grid-template-columns: minmax(70px, 0.9fr) 1.6fr auto; align-items: center; gap: 10px; padding: 5px 6px; margin: 0 -6px; border-radius: 7px; }
+.logos-root .ws-ctl.is-on { background: rgba(94,118,51,0.08); }
+.logos-root .ws-ctl-name { background: none; border: 0; padding: 0; text-align: left; cursor: pointer; font-family: var(--lg-stix, var(--serif)); font-size: 15px; color: var(--lg-ink); }
+.logos-root .ws-ctl-name:hover { color: var(--lg-primary); }
+.logos-root .ws-ctl input[type="range"] { width: 100%; accent-color: var(--lg-primary); }
+.logos-root .ws-ctl-v { font-variant-numeric: tabular-nums; font-size: 12.5px; color: var(--lg-ink); text-align: right; white-space: nowrap; }
+.logos-root .ws-ctl-v em { font-style: italic; color: var(--lg-ink-40); font-family: var(--serif); }
+
+.logos-root .ws-insp-head { padding: 2px 0 8px; border-bottom: 1px solid var(--lg-line); margin-bottom: 8px; }
+.logos-root .ws-insp-head h3 { margin: 2px 0 2px; font-family: var(--serif); font-weight: 400; font-size: 22px; line-height: 1.2; color: var(--lg-ink); }
+.logos-root .ws-kicker { font-size: 9.5px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--lg-primary); }
+.logos-root .ws-hint { font-family: var(--serif); font-style: italic; font-size: 13.5px; color: var(--lg-ink-60); margin: 4px 0 10px; }
+.logos-root .ws-lines { margin: 0; padding: 0 0 0 16px; font-size: 13.5px; line-height: 1.55; color: var(--lg-ink); }
+.logos-root .ws-sec { border-bottom: 1px solid var(--lg-line); padding: 6px 0; }
+.logos-root .ws-sec summary { cursor: pointer; display: flex; gap: 8px; align-items: baseline; list-style: none; font-size: 12.5px; }
+.logos-root .ws-sec summary::-webkit-details-marker { display: none; }
+.logos-root .ws-sec summary span { font-weight: 600; color: var(--lg-ink); }
+.logos-root .ws-sec summary em { font-family: var(--serif); font-size: 13px; color: var(--lg-ink-60); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.logos-root .ws-sec dl { margin: 6px 0 2px; display: grid; gap: 3px; }
+.logos-root .ws-sec dl > div { display: grid; grid-template-columns: minmax(90px, 0.8fr) 1.4fr; gap: 10px; font-size: 12.5px; }
+.logos-root .ws-sec dt { color: var(--lg-ink-60); }
+.logos-root .ws-sec dt button { background: none; border: 0; padding: 0; color: var(--lg-primary); cursor: pointer; font: inherit; text-align: left; }
+.logos-root .ws-sec dd { margin: 0; color: var(--lg-ink); }
+.logos-root .ws-insp-acts { display: flex; gap: 8px; margin-top: 12px; }
+.logos-root .ws-insp-acts button, .logos-root .ws-trace-acts button {
+  font-family: var(--lg-sans); font-size: 12.5px; cursor: pointer; border-radius: 999px; padding: 5px 12px;
+  border: 1px solid rgba(94,118,51,0.4); background: none; color: var(--lg-primary);
+}
+.logos-root .ws-insp-acts .is-quiet { border-color: transparent; color: var(--lg-ink-60); }
+.logos-root .ws-trace-acts { display: flex; gap: 8px; margin: 2px 0 10px; }
+.logos-root .ws-trace-acts button:disabled { opacity: 0.35; cursor: default; }
+.logos-root .ws-trace-list { list-style: none; margin: 0; padding: 0; border-left: 1px solid var(--lg-line); }
+.logos-root .ws-trace-list li button {
+  display: flex; align-items: baseline; gap: 8px; width: 100%; text-align: left; background: none; border: 0; cursor: pointer;
+  padding: 6px 10px 6px 14px; position: relative; font-family: var(--lg-sans); font-size: 13px; color: var(--lg-ink);
+}
+.logos-root .ws-trace-list li button::before { content: ""; position: absolute; left: -4px; top: 12px; width: 7px; height: 7px; border-radius: 50%; background: var(--lg-paper); border: 1px solid var(--lg-ink-40); }
+.logos-root .ws-trace-list li.is-here button::before { background: var(--lg-primary); border-color: var(--lg-primary); }
+.logos-root .ws-trace-list li.is-ahead button { color: var(--lg-ink-40); }
+.logos-root .ws-trace-list li button:disabled { cursor: default; }
+.logos-root .ws-trace-list li button:not(:disabled):hover { color: var(--lg-primary); }
+.logos-root .ws-trace-list em { font-family: var(--serif); font-size: 12px; color: var(--lg-primary); }
+
+/* ── the conversation, as a panel ─────────────────────────────────────── */
+.logos-root .ws-chat-focus {
+  display: flex; align-items: baseline; gap: 8px; margin: 0 16px; padding: 6px 0;
+  border-bottom: 1px solid var(--lg-line); font-family: var(--lg-sans); font-size: 12px; color: var(--lg-ink-60);
+}
+.logos-root .ws-chat-focus strong { font-family: var(--serif); font-weight: 400; font-style: italic; font-size: 14px; color: var(--lg-ink); }
+.logos-root .ws-chat-focus button { margin-left: auto; background: none; border: 0; cursor: pointer; color: var(--lg-ink-40); font-size: 14px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .logos-root .ws-acts, .logos-root .ws-divider::after, .logos-root .ws-drop span { transition: none; }
+}
+
+/* ── Logos 3: the workspace takes the place of the two fixed columns ──── */
+.logos-root .lg-split.is-ws { grid-template-columns: 280px minmax(0, 1fr); }
+.logos-root .lg-split.is-ws.rail-closed { grid-template-columns: minmax(0, 1fr); }
+.logos-root .lg-split.is-ws.draft-open,
+.logos-root .lg-split.is-ws.draft-open.rail-closed { grid-template-columns: minmax(0, 1fr) minmax(380px, 0.8fr); }
+.logos-root .lg-ws-col { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.logos-root .lg-ws-col > .lg-head { padding-top: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--lg-line); }
+.logos-root .lg-ws-col > .ws-root { flex: 1; min-height: 0; }
+.logos-root .lg-split.is-ws .lg-mswitch { display: none; }
+.logos-root .lg-split.is-ws .lg-ws-col { display: flex !important; }
+@media (max-width: 900px) {
+  .logos-root .lg-split.is-ws, .logos-root .lg-split.is-ws.rail-closed { grid-template-columns: 1fr; }
+}
+/* the conversation and the map, as panels: no column borders of their own */
+.logos-root .ws-body > .lg-convo-panel { display: flex; flex-direction: column; min-height: 0; }
+.logos-root .ws-body > .lg-panel-in { border-left: none; border-top: none; background: var(--lg-paper); }
+/* the shell's title already says Thinking Map; the map's own head keeps its state line */
+.logos-root .ws-body > .lg-panel-in .lg-panel-title { display: none; }
+.logos-root .ws-t-model .ws-body, .logos-root .ws-t-map .ws-body { background: var(--lg-panel); }
+/* the fixed layout hides one column on a phone; in the workspace the tabs decide */
+@media (max-width: 900px) {
+  .logos-root .lg-split.is-ws .ws-body > .lg-panel-in,
+  .logos-root .lg-split.is-ws .ws-body > .lg-convo-panel { display: flex; flex-direction: column; min-height: 0; }
+}

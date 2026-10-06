@@ -110,6 +110,7 @@ export function ThinkingMap({
   emerging,
   onAskAbout,
   onModelEdited,
+  onSelectNode,
   guarded,
   lensLimit,
   onLocked,
@@ -156,6 +157,12 @@ export function ThinkingMap({
   onAskAbout?: (id: string, label: string) => void;
   /** a change the surface made to a document's model — a slider, a cursor, a selection, an open view */
   onModelEdited?: (docId: string, model: Model) => void;
+  /**
+   * A card was selected. In the Logos 3 workspace this makes the idea the
+   * workspace's focus — what the inspector describes and what the
+   * conversation means by "this". Single-player Logos 2 passes nothing.
+   */
+  onSelectNode?: (id: string) => void;
   /** Answer Guard is on — the board must not reveal a withheld result */
   guarded?: boolean;
   /**
@@ -972,6 +979,7 @@ export function ThinkingMap({
                 onClick={(ev) => {
                   ev.stopPropagation();
                   setFocused(p.id);
+                  onSelectNode?.(p.id);
                   if (menu?.id === p.id) {
                     setMenu(null);
                     return;

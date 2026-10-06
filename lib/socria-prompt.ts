@@ -1294,6 +1294,12 @@ export interface ModelConfig {
    * its successor like a withdrawn model (lib/socria-model-store.ts).
    */
   devOnly?: boolean;
+  /**
+   * The composable workspace (Logos 3): the conversation, the map and the
+   * model become panels the person arranges, over the same session state.
+   * See lib/workspace/tiling.ts.
+   */
+  workspace?: boolean;
 
   /**
    * TEMPORARILY WITHDRAWN — the model exists, answers, and is not offered.
@@ -1645,6 +1651,7 @@ export const SOCRIA_MODELS: Record<SocriaModel, ModelConfig> = {
     requiresAuth: true,
     logosSurface: true,
     collab: true,
+    workspace: true,
   },
   // Core 4 — built, and selectable. It carried `soon` while it was an
   // announcement, which made the picker grey it out; that flag came off when

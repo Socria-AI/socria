@@ -73,6 +73,9 @@ export function ModelView({
   ops,
   onModel,
   onAsk,
+  pinnedView,
+  onPinView,
+  understand = true,
 }: {
   model: Model;
   /**
@@ -98,6 +101,21 @@ export function ModelView({
    * the reader was looking at.
    */
   onAsk?: (id: string) => void;
+  /**
+   * A representation pinned to THIS view rather than opened on the model.
+   *
+   * The Logos 3 workspace can show one model several ways at once — its
+   * surface in one panel, its level sets in another — and which way a panel is
+   * looking is that panel's business, not the model's. So a pinned view is
+   * read here instead of `model.view`, and opening a view from this panel's
+   * row tells the host (`onPinView`) instead of writing the model. Selection
+   * is still written to the model: every view of it agrees on what "this" is.
+   * Undefined means "follow the model", which is how every other host uses it.
+   */
+  pinnedView?: string | null;
+  onPinView?: (id: string | null) => void;
+  /** the layer of views and the account beneath the figure; a panel pinned to one representation can leave it out */
+  understand?: boolean;
 }) {
   // THE MODEL IS THE STATE. The frame holds the camera and the clock; this
   // holds the thing being looked at, so a control moved in the chrome and a
@@ -148,7 +166,8 @@ export function ModelView({
   // everything that only READS should read.
   const full = useMemo(() => unpack(model), [model]);
 
-  const openv = useMemo(() => (model.view ? viewById(full, model.view) : null), [full, model.view]);
+  const viewId = pinnedView !== undefined ? pinnedView : model.view;
+  const openv = useMemo(() => (viewId ? viewById(full, viewId) : null), [full, viewId]);
 
   // A READ VIEW: its content, derived by lib/model/viewdata.ts and set into the
   // same frame by panelMarks. Null for a view that puts marks in the frame.
@@ -404,6 +423,18 @@ export function ModelView({
   const openView = useCallback(
     (id: string) => {
       const v = viewById(full, id);
+      // Pinned: the panel changes how it looks; the model is not told, except
+      // for the selection, which every view of it shares.
+      if (onPinView) {
+        onPinView(id);
+        if (v?.of && v.of !== model.selected) {
+          const sel: Model = { ...model, version: (model.version ?? 0) + 1, selected: v.of };
+          setModel(sel);
+          setView((s) => ({ ...s, selected: v.of }));
+          onModel?.(sel);
+        }
+        return;
+      }
       const next: Model = {
         ...model,
         version: (model.version ?? 0) + 1,
@@ -414,7 +445,7 @@ export function ModelView({
       setView((s) => (v?.of ? { ...s, selected: v.of } : s));
       onModel?.(next);
     },
-    [model, full, onModel]
+    [model, full, onModel, onPinView]
   );
 
   const render = useCallback(
@@ -997,7 +1028,7 @@ export function ModelView({
         lib/model/inspect.ts, and its whole job is to put what the model already
         knows within reach. Closed by default: the figure is what somebody came
         to look at. */}
-    <Understand model={full} onSelect={select} onView={openView} onAsk={onAsk} />
+    {understand && <Understand model={pinnedView !== undefined ? { ...full, view: pinnedView ?? undefined } : full} onSelect={select} onView={openView} onAsk={onAsk} />}
     </div>
   );
 }
