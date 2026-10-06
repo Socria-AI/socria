@@ -117,18 +117,17 @@ import {
   addPanel,
   configurePanel,
   panelsOf,
-  presetLayout,
-  PRESETS,
   sanitizeLayout,
+  singleLayout,
   type PanelNode,
   type WorkspaceLayout,
 } from '@/lib/workspace/tiling';
-import { factsFrom, suggestLayout, suggestViews, type LayoutSuggestion } from '@/lib/workspace/surfaces';
+import { arrangementsFor, factsFrom, suggestLayout, suggestViews, type LayoutSuggestion } from '@/lib/workspace/surfaces';
 import { describeFocus, type Focus } from '@/lib/workspace/focus';
 import { LENSES, type LensId } from '@/lib/logos-layout';
 
 /** Where a person's own Logos 3 arrangement is kept: this browser, never the session. */
-const WS_KEY = 'socria.logos3.workspace.v1';
+const WS_KEY = 'socria.logos3.workspace.v2';
 import { DRIFT_DISMISS_LIMIT, readDrift, type DriftVerdict } from '@/lib/topic-drift';
 import {
   MATH_FADE_MS,
@@ -2782,19 +2781,19 @@ export function LogosApp({
   focusRef.current = focus;
   const [wsDismissed, setWsDismissed] = useState<Set<string>>(() => new Set());
   const wsFacts = useMemo(() => factsFrom(map), [map]);
-  const presetCtx = useMemo(() => {
-    const d = wsFacts.docs.find((x) => x.id === wsFacts.activeDoc) ?? wsFacts.docs[wsFacts.docs.length - 1];
-    return { docs: wsFacts.docs.map((x) => x.id), views: d?.views ?? [], hasViz: !!wsFacts.viz };
-  }, [wsFacts]);
+  // Something to look at besides the map: a built model, or a picture.
+  const wsHasModel = wsFacts.docs.length > 0 || !!wsFacts.viz;
   useEffect(() => {
     if (!workspaceOn || wsLayout) return;
     let saved: WorkspaceLayout | null = null;
     try {
       saved = sanitizeLayout(JSON.parse(localStorage.getItem(WS_KEY) || 'null'));
     } catch {}
-    // A conceptual line of thinking starts from the map; one with a model, from the model.
-    setWsLayout(saved && saved.root ? saved : presetLayout(presetCtx.docs.length || presetCtx.hasViz ? 'model' : 'think', presetCtx));
-  }, [workspaceOn, wsLayout, presetCtx]);
+    // ONE THING IN FOCUS. Logos 3 starts on a single surface — the model when
+    // there is one, the Thinking Map when there is not — with the composer
+    // beneath it. Everything else is a "+ View" away.
+    setWsLayout(saved && saved.root ? saved : singleLayout(wsHasModel ? 'model' : 'map'));
+  }, [workspaceOn, wsLayout, wsHasModel]);
   const wsSaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const changeLayout = useCallback((next: WorkspaceLayout) => {
     setWsLayout(next);
@@ -2806,6 +2805,28 @@ export function LogosApp({
     }, 250);
   }, []);
   const wsViews = useMemo(() => (wsLayout ? suggestViews(wsFacts, wsLayout) : []), [wsFacts, wsLayout]);
+  const wsArrangements = useMemo(() => (wsLayout ? arrangementsFor(wsFacts, wsLayout) : []), [wsFacts, wsLayout]);
+  // THE ONE SURFACE FOLLOWS THE WORK — only while it is one surface. When a
+  // line of thinking that was all map builds its first model, the model is
+  // what there is to look at; a line opened without a model shows its map.
+  // An arrangement somebody made of several panels is theirs and never moves.
+  const wsSeen = useRef<{ id: string | null; docs: number }>({ id: null, docs: 0 });
+  useEffect(() => {
+    if (!workspaceOn || !wsLayout) return;
+    const seen = wsSeen.current;
+    const docs = wsFacts.docs.length + (wsFacts.viz ? 1 : 0);
+    const ps = panelsOf(wsLayout);
+    const one = ps.length === 1 ? ps[0] : null;
+    if (one && seen.id !== null) {
+      const switched = seen.id !== activeId;
+      if (one.type === 'map' && wsHasModel && (switched || docs > seen.docs)) changeLayout(singleLayout('model'));
+      else if (one.type === 'model' && !wsHasModel) changeLayout(singleLayout('map'));
+    }
+    wsSeen.current = { id: activeId, docs };
+  }, [workspaceOn, wsLayout, wsFacts, wsHasModel, activeId, changeLayout]);
+  // The conversation, while it is not a panel: a composer and Socria's latest
+  // reply beneath the stage, opened into its history only when asked.
+  const [dockOpen, setDockOpen] = useState(false);
   const lastSaid = useMemo(() => [...messages].reverse().find((x) => x.role === 'user')?.content ?? '', [messages]);
   const wsSuggestion = useMemo(
     () => (workspaceOn && wsLayout ? suggestLayout(wsFacts, wsLayout, lastSaid, wsDismissed) : null),
@@ -2919,10 +2940,16 @@ export function LogosApp({
     });
   };
   // "Ask about this" from the inspector: the composer is seeded, never sent,
-  // and the conversation opens if it was closed — the person asked for it.
+  // and the cursor goes to it — the composer is always on screen.
   askLabelRef.current = (label) => {
     setInput((cur) => (cur.trim() ? cur : `About ${label} — why is it what it is?`));
-    if (wsLayout && !panelsOf(wsLayout).some((x) => x.type === 'chat')) changeLayout(addPanel(wsLayout, { type: 'chat' }).layout);
+    requestAnimationFrame(() => {
+      const ta = document.querySelector<HTMLTextAreaElement>('.lg-composer textarea');
+      if (ta) {
+        ta.focus();
+        ta.setSelectionRange(ta.value.length, ta.value.length);
+      }
+    });
   };
 
   // ── THE WORKSPACE'S PANELS ───────────────────────────────────────
@@ -3007,10 +3034,8 @@ export function LogosApp({
   }
 
   function acceptSuggestion(sg: LayoutSuggestion) {
-    if (!wsLayout) return;
-    let next = wsLayout;
-    for (const a of sg.action) next = addPanel(next, a).layout;
-    changeLayout(next);
+    const arr = wsArrangements.find((a) => a.id === sg.arrangement);
+    if (arr) changeLayout(arr.layout);
     setWsDismissed((d) => new Set(d).add(sg.id));
   }
 
@@ -3671,6 +3696,83 @@ export function LogosApp({
     </>
   );
 
+  // ── LOGOS 3, AT REST ───────────────────────────────────────────────
+  //
+  // THE DOCK. While the conversation is not a panel, it is this: Socria's
+  // latest reply as a few lines, the composer, and — only when asked — the
+  // history above them. The thing being thought about keeps the screen.
+  const chatPanelOpen = !!wsLayout && panelsOf(wsLayout).some((x) => x.type === 'chat');
+  // (no hooks here: this runs after the access gate's early return)
+  const lastReply = [...messages].reverse().find((x) => x.role === 'assistant')?.content ?? '';
+  const peek = streaming || (busy ? '' : lastReply);
+  const wsDock =
+    workspaceOn && !chatPanelOpen ? (
+      <div className={`ws-dock lg-convo${dockOpen ? ' is-open' : ''}${messages.length ? '' : ' is-new'}`}>
+        {messages.length > 0 && (
+          <div className="ws-dock-row">
+            {!dockOpen && (peek || busy) ? (
+              <button type="button" className="ws-peek" onClick={() => setDockOpen(true)} aria-label="Socria’s latest reply — open the conversation">
+                <span className="ws-peek-who">Socria</span>
+                {peek ? (
+                  <span className="ws-peek-text">
+                    <Inline text={peek} math />
+                  </span>
+                ) : (
+                  <span className="lg-thinking" aria-label="Thinking">
+                    <span /> <span /> <span />
+                  </span>
+                )}
+              </button>
+            ) : (
+              <span className="ws-peek-gap" />
+            )}
+            <button
+              type="button"
+              className="ws-dock-toggle"
+              aria-expanded={dockOpen}
+              onClick={() => setDockOpen((v) => !v)}
+              title={dockOpen ? 'Fold the conversation away' : 'The whole conversation'}
+            >
+              {dockOpen ? 'Fold away' : `Conversation · ${messages.length}`}
+            </button>
+          </div>
+        )}
+        {focusBrief && (
+          <div className="ws-chat-focus" role="status">
+            <span>About</span>
+            <strong>{focusBrief.label}</strong>
+            <span>{focusBrief.of}</span>
+            <button type="button" aria-label="Clear what the conversation is about" onClick={() => setFocus(null)}>×</button>
+          </div>
+        )}
+        {convoBody}
+      </div>
+    ) : null;
+  // THE INSPECTOR, WHEN THERE IS SOMETHING TO INSPECT. Selecting a part of a
+  // model, a parameter or an input brings a small card describing it; it
+  // goes when the selection does. "Keep open" makes it a panel.
+  const inspectorOpen = !!wsLayout && panelsOf(wsLayout).some((x) => x.type === 'inspector');
+  const cardFocus = focus && focus.kind !== 'node' ? focus : null;
+  const cardDoc = cardFocus && map.models ? (docOf(map.models, cardFocus.doc) ?? wsActiveDoc) : null;
+  const wsCard =
+    workspaceOn && cardFocus && cardDoc && !inspectorOpen ? (
+      <aside className="ws-card" aria-label="What is selected">
+        <div className="ws-card-acts">
+          <button
+            type="button"
+            className="ws-card-keep"
+            onClick={() => wsLayout && changeLayout(addPanel(wsLayout, { type: 'inspector' }, 1.6, 0.32).layout)}
+          >
+            Keep open
+          </button>
+          <button type="button" className="ws-act" aria-label="Close" onClick={() => setFocus(null)}>
+            ×
+          </button>
+        </div>
+        <InspectorPanel map={map} doc={cardDoc} focus={cardFocus} onFocus={setFocus} onAsk={stableAskLabel} />
+      </aside>
+    ) : null;
+
   return (
     <div
       className={`logos-root${fmAnchor === 'control' ? ' is-firstmap-control' : ''}${
@@ -3863,19 +3965,19 @@ export function LogosApp({
 
         {workspaceOn && wsLayout ? (
           <div className="lg-ws-col">
-            {convoHead}
             <Workspace
               layout={wsLayout}
               onLayout={changeLayout}
               render={renderPanel}
               titleOf={panelTitle}
               views={wsViews}
-              presets={PRESETS}
-              onPreset={(id) => changeLayout(presetLayout(id, presetCtx))}
-              onReset={() => changeLayout(presetLayout(wsLayout.preset ?? (wsFacts.docs.length ? 'model' : 'think'), presetCtx))}
+              arrangements={wsArrangements}
               suggestion={wsSuggestion}
               onAccept={acceptSuggestion}
               onDismiss={(s) => setWsDismissed((d) => new Set(d).add(s.id))}
+              head={convoHead}
+              dock={wsDock}
+              overlay={wsCard}
             />
           </div>
         ) : (

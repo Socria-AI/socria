@@ -24,7 +24,7 @@ import { availableLenses, LENSES, type LensId } from '@/lib/logos-layout';
 import { modelFor, current } from '@/lib/model/docs';
 import { viewsFor } from '@/lib/model/views';
 import { inputsOf } from '@/lib/model/derive';
-import { isOpen, panelsOf, type PanelConfig, type SurfaceType, type WorkspaceLayout } from './tiling';
+import { dominantPanel, isOpen, pairLayout, panelsOf, singleLayout, type PanelConfig, type SurfaceType, type WorkspaceLayout } from './tiling';
 
 /** What a person can point at, in any surface. */
 export type FocusKind = 'node' | 'object' | 'param' | 'input';
@@ -183,19 +183,63 @@ export function suggestViews(facts: WorkspaceFacts, layout: WorkspaceLayout): Vi
   return out.sort((a, b) => Number(a.open) - Number(b.open) || b.score - a.score || order.indexOf(a.type) - order.indexOf(b.type));
 }
 
+// ── arrangements: contextual, never permanent modes ───────────────
+
+export interface Arrangement {
+  id: string;
+  label: string;
+  why: string;
+  layout: WorkspaceLayout;
+}
+
+/**
+ * The ways the workspace could be arranged for what is here — offered inside
+ * "+ View", and only when they mean something. A comparison needs two things
+ * to compare; "one view" needs more than one. There is no permanent row of
+ * modes: the workspace is simple until the work is not.
+ */
+export function arrangementsFor(facts: WorkspaceFacts, layout: WorkspaceLayout): Arrangement[] {
+  const out: Arrangement[] = [];
+  const doc = facts.docs.find((d) => d.id === facts.activeDoc) ?? facts.docs[facts.docs.length - 1] ?? null;
+  const panels = panelsOf(layout);
+  if (facts.docs.length >= 2) {
+    const [a, b] = facts.docs.slice(-2);
+    out.push({ id: 'compare', label: 'Compare side by side', why: `${a.title} beside ${b.title}`, layout: pairLayout({ type: 'model', config: { doc: a.id } }, { type: 'model', config: { doc: b.id } }) });
+  } else if (doc) {
+    const other = doc.views.find((v) => !v.primary && v.marks);
+    if (other) out.push({ id: 'compare', label: 'Compare side by side', why: `the model beside its ${other.variant.toLowerCase()}, linked`, layout: pairLayout({ type: 'model' }, { type: 'model', config: { view: other.id } }) });
+  }
+  if (doc && doc.params + doc.inputs > 0) {
+    out.push({ id: 'controls', label: 'Model with its controls', why: 'every parameter beside the model', layout: pairLayout({ type: 'model' }, { type: 'params' }, 0.72) });
+  }
+  // The map beside its model only when the map holds reasoning beyond the
+  // model itself — and as the graph, or it would be the same picture twice.
+  if (doc && facts.nodes >= 3) {
+    out.push({ id: 'map-model', label: 'Map beside the model', why: 'the reasoning and the model together', layout: pairLayout({ type: 'map', config: { lens: 'graph' } }, { type: 'model' }) });
+  }
+  if (facts.nodes >= 4 && facts.lenses.includes('evidence')) {
+    out.push({ id: 'evidence', label: 'Map beside its evidence', why: 'what each belief rests on, next to the map', layout: pairLayout({ type: 'map' }, { type: 'map', config: { lens: 'evidence' } }) });
+  }
+  if (panels.length > 1) {
+    const d = dominantPanel(layout);
+    if (d) out.push({ id: 'one', label: 'One view', why: 'just the one in focus', layout: singleLayout(d.type, d.config) });
+  }
+  return out;
+}
+
 // ── suggestions to change the arrangement ─────────────────────────
 
 export interface LayoutSuggestion {
   id: string;
   text: string;
-  action: { type: SurfaceType; config?: PanelConfig }[];
+  /** an arrangement from arrangementsFor — applied only if the person accepts */
+  arrangement: string;
 }
 
 /**
- * At most one suggestion, and only one the state earns. The workspace is the
- * person's: Socria may suggest a change and preview what it would open, and
- * nothing moves until they accept. A suggestion they dismissed is not made
- * again in this line of thinking.
+ * At most one suggestion, and only when the conversation itself asks for a
+ * different arrangement. The workspace is the person's: nothing moves until
+ * they accept, and a suggestion they dismissed is not made again.
  */
 export function suggestLayout(
   facts: WorkspaceFacts,
@@ -203,30 +247,16 @@ export function suggestLayout(
   lastSaid: string,
   dismissed: ReadonlySet<string>
 ): LayoutSuggestion | null {
-  const open = (t: SurfaceType) => panelsOf(layout).some((p) => p.type === t);
-  const doc = facts.docs.find((d) => d.id === facts.activeDoc) ?? facts.docs[facts.docs.length - 1] ?? null;
   const said = lastSaid.toLowerCase();
-  const offer = (s: LayoutSuggestion) => (dismissed.has(s.id) ? null : s);
-
-  if (facts.docs.length >= 2 && /\b(compare|versus|vs\.?|side by side|difference between)\b/.test(said)) {
-    const [a, b] = facts.docs.slice(-2);
-    const both = panelsOf(layout).filter((p) => p.type === 'model').map((p) => p.config?.doc);
-    if (!(both.includes(a.id) && both.includes(b.id))) {
-      const s = offer({ id: `compare:${a.id}:${b.id}`, text: `Open ${a.title} and ${b.title} side by side?`, action: [{ type: 'model', config: { doc: a.id } }, { type: 'model', config: { doc: b.id } }] });
-      if (s) return s;
-    }
+  const has = (id: string) => arrangementsFor(facts, layout).some((a) => a.id === id);
+  const twoModels = panelsOf(layout).filter((p) => p.type === 'model').length >= 2;
+  if (!twoModels && has('compare') && /\b(compare|versus|vs\.?|side by side|difference between)\b/.test(said)) {
+    const s = { id: `compare:${facts.docs.map((d) => d.id).join(',')}`, text: 'Compare them side by side?', arrangement: 'compare' };
+    if (!dismissed.has(s.id)) return s;
   }
-  if (doc && !open('model')) {
-    const s = offer({ id: `model:${doc.id}`, text: `Open ${doc.title} in the workspace?`, action: [{ type: 'model' }] });
-    if (s) return s;
-  }
-  if (doc && open('model') && doc.params + doc.inputs >= 2 && !open('params')) {
-    const s = offer({ id: `params:${doc.id}`, text: 'Open its parameters and the inspector beside it?', action: [{ type: 'params' }, ...(open('inspector') ? [] : [{ type: 'inspector' as const }])] });
-    if (s) return s;
-  }
-  if (!doc && facts.nodes >= 6 && facts.lenses.includes('evidence') && /\b(source|evidence|cite|research|study|studies|data)\b/.test(said) && !isOpen(layout, 'map', { lens: 'evidence' })) {
-    const s = offer({ id: 'evidence', text: 'Open the evidence beside the map?', action: [{ type: 'map', config: { lens: 'evidence' } }] });
-    if (s) return s;
+  if (!isOpen(layout, 'map', { lens: 'evidence' }) && has('evidence') && /\b(source|evidence|cite|research|study|studies)\b/.test(said)) {
+    const s = { id: 'evidence', text: 'Put the evidence beside the map?', arrangement: 'evidence' };
+    if (!dismissed.has(s.id)) return s;
   }
   return null;
 }

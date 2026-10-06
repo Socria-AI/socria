@@ -174,9 +174,12 @@ export function splitPanel(
   targetId: string,
   dir: 'row' | 'col',
   panel: { type: SurfaceType; config?: PanelConfig },
-  side: 'before' | 'after' = 'after'
+  side: 'before' | 'after' = 'after',
+  /** the share of the target's room the new panel takes */
+  share = 0.5
 ): { layout: WorkspaceLayout; id: string | null } {
   if (panelsOf(layout).length >= LIMITS.panels) return { layout, id: null };
+  const k = Math.min(0.9, Math.max(0.1, share));
   if (!findPanel(layout, targetId)) return { layout, id: null };
   const id = freshId(layout, 'p');
   const fresh: PanelNode = { kind: 'panel', id, type: panel.type, ...(panel.config ? { config: { ...panel.config } } : {}) };
@@ -187,11 +190,11 @@ export function splitPanel(
       const i = s.children.findIndex((c) => c.id === targetId);
       const children = [...s.children];
       const sizes = [...s.sizes];
-      const half = sizes[i] / 2;
-      sizes[i] = half;
+      const given = sizes[i] * k;
+      sizes[i] = sizes[i] - given;
       const at = side === 'after' ? i + 1 : i;
       children.splice(at, 0, fresh);
-      sizes.splice(at, 0, half);
+      sizes.splice(at, 0, given);
       return { ...s, children, sizes: normalize(sizes) };
     });
     return { layout: { ...layout, root, preset: null }, id };
@@ -201,7 +204,7 @@ export function splitPanel(
     kind: 'split',
     id: sid,
     dir,
-    sizes: [0.5, 0.5],
+    sizes: side === 'after' ? [1 - k, k] : [k, 1 - k],
     children: side === 'after' ? [n, fresh] : [fresh, n],
   }));
   return { layout: { ...layout, root, preset: null }, id };
@@ -298,7 +301,8 @@ export function movePanel(
 export function addPanel(
   layout: WorkspaceLayout,
   panel: { type: SurfaceType; config?: PanelConfig },
-  aspect = 1.6
+  aspect = 1.6,
+  share = 0.5
 ): { layout: WorkspaceLayout; id: string | null } {
   if (!layout.root) {
     const id = 'p1';
@@ -318,7 +322,7 @@ export function addPanel(
   walk(layout.root, aspect, 1);
   const target = best as { id: string; area: number; w: number; h: number } | null;
   if (!target) return { layout, id: null };
-  return splitPanel({ ...layout, maximized: null }, target.id, target.w >= target.h ? 'row' : 'col', panel, 'after');
+  return splitPanel({ ...layout, maximized: null }, target.id, target.w >= target.h ? 'row' : 'col', panel, 'after', share);
 }
 
 // ── presets: starting points, not modes ───────────────────────────
@@ -465,4 +469,31 @@ export function sanitizeLayout(raw: unknown): WorkspaceLayout | null {
   layout.maximized = max && findPanel(layout, max) ? max : null;
   layout.preset = PRESETS.some((p) => p.id === r.preset) ? (r.preset as PresetId) : null;
   return layout;
+}
+
+// ── simple at rest ────────────────────────────────────────────────
+
+/** One surface, the whole workspace. Where Logos 3 starts, and where "one view" returns. */
+export function singleLayout(type: SurfaceType, config?: PanelConfig): WorkspaceLayout {
+  return { v: 1, root: P('p1', type, config), maximized: null, preset: null };
+}
+
+/** The panel with the most room — the one in focus when there are several. */
+export function dominantPanel(layout: WorkspaceLayout, aspect = 1.6): PanelNode | null {
+  let best: { p: PanelNode; area: number } | null = null;
+  const walk = (n: LayoutNode | null, w: number, h: number) => {
+    if (!n) return;
+    if (n.kind === 'panel') {
+      if (!best || w * h > best.area + 1e-9) best = { p: n, area: w * h };
+      return;
+    }
+    n.children.forEach((c, i) => walk(c, n.dir === 'row' ? w * n.sizes[i] : w, n.dir === 'col' ? h * n.sizes[i] : h));
+  };
+  walk(layout.root, aspect, 1);
+  return (best as { p: PanelNode; area: number } | null)?.p ?? null;
+}
+
+/** Two surfaces side by side, the first given more room. */
+export function pairLayout(a: { type: SurfaceType; config?: PanelConfig }, b: { type: SurfaceType; config?: PanelConfig }, share = 0.5): WorkspaceLayout {
+  return { v: 1, root: S('s1', 'row', [share, 1 - share], [P('p1', a.type, a.config), P('p2', b.type, b.config)]), maximized: null, preset: null };
 }

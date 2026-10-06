@@ -42,8 +42,9 @@ The document layer (revisions, coalesced adoption, undo), the representation reg
 
 ## 6. The workspace architecture
 
-- **`lib/workspace/tiling.ts`** — a layout is a tree of splits and panels. Pure operations: split, close, replace, configure, resize, maximise/restore, move (edge or swap), add. Presets build a layout *for what the session holds*. `sanitizeLayout` reads storage defensively.
-- **`components/workspace/Workspace.tsx`** — draws a layout and writes only the layout. Hairline dividers (pointer and keyboard), restrained headers whose controls appear on hover/focus, drag-to-move with edge zones, double-click or ⤢ to maximise, Esc to restore, `+ View`, presets, one suggestion line. Narrow screens become tabs.
+- **`lib/workspace/tiling.ts`** — a layout is a tree of splits and panels. Pure operations: split (at any share), close, replace, configure, resize, maximise/restore, move (edge or swap), add. `singleLayout` is where Logos 3 rests; `dominantPanel` is the panel with the most room. `sanitizeLayout` reads storage defensively.
+- **`lib/workspace/surfaces.ts`** — `suggestViews` (representations worth opening) and `arrangementsFor` (arrangements worth making: compare, model with its controls, map beside the model, map beside its evidence, one view), each offered only when the state gives it meaning.
+- **`components/workspace/Workspace.tsx`** — draws a layout and writes only the layout. A single panel has no chrome. Among several, hairline dividers (pointer and keyboard) and a corner chip — name, ⤢, × — that shows on hover; drag the name to move, double-click or ⤢ to maximise, Esc to restore. `+ View` in the header holds the views and the arrangements. Slots for the host's header, a dock beneath the stage and a contextual card over the panel in focus. Narrow screens show one surface; tabs appear only when there are several.
 - **`LogosApp`** renders the same named pieces (`convoHead`, `convoBody`, `mapBody`) either in Logos 2's columns or as Logos 3's panels. A model with `workspace: true` (`lib/socria-prompt.ts`) gets the workspace.
 
 ## 7. The panel contract (`lib/workspace/surfaces.ts`)
@@ -58,7 +59,7 @@ Each surface declares what it represents, what selections it **emits** and **res
 
 ## 9. Persistence, history, Think Together
 
-- The **layout** persists per browser (`localStorage`, `socria.logos3.workspace.v1`), never in the session and never into a shared room. Two people thinking together share the model and keep their own layouts and focus.
+- The **layout** persists per browser (`localStorage`, `socria.logos3.workspace.v2`), never in the session and never into a shared room. Two people thinking together share the model and keep their own layouts and focus.
 - **Focus** is never persisted.
 - **Layout changes never touch model history.** Model changes from any panel go through one write path — `adopt` into the document, coalesced per drag — so they appear in Trace and can be undone.
 
@@ -69,6 +70,30 @@ Tiled workspace with resize, split, close, replace, move, maximise/restore, rese
 ### Acceptance (Chromium, real engine, scripted model calls)
 
 A saddle built from the conversation; Model preset (model, conversation, parameters, inspector). Moving `a` to −1.2 in Parameters moved the model's own slider, the inspector, the conversation's context ("a parameter of A saddle, now −1.2 … what depends on it: z, ∂z/∂x") and the Trace ("a to −1.2"). Maximise, restore, split with a linked Level sets view, close and reopen the conversation: `a` stayed −1.2. Reload: the layout and the value returned. A conceptual decision: `+ View` offered the map's lenses, the inspector and the conversation — no model, parameters or trace.
+
+## 11. Simple at rest, powerful on demand
+
+The first slice exposed the architecture itself: six permanent modes, a header on every panel, a large conversation column, a menu in every corner. A new person did not know where to look. The architecture stayed; its expression changed.
+
+**One thing in focus. Anything available when needed.**
+
+| At rest | On demand |
+|---|---|
+| One surface: the Thinking Map, or the model once there is one | `+ View` opens a representation beside it, or an arrangement |
+| The conversation is a composer beneath the stage, with Socria's latest reply as a few lines | "Conversation" opens the history above the composer; it can also be a panel |
+| No panel chrome | Several panels: a corner chip on hover (name, maximise, close) |
+| No inspector | Selecting a part, parameter or input brings a card describing it; "Keep open" makes it a panel |
+| No modes | Arrangements — compare, model with its controls, map beside the model, map beside its evidence, one view — offered only when they mean something |
+| The model's name and its view switcher | "Understand" opens how it was computed, what it can't show, and the structural views |
+
+Rules that keep it that way:
+
+- The one surface follows the work **only while it is one surface**: a map that builds its first model becomes the model; a line with no model shows its map. An arrangement of several panels is the person's and never moves.
+- A surface that serves another (parameters, inspector, trace, conversation) opens at a third of the room, so the thing being thought about keeps it.
+- Nothing is said twice in Logos 3: the map's lens bar and legend, the model's corner labels and transparency caption, and the model's own sliders while a Parameters panel is open, are hidden there. Logos 2 is unchanged.
+- Socria's suggestion is one quiet line, only when the conversation asks for a different arrangement ("compare", "evidence"), applied only if accepted.
+
+Verified in Chromium against the real engine with scripted model calls: fresh line (map + composer only), a decision drawn, the saddle built (the single surface switches to the model), Model with its controls, parameter `a` to −1.2 with the inspector card and the conversation focus, Keep open, close, One view, reload; a phone at 390px with no horizontal scroll; Logos 2 unchanged.
 
 ## Next
 

@@ -5,38 +5,31 @@
 
 .logos-root .ws-root { display: flex; flex-direction: column; min-height: 0; min-width: 0; height: 100%; position: relative; }
 
-/* ── the bar: presets, a suggestion, + View ─────────────────────────── */
-.logos-root .ws-bar {
-  display: flex; align-items: center; gap: 14px; min-height: 36px;
-  padding: 0 14px; border-bottom: 1px solid var(--lg-line);
-  font-family: var(--lg-sans); font-size: 12px; color: var(--lg-ink-60);
+/* ── the top row: the host's header, a suggestion, + View ──────────── */
+.logos-root .ws-top { display: flex; align-items: center; gap: 10px; min-width: 0; padding-right: 18px; }
+.logos-root .ws-top-head { flex: 1; min-width: 0; }
+.logos-root .ws-add { position: relative; flex: 0 0 auto; }
+.logos-root .ws-add-btn {
+  background: none; border: 1px solid transparent; padding: 5px 11px; border-radius: 999px; cursor: pointer;
+  font-family: var(--lg-sans); font-size: 12.5px; color: var(--lg-ink-60); white-space: nowrap;
 }
-.logos-root .ws-presets { display: flex; gap: 2px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
-.logos-root .ws-presets button {
-  background: none; border: 0; padding: 6px 9px; border-radius: 6px; cursor: pointer;
-  font: inherit; color: var(--lg-ink-60); white-space: nowrap;
-}
-.logos-root .ws-presets button:hover { color: var(--lg-ink); background: rgba(31,31,31,0.04); }
-.logos-root .ws-presets button.is-on { color: var(--lg-primary); }
-.logos-root .ws-bar-r { margin-left: auto; display: flex; align-items: center; gap: 4px; }
-.logos-root .ws-add { position: relative; }
-.logos-root .ws-add-btn, .logos-root .ws-reset {
-  background: none; border: 0; padding: 6px 10px; border-radius: 6px; cursor: pointer;
-  font: inherit; color: var(--lg-ink-60);
-}
-.logos-root .ws-add-btn { color: var(--lg-primary); font-weight: 500; }
-.logos-root .ws-add-btn:hover, .logos-root .ws-reset:hover { background: rgba(31,31,31,0.04); color: var(--lg-ink); }
+.logos-root .ws-add-btn:hover, .logos-root .ws-add-btn[aria-expanded="true"] { border-color: var(--lg-line); color: var(--lg-ink); }
 .logos-root .ws-suggest {
-  display: flex; align-items: center; gap: 8px; min-width: 0;
-  font-family: var(--serif); font-style: italic; font-size: 13.5px; color: var(--lg-ink);
+  display: flex; align-items: center; gap: 8px; min-width: 0; max-width: 46%;
+  font-family: var(--serif); font-style: italic; font-size: 13.5px; color: var(--lg-ink-60);
 }
 .logos-root .ws-suggest span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .logos-root .ws-suggest button {
   font-family: var(--lg-sans); font-style: normal; font-size: 12px; cursor: pointer;
-  border-radius: 999px; padding: 3px 10px; border: 1px solid transparent; background: none; color: var(--lg-ink-60);
+  border-radius: 999px; padding: 3px 10px; border: 1px solid transparent; background: none; color: var(--lg-ink-40);
 }
-.logos-root .ws-suggest .ws-suggest-go { border-color: rgba(94,118,51,0.4); color: var(--lg-primary); }
-.logos-root .ws-suggest .ws-suggest-go:hover { background: rgba(94,118,51,0.08); }
+.logos-root .ws-suggest .ws-suggest-go { color: var(--lg-primary); }
+.logos-root .ws-suggest button:hover { border-color: var(--lg-line); }
+/* Logos 3's header says less: the mark, and the few doors a person needs. */
+.logos-root .lg-split.is-ws .lg-head { padding: 12px 18px 10px; }
+.logos-root .lg-split.is-ws .lg-head-note { display: none; }
+.logos-root .lg-split.is-ws .lg-back .lg-lbl-long { display: none; }
+.logos-root .lg-split.is-ws .lg-back .lg-lbl-short { display: inline !important; }
 
 /* ── the stage: splits, cells, hairline dividers ─────────────────────── */
 .logos-root .ws-stage { flex: 1; min-height: 0; min-width: 0; display: flex; position: relative; }
@@ -58,26 +51,26 @@
 
 /* ── a panel ─────────────────────────────────────────────────────────── */
 .logos-root .ws-panel { display: flex; flex-direction: column; min-width: 0; min-height: 0; position: relative; background: var(--lg-paper); }
-.logos-root .ws-head {
-  display: flex; align-items: baseline; gap: 10px; flex: 0 0 auto;
-  padding: 9px 12px 7px 16px; position: relative; user-select: none;
+/* Among several panels, a panel's name and its two controls sit in a small
+   chip in its corner, and only while the pointer is over the panel. */
+.logos-root .ws-chip {
+  position: absolute; top: 8px; right: 8px; z-index: 8;
+  display: flex; align-items: center; gap: 2px; padding: 2px 3px 2px 10px;
+  border-radius: 999px; background: rgba(250,248,242,0.92); border: 1px solid var(--lg-line);
+  box-shadow: 0 6px 18px -12px rgba(31,31,31,0.4);
+  opacity: 0; pointer-events: none; transition: opacity 0.15s;
 }
-.logos-root .ws-head[draggable="true"] { cursor: grab; }
-.logos-root .ws-title {
-  font-family: var(--lg-sans); font-size: 10px; font-weight: 600; letter-spacing: 0.16em;
-  text-transform: uppercase; color: var(--lg-ink-40);
+.logos-root .ws-panel:hover > .ws-chip,
+.logos-root .ws-chip:focus-within,
+.logos-root .ws-panel.is-max > .ws-chip { opacity: 1; pointer-events: auto; }
+.logos-root .ws-chip-t {
+  font-family: var(--lg-sans); font-size: 10px; font-weight: 600; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--lg-ink-40); padding-right: 4px; user-select: none;
 }
-.logos-root .ws-title-sub {
-  font-family: var(--serif); font-style: italic; font-size: 13px; color: var(--lg-ink-60);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
-}
-.logos-root .ws-acts { margin-left: auto; display: flex; gap: 2px; opacity: 0; transition: opacity 0.15s; }
-.logos-root .ws-panel:hover > .ws-head .ws-acts,
-.logos-root .ws-head:focus-within .ws-acts,
-.logos-root .ws-panel.is-max > .ws-head .ws-acts { opacity: 1; }
+.logos-root .ws-chip-t[draggable="true"] { cursor: grab; }
 .logos-root .ws-act {
   background: none; border: 0; cursor: pointer; color: var(--lg-ink-40);
-  font-size: 13px; line-height: 1; padding: 4px 6px; border-radius: 5px;
+  font-size: 13px; line-height: 1; padding: 4px 6px; border-radius: 999px;
 }
 .logos-root .ws-act:hover, .logos-root .ws-act:focus-visible { color: var(--lg-ink); background: rgba(31,31,31,0.05); }
 .logos-root .ws-body { flex: 1; min-height: 0; min-width: 0; display: flex; flex-direction: column; overflow: hidden; position: relative; }
@@ -101,7 +94,7 @@
   box-shadow: 0 18px 50px -24px rgba(31,31,31,0.45); padding: 6px;
   font-family: var(--lg-sans);
 }
-.logos-root .ws-menu-small { width: 200px; }
+.logos-root .ws-menu-none { margin: 8px; font-family: var(--serif); font-style: italic; font-size: 13px; color: var(--lg-ink-60); }
 .logos-root .ws-menu-k { margin: 6px 8px 4px; font-size: 9.5px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--lg-ink-40); }
 .logos-root .ws-menu-k.is-sub { margin-top: 10px; }
 .logos-root .ws-menu-row {
@@ -185,7 +178,7 @@
 .logos-root .ws-chat-focus button { margin-left: auto; background: none; border: 0; cursor: pointer; color: var(--lg-ink-40); font-size: 14px; }
 
 @media (prefers-reduced-motion: reduce) {
-  .logos-root .ws-acts, .logos-root .ws-divider::after, .logos-root .ws-drop span { transition: none; }
+  .logos-root .ws-chip, .logos-root .ws-divider::after, .logos-root .ws-drop span { transition: none; }
 }
 
 /* ── Logos 3: the workspace takes the place of the two fixed columns ──── */
@@ -194,7 +187,6 @@
 .logos-root .lg-split.is-ws.draft-open,
 .logos-root .lg-split.is-ws.draft-open.rail-closed { grid-template-columns: minmax(0, 1fr) minmax(380px, 0.8fr); }
 .logos-root .lg-ws-col { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
-.logos-root .lg-ws-col > .lg-head { padding-top: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--lg-line); }
 .logos-root .lg-ws-col > .ws-root { flex: 1; min-height: 0; }
 .logos-root .lg-split.is-ws .lg-mswitch { display: none; }
 .logos-root .lg-split.is-ws .lg-ws-col { display: flex !important; }
@@ -204,11 +196,109 @@
 /* the conversation and the map, as panels: no column borders of their own */
 .logos-root .ws-body > .lg-convo-panel { display: flex; flex-direction: column; min-height: 0; }
 .logos-root .ws-body > .lg-panel-in { border-left: none; border-top: none; background: var(--lg-paper); }
-/* the shell's title already says Thinking Map; the map's own head keeps its state line */
-.logos-root .ws-body > .lg-panel-in .lg-panel-title { display: none; }
+/* the map needs no head of its own in the workspace: what it is, is plain */
+.logos-root .ws-body > .lg-panel-in > .lg-panel-head { display: none; }
 .logos-root .ws-t-model .ws-body, .logos-root .ws-t-map .ws-body { background: var(--lg-panel); }
 /* the fixed layout hides one column on a phone; in the workspace the tabs decide */
 @media (max-width: 900px) {
   .logos-root .lg-split.is-ws .ws-body > .lg-panel-in,
   .logos-root .lg-split.is-ws .ws-body > .lg-convo-panel { display: flex; flex-direction: column; min-height: 0; }
 }
+
+/* ── the dock: the conversation, while it is not a panel ─────────────── */
+.logos-root .ws-dock {
+  flex: 0 0 auto; position: relative; display: flex; flex-direction: column;
+  width: min(780px, calc(100% - 32px)); margin: 0 auto; padding-top: 6px; min-height: 0;
+}
+.logos-root .ws-dock .lg-composer { padding: 6px 0 8px; }
+.logos-root .ws-dock .lg-tools { margin: 0; padding: 0 2px 10px; }
+.logos-root .ws-dock .lg-guard, .logos-root .ws-dock .lg-one-note, .logos-root .ws-dock .lg-drift, .logos-root .ws-dock .lg-allow { margin-left: 0; margin-right: 0; }
+.logos-root .ws-dock:not(.is-open) .lg-thread { display: none; }
+.logos-root .ws-dock.is-open .lg-thread { flex: 0 1 auto; max-height: 52vh; padding: 10px 4px 8px; border-top: 1px solid var(--lg-line); }
+.logos-root .ws-dock .ws-chat-focus { margin: 0 0 2px; }
+.logos-root .ws-dock-row { display: flex; align-items: flex-start; gap: 12px; }
+.logos-root .ws-peek-gap { flex: 1; }
+.logos-root .ws-dock-toggle {
+  flex: 0 0 auto; margin-top: 3px; background: none; border: 1px solid transparent; border-radius: 999px; cursor: pointer;
+  padding: 2px 9px; font-family: var(--lg-sans); font-size: 11.5px; color: var(--lg-ink-40); white-space: nowrap;
+}
+.logos-root .ws-dock-toggle:hover, .logos-root .ws-dock-toggle[aria-expanded="true"] { color: var(--lg-ink); border-color: var(--lg-line); }
+/* Socria's latest reply, a few lines of it, where the eye already is */
+.logos-root .ws-peek {
+  display: flex; align-items: baseline; gap: 10px; flex: 1; min-width: 0; text-align: left;
+  background: none; border: 0; cursor: pointer; padding: 4px 2px 2px; color: var(--lg-ink);
+}
+.logos-root .ws-peek-who {
+  flex: 0 0 auto; font-family: var(--lg-sans); font-size: 10px; font-weight: 600; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--lg-primary);
+}
+.logos-root .ws-peek-text {
+  font-family: var(--serif); font-size: 15px; line-height: 1.5; color: var(--lg-ink);
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+}
+.logos-root .ws-peek:hover .ws-peek-text { color: var(--lg-ink-60); }
+/* a new line of thinking: the first words, and the openings, stay in reach */
+.logos-root .ws-dock.is-new .lg-thread { display: block; flex: 0 1 auto; max-height: 40vh; padding: 0 2px; }
+.logos-root .ws-dock.is-new .lg-intro h1 { display: none; }
+.logos-root .ws-dock.is-new .lg-intro > p { display: none; }
+
+/* ── the contextual inspector card ───────────────────────────────────── */
+.logos-root .ws-card {
+  position: absolute; z-index: 12; top: 14px; right: 14px;
+  width: min(320px, 42%); display: flex; flex-direction: column; min-height: 0; max-height: min(520px, calc(100% - 28px));
+  background: var(--lg-paper); border: 1px solid var(--lg-line); border-radius: 12px;
+  box-shadow: 0 22px 60px -30px rgba(31,31,31,0.5);
+  animation: wsCardIn 0.18s ease both;
+}
+.logos-root .ws-card > .ws-insp { flex: 1; min-height: 0; }
+.logos-root .ws-card-acts { display: flex; align-items: center; justify-content: flex-end; gap: 4px; padding: 6px 6px 0; }
+.logos-root .ws-card-keep {
+  background: none; border: 0; cursor: pointer; border-radius: 999px; padding: 3px 9px;
+  font-family: var(--lg-sans); font-size: 11.5px; color: var(--lg-ink-40);
+}
+.logos-root .ws-card-keep:hover { color: var(--lg-primary); background: rgba(94,118,51,0.07); }
+@keyframes wsCardIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .logos-root .ws-card { animation: none; } }
+
+@media (max-width: 900px) {
+  .logos-root .lg-split.is-ws .ws-dock { display: flex !important; width: calc(100% - 24px); }
+  .logos-root .lg-split.is-ws .ws-dock .lg-tools { padding-bottom: 10px; }
+  .logos-root .ws-top { padding-right: 10px; }
+  .logos-root .ws-card { left: 10px; right: 10px; width: auto; top: auto; bottom: 10px; max-height: 60%; }
+}
+/* among several panels, the card clears the corner chip */
+.logos-root .ws-panel.has-chip > .ws-card { top: 44px; max-height: min(560px, calc(100% - 58px)); }
+
+/* ── what a surface says about itself, in Logos 3 ───────────────────────
+   The model's name stays; how it was drawn, what is not available and the
+   corner labels are a click away (Understand) rather than always on. */
+.logos-root .lg-split.is-ws .sfx-l,
+.logos-root .lg-split.is-ws .sfx-note { display: none; }
+.logos-root .lg-split.is-ws .sfx-icon { opacity: 0; transition: opacity 0.15s; }
+.logos-root .lg-split.is-ws .sfx:hover .sfx-icon,
+.logos-root .lg-split.is-ws .sfx-icon:focus-visible,
+.logos-root .lg-split.is-ws .sfx.is-full .sfx-icon { opacity: 1; }
+.logos-root .lg-split.is-ws .und:not(.is-shown) { display: flex; flex-direction: row-reverse; align-items: center; gap: 12px; }
+.logos-root .lg-split.is-ws .und:not(.is-shown) .und-bar { flex: 0 0 auto; }
+.logos-root .lg-split.is-ws .und:not(.is-shown) .und-views { flex: 1; min-width: 0; }
+.logos-root .lg-split.is-ws .und:not(.is-shown) .und-what,
+.logos-root .lg-split.is-ws .und:not(.is-shown) .und-views-label,
+.logos-root .lg-split.is-ws .und:not(.is-shown) .und-missing,
+.logos-root .lg-split.is-ws .und:not(.is-shown) .und-group:has(> .und-of:not([title])) { display: none; }
+/* The map names its lens in its own tabs; the bar above them repeated it,
+   and the legend repeats what every node already says on its face. */
+.logos-root .lg-split.is-ws .ws-t-map .mp-top:not(:has(.mp-x)),
+.logos-root .lg-split.is-ws .ws-t-map .mp-bot { display: none; }
+/* Think together: the icon alone; the name is its tooltip and its label. */
+.logos-root .lg-split.is-ws .lg-collab-start { font-size: 0; gap: 0; padding: 0 8px; border-color: transparent; }
+.logos-root .lg-split.is-ws .lg-collab-start svg { width: 17px; height: 17px; }
+/* the openings, when a line of thinking is new: a row of short starts */
+.logos-root .ws-dock.is-new .lg-openings { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin: 0 0 4px; }
+.logos-root .ws-dock.is-new .lg-openings-lead { flex-basis: 100%; text-align: center; margin: 0 0 2px; font-size: 10px; color: var(--lg-ink-40); }
+.logos-root .ws-dock.is-new .lg-opening { padding: 6px 12px; border-radius: 999px; width: auto; }
+.logos-root .ws-dock.is-new .lg-opening small { display: none; }
+.logos-root .ws-dock.is-new .lg-opening strong { font-weight: 500; font-size: 13px; }
+.logos-root .ws-dock.is-new .lg-intro { padding: 0; margin: 0; max-width: none; }
+/* With a Parameters panel open, the model's own sliders would be the same
+   controls twice; the panel holds them. */
+.logos-root .ws-root:has(.ws-t-params) .ws-t-model .sfx-ctls { display: none; }

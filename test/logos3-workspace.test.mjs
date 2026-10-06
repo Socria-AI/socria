@@ -15,8 +15,9 @@ import { fileURLToPath } from 'node:url';
 import {
   addPanel, closePanel, configurePanel, findPanel, isOpen, maximize, movePanel, normalize, panelsOf,
   presetLayout, PRESETS, replacePanel, resizeSplit, restore, sanitizeLayout, splitPanel, LIMITS,
+  singleLayout, dominantPanel, pairLayout,
 } from './.tmp/tiling.mjs';
-import { factsFrom, suggestLayout, suggestViews, SURFACES } from './.tmp/surfaces.mjs';
+import { arrangementsFor, factsFrom, suggestLayout, suggestViews, SURFACES } from './.tmp/surfaces.mjs';
 import { describeFocus, focusBlock, sanitizeFocus } from './.tmp/focus.mjs';
 import { open, EMPTY_WORKSPACE, setValue } from './.tmp/docs.mjs';
 import { modelById } from './.tmp/library.mjs';
@@ -170,16 +171,47 @@ console.log('\n=== + View offers what the state supports, and nothing else ===')
 console.log('\n=== Socria suggests; the person decides ===');
 {
   const saddle = withDoc('saddle');
-  const think = presetLayout('think', { docs: [] });
-  const sg = suggestLayout(factsFrom(saddle), think, 'model a saddle', new Set());
-  ok('a model with no model panel open earns one suggestion', sg?.action[0]?.type === 'model', JSON.stringify(sg));
-  ok('  which is dismissable for good', suggestLayout(factsFrom(saddle), think, 'model a saddle', new Set([sg.id])) === null || suggestLayout(factsFrom(saddle), think, 'model a saddle', new Set([sg.id])).id !== sg.id);
-  ok('an argument earns none from ordinary talk', suggestLayout(factsFrom(argument), think, 'I keep going back and forth', new Set()) === null);
-  ok('  and the evidence beside the map once research comes up', suggestLayout(factsFrom(argument), think, 'what does the research say?', new Set())?.action[0]?.config?.lens === 'evidence');
+  const one = singleLayout('model');
+  ok('a model on screen earns no suggestion from ordinary talk', suggestLayout(factsFrom(saddle), one, 'model a saddle', new Set()) === null);
+  ok('an argument earns none from ordinary talk', suggestLayout(factsFrom(argument), singleLayout('map'), 'I keep going back and forth', new Set()) === null);
+  const ev = suggestLayout(factsFrom(argument), singleLayout('map'), 'what does the research say?', new Set());
+  ok('  and the evidence beside the map once research comes up', ev?.arrangement === 'evidence', JSON.stringify(ev));
+  ok('  which is dismissable for good', suggestLayout(factsFrom(argument), singleLayout('map'), 'what does the research say?', new Set([ev.id])) === null);
   const two = { ...saddle, models: open(saddle.models, modelById('torus')).workspace };
-  const cmp = suggestLayout(factsFrom(two), presetLayout('model', { docs: ['x'] }), 'compare the saddle with the torus', new Set());
-  ok('"compare" with two models suggests them side by side', cmp?.action.length === 2 && cmp.action.every((a) => a.type === 'model' && a.config?.doc), JSON.stringify(cmp));
+  const cmp = suggestLayout(factsFrom(two), one, 'compare the saddle with the torus', new Set());
+  ok('"compare" with two models suggests them side by side', cmp?.arrangement === 'compare', JSON.stringify(cmp));
+  const arr = arrangementsFor(factsFrom(two), one).find((a) => a.id === cmp.arrangement);
+  ok('  and the arrangement it names is two model panels, one for each', types(arr.layout) === 'model,model' && panelsOf(arr.layout).every((p) => p.config?.doc), JSON.stringify(arr?.layout));
   ok('nothing in the suggestion rules can move a panel by itself', !/onLayout|changeLayout/.test(read('lib/workspace/surfaces.ts')));
+}
+
+console.log('\n=== simple at rest, powerful on demand ===');
+{
+  const saddle = withDoc('saddle');
+  const s1 = singleLayout('map');
+  ok('the resting workspace is one surface', panelsOf(s1).length === 1 && sound(s1) && s1.preset === null);
+  ok('an arrangement offers itself only when it means something: a bare question offers none',
+    arrangementsFor(factsFrom({ nodes: [], edges: [] }), s1).length === 0);
+  const ids = (f, l) => arrangementsFor(f, l).map((a) => a.id).join(',');
+  ok('a model offers its controls, a comparison of two of its views, and the map beside it',
+    /compare/.test(ids(factsFrom(saddle), singleLayout('model'))) && /controls/.test(ids(factsFrom(saddle), singleLayout('model'))), ids(factsFrom(saddle), singleLayout('model')));
+  ok('  and "one view" only once there is more than one', !/one/.test(ids(factsFrom(saddle), singleLayout('model'))) && /one/.test(ids(factsFrom(saddle), pairLayout({ type: 'model' }, { type: 'params' }, 0.72))));
+  const ctl = arrangementsFor(factsFrom(saddle), singleLayout('model')).find((a) => a.id === 'controls');
+  ok('the controls take the smaller share; the model keeps the room', ctl.layout.root.sizes[0] > 0.6 && sound(ctl.layout));
+  ok('"one view" returns to the panel with the most room', dominantPanel(pairLayout({ type: 'model' }, { type: 'params' }, 0.72))?.type === 'model');
+  const side = addPanel(singleLayout('model'), { type: 'inspector' }, 1.6, 0.32).layout;
+  ok('a surface that serves another opens beside it at a smaller share', Math.abs(side.root.sizes[1] - 0.32) < 1e-9 && sound(side), JSON.stringify(side.root.sizes));
+  const half = splitPanel(singleLayout('map'), 'p1', 'row', { type: 'model' }).layout;
+  ok('  and the default split is still even', Math.abs(half.root.sizes[0] - 0.5) < 1e-9);
+  const ws = read('components/workspace/Workspace.tsx');
+  ok('there is no permanent row of modes', !/presets|onPreset|onReset|ws-presets/.test(ws));
+  ok('a single panel carries no chrome', /const chrome = several \|\| isMax/.test(ws));
+  ok('"+ View" holds the views and the arrangements', /Open beside/.test(ws) && /Arrange/.test(ws) && /onArrange/.test(ws));
+  const app = read('components/LogosApp.tsx');
+  ok('Logos 3 starts on one surface — the model if there is one, else the map', /singleLayout\(wsHasModel \? 'model' : 'map'\)/.test(app));
+  ok('the conversation is a composer beneath the stage until it is asked for', /className=\{`ws-dock lg-convo/.test(app) && /dock=\{wsDock\}/.test(app));
+  ok('the inspector appears for a selection, and only then', /focus && focus\.kind !== 'node'/.test(app) && /overlay=\{wsCard\}/.test(app));
+  ok('the one surface follows the work, but an arrangement of several never moves', /ps\.length === 1 \? ps\[0\] : null/.test(app));
 }
 
 console.log('\n=== the focus the conversation receives ===');
@@ -216,7 +248,7 @@ console.log('\n=== the wiring ===');
   ok('Logos 2 keeps its two columns, exactly as before', /\{mapBody\(\{ primary: true \}\)\}/.test(app) && /\{convoHead\}\s*\{convoBody\}/.test(app));
   ok('every model edit — map, model panel, parameters — goes through one write path', (app.match(/onModel=\{stableModelEdited\}/g) || []).length >= 2 && /onModelEdited=\{stableModelEdited\}/.test(app) && /adopt\(ws, docId, m, Date\.now\(\)\)/.test(app));
   ok('undo and redo are the document’s own verbs', /undoDoc\(ws, docId\)/.test(app) && /redoDoc\(ws, docId\)/.test(app) && /restoreDoc\(ws, docId, op\)/.test(app));
-  ok('the layout is kept in this browser, never in the session', /const WS_KEY = 'socria\.logos3\.workspace\.v1'/.test(app) && /localStorage\.setItem\(WS_KEY/.test(app) && !/workspace: wsLayout|layout: wsLayout,\s*\}/.test(app));
+  ok('the layout is kept in this browser, never in the session', /const WS_KEY = 'socria\.logos3\.workspace\.v2'/.test(app) && /localStorage\.setItem\(WS_KEY/.test(app) && !/workspace: wsLayout|layout: wsLayout,\s*\}/.test(app));
   ok('a layout change never touches a model', !/patchActive\([^)]*wsLayout/.test(app));
   ok('the turn carries the focus, described from canonical state', /describeFocus\(focusRef\.current, mapRef\.current\)/.test(app));
   ok('the chat route reads it, cleaned', /focusBlock\(sanitizeFocus\(body\?\.focus\)\)/.test(read('app/api/logos/chat/route.ts')));

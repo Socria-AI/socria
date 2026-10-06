@@ -6,38 +6,43 @@
 // the host's `render`, which draws the host's surfaces over the host's state —
 // and it writes only the layout, which is the person's own arrangement.
 //
-// QUIET BY DESIGN. A panel's chrome is one small caps title and, on hover or
-// focus, two controls. Dividers are hairlines that thicken under the pointer.
-// The content is the point; the shell should almost disappear while somebody
-// is thinking.
+// SIMPLE AT REST, POWERFUL ON DEMAND. The architecture underneath is a tiling
+// tree of any surfaces; what a person sees is ONE thing in focus. A single
+// panel has no chrome at all. Several panels are separated by hairlines, and
+// each shows its name and its two controls (maximise, close) only while the
+// pointer is over it. There is no row of modes: the ways the workspace can be
+// arranged are offered inside "+ View", and only the ones that mean something
+// for what is here. The conversation is a composer beneath the stage (the
+// host's `dock`) until somebody wants more of it.
 //
 // THE HUMAN OWNS THE ARRANGEMENT. Nothing here moves unless a person moved it
-// or accepted a suggestion to. Suggestions arrive from the host as one quiet
-// line with an Open and a Not now.
+// or accepted a suggestion to. A suggestion is one quiet line with an Open and
+// a Not now.
 
 import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   addPanel,
   closePanel,
+  dominantPanel,
   maximize,
   movePanel,
   panelsOf,
-  replacePanel,
   resizeSplit,
   restore,
-  splitPanel,
   type LayoutNode,
   type PanelConfig,
   type PanelNode,
-  type PresetId,
   type SplitNode,
   type SurfaceType,
   type WorkspaceLayout,
 } from '@/lib/workspace/tiling';
-import type { LayoutSuggestion, ViewSuggestion } from '@/lib/workspace/surfaces';
+import type { Arrangement, LayoutSuggestion, ViewSuggestion } from '@/lib/workspace/surfaces';
 import './workspace.css';
 
 type Zone = 'left' | 'right' | 'top' | 'bottom' | 'center';
+
+/** Surfaces that serve another one: opened beside it, they take the smaller share. */
+const BESIDE: ReadonlySet<SurfaceType> = new Set<SurfaceType>(['params', 'inspector', 'trace', 'chat']);
 
 export interface WorkspaceProps {
   layout: WorkspaceLayout;
@@ -48,12 +53,17 @@ export interface WorkspaceProps {
   titleOf: (panel: PanelNode) => { title: string; sub?: string };
   /** what may be opened now, ranked (lib/workspace/surfaces.ts suggestViews) */
   views: ViewSuggestion[];
-  presets: readonly { id: PresetId; label: string; says: string }[];
-  onPreset: (id: PresetId) => void;
-  onReset: () => void;
+  /** the arrangements that mean something now (lib/workspace/surfaces.ts arrangementsFor) */
+  arrangements: Arrangement[];
   suggestion: LayoutSuggestion | null;
   onAccept: (s: LayoutSuggestion) => void;
   onDismiss: (s: LayoutSuggestion) => void;
+  /** the row above the stage — the host's header; "+ View" sits at its end */
+  head?: ReactNode;
+  /** beneath the stage — the composer, while the conversation is not a panel */
+  dock?: ReactNode;
+  /** a contextual card (the inspector, for a selection), over the panel in focus */
+  overlay?: ReactNode;
 }
 
 function useNarrow(): boolean {
@@ -68,12 +78,24 @@ function useNarrow(): boolean {
   return narrow;
 }
 
-/** A small menu of surfaces to open — the + View list, and Split / Replace inside a panel. */
-function ViewMenu({ views, onPick, onClose, title }: { views: ViewSuggestion[]; onPick: (v: ViewSuggestion) => void; onClose: () => void; title: string }) {
+/** "+ View": the representations worth opening, then the arrangements worth making. */
+function ViewMenu({
+  views,
+  arrangements,
+  onPick,
+  onArrange,
+  onClose,
+}: {
+  views: ViewSuggestion[];
+  arrangements: Arrangement[];
+  onPick: (v: ViewSuggestion) => void;
+  onArrange: (a: Arrangement) => void;
+  onClose: () => void;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const away = (e: PointerEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+      if (ref.current && !ref.current.contains(e.target as Node) && !(e.target as HTMLElement)?.closest?.('.ws-add')) onClose();
     };
     const key = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
     window.addEventListener('pointerdown', away);
@@ -83,32 +105,34 @@ function ViewMenu({ views, onPick, onClose, title }: { views: ViewSuggestion[]; 
       window.removeEventListener('keydown', key);
     };
   }, [onClose]);
-  const fresh = views.filter((v) => !v.open);
-  const open = views.filter((v) => v.open);
+  // Only what is not already on screen, and only the few that rank: the full
+  // registry is never a list a person should have to read.
+  const fresh = views.filter((v) => !v.open).slice(0, 6);
   return (
-    <div className="ws-menu" ref={ref} role="menu" aria-label={title}>
-      <p className="ws-menu-k">{title}</p>
+    <div className="ws-menu" ref={ref} role="menu" aria-label="Open a view">
+      {fresh.length > 0 && <p className="ws-menu-k">Open beside</p>}
       {fresh.map((v, i) => (
-        <button key={`f${i}`} type="button" role="menuitem" className="ws-menu-row" onClick={() => onPick(v)}>
+        <button key={`v${i}`} type="button" role="menuitem" className="ws-menu-row" onClick={() => onPick(v)}>
           <span className="ws-menu-l">{v.label}</span>
           <span className="ws-menu-w">{v.why}</span>
         </button>
       ))}
-      {open.length > 0 && <p className="ws-menu-k is-sub">Already open</p>}
-      {open.map((v, i) => (
-        <button key={`o${i}`} type="button" role="menuitem" className="ws-menu-row is-open" onClick={() => onPick(v)}>
-          <span className="ws-menu-l">{v.label}</span>
+      {arrangements.length > 0 && <p className={`ws-menu-k${fresh.length ? ' is-sub' : ''}`}>Arrange</p>}
+      {arrangements.map((a) => (
+        <button key={a.id} type="button" role="menuitem" className="ws-menu-row" data-arrangement={a.id} onClick={() => onArrange(a)}>
+          <span className="ws-menu-l">{a.label}</span>
+          <span className="ws-menu-w">{a.why}</span>
         </button>
       ))}
+      {!fresh.length && !arrangements.length && <p className="ws-menu-none">Everything worth opening is already here.</p>}
     </div>
   );
 }
 
 export function Workspace(props: WorkspaceProps) {
-  const { layout, onLayout, render, titleOf, views } = props;
+  const { layout, onLayout, render, titleOf, views, arrangements } = props;
   const narrow = useNarrow();
   const [adding, setAdding] = useState(false);
-  const [menu, setMenu] = useState<{ id: string; mode: 'actions' | 'split-row' | 'split-col' | 'replace' } | null>(null);
   const [dragging, setDragging] = useState<string | null>(null);
   const [zone, setZone] = useState<{ id: string; zone: Zone } | null>(null);
   const [tab, setTab] = useState<string | null>(null);
@@ -127,7 +151,7 @@ export function Workspace(props: WorkspaceProps) {
 
   const open = useCallback(
     (v: { type: SurfaceType; config?: PanelConfig }) => {
-      const placed = addPanel(layoutRef.current, v);
+      const placed = addPanel(layoutRef.current, v, 1.6, BESIDE.has(v.type) ? 0.32 : 0.5);
       onLayout(placed.layout);
       if (placed.id) setTab(placed.id);
     },
@@ -135,15 +159,22 @@ export function Workspace(props: WorkspaceProps) {
   );
 
   const panels = panelsOf(layout);
+  const several = panels.length > 1;
+  // The card sits over the panel with the most room, never over the smaller
+  // one somebody may be working in.
+  const focusId = layout.maximized ?? dominantPanel(layout)?.id ?? null;
 
   // ── one panel ────────────────────────────────────────────────────
+  // Alone, a panel is only its content. Among several, a small chip in its
+  // corner — its name, maximise, close — shows while the pointer is over it.
   const Panel = (p: PanelNode, isMax = false) => {
     const { title, sub } = titleOf(p);
     const showZones = dragging && dragging !== p.id;
+    const chrome = several || isMax;
     return (
       <section
         key={p.id}
-        className={`ws-panel ws-t-${p.type}${isMax ? ' is-max' : ''}`}
+        className={`ws-panel ws-t-${p.type}${isMax ? ' is-max' : ''}${chrome ? ' has-chip' : ''}`}
         aria-label={sub ? `${title} — ${sub}` : title}
         data-panel={p.id}
         onDragOver={(e) => {
@@ -165,24 +196,27 @@ export function Workspace(props: WorkspaceProps) {
           setZone(null);
         }}
       >
-        <header
-          className="ws-head"
-          draggable={!isMax && !narrow}
-          onDragStart={(e) => {
-            e.dataTransfer.effectAllowed = 'move';
-            e.dataTransfer.setData('text/plain', p.id);
-            setDragging(p.id);
-          }}
-          onDragEnd={() => {
-            setDragging(null);
-            setZone(null);
-          }}
-          onDoubleClick={() => onLayout(isMax ? restore(layout) : maximize(layout, p.id))}
-          title="Drag to move · double-click to give it the whole workspace"
-        >
-          <span className="ws-title">{title}</span>
-          {sub && <span className="ws-title-sub">{sub}</span>}
-          <span className="ws-acts">
+        <div className="ws-body">{render(p)}</div>
+        {p.id === focusId && props.overlay}
+        {chrome && (
+          <div className="ws-chip">
+            <span
+              className="ws-chip-t"
+              draggable={!isMax && !narrow}
+              onDragStart={(e) => {
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', p.id);
+                setDragging(p.id);
+              }}
+              onDragEnd={() => {
+                setDragging(null);
+                setZone(null);
+              }}
+              onDoubleClick={() => onLayout(isMax ? restore(layout) : maximize(layout, p.id))}
+              title="Drag to move · double-click to give it the whole workspace"
+            >
+              {title}
+            </span>
             <button
               type="button"
               className="ws-act"
@@ -192,36 +226,13 @@ export function Workspace(props: WorkspaceProps) {
             >
               {isMax ? '⤡' : '⤢'}
             </button>
-            {!isMax && (
-              <button type="button" className="ws-act" aria-label={`${title}: more`} aria-haspopup="menu" aria-expanded={menu?.id === p.id} onClick={() => setMenu(menu?.id === p.id ? null : { id: p.id, mode: 'actions' })}>
-                ···
+            {several && !isMax && (
+              <button type="button" className="ws-act" aria-label={`Close ${title}`} title="Close" onClick={() => onLayout(closePanel(layoutRef.current, p.id))}>
+                ×
               </button>
             )}
-          </span>
-          {menu?.id === p.id && menu.mode === 'actions' && (
-            <div className="ws-menu ws-menu-small" role="menu">
-              <button type="button" role="menuitem" className="ws-menu-row" onClick={() => setMenu({ id: p.id, mode: 'split-row' })}>Split right…</button>
-              <button type="button" role="menuitem" className="ws-menu-row" onClick={() => setMenu({ id: p.id, mode: 'split-col' })}>Split below…</button>
-              <button type="button" role="menuitem" className="ws-menu-row" onClick={() => setMenu({ id: p.id, mode: 'replace' })}>Show something else here…</button>
-              <button type="button" role="menuitem" className="ws-menu-row" onClick={() => { setMenu(null); onLayout(maximize(layout, p.id)); }}>Maximise</button>
-              <button type="button" role="menuitem" className="ws-menu-row is-close" onClick={() => { setMenu(null); onLayout(closePanel(layout, p.id)); }}>Close</button>
-            </div>
-          )}
-          {menu?.id === p.id && menu.mode !== 'actions' && (
-            <ViewMenu
-              title={menu.mode === 'replace' ? 'Show here instead' : menu.mode === 'split-row' ? 'Open to the right' : 'Open below'}
-              views={views}
-              onClose={() => setMenu(null)}
-              onPick={(v) => {
-                const m = menu.mode;
-                setMenu(null);
-                if (m === 'replace') onLayout(replacePanel(layoutRef.current, p.id, v.type, v.config));
-                else onLayout(splitPanel(layoutRef.current, p.id, m === 'split-row' ? 'row' : 'col', { type: v.type, config: v.config }).layout);
-              }}
-            />
-          )}
-        </header>
-        <div className="ws-body">{render(p)}</div>
+          </div>
+        )}
         {showZones && (
           <div className={`ws-drop${zone?.id === p.id ? ` is-${zone.zone}` : ''}`} aria-hidden="true">
             <span />
@@ -293,16 +304,33 @@ export function Workspace(props: WorkspaceProps) {
 
   const Node = (n: LayoutNode): ReactNode => (n.kind === 'panel' ? Panel(n) : Split(n));
 
-  // ── the bar ──────────────────────────────────────────────────────
-  const bar = (
-    <div className="ws-bar">
-      <nav className="ws-presets" aria-label="Start from">
-        {props.presets.map((p) => (
-          <button key={p.id} type="button" className={layout.preset === p.id ? 'is-on' : ''} onClick={() => props.onPreset(p.id)} title={p.says}>
-            {p.label}
-          </button>
-        ))}
-      </nav>
+  // ── the top row: the host's header, a suggestion, + View ──────────
+  const addView = (
+    <span className="ws-add">
+      <button type="button" className="ws-add-btn" aria-haspopup="menu" aria-expanded={adding} onClick={() => setAdding((v) => !v)}>
+        + View
+      </button>
+      {adding && (
+        <ViewMenu
+          views={views}
+          arrangements={arrangements}
+          onClose={() => setAdding(false)}
+          onPick={(v) => {
+            setAdding(false);
+            open(v);
+          }}
+          onArrange={(a) => {
+            setAdding(false);
+            onLayout(a.layout);
+            setTab(null);
+          }}
+        />
+      )}
+    </span>
+  );
+  const top = (
+    <div className="ws-top">
+      <div className="ws-top-head">{props.head}</div>
       {props.suggestion && (
         <div className="ws-suggest" role="status">
           <span>{props.suggestion.text}</span>
@@ -310,57 +338,42 @@ export function Workspace(props: WorkspaceProps) {
           <button type="button" className="ws-suggest-no" onClick={() => props.onDismiss(props.suggestion!)}>Not now</button>
         </div>
       )}
-      <span className="ws-bar-r">
-        <span className="ws-add">
-          <button type="button" className="ws-add-btn" aria-haspopup="menu" aria-expanded={adding} onClick={() => setAdding((v) => !v)}>
-            + View
-          </button>
-          {adding && (
-            <ViewMenu
-              title="Open beside what is here"
-              views={views}
-              onClose={() => setAdding(false)}
-              onPick={(v) => {
-                setAdding(false);
-                open(v);
-              }}
-            />
-          )}
-        </span>
-        <button type="button" className="ws-reset" onClick={props.onReset} title="Back to the starting layout for what this line of thinking holds">
-          Reset
-        </button>
-      </span>
+      {addView}
     </div>
   );
 
-  // ── narrow screens: one surface at a time, the rest a tab away ───
+  // ── narrow screens: one surface at a time ────────────────────────
   if (narrow) {
-    // Until a tab is chosen, a phone opens on the conversation: it is where
-    // the first thing anybody does on a small screen — say something — happens.
-    const active = panels.find((p) => p.id === (layout.maximized ?? tab)) ?? panels.find((p) => p.type === 'chat') ?? panels[0] ?? null;
+    const active = panels.find((p) => p.id === (layout.maximized ?? tab)) ?? panels[0] ?? null;
     return (
       <div className="ws-root is-narrow">
-        <div className="ws-tabs" role="tablist">
-          {panels.map((p) => (
-            <button key={p.id} type="button" role="tab" aria-selected={active?.id === p.id} onClick={() => setTab(p.id)}>
-              {titleOf(p).title}
-            </button>
-          ))}
-          <span className="ws-add">
-            <button type="button" className="ws-add-btn" onClick={() => setAdding((v) => !v)}>+</button>
-            {adding && <ViewMenu title="Open" views={views} onClose={() => setAdding(false)} onPick={(v) => { setAdding(false); open(v); }} />}
-          </span>
+        {top}
+        {several && (
+          <div className="ws-tabs" role="tablist">
+            {panels.map((p) => (
+              <button key={p.id} type="button" role="tab" aria-selected={active?.id === p.id} onClick={() => setTab(p.id)}>
+                {titleOf(p).title}
+              </button>
+            ))}
+          </div>
+        )}
+        <div className="ws-stage">
+          {active ? (
+            <section className={`ws-panel ws-t-${active.type}`} data-panel={active.id}>
+              <div className="ws-body">{render(active)}</div>
+            </section>
+          ) : null}
+          {props.overlay}
         </div>
-        <div className="ws-stage">{active ? Panel(active, false) : null}</div>
+        {props.dock}
       </div>
     );
   }
 
   const max = layout.maximized ? panels.find((p) => p.id === layout.maximized) : null;
   return (
-    <div className={`ws-root${dragging ? ' is-dragging' : ''}`}>
-      {bar}
+    <div className={`ws-root${dragging ? ' is-dragging' : ''}${several ? ' is-several' : ''}`}>
+      {top}
       <div className="ws-stage">
         {max ? (
           Panel(max, true)
@@ -368,9 +381,8 @@ export function Workspace(props: WorkspaceProps) {
           Node(layout.root)
         ) : (
           <div className="ws-blank">
-            <p>An empty workspace.</p>
             <div className="ws-blank-list">
-              {views.slice(0, 6).map((v, i) => (
+              {views.slice(0, 4).map((v, i) => (
                 <button key={i} type="button" onClick={() => open(v)}>
                   <span>{v.label}</span>
                   <em>{v.why}</em>
@@ -380,6 +392,7 @@ export function Workspace(props: WorkspaceProps) {
           </div>
         )}
       </div>
+      {props.dock}
     </div>
   );
 }
