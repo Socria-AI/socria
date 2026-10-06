@@ -1,6 +1,6 @@
 // app/layout.tsx
 import type { Metadata } from 'next';
-import { Instrument_Serif, Inter, Kalam, STIX_Two_Text } from 'next/font/google';
+import localFont from 'next/font/local';
 import { ClerkProvider } from '@clerk/nextjs';
 import { Analytics } from '@vercel/analytics/react';
 import './globals.css';
@@ -18,34 +18,51 @@ import {
 import { EnvBadge } from '@/components/EnvBadge';
 import { SetupNotice } from '@/components/SetupNotice';
 
-const serif = Instrument_Serif({
-  subsets: ['latin'],
-  weight: ['400'],
-  style: ['normal', 'italic'],
+// THE FACES ARE IN THE REPOSITORY (app/fonts), NOT FETCHED AT BUILD.
+//
+// next/font names each face's class from a hash of the CSS it is built from.
+// Fetched from Google, that CSS can differ between the server compile and the
+// client compile — one reads a build cache, the other fetches afresh — and then
+// the page asks for `__variable_X` while the stylesheet defines `__variable_Y`.
+// Every font variable goes missing and the whole product renders in Times. It
+// happened on a preview build. Local files hash the same in every compile, so
+// the two halves of a build can never disagree about a font's name again.
+const serif = localFont({
+  src: [
+    { path: './fonts/InstrumentSerif-400.woff2', weight: '400', style: 'normal' },
+    { path: './fonts/InstrumentSerif-400-italic.woff2', weight: '400', style: 'italic' },
+  ],
   variable: '--font-serif',
   display: 'swap',
+  adjustFontFallback: 'Times New Roman',
 });
 
-const sans = Inter({
-  subsets: ['latin'],
+const sans = localFont({
+  src: [{ path: './fonts/Inter-100-900.woff2', weight: '100 900', style: 'normal' }],
   variable: '--font-sans',
   display: 'swap',
+  adjustFontFallback: 'Arial',
 });
 
 // The Board's two voices: Kalam for handwritten notes/annotations, STIX Two
 // Math for equations. Loaded here so the whole app can reach them via CSS vars.
-const hand = Kalam({
-  subsets: ['latin'],
-  weight: ['300', '400', '700'],
+const hand = localFont({
+  src: [
+    { path: './fonts/Kalam-300.woff2', weight: '300', style: 'normal' },
+    { path: './fonts/Kalam-400.woff2', weight: '400', style: 'normal' },
+    { path: './fonts/Kalam-700.woff2', weight: '700', style: 'normal' },
+  ],
   variable: '--font-hand',
   display: 'swap',
+  preload: false,
 });
 
-const stix = STIX_Two_Text({
-  subsets: ['latin'],
-  weight: ['400'],
+const stix = localFont({
+  src: [{ path: './fonts/STIXTwoText-400.woff2', weight: '400', style: 'normal' }],
   variable: '--font-stix',
   display: 'swap',
+  preload: false,
+  adjustFontFallback: 'Times New Roman',
 });
 
 const siteUrl =

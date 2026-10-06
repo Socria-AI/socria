@@ -14,8 +14,8 @@
   --d-line: rgba(53, 70, 32, 0.16);
   --d-moss: #5e7633;
   --d-moss-deep: #354620;
-  --d-serif: var(--font-serif), 'Instrument Serif', Georgia, serif;
-  --d-sans: var(--font-sans), Inter, system-ui, sans-serif;
+  --d-serif: var(--font-serif, Georgia, serif), 'Instrument Serif', Georgia, serif;
+  --d-sans: var(--font-sans, system-ui, -apple-system, 'Segoe UI', sans-serif), Inter, system-ui, sans-serif;
   --d-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
 
   min-height: 100svh;

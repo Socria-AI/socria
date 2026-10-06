@@ -9,7 +9,7 @@
      A CSS file imported from a component in Next.js is a GLOBAL stylesheet,
      so unscoped they would style four other surfaces the moment somebody
      opened /memory. This repo has already had that bug once.
-   - var(--font-serif)/var(--font-sans) became var(--serif)/var(--sans). The
+   - var(--font-serif, Georgia, serif)/var(--font-sans, system-ui, -apple-system, 'Segoe UI', sans-serif) became var(--serif)/var(--sans). The
      first pair are the raw next/font variables and carry no fallback stack;
      the second are what the app defines on top of them, so a font that has
      not loaded degrades to Georgia rather than to whatever the browser picks.

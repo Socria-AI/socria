@@ -42,7 +42,7 @@ const WORD = {
   xl: '3rem'
 };
 const BASE = {
-  fontFamily: 'var(--font-sans)',
+  fontFamily: 'var(--font-sans, system-ui, -apple-system, "Segoe UI", sans-serif)',
   fontWeight: 500,
   border: '1px solid transparent',
   borderRadius: 'var(--radius-pill)',
@@ -500,7 +500,7 @@ function renderEmphasis(text) {
     out.push(/*#__PURE__*/React.createElement("em", {
       key: key++,
       style: {
-        fontFamily: 'var(--font-serif)',
+        fontFamily: 'var(--font-serif, Georgia, serif)',
         fontStyle: 'italic',
         color: 'var(--moss-700)',
         fontSize: '1.18em',
@@ -652,7 +652,7 @@ function _Logo({
     }
   }), showWordmark && /*#__PURE__*/React.createElement("span", {
     style: {
-      fontFamily: 'var(--font-serif)',
+      fontFamily: 'var(--font-serif, Georgia, serif)',
       fontSize: WORD[size] || WORD.md,
       lineHeight: 1,
       letterSpacing: '0.01em',
@@ -690,7 +690,7 @@ function _Label({
       display: 'inline-flex',
       alignItems: 'center',
       gap: '0.7em',
-      fontFamily: 'var(--font-sans)',
+      fontFamily: 'var(--font-sans, system-ui, -apple-system, "Segoe UI", sans-serif)',
       fontSize: 'var(--type-label)',
       fontWeight: 600,
       letterSpacing: 'var(--tracking-label)',
@@ -751,7 +751,7 @@ function _Button({
     if (hover) style.borderColor = onDark ? 'var(--paper)' : 'var(--ink)';
   } else if (variant === 'link') {
     style = {
-      fontFamily: 'var(--font-serif)',
+      fontFamily: 'var(--font-serif, Georgia, serif)',
       fontStyle: 'italic',
       fontSize: '1.2rem',
       color: onDark ? 'var(--sage)' : hover ? 'var(--moss)' : 'var(--moss-700)',
@@ -904,7 +904,7 @@ function _InsightCard({
   }))), eyebrow), label && /*#__PURE__*/React.createElement("p", {
     style: {
       margin: '12px 0 8px',
-      fontFamily: 'var(--font-serif)',
+      fontFamily: 'var(--font-serif, Georgia, serif)',
       fontStyle: 'italic',
       fontSize: '1.05rem',
       color: 'var(--moss-700)'
@@ -912,7 +912,7 @@ function _InsightCard({
   }, label), /*#__PURE__*/React.createElement("p", {
     style: {
       margin: 0,
-      fontFamily: 'var(--font-serif)',
+      fontFamily: 'var(--font-serif, Georgia, serif)',
       fontSize: '1.45rem',
       lineHeight: 1.32,
       color: 'var(--ink)',
@@ -1055,7 +1055,7 @@ function _SynthesisCard({
   })), "Synthesis"), title && /*#__PURE__*/React.createElement("h4", {
     style: {
       margin: '8px 0 0',
-      fontFamily: 'var(--font-serif)',
+      fontFamily: 'var(--font-serif, Georgia, serif)',
       fontWeight: 400,
       fontSize: '1.4rem',
       lineHeight: 1.1,
@@ -1173,7 +1173,7 @@ function _Transcript({
     }, /*#__PURE__*/React.createElement("span", {
       style: {
         display: 'block',
-        fontFamily: 'var(--font-sans)',
+        fontFamily: 'var(--font-sans, system-ui, -apple-system, "Segoe UI", sans-serif)',
         fontSize: '.66rem',
         letterSpacing: '.2em',
         textTransform: 'uppercase',
@@ -1183,7 +1183,7 @@ function _Transcript({
       }
     }, l.label || (ai ? 'Socria' : 'The visitor')), /*#__PURE__*/React.createElement("span", {
       style: ai ? {
-        fontFamily: 'var(--font-serif)',
+        fontFamily: 'var(--font-serif, Georgia, serif)',
         fontStyle: 'italic',
         fontSize: '1.14em',
         color: 'var(--moss-700)'
@@ -1222,14 +1222,14 @@ function _DefinitionEntry({
     }
   }, /*#__PURE__*/React.createElement("span", {
     style: {
-      fontFamily: 'var(--font-serif)',
+      fontFamily: 'var(--font-serif, Georgia, serif)',
       fontSize: 'clamp(2.6rem,6vw,4.6rem)',
       letterSpacing: '-.02em',
       color: 'var(--ink-journal)'
     }
   }, word), pronunciation && /*#__PURE__*/React.createElement("span", {
     style: {
-      fontFamily: 'var(--font-serif)',
+      fontFamily: 'var(--font-serif, Georgia, serif)',
       fontStyle: 'italic',
       fontSize: '1.3rem',
       color: 'var(--ink-45-journal)'
@@ -1252,7 +1252,7 @@ function _DefinitionEntry({
   }, gloss), coda && /*#__PURE__*/React.createElement("p", {
     style: {
       margin: '34px 0 0',
-      fontFamily: 'var(--font-serif)',
+      fontFamily: 'var(--font-serif, Georgia, serif)',
       fontSize: 'clamp(1.5rem,2.6vw,2.2rem)',
       lineHeight: 1.2,
       color: 'var(--ink-journal)'
@@ -1330,7 +1330,7 @@ function _Composer({
       resize: 'none',
       background: 'transparent',
       font: 'inherit',
-      fontFamily: 'var(--font-sans)',
+      fontFamily: 'var(--font-sans, system-ui, -apple-system, "Segoe UI", sans-serif)',
       fontSize: 15,
       lineHeight: 1.55,
       padding: '6px 0',
@@ -1686,7 +1686,7 @@ function _OneMark({
   }), /*#__PURE__*/React.createElement("span", {
     style: {
       position: 'relative',
-      fontFamily: 'var(--font-serif)',
+      fontFamily: 'var(--font-serif, Georgia, serif)',
       fontStyle: 'italic',
       fontSize: size * 0.34,
       lineHeight: 1,
@@ -1703,7 +1703,7 @@ function _SpecTable({
   rows = []
 }) {
   const caps = {
-    fontFamily: 'var(--font-sans)',
+    fontFamily: 'var(--font-sans, system-ui, -apple-system, "Segoe UI", sans-serif)',
     fontSize: 'var(--doc-label)',
     fontWeight: 500,
     letterSpacing: 'var(--doc-tracking-caps)',
@@ -1724,7 +1724,7 @@ function _SpecTable({
       width: '100%',
       borderCollapse: 'collapse',
       margin: '28px 0',
-      fontFamily: 'var(--font-sans)'
+      fontFamily: 'var(--font-sans, system-ui, -apple-system, "Segoe UI", sans-serif)'
     }
   }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", {
     style: {
@@ -1759,7 +1759,7 @@ function _ContrastPair({
   const label = accent => ({
     display: 'block',
     marginBottom: 10,
-    fontFamily: 'var(--font-sans)',
+    fontFamily: 'var(--font-sans, system-ui, -apple-system, "Segoe UI", sans-serif)',
     fontSize: 'var(--doc-label)',
     fontWeight: 500,
     letterSpacing: 'var(--doc-tracking-caps)',
@@ -1768,7 +1768,7 @@ function _ContrastPair({
   });
   const q = accent => ({
     margin: 0,
-    fontFamily: 'var(--font-serif)',
+    fontFamily: 'var(--font-serif, Georgia, serif)',
     fontWeight: 400,
     fontSize: 'var(--doc-question)',
     lineHeight: 1.16,

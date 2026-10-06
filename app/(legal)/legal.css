@@ -12,8 +12,8 @@
   --lg-line: rgba(53, 70, 32, 0.16);
   --lg-moss: #5e7633;
   --lg-moss-deep: #354620;
-  --lg-serif: var(--font-serif), 'Instrument Serif', Georgia, serif;
-  --lg-sans: var(--font-sans), Inter, system-ui, sans-serif;
+  --lg-serif: var(--font-serif, Georgia, serif), 'Instrument Serif', Georgia, serif;
+  --lg-sans: var(--font-sans, system-ui, -apple-system, 'Segoe UI', sans-serif), Inter, system-ui, sans-serif;
 
   min-height: 100svh;
   display: flex;

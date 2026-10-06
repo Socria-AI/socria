@@ -28,14 +28,14 @@
 .tour-note.tour-above{animation:tn-in-up .62s var(--ease-out-expo) both}
 /* the step as a numeral, the way a spread is numbered */
 .tn-head{display:flex;align-items:baseline;gap:12px}
-.tn-num{font-family:var(--font-serif);font-style:italic;font-size:1.62rem;line-height:1;
+.tn-num{font-family:var(--font-serif, Georgia, serif);font-style:italic;font-size:1.62rem;line-height:1;
   color:var(--moss-700);flex:0 0 auto;min-width:1.6ch}
 /* The title is a <p class="tn-t">, not an <h3> — Tour.tsx renders a heading
    only in the sense that it reads as one, because an aside beside a control
    is not a document section. This selector still said h3, so the title fell
    through to the body rule below and rendered at 14.5px: the note had no
    headline at all, just two paragraphs. */
-.tour-note .tn-t{margin:0;font-family:var(--font-serif);font-size:1.48rem;line-height:1.08;
+.tour-note .tn-t{margin:0;font-family:var(--font-serif, Georgia, serif);font-size:1.48rem;line-height:1.08;
   letter-spacing:-.018em;color:var(--ink)}
 .tour-note p{margin:11px 0 0;font-size:14.5px;line-height:1.62;color:var(--ink-70);max-width:38ch}
 .tour-note .tn-t{margin-top:0}
@@ -44,12 +44,12 @@
 .tn-ticks{display:flex;gap:5px;margin-right:auto}
 .tn-ticks i{width:18px;height:2px;background:var(--ink-12);display:block;transition:background .45s var(--ease-standard)}
 .tn-ticks i.on{background:var(--moss)}
-.tn-skip{font-family:var(--font-sans);font-size:10px;font-weight:600;letter-spacing:.2em;
+.tn-skip{font-family:var(--font-sans, system-ui, -apple-system, 'Segoe UI', sans-serif);font-size:10px;font-weight:600;letter-spacing:.2em;
   text-transform:uppercase;color:var(--ink-45);background:none;border:none;cursor:pointer;transition:color .2s}
 .tn-skip:hover{color:var(--ink)}
 .tn-next{display:inline-flex;align-items:center;gap:.5em;height:38px;padding:0 19px;border-radius:999px;
   background:var(--ink);color:var(--paper);border:none;cursor:pointer;
-  font-family:var(--font-sans);font-size:13px;font-weight:500;transition:background .2s,transform .2s}
+  font-family:var(--font-sans, system-ui, -apple-system, 'Segoe UI', sans-serif);font-size:13px;font-weight:500;transition:background .2s,transform .2s}
 .tn-next:hover{background:var(--moss);transform:translateY(-2px)}
 .tn-next .ar{transition:transform .2s}
 .tn-next:hover .ar{transform:translateX(3px)}

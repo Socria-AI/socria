@@ -101,12 +101,12 @@ const config: Config = {
       fontFamily: {
         // Anything *said*. 400 only — emphasis is italic, moss, one step
         // larger, never bold.
-        serif: ['var(--font-serif)', 'Georgia', 'serif'],
+        serif: ['var(--font-serif, Georgia, serif)', 'Georgia', 'serif'],
         // Anything *operated*. Never above 22px in marketing.
-        sans: ['var(--font-sans)', 'system-ui', 'sans-serif'],
+        sans: ['var(--font-sans, system-ui, -apple-system, "Segoe UI", sans-serif)', 'system-ui', 'sans-serif'],
         // The Board, and nowhere else.
-        hand: ['var(--font-hand)', 'cursive'],
-        math: ['var(--font-stix)', 'Georgia', 'serif'],
+        hand: ['var(--font-hand, cursive)', 'cursive'],
+        math: ['var(--font-stix, Georgia, serif)', 'Georgia', 'serif'],
       },
       spacing: {
         edge: 'clamp(24px, 6vw, 120px)',

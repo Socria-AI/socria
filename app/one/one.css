@@ -16,7 +16,7 @@
   --paper:#F4F1E8;--paper-2:#eae5d7;--ink:#20201b;--ink-70:rgba(32,32,27,.7);--ink-45:rgba(32,32,27,.45);
   --ink-25:rgba(32,32,27,.25);--ink-12:rgba(32,32,27,.12);--moss:#5e7633;--moss-700:#465a26;
   --sage:#9CB874;--forest:#232f14;--forest-2:#1a2410;--gold:#b8a26b;--border:#ded8c6;
-  --serif:var(--font-serif),"Instrument Serif",Georgia,serif;--sans:var(--font-sans),"Inter",system-ui,sans-serif;
+  --serif:var(--font-serif, Georgia, serif),"Instrument Serif",Georgia,serif;--sans:var(--font-sans, system-ui, -apple-system, 'Segoe UI', sans-serif),"Inter",system-ui,sans-serif;
   --edge:clamp(24px,6vw,120px);--measure:min(1080px,92vw);
   margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);line-height:1.55;
   -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;overflow-x:clip;

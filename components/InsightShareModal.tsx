@@ -102,11 +102,11 @@ export function InsightShareModal({
       const logo = await loadLogo();
       if (cancelled) return;
       const serif = resolveFontStack(
-        'var(--font-serif), "Instrument Serif", Georgia, serif',
+        'var(--font-serif, Georgia, serif), "Instrument Serif", Georgia, serif',
         'Georgia, serif'
       );
       const sans = resolveFontStack(
-        'var(--font-sans), Inter, system-ui, sans-serif',
+        'var(--font-sans, system-ui, -apple-system, "Segoe UI", sans-serif), Inter, system-ui, sans-serif',
         'system-ui, sans-serif'
       );
       renderInsightCanvas(canvas, format, insight, logo, { serif, sans });
