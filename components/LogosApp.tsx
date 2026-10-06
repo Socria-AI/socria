@@ -125,6 +125,17 @@ import {
 import { arrangementsFor, factsFrom, suggestLayout, suggestViews, type LayoutSuggestion } from '@/lib/workspace/surfaces';
 import { describeFocus, type Focus } from '@/lib/workspace/focus';
 import { briefOf } from '@/lib/representation';
+import {
+  canSynthesize,
+  lastSynthesis,
+  sanitizeSynthesis,
+  synthesisText,
+  type Next,
+  type Possibility,
+  type Ref as SynthRef,
+  type Synthesis,
+} from '@/lib/logos-synthesis';
+import { LogosSynthesis, SynthesisPending } from '@/components/LogosSynthesis';
 import { useThemeGuard } from '@/components/account/ThemePicker';
 import { LENSES, type LensId } from '@/lib/logos-layout';
 
@@ -414,6 +425,9 @@ export function LogosApp({
   // What the last extraction actually reorganized, so it can be seen happening.
   const [changed, setChanged] = useState<Set<string>>(new Set());
   const [deltaNote, setDeltaNote] = useState<string | null>(null);
+  // SYNTHESIS: which scope is being read right now, and what is picked on the map.
+  const [synthBusy, setSynthBusy] = useState<null | 'workspace' | 'selection'>(null);
+  const [picked, setPicked] = useState<Set<string>>(() => new Set());
 
   const [explore, setExplore] = useState<{
     key: string;
@@ -1735,6 +1749,7 @@ export function LogosApp({
   }, [activeId, plan, refreshUsage]);
 
   function switchSession(id: string) {
+    setPicked(new Set());
     if (id === activeIdRef.current) return;
     // The share note belongs to the map it was shown on.
     setFirstMapNote(false);
@@ -2465,10 +2480,102 @@ export function LogosApp({
       return { ...s, map: out.map, contexts };
     });
     const said = out.applied.map((a) => a.said).join(' ');
-    setChanged(new Set(out.applied.flatMap((a) => ('id' in a.edit ? [a.edit.id] : [a.edit.from, a.edit.to]))));
+    const before = new Set(current.map.nodes.map((n) => n.id));
+    const fresh = out.map.nodes.filter((n) => !before.has(n.id)).map((n) => n.id);
+    setChanged(new Set(out.applied.flatMap((a) => ('id' in a.edit ? [a.edit.id] : 'from' in a.edit ? [a.edit.from, a.edit.to] : fresh))));
     setDeltaNote(said);
     return said;
   }
+
+  // ── SYNTHESIS: STRUCTURE → UNDERSTANDING ─────────────────────────
+  //
+  // Socria reads the map the person built — not the chat — and holds up a
+  // mirror: what it amounts to, where it is weak, what it does not yet hold
+  // (lib/logos-synthesis.ts). The synthesis lands in the conversation as
+  // itself, never writes to the map, and anything it suggests enters the map
+  // only when the person takes it — marked as Socria's for good.
+  async function synthesize(kind: 'workspace' | 'selection') {
+    const sid = activeIdRef.current;
+    const s = sessionsRef.current.find((x) => x.id === sid);
+    if (!sid || !s || synthBusy) return;
+    const ids = kind === 'selection' ? [...picked] : [];
+    setSynthBusy(kind);
+    setError(null);
+    try {
+      const res = await fetch('/api/logos/synthesize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...keyHeaders() },
+        body: JSON.stringify({
+          map: s.map,
+          messages: s.messages.slice(-8).map((m) => ({ role: m.role, content: m.content, ...(m.synthesis ? { synthesis: true } : {}) })),
+          scope: { kind, ids },
+          // What the next synthesis compares against: the last one's snapshot.
+          ...(kind === 'workspace' && lastSynthesis(s.messages) ? { since: lastSynthesis(s.messages) } : {}),
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      const syn = res.ok ? sanitizeSynthesis(json?.synthesis) : undefined;
+      if (!syn) throw new Error(json?.error || 'Socria could not read the map just now. Try again in a moment.');
+      patchSession(sid, (x) => ({ ...x, messages: [...x.messages, { role: 'assistant', content: synthesisText(syn), synthesis: syn }] }));
+      if (kind === 'selection') setPicked(new Set());
+      if (workspaceOn) setDockOpen(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Socria could not read the map just now.');
+    } finally {
+      setSynthBusy(null);
+    }
+  }
+
+  /** The person's choice on something a synthesis offered — remembered on the synthesis itself. */
+  function markTaken(synId: string, key: string, v: 'added' | 'dismissed') {
+    patchActive((x) => ({
+      ...x,
+      messages: x.messages.map((m) =>
+        m.synthesis?.id === synId ? { ...m, synthesis: { ...m.synthesis, taken: { ...(m.synthesis.taken ?? {}), [key]: v } } } : m
+      ),
+    }));
+  }
+
+  function focusComposer() {
+    requestAnimationFrame(() => {
+      const ta = document.querySelector<HTMLTextAreaElement>('.lg-composer textarea');
+      if (ta) {
+        ta.focus();
+        ta.setSelectionRange(ta.value.length, ta.value.length);
+      }
+    });
+  }
+
+  const synthProps = (syn: Synthesis, latest: boolean) => ({
+    synthesis: syn,
+    latest,
+    onNext: (n: Next) => {
+      if (n.id === 'continue' || !n.say) return focusComposer();
+      void send(n.say);
+    },
+    onPossibility: (p: Possibility, act: 'explore' | 'add' | 'dismiss') => {
+      if (act === 'explore') {
+        setInput(`Let's explore this: ${p.text}`);
+        focusComposer();
+      } else if (act === 'add') {
+        if (editMap([{ op: 'add', node: { label: p.label, type: p.type, origin: 'socria' } }])) markTaken(syn.id, p.id, 'added');
+      } else markTaken(syn.id, p.id, 'dismissed');
+    },
+    onReading: (key: string, item: SynthRef, act: 'add' | 'dismiss') => {
+      if (act === 'add') {
+        const label = item.text.length > 90 ? item.text.slice(0, 89).trimEnd() + '…' : item.text;
+        if (editMap([{ op: 'add', node: { label, type: 'value', role: 'value', origin: 'socria' } }])) markTaken(syn.id, key, 'added');
+      } else markTaken(syn.id, key, 'dismissed');
+    },
+    onRef: (id: string) => {
+      setChanged(new Set([id]));
+      if (workspaceOn) setFocus({ kind: 'node', id });
+    },
+  });
+  const lastSynthIndex = (() => {
+    for (let i = messages.length - 1; i >= 0; i--) if (messages[i].synthesis) return i;
+    return -1;
+  })();
 
   async function send(text: string, atts: Attachment[] = []) {
     const content = text.trim();
@@ -3236,7 +3343,9 @@ export function LogosApp({
               </div>
             )}
 
-            {messages.map((m, i) => (
+            {messages.map((m, i) => m.synthesis ? (
+              <LogosSynthesis key={i} {...synthProps(m.synthesis, i === lastSynthIndex && i === messages.length - 1)} />
+            ) : (
               <div
                 key={i}
                 className={`lg-msg lg-msg-${m.role}${m.by ? ' lg-msg-by' : ''}`}
@@ -3278,6 +3387,8 @@ export function LogosApp({
                 </div>
               </div>
             )}
+
+            {synthBusy && <SynthesisPending scope={synthBusy} />}
 
             {busy && !streaming && (
               <div className="lg-msg lg-msg-assistant">
@@ -3537,6 +3648,20 @@ export function LogosApp({
                 different button, a different list order, glyphs instead of
                 the "how it answers" sheet. Picking another model navigates
                 there; Logos 2 has no axes of its own to show beneath it. */}
+            {/* SYNTHESIZE — the payoff after externalising: Socria reads what
+                the map has become. Quiet until there is enough to read. */}
+            <button
+              type="button"
+              className="lg-synth"
+              onClick={() => void synthesize('workspace')}
+              disabled={!canSynthesize(map) || !!synthBusy || busy}
+              title={canSynthesize(map) ? 'See where your thinking stands' : 'Synthesis needs at least two things on the map'}
+            >
+              <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" aria-hidden="true">
+                <path d="M2 3.5h5.5M2 8h4M2 12.5h5.5M9.5 3.5 13 8l-3.5 4.5M7.5 8H13" />
+              </svg>
+              {synthBusy === 'workspace' ? 'Reading your map…' : 'Synthesize'}
+            </button>
             <ModelPicker value={model} onChange={pickModel} isSignedIn={!!isSignedIn || unlocked} />
           </div>
     </>
@@ -3622,8 +3747,27 @@ export function LogosApp({
               </button>
             </div>
           )}
+          {/* PICKED FOR A SYNTHESIS — shift- or ⌘-click cards to gather them. */}
+          {primary && picked.size > 0 && (
+            <div className="lg-picked-bar" role="status">
+              <span>{picked.size} selected</span>
+              {picked.size >= 2 && (
+                <button type="button" className="is-go" disabled={!!synthBusy} onClick={() => void synthesize('selection')}>
+                  {synthBusy === 'selection' ? 'Reading…' : 'Synthesize these'}
+                </button>
+              )}
+              <button type="button" onClick={() => setPicked(new Set())}>Clear</button>
+            </div>
+          )}
           <ThinkingMap
             key={`tm-${lens ?? ''}`}
+            picked={picked}
+            onPick={(id) => setPicked((cur) => {
+              const next = new Set(cur);
+              if (next.has(id)) next.delete(id);
+              else next.add(id);
+              return next;
+            })}
             initialLens={lens as LensId | undefined}
             onSelectNode={(id) => setFocus({ kind: 'node', id })}
             map={map}
@@ -3715,10 +3859,16 @@ export function LogosApp({
   const chatPanelOpen = !!wsLayout && panelsOf(wsLayout).some((x) => x.type === 'chat');
   // (no hooks here: this runs after the access gate's early return)
   const lastReply = [...messages].reverse().find((x) => x.role === 'assistant')?.content ?? '';
-  const peek = streaming || (busy ? '' : lastReply);
+  const lastIsSynth = !!messages[messages.length - 1]?.synthesis;
+  const peek = streaming || (busy || lastIsSynth ? '' : lastReply);
   const wsDock =
     workspaceOn && !chatPanelOpen ? (
       <div className={`ws-dock lg-convo${dockOpen ? ' is-open' : ''}${messages.length ? '' : ' is-new'}`}>
+        {/* A synthesis opens above the composer — the moment it exists for. */}
+        {!dockOpen && synthBusy && <SynthesisPending scope={synthBusy} />}
+        {!dockOpen && !synthBusy && lastIsSynth && !busy && !streaming && (
+          <LogosSynthesis {...synthProps(messages[messages.length - 1].synthesis!, true)} />
+        )}
         {messages.length > 0 && (
           <div className="ws-dock-row">
             {!dockOpen && (peek || busy) ? (

@@ -31,7 +31,9 @@ export type MapEdit =
   | { op: 'rename'; id: string; label: string }
   | { op: 'status'; id: string; status: LogosNodeStatus }
   | { op: 'link'; from: string; to: string; relation?: LogosRelation }
-  | { op: 'unlink'; from: string; to: string };
+  | { op: 'unlink'; from: string; to: string }
+  /** a node the person chose to take — a Socria suggestion keeps origin 'socria' */
+  | { op: 'add'; node: { label: string; type: LogosNode['type']; role?: LogosNode['role']; origin?: LogosNode['origin'] }; near?: string };
 
 /** The most labels a map remembers removing. Past this the oldest is forgotten. */
 export const MAX_REMOVED = 40;
@@ -108,6 +110,17 @@ export function applyMapEdits(map: ThinkingMap, edits: readonly MapEdit[]): Edit
       const dup = edges.some((e) => (e.from === a.id && e.to === b.id) || (e.from === b.id && e.to === a.id));
       if (!dup) edges = [...edges, { from: a.id, to: b.id, relation, strength: 'normal' }];
       applied.push({ edit, said: dup ? `${quote(a.label)} and ${quote(b.label)} were already connected.` : `Connected ${quote(a.label)} to ${quote(b.label)}.` });
+    } else if (edit.op === 'add') {
+      const label = edit.node.label.replace(/\s+/g, ' ').trim().slice(0, MAX_LABEL);
+      if (!label) { refused.push(`A node cannot be called nothing.`); continue; }
+      if (nodes.some((x) => keyOf(x.label) === keyOf(label))) { refused.push(`${quote(label)} is already on the map.`); continue; }
+      let id = 'n_' + keyOf(label).replace(/\s+/g, '_').slice(0, 24);
+      while (byId(id)) id += '_';
+      nodes = [...nodes, { id, type: edit.node.type, label, status: 'open', ...(edit.node.role ? { role: edit.node.role } : {}), ...(edit.node.origin ? { origin: edit.node.origin } : {}) }];
+      // A removal of the same wording is forgotten: they asked for it back.
+      removed = removed.filter((r) => r !== keyOf(label));
+      if (edit.near && byId(edit.near)) edges = [...edges, { from: id, to: edit.near, relation: 'relates', strength: 'normal' }];
+      applied.push({ edit, said: `Added ${quote(label)} to the map${edit.node.origin === 'socria' ? ', marked as Socria’s suggestion' : ''}.` });
     } else if (edit.op === 'unlink') {
       const a = byId(edit.from), b = byId(edit.to);
       if (!a || !b) { refused.push(`Both ends of a connection have to be on the map.`); continue; }

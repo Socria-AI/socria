@@ -12,6 +12,7 @@ import { EMPTY_MAP, type ThinkingMap } from './logos';
 import type { Attachment } from './logos-attachments';
 import { sanitizeContexts, type NodeContexts } from './logos-sources';
 import type { ByRef } from './logos';
+import type { Synthesis } from './logos-synthesis';
 
 export interface LogosMsg {
   role: 'user' | 'assistant';
@@ -20,6 +21,8 @@ export interface LogosMsg {
   attachments?: Attachment[];
   /** who wrote it, when two people are thinking together — see lib/collab.ts */
   by?: ByRef;
+  /** Socria's synthesis of the map, when this message is one — lib/logos-synthesis.ts */
+  synthesis?: Synthesis;
 }
 
 /** What the person actually wrote. Theirs — Logos never writes into it. */

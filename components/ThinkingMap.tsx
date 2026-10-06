@@ -114,6 +114,8 @@ export function ThinkingMap({
   onAskAbout,
   onModelEdited,
   onSelectNode,
+  picked,
+  onPick,
   guarded,
   lensLimit,
   onLocked,
@@ -166,6 +168,9 @@ export function ThinkingMap({
    * conversation means by "this". Single-player Logos 2 passes nothing.
    */
   onSelectNode?: (id: string) => void;
+  /** objects picked for a synthesis of just those (shift- or ⌘-click) */
+  picked?: ReadonlySet<string>;
+  onPick?: (id: string) => void;
   /** Answer Guard is on — the board must not reveal a withheld result */
   guarded?: boolean;
   /**
@@ -977,7 +982,9 @@ export function ThinkingMap({
                   menuFor === p.id ? ' is-open' : ''
                 }${relevant?.has(p.id) ? ' is-relevant' : ''}${
                   p.node.flag ? ` lg-flag-${p.node.flag}` : ''
-                }${p.branch ? ' is-branch' : ''}${shapeLens && !p.loose ? ' is-shaped' : ''}`}
+                }${p.branch ? ' is-branch' : ''}${shapeLens && !p.loose ? ' is-shaped' : ''}${
+                  picked?.has(p.id) ? ' is-picked' : ''
+                }${p.node.origin === 'socria' ? ' is-socria' : ''}`}
                 title={shapeLens && p.node.role ? `${p.node.role} · ${p.node.type}` : undefined}
                 aria-haspopup="menu"
                 aria-expanded={menuFor === p.id}
@@ -1004,6 +1011,12 @@ export function ThinkingMap({
                 }}
                 onClick={(ev) => {
                   ev.stopPropagation();
+                  // Shift or ⌘: pick it, for a synthesis of just what is picked.
+                  if (onPick && (ev.shiftKey || ev.metaKey || ev.ctrlKey)) {
+                    setMenu(null);
+                    onPick(p.id);
+                    return;
+                  }
                   setFocused(p.id);
                   onSelectNode?.(p.id);
                   if (menu?.id === p.id) {

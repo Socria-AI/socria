@@ -24,6 +24,7 @@ const MODULES = [
   'lib/logos-layout.ts',
   'lib/logos.ts',
   'lib/representation.ts',
+  'lib/logos-synthesis.ts',
   'lib/theme.ts',
   'lib/entitlements.ts',
   'lib/usage-scope.ts',

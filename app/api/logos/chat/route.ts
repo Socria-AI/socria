@@ -10,6 +10,7 @@
 // limited either way.
 
 import { buildingBlock, sanitizeBrief } from '@/lib/representation';
+import { isSynthesisText, SYNTHESIS_CORRECTION } from '@/lib/logos-synthesis';
 import { NextRequest, NextResponse } from 'next/server';
 import { streamFailureNotice } from '@/lib/upstream-error';
 import OpenAI from 'openai';
@@ -160,6 +161,11 @@ export async function POST(req: NextRequest) {
         .slice(0, 2);
     })();
     const twoPeople = collabPeople.length >= 2;
+    // The assistant turn just before this one was a synthesis.
+    const repliesToSynthesis = (() => {
+      for (let i = kept.length - 2; i >= 0; i--) if (kept[i]?.role === 'assistant') return isSynthesisText(kept[i].content);
+      return false;
+    })();
 
     // Attachments are flattened into the text the model reads. Only the turn
     // being answered carries a long note in full.
@@ -372,6 +378,9 @@ export async function POST(req: NextRequest) {
       // spine as it stands, so the reply talks in steps and branches when
       // they are designing a sequence, rather than in loose concepts.
       (focusLabel ? '' : buildingBlock(sanitizeBrief(body?.building))) +
+      // Answering a synthesis: a correction of Socria's READING is not a change
+      // to the person's thinking, and the reply has to know which it is.
+      (repliesToSynthesis ? SYNTHESIS_CORRECTION : '') +
       // Logos 3: when two people are in the room, Socria becomes the layer
       // between them — it names both, surfaces the connections, the
       // disagreements, the assumptions and the open questions between what

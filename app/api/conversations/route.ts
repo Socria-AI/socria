@@ -4,6 +4,7 @@
 // PATCH /api/conversations         → rename one (title only)
 // POST /api/conversations          → bulk-upsert (used for localStorage → cloud migration)
 
+import { sanitizeSynthesis } from '@/lib/logos-synthesis';
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { supabaseAdmin } from '@/lib/supabase';
@@ -46,11 +47,15 @@ function sanitizeMessages(raw: unknown): Msg[] {
       // so a shared session opened alone later still shows whose idea each
       // one was; validated so a broken author reads as none, not as a crash.
       const by = sanitizeByRef(m.by);
+      // A Logos synthesis: Socria's structured reading of the map, kept so it
+      // re-renders as itself and so the next one can say what changed.
+      const synthesis = m.role === 'assistant' ? sanitizeSynthesis(m.synthesis) : undefined;
       return {
         role: m.role,
         content: m.content,
         ...(attachments.length ? { attachments } : {}),
         ...(by ? { by } : {}),
+        ...(synthesis ? { synthesis } : {}),
       };
     });
 }

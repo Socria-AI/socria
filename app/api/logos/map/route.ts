@@ -42,6 +42,7 @@ import {
   type Wanted,
 } from '@/lib/model/wants';
 import { dropRemoved } from '@/lib/map-edit';
+import { isSynthesisText } from '@/lib/logos-synthesis';
 import { settle, unanswered } from '@/lib/model/ask';
 import {
   buildRestructurePrompt,
@@ -125,7 +126,11 @@ export async function POST(req: NextRequest) {
       (m: any) =>
         m &&
         (m.role === 'user' || m.role === 'assistant') &&
-        typeof m.content === 'string'
+        typeof m.content === 'string' &&
+        // A SYNTHESIS IS SOCRIA'S READING, NOT THE PERSON'S THINKING. Mapped
+        // from, it would write Socria's interpretation into their structure.
+        !m.synthesis &&
+        !isSynthesisText(m.content)
     )
     .slice(-MAX_HISTORY);
 
@@ -260,6 +265,16 @@ export async function POST(req: NextRequest) {
     // The extractor's output is a PROPOSAL: sanitizeMap's default trust mode
     // strips any `built` it wrote and keeps a `propose` block instead.
     let next = sanitizeMap(parsed);
+    // WHERE EACH NODE CAME FROM survives the rebuild: an accepted Socria
+    // suggestion stays marked as one, whatever the extractor wrote back.
+    {
+      const origin = new Map(current.nodes.filter((n) => n.origin).map((n) => [n.id, n.origin!]));
+      const byLabel = new Map(current.nodes.filter((n) => n.origin).map((n) => [n.label.toLowerCase(), n.origin!]));
+      next = { ...next, nodes: next.nodes.map((n) => {
+        const o = origin.get(n.id) ?? byLabel.get(n.label.toLowerCase());
+        return o ? { ...n, origin: o } : n;
+      }) };
+    }
 
     // ── WHAT ARE THEY BUILDING? ───────────────────────────────────
     //

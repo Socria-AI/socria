@@ -217,7 +217,18 @@ export interface LogosNode {
    * "Sign up" is an action (type) and a step (role). See lib/representation.ts.
    */
   role?: Role;
+  /**
+   * WHERE IT CAME FROM. Absent means the person — what they said, or what the
+   * extractor read from them. 'socria' is a suggestion of Socria's the person
+   * chose to take (a synthesis possibility or principle); 'source' is material
+   * they attached; 'computed' is something the engine derived. Kept for good:
+   * an accepted suggestion never quietly becomes "their idea".
+   */
+  origin?: NodeOrigin;
 }
+
+export const NODE_ORIGINS = ['socria', 'source', 'computed'] as const;
+export type NodeOrigin = (typeof NODE_ORIGINS)[number];
 
 export interface LogosEdge {
   from: string;
@@ -437,6 +448,7 @@ export function sanitizeMap(raw: any, opts?: { trust?: VizTrust }): ThinkingMap 
       const note = str(n?.note, MAX_NOTE);
       const by = sanitizeByRef(n?.by);
       const role = sanitizeRole(n?.role);
+      const origin: NodeOrigin | undefined = NODE_ORIGINS.includes(n?.origin) ? (n.origin as NodeOrigin) : undefined;
       return {
         id,
         type,
@@ -448,6 +460,7 @@ export function sanitizeMap(raw: any, opts?: { trust?: VizTrust }): ThinkingMap 
         ...(note ? { note } : {}),
         ...(by ? { by } : {}),
         ...(role ? { role } : {}),
+        ...(origin ? { origin } : {}),
       };
     })
     .filter((n: LogosNode | null): n is LogosNode => {
@@ -1103,7 +1116,7 @@ nodes:
 ${current.nodes
   .map(
     (n) =>
-      `  ${n.id} [${n.type}${n.status && n.status !== 'open' ? `/${n.status}` : ''}${n.role ? `, role ${n.role}` : ''}] ${n.label}` +
+      `  ${n.id} [${n.type}${n.status && n.status !== 'open' ? `/${n.status}` : ''}${n.role ? `, role ${n.role}` : ''}${n.origin === 'socria' ? ', suggested by Socria and accepted' : ''}] ${n.label}` +
       (n.merged?.length ? `  (absorbed: ${n.merged.join('; ')})` : '')
   )
   .join('\n')}
@@ -1462,5 +1475,7 @@ WHOSE THINKING IS IT:
 - Only an attachment marked "my thinking", and what they say in conversation, may become a belief, value, goal or decision of theirs.
 - When someone quotes or paraphrases a source approvingly, that is still a claim they are leaning on, not automatically a belief they hold. If they explicitly adopt it, then it becomes theirs.
 - Grounded material attached to a node gives CONTEXT, NOT AUTHORITY. It may sharpen THAT node's label, add claims/evidence/source/constraint nodes connected to it, or justify status "supported" when it genuinely backs the node. It never creates a belief, value, goal or decision the user hasn't voiced, never resolves a question for them, and never outranks what they actually said in conversation.
-- If the latest message adds nothing structural, return the current map unchanged.`;
+- If the latest message adds nothing structural, return the current map unchanged.
+- A node marked "suggested by Socria and accepted" keeps its id and its wording unless the person changes it.
+- SOCRIA'S SYNTHESES ARE NOT THE PERSON'S THINKING. They are removed from the transcript you see. When the person replies to one: if they correct Socria's READING ("that's not what I meant"), the map does not change; if they state their OWN position ("ease of access matters more than personalization"), map that position like anything else they say.`;
 }
