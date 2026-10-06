@@ -20,8 +20,18 @@ import type {
   ThinkingMap,
 } from './logos';
 import { compileFunction, type CompiledFn } from './logos-math';
+import {
+  attachmentsOf,
+  backEdges,
+  GRAMMARS,
+  lensFor,
+  orderSpine,
+  spineOf,
+  transitionsOf,
+  type Building,
+} from './representation';
 
-export type LensId = 'graph' | 'structure' | 'tensions' | 'evidence' | 'solve' | 'plot' | 'board' | 'matrix';
+export type LensId = 'graph' | 'structure' | 'tensions' | 'evidence' | 'solve' | 'plot' | 'board' | 'matrix' | 'flow' | 'timeline';
 
 export interface Placed {
   id: string;
@@ -30,6 +40,12 @@ export interface Placed {
   y: number;
   w: number;
   h: number;
+  /** the details that hang from this part of the shape — shown on it, not beside it */
+  attached?: LogosNode[];
+  /** a part of the shape where the path divides */
+  branch?: boolean;
+  /** on the map, but not yet placed in the shape */
+  loose?: boolean;
 }
 
 export interface Connector {
@@ -56,6 +72,8 @@ export interface Layout {
 }
 
 export const LENSES: { id: LensId; label: string; caption: string }[] = [
+  { id: 'flow', label: 'Flow', caption: 'What happens, in what order, and where it branches.' },
+  { id: 'timeline', label: 'Timeline', caption: 'What happened, and in what order.' },
   { id: 'graph', label: 'Graph', caption: 'See how everything connects.' },
   { id: 'structure', label: 'Structure', caption: 'What am I trying to accomplish?' },
   { id: 'tensions', label: 'Tensions', caption: 'What’s pulling me in different directions?' },
@@ -79,6 +97,7 @@ export const RELATION_LABEL: Record<LogosRelation, string> = {
   implies: 'implies',
   justifies: 'justifies',
   equivalent_to: 'equivalent to',
+  applies_to: 'applies to',
 };
 
 const CARD_W = 150;
@@ -111,9 +130,18 @@ function cardH(label: string, w = CARD_W) {
  * step by step, and the animation beside it is a second look at the same
  * work rather than a replacement for it.
  */
-export function leadLens(lenses: LensId[], hasViz: boolean): LensId | null {
+export function leadLens(lenses: LensId[], hasViz: boolean, building?: Building | null): LensId | null {
   if (!lenses.length) return null;
+  // A model they are building leads with the model; worked algebra leads with
+  // its chain.
+  if (building?.kind === 'model' && lenses.includes('plot')) return 'plot';
   if (lenses.includes('solve')) return 'solve';
+  // WHAT THEY ARE BUILDING decides the shape, before any of the fallbacks
+  // below: a process opens as a flow, a timeline on its axis, a decision as
+  // its table. The structure has to be there for the lens to be offered at
+  // all (availableLenses), so this never opens an empty frame.
+  const shaped = lensFor(building, lenses) as LensId | null;
+  if (shaped) return shaped;
   if (hasViz && lenses.includes('plot')) return 'plot';
   // A map that is making a comparison opens on the comparison. Same reasoning
   // as the two above: when the work has a shape of its own, the lens that
@@ -148,6 +176,20 @@ export function availableLenses(map: ThinkingMap): LensId[] {
   const out: LensId[] = [];
   const quant = isQuantitative(map);
 
+  const shapes: LensId[] = [];
+  // THE SHAPES WITH AN ORDER. A flow is offered whenever the map holds a
+  // sequence — two parts of a spine joined by a transition — whatever the
+  // work is called, because the structure is the evidence, not the label.
+  // A timeline when it is events in order, or when the reading says so.
+  {
+    const kind = map.building?.kind;
+    const spine = spineOf(map, kind && GRAMMARS[kind].ordered ? kind : undefined);
+    const ordered = spine.size >= 2 && transitionsOf(map, spine).length >= 1;
+    const events = map.nodes.some((n) => n.role === 'event' || n.role === 'period');
+    if (ordered && kind !== 'timeline') shapes.push('flow');
+    if (ordered && (kind === 'timeline' || events)) shapes.push('timeline');
+  }
+
   // The concept views. They read the SHAPE of an argument — what supports
   // what, what sits under what — which is the right question for a decision
   // or an essay and the wrong one for a calculation, where the shape is the
@@ -156,6 +198,11 @@ export function availableLenses(map: ThinkingMap): LensId[] {
     if (map.nodes.length) out.push('graph');
     if (map.nodes.length > 1) out.push('structure');
   }
+  // Which tab sorts first is not which lens leads — leadLens decides that
+  // from what is being built — but a map with no reading yet keeps its graph
+  // first, and one whose reading is an ordered shape shows that shape first.
+  if (map.building && GRAMMARS[map.building.kind].ordered) out.unshift(...shapes);
+  else out.push(...shapes);
 
   // A comparison is a table, not a graph, and it is offered whenever the map
   // is already making one — options judged against criteria. Placed ahead of
@@ -833,4 +880,217 @@ function rank(v: CellVerdict, s?: LogosEdgeStrength): number {
   const base = v === 'unknown' ? 0 : v === 'noted' ? 1 : 2;
   const w = s === 'strong' ? 2 : s === 'weak' ? 0 : 1;
   return base * 3 + w;
+}
+
+
+// ── the shapes with an order: flow and timeline ─────────────────────
+
+const FLOW_W = 168;
+const FLOW_GAP_X = 70;
+const FLOW_GAP_Y = 30;
+const FLOW_PAD = 40;
+/** room under a card for the count of what hangs from it */
+const ATTACH_H = 18;
+
+/**
+ * A FLOW. The spine in order — each part in the column after the latest thing
+ * that comes before it — so a sequence reads left to right and a branch is
+ * the paths it opens, stacked in the next column. Details are not cards on the
+ * canvas: they ride on the step they apply to, and are listed when it is
+ * opened. Whatever is on the map but not yet placed in the shape sits in a row
+ * beneath it, so nothing the person thought is hidden by the shape.
+ *
+ * Narrow panels run it top to bottom instead.
+ */
+export function layoutFlow(map: ThinkingMap, w: number, h: number): Layout {
+  const cap = capOf('flow');
+  const kind = map.building?.kind;
+  const spine = spineOf(map, kind && GRAMMARS[kind].ordered ? kind : undefined);
+  if (spine.size < 2) return emptyLayout('flow', 'A flow appears when there are steps in an order.');
+  const layers = orderSpine(map, spine);
+  const attached = attachmentsOf(map, spine);
+  const held = new Set([...attached.values()].flat().map((n) => n.id));
+  const byId = new Map(map.nodes.map((n) => [n.id, n]));
+  const across = w >= 640;
+  const forks = new Map<string, number>();
+  for (const e of transitionsOf(map, spine)) forks.set(e.from, (forks.get(e.from) ?? 0) + 1);
+
+  const placed: Placed[] = [];
+  const at = new Map<string, Placed>();
+  const cardOf = (id: string) => {
+    const node = byId.get(id)!;
+    const extra = attached.get(id)?.length ? ATTACH_H : 0;
+    return { node, h: cardH(node.label, FLOW_W) + extra };
+  };
+
+  // The extent of each layer, to centre the paths of a branch on one another.
+  const layerSpan = layers.map((l) => l.reduce((sum, id) => sum + cardOf(id).h, 0) + FLOW_GAP_Y * (l.length - 1));
+  // A LONG FLOW WRAPS, like a line of text: as many steps as fit across, then
+  // the next row continues from the left. Scrolling sideways through eleven
+  // steps to find where the path divides is the opposite of seeing it.
+  const perRow = Math.max(2, Math.floor((w - FLOW_PAD * 2 + FLOW_GAP_X) / (FLOW_W + FLOW_GAP_X)));
+  const rowOf = (li: number) => Math.floor(li / perRow);
+  const rows = Math.ceil(layers.length / perRow);
+  const rowSpan = Array.from({ length: rows }, (_, r) => Math.max(...layerSpan.slice(r * perRow, (r + 1) * perRow)));
+  const rowTop: number[] = [];
+  rowSpan.forEach((span, r) => rowTop.push(r === 0 ? FLOW_PAD : rowTop[r - 1] + rowSpan[r - 1] + FLOW_GAP_Y + 56));
+  layers.forEach((layer, li) => {
+    let offset = -layerSpan[li] / 2;
+    const r = rowOf(li);
+    for (const id of layer) {
+      const { node, h: ch } = cardOf(id);
+      const along = FLOW_PAD + (li % perRow) * (across ? FLOW_W + FLOW_GAP_X : 0) + (across ? FLOW_W / 2 : 0);
+      const cross = offset + ch / 2;
+      const x = across ? along : w / 2 + 0;
+      const y = across ? rowTop[r] + rowSpan[r] / 2 + cross : FLOW_PAD + ch / 2;
+      const p: Placed = {
+        id,
+        node,
+        x,
+        y,
+        w: FLOW_W,
+        h: ch,
+        ...(attached.get(id)?.length ? { attached: attached.get(id) } : {}),
+        ...((forks.get(id) ?? 0) >= 2 || node.role === 'branch' ? { branch: true } : {}),
+      };
+      placed.push(p);
+      at.set(id, p);
+      offset += ch + FLOW_GAP_Y;
+    }
+  });
+  // Top to bottom: lay the layers down the page, each layer's paths side by side.
+  if (!across) {
+    let y = FLOW_PAD;
+    for (const layer of layers) {
+      const tall = Math.max(...layer.map((id) => at.get(id)!.h));
+      const span = layer.length * FLOW_W + (layer.length - 1) * 24;
+      layer.forEach((id, i) => {
+        const p = at.get(id)!;
+        p.x = w / 2 - span / 2 + FLOW_W / 2 + i * (FLOW_W + 24);
+        p.y = y + tall / 2;
+      });
+      y += tall + FLOW_GAP_Y + 10;
+    }
+  }
+
+  // Loose: on the map, not in the shape, and hanging from nothing in it.
+  const loose = map.nodes.filter((n) => !spine.has(n.id) && !held.has(n.id));
+  const bottom = Math.max(...placed.map((p) => p.y + p.h / 2)) + 54;
+  loose.forEach((node, i) => {
+    const per = Math.max(1, Math.floor((Math.max(w, FLOW_W * 2) - FLOW_PAD) / (CARD_W + 20)));
+    const ch = cardH(node.label);
+    const p: Placed = {
+      id: node.id,
+      node,
+      x: FLOW_PAD + CARD_W / 2 + (i % per) * (CARD_W + 20),
+      y: bottom + ch / 2 + Math.floor(i / per) * (CARD_H2 + 16),
+      w: CARD_W,
+      h: ch,
+      loose: true,
+    };
+    placed.push(p);
+    at.set(node.id, p);
+  });
+
+  const back = backEdges(map, spine);
+  const connectors: Connector[] = transitionsOf(map, spine).map((e) => {
+    const a = at.get(e.from)!;
+    const b = at.get(e.to)!;
+    const returns = back.has(`${e.from}>${e.to}`);
+    let path: string;
+    let lx: number;
+    let ly: number;
+    if (returns) {
+      // A loop back runs under the cards it returns across.
+      const low = Math.max(a.y + a.h / 2, b.y + b.h / 2) + 26;
+      path = `M${a.x},${a.y + a.h / 2} C${a.x},${low} ${b.x},${low} ${b.x},${b.y + b.h / 2}`;
+      lx = (a.x + b.x) / 2;
+      ly = low;
+    } else if (across && b.y - b.h / 2 > a.y + a.h / 2 + 20 && b.x < a.x) {
+      // Onto the next row: down from the end of this one, back to the start.
+      const y1 = a.y + a.h / 2;
+      const y2 = b.y - b.h / 2;
+      const my = (y1 + y2) / 2;
+      path = `M${a.x},${y1} C${a.x},${my + 10} ${b.x},${my - 10} ${b.x},${y2}`;
+      lx = b.x;
+      ly = y2 - 6;
+    } else if (across) {
+      const x1 = a.x + a.w / 2;
+      const x2 = b.x - b.w / 2;
+      const mx = (x1 + x2) / 2;
+      path = `M${x1},${a.y} C${mx},${a.y} ${mx},${b.y} ${x2},${b.y}`;
+      // The condition sits by the path it opens, not where two paths cross.
+      lx = (mx + x2) / 2;
+      ly = b.y - 4;
+    } else {
+      const y1 = a.y + a.h / 2;
+      const y2 = b.y - b.h / 2;
+      const my = (y1 + y2) / 2;
+      path = `M${a.x},${y1} C${a.x},${my} ${b.x},${my} ${b.x},${y2}`;
+      lx = b.x;
+      ly = y2 - 2;
+    }
+    return {
+      key: `${e.from}~${e.to}~${e.relation}`,
+      path,
+      relation: e.relation,
+      strength: e.strength,
+      arrow: true,
+      ...(e.when ? { label: e.when.length > 26 ? e.when.slice(0, 25) + '…' : e.when, lx, ly } : {}),
+    };
+  });
+  return { placed, connectors, caption: cap };
+}
+
+/**
+ * A TIMELINE. The same order as a flow, set along one axis: each moment in
+ * its place, alternating above and below the line so neighbours never
+ * collide, with things that happened together stacked on the same tick.
+ */
+export function layoutTimeline(map: ThinkingMap, w: number, h: number): Layout {
+  const cap = capOf('timeline');
+  const spine = spineOf(map, 'timeline');
+  if (spine.size < 2) return emptyLayout('timeline', 'A timeline appears when there are events in an order.');
+  const layers = orderSpine(map, spine);
+  const attached = attachmentsOf(map, spine);
+  const byId = new Map(map.nodes.map((n) => [n.id, n]));
+  const step = Math.max(FLOW_W + 24, (w - FLOW_PAD * 2) / Math.max(1, layers.length));
+  const axis = Math.max(h / 2, 180);
+  const placed: Placed[] = [];
+  const at = new Map<string, Placed>();
+  layers.forEach((layer, li) => {
+    layer.forEach((id, k) => {
+      const node = byId.get(id)!;
+      const ch = cardH(node.label, FLOW_W) + (attached.get(id)?.length ? ATTACH_H : 0);
+      const above = (li + k) % 2 === 0;
+      const tier = 40 + k * (CARD_H2 + 18);
+      const p: Placed = {
+        id,
+        node,
+        x: FLOW_PAD + FLOW_W / 2 + li * step,
+        y: above ? axis - tier - ch / 2 : axis + tier + ch / 2,
+        w: FLOW_W,
+        h: ch,
+        ...(attached.get(id)?.length ? { attached: attached.get(id) } : {}),
+      };
+      placed.push(p);
+      at.set(id, p);
+    });
+  });
+  const first = placed[0];
+  const last = placed[placed.length - 1];
+  const connectors: Connector[] = [
+    {
+      key: 'timeline-axis',
+      path: `M${first.x - FLOW_W / 2},${axis} L${last.x + FLOW_W / 2},${axis}`,
+      relation: 'precedes',
+      arrow: true,
+    },
+    ...placed.map((p) => ({
+      key: `tick~${p.id}`,
+      path: `M${p.x},${axis} L${p.x},${p.y + (p.y < axis ? p.h / 2 : -p.h / 2)}`,
+      relation: 'part_of' as const,
+    })),
+  ];
+  return { placed, connectors, caption: cap };
 }

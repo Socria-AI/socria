@@ -96,6 +96,7 @@ const EDGE: Record<LogosRelation, { colour: string; dash?: string }> = {
   implies: { colour: ACCENT },
   justifies: { colour: '#6E93A3' },
   equivalent_to: { colour: '#6E7FA3', dash: '8 3 2 3' },
+  applies_to: { colour: '#B9BFB1', dash: '2 3' },
 };
 
 // Fonts the SVG can count on inside an <img>: whatever the machine has.

@@ -15,6 +15,16 @@ import { sanitizeWorkspace, type ModelWorkspace } from './model/docs';
 import { WHY_NOT_ANSWER } from './why-not-answer';
 import { WRONG_CHAT } from './wrong-chat';
 
+import {
+  buildingLine,
+  grammarGuide,
+  GRAMMAR_IDS,
+  sanitizeBuilding,
+  sanitizeRole,
+  type Building,
+  type Role,
+} from './representation';
+
 export const LOGOS_MODEL = 'gpt-5.6-sol';
 // If the Sol id is ever rejected as unknown, the routes retry with this so a
 // demo never dies mid-sentence.
@@ -84,6 +94,12 @@ export const RELATIONS = [
   'justifies',
   /** logic: A and B are logically equivalent (iff) */
   'equivalent_to',
+  /**
+   * structure: A is a detail that bears on B — a constraint on a step, a
+   * question about a branch, a value an option is judged by. What makes a
+   * shape hierarchical instead of one flat canvas (lib/representation.ts).
+   */
+  'applies_to',
 ] as const;
 export type LogosRelation = (typeof RELATIONS)[number];
 
@@ -195,6 +211,12 @@ export interface LogosNode {
   flag?: MathFlag;
   /** a short annotation: a repair hint on an error, a note on a step (may hold $…$) */
   note?: string;
+  /**
+   * WHAT IT DOES IN THE SHAPE being built — a step, a branch, a criterion, a
+   * constraint on something — as distinct from `type`, which is what it IS.
+   * "Sign up" is an action (type) and a step (role). See lib/representation.ts.
+   */
+  role?: Role;
 }
 
 export interface LogosEdge {
@@ -204,6 +226,8 @@ export interface LogosEdge {
   strength?: LogosEdgeStrength;
   /** math: the operation that turns `from` into `to`, e.g. "−6 both sides" */
   op?: string;
+  /** the condition this transition is taken on — "chooses Logos", "has an account" */
+  when?: string;
 }
 
 export interface ThinkingMap {
@@ -213,6 +237,14 @@ export interface ThinkingMap {
   context?: ThinkingContext;
   /** for math: how they're engaging — learning drives the Answer Guard */
   intent?: MathIntent;
+  /**
+   * WHAT THE PERSON IS BUILDING with this thinking — a process, a decision, an
+   * argument, a timeline — which decides the shape the map is drawn in. Read
+   * from the conversation and the structure, or said by the person; separate
+   * from `context`, which is the kind of work, and `ask`, which is this turn's
+   * request. See lib/representation.ts.
+   */
+  building?: Building;
   /**
    * math: an interactive picture of the idea, when motion would teach it
    * better than prose. Drives the Plot lens; see lib/logos-viz.ts.
@@ -288,6 +320,12 @@ const MAX_MERGED = 4;
 const MAX_TEX = 240;
 const MAX_NOTE = 220;
 const MAX_OP = 60;
+const MAX_WHEN = 60;
+// A shape with a spine — a process, a plan, a timeline — carries its details
+// UNDER its steps rather than beside them, so it can hold more without the
+// canvas becoming the spaghetti the cap exists to prevent.
+const MAX_NODES_SHAPED = 22;
+const MAX_EDGES_SHAPED = 32;
 
 /**
  * The near misses worth naming, mapped to the type they actually are.
@@ -358,6 +396,10 @@ export function sanitizeMap(raw: any, opts?: { trust?: VizTrust }): ThinkingMap 
     ? (raw.context as ThinkingContext)
     : undefined;
   const isMath = context === 'math';
+  const building = sanitizeBuilding(raw.building);
+  const shaped = !!building && ['process', 'plan', 'timeline'].includes(building.kind);
+  const nodeCap = isMath ? MAX_NODES_MATH : shaped ? MAX_NODES_SHAPED : MAX_NODES;
+  const edgeCap = isMath ? MAX_EDGES_MATH : shaped ? MAX_EDGES_SHAPED : MAX_EDGES;
   const intent: MathIntent | undefined =
     isMath && MATH_INTENTS.includes(raw.intent) ? (raw.intent as MathIntent) : undefined;
   const str = (v: any, n: number) =>
@@ -394,6 +436,7 @@ export function sanitizeMap(raw: any, opts?: { trust?: VizTrust }): ThinkingMap 
         : undefined;
       const note = str(n?.note, MAX_NOTE);
       const by = sanitizeByRef(n?.by);
+      const role = sanitizeRole(n?.role);
       return {
         id,
         type,
@@ -404,6 +447,7 @@ export function sanitizeMap(raw: any, opts?: { trust?: VizTrust }): ThinkingMap 
         ...(flag ? { flag } : {}),
         ...(note ? { note } : {}),
         ...(by ? { by } : {}),
+        ...(role ? { role } : {}),
       };
     })
     .filter((n: LogosNode | null): n is LogosNode => {
@@ -412,7 +456,7 @@ export function sanitizeMap(raw: any, opts?: { trust?: VizTrust }): ThinkingMap 
       seen.add(n.id);
       return true;
     })
-    .slice(0, isMath ? MAX_NODES_MATH : MAX_NODES);
+    .slice(0, nodeCap);
 
   const ids = new Set(nodes.map((n) => n.id));
   const edgeSeen = new Set<string>();
@@ -434,7 +478,8 @@ export function sanitizeMap(raw: any, opts?: { trust?: VizTrust }): ThinkingMap 
         ? (e.strength as LogosEdgeStrength)
         : 'normal';
       const op = str(e?.op, MAX_OP);
-      return { from, to, relation, strength, ...(op ? { op } : {}) };
+      const when = str(e?.when, MAX_WHEN);
+      return { from, to, relation, strength, ...(op ? { op } : {}), ...(when ? { when } : {}) };
     })
     .filter((e: LogosEdge | null): e is LogosEdge => {
       // Drop dangling edges — they'd render as lines into empty space.
@@ -443,14 +488,16 @@ export function sanitizeMap(raw: any, opts?: { trust?: VizTrust }): ThinkingMap 
       // transforms_to is directional and ordered, so two opposite ones are
       // distinct; other relations are keyed order-independent.
       const key =
-        e.relation === 'transforms_to' || e.relation === 'implies'
+        // A sequence can loop back, and a detail applies one way: both are
+        // directional, so A→B and B→A are two different edges.
+        e.relation === 'transforms_to' || e.relation === 'implies' || e.relation === 'precedes' || e.relation === 'leads_to' || e.relation === 'applies_to'
           ? `${e.from}>${e.to}:${e.relation}`
           : [e.from, e.to].sort().join('~') + e.relation;
       if (edgeSeen.has(key)) return false;
       edgeSeen.add(key);
       return true;
     })
-    .slice(0, isMath ? MAX_EDGES_MATH : MAX_EDGES);
+    .slice(0, edgeCap);
 
   // Which scenes survive, and why the test is on the KIND rather than on the
   // conversation's label.
@@ -539,6 +586,7 @@ export function sanitizeMap(raw: any, opts?: { trust?: VizTrust }): ThinkingMap 
     edges,
     ...(removed.length ? { removed } : {}),
     ...(named ? { context: named } : {}),
+    ...(building ? { building } : {}),
     ...(intent && named === 'math' ? { intent } : {}),
     ...(ask ? { ask } : {}),
     // Carried raw and unjudged: buildProposal is the only thing allowed to
@@ -808,6 +856,7 @@ const LINEAGE_PHRASE: Record<LogosRelation, [string, string]> = {
   implies: ['implies', 'follows from'],
   equivalent_to: ['is equivalent to', 'is equivalent to'],
   justifies: ['justifies', 'is justified by'],
+  applies_to: ['applies to', 'is shaped by'],
 };
 
 /** How one node sits against the rest of the map, in plain language. */
@@ -1054,7 +1103,7 @@ nodes:
 ${current.nodes
   .map(
     (n) =>
-      `  ${n.id} [${n.type}${n.status && n.status !== 'open' ? `/${n.status}` : ''}] ${n.label}` +
+      `  ${n.id} [${n.type}${n.status && n.status !== 'open' ? `/${n.status}` : ''}${n.role ? `, role ${n.role}` : ''}] ${n.label}` +
       (n.merged?.length ? `  (absorbed: ${n.merged.join('; ')})` : '')
   )
   .join('\n')}
@@ -1066,7 +1115,7 @@ ${
           (e) =>
             `  ${e.from} --${e.relation}${
               e.strength && e.strength !== 'normal' ? `(${e.strength})` : ''
-            }--> ${e.to}`
+            }${e.when ? ` [when ${e.when}]` : ''}--> ${e.to}`
         )
         .join('\n')
     : '  (none yet)'
@@ -1138,6 +1187,7 @@ Someone who says "more guns" wants the position along the frontier MOVED, not a 
 ${currentBlock}${removedBlock}
 
 Thinking context: ${contextLine}
+What they are building: ${buildingLine(current.building)}
 ${vizBlock}
 ${
   grounded
@@ -1150,12 +1200,13 @@ ${grounded}
 }
 Return ONLY JSON, exactly this shape:
 {
+  "building": {"kind": "${GRAMMAR_IDS.join('|')}", "also": ["other shapes present in the same thinking"], "why": "one short line: what they are constructing"},
   "context": "deciding|writing|creating|researching|learning|planning|brainstorming|reflecting|analysing|math",
   "ask": {"action": "discuss|explore|explain|question|map|construct|modify|remove|compute|simulate|estimate|represent|compare|trace|research|verify", "artifact": "answer|map|model|simulation|plot|diagram|estimate|draft|research|comparison", "topic": "the subject in their words", "domain": "the field, if it is clear", "formal": {"outcome": "what is being explained, or what the model is of", "inputs": ["what explains it"], "states": ["named states, bodies, compartments, stocks"], "parameters": ["named coefficients or constants"], "equations": ["an equation THEY wrote"], "method": "a method THEY named — never one you chose", "data": "data they referred to or supplied"}, "operations": ["manipulate", "run", "fit", "compare"]},
   "propose": { … a structured model — see PROPOSING A STRUCTURED MODEL below. A SIBLING OF "viz", never inside it },
   "intent": "learning|verification|utility|exploration",  // ONLY for context=math
-  "nodes": [{"id": "short_snake_case_id", "type": "<node type>", "label": "a short phrase in their own framing", "status": "open|supported|resolved|revised", "merged": ["label of a node folded into this one"], "tex": "LaTeX for this node, if mathematical", "flag": "error|verified", "note": "a short annotation or repair hint"}],
-  "edges": [{"from": "node_id", "to": "node_id", "relation": "supports|conflicts|depends|relates|leads_to|revises|precedes|part_of|transforms_to|implies|justifies|equivalent_to", "strength": "weak|normal|strong", "op": "the operation on a transforms_to edge"}],
+  "nodes": [{"id": "short_snake_case_id", "type": "<node type>", "role": "<its structural role in what they are building>", "label": "a short phrase in their own framing", "status": "open|supported|resolved|revised", "merged": ["label of a node folded into this one"], "tex": "LaTeX for this node, if mathematical", "flag": "error|verified", "note": "a short annotation or repair hint"}],
+  "edges": [{"from": "node_id", "to": "node_id", "relation": "supports|conflicts|depends|relates|leads_to|revises|precedes|part_of|transforms_to|implies|justifies|equivalent_to|applies_to", "strength": "weak|normal|strong", "op": "the operation on a transforms_to edge", "when": "the condition a transition is taken on"}],
   "viz": {"kind": "function|limit|derivative|riemann|taylor|sequence|vectors|matrix|distribution|ode|supply-demand|ppc|ad-as|diagram|simulation", "sim": {"object": "black-hole|orbit|oscillator|projectile"}, "parts": [{"o": "curve|path|data|band|errorbar|callout|point|segment|line|vector|region|rects|sequence|vrule|hrule|label", "expr": "for a curve, y in terms of x", "param": "for a path, the letter both coordinates are written in", "from": 0, "to": 6.2832, "closed": true, "x": 0, "y": 0, "x1": 0, "y1": 0, "x2": 0, "y2": 0, "at": 0, "slope": 1, "pts": [{"x": 0, "y": 0}], "bars": [{"x0": 0, "x1": 1, "y": 2}], "text": "for a label or callout", "points": [{"x": 1, "y": 3.4}], "fit": true, "connect": false, "lower": "for a band, the bottom edge in terms of x", "upper": "the top edge", "dy": 0.5, "dx": 0.2, "toX": 0, "toY": 0, "tone": "primary|accent|tension|muted|ghost", "dashed": false, "label": "short"}], "quantities": [{"tex": "K_a", "expr": "10^(-p)", "help": "what it is, without the number"}], "says": {"caption": "one line under the picture", "narration": "what is happening now", "ask": "a question to sit with while the guard is up"}, "expr": "the function in plain notation", "varName": "x", "a": 0, "b": 1, "rule": "left|right|midpoint", "matrix": [[1, 1], [0, 1]], "vectors": [{"x": 2, "y": 1, "label": "u"}], "dist": "normal|binomial|poisson|exponential", "demand": {"intercept": 100, "slope": -1}, "supply": {"intercept": 20, "slope": 1}, "control": {"kind": "ceiling|floor", "at": 45}, "tax": 12, "surplus": true, "frontier": {"xMax": 100, "yMax": 80, "bowed": true, "grows": "both|x|y"}, "ad": {"intercept": 140, "slope": -1}, "sras": {"intercept": 20, "slope": 1}, "potential": 60, "axes": {"x": "Guns", "y": "Butter"}, "partial": true, "ghost": true, "overlays": [{"id": "short_id", "expr": "x^2", "label": "optional", "visible": true, "source": "user"}], "view": {"xMin": -6, "xMax": 6}, "params": [{"id": "a", "min": -3, "max": 3, "step": 0.1, "value": 1}], "title": "a short line naming what is being shown"}
 }
 
@@ -1192,6 +1243,30 @@ WHAT IS NOT A CONSTRUCTION, whatever words are in it: a question about what a ki
 FILL IN "formal" WITH WHAT THEY SAID, NOT WHAT YOU WOULD CHOOSE. If they named the outcome and the regressors, say so — that is the evidence they were specifying rather than musing, and it is checked against what gets built. Leave "method" out unless they named one: choosing an estimator is their work, not yours.
 
 AN ASK IS NOT A PROMISE. Writing "construct" does not build anything; the engine decides whether the proposal below is a model and says so either way. Write what they asked for and let the engine answer for it.
+
+WHAT ARE THEY BUILDING? ("building", and every node's "role") — DECIDE THIS BEFORE YOU TYPE A SINGLE NODE.
+
+A third question, and the one that decides the SHAPE of the map:
+
+  WHAT ARE THEY TALKING ABOUT?      → "context"
+  WHAT ARE THEY ASKING FOR?         → "ask"
+  WHAT ARE THEY TRYING TO BUILD?    → "building"
+
+Two people can talk about the same subject and be building different things. "Our hiring process" can be a PROCESS (the rounds a candidate goes through), a DECISION (which of two candidates), or an ARGUMENT (why the process is unfair). Read what they are constructing from the whole conversation — what they keep adding to, what they would be holding at the end — never from the topic or a single word. These are the shapes; they are examples of structural grammars, and thinking may hold several at once:
+
+${grammarGuide()}
+
+SEMANTIC TYPE AND STRUCTURAL ROLE ARE DIFFERENT, AND A NODE HAS BOTH.
+- "type" is what the thing IS: an action, a value, a concept, a constraint.
+- "role" is what it DOES in what they are building: a step, a branch, an option, a criterion — or a DETAIL of one of those (constraint, value, risk, question, goal, note).
+- "Sign up" is an action; in a process its role is step. "Easy access" is a value; in a process it is a detail that bears on the steps it constrains. "User chooses Core or Logos" contains two concepts; its role is branch.
+- THE SHAPE COMES FIRST. The nodes that make up the shape (its spine) are what the map is drawn from. Everything else hangs from the part it bears on: an "applies_to" edge FROM the detail TO each spine node it concerns. A constraint that affects three steps applies to three steps. Do not leave details floating as peers of the steps.
+- A DESCRIPTION OF THE SHAPE IS NOT A NODE. "The steps involved", "the user experience", "the information to be provided" are what the person is ABOUT to lay out — draw the steps, not a node called "steps involved".
+- ORDERED SHAPES (process, plan, timeline): put the spine in order with "precedes" edges from earlier to later. Where the path divides, the dividing node gets role "branch" and one "precedes" edge to each path, with the condition on the edge's "when" ("enters through Logos", "has no account"). A path can rejoin, and it can loop back.
+- A STATEMENT ABOUT THE ORDER CHANGES THE ORDER. "I don't want X before Y" or "Z should come first" is a constraint on the structure: move the steps so the order obeys it, and keep the statement as a constraint node applying to the step it moved. "People entering through B shouldn't have to go through A first" means a branch that skips A. "Group G only gets one of X" is a constraint that applies to the step or path G takes.
+- MIXED SHAPES ARE NORMAL. A plan whose actions carry open questions, a decision with a timeline inside it: pick the shape the person is primarily constructing for "kind", name the others in "also", and let the details hang from the spine.
+- THE SHAPE CAN CHANGE. If what they are building has genuinely changed, change "kind" — and keep every idea already on the map, re-roled for the new shape. Never discard thinking to make a shape fit.
+- Keep a node's id when its role changes.
 
 READ THE CONTEXT SECOND.
 People do not only make decisions. Work out what kind of thinking is actually happening and let that decide which node types earn their place. A map full of goals and tradeoffs is wrong for someone drafting a chapter, and a map of themes and characters is wrong for someone choosing a job.
@@ -1361,7 +1436,7 @@ Node types mean:
   result = the final answer
   error = a mistake, or where the reasoning diverged
 
-Relations mean: supports (A is a reason for B), conflicts (A pulls against B), depends (B requires A, including a prerequisite), relates (loose association), leads_to (A produces B), revises (A is a later version of B), precedes (A comes before B in time or sequence), part_of (A sits inside B — a section within a piece, a scene within an act), transforms_to (expression A becomes expression B via an operation — the solution chain), implies (A logically implies B — proofs), justifies (a theorem/definition/property justifies a step).
+Relations mean: applies_to (A is a detail that bears on B — a constraint on a step, a question about a branch), supports (A is a reason for B), conflicts (A pulls against B), depends (B requires A, including a prerequisite), relates (loose association), leads_to (A produces B), revises (A is a later version of B), precedes (A comes before B in time or sequence), part_of (A sits inside B — a section within a piece, a scene within an act), transforms_to (expression A becomes expression B via an operation — the solution chain), implies (A logically implies B — proofs), justifies (a theorem/definition/property justifies a step).
 - Labels are short phrases (2–8 words) in THEIR language, not yours. Never full sentences.
 - Prefer typing precisely: a stated priority is a value, not an idea; "I've decided X" is a decision; a cost of a choice is a consequence.
 - Maximum 16 nodes — 26 for mathematics, where a solution chain or a proof is legitimately longer. When it would grow past that, merge or drop the least load-bearing node instead. A small sharp map beats a big one.

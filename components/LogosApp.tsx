@@ -124,6 +124,7 @@ import {
 } from '@/lib/workspace/tiling';
 import { arrangementsFor, factsFrom, suggestLayout, suggestViews, type LayoutSuggestion } from '@/lib/workspace/surfaces';
 import { describeFocus, type Focus } from '@/lib/workspace/focus';
+import { briefOf } from '@/lib/representation';
 import { LENSES, type LensId } from '@/lib/logos-layout';
 
 /** Where a person's own Logos 3 arrangement is kept: this browser, never the session. */
@@ -2596,6 +2597,11 @@ export function LogosApp({
           ...(() => {
             const brief = workspaceOn ? describeFocus(focusRef.current, mapRef.current) : null;
             return brief ? { focus: brief } : {};
+          })(),
+          // What the map reads them as building, and its spine in order.
+          ...(() => {
+            const b = mapRef.current ? briefOf(mapRef.current) : null;
+            return b ? { building: b } : {};
           })(),
           // Two people in the room: their names, so Socria answers as the
           // layer between them. Names only — never who is signed in.

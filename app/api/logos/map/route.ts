@@ -43,6 +43,15 @@ import {
 } from '@/lib/model/wants';
 import { dropRemoved } from '@/lib/map-edit';
 import { settle, unanswered } from '@/lib/model/ask';
+import {
+  buildRestructurePrompt,
+  GRAMMARS,
+  keptEverything,
+  readBuilding,
+  satisfies,
+  statedBuilding,
+  type GrammarId,
+} from '@/lib/representation';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -152,6 +161,16 @@ export async function POST(req: NextRequest) {
   const wanted = wantedSimulation(said);
   const bare = !!wanted && bareRequest(said, wanted);
   /** A map that failed to extract still answers a named simulation. */
+  // ── WHAT THEY ARE BUILDING, IF THEY SAID ──────────────────────────
+  //
+  // "Actually, show this as a process" is an instruction about the SHAPE.
+  // It reaches the extractor as the reading the map already carries, so the
+  // pass restructures what is there rather than starting over, and it wins
+  // over whatever the extractor or the structure would have read.
+  const stated: GrammarId | null = statedBuilding(said);
+  const asked: ThinkingMap = stated
+    ? { ...current, building: readBuilding({ map: current, stated, prev: current.building }) ?? undefined }
+    : current;
   const salvage = (map: ThinkingMap): ThinkingMap => {
     if (!wanted || isThatSimulation(map.viz, wanted)) return map;
     console.info('logos map: extraction failed; %s', correctionNote(wanted));
@@ -181,7 +200,7 @@ export async function POST(req: NextRequest) {
           {
             role: 'system',
             content:
-              buildMapPrompt(current, grounded) +
+              buildMapPrompt(asked, grounded) +
               guidance +
               (withPicture ? '' : NO_PICTURE),
           },
@@ -221,7 +240,7 @@ export async function POST(req: NextRequest) {
     const raw = completion.choices?.[0]?.message?.content;
     if (!raw) {
       console.warn('logos map: empty completion');
-      return NextResponse.json({ map: salvage(current) });
+      return NextResponse.json({ map: salvage(asked) });
     }
 
     let parsed: any;
@@ -235,12 +254,54 @@ export async function POST(req: NextRequest) {
         completion.choices?.[0]?.finish_reason,
         raw.slice(0, 200)
       );
-      return NextResponse.json({ map: salvage(current) });
+      return NextResponse.json({ map: salvage(asked) });
     }
 
     // The extractor's output is a PROPOSAL: sanitizeMap's default trust mode
     // strips any `built` it wrote and keeps a `propose` block instead.
     let next = sanitizeMap(parsed);
+
+    // ── WHAT ARE THEY BUILDING? ───────────────────────────────────
+    //
+    // The extractor's reading of the conversation, the structure it actually
+    // returned, and the person's own word, weighed in lib/representation.ts.
+    // When the reading names a shape and the structure is not that shape — a
+    // "process" handed back as a cloud of constraints with no order in it,
+    // which is exactly the reported failure — the map is restructured once,
+    // for the shape alone, and only kept if nothing the person thought was
+    // lost on the way.
+    const proposedShape = next.building ?? null;
+    const shape = readBuilding({ map: next, proposed: proposedShape, stated, prev: asked.building ?? null });
+    if (shape) next.building = shape;
+    else delete next.building;
+    const claimed = shape && (shape.by === 'person' || proposedShape?.kind === shape.kind) ? shape.kind : null;
+    if (claimed && claimed !== 'model' && next.nodes.length >= 3 && !satisfies(next, claimed)) {
+      try {
+        const again = await openai.chat.completions.create({
+          model: configured,
+          temperature: 0,
+          max_tokens: CEILING,
+          response_format: { type: 'json_object' },
+          messages: [
+            { role: 'system', content: buildRestructurePrompt(next, claimed) },
+            { role: 'user', content: transcript },
+          ],
+        });
+        const text = again.choices?.[0]?.message?.content;
+        const got = text ? JSON.parse(text) : null;
+        const fixed = got && typeof got === 'object' ? sanitizeMap({ ...got, context: next.context, building: next.building }) : null;
+        if (fixed && satisfies(fixed, claimed) && keptEverything(next, fixed)) {
+          next = { ...next, nodes: fixed.nodes, edges: fixed.edges };
+          const settled = readBuilding({ map: next, proposed: proposedShape, stated, prev: asked.building ?? null });
+          if (settled) next.building = settled;
+          console.info('logos map: restructured as a %s — the first pass had no %s in it', claimed, GRAMMARS[claimed].label.toLowerCase());
+        } else {
+          console.info('logos map: the restructure as a %s was not kept (%s)', claimed, !fixed ? 'unreadable' : !satisfies(fixed, claimed) ? 'still not that shape' : 'it dropped thinking');
+        }
+      } catch (e) {
+        console.warn('logos map: restructure failed', e);
+      }
+    }
 
     // ── WHAT THEY PLAINLY ASKED FOR ───────────────────────────────
     //
@@ -281,7 +342,7 @@ export async function POST(req: NextRequest) {
 
     // Never let a malformed extraction blank a map the user has built up.
     if (next.nodes.length === 0 && current.nodes.length > 0) {
-      return NextResponse.json({ map: salvage(current) });
+      return NextResponse.json({ map: salvage(asked) });
     }
     // What the person took off the map stays off, whatever the extractor made
     // of the transcript that still mentions it. The client does this too; the

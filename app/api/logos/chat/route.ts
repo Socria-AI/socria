@@ -9,6 +9,7 @@
 // configured — the default — this route simply requires an account. Rate
 // limited either way.
 
+import { buildingBlock, sanitizeBrief } from '@/lib/representation';
 import { NextRequest, NextResponse } from 'next/server';
 import { streamFailureNotice } from '@/lib/upstream-error';
 import OpenAI from 'openai';
@@ -367,6 +368,10 @@ export async function POST(req: NextRequest) {
       // so "why is this negative?" is about the thing they are looking at.
       // Not on a focused node thread, which is already about one node.
       (focusLabel ? '' : focusBlock(sanitizeFocus(body?.focus))) +
+      // What they are building — a process, a decision, a timeline — and its
+      // spine as it stands, so the reply talks in steps and branches when
+      // they are designing a sequence, rather than in loose concepts.
+      (focusLabel ? '' : buildingBlock(sanitizeBrief(body?.building))) +
       // Logos 3: when two people are in the room, Socria becomes the layer
       // between them — it names both, surfaces the connections, the
       // disagreements, the assumptions and the open questions between what

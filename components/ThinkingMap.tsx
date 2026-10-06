@@ -20,7 +20,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import type { ThinkingMap as TMap, LogosRelation } from '@/lib/logos';
+import type { ThinkingMap as TMap, LogosRelation, LogosNode } from '@/lib/logos';
 import { MODE_META, NODE_MODES, type NodeMode } from '@/lib/logos-explore';
 import type { MapEdit } from '@/lib/map-edit';
 import { NodeGlyph } from './NodeGlyph';
@@ -58,6 +58,8 @@ import {
   layoutStructure,
   layoutTensions,
   layoutSolve,
+  layoutFlow,
+  layoutTimeline,
   cardH,
   GRAPH_W,
   type Connector,
@@ -66,6 +68,7 @@ import {
   type Placed,
   buildMatrix,
 } from '@/lib/logos-layout';
+import { attachmentsOf, GRAMMARS, spineOf } from '@/lib/representation';
 
 type P = { x: number; y: number; vx: number; vy: number };
 
@@ -208,6 +211,9 @@ export function ThinkingMap({
   mapRef.current = map;
 
   const [lens, setLens] = useState<LensId>(initialLens);
+  const lensRef = useRef<LensId>(initialLens);
+  lensRef.current = lens;
+  const lastW = useRef(0);
 
   // The model document this line of thinking is holding, if any. Read from the
   // MAP rather than passed in: the map is the session's canonical state, and a
@@ -252,8 +258,9 @@ export function ThinkingMap({
     zoomRef.current = zoom;
     sizeRef.current = { w: world.w, h: world.h };
     alphaRef.current = Math.max(alphaRef.current, 0.35);
-    setMenu(null);
   }, [zoom, world.w, world.h]);
+  // A new scale moves every card; a new size is the ResizeObserver's to judge.
+  useEffect(() => setMenu(null), [zoom]);
 
   const zoomBy = (dir: -1 | 1) => setZoom((z) => stepZoom(z, dir));
 
@@ -345,7 +352,7 @@ export function ThinkingMap({
   // does. Without this a map carrying a document and no scene opened on the
   // concept graph, and the first-model sequence asked for a value to be
   // moved on a surface that was a tab away.
-  const lead = leadLens(lenses, !!map.viz || !!map.models?.docs?.length);
+  const lead = leadLens(lenses, !!map.viz || !!map.models?.docs?.length, map.building);
   const open = useMemo(() => {
     if (lensLimit === null || lensLimit === undefined) return null;
     const ordered = [
@@ -407,6 +414,8 @@ export function ThinkingMap({
     if (lens === 'structure') return layoutStructure(map, w, h);
     if (lens === 'tensions') return layoutTensions(map, w, h);
     if (lens === 'solve') return layoutSolve(map, w, h);
+    if (lens === 'flow') return layoutFlow(map, w, h);
+    if (lens === 'timeline') return layoutTimeline(map, w, h);
     return layoutEvidence(map, w, h);
   }, [lens, map, size]);
 
@@ -574,10 +583,15 @@ export function ThinkingMap({
       // sizeRef is the simulation's world, which zoom can widen; `size` stays
       // the container, because the Board and the plot draw to fit it.
       sizeRef.current = { w: r.width / Math.min(zoomRef.current, 1), h: r.height / Math.min(zoomRef.current, 1) };
+      const wider = Math.abs(r.width - lastW.current) > 1;
+      lastW.current = r.width;
       setSize({ w: r.width, h: r.height });
       alphaRef.current = Math.max(alphaRef.current, 0.4);
-      // The menu is pinned to coordinates that no longer mean anything.
-      setMenu(null);
+      // The menu is pinned to coordinates that no longer mean anything — when
+      // the cards moved. A laid-out lens only moves them when the width does;
+      // a panel growing shorter under it (the conversation naming the card
+      // just selected, in Logos 3) leaves every card where it was.
+      if (wider || lensRef.current === 'graph') setMenu(null);
     };
     const ro = new ResizeObserver(apply);
     ro.observe(el);
@@ -611,6 +625,17 @@ export function ThinkingMap({
               ? 'Plot'
               : null;
 
+  // THE DETAILS OF EACH PART OF THE SHAPE — a constraint on a step, a question
+  // about a branch — read from canonical state, so the card's menu lists them
+  // in whichever lens it is opened from.
+  const details = useMemo(() => {
+    const kind = map.building?.kind;
+    const spine = spineOf(map, kind && GRAMMARS[kind].ordered ? kind : undefined);
+    return spine.size ? attachmentsOf(map, spine) : new Map<string, LogosNode[]>();
+  }, [map]);
+  // In a shape's own lens a card says what it DOES there; elsewhere, what it is.
+  const shapeLens = lens === 'flow' || lens === 'timeline';
+
   const cards: Placed[] =
     lens === 'graph'
       ? map.nodes.map((n) => ({
@@ -634,7 +659,7 @@ export function ThinkingMap({
       : (staticLayout?.connectors ?? []);
 
   return (
-    <div className={`lg-map-wrap${emerging ? ' is-emerging' : ''}`}>
+    <div className={`lg-map-wrap${emerging ? ' is-emerging' : ''}`} data-lens={lens}>
       {/* ── THE PLATE'S TOP BAR, from the design project's Copy 8 ────────
           The lenses used to float bare above the figure with nothing holding
           them, so the panel began with a row of pills and no statement of what
@@ -930,7 +955,7 @@ export function ThinkingMap({
                     }
                   : undefined
               }
-              className={`lg-node-pos${dim(on)}${menuFor === p.id ? ' is-menu' : ''}`}
+              className={`lg-node-pos${dim(on)}${menuFor === p.id ? ' is-menu' : ''}${p.loose ? ' is-loose' : ''}`}
               style={
                 {
                   // Its place in the sequence, for the emergence.
@@ -952,7 +977,8 @@ export function ThinkingMap({
                   menuFor === p.id ? ' is-open' : ''
                 }${relevant?.has(p.id) ? ' is-relevant' : ''}${
                   p.node.flag ? ` lg-flag-${p.node.flag}` : ''
-                }`}
+                }${p.branch ? ' is-branch' : ''}${shapeLens && !p.loose ? ' is-shaped' : ''}`}
+                title={shapeLens && p.node.role ? `${p.node.role} · ${p.node.type}` : undefined}
                 aria-haspopup="menu"
                 aria-expanded={menuFor === p.id}
                 onMouseEnter={() => setHovered(p.id)}
@@ -1006,7 +1032,7 @@ export function ThinkingMap({
               >
                 <span className="lg-node-head">
                   <NodeGlyph type={p.node.type} />
-                  <span className="lg-node-type">{p.node.type}</span>
+                  <span className="lg-node-type">{shapeLens && p.node.role ? p.node.role : p.node.type}</span>
                   {/* Logos 2: whose idea this was, a small dot in their seat
                       colour. Absent on a single-player map, where no node
                       carries an author. */}
@@ -1049,6 +1075,11 @@ export function ThinkingMap({
                     <MathText>{p.node.note}</MathText>
                   </span>
                 )}
+                {!!p.attached?.length && (
+                  <span className="lg-node-attached" title={p.attached.map((d) => `${d.role ?? d.type}: ${d.label}`).join('\n')}>
+                    {p.attached.length} {p.attached.length === 1 ? 'detail' : 'details'}
+                  </span>
+                )}
                 {!!p.node.merged?.length && (
                   <span
                     className="lg-node-merged"
@@ -1075,6 +1106,20 @@ export function ThinkingMap({
                 style={{ left: menu.x, top: menu.y }}
                 onClick={(ev) => ev.stopPropagation()}
               >
+                {/* WHAT HANGS FROM THIS PART OF THE SHAPE — the constraints,
+                    values and questions that apply to it, under it rather
+                    than beside it on the canvas. */}
+                {!!details.get(node.id)?.length && (
+                  <div className="lg-acts-details" role="group" aria-label={`On ${node.label}`}>
+                    {details.get(node.id)!.map((d) => (
+                      <p key={d.id} className="lg-acts-detail">
+                        <span className="lg-acts-detail-k">{d.role ?? d.type}</span>
+                        <span className="lg-acts-detail-v">{d.label}</span>
+                      </p>
+                    ))}
+                    <span className="lg-act-sep" role="separator" />
+                  </div>
+                )}
                 {NODE_MODES.map((m) => (
                   <button
                     key={m}

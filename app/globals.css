@@ -4547,6 +4547,44 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
 .logos-root .lg-node.lg-st-revised .lg-node-label { text-decoration: line-through; text-decoration-thickness: 1px; text-decoration-color: var(--lg-ink-24); }
 .logos-root .lg-node.lg-st-supported { border-color: rgba(38, 70, 83, 0.38); }
 
+/* ── a shape with a spine: flow and timeline (lib/representation.ts) ──
+   In a flow the order IS the claim, so a transition is a solid arrow; a
+   branch is the one card that admits the path divides; details ride on the
+   step they apply to, and what is not yet placed in the shape stays visible,
+   quieter, beneath it. */
+.logos-root .lg-map-wrap[data-lens="flow"] .lg-conn-precedes .lg-edge,
+.logos-root .lg-map-wrap[data-lens="flow"] .lg-conn-leads_to .lg-edge { stroke-dasharray: none; }
+.logos-root .lg-map-wrap[data-lens="flow"] .lg-conn-precedes,
+.logos-root .lg-map-wrap[data-lens="timeline"] .lg-conn-precedes { color: rgba(53, 70, 32, 0.55); }
+.logos-root .lg-map-wrap[data-lens="timeline"] .lg-conn-precedes .lg-edge { stroke-dasharray: none; stroke-width: 1.4; }
+.logos-root .lg-map-wrap[data-lens="timeline"] .lg-conn-part_of .lg-edge { stroke-dasharray: 2 3; }
+.logos-root .lg-map-wrap[data-lens="flow"] .lg-conn-label { font-size: 11px; fill: var(--lg-ink-60); paint-order: stroke; stroke: var(--lg-paper, #f6f3ec); stroke-width: 4px; }
+.logos-root .lg-node.is-shaped:not(.lg-node-decision) .lg-node-type { color: var(--lg-primary); }
+.logos-root .lg-node.lg-node-decision .lg-node-attached { background: rgba(255, 255, 255, 0.16); color: rgba(255, 255, 255, 0.82); }
+.logos-root .lg-node.is-branch { border-color: rgba(53, 70, 32, 0.55); box-shadow: inset 3px 0 0 rgba(53, 70, 32, 0.55); }
+.logos-root .lg-node-pos.is-loose { opacity: 0.62; }
+.logos-root .lg-node-pos.is-loose:hover { opacity: 1; }
+.logos-root .lg-node-attached {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(53, 70, 32, 0.07);
+  font-size: 10px;
+  letter-spacing: 0.03em;
+  color: var(--lg-ink-60);
+}
+/* A step with details opens a wider menu: what bears on it, then what to do. */
+.logos-root .lg-acts:has(.lg-acts-details) { width: 248px; }
+.logos-root .lg-acts-details { display: flex; flex-direction: column; gap: 6px; padding: 6px 7px 0; }
+.logos-root .lg-acts-detail { margin: 0; display: flex; flex-direction: column; gap: 1px; font-size: 12.5px; line-height: 1.35; color: var(--lg-ink); }
+.logos-root .lg-acts-detail-k {
+  font-size: 9px; font-weight: 600; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--lg-ink-40);
+}
+.logos-root .lg-conn-applies_to { color: rgba(53, 70, 32, 0.28); }
+.logos-root .lg-conn-applies_to .lg-edge { stroke-dasharray: 2 3; }
+
 .logos-root .lg-node-merged {
   display: block;
   margin-top: 5px;
