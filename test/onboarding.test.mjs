@@ -8,6 +8,11 @@ import {
   STEPS, byId, planFor, advance, shouldStart, finish, isRunning, indexOf,
   IDLE, DONE, ONBOARDING_KEY, DEFAULT_SHAPE,
 } from './.tmp/onboarding.mjs';
+import { FIRST_RUN_KEYS, forgetFirstRunLocal, readFirstRun } from './.tmp/first-run.mjs';
+import { readFileSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+const read = (p) => readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', p), 'utf8');
 
 let pass = 0, fail = 0;
 const ok = (n, c, x = '') => (c ? pass++ : (fail++, console.log('FAIL', n, x)));
@@ -94,6 +99,26 @@ console.log('=== bookkeeping ===');
   ok('the three beats are', ['became', 'changed', 'release'].every((at) => isRunning({ at })));
   ok('indexOf counts the beats', indexOf({ at: 'became' }) === 0 && indexOf({ at: 'changed' }) === 1 && indexOf({ at: 'release' }) === 2 && indexOf(IDLE) === -1);
   ok('the legacy key is still named, for the record that reads it', ONBOARDING_KEY === 'socria.firstmap.v1');
+}
+
+console.log('\n=== replaying onboarding, for testing ===');
+{
+  const mem = new Map(FIRST_RUN_KEYS.map((k) => [k, k === 'socria.firstrun.v1' ? JSON.stringify({ v: 1, at: { 'socria.intro': 1, 'logos.aha': 2 } }) : '1']));
+  mem.set('socria.model.v1', 'core-4');
+  const store = { getItem: (k) => mem.get(k) ?? null, removeItem: (k) => mem.delete(k), setItem: (k, v) => mem.set(k, v) };
+  forgetFirstRunLocal(store);
+  ok('every first-run key on the device is forgotten, legacy flags and hints included', FIRST_RUN_KEYS.every((k) => !mem.has(k)) && Object.keys(readFirstRun(store).at).length === 0);
+  ok('  and nothing else', mem.get('socria.model.v1') === 'core-4');
+  let threw = false;
+  try { forgetFirstRunLocal({ removeItem: () => { throw new Error('blocked'); } }); } catch { threw = true; }
+  ok('  a blocked store does not throw', !threw);
+  const route = read('app/api/profile/route.ts');
+  ok('the account copy can be reset — the one write that is not a union', /b\.firstRunReset === true/.test(route) && /row\.first_run = EMPTY_FIRST_RUN/.test(route));
+  const ob = read('components/onboarding/Onboarding.tsx');
+  ok('/onboarding?replay=1 resets, then loads clean — never on production', /params\?\.get\('replay'\) === '1' && !isProduction\(\)/.test(ob) && /window\.location\.replace/.test(ob));
+  ok('the Logos door opens the newest Logos on offer', /isOffered\('logos-3'\) \? '\/chat\?model=logos-3'/.test(ob));
+  const sheet = read('components/account/AccountSheet.tsx');
+  ok('Manage Account offers the replay off production only', /\{!isProduction\(\) && \(/.test(sheet) && /href="\/onboarding\?replay=1"/.test(sheet) && /href="\/onboarding\?replay=1&to=logos"/.test(sheet));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

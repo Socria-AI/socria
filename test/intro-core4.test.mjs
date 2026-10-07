@@ -117,7 +117,7 @@ console.log('\n=== the beginning is the premise and the thought, then the produc
   ok('  with no dials of its own', !/import \{ Dial \}/.test(onboarding) && !/rememberReadability/.test(onboarding));
   ok('  and no rehearsed reply', !/resolveScript/.test(onboarding));
   ok('it carries the sentence rather than asking for it twice', /carry\(/.test(onboarding));
-  ok('it lands them in the chat', /router\.push\(toLogos \? '\/chat\?model=logos-2' : '\/chat'\)/.test(onboarding));
+  ok('it lands them in the chat — or in the newest Logos on offer', /router\.push\(toLogos \? \(isOffered\('logos-3'\) \? '\/chat\?model=logos-3' : '\/chat\?model=logos-2'\) : '\/chat'\)/.test(onboarding));
   ok('  or in Logos when that is where they were going', /params\?\.get\('to'\) === 'logos'/.test(onboarding));
   ok('  and never on a withdrawn surface', !/router\.push\('\/chat\?model=logos'\)/.test(onboarding));
   ok('the premise is recorded once, skipped or not', /reach\('socria\.intro', \{ skipped: true \}\)/.test(onboarding));

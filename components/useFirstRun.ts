@@ -15,6 +15,7 @@ import {
   ANALYTICS_FOR,
   EMPTY_FIRST_RUN,
   aheadOf,
+  forgetFirstRunLocal,
   has,
   mergeFirstRun,
   parseFirstRun,
@@ -42,6 +43,26 @@ async function putRemote(s: FirstRun): Promise<void> {
   } catch {
     // The browser's copy is the record of truth until the next sync.
   }
+}
+
+/**
+ * START ONBOARDING AGAIN — for testing it (dev and preview only; the callers
+ * check). Clears this browser's record and, for an account, the copy on the
+ * profile, which a plain local clear would merge straight back. The caller
+ * then navigates with a full page load, so every hook starts from nothing.
+ */
+export async function replayFirstRun(): Promise<void> {
+  forgetFirstRunLocal(typeof window !== 'undefined' ? window.localStorage : null);
+  mergedForAccount = false;
+  try {
+    // Signed out, this is a 401 and there is nothing on an account to clear.
+    await fetch('/api/profile', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ firstRunReset: true }),
+    });
+  } catch {}
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event(FIRST_RUN_CHANGED));
 }
 
 export function useFirstRun(opts: { signedIn: boolean; surface: 'core' | 'logos' }) {

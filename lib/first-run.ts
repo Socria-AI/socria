@@ -76,6 +76,30 @@ export const FIRST_RUN_KEY = 'socria.firstrun.v1';
 
 export const EMPTY_FIRST_RUN: FirstRun = { v: 1, at: {} };
 
+/**
+ * Every browser key the first run is read from: the record, the older flags it
+ * reads as legacy milestones, the first-map share note, and the hints. Clearing
+ * all of them is what "start again as a new person" means on this device.
+ */
+export const FIRST_RUN_KEYS = [
+  FIRST_RUN_KEY,
+  'socria.tour.v1',
+  'socria.firstmap.v1',
+  'socria.firstMap.v1',
+  'socria.logos.guide.v1',
+  'socria.core4IntroDontShowAgain.v1',
+  'socria.hints.seen.v1',
+] as const;
+
+/** Forget, on this device, everything the first run has shown. */
+export function forgetFirstRunLocal(store: Pick<Storage, 'removeItem'> | null | undefined): void {
+  for (const k of FIRST_RUN_KEYS) {
+    try {
+      store?.removeItem(k);
+    } catch {}
+  }
+}
+
 const isMilestone = (v: unknown): v is Milestone =>
   typeof v === 'string' && (MILESTONES as readonly string[]).includes(v);
 
