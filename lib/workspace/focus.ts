@@ -24,15 +24,18 @@ import { docOf, modelFor } from '@/lib/model/docs';
 import { inputsOf } from '@/lib/model/derive';
 import { affectedBy } from '@/lib/model/deps';
 import { inspectObject, inspectionLines } from '@/lib/model/inspect';
+import { objOf, kindOf, currentOf } from '@/lib/objects';
 
 export type Focus =
   | { kind: 'param' | 'input' | 'object'; doc: string; id: string }
   | { kind: 'node'; id: string }
+  /** a part of an object of thought — a row of a matrix, a parameter of a function (lib/objects/) */
+  | { kind: 'part'; obj: string; part: string }
   | null;
 
 /** What the conversation is told about the focus. Small, plain, bounded. */
 export interface FocusBrief {
-  kind: 'param' | 'input' | 'object' | 'node';
+  kind: 'param' | 'input' | 'object' | 'node' | 'part';
   /** what it is called, as the person sees it */
   label: string;
   /** the model or map it belongs to */
@@ -47,6 +50,22 @@ const MAX_LINE = 220;
 /** The focus, described from the state it points at — or null when that thing no longer exists. */
 export function describeFocus(focus: Focus, map: ThinkingMap | null | undefined): FocusBrief | null {
   if (!focus || !map) return null;
+  if (focus.kind === 'part') {
+    const o = objOf(map.objects, focus.obj);
+    const k = o ? kindOf(o.kind) : null;
+    if (!o || !k) return null;
+    const st = currentOf(o);
+    const lines = k.partFacts(st, focus.part);
+    const part = k.parts(st).find((p) => p.id === focus.part);
+    if (!lines || !part) return null;
+    const last = o.steps[o.at - 1];
+    return clip({
+      kind: 'part',
+      label: `${part.label} of ${o.name}`,
+      of: `${k.label.toLowerCase()} ${o.name}`,
+      lines: [...lines, ...(last ? [`the last step on ${o.name}: ${last.said} (${last.by === 'person' ? 'their choice' : 'Socria’s'}; computed)`] : [])],
+    });
+  }
   if (focus.kind === 'node') {
     const n = map.nodes.find((x) => x.id === focus.id);
     if (!n) return null;
@@ -118,7 +137,7 @@ export function sanitizeFocus(raw: unknown): FocusBrief | null {
   if (!raw || typeof raw !== 'object') return null;
   const r = raw as Record<string, unknown>;
   const kind = r.kind;
-  if (kind !== 'param' && kind !== 'input' && kind !== 'object' && kind !== 'node') return null;
+  if (kind !== 'param' && kind !== 'input' && kind !== 'object' && kind !== 'node' && kind !== 'part') return null;
   const str = (v: unknown, n: number) => (typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().slice(0, n) : '');
   const label = str(r.label, 80);
   if (!label) return null;
@@ -134,7 +153,7 @@ export function sanitizeFocus(raw: unknown): FocusBrief | null {
  */
 export function focusBlock(b: FocusBrief | null): string {
   if (!b) return '';
-  const what = b.kind === 'node' ? 'an idea on their Thinking Map' : b.kind === 'object' ? `a part of the model "${b.of}"` : b.kind === 'param' ? `a parameter of the model "${b.of}"` : `a free input of the model "${b.of}"`;
+  const what = b.kind === 'part' ? `part of ${b.of}, an object they are working on` : b.kind === 'node' ? 'an idea on their Thinking Map' : b.kind === 'object' ? `a part of the model "${b.of}"` : b.kind === 'param' ? `a parameter of the model "${b.of}"` : `a free input of the model "${b.of}"`;
   return `
 
 WHAT THEY HAVE SELECTED IN THE WORKSPACE: "${b.label}" — ${what}. When they say "this", "it" or "here", they mean this, unless what they wrote says otherwise. What the workspace knows about it, from the model's own state:

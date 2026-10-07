@@ -31,7 +31,7 @@ import {
   type Building,
 } from './representation';
 
-export type LensId = 'graph' | 'structure' | 'tensions' | 'evidence' | 'solve' | 'plot' | 'board' | 'matrix' | 'flow' | 'timeline';
+export type LensId = 'work' | 'graph' | 'structure' | 'tensions' | 'evidence' | 'solve' | 'plot' | 'board' | 'matrix' | 'flow' | 'timeline';
 
 export interface Placed {
   id: string;
@@ -46,6 +46,12 @@ export interface Placed {
   branch?: boolean;
   /** on the map, but not yet placed in the shape */
   loose?: boolean;
+  /**
+   * An object of thought drawn as itself (lib/objects/): which object, which
+   * of its states, and whether this is the one the person works on (`live`)
+   * or a state in its trail.
+   */
+  objRef?: { id: string; at: number; live: boolean; undone?: boolean };
 }
 
 export interface Connector {
@@ -68,6 +74,8 @@ export interface Connector {
    */
   from?: string;
   to?: string;
+  /** how the line is drawn beyond its relation: a step Socria suggested, one stepped back from */
+  tone?: 'suggested' | 'undone';
 }
 
 export interface Layout {
@@ -80,6 +88,7 @@ export interface Layout {
 }
 
 export const LENSES: { id: LensId; label: string; caption: string }[] = [
+  { id: 'work', label: 'Work', caption: 'The thing itself, and what each step did to it.' },
   { id: 'flow', label: 'Flow', caption: 'What happens, in what order, and where it branches.' },
   { id: 'timeline', label: 'Timeline', caption: 'What happened, and in what order.' },
   { id: 'graph', label: 'Graph', caption: 'See how everything connects.' },
@@ -114,6 +123,15 @@ const CARD_H = 56;
 const LINE_H = 19;
 const GRAPH_W = 168;
 
+/** A card that carries an object of thought draws the object, not its label, and is taller. */
+export const OBJ_CARD_H = 114;
+function nodeH(node: { label: string; obj?: string; note?: string }, w = CARD_W): number {
+  if (node.obj) return OBJ_CARD_H;
+  // a note under the label is smaller type, but it is lines all the same
+  const note = node.note ? Math.ceil((node.note.length * 6.2) / (w - 26)) * 15 + 6 : 0;
+  return cardH(node.label, w) + note;
+}
+
 function cardH(label: string, w = CARD_W) {
   // ~7.1px per character at 13.5px Inter, wrapping inside the card's
   // padding. It used to say every card was one or two short lines, and the
@@ -145,6 +163,10 @@ function cardH(label: string, w = CARD_W) {
  */
 export function leadLens(lenses: LensId[], hasViz: boolean, building?: Building | null): LensId | null {
   if (!lenses.length) return null;
+  // THE THING ITSELF LEADS. When the person is working ON something — a
+  // matrix being reduced, a function being explored — the lens that shows it
+  // is the point of the map; statements about it are a step back from it.
+  if (lenses.includes('work')) return 'work';
   // A model they are building leads with the model; worked algebra leads with
   // its chain.
   if (building?.kind === 'model' && lenses.includes('plot')) return 'plot';
@@ -258,6 +280,10 @@ export function availableLenses(map: ThinkingMap): LensId[] {
     if (!map.viz && !map.models?.docs.length && plottableNodes(map).length) out.push('plot');
     if (map.nodes.length) out.push('board');
   }
+
+  // The objects of thought, drawn as themselves — offered whenever there is
+  // one, first, because it is what the work is ABOUT (lib/objects/).
+  if (map.objects?.objs.length) out.unshift('work');
 
   // Never nothing. Quantitative work that has produced no chain, no scene and
   // no board — a question just asked, an economics conversation still in
@@ -427,7 +453,7 @@ export function layoutStructure(map: ThinkingMap, w: number, h: number): Layout 
     for (let i = 0; i < level.length; i += perLine) rows.push(level.slice(i, i + perLine));
   }
   const topPad = 56;
-  const tallest = Math.max(CARD_H, ...nodes.map((n) => cardH(n.label)));
+  const tallest = Math.max(CARD_H, ...nodes.map((n) => nodeH(n)));
   const rowGap = Math.max(
     Math.max(74, tallest + 22),
     Math.min(112, (h - topPad - 56) / Math.max(rows.length - 1, 1))
@@ -447,7 +473,7 @@ export function layoutStructure(map: ThinkingMap, w: number, h: number): Layout 
         x: w / 2 - totalW / 2 + i * spacing,
         y,
         w: CARD_W,
-        h: cardH(node.label),
+        h: nodeH(node),
       };
       placed.push(p);
       pos.set(id, p);
@@ -503,8 +529,8 @@ export function layoutTensions(map: ThinkingMap, w: number, h: number): Layout {
     const b = byId.get(e.to);
     if (!a || !b) return;
     const y = topPad + i * rowGap;
-    const pa: Placed = { id: a.id, node: a, x: w / 2 - half, y, w: CARD_W, h: cardH(a.label) };
-    const pb: Placed = { id: b.id, node: b, x: w / 2 + half, y, w: CARD_W, h: cardH(b.label) };
+    const pa: Placed = { id: a.id, node: a, x: w / 2 - half, y, w: CARD_W, h: nodeH(a) };
+    const pb: Placed = { id: b.id, node: b, x: w / 2 + half, y, w: CARD_W, h: nodeH(b) };
     placed.push(pa, pb);
     connectors.push({
       key: `t~${e.from}~${e.to}`,
@@ -529,7 +555,7 @@ export function layoutTensions(map: ThinkingMap, w: number, h: number): Layout {
       x: w / 2,
       y: topPad + conflicts.length * rowGap + i * 86,
       w: CARD_W,
-      h: cardH(n.label),
+      h: nodeH(n),
     });
   });
 
@@ -569,7 +595,7 @@ export function layoutEvidence(map: ThinkingMap, w: number, h: number): Layout {
         x: w / 2 - total / 2 + i * spacing,
         y: h / 2,
         w: CARD_W,
-        h: cardH(n.label),
+        h: nodeH(n),
       });
     });
     return { placed, connectors, caption: capOf('evidence') };
@@ -583,7 +609,7 @@ export function layoutEvidence(map: ThinkingMap, w: number, h: number): Layout {
   const span = colWs.reduce((a, b) => a + b, 0);
   let cursor = w / 2 - span / 2;
   // the evidence row sits below the tallest claim, however long its words
-  const claimH = Math.max(...claims.map((c) => cardH(c.label)));
+  const claimH = Math.max(...claims.map((c) => nodeH(c)));
   const kidH = Math.max(CARD_H, ...claims.flatMap((c) => (supportOf.get(c.id) || []).map((k) => cardH(byId.get(k)?.label ?? ''))));
   const kidY = Math.max(200, 72 + claimH / 2 + 44 + kidH / 2);
   claims.forEach((claim, ci) => {
@@ -596,7 +622,7 @@ export function layoutEvidence(map: ThinkingMap, w: number, h: number): Layout {
       x: cx,
       y: 72,
       w: CARD_W,
-      h: cardH(claim.label),
+      h: nodeH(claim),
     };
     placed.push(top);
     const kids = supportOf.get(claim.id) || [];
@@ -611,7 +637,7 @@ export function layoutEvidence(map: ThinkingMap, w: number, h: number): Layout {
         x: cx - total / 2 + i * spacing,
         y: kidY,
         w: CARD_W,
-        h: cardH(n.label),
+        h: nodeH(n),
       };
       placed.push(p);
       const midY = (top.y + top.h / 2 + (p.y - p.h / 2)) / 2;
@@ -643,9 +669,13 @@ const SETUP_TYPES = new Set<LogosNode['type']>(['given', 'unknown', 'constraint'
 const ASIDE_TYPES = new Set<LogosNode['type']>(['theorem', 'definition']);
 
 function solveCardH(n: LogosNode, w: number) {
+  if (n.obj) return OBJ_CARD_H;
+  // a matrix written in TeX is as tall as its rows
+  const rows = n.tex && /\\begin\{|\\left\[/.test(n.tex) ? n.tex.split('\\\\').length : 0;
+  if (rows) return 40 + rows * 22 + (n.note ? 20 : 0);
   const len = (n.tex || n.label).length + (n.note ? n.note.length * 0.5 : 0);
-  if (len * 6.6 > (w - 26) * 2) return 76;
-  return len * 6.6 > w - 26 ? 58 : 42;
+  const lines = Math.min(4, Math.max(1, Math.ceil((len * 6.6) / (w - 26))));
+  return CARD_H + (lines - 1) * LINE_H;
 }
 
 export function layoutSolve(map: ThinkingMap, w: number, h: number): Layout {
@@ -965,7 +995,7 @@ export function layoutFlow(map: ThinkingMap, w: number, h: number): Layout {
   const cardOf = (id: string) => {
     const node = byId.get(id)!;
     const extra = attached.get(id)?.length ? ATTACH_H : 0;
-    return { node, h: cardH(node.label, FLOW_W) + extra };
+    return { node, h: nodeH(node, FLOW_W) + extra };
   };
 
   // The extent of each layer, to centre the paths of a branch on one another.
@@ -1021,10 +1051,10 @@ export function layoutFlow(map: ThinkingMap, w: number, h: number): Layout {
   // Loose: on the map, not in the shape, and hanging from nothing in it.
   const loose = map.nodes.filter((n) => !spine.has(n.id) && !held.has(n.id));
   const bottom = Math.max(...placed.map((p) => p.y + p.h / 2)) + 54;
-  const looseStep = Math.max(CARD_H + LINE_H, ...loose.map((n) => cardH(n.label))) + 16;
+  const looseStep = Math.max(CARD_H + LINE_H, ...loose.map((n) => nodeH(n))) + 16;
   loose.forEach((node, i) => {
     const per = Math.max(1, Math.floor((Math.max(w, FLOW_W * 2) - FLOW_PAD) / (CARD_W + 20)));
-    const ch = cardH(node.label);
+    const ch = nodeH(node);
     const p: Placed = {
       id: node.id,
       node,
@@ -1109,12 +1139,12 @@ export function layoutTimeline(map: ThinkingMap, w: number, h: number): Layout {
   // one tier is as tall as the tallest card on the line, so stacked cards never touch
   const tierH = Math.max(
     CARD_H + LINE_H,
-    ...layers.flat().map((id) => cardH(byId.get(id)!.label, FLOW_W) + (attached.get(id)?.length ? ATTACH_H : 0))
+    ...layers.flat().map((id) => nodeH(byId.get(id)!, FLOW_W) + (attached.get(id)?.length ? ATTACH_H : 0))
   );
   layers.forEach((layer, li) => {
     layer.forEach((id, k) => {
       const node = byId.get(id)!;
-      const ch = cardH(node.label, FLOW_W) + (attached.get(id)?.length ? ATTACH_H : 0);
+      const ch = nodeH(node, FLOW_W) + (attached.get(id)?.length ? ATTACH_H : 0);
       const above = (li + k) % 2 === 0;
       const tier = 40 + k * (tierH + 18);
       const p: Placed = {
@@ -1147,4 +1177,132 @@ export function layoutTimeline(map: ThinkingMap, w: number, h: number): Layout {
     })),
   ];
   return { placed, connectors, caption: cap };
+}
+
+// ── work: the objects of thought, as themselves ─────────────────────
+//
+// Each object the person is working on is drawn as itself — the matrix, the
+// curve — large enough to work in, with its trail beneath: every state it has
+// been in and the operation between each pair, so STATE → OPERATION → STATE
+// is something on the page rather than a sentence about one. The statements
+// ABOUT an object (a question about the pivot, an idea about the rank) sit
+// beside it, joined to it; everything else on the map follows below. Sizes
+// come from each kind's own declaration (lib/objects/), so a new kind lays out
+// here without this function learning its name.
+
+import { kindOf, currentOf, type ThoughtObject } from './objects';
+import { routeBetween } from './canvas';
+
+const TRAIL_GAP = 92;
+const TRAIL_MAX = 6;
+
+export function layoutWork(map: ThinkingMap, w: number, _h: number): Layout {
+  const objs = map.objects?.objs ?? [];
+  if (!objs.length) return emptyLayout('work', 'Nothing to work on yet — write a matrix or a function and it appears here as itself.');
+  const placed: Placed[] = [];
+  const connectors: Connector[] = [];
+  const box = (p: Placed) => ({ x: p.x - p.w / 2, y: p.y - p.h / 2, w: p.w, h: p.h });
+  const objNode = new Map<string, string>(); // map node id → the live figure it stands for
+  for (const n of map.nodes) if (n.obj && objs.some((o) => o.id === n.obj)) objNode.set(n.id, `obj:${n.obj}`);
+  const used = new Set<string>(objNode.keys());
+  const pseudo = (o: ThoughtObject, at: number): LogosNode => ({ id: `obj:${o.id}@${at}`, type: 'given', label: `${o.name}` });
+  let y = 36;
+
+  for (const o of objs) {
+    const k = kindOf(o.kind);
+    if (!k) continue;
+    const live = k.size(currentOf(o), 'live');
+    const liveP: Placed = {
+      id: `obj:${o.id}`,
+      node: { id: `obj:${o.id}`, type: 'given', label: o.name },
+      x: w / 2,
+      y: y + live.h / 2,
+      w: live.w,
+      h: live.h,
+      objRef: { id: o.id, at: o.at, live: true },
+    };
+    placed.push(liveP);
+
+    // what the map says ABOUT this object, beside it
+    const about = map.nodes.filter(
+      (n) => !used.has(n.id) && map.edges.some((e) => (e.from === n.id && objNode.get(e.to) === liveP.id) || (e.to === n.id && objNode.get(e.from) === liveP.id))
+    );
+    let ay = y;
+    const ax = w / 2 + live.w / 2 + 40 + CARD_W / 2;
+    for (const n of about.slice(0, 6)) {
+      const h = nodeH(n);
+      const p: Placed = { id: n.id, node: n, x: ax, y: ay + h / 2, w: CARD_W, h };
+      placed.push(p);
+      used.add(n.id);
+      const r = routeBetween(box(p), box(liveP));
+      connectors.push({ key: `about:${n.id}`, from: n.id, to: liveP.id, path: r.d, relation: 'relates' });
+      ay += h + 16;
+    }
+    y = Math.max(y + live.h, ay) + 44;
+
+    // the trail: every state, and the step between each pair
+    if (o.states.length > 1) {
+      const last = o.states.length - 1;
+      const first = Math.max(0, last - TRAIL_MAX + 1);
+      const sizes = o.states.slice(first).map((st) => k.size(st, 'trail'));
+      const total = sizes.reduce((a, sz) => a + sz.w, 0) + TRAIL_GAP * (sizes.length - 1);
+      const tall = Math.max(...sizes.map((sz) => sz.h));
+      let x = w / 2 - total / 2;
+      let prev: Placed | null = null;
+      sizes.forEach((sz, idx) => {
+        const at = first + idx;
+        const p: Placed = {
+          id: `obj:${o.id}@${at}`,
+          node: pseudo(o, at),
+          x: x + sz.w / 2,
+          y: y + tall / 2,
+          w: sz.w,
+          h: sz.h,
+          objRef: { id: o.id, at, live: false, ...(at > o.at ? { undone: true } : {}) },
+        };
+        placed.push(p);
+        if (prev) {
+          const step = o.steps[at - 1];
+          const ax0 = prev.x + prev.w / 2 + 6;
+          const ax1 = p.x - p.w / 2 - 6;
+          connectors.push({
+            key: `step:${o.id}:${at}`,
+            from: prev.id,
+            to: p.id,
+            path: `M ${ax0} ${p.y} L ${ax1} ${p.y}`,
+            relation: 'transforms_to',
+            arrow: true,
+            label: step?.said,
+            lx: (ax0 + ax1) / 2,
+            ly: p.y - 6,
+            ...(at > o.at ? { tone: 'undone' as const } : step?.suggested ? { tone: 'suggested' as const } : {}),
+          });
+        }
+        prev = p;
+        x += sz.w + TRAIL_GAP;
+      });
+      y += tall + 52;
+    }
+  }
+
+  // everything else on the map, below: the thinking around the work
+  const rest = map.nodes.filter((n) => !used.has(n.id));
+  const STEP = CARD_W + 18;
+  const perLine = Math.max(3, Math.floor((Math.max(w, 600) - 60) / STEP));
+  for (let i = 0; i < rest.length; i += perLine) {
+    const line = rest.slice(i, i + perLine);
+    const tall = Math.max(...line.map((n) => nodeH(n)));
+    const x0 = w / 2 - ((line.length - 1) * STEP) / 2;
+    line.forEach((n, j) => placed.push({ id: n.id, node: n, x: x0 + j * STEP, y: y + tall / 2, w: CARD_W, h: nodeH(n) }));
+    y += tall + 34;
+  }
+  const at = new Map(placed.map((p) => [p.id, p]));
+  for (const e of map.edges) {
+    const a = at.get(objNode.get(e.from) ?? e.from);
+    const b = at.get(objNode.get(e.to) ?? e.to);
+    if (!a || !b || a === b || connectors.some((c) => c.from === a.id && c.to === b.id)) continue;
+    const r = routeBetween(box(a), box(b));
+    connectors.push({ key: `${e.from}~${e.to}~${e.relation}`, from: a.id, to: b.id, path: r.d, relation: e.relation, strength: e.strength });
+  }
+  return { placed, connectors, caption: capOf('work') };
 }

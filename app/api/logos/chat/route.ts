@@ -57,6 +57,7 @@ import {
 import { mayUse } from '@/lib/route-guard';
 import { collabBlock, type Seat } from '@/lib/collab';
 import { focusBlock, sanitizeFocus } from '@/lib/workspace/focus';
+import { objectsBlock, sanitizeSpace } from '@/lib/objects';
 import { wantedSimulation, bareRequest, hasSurface, simulationBlock } from '@/lib/model/wants';
 
 export const runtime = 'nodejs';
@@ -374,6 +375,32 @@ export async function POST(req: NextRequest) {
       // so "why is this negative?" is about the thing they are looking at.
       // Not on a focused node thread, which is already about one node.
       (focusLabel ? '' : focusBlock(sanitizeFocus(body?.focus))) +
+      // THE OBJECTS THEY ARE WORKING ON — the matrix, the function — as the
+      // workspace holds them. Re-sanitised, which RE-COMPUTES every step from
+      // the state before it (lib/objects/core.ts), so nothing a browser sends
+      // can make the reply believe a state was computed that was not. The
+      // reply is told what the person's step did; it never does the arithmetic.
+      (() => {
+        const space = sanitizeSpace(body?.objects);
+        if (!space) return '';
+        const guarded = resolveGuard(body?.guard) === 'guard';
+        const st = body?.objectStep;
+        const o = st && typeof st.obj === 'string' ? space.objs.find((x) => x.id === st.obj) : null;
+        const step = o && o.at === o.states.length - 1 ? o.steps[o.at - 1] : null;
+        const lastStep = step && step.said === st.said ? { obj: o!.id, step } : null;
+        const refused = typeof body?.objectRefused === 'string' ? body.objectRefused.replace(/\s+/g, ' ').slice(0, 200) : null;
+        const claims = (Array.isArray(body?.objectClaims) ? body.objectClaims : [])
+          .slice(0, 2)
+          .map((c: any) => {
+            const ob = space.objs.find((x) => x.id === c?.obj);
+            const cells = (Array.isArray(c?.cells) ? c.cells : []).slice(0, 6).filter((x: any) => Number.isInteger(x?.r) && Number.isInteger(x?.c) && typeof x?.was === 'string' && typeof x?.is === 'string' && x.was.length < 24 && x.is.length < 24);
+            return ob && cells.length
+              ? `They wrote out their own working for ${ob.name}; it differs from the computed state at ${cells.map((x: any) => `(${x.r}, ${x.c}) — theirs ${x.is}, computed ${x.was}`).join('; ')}. Point them at that entry and ask how they got it; do not simply correct it.`
+              : '';
+          })
+          .filter(Boolean);
+        return objectsBlock(space, { guarded, lastStep, refused }) + (claims.length ? claims.join('\n') + '\n' : '');
+      })() +
       // What they are building — a process, a decision, a timeline — and its
       // spine as it stands, so the reply talks in steps and branches when
       // they are designing a sequence, rather than in loose concepts.

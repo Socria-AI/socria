@@ -24,6 +24,7 @@ import {
   EMPTY_MAP,
   type ThinkingMap,
 } from '@/lib/logos';
+import { discover, bindNodes, objectsForExtractor, EMPTY_SPACE } from '@/lib/objects';
 import { renderMessageForModel, sanitizeAttachments } from '@/lib/logos-attachments';
 import { renderContextsForMap, sanitizeContexts } from '@/lib/logos-sources';
 import { guidanceBlock, resolveDepth, resolveGuard } from '@/lib/logos-guidance';
@@ -207,6 +208,9 @@ export async function POST(req: NextRequest) {
             content:
               buildMapPrompt(asked, grounded) +
               guidance +
+              // the objects the person is working on exist as themselves —
+              // nodes refer to them, never copy or "compute" their values
+              objectsForExtractor(current.objects) +
               (withPicture ? '' : NO_PICTURE),
           },
           { role: 'user', content: transcript },
@@ -363,6 +367,21 @@ export async function POST(req: NextRequest) {
     // of the transcript that still mentions it. The client does this too; the
     // server does it so a map read from here is already honest.
     next = dropRemoved(next, current.removed) as typeof next;
+    // ── THE OBJECTS OF THOUGHT ────────────────────────────────────
+    // Carried from the client's map, never taken from the extractor: an
+    // object's states are computed, and the extractor cannot compute. A
+    // matrix or function the person wrote that the workspace does not hold
+    // yet (a turn from a collaborator, a session from before objects) is
+    // found in their own words and added. Then every node that carries a
+    // matrix is held to the objects: bound to a computed state when it is
+    // one, and not shown as a result when nothing computed it.
+    {
+      const { objects: _ignored, ...rest } = next;
+      let objects = current.objects ?? EMPTY_SPACE;
+      const theirs = kept.filter((m: any) => m.role === 'user').map((m: any) => String(m.content));
+      for (const t of theirs) objects = discover(objects, t, 'person').space;
+      next = bindNodes({ ...rest, ...(objects.objs.length ? { objects } : {}) } as typeof next, theirs.join('\n')) as typeof next;
+    }
     // ── THE ON-RAMP ───────────────────────────────────────────────
     //
     // A proposal reaches the engine HERE, on the server, and only here. The
@@ -546,7 +565,7 @@ export async function POST(req: NextRequest) {
     if (plan === 'free') {
       const held = capMapForFree(withModels, current);
       return NextResponse.json({
-        map: { ...held.map, ...(models.docs.length ? { models } : {}) },
+        map: { ...held.map, ...(models.docs.length ? { models } : {}), ...(next.objects ? { objects: next.objects } : {}) },
         capped: held.capped,
         ...(build ? { build } : {}),
       });

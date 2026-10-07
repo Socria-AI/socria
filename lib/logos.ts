@@ -12,6 +12,7 @@
 import { ECON_KINDS, sanitizeViz, type VizScene, type VizTrust } from './logos-viz';
 import { sanitizeAsk, type TurnAsk } from './model/ask';
 import { sanitizeWorkspace, type ModelWorkspace } from './model/docs';
+import { sanitizeSpace, type ObjectSpace } from './objects';
 import { WHY_NOT_ANSWER } from './why-not-answer';
 import { WRONG_CHAT } from './wrong-chat';
 
@@ -225,6 +226,13 @@ export interface LogosNode {
    * an accepted suggestion never quietly becomes "their idea".
    */
   origin?: NodeOrigin;
+  /**
+   * THE OBJECT THIS NODE IS ABOUT — a matrix, a function — held in
+   * `objects` and drawn as itself rather than as text in a box. `objAt` is
+   * which of its states the node shows (absent: the current one).
+   */
+  obj?: string;
+  objAt?: number;
 }
 
 export const NODE_ORIGINS = ['socria', 'source', 'computed'] as const;
@@ -314,6 +322,15 @@ export interface ThinkingMap {
    * the rest of the thinking lives.
    */
   models?: ModelWorkspace;
+  /**
+   * THE OBJECTS OF THOUGHT — the things the person is reasoning ABOUT, held as
+   * themselves: a matrix being row-reduced, a function being explored. Each
+   * has an identity, a history of states, and for every step the operation,
+   * who chose it and that it was computed (lib/objects/). Kept in the map for
+   * the same reason models are: it is the session's canonical state, and an
+   * object stored anywhere else would drift from the thinking about it.
+   */
+  objects?: ObjectSpace;
 }
 
 export const EMPTY_MAP: ThinkingMap = { nodes: [], edges: [] };
@@ -461,6 +478,8 @@ export function sanitizeMap(raw: any, opts?: { trust?: VizTrust }): ThinkingMap 
         ...(by ? { by } : {}),
         ...(role ? { role } : {}),
         ...(origin ? { origin } : {}),
+        ...(typeof n?.obj === 'string' && /^[A-Za-z0-9_]{1,16}$/.test(n.obj) ? { obj: n.obj } : {}),
+        ...(typeof n?.obj === 'string' && Number.isInteger(n?.objAt) && n.objAt >= 0 && n.objAt < 64 ? { objAt: n.objAt } : {}),
       };
     })
     .filter((n: LogosNode | null): n is LogosNode => {
@@ -584,6 +603,7 @@ export function sanitizeMap(raw: any, opts?: { trust?: VizTrust }): ThinkingMap 
   // a document is only worth what it can still prove, and one that no longer
   // computes loses the claim rather than keeping a stamp saying it once did.
   const models = raw.models ? sanitizeWorkspace(raw.models) : null;
+  const objects = raw.objects ? sanitizeSpace(raw.objects) : undefined;
   // Null when unreadable rather than defaulted — see sanitizeAsk for why a
   // default here would reintroduce the exact bug this field exists to fix.
   const ask = sanitizeAsk(raw.ask);
@@ -607,6 +627,9 @@ export function sanitizeMap(raw: any, opts?: { trust?: VizTrust }): ThinkingMap 
     ...(propose && typeof propose === 'object' ? { propose } : {}),
     ...(viz ? { viz } : {}),
     ...(models && models.docs.length ? { models } : {}),
+    // Every state re-checked and every step re-computed (lib/objects/core.ts):
+    // a history that does not follow from its operations is cut where it stops.
+    ...(objects ? { objects } : {}),
   };
 }
 

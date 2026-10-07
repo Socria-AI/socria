@@ -15,7 +15,22 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useUser } from '@clerk/nextjs';
-import { ThinkingMap, VIEW_RESET, type MapNodeRef } from '@/components/ThinkingMap';
+import { ThinkingMap, VIEW_RESET, type MapNodeRef, type ObjectAction } from '@/components/ThinkingMap';
+import { sanitizeViz } from '@/lib/logos-viz';
+import {
+  apply as applyObjectOp,
+  bindNodes,
+  discover,
+  mergeSpaces,
+  objOf,
+  readOperation,
+  seek as seekObject,
+  spaceOf,
+  suggestionsIn,
+  type MatrixState,
+  type ObjectSpace,
+  type ThoughtObject,
+} from '@/lib/objects';
 import { ExplorePanel } from '@/components/ExplorePanel';
 import { emptyWorkspace, update as wsUpdate } from '@/lib/workspace/store';
 import { bridgeSurfaces, projectMap, projectMind } from '@/lib/workspace/adapters';
@@ -482,6 +497,13 @@ export function LogosApp({
   const draftRef = useRef<DraftHandle>(null);
 
   const bottomRef = useRef<HTMLDivElement>(null);
+  // The part of an object of thought the person has selected — a row, an
+  // entry, a parameter. Per person and ephemeral, like the workspace focus.
+  const [objSel, setObjSel] = useState<{ obj: string; part: string } | null>(null);
+  const objSelRef = useRef(objSel);
+  objSelRef.current = objSel;
+  /** the object whose plane picture is on the Plot lens, so the picture follows it */
+  const planeOfRef = useRef<string | null>(null);
   const sessionsRef = useRef<LogosSession[]>([]);
   sessionsRef.current = sessions;
   const activeIdRef = useRef<string | null>(null);
@@ -2062,8 +2084,17 @@ export function LogosApp({
               // both.
               const echoed = JSON.stringify(json.map.models ?? null) === sentModels;
               const models = echoed ? s.map?.models : json.map.models;
-              const map = { ...json.map, ...(viz ? { viz } : {}), ...(models ? { models } : {}) };
-              if (!models) delete (map as { models?: unknown }).models;
+              // THE LIVE OBJECTS WIN, too. An operation taken while the
+              // extraction was in flight is the person's; the server may only
+              // ADD an object, never roll one back (lib/objects/core.ts).
+              const objects = mergeSpaces(s.map?.objects, json.map.objects);
+              const unbound = { ...json.map, ...(viz ? { viz } : {}), ...(models ? { models } : {}), ...(objects ? { objects } : {}) };
+              if (!models) delete (unbound as { models?: unknown }).models;
+              if (!objects) delete (unbound as { objects?: unknown }).objects;
+              // A matrix the extractor wrote into a node is drawn as the
+              // object when it IS one of its computed states — and is not
+              // shown as a result when nothing computed it.
+              const map = bindNodes(unbound as TMap, s.messages.filter((m) => m.role === 'user').map((m) => m.content).join('\n'));
               // What the person took off stays off, whatever the extractor
               // made of a transcript that still mentions it (lib/map-edit.ts).
               const kept = dropRemoved(map, s.map?.removed);
@@ -2610,9 +2641,99 @@ export function LogosApp({
     return -1;
   })();
 
+  /** The objects of thought, written back into the active line of thinking. */
+  function commitObjects(space: ObjectSpace, touched?: ThoughtObject | null) {
+    // A 2 × 2 matrix whose plane picture is on screen: the picture is the
+    // same object seen another way, so it follows the object — computed from
+    // the new entries, never redrawn from a description.
+    let viz = mapRef.current.viz;
+    if (touched && touched.kind === 'matrix' && planeOfRef.current === touched.id && viz?.kind === 'matrix') {
+      const rows = (touched.states[touched.at] as MatrixState).rows;
+      const next = sanitizeViz({ ...viz, matrix: rows.map((r) => r.map((v) => { const [n, d] = v.split('/'); return Number(n) / Number(d ?? 1); })) });
+      if (next) viz = next;
+    }
+    mapRef.current = { ...mapRef.current, objects: space, ...(viz ? { viz } : {}) };
+    patchActive((s) => ({ ...s, map: { ...(s.map ?? EMPTY_MAP), objects: space, ...(viz ? { viz } : {}) } }));
+  }
+
+  /**
+   * THE OBJECTS IN A MESSAGE, BEFORE ANYTHING ELSE. A matrix or a function
+   * written in it becomes an object the person can work on. An operation
+   * written in it ("R2 ← R2 − 3R1") is computed on the object it is about,
+   * here and exactly — and the reply is then told what THEIR step did, never
+   * asked to work it out (lib/objects/).
+   */
+  function takeObjects(content: string, atts: Attachment[]) {
+    const space0 = spaceOf(mapRef.current);
+    const found = discover(space0, content, 'person');
+    let space = found.space;
+    for (const a of atts) {
+      const t = a.kind === 'note' ? a.text : a.reading;
+      if (t) space = discover(space, t, 'source').space;
+    }
+    let lastStep: { obj: string; said: string } | null = null;
+    let refused: string | null = null;
+    let touched: ThoughtObject | null = null;
+    // a message that brings an object in is not also an operation on it
+    if (space === space0) {
+      const read = readOperation(space, content, objSelRef.current?.obj);
+      if (read) {
+        const r = applyObjectOp(space, read.id, read.op, read.args, { by: 'person' });
+        if (r.ok) {
+          space = r.space;
+          touched = r.obj;
+          lastStep = { obj: read.id, said: r.step.said };
+        } else refused = r.why;
+      }
+    }
+    if (space !== space0) commitObjects(space, touched);
+    return { lastStep, refused, claims: found.claims };
+  }
+
+  /** Something done TO an object in the workspace: computed here, and only here. */
+  function onObject(a: ObjectAction): { ok: boolean; why?: string } | void {
+    const space = spaceOf(mapRef.current);
+    if (a.type === 'op') {
+      const r = applyObjectOp(space, a.obj, a.op, a.args, { by: 'person', suggested: a.suggested });
+      if (!r.ok) return { ok: false, why: r.why };
+      commitObjects(r.space, r.obj);
+      return { ok: true };
+    }
+    if (a.type === 'seek') {
+      const next = seekObject(space, a.obj, a.at);
+      commitObjects(next, objOf(next, a.obj));
+      return;
+    }
+    if (a.type === 'select') {
+      const v = a.part ? { obj: a.obj, part: a.part } : null;
+      setObjSel(v);
+      if (workspaceOn) setFocus(v ? { kind: 'part', ...v } : null);
+      return;
+    }
+    if (a.type === 'view' && a.view === 'plane') {
+      // ANOTHER VIEW OF THE SAME OBJECT, not a new artefact: the plane picture
+      // of a 2 × 2 matrix, built from its current entries and kept in step.
+      const o = objOf(space, a.obj);
+      if (!o || o.kind !== 'matrix') return;
+      const rows = (o.states[o.at] as MatrixState).rows;
+      const viz = sanitizeViz({
+        kind: 'matrix',
+        matrix: rows.map((r) => r.map((v) => { const [n, d] = v.split('/'); return Number(n) / Number(d ?? 1); })),
+        title: `${o.name} acting on the plane`,
+        says: { caption: `Matrix ${o.name}, as it stands now — computed from its entries.` },
+      });
+      if (!viz) return;
+      planeOfRef.current = o.id;
+      mapRef.current = { ...mapRef.current, viz };
+      patchActive((s) => ({ ...s, map: { ...(s.map ?? EMPTY_MAP), viz } }));
+    }
+  }
+
   async function send(text: string, atts: Attachment[] = []) {
     const content = text.trim();
     if ((!content && !atts.length) || busy || !activeIdRef.current) return;
+
+    const objTurn = takeObjects(content, atts);
 
     // A COMMAND TO THE MAP IS NOT A QUESTION FOR LOGOS. "Remove the node about
     // rent" used to go to the model, which answered in prose while the node
@@ -2620,7 +2741,7 @@ export function LogosApp({
     // what was done written into the conversation so the record is complete
     // and the extractor sees it too. A sentence that is not plainly a command
     // is not touched (lib/map-edit.ts decides, and errs toward sending).
-    if (!atts.length) {
+    if (!atts.length && !objTurn.lastStep) {
       const cmd = readMapCommand(content, mapRef.current);
       if (cmd) {
         setError(null);
@@ -2737,6 +2858,13 @@ export function LogosApp({
           // Read here, at the moment of sending, so the reply is answering the
           // picture as it actually stands rather than as it opened.
           ...(sentViz ? { vizState: sentViz } : {}),
+          // The objects they are working on, and what this turn did to them.
+          // Re-sanitised on the server, where every step is RE-COMPUTED from
+          // the state before it — so what the reply is told was computed was.
+          ...(mapRef.current?.objects ? { objects: mapRef.current.objects } : {}),
+          ...(objTurn.lastStep ? { objectStep: objTurn.lastStep } : {}),
+          ...(objTurn.refused ? { objectRefused: objTurn.refused } : {}),
+          ...(objTurn.claims.length ? { objectClaims: objTurn.claims } : {}),
           // Logos 3: what they have selected in the workspace, described from
           // canonical state — so "why is this negative?" is about β₂.
           ...(() => {
@@ -3826,6 +3954,17 @@ export function LogosApp({
             key={`tm-${lens ?? ''}`}
             // where the person put this line of thinking's cards, kept for it
             layoutKey={activeId}
+            // THE OBJECTS OF THOUGHT, worked on in place: every operation is
+            // computed here (lib/objects/) and comes back as the next state.
+            onObject={onObject}
+            objectSel={objSel}
+            // what Socria suggested in its last reply — offered, never applied,
+            // and not offered at all while the person is learning
+            objectSuggestions={
+              guarded || !map.objects?.objs.length
+                ? undefined
+                : suggestionsIn([...messages].reverse().find((m) => m.role === 'assistant' && !m.synthesis)?.content ?? '', spaceOf(map))
+            }
             picked={picked}
             onPick={(id) => setPicked((cur) => {
               const next = new Set(cur);
@@ -3980,7 +4119,7 @@ export function LogosApp({
   // model, a parameter or an input brings a small card describing it; it
   // goes when the selection does. "Keep open" makes it a panel.
   const inspectorOpen = !!wsLayout && panelsOf(wsLayout).some((x) => x.type === 'inspector');
-  const cardFocus = focus && focus.kind !== 'node' ? focus : null;
+  const cardFocus = focus && focus.kind !== 'node' && focus.kind !== 'part' ? focus : null;
   const cardDoc = cardFocus && map.models ? (docOf(map.models, cardFocus.doc) ?? wsActiveDoc) : null;
   const wsCard =
     workspaceOn && cardFocus && cardDoc && !inspectorOpen ? (

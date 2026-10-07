@@ -41,6 +41,7 @@
 //
 // PURE. No React, no network.
 
+import { objectHistoryLines } from './objects';
 import type { LogosEdge, LogosNode, ThinkingMap } from './logos';
 import {
   attachmentsOf,
@@ -180,6 +181,12 @@ export interface Digest {
   counts: string;
   /** the model the session holds, if any */
   model?: { title: string; params: string[]; equations: string[]; assumptions: string[] };
+  /**
+   * THE WORK DONE ON OBJECTS — from their transformation history, not from
+   * the chat: every operation, who chose it, what the computation showed, and
+   * where each object stands (lib/objects/).
+   */
+  work?: { did: string[]; open: string[] };
   change?: Change;
 }
 
@@ -287,6 +294,7 @@ export function changeBetween(before: Snapshot, after: ThinkingMap): Change | nu
  * thinking comes from here; the conversation is never consulted.
  */
 export function digest(map: ThinkingMap, opts: { scope?: ScopeKind; ids?: string[]; since?: Snapshot | null } = {}): Digest {
+  const work = objectHistoryLines(map.objects, false);
   const scope: ScopeKind = opts.scope === 'selection' && opts.ids?.length ? 'selection' : 'workspace';
   const m = scoped(map, scope === 'selection' ? opts.ids : undefined);
   const kind = map.building?.kind;
@@ -435,6 +443,7 @@ export function digest(map: ThinkingMap, opts: { scope?: ScopeKind; ids?: string
     findings: findings.slice(0, 8),
     counts,
     ...(model ? { model } : {}),
+    ...(work.did.length || work.open.length ? { work: { did: work.did.slice(-8), open: work.open.slice(0, 4) } } : {}),
     ...(change ? { change } : {}),
   };
 }
@@ -467,6 +476,7 @@ ${d.layers ? `THE SHAPE, IN ORDER: ${d.layers.map((l) => l.join(' | ')).join(' �
 OBJECTS (${d.counts}${shown.length < d.nodes.length ? `; the ${shown.length} most load-bearing shown` : ''}):
 ${shown.map(line).join('\n')}
 
+${d.work ? `WORK DONE ON THE OBJECTS THEMSELVES (computed by the workspace; who chose each step is recorded — say it as theirs when it was theirs):\n${d.work.did.map((x) => `  ${x}`).join('\n')}${d.work.open.length ? `\nWhere the objects stand: ${d.work.open.join('; ')}` : ''}\n` : ''}
 RELATIONSHIPS:
 ${d.edges.filter((e) => ids.has(e.from) && ids.has(e.to)).slice(0, 80).map((e) => `  ${e.from} --${e.relation}${e.when ? ` [when ${e.when}]` : ''}--> ${e.to}`).join('\n') || '  (none)'}
 
@@ -691,6 +701,12 @@ export function fromStructure(d: Digest, base: Pick<Synthesis, 'id' | 'at' | 'sc
 
   // A plain paragraph from the shape: what it is, what shapes it, what is open.
   const bits: string[] = [];
+  // The work done ON an object leads: it is what they did, in their order.
+  if (d.work?.did.length) {
+    const last = d.work.did[d.work.did.length - 1];
+    bits.push(`${d.work.did.length === 1 ? last : `${d.work.did.length} steps taken; the last: ${last.replace(/^You chose /, 'you chose ')}`}.`);
+    if (d.work.open.length) bits.push(`${d.work.open[0].replace(/^(\w+): /, '$1 — ')}.`);
+  }
   if (d.scope === 'selection') {
     const types = [...new Set(d.nodes.map((n) => n.role ?? n.type))];
     bits.push(
@@ -724,8 +740,14 @@ export function fromStructure(d: Digest, base: Pick<Synthesis, 'id' | 'at' | 'sc
   );
 
   const sections: Synthesis['sections'] = [];
+  if (d.work?.did.length) sections.push({ id: 'established', items: d.work.did.slice(-LIMIT.items).map((x) => ref([], x)) });
+  if (d.work?.open.length) sections.push({ id: 'unresolved', items: d.work.open.slice(0, LIMIT.items).map((x) => ref([], x)) });
   const est = d.established.slice(0, LIMIT.items).map((id) => ref([id], L(id)));
-  if (est.length) sections.push({ id: 'established', items: est });
+  if (est.length) {
+    const had = sections.find((x) => x.id === 'established');
+    if (had) had.items.push(...est);
+    else sections.push({ id: 'established', items: est });
+  }
   const cand = d.candidates
     .map((id) => byId.get(id)!)
     .sort((a, b) => b.support - a.support || b.degree - a.degree)
@@ -735,7 +757,11 @@ export function fromStructure(d: Digest, base: Pick<Synthesis, 'id' | 'at' | 'sc
   const ten = d.tensions.slice(0, LIMIT.items).map((t) => ref([t.a, ...(t.b ? [t.b] : [])], t.label));
   if (ten.length) sections.push({ id: 'tensions', items: ten });
   const un = d.open.slice(0, LIMIT.items).map((id) => ref([id], /\?$/.test(L(id)) ? L(id) : `${L(id)}?`));
-  if (un.length) sections.push({ id: 'unresolved', items: un });
+  if (un.length) {
+    const had = sections.find((x) => x.id === 'unresolved');
+    if (had) had.items.push(...un);
+    else sections.push({ id: 'unresolved', items: un });
+  }
   if (!sections.length && d.nodes.length) {
     sections.push({ id: 'emerging', items: d.nodes.slice(0, LIMIT.items).map((n) => ref([n.id], n.label)) });
   }

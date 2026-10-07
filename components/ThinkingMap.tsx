@@ -56,6 +56,7 @@ import {
   layoutSolve,
   layoutFlow,
   layoutTimeline,
+  layoutWork,
   cardH,
   GRAPH_W,
   type Connector,
@@ -65,6 +66,15 @@ import {
   buildMatrix,
 } from '@/lib/logos-layout';
 import { attachmentsOf, GRAMMARS, spineOf } from '@/lib/representation';
+import { ObjectFigure } from '@/components/objects/ObjectFigure';
+import { kindOf, objOf, currentOf, type ThoughtObject } from '@/lib/objects';
+
+/** What a person did to an object of thought, on its way up to be computed. */
+export type ObjectAction =
+  | { type: 'op'; obj: string; op: string; args: Record<string, string | number>; suggested?: boolean }
+  | { type: 'seek'; obj: string; at: number }
+  | { type: 'select'; obj: string; part: string | null }
+  | { type: 'view'; obj: string; view: string };
 import {
   IDENTITY,
   NO_INSETS,
@@ -182,6 +192,9 @@ export function ThinkingMap({
   vizOps,
   layoutKey,
   embedded,
+  onObject,
+  objectSel,
+  objectSuggestions,
 }: {
   map: TMap;
   initialLens?: LensId;
@@ -274,6 +287,17 @@ export function ThinkingMap({
    * and a one-finger swipe stay the page's, and only a pinch zooms the map.
    */
   embedded?: boolean;
+  /**
+   * An object of thought was worked on — an operation chosen, a state
+   * stepped to, a part selected. The host computes it (lib/objects/) and the
+   * next state comes back down in `map.objects`; an operation's answer says
+   * whether it was computed and, if not, why.
+   */
+  onObject?: (a: ObjectAction) => { ok: boolean; why?: string } | void;
+  /** the part of an object the person has selected */
+  objectSel?: { obj: string; part: string } | null;
+  /** operations Socria suggested in its last reply, offered on the object */
+  objectSuggestions?: { id: string; op: string; args: Record<string, string | number>; said: string }[];
 }) {
   // ── THREE HANDS, THREE THINGS ────────────────────────────────────
   //   drag the canvas  → the camera (lib/canvas.ts), presentational
@@ -1033,6 +1057,7 @@ export function ThinkingMap({
     if (lens === 'solve') return layoutSolve(map, w, h);
     if (lens === 'flow') return layoutFlow(map, w, h);
     if (lens === 'timeline') return layoutTimeline(map, w, h);
+    if (lens === 'work') return layoutWork(map, w, h);
     return layoutEvidence(map, w, h);
   }, [lens, map, size]);
 
@@ -1779,6 +1804,55 @@ export function ThinkingMap({
             (p.node.type === 'result' ||
               p.node.type === 'verification' ||
               p.node.type === 'counterexample');
+          // AN OBJECT OF THOUGHT, AS ITSELF. Not a card with a matrix written
+          // in it: the matrix, which the person works in (live) or a state in
+          // its trail. Dragging it by its frame moves it like any card.
+          if (p.objRef) {
+            const o = objOf(map.objects, p.objRef.id);
+            if (!o) return null;
+            const live = p.objRef.live;
+            return (
+              <div
+                key={p.id}
+                ref={(el) => {
+                  if (el) nodeElRef.current.set(p.id, el);
+                  else nodeElRef.current.delete(p.id);
+                }}
+                data-id={p.id}
+                className={`lg-node-pos is-obj${live ? ' is-obj-live' : ' is-obj-trail'}${p.objRef.undone ? ' is-obj-undone' : ''}${dim(on)}${
+                  isPinned(canvasRef.current, lens, p.id) ? ' is-placed' : ''
+                }`}
+                style={{ '--i': cards.indexOf(p), transform: `translate(-50%, -50%) translate(${p.x}px, ${p.y}px)` } as React.CSSProperties}
+              >
+                <div className="lg-node lg-obj" style={{ width: p.w }}>
+                  <ObjectFigure
+                    obj={o}
+                    at={p.objRef.at}
+                    mode={live ? 'live' : 'trail'}
+                    guarded={guarded}
+                    sel={objectSel?.obj === o.id ? objectSel.part : null}
+                    onSelect={(part) => onObject?.({ type: 'select', obj: o.id, part })}
+                    onSeek={(at) => onObject?.({ type: 'seek', obj: o.id, at })}
+                    onView={(view) => {
+                      onObject?.({ type: 'view', obj: o.id, view });
+                      if (view === 'plane' && lenses.includes('plot')) {
+                        lensManual.current = true;
+                        setLens('plot');
+                      }
+                    }}
+                    {...(live
+                      ? {
+                          onOp: (op: string, args: Record<string, string | number>, suggested?: boolean) =>
+                            onObject?.({ type: 'op', obj: o.id, op, args, suggested }) ?? { ok: false, why: 'Nothing here can compute that.' },
+                          readOp: (text: string) => kindOf(o.kind)?.readOp(text, currentOf(o)) ?? null,
+                          suggestions: objectSuggestions?.filter((x) => x.id === o.id),
+                        }
+                      : {})}
+                  />
+                </div>
+              </div>
+            );
+          }
           return (
             <div
               key={p.id}
@@ -1922,7 +1996,9 @@ export function ThinkingMap({
                   )}
                 </span>
                 <span className="lg-node-label">
-                  {hideVal ? (
+                  {p.node.obj && objOf(map.objects, p.node.obj) ? (
+                    <ObjectFigure obj={objOf(map.objects, p.node.obj) as ThoughtObject} at={p.node.objAt ?? (objOf(map.objects, p.node.obj) as ThoughtObject).at} mode="card" guarded={guarded} />
+                  ) : hideVal ? (
                     <TeX tex={'=\\ ?'} />
                   ) : p.node.tex ? (
                     <TeX tex={p.node.tex} />
