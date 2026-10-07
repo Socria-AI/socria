@@ -37,8 +37,11 @@ import { MatrixLens } from './MatrixLens';
 import type { VizScene } from '@/lib/logos-viz';
 import { MathBoard } from './MathBoard';
 
+type TabsAt = 'top' | 'bottom' | 'left' | 'right';
+const TABS_KEY = 'socria.map.tabs.v1';
+
 /** The zoom ladder. Discrete steps, so every zoom lands somewhere legible. */
-const ZOOMS = [0.55, 0.7, 0.85, 1, 1.2, 1.45];
+const ZOOMS = [0.35, 0.45, 0.55, 0.7, 0.85, 1, 1.2, 1.45, 1.75, 2.1, 2.5];
 /** Wheel delta that makes one step — roughly one notch of a mouse wheel. */
 const WHEEL_STEP = 60;
 
@@ -216,9 +219,28 @@ export function ThinkingMap({
   mapRef.current = map;
 
   const [lens, setLens] = useState<LensId>(initialLens);
+  // WHERE THE LENS TABS SIT — any edge of the map, the person's choice, kept per browser.
+  const outerRef = useRef<HTMLDivElement>(null);
+  const [tabsAt, setTabsAt] = useState<TabsAt>('top');
+  const [tabsDrag, setTabsDrag] = useState<TabsAt | null>(null);
+  useEffect(() => {
+    try {
+      const v = localStorage.getItem(TABS_KEY);
+      if (v === 'top' || v === 'bottom' || v === 'left' || v === 'right') setTabsAt(v);
+    } catch {}
+  }, []);
+  const placeTabs = (at: TabsAt) => {
+    setTabsAt(at);
+    try {
+      localStorage.setItem(TABS_KEY, at);
+    } catch {}
+  };
   const lensRef = useRef<LensId>(initialLens);
   lensRef.current = lens;
   const lastW = useRef(0);
+  /** a drag across the empty canvas, and whether the last one moved */
+  const panRef = useRef<{ x: number; y: number; sl: number; st: number; moved: boolean } | null>(null);
+  const pannedRef = useRef(false);
 
   // The model document this line of thinking is holding, if any. Read from the
   // MAP rather than passed in: the map is the session's canonical state, and a
@@ -282,7 +304,14 @@ export function ThinkingMap({
     if (!el) return;
 
     const onWheel = (e: WheelEvent) => {
-      if (!e.ctrlKey && !e.metaKey) return;
+      // SCROLL INTO AND OUT OF THE MAP. A mouse wheel zooms, the way every map
+      // does; a trackpad's two-finger scroll still pans (it arrives as small,
+      // fractional deltas, often with a sideways part), and a pinch — which
+      // the browser reports with ctrlKey set — zooms. Shift+wheel always pans.
+      const pinch = e.ctrlKey || e.metaKey;
+      const mouseWheel =
+        !e.shiftKey && (e.deltaMode === 1 || (e.deltaX === 0 && Math.abs(e.deltaY) >= 40 && Number.isInteger(e.deltaY)));
+      if (!pinch && !mouseWheel) return;
       // The plot and the Board draw themselves to fit, so they have no zoom
       // control; changing it behind their backs would only grow the sizer and
       // hang a scrollbar off nothing.
@@ -664,7 +693,7 @@ export function ThinkingMap({
       : (staticLayout?.connectors ?? []);
 
   return (
-    <div className={`lg-map-wrap${emerging ? ' is-emerging' : ''}`} data-lens={lens}>
+    <div ref={outerRef} className={`lg-map-wrap${emerging ? ' is-emerging' : ''} tabs-${tabsAt}${tabsDrag ? ' is-moving-tabs' : ''}`} data-lens={lens}>
       {/* ── THE PLATE'S TOP BAR, from the design project's Copy 8 ────────
           The lenses used to float bare above the figure with nothing holding
           them, so the panel began with a row of pills and no statement of what
@@ -713,6 +742,45 @@ export function ThinkingMap({
       )}
       {lenses.length > 1 && (
         <div className="mp-tabs" role="tablist" aria-label="Map lens">
+          {/* The tabs go where the person wants them: drag the grip to any
+              edge of the map, or use the arrow keys on it. */}
+          <button
+            type="button"
+            className="mp-tabs-grip"
+            aria-label={`Move the lens tabs — now at the ${tabsAt}. Drag, or use the arrow keys.`}
+            title="Drag to move the tabs"
+            onPointerDown={(e) => {
+              e.currentTarget.setPointerCapture(e.pointerId);
+              setTabsDrag(tabsAt);
+            }}
+            onPointerMove={(e) => {
+              if (!tabsDrag) return;
+              const r = outerRef.current?.getBoundingClientRect();
+              if (!r) return;
+              const d: [TabsAt, number][] = [
+                ['left', (e.clientX - r.left) / r.width],
+                ['right', (r.right - e.clientX) / r.width],
+                ['top', (e.clientY - r.top) / r.height],
+                ['bottom', (r.bottom - e.clientY) / r.height],
+              ];
+              const z = d.sort((a, b) => a[1] - b[1])[0][0];
+              if (z !== tabsDrag) setTabsDrag(z);
+            }}
+            onPointerUp={() => {
+              if (tabsDrag) placeTabs(tabsDrag);
+              setTabsDrag(null);
+            }}
+            onPointerCancel={() => setTabsDrag(null)}
+            onKeyDown={(e) => {
+              const to: Partial<Record<string, TabsAt>> = { ArrowUp: 'top', ArrowDown: 'bottom', ArrowLeft: 'left', ArrowRight: 'right' };
+              if (to[e.key]) {
+                e.preventDefault();
+                placeTabs(to[e.key]!);
+              }
+            }}
+          >
+            <span aria-hidden="true" />
+          </button>
           {LENSES.filter((l) => lenses.includes(l.id)).map((l) => (
             <button
               key={l.id}
@@ -742,9 +810,48 @@ export function ThinkingMap({
       )}
 
       <div
-        className="lg-map"
+        className={`lg-map${lens === 'plot' || lens === 'board' || lens === 'matrix' ? '' : ' can-pan'}`}
         ref={wrapRef}
+        // DRAG THE CANVAS TO MOVE AROUND IT — anywhere that is not a card, a
+        // control or a menu. A drag is not a click: it does not clear the focus.
+        onPointerDown={(e) => {
+          if (e.button !== 0 || lens === 'plot' || lens === 'board' || lens === 'matrix') return;
+          const t = e.target as HTMLElement;
+          if (t.closest('.lg-node, button, a, input, textarea, select, .lg-acts, .lg-zoom, .mp-tabs, .mp-top')) return;
+          const el = wrapRef.current;
+          if (!el) return;
+          panRef.current = { x: e.clientX, y: e.clientY, sl: el.scrollLeft, st: el.scrollTop, moved: false };
+        }}
+        onPointerMove={(e) => {
+          const p = panRef.current;
+          const el = wrapRef.current;
+          if (!p || !el) return;
+          const dx = e.clientX - p.x;
+          const dy = e.clientY - p.y;
+          if (!p.moved) {
+            if (Math.hypot(dx, dy) < 4) return;
+            p.moved = true;
+            el.setPointerCapture?.(e.pointerId);
+            el.classList.add('is-panning');
+          }
+          el.scrollLeft = p.sl - dx;
+          el.scrollTop = p.st - dy;
+        }}
+        onPointerUp={() => {
+          const p = panRef.current;
+          panRef.current = null;
+          wrapRef.current?.classList.remove('is-panning');
+          if (p?.moved) pannedRef.current = true;
+        }}
+        onPointerCancel={() => {
+          panRef.current = null;
+          wrapRef.current?.classList.remove('is-panning');
+        }}
         onClick={() => {
+          if (pannedRef.current) {
+            pannedRef.current = false;
+            return;
+          }
           setFocused(null);
           setMenu(null);
         }}

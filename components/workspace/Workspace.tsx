@@ -41,6 +41,10 @@ import './workspace.css';
 
 type Zone = 'left' | 'right' | 'top' | 'bottom' | 'center';
 
+/** Where the conversation sits around the stage. The person's choice; kept per browser by the host. */
+export type DockSide = 'bottom' | 'top' | 'left' | 'right';
+export const DOCK_SIDES: readonly DockSide[] = ['bottom', 'top', 'left', 'right'];
+
 /** Surfaces that serve another one: opened beside it, they take the smaller share. */
 const BESIDE: ReadonlySet<SurfaceType> = new Set<SurfaceType>(['params', 'inspector', 'trace', 'chat']);
 
@@ -62,6 +66,9 @@ export interface WorkspaceProps {
   head?: ReactNode;
   /** beneath the stage — the composer, while the conversation is not a panel */
   dock?: ReactNode;
+  /** which side of the stage the dock sits on, and how the person moves it */
+  dockSide?: DockSide;
+  onDockSide?: (side: DockSide) => void;
   /** a contextual card (the inspector, for a selection), over the panel in focus */
   overlay?: ReactNode;
 }
@@ -136,6 +143,22 @@ export function Workspace(props: WorkspaceProps) {
   const [dragging, setDragging] = useState<string | null>(null);
   const [zone, setZone] = useState<{ id: string; zone: Zone } | null>(null);
   const [tab, setTab] = useState<string | null>(null);
+  // MOVING THE CONVERSATION: a drag from its grip shows the four edges of the
+  // stage, and it lands on whichever is nearest the pointer.
+  const [dockDrag, setDockDrag] = useState<DockSide | null>(null);
+  const mainRef = useRef<HTMLDivElement>(null);
+  const side: DockSide = props.dockSide ?? 'bottom';
+  const nearestEdge = (x: number, y: number): DockSide => {
+    const r = mainRef.current?.getBoundingClientRect();
+    if (!r) return side;
+    const d: [DockSide, number][] = [
+      ['left', (x - r.left) / r.width],
+      ['right', (r.right - x) / r.width],
+      ['top', (y - r.top) / r.height],
+      ['bottom', (r.bottom - y) / r.height],
+    ];
+    return d.sort((a, b) => a[1] - b[1])[0][0];
+  };
   const layoutRef = useRef(layout);
   layoutRef.current = layout;
 
@@ -371,9 +394,48 @@ export function Workspace(props: WorkspaceProps) {
   }
 
   const max = layout.maximized ? panels.find((p) => p.id === layout.maximized) : null;
+  const dock = props.dock ? (
+    <div className="ws-dockwrap">
+      {props.onDockSide && (
+        <button
+          type="button"
+          className="ws-dock-grip"
+          aria-label={`Move the conversation — now on the ${side}. Drag it, or use the arrow keys.`}
+          title="Drag to move the conversation"
+          onPointerDown={(e) => {
+            e.currentTarget.setPointerCapture(e.pointerId);
+            setDockDrag(side);
+          }}
+          onPointerMove={(e) => {
+            if (dockDrag) {
+              const z = nearestEdge(e.clientX, e.clientY);
+              if (z !== dockDrag) setDockDrag(z);
+            }
+          }}
+          onPointerUp={() => {
+            if (dockDrag && dockDrag !== side) props.onDockSide?.(dockDrag);
+            setDockDrag(null);
+          }}
+          onPointerCancel={() => setDockDrag(null)}
+          onKeyDown={(e) => {
+            const to: Partial<Record<string, DockSide>> = { ArrowUp: 'top', ArrowDown: 'bottom', ArrowLeft: 'left', ArrowRight: 'right' };
+            const next = to[e.key];
+            if (next) {
+              e.preventDefault();
+              props.onDockSide?.(next);
+            }
+          }}
+        >
+          <span aria-hidden="true" />
+        </button>
+      )}
+      {props.dock}
+    </div>
+  ) : null;
   return (
     <div className={`ws-root${dragging ? ' is-dragging' : ''}${several ? ' is-several' : ''}`}>
       {top}
+      <div ref={mainRef} className={`ws-main dock-${side}${dockDrag ? ' is-moving-dock' : ''}`}>
       <div className="ws-stage">
         {max ? (
           Panel(max, true)
@@ -392,7 +454,15 @@ export function Workspace(props: WorkspaceProps) {
           </div>
         )}
       </div>
-      {props.dock}
+      {dock}
+      {dockDrag && (
+        <div className="ws-dockzones" aria-hidden="true">
+          {DOCK_SIDES.map((z) => (
+            <span key={z} className={`is-${z}${dockDrag === z ? ' is-on' : ''}`} />
+          ))}
+        </div>
+      )}
+      </div>
     </div>
   );
 }

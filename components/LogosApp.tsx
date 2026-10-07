@@ -111,7 +111,7 @@ import {
   undo as undoDoc,
 } from '@/lib/model/docs';
 import type { Model } from '@/lib/model/schema';
-import { Workspace } from '@/components/workspace/Workspace';
+import { DOCK_SIDES, Workspace, type DockSide } from '@/components/workspace/Workspace';
 import { InspectorPanel, ModelPanel, ParamsPanel, TracePanel } from '@/components/workspace/panels';
 import {
   addPanel,
@@ -141,6 +141,8 @@ import { LENSES, type LensId } from '@/lib/logos-layout';
 
 /** Where a person's own Logos 3 arrangement is kept: this browser, never the session. */
 const WS_KEY = 'socria.logos3.workspace.v2';
+/** Where the conversation dock sits around the stage. */
+const DOCK_KEY = 'socria.logos3.dock.v1';
 import { DRIFT_DISMISS_LIMIT, readDrift, type DriftVerdict } from '@/lib/topic-drift';
 import {
   MATH_FADE_MS,
@@ -2945,6 +2947,21 @@ export function LogosApp({
   // The conversation, while it is not a panel: a composer and Socria's latest
   // reply beneath the stage, opened into its history only when asked.
   const [dockOpen, setDockOpen] = useState(false);
+  // WHERE THE CONVERSATION SITS — below, above, or beside the stage. The
+  // person moves it by its grip; kept per browser, like the layout.
+  const [dockSide, setDockSide] = useState<DockSide>('bottom');
+  useEffect(() => {
+    try {
+      const v = localStorage.getItem(DOCK_KEY);
+      if (v && (DOCK_SIDES as readonly string[]).includes(v)) setDockSide(v as DockSide);
+    } catch {}
+  }, []);
+  const moveDock = useCallback((side: DockSide) => {
+    setDockSide(side);
+    try {
+      localStorage.setItem(DOCK_KEY, side);
+    } catch {}
+  }, []);
   const lastSaid = useMemo(() => [...messages].reverse().find((x) => x.role === 'user')?.content ?? '', [messages]);
   const wsSuggestion = useMemo(
     () => (workspaceOn && wsLayout ? suggestLayout(wsFacts, wsLayout, lastSaid, wsDismissed) : null),
@@ -3861,17 +3878,19 @@ export function LogosApp({
   const lastReply = [...messages].reverse().find((x) => x.role === 'assistant')?.content ?? '';
   const lastIsSynth = !!messages[messages.length - 1]?.synthesis;
   const peek = streaming || (busy || lastIsSynth ? '' : lastReply);
+  // Beside the stage the history is always shown; below or above, on demand.
+  const dockShown = dockOpen || dockSide === 'left' || dockSide === 'right';
   const wsDock =
     workspaceOn && !chatPanelOpen ? (
-      <div className={`ws-dock lg-convo${dockOpen ? ' is-open' : ''}${messages.length ? '' : ' is-new'}`}>
+      <div className={`ws-dock lg-convo${dockShown ? ' is-open' : ''}${messages.length ? '' : ' is-new'}`}>
         {/* A synthesis opens above the composer — the moment it exists for. */}
-        {!dockOpen && synthBusy && <SynthesisPending scope={synthBusy} />}
-        {!dockOpen && !synthBusy && lastIsSynth && !busy && !streaming && (
+        {!dockShown && synthBusy && <SynthesisPending scope={synthBusy} />}
+        {!dockShown && !synthBusy && lastIsSynth && !busy && !streaming && (
           <LogosSynthesis {...synthProps(messages[messages.length - 1].synthesis!, true)} />
         )}
         {messages.length > 0 && (
           <div className="ws-dock-row">
-            {!dockOpen && (peek || busy) ? (
+            {!dockShown && (peek || busy) ? (
               <button type="button" className="ws-peek" onClick={() => setDockOpen(true)} aria-label="Socria’s latest reply — open the conversation">
                 <span className="ws-peek-who">Socria</span>
                 {peek ? (
@@ -3890,7 +3909,7 @@ export function LogosApp({
             <button
               type="button"
               className="ws-dock-toggle"
-              aria-expanded={dockOpen}
+              aria-expanded={dockShown}
               onClick={() => setDockOpen((v) => !v)}
               title={dockOpen ? 'Fold the conversation away' : 'The whole conversation'}
             >
@@ -4138,6 +4157,8 @@ export function LogosApp({
               onDismiss={(s) => setWsDismissed((d) => new Set(d).add(s.id))}
               head={convoHead}
               dock={wsDock}
+              dockSide={dockSide}
+              onDockSide={moveDock}
               overlay={wsCard}
             />
           </div>

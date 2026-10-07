@@ -4585,6 +4585,38 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
 .logos-root .lg-conn-applies_to { color: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.28); }
 .logos-root .lg-conn-applies_to .lg-edge { stroke-dasharray: 2 3; }
 
+/* the lens tabs, wherever the person puts them */
+.logos-root .lg-map-wrap { position: relative; }
+.logos-root .mp-tabs { align-items: center; }
+.logos-root .mp-tabs-grip { flex: 0 0 auto; width: 14px; height: 22px; padding: 0; margin-right: 4px; border: 0; background: none; cursor: grab; touch-action: none; }
+.logos-root .mp-tabs-grip span { display: block; width: 4px; height: 14px; margin: 4px auto; border-radius: 2px;
+  background-image: radial-gradient(circle, var(--lg-ink-24) 1.2px, transparent 1.3px); background-size: 4px 4px; }
+.logos-root .mp-tabs-grip:hover span, .logos-root .mp-tabs-grip:focus-visible span { background-image: radial-gradient(circle, var(--lg-primary) 1.2px, transparent 1.3px); }
+.logos-root .lg-map-wrap.tabs-bottom > .mp-tabs { order: 10; border-bottom: none; border-top: 1px solid var(--lg-line); }
+.logos-root .lg-map-wrap.tabs-bottom > .mp-bot { order: 11; }
+.logos-root .lg-map-wrap:is(.tabs-left, .tabs-right) > .mp-tabs {
+  position: absolute; z-index: 8; top: 50%; transform: translateY(-50%); flex-direction: column; flex-wrap: nowrap; align-items: stretch;
+  padding: 6px; border: 1px solid var(--lg-line); border-radius: 14px; background: var(--lg-panel);
+  box-shadow: 0 10px 30px -20px rgba(var(--shadow-rgb, 32, 32, 27), 0.45);
+}
+.logos-root .lg-map-wrap.tabs-left > .mp-tabs { left: 10px; }
+/* the canvas gives the strip its own room, so it never sits over a card */
+.logos-root .lg-map-wrap.tabs-left > .lg-map { padding-left: 104px; }
+.logos-root .lg-map-wrap.tabs-right > .lg-map { padding-right: 104px; }
+.logos-root .lg-map-wrap.tabs-right > .mp-tabs { right: 10px; }
+.logos-root .lg-map-wrap:is(.tabs-left, .tabs-right) .mp-tabs-grip { width: 100%; height: 14px; margin: 0 0 4px; }
+.logos-root .lg-map-wrap:is(.tabs-left, .tabs-right) .mp-tabs-grip span { width: 14px; height: 4px; }
+.logos-root .lg-map-wrap.is-moving-tabs, .logos-root .lg-map-wrap.is-moving-tabs * { cursor: grabbing !important; user-select: none; }
+.logos-root .lg-map-wrap.is-moving-tabs::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 20;
+  border: 1px dashed rgba(var(--lg-primary-rgb, 53, 70, 32), 0.35); border-radius: 6px;
+}
+
+/* the canvas can be dragged to move around it */
+.logos-root .lg-map.can-pan { cursor: grab; }
+.logos-root .lg-map.is-panning { cursor: grabbing; user-select: none; }
+.logos-root .lg-map.can-pan .lg-node { cursor: pointer; }
+
 .logos-root .lg-node-merged {
   display: block;
   margin-top: 5px;

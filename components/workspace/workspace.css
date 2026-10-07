@@ -302,3 +302,41 @@
 /* With a Parameters panel open, the model's own sliders would be the same
    controls twice; the panel holds them. */
 .logos-root .ws-root:has(.ws-t-params) .ws-t-model .sfx-ctls { display: none; }
+
+/* ── the conversation, wherever the person puts it ─────────────────── */
+.logos-root .ws-main { flex: 1; min-height: 0; min-width: 0; display: flex; position: relative; }
+.logos-root .ws-main.dock-bottom { flex-direction: column; }
+.logos-root .ws-main.dock-top { flex-direction: column-reverse; }
+.logos-root .ws-main.dock-right { flex-direction: row; }
+.logos-root .ws-main.dock-left { flex-direction: row-reverse; }
+.logos-root .ws-main > .ws-stage { flex: 1; min-height: 0; min-width: 0; }
+.logos-root .ws-dockwrap { position: relative; display: flex; flex-direction: column; min-height: 0; flex: 0 0 auto; }
+.logos-root .ws-main.dock-top > .ws-dockwrap { border-bottom: 1px solid var(--lg-line); padding-bottom: 4px; }
+.logos-root .ws-main:is(.dock-left, .dock-right) > .ws-dockwrap { width: clamp(300px, 30%, 420px); }
+.logos-root .ws-main.dock-right > .ws-dockwrap { border-left: 1px solid var(--lg-line); }
+.logos-root .ws-main.dock-left > .ws-dockwrap { border-right: 1px solid var(--lg-line); }
+/* beside the stage it is a column: the history fills it, the composer sits at its foot */
+.logos-root .ws-main:is(.dock-left, .dock-right) .ws-dock { width: 100%; height: 100%; margin: 0; padding: 18px 16px 0; }
+.logos-root .ws-main:is(.dock-left, .dock-right) .ws-dock .lg-thread { display: block; flex: 1 1 auto; max-height: none; overflow-y: auto; padding: 0 2px 8px; border-top: none; }
+.logos-root .ws-main:is(.dock-left, .dock-right) .ws-dock .syn { max-height: none; }
+.logos-root .ws-main:is(.dock-left, .dock-right) .ws-dock-toggle { display: none; }
+
+/* the grip: a short bar on the edge that faces the stage */
+.logos-root .ws-dock-grip {
+  position: absolute; z-index: 6; left: 50%; top: -9px; transform: translateX(-50%);
+  width: 46px; height: 16px; padding: 0; border: 0; background: none; cursor: grab; touch-action: none;
+}
+.logos-root .ws-dock-grip span { display: block; width: 34px; height: 4px; margin: 6px auto; border-radius: 99px; background: var(--lg-ink-24); transition: background 0.15s, width 0.15s; }
+.logos-root .ws-dock-grip:hover span, .logos-root .ws-dock-grip:focus-visible span { background: var(--lg-primary); width: 42px; }
+.logos-root .ws-main.dock-top .ws-dock-grip { top: auto; bottom: -9px; }
+.logos-root .ws-main:is(.dock-left, .dock-right) .ws-dock-grip { top: 2px; }
+.logos-root .ws-main.is-moving-dock, .logos-root .ws-main.is-moving-dock * { cursor: grabbing !important; user-select: none; }
+
+/* where it can land, while it is being moved */
+.logos-root .ws-dockzones { position: absolute; inset: 0; z-index: 30; pointer-events: none; }
+.logos-root .ws-dockzones span { position: absolute; background: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.06); border: 1px dashed rgba(var(--lg-primary-rgb, 53, 70, 32), 0.3); transition: background 0.12s; }
+.logos-root .ws-dockzones span.is-on { background: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.16); border-style: solid; }
+.logos-root .ws-dockzones .is-bottom { left: 10%; right: 10%; bottom: 6px; height: 22%; border-radius: 12px; }
+.logos-root .ws-dockzones .is-top { left: 10%; right: 10%; top: 6px; height: 22%; border-radius: 12px; }
+.logos-root .ws-dockzones .is-left { top: 10%; bottom: 10%; left: 6px; width: 22%; border-radius: 12px; }
+.logos-root .ws-dockzones .is-right { top: 10%; bottom: 10%; right: 6px; width: 22%; border-radius: 12px; }
