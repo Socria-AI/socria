@@ -8539,84 +8539,6 @@ a.one-mark.is-strip:hover { background: rgba(38, 72, 90, 0.075); }
 .jrn-foot-no { color: rgba(var(--ink-rgb, 31, 31, 31), 0.55); }
 .jrn-foot-note { margin-left: auto; font-style: italic; }
 
-/* ── the first map ──────────────────────────────────────────────────
- *
- * A sheet at the bottom of the map pane, at every width. The invitation it
- * replaces was desktop-only, which is the one mistake worth not repeating.
- */
-/* In flow, under the panel head, the width of the panel's text column: a
-   note beside the figure rather than a card over it. */
-.logos-root .lg-fm {
-  display: flex;
-  justify-content: flex-start;
-  padding: 0 32px 12px;
-  animation: lgFade 0.4s ease both;
-}
-.logos-root .lg-fm-card {
-  width: 100%;
-  max-width: 560px;
-  background: var(--lg-paper, #fff);
-  border: 1px solid var(--lg-line);
-  border-left: 2px solid var(--lg-primary);
-  border-radius: 10px;
-  padding: 12px 15px 12px;
-}
-.logos-root .lg-fm-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 9px;
-}
-.logos-root .lg-fm-dots { display: inline-flex; gap: 5px; }
-.logos-root .lg-fm-dots i {
-  width: 14px;
-  height: 3px;
-  border-radius: 2px;
-  background: var(--lg-line);
-  transition: background 220ms ease;
-}
-.logos-root .lg-fm-dots i.is-on { background: var(--lg-primary); }
-.logos-root .lg-fm-skip {
-  font-size: 12px;
-  color: var(--lg-ink-60);
-  background: none;
-  border: 0;
-  cursor: pointer;
-  padding: 2px 4px;
-}
-.logos-root .lg-fm-skip:hover { color: var(--lg-ink); }
-.logos-root .lg-fm-title {
-  font-family: var(--serif);
-  font-size: 17px;
-  font-weight: 400;
-  letter-spacing: -0.005em;
-  line-height: 1.25;
-  color: var(--lg-ink);
-  margin: 0 0 5px;
-}
-.logos-root .lg-fm-body {
-  font-size: 12.5px;
-  line-height: 1.5;
-  color: var(--lg-ink-60);
-  margin: 0;
-}
-.logos-root .lg-fm-foot { margin-top: 10px; min-height: 26px; display: flex; align-items: center; }
-.logos-root .lg-fm-cue {
-  font-size: 12px;
-  color: var(--lg-primary);
-  font-weight: 500;
-}
-.logos-root .lg-fm-go {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--lg-paper);
-  background: var(--lg-primary);
-  border: 0;
-  border-radius: 8px;
-  padding: 6px 14px;
-  cursor: pointer;
-}
-
 /* ── THE FIRST MAP, ARRIVING ────────────────────────────────────────
    Language becoming structure: each card rises in turn, each line draws
    from the card it leaves to the one it reaches. On for a few seconds the
@@ -8646,18 +8568,6 @@ a.one-mark.is-strip:hover { background: rgba(38, 72, 90, 0.075); }
 }
 @keyframes lgDraw { to { stroke-dashoffset: 0; } }
 
-/* The value being talked about, while the sequence asks for it to be moved:
-   the first control on the frame. The same slow breath the card gets. */
-.logos-root.is-firstmap-control .sfx-ctl:first-child input[type='range'] {
-  animation: lg-fm-pulse 2.1s ease-in-out infinite;
-  border-radius: 6px;
-}
-html.anim-off .logos-root.is-firstmap-control .sfx-ctl:first-child input[type='range'] { animation: none; }
-@media (prefers-reduced-motion: reduce) {
-  .logos-root.is-firstmap-control .sfx-ctl:first-child input[type='range'],
-  .logos-root.is-firstmap-node .lg-node { animation: none; }
-}
-
 /* ── SOMETHING FOUND ALONG THE WAY ──────────────────────────────────
    A capability, said once, at the moment its value is legible — "three
    parts of your model depend on this" when something with three dependents
@@ -8684,16 +8594,6 @@ html.anim-off .logos-root.is-firstmap-control .sfx-ctl:first-child input[type='r
   font: inherit; font-style: normal; font-size: 15px; line-height: 1; color: var(--lg-ink-40); cursor: pointer;
 }
 .logos-root .lg-found-x:hover { color: var(--lg-ink); }
-
-/* The card being talked about, while the sequence is on it. */
-.logos-root.is-firstmap-node .lg-node {
-  animation: lg-fm-pulse 2.1s ease-in-out infinite;
-}
-@keyframes lg-fm-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(var(--lg-primary-rgb, 53, 70, 32), 0); }
-  50% { box-shadow: 0 0 0 4px rgba(var(--lg-primary-rgb, 53, 70, 32), 0.16); }
-}
-html.anim-off .logos-root.is-firstmap-node .lg-node, html:not(.js) .logos-root.is-firstmap-node .lg-node{ animation: none; }
 
 /* ── CORE'S ONE LINE ─────────────────────────────────────────────────
    Said once, under the first reply, while the difference it names is on

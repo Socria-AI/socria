@@ -16,7 +16,6 @@ import { FIRST_RUN_KEY, readFirstRun, type Milestone } from '@/lib/first-run';
 import { replayPart } from '@/components/useFirstRun';
 import { HINTS_CHANGED } from '@/components/Hint';
 import { CANVAS_PREFIX } from '@/lib/canvas-store';
-import { isOffered } from '@/lib/socria-model-store';
 
 /** What this browser remembers about how Logos 3 was arranged. */
 const LAYOUT_KEYS = ['socria.logos3.workspace.v2', 'socria.logos3.dock.v1', 'socria.map.tabs.v1'];
@@ -59,7 +58,6 @@ export function TestingTools({ onClose }: { onClose: () => void }) {
   const where = [currentEnv() === 'development' ? 'local build' : currentEnv(), ref ? `branch ${ref}` : null, sha ? sha.slice(0, 7) : null]
     .filter(Boolean)
     .join(' · ');
-  const logos = isOffered('logos-3') ? 'logos-3' : 'logos-2';
 
   const run = async (id: string, act: () => Promise<void> | void, then?: () => void) => {
     setBusy(id);
@@ -87,23 +85,13 @@ export function TestingTools({ onClose }: { onClose: () => void }) {
       <div className="acts">
         <a className="act" href="/onboarding?replay=1">
           <span className="t">Replay onboarding</span>
-          <span className="d">As a new person — the premise, then the chat</span>
-        </a>
-        <a className="act" href="/onboarding?replay=1&to=logos">
-          <span className="t">Replay onboarding into Logos</span>
-          <span className="d">The premise, then Logos and its first map</span>
+          <span className="d">As a new person — name, what you think about, how you like to think, then the first thought</span>
         </a>
         <Item
           id="core"
           t="Replay Core’s first line"
           d="Shows again under the next reply in the chat"
           onClick={() => void run('core', () => replayPart('core'), () => window.location.assign('/chat'))}
-        />
-        <Item
-          id="logos"
-          t="Replay the Logos first map"
-          d="The three beats, on the next map of four cards or a model"
-          onClick={() => void run('logos', () => replayPart('logos'), () => window.location.assign(`/chat?model=${logos}`))}
         />
         <Item
           id="found"

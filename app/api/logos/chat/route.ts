@@ -59,6 +59,7 @@ import { collabBlock, type Seat } from '@/lib/collab';
 import { focusBlock, sanitizeFocus } from '@/lib/workspace/focus';
 import { objectsBlock, sanitizeSpace } from '@/lib/objects';
 import { roleBlock } from '@/lib/onboarding-roles';
+import { nameBlock } from '@/lib/onboarding-name';
 import { wantedSimulation, bareRequest, hasSurface, simulationBlock } from '@/lib/model/wants';
 
 export const runtime = 'nodejs';
@@ -378,6 +379,7 @@ export async function POST(req: NextRequest) {
       (focusLabel ? '' : focusBlock(sanitizeFocus(body?.focus))) +
       // what they mostly think about, from onboarding — examples, not assumptions
       roleBlock(body?.role) +
+      nameBlock(body?.name) +
       // THE OBJECTS THEY ARE WORKING ON — the matrix, the function — as the
       // workspace holds them. Re-sanitised, which RE-COMPUTES every step from
       // the state before it (lib/objects/core.ts), so nothing a browser sends

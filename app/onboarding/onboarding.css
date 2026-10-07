@@ -241,19 +241,70 @@
   border-bottom:1px solid var(--ink-12)}
 .ob-later:hover{color:var(--moss-700);border-bottom-color:var(--moss)}
 
-/* ── the starting points: visible, each with its own icon ── */
-.ob-ways{margin:clamp(20px,3.6vh,30px) 0 0;display:flex;flex-wrap:wrap;gap:10px}
-.ob-way{display:inline-flex;align-items:center;gap:9px;padding:10px 16px 10px 12px;border:1px solid var(--ink-12);border-radius:999px;
-  background:rgba(255,255,255,.55);cursor:pointer;color:var(--ink);transition:border-color .2s,background .2s,color .2s}
-.ob-way:hover,.ob-way:focus-visible{border-color:var(--moss);background:rgba(255,255,255,.9);outline:none}
-.ob-way.is-on{border-color:var(--moss);background:rgba(94,118,51,.1);color:var(--moss-700)}
-.ob-way-ic{display:inline-flex;color:var(--moss-700)}
-.ob-way-t{font-family:var(--serif);font-size:1.08rem;line-height:1}
 @media(max-width:560px){
   .ob-roles{grid-template-columns:1fr 1fr;gap:8px}
   .ob-card{grid-template-columns:1fr;padding:12px}
   .ob-card-ic{grid-row:auto;width:34px;height:34px;margin-bottom:6px}
   .ob-card-t{font-size:1.1rem}
-  .ob-way{padding:8px 12px 8px 10px}
 }
 @media(prefers-reduced-motion:reduce){.ob-card,.ob-way{transition:none}.ob-card:hover{transform:none}}
+
+/* ── steps: where they are, quietly, in the top bar ── */
+.ob-steps{display:inline-flex;gap:6px;margin-left:auto;margin-right:18px}
+.ob-steps i{display:block;width:22px;height:3px;border-radius:2px;background:var(--ink-12)}
+.ob-steps i.on{background:var(--moss)}
+
+/* ── the name ── */
+.ob-name{margin-top:clamp(22px,4vh,34px);display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.ob-name input{flex:1;min-width:220px;max-width:460px;font-family:var(--serif);font-size:clamp(1.6rem,3.4vw,2.3rem);color:var(--ink);
+  background:none;border:none;border-bottom:1.5px solid var(--ink-25);padding:6px 2px;outline:none;transition:border-color .2s}
+.ob-name input:focus{border-bottom-color:var(--moss)}
+.ob-name input::placeholder{color:var(--ink-25)}
+.ob-primary:disabled{opacity:.4;cursor:default;transform:none}
+
+/* ── how they like to think: two large cards with a picture of each ── */
+.ob-how{margin-top:clamp(22px,4vh,36px);display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
+.ob-howc{display:flex;flex-direction:column;align-items:flex-start;gap:6px;text-align:left;padding:18px 20px 18px;border:1px solid var(--ink-12);
+  border-radius:16px;background:rgba(255,255,255,.6);cursor:pointer;color:var(--ink);transition:border-color .2s,background .2s,transform .2s,box-shadow .2s}
+.ob-howc:hover,.ob-howc:focus-visible{border-color:var(--moss);background:rgba(255,255,255,.9);transform:translateY(-2px);box-shadow:0 14px 34px -22px rgba(32,32,27,.5);outline:none}
+.ob-howc.is-on{border-color:var(--moss);background:rgba(94,118,51,.08)}
+.ob-howc-pic{width:100%;height:auto;max-height:96px;margin-bottom:8px;border-radius:10px;background:rgba(94,118,51,.06)}
+.ob-howc-pic .b1{fill:rgba(32,32,27,.1)}
+.ob-howc-pic .b2{fill:rgba(94,118,51,.28)}
+.ob-howc-pic .dot{fill:var(--moss)}
+.ob-howc-pic .rule{stroke:rgba(32,32,27,.14);stroke-width:1}
+.ob-howc-pic .edge{fill:none;stroke:rgba(94,118,51,.55);stroke-width:1.2}
+.ob-howc-pic .n{fill:#fff;stroke:rgba(32,32,27,.28);stroke-width:1}
+.ob-howc-pic .n.on{fill:rgba(94,118,51,.2);stroke:var(--moss)}
+.ob-howc-t{font-family:var(--serif);font-size:clamp(1.4rem,2.4vw,1.7rem);line-height:1.05}
+.ob-howc-d{font-family:var(--font-sans, system-ui, sans-serif),Inter,system-ui,sans-serif;font-size:.88rem;line-height:1.4;color:var(--ink-60)}
+.ob-howc-n{margin-top:6px;font-family:var(--font-sans, system-ui, sans-serif),Inter,system-ui,sans-serif;font-size:.68rem;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--moss-700)}
+
+/* ── the starting points: large, impossible to miss, each with its icon ── */
+.ob-kick{margin:10px 0 0;font-family:var(--serif);font-style:italic;font-size:clamp(1.05rem,1.6vw,1.25rem);color:var(--ink-60)}
+.ob-ways{margin:clamp(18px,3vh,26px) 0 clamp(14px,2.6vh,22px);display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));gap:12px}
+.ob-way{display:flex;flex-direction:column;align-items:flex-start;gap:4px;text-align:left;padding:16px 16px 15px;border:1px solid var(--ink-12);border-radius:14px;
+  background:rgba(255,255,255,.62);cursor:pointer;color:var(--ink);transition:border-color .2s,background .2s,transform .2s,box-shadow .2s}
+.ob-way:hover,.ob-way:focus-visible{border-color:var(--moss);background:rgba(255,255,255,.92);transform:translateY(-2px);box-shadow:0 12px 28px -20px rgba(32,32,27,.5);outline:none}
+.ob-way.is-on{border-color:var(--moss);background:rgba(94,118,51,.1);box-shadow:0 0 0 1px var(--moss) inset}
+.ob-way-ic{display:inline-flex;align-items:center;justify-content:center;width:42px;height:42px;margin-bottom:6px;border-radius:12px;background:rgba(94,118,51,.12);color:var(--moss-700)}
+.ob-way.is-on .ob-way-ic{background:var(--moss);color:var(--paper)}
+.ob-way-t{font-family:var(--serif);font-size:1.28rem;line-height:1.1}
+.ob-way-d{font-family:var(--font-sans, system-ui, sans-serif),Inter,system-ui,sans-serif;font-size:.8rem;line-height:1.35;color:var(--ink-60)}
+/* the example, as a card under the field — something to take, not small print */
+.ob-eg-card{margin:14px 0 0;display:flex;flex-direction:column;align-items:flex-start;gap:6px;padding:14px 18px;border-left:3px solid var(--moss);
+  background:rgba(94,118,51,.06);border-radius:0 12px 12px 0}
+.ob-eg-card .ob-eg-k{font-size:10px}
+.ob-eg-card button{font-family:var(--serif);font-size:clamp(1.1rem,1.8vw,1.35rem);line-height:1.35;color:var(--ink);background:none;border:none;padding:0;text-align:left;cursor:pointer}
+.ob-eg-card button:hover{color:var(--moss-700)}
+.ob-eg-use{font-family:var(--font-sans, system-ui, sans-serif),Inter,system-ui,sans-serif;font-size:.74rem;color:var(--ink-45)}
+@media(max-width:560px){
+  .ob-ways{grid-template-columns:1fr 1fr;gap:8px}
+  .ob-way{padding:12px}
+  .ob-way-ic{width:36px;height:36px}
+  .ob-way-t{font-size:1.08rem}
+  .ob-how{grid-template-columns:1fr}
+  .ob-steps{margin-right:10px}
+  .ob-steps i{width:14px}
+}
+@media(prefers-reduced-motion:reduce){.ob-way,.ob-howc{transition:none}.ob-way:hover,.ob-howc:hover{transform:none}}

@@ -7,6 +7,36 @@
 import { useEffect, useState } from 'react';
 import { ROLES, readRole, writeRole, type RoleId } from '@/lib/onboarding-roles';
 import { ObIcon } from '@/components/onboarding/ObIcon';
+import { readName, sanitizeName, writeName } from '@/lib/onboarding-name';
+
+/** What Socria calls them — the name onboarding asked for, changeable or clearable. */
+export function NameField() {
+  const [name, setName] = useState('');
+  const [saved, setSaved] = useState<string | null>(null);
+  useEffect(() => {
+    const n = readName();
+    setName(n ?? '');
+    setSaved(n);
+  }, []);
+  const ok = !name.trim() || !!sanitizeName(name);
+  const dirty = (sanitizeName(name) ?? null) !== saved;
+  return (
+    <form
+      className="rp-name"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (!ok) return;
+        setSaved(writeName(name.trim() ? name : null));
+      }}
+    >
+      <input value={name} maxLength={40} placeholder="Not set" aria-label="What Socria calls you" onChange={(e) => setName(e.target.value)} />
+      <button type="submit" disabled={!ok || !dirty}>
+        Save
+      </button>
+      {!ok && <span className="rp-bad">Just a name, please.</span>}
+    </form>
+  );
+}
 
 export function RolePicker() {
   const [role, setRole] = useState<RoleId | null>(null);

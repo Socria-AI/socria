@@ -32,7 +32,7 @@ import { clearSocriaLocalData } from '@/lib/local-data';
 import { ThemePicker } from './ThemePicker';
 import { AccessCode } from './AccessCode';
 import { TestingTools } from './TestingTools';
-import { RolePicker } from './RolePicker';
+import { NameField, RolePicker } from './RolePicker';
 
 export function AccountSheet({
   open,
@@ -166,6 +166,11 @@ export function AccountSheet({
             <div className="sec">
               <span className="lbl">Theme</span>
               <ThemePicker isOne={isOne} onUpgrade={onClose} />
+            </div>
+
+            <div className="sec">
+              <span className="lbl">What Socria calls you</span>
+              <NameField />
             </div>
 
             <div className="sec">

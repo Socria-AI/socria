@@ -89,8 +89,10 @@ export const FIRST_RUN_KEYS = [
   'socria.logos.guide.v1',
   'socria.core4IntroDontShowAgain.v1',
   'socria.hints.seen.v1',
-  // what they told onboarding they mostly think about, so a replay asks again
+  // what they told onboarding — what they mostly think about, and their name —
+  // so a replay asks again
   'socria.role.v1',
+  'socria.name.v1',
 ] as const;
 
 /**
@@ -101,10 +103,6 @@ export const FIRST_RUN_KEYS = [
 export const REPLAYS = {
   all: { milestones: [...MILESTONES] as Milestone[], keys: [...FIRST_RUN_KEYS] as string[] },
   core: { milestones: ['core.first', 'core.aha'] as Milestone[], keys: ['socria.core4IntroDontShowAgain.v1'] },
-  logos: {
-    milestones: MILESTONES.filter((m) => m.startsWith('logos.')) as Milestone[],
-    keys: ['socria.firstmap.v1', 'socria.firstMap.v1', 'socria.logos.guide.v1'],
-  },
   found: { milestones: MILESTONES.filter((m) => m.startsWith('found.')) as Milestone[], keys: ['socria.hints.seen.v1'] },
 } as const;
 export type ReplayPart = keyof typeof REPLAYS;

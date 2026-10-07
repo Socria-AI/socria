@@ -165,3 +165,9 @@
 .acct-sheet .rp-o:hover{border-color:var(--moss, #5e7633)}
 .acct-sheet .rp-o.on{border-color:var(--moss, #5e7633);background:rgba(var(--moss-rgb, 94, 118, 51), .1)}
 .acct-sheet .rp-note{flex-basis:100%;margin:6px 0 0;font-size:.76rem;color:var(--ink-70)}
+.acct-sheet .rp-name{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.acct-sheet .rp-name input{flex:1;min-width:0;max-width:260px;border:0;border-bottom:1px solid var(--line, rgba(31,31,31,.18));background:none;padding:6px 2px;font:inherit;font-size:1rem;color:var(--ink);outline:none}
+.acct-sheet .rp-name input:focus{border-bottom-color:var(--moss, #5e7633)}
+.acct-sheet .rp-name button{border:1px solid var(--line, rgba(31,31,31,.18));background:none;border-radius:999px;padding:4px 12px;cursor:pointer;font:inherit;font-size:.82rem;color:var(--ink)}
+.acct-sheet .rp-name button:disabled{opacity:.4;cursor:default}
+.acct-sheet .rp-bad{font-size:.76rem;color:var(--tension, #9c5b3c)}

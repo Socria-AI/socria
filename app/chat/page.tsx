@@ -2,6 +2,7 @@
 'use client';
 
 import { readRole } from '@/lib/onboarding-roles';
+import { readName } from '@/lib/onboarding-name';
 import { useThemeGuard } from '@/components/account/ThemePicker';
 import { useGateSync } from '@/components/account/AccessCode';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -1760,6 +1761,8 @@ export default function ChatPage() {
           projectId: convoForRequest.projectId ?? undefined,
           // what they told onboarding they mostly think about (an id, or nothing)
           role: readRole() ?? undefined,
+          // what they asked to be called (sanitised again on the server)
+          name: readName() ?? undefined,
         }),
       });
 

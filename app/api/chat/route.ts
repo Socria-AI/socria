@@ -4,6 +4,7 @@
 // Returns a streaming plain-text response.
 
 import { roleBlock } from '@/lib/onboarding-roles';
+import { nameBlock } from '@/lib/onboarding-name';
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { auth } from '@clerk/nextjs/server';
@@ -475,7 +476,7 @@ export async function POST(req: NextRequest) {
     }
     // What they told onboarding they mostly think about — a known id, worded
     // by us, used only to pick examples that land (lib/onboarding-roles.ts).
-    systemPrompt += roleBlock(body?.role);
+    systemPrompt += roleBlock(body?.role) + nameBlock(body?.name);
 
     if (process.env.NODE_ENV !== 'production') {
       const userTurns = clean.filter((m) => m.role === 'user').length;

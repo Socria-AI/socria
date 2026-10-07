@@ -45,7 +45,7 @@ ok('roleOf only knows the seven', roleOf('lead')?.title === 'Leading' && roleOf(
 
 console.log('\n=== the wiring ===');
 const intro = read('components/onboarding/FirstRunIntro.tsx');
-ok('onboarding asks it between the premise and the thought, skippably', /beat === 'who'/.test(intro) && /Rather not say/.test(intro) && /setBeat\(role \? 'intent' : 'who'\)/.test(intro));
+ok('onboarding asks it after the name, skippably', /beat === 'who'/.test(intro) && /Rather not say/.test(intro) && /'premise', 'name', 'who'/.test(intro));
 ok('the starting points follow the role’s order and wording', /role \? role\.order/.test(intro) && /role\?\.ways\[id\]/.test(intro));
 ok('the starting points are visible cards with icons, not a line of italics', /className=\{`ob-way/.test(intro) && /<ObIcon/.test(intro) && !/ob-intents/.test(intro));
 ok('both chat routes give Socria the line', /roleBlock\(body\?\.role\)/.test(read('app/api/chat/route.ts')) && /roleBlock\(body\?\.role\)/.test(read('app/api/logos/chat/route.ts')));

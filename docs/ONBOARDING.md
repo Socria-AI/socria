@@ -6,27 +6,30 @@ rather than three.
 ## The shape
 
 ```
-SOCRIA            the premise, once      "Most AI gives you an answer.
-                                           Socria helps you build the thinking behind one."
-                                          "What are you trying to figure out?"
-  │
-  ├── CORE        one line, once          after the first real reply:
-  │                                       "You'll still do the thinking. Core helps you
-  │                                        see what you're missing."
-  │
-  └── LOGOS       three beats, once       on the person's own first map or model:
-                                          "This is your thinking becoming a model."
-                                          "Change the model, and Logos updates what depends on it."
-                                          "Now keep thinking."
+ONE ONBOARDING, FOR ALL OF SOCRIA (components/onboarding/FirstRunIntro.tsx)
 
-  …and, on every surface, things FOUND along the way — each once, when its
-  value is legible on screen, never on a timer.
+  premise   "Most AI gives you an answer. Socria helps you build the thinking behind one."
+  name      "First — what should we call you?"            lib/onboarding-name.ts
+  who       "What do you mostly think about?"             lib/onboarding-roles.ts
+            Studying · Building · Researching · Making · Leading · Helping people · Life, mostly
+  how       "How do you like to think something through?"
+            Talk it through → Core 4  ·  See it laid out → Logos 2
+  thought   "What are you trying to figure out, <name>?"  five starting points as cards,
+            ordered and worded for what they think about
+
+CORE        one line, once, after the first real reply
 ```
 
-Nothing performs itself. Every beat advances on something the person did.
-Nothing is onboarding-specific: the first reply is the engine's own, the
-first model is the engine's own, the cue names a parameter because the
-canonical model calls it one and mentions a backend because one ran.
+Every step is skippable, and anything already answered on this browser is not
+asked again. The model question is asked only where no surface has been chosen
+yet (/onboarding, for anyone who can open both); over the chat or over Logos the
+surface is the answer. There is no Logos-only sequence any more: the three-beat
+coach marks over a first map (lib/onboarding.ts, components/FirstMap.tsx) were
+removed. The first map still rises card by card once, with nothing to press.
+
+The name and the answer to "what do you think about" live in this browser, are
+changeable under Manage Account, and reach Socria as one sanitised line each —
+the name to be used rarely, the role only to pick examples that land.
 
 ## The record — `lib/first-run.ts`
 
@@ -88,27 +91,6 @@ After the first reply they have ever had, one line under it, in the thread's
 margin. Dismissed by × or by continuing; continuing is the aha. The furniture
 tour and the Core 4 announcement **no longer open on a first visit** — both
 stay reachable (account sheet; the pill beside the composer).
-
-## Logos
-
-`lib/onboarding.ts` plans three beats from the **shape** of what is on screen
-(`model` or only a map; how many controls; the first control's canonical kind
-and label; whether a backend ran — read from `computationFacts`). The
-sequence opens when the first map has four nodes or a model document exists,
-never while a reply streams or a sentence is being typed, and never for
-someone whose record says `logos.aha`.
-
-- The map **emerges** once (cards rise in turn, lines draw) — `emerging` on
-  `ThinkingMap`, off under reduced motion.
-- On a model with a control the cue is "Try changing this — move *label*" and
-  the first slider breathes; on a map, "Press any card to go on".
-- Moving a value → "Change the model, and Logos updates what depends on it",
-  naming the operation and backend **only if one ran**.
-- "Ask about this" (or a card's own Explore/Challenge/Trace) → "Now keep
-  thinking." → released. Skip is one press from anywhere.
-
-Signals come from real events: `onModelEdited` (a value moved vs a
-selection), the card menu, `onAskAbout`.
 
 ## Found along the way
 
