@@ -123,6 +123,8 @@ const MODULES = [
   'lib/first-run.ts',
   'lib/logos-connect.ts',
   'lib/access-codes-server.ts',
+  'lib/feature-gates.ts',
+  'lib/feature-gates-server.ts',
   'lib/local-data.ts',
   'lib/cognition/state.ts',
   'lib/core4/signals.ts',

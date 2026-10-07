@@ -1,6 +1,7 @@
 // lib/socria-prompt.ts
 // The Socria system prompts. Sent as the system message on every chat call.
 
+import type { GateId } from './feature-gates';
 import { WHY_NOT_ANSWER } from './why-not-answer';
 import { WRONG_CHAT } from './wrong-chat';
 import { SAVED_VOICE_READING, SAVED_VOICE_RULE } from './memory-voice';
@@ -1295,6 +1296,11 @@ export interface ModelConfig {
    */
   devOnly?: boolean;
   /**
+   * On production, listed only once this access gate is open — a code entered
+   * under Manage Account (lib/access-codes.ts). Dev and preview list it freely.
+   */
+  gate?: GateId;
+  /**
    * The composable workspace (Logos 3): the conversation, the map and the
    * model become panels the person arranges, over the same session state.
    * See lib/workspace/tiling.ts.
@@ -1652,6 +1658,8 @@ export const SOCRIA_MODELS: Record<SocriaModel, ModelConfig> = {
     logosSurface: true,
     collab: true,
     workspace: true,
+    // On production, opened by the code entered under Manage Account.
+    gate: 'logos3',
   },
   // Core 4 — built, and selectable. It carried `soon` while it was an
   // announcement, which made the picker grey it out; that flag came off when

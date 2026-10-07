@@ -2,6 +2,7 @@
 'use client';
 
 import { useThemeGuard } from '@/components/account/ThemePicker';
+import { useGateSync } from '@/components/account/AccessCode';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
@@ -453,6 +454,8 @@ export default function ChatPage() {
   // sidebar foot and the model menu. Both wait for `known` — see usePlan.
   const planState = usePlan();
   useThemeGuard(planState.plan === 'one', planState.known);
+  // A feature unlocked on another device (Manage Account → Access code).
+  useGateSync();
 
   // ── Socria One, said at the two moments it is allowed to be ────────
   //
@@ -2209,8 +2212,10 @@ export default function ChatPage() {
     // being ignored: the link was somebody's intent to open the environment, and
     // dropping them on whatever they happened to be on last answers a different
     // question.
+    // The same for a model behind an access code nobody here has entered
+    // (Logos 3 on production): the nearest surface of its kind, Logos 2.
     const asked =
-      typeof want === 'string' && want in SOCRIA_MODELS && SOCRIA_MODELS[want as SocriaModel].withdrawn
+      typeof want === 'string' && want in SOCRIA_MODELS && (SOCRIA_MODELS[want as SocriaModel].withdrawn || !isOffered(want as SocriaModel))
         ? withdrawnTo(want as SocriaModel)
         : want;
     if (!isSelectable(asked)) return;

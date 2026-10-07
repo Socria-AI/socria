@@ -21,6 +21,7 @@
 // is worse than the bug.
 
 import { isProduction } from './environment';
+import { openGates, type GateId } from './feature-gates';
 import { SOCRIA_MODELS, type Readability, type ReplyLength, type SocriaModel } from './socria-prompt';
 
 export const MODEL_KEY = 'socria.model.v1';
@@ -145,16 +146,16 @@ export function readStoredModel(): SocriaModel | null {
  * somebody can pick. A model that is merely gated by plan or sign-in IS
  * offered — it is shown with what it needs, which is the point of showing it.
  */
-export function isOffered(model: SocriaModel): boolean {
+export function isOffered(model: SocriaModel, gates: readonly GateId[] = openGates()): boolean {
   const m = SOCRIA_MODELS[model];
   // A dev-only model is offered everywhere but production, and held back
   // there exactly as a withdrawn one is.
-  return !m.withdrawn && !m.soon && !(m.devOnly && isProduction());
+  return !m.withdrawn && !m.soon && !(m.devOnly && isProduction()) && !(m.gate && isProduction() && !gates.includes(m.gate));
 }
 
 /** Every model a menu may show, in registry order. */
-export function offeredModels(): SocriaModel[] {
-  return (Object.keys(SOCRIA_MODELS) as SocriaModel[]).filter(isOffered);
+export function offeredModels(gates: readonly GateId[] = openGates()): SocriaModel[] {
+  return (Object.keys(SOCRIA_MODELS) as SocriaModel[]).filter((m) => isOffered(m, gates));
 }
 
 /**

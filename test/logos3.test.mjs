@@ -42,7 +42,13 @@ console.log('\n=== offered everywhere, production included ===');
 {
   for (const env of ['production', 'preview']) {
     withEnv({ NEXT_PUBLIC_VERCEL_ENV: env, VERCEL_ENV: env }, () => {
-      ok(`offered on ${env}`, isOffered('logos-3') && offeredModels().includes('logos-3'));
+      // On production it opens with its access code (Manage Account → Access
+      // code, test/feature-gates.test.mjs); everywhere else it is simply there.
+      if (env === 'production') {
+        ok('on production, hidden until its access code is entered', !isOffered('logos-3', []) && isOffered('logos-3', ['logos3']));
+      } else {
+        ok(`offered on ${env}`, isOffered('logos-3', []) && offeredModels([]).includes('logos-3'));
+      }
     });
   }
   ok('it is not marked dev-only any more', !SOCRIA_MODELS['logos-3'].devOnly);

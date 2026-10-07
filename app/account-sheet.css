@@ -131,3 +131,15 @@
   padding:1px 6px;border-radius:999px;background:var(--one-pblue);color:var(--one-cream)}
 .acct-sheet .theme-note{grid-column:1/-1;margin:2px 0 0;font-size:.84rem;color:var(--ink-70)}
 @media (max-width:520px){.acct-sheet .themes{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* ── access code ─────────────────────────────────────────────────────── */
+.acct-sheet .access{display:flex;flex-direction:column;gap:10px}
+.acct-sheet .access-open{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:0;font-size:.92rem;color:var(--ink)}
+.acct-sheet .access-open b{font-weight:600}
+.acct-sheet .access-form{display:flex;gap:8px}
+.acct-sheet .access-form input{flex:1;min-width:0;background:var(--surface, #fff);border:1px solid var(--app-border);border-radius:999px;
+  padding:9px 16px;font:inherit;font-size:.95rem;letter-spacing:.06em;color:var(--ink);outline:none}
+.acct-sheet .access-form input:focus{border-color:var(--moss);box-shadow:0 0 0 3px rgba(var(--moss-rgb, 94, 118, 51),.13)}
+.acct-sheet .access-form button{border:1px solid var(--ink);border-radius:999px;background:none;padding:0 18px;font:inherit;font-size:.9rem;color:var(--ink);cursor:pointer}
+.acct-sheet .access-form button:disabled{opacity:.4;cursor:default}
+.acct-sheet .access-err{margin:0;font-size:.85rem;color:var(--machine)}

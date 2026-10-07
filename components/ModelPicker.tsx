@@ -40,6 +40,7 @@ import {
   type ReplyLength,
 } from '@/lib/socria-prompt';
 import { offeredModels } from '@/lib/socria-model-store';
+import { GATE_CHANGED, openGates, type GateId } from '@/lib/feature-gates';
 import { PLANS } from '@/lib/entitlements';
 import { type Plan } from '@/lib/socria-one';
 import { ModelGlyph } from './ModelGlyph';
@@ -58,8 +59,23 @@ import '@/app/app-shell.css';
 // …and what may be shown at all is `isOffered`, which lives in the store
 // because Logos carries a menu of its own and the two used to disagree. A
 // withdrawn model still exists and still answers; it is simply not a choice.
-const ANSWERERS = offeredModels().filter((id) => !SOCRIA_MODELS[id].logosSurface);
-const SURFACES = offeredModels().filter((id) => SOCRIA_MODELS[id].logosSurface);
+// A model behind a feature gate (lib/feature-gates.ts) appears once its code
+// has been entered under Manage Account — read after mount, so the server's
+// render and the first client render agree, and again whenever a gate opens.
+function useOffered() {
+  const [gates, setGates] = useState<GateId[]>([]);
+  useEffect(() => {
+    const read = () => setGates(openGates());
+    read();
+    window.addEventListener(GATE_CHANGED, read);
+    return () => window.removeEventListener(GATE_CHANGED, read);
+  }, []);
+  const all = offeredModels(gates);
+  return {
+    ANSWERERS: all.filter((id) => !SOCRIA_MODELS[id].logosSurface),
+    SURFACES: all.filter((id) => SOCRIA_MODELS[id].logosSurface),
+  };
+}
 
 export function ModelPicker({
   value,
@@ -97,6 +113,7 @@ export function ModelPicker({
    */
   plan?: Plan;
 }) {
+  const { ANSWERERS, SURFACES } = useOffered();
   const [open, setOpen] = useState(false);
   /** the register they pressed that their plan does not open, if any */
   const [locked, setLocked] = useState<string | null>(null);

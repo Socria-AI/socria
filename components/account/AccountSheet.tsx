@@ -30,6 +30,7 @@ import { StudentAccess } from '@/components/StudentAccess';
 import type { PlanState } from '@/components/usePlan';
 import { clearSocriaLocalData } from '@/lib/local-data';
 import { ThemePicker } from './ThemePicker';
+import { AccessCode } from './AccessCode';
 
 export function AccountSheet({
   open,
@@ -153,6 +154,11 @@ export function AccountSheet({
                   {isOne ? 'Manage membership' : 'Continue with One →'}
                 </Link>
               </div>
+            </div>
+
+            <div className="sec">
+              <span className="lbl">Access code</span>
+              <AccessCode onOpened={onClose} />
             </div>
 
             <div className="sec">
