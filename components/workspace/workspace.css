@@ -340,3 +340,18 @@
 .logos-root .ws-dockzones .is-top { left: 10%; right: 10%; top: 6px; height: 22%; border-radius: 12px; }
 .logos-root .ws-dockzones .is-left { top: 10%; bottom: 10%; left: 6px; width: 22%; border-radius: 12px; }
 .logos-root .ws-dockzones .is-right { top: 10%; bottom: 10%; right: 6px; width: 22%; border-radius: 12px; }
+
+/* ── reset view: last in "+ View", and it asks first ───────────────── */
+.logos-root .ws-menu-reset { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--lg-line); }
+.logos-root .ws-reset-row .ws-menu-l { color: var(--lg-ink-60); }
+.logos-root .ws-reset-row:hover .ws-menu-l { color: var(--lg-ink); }
+.logos-root .ws-confirm { padding: 8px 8px 6px; }
+.logos-root .ws-confirm-q { margin: 0 0 4px; font-family: var(--serif); font-size: 18px; line-height: 1.2; color: var(--lg-ink); }
+.logos-root .ws-confirm-d { margin: 0 0 10px; font-size: 12.5px; line-height: 1.45; color: var(--lg-ink-60); }
+.logos-root .ws-confirm-acts { display: flex; gap: 8px; }
+.logos-root .ws-confirm-acts button {
+  border: 1px solid var(--lg-line); background: none; border-radius: 999px; padding: 5px 14px; cursor: pointer;
+  font-family: var(--lg-sans); font-size: 12.5px; color: var(--lg-ink-60);
+}
+.logos-root .ws-confirm-acts button.is-go { background: var(--lg-primary); border-color: var(--lg-primary); color: var(--lg-paper); }
+.logos-root .ws-confirm-acts button:hover:not(.is-go) { color: var(--lg-ink); border-color: var(--lg-ink-24); }

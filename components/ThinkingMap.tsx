@@ -39,6 +39,8 @@ import { MathBoard } from './MathBoard';
 
 type TabsAt = 'top' | 'bottom' | 'left' | 'right';
 const TABS_KEY = 'socria.map.tabs.v1';
+/** Fired on window by Logos 3's Reset view; every map goes back to how it starts. */
+export const VIEW_RESET = 'socria:view-reset';
 
 /** The zoom ladder. Discrete steps, so every zoom lands somewhere legible. */
 const ZOOMS = [0.35, 0.45, 0.55, 0.7, 0.85, 1, 1.2, 1.45, 1.75, 2.1, 2.5];
@@ -228,6 +230,20 @@ export function ThinkingMap({
       const v = localStorage.getItem(TABS_KEY);
       if (v === 'top' || v === 'bottom' || v === 'left' || v === 'right') setTabsAt(v);
     } catch {}
+  }, []);
+  // RESET VIEW (Logos 3's "+ View"): the tabs and the zoom go back to where they start.
+  useEffect(() => {
+    const reset = () => {
+      setTabsAt('top');
+      setZoom(1);
+      setMenu(null);
+      try {
+        localStorage.removeItem(TABS_KEY);
+      } catch {}
+      wrapRef.current?.scrollTo({ left: 0, top: 0 });
+    };
+    window.addEventListener(VIEW_RESET, reset);
+    return () => window.removeEventListener(VIEW_RESET, reset);
   }, []);
   const placeTabs = (at: TabsAt) => {
     setTabsAt(at);

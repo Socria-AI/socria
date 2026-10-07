@@ -15,7 +15,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useUser } from '@clerk/nextjs';
-import { ThinkingMap, type MapNodeRef } from '@/components/ThinkingMap';
+import { ThinkingMap, VIEW_RESET, type MapNodeRef } from '@/components/ThinkingMap';
 import { ExplorePanel } from '@/components/ExplorePanel';
 import { emptyWorkspace, update as wsUpdate } from '@/lib/workspace/store';
 import { bridgeSurfaces, projectMap, projectMind } from '@/lib/workspace/adapters';
@@ -2574,6 +2574,22 @@ export function LogosApp({
       if (workspaceOn) setFocus({ kind: 'node', id });
     },
   });
+  // RESET VIEW — confirmed in "+ View". Everything about how Logos 3 is
+  // ARRANGED goes back to how it starts: one surface (the model if there is
+  // one, else the map), the conversation below, the map's tabs on top at 100%.
+  // Nothing the person thought is touched: no message, node or model changes.
+  function resetView() {
+    changeLayout(singleLayout(wsHasModel ? 'model' : 'map'));
+    moveDock('bottom');
+    try {
+      localStorage.removeItem(DOCK_KEY);
+    } catch {}
+    setDockOpen(false);
+    setFocus(null);
+    setPicked(new Set());
+    window.dispatchEvent(new Event(VIEW_RESET));
+  }
+
   const lastSynthIndex = (() => {
     for (let i = messages.length - 1; i >= 0; i--) if (messages[i].synthesis) return i;
     return -1;
@@ -4159,6 +4175,7 @@ export function LogosApp({
               dock={wsDock}
               dockSide={dockSide}
               onDockSide={moveDock}
+              onResetView={resetView}
               overlay={wsCard}
             />
           </div>

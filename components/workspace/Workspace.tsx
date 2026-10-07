@@ -66,6 +66,8 @@ export interface WorkspaceProps {
   head?: ReactNode;
   /** beneath the stage — the composer, while the conversation is not a panel */
   dock?: ReactNode;
+  /** put the whole view back to how Logos 3 starts — asked for, and confirmed, in "+ View" */
+  onResetView?: () => void;
   /** which side of the stage the dock sits on, and how the person moves it */
   dockSide?: DockSide;
   onDockSide?: (side: DockSide) => void;
@@ -92,14 +94,18 @@ function ViewMenu({
   onPick,
   onArrange,
   onClose,
+  onReset,
 }: {
   views: ViewSuggestion[];
   arrangements: Arrangement[];
   onPick: (v: ViewSuggestion) => void;
   onArrange: (a: Arrangement) => void;
   onClose: () => void;
+  onReset?: () => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  // RESET VIEW asks first: it undoes every arrangement the person has made.
+  const [confirming, setConfirming] = useState(false);
   useEffect(() => {
     const away = (e: PointerEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node) && !(e.target as HTMLElement)?.closest?.('.ws-add')) onClose();
@@ -132,6 +138,39 @@ function ViewMenu({
         </button>
       ))}
       {!fresh.length && !arrangements.length && <p className="ws-menu-none">Everything worth opening is already here.</p>}
+      {onReset && (
+        <div className="ws-menu-reset">
+          {!confirming ? (
+            <button type="button" role="menuitem" className="ws-menu-row ws-reset-row" onClick={() => setConfirming(true)}>
+              <span className="ws-menu-l">Reset view</span>
+              <span className="ws-menu-w">back to how Logos 3 starts</span>
+            </button>
+          ) : (
+            <div className="ws-confirm" role="alertdialog" aria-label="Reset the view?">
+              <p className="ws-confirm-q">Are you sure?</p>
+              <p className="ws-confirm-d">
+                Panels, where the conversation sits, the map’s tabs and zoom go back to their defaults. Your thinking, your map and your models are not touched.
+              </p>
+              <span className="ws-confirm-acts">
+                <button
+                  type="button"
+                  className="is-go"
+                  autoFocus
+                  onClick={() => {
+                    setConfirming(false);
+                    onReset();
+                  }}
+                >
+                  Reset view
+                </button>
+                <button type="button" onClick={() => setConfirming(false)}>
+                  Cancel
+                </button>
+              </span>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -347,6 +386,15 @@ export function Workspace(props: WorkspaceProps) {
             onLayout(a.layout);
             setTab(null);
           }}
+          onReset={
+            props.onResetView
+              ? () => {
+                  setAdding(false);
+                  setTab(null);
+                  props.onResetView!();
+                }
+              : undefined
+          }
         />
       )}
     </span>

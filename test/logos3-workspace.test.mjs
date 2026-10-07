@@ -204,7 +204,7 @@ console.log('\n=== simple at rest, powerful on demand ===');
   const half = splitPanel(singleLayout('map'), 'p1', 'row', { type: 'model' }).layout;
   ok('  and the default split is still even', Math.abs(half.root.sizes[0] - 0.5) < 1e-9);
   const ws = read('components/workspace/Workspace.tsx');
-  ok('there is no permanent row of modes', !/presets|onPreset|onReset|ws-presets/.test(ws));
+  ok('there is no permanent row of modes', !/presets|onPreset|ws-presets|className="ws-bar"/.test(ws));
   ok('a single panel carries no chrome', /const chrome = several \|\| isMax/.test(ws));
   ok('"+ View" holds the views and the arrangements', /Open beside/.test(ws) && /Arrange/.test(ws) && /onArrange/.test(ws));
   const app = read('components/LogosApp.tsx');
@@ -258,6 +258,17 @@ console.log('\n=== the wiring ===');
   ok('Escape restores a maximised panel', /e\.key === 'Escape'/.test(ws) && /restore\(layoutRef\.current\)/.test(ws));
   ok('dividers can be moved from the keyboard', /aria-orientation/.test(ws) && /ArrowLeft/.test(ws));
   ok('a narrow screen shows one surface at a time, as tabs', /is-narrow/.test(ws) && /role="tablist"/.test(ws));
+}
+
+console.log('\n=== reset view ===');
+{
+  const ws = read('components/workspace/Workspace.tsx');
+  const app = read('components/LogosApp.tsx');
+  ok('"+ View" offers Reset view, and asks first', /Reset view/.test(ws) && /Are you sure\?/.test(ws) && /setConfirming\(true\)/.test(ws) && />\s*Cancel\s*</.test(ws));
+  ok('it resets the arrangement, the dock and the maps — and nothing else', /function resetView\(\)/.test(app) && /changeLayout\(singleLayout\(wsHasModel \? 'model' : 'map'\)\)/.test(app) && /moveDock\('bottom'\)/.test(app) && /dispatchEvent\(new Event\(VIEW_RESET\)\)/.test(app));
+  const body = app.slice(app.indexOf('function resetView()'), app.indexOf('function resetView()') + 900);
+  ok('  never the thinking: no message, map or model is written', !/patchActive|patchSession|editMap|setSessions/.test(body));
+  ok('every map puts its tabs and zoom back', /addEventListener\(VIEW_RESET/.test(read('components/ThinkingMap.tsx')) && /setTabsAt\('top'\)/.test(read('components/ThinkingMap.tsx')) && /setZoom\(1\)/.test(read('components/ThinkingMap.tsx')));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
