@@ -1570,6 +1570,7 @@ export function ThinkingMap({
       <div
         className={`lg-map${isCanvas ? ' can-pan' : ''}${embedded ? ' is-embedded' : ''}`}
         ref={wrapRef}
+        data-tour={embedded ? undefined : 'map'}
         // THE CANVAS. Drag empty paper to move around; drag a card to move
         // it; wheel or pinch to zoom where the pointer is; two fingers pan and
         // pinch on a touch screen. Focused, the arrow keys move around it.
@@ -1876,6 +1877,8 @@ export function ThinkingMap({
             >
               <button
                 type="button"
+                // the first card is the one the tour points at
+                data-tour={!embedded && p === cards.find((c) => !c.objRef) ? 'card' : undefined}
                 style={{ width: p.w }}
                 className={`lg-node lg-node-${p.node.type} lg-st-${p.node.status ?? 'open'}${
                   focused === p.id ? ' is-focused' : ''

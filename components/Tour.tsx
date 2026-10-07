@@ -1,7 +1,7 @@
 'use client';
 // components/Tour.tsx
 //
-// Four anchored notes, once, then never again.
+// A few anchored notes, once, then never again.
 //
 // Not a carousel and not a blocking modal. One SVG draws the scrim, cuts a
 // hole around the control being named, rings it in ink and runs a leader to
@@ -12,19 +12,29 @@
 // tour that rings empty space to explain something invisible is the failure
 // this most easily falls into.
 
-import { useCallback, useEffect, useState } from 'react';
-import { ROMAN, TOUR_STEPS, inkRect, nextStep } from '@/lib/tour';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { ROMAN, TOUR_STEPS, inkRect, nextStep as nextOf, placeNote, type TourStep } from '@/lib/tour';
 
 interface Box { x: number; y: number; w: number; h: number }
 
-export function Tour({ open, onDone }: { open: boolean; onDone: () => void }) {
+export function Tour({ open, onDone, steps = TOUR_STEPS }: { open: boolean; onDone: () => void; steps?: TourStep[] }) {
+  const nextStep = (i: number) => nextOf(i, steps.length);
   const [i, setI] = useState(0);
   const [box, setBox] = useState<Box | null>(null);
   const [vw, setVw] = useState(0);
   const [vh, setVh] = useState(0);
+  // The note's real height, measured once it is on the page: the copy wraps
+  // differently at every width, and a guessed height is how a note ends up
+  // sitting on the control it is naming.
+  const noteRef = useRef<HTMLDivElement>(null);
+  const [noteH, setNoteH] = useState(210);
+  useLayoutEffect(() => {
+    const h = noteRef.current?.offsetHeight;
+    if (h && Math.abs(h - noteH) > 1) setNoteH(h);
+  });
 
   const measure = useCallback((idx: number): Box | null => {
-    const step = TOUR_STEPS[idx];
+    const step = steps[idx];
     if (!step) return null;
     const el = document.querySelector<HTMLElement>(`[data-tour="${step.anchor}"]`);
     if (!el) return null;
@@ -32,7 +42,7 @@ export function Tour({ open, onDone }: { open: boolean; onDone: () => void }) {
     // Zero-sized means present in the tree but not actually shown.
     if (r.width < 4 || r.height < 4) return null;
     return { x: r.left, y: r.top, w: r.width, h: r.height };
-  }, []);
+  }, [steps]);
 
   // Walk forward to the first step whose control is really on screen.
   const settle = useCallback(
@@ -108,7 +118,7 @@ export function Tour({ open, onDone }: { open: boolean; onDone: () => void }) {
   }, [open, onDone]);
 
   if (!open || !box) return null;
-  const step = TOUR_STEPS[i];
+  const step = steps[i];
   const pad = 6;
   const bx = box.x - pad;
   const by = box.y - pad;
@@ -121,18 +131,16 @@ export function Tour({ open, onDone }: { open: boolean; onDone: () => void }) {
     else settle(n);
   };
 
-  // The note sits beside the hole, clamped so it never leaves the window.
-  const NW = 288;
-  const noteX =
-    step.place === 'right'
-      ? Math.min(bx + bw + 18, vw - NW - 16)
-      : Math.min(Math.max(16, bx + bw / 2 - NW / 2), vw - NW - 16);
-  const noteY =
-    step.place === 'above'
-      ? Math.max(16, by - 150)
-      : step.place === 'below'
-        ? Math.min(by + bh + 16, vh - 170)
-        : Math.min(Math.max(16, by), vh - 170);
+  // The note sits beside the hole, never over it, and never off the window.
+  const NW = Math.min(288, Math.max(200, vw - 32));
+  const placed = placeNote({ x: bx, y: by, w: bw, h: bh }, step.place, { w: NW, h: noteH }, { w: vw, h: vh });
+  const noteX = placed.x;
+  const noteY = placed.y;
+  // the leader lands on the note's edge nearest the control
+  const cx = bx + bw / 2;
+  const cy = by + bh / 2;
+  const endX = Math.min(Math.max(cx, noteX + 24), noteX + NW - 24);
+  const endY = placed.side === 'above' ? noteY + noteH : placed.side === 'below' ? noteY : Math.min(Math.max(cy, noteY + 20), noteY + noteH - 20);
 
   return (
     <div className="tour-layer" role="dialog" aria-modal="false" aria-label={step.title}>
@@ -151,19 +159,24 @@ export function Tour({ open, onDone }: { open: boolean; onDone: () => void }) {
         <path d={inkRect(bx, by, bw, bh)} className="tour-ring" />
         <path
           className="tour-leader"
-          d={`M${bx + bw / 2},${by + bh / 2} Q${(bx + bw / 2 + noteX) / 2},${
-            (by + bh / 2 + noteY) / 2
-          } ${noteX + NW / 2},${noteY + 20}`}
+          d={`M${cx},${placed.side === 'above' ? by : placed.side === 'below' ? by + bh : cy} Q${(cx + endX) / 2},${(cy + endY) / 2} ${endX},${endY}`}
         />
         {/* where the leader lands on the note */}
-        <circle className="tour-dot" cx={noteX + NW / 2} cy={noteY + 20} r="3.5" />
+        <circle className="tour-dot" cx={endX} cy={endY} r="3.5" />
       </svg>
 
-      <div className="tour-note" style={{ left: noteX, top: noteY, width: NW }}>
+      <div
+        ref={noteRef}
+        // NOT .tour-above: that class lifts the note by its own height in a
+        // transform, which was right when the top was the control's edge and
+        // doubles the lift now that placeNote has already placed it
+        className="tour-note"
+        style={{ left: noteX, top: noteY, width: NW }}
+      >
         <div className="tn-head">
           <span className="tn-num">{ROMAN[i]}.</span>
           <span className="tn-ticks" aria-hidden="true">
-            {TOUR_STEPS.map((s, n) => (
+            {steps.map((s, n) => (
               <i key={s.anchor} className={n <= i ? 'on' : ''} />
             ))}
           </span>
@@ -176,7 +189,7 @@ export function Tour({ open, onDone }: { open: boolean; onDone: () => void }) {
             Skip
           </button>
           <button type="button" className="tn-next" onClick={advance}>
-            {nextStep(i) === null ? 'Done' : 'Next'}
+            {nextStep(i) === null ? 'Got it' : 'Next'}
           </button>
         </div>
       </div>

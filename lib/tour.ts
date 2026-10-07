@@ -1,6 +1,6 @@
 // lib/tour.ts
 //
-// The first-run tour: four anchored notes, once, then never again.
+// The first-run tour: a few anchored notes, once, then never again.
 //
 // ANCHORED BY data-tour, NOT BY STYLE. The design named its targets with
 // CSS classes — `.s-list`, `.mp-btn`, `.cp-wrap textarea` — which works in a
@@ -18,62 +18,103 @@
 export interface TourStep {
   /** the value of the data-tour attribute to ring */
   anchor: string;
-  place: 'right' | 'above' | 'below';
+  place: 'right' | 'left' | 'above' | 'below';
   title: string;
-  /** one sentence, with a single <em>. Ours, never anything typed. */
+  /** one short sentence, with a single <em>. Ours, never anything typed. */
   body: string;
 }
 
-export const TOUR_STEPS: TourStep[] = [
-  {
-    anchor: 'sessions', place: 'right',
-    title: 'Your sessions',
-    body: 'Every thought session stays here, in full. <em>Nothing is deleted to make room</em> for something newer.',
-  },
-  {
-    anchor: 'composer', place: 'above',
-    title: 'Say the real thing',
-    body: 'Not a prompt. A sentence about what you are actually trying to work out — <em>it reads for the claim underneath.</em>',
-  },
-  {
-    anchor: 'model', place: 'above',
-    title: 'Model, and depth',
-    body: 'One control, two questions: <em>which model answers, and how far it goes.</em>',
-  },
-  {
-    anchor: 'account', place: 'below',
-    title: 'Yours to take',
-    body: 'Your account and your picture. Every map is exportable — or deletable — <em>the moment you decide.</em>',
-  },
+/**
+ * STUPIDLY SIMPLE, ON PURPOSE. A few words each, one thing per note, and it
+ * runs right after onboarding has sent their first thought — when they are
+ * looking at Socria's first answer and the controls finally mean something.
+ */
+export const CORE_TOUR: TourStep[] = [
+  { anchor: 'composer', place: 'above', title: 'Write here', body: 'Say what you are working through. <em>Socria asks back.</em>' },
+  { anchor: 'model', place: 'above', title: 'Pick how it thinks', body: 'Core 4 talks it through. <em>Logos draws it as a map.</em>' },
+  { anchor: 'sessions', place: 'right', title: 'It is all saved', body: 'Every conversation stays here, <em>in full.</em>' },
 ];
 
+export const LOGOS_TOUR: TourStep[] = [
+  { anchor: 'map', place: 'left', title: 'This is your map', body: 'What you say is drawn here <em>as you talk.</em>' },
+  { anchor: 'card', place: 'below', title: 'Tap any card', body: 'Explore it, challenge it, <em>or ask about it.</em>' },
+  { anchor: 'composer', place: 'above', title: 'Keep talking', body: 'The map grows <em>with every message.</em>' },
+  { anchor: 'model', place: 'above', title: 'Switch any time', body: 'Rather just talk it through? <em>Pick Core 4 here.</em>' },
+];
+
+/** The chat's tour — what "Take the tour again" replays. */
+export const TOUR_STEPS: TourStep[] = CORE_TOUR;
+
 export const TOUR_KEY = 'socria.tour.v1';
+export const LOGOS_TOUR_KEY = 'socria.tour.logos.v1';
 export const ROMAN = ['i', 'ii', 'iii', 'iv', 'v'];
 
 /**
  * Whether to run at all.
  *
- * The onboarding condition is the interesting one. /onboarding already walks
- * somebody through what Socria is FOR, on their own sentence, and this walks
- * them round the furniture. Both in one session is too much teaching for one
- * sitting, so a person who has just arrived from the beginning is left alone
- * and meets this on a later visit — which is also when the furniture starts
- * to matter.
+ * ONBOARDING STARTS IT. It used to be held back from anybody who had just
+ * come through onboarding — two lessons in one sitting — but onboarding now
+ * sends their first thought for them, so the tour is what comes next: once
+ * Socria's first answer is on screen, the notes name the few controls they
+ * will actually use. Otherwise it runs only when asked for (Manage Account).
  */
 export function shouldRunTour(c: {
+  /** this tour's key is already written */
   done: boolean;
-  signedIn: boolean;
+  /** not asked: a signed-out visitor's tour simply skips what they cannot see */
+  signedIn?: boolean;
   /** they arrived straight from /onboarding this session */
   justOnboarded: boolean;
   /** a sheet or modal already owns the screen */
   blocked: boolean;
 }): boolean {
-  return !c.done && c.signedIn && !c.justOnboarded && !c.blocked;
+  return c.justOnboarded && !c.done && !c.blocked;
+}
+
+/**
+ * WHERE THE NOTE GOES: beside the control, never on top of it.
+ *
+ * It used to be placed a fixed 150px above the control, and the note is
+ * taller than that — so "Write here" sat over the very composer it was
+ * naming, and the model chip was hidden under its own note. This takes the
+ * note's MEASURED size, tries the side the step asked for, then the opposite
+ * side, then the two others, and takes the first that fits the window
+ * without touching the control. Only when nothing fits (a phone, a huge
+ * control) does it fall back to the clamped preferred side.
+ */
+export type Side = TourStep['place'];
+export interface Rect { x: number; y: number; w: number; h: number }
+const OPPOSITE: Record<Side, Side> = { above: 'below', below: 'above', left: 'right', right: 'left' };
+export function placeNote(
+  box: Rect,
+  want: Side,
+  note: { w: number; h: number },
+  view: { w: number; h: number },
+  gap = 18,
+  margin = 16
+): { x: number; y: number; side: Side } {
+  const clampX = (x: number) => Math.min(Math.max(margin, x), Math.max(margin, view.w - note.w - margin));
+  const clampY = (y: number) => Math.min(Math.max(margin, y), Math.max(margin, view.h - note.h - margin));
+  const at = (side: Side) => {
+    if (side === 'above') return { x: clampX(box.x + box.w / 2 - note.w / 2), y: box.y - gap - note.h, side };
+    if (side === 'below') return { x: clampX(box.x + box.w / 2 - note.w / 2), y: box.y + box.h + gap, side };
+    if (side === 'right') return { x: box.x + box.w + gap, y: clampY(box.y), side };
+    return { x: box.x - gap - note.w, y: clampY(box.y), side };
+  };
+  const fits = (p: { x: number; y: number }) =>
+    p.x >= margin - 0.5 && p.y >= margin - 0.5 && p.x + note.w <= view.w - margin + 0.5 && p.y + note.h <= view.h - margin + 0.5;
+  const order: Side[] = [want, OPPOSITE[want], ...(['above', 'below', 'right', 'left'] as Side[]).filter((s) => s !== want && s !== OPPOSITE[want])];
+  for (const side of order) {
+    const p = at(side);
+    if (fits(p)) return p;
+  }
+  const p = at(want);
+  return { x: clampX(p.x), y: clampY(p.y), side: want };
 }
 
 /** The next index, or null when the tour is over. */
-export function nextStep(i: number): number | null {
-  return i + 1 < TOUR_STEPS.length ? i + 1 : null;
+export function nextStep(i: number, n: number = TOUR_STEPS.length): number | null {
+  return i + 1 < n ? i + 1 : null;
 }
 
 /**

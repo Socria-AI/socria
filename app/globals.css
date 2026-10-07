@@ -6547,6 +6547,14 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
   .logos-root .lg-allow { font-size: 11px; padding: 5px 8px; }
 }
 
+/* onboarding's first thought was free — said once, quietly, under the answer */
+.logos-root .lg-gift {
+  margin: 2px 0 10px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--lg-ink-60);
+  font-style: italic;
+}
 /* the wrong-chat note: an aside, deliberately not a modal */
 .logos-root .lg-drift {
   position: relative;

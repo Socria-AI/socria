@@ -42,6 +42,8 @@ import { AttachmentList, LogosComposer, type Draft } from '@/components/LogosCom
 import { DraftSpace, type DraftHandle, type DraftSelection } from '@/components/DraftSpace';
 import { DraftResponsePanel } from '@/components/DraftResponsePanel';
 import { LogosGuide, GUIDE_SEEN_KEY } from '@/components/LogosGuide';
+import { Tour } from '@/components/Tour';
+import { LOGOS_TOUR, LOGOS_TOUR_KEY, shouldRunTour } from '@/lib/tour';
 import { LogosMark } from '@/components/LogosMark';
 import { AccountControl } from '@/components/account/AccountControl';
 import { AccountSheet } from '@/components/account/AccountSheet';
@@ -298,9 +300,15 @@ export function LogosApp({
   onProjectSettings,
   onCreateProject,
   onMoveChat,
+  autoSend = false,
+  tourAfter = false,
 }: {
   onSwitchModel?: (next: SocriaModel) => void;
   initialInput?: string;
+  /** send initialInput on landing — onboarding's first thought, free once per account */
+  autoSend?: boolean;
+  /** run the tour once Socria's first reply is on screen — onboarding starts it */
+  tourAfter?: boolean;
   model?: SocriaModel;
   chats?: { id: string; title: string; updatedAt: number; projectId?: string | null }[];
   onOpenChat?: (id: string) => void;
@@ -425,6 +433,11 @@ export function LogosApp({
     seeded.current = true;
     setInput(initialInput);
   }, [initialInput]);
+  /** this send is onboarding's sentence — the one the server lets through free, once */
+  const firstThoughtRef = useRef(false);
+  /** …and the server let it through free: one quiet line under the answer says so */
+  const [gifted, setGifted] = useState(false);
+  const autoSentRef = useRef(false);
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [streaming, setStreaming] = useState('');
   const [busy, setBusy] = useState(false);
@@ -948,6 +961,51 @@ export function LogosApp({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map.nodes?.length, map.models?.docs?.length, firstRun.ready, busy]);
+
+  // ONBOARDING'S SENTENCE GOES STRAIGHT THROUGH. Written on /onboarding, it is
+  // sent the moment there is a session to send it in — they should land on
+  // Socria answering them, not on their own sentence waiting in a box. It is
+  // marked as the first thought, which the server lets through without
+  // spending one of the month's chats (once per account, kept on the server).
+  useEffect(() => {
+    if (!autoSend || autoSentRef.current || !initialInput || hydrating || busy || !activeId) return;
+    autoSentRef.current = true;
+    seeded.current = true;
+    firstThoughtRef.current = true;
+    void send(initialInput).finally(() => {
+      firstThoughtRef.current = false;
+    });
+    // send reads the state it needs when it runs
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoSend, initialInput, hydrating, busy, activeId]);
+
+  // …and once the answer is in and the map has drawn, the tour: four notes,
+  // once. It waits for the screen to be free — never over the guide, a sheet,
+  // or the first map rising — and gives the map a few seconds at most.
+  const [tourOpen, setTourOpen] = useState(false);
+  const tourShownRef = useRef(false);
+  const hasReply = messages.some((m) => m.role === 'assistant');
+  const mapDrawn = (map.nodes?.length ?? 0) > 0 && !mapping;
+  const screenBusy = guideOpen || styleOpen || emerging || explore.open || ctxPanel.open;
+  useEffect(() => {
+    if (tourShownRef.current || busy || !hasReply) return;
+    let done = false;
+    try {
+      done = localStorage.getItem(LOGOS_TOUR_KEY) === '1';
+    } catch {}
+    if (!shouldRunTour({ done, justOnboarded: tourAfter, blocked: screenBusy })) return;
+    const t = setTimeout(() => {
+      tourShownRef.current = true;
+      setTourOpen(true);
+    }, mapDrawn ? 900 : 6000);
+    return () => clearTimeout(t);
+  }, [tourAfter, busy, hasReply, mapDrawn, screenBusy]);
+  const endTour = useCallback(() => {
+    setTourOpen(false);
+    try {
+      localStorage.setItem(LOGOS_TOUR_KEY, '1');
+    } catch {}
+  }, []);
 
   const logosStarters = buildStarters(
     {
@@ -2699,7 +2757,8 @@ export function LogosApp({
     // a press that does nothing — that was the whole reason entitlement
     // prompts were never rationed, and the once-per-tab rule only holds
     // because this line keeps the promise the sheet used to.
-    if (!one && chatsSpent && !messages.some((m) => m.role === 'user')) {
+    // Onboarding's sentence is exempt — the server decides whether it still is.
+    if (!one && chatsSpent && !firstThoughtRef.current && !messages.some((m) => m.role === 'user')) {
       if (!ask('chats-spent')) setError(boundaryNote('chats'));
       return;
     }
@@ -2793,6 +2852,9 @@ export function LogosApp({
           // what they told onboarding they mostly think about (an id, or nothing)
           ...(readRole() ? { role: readRole() } : {}),
           ...(readName() ? { name: readName() } : {}),
+          // the sentence onboarding sent for them: free, once per account
+          // (the server keeps the once — lib/usage.ts firstThoughtUsed)
+          ...(firstThoughtRef.current ? { firstThought: true } : {}),
           ...(objTurn.lastStep ? { objectStep: objTurn.lastStep } : {}),
           ...(objTurn.refused ? { objectRefused: objTurn.refused } : {}),
           ...(objTurn.claims.length ? { objectClaims: objTurn.claims } : {}),
@@ -2833,6 +2895,12 @@ export function LogosApp({
 
       // The turn was accepted. Now the map may be rebuilt from it.
       refreshMap();
+      // The server says when this was onboarding's free first thought, so the
+      // free plan's count can be read honestly under the answer.
+      if (res.headers.get('X-Socria-First-Thought') === '1') {
+        setGifted(true);
+        void refreshUsage(activeIdRef.current);
+      }
 
       const reader = res.body?.getReader();
       const decoder = new TextDecoder();
@@ -3520,6 +3588,17 @@ export function LogosApp({
               </div>
             )}
 
+            {gifted && !busy && !one && (
+              <p className="lg-gift" role="note">
+                This one was on us.{' '}
+                {usage.chats?.limit != null
+                  ? (() => {
+                      const left = Math.max(0, usage.chats.limit - usage.chats.used);
+                      return `You still have ${left} free Logos ${left === 1 ? 'chat' : 'chats'} this month.`;
+                    })()
+                  : 'Your free Logos chats this month are all still there.'}
+              </p>
+            )}
             {error && <p className="lg-error">{error}</p>}
             <div ref={bottomRef} />
           </div>
@@ -4077,19 +4156,14 @@ export function LogosApp({
         <LogosIntroOnce
           onStart={(text) => {
             firstRun.reach('socria.intro');
-            setInput(text);
-            requestAnimationFrame(() => {
-              const ta = document.querySelector<HTMLTextAreaElement>('.lg-composer textarea');
-              if (ta) {
-                ta.focus();
-                ta.setSelectionRange(ta.value.length, ta.value.length);
-              }
-            });
+            // straight through: the answer to their own question is the welcome
+            void send(text);
           }}
           onSkip={() => firstRun.reach('socria.intro', { skipped: true })}
         />
       )}
       <LogosGuide open={guideOpen} onClose={closeGuide} />
+      <Tour open={tourOpen} steps={LOGOS_TOUR} onDone={endTour} />
       {styleOpen && (
         <div className="lg-style-scrim" role="dialog" aria-modal="true" aria-label="How should Socria work with you?">
           <div className="lg-style-back" onClick={() => setStyleOpen(false)} aria-hidden="true" />
@@ -4176,6 +4250,7 @@ export function LogosApp({
         open={acctOpen}
         onClose={() => setAcctOpen(false)}
         isOne={one}
+        onRetakeTour={() => setTourOpen(true)}
       />
 
       <SocriaOneModal

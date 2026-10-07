@@ -308,7 +308,7 @@ export function LogosComposer({
   }
 
   return (
-    <div className="lg-composer">
+    <div className="lg-composer" data-tour="composer">
       <div
         className={`lg-composer-box${dragging ? ' is-dropping' : ''}`}
         onDragEnter={(e) => {

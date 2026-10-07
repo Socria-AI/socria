@@ -80,6 +80,9 @@ export function Onboarding() {
           text,
           intent,
           surface: model === 'logos-2' ? 'logos' : 'core',
+          // it goes straight through: they land on Socria's answer to their own
+          // question, and the tour starts from there
+          send: true,
         });
         go(model);
       }}

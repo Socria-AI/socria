@@ -32,7 +32,9 @@ import {
   bumpUsage,
   chatAlreadyCounted,
   checkAllowance,
+  firstThoughtUsed,
   markChatCounted,
+  claimFirstThought,
 } from '@/lib/usage';
 import { renderContextsForNode, sanitizeNodeContextList } from '@/lib/logos-sources';
 import { guidanceBlock, resolveDepth, resolveGuard } from '@/lib/logos-guidance';
@@ -220,8 +222,12 @@ export async function POST(req: NextRequest) {
     // Whether THIS request is the one that will pay for the conversation.
     // Checked here, charged further down — see the note at the charge itself.
     const willCharge = isNewChat && !alreadyCounted;
+    // The sentence written in onboarding, sent for them on landing: free, once
+    // per account ever (lib/usage.ts firstThoughtUsed). The claim is the
+    // client's; the once-ever is the server's.
+    const firstThought = willCharge && body?.firstThought === true && !!userId && !(await firstThoughtUsed(userId));
 
-    if (willCharge) {
+    if (willCharge && !firstThought) {
       const allowance = await checkAllowance(userId, plan, 'chats');
       if (!allowance.ok) {
         // A note about this boundary may go by email — a day from now, not
@@ -478,8 +484,12 @@ export async function POST(req: NextRequest) {
     // answer is being written, and a connection that drops halfway through
     // one is a turn the person had. The marker goes with it, so the retry of
     // an answered turn is still free.
+    let gifted = false;
     if (willCharge && userId && limitOf(plan, 'chats') !== null) {
-      await bumpUsage(userId, 'chats');
+      // the gift is claimed atomically; a request that lost the race to
+      // another tab is an ordinary chat and is counted as one
+      gifted = firstThought && (await claimFirstThought(userId));
+      if (!gifted) await bumpUsage(userId, 'chats');
       await markChatCounted(userId, sessionId);
     }
 
@@ -510,6 +520,8 @@ export async function POST(req: NextRequest) {
         'Content-Type': 'text/plain; charset=utf-8',
         'Cache-Control': 'no-cache, no-transform',
         'X-Content-Type-Options': 'nosniff',
+        // onboarding's first thought, let through free — the client says so once
+        ...(gifted ? { 'X-Socria-First-Thought': '1' } : {}),
       },
     });
   } catch (e: any) {

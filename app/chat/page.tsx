@@ -341,6 +341,13 @@ export default function ChatPage() {
   const [carriedText, setCarriedText] = useState('');
   /** they arrived with a sentence from the first-run screen — it has just been read */
   const carriedRef = useRef(false);
+  /**
+   * ONBOARDING'S SENTENCE GOES STRAIGHT THROUGH. Written on /onboarding, it is
+   * sent on landing — to Core here, or to Logos (which sends its own) — and
+   * once Socria's first answer is on screen, the tour starts.
+   */
+  const [autoSend, setAutoSend] = useState<{ text: string; logos: boolean } | null>(null);
+  const [tourAfter, setTourAfter] = useState(false);
   // What this person has already been taught, on every surface (lib/first-run.ts).
   const firstRun = useFirstRun({ signedIn: !!isSignedIn, surface: 'core' });
   /** the conversation Core's one line is shown under, if any */
@@ -431,13 +438,10 @@ export default function ChatPage() {
   // means the tour simply waits, and opens when the screen is free.
   const anythingOpen =
     logosModalOpen || core4IntroOpen || acctOpen || importOpen || !!shareInsight;
-  // THE FURNITURE TOUR NO LONGER RUNS ON ITS OWN. Chat is a familiar
-  // interaction; what a first visit has to teach is why Core answers the way
-  // it does, and that is taught by the first reply (see `coreLine`). The tour
-  // stays reachable from the account sheet for anyone who wants the furniture
-  // named, and lib/tour.ts still decides it would be allowed.
-  void shouldRunTour;
-  void justOnboarded;
+  // THE TOUR RUNS ONCE, STARTED BY ONBOARDING: after the sentence onboarding
+  // sent has been answered (see the effect beside the auto-send). Otherwise
+  // it is reachable from the account sheet for anyone who wants the
+  // furniture named.
   const [journey, setJourney] = useState<UserUnderstanding | null>(null);
   // Freshest journey, immune to stale closures (the cadence update fires from
   // async flows that captured an older render).
@@ -1235,6 +1239,39 @@ export default function ChatPage() {
 
   // Scroll to bottom when messages or stream changes
   const active = conversations.find((c) => c.id === activeId);
+
+  // Onboarding's sentence, sent to Core once the conversations are in and the
+  // model they chose has been applied (Logos sends its own — see LogosApp).
+  useEffect(() => {
+    if (!autoSend || autoSend.logos || hydrating || sending || isLogosSurface(model)) return;
+    const text = autoSend.text;
+    setAutoSend(null);
+    setInput('');
+    void send(text);
+    // send reads the state it needs when it runs
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoSend, hydrating, sending, model]);
+  // …and once Socria's first answer has landed, the tour: a few notes, once.
+  useEffect(() => {
+    if (isLogosSurface(model) || sending) return;
+    if (!active?.messages.some((m) => m.role === 'assistant')) return;
+    let done = false;
+    try {
+      done = localStorage.getItem(TOUR_KEY) === '1';
+    } catch {}
+    const may = shouldRunTour({
+      done,
+      signedIn: !!isSignedIn,
+      justOnboarded: tourAfter && justOnboarded.current,
+      blocked: anythingOpen,
+    });
+    if (!may) return;
+    const t = setTimeout(() => {
+      setTourAfter(false);
+      setTourOpen(true);
+    }, 900);
+    return () => clearTimeout(t);
+  }, [tourAfter, model, sending, active?.messages, anythingOpen, isSignedIn]);
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [active?.messages.length, streamed]);
@@ -2129,6 +2166,10 @@ export default function ChatPage() {
     if (carried) {
       carriedRef.current = true;
       setCarriedText(carried.text);
+      if (carried.send) {
+        setAutoSend({ text: carried.text, logos: carried.surface === 'logos' });
+        setTourAfter(true);
+      }
       setInput(carried.text);
       requestAnimationFrame(() => textareaRef.current?.focus());
       // Written for Logos — on the Logos page's own door — so it opens there,
@@ -2289,6 +2330,9 @@ export default function ChatPage() {
       )}
       <LogosApp
         initialInput={carriedText}
+        // onboarding's sentence is sent for them, and the tour follows the reply
+        autoSend={!!autoSend?.logos}
+        tourAfter={tourAfter}
         // WHICH Logos. Without this the surface assumed it was Logos 1 — its
         // composer's model menu named that one, ticked it, and offered it.
         model={model}
@@ -2588,8 +2632,8 @@ export default function ChatPage() {
         <IntroOnce
           onStart={(text) => {
             firstRun.reach('socria.intro');
-            setInput(text);
-            requestAnimationFrame(() => textareaRef.current?.focus());
+            // straight through: the answer to their own question is the welcome
+            void send(text);
           }}
           onSkip={() => firstRun.reach('socria.intro', { skipped: true })}
         />

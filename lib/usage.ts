@@ -199,6 +199,59 @@ export async function markChatCounted(
   }
 }
 
+/**
+ * THE FIRST THOUGHT IS FREE — once per account, ever.
+ *
+ * The sentence somebody writes in onboarding is sent for them the moment they
+ * land, and it is not one of their month's chats: a free person arrives, sees
+ * Socria answer their own question, and still has every chat of the month
+ * ahead of them. Lifetime, not monthly, and marked on the account, so it is
+ * one conversation and never a loophole.
+ */
+const FIRST_THOUGHT_SCOPE = 'first-thought';
+
+export async function firstThoughtUsed(userId: string | null): Promise<boolean> {
+  if (!userId) return true;
+  try {
+    const { data, error } = await supabaseAdmin()
+      .from('logos_usage')
+      .select('n')
+      .eq('user_id', userId)
+      .eq('scope', FIRST_THOUGHT_SCOPE)
+      .eq('counter', 'chats')
+      .maybeSingle();
+    // Unreadable: no gift. The ordinary allowance still applies, so nobody is
+    // refused — they are simply counted as usual.
+    if (error) return true;
+    return typeof data?.n === 'number' && data.n > 0;
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * Take the gift, atomically. True only for the request whose increment made
+ * the marker 1 — two requests racing past firstThoughtUsed cannot both be
+ * free; the loser is charged as an ordinary chat. A marker that cannot be
+ * written is not a gift either: that turn is counted as usual.
+ */
+export async function claimFirstThought(userId: string | null): Promise<boolean> {
+  if (!userId) return false;
+  try {
+    const { data, error } = await supabaseAdmin().rpc('bump_logos_usage', {
+      p_user: userId,
+      p_scope: FIRST_THOUGHT_SCOPE,
+      p_counter: 'chats',
+      p_by: 1,
+      p_at: Date.now(),
+    });
+    if (error) return false;
+    return data === 1;
+  } catch {
+    return false;
+  }
+}
+
 export interface Allowance {
   /** false when this action is past the plan's limit */
   ok: boolean;
