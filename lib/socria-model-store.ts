@@ -150,8 +150,17 @@ export function isOffered(model: SocriaModel, gates: readonly GateId[] = openGat
   const m = SOCRIA_MODELS[model];
   // A dev-only model is offered everywhere but production, and held back
   // there exactly as a withdrawn one is.
-  return !m.withdrawn && !m.soon && !(m.devOnly && isProduction()) && !(m.gate && isProduction() && !gates.includes(m.gate));
+  // An earlier model kept under "Other models" stays a real choice — picked
+  // there, remembered, and reached by a link — though retired from the main list.
+  const kept = OTHER_MODELS.includes(model);
+  return (kept || !m.withdrawn) && !m.soon && !(m.devOnly && isProduction()) && !(m.gate && isProduction() && !gates.includes(m.gate));
 }
+
+/**
+ * The earlier models, listed under "Other models" in the picker by name alone.
+ * Not the ones Socria leads with; kept for whoever wants them.
+ */
+export const OTHER_MODELS: readonly SocriaModel[] = ['core-2', 'core-3', 'logos'];
 
 /** Every model a menu may show, in registry order. */
 export function offeredModels(gates: readonly GateId[] = openGates()): SocriaModel[] {
@@ -169,9 +178,11 @@ export function offeredModels(gates: readonly GateId[] = openGates()): SocriaMod
  */
 export function withdrawnTo(model: SocriaModel): SocriaModel | null {
   const from = SOCRIA_MODELS[model];
-  const sameKind = offeredModels().find(
-    (id) => id !== model && !!SOCRIA_MODELS[id].logosSurface === !!from.logosSurface
-  );
+  // a current model first; an earlier one only if nothing current is of the same kind
+  const sameKind =
+    offeredModels().find(
+      (id) => id !== model && !OTHER_MODELS.includes(id) && !!SOCRIA_MODELS[id].logosSurface === !!from.logosSurface
+    ) ?? offeredModels().find((id) => id !== model && !!SOCRIA_MODELS[id].logosSurface === !!from.logosSurface);
   return sameKind ?? null;
 }
 

@@ -39,7 +39,7 @@ import {
   type Readability,
   type ReplyLength,
 } from '@/lib/socria-prompt';
-import { offeredModels } from '@/lib/socria-model-store';
+import { offeredModels, OTHER_MODELS } from '@/lib/socria-model-store';
 import { GATE_CHANGED, openGates, type GateId } from '@/lib/feature-gates';
 import { PLANS } from '@/lib/entitlements';
 import { type Plan } from '@/lib/socria-one';
@@ -71,9 +71,11 @@ function useOffered() {
     return () => window.removeEventListener(GATE_CHANGED, read);
   }, []);
   const all = offeredModels(gates);
+  const main = all.filter((id) => !OTHER_MODELS.includes(id));
   return {
-    ANSWERERS: all.filter((id) => !SOCRIA_MODELS[id].logosSurface),
-    SURFACES: all.filter((id) => SOCRIA_MODELS[id].logosSurface),
+    ANSWERERS: main.filter((id) => !SOCRIA_MODELS[id].logosSurface),
+    SURFACES: main.filter((id) => SOCRIA_MODELS[id].logosSurface),
+    OTHERS: OTHER_MODELS.filter((id) => all.includes(id)),
   };
 }
 
@@ -113,7 +115,7 @@ export function ModelPicker({
    */
   plan?: Plan;
 }) {
-  const { ANSWERERS, SURFACES } = useOffered();
+  const { ANSWERERS, SURFACES, OTHERS } = useOffered();
   const [open, setOpen] = useState(false);
   /** the register they pressed that their plan does not open, if any */
   const [locked, setLocked] = useState<string | null>(null);
@@ -284,6 +286,28 @@ export function ModelPicker({
                 Logos 2 is that surface with the model workspace in it. */}
             <div className="mp-rule" />
             {SURFACES.map(row)}
+
+            {/* The earlier models, by name and nothing else. */}
+            {OTHERS.length > 0 && (
+              <>
+                <div className="mp-rule" />
+                <p className="mp-lbl">Other models</p>
+                <div className="mp-others">
+                  {OTHERS.map((id) => (
+                    <button
+                      key={id}
+                      type="button"
+                      role="menuitemradio"
+                      aria-checked={value === id}
+                      className={`mp-other${value === id ? ' on' : ''}`}
+                      onClick={() => pick(id)}
+                    >
+                      {SOCRIA_MODELS[id].id === 'logos' ? 'Logos 1' : SOCRIA_MODELS[id].short}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
 
             {needs && (
               <p className="mp-need">

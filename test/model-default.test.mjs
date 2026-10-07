@@ -29,6 +29,7 @@ import {
   readStoredModel,
   rememberModel,
   withdrawnTo,
+  OTHER_MODELS,
 } from './.tmp/socria-model-store.mjs';
 import { SOCRIA_MODELS as MODELS } from './.tmp/socria-prompt.mjs';
 import { readFileSync } from 'node:fs';
@@ -104,8 +105,9 @@ console.log('\n=== ours versus theirs ===');
   // model returns.
   ok('...and what was written is what is stored',
     localStorage.getItem(MODEL_KEY) === 'logos');
+  // Logos 1 is offered (under Other models), so it reads back as itself.
   ok('...while reading it back gives the surface that is offered',
-    readStoredModel() === 'logos-2');
+    readStoredModel() === 'logos');
 }
 
 console.log('\n=== what the rule does to each kind of person ===');
@@ -146,8 +148,9 @@ console.log('\n=== what the rule does to each kind of person ===');
   // surface away.
   fresh();
   chooseModel('logos');
+  // Logos 1 is kept under "Other models": chosen, it is what they get.
   ok('a free person who chose Logos keeps a Logos surface',
-    opens({ hasAccount: true, isOne: false }) === 'logos-2');
+    opens({ hasAccount: true, isOne: false }) === 'logos');
 
   // Signing out is the exception the page enforces separately, because the
   // API would bounce every message. Asserted here as the rule it is.
@@ -157,7 +160,7 @@ console.log('\n=== what the rule does to each kind of person ===');
   chooseModel('logos');
   const signedOut = opens({ hasAccount: false, isOne: false });
   ok('a choice they can no longer use is still their choice, until clamped',
-    signedOut === 'logos-2');
+    signedOut === 'logos');
   ok('...and the clamp answers Core 3.1', autoModel({ hasAccount: false, isOne: false }) === 'core-3');
 }
 
@@ -180,7 +183,7 @@ console.log('\n=== the way back out of Logos ===');
   // Core 2 still stores and still returns: it answers until 2 October, and a
   // retirement that took somebody out of a conversation early would be the
   // one thing worse than the retirement.
-  ok('a model with a date on it is still a model', readStoredModel() === 'logos-2');
+  ok('a model with a date on it is still a model', readStoredModel() === 'logos');
 }
 
 console.log('\n=== nothing here throws in a browser that refuses storage ===');
@@ -214,7 +217,7 @@ console.log('\n=== junk in storage is not a model ===');
     ok(`"${junk}" is not a stored model`, readStoredModel() === null);
   }
   localStorage.setItem(MODEL_KEY, 'logos');
-  ok('a real one still reads', readStoredModel() === 'logos-2');
+  ok('a real one still reads', readStoredModel() === 'logos');
   // Logos 2 is real and selectable — it must store like any other.
   localStorage.setItem(MODEL_KEY, 'logos-2');
   ok('Logos 2 is a stored model', readStoredModel() === 'logos-2');
@@ -235,7 +238,9 @@ console.log('\n=== the retirement is data, and it has happened ===');
   // it, offered to nobody, and nobody whose browser holds it is stranded.
   const docs = readFile('app/docs/content/core-2.tsx');
   ok('Core 2 is withdrawn, with the reason beside the switch', typeof MODELS['core-2'].withdrawn === 'string' && /2 October/.test(MODELS['core-2'].withdrawn));
-  ok('  and offered to nobody', !offeredModels().includes('core-2'));
+  // …but kept, by name only, under "Other models" for whoever wants it.
+  ok('  and kept only under Other models', OTHER_MODELS.includes('core-2') && offeredModels().includes('core-2'));
+  ok('  which the picker lists apart from the current models', /OTHER_MODELS\.includes\(id\)/.test(readFile('components/ModelPicker.tsx')) && /Other models/.test(readFile('components/ModelPicker.tsx')));
   ok('nothing is leaving any more', Object.values(MODELS).filter((m) => m.leaving).length === 0);
   ok('the model’s own page says it retired', /retired on 2 October/.test(docs));
   ok('  and where the free tier went', /Core 3\.1/.test(docs));
@@ -308,7 +313,7 @@ console.log('\n=== a withdrawn model: still there, not offered, not stranding an
     fresh();
     chooseModel(id);
     ok(`a stored ${id} reads back as something offered`,
-      !MODELS[readStoredModel()].withdrawn);
+      OTHER_MODELS.includes(id) ? readStoredModel() === id : !MODELS[readStoredModel()].withdrawn);
     ok('  ...and the raw choice is kept, so restoring the model restores them',
       localStorage.getItem(MODEL_KEY) === id);
     rememberModel(id);
@@ -331,11 +336,11 @@ console.log('\n=== a withdrawn model: still there, not offered, not stranding an
   ok('  and does not build one of its own', !rollsOwn(picker));
   ok('the Logos picker is the same picker, so it shows the same list', /<ModelPicker value=\{model\}/.test(logos) && !/lg-model-btn/.test(logos));
   ok('  and does not build one of its own', !rollsOwn(logos));
-  ok('offeredModels leaves out everything withdrawn',
-    offeredModels().every((id) => !MODELS[id].withdrawn && !MODELS[id].soon));
+  ok('offeredModels leaves out everything withdrawn, except what is kept under Other models',
+    offeredModels().every((id) => (!MODELS[id].withdrawn || OTHER_MODELS.includes(id)) && !MODELS[id].soon));
   ok('  and leaves in everything else',
     offeredModels().length === Object.keys(MODELS).filter(
-      (id) => !MODELS[id].withdrawn && !MODELS[id].soon).length);
+      (id) => (!MODELS[id].withdrawn || OTHER_MODELS.includes(id)) && !MODELS[id].soon).length);
 
   ok('the chat page refuses to select one', /withdrawn/.test(chat));
   ok('  and sends a ?model= link for one to the successor',

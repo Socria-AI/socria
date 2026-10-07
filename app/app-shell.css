@@ -704,3 +704,10 @@
 .app-root .s-move button:hover{background:rgba(var(--ink-rgb, 31, 31, 31), .05);color:var(--ink)}
 .app-root .s-move button[aria-current="true"]{color:var(--moss-700)}
 .app-root .s-row[draggable="true"]{cursor:grab}
+
+/* Other models: the earlier ones, by name alone */
+.app-root .mp-others{display:flex;flex-wrap:wrap;gap:2px 4px;padding:0 4px 4px}
+.app-root .mp-other{border:0;background:none;cursor:pointer;padding:5px 8px;border-radius:7px;
+  font-family:var(--font-sans, system-ui, sans-serif);font-size:.82rem;color:var(--ink-60, rgba(31,31,31,.6))}
+.app-root .mp-other:hover{background:rgba(var(--ink-rgb, 31, 31, 31), .04);color:var(--ink)}
+.app-root .mp-other.on{background:rgba(var(--moss-rgb, 94, 118, 51), .1);color:var(--ink)}
