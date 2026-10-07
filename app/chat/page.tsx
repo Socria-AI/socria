@@ -1,6 +1,7 @@
 // app/chat/page.tsx
 'use client';
 
+import { readRole } from '@/lib/onboarding-roles';
 import { useThemeGuard } from '@/components/account/ThemePicker';
 import { useGateSync } from '@/components/account/AccessCode';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -1757,6 +1758,8 @@ export default function ChatPage() {
           // The Project it is in. Retrieval gives that region of the graph
           // priority — it does not wall anything else off.
           projectId: convoForRequest.projectId ?? undefined,
+          // what they told onboarding they mostly think about (an id, or nothing)
+          role: readRole() ?? undefined,
         }),
       });
 

@@ -89,6 +89,8 @@ export const FIRST_RUN_KEYS = [
   'socria.logos.guide.v1',
   'socria.core4IntroDontShowAgain.v1',
   'socria.hints.seen.v1',
+  // what they told onboarding they mostly think about, so a replay asks again
+  'socria.role.v1',
 ] as const;
 
 /**

@@ -17,6 +17,7 @@ import { useRouter } from 'next/navigation';
 import { useUser } from '@clerk/nextjs';
 import { ThinkingMap, VIEW_RESET, type MapNodeRef, type ObjectAction } from '@/components/ThinkingMap';
 import { sanitizeViz } from '@/lib/logos-viz';
+import { readRole } from '@/lib/onboarding-roles';
 import {
   apply as applyObjectOp,
   bindNodes,
@@ -2862,6 +2863,8 @@ export function LogosApp({
           // Re-sanitised on the server, where every step is RE-COMPUTED from
           // the state before it — so what the reply is told was computed was.
           ...(mapRef.current?.objects ? { objects: mapRef.current.objects } : {}),
+          // what they told onboarding they mostly think about (an id, or nothing)
+          ...(readRole() ? { role: readRole() } : {}),
           ...(objTurn.lastStep ? { objectStep: objTurn.lastStep } : {}),
           ...(objTurn.refused ? { objectRefused: objTurn.refused } : {}),
           ...(objTurn.claims.length ? { objectClaims: objTurn.claims } : {}),

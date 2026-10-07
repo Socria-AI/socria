@@ -156,3 +156,12 @@
 .acct-sheet .tt-reached span{font-weight:600}
 .acct-sheet .tt-note{margin:12px 0 0;font-size:.74rem;line-height:1.45;color:var(--ink-70)}
 .acct-sheet .tt-note code{font-size:.72rem}
+
+/* What you mostly think about */
+.acct-sheet .rp{display:flex;flex-wrap:wrap;gap:6px}
+.acct-sheet .rp-o{display:inline-flex;align-items:center;gap:6px;padding:6px 11px 6px 9px;border:1px solid var(--line, rgba(31,31,31,.14));border-radius:999px;
+  background:none;cursor:pointer;font:inherit;font-size:.86rem;color:var(--ink)}
+.acct-sheet .rp-o svg{color:var(--moss-700, #3e5a23)}
+.acct-sheet .rp-o:hover{border-color:var(--moss, #5e7633)}
+.acct-sheet .rp-o.on{border-color:var(--moss, #5e7633);background:rgba(var(--moss-rgb, 94, 118, 51), .1)}
+.acct-sheet .rp-note{flex-basis:100%;margin:6px 0 0;font-size:.76rem;color:var(--ink-70)}

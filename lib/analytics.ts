@@ -63,6 +63,9 @@ export const EVENTS = [
   'logos_first_experience_completed',
   'logos_aha_reached',
   'onboarding_skipped',
+  // which broad kind of thinking they picked in onboarding — an id from
+  // lib/onboarding-roles.ts, never their words
+  'onboarding_role_chosen',
   'progressive_trace_discovered',
   'progressive_view_discovered',
   'progressive_dependencies_discovered',

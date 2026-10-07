@@ -21,6 +21,9 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Logo } from '@/components/journal/ds';
+import { ObIcon } from './ObIcon';
+import { ROLES, readRole, roleOf, writeRole, type IntentId, type Role } from '@/lib/onboarding-roles';
+import { track } from '@/lib/analytics';
 import '@/app/onboarding/onboarding.css';
 
 /* ── words, rising on mount. Nothing here depends on scroll. ── */
@@ -100,7 +103,11 @@ export function FirstRunIntro({
   onStart: (text: string, intent: string | null) => void;
   onSkip: () => void;
 }) {
-  const [beat, setBeat] = useState<'premise' | 'intent'>('premise');
+  const [beat, setBeat] = useState<'premise' | 'who' | 'intent'>('premise');
+  // WHAT THEY MOSTLY THINK ABOUT — asked once, skippable, and only so the
+  // starting points and their examples fit (lib/onboarding-roles.ts).
+  const [role, setRole] = useState<Role | null>(null);
+  useEffect(() => setRole(roleOf(readRole())), []);
   const [intent, setIntent] = useState<Intent | null>(null);
   const [text, setText] = useState('');
   const area = useRef<HTMLTextAreaElement>(null);
@@ -113,6 +120,19 @@ export function FirstRunIntro({
     const s = (v || '').replace(/\s+$/, '').slice(0, MAX);
     if (!s.trim()) return;
     onStart(s, intent?.id ?? null);
+  };
+  // the starting points, in the order that fits them, worded for their life
+  const ways: Intent[] = (role ? role.order : (INTENTS.map((i) => i.id) as IntentId[])).map((id) => {
+    const base = INTENTS.find((i) => i.id === id)!;
+    const w = role?.ways[id];
+    return w ? { ...base, placeholder: w.placeholder, eg: w.eg } : base;
+  });
+  const pickRole = (r: Role | null) => {
+    writeRole(r?.id ?? null);
+    setRole(r);
+    if (r) track('onboarding_role_chosen', { kind: r.id });
+    setIntent(null);
+    setBeat('intent');
   };
 
   const question = surface === 'logos' ? 'What are you trying to understand?' : 'What are you trying to figure out?';
@@ -140,10 +160,33 @@ export function FirstRunIntro({
               </span>
             </h1>
             <div className="ob-row ob-fade" style={{ '--d': '1.35s' } as React.CSSProperties}>
-              <button type="button" className="ob-primary" onClick={() => setBeat('intent')}>
+              <button type="button" className="ob-primary" onClick={() => setBeat(role ? 'intent' : 'who')}>
                 Start thinking
               </button>
             </div>
+          </div>
+        ) : beat === 'who' ? (
+          <div className="ob-wrap ob-wrap-wide" key="who">
+            <h1 className="ob-q ob-q-sm">
+              <Rise text="What do you mostly think about?" />
+            </h1>
+            <p className="ob-sub ob-fade" style={{ '--d': '.35s' } as React.CSSProperties}>
+              So the examples fit. Change it any time in Manage Account.
+            </p>
+            <div className="ob-roles ob-fade" style={{ '--d': '.5s' } as React.CSSProperties} role="list">
+              {ROLES.map((r) => (
+                <button key={r.id} type="button" role="listitem" className={`ob-card${role?.id === r.id ? ' is-on' : ''}`} onClick={() => pickRole(r)}>
+                  <span className="ob-card-ic"><ObIcon name={r.id} /></span>
+                  <span className="ob-card-t">{r.title}</span>
+                  <span className="ob-card-d">{r.line}</span>
+                </button>
+              ))}
+            </div>
+            <p className="ob-fade" style={{ '--d': '.7s' } as React.CSSProperties}>
+              <button type="button" className="ob-later" onClick={() => pickRole(null)}>
+                Rather not say
+              </button>
+            </p>
           </div>
         ) : (
           <div className="ob-wrap" key="intent">
@@ -181,26 +224,26 @@ export function FirstRunIntro({
             <p className="ob-hint ob-fade" style={{ '--d': '.55s' } as React.CSSProperties}>
               Something real. Enter to begin.
             </p>
-            {/* Five starting points, as text. Pressing one changes the
-                placeholder and the example beneath; it never fills the field. */}
-            <p className="ob-intents ob-fade" style={{ '--d': '.7s' } as React.CSSProperties} aria-label="Starting points">
-              {INTENTS.map((o, i) => (
-                <span key={o.id}>
-                  {i > 0 && <span className="ob-dot" aria-hidden="true">·</span>}
-                  <button
-                    type="button"
-                    className={intent?.id === o.id ? 'is-on' : undefined}
-                    aria-pressed={intent?.id === o.id}
-                    onClick={() => {
-                      setIntent((cur) => (cur?.id === o.id ? null : o));
-                      area.current?.focus();
-                    }}
-                  >
-                    {o.title}
-                  </button>
-                </span>
+            {/* Five starting points, as cards — in the order that fits what
+                they mostly think about. Pressing one changes the placeholder
+                and the example beneath; it never fills the field. */}
+            <div className="ob-ways ob-fade" style={{ '--d': '.7s' } as React.CSSProperties} role="group" aria-label="Starting points">
+              {ways.map((o) => (
+                <button
+                  key={o.id}
+                  type="button"
+                  className={`ob-way${intent?.id === o.id ? ' is-on' : ''}`}
+                  aria-pressed={intent?.id === o.id}
+                  onClick={() => {
+                    setIntent((cur) => (cur?.id === o.id ? null : o));
+                    area.current?.focus();
+                  }}
+                >
+                  <span className="ob-way-ic"><ObIcon name={o.id === 'research' ? 'research-intent' : o.id} size={20} /></span>
+                  <span className="ob-way-t">{o.title}</span>
+                </button>
               ))}
-            </p>
+            </div>
             {intent && !text.trim() && (
               <p className="ob-eg-line ob-fade" style={{ '--d': '.05s' } as React.CSSProperties}>
                 <span className="ob-eg-k">for instance</span>

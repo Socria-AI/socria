@@ -28,6 +28,7 @@ const MODULES = [
   'lib/canvas.ts',
   'lib/canvas-store.ts',
   'lib/objects/index.ts',
+  'lib/onboarding-roles.ts',
   'lib/theme.ts',
   'lib/entitlements.ts',
   'lib/usage-scope.ts',
