@@ -8,7 +8,7 @@ import {
   STEPS, byId, planFor, advance, shouldStart, finish, isRunning, indexOf,
   IDLE, DONE, ONBOARDING_KEY, DEFAULT_SHAPE,
 } from './.tmp/onboarding.mjs';
-import { FIRST_RUN_KEYS, forgetFirstRunLocal, readFirstRun } from './.tmp/first-run.mjs';
+import { FIRST_RUN_KEYS, forgetFirstRunLocal, readFirstRun, REPLAYS, withoutMilestones, MILESTONES } from './.tmp/first-run.mjs';
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -113,12 +113,24 @@ console.log('\n=== replaying onboarding, for testing ===');
   try { forgetFirstRunLocal({ removeItem: () => { throw new Error('blocked'); } }); } catch { threw = true; }
   ok('  a blocked store does not throw', !threw);
   const route = read('app/api/profile/route.ts');
-  ok('the account copy can be reset — the one write that is not a union', /b\.firstRunReset === true/.test(route) && /row\.first_run = EMPTY_FIRST_RUN/.test(route));
+  ok('the account copy can be reset or replaced — the writes that are not a union', /testing && b\.firstRunReset === true/.test(route) && /row\.first_run = EMPTY_FIRST_RUN/.test(route) && /testing && b\.firstRunReplace/.test(route));
+  ok('  and never on production, where a record only grows', /const testing = !isProduction\(\);/.test(route));
+  const rec = { v: 1, at: Object.fromEntries(MILESTONES.map((m, i) => [m, i + 1])), skipped: ['logos.aha'] };
+  const core = withoutMilestones(rec, REPLAYS.core.milestones);
+  ok('replaying Core takes back exactly its two milestones', !core.at['core.first'] && !core.at['core.aha'] && Object.keys(core.at).length === MILESTONES.length - 2);
+  const lg = withoutMilestones(rec, REPLAYS.logos.milestones);
+  ok('replaying Logos takes back every logos.* milestone and its skip, nothing else', Object.keys(lg.at).every((m) => !m.startsWith('logos.')) && !lg.skipped && !!lg.at['core.first'] && !!lg.at['socria.intro']);
+  ok('  and the old Logos flags that would put them back', ['socria.firstmap.v1', 'socria.logos.guide.v1'].every((k) => REPLAYS.logos.keys.includes(k)));
+  ok('replaying the notes takes back found.* and the hints seen', Object.keys(withoutMilestones(rec, REPLAYS.found.milestones).at).every((m) => !m.startsWith('found.')) && REPLAYS.found.keys.includes('socria.hints.seen.v1'));
   const ob = read('components/onboarding/Onboarding.tsx');
   ok('/onboarding?replay=1 resets, then loads clean — never on production', /params\?\.get\('replay'\) === '1' && !isProduction\(\)/.test(ob) && /window\.location\.replace/.test(ob));
   ok('the Logos door opens the newest Logos on offer', /isOffered\('logos-3'\) \? '\/chat\?model=logos-3'/.test(ob));
   const sheet = read('components/account/AccountSheet.tsx');
-  ok('Manage Account offers the replay off production only', /\{!isProduction\(\) && \(/.test(sheet) && /href="\/onboarding\?replay=1"/.test(sheet) && /href="\/onboarding\?replay=1&to=logos"/.test(sheet));
+  const tools = read('components/account/TestingTools.tsx');
+  ok('Manage Account has a Testing section', /<TestingTools onClose=\{onClose\} \/>/.test(sheet) && /<span className="lbl">Testing<\/span>/.test(tools));
+  ok('  which renders nothing on production', /if \(isProduction\(\)\) return null;/.test(tools));
+  ok('  with both replays, the parts, and the layout resets', /href="\/onboarding\?replay=1"/.test(tools) && /href="\/onboarding\?replay=1&to=logos"/.test(tools) && /replayPart\('core'\)/.test(tools) && /replayPart\('logos'\)/.test(tools) && /replayPart\('found'\)/.test(tools) && /CANVAS_PREFIX/.test(tools));
+  ok('  and it touches no conversations, maps or memory', !/conversations|\/api\/memory|socria\.logos\.sessions/.test(tools.replace(/never your conversations, maps, models or memory|Nothing here reaches anybody's\s*\/\/ conversations, maps, models or memory\./g, '')));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

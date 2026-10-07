@@ -91,6 +91,30 @@ export const FIRST_RUN_KEYS = [
   'socria.hints.seen.v1',
 ] as const;
 
+/**
+ * WHAT CAN BE REPLAYED, for testing (Manage Account → Testing, never on
+ * production). Each part names the milestones it takes back and the older
+ * browser flags that would otherwise put them straight back (legacyMilestones).
+ */
+export const REPLAYS = {
+  all: { milestones: [...MILESTONES] as Milestone[], keys: [...FIRST_RUN_KEYS] as string[] },
+  core: { milestones: ['core.first', 'core.aha'] as Milestone[], keys: ['socria.core4IntroDontShowAgain.v1'] },
+  logos: {
+    milestones: MILESTONES.filter((m) => m.startsWith('logos.')) as Milestone[],
+    keys: ['socria.firstmap.v1', 'socria.firstMap.v1', 'socria.logos.guide.v1'],
+  },
+  found: { milestones: MILESTONES.filter((m) => m.startsWith('found.')) as Milestone[], keys: ['socria.hints.seen.v1'] },
+} as const;
+export type ReplayPart = keyof typeof REPLAYS;
+
+/** The record with these milestones taken back — as if they had never been reached. */
+export function withoutMilestones(s: FirstRun, ms: readonly Milestone[]): FirstRun {
+  const at = { ...s.at };
+  for (const m of ms) delete at[m];
+  const skipped = (s.skipped ?? []).filter((m) => !ms.includes(m));
+  return { v: 1, at, ...(skipped.length ? { skipped } : {}) };
+}
+
 /** Forget, on this device, everything the first run has shown. */
 export function forgetFirstRunLocal(store: Pick<Storage, 'removeItem'> | null | undefined): void {
   for (const k of FIRST_RUN_KEYS) {

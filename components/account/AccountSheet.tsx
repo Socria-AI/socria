@@ -31,7 +31,7 @@ import type { PlanState } from '@/components/usePlan';
 import { clearSocriaLocalData } from '@/lib/local-data';
 import { ThemePicker } from './ThemePicker';
 import { AccessCode } from './AccessCode';
-import { isProduction } from '@/lib/environment';
+import { TestingTools } from './TestingTools';
 
 export function AccountSheet({
   open,
@@ -224,23 +224,6 @@ export function AccountSheet({
                   <span className="t">Show hints again</span>
                   <span className="d">The one-line notes beside new things</span>
                 </button>
-                {/* FOR TESTING, never on production: walk through onboarding
-                    again as a new person, on this account — no incognito
-                    window (a protected preview will not let one in) and no
-                    second account. /onboarding?replay=1 clears the record on
-                    this browser and on the account, then begins. */}
-                {!isProduction() && (
-                  <>
-                    <a className="act" href="/onboarding?replay=1">
-                      <span className="t">Replay onboarding</span>
-                      <span className="d">Testing only · start again as a new person, into the chat</span>
-                    </a>
-                    <a className="act" href="/onboarding?replay=1&to=logos">
-                      <span className="t">Replay onboarding into Logos</span>
-                      <span className="d">Testing only · the premise, then the Logos first map</span>
-                    </a>
-                  </>
-                )}
                 <button type="button" className="act" onClick={() => {
                     // A shared device must not hand the next person this
                     // one's conversations, sessions or derived memory.
@@ -252,6 +235,9 @@ export function AccountSheet({
                 </button>
               </div>
             </div>
+
+            {/* Testing: never on production (the component checks). */}
+            <TestingTools onClose={onClose} />
           </div>
 
           <div className="footbar">

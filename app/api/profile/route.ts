@@ -16,6 +16,7 @@ import {
   hasJourneyContent,
 } from '@/lib/socria-prompt';
 import { EMPTY_FIRST_RUN, mergeFirstRun, parseFirstRun } from '@/lib/first-run';
+import { isProduction } from '@/lib/environment';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -122,11 +123,15 @@ export async function PUT(req: NextRequest) {
       const held = sanitizeUserUnderstanding((cur as { understanding?: unknown } | null)?.understanding);
       row.understanding = { ...incoming, entries: held.entries, forgotten: held.forgotten };
     }
-    if (b.firstRunReset === true) {
-      // The one write that is not a union: the person asked to see the first
-      // run again (Replay onboarding, offered off production). Their own row,
-      // their own record of what they have been shown — nothing else changes.
+    // The two writes that are not a union: the person asked to see the first
+    // run (or part of it) again — Manage Account → Testing. Their own row,
+    // their own record of what they have been shown, nothing else. Testing
+    // only: refused on production, where a record only ever grows.
+    const testing = !isProduction();
+    if (testing && b.firstRunReset === true) {
       row.first_run = EMPTY_FIRST_RUN;
+    } else if (testing && b.firstRunReplace && typeof b.firstRunReplace === 'object') {
+      row.first_run = parseFirstRun(b.firstRunReplace);
     } else if ('firstRun' in b) {
       // A UNION, never a replacement: the earliest time per milestone wins,
       // so a stale tab or an older device cannot un-teach the account.

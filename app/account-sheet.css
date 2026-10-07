@@ -143,3 +143,16 @@
 .acct-sheet .access-form button{border:1px solid var(--ink);border-radius:999px;background:none;padding:0 18px;font:inherit;font-size:.9rem;color:var(--ink);cursor:pointer}
 .acct-sheet .access-form button:disabled{opacity:.4;cursor:default}
 .acct-sheet .access-err{margin:0;font-size:.85rem;color:var(--machine)}
+
+/* Testing — never on production. Quieter than the account itself, and
+   labelled where it is, so nobody mistakes a test control for a setting. */
+.acct-sheet .sec.tt{border-top:1px dashed var(--line, rgba(31,31,31,.18))}
+.acct-sheet .tt-where{margin:-4px 0 10px;font-family:var(--font-sans, system-ui, sans-serif);font-size:.72rem;letter-spacing:.02em;color:var(--ink-70)}
+.acct-sheet .tt-sub{margin:14px 0 2px;font-family:var(--font-sans, system-ui, sans-serif);font-size:.62rem;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-70)}
+.acct-sheet .tt .act{width:100%;background:none;border-left:0;border-right:0;border-top:0;text-align:left;cursor:pointer;font:inherit;color:inherit}
+.acct-sheet .tt .act:disabled{opacity:.5;cursor:default}
+.acct-sheet .tt-done{font-size:.8rem;color:var(--moss-700, #3e5a23)}
+.acct-sheet .tt-reached{margin:8px 0 0;font-size:.74rem;line-height:1.5;color:var(--ink-70);word-break:break-word}
+.acct-sheet .tt-reached span{font-weight:600}
+.acct-sheet .tt-note{margin:12px 0 0;font-size:.74rem;line-height:1.45;color:var(--ink-70)}
+.acct-sheet .tt-note code{font-size:.72rem}

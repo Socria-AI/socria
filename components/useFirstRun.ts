@@ -16,6 +16,9 @@ import {
   EMPTY_FIRST_RUN,
   aheadOf,
   forgetFirstRunLocal,
+  REPLAYS,
+  withoutMilestones,
+  type ReplayPart,
   has,
   mergeFirstRun,
   parseFirstRun,
@@ -63,6 +66,33 @@ export async function replayFirstRun(): Promise<void> {
     });
   } catch {}
   if (typeof window !== 'undefined') window.dispatchEvent(new Event(FIRST_RUN_CHANGED));
+}
+
+/**
+ * Replay ONE part of the first run — Core's line, the Logos first map, the
+ * notes found along the way — on this browser and on the account (testing
+ * only; the callers check, and the route refuses on production).
+ */
+export async function replayPart(part: ReplayPart): Promise<void> {
+  if (part === 'all') return replayFirstRun();
+  if (typeof window === 'undefined') return;
+  const { milestones, keys } = REPLAYS[part];
+  for (const k of keys) {
+    try {
+      window.localStorage.removeItem(k);
+    } catch {}
+  }
+  const next = withoutMilestones(readFirstRun(window.localStorage), milestones);
+  writeFirstRun(window.localStorage, next);
+  mergedForAccount = false;
+  try {
+    await fetch('/api/profile', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ firstRunReplace: next }),
+    });
+  } catch {}
+  window.dispatchEvent(new Event(FIRST_RUN_CHANGED));
 }
 
 export function useFirstRun(opts: { signedIn: boolean; surface: 'core' | 'logos' }) {
