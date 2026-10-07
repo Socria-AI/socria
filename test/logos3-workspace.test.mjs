@@ -268,7 +268,8 @@ console.log('\n=== reset view ===');
   ok('it resets the arrangement, the dock and the maps — and nothing else', /function resetView\(\)/.test(app) && /changeLayout\(singleLayout\(wsHasModel \? 'model' : 'map'\)\)/.test(app) && /moveDock\('bottom'\)/.test(app) && /dispatchEvent\(new Event\(VIEW_RESET\)\)/.test(app));
   const body = app.slice(app.indexOf('function resetView()'), app.indexOf('function resetView()') + 900);
   ok('  never the thinking: no message, map or model is written', !/patchActive|patchSession|editMap|setSessions/.test(body));
-  ok('every map puts its tabs and zoom back', /addEventListener\(VIEW_RESET/.test(read('components/ThinkingMap.tsx')) && /setTabsAt\('top'\)/.test(read('components/ThinkingMap.tsx')) && /setZoom\(1\)/.test(read('components/ThinkingMap.tsx')));
+  ok('every map puts its tabs and camera back', /addEventListener\(VIEW_RESET/.test(read('components/ThinkingMap.tsx')) && /setTabsAt\('top'\)/.test(read('components/ThinkingMap.tsx')) && /withoutCameras\(canvasRef\.current\)/.test(read('components/ThinkingMap.tsx')));
+  ok('  but not where the person put their cards', !/forgetCanvas|withoutPins/.test(read('components/ThinkingMap.tsx')));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

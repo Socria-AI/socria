@@ -112,7 +112,7 @@ export function Logos2Workspace() {
       id: 'map',
       label: 'Map',
       title: 'Thinking map',
-      node: <ThinkingMap map={MAP} initialLens="graph" />,
+      node: <ThinkingMap embedded map={MAP} initialLens="graph" />,
     },
     {
       id: 'surface',

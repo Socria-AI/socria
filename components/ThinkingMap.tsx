@@ -42,17 +42,8 @@ const TABS_KEY = 'socria.map.tabs.v1';
 /** Fired on window by Logos 3's Reset view; every map goes back to how it starts. */
 export const VIEW_RESET = 'socria:view-reset';
 
-/** The zoom ladder. Discrete steps, so every zoom lands somewhere legible. */
-const ZOOMS = [0.35, 0.45, 0.55, 0.7, 0.85, 1, 1.2, 1.45, 1.75, 2.1, 2.5];
-/** Wheel delta that makes one step — roughly one notch of a mouse wheel. */
-const WHEEL_STEP = 60;
-
-/** One rung up or down from wherever `from` sits, clamped at both ends. */
-function stepZoom(from: number, dir: -1 | 1): number {
-  const i = ZOOMS.indexOf(from);
-  const at = i === -1 ? ZOOMS.indexOf(1) : i;
-  return ZOOMS[Math.min(ZOOMS.length - 1, Math.max(0, at + dir))];
-}
+/** The lenses that are a canvas of cards — the plot, the Board and the table draw themselves to fit. */
+const isCanvasLens = (l: LensId) => l !== 'plot' && l !== 'board' && l !== 'matrix';
 import { LogosMark } from './LogosMark';
 import { OneLock } from './OneLock';
 import {
@@ -74,6 +65,47 @@ import {
   buildMatrix,
 } from '@/lib/logos-layout';
 import { attachmentsOf, GRAMMARS, spineOf } from '@/lib/representation';
+import {
+  IDENTITY,
+  NO_INSETS,
+  ZOOM_MAX,
+  ZOOM_MIN,
+  FIT_MAX,
+  KEY_NUDGE,
+  KEY_PAN,
+  boundsOf,
+  cameraTransform,
+  easeCamera,
+  fitCamera,
+  hashUnit,
+  isDrag,
+  keepInView,
+  panBy,
+  pinchCamera,
+  readWheel,
+  routeBetween,
+  sameCamera,
+  toScreen,
+  visibleShare,
+  zoomAt,
+  type Camera,
+  type Insets,
+  type Pt,
+  type Rect,
+} from '@/lib/canvas';
+import {
+  emptyCanvas,
+  isPinned,
+  lensOf,
+  loadCanvas,
+  pin,
+  saveCanvas,
+  unpin,
+  withCamera,
+  withSettled,
+  withoutCameras,
+  type CanvasDoc,
+} from '@/lib/canvas-store';
 
 type P = { x: number; y: number; vx: number; vy: number };
 
@@ -84,20 +116,40 @@ const CENTER_PULL = 0.005;
 const DAMPING = 0.87;
 const ALPHA_DECAY = 0.991;
 const ALPHA_MIN = 0.004;
-const PAD = 104;
-const HALF_W = 92;
-const HALF_H = 46;
-const GAP = 14;
+/** air kept between two cards, past their own edges */
+const GAP = 16;
 const SEPARATION_PASSES = 3;
-const TRIM_W = 84;
-const TRIM_H = 26;
 // Roughly the action menu's height — only used to decide which side to open on.
 const MENU_H = 330;
 
-function boxExit(dx: number, dy: number): number {
-  const tx = dx === 0 ? Infinity : TRIM_W / Math.abs(dx);
-  const ty = dy === 0 ? Infinity : TRIM_H / Math.abs(dy);
+/** How far along a centre-to-centre line a card's edge lies, for a card of this size. */
+function boxExit(dx: number, dy: number, d?: { w: number; h: number }): number {
+  const hw = (d?.w ?? GRAPH_W) / 2 - 2;
+  const hh = (d?.h ?? 52) / 2 - 2;
+  const tx = dx === 0 ? Infinity : hw / Math.abs(dx);
+  const ty = dy === 0 ? Infinity : hh / Math.abs(dy);
   return Math.min(tx, ty, 0.5);
+}
+
+/**
+ * A laid-out lens's connectors, with every line that touches a card the
+ * person moved re-drawn from the card's new place. A line that belonged to
+ * the card alone (a timeline tick to an axis it has left) is not drawn.
+ */
+function rerouted(conns: Connector[], placed: Placed[], pins: Record<string, [number, number]>): Connector[] {
+  if (!Object.keys(pins).length) return conns;
+  const at = new Map(placed.map((p) => [p.id, p]));
+  const box = (p: Placed): Rect => ({ x: p.x - p.w / 2, y: p.y - p.h / 2, w: p.w, h: p.h });
+  return conns.map((c) => {
+    const moved = (c.from && pins[c.from]) || (c.to && pins[c.to]);
+    if (!moved) return c;
+    if (!c.from || !c.to) return { ...c, path: '' };
+    const a = at.get(c.from);
+    const b = at.get(c.to);
+    if (!a || !b) return c;
+    const r = routeBetween(box(a), box(b));
+    return { ...c, path: r.d, ...(c.label ? { lx: r.mx, ly: r.my } : {}) };
+  });
 }
 
 export type MapNodeRef = { id: string; label: string; type: TMap['nodes'][number]['type'] };
@@ -128,6 +180,8 @@ export function ThinkingMap({
   onViz,
   onVizRead,
   vizOps,
+  layoutKey,
+  embedded,
 }: {
   map: TMap;
   initialLens?: LensId;
@@ -209,18 +263,67 @@ export function ThinkingMap({
   onVizRead?: (read: (() => VizModelState) | null) => void;
   /** changes the conversation asked for, on their way down to the picture */
   vizOps?: { seq: number; ops: VizOp[] } | null;
+  /**
+   * Which line of thinking this map is, so where the person put its cards
+   * (and the view they left it at) is kept for it — in this browser, apart
+   * from the map itself (lib/canvas-store.ts). Absent: kept for the visit.
+   */
+  layoutKey?: string | null;
+  /**
+   * The map sits inside a page that scrolls (a demo, the showcase): the wheel
+   * and a one-finger swipe stay the page's, and only a pinch zooms the map.
+   */
+  embedded?: boolean;
 }) {
+  // ── THREE HANDS, THREE THINGS ────────────────────────────────────
+  //   drag the canvas  → the camera (lib/canvas.ts), presentational
+  //   drag a card      → the layout (lib/canvas-store.ts), this browser's
+  //   edit a card      → the map (onEdit → lib/map-edit.ts), canonical
+  // Nothing in this block writes to the map, calls a model, or re-renders the
+  // component per frame: pointer moves write transforms straight to the DOM
+  // and settle into React state once, when the hand lets go.
   const wrapRef = useRef<HTMLDivElement>(null);
+  /** the world layer: every card and line, moved as one by the camera */
+  const worldRef = useRef<HTMLDivElement>(null);
   const posRef = useRef<Map<string, P>>(new Map());
   const nodeElRef = useRef<Map<string, HTMLDivElement>>(new Map());
   const edgeElRef = useRef<Map<string, SVGPathElement>>(new Map());
-  const sizeRef = useRef({ w: 800, h: 600 });
+  const labelElRef = useRef<Map<string, SVGTextElement>>(new Map());
+  /** each graph card's real size, measured — not one size assumed for all */
+  const dimsRef = useRef<Map<string, { w: number; h: number }>>(new Map());
   const alphaRef = useRef(1);
   const rafRef = useRef(0);
   const mapRef = useRef(map);
   mapRef.current = map;
 
   const [lens, setLens] = useState<LensId>(initialLens);
+  const lensRef = useRef<LensId>(initialLens);
+  lensRef.current = lens;
+  /** the lenses that are a canvas of cards — the rest draw themselves to fit */
+  const isCanvas = lens !== 'plot' && lens !== 'board' && lens !== 'matrix';
+
+  // ── the layout this browser keeps for this line of thinking ──────
+  const canvasRef = useRef<CanvasDoc>(emptyCanvas());
+  const keyRef = useRef<string | null | undefined>(undefined);
+  const [pinsVer, setPinsVer] = useState(0);
+  /** Load the arrangement when the line of thinking changes; its graph positions go with it. */
+  // Read in an effect, not during render: the server has no storage, and a
+  // first render that differed between the two would not hydrate.
+  useLayoutEffect(() => {
+    if (keyRef.current === layoutKey) return;
+    keyRef.current = layoutKey;
+    canvasRef.current = loadCanvas(layoutKey);
+    posRef.current = new Map();
+    camLensRef.current = null;
+    setPinsVer((v) => v + 1);
+  }, [layoutKey]);
+  const pinsOf = (l: LensId) => canvasRef.current.lenses[l]?.pins ?? {};
+  const commitCanvas = (next: CanvasDoc, rerender = true) => {
+    canvasRef.current = next;
+    saveCanvas(keyRef.current, next);
+    if (rerender) setPinsVer((v) => v + 1);
+  };
+
   // WHERE THE LENS TABS SIT — any edge of the map, the person's choice, kept per browser.
   const outerRef = useRef<HTMLDivElement>(null);
   const [tabsAt, setTabsAt] = useState<TabsAt>('top');
@@ -231,32 +334,12 @@ export function ThinkingMap({
       if (v === 'top' || v === 'bottom' || v === 'left' || v === 'right') setTabsAt(v);
     } catch {}
   }, []);
-  // RESET VIEW (Logos 3's "+ View"): the tabs and the zoom go back to where they start.
-  useEffect(() => {
-    const reset = () => {
-      setTabsAt('top');
-      setZoom(1);
-      setMenu(null);
-      try {
-        localStorage.removeItem(TABS_KEY);
-      } catch {}
-      wrapRef.current?.scrollTo({ left: 0, top: 0 });
-    };
-    window.addEventListener(VIEW_RESET, reset);
-    return () => window.removeEventListener(VIEW_RESET, reset);
-  }, []);
   const placeTabs = (at: TabsAt) => {
     setTabsAt(at);
     try {
       localStorage.setItem(TABS_KEY, at);
     } catch {}
   };
-  const lensRef = useRef<LensId>(initialLens);
-  lensRef.current = lens;
-  const lastW = useRef(0);
-  /** a drag across the empty canvas, and whether the last one moved */
-  const panRef = useRef<{ x: number; y: number; sl: number; st: number; moved: boolean } | null>(null);
-  const pannedRef = useRef(false);
 
   // The model document this line of thinking is holding, if any. Read from the
   // MAP rather than passed in: the map is the session's canonical state, and a
@@ -267,9 +350,9 @@ export function ThinkingMap({
   const [size, setSize] = useState({ w: 800, h: 600 });
   const [focused, setFocused] = useState<string | null>(null);
   const [hovered, setHovered] = useState<string | null>(null);
-  // The action menu is anchored in map coordinates and drawn in its own layer
-  // above every card — nesting it inside a card leaves it fighting the
-  // neighbours it overlaps for paint order.
+  // The action menu is drawn in the viewport, above the world — readable at
+  // any zoom, and never fighting a neighbouring card for paint order. It is
+  // placed in viewport pixels, so the camera moving closes it.
   const [menu, setMenu] = useState<{
     id: string;
     x: number;
@@ -277,110 +360,340 @@ export function ThinkingMap({
     above: boolean;
   } | null>(null);
   const menuFor = menu?.id ?? null;
+  const menuRef = useRef(menu);
+  menuRef.current = menu;
 
-  const [zoom, setZoom] = useState(1);
-  const zoomRef = useRef(1);
-  /** wheel delta banked toward the next step on the discrete ladder */
-  const wheelRef = useRef(0);
-  /** scroll offset to restore after a zoom, so the cursor stays anchored */
-  const anchorRef = useRef<{ left: number; top: number } | null>(null);
+  // ── the camera ───────────────────────────────────────────────────
+  const camRef = useRef<Camera>(IDENTITY);
+  /** the person has moved the camera on this lens: from then on, nothing re-centres it for them */
+  const movedRef = useRef(false);
+  const camLensRef = useRef<LensId | null>(null);
+  const vpRef = useRef({ w: 800, h: 600 });
+  const insetsRef = useRef<Insets>(NO_INSETS);
+  const tweenRef = useRef<Camera | null>(null);
+  const frameRef = useRef(0);
+  const camSaveRef = useRef(0);
+  const zoomLevelRef = useRef<HTMLButtonElement>(null);
+  const zoomInRef = useRef<HTMLButtonElement>(null);
+  const zoomOutRef = useRef<HTMLButtonElement>(null);
+  const fitRef = useRef<HTMLButtonElement>(null);
 
-  // Zooming OUT gives the graph simulation more room rather than just shrinking
-  // what is already there — a crowded map rendered smaller is still crowded.
-  // Zooming IN never shrinks the world: it magnifies, and the container's own
-  // overflow does the panning. The static lenses compute their own extents and
-  // already overflow, so for them the scale alone is the whole feature.
-  const world = useMemo(
-    () => ({ w: size.w / Math.min(zoom, 1), h: size.h / Math.min(zoom, 1) }),
-    [size.w, size.h, zoom]
-  );
+  // ── a gesture in progress ────────────────────────────────────────
+  type Gesture =
+    | { kind: 'press'; on: 'canvas' | 'node'; id?: string; pid: number; type: string; x0: number; y0: number }
+    | { kind: 'pan'; pid: number; x0: number; y0: number; cam0: Camera }
+    | { kind: 'node'; pid: number; id: string; x0: number; y0: number; sx: number; sy: number; k: number }
+    | { kind: 'pinch'; a: number; b: number; a0: Pt; b0: Pt; cam0: Camera };
+  const gestureRef = useRef<Gesture | null>(null);
+  const pointersRef = useRef<Map<number, Pt>>(new Map());
+  /** a drag just ended: the click the browser is about to send is not a click */
+  const suppressClickRef = useRef(false);
+  /** a card being dragged on a laid-out lens: where it is right now */
+  const dragAtRef = useRef<{ id: string; x: number; y: number } | null>(null);
+  /** the cards and connectors as last rendered, for re-routing a dragged card's lines */
+  const placedNowRef = useRef<Placed[]>([]);
+  const connNowRef = useRef<Connector[]>([]);
 
-  // Widening the world means the graph has somewhere new to spread into, so
-  // wake the simulation; a pinned menu is measured against the old scale.
-  useEffect(() => {
-    zoomRef.current = zoom;
-    sizeRef.current = { w: world.w, h: world.h };
-    alphaRef.current = Math.max(alphaRef.current, 0.35);
-  }, [zoom, world.w, world.h]);
-  // A new scale moves every card; a new size is the ResizeObserver's to judge.
-  useEffect(() => setMenu(null), [zoom]);
-
-  const zoomBy = (dir: -1 | 1) => setZoom((z) => stepZoom(z, dir));
-
-  // Ctrl/Cmd + wheel zooms, the way every map on the web does. A trackpad
-  // pinch arrives as a wheel event with ctrlKey already set, so pinch-to-zoom
-  // comes along for free. A plain wheel is left alone: it still pans a map
-  // that has grown past the panel, which is the more common thing to want.
-  //
-  // Registered by hand rather than with onWheel because React attaches wheel
-  // listeners passively, and without preventDefault the browser zooms the
-  // whole page instead of the map.
-  useEffect(() => {
-    const el = wrapRef.current;
-    if (!el) return;
-
-    const onWheel = (e: WheelEvent) => {
-      // SCROLL INTO AND OUT OF THE MAP. A mouse wheel zooms, the way every map
-      // does; a trackpad's two-finger scroll still pans (it arrives as small,
-      // fractional deltas, often with a sideways part), and a pinch — which
-      // the browser reports with ctrlKey set — zooms. Shift+wheel always pans.
-      const pinch = e.ctrlKey || e.metaKey;
-      const mouseWheel =
-        !e.shiftKey && (e.deltaMode === 1 || (e.deltaX === 0 && Math.abs(e.deltaY) >= 40 && Number.isInteger(e.deltaY)));
-      if (!pinch && !mouseWheel) return;
-      // The plot and the Board draw themselves to fit, so they have no zoom
-      // control; changing it behind their backs would only grow the sizer and
-      // hang a scrollbar off nothing.
-      if (lens === 'plot' || lens === 'board' || lens === 'matrix') return;
-      e.preventDefault();
-
-      // One mouse notch (~100) is one step; a pinch sends many small deltas,
-      // so they accumulate instead of tearing through the whole ladder in a
-      // single gesture. Reversing direction discards what was banked.
-      const d = e.deltaY;
-      if (d === 0) return;
-      if (d > 0 !== wheelRef.current > 0) wheelRef.current = 0;
-      wheelRef.current += d;
-      if (Math.abs(wheelRef.current) < WHEEL_STEP) return;
-      const dir: -1 | 1 = wheelRef.current > 0 ? -1 : 1; // wheel down zooms out
-      wheelRef.current = 0;
-
-      const from = zoomRef.current;
-      const to = stepZoom(from, dir);
-      if (to === from) return;
-
-      // Keep whatever is under the cursor under the cursor. Only meaningful
-      // while zoomed past 1:1 — below that the sizer matches the panel and
-      // there is nothing to scroll — but harmless to compute either way.
-      const box = el.getBoundingClientRect();
-      const px = e.clientX - box.left;
-      const py = e.clientY - box.top;
-      const sx = (el.scrollLeft + px) / from;
-      const sy = (el.scrollTop + py) / from;
-      anchorRef.current = { left: sx * to - px, top: sy * to - py };
-
-      setZoom(to);
-    };
-
-    el.addEventListener('wheel', onWheel, { passive: false });
-    return () => el.removeEventListener('wheel', onWheel);
-  }, [lens]);
-
-  // Applied after the sizer has grown, or the scroll offset would be clamped
-  // against the old extent and the anchor would slide.
-  useLayoutEffect(() => {
-    const el = wrapRef.current;
-    const a = anchorRef.current;
-    anchorRef.current = null;
-    if (!el || !a) return;
-    el.scrollLeft = a.left;
-    el.scrollTop = a.top;
-  }, [zoom]);
-
-  // Hold the graph still while a menu is open — a target that drifts out from
-  // under the cursor is the fastest way to make this feel cheap.
+  // Hold the graph still while a menu is open or a card is in the hand — a
+  // target that drifts out from under the cursor is the fastest way to make
+  // this feel cheap.
   const frozenRef = useRef(false);
   frozenRef.current = menu !== null;
+  const held = () => frozenRef.current || gestureRef.current?.kind === 'node';
+
+  const dimOf = (id: string) => dimsRef.current.get(id) ?? { w: GRAPH_W, h: 64 };
+
+  /** Everything on the canvas, in world coordinates. */
+  const contentBounds = (): Rect | null => {
+    if (lensRef.current === 'graph') {
+      const rects: Rect[] = [];
+      for (const n of mapRef.current.nodes) {
+        const p = posRef.current.get(n.id);
+        if (!p) continue;
+        const d = dimOf(n.id);
+        rects.push({ x: p.x - d.w / 2, y: p.y - d.h / 2, w: d.w, h: d.h });
+      }
+      return boundsOf(rects);
+    }
+    return boundsOf(placedNowRef.current.map((p) => ({ x: p.x - p.w / 2, y: p.y - p.h / 2, w: p.w, h: p.h })));
+  };
+
+  /** Fit was asked for by name: show ALL of it, however small that makes it. */
+  const fitAllRef = useRef(false);
+  const fitTarget = (): Camera | null => {
+    const b = contentBounds();
+    if (!b) return null;
+    const graph = lensRef.current === 'graph';
+    if (fitAllRef.current) return fitCamera(b, vpRef.current.w, vpRef.current.h, { pad: 28, insets: insetsRef.current, maxK: FIT_MAX, minK: ZOOM_MIN });
+    return fitCamera(b, vpRef.current.w, vpRef.current.h, {
+      pad: graph ? 44 : 28,
+      insets: insetsRef.current,
+      maxK: FIT_MAX,
+      // Fitting a hundred cards into a panel makes them unreadable; past this
+      // floor the map is shown legibly from its centre (graph) or its start.
+      minK: graph ? 0.45 : 0.6,
+      align: graph ? 'center' : 'start',
+    });
+  };
+
+  /** Write the camera to the DOM — the world's transform, the grid, the readout. */
+  const applyCam = () => {
+    const c = camRef.current;
+    const world = worldRef.current;
+    if (world) world.style.transform = cameraTransform(c);
+    const el = wrapRef.current;
+    if (el && isCanvasLens(lensRef.current)) {
+      // the notebook grid moves with the paper, so a pan reads as a pan
+      let g = 26 * c.k;
+      while (g < 13) g *= 2;
+      el.style.backgroundSize = `${g}px ${g}px`;
+      el.style.backgroundPosition = `${Math.round(c.x)}px ${Math.round(c.y)}px`;
+    }
+    const pct = Math.round(c.k * 100);
+    if (zoomLevelRef.current) {
+      zoomLevelRef.current.textContent = `${pct}%`;
+      zoomLevelRef.current.setAttribute('aria-label', `Zoom ${pct} percent — back to 100`);
+    }
+    if (zoomOutRef.current) zoomOutRef.current.disabled = c.k <= ZOOM_MIN + 0.001;
+    if (zoomInRef.current) zoomInRef.current.disabled = c.k >= ZOOM_MAX - 0.001;
+  };
+
+  /** Is any of the map off-screen? Then the Fit control says so, quietly. */
+  const markOffscreen = () => {
+    const b = contentBounds();
+    const off = !!b && visibleShare(camRef.current, b, vpRef.current.w, vpRef.current.h) < 0.995;
+    fitRef.current?.classList.toggle('is-hint', off && movedRef.current);
+  };
+
+  const saveCamSoon = () => {
+    window.clearTimeout(camSaveRef.current);
+    camSaveRef.current = window.setTimeout(() => {
+      commitCanvas(withCamera(canvasRef.current, lensRef.current, camRef.current, movedRef.current), false);
+      markOffscreen();
+    }, 260);
+  };
+
+  const flush = () => {
+    const t = tweenRef.current;
+    if (t) {
+      camRef.current = easeCamera(camRef.current, t, 0.24);
+      if (camRef.current === t) tweenRef.current = null;
+    }
+    const drag = dragAtRef.current;
+    if (drag) moveStaticCard(drag.id, drag.x, drag.y);
+    if (lensRef.current === 'graph' && gestureRef.current?.kind === 'node') paint();
+    applyCam();
+    if (tweenRef.current) schedule();
+  };
+  const schedule = () => {
+    if (frameRef.current) return;
+    frameRef.current = requestAnimationFrame(() => {
+      frameRef.current = 0;
+      flush();
+    });
+  };
+  useEffect(() => () => cancelAnimationFrame(frameRef.current), []);
+
+  const reducedMotion = () =>
+    typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  const animateTo = (to: Camera) => {
+    if (reducedMotion()) {
+      tweenRef.current = null;
+      camRef.current = to;
+      applyCam();
+      return;
+    }
+    tweenRef.current = to;
+    schedule();
+  };
+
+  /** The person moved the camera. It is theirs now: auto-fit stops on this lens. */
+  const userCam = (next: Camera, animate = false) => {
+    const kept = keepInView(next, contentBounds(), vpRef.current.w, vpRef.current.h);
+    movedRef.current = true;
+    fitAllRef.current = false;
+    if (menuRef.current) setMenu(null);
+    if (animate) animateTo(kept);
+    else {
+      tweenRef.current = null;
+      camRef.current = kept;
+      schedule();
+    }
+    saveCamSoon();
+  };
+
+  /** Show all of it — and go back to following the map as it grows. */
+  const fitAll = (animate = true, everything = true) => {
+    movedRef.current = false;
+    fitAllRef.current = everything;
+    const t = fitTarget();
+    fitRef.current?.classList.remove('is-hint');
+    if (!t) return;
+    if (animate) animateTo(t);
+    else {
+      tweenRef.current = null;
+      camRef.current = t;
+      applyCam();
+    }
+    saveCamSoon();
+  };
+
+  /** Until the person moves the camera, it keeps the whole map in view as it changes. */
+  const follow = (instant = false) => {
+    if (movedRef.current || held() || gestureRef.current) return;
+    const t = fitTarget();
+    if (!t) return;
+    if (instant || camLensRef.current !== lensRef.current) {
+      tweenRef.current = null;
+      camRef.current = t;
+      applyCam();
+    } else if (!sameCamera(camRef.current, t)) animateTo(t);
+  };
+
+  /** The camera this lens was last looked at from — or a fresh fit. */
+  const enterLens = (l: LensId) => {
+    const saved = canvasRef.current.lenses[l]?.cam;
+    const b = contentBounds();
+    if (saved?.moved && b && visibleShare(saved, b, vpRef.current.w, vpRef.current.h) > 0.02) {
+      // A remembered view that still shows some of the map is kept. One that
+      // shows nothing (the map changed elsewhere) would open on blank paper.
+      camRef.current = { x: saved.x, y: saved.y, k: saved.k };
+      movedRef.current = true;
+      tweenRef.current = null;
+      applyCam();
+    } else {
+      movedRef.current = false;
+      fitAllRef.current = false;
+      camLensRef.current = null;
+      follow(true);
+    }
+    camLensRef.current = l;
+    markOffscreen();
+  };
+
+  const zoomStep = (dir: -1 | 1) => {
+    const c = tweenRef.current ?? camRef.current;
+    userCam(zoomAt(c, c.k * (dir > 0 ? 1.25 : 0.8), vpRef.current.w / 2, vpRef.current.h / 2), true);
+  };
+
+  /** Keyboard focus landed on a card the camera cannot see: bring it into view. */
+  const ensureVisible = (id: string) => {
+    const r = rectOf(id);
+    if (!r) return;
+    const c = camRef.current;
+    const a = toScreen(c, r.x, r.y);
+    const w = r.w * c.k;
+    const h = r.h * c.k;
+    const m = 24;
+    let dx = 0;
+    let dy = 0;
+    if (a.x < m) dx = m - a.x;
+    else if (a.x + w > vpRef.current.w - m) dx = vpRef.current.w - m - (a.x + w);
+    if (a.y < m) dy = m - a.y;
+    else if (a.y + h > vpRef.current.h - m) dy = vpRef.current.h - m - (a.y + h);
+    if (dx || dy) userCam(panBy(c, dx, dy), true);
+  };
+
+  /** A card's box in world coordinates, wherever it is right now. */
+  function rectOf(id: string): Rect | null {
+    if (lensRef.current === 'graph') {
+      const p = posRef.current.get(id);
+      if (!p) return null;
+      const d = dimOf(id);
+      return { x: p.x - d.w / 2, y: p.y - d.h / 2, w: d.w, h: d.h };
+    }
+    const p = placedNowRef.current.find((q) => q.id === id);
+    if (!p) return null;
+    const at = dragAtRef.current?.id === id ? dragAtRef.current : p;
+    return { x: at.x - p.w / 2, y: at.y - p.h / 2, w: p.w, h: p.h };
+  }
+
+  /** A laid-out lens, mid-drag: the card and the lines that touch it, straight to the DOM. */
+  function moveStaticCard(id: string, x: number, y: number) {
+    const el = nodeElRef.current.get(id);
+    if (el) el.style.transform = `translate(-50%, -50%) translate(${x}px, ${y}px)`;
+    for (const c of connNowRef.current) {
+      if (c.from !== id && c.to !== id) continue;
+      const path = edgeElRef.current.get(c.key);
+      if (!path) continue;
+      if (!c.from || !c.to) {
+        path.setAttribute('d', '');
+        continue;
+      }
+      const a = rectOf(c.from);
+      const b = rectOf(c.to);
+      if (!a || !b) continue;
+      const r = routeBetween(a, b);
+      path.setAttribute('d', r.d);
+      const t = labelElRef.current.get(c.key);
+      if (t) {
+        t.setAttribute('x', String(r.mx));
+        t.setAttribute('y', String(r.my - 9));
+      }
+    }
+  }
+
+  /** Put back what a cancelled drag moved, from what was last rendered. */
+  function restoreStatic(id: string) {
+    const p = placedNowRef.current.find((q) => q.id === id);
+    const el = nodeElRef.current.get(id);
+    if (p && el) el.style.transform = `translate(-50%, -50%) translate(${p.x}px, ${p.y}px)`;
+    for (const c of connNowRef.current) {
+      if (c.from !== id && c.to !== id) continue;
+      edgeElRef.current.get(c.key)?.setAttribute('d', c.path);
+      const t = labelElRef.current.get(c.key);
+      if (t && c.lx != null && c.ly != null) {
+        t.setAttribute('x', String(c.lx));
+        t.setAttribute('y', String(c.ly - 9));
+      }
+    }
+  }
+
+  /** A card was put down: it is pinned there, in this lens, until they let it go. */
+  const placeCard = (id: string, x: number, y: number) => {
+    const l = lensRef.current;
+    if (l === 'graph') {
+      const p = posRef.current.get(id);
+      if (p) {
+        p.x = x;
+        p.y = y;
+        p.vx = 0;
+        p.vy = 0;
+      }
+      // the neighbours that were not placed by hand make room, gently
+      alphaRef.current = Math.max(alphaRef.current, 0.12);
+    }
+    // Moving a card is taking the camera's job back too: a map that
+    // re-centred itself under a card just put down would undo the gesture.
+    movedRef.current = true;
+    fitAllRef.current = false;
+    commitCanvas(withCamera(pin(canvasRef.current, l, id, x, y), l, camRef.current, true));
+  };
+
+  const releaseCard = (id: string) => {
+    const l = lensRef.current;
+    commitCanvas(unpin(canvasRef.current, l, id));
+    if (l === 'graph') alphaRef.current = Math.max(alphaRef.current, 0.3);
+  };
+
+  // RESET VIEW (Logos 3's "+ View"): the tabs, the camera and the zoom go back
+  // to where they start. Where the person put their cards is their work, not
+  // the view, and stays.
+  const resetRef = useRef(() => {});
+  resetRef.current = () => {
+    setTabsAt('top');
+    setMenu(null);
+    try {
+      localStorage.removeItem(TABS_KEY);
+    } catch {}
+    commitCanvas(withoutCameras(canvasRef.current), false);
+    fitAll(false, false);
+  };
+  useEffect(() => {
+    const reset = () => resetRef.current();
+    window.addEventListener(VIEW_RESET, reset);
+    return () => window.removeEventListener(VIEW_RESET, reset);
+  }, []);
 
   useEffect(() => {
     if (!menuFor) return;
@@ -391,7 +704,261 @@ export function ThinkingMap({
     return () => window.removeEventListener('keydown', onKey);
   }, [menuFor]);
 
+  // ── the wheel: zoom where the pointer is, pan where the trackpad goes ──
+  // Registered by hand because React attaches wheel listeners passively, and
+  // without preventDefault the browser zooms or scrolls the page instead.
+  const wheelRef = useRef<(e: WheelEvent) => void>(() => {});
+  wheelRef.current = (e: WheelEvent) => {
+    if (!isCanvasLens(lensRef.current)) return;
+    if ((e.target as Element | null)?.closest?.('.lg-acts')) return;
+    // On a page that scrolls past the map (a demo, the showcase) the wheel is
+    // the page's; only a pinch, or ctrl, belongs to the map.
+    if (embedded && !e.ctrlKey && !e.metaKey) return;
+    e.preventDefault();
+    const it = readWheel(e);
+    const el = wrapRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const c = camRef.current;
+    if (it.kind === 'zoom') userCam(zoomAt(c, c.k * it.factor, e.clientX - r.left, e.clientY - r.top));
+    else userCam(panBy(c, it.dx, it.dy));
+  };
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const on = (e: WheelEvent) => wheelRef.current(e);
+    el.addEventListener('wheel', on, { passive: false });
+    return () => el.removeEventListener('wheel', on);
+  }, []);
+
+  // ── pointers: one handler for mouse, pen and touch ──────────────────
+  const endGesture = (commit: boolean) => {
+    const g = gestureRef.current;
+    gestureRef.current = null;
+    const el = wrapRef.current;
+    el?.classList.remove('is-panning', 'is-dragging-node');
+    if (!g) return;
+    if (g.kind === 'pan' || g.kind === 'pinch') {
+      suppressClickRef.current = true;
+      saveCamSoon();
+      return;
+    }
+    if (g.kind !== 'node') return;
+    nodeElRef.current.get(g.id)?.classList.remove('is-dragging');
+    suppressClickRef.current = true;
+    const graph = lensRef.current === 'graph';
+    if (!commit) {
+      // cancelled — Escape, a lost pointer, the window losing focus: it goes back
+      if (graph) {
+        const p = posRef.current.get(g.id);
+        if (p) {
+          p.x = g.sx;
+          p.y = g.sy;
+        }
+        paint();
+      } else restoreStatic(g.id);
+      dragAtRef.current = null;
+      return;
+    }
+    const at = graph ? posRef.current.get(g.id) : dragAtRef.current;
+    dragAtRef.current = null;
+    if (at) placeCard(g.id, at.x, at.y);
+  };
+
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isCanvasLens(lensRef.current)) return;
+    suppressClickRef.current = false;
+    const pts = pointersRef.current;
+    const t = e.target as HTMLElement;
+    // Controls keep their own clicks: the menu, the zoom, the tabs, the bar.
+    if (t.closest('.lg-acts, .lg-zoom, .mp-tabs, .mp-top, a, input, textarea, select') ||
+        (t.closest('button') && !t.closest('.lg-node'))) return;
+    if (e.pointerType === 'mouse' && e.button !== 0 && e.button !== 1) return;
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    // A second finger turns whatever the first was doing into a pinch.
+    if (pts.size === 2) {
+      const g = gestureRef.current;
+      if (g?.kind === 'node') endGesture(true);
+      const [a, b] = Array.from(pts.keys());
+      try {
+        wrapRef.current?.setPointerCapture(a);
+        wrapRef.current?.setPointerCapture(b);
+      } catch {}
+      gestureRef.current = { kind: 'pinch', a, b, a0: { ...pts.get(a)! }, b0: { ...pts.get(b)! }, cam0: camRef.current };
+      if (menuRef.current) setMenu(null);
+      return;
+    }
+    if (pts.size > 2) return;
+
+    const card = t.closest('.lg-node-pos') as HTMLElement | null;
+    const id = card?.dataset.id;
+    // The middle button always pans, whatever it lands on.
+    const onNode = !!id && e.button !== 1;
+    gestureRef.current = { kind: 'press', on: onNode ? 'node' : 'canvas', id: onNode ? id : undefined, pid: e.pointerId, type: e.pointerType, x0: e.clientX, y0: e.clientY };
+    if (e.button === 1) e.preventDefault();
+  };
+
+  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const pts = pointersRef.current;
+    if (pts.has(e.pointerId)) pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const g = gestureRef.current;
+    if (!g) return;
+    if (g.kind === 'pinch') {
+      const a1 = pts.get(g.a);
+      const b1 = pts.get(g.b);
+      if (!a1 || !b1) return;
+      const r = wrapRef.current!.getBoundingClientRect();
+      const o = (p: Pt) => ({ x: p.x - r.left, y: p.y - r.top });
+      userCam(pinchCamera(g.cam0, o(g.a0), o(g.b0), o(a1), o(b1)));
+      return;
+    }
+    if (e.pointerId !== g.pid) return;
+    const dx = e.clientX - g.x0;
+    const dy = e.clientY - g.y0;
+    if (g.kind === 'press') {
+      if (!isDrag(dx, dy, g.type)) return;
+      try {
+        wrapRef.current?.setPointerCapture(e.pointerId);
+      } catch {}
+      if (menuRef.current) setMenu(null);
+      if (g.on === 'node' && g.id) {
+        const r = rectOf(g.id);
+        if (!r) {
+          gestureRef.current = null;
+          return;
+        }
+        const sx = r.x + r.w / 2;
+        const sy = r.y + r.h / 2;
+        gestureRef.current = { kind: 'node', pid: g.pid, id: g.id, x0: g.x0, y0: g.y0, sx, sy, k: camRef.current.k };
+        nodeElRef.current.get(g.id)?.classList.add('is-dragging');
+        wrapRef.current?.classList.add('is-dragging-node');
+        setHovered(null);
+      } else {
+        gestureRef.current = { kind: 'pan', pid: g.pid, x0: g.x0, y0: g.y0, cam0: camRef.current };
+        wrapRef.current?.classList.add('is-panning');
+      }
+      return onPointerMove(e);
+    }
+    if (g.kind === 'pan') {
+      userCam(panBy(g.cam0, dx, dy));
+      return;
+    }
+    if (g.kind === 'node') {
+      const x = g.sx + dx / g.k;
+      const y = g.sy + dy / g.k;
+      if (lensRef.current === 'graph') {
+        const p = posRef.current.get(g.id);
+        if (p) {
+          p.x = x;
+          p.y = y;
+          p.vx = 0;
+          p.vy = 0;
+        }
+      } else dragAtRef.current = { id: g.id, x, y };
+      schedule();
+    }
+  };
+
+  const onPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    const pts = pointersRef.current;
+    pts.delete(e.pointerId);
+    const g = gestureRef.current;
+    if (!g) return;
+    if (g.kind === 'pinch') {
+      // One finger lifted: the other carries on as a pan, from where it is.
+      const rest = Array.from(pts.entries())[0];
+      if (rest && (rest[0] === g.a || rest[0] === g.b)) {
+        gestureRef.current = { kind: 'pan', pid: rest[0], x0: rest[1].x, y0: rest[1].y, cam0: camRef.current };
+        return;
+      }
+      endGesture(true);
+      return;
+    }
+    if (e.pointerId !== g.pid) return;
+    if (g.kind === 'press') {
+      gestureRef.current = null;
+      return;
+    }
+    endGesture(true);
+  };
+
+  const onPointerCancel = (e: React.PointerEvent<HTMLDivElement>) => {
+    pointersRef.current.delete(e.pointerId);
+    const g = gestureRef.current;
+    if (!g) return;
+    if (g.kind === 'pinch' || ('pid' in g && g.pid === e.pointerId)) endGesture(g.kind !== 'node');
+  };
+
+  // Escape puts a card back mid-drag; the window losing focus ends whatever
+  // the hand was doing, so nothing is left stuck to a pointer that is gone.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && gestureRef.current?.kind === 'node') {
+        e.preventDefault();
+        endGesture(false);
+      }
+    };
+    const onBlur = () => {
+      pointersRef.current.clear();
+      if (gestureRef.current) endGesture(gestureRef.current.kind !== 'node');
+    };
+    window.addEventListener('keydown', onKey);
+    window.addEventListener('blur', onBlur);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('blur', onBlur);
+    };
+    // endGesture reads only refs
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /** The canvas itself, focused: arrows move around, + and − zoom, 0 fits. */
+  const onCanvasKey = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.target !== e.currentTarget || !isCanvasLens(lensRef.current)) return;
+    const c = camRef.current;
+    const step = e.shiftKey ? KEY_PAN * 4 : KEY_PAN;
+    const pans: Record<string, [number, number]> = {
+      ArrowLeft: [step, 0],
+      ArrowRight: [-step, 0],
+      ArrowUp: [0, step],
+      ArrowDown: [0, -step],
+    };
+    if (pans[e.key]) {
+      e.preventDefault();
+      userCam(panBy(c, ...pans[e.key]), true);
+    } else if (e.key === '+' || e.key === '=') {
+      e.preventDefault();
+      zoomStep(1);
+    } else if (e.key === '-' || e.key === '_') {
+      e.preventDefault();
+      zoomStep(-1);
+    } else if (e.key === '0') {
+      e.preventDefault();
+      fitAll();
+    } else if (e.key === 'Escape') {
+      setMenu(null);
+      setFocused(null);
+    }
+  };
+
+  /** Alt (Option) + arrows on a focused card moves it, the keyboard's drag. */
+  const nudgeCard = (id: string, key: string, big: boolean) => {
+    const d = big ? KEY_NUDGE * 4 : KEY_NUDGE;
+    const by: Record<string, [number, number]> = { ArrowLeft: [-d, 0], ArrowRight: [d, 0], ArrowUp: [0, -d], ArrowDown: [0, d] };
+    const r = rectOf(id);
+    if (!r || !by[key]) return false;
+    const x = r.x + r.w / 2 + by[key][0];
+    const y = r.y + r.h / 2 + by[key][1];
+    setMenu(null);
+    placeCard(id, x, y);
+    if (lensRef.current === 'graph') paint();
+    requestAnimationFrame(() => ensureVisible(id));
+    return true;
+  };
+
   const lenses = useMemo(() => availableLenses(map), [map]);
+
 
   // The lens this map leads with — the signature view for what it holds,
   // never a stub. Every plan opens all of them, so `open` below is null and
@@ -470,39 +1037,112 @@ export function ThinkingMap({
   }, [lens, map, size]);
 
   // ── graph lens: seed positions ───────────────────────────────────
-  useEffect(() => {
+  // Deterministic, so the same map opens the same way on every load; and
+  // incremental, so a new turn of conversation places what is new near what
+  // it touches without shaking everything that was already settled.
+  const edgeSigRef = useRef('');
+  useLayoutEffect(() => {
     if (lens !== 'graph') return;
-    const { w, h } = sizeRef.current;
     const pos = posRef.current;
     const ids = new Set(map.nodes.map((n) => n.id));
-    for (const id of Array.from(pos.keys())) if (!ids.has(id)) pos.delete(id);
-
+    let removed = 0;
+    for (const id of Array.from(pos.keys()))
+      if (!ids.has(id)) {
+        pos.delete(id);
+        removed++;
+      }
+    const lay = lensOf(canvasRef.current, 'graph');
+    const before = pos.size;
+    let fresh = 0;
+    let remembered = 0;
+    let spiral = 0;
+    // where a brand-new, unconnected card goes: around what is already there
+    let cx = 0;
+    let cy = 0;
+    if (pos.size) {
+      for (const p of pos.values()) {
+        cx += p.x;
+        cy += p.y;
+      }
+      cx /= pos.size;
+      cy /= pos.size;
+    }
     for (const n of map.nodes) {
-      if (pos.has(n.id)) continue;
+      const pinned = lay.pins[n.id];
+      const have = pos.get(n.id);
+      if (pinned) {
+        if (have) {
+          have.x = pinned[0];
+          have.y = pinned[1];
+        } else {
+          pos.set(n.id, { x: pinned[0], y: pinned[1], vx: 0, vy: 0 });
+          remembered++;
+        }
+        continue;
+      }
+      if (have) continue;
+      const settled = lay.settled?.[n.id];
+      if (settled) {
+        pos.set(n.id, { x: settled[0], y: settled[1], vx: 0, vy: 0 });
+        remembered++;
+        continue;
+      }
+      fresh++;
       const neighbour = map.edges.find(
         (e) => (e.from === n.id && pos.has(e.to)) || (e.to === n.id && pos.has(e.from))
       );
-      const anchor = neighbour
-        ? pos.get(neighbour.from === n.id ? neighbour.to : neighbour.from)
-        : null;
-      const angle = Math.random() * Math.PI * 2;
-      const base = anchor ?? { x: w / 2, y: h / 2 };
-      const dist = anchor ? SPRING_LEN * 0.85 : 40 + Math.random() * 60;
-      pos.set(n.id, {
-        x: base.x + Math.cos(angle) * dist,
-        y: base.y + Math.sin(angle) * dist,
-        vx: 0,
-        vy: 0,
-      });
+      const anchor = neighbour ? pos.get(neighbour.from === n.id ? neighbour.to : neighbour.from) : null;
+      if (anchor) {
+        const angle = hashUnit(n.id) * Math.PI * 2;
+        pos.set(n.id, {
+          x: anchor.x + Math.cos(angle) * SPRING_LEN * 0.85,
+          y: anchor.y + Math.sin(angle) * SPRING_LEN * 0.85,
+          vx: 0,
+          vy: 0,
+        });
+      } else {
+        // a sunflower spiral: evenly spread from the first card, so a large
+        // map starts out spread rather than piled on one point
+        const i = before + spiral++;
+        const r = 96 * Math.sqrt(i + 0.5);
+        const a = i * 2.399963;
+        pos.set(n.id, { x: cx + Math.cos(a) * r * 1.5, y: cy + Math.sin(a) * r, vx: 0, vy: 0 });
+      }
     }
-    alphaRef.current = 1;
+    const sig = map.edges.map((e) => `${e.from}>${e.to}`).join('|');
+    const edgesChanged = sig !== edgeSigRef.current;
+    edgeSigRef.current = sig;
+    if (fresh) alphaRef.current = Math.max(alphaRef.current, before + remembered === 0 ? 1 : 0.4);
+    else if (remembered && before === 0) alphaRef.current = 0.03; // as it was left
+    else if (edgesChanged || removed) alphaRef.current = Math.max(alphaRef.current, 0.15);
+    paint();
+    if (camLensRef.current !== 'graph') enterLens('graph');
+    else follow();
+    // `paint` and the camera helpers read refs only
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map, lens, pinsVer]);
+
+  // Each card's real size, so cards of three lines are kept apart as cards of
+  // three lines — the old separation assumed every card was one size.
+  useLayoutEffect(() => {
+    if (lens !== 'graph') return;
+    const dims = dimsRef.current;
+    for (const [id, el] of nodeElRef.current) {
+      const w = el.offsetWidth;
+      const h = el.offsetHeight;
+      if (w && h) dims.set(id, { w, h });
+    }
   }, [map, lens]);
 
   const paint = useCallback(() => {
+    // The same card elements serve every lens. A frame of the graph's loop
+    // that lands after the switch to a laid-out lens must not write graph
+    // positions over the lens's own.
+    if (lensRef.current !== 'graph') return;
     const pos = posRef.current;
     for (const [id, el] of nodeElRef.current) {
       const p = pos.get(id);
-      if (p && el) el.style.transform = `translate(-50%, -50%) translate(${p.x}px, ${p.y}px)`;
+      if (p && el) el.style.transform = `translate(-50%, -50%) translate(${Math.round(p.x * 10) / 10}px, ${Math.round(p.y * 10) / 10}px)`;
     }
     for (const [key, el] of edgeElRef.current) {
       const [from, to] = key.split('~');
@@ -512,15 +1152,17 @@ export function ThinkingMap({
       const dx = b.x - a.x;
       const dy = b.y - a.y;
       const len = Math.hypot(dx, dy) || 1;
-      const t = boxExit(dx, dy);
-      const ax = a.x + dx * t;
-      const ay = a.y + dy * t;
-      const bx = b.x - dx * t;
-      const by = b.y - dy * t;
-      if ((bx - ax) * dx + (by - ay) * dy <= 0) {
+      // leave each card at its own edge
+      const ta = boxExit(dx, dy, dimsRef.current.get(from));
+      const tb = boxExit(dx, dy, dimsRef.current.get(to));
+      if (ta + tb >= 0.98) {
         el.setAttribute('d', '');
         continue;
       }
+      const ax = a.x + dx * ta;
+      const ay = a.y + dy * ta;
+      const bx = b.x - dx * tb;
+      const by = b.y - dy * tb;
       const off = Math.min(22, len * 0.1);
       const cx = (ax + bx) / 2 - (dy / len) * off;
       const cy = (ay + by) / 2 + (dx / len) * off;
@@ -529,12 +1171,20 @@ export function ThinkingMap({
   }, []);
 
   // ── graph lens: simulation ───────────────────────────────────────
+  // No box: the canvas is as large as the thinking. It used to clamp every
+  // card inside the panel AFTER separating them, which pushed cards straight
+  // back into each other at the edges — the clumping people saw. The camera
+  // now follows the map instead (until the person moves it).
   useEffect(() => {
     if (lens !== 'graph') return;
+    let frame = 0;
     const step = () => {
+      if (lensRef.current !== 'graph') return;
       const alpha = alphaRef.current;
-      if (alpha > ALPHA_MIN && !frozenRef.current) {
-        const { w, h } = sizeRef.current;
+      const graphPins = canvasRef.current.lenses.graph?.pins;
+      const dragging = gestureRef.current?.kind === 'node' ? gestureRef.current.id : null;
+      const fixed = (id: string) => id === dragging || !!graphPins?.[id];
+      if (alpha > ALPHA_MIN && !held()) {
         const pos = posRef.current;
         const nodes = mapRef.current.nodes;
         const edges = mapRef.current.edges;
@@ -549,9 +1199,10 @@ export function ThinkingMap({
             let dy = b.y - a.y;
             let d = Math.hypot(dx, dy);
             if (d < 0.01) {
-              dx = Math.random() - 0.5;
-              dy = Math.random() - 0.5;
-              d = 1;
+              // deterministic, so two loads of one map come to rest alike
+              dx = ((i * 7 + j * 3) % 11) - 5;
+              dy = ((i * 5 + j * 11) % 13) - 6;
+              d = Math.hypot(dx, dy) || 1;
             }
             const eff = Math.max(d, 82);
             const f = (REPULSION / (eff * eff)) * alpha;
@@ -577,77 +1228,125 @@ export function ThinkingMap({
         for (const n of nodes) {
           const p = pos.get(n.id);
           if (!p) continue;
-          p.vx += (w / 2 - p.x) * CENTER_PULL * alpha;
-          p.vy += (h / 2 - p.y) * CENTER_PULL * alpha;
+          if (fixed(n.id)) {
+            p.vx = 0;
+            p.vy = 0;
+            continue;
+          }
+          p.vx += -p.x * CENTER_PULL * alpha;
+          p.vy += -p.y * CENTER_PULL * alpha;
           p.vx *= DAMPING;
           p.vy *= DAMPING;
           p.x += p.vx;
           p.y += p.vy;
         }
-        const minX = HALF_W * 2 + GAP;
-        const minY = HALF_H * 2 + GAP;
+        // hard separation, card by card at each card's real size; a card
+        // the person placed never moves — the other one makes room
         for (let pass = 0; pass < SEPARATION_PASSES; pass++) {
           for (let i = 0; i < nodes.length; i++) {
-            const a = pos.get(nodes[i].id);
+            const ia = nodes[i].id;
+            const a = pos.get(ia);
             if (!a) continue;
+            const da = dimOf(ia);
+            const fa = fixed(ia);
             for (let j = i + 1; j < nodes.length; j++) {
-              const b = pos.get(nodes[j].id);
+              const ib = nodes[j].id;
+              const b = pos.get(ib);
               if (!b) continue;
+              const fb = fixed(ib);
+              if (fa && fb) continue;
+              const db = dimOf(ib);
               const dx = b.x - a.x;
               const dy = b.y - a.y;
-              const ox = minX - Math.abs(dx);
-              const oy = minY - Math.abs(dy);
+              const ox = (da.w + db.w) / 2 + GAP - Math.abs(dx);
+              const oy = (da.h + db.h) / 2 + GAP - Math.abs(dy);
               if (ox <= 0 || oy <= 0) continue;
+              const wa = fa ? 0 : fb ? 1 : 0.5;
+              const wb = fb ? 0 : fa ? 1 : 0.5;
               if (ox < oy) {
-                const s = (ox / 2) * (dx < 0 ? -1 : 1);
-                a.x -= s;
-                b.x += s;
+                const s = ox * (dx < 0 ? -1 : 1);
+                a.x -= s * wa;
+                b.x += s * wb;
               } else {
-                const s = (oy / 2) * (dy < 0 ? -1 : 1);
-                a.y -= s;
-                b.y += s;
+                const s = oy * (dy < 0 ? -1 : 1);
+                a.y -= s * wa;
+                b.y += s * wb;
               }
             }
           }
         }
-        for (const n of nodes) {
-          const p = pos.get(n.id);
-          if (!p) continue;
-          p.x = Math.max(PAD, Math.min(w - PAD, p.x));
-          p.y = Math.max(PAD * 0.62, Math.min(h - PAD * 0.62, p.y));
-        }
-        alphaRef.current = alpha * ALPHA_DECAY;
+        const next = alpha * ALPHA_DECAY;
+        alphaRef.current = next;
         paint();
+        // remember where it came to rest, once, as it comes to rest
+        if (next <= ALPHA_MIN) {
+          const settled: Record<string, [number, number]> = {};
+          for (const n of nodes) {
+            const p = pos.get(n.id);
+            if (p) settled[n.id] = [p.x, p.y];
+          }
+          commitCanvas(withSettled(canvasRef.current, 'graph', settled), false);
+          markOffscreen();
+        }
+        if (++frame % 5 === 0) follow();
       }
       rafRef.current = requestAnimationFrame(step);
     };
     rafRef.current = requestAnimationFrame(step);
     return () => cancelAnimationFrame(rafRef.current);
+    // the loop reads refs only
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paint, lens]);
 
+  // The panel's size. A laid-out lens is computed for it; the camera keeps
+  // following the map (or, once the person has moved it, stays exactly where
+  // they left it — a panel growing shorter under an open menu moves nothing).
   useEffect(() => {
     const el = wrapRef.current;
     if (!el) return;
     const apply = () => {
       const r = el.getBoundingClientRect();
-      // sizeRef is the simulation's world, which zoom can widen; `size` stays
-      // the container, because the Board and the plot draw to fit it.
-      sizeRef.current = { w: r.width / Math.min(zoomRef.current, 1), h: r.height / Math.min(zoomRef.current, 1) };
-      const wider = Math.abs(r.width - lastW.current) > 1;
-      lastW.current = r.width;
+      const cs = getComputedStyle(el);
+      insetsRef.current = {
+        top: parseFloat(cs.paddingTop) || 0,
+        right: parseFloat(cs.paddingRight) || 0,
+        bottom: parseFloat(cs.paddingBottom) || 0,
+        left: parseFloat(cs.paddingLeft) || 0,
+      };
+      const wider = Math.abs(r.width - vpRef.current.w) > 1;
+      vpRef.current = { w: r.width, h: r.height };
       setSize({ w: r.width, h: r.height });
-      alphaRef.current = Math.max(alphaRef.current, 0.4);
-      // The menu is pinned to coordinates that no longer mean anything — when
-      // the cards moved. A laid-out lens only moves them when the width does;
-      // a panel growing shorter under it (the conversation naming the card
-      // just selected, in Logos 3) leaves every card where it was.
-      if (wider || lensRef.current === 'graph') setMenu(null);
+      if (wider && menuRef.current) setMenu(null);
+      follow(true);
+      markOffscreen();
     };
     const ro = new ResizeObserver(apply);
     ro.observe(el);
     apply();
     return () => ro.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // The tabs moved to a side: the canvas's free area changed with them.
+  useLayoutEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const cs = getComputedStyle(el);
+    insetsRef.current = {
+      top: parseFloat(cs.paddingTop) || 0,
+      right: parseFloat(cs.paddingRight) || 0,
+      bottom: parseFloat(cs.paddingBottom) || 0,
+      left: parseFloat(cs.paddingLeft) || 0,
+    };
+    follow();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tabsAt]);
+
+  // The camera is the DOM's, not React's: put it back after every render.
+  useLayoutEffect(() => {
+    applyCam();
+  });
+
 
   const dim = (on: boolean) => (related && !on ? ' is-dim' : '');
 
@@ -686,6 +1385,12 @@ export function ThinkingMap({
   // In a shape's own lens a card says what it DOES there; elsewhere, what it is.
   const shapeLens = lens === 'flow' || lens === 'timeline';
 
+  // A laid-out lens, with the cards the person moved where they put them —
+  // and every line touching a moved card re-routed to where it now is.
+  const lensPins = lens !== 'graph' && isCanvas ? pinsOf(lens) : {};
+  const placedWithPins: Placed[] = (staticLayout?.placed ?? []).map((p) =>
+    lensPins[p.id] ? { ...p, x: lensPins[p.id][0], y: lensPins[p.id][1] } : p
+  );
   const cards: Placed[] =
     lens === 'graph'
       ? map.nodes.map((n) => ({
@@ -696,7 +1401,7 @@ export function ThinkingMap({
           w: GRAPH_W,
           h: cardH(n.label, GRAPH_W),
         }))
-      : (staticLayout?.placed ?? []);
+      : placedWithPins;
 
   const connectors: Connector[] =
     lens === 'graph'
@@ -706,7 +1411,19 @@ export function ThinkingMap({
           relation: e.relation as LogosRelation,
           strength: e.strength,
         }))
-      : (staticLayout?.connectors ?? []);
+      : rerouted(staticLayout?.connectors ?? [], placedWithPins, lensPins);
+  placedNowRef.current = lens === 'graph' ? [] : cards;
+  connNowRef.current = lens === 'graph' ? [] : connectors;
+
+  // Each new lens, and each new arrangement of a laid-out one: the camera
+  // either follows it (nobody has moved it) or stays exactly where it was.
+  useLayoutEffect(() => {
+    if (!isCanvasLens(lens) || lens === 'graph') return;
+    if (camLensRef.current !== lens) enterLens(lens);
+    else follow();
+    // the camera helpers read refs only
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lens, staticLayout, pinsVer]);
 
   return (
     <div ref={outerRef} className={`lg-map-wrap${emerging ? ' is-emerging' : ''} tabs-${tabsAt}${tabsDrag ? ' is-moving-tabs' : ''}`} data-lens={lens}>
@@ -826,48 +1543,46 @@ export function ThinkingMap({
       )}
 
       <div
-        className={`lg-map${lens === 'plot' || lens === 'board' || lens === 'matrix' ? '' : ' can-pan'}`}
+        className={`lg-map${isCanvas ? ' can-pan' : ''}${embedded ? ' is-embedded' : ''}`}
         ref={wrapRef}
-        // DRAG THE CANVAS TO MOVE AROUND IT — anywhere that is not a card, a
-        // control or a menu. A drag is not a click: it does not clear the focus.
-        onPointerDown={(e) => {
-          if (e.button !== 0 || lens === 'plot' || lens === 'board' || lens === 'matrix') return;
-          const t = e.target as HTMLElement;
-          if (t.closest('.lg-node, button, a, input, textarea, select, .lg-acts, .lg-zoom, .mp-tabs, .mp-top')) return;
-          const el = wrapRef.current;
-          if (!el) return;
-          panRef.current = { x: e.clientX, y: e.clientY, sl: el.scrollLeft, st: el.scrollTop, moved: false };
-        }}
-        onPointerMove={(e) => {
-          const p = panRef.current;
-          const el = wrapRef.current;
-          if (!p || !el) return;
-          const dx = e.clientX - p.x;
-          const dy = e.clientY - p.y;
-          if (!p.moved) {
-            if (Math.hypot(dx, dy) < 4) return;
-            p.moved = true;
-            el.setPointerCapture?.(e.pointerId);
-            el.classList.add('is-panning');
+        // THE CANVAS. Drag empty paper to move around; drag a card to move
+        // it; wheel or pinch to zoom where the pointer is; two fingers pan and
+        // pinch on a touch screen. Focused, the arrow keys move around it.
+        tabIndex={isCanvas && map.nodes.length ? 0 : undefined}
+        role={isCanvas ? 'region' : undefined}
+        aria-label={
+          isCanvas
+            ? 'Map. Drag to move around, or use the arrow keys; plus and minus zoom; 0 shows all of it. Alt and an arrow key moves a card.'
+            : undefined
+        }
+        onKeyDown={onCanvasKey}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerCancel}
+        onLostPointerCapture={(e) => {
+          // the browser took the pointer away (an element went, a system
+          // gesture began): whatever it was doing ends, kept where it is
+          // Only the canvas's own capture. A touch is captured implicitly by
+          // the card it starts on; taking it over for a drag releases that
+          // one, and the release bubbles here — it is not the end of anything.
+          if (e.target !== e.currentTarget) return;
+          const g = gestureRef.current;
+          if (g && g.kind !== 'press' && g.kind !== 'pinch' && g.pid === e.pointerId) {
+            pointersRef.current.delete(e.pointerId);
+            endGesture(true);
           }
-          el.scrollLeft = p.sl - dx;
-          el.scrollTop = p.st - dy;
         }}
-        onPointerUp={() => {
-          const p = panRef.current;
-          panRef.current = null;
-          wrapRef.current?.classList.remove('is-panning');
-          if (p?.moved) pannedRef.current = true;
-        }}
-        onPointerCancel={() => {
-          panRef.current = null;
-          wrapRef.current?.classList.remove('is-panning');
+        // A drag is never also a click: the click the browser sends at the end
+        // of one is swallowed here, before any card or the canvas sees it.
+        onClickCapture={(e) => {
+          if (suppressClickRef.current) {
+            suppressClickRef.current = false;
+            e.stopPropagation();
+            e.preventDefault();
+          }
         }}
         onClick={() => {
-          if (pannedRef.current) {
-            pannedRef.current = false;
-            return;
-          }
           setFocused(null);
           setMenu(null);
         }}
@@ -987,25 +1702,12 @@ export function ThinkingMap({
             ) : null;
           })()}
 
-        {/* The sizer carries the scrollable extent, because a transform does
-            not change an element's layout box; the surface inside it is what
-            actually scales. Zoomed out the two cancel and the map fits the
-            panel exactly; zoomed in the sizer grows and the panel pans.
-
-            Skipped entirely on the lenses that draw themselves. It is a
-            full-bleed absolute layer painted after them, so leaving it up
-            over the plot or the Board put an invisible sheet across both —
-            harmless while neither had anything to click, and not harmless
-            now that the plot has controls. */}
-        {lens !== 'plot' && lens !== 'board' && (
-        <div
-          className="lg-map-sizer"
-          style={{ width: world.w * zoom, height: world.h * zoom }}
-        >
-          <div
-            className="lg-map-surface"
-            style={{ width: world.w, height: world.h, transform: `scale(${zoom})` }}
-          >
+        {/* THE WORLD: every card and every line, in world coordinates, moved
+            as one by the camera's transform (written to the DOM directly —
+            see applyCam). Not rendered on the lenses that draw themselves:
+            it would lie over the plot and the Board like a sheet of glass. */}
+        {isCanvas && (
+          <div className="lg-map-world" ref={worldRef}>
         <svg className="lg-edges" aria-hidden="true">
           <defs>
             <marker
@@ -1031,14 +1733,10 @@ export function ThinkingMap({
                 style={{ '--i': connectors.indexOf(c) } as React.CSSProperties}
               >
                 <path
-                  ref={
-                    lens === 'graph'
-                      ? (el) => {
-                          if (el) edgeElRef.current.set(c.key, el);
-                          else edgeElRef.current.delete(c.key);
-                        }
-                      : undefined
-                  }
+                  ref={(el) => {
+                    if (el) edgeElRef.current.set(c.key, el);
+                    else edgeElRef.current.delete(c.key);
+                  }}
                   className="lg-edge"
                   d={lens === 'graph' ? undefined : c.path}
                   pathLength={1}
@@ -1047,7 +1745,16 @@ export function ThinkingMap({
                   markerStart={c.double ? 'url(#lg-arrow)' : undefined}
                 />
                 {c.label && c.lx != null && c.ly != null && (
-                  <text className="lg-conn-label" x={c.lx} y={c.ly - 9} textAnchor="middle">
+                  <text
+                    ref={(el) => {
+                      if (el) labelElRef.current.set(c.key, el);
+                      else labelElRef.current.delete(c.key);
+                    }}
+                    className="lg-conn-label"
+                    x={c.lx}
+                    y={c.ly - 9}
+                    textAnchor="middle"
+                  >
                     {c.label}
                   </text>
                 )}
@@ -1075,15 +1782,14 @@ export function ThinkingMap({
           return (
             <div
               key={p.id}
-              ref={
-                lens === 'graph'
-                  ? (el) => {
-                      if (el) nodeElRef.current.set(p.id, el);
-                      else nodeElRef.current.delete(p.id);
-                    }
-                  : undefined
-              }
-              className={`lg-node-pos${dim(on)}${menuFor === p.id ? ' is-menu' : ''}${p.loose ? ' is-loose' : ''}`}
+              ref={(el) => {
+                if (el) nodeElRef.current.set(p.id, el);
+                else nodeElRef.current.delete(p.id);
+              }}
+              data-id={p.id}
+              className={`lg-node-pos${dim(on)}${menuFor === p.id ? ' is-menu' : ''}${p.loose ? ' is-loose' : ''}${
+                isPinned(canvasRef.current, lens, p.id) ? ' is-placed' : ''
+              }`}
               style={
                 {
                   // Its place in the sequence, for the emergence.
@@ -1113,7 +1819,11 @@ export function ThinkingMap({
                 aria-expanded={menuFor === p.id}
                 onMouseEnter={() => setHovered(p.id)}
                 onMouseLeave={() => setHovered(null)}
-                onFocus={() => setHovered(p.id)}
+                onFocus={(ev) => {
+                  setHovered(p.id);
+                  // reached by Tab, somewhere the camera is not looking: look there
+                  if (ev.currentTarget.matches(':focus-visible')) ensureVisible(p.id);
+                }}
                 onBlur={() => setHovered(null)}
                 // A right-click is the same press: the card's menu is the
                 // card's menu, and the browser's own has nothing to offer here.
@@ -1123,6 +1833,23 @@ export function ThinkingMap({
                   ev.currentTarget.click();
                 }}
                 onKeyDown={(ev) => {
+                  // Alt + an arrow moves the card — the keyboard's drag. It
+                  // changes where the card sits, never what it says.
+                  if (ev.altKey && ev.key.startsWith('Arrow') && isCanvas) {
+                    ev.preventDefault();
+                    ev.stopPropagation();
+                    nudgeCard(p.id, ev.key, ev.shiftKey);
+                    return;
+                  }
+                  if (ev.key === 'Escape') {
+                    ev.stopPropagation();
+                    if (menu) setMenu(null);
+                    else {
+                      setFocused(null);
+                      wrapRef.current?.focus();
+                    }
+                    return;
+                  }
                   // Delete on a focused card takes it off the map, the same
                   // edit the menu offers — so a keyboard can do what a mouse can.
                   if ((ev.key === 'Delete' || ev.key === 'Backspace') && onEdit) {
@@ -1152,16 +1879,15 @@ export function ThinkingMap({
                   if (!el || !box) return;
                   // Flip above the card when there isn't room beneath it.
                   const above = card.bottom - box.top + MENU_H > box.height;
-                  // The menu sits inside the scrollable, scaled sizer, so it is
-                  // placed in scroll-content coordinates — client rects are
-                  // viewport-relative, hence the scroll offsets.
+                  // The menu is in the viewport, not the world: placed in the
+                  // panel's own pixels, kept inside it, the same size at any zoom.
                   onNodePress?.();
                   setMenu({
                     id: p.id,
-                    x: card.left - box.left + el.scrollLeft + card.width / 2,
+                    x: Math.min(Math.max(card.left - box.left + card.width / 2, 100), Math.max(100, box.width - 100)),
                     y: above
-                      ? card.top - box.top + el.scrollTop - 8
-                      : card.bottom - box.top + el.scrollTop + 8,
+                      ? Math.max(card.top - box.top - 8, MENU_H * 0.4)
+                      : Math.max(8, card.bottom - box.top + 8),
                     above,
                   });
                 }}
@@ -1230,8 +1956,9 @@ export function ThinkingMap({
           );
         })}
           </div>
+        )}
 
-        {menu &&
+        {menu && isCanvas &&
           (() => {
             const node = map.nodes.find((n) => n.id === menu.id);
             if (!node) return null;
@@ -1338,11 +2065,28 @@ export function ThinkingMap({
                     </button>
                   </>
                 )}
+                {/* Where it sits is the person's to undo, quietly: a card
+                    they placed by hand can be handed back to the layout. */}
+                {isPinned(canvasRef.current, lens, node.id) && (
+                  <>
+                    <span className="lg-act-sep" role="separator" />
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="lg-act lg-act-unpin"
+                      onClick={() => {
+                        setMenu(null);
+                        releaseCard(node.id);
+                      }}
+                    >
+                      <span className="lg-act-label">Return to its place</span>
+                      <span className="lg-act-blurb">Let the layout place it again</span>
+                    </button>
+                  </>
+                )}
               </div>
             );
           })()}
-        </div>
-        )}
 
         {related && active && lens === 'graph' && (
           <div className="lg-legend" aria-live="polite">
@@ -1369,36 +2113,41 @@ export function ThinkingMap({
         )}
       </div>
 
-      {/* Zoom is meaningless on the plot and the Board, which draw to fit. */}
-      {map.nodes.length > 0 && lens !== 'plot' && lens !== 'board' && (
-        <div className="lg-zoom" role="group" aria-label="Zoom">
-          <button
-            type="button"
-            onClick={() => zoomBy(-1)}
-            disabled={zoom <= ZOOMS[0]}
-            aria-label="Zoom out"
-            title="Zoom out"
-          >
+      {/* The camera's controls. Zoom is meaningless on the plot, the Board and
+          the table, which draw to fit. The readout and the disabled states
+          are written by applyCam, so a pinch never re-renders the map. */}
+      {map.nodes.length > 0 && isCanvas && (
+        <div className="lg-zoom" role="group" aria-label="Zoom and view">
+          <button ref={zoomOutRef} type="button" onClick={() => zoomStep(-1)} aria-label="Zoom out" title="Zoom out (−)">
             −
           </button>
           <button
+            ref={zoomLevelRef}
             type="button"
             className="lg-zoom-level"
-            onClick={() => setZoom(1)}
-            disabled={zoom === 1}
-            aria-label={`Zoom ${Math.round(zoom * 100)} percent — reset`}
-            title="Reset zoom — or hold Ctrl and scroll to zoom on the map"
+            onClick={() => {
+              const c = camRef.current;
+              userCam(zoomAt(c, 1, vpRef.current.w / 2, vpRef.current.h / 2), true);
+            }}
+            aria-label="Zoom 100 percent — back to 100"
+            title="Back to 100% — or scroll, or pinch, to zoom where you point"
           >
-            {Math.round(zoom * 100)}%
+            100%
+          </button>
+          <button ref={zoomInRef} type="button" onClick={() => zoomStep(1)} aria-label="Zoom in" title="Zoom in (+)">
+            +
           </button>
           <button
+            ref={fitRef}
             type="button"
-            onClick={() => zoomBy(1)}
-            disabled={zoom >= ZOOMS[ZOOMS.length - 1]}
-            aria-label="Zoom in"
-            title="Zoom in"
+            className="lg-zoom-fit"
+            onClick={() => fitAll()}
+            aria-label="Show all of the map"
+            title="Show all of it (0)"
           >
-            +
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M2.5 6V2.5H6M10 2.5h3.5V6M13.5 10v3.5H10M6 13.5H2.5V10" />
+            </svg>
           </button>
         </div>
       )}

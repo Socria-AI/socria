@@ -214,7 +214,7 @@
 .logos-root .ws-dock .lg-tools { margin: 0; padding: 0 2px 10px; }
 .logos-root .ws-dock .lg-guard, .logos-root .ws-dock .lg-one-note, .logos-root .ws-dock .lg-drift, .logos-root .ws-dock .lg-allow { margin-left: 0; margin-right: 0; }
 .logos-root .ws-dock:not(.is-open) .lg-thread { display: none; }
-.logos-root .ws-dock.is-open .lg-thread { flex: 0 1 auto; max-height: 52vh; padding: 10px 4px 8px; border-top: 1px solid var(--lg-line); }
+.logos-root .ws-dock.is-open .lg-thread { flex: 0 1 auto; min-height: 0; max-height: 52vh; padding: 10px 4px 8px; border-top: 1px solid var(--lg-line); }
 .logos-root .ws-dock .ws-chat-focus { margin: 0 0 2px; }
 .logos-root .ws-dock-row { display: flex; align-items: flex-start; gap: 12px; }
 .logos-root .ws-peek-gap { flex: 1; }
@@ -310,7 +310,17 @@
 .logos-root .ws-main.dock-right { flex-direction: row; }
 .logos-root .ws-main.dock-left { flex-direction: row-reverse; }
 .logos-root .ws-main > .ws-stage { flex: 1; min-height: 0; min-width: 0; }
-.logos-root .ws-dockwrap { position: relative; display: flex; flex-direction: column; min-height: 0; flex: 0 0 auto; }
+.logos-root .ws-dockwrap { position: relative; display: flex; flex-direction: column; min-height: 0; flex: 0 1 auto; }
+/* THE COMPOSER IS NEVER PUSHED OUT OF REACH. Above or below the stage, the
+   dock may take only what the stage can spare: the history (and a synthesis)
+   shrink and scroll within themselves; the composer, the tools and the row
+   above them never shrink. The stage keeps a floor, so unfolding the
+   conversation on a short screen cannot squeeze the map to nothing either. */
+.logos-root .ws-main:is(.dock-bottom, .dock-top) > .ws-stage,
+.logos-root .ws-root.is-narrow > .ws-stage { min-height: min(26vh, 220px); }
+.logos-root .ws-dockwrap > .ws-dock, .logos-root .ws-root.is-narrow > .ws-dock { flex: 0 1 auto; min-height: 0; }
+.logos-root .ws-dock > * { flex-shrink: 0; }
+.logos-root .ws-dock > .lg-thread, .logos-root .ws-dock > .syn { flex-shrink: 1; min-height: 0; }
 .logos-root .ws-main.dock-top > .ws-dockwrap { border-bottom: 1px solid var(--lg-line); padding-bottom: 4px; }
 .logos-root .ws-main:is(.dock-left, .dock-right) > .ws-dockwrap { width: clamp(300px, 30%, 420px); }
 .logos-root .ws-main.dock-right > .ws-dockwrap { border-left: 1px solid var(--lg-line); }

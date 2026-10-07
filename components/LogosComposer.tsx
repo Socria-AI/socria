@@ -354,7 +354,7 @@ export function LogosComposer({
             type="button"
             className="lg-attach"
             onClick={() => fileRef.current?.click()}
-            disabled={busy || drafts.length >= MAX_ATTACHMENTS}
+            disabled={drafts.length >= MAX_ATTACHMENTS}
             aria-label="Attach an image or a text file"
             title="Attach an image or a text file"
           >
@@ -378,8 +378,12 @@ export function LogosComposer({
             ref={taRef}
             value={value}
             rows={1}
-            placeholder="What are you working through?"
-            disabled={busy}
+            // NEVER disabled. A disabled textarea drops focus and refuses the
+            // caret, so while Socria replied the person could not type — the
+            // "I have to fold the conversation away to type" report. Only
+            // sending waits for the reply (canSend); writing never does.
+            placeholder={busy ? 'Keep writing — you can send once Socria has replied' : 'What are you working through?'}
+            aria-busy={busy || undefined}
             onChange={(e) => {
               onChange(e.target.value);
               grow();

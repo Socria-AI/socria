@@ -1028,9 +1028,24 @@ export function LogosApp({
     refreshMap();
   }
 
+  // THE THREAD FOLLOWS THE CONVERSATION — AND ONLY THE THREAD MOVES. This was
+  // scrollIntoView, which scrolls every ancestor to bring the end into view,
+  // overflow:hidden ones included: in Logos 3 it shifted the workspace itself
+  // on every streamed token, so an expanded conversation jumped and the
+  // composer could end up out of reach. Now only the thread's own scrollTop
+  // changes, and a streaming reply follows only someone already at the end —
+  // whoever scrolled up to read is left where they are.
+  const threadRef = useRef<HTMLDivElement>(null);
+  const atEndRef = useRef(true);
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages.length, streaming]);
+    const t = threadRef.current;
+    if (t) t.scrollTop = t.scrollHeight;
+    atEndRef.current = true;
+  }, [messages.length]);
+  useEffect(() => {
+    const t = threadRef.current;
+    if (t && atEndRef.current) t.scrollTop = t.scrollHeight;
+  }, [streaming, busy]);
 
   // On mobile the rail is an overlay, so it must not start open across the
   // whole screen. One check at mount; resizing a desktop window later is a
@@ -2972,6 +2987,14 @@ export function LogosApp({
       if (v && (DOCK_SIDES as readonly string[]).includes(v)) setDockSide(v as DockSide);
     } catch {}
   }, []);
+  // Unfolding the conversation shows its end — the thread was not laid out
+  // while folded, so it has no scroll position worth keeping.
+  useEffect(() => {
+    const t = threadRef.current;
+    if (!t) return;
+    t.scrollTop = t.scrollHeight;
+    atEndRef.current = true;
+  }, [dockOpen, dockSide]);
   const moveDock = useCallback((side: DockSide) => {
     setDockSide(side);
     try {
@@ -3322,7 +3345,14 @@ export function LogosApp({
   const convoBody = (
     <>
 
-          <div className="lg-thread">
+          <div
+            className="lg-thread"
+            ref={threadRef}
+            onScroll={(e) => {
+              const t = e.currentTarget;
+              atEndRef.current = t.scrollHeight - t.scrollTop - t.clientHeight < 48;
+            }}
+          >
             {messages.length === 0 && !streaming && (
               <div className="lg-intro">
                 <h1>Think out loud.</h1>
@@ -3794,6 +3824,8 @@ export function LogosApp({
           )}
           <ThinkingMap
             key={`tm-${lens ?? ''}`}
+            // where the person put this line of thinking's cards, kept for it
+            layoutKey={activeId}
             picked={picked}
             onPick={(id) => setPicked((cur) => {
               const next = new Set(cur);

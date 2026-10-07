@@ -100,7 +100,7 @@ export function DemoSplit() {
           </header>
           {/* Editable, as the product's is: right-click a card, or press
               Delete on one, and it goes — the same edit path (lib/map-edit.ts). */}
-          <ThinkingMap map={demo} initialLens="graph" onEdit={(e) => setDemo((m) => applyMapEdits(m, [e]).map)} />
+          <ThinkingMap embedded map={demo} initialLens="graph" onEdit={(e) => setDemo((m) => applyMapEdits(m, [e]).map)} />
         </section>
       </div>
     </Frame>
@@ -135,7 +135,7 @@ export function DemoLenses() {
       <p className="ui-lensblurb">{LENSES.find((l) => l.id === lens)!.blurb}</p>
       <Frame label="Switch lens and the same thinking rearranges — try it" height={380}>
         <div className="lg-panel" style={{ height: '100%' }}>
-          <ThinkingMap key={lens} map={DEMO_MAP} initialLens={lens} />
+          <ThinkingMap embedded key={lens} map={DEMO_MAP} initialLens={lens} />
         </div>
       </Frame>
     </div>

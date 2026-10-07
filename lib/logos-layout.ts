@@ -60,6 +60,14 @@ export interface Connector {
   ly?: number;
   arrow?: boolean;
   double?: boolean;
+  /**
+   * The cards it joins. A card the person drags out of the lens's own
+   * arrangement takes its connections with it — they are re-routed from
+   * these, since the lens's path assumed the card was where the lens put it.
+   * A connector with only `to` belongs to that card alone (a timeline tick).
+   */
+  from?: string;
+  to?: string;
 }
 
 export interface Layout {
@@ -101,13 +109,18 @@ export const RELATION_LABEL: Record<LogosRelation, string> = {
 };
 
 const CARD_W = 150;
-const CARD_H = 42;
-const CARD_H2 = 58; // two-line
+/** a one-line card as drawn: padding, the type line, one line of label */
+const CARD_H = 56;
+const LINE_H = 19;
 const GRAPH_W = 168;
 
 function cardH(label: string, w = CARD_W) {
-  // ~7.1px per character at 13.5px Inter; wrap past the card width.
-  return label.length * 7.1 > w - 26 ? CARD_H2 : CARD_H;
+  // ~7.1px per character at 13.5px Inter, wrapping inside the card's
+  // padding. It used to say every card was one or two short lines, and the
+  // layouts that trusted it stacked three-line cards on top of each other.
+  const perLine = Math.max(8, Math.floor((w - 26) / 7.1));
+  const lines = Math.min(5, Math.max(1, Math.ceil((label.length * 1.08) / perLine)));
+  return CARD_H + (lines - 1) * LINE_H;
 }
 
 /**
@@ -403,10 +416,20 @@ export function layoutStructure(map: ThinkingMap, w: number, h: number): Layout 
     (order[d] ||= []).push(n.id);
   }
 
-  const rows = order.filter(Boolean);
+  // A CARD NEVER SITS ON A CARD. Spacing used to shrink with the panel's
+  // width until seventy cards in one level overlapped into a single smear.
+  // Now a level that will not fit is wrapped onto further lines of its own,
+  // and a line may run wider than the panel — the canvas pans and fits.
+  const STEP = CARD_W + 16;
+  const perLine = Math.max(6, Math.floor((1.6 * (w - 80)) / STEP));
+  const rows: string[][] = [];
+  for (const level of order.filter(Boolean)) {
+    for (let i = 0; i < level.length; i += perLine) rows.push(level.slice(i, i + perLine));
+  }
   const topPad = 56;
+  const tallest = Math.max(CARD_H, ...nodes.map((n) => cardH(n.label)));
   const rowGap = Math.max(
-    74,
+    Math.max(74, tallest + 22),
     Math.min(112, (h - topPad - 56) / Math.max(rows.length - 1, 1))
   );
   const placed: Placed[] = [];
@@ -414,7 +437,7 @@ export function layoutStructure(map: ThinkingMap, w: number, h: number): Layout 
 
   rows.forEach((row, di) => {
     const y = topPad + di * rowGap;
-    const spacing = Math.min(190, (w - 80) / Math.max(row.length, 1));
+    const spacing = Math.max(STEP, Math.min(190, (w - 80) / Math.max(row.length, 1)));
     const totalW = spacing * (row.length - 1);
     row.forEach((id, i) => {
       const node = byId.get(id)!;
@@ -444,6 +467,8 @@ export function layoutStructure(map: ThinkingMap, w: number, h: number): Layout 
       );
       connectors.push({
         key: `${parent}~${c}`,
+        from: parent,
+        to: c,
         // right-angle routing, the reference's tree grammar
         path: `M ${p.x} ${p.y + p.h / 2} V ${midY} H ${k.x} V ${k.y - k.h / 2}`,
         relation: edge?.relation || 'relates',
@@ -471,7 +496,7 @@ export function layoutTensions(map: ThinkingMap, w: number, h: number): Layout {
   const connectors: Connector[] = [];
   const rowGap = 130;
   const topPad = 70;
-  const half = Math.min(230, (w - 200) / 2);
+  const half = Math.max(CARD_W / 2 + 24, Math.min(230, (w - 200) / 2));
 
   conflicts.forEach((e, i) => {
     const a = byId.get(e.from);
@@ -483,6 +508,8 @@ export function layoutTensions(map: ThinkingMap, w: number, h: number): Layout {
     placed.push(pa, pb);
     connectors.push({
       key: `t~${e.from}~${e.to}`,
+      from: pa.id,
+      to: pb.id,
       path: `M ${pa.x + pa.w / 2} ${y} H ${pb.x - pb.w / 2}`,
       relation: 'conflicts',
       strength: e.strength,
@@ -533,7 +560,7 @@ export function layoutEvidence(map: ThinkingMap, w: number, h: number): Layout {
 
   if (!claims.length) {
     // Evidence with nothing attached — lay it out in a simple row.
-    const spacing = Math.min(190, (w - 80) / Math.max(evidence.length, 1));
+    const spacing = Math.max(CARD_W + 16, Math.min(190, (w - 80) / Math.max(evidence.length, 1)));
     const total = spacing * (evidence.length - 1);
     evidence.forEach((n, i) => {
       placed.push({
@@ -548,9 +575,21 @@ export function layoutEvidence(map: ThinkingMap, w: number, h: number): Layout {
     return { placed, connectors, caption: capOf('evidence') };
   }
 
-  const colW = Math.min(300, (w - 60) / claims.length);
+  // Each claim's column is as wide as its evidence needs, never narrower
+  // than a card: columns sit side by side, they do not overlap.
+  const STEP = CARD_W + 16;
+  const baseCol = Math.max(STEP + 8, Math.min(300, (w - 60) / claims.length));
+  const colWs = claims.map((c) => Math.max(baseCol, (supportOf.get(c.id)?.length ?? 0) * STEP));
+  const span = colWs.reduce((a, b) => a + b, 0);
+  let cursor = w / 2 - span / 2;
+  // the evidence row sits below the tallest claim, however long its words
+  const claimH = Math.max(...claims.map((c) => cardH(c.label)));
+  const kidH = Math.max(CARD_H, ...claims.flatMap((c) => (supportOf.get(c.id) || []).map((k) => cardH(byId.get(k)?.label ?? ''))));
+  const kidY = Math.max(200, 72 + claimH / 2 + 44 + kidH / 2);
   claims.forEach((claim, ci) => {
-    const cx = w / 2 - (colW * (claims.length - 1)) / 2 + ci * colW;
+    const colW = colWs[ci];
+    const cx = cursor + colW / 2;
+    cursor += colW;
     const top: Placed = {
       id: claim.id,
       node: claim,
@@ -561,7 +600,7 @@ export function layoutEvidence(map: ThinkingMap, w: number, h: number): Layout {
     };
     placed.push(top);
     const kids = supportOf.get(claim.id) || [];
-    const spacing = Math.min(170, colW / Math.max(kids.length, 1));
+    const spacing = Math.max(STEP, Math.min(170, colW / Math.max(kids.length, 1)));
     const total = spacing * (kids.length - 1);
     kids.forEach((kid, i) => {
       const n = byId.get(kid);
@@ -570,7 +609,7 @@ export function layoutEvidence(map: ThinkingMap, w: number, h: number): Layout {
         id: kid,
         node: n,
         x: cx - total / 2 + i * spacing,
-        y: 200,
+        y: kidY,
         w: CARD_W,
         h: cardH(n.label),
       };
@@ -578,6 +617,8 @@ export function layoutEvidence(map: ThinkingMap, w: number, h: number): Layout {
       const midY = (top.y + top.h / 2 + (p.y - p.h / 2)) / 2;
       connectors.push({
         key: `e~${claim.id}~${kid}`,
+        from: claim.id,
+        to: kid,
         path: `M ${top.x} ${top.y + top.h / 2} V ${midY} H ${p.x} V ${p.y - p.h / 2}`,
         relation: 'supports',
         strength: map.edges.find(
@@ -731,6 +772,8 @@ export function layoutSolve(map: ThinkingMap, w: number, h: number): Layout {
           : `M ${a.x} ${y1} V ${midY} H ${b.x} V ${y2}`;
       connectors.push({
         key: `${e.from}>${e.to}`,
+        from: e.from,
+        to: e.to,
         path,
         relation: e.relation,
         arrow: true,
@@ -743,6 +786,8 @@ export function layoutSolve(map: ThinkingMap, w: number, h: number): Layout {
       const y = (a.y + b.y) / 2;
       connectors.push({
         key: `j~${e.from}~${e.to}`,
+        from: e.from,
+        to: e.to,
         path: `M ${a.x - a.w / 2} ${a.y} H ${b.x + b.w / 2}`,
         relation: 'justifies',
         strength: e.strength,
@@ -976,6 +1021,7 @@ export function layoutFlow(map: ThinkingMap, w: number, h: number): Layout {
   // Loose: on the map, not in the shape, and hanging from nothing in it.
   const loose = map.nodes.filter((n) => !spine.has(n.id) && !held.has(n.id));
   const bottom = Math.max(...placed.map((p) => p.y + p.h / 2)) + 54;
+  const looseStep = Math.max(CARD_H + LINE_H, ...loose.map((n) => cardH(n.label))) + 16;
   loose.forEach((node, i) => {
     const per = Math.max(1, Math.floor((Math.max(w, FLOW_W * 2) - FLOW_PAD) / (CARD_W + 20)));
     const ch = cardH(node.label);
@@ -983,7 +1029,7 @@ export function layoutFlow(map: ThinkingMap, w: number, h: number): Layout {
       id: node.id,
       node,
       x: FLOW_PAD + CARD_W / 2 + (i % per) * (CARD_W + 20),
-      y: bottom + ch / 2 + Math.floor(i / per) * (CARD_H2 + 16),
+      y: bottom + ch / 2 + Math.floor(i / per) * looseStep,
       w: CARD_W,
       h: ch,
       loose: true,
@@ -1032,6 +1078,8 @@ export function layoutFlow(map: ThinkingMap, w: number, h: number): Layout {
     }
     return {
       key: `${e.from}~${e.to}~${e.relation}`,
+      from: e.from,
+      to: e.to,
       path,
       relation: e.relation,
       strength: e.strength,
@@ -1058,12 +1106,17 @@ export function layoutTimeline(map: ThinkingMap, w: number, h: number): Layout {
   const axis = Math.max(h / 2, 180);
   const placed: Placed[] = [];
   const at = new Map<string, Placed>();
+  // one tier is as tall as the tallest card on the line, so stacked cards never touch
+  const tierH = Math.max(
+    CARD_H + LINE_H,
+    ...layers.flat().map((id) => cardH(byId.get(id)!.label, FLOW_W) + (attached.get(id)?.length ? ATTACH_H : 0))
+  );
   layers.forEach((layer, li) => {
     layer.forEach((id, k) => {
       const node = byId.get(id)!;
       const ch = cardH(node.label, FLOW_W) + (attached.get(id)?.length ? ATTACH_H : 0);
       const above = (li + k) % 2 === 0;
-      const tier = 40 + k * (CARD_H2 + 18);
+      const tier = 40 + k * (tierH + 18);
       const p: Placed = {
         id,
         node,
@@ -1088,6 +1141,7 @@ export function layoutTimeline(map: ThinkingMap, w: number, h: number): Layout {
     },
     ...placed.map((p) => ({
       key: `tick~${p.id}`,
+      to: p.id,
       path: `M${p.x},${axis} L${p.x},${p.y + (p.y < axis ? p.h / 2 : -p.h / 2)}`,
       relation: 'part_of' as const,
     })),

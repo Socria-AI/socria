@@ -625,7 +625,7 @@ export function DemoTwoSeats() {
           </span>
           <span className="lg-panel-state">7 nodes · 2 people</span>
         </header>
-        <ThinkingMapView map={TWO_SEATS} initialLens="graph" />
+        <ThinkingMapView embedded map={TWO_SEATS} initialLens="graph" />
       </section>
     </DocsFrame>
   );

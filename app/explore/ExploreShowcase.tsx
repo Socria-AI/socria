@@ -143,7 +143,7 @@ function Exhibit({ scenario }: { scenario: Scenario }) {
                   </span>
                   <span className="lg-panel-state">{map.nodes.length} nodes</span>
                 </header>
-                <ThinkingMap map={map} initialLens={lens ?? 'graph'} onEdit={(e) => setEdited((m) => applyMapEdits(m ?? map, [e]).map)} />
+                <ThinkingMap embedded map={map} initialLens={lens ?? 'graph'} onEdit={(e) => setEdited((m) => applyMapEdits(m ?? map, [e]).map)} />
               </section>
             </div>
           </Frame>

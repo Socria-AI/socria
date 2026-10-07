@@ -3768,16 +3768,15 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
    to 33 million pixels. Out of flow it still creates the scrollable extent
    (.lg-map is the positioned ancestor) but can no longer drive the measurement
    that produced it. */
-.logos-root .lg-map-sizer { position: absolute; top: 0; left: 0; }
-.logos-root .lg-map-surface {
-  position: absolute; inset: 0;
-  transform-origin: 0 0;
-  transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+/* THE WORLD. Every card and line lives in world coordinates inside one layer,
+   and the camera moves that layer with a single transform (lib/canvas.ts,
+   written by ThinkingMap's applyCam). The panel never scrolls: a canvas is
+   panned, not scrolled, and a scrollbar on a map reads as a long web page.
+   1px, not 0: an SVG of zero size is not drawn at all. */
+.logos-root .lg-map-world {
+  position: absolute; left: 0; top: 0; width: 1px; height: 1px;
+  transform-origin: 0 0; will-change: transform;
 }
-@media (prefers-reduced-motion: reduce) {
-  .logos-root .lg-map-surface { transition: none; }
-}
-
 .logos-root .lg-zoom {
   position: absolute; right: 12px; bottom: 12px; z-index: 4;
   display: flex; align-items: stretch;
@@ -3799,6 +3798,13 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
   color: var(--lg-ink-40);
 }
 .logos-root .lg-zoom .lg-zoom-level:disabled { opacity: 0.55; }
+.logos-root .lg-zoom .lg-zoom-fit { position: relative; border-left: 1px solid var(--lg-line); display: inline-flex; align-items: center; justify-content: center; }
+.logos-root .lg-zoom .lg-zoom-fit svg { width: 13px; height: 13px; }
+/* some of the map is out of view: the one control that brings it back says so */
+.logos-root .lg-zoom .lg-zoom-fit.is-hint { color: var(--lg-primary); }
+.logos-root .lg-zoom .lg-zoom-fit.is-hint::after {
+  content: ""; position: absolute; top: 4px; right: 4px; width: 5px; height: 5px; border-radius: 50%; background: var(--lg-accent, #3a6ea5);
+}
 
 .logos-root .lg-map {
   position: relative;
@@ -4612,10 +4618,33 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
   border: 1px dashed rgba(var(--lg-primary-rgb, 53, 70, 32), 0.35); border-radius: 6px;
 }
 
-/* the canvas can be dragged to move around it */
-.logos-root .lg-map.can-pan { cursor: grab; }
-.logos-root .lg-map.is-panning { cursor: grabbing; user-select: none; }
+/* THE CANVAS: drag the paper to move around it, drag a card to move the card.
+   The browser's own touch panning and pinch-zoom are switched off over it,
+   because the canvas does both itself; text is not selected by a drag. */
+.logos-root .lg-map.can-pan {
+  overflow: hidden; cursor: grab; touch-action: none;
+  user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+}
+/* inside a page that scrolls, a vertical swipe is still the page's */
+.logos-root .lg-map.can-pan.is-embedded { touch-action: pan-y; }
+.logos-root .lg-map.can-pan:focus-visible { outline: 2px solid rgba(var(--lg-primary-rgb, 53, 70, 32), 0.45); outline-offset: -2px; }
+.logos-root .lg-map.is-panning, .logos-root .lg-map.is-panning * { cursor: grabbing !important; }
 .logos-root .lg-map.can-pan .lg-node { cursor: pointer; }
+.logos-root .lg-node:focus-visible { outline: 2px solid var(--lg-accent, #3a6ea5); outline-offset: 3px; }
+/* a card in the hand: lifted a little, above the rest, the lines following it */
+.logos-root .lg-map.is-dragging-node, .logos-root .lg-map.is-dragging-node * { cursor: grabbing !important; }
+.logos-root .lg-node-pos.is-dragging { z-index: 6; transition: none; }
+.logos-root .lg-node-pos.is-dragging .lg-node {
+  box-shadow: 0 16px 34px -18px rgba(var(--shadow-rgb, 32, 32, 27), 0.55), 0 0 0 1px rgba(var(--lg-primary-rgb, 53, 70, 32), 0.28);
+}
+/* a card placed by hand says so only when asked (hovered, focused) */
+.logos-root .lg-node-pos.is-placed .lg-node::after {
+  content: ""; position: absolute; top: 6px; right: 6px; width: 5px; height: 5px; border-radius: 50%;
+  background: var(--lg-ink-40); opacity: 0; transition: opacity 0.15s;
+}
+.logos-root .lg-node-pos.is-placed:hover .lg-node::after,
+.logos-root .lg-node-pos.is-placed .lg-node:focus-visible::after { opacity: 0.7; }
+.logos-root .lg-act-unpin .lg-act-label { color: var(--lg-ink-60); }
 
 .logos-root .lg-node-merged {
   display: block;
@@ -8594,7 +8623,9 @@ a.one-mark.is-strip:hover { background: rgba(38, 72, 90, 0.075); }
    first time somebody's words are drawn, then never again. Off entirely
    under reduced motion — the map simply is there. */
 @media (prefers-reduced-motion: no-preference) {
-  .logos-root .lg-map-wrap.is-emerging .lg-node-pos {
+  /* on the card, not its positioner: the positioner's transform is where the
+     card IS, and an animation of it would park every card at the origin */
+  .logos-root .lg-map-wrap.is-emerging .lg-node-pos > .lg-node {
     animation: lgEmerge 0.62s cubic-bezier(0.16, 1, 0.3, 1) both;
     animation-delay: calc(0.12s + var(--i, 0) * 0.14s);
   }
