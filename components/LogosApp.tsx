@@ -43,6 +43,7 @@ import { DraftSpace, type DraftHandle, type DraftSelection } from '@/components/
 import { DraftResponsePanel } from '@/components/DraftResponsePanel';
 import { LogosGuide, GUIDE_SEEN_KEY } from '@/components/LogosGuide';
 import { Tour } from '@/components/Tour';
+import { MindAtlas } from '@/components/mind/MindAtlas';
 import { LOGOS_TOUR, LOGOS_TOUR_KEY, shouldRunTour } from '@/lib/tour';
 import { LogosMark } from '@/components/LogosMark';
 import { AccountControl } from '@/components/account/AccountControl';
@@ -433,6 +434,8 @@ export function LogosApp({
     seeded.current = true;
     setInput(initialInput);
   }, [initialInput]);
+  /** the Mind view in place of the map: how this chat connects to everything else */
+  const [mindOpen, setMindOpen] = useState(false);
   /** this send is onboarding's sentence — the one the server lets through free, once */
   const firstThoughtRef = useRef(false);
   /** …and the server let it through free: one quiet line under the answer says so */
@@ -2852,6 +2855,12 @@ export function LogosApp({
           // what they told onboarding they mostly think about (an id, or nothing)
           ...(readRole() ? { role: readRole() } : {}),
           ...(readName() ? { name: readName() } : {}),
+          // LOGOS 3 REMEMBERS through the same Mind graph as Core 4: recalled
+          // before the reply, learned from after it (app/api/logos/chat). Never
+          // in a shared room — the other person's words are not theirs to keep.
+          ...(workspaceOn && cloud && !inShared
+            ? { mind: true, ...(active?.projectId ? { projectId: active.projectId } : {}) }
+            : {}),
           // the sentence onboarding sent for them: free, once per account
           // (the server keeps the once — lib/usage.ts firstThoughtUsed)
           ...(firstThoughtRef.current ? { firstThought: true } : {}),
@@ -3897,6 +3906,18 @@ export function LogosApp({
             >
               Save as image
             </button>
+            {/* Logos 3 remembers through the Mind graph; this is where you see
+                how this line of thinking connects to everything else. */}
+            {primary && workspaceOn && cloud && (
+              <button
+                type="button"
+                className={`lg-panel-mind${mindOpen ? ' is-on' : ''}`}
+                aria-pressed={mindOpen}
+                onClick={() => setMindOpen((v) => !v)}
+              >
+                {mindOpen ? 'Back to the map' : 'Mind'}
+              </button>
+            )}
           </header>
           {/* What the engine did with a model this turn proposed — a build or a
               refusal, in its own words. A LINE OF ITS OWN under the head, not
@@ -3958,6 +3979,24 @@ export function LogosApp({
               <button type="button" onClick={() => setPicked(new Set())}>Clear</button>
             </div>
           )}
+          {primary && mindOpen ? (
+            // EVERYTHING SOCRIA REMEMBERS, CONNECTED — this chat in the middle,
+            // what it touches around it, and the other chats, Projects and
+            // memories those lead to (lib/mind/atlas.ts). Read through the
+            // logos scope, so nothing private arrives here at all.
+            <div className="lg-mind-host">
+              <MindAtlas
+                scope="logos"
+                embedded
+                focusChat={activeId}
+                refreshKey={`${activeId}:${messages.length}:${busy ? 1 : 0}`}
+                onOpenChat={(id, surface) => {
+                  if (surface === 'logos') switchSession(id);
+                  else onOpenChat?.(id);
+                }}
+              />
+            </div>
+          ) : (
           <ThinkingMap
             key={`tm-${lens ?? ''}`}
             // where the person put this line of thinking's cards, kept for it
@@ -4020,6 +4059,7 @@ export function LogosApp({
             // revision). The state lands at once; the save trails the drag.
             onModelEdited={stableModelEdited}
           />
+          )}
           {primary && (<>
           <ExplorePanel
             open={explore.open}

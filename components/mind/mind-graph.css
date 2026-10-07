@@ -145,6 +145,10 @@
 .mem-root .f-evidence{fill:#3A6EA5}
 .mem-root .f-question{fill:#E8B62C}
 .mem-root .f-neutral{fill:rgba(32,32,27,.5)}
+.mem-root .c-chat{stroke:var(--ink);stroke-width:2}
+.mem-root .c-made{stroke:#8A5A9E}
+.mem-root .f-chat{fill:var(--ink)}
+.mem-root .f-made{fill:#8A5A9E}
 
 /* ---------- the list, as a file explorer ---------- */
 .mem-root .explorer{border-top:1px solid var(--ink-12)}
@@ -405,3 +409,6 @@
 .mem-root .mem-ask button:disabled{opacity:.4;cursor:not-allowed}
 .mem-root .mem-ask-n{font-size:12px;color:var(--ink-50);display:inline-flex;align-items:center;gap:8px}
 .mem-root .mem-ask-n .clear{font-size:12px;padding:4px 10px}
+
+/* the atlas on an empty Memory page: chats and maps connect before memories exist */
+.mem-root .mem-everything{padding:0 clamp(18px,4vw,56px) 28px}

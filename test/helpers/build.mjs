@@ -167,6 +167,8 @@ const MODULES = [
   'lib/mind/serialize.ts',
   'lib/mind/extract.ts',
   'lib/mind/ingest-text.ts',
+  'lib/mind/atlas.ts',
+  'lib/mind/logos-turn.ts',
   'lib/checkout-attribution.ts',
   'lib/person-memory.ts',
   'lib/file-kinds.ts',

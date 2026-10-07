@@ -633,7 +633,10 @@ export default function ChatPage() {
               }))
           );
           setConversations(list);
-          setActiveId(list[0]?.id ?? null);
+          // A link into one particular chat — from the Memory page's atlas,
+          // a Project's home — opens that chat rather than the newest.
+          const wantChat = new URLSearchParams(window.location.search).get('c');
+          setActiveId(wantChat && list.some((c) => c.id === wantChat) ? wantChat : list[0]?.id ?? null);
         } catch (e: any) {
           if (!cancelled) setError(e?.message || 'Failed to load conversations');
         }
@@ -654,7 +657,10 @@ export default function ChatPage() {
           typeof window !== 'undefined'
             ? localStorage.getItem(ACTIVE_KEY)
             : null;
-        if (lastActive && stored.some((c) => c.id === lastActive)) {
+        const wantChat = new URLSearchParams(window.location.search).get('c');
+        if (wantChat && stored.some((c) => c.id === wantChat)) {
+          setActiveId(wantChat);
+        } else if (lastActive && stored.some((c) => c.id === lastActive)) {
           setActiveId(lastActive);
         } else {
           setActiveId(stored[0]?.id ?? null);

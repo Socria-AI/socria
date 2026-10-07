@@ -41,6 +41,8 @@ import { projectMind } from '@/lib/workspace/adapters';
 import { emptyWorkspace } from '@/lib/workspace/store';
 import { query } from '@/lib/workspace/portable';
 import type { MindGraph } from '@/lib/mind/types';
+import { MindAtlas } from './MindAtlas';
+import { isOffered, lastCoreModel } from '@/lib/socria-model-store';
 import './mind-graph.css';
 
 interface Provenance {
@@ -94,7 +96,7 @@ type StorageFault = 'missing-tables' | 'denied' | 'unavailable';
  * `type` is an open string in the ontology, so anything unlisted falls to a
  * neutral concept rather than to nothing.
  */
-const TYPES: Record<string, { glyph: LogosNodeType; code: 'person' | 'neutral' | 'question' | 'evidence' }> = {
+const TYPES: Record<string, { glyph: LogosNodeType; code: 'person' | 'neutral' | 'question' | 'evidence' | 'chat' | 'made' }> = {
   Person: { glyph: 'character', code: 'person' },
   Organization: { glyph: 'theme', code: 'neutral' },
   Project: { glyph: 'milestone', code: 'neutral' },
@@ -114,6 +116,18 @@ const TYPES: Record<string, { glyph: LogosNodeType; code: 'person' | 'neutral' |
   Event: { glyph: 'step', code: 'neutral' },
   Experience: { glyph: 'given', code: 'neutral' },
   Conversation: { glyph: 'claim', code: 'neutral' },
+  // What the atlas adds (lib/mind/atlas.ts): the chats themselves, and what
+  // was made in them. Their own two colours, so a chat never reads as a
+  // memory and a plot never reads as a claim.
+  Chat: { glyph: 'claim', code: 'chat' },
+  Plot: { glyph: 'equation', code: 'made' },
+  Model: { glyph: 'definition', code: 'made' },
+  Object: { glyph: 'given', code: 'made' },
+  Idea: { glyph: 'idea', code: 'neutral' },
+  Tension: { glyph: 'tension', code: 'question' },
+  Given: { glyph: 'given', code: 'neutral' },
+  Theme: { glyph: 'theme', code: 'neutral' },
+  Constraint: { glyph: 'constraint', code: 'neutral' },
 };
 const UNKNOWN_TYPE = { glyph: 'concept' as LogosNodeType, code: 'neutral' as const };
 const typeOf = (t: string) => TYPES[t] ?? UNKNOWN_TYPE;
@@ -135,15 +149,17 @@ type Tri = [string, string, string];
 
 // ── the canvas ──────────────────────────────────────────────────────
 
-function Graph({
-  nodes, edges, sel, onSel,
+export function Graph({
+  nodes, edges, sel, onSel, width = 1000,
 }: {
   nodes: Node[]; edges: Tri[]; sel: string | null; onSel: (id: string) => void;
+  /** the drawing's own width — smaller in a panel, so its text is not shrunk to nothing */
+  width?: number;
 }) {
   const [fold, setFold] = useState(true);
   const [open, setOpen] = useState<string | null>(null);
   const dense = nodes.length > 60;
-  const W = 1000;
+  const W = width;
   const H = open ? 620 : dense ? (fold ? 1000 : 780) : 520;
 
   /**
@@ -705,6 +721,16 @@ function Panel({
 
 // ── the page ────────────────────────────────────────────────────────
 
+/** Into a chat from the atlas: Logos sessions open in Logos, chats in Core. */
+function openChat(id: string, surface: 'core' | 'logos') {
+  const q = encodeURIComponent(id);
+  window.location.assign(
+    surface === 'logos'
+      ? `/chat?model=${isOffered('logos-3') ? 'logos-3' : 'logos-2'}&s=${q}`
+      : `/chat?model=${lastCoreModel()}&c=${q}`
+  );
+}
+
 export function MindGraphView() {
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
@@ -716,7 +742,7 @@ export function MindGraphView() {
   const [storage, setStorage] = useState<StorageFault | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [view, setView] = useState<'graph' | 'list'>('list');
+  const [view, setView] = useState<'graph' | 'list' | 'everything'>('list');
   const [selected, setSelected] = useState<string | null>(null);
   /** what is waiting on a change they made — see lib/workspace/impact.ts */
   const [waiting, setWaiting] = useState<Waiting[]>([]);
@@ -948,6 +974,11 @@ export function MindGraphView() {
             {uploadControl}
           </div>
         </div>
+        {/* No memories yet is not no work: the chats, maps and plots are still
+            there, and still connect to one another. */}
+        <div className="mem-everything">
+          <MindAtlas scope="all" onOpenChat={openChat} />
+        </div>
         {/* An empty graph is exactly where writing by hand matters most: there
             is nothing to correct yet, and waiting for an extractor to notice
             something would make this page a report they cannot act on. */}
@@ -985,6 +1016,7 @@ export function MindGraphView() {
           <span className="seg" role="group" aria-label="View">
             <button aria-pressed={view === 'graph'} onClick={() => setView('graph')}>Graph</button>
             <button aria-pressed={view === 'list'} onClick={() => setView('list')}>List</button>
+            <button aria-pressed={view === 'everything'} onClick={() => setView('everything')}>Everything</button>
           </span>
           {uploadControl}
           {/* The whole thing as one file: objects, connections and where each
@@ -1070,6 +1102,11 @@ export function MindGraphView() {
 
           {!nodes.length ? (
             <p className="deck">Nothing has been believed yet — only the claims below, noticed once.</p>
+          ) : view === 'everything' ? (
+            // Every chat, map, plot, model, object and Project, joined to what
+            // is remembered (lib/mind/atlas.ts). Read-only: correcting still
+            // happens in the graph and the list.
+            <MindAtlas scope="all" onOpenChat={openChat} />
           ) : view === 'graph' ? (
             <Graph nodes={visible} edges={tri} sel={selected} onSel={setSelected} />
           ) : (

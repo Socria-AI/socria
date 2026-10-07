@@ -6547,6 +6547,13 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
   .logos-root .lg-allow { font-size: 11px; padding: 5px 8px; }
 }
 
+/* Logos 3's Mind view: the atlas in the map's place (components/mind/MindAtlas) */
+.logos-root .lg-mind-host{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;overflow:hidden;background:var(--lg-paper)}
+.logos-root .lg-mind-host > .ma-root{flex:1 1 auto}
+.logos-root .lg-panel-mind{font-family:var(--lg-sans);font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;
+  padding:4px 10px;margin-left:8px;border:1px solid var(--lg-line);border-radius:999px;background:transparent;color:var(--lg-ink-60);cursor:pointer}
+.logos-root .lg-panel-mind:hover{color:var(--lg-ink);border-color:var(--lg-ink-40)}
+.logos-root .lg-panel-mind.is-on{background:var(--lg-ink);color:var(--lg-paper);border-color:var(--lg-ink)}
 /* onboarding's first thought was free — said once, quietly, under the answer */
 .logos-root .lg-gift {
   margin: 2px 0 10px;

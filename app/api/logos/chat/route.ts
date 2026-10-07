@@ -63,6 +63,10 @@ import { objectsBlock, sanitizeSpace } from '@/lib/objects';
 import { roleBlock } from '@/lib/onboarding-roles';
 import { nameBlock } from '@/lib/onboarding-name';
 import { wantedSimulation, bareRequest, hasSurface, simulationBlock } from '@/lib/model/wants';
+import { recall, remember, type RecallResult } from '@/lib/mind/pipeline';
+import { extractionContext } from '@/lib/mind/activate';
+import { cleanId, logosMemoryText, logosPersistPolicy } from '@/lib/mind/logos-turn';
+import { waitUntil } from '@vercel/functions';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -337,6 +341,47 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // ── LOGOS 3 REMEMBERS THROUGH THE MIND GRAPH ─────────────────────
+    //
+    // The same memory Core 4 has, by the same two calls (lib/mind/pipeline.ts):
+    // recall() before the reply, remember() after it, with surface 'logos'.
+    // So a line of thinking drawn here is something Core knows about next week,
+    // and what Core learned in March is something a map here can lean on.
+    //
+    // Recall on this surface never carries a private node — not even one made
+    // in this conversation — because a Logos map can be saved as a picture
+    // (invariant 3, lib/mind/types.ts). What may be WRITTEN is decided by Core
+    // 4's own privacy rule, folded over everything they have said here
+    // (lib/mind/logos-turn.ts): off the record keeps nothing, and a sensitive
+    // subject is kept to this conversation.
+    //
+    // Logos 3 only, asked for by the client, for an account, on the main
+    // thread — a node's side-thread is the same conversation seen narrower.
+    // NEVER IN A SHARED ROOM: the other person's words are not this person's
+    // to remember, and this person's memories are not the guest's to read.
+    const mindOn = !!userId && body?.mind === true && !focusLabel && !body?.collab && !twoPeople;
+    const mindConversation = mindOn ? cleanId(sessionId) : null;
+    const mindProject = mindOn ? cleanId(body?.projectId) : null;
+    const mindPolicy = mindOn
+      ? logosPersistPolicy(clean.filter((m: { role: string }) => m.role === 'user').map((m: { content: string }) => m.content))
+      : 'none';
+    let recalled: RecallResult | null = null;
+    if (mindOn) {
+      recalled = await recall(userId!, String(last?.content ?? '').slice(0, 2000), {
+        now: Date.now(),
+        plan: plan === 'one' ? 'one' : 'free',
+        surface: 'logos',
+        conversationId: mindConversation ?? undefined,
+        projectId: mindProject,
+      }).catch(() => null);
+      // The graph REPLACES the flat list when it has anything to say, as it
+      // does for Core 4 — two memories of one person in one prompt would
+      // disagree with each other about what matters. Nothing recalled (a new
+      // account, a database having a bad minute) keeps the older block.
+      const fromGraph = (recalled?.projectBlock ?? '') + (recalled?.block ?? '');
+      if (fromGraph.trim()) memoryBlock = '\n\n' + fromGraph;
+    }
+
     const vizState = sanitizeModelState(body?.vizState);
 
     // A BARE REQUEST FOR ONE OF THE ENGINE'S OWN SURFACES. The map route
@@ -497,11 +542,13 @@ export async function POST(req: NextRequest) {
     const stream = new ReadableStream({
       async start(controller) {
         let sent = false;
+        let reply = '';
         try {
           for await (const chunk of completion) {
             const delta = chunk.choices?.[0]?.delta?.content ?? '';
             if (delta) {
               sent = true;
+              reply += delta;
               controller.enqueue(encoder.encode(delta));
             }
           }
@@ -510,6 +557,29 @@ export async function POST(req: NextRequest) {
           // person nor the log, so an expired key looked like a flaky network.
           controller.enqueue(encoder.encode(streamFailureNotice('logos chat stream', e, sent)));
         } finally {
+          // Logos 3: learn from the turn, BEFORE the stream closes — waitUntil
+          // needs the request it was registered from (the same note as Core's,
+          // app/api/chat/route.ts). Only a whole answer is read; a failure
+          // notice is not something Socria said.
+          if (mindOn && mindPolicy !== 'none' && reply.trim()) {
+            const write = () =>
+              remember(userId!, logosMemoryText(String(last?.content ?? ''), reply), {
+                now: Date.now(),
+                apiKey: apiKey!,
+                surface: 'logos',
+                conversationId: mindConversation ?? undefined,
+                existing: extractionContext(recalled?.subgraph ?? null, recalled?.graph ?? null, mindConversation),
+                projectId: mindProject,
+                ...(mindPolicy === 'conversation_only' ? { private: true } : {}),
+              }).catch((err: unknown) => {
+                console.error('[logos/chat] mind graph remember failed', err);
+              });
+            try {
+              waitUntil(write());
+            } catch {
+              void write();
+            }
+          }
           controller.close();
         }
       },
