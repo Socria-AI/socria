@@ -357,6 +357,152 @@ export function compileExpr(raw: string, varNames: string[]): CompiledExpr | nul
   return { vars: used, eval: evaluate };
 }
 
+/**
+ * An expression evaluated over whole arrays at once — the same grammar, the
+ * same names, the same refusals as `compileExpr`.
+ *
+ * WHY IT EXISTS. A field on a grid evaluates its reaction terms at every cell
+ * on every step: Gray–Scott on 64 × 64 cells for four thousand steps is
+ * thirty-three million evaluations of each rate. The scalar evaluator walks
+ * its token list and builds a stack for every one of them. Here each token is
+ * applied to a whole column in one tight loop, so the cost of reading the
+ * expression is paid once per step rather than once per cell — and no code is
+ * generated from the text, which stays data.
+ */
+export interface VectorExpr {
+  vars: string[];
+  /**
+   * out[i] = the expression with each name bound to a number (the same at
+   * every i) or to an array (its i-th entry). A name bound to nothing is NaN.
+   */
+  evalInto: (bind: Record<string, number | ArrayLike<number>>, out: Float64Array) => void;
+}
+
+type Col = number | ArrayLike<number>;
+
+export function compileVectorExpr(raw: string, varNames: string[]): VectorExpr | null {
+  if (typeof raw !== 'string' || raw.length > 4000) return null;
+  const allowed = new Set(varNames.map((v) => v.toLowerCase()));
+  const toks0 = tokenize(normalizeExpr(raw), allowed);
+  if (!toks0 || !toks0.length) return null;
+  const rpn = toRpn(insertImplicitMult(toks0));
+  if (!rpn) return null;
+  // the stack discipline, checked once, so evaluating can trust it
+  let depth = 0;
+  for (const tk of rpn) {
+    if (tk.t === 'num' || tk.t === 'var') depth++;
+    else if (tk.t === 'fn') {
+      if (FUNCS2[tk.v]) {
+        if (depth < 2) return null;
+        depth--;
+      } else if (!FUNCS[tk.v] || depth < 1) return null;
+    } else if (tk.t === 'op') {
+      if (tk.v === 'u-') {
+        if (depth < 1) return null;
+      } else {
+        if (depth < 2) return null;
+        depth--;
+      }
+    } else return null;
+  }
+  if (depth !== 1) return null;
+  const used = [...new Set(rpn.filter((t) => t.t === 'var').map((t) => (t as { v: string }).v))];
+
+  // scratch columns, reused from one evaluation to the next while the length holds
+  let pool: Float64Array[] = [];
+  return {
+    vars: used,
+    evalInto(bind, out) {
+      const n = out.length;
+      if (pool.length && pool[0].length !== n) pool = [];
+      let free = 0;
+      const temp = (): Float64Array => {
+        if (free === pool.length) pool.push(new Float64Array(n));
+        return pool[free++];
+      };
+      const named: Record<string, Col> = Object.create(null);
+      for (const k of Object.keys(bind)) named[k.toLowerCase()] = bind[k];
+      const one = (a: Col, f: (x: number) => number): Col => {
+        if (typeof a === 'number') return f(a);
+        const r = temp();
+        for (let i = 0; i < n; i++) r[i] = f(a[i]);
+        return r;
+      };
+      const two = (op: string, a: Col, b: Col): Col => {
+        if (typeof a === 'number' && typeof b === 'number') {
+          return op === '+' ? a + b : op === '-' ? a - b : op === '*' ? a * b : op === '/' ? a / b : op === '%' ? a % b : Math.pow(a, b);
+        }
+        const r = temp();
+        const A = typeof a === 'number' ? null : a;
+        const B = typeof b === 'number' ? null : b;
+        const sa = typeof a === 'number' ? a : 0;
+        const sb = typeof b === 'number' ? b : 0;
+        switch (op) {
+          case '+':
+            if (A && B) for (let i = 0; i < n; i++) r[i] = A[i] + B[i];
+            else if (A) for (let i = 0; i < n; i++) r[i] = A[i] + sb;
+            else for (let i = 0; i < n; i++) r[i] = sa + B![i];
+            break;
+          case '-':
+            if (A && B) for (let i = 0; i < n; i++) r[i] = A[i] - B[i];
+            else if (A) for (let i = 0; i < n; i++) r[i] = A[i] - sb;
+            else for (let i = 0; i < n; i++) r[i] = sa - B![i];
+            break;
+          case '*':
+            if (A && B) for (let i = 0; i < n; i++) r[i] = A[i] * B[i];
+            else if (A) for (let i = 0; i < n; i++) r[i] = A[i] * sb;
+            else for (let i = 0; i < n; i++) r[i] = sa * B![i];
+            break;
+          case '/':
+            if (A && B) for (let i = 0; i < n; i++) r[i] = A[i] / B[i];
+            else if (A) for (let i = 0; i < n; i++) r[i] = A[i] / sb;
+            else for (let i = 0; i < n; i++) r[i] = sa / B![i];
+            break;
+          case '%':
+            for (let i = 0; i < n; i++) r[i] = (A ? A[i] : sa) % (B ? B[i] : sb);
+            break;
+          default:
+            // powers: a square or a cube by multiplying, which is exact and fast
+            if (A && !B && sb === 2) for (let i = 0; i < n; i++) r[i] = A[i] * A[i];
+            else if (A && !B && sb === 3) for (let i = 0; i < n; i++) r[i] = A[i] * A[i] * A[i];
+            else for (let i = 0; i < n; i++) r[i] = Math.pow(A ? A[i] : sa, B ? B[i] : sb);
+        }
+        return r;
+      };
+      const st: Col[] = [];
+      for (const tk of rpn) {
+        if (tk.t === 'num') st.push(tk.v);
+        else if (tk.t === 'var') {
+          const v = named[tk.v];
+          st.push(v === undefined ? NaN : v);
+        } else if (tk.t === 'fn') {
+          const f2 = FUNCS2[tk.v];
+          if (f2) {
+            const b = st.pop()!;
+            const a = st.pop()!;
+            if (typeof a === 'number' && typeof b === 'number') st.push(f2(a, b));
+            else {
+              const r = temp();
+              for (let i = 0; i < n; i++) r[i] = f2(typeof a === 'number' ? a : a[i], typeof b === 'number' ? b : b[i]);
+              st.push(r);
+            }
+          } else st.push(one(st.pop()!, FUNCS[tk.v]));
+        } else if (tk.t === 'op') {
+          if (tk.v === 'u-') st.push(one(st.pop()!, (x) => -x));
+          else {
+            const b = st.pop()!;
+            const a = st.pop()!;
+            st.push(two(tk.v, a, b));
+          }
+        }
+      }
+      const res = st[0];
+      if (typeof res === 'number') out.fill(res);
+      else for (let i = 0; i < n; i++) out[i] = res[i];
+    },
+  };
+}
+
 /** Compile "y = x^2 - 3" into a numeric function of one variable, or null. */
 export function compileFunction(raw: string): CompiledFn | null {
   if (typeof raw !== 'string' || raw.length > 400) return null;
