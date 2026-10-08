@@ -73,6 +73,21 @@ export const EVENTS = [
   'progressive_dependencies_discovered',
   'progressive_compare_discovered',
   'progressive_evidence_discovered',
+  // Socria Rewards (lib/rewards/). Shape only: which reward (`kind`: 'challenge' |
+  // 'referral_signup' | 'referral_activation'), what became of it (`outcome`:
+  // 'active' | 'banked' | …), and how a friend arrived (`surface`: 'link' |
+  // 'invite'). Never a code, an id, a name or an address.
+  'rewards_challenge_viewed',
+  'rewards_challenge_started',
+  'rewards_challenge_completed',
+  'rewards_challenge_reward_granted',
+  'rewards_referral_link_copied',
+  'rewards_referral_link_opened',
+  'rewards_referral_signup_completed',
+  'rewards_referral_activation_completed',
+  'rewards_referral_reward_granted',
+  'rewards_promo_expired',
+  'rewards_promo_converted',
 ] as const;
 export type AnalyticsEvent = (typeof EVENTS)[number];
 
@@ -124,6 +139,8 @@ export interface EventProps {
   step?: string;
   /** the KIND of thing a first-run beat pointed at — 'parameter' | 'assumption' | 'view' — never its label */
   object?: string;
+  /** what became of a reward — 'active' | 'banked' | 'bank_full' | 'monthly_cap' (lib/rewards/promo-engine.ts) */
+  outcome?: string;
 }
 
 const ALLOWED_KEYS = new Set<keyof EventProps>([
@@ -145,6 +162,7 @@ const ALLOWED_KEYS = new Set<keyof EventProps>([
   'feedback',
   'step',
   'object',
+  'outcome',
 ]);
 
 /**

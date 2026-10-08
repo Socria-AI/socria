@@ -565,6 +565,42 @@ export async function acceptInvite(userId: string, token: string): Promise<Joine
   return { type: s.resourceType, id: s.resourceId, role: m.role, kind: info?.kind ?? 'chat' };
 }
 
+/**
+ * WHO SENT THIS INVITATION — read only, for Socria Rewards.
+ *
+ * A signed-out person opening a share link, a share code or an emailed
+ * invitation is somebody a member of Socria invited; if they go on to create
+ * an account, that member brought them, exactly as a referral link would have
+ * (lib/rewards/). This answers "whose invitation is it" and nothing else: it
+ * joins nobody, changes nothing, and answers null for anything that would not
+ * open — a reset link, a withdrawn invitation, a code turned off.
+ */
+export async function inviterOf(input: { token?: string | null; invite?: string | null; code?: string | null }): Promise<string | null> {
+  try {
+    if (input.token) {
+      const { data } = await supabaseAdmin().from('shares').select('*').eq('link_hash', sha(input.token)).maybeSingle();
+      const sh = data ? rowToShare(data as Record<string, unknown>) : null;
+      if (sh && sh.linkRole && sh.linkNonce && linkToken(sh.id, sh.linkNonce) === input.token) return sh.ownerId;
+      return null;
+    }
+    if (input.invite) {
+      const { data } = await supabaseAdmin().from('share_members').select('*').eq('invite_hash', sha(input.invite)).is('removed_at', null).maybeSingle();
+      const m = data ? rowToMember(data as Record<string, unknown>) : null;
+      if (!m) return null;
+      const { data: sd } = await supabaseAdmin().from('shares').select('*').eq('id', m.shareId).maybeSingle();
+      return sd ? rowToShare(sd as Record<string, unknown>).ownerId : null;
+    }
+    if (input.code) {
+      const { data } = await supabaseAdmin().from('shares').select('*').eq('code', input.code).maybeSingle();
+      const sh = data ? rowToShare(data as Record<string, unknown>) : null;
+      return sh && sh.codeRole ? sh.ownerId : null;
+    }
+  } catch {
+    // no database, or a hiccup: an invitation still opens; it just carries no referral
+  }
+  return null;
+}
+
 /** Invitations sent to an address this account has verified, claimed when they sign in. */
 export async function claimInvites(userId: string): Promise<number> {
   const emails = await verifiedEmails(userId);

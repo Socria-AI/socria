@@ -10,7 +10,7 @@ import { stripe, stripeConfigured, onePriceId, siteUrl, usableCustomer } from '@
 import { isMissingCustomer, priceIdProblem, stripeFailure } from '@/lib/stripe-diagnosis';
 import { getSubscription, isCompCustomer, tryUpsertSubscription } from '@/lib/subscriptions';
 import { enforceRateLimit } from '@/lib/rate-limit';
-import { resolvePlanForRequest } from '@/lib/socria-one-server';
+import { resolveBasePlanForRequest } from '@/lib/socria-one-server';
 import { attributionMetadata, readAttribution } from '@/lib/checkout-attribution';
 import { lifecycleAddress } from '@/lib/lifecycle';
 
@@ -68,7 +68,13 @@ export async function POST(req: NextRequest) {
   // A comp or a code is deliberately included: they already have it, and the
   // honest response is to say so rather than to take money for a thing they
   // are not missing.
-  if ((await resolvePlanForRequest(req, userId)) === 'one') {
+  //
+  // PROMOTIONAL time is deliberately NOT included. Someone on seven days from
+  // Socria Rewards has bought nothing; refusing them here would make the one
+  // thing a reward is for — trying Socria One before paying for it —
+  // impossible to finish. What is left of their reward is banked when the
+  // subscription starts (the webhook), not lost.
+  if ((await resolveBasePlanForRequest(req, userId)) === 'one') {
     return NextResponse.json(
       { error: 'You already have Socria One.', already: true },
       { status: 409 }

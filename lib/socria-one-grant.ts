@@ -81,8 +81,16 @@ const TTL = 60_000;
 const cache = new Map<string, { v: boolean; at: number }>();
 
 export async function hasAccountGrant(userId: string): Promise<boolean> {
+  return (await readGrant(userId)).v;
+}
+
+/**
+ * The read behind hasAccountGrant, saying whether it really asked. `ok: false`
+ * means Clerk could not be reached and `v` is a stale or default answer.
+ */
+async function readGrant(userId: string): Promise<{ v: boolean; ok: boolean }> {
   const hit = cache.get(userId);
-  if (hit && Date.now() - hit.at < TTL) return hit.v;
+  if (hit && Date.now() - hit.at < TTL) return { v: hit.v, ok: true };
   try {
     const user = await clerkClient().users.getUser(userId);
     const meta = user?.privateMetadata as Record<string, unknown> | null;
@@ -113,12 +121,22 @@ export async function hasAccountGrant(userId: string): Promise<boolean> {
     // whose access is meant to end when the programme does, would keep One
     // for ever because of a row nothing updates.
     if (comped && !granted) void writeAccountGrant(userId).catch(() => {});
-    return v;
+    return { v, ok: true };
   } catch {
     // Clerk unreachable: answer from the stale cache if we have one, and
     // never let entitlement checking take the request down.
-    return hit?.v ?? false;
+    return { v: hit?.v ?? false, ok: !!hit };
   }
+}
+
+/**
+ * The same answer as hasAccountGrant, or null when Clerk could not be asked
+ * and nothing is cached — for the one caller that must not mistake "unknown"
+ * for "no" (Socria Rewards, deciding whether a reward is banked or started).
+ */
+export async function accountGrantKnown(userId: string): Promise<boolean | null> {
+  const r = await readGrant(userId);
+  return r.ok ? r.v : null;
 }
 
 export async function writeAccountGrant(userId: string): Promise<void> {

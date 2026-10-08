@@ -203,6 +203,31 @@ export async function GET(req: NextRequest) {
   const presenceErr = missingTable(presenceRaw) ? null : presenceRaw;
   out.yourPresence = presence ?? [];
 
+  // Socria Rewards: the rewards they received and what became of each, their
+  // promotional account, their referral code, how they themselves arrived,
+  // and the friends they invited — as statuses and dates, never the friends'
+  // ids (those are other people's accounts).
+  const { data: promoAccount, error: promoAccountRaw } = await db
+    .from('promo_accounts').select('promo_until, banked_ms, ref_month, ref_count, converted_at, updated_at').eq('user_id', userId).maybeSingle();
+  const promoAccountErr = missingTable(promoAccountRaw) ? null : promoAccountRaw;
+  out.rewardsAccount = promoAccount ?? null;
+  const { data: promoLedger, error: promoLedgerRaw } = await db
+    .from('promo_ledger').select('source, days, status, applied_ms, ends_at, created_at').eq('user_id', userId);
+  const promoLedgerErr = missingTable(promoLedgerRaw) ? null : promoLedgerRaw;
+  out.rewardsReceived = promoLedger ?? [];
+  const { data: refCode, error: refCodeRaw } = await db
+    .from('referral_codes').select('code, created_at').eq('user_id', userId).maybeSingle();
+  const refCodeErr = missingTable(refCodeRaw) ? null : refCodeRaw;
+  out.referralCode = refCode ?? null;
+  const { data: invitedYou, error: invitedYouRaw } = await db
+    .from('referrals').select('via, status, created_at, activated_at').eq('user_id', userId).maybeSingle();
+  const invitedYouErr = missingTable(invitedYouRaw) ? null : invitedYouRaw;
+  out.howYouArrived = invitedYou ?? null;
+  const { data: youInvited, error: youInvitedRaw } = await db
+    .from('referrals').select('via, status, created_at, activated_at').eq('referrer_id', userId);
+  const youInvitedErr = missingTable(youInvitedRaw) ? null : youInvitedRaw;
+  out.friendsYouInvited = youInvited ?? [];
+
   out.core4Note =
     'core4State and reasoningLedger separate what you said from what Socria inferred: an ' +
     'inferred field carries its confidence and the evidence it rests on, and a ledger entry ' +
@@ -237,6 +262,11 @@ export async function GET(req: NextRequest) {
     ['yourComments', shareCommentsErr],
     ['yourSharedActivity', shareActivityErr],
     ['yourPresence', presenceErr],
+    ['rewardsAccount', promoAccountErr],
+    ['rewardsReceived', promoLedgerErr],
+    ['referralCode', refCodeErr],
+    ['howYouArrived', invitedYouErr],
+    ['friendsYouInvited', youInvitedErr],
   ]
     .filter(([, e]) => !!e)
     .map(([name]) => name as string);

@@ -115,3 +115,20 @@ revoke all on share_presence from anon, authenticated;
 -- The browser holds no Supabase credentials at all: everything goes through our
 -- own authenticated routes. The walls stay regardless — they are the second
 -- line, not the first.
+
+-- Socria Rewards (schema.sql, "Socria Rewards"). Reached only through
+-- lib/rewards/supabase-rewards-store.ts with the service role. A promotional
+-- account is entitlement state: readable, it says who holds free time;
+-- writable, it is free Socria One for anyone who asks.
+alter table promo_accounts enable row level security;
+alter table promo_accounts force row level security;
+alter table promo_ledger   enable row level security;
+alter table promo_ledger   force row level security;
+alter table referral_codes enable row level security;
+alter table referral_codes force row level security;
+alter table referrals      enable row level security;
+alter table referrals      force row level security;
+revoke all on promo_accounts from anon, authenticated;
+revoke all on promo_ledger   from anon, authenticated;
+revoke all on referral_codes from anon, authenticated;
+revoke all on referrals      from anon, authenticated;

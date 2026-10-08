@@ -620,3 +620,85 @@ create table if not exists capability_evidence (
 );
 
 create index if not exists capability_evidence_user_concept_idx on capability_evidence (user_id, concept);
+
+-- ── Socria Rewards ───────────────────────────────────────────────────
+--
+--   Create 5 nodes. Get 7 days free.
+--   Invite a friend. Give 7 days. Get 7 days.
+--
+-- Promotional Socria One, granted by the server and never by the browser
+-- (lib/rewards/). Four tables, all reached only through the service role:
+--
+--   promo_ledger    one row per reward, keyed for all time — the key
+--                   ('challenge:<user>', 'referral_signup:<user>',
+--                   'referral_activation:<referred>') is the primary key, so
+--                   a reward can be recorded once and only once. Source,
+--                   recipient, award time, what was actually added after the
+--                   cap, when the window it joined ends, and its outcome.
+--   promo_accounts  one row per person who has ever had a reward: promotional
+--                   access runs until promo_until (epoch ms); banked_ms is
+--                   time held while they had Socria One some other way. The
+--                   keys already applied and the month's referral counter live
+--                   on this row, and every write is conditional on `version`,
+--                   so checking a limit and spending it are one write.
+--   referral_codes  one shareable code per person.
+--   referrals       one row per INVITED person (user_id is the primary key:
+--                   one referrer per account). referrer_id is nulled when the
+--                   referrer deletes their account.
+--
+-- Paid billing is not here and is never touched: socria_subscriptions and
+-- Stripe stay the record of what someone pays for. Promotional access is a
+-- layer over it — see lib/rewards/promo-engine.ts for the rules.
+--
+-- Times are epoch milliseconds (bigint), like the rest of the ledger tables.
+-- Safe to re-run.
+create table if not exists promo_accounts (
+  user_id text primary key,
+  version integer not null default 0,
+  promo_until bigint,
+  banked_ms bigint not null default 0,
+  applied jsonb not null default '[]'::jsonb,
+  ref_month text,
+  ref_count integer not null default 0,
+  expired_for bigint,
+  converted_at bigint,
+  updated_at bigint not null
+);
+
+-- The cron's sweep for windows that ended and have not been reported.
+create index if not exists promo_accounts_until_idx on promo_accounts (promo_until);
+
+create table if not exists promo_ledger (
+  key text primary key,
+  user_id text not null,
+  source text not null check (source in ('challenge', 'referral_signup', 'referral_activation')),
+  days integer not null check (days >= 0),
+  status text not null default 'pending',
+  applied_ms bigint not null default 0,
+  ends_at bigint,
+  meta jsonb not null default '{}'::jsonb,
+  created_at bigint not null
+);
+
+create index if not exists promo_ledger_user_idx on promo_ledger (user_id, created_at desc);
+-- Grants that started and did not finish, for the cron to complete.
+create index if not exists promo_ledger_pending_idx on promo_ledger (created_at) where status = 'pending';
+
+create table if not exists referral_codes (
+  user_id text primary key,
+  code text not null unique,
+  created_at bigint not null
+);
+
+create table if not exists referrals (
+  user_id text primary key,
+  referrer_id text,
+  code text not null,
+  via text not null check (via in ('link', 'invite')),
+  status text not null default 'signed_up',
+  created_at bigint not null,
+  activated_at bigint,
+  constraint referrals_not_self check (referrer_id is null or referrer_id <> user_id)
+);
+
+create index if not exists referrals_referrer_idx on referrals (referrer_id, created_at desc);

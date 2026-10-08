@@ -95,7 +95,8 @@ export function OneStory() {
     fetch('/api/logos/plan')
       .then((r) => (r.ok ? r.json() : null))
       .then((j) => {
-        if (j?.plan === 'one') setMember(true);
+        // Socria One from a reward alone is not a membership: the invitations stay invitations.
+        if (j?.plan === 'one' && !j?.promo?.only) setMember(true);
       })
       .catch(() => {});
   }, []);

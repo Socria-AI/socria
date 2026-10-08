@@ -52,7 +52,22 @@ export interface StudentState {
   email: string | null;
 }
 
+/**
+ * Promotional Socria One from Socria Rewards, when there is any. `only` is
+ * the case that changes what surfaces say: Socria One from a reward alone —
+ * still worth subscribing to, and with no billing behind it to manage.
+ */
+export interface PromoInfo {
+  active: boolean;
+  until: number | null;
+  daysLeft: number;
+  bankedDays: number;
+  only: boolean;
+}
+
 export interface PlanState {
+  /** promotional time from Socria Rewards, when there is any */
+  promo?: PromoInfo;
   plan: Plan;
   /** `plan` can be trusted — see the note above on what that takes */
   known: boolean;
@@ -88,6 +103,12 @@ export function usePlan(): PlanState {
   // Bumping this re-runs the effect below, which is how refresh() works.
   const [asked, setAsked] = useState(0);
   const refresh = useCallback(() => setAsked((n) => n + 1), []);
+  // A reward can change what someone holds (lib/rewards/): when one lands, or promotional time
+  // starts or ends, components/rewards/useRewards says so, and the answer is asked for again.
+  useEffect(() => {
+    window.addEventListener('socria:plan-changed', refresh);
+    return () => window.removeEventListener('socria:plan-changed', refresh);
+  }, [refresh]);
   // refresh is not kept in state: it never changes, and holding it there
   // meant a load that failed left the caller with the no-op placeholder — the
   // one case where being able to ask again matters most.
@@ -130,9 +151,21 @@ export function usePlan(): PlanState {
                 email: typeof j.student.email === 'string' ? j.student.email : null,
               }
             : undefined;
-        setState({ plan, known: true, manageable: !!j.manageable, ...(student ? { student } : {}) });
+        const promo: PromoInfo | undefined =
+          j.promo && typeof j.promo === 'object'
+            ? {
+                active: !!j.promo.active,
+                until: typeof j.promo.until === 'number' ? j.promo.until : null,
+                daysLeft: Number.isFinite(j.promo.daysLeft) ? Math.max(0, Math.round(j.promo.daysLeft)) : 0,
+                bankedDays: Number.isFinite(j.promo.bankedDays) ? Math.max(0, Math.round(j.promo.bankedDays)) : 0,
+                only: !!j.promo.only,
+              }
+            : undefined;
+        setState({ plan, known: true, manageable: !!j.manageable, ...(student ? { student } : {}), ...(promo ? { promo } : {}) });
         try {
-          if (plan === 'one') localStorage.setItem(ONE_KEY_STORAGE, '1');
+          // NOT for Socria One that comes from a reward alone: this belief outlives the page and is never
+          // cleared, and a reward ends — a browser must not go on believing it holds what it held for a week.
+          if (plan === 'one' && !promo?.only) localStorage.setItem(ONE_KEY_STORAGE, '1');
         } catch {}
       })
       .catch(() => {

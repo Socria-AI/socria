@@ -18,6 +18,7 @@ import { stripe, stripeConfigured } from '@/lib/stripe';
 import { enforceRateLimit } from '@/lib/rate-limit';
 import { purgeSharing } from '@/lib/share/server';
 import { purgeUploads } from '@/lib/upload-store';
+import { purgeReferrer } from '@/lib/rewards/supabase-rewards-store';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -59,6 +60,14 @@ const OWNED_TABLES = [
   'reasoning_links',
   'core4_turns',
   'capability_evidence',
+  // Socria Rewards: their promotional account and the ledger of rewards they
+  // received, their referral code, and the row saying who invited them. The
+  // other side — their name on the rows of people THEY invited — is cut by
+  // purgeReferrer below.
+  'promo_accounts',
+  'promo_ledger',
+  'referral_codes',
+  'referrals',
 ] as const;
 
 /**
@@ -83,6 +92,10 @@ const LATE_TABLES = new Set<string>([
   'reasoning_links',
   'core4_turns',
   'capability_evidence',
+  'promo_accounts',
+  'promo_ledger',
+  'referral_codes',
+  'referrals',
 ]);
 
 /**
@@ -198,6 +211,24 @@ export async function DELETE(req: NextRequest) {
         error:
           'Could not delete everything, so nothing further was removed and your account still exists. Please email hellosocria@gmail.com and we will finish it by hand.',
         failedAt: 'shares',
+        deleted,
+      },
+      { status: 500 }
+    );
+  }
+
+  // Socria Rewards: the people they invited keep their own rows, with this
+  // person's id taken off them (lib/rewards/supabase-rewards-store.ts). Fails
+  // closed like the rest.
+  try {
+    await purgeReferrer(userId);
+  } catch (e) {
+    console.error('account delete: referral purge failed', e);
+    return NextResponse.json(
+      {
+        error:
+          'Could not delete everything, so nothing further was removed and your account still exists. Please email hellosocria@gmail.com and we will finish it by hand.',
+        failedAt: 'referrals',
         deleted,
       },
       { status: 500 }

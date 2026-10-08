@@ -83,7 +83,10 @@ function PlanRail() {
   const plan = usePlan();
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const isOne = plan.known && plan.plan === 'one';
+  // Socria One from a REWARD alone is not a membership: the card still sells it, and says
+  // what happens to the reward's days (they are saved, not lost — lib/rewards/promo-engine.ts).
+  const fromReward = plan.known && plan.plan === 'one' && !!plan.promo?.only;
+  const isOne = plan.known && plan.plan === 'one' && !fromReward;
 
   /**
    * The mockup's CTA is a hardcoded Stripe Payment Link placeholder
@@ -147,11 +150,15 @@ function PlanRail() {
                 thing that makes a pricing page feel untrustworthy. */}
             {plan.known && (
               <span className="state">
-                {held
-                  ? 'Your plan now'
-                  : t.id === 'one'
-                    ? 'The complete environment'
-                    : 'Where everyone starts'}
+                {fromReward && plan.promo
+                  ? t.id === 'one'
+                    ? `Yours from Rewards · ${plan.promo.daysLeft} ${plan.promo.daysLeft === 1 ? 'day' : 'days'} left`
+                    : 'Where everyone starts'
+                  : held
+                    ? 'Your plan now'
+                    : t.id === 'one'
+                      ? 'The complete environment'
+                      : 'Where everyone starts'}
               </span>
             )}
             <ul>
@@ -175,7 +182,9 @@ function PlanRail() {
                   </button>
                   {err && <p className="err">{err}</p>}
                   <p className="note" style={{ marginTop: 9 }}>
-                    {t.note}
+                    {fromReward && plan.promo
+                      ? `You have Socria One from Socria Rewards for ${plan.promo.daysLeft} more ${plan.promo.daysLeft === 1 ? 'day' : 'days'}. Subscribing keeps it — and the days still to come are saved, not lost.`
+                      : t.note}
                   </p>
                 </>
               ) : t.id === 'one' ? (

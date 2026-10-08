@@ -10,14 +10,27 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { enforceRateLimit } from '@/lib/rate-limit';
 import { cleanToken, landing, normalizeCode } from '@/lib/share/roles';
-import { ShareError, acceptCode, acceptInvite, acceptLink, type Joined } from '@/lib/share/server';
+import { ShareError, acceptCode, acceptInvite, acceptLink, inviterOf, type Joined } from '@/lib/share/server';
+import { rememberInviter } from '@/lib/rewards/rewards-server';
+import { rewardsConfig } from '@/lib/rewards/rewards-config';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
   const { userId } = auth();
-  if (!userId) return NextResponse.json({ error: 'Sign in to open this.', signIn: true }, { status: 401 });
+  if (!userId) {
+    const res = NextResponse.json({ error: 'Sign in to open this.', signIn: true }, { status: 401 });
+    // A signed-out person opening an invitation may be about to make an account: if they do, the
+    // person who invited them brought them to Socria (Socria Rewards, "Give 7, Get 7"). Read-only,
+    // rate-limited, best effort — the answer to this request is the 401 either way.
+    if (rewardsConfig().enabled && !(await enforceRateLimit(req, null, 'aux'))) {
+      const b = await req.json().catch(() => null);
+      const inviter = await inviterOf({ token: cleanToken(b?.token), invite: cleanToken(b?.invite), code: normalizeCode(b?.code) });
+      await rememberInviter(req, res, inviter);
+    }
+    return res;
+  }
   // tight: a code is eight characters, and guessing is not a feature
   const limited = await enforceRateLimit(req, userId, 'aux');
   if (limited) return limited;

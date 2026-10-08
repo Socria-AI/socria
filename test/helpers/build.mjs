@@ -212,6 +212,12 @@ const MODULES = [
   'lib/socria-prompt.ts',
   'app/explore/scenarios.ts',
   'app/docs/registry.ts',
+  'lib/rewards/rewards-config.ts',
+  'lib/rewards/promo-engine.ts',
+  'lib/rewards/rewards-store.ts',
+  'lib/rewards/challenge-rule.ts',
+  'lib/rewards/referral-rule.ts',
+  'lib/rewards/rewards-service.ts',
 ];
 
 export async function buildAll() {

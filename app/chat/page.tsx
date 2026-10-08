@@ -67,6 +67,7 @@ import { FindPanel } from '@/components/FindPanel';
 import { Hint, useSeenHints } from '@/components/Hint';
 import { pickHint } from '@/lib/hints';
 import { AccountSheet } from '@/components/account/AccountSheet';
+import { RewardsSync } from '@/components/rewards/RewardsSync';
 import { TOUR_KEY, shouldRunTour } from '@/lib/tour';
 import { ProjectHome } from '@/components/projects/ProjectHome';
 import { JoinWithCode, ShareDialog } from '@/components/share/ShareDialog';
@@ -2880,6 +2881,8 @@ export default function ChatPage() {
         error={oneError}
       />
       </div>
+      {/* Socria Rewards: a friend's link opened before sign-up, a friend's first real conversations */}
+      <RewardsSync enabled={!!isSignedIn} />
       <AccountSheet
         open={acctOpen}
         onClose={() => setAcctOpen(false)}

@@ -57,6 +57,8 @@ import { LOGOS3_TOUR, LOGOS_TOUR, LOGOS_TOUR_KEY, shouldRunTour } from '@/lib/to
 import { LogosMark } from '@/components/LogosMark';
 import { AccountControl } from '@/components/account/AccountControl';
 import { AccountSheet } from '@/components/account/AccountSheet';
+import { ChallengeChip } from '@/components/rewards/ChallengeChip';
+import { PLAN_CHANGED, SESSION_SAVED } from '@/components/rewards/useRewards';
 import { ModelPicker } from '@/components/ModelPicker';
 import { CollabBar } from '@/components/CollabBar';
 import { useLogosCollab } from '@/components/useLogosCollab';
@@ -1469,7 +1471,8 @@ export function LogosApp({
         setPlan(json.plan);
         setPlanKnown(true);
         try {
-          if (json.plan === 'one') localStorage.setItem(ONE_KEY_STORAGE, '1');
+          // a reward's Socria One is not remembered as a belief: it ends, and the belief would not
+          if (json.plan === 'one' && !json?.promo?.only) localStorage.setItem(ONE_KEY_STORAGE, '1');
           else localStorage.removeItem(ONE_KEY_STORAGE);
         } catch {}
       }
@@ -1478,6 +1481,13 @@ export function LogosApp({
       // Offline or unconfigured — keep whatever we believed.
     }
   }, [keyHeaders]);
+
+  // A reward landed, or promotional time started or ended (components/rewards/useRewards): ask again.
+  useEffect(() => {
+    const again = () => void syncPlan();
+    window.addEventListener(PLAN_CHANGED, again);
+    return () => window.removeEventListener(PLAN_CHANGED, again);
+  }, [syncPlan]);
 
   /**
    * Take up Socria One.
@@ -1628,6 +1638,17 @@ export function LogosApp({
     () => (typeof window === 'undefined' ? null : joinCodeFrom(window.location.search)),
     []
   );
+  // A SIGNED-OUT PERSON OPENING A THINK TOGETHER ROOM LINK may be about to make an account to join
+  // it. If they do, the host brought them to Socria (Socria Rewards, "Give 7, Get 7"): the server is
+  // asked to remember that, once. It changes nothing about the room or the gate in front of it.
+  useEffect(() => {
+    if (!isLoaded || isSignedIn || !joinCode) return;
+    void fetch('/api/rewards/invite', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ room: joinCode }),
+    }).catch(() => {});
+  }, [isLoaded, isSignedIn, joinCode]);
   /** every session id that has ever been a shared room in this tab */
   const sharedIdsRef = useRef<Set<string>>(new Set());
   const room = useLogosCollab({
@@ -1680,11 +1701,13 @@ export function LogosApp({
         return;
       }
       try {
-        await fetch('/api/conversations', {
+        const res = await fetch('/api/conversations', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ conversation: { ...s, kind: 'logos' } }),
         });
+        // the stored map changed: Socria Rewards reads progress from it (components/rewards/useRewards)
+        if (res.ok) window.dispatchEvent(new Event(SESSION_SAVED));
       } catch {
         // A failed save must never interrupt thinking. The session stays in
         // memory and the next turn tries again.
@@ -3750,6 +3773,8 @@ export function LogosApp({
                 <circle cx="9" cy="17" r="2.2" />
               </svg>
             </button>
+            {/* Socria Rewards: the 5-Node Challenge, quietly, beside the map it is about. */}
+            <ChallengeChip enabled={cloud} onOpenAccount={() => setAcctOpen(true)} />
             {/* Connected sources are dormant (see connectorsEnabled) — no
                 door to a room that isn't open. */}
             {CONNECTORS_ON && (

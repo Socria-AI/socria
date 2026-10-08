@@ -7,7 +7,9 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { resolvePlanForRequest } from '@/lib/socria-one-server';
+import { resolveBasePlanForRequest, resolvePlanForRequest } from '@/lib/socria-one-server';
+import { promoSnapshot } from '@/lib/rewards/promo-access';
+import { daysOf } from '@/lib/rewards/promo-engine';
 import { getSubscription, isCompCustomer } from '@/lib/subscriptions';
 import { mirrorEntitles, readStripeMirror, studentEmail } from '@/lib/socria-one-grant';
 import { eduDomainLabel, eduDomains, eduProgrammeOn, eduSchool, warnIfEduOff } from '@/lib/socria-edu';
@@ -18,6 +20,22 @@ export const dynamic = 'force-dynamic';
 export async function GET(req: NextRequest) {
   const { userId } = auth();
   const plan = await resolvePlanForRequest(req, userId);
+  // PROMOTIONAL time from Socria Rewards, said apart from what they hold. `only` is the case the
+  // surfaces must treat differently: Socria One that comes from a reward alone, which /one must
+  // still sell and "Manage membership" has nothing behind.
+  const base = plan === 'one' ? await resolveBasePlanForRequest(req, userId) : 'free';
+  const snap = userId ? await promoSnapshot(userId) : null;
+  const now = Date.now();
+  const promo =
+    snap && ((snap.until ?? 0) > now || snap.bankedMs > 0)
+      ? {
+          active: (snap.until ?? 0) > now,
+          until: snap.until,
+          daysLeft: daysOf(Math.max(0, (snap.until ?? 0) - now), 86_400_000),
+          bankedDays: daysOf(snap.bankedMs, 86_400_000),
+          only: plan === 'one' && base === 'free',
+        }
+      : undefined;
   // Only a real Stripe customer has anything to manage — an access-code or
   // complimentary unlock has no billing behind it and shouldn't be offered
   // a portal it can't open.
@@ -61,5 +79,6 @@ export async function GET(req: NextRequest) {
     manageable,
     cancelAtPeriodEnd: !!sub?.cancelAtPeriodEnd,
     ...(student ? { student } : {}),
+    ...(promo ? { promo } : {}),
   });
 }

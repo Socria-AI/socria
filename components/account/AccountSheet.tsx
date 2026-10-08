@@ -27,7 +27,8 @@ import { TOUR_KEY } from '@/lib/tour';
 import { resetSeen } from '@/lib/hints';
 import { HINTS_CHANGED } from '@/components/Hint';
 import { StudentAccess } from '@/components/StudentAccess';
-import type { PlanState } from '@/components/usePlan';
+import { usePlan, type PlanState } from '@/components/usePlan';
+import { RewardsPanel } from '@/components/rewards/RewardsPanel';
 import { clearSocriaLocalData } from '@/lib/local-data';
 import { ThemePicker } from './ThemePicker';
 import { AccessCode } from './AccessCode';
@@ -131,32 +132,14 @@ export function AccountSheet({
               </div>
             </div>
 
-            <div className="sec">
-              <span className="lbl">Membership</span>
-              <div className="plan">
-                <div>
-                  <div className="tier">
-                    <span className="t">
-                      {isOne ? (
-                        <>
-                          Socria <span className="em">One</span>
-                        </>
-                      ) : (
-                        'Logos, free'
-                      )}
-                    </span>
-                  </div>
-                  <p className="note">
-                    {isOne
-                      ? 'Unbounded maps, Research across the whole map, every depth, Draft Space in full.'
-                      : 'Real maps, every lens and every move.'}
-                  </p>
-                </div>
-                <Link className="link-act" href="/one" onClick={onClose}>
-                  {isOne ? 'Manage membership' : 'Continue with One →'}
-                </Link>
-              </div>
-            </div>
+            {plan ? (
+              <Membership isOne={isOne} plan={plan} onClose={onClose} />
+            ) : (
+              <MembershipAsked isOne={isOne} onClose={onClose} />
+            )}
+
+            {/* Socria Rewards: the 5-Node Challenge, Give 7 / Get 7, and what each reward did. */}
+            <RewardsPanel enabled={!!user} />
 
             <div className="sec">
               <span className="lbl">Access code</span>
@@ -263,4 +246,50 @@ export function AccountSheet({
       </div>
     </div>
   );
+}
+
+/**
+ * The membership line. Socria One from a REWARD alone is said as such — with
+ * how long is left and the way to keep it — rather than as a membership with
+ * something to manage, because there is no billing behind it.
+ */
+function Membership({ isOne, plan, onClose }: { isOne: boolean; plan: PlanState | null; onClose: () => void }) {
+  const promo = plan?.promo;
+  const fromReward = isOne && !!promo?.only;
+  return (
+    <div className="sec">
+      <span className="lbl">Membership</span>
+      <div className="plan">
+        <div>
+          <div className="tier">
+            <span className="t">
+              {isOne ? (
+                <>
+                  Socria <span className="em">One</span>
+                </>
+              ) : (
+                'Logos, free'
+              )}
+            </span>
+          </div>
+          <p className="note">
+            {fromReward
+              ? `From Socria Rewards — ${promo!.daysLeft} ${promo!.daysLeft === 1 ? 'day' : 'days'} left. A membership keeps it, and saves the days still to come.`
+              : isOne
+                ? 'Unbounded maps, Research across the whole map, every depth, Draft Space in full.'
+                : 'Real maps, every lens and every move.'}
+          </p>
+        </div>
+        <Link className="link-act" href="/one" onClick={onClose}>
+          {fromReward ? 'Keep Socria One →' : isOne ? 'Manage membership' : 'Continue with One →'}
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+/** The same line, for a caller that did not pass the plan: asked only while the sheet is open. */
+function MembershipAsked({ isOne, onClose }: { isOne: boolean; onClose: () => void }) {
+  const plan = usePlan();
+  return <Membership isOne={isOne} plan={plan.known ? plan : null} onClose={onClose} />;
 }
