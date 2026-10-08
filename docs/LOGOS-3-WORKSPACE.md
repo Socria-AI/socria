@@ -157,6 +157,57 @@ Tests: `test/logos3-structure.test.mjs` (65 checks). Verified in Chromium:
 - dark theme renders correctly;
 - a 390px phone has no sideways scroll.
 
+## 13. Notes in the conversation; the chrome put away
+
+**Notes on the work sit in the conversation.** Three notes used to be strips
+across the top of the map:
+- what the engine did with a model this turn proposed, which may be a
+  refusal or a variable it left out;
+- a cue to something worth finding ("See where this came from…");
+- the first map's save-as-image nudge.
+
+In Logos 3 they are said under Socria's latest reply instead, where the
+person is already reading. They sit in the thread when the conversation is
+open, and under the reply's preview when it is folded. Each can be put away.
+The map keeps the screen. Logos 2 keeps its strips.
+
+**The chats bar and header, put away.** A control at the far right of the
+header hides both, and the thinking takes the whole window. One small button
+in the top-right corner brings them back. The choice is kept per browser
+(`socria.logos.chrome.v1`). The ≡ at the top left still hides the chats bar
+on its own.
+
+Tests: `test/logos3-chat-notes.test.mjs`. Verified in Chromium:
+- no strip over the map;
+- the cue under the folded reply, and the build note, including what it left
+  out, in the thread directly under the reply;
+- dismissing a note;
+- hiding and restoring the chats bar and header, which persists across a
+  reload;
+- a phone at 390px.
+
+## 13. Notes in the conversation; the chrome put away
+
+**Notes on the work sit in the conversation.** Three notes used to be strips
+across the top of the map:
+- what the engine did with a model this turn proposed, which may be a
+  refusal or a variable it left out;
+- a cue to something worth finding;
+- the first map's save-as-image nudge.
+
+In Logos 3 they sit under Socria's latest reply instead. They appear in the
+thread when the conversation is open, and under the reply's preview when it is
+folded. Each can be put away. Logos 2 keeps its strips.
+
+**The chats bar and header, put away.** A control at the far right of the
+header hides both. One small button in the top-right corner brings them back.
+The choice is kept per browser (`socria.logos.chrome.v1`). The ≡ at the top
+left still hides the chats bar on its own.
+
+Tests: `test/logos3-chat-notes.test.mjs`. Verified in Chromium: no strip over
+the map; the notes in place, folded and open; dismissing; hide and restore,
+kept across a reload; a phone at 390px.
+
 ## Next
 
 Sources and Evidence as their own surfaces; a Compare/Differences panel over `compareRevisions`; branch selection; per-panel cameras that survive remounts; suggestions from the conversation's own ask (`lib/model/ask.ts`) rather than keywords.

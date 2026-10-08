@@ -161,6 +161,8 @@ import { LENSES, type LensId } from '@/lib/logos-layout';
 const WS_KEY = 'socria.logos3.workspace.v2';
 /** Where the conversation dock sits around the stage. */
 const DOCK_KEY = 'socria.logos3.dock.v1';
+/** the chats bar and header, hidden from the top-right control — per browser */
+const CHROME_KEY = 'socria.logos.chrome.v1';
 import { DRIFT_DISMISS_LIMIT, readDrift, type DriftVerdict } from '@/lib/topic-drift';
 import {
   MATH_FADE_MS,
@@ -341,6 +343,25 @@ export function LogosApp({
   const [activeId, setActiveId] = useState<string | null>(null);
   const [hydrating, setHydrating] = useState(true);
   const [railOpen, setRailOpen] = useState(true);
+  /**
+   * THE CHATS BAR AND THE HEADER, PUT AWAY — the control at the top right.
+   * The thinking gets the whole window; one small button in the corner brings
+   * both back. Kept per browser. (The ≡ at the top left still hides the chats
+   * bar alone.)
+   */
+  const [chromeHidden, setChromeHidden] = useState(false);
+  useEffect(() => {
+    try {
+      setChromeHidden(localStorage.getItem(CHROME_KEY) === 'hidden');
+    } catch {}
+  }, []);
+  const hideChrome = useCallback((hide: boolean) => {
+    setChromeHidden(hide);
+    try {
+      if (hide) localStorage.setItem(CHROME_KEY, 'hidden');
+      else localStorage.removeItem(CHROME_KEY);
+    } catch {}
+  }, []);
   // On a phone there is room for one surface at a time: the conversation by
   // default, the map when asked. Desktop ignores this entirely.
   const [mobileView, setMobileView] = useState<'chat' | 'map'>('chat');
@@ -3660,9 +3681,66 @@ export function LogosApp({
             {isSignedIn && (
               <AccountControl onOpen={() => setAcctOpen(true)} isOne={one} />
             )}
+            <button
+              type="button"
+              className="lg-chrome-hide"
+              onClick={() => hideChrome(true)}
+              aria-label="Hide the chats bar and header"
+              title="Hide the chats bar and header"
+            >
+              <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />
+              </svg>
+            </button>
             </div>
           </header>
   );
+  // NOTES ON THE WORK, IN THE CONVERSATION (Logos 3). What the engine did with
+  // a model this turn proposed, a cue to something worth finding, the first
+  // map's save nudge: said under Socria's latest reply, where the person is
+  // already reading, rather than as strips across the top of the map — the
+  // surface being thought about keeps the screen. Logos 2 keeps its strips.
+  const chatNotes =
+    workspaceOn && !busy && !mapping && (buildNote || found || firstMapNote) ? (
+      <div className="lg-annots" aria-label="Notes on this turn">
+        {buildNote && (
+          <p className="lg-annot" role="status">
+            <span className="lg-annot-k">The model</span>
+            <span className="lg-annot-t">{buildNote}</span>
+            <button type="button" className="lg-annot-x" aria-label="Dismiss" onClick={() => setBuildNote(null)}>
+              ×
+            </button>
+          </p>
+        )}
+        {found && !buildNote && (
+          <p className="lg-annot" role="note">
+            <span className="lg-annot-k">{found.kicker}</span>
+            <span className="lg-annot-t">{found.text}</span>
+            <button type="button" className="lg-annot-x" aria-label="Dismiss" onClick={() => dismissFound(found.id)}>
+              ×
+            </button>
+          </p>
+        )}
+        {firstMapNote && (
+          <p className="lg-annot" role="note">
+            <span className="lg-annot-t">{FIRST_MAP_NOTE}</span>
+            <button
+              type="button"
+              className="lg-annot-act"
+              onClick={() => {
+                void exportMapPng(map, active?.title && active.title !== UNTITLED ? active.title : 'A line of thinking');
+                setFirstMapNote(false);
+              }}
+            >
+              Save as image
+            </button>
+            <button type="button" className="lg-annot-x" aria-label="Dismiss" onClick={() => setFirstMapNote(false)}>
+              ×
+            </button>
+          </p>
+        )}
+      </div>
+    ) : null;
   const convoBody = (
     <>
 
@@ -3758,6 +3836,9 @@ export function LogosApp({
                 </div>
               </div>
             ))}
+
+            {/* Logos 3: notes on the work, under the reply they belong to */}
+            {chatNotes}
 
             {streaming && (
               <div className="lg-msg lg-msg-assistant">
@@ -4116,7 +4197,7 @@ export function LogosApp({
               a label in the title row: it is a sentence, sometimes three, and
               set beside "THINKING MAP · GRAPHING" it wrapped down the side of
               the panel in capitals. Dismissed by the next turn, or by hand. */}
-          {buildNote && !mapping && (
+          {buildNote && !mapping && !workspaceOn && (
             <p className="lg-panel-note" role="status">
               <span className="lg-panel-note-text">{buildNote}</span>
               <button type="button" className="lg-panel-note-x" aria-label="Dismiss" onClick={() => setBuildNote(null)}>
@@ -4127,7 +4208,7 @@ export function LogosApp({
           {/* The first-model sequence, in flow under the head rather than
               floating over the figure: its last cue points at the Understand
               bar, which a card pinned to the bottom of the pane was covering. */}
-          {found && !buildNote && !mapping && (
+          {found && !buildNote && !mapping && !workspaceOn && (
             <p className="lg-found" role="note">
               <span className="lg-found-text">
                 <b>{found.kicker}</b>
@@ -4140,7 +4221,7 @@ export function LogosApp({
           )}
           {/* The share nudge waits for the sequence: two notes about the
               same first map, stacked, is the product talking over itself. */}
-          {firstMapNote && (
+          {firstMapNote && !workspaceOn && (
             <div className="lg-guard lg-share-note" role="note">
               <span className="lg-guard-dot" aria-hidden="true" />
               <span className="lg-guard-text">{FIRST_MAP_NOTE}</span>
@@ -4345,6 +4426,8 @@ export function LogosApp({
             </button>
           </div>
         )}
+        {/* folded, the notes sit under the reply's peek; open, in the thread */}
+        {!dockShown && chatNotes}
         {focusBrief && (
           <div className="ws-chat-focus" role="status">
             <span>About</span>
@@ -4584,7 +4667,7 @@ export function LogosApp({
         </div>
       )}
       <div
-        className={`lg-split${workspaceOn ? ' is-ws' : ''}${railOpen ? '' : ' rail-closed'}${draftOpen ? ' draft-open' : ''}${
+        className={`lg-split${workspaceOn ? ' is-ws' : ''}${railOpen && !chromeHidden ? '' : ' rail-closed'}${chromeHidden ? ' chrome-hidden' : ''}${draftOpen ? ' draft-open' : ''}${
           mobileView === 'map' ? ' mv-map' : ''
         }`}
       >
@@ -4599,7 +4682,7 @@ export function LogosApp({
             chats={chats}
             onOpenChat={onOpenChat}
             activeId={activeId}
-            open={railOpen}
+            open={railOpen && !chromeHidden}
             syncing={hydrating}
             cloud={cloud}
             onSelect={(id) => {
@@ -4700,7 +4783,21 @@ export function LogosApp({
         {/* mobile: the rail overlays; tapping the dimmed page puts it away.
             These live at the split level so hiding one surface (chat or map)
             never hides the controls that swap them. */}
-        {railOpen && (
+        {chromeHidden && (
+          <button
+            type="button"
+            className="lg-chrome-show"
+            onClick={() => hideChrome(false)}
+            aria-label="Show the chats bar and header"
+            title="Show the chats bar and header"
+          >
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <rect x="3.5" y="4.5" width="17" height="15" rx="2.5" />
+              <path d="M3.5 9h17M9 9v10.5" />
+            </svg>
+          </button>
+        )}
+        {railOpen && !chromeHidden && (
           <div className="lg-mscrim" onClick={() => setRailOpen(false)} aria-hidden="true" />
         )}
         <div className="lg-mswitch" role="tablist" aria-label="View">

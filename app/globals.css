@@ -3107,7 +3107,8 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
 .logos-root .lg-mrail,
 .logos-root .lg-guide-open,
 .logos-root .lg-conn-open,
-.logos-root .lg-style-open {
+.logos-root .lg-style-open,
+.logos-root .lg-chrome-hide {
   display: grid; place-items: center;
   width: 28px; height: 28px; flex: 0 0 auto;
   padding: 0; margin: 0;
@@ -3120,10 +3121,25 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
 .logos-root .lg-mrail:hover,
 .logos-root .lg-guide-open:hover,
 .logos-root .lg-conn-open:hover,
-.logos-root .lg-style-open:hover {
+.logos-root .lg-style-open:hover,
+.logos-root .lg-chrome-hide:hover {
   color: var(--lg-primary);
   background: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.07);
 }
+/* THE CHATS BAR AND HEADER, PUT AWAY (the control at the far right of the
+   header). The rail closes as it does from the ≡, the header row goes, and one
+   small button stays in the top-right corner to bring both back. */
+.logos-root .lg-split.chrome-hidden .lg-head,
+.logos-root .lg-split.chrome-hidden .ws-top { display: none; }
+.logos-root .lg-chrome-show {
+  position: fixed; top: 10px; right: 12px; z-index: 45;
+  display: grid; place-items: center; width: 32px; height: 32px; padding: 0;
+  border: 1px solid var(--lg-line); border-radius: 9px;
+  background: var(--lg-panel); color: var(--lg-ink-60);
+  box-shadow: 0 6px 18px -10px rgba(0, 0, 0, 0.35);
+  cursor: pointer; transition: color 0.18s, border-color 0.18s;
+}
+.logos-root .lg-chrome-show:hover { color: var(--lg-primary); border-color: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.4); }
 /* the rail toggle alone says whether the thing it opens is open */
 .logos-root .lg-mrail[aria-expanded="true"] { color: var(--lg-ink-60); }
 /* On a phone every one of them is hit by the same thumb, so they all grow —
@@ -3132,7 +3148,8 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
   .logos-root .lg-mrail,
   .logos-root .lg-guide-open,
   .logos-root .lg-conn-open,
-  .logos-root .lg-style-open {
+  .logos-root .lg-style-open,
+  .logos-root .lg-chrome-hide {
     width: 32px; height: 32px;
     color: var(--lg-ink-60);
   }
