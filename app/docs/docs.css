@@ -594,3 +594,38 @@
 .docs-root table.d-eng-parts { width: 100%; font-size: 13px; }
 .docs-root table.d-eng-parts td:nth-child(3) { color: var(--d-ink-70); }
 .docs-root .d-eng-facts { font-size: 13px; color: var(--d-ink-70); }
+
+/* ── Live 3D designs, drawn by the panel's own canvas ──────────────── */
+.docs-root .d-cad { margin: 12px 0 10px; border: 1px solid var(--d-line); border-radius: 10px; overflow: hidden; background: #f6f3ec; }
+.docs-root .d-cad-stage { position: relative; height: 380px; }
+.docs-root .d-cad-plan { display: block; width: 100%; height: 100%; color: var(--d-ink); }
+.docs-root .d-cad-wait { position: absolute; inset: 0; display: grid; place-items: center; color: var(--d-ink-45); font-size: 13px; }
+.docs-root .d-cad-wake {
+  position: absolute; inset: 0; z-index: 2;
+  display: flex; align-items: flex-end; justify-content: center; padding: 0 0 14px;
+  background: transparent; border: 0; cursor: pointer;
+}
+.docs-root .d-cad-wake span {
+  font-size: 12px; color: var(--d-ink-70);
+  background: rgba(250, 248, 241, 0.92); border: 1px solid var(--d-line); border-radius: 999px; padding: 4px 12px;
+}
+.docs-root .d-cad-wake:hover span,
+.docs-root .d-cad-wake:focus-visible span { color: var(--d-moss-deep); border-color: var(--d-moss); }
+.docs-root .d-cad-cap {
+  display: flex; align-items: center; gap: 10px; padding: 7px 12px;
+  border-top: 1px solid var(--d-line); background: var(--d-card); font-size: 12.5px; color: var(--d-ink-45);
+}
+.docs-root .d-cad-cap span { flex: 1 1 auto; min-width: 0; }
+.docs-root .d-cad-cap button {
+  flex: none; font: inherit; font-size: 12px; color: var(--d-ink-70);
+  background: transparent; border: 1px solid var(--d-line); border-radius: 6px; padding: 2px 10px; cursor: pointer;
+}
+.docs-root .d-cad-cap button:hover { border-color: var(--d-moss); color: var(--d-moss-deep); }
+.docs-root .d-eng-x { color: var(--d-ink-45); font-weight: 400; }
+@media (max-width: 640px) {
+  .docs-root .d-cad-stage { height: 300px; }
+}
+@media print {
+  .docs-root .d-cad-wake,
+  .docs-root .d-cad-cap button { display: none; }
+}

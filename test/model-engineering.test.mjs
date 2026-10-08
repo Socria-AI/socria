@@ -5,7 +5,8 @@
 import { ENGINEERING, SCENE_EXAMPLES, curveAt, curveExtremes, stateAt, stateMax, runEnd, withParam } from './.tmp/engineering.mjs';
 import { buildProposal } from './.tmp/propose.mjs';
 import { readScene } from './.tmp/scene-intent.mjs';
-import { SCENE } from './.tmp/scene.mjs';
+import { SCENE, massOf, sceneMass } from './.tmp/scene.mjs';
+import { sectionOf, worldBox, rotationMatrix } from './.tmp/scene-geometry.mjs';
 
 let pass = 0, fail = 0;
 const ok = (n, c, x = '') => (c ? pass++ : (fail++, console.log('FAIL', n, x)));
@@ -144,6 +145,37 @@ console.log('=== Live 3D examples read as written, and measure ===');
   ok('wing stretched 1.5× in thickness: 18% thick, planform unchanged', SCENE.partFacts(fat, fat.nodes[0].id).some((f) => /planform area 6\.000 m².*thickest 0\.27 m \(18% of the chord\)/.test(f)));
   const squashed = { ...noz, nodes: noz.nodes.map((n) => ({ ...n, scale: [2, 1, 1] })) };
   ok('nozzle stretched unevenly across: the radii are said to be its profile’s, the ratios unchanged', SCENE.partFacts(squashed, squashed.nodes[0].id).some((f) => /narrowest radius 0\.15 m \(of its profile, before the stretch\)/.test(f)) && SCENE.partFacts(squashed, squashed.nodes[0].id).some((f) => /area ratios \(r\/r_min\)²: 2\.507 and 39\.06/.test(f)));
+  // the designs added for the docs' CAD gallery, each held to what it should measure
+  const beam = at('ibeam');
+  const b0 = beam.nodes[0];
+  const Ib = 2 * ((0.2 * 0.015 ** 3) / 12 + 0.2 * 0.015 * 0.1425 ** 2) + (0.009 * 0.27 ** 3) / 12;
+  const sb = sectionOf(b0);
+  ok('I-beam: area 2·b·t_f + t_w·h_w, laid along z, 3 m long', rel(sb.area, 2 * 0.2 * 0.015 + 0.009 * 0.27, 1e-12) && rel(worldBox(b0).max[2] - worldBox(b0).min[2], 3, 1e-9) && rel(worldBox(b0).max[1] - worldBox(b0).min[1], 0.3, 1e-9));
+  ok('I-beam: I about its strong axis by the parallel-axis theorem, 1.367×10⁻⁴ m⁴', rel(sb.Ix, Ib, 1e-9) && /1\.367×10⁻⁴ m⁴/.test(SCENE.partFacts(beam, b0.id).join(' ')));
+  ok('I-beam: 7850 × A × 3 kg', rel(massOf(b0).kg, 7850 * sb.area * 3, 1e-12));
+  const truss = at('truss');
+  ok('truss: 11 bars, the posts a bay of 0.975 m apart', truss.nodes.length === 11 && truss.nodes.filter((n) => /^post/.test(n.name)).every((n, i, a) => i === 0 || rel(n.pos[0] - a[i - 1].pos[0], 0.975, 1e-9)));
+  ok('truss: its mass is the bars’, 7850 × 0.15016 m³', rel(sceneMass(truss).kg, 7850 * (2 * 0.04 + 5 * 0.01 + 4 * 1.4 * 0.06 * 0.06), 1e-9));
+  const brg = at('bearing');
+  const balls = brg.nodes.filter((n) => n.shape === 'sphere');
+  ok('bearing: nine balls on the 35 mm pitch circle, each touching both races at mid-height', balls.length === 9 && balls.every((n) => rel(Math.hypot(n.pos[0], n.pos[2]), 0.035, 1e-9) && rel(n.pos[1], 0.01, 1e-9)) && rel(0.035 - 0.01, brg.nodes[1].dims.R, 1e-12) && rel(0.035 + 0.01, brg.nodes[0].dims.r, 1e-12));
+  const pul = at('pulley');
+  const exact = 7870 * Math.PI * 2 * ((0.1 ** 3 - 0.08 ** 3) / 3);
+  ok('pulley: its numerical mass agrees with π∫r² dy to 1e-6', rel(massOf(pul.nodes[0]).kg, exact, 1e-6) && massOf(pul.nodes[0]).how === 'numerical');
+  const spk = at('sprocket');
+  ok('sprocket: a 24-point star’s area n·r·rᵢ·sin(π/n), and its mass from it', rel(sectionOf(spk.nodes[0]).area, 24 * 0.1 * 0.088 * Math.sin(Math.PI / 24), 1e-12) && rel(massOf(spk.nodes[0]).kg, 7850 * 0.02 * 24 * 0.1 * 0.088 * Math.sin(Math.PI / 24), 1e-12));
+  const hs = at('heatsink');
+  const fins = hs.nodes.slice(1);
+  ok('heat sink: ten fins on a 10 mm pitch, centred on the base and resting on it', fins.length === 10 && rel(Math.min(...fins.map((n) => n.pos[0])), -0.045, 1e-9) && rel(Math.max(...fins.map((n) => n.pos[0])), 0.045, 1e-9) && fins.every((n) => n.on === hs.nodes[0].id));
+  ok('heat sink: 345.6 g of aluminium', rel(sceneMass(hs).kg, 2700 * (0.1 * 0.008 * 0.08 + 10 * 0.002 * 0.04 * 0.08), 1e-12));
+  const vawt = at('vawt');
+  const blades = vawt.nodes.filter((n) => /^blade/.test(n.name));
+  ok('wind turbine: three blades 0.8 m from the mast, 120° apart, and no mass claimed', blades.length === 3 && blades.every((n) => rel(Math.hypot(n.pos[0], n.pos[2]), 0.8, 1e-9)) && sceneMass(vawt) === null);
+  const rot = at('rotor');
+  const rb = rot.nodes.filter((n) => /^blade/.test(n.name));
+  // each blade's own "up" (its local y) leans 12° from the vertical: the copies keep the pitch
+  const tilt = (n) => (Math.acos(rotationMatrix(n.rot)[1][1]) * 180) / Math.PI;
+  ok('rotor: three blades around the hub, each still pitched 12°', rb.length === 3 && rb.every((n) => rel(Math.hypot(n.pos[0], n.pos[2]), 0.35, 1e-9) && Math.abs(tilt(n) - 12) < 1e-6), JSON.stringify(rb.map(tilt)));
   const spring = at('spring');
   ok('spring: its wire measured along the helix, said to be numerical', SCENE.partFacts(spring, spring.nodes[0].id).some((f) => /the curve’s length 3\.1\d\d m/.test(f)));
 }

@@ -86,7 +86,7 @@ export const DOC_PAGES: DocPage[] = [
   {
     slug: 'logos-3-engineering',
     title: 'Engineering in Logos 3',
-    blurb: 'Engines, mechanisms, circuits, structures, flows, flight, reactions and control — what to ask for, what the engine builds, and the numbers it computes, each checked.',
+    blurb: 'Engines, mechanisms, circuits, structures, flows, flight, reactions and control — what to ask for, what the engine builds, and the numbers it computes, each checked — and CAD-style designs drawn in 3D.',
     group: 'The models',
   },
   {

@@ -10,6 +10,7 @@
 // so what is drawn sits where the scene's numbers put it.
 
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { compileExpr } from '@/lib/logos-math';
 import { profile, revolveProfile, surfaceGrid, type ShapeLike } from '@/lib/objects/scene-geometry';
 
@@ -99,10 +100,27 @@ export function geometryOf(s: ShapeLike): THREE.BufferGeometry | null {
     case 'revolve': {
       const r = revolveProfile(s);
       if (!r) return null;
-      return new THREE.LatheGeometry(
+      const lathe = new THREE.LatheGeometry(
         r.pts.map(([x, y]) => new THREE.Vector2(x, y)),
         96
       );
+      // CLOSED AT BOTH ENDS, as it is measured: its volume is the solid π∫r² dy,
+      // so an end with a radius is a face — without it a pulley drew as a band
+      const ends: THREE.BufferGeometry[] = [];
+      for (const [k, up] of [[0, false], [r.pts.length - 1, true]] as const) {
+        const [rr, y] = r.pts[k];
+        if (!(rr > 1e-9)) continue;
+        const disc = new THREE.CircleGeometry(rr, 96);
+        disc.rotateX(up ? -Math.PI / 2 : Math.PI / 2);
+        disc.translate(0, y, 0);
+        ends.push(disc);
+      }
+      if (!ends.length) return lathe;
+      const merged = mergeGeometries([lathe, ...ends]);
+      if (!merged) return lathe;
+      lathe.dispose();
+      for (const e of ends) e.dispose();
+      return merged;
     }
     case 'tube': {
       const e = s.exprs ?? {};

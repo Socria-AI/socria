@@ -129,3 +129,27 @@ export function planOf(s: SceneState): Plan {
   }
   return { parts, bounds: parts.length ? [x0, z0, x1, z1] : null };
 }
+
+export interface PlanPath {
+  id: string;
+  /** the part's outline and holes, as one SVG path in the box's own pixels */
+  d: string;
+  color: string;
+  silhouette: boolean;
+}
+
+/**
+ * The plan as SVG paths fitted to a W × H box. Computed once — on the server,
+ * for a page — and handed to whatever draws it, so the drawing and the page it
+ * arrived in can never disagree about a hull.
+ */
+export function planPaths(s: SceneState, W: number, H: number, pad = 18): PlanPath[] {
+  const plan = planOf(s);
+  const b = plan.bounds;
+  if (!b) return [];
+  const k = Math.min((W - 2 * pad) / Math.max(b[2] - b[0], 1e-9), (H - 2 * pad) / Math.max(b[3] - b[1], 1e-9));
+  const ox = W / 2 - ((b[0] + b[2]) / 2) * k;
+  const oz = H / 2 - ((b[1] + b[3]) / 2) * k;
+  const ring = (r: [number, number][]) => r.map(([x, z], i) => `${i ? 'L' : 'M'}${(ox + x * k).toFixed(1)} ${(oz + z * k).toFixed(1)}`).join(' ') + ' Z';
+  return plan.parts.map((p) => ({ id: p.id, d: p.rings.map(ring).join(' '), color: p.color, silhouette: p.silhouette }));
+}

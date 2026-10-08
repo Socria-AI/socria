@@ -119,11 +119,21 @@ function Room() {
   return null;
 }
 
+/**
+ * Where the scene is and how big — its own size, however small. A floor of 1 m
+ * here framed a 110 mm bearing as a speck in a ten-metre room.
+ */
 function frameOf(s: SceneState) {
   const b = sceneBox(s) ?? { min: [-1, 0, -1] as Vec3, max: [1, 1, 1] as Vec3 };
   const c = new THREE.Vector3((b.min[0] + b.max[0]) / 2, (b.min[1] + b.max[1]) / 2, (b.min[2] + b.max[2]) / 2);
-  const size = Math.max(b.max[0] - b.min[0], b.max[1] - b.min[1], b.max[2] - b.min[2], 1);
+  const size = Math.max(b.max[0] - b.min[0], b.max[1] - b.min[1], b.max[2] - b.min[2], 1e-3);
   return { c, size };
+}
+
+/** The largest of 1, 2 or 5 × a power of ten that is at most v. */
+function roundStep(v: number): number {
+  const p = 10 ** Math.floor(Math.log10(v));
+  return v >= 5 * p ? 5 * p : v >= 2 * p ? 2 * p : p;
 }
 
 /** Frame the whole scene — on first sight, and when asked. Never on its own while someone is looking. */
@@ -149,16 +159,18 @@ function Fit({ scene, fitKey }: { scene: SceneState; fitKey: number }) {
   return null;
 }
 
-/** The floor: a grid at y = 0, sized to the scene, in whole metres. */
+/** The floor: a grid at y = 0, sized to the scene, in a round step — 1, 2 or 5 × a power of ten of a metre. */
 function Floor({ scene, dark }: { scene: SceneState; dark?: boolean }) {
   const { size } = frameOf(scene);
-  const span = Math.max(10, Math.ceil(size * 2.5));
+  const step = roundStep(size / 4);
+  const cells = Math.max(10, Math.ceil((size * 2.5) / step));
+  const span = cells * step;
   const grid = useMemo(() => {
-    const g = new THREE.GridHelper(span, span, dark ? '#5a5f68' : '#a9a397', dark ? '#373b42' : '#ddd8cc');
+    const g = new THREE.GridHelper(span, cells, dark ? '#5a5f68' : '#a9a397', dark ? '#373b42' : '#ddd8cc');
     (g.material as THREE.Material).transparent = true;
     (g.material as THREE.Material).opacity = 0.9;
     return g;
-  }, [span, dark]);
+  }, [span, cells, dark]);
   useEffect(() => () => {
     grid.geometry.dispose();
     (grid.material as THREE.Material).dispose();

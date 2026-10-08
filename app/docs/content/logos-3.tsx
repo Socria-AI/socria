@@ -125,9 +125,11 @@ export function Logos3() {
       <H2 id="engineering">Engineering examples</H2>
       <p>
         What Logos 3 can build for engineering work — engines, mechanisms and vibration, circuits, beams and columns,
-        cooling and flow, rockets and orbits, reactions, control loops, and geometry in the experimental Live 3D panel — is
-        on <Link href="/docs/logos-3-engineering">Engineering in Logos 3</Link>: the words to ask with, the model the
-        engine builds, live, and the numbers it computes.
+        cooling and flow, rockets and orbits, reactions, control loops — is on{' '}
+        <Link href="/docs/logos-3-engineering">Engineering in Logos 3</Link>: the words to ask with, the model the engine
+        builds, live, and the numbers it computes. The same page has{' '}
+        <Link href="/docs/logos-3-engineering#live3d">CAD-style designs built in the Live 3D panel</Link> — a bearing, an
+        I-beam, a truss, a heat sink, a rotor and more — each drawn in 3D from the words that describe it.
       </p>
     </Article>
   );

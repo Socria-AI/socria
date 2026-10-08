@@ -9,7 +9,7 @@ import * as THREE from 'three';
 import { create, apply, sanitizeSpace, kindOf, currentOf, SCENE, SCENE_OPS, settle, sanitizeScene, dependents, nodeLine, objectsBlock } from './.tmp/index.mjs';
 import { massOf, sceneMass } from './.tmp/scene.mjs';
 import { readScene, clausesOf } from './.tmp/scene-intent.mjs';
-import { measure, rotationMatrix, eulerOf, rotateAbout, worldBox, localBox, profile, surfaceGrid, revolveProfile, tubePath, parsePoints, polygonArea, nacaSection, centroid, toWorld } from './.tmp/scene-geometry.mjs';
+import { measure, rotationMatrix, eulerOf, rotateAbout, worldBox, localBox, profile, surfaceGrid, revolveProfile, tubePath, parsePoints, polygonArea, nacaSection, centroid, toWorld, sectionOf } from './.tmp/scene-geometry.mjs';
 import { planOf } from './.tmp/scene-plan.mjs';
 import { factsFrom, suggestViews } from './.tmp/surfaces.mjs';
 import { singleLayout, sanitizeLayout, isOpen, addPanel } from './.tmp/tiling.mjs';
@@ -477,6 +477,67 @@ console.log('=== what it is made of: mass and centre of mass ===');
   ok('make it steel: an edit sets the material', read('make the cone 7800 kg/m3', s).preview.nodes[2].density === 7800);
   ok('a material survives storage', sanitizeScene(JSON.parse(JSON.stringify(s))).nodes[0].density === 7850 && sanitizeScene(JSON.parse(JSON.stringify(s))).nodes[0].densityFrom === 'nominal');
   ok('nonsense density refused', typeof SCENE_OPS.matter.check(s, { id: 'box1', density: -3 }) === 'string');
+}
+
+console.log('=== layouts for designs: gaps, centring, rings around a part, outlines extruded ===');
+{
+  const clean = (r) => r.clauses.every((c) => c.understood && !(c.skipped && c.skipped.length));
+  // a row put on top of something stands across it, centred
+  const fins = read('a box 1 m wide, 0.1 m tall and 1 m deep called base, then a row of 5 boxes 0.05 m wide, 0.3 m tall and 1 m deep on top of it with a gap of 0.15 m');
+  const f = fins.preview.nodes.slice(1);
+  ok('a row on a part is centred on it', clean(fins) && f.length === 5 && near(Math.min(...f.map((n) => n.pos[0])), -0.4) && near(Math.max(...f.map((n) => n.pos[0])), 0.4), JSON.stringify(fins.clauses));
+  ok('… with the gap edge to edge: a 0.2 m pitch', f.every((n, i) => i === 0 || near(n.pos[0] - f[i - 1].pos[0], 0.2)));
+  ok('… still resting on it, and it says it centred them', f.every((n) => n.on === 'box1') && fins.clauses[1].notes.some((x) => /centred on base/.test(x)));
+  ok('a row on the floor is not moved', near(read('a row of 3 cubes').preview.nodes[0].pos[0], 0));
+  const apart = read('a row of 4 spheres of radius 0.1 0.5 m apart').preview.nodes;
+  ok('“0.5 m apart” is centre to centre', apart.length === 4 && near(apart[3].pos[0] - apart[0].pos[0], 1.5));
+  // a ring around a part, or around the origin
+  const base = read('a cylinder 1 m in diameter and 0.2 m tall at (3, 0.1, 2) called hub').preview;
+  const ring = read('a ring of 6 spheres 0.2 m in diameter with radius 1 around the hub', base);
+  const balls = ring.preview.nodes.slice(1);
+  ok('a ring around a part is centred on it', clean(ring) && balls.length === 6 && balls.every((n) => near(Math.hypot(n.pos[0] - 3, n.pos[2] - 2), 1)), JSON.stringify(ring.clauses));
+  const o = read('a ring of 4 cubes with radius 2 around the origin', base).preview.nodes.slice(1);
+  ok('… or around the origin, not put beside the scene', o.length === 4 && o.every((n) => near(Math.hypot(n.pos[0], n.pos[2]), 2)));
+  ok('around something that is not there is a problem, and builds nothing', !!read('a ring of 4 cubes around the dragon', base).clauses[0].problem && read('a ring of 4 cubes around the dragon', base).preview.nodes.length === 1);
+  // a copy with a gap
+  const cp = read('a box 0.5 m wide, then copy it 3 times to the right with a gap of 0.1 m');
+  ok('copies with a gap: each one width plus the gap further on', clean(cp) && near(cp.preview.nodes[3].pos[0] - cp.preview.nodes[0].pos[0], 3 * 0.6), JSON.stringify(cp.clauses));
+  // an outline is extruded by the length given, and its noun is read
+  const tall = read('a polygon with corners (0, 0), (1, 0), (1, 1), (0, 1), 2 m tall');
+  ok('an outline extruded “2 m tall”, nothing skipped', clean(tall) && near(tall.preview.nodes[0].dims.h, 2), JSON.stringify(tall.clauses));
+  const long = read('a steel polygon with corners (0, 0), (0.2, 0), (0.2, 0.02), (0, 0.02), 3 m long');
+  ok('… or “3 m long”, as a section to be laid down', clean(long) && near(long.preview.nodes[0].dims.h, 3) && near(massOf(long.preview.nodes[0]).kg, 7850 * 0.004 * 3));
+  // a shape given by an equation keeps the name it is given, after the equation or before it
+  const named = read('revolve r = 1 + 0.2*y for y from 0 to 1 called vase');
+  ok('“called vase” after an equation is read, not swallowed', clean(named) && named.preview.nodes[0].name === 'vase', JSON.stringify(named.preview.nodes[0]?.name));
+  const tube = read('a tube called coil x = cos(t), y = sin(t), z = 0.1*t for t from 0 to 6.28');
+  ok('… and before it', tube.preview.nodes[0]?.name === 'coil' && tube.preview.nodes[0]?.shape === 'tube');
+}
+
+console.log('=== a section’s area and second moments, exact ===');
+{
+  const sec = (shape, dims, exprs, scale = [1, 1, 1]) => sectionOf({ shape, dims, exprs, pos: [0, 0, 0], rot: [0, 0, 0], scale });
+  // a rectangle b × d: I about its own x axis (∫z²) is b·d³/12
+  const rect = sec('polygon', { h: 1 }, { pts: '0,0|0.3,0|0.3,0.1|0,0.1' });
+  ok('a rectangle: A = b·d, I = b·d³/12 and d·b³/12', near(rect.area, 0.03) && near(rect.Ix, (0.3 * 0.1 ** 3) / 12) && near(rect.Iz, (0.1 * 0.3 ** 3) / 12));
+  // the same corners the other way round are the same section
+  const cw = sec('polygon', { h: 1 }, { pts: '0,0.1|0.3,0.1|0.3,0|0,0' });
+  ok('… whichever way the corners run', near(cw.area, rect.area) && near(cw.Ix, rect.Ix));
+  // a T: centroid and I by the parallel-axis theorem, worked by hand
+  const tee = sec('polygon', { h: 1 }, { pts: '0,0|0.2,0|0.2,0.02|0.11,0.02|0.11,0.2|0.09,0.2|0.09,0.02|0,0.02' });
+  const zc = (0.004 * 0.01 + 0.0036 * 0.11) / 0.0076;
+  const IxT = (0.2 * 0.02 ** 3) / 12 + 0.004 * (zc - 0.01) ** 2 + (0.02 * 0.18 ** 3) / 12 + 0.0036 * (0.11 - zc) ** 2;
+  ok('a T-section: its centroid off the middle of its corners, and I about it', near(tee.area, 0.0076) && near(tee.cz, zc - 0.06) && near(tee.Ix, IxT, 1e-9), JSON.stringify(tee));
+  // a ring from the annulus formulas, not its drawn 96-gon
+  const ring = sec('ring', { R: 0.05, r: 0.045, h: 1 });
+  ok('a ring: π(R⁴ − r⁴)/4 exactly', near(ring.Ix, (PI * (0.05 ** 4 - 0.045 ** 4)) / 4) && near(ring.Iz, ring.Ix) && near(ring.area, PI * (0.05 ** 2 - 0.045 ** 2)));
+  // a square prism is the same about any centroidal axis: a⁴/12
+  const sq = sec('prism', { n: 4, r: Math.SQRT2 / 2, h: 1 });
+  ok('a square prism of side 1: I = 1/12 about either axis', near(sq.area, 1) && near(sq.Ix, 1 / 12) && near(sq.Iz, 1 / 12));
+  // stretched: x by 2 doubles the area and I about x, and multiplies I about z by eight
+  const st = sec('polygon', { h: 1 }, { pts: '0,0|0.3,0|0.3,0.1|0,0.1' }, [2, 1, 1]);
+  ok('a stretch is followed: A·sx·sz, Ix·sx·sz³, Iz·sx³·sz', near(st.area, 0.06) && near(st.Ix, 2 * rect.Ix) && near(st.Iz, 8 * rect.Iz));
+  ok('no section for a shape that is not an extrusion', sec('box', { w: 1, h: 1, d: 1 }) === null && sec('sphere', { r: 1 }) === null);
 }
 
 console.log('=== the source keeps its promises ===');

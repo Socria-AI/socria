@@ -73,6 +73,11 @@ Two additions from the Engineering Atlas:
     no density are counted, not guessed.
   - Nothing is loaded or stressed: no strength is modelled.
 - **What a shape's geometry says**, among its facts:
+  - an extruded outline's section — a prism, a star, a ring, the person's
+    own corners: its area, its centroid and its second moments about the
+    centroid (∫z² dA and ∫x² dA in the part's own x–z plane), exact by
+    Green's theorem over the corners, and the annulus formulas for a ring.
+    The I a bending formula needs; no load is applied;
   - a revolved contour's narrowest radius (a nozzle's throat), where its
     profile has it, and the end-to-throat area ratios (r/r_min)²;
   - an airfoil's planform area, aspect ratio b²/S and thickness.
@@ -105,7 +110,7 @@ support leaves what rested on it where it was, resting on nothing.
 | prism (n sides), star (n points), ring (annulus) | extrusions of computed profiles |
 | polygon | an extrusion of the person's own corners |
 | surface | z = f(x, y) evaluated on a grid; cells where f is undefined are left out and counted |
-| revolve | r(y) turned about the vertical axis |
+| revolve | r(y) turned about the vertical axis, closed at its ends as its volume is |
 | tube | a tube along the curve (x(t), y(t), z(t)), evaluated wherever Three asks for a point |
 
 Shapes given by an equation stand at their own coordinates, so a point on
@@ -142,7 +147,12 @@ What it reads:
   "around the origin", "around the flange": the copies stand evenly round
   the circle, each turned to face out as the first did), stack, rename,
   remove, clear, display unit;
-- arrangements: a row, a stack or tower, a ring or a grid of N;
+- arrangements: a row, a stack or tower, a ring or a grid of N — spaced
+  "0.25 m apart" (centre to centre) or "with a gap of 0.008 m" (edge to
+  edge). A row or grid put on top of a part is centred on it, and says so;
+  a ring goes "around the hub" or "around the origin";
+- an outline by its corners, extruded by how thick, tall or long it is
+  ("… 3 m long", for a section about to be laid down as a beam);
 - shapes given by an equation, as listed above.
 
 How it decides which part is meant:
@@ -200,9 +210,26 @@ change it. The panel says so, and `onObject` refuses the operation.
 - **A step can carry its time** (`ObjectAction.at`), so one description's
   steps can be grouped.
 
+## Framing
+
+The view frames the scene at its own size, however small, and the floor is a
+grid in a round step — 1, 2 or 5 × a power of ten of a metre — sized to it. A
+floor of whole metres used to frame a 110 mm bearing as a speck.
+
+## In the docs
+
+The docs page *Engineering in Logos 3* draws fifteen designs — a flywheel, a
+radial layout, a spring, a ball bearing, a V-belt pulley, a sprocket, a
+flange, an I-beam, a truss, a pipe, a heat sink, a wind turbine, a nozzle, a
+wing and a rotor — with this panel's own reader and canvas
+(`app/docs/DocsScene.tsx`). Each is read from its words in the browser; until
+it is near the screen, and without WebGL, JavaScript or in print, the plan
+seen from above stands in, computed on the server. A figure takes the wheel
+and a dragging finger only after it is clicked.
+
 ## Verification
 
-- `test/logos3-scene.test.mjs` (211 checks), covering:
+- `test/logos3-scene.test.mjs` (229 checks), covering:
   - every volume and area against its formula, and the numerical ones
     against cases with closed forms (a revolved line is a cone, 9π);
   - the rotation matrix against `THREE.Matrix4.makeRotationFromEuler`,
@@ -214,7 +241,15 @@ change it. The panel says so, and `onObject` refuses the operation.
   - the reader: sizes, units, arrangements, placements, edits, references,
     and what it refuses;
   - the plan view;
-  - the workspace: what "+ View" offers, and the layout's pinned scene.
+  - the workspace: what "+ View" offers, and the layout's pinned scene;
+  - layouts for designs: gaps, rows centred on what they rest on, rings
+    around a part, outlines extruded by a length;
+  - sections: a rectangle, a T by the parallel-axis theorem, a ring, a
+    square, and a stretch, each against its closed form.
+- `test/model-engineering.test.mjs`: every design on the docs page reads in
+  full, and each measures what it should — the I-beam's I, the truss's and
+  heat sink's mass, the bearing's balls touching both races, the pulley's
+  numerical mass against π∫r² dy, the rotor's blades keeping their pitch.
 - Chromium, with WebGL through SwiftShader (`scripts/.probe-live3d*.mjs`,
   not kept):
   - type, preview, Build;

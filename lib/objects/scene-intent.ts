@@ -187,6 +187,8 @@ interface DimReading {
   depth?: number;
   chord?: number;
   span?: number;
+  /** "3 m long": a width for most shapes, the extrusion for an outline */
+  long?: number;
 }
 
 function readDims(c: Clause, unit: LengthUnit): DimReading {
@@ -222,7 +224,7 @@ function readDims(c: Clause, unit: LengthUnit): DimReading {
     if (k === 'wide') out.w = v;
     else if (k === 'tall' || k === 'high') out.h = v;
     else if (k === 'deep') out.d = v;
-    else if (k === 'long') out.w = v;
+    else if (k === 'long') out.w = out.long = v;
     else if (k === 'thick') out.depth = v;
     else if (k === 'across' || k.includes('diameter')) out.diameter = v;
     else if (k.includes('radius')) out.r = v;
@@ -239,6 +241,7 @@ function readDims(c: Clause, unit: LengthUnit): DimReading {
       if (v === null) continue;
       const k = b[2].toLowerCase();
       if (k === 'wide' || k === 'long') out.w = v;
+      if (k === 'long') out.long = v;
       if (k === 'tall' || k === 'high') out.h = v;
       if (k === 'deep') out.d = v;
       if (k === 'thick') out.depth = v;
@@ -259,7 +262,8 @@ function readDims(c: Clause, unit: LengthUnit): DimReading {
     else if (k === 'tube radius' || k === 'minor radius') out.tube = v;
     else if (k === 'radius') out.r = v;
     else if (k === 'diameter') out.diameter = v;
-    else if (k === 'width' || k === 'length') out.w = v;
+    else if (k === 'width') out.w = v;
+    else if (k === 'length') out.w = out.long = v;
     else if (k === 'height') out.h = v;
     else if (k === 'depth') out.d = v;
     else if (k === 'thickness') out.depth = v;
@@ -807,8 +811,10 @@ function dimArgs(shape: SceneShape, d: DimReading, cube: boolean): { dims: Recor
       else if (d.h !== undefined) dims.h = d.h;
       break;
     case 'polygon':
+      // an outline is extruded: "0.02 thick", "2 tall" or — for a section about to be laid down as a beam — "3 long"
       if (d.depth !== undefined) dims.h = d.depth;
       else if (d.h !== undefined) dims.h = d.h;
+      else if (d.long !== undefined) dims.h = d.long;
       break;
     case 'airfoil':
       if (d.chord !== undefined) dims.c = d.chord;
@@ -857,8 +863,15 @@ function readCreate(c: Clause, st: Ctx): string | null {
   // what shape, and how many
   // what it is made of first: a shape given by an equation consumes the rest of the clause
   const matter = readMatter(c);
+  // …and its name: a shape given by an equation reads to the end of the clause, and "called pulley" after
+  // "r = … for y from 0 to 0.04" was swallowed with it — the part came out named "revolved shape"
+  // the name ends where the clause, a comma, a "with/at/on/and" or the equation itself ("x = …", "r(y) = …") begins
+  const NAMED = /\b(?:called|named)\s+["“]?([a-z][\w ]{0,30}?)["”]?(?=$|\s*[,;]|\s+(?:with|at|on|and)\b|\s+[a-z]\w*\s*(?:\(\s*[a-z]\s*\))?\s*=)/i;
+  const earlyName = c.take(NAMED)?.[1];
   const param = readParametric(c, st.unit);
   if (param && 'problem' in param) return param.problem;
+  // an outline given by its corners is still called something, and is extruded by a length read below
+  if (param?.shape === 'polygon') c.take(/\b(?:polygon|outline|section|profile|plate|extrusion)\b/i);
   let shape: SceneShape | null = param ? param.shape : null;
   let opts: { cube?: true; slab?: true } | undefined;
   let sidesFromNoun: number | undefined;
@@ -894,7 +907,7 @@ function readCreate(c: Clause, st: Ctx): string | null {
     if (inline) count = Math.max(1, Math.round(numOf(inline[1]) ?? 1));
   }
   if (count > MAX_NODES) return `A scene holds at most ${MAX_NODES} parts.`;
-  const name = c.take(/\b(?:called|named)\s+["“]?([a-z][\w ]{0,30}?)["”]?(?=$|\s*[,;]|\s+(?:with|at|on|and)\b)/i)?.[1];
+  const name = earlyName ?? c.take(NAMED)?.[1];
   const look = readLook(c);
   if (shape === 'prism') {
     const adj = c.take(/\b(triangular|square|pentagonal|hexagonal|heptagonal|octagonal)\b/i);
@@ -908,15 +921,44 @@ function readCreate(c: Clause, st: Ctx): string | null {
     else if (c.take(/\bsymmetric(?:al)?\b/i)) naca = { m: 0, p: 0 };
     if (naca && naca.m > 0 && naca.p === 0) return `NACA ${nm![1]}${nm![2]}${nm![3]} is not a section: a cambered one needs where its camber peaks (the second digit).`;
   }
-  const spacing = c.take(new RegExp(`\\b(?:spaced|every|apart by|spacing(?: of)?)\\s*${NUM_RE}\\s*${UNIT_RE}?(?:\\s+apart)?`, 'i'));
+  // centre to centre ("spaced 0.25 apart", "0.25 m apart"), or edge to edge ("with a gap of 0.01")
+  const spacing =
+    c.take(new RegExp(`\\b(?:spaced|every|apart by|spacing(?: of)?)\\s*${NUM_RE}\\s*${UNIT_RE}?(?:\\s+apart)?`, 'i')) ??
+    c.take(new RegExp(`${NUM_RE}\\s*${UNIT_RE}?\\s+apart\\b`, 'i'));
+  const gapM = spacing ? null : c.take(new RegExp(`\\b(?:with\\s+)?(?:a\\s+)?(?:gap|space|clearance)\\s+(?:of\\s+)?${NUM_RE}\\s*${UNIT_RE}?(?:\\s+between\\s+(?:them|each(?:\\s+one)?))?`, 'i'));
   const along = c.take(/\b(?:along|in)\s+(?:the\s+)?([xyz])(?:[\s-]?(?:axis|direction))?\b/i)?.[1]?.toLowerCase();
   const ringR = arrangement === 'ring' || arrangement === 'circle' ? c.take(new RegExp(`\\b(?:with\\s+(?:a\\s+)?)?radius\\s*(?:of)?\\s*${NUM_RE}\\s*${UNIT_RE}?`, 'i')) : null;
+  // "a ring of 9 balls … around the inner race", "… around the origin": where the ring is centred
+  let ringAt: [number, number] | null = null;
+  const aroundM = arrangement === 'ring' || arrangement === 'circle' ? /\baround\b/i.exec(c.work) : null;
+  if (aroundM) {
+    const after = aroundM.index + aroundM[0].length;
+    const lead = c.work.slice(after).search(/\S|$/);
+    const rest = c.work.slice(after + lead);
+    const origin = /^(?:the\s+)?(?:origin|centre|center|middle)\b/i.exec(rest);
+    let len = 0;
+    if (origin) {
+      ringAt = [0, 0];
+      len = origin[0].length;
+    } else {
+      const words = refAt(rest, st.s);
+      if (!words) return 'Around what? Name a part already there, or say “around the origin”.';
+      const ref = resolve(words.phrase, st.s, st.ctx, st.recent);
+      if (!ref) return missing(st, words.phrase);
+      const at = st.s.nodes.find((n) => n.id === ref.ids[0])!;
+      ringAt = [at.pos[0], at.pos[2]];
+      len = words.len;
+    }
+    c.work = c.work.slice(0, aroundM.index) + ' '.repeat(after + lead + len - aroundM.index) + c.work.slice(after + lead + len);
+  }
   // sizes before places: in "a sphere of radius 0.5 on top of it" the 0.5 is the sphere's
-  const d = param ? ({} as DimReading) : readDims(c, st.unit);
+  const d = param && param.shape !== 'polygon' ? ({} as DimReading) : readDims(c, st.unit);
   const place = readPlacement(c, st.s, st.ctx, st.recent, st.unit);
   if (place && 'problem' in place) return place.problem;
   if (sidesFromNoun !== undefined && d.n === undefined) d.n = sidesFromNoun;
-  const { dims } = param ? { dims: param.dims } : dimArgs(shape, d, !!opts?.cube);
+  const { dims } = param
+    ? { dims: param.shape === 'polygon' ? { ...param.dims, ...dimArgs('polygon', d, false).dims } : param.dims }
+    : dimArgs(shape, d, !!opts?.cube);
   if (naca) Object.assign(dims, naca);
   const args: SceneOp['args'] = { shape };
   if (Object.keys(dims).length) args.dims = writePairs(dims);
@@ -952,7 +994,7 @@ function readCreate(c: Clause, st: Ctx): string | null {
     if (matter.density === undefined) c.notes.push(`${matter.name}: a nominal density of ${NOMINAL_DENSITY[matter.name!]} kg/m³ — a typical value; give a measured one to replace it`);
   }
   let beside = false;
-  if (!place && !param && before.nodes.length) {
+  if (!place && !param && !ringAt && before.nodes.length) {
     // nowhere given, and the scene is not empty: beside what is there, on the floor, rather than inside it
     const sb = sceneBox(before);
     const fb = worldBox(first);
@@ -969,15 +1011,18 @@ function readCreate(c: Clause, st: Ctx): string | null {
   if (count > 1) {
     const b = worldBox(first)!;
     const ext: Vec3 = [b.max[0] - b.min[0], b.max[1] - b.min[1], b.max[2] - b.min[2]];
-    const gap = 0.25 * UNIT_M[st.unit];
-    const step = spacing ? (numOf(spacing[1]) ?? 1) * unitOf(spacing[2], st.unit) : null;
+    const gap = gapM ? (numOf(gapM[1]) ?? 0) * unitOf(gapM[2], st.unit) : 0.25 * UNIT_M[st.unit];
+    // a gap given is edge to edge, so the step is the part's own extent plus it
+    const along_ = along === 'z' ? 2 : 0;
+    const step = spacing ? (numOf(spacing[1]) ?? 1) * unitOf(spacing[2], st.unit) : gapM ? ext[along_] + gap : null;
     if (arrangement === 'ring' || arrangement === 'circle') {
       const R = ringR ? (numOf(ringR[1]) ?? 2) * unitOf(ringR[2], st.unit) : Math.max(1, (count * (ext[0] + gap)) / (2 * Math.PI));
       if (!ringR) c.notes.push(`ring radius ${lengthWord(R, st.unit)}, so they do not touch (none given)`);
-      // the first goes on the circle at angle 0 about where it was put — or, put beside the
-      // scene, the whole ring does, its near edge where the first part stood
-      const cx = first.pos[0] + (beside ? R : 0);
-      const cz = first.pos[2];
+      // the first goes on the circle at angle 0 about where it was put — or about the part or
+      // point it was asked to go around — or, put beside the scene, the whole ring does, its
+      // near edge where the first part stood
+      const cx = ringAt ? ringAt[0] : first.pos[0] + (beside ? R : 0);
+      const cz = ringAt ? ringAt[1] : first.pos[2];
       const w1 = run(st, 'moveTo', { id: first.id, x: cx + R, z: cz });
       if (w1) return w1;
       const w2 = run(st, 'copy', { id: first.id, count: count - 1, ring: R, cx, cz });
@@ -1008,6 +1053,23 @@ function readCreate(c: Clause, st: Ctx): string | null {
       if (!step) c.notes.push(`spaced ${lengthWord(dxv, st.unit)} apart, centre to centre (no spacing given)`);
       const w2 = run(st, 'copy', { id: first.id, count: count - 1, [ax]: dxv });
       if (w2) return w2;
+    }
+    // A ROW OR A GRID PUT ON TOP OF SOMETHING IS CENTRED ON IT: "ten fins on top of the base"
+    // stand across the base, not from its middle outward
+    const flatLayout = arrangement !== 'ring' && arrangement !== 'circle' && arrangement !== 'stack' && arrangement !== 'tower' && arrangement !== 'pile' && arrangement !== 'column' && along !== 'y';
+    const sup = place?.target && place.target !== 'ground' && (place.side ?? 'top') === 'top' ? st.s.nodes.find((n) => n.id === place.target) : null;
+    if (flatLayout && sup) {
+      const made = lastAdded(before, st.s).map((id) => st.s.nodes.find((n) => n.id === id)!);
+      const mid = (v: number[]) => (Math.min(...v) + Math.max(...v)) / 2;
+      const dx = sup.pos[0] - mid(made.map((n) => n.pos[0]));
+      const dz = sup.pos[2] - mid(made.map((n) => n.pos[2]));
+      if (Math.abs(dx) > 1e-12 || Math.abs(dz) > 1e-12) {
+        for (const n of made) {
+          const w4 = run(st, 'moveTo', { id: n.id, x: n.pos[0] + dx, z: n.pos[2] + dz });
+          if (w4) return w4;
+        }
+        c.notes.push(`centred on ${sup.name}`);
+      }
     }
   }
   st.recent = lastAdded(before, st.s);
@@ -1178,21 +1240,24 @@ function readEdit(c: Clause, st: Ctx): string | null {
     }
     const b = worldBox(node)!;
     const ext: Vec3 = [b.max[0] - b.min[0], b.max[1] - b.min[1], b.max[2] - b.min[2]];
+    // an edge-to-edge gap, read before the directions so its number is not taken for a distance
+    const gapM = c.take(new RegExp(`\\b(?:with\\s+)?(?:a\\s+)?(?:gap|space|clearance)\\s+(?:of\\s+)?${NUM_RE}\\s*${UNIT_RE}?(?:\\s+between\\s+(?:them|each(?:\\s+one)?))?`, 'i'));
+    const gapGiven = gapM ? (numOf(gapM[1]) ?? 0) * unitOf(gapM[2], st.unit) : null;
     const dir = readDirections(c, st.unit);
     const spacing = c.take(new RegExp(`\\b(?:spaced|every|apart by|spacing(?: of)?)\\s*${NUM_RE}\\s*${UNIT_RE}?(?:\\s+apart)?`, 'i'));
     const along = c.take(/\b(?:along|in)\s+(?:the\s+)?([xyz])(?:[\s-]?(?:axis|direction))?\b/i)?.[1]?.toLowerCase();
-    const gapStep = (k: number) => (spacing ? (numOf(spacing[1]) ?? 1) * unitOf(spacing[2], st.unit) : ext[k] + 0.25 * UNIT_M[st.unit]);
+    const gapStep = (k: number) => (spacing ? (numOf(spacing[1]) ?? 1) * unitOf(spacing[2], st.unit) : ext[k] + (gapGiven ?? 0.25 * UNIT_M[st.unit]));
     const before = st.s;
     let args: SceneOp['args'];
     if (dir.moved) {
       args = { id, count: copies, dx: dir.d[0] || 0, dy: dir.d[1] || 0, dz: dir.d[2] || 0 };
       // a direction without a distance: step by the part's own size plus a little
       for (const k of dir.unsized) args[['dx', 'dy', 'dz'][k]] = gapStep(k) * dir.sign[k];
-      if (dir.unsized.length && !spacing) c.notes.push(`each copy one size further on, with a ${lengthWord(0.25 * UNIT_M[st.unit], st.unit)} gap`);
+      if (dir.unsized.length && !spacing && gapGiven === null) c.notes.push(`each copy one size further on, with a ${lengthWord(0.25 * UNIT_M[st.unit], st.unit)} gap`);
       if (dir.d[1] !== 0 && !dir.d[0] && !dir.d[2] && dir.sign[1] > 0) args.stack = 'y';
     } else {
       const k = along === 'y' ? 1 : along === 'z' ? 2 : 0;
-      if (!spacing) c.notes.push(`copies placed along ${['x', 'y', 'z'][k]}, one size apart with a ${lengthWord(0.25 * UNIT_M[st.unit], st.unit)} gap`);
+      if (!spacing && gapGiven === null) c.notes.push(`copies placed along ${['x', 'y', 'z'][k]}, one size apart with a ${lengthWord(0.25 * UNIT_M[st.unit], st.unit)} gap`);
       args = { id, count: copies, [['dx', 'dy', 'dz'][k]]: gapStep(k) };
       if (k === 1) args.stack = 'y';
     }

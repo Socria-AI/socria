@@ -598,3 +598,56 @@ export function revolveThroat(s: ShapeLike): { rMin: number; yMin: number; rStar
   if (![best.r, rStart, rEnd].every(Number.isFinite)) return null;
   return { rMin: best.r, yMin: best.y, rStart, rEnd };
 }
+
+/**
+ * An extruded part's cross-section, from its own outline: area, centroid and
+ * second moments of area about the centroid — I about x (∫z² dA) and about
+ * z (∫x² dA) in the part's own x–z plane, stretch included.
+ *
+ * EXACT for every outline that is a polygon (a prism, a star, the person's own
+ * corners): Green's theorem over the edges, holes subtracted. EXACT for the
+ * ring from the annulus formulas, not its drawn 96-gon. Geometry only — the I
+ * a bending formula needs, with no load anywhere.
+ */
+export function sectionOf(s: ShapeLike): { area: number; cx: number; cz: number; Ix: number; Iz: number } | null {
+  if (!['prism', 'star', 'ring', 'polygon'].includes(s.shape)) return null;
+  const [sx, , sz] = s.scale;
+  let A = 0, Sx = 0, Sz = 0, Ixx = 0, Izz = 0;
+  if (s.shape === 'ring') {
+    const { R, r } = s.dims;
+    A = Math.PI * (R * R - r * r);
+    Ixx = Izz = (Math.PI * (R ** 4 - r ** 4)) / 4;
+  } else {
+    const p = profile(s);
+    if (!p) return null;
+    // each ring's signed integrals; the outline counts positive and each hole negative, whichever way they wind
+    const ringOf = (pts: [number, number][], sign: 1 | -1) => {
+      let a = 0, mx = 0, mz = 0, ix = 0, iz = 0;
+      for (let i = 0; i < pts.length; i++) {
+        const [x0, z0] = pts[i];
+        const [x1, z1] = pts[(i + 1) % pts.length];
+        const k = x0 * z1 - x1 * z0;
+        a += k / 2;
+        mx += ((x0 + x1) * k) / 6;
+        mz += ((z0 + z1) * k) / 6;
+        ix += ((z0 * z0 + z0 * z1 + z1 * z1) * k) / 12;
+        iz += ((x0 * x0 + x0 * x1 + x1 * x1) * k) / 12;
+      }
+      const w = sign * Math.sign(a || 1);
+      A += w * a;
+      Sx += w * mx;
+      Sz += w * mz;
+      Ixx += w * ix;
+      Izz += w * iz;
+    };
+    ringOf(p.outer, 1);
+    for (const h of p.holes) ringOf(h, -1);
+  }
+  if (!(A > 0)) return null;
+  const cx = Sx / A;
+  const cz = Sz / A;
+  // about the centroid, then stretched: x by sx and z by sz
+  const Ixc = Ixx - A * cz * cz;
+  const Izc = Izz - A * cx * cx;
+  return { area: A * sx * sz, cx: cx * sx, cz: cz * sz, Ix: Ixc * sx * sz ** 3, Iz: Izc * sx ** 3 * sz };
+}

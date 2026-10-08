@@ -29,7 +29,7 @@
 // PURE.
 
 import { register, type ObjectKind } from './core';
-import { centroid, localBox, measure, parsePoints, revolveThroat, rotateAbout, toWorld, worldBox, type Box3, type Vec3 } from './scene-geometry';
+import { centroid, localBox, measure, parsePoints, revolveThroat, rotateAbout, sectionOf, toWorld, worldBox, type Box3, type Vec3 } from './scene-geometry';
 import { compileExpr } from '@/lib/logos-math';
 
 export type LengthUnit = 'm' | 'cm' | 'mm' | 'in' | 'ft';
@@ -884,6 +884,23 @@ function shapeFacts(n: SceneNode, unit: LengthUnit): string[] {
     return [
       `narrowest radius ${lengthIn(t.rMin * k, unit)}${even ? '' : ' (of its profile, before the stretch)'} where its profile has y = ${Number(t.yMin.toPrecision(4))} (its throat); ends ${lengthIn(t.rStart * k, unit)} and ${lengthIn(t.rEnd * k, unit)}`,
       `end-to-throat area ratios (r/r_min)²: ${Number(((t.rStart / t.rMin) ** 2).toPrecision(4))} and ${Number(((t.rEnd / t.rMin) ** 2).toPrecision(4))} — geometry only`,
+    ];
+  }
+  const sec = sectionOf(n);
+  if (sec) {
+    // small quantities in powers of ten — 1.367×10⁻⁴ m⁴, not 0.0001367
+    const e = (v: number) => {
+      if (v === 0 || (Math.abs(v) >= 1e-2 && Math.abs(v) < 1e5)) return String(Number(v.toPrecision(4)));
+      const k = Math.floor(Math.log10(Math.abs(v)));
+      const sup = String(k).replace('-', '⁻').replace(/\d/g, (c) => '⁰¹²³⁴⁵⁶⁷⁸⁹'[Number(c)]);
+      return `${(v / 10 ** k).toFixed(3)}×10${sup}`;
+    };
+    const tiny = 1e-9 * Math.sqrt(sec.area);
+    const cx = Math.abs(sec.cx) < tiny ? 0 : sec.cx;
+    const cz = Math.abs(sec.cz) < tiny ? 0 : sec.cz;
+    const off = cx || cz ? `, its centroid (${lengthIn(cx, unit)}, ${lengthIn(cz, unit)}) from the part's middle` : '';
+    return [
+      `section, in the part's own x–z plane: area ${e(sec.area)} m²${off}; second moments about its centroid — about x (∫z² dA) ${e(sec.Ix)} m⁴, about z (∫x² dA) ${e(sec.Iz)} m⁴ — geometry only, no load is applied`,
     ];
   }
   if (n.shape === 'airfoil') {

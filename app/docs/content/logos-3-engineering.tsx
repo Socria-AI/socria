@@ -12,9 +12,11 @@
 import Link from 'next/link';
 import { Article, H2, Callout, Defs, Def, TableWrap } from '../Article';
 import { DemoEngineering } from '../DocsDemo';
+import { DemoScene } from '../DocsScene';
 import { docPage } from '../registry';
 import { ENGINEERING, SCENE_EXAMPLES, type Discipline, type EngineeringExample, type SceneExample } from '@/lib/model/engineering';
 import { readScene } from '@/lib/objects/scene-intent';
+import { planPaths } from '@/lib/objects/scene-plan';
 import { SCENE, SHAPE_WORD, massOf, sizeOf, type SceneState } from '@/lib/objects/scene';
 
 const page = docPage('logos-3-engineering')!;
@@ -33,7 +35,7 @@ const DISCIPLINES: { id: string; d: Discipline; lead: string }[] = [
 const sections = [
   { id: 'how', heading: 'How to read these' },
   ...DISCIPLINES.map((x) => ({ id: x.id, heading: x.d })),
-  { id: 'live3d', heading: 'Geometry in Live 3D' },
+  { id: 'live3d', heading: 'CAD-style designs in Live 3D' },
   { id: 'limits', heading: 'Where it stops' },
 ];
 
@@ -61,11 +63,24 @@ function Example({ e }: { e: EngineeringExample }) {
 const EMPTY: SceneState = { nodes: [], next: 1, unit: 'm' };
 const kg = (v: number) => (v >= 1000 ? `${Number((v / 1000).toPrecision(4))} t` : v >= 1 ? `${Number(v.toPrecision(4))} kg` : `${Number((v * 1000).toPrecision(4))} g`);
 
+/** Parts that are copies of one another — the same shape, size and mass — are one row with a count. */
+function rowsOf(s: SceneState) {
+  const rows: { n: SceneState['nodes'][number]; count: number; key: string }[] = [];
+  for (const n of s.nodes) {
+    const m = massOf(n);
+    const key = `${n.shape}|${sizeOf(n, s.unit)}|${m ? m.kg.toPrecision(6) : ''}`;
+    const last = rows[rows.length - 1];
+    if (last && last.key === key) last.count += 1;
+    else rows.push({ n, count: 1, key });
+  }
+  return rows;
+}
+
 function SceneBlock({ x }: { x: SceneExample }) {
   const r = readScene(x.say, EMPTY);
   const s = r.preview;
   const facts = SCENE.facts(s, { guarded: false }).filter((f) => /^mass |^everything fits/.test(f));
-  const own = s.nodes.flatMap((n) => (SCENE.partFacts(s, n.id) ?? []).filter((f) => /narrowest radius|area ratios|planform area|curve’s length/.test(f)).map((f) => `${n.name}: ${f}`));
+  const own = s.nodes.flatMap((n) => (SCENE.partFacts(s, n.id) ?? []).filter((f) => /narrowest radius|area ratios|planform area|curve’s length|^section, in the part/.test(f)).map((f) => `${n.name}: ${f}`));
   return (
     <section className="d-eng" id={`scene-${x.id}`} aria-labelledby={`scene-${x.id}-h`}>
       <h3 id={`scene-${x.id}-h`}>
@@ -78,6 +93,7 @@ function SceneBlock({ x }: { x: SceneExample }) {
       <p className="d-eng-read">
         Read as: {r.clauses.map((c) => c.understood ?? c.problem).join(' · ')}
       </p>
+      <DemoScene say={x.say} title={x.title} plan={planPaths(s, 640, 300)} />
       <TableWrap>
         <table className="d-eng-parts">
           <thead>
@@ -89,11 +105,14 @@ function SceneBlock({ x }: { x: SceneExample }) {
             </tr>
           </thead>
           <tbody>
-            {s.nodes.map((n) => {
+            {rowsOf(s).map(({ n, count }) => {
               const m = massOf(n);
               return (
                 <tr key={n.id}>
-                  <td>{n.name}</td>
+                  <td>
+                    {n.name}
+                    {count > 1 && <span className="d-eng-x"> and {count - 1} more alike</span>}
+                  </td>
                   <td>{SHAPE_WORD[n.shape]}</td>
                   <td>{sizeOf(n, s.unit)}</td>
                   <td>{m ? `${kg(m.kg)}${m.nominal ? ' (nominal density)' : ''}${m.how === 'numerical' ? ' — numerical' : ''}` : '—'}</td>
@@ -121,8 +140,8 @@ export function Logos3Engineering() {
       <p>
         Logos 3 builds models from what you say — curves, systems that evolve, mechanisms assembled from parts — and, in
         its experimental Live 3D panel, geometry you describe. This page is a field guide for engineers: {ENGINEERING.length}{' '}
-        models across eight disciplines and {SCENE_EXAMPLES.length} pieces of geometry, each with the words that ask for it,
-        what Logos builds, what to look at, and the numbers it computes.
+        models across eight disciplines and {SCENE_EXAMPLES.length} CAD-style designs drawn in 3D, each with the words that
+        ask for it, what Logos builds, what to look at, and the numbers it computes.
       </p>
 
       <H2 id="how">How to read these</H2>
@@ -165,17 +184,24 @@ export function Logos3Engineering() {
         </div>
       ))}
 
-      <H2 id="live3d">Geometry in Live 3D</H2>
+      <H2 id="live3d">CAD-style designs in Live 3D</H2>
       <p>
         Live 3D is an experimental panel in the Logos 3 workspace — <em>+ View → Live 3D</em>. Describe a shape and it is
         drawn as you type; press Enter and it is built. Every part keeps its identity, every size is exact, and parts can
         rest on one another. Give a part a material and it has a mass: density × its volume. It is a{' '}
-        <strong>geometric preview</strong> — nothing in it is loaded, stressed or simulated — and it says so. The
-        descriptions below are read by the same reader the panel uses, so what is listed is what typing them builds.
+        <strong>geometric preview</strong> — nothing in it is loaded, stressed or simulated — and it says so.
       </p>
-      {SCENE_EXAMPLES.map((x) => (
-        <SceneBlock key={x.id} x={x} />
-      ))}
+      <p>
+        Below are {SCENE_EXAMPLES.length} designs, from a flywheel to a truss. Each figure is the design itself, not a
+        picture of it: the words above it are read by the panel’s own reader in your browser, and the scene they build is
+        drawn by the panel’s own 3D view. Click a figure to turn and zoom it, and click a part for its name and size.
+        The parts, masses and section properties listed under each are computed from the same reading.
+      </p>
+      {[...SCENE_EXAMPLES]
+        .sort((a, b) => DISCIPLINES.findIndex((d) => d.d === a.discipline) - DISCIPLINES.findIndex((d) => d.d === b.discipline))
+        .map((x) => (
+          <SceneBlock key={x.id} x={x} />
+        ))}
       <Callout tag="Nominal densities">
         A named material — steel, aluminium, oak — takes a typical density, and the panel marks it nominal. It is a
         reasonable value at room temperature, not a material card: type the density you measured and it replaces it.
