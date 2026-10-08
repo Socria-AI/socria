@@ -1,231 +1,112 @@
-# Scientific modeling in Logos 3
+# Science primitives (lib/science/) — status against the ornithology data atlas
 
-This report covers what was built from the course material (2.26, 12.006,
-Strang's linear algebra, the compendium and the Engineering CAD Atlas), what
-is still unsupported, and what to show.
+The atlas (Socria Logos 3 · Ornithology & Birdwatching Data Atlas, October 2026)
+asks for reusable scientific capabilities rather than bird-specific features,
+real computation, preserved provenance, and observed data kept apart from
+modelled predictions. This is what exists, what is tested, and what is not
+done yet.
 
-## In one paragraph
+**Where things stand.** Sixteen pure modules in `lib/science/`, exercised by
+`test/science-atlas.test.mjs` (121 checks) on seeded synthetic fixtures. Every
+fixture is labelled `simulated` wherever it travels, and the species in it are
+invented codes (TX-A, TX-B…), so no test claims anything about a real bird.
 
-Logos 3 started this work integrating ordinary differential equations with
-RK4 and drawing curves and surfaces. It now also has:
-- **Fields**, on a line or a plane: heat, transport, reaction, and shocks.
-- **Maps** with their bifurcation diagrams, including Feigenbaum's δ computed
-  from each map's own cycles.
-- **Poincaré sections** of flows.
-- **Strang's analysis of any matrix**: the four subspaces, A = CR,
-  eigenvalues and singular values.
-- **Buckingham Π groups** from the units a model carries.
-- **Boundary-value problems** solved by shooting, returning every solution.
-- **A conversational geometry panel**, with exact section properties and
-  masses.
+**Not done yet: the conversation cannot reach them.** These are library
+functions. Logos's model engine does not call them yet, so asking Logos to
+"fit a Poisson model to my checklist" does not use them — that is the next
+step (ORN-B below). Nothing here downloads data: there are no eBird, GBIF,
+Movebank or xeno-canto connectors, and none of those sources were reachable
+from where this was built.
 
-The rules are the same throughout:
-- **Domain-independent.** Nothing branches on what a model is about. A field
-  is a field whether it holds heat or a population, and a map is a map whether
-  it counts rabbits or iterates the logistic equation.
-- **It refuses rather than guesses.** A missing starting value, an unstated
-  boundary, a species called T (which is time) or a step above the stability
-  bound is named, not filled in.
-- **It checks its own work.** Wherever a closed form, a conservation law or a
-  known constant exists, the run is compared with it, and the result is said.
+## The thirty benchmarks
 
-There are 1,339 checks across the suites below, and all 173 test suites pass.
+"Implemented and tested" means the primitive exists and the benchmark's
+behaviour is asserted in `test/science-atlas.test.mjs` on synthetic data with a
+known answer. None of the thirty is yet reachable from a Logos conversation.
 
-## What was built
+| ID | Objective | Status | Where |
+|---|---|---|---|
+| B01 | Resolve taxonomic synonyms without merging distinct taxa | Implemented and tested: versioned resolution; ambiguous names return every candidate and no pick; splits and lumps between versions reported | taxonomy.ts |
+| B02 | Lookalikes with cited identification differences | Implemented and tested: a difference is shown only when both sides cite a source; unsourced traits are set aside | records.ts |
+| B03 | Import checklist CSV with timestamps and coordinate uncertainty | Implemented and tested: RFC 4180 CSV read against a schema; UTC conversion; uncertainty kept | table.ts |
+| B04 | Reject impossible lat/lon | Implemented and tested: rejected with the reason, never clamped; (0, 0) flagged as a likely typo | table.ts, geo.ts |
+| B05 | Zero counts kept apart from missing | Implemented and tested: 0 stays 0; NA, empty and similar become null; an "X" count is not turned into a number | table.ts |
+| B06 | Effort-normalised frequency with an explicit denominator | Implemented and tested: reporting rate over complete lists only, with a Wilson interval; rate per unit effort with exclusions counted | ecology.ts |
+| B07 | Map without exposing obscured locations | Implemented and tested: deterministic grid generalisation with the uncertainty it adds; the export carries only the cell | geo.ts, bundle.ts |
+| B08 | Months compared at matched effort | Implemented and tested: direct standardisation over effort and protocol strata; strata seen in one group are dropped and named | ecology.ts |
+| B09 | Recording metadata, licence preserved | Implemented and tested: licence kept verbatim and read (Creative Commons family); unknown means ask, never free | records.ts |
+| B10 | Spectrogram of a known sine | Implemented and tested: peak within a tenth of a bin; frequency, time and hop resolution stated | signal.ts |
+| B11 | Synthetic sweep, endpoints verified | Implemented and tested: ridge within one bin of the analytic instantaneous frequency, linear and exponential | signal.ts |
+| B12 | Clipped and silent segments flagged | Implemented and tested | signal.ts |
+| B13 | Compare annotations without inventing identity | Implemented and tested: time–frequency IoU matching; human annotations required as the reference; no identity in the output | signal.ts |
+| B14 | Geodesic distance between known points | Implemented and tested: Vincenty reproduces Flinders Peak → Buninyong (54 972.271 m) to the millimetre; non-convergence reported | geo.ts |
+| B15 | Reject negative time intervals | Implemented and tested: no speed across a zero or negative interval; flagged | track.ts |
+| B16 | Flag implausible inferred speeds | Implemented and tested: flagged for review against a caller-stated limit, never deleted | track.ts |
+| B17 | Observed vs interpolated shown differently | Implemented and tested: each resampled point says whether it was observed; nothing is interpolated across a large gap | track.ts |
+| B18 | Stopover in a labelled synthetic track | Implemented and tested: recall ≥ 0.95 and precision ≥ 0.9 against the labels; the thresholds and sampling interval returned with the result | track.ts |
+| B19 | Weather joined by space and time with tolerance | Implemented and tested: nearest in time within both tolerances, or no match with the failing tolerance named | geo.ts |
+| B20 | Poisson regression on seeded counts | Implemented and tested: IRLS with a log-effort offset; coefficients within their 95% intervals | glm.ts |
+| B21 | Overdispersion, with a negative binomial comparison | Implemented and tested: Pearson dispersion, excess zeros, NB2 with θ by maximum likelihood, the boundary LR test | glm.ts |
+| B22 | Occupancy from repeated synthetic surveys | Implemented and tested: ψ and p by maximum likelihood; interval coverage checked across 12 seeded worlds; one visit per site is refused as unidentifiable | occupancy.ts |
+| B23 | Detection bias in raw richness | Implemented and tested: the same community looks richer with more visits; rarefaction removes the difference; Chao2 | ecology.ts |
+| B24 | Spatial model cross-validated with blocked folds | Implemented and tested: random folds flatter a nearest-neighbour model by ≥ 1.3× against blocked folds | crossval.ts |
+| B25 | Wing loading from mass and area | Implemented and tested | flight.ts |
+| B26 | Aspect ratio with a dimensional check | Implemented and tested: units go through the dimensional analyser; an "area" in metres is refused | flight.ts |
+| B27 | Idealised lift with explicit coefficient assumptions | Implemented and tested: an assumed coefficient makes the result hypothetical and says so; a measured one cites its source | flight.ts |
+| B28 | Vary wing geometry and recompute | Implemented and tested | flight.ts |
+| B29 | Sensitivity of predicted timing to temperature | Implemented and tested: least-squares slope with a 95% interval, labelled an association and not a causal effect; elasticities; one-at-a-time sweeps | sensitivity.ts |
+| B30 | Export provenance, assumptions, uncertainty and results | Implemented and tested: deterministic bundle with schemas, provenance, licences, caveats, a "simulated" notice and a sha256 manifest | bundle.ts, provenance.ts |
 
-### The numerical core — `lib/numeric/`
+## Limitations
 
-| module | what it does | held to |
-|---|---|---|
-| `linalg.ts` | exact rational RREF, A = CR, the four subspaces, LU, Householder QR, least squares, symmetric and general eigenproblems with eigenvectors and diagonalizability, SVD, rank, pseudoinverse, condition number, projectors | 596 checks, including Strang's worked examples |
-| `ode.ts` | Dormand–Prince 5(4) with error control, dense output and event location | analytic solutions and event times (17) |
-| `roots.ts` | Brent; Newton from many starts | (14) |
-| `dynamics.ts` | fixed points and their classification (flows and maps); continuation; Lyapunov spectra (flows and maps) with Kaplan–Yorke dimension; Poincaré sections; orbits, cobwebs, bifurcation diagrams; periodic points; Feigenbaum's constants from superstable cycles | Lorenz, Hénon, logistic, Feigenbaum (46) |
-| `fields.ts` | 1D heat by Crank–Nicolson; `transport1D`, with up to four species of diffusion, Rusanov transport and Strang-split reaction, ends held or fluxed or on a ring; `field2D`, with up to four species on a plane, periodic, insulated or held edges, and refusal above the stability bound; exact Fourier series for checking | series, conservation, Rankine–Hugoniot, Fisher speed (46) |
-| `dimensional.ts` | units as written into the seven base dimensions; Buckingham Π from the exact null space, in Buckingham's own form | pendulum, drag, Nusselt, Fourier (30, with `bvp`) |
-| `bvp.ts` | two-point boundary-value problems by shooting, returning every solution in the range scanned | sin x, x³, Bratu's two solutions and its fold |
+**Methods**
 
-### In the model engine — what a Logos proposal can now declare
+- Occupancy is single-season with logit-linear covariates. Multi-season,
+  false positives and Royle–Nichols abundance are not implemented.
+- Distance sampling, capture–recapture, GAMs, hierarchical and Bayesian
+  spatiotemporal models are not implemented.
+- The GLM covers Poisson and NB2 with a log link only. There is no zero
+  inflation, no random effects, and no robust or sandwich errors.
+- Standard errors are Wald, and intervals use the normal quantile. For small
+  samples these are optimistic.
+- The STFT is plain: Hann, Hamming or rectangular windows. There is no
+  mel scale and no filters, and no audio file decoding (WAV/FLAC must already
+  be samples).
+- Tracks interpolate linearly in latitude and longitude. That is wrong across
+  the antimeridian and coarse over long gaps, which is why large gaps are
+  never interpolated.
+- There is no state-space smoothing and no hidden Markov movement states.
 
-| declaration | what the engine does with it | views |
-|---|---|---|
-| `system` (existing) | fixed points with eigenvalues, nullclines, Lyapunov exponents; the Poincaré section when three or more states keep crossing a plane | Phase portrait, **Poincaré section**, How it behaves |
-| **`pde`** | a quantity at every point of a line or a plane, stepped by diffusion, transport and reaction; conservation and exact-series self-checks | **Over space and time** (heat map), **The field**, **Surface** |
-| **`map`** | x at the next step from x now: period, Lyapunov exponents, fixed points with multipliers, Feigenbaum's δ for one-humped maps | **Iterates**, **Cobweb**, **Bifurcation diagram** |
-| parameters with units | Buckingham Π groups, listed in the Inspector | — |
+**Data and sources**
 
-The reply model is taught both new blocks, with worked examples.
+- Taxonomy matching folds case, spacing and diacritics, and nothing fuzzier.
+  A misspelling resolves only through a written synonym.
+- The licence reader knows the Creative Commons family by name. Anything
+  else is unknown.
+- No connectors and no real datasets. Nothing has been run on licensed
+  real-world data. The atlas asks for that too, and it needs data obtained
+  under the sources' terms.
 
-The renderer gained:
-- heat maps, with a viridis or diverging colour scale;
-- planes drawn to scale;
-- point clouds over 4,000 points drawn as one image (a bifurcation diagram was
-  38,400 SVG circles);
-- playback at the model's own rate, so a two-hour run replays in seconds.
+**Interpretation**
 
-Design notes: [MODEL-FIELDS.md](MODEL-FIELDS.md),
-[MODEL-MAPS.md](MODEL-MAPS.md), [MODEL-VIEWS.md](MODEL-VIEWS.md).
+- Flight formulas are textbook relationships, not a model of any bird.
+  Coefficients must be measured, or the result is hypothetical.
+- Gliding is not flapping.
 
-### Objects of thought
+## Next (ORN-B): reach them from Logos
 
-A matrix object gains **What it is**, computed from its entries:
-- rank, and the four subspaces with exact bases;
-- A = CR;
-- the exact determinant, eigenvalues with eigenvectors, singular values and
-  the condition number;
-- a 2 × 2's action on the plane, in words (rotation, reflection, shear,
-  projection, stretch);
-- for an augmented matrix, what Ax = b has.
-
-All of it is hidden while a learner works the elimination by hand.
-
-### Live 3D, from the CAD Atlas
-
-The panel already had: describe a scene, preview it, build it, undo it by
-description. The description is now typed in the chat, which is the only text
-box in Logos: the panel previews it as it is typed, and sending it builds it.
-This work added:
-- NACA four-digit airfoils (Atlas benchmark 29);
-- materials and nominal densities, with mass and centre of mass;
-- exact section properties of any extruded outline (area, centroid, second
-  moments);
-- a revolved contour's throat;
-- copies around a circle, rows centred on what they rest on, and gaps.
-
-The panel calls itself a *geometric preview*: nothing in it is loaded or
-stressed.
-
-### Documentation, live
-
-- **[Engineering in Logos 3](/docs/logos-3-engineering).** 30 models across
-  eight disciplines, each built live from its proposal with its numbers
-  computed: cycles, mechanisms, circuits, beams, a heated rod, a shock, a
-  reaction front and Gray–Scott patterns. It also has 15 CAD-style designs
-  drawn in 3D, from a ball bearing to a truss.
-- **[Dynamics and chaos in Logos 3](/docs/logos-3-dynamics).** The road to
-  chaos, universality, the Hénon attractor, the Lorenz butterfly with its
-  section, and predator–prey cycles.
-
-Every "Computed" line on both pages is also asserted in the tests. All 35 live
-models were checked in Chromium.
-
-## What remains unsupported
-
-**From the courses**
-- **2.26, fluids.**
-  - No Navier–Stokes and no CFD: no flow around a body, no boundary layers.
-  - Transport is on a line only. The plane is diffusion and reaction.
-  - No wave equation (second order in time).
-  - Compressible flow appears as closed forms (nozzle area ratio), not as a
-    solver.
-- **12.006, nonlinear dynamics.**
-  - Poincaré sections use one plane: the third state at its mean.
-  - No stroboscopic section for forced flows.
-  - No two-parameter bifurcation diagrams.
-  - Continuation of unstable branches is in the numerical core but not drawn.
-  - No coupled map lattices.
-- **Strang.**
-  - Matrix objects hold exact rationals, so a rotation by 30° cannot be held
-    exactly (one by atan(4/3) can).
-  - No 3D transformation view.
-  - Jordan forms are reported only as "not diagonalizable".
-
-**In the engine**
-- **Boundary-value problems** are solved in the numerical core but are not yet
-  a declaration a model can carry or a view the person can open.
-- **Dimensional analysis** lists Π groups. It does not check that a model's
-  equations are dimensionally consistent, and expressions do not convert
-  units.
-- **Fields run on the page's own thread.** A 64 × 64 Gray–Scott run is about
-  a second each time a control moves; there is no worker yet. A plane is
-  stepped explicitly, so a stiff reaction needs a small step, and the engine
-  refuses a step above the diffusion bound rather than going implicit.
-- **Not built:** stochastic models (SDEs, Monte Carlo ensembles), constrained
-  optimisation, and statistics beyond least squares. They remain declared,
-  not drawn.
-
-**From the CAD Atlas**
-- No sketches with constraints.
-- No B-rep, booleans, fillets, chamfers, lofts or shells.
-- No assemblies, joints or linkages.
-- No finite-element stress or CFD.
-- No GD&T and no materials database (densities are nominal and said to be).
-- No involute gear teeth.
-- No STEP or CAD import or export.
-
-The open kernels that would carry these, by licence:
-- Open CASCADE: LGPL-2.1, with an exception.
-- Manifold: Apache-2.0.
-- Gmsh, CalculiX and OpenFOAM: GPL, which matters for distribution.
-
-## The strongest demonstrations and trailers
-
-Ranked by how much each shows in a few seconds and how hard it is to fake.
-Each is live on the docs pages today.
-
-1. **The road to chaos** (Dynamics, *The road to chaos* + *The same cascade in
-   another map*).
-   - **Shot:** type "a population that grows by r but is limited by
-     crowding — what happens as r rises?" The bifurcation diagram fills in:
-     one branch, two, four, then chaos with its period-3 window. Then the
-     line: "Feigenbaum's δ, computed from this map's own cycles: 4.6692."
-     Cut to the sine map: different curve, same δ.
-   - **Why:** the most recognisable picture in nonlinear science, and a
-     constant of nature derived live rather than quoted.
-2. **Patterns from a reaction** (Engineering, *Patterns from a reaction*).
-   - **Shot:** a purple square seed. Press play, and Gray–Scott grows a
-     self-replicating pattern that fills the plane. Nudge the feed rate and
-     the pattern changes kind.
-   - **Why:** the most visually arresting run Logos makes, and it is a PDE
-     solve, not an animation.
-3. **The Lorenz butterfly, cut open** (Dynamics, *The Lorenz butterfly, cut*).
-   - **Shot:** the 3D path, then the Poincaré section collapsing it to thin
-     curves. The Inspector lists the wings' centres at (±8.485, ±8.485, 27)
-     with eigenvalues 0.094 ± 10.2i.
-4. **Heat along a rod, checked against the exact answer** (Engineering,
-   *Heat along a rod*: the Atlas's transient-rod benchmark).
-   - **Shot:** the heat map fanning in from the hot end. Then the caption,
-     stated by the engine: "within 0.0071% of the exact series."
-   - **Why:** a trust shot, the one that says the pictures are computed.
-5. **A shock forming** (Engineering, *A shock forming*).
-   - **Shot:** a smooth wave steepening into a jump in Burgers' equation,
-     with ∫u kept to 2 × 10⁻¹⁴ on the ring.
-6. **CAD from a sentence** (Engineering, *CAD-style designs*).
-   - **Shot:** "a ring of 9 steel balls around the outer race" becomes a ball
-     bearing in 3D. "A steel I-beam …" comes with its exact second moment,
-     I = 1.367 × 10⁻⁴ m⁴.
-   - **Caveat:** keep the *geometric preview* label in frame.
-7. **Strang in one keystroke.**
-   - **Shot:** type a matrix, open *What it is*, and the four subspaces
-     appear with exact bases.
-   - **Why:** best aimed at students.
-8. **A reaction front at 2√(rD)**, and **predator–prey cycles**. Good
-   supporting shots, each with its theory number on screen.
-
-**Not yet trailer-ready:** Bratu's two solutions (shooting is in the core but
-not in the UI), and anything involving flow around a body.
-
-**A 45-second cut.** Logistic cascade with δ (10 s) → Gray–Scott growing
-(10 s) → Lorenz and its section (8 s) → rod vs exact series, the trust beat
-(7 s) → bearing from a sentence (6 s) → close on "every number computed,
-every one checked" (4 s).
-
-## Verification at a glance
-
-| suite | checks |
-|---|---|
-| numeric-linalg | 596 |
-| logos3-scene | 231 |
-| model-engineering | 177 |
-| numeric-dynamics, numeric-fields | 46 each |
-| model-pde | 43 |
-| model-map, model-phase | 40 each |
-| objects-matrix-analysis | 35 |
-| numeric-dimensional-bvp | 30 |
-| model-dynamics-examples | 24 |
-| numeric-ode | 17 |
-| numeric-roots | 14 |
-
-All 173 test suites pass. The docs pages were checked in Chromium with WebGL:
-every live model draws, with no console errors and no sideways overflow at
-phone width.
+1. **Data blocks.** A data block carries its table, schema and provenance:
+   `provenance` on the model's data, and the observed / modelled / simulated
+   labels shown beside values.
+2. **The estimation solver.** It gains Poisson and NB fits with an offset, and
+   occupancy, through the same proposal → build → solve path as every other
+   model.
+3. **Views.**
+   - A track view: observed fixes and interpolated segments drawn differently.
+   - A spectrogram view.
+   - An occurrence map that draws only generalised coordinates.
+4. **Formula quantities.** Wing loading and aspect ratio as derived readouts
+   with units checked. This joins the formula-quantity work in the Logos 3 fix
+   plan.
+5. **Proposal rules.** These describe what the engine can now compute, so the
+   language model proposes them instead of prose.
