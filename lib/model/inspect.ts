@@ -30,6 +30,7 @@
 // PURE.
 
 import { estimate } from './estimate';
+import { behaviourOf } from './phase';
 import { expressionOf } from './derive';
 import { equationLines, solutionFor } from './equations';
 import { restsOn, affectedBy } from './deps';
@@ -52,7 +53,7 @@ export interface Fact {
 }
 
 export interface Section {
-  id: 'what' | 'state' | 'components' | 'computation' | 'provenance' | 'dependencies' | 'views' | 'gaps';
+  id: 'what' | 'state' | 'components' | 'computation' | 'behaviour' | 'provenance' | 'dependencies' | 'views' | 'gaps';
   label: string;
   /** one line for a collapsed view — progressive disclosure starts here */
   summary: string;
@@ -422,6 +423,38 @@ export function inspectObject(model: Model, id: string): Inspection | null {
       });
     }
     sections.push(section('computation', 'What can be done with it', `${comp.length} operation${comp.length === 1 ? '' : 's'}`, comp));
+
+    // HOW IT BEHAVES — where a system rests and how nearby starts fare, computed (lib/model/phase.ts)
+    if (o.system) {
+      const b = behaviourOf(model, o);
+      if (b) {
+        const facts: Fact[] = [];
+        if (!b.autonomous) facts.push({ label: 'Fixed points', value: b.how, of: o.id });
+        for (const fp of b.fixed) {
+          facts.push({
+            label: fp.type[0].toUpperCase() + fp.type.slice(1),
+            value: `at (${fp.at.map((v) => sig(v)).join(', ')}) — eigenvalues ${fp.eig}; ${fp.stable === true ? 'nearby states settle onto it' : fp.stable === false ? 'nearby states leave it' : 'the linearization cannot decide'}`,
+            of: o.id,
+            fidelity: 'numerically-computed',
+          });
+        }
+        if (b.autonomous && !b.fixed.length) facts.push({ label: 'Fixed points', value: `none found — ${b.how}`, of: o.id, fidelity: 'numerically-computed' });
+        if (b.lyapunov) {
+          const l1 = b.lyapunov.exponents[0];
+          facts.push({
+            label: 'Lyapunov exponents',
+            value: `${b.lyapunov.exponents.map((v) => sig(v)).join(', ')} per unit time — a finite-time estimate. ${
+              l1 > 0.01 ? 'The largest is positive: nearby starts separate exponentially, so the run is sensitive to where it begins.' : 'None is clearly positive over this time: nearby starts do not separate exponentially.'
+            }`,
+            of: o.id,
+            fidelity: 'numerically-computed',
+          });
+          if (b.lyapunov.kaplanYorke !== undefined && l1 > 0.01) facts.push({ label: 'Kaplan–Yorke dimension', value: `${sig(b.lyapunov.kaplanYorke)} — from the same estimate`, of: o.id, fidelity: 'numerically-computed' });
+          facts.push({ label: 'How', value: `${b.how}; ${b.lyapunov.method}`, of: o.id });
+        }
+        sections.push(section('behaviour', 'How it behaves', b.fixed.length ? `${b.fixed.length} fixed point${b.fixed.length === 1 ? '' : 's'}` : b.autonomous ? 'no fixed point found' : 'driven by time', facts));
+      }
+    }
 
     // WHAT IT RESTS ON, AND WHAT RESTS ON IT.
     const rests = restsOn(model, o.id);

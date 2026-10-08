@@ -164,7 +164,7 @@ export const RENDERED = new Set<ViewFamily>([
   // frames — the compiler's own geometry, narrowed to the object
   'surface', 'curve', 'scatter', 'field', 'trajectory', 'timeline', 'mechanism', 'network',
   // frames — computed here from what already ran
-  'contour', 'slice', 'residual', 'interval',
+  'contour', 'slice', 'residual', 'interval', 'phase',
   // read
   'equation', 'table', 'matrix', 'structure', 'derivative', 'sensitivity', 'diagnostic', 'text',
 ]);

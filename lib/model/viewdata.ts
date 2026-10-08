@@ -34,6 +34,7 @@ import { symbolTable } from './symbols';
 import type { Primitive } from './primitives';
 import type { Model, ModelObject } from './schema';
 import { RENDERED, viewsFor, type ViewSpec } from './views';
+import { portraitOf } from './phase';
 import { unitOf, unitOfObject, withUnit } from './units';
 
 /** What a view that is READ rather than looked at contains. */
@@ -91,6 +92,7 @@ export function frameFor(model: Model, id: string): VisualizationSpec | null {
   const o = (v.of ? model.objects.find((x) => x.id === v.of) : null) ?? null;
 
   if (v.family === 'residual' && o) return residualFrame(model, o);
+  if (v.family === 'phase' && o) return phaseFrame(model, o);
   if (v.family === 'interval' && o) return intervalFrame(model, o);
 
   // ── A SLOPE OPENED ON ITS OWN IS ITS OWN FIGURE ──────────────────
@@ -450,6 +452,24 @@ function residualFrame(model: Model, o: ModelObject): VisualizationSpec | null {
     note: `${residuals.length} residuals from the fit that ran (${got.fit.method}, σ = ${Number(got.fit.sigma.toPrecision(4))}) — what the relationship does not account for at each observation`,
     fidelity: 'data-derived',
   });
+}
+
+/**
+ * THE STATES AGAINST EACH OTHER (lib/model/phase.ts): the run, and — where the
+ * plane is the whole state — the field, the nullclines, other paths and the
+ * fixed points, each classified. A projection says it is one.
+ */
+function phaseFrame(model: Model, o: ModelObject): VisualizationSpec | null {
+  const p = portraitOf(model, o);
+  if (!p) return null;
+  const spec = reframe(model, o, {
+    primitives: p.primitives,
+    box: { x: p.box.x, y: p.box.y, z: [0, 1] },
+    axisNames: [withUnit(p.names[0], unitOf(model, p.names[0])), withUnit(p.names[1], unitOf(model, p.names[1])), ''],
+    note: p.note,
+    fidelity: 'numerically-computed',
+  });
+  return p.whole ? spec : { ...spec, partial: `a projection onto ${p.names[0]} and ${p.names[1]}` };
 }
 
 /**

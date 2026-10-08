@@ -112,6 +112,40 @@ conceptual one built in the test because the library has none:
 - change → invalidate → recompute → the same views remain available, and the
   inspector reports the new value
 
+## The phase portrait, drawn (lib/model/phase.ts)
+
+The `phase` family was declared and not drawn. It is now a frame, computed:
+
+- **Always:** the run the other views draw, plotted as one state against
+  another.
+- **When the plane is the whole state:** a two-state system whose rates do
+  not change with time at their current values. That is decided by
+  evaluating the rates, so a drive written f₀·sin(ωt) with f₀ = 0 counts as
+  autonomous. The frame then adds:
+  - the field, with the right-hand sides evaluated on a 17 × 17 grid;
+  - both nullclines, traced by marching squares;
+  - paths from other starting states, integrated by Dormand–Prince;
+  - the fixed points, found by Newton from a grid of starts and classified
+    by their Jacobian's eigenvalues.
+- **Otherwise:** the frame is marked `partial`, a projection onto two of the
+  states. No field is claimed.
+
+The Inspector gains **How it behaves** for any system:
+- its fixed points, each with its eigenvalues and what nearby states do;
+- for an autonomous system of up to six states, Lyapunov exponents by
+  Benettin's method, said to be a finite-time estimate, with the
+  Kaplan–Yorke dimension when the largest is positive.
+
+Checked against closed forms (`test/model-phase.test.mjs`):
+- **Damped oscillator:** eigenvalues −c/2m ± i√(k/m − (c/2m)²).
+- **Van der Pol:** μ/2 ± i√(1 − μ²/4).
+- **Lotka–Volterra:** a saddle at the origin, and a centre at (d/c, a/b)
+  with frequency √(ad).
+- **Lorenz:**
+  - fixed points C± at (±√(β(r−1)), ±√(β(r−1)), r−1);
+  - exponents that sum to −(σ + 1 + β);
+  - a Kaplan–Yorke dimension of 2.06.
+
 ## Architectural debt
 
 1. **Most families are declared, not drawn.** `table`, `matrix`, `structure`,

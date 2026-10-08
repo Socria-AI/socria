@@ -96,6 +96,7 @@ const MODULES = [
   'lib/model/derive.ts',
   'lib/model/views.ts',
   'lib/model/viewdata.ts',
+  'lib/model/phase.ts',
   'lib/model/inspect.ts',
   'lib/model/algebra.ts',
   'lib/model/equations.ts',
