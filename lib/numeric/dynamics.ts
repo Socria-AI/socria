@@ -328,7 +328,7 @@ export function lyapunovFlow(sys: Flow, y0: readonly number[], opts: { transient
       y = r2.y.at(-1) ?? y;
     }
   }
-  let V = Array.from({ length: n }, (_, i) => Array.from({ length: k }, (_, j) => (i === j ? 1 : 0)));
+  let V: number[][] = Array.from({ length: n }, (_, i) => Array.from({ length: k }, (_, j) => (i === j ? 1 : 0)));
   const sums = new Array(k).fill(0);
   const history: { t: number; exponents: number[] }[] = [];
   let divSum = 0;
@@ -389,7 +389,7 @@ export function lyapunovMap(sys: DiscreteMap, x0: readonly number[], opts: { tra
   const k = Math.min(d, opts.k ?? d);
   let x = x0.slice();
   for (let i = 0; i < (opts.transient ?? 1000); i++) x = sys.g(x);
-  let V = Array.from({ length: d }, (_, i) => Array.from({ length: k }, (_, j) => (i === j ? 1 : 0)));
+  let V: number[][] = Array.from({ length: d }, (_, i) => Array.from({ length: k }, (_, j) => (i === j ? 1 : 0)));
   const sums = new Array(k).fill(0);
   const N = opts.n ?? 100000;
   const history: { t: number; exponents: number[] }[] = [];
@@ -573,7 +573,7 @@ export function periodicPoints(sys: DiscreteMap, k: number, box: Box): Cycle[] {
     if (cycles.some((c) => c.points.some((q) => dist(q, x) < 1e-7 * Math.max(1, norm(x))))) continue;
     const pts: number[][] = [x];
     for (let i = 1; i < k; i++) pts.push(sys.g(pts[i - 1]));
-    let M = Array.from({ length: sys.dim }, (_, i) => Array.from({ length: sys.dim }, (_, j) => (i === j ? 1 : 0)));
+    let M: number[][] = Array.from({ length: sys.dim }, (_, i) => Array.from({ length: sys.dim }, (_, j) => (i === j ? 1 : 0)));
     for (const p of pts) {
       const J = mapJ(sys, p);
       M = J.map((row) => M[0].map((_, j) => row.reduce((s, v, r) => s + v * M[r][j], 0)));
