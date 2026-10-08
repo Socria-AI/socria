@@ -110,3 +110,10 @@ export const showCode = (c: string) => (c.length === CODE_LEN ? `${c.slice(0, 4)
 export function cleanToken(v: unknown): string | null {
   return typeof v === 'string' && /^[A-Za-z0-9_-]{32,64}$/.test(v) ? v : null;
 }
+
+/** Where joining something lands: a Project's home, a Logos session, a shared chat. */
+export function landing(j: { type: ResourceType; id: string; kind: 'chat' | 'logos' | 'project' }): string {
+  if (j.type === 'project') return `/chat?p=${encodeURIComponent(j.id)}`;
+  if (j.kind === 'logos') return `/chat?model=logos-3&s=${encodeURIComponent(j.id)}&shared=1`;
+  return `/chat?shared=${encodeURIComponent(j.id)}`;
+}

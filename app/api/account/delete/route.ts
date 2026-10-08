@@ -189,7 +189,7 @@ export async function DELETE(req: NextRequest) {
   // theirs. Fails closed like the loop above.
   try {
     await purgeSharing(userId);
-    deleted.push('shares', 'share_members', 'share_comments', 'share_activity');
+    deleted.push('shares', 'share_members', 'share_comments', 'share_activity', 'share_presence');
   } catch (e) {
     console.error('account delete: sharing purge failed', e);
     return NextResponse.json(

@@ -22,6 +22,7 @@ const PK = {
   reasoning_links: ['user_id', 'id'],
   core4_turns: ['user_id', 'conversation_id', 'turn'],
   capability_evidence: ['user_id', 'id'],
+  share_presence: ['resource_type', 'resource_id', 'user_id'],
 };
 
 export const db = {
@@ -81,6 +82,7 @@ class Query {
   eq(c, v) { this.filters.push((r) => r[c] === v); this._cols = [...(this._cols ?? []), c]; return this; }
   in(c, vs) { this.filters.push((r) => vs.includes(r[c])); this._cols = [...(this._cols ?? []), c]; return this; }
   lt(c, v) { this.filters.push((r) => r[c] < v); this._cols = [...(this._cols ?? []), c]; return this; }
+  is(c, v) { this.filters.push((r) => (v === null ? r[c] === null || r[c] === undefined : r[c] === v)); this._cols = [...(this._cols ?? []), c]; return this; }
   not(c, op, v) {
     if (op === 'is' && v === null) this.filters.push((r) => r[c] !== null && r[c] !== undefined);
     this._cols = [...(this._cols ?? []), c];

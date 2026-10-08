@@ -43,7 +43,7 @@ console.log('=== the route: Logos 3, an account, never in a room ===');
   const route = read('app/api/logos/chat/route.ts');
   ok('the same recall Core uses, as the logos surface', /recall\(userId!, [\s\S]{0,260}surface: 'logos'/.test(route));
   ok('  and the same remember', /remember\(userId!, logosMemoryText\(/.test(route) && /surface: 'logos',\s*conversationId: mindConversation/.test(route));
-  ok('only when asked, for an account, on the main thread, alone', /const mindOn = !!userId && body\?\.mind === true && !focusLabel && !body\?\.collab && !twoPeople;/.test(route));
+  ok('only when asked, for an account, on the main thread, alone — and never in a shared conversation', /const mindOn = !!userId && body\?\.mind === true && !focusLabel && !body\?\.collab && !twoPeople && !sharedCtx\.shared;/.test(route));
   ok('off the record writes nothing', /mindOn && mindPolicy !== 'none' && reply\.trim\(\)/.test(route));
   ok('a sensitive conversation is written private', /mindPolicy === 'conversation_only' \? \{ private: true \}/.test(route));
   ok('the policy is folded over everything they said here', /logosPersistPolicy\(clean\.filter\(\(m: \{ role: string \}\) => m\.role === 'user'\)/.test(route));

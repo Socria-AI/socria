@@ -10,6 +10,7 @@ import { auth } from '@clerk/nextjs/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { sanitizeMemory, EMPTY_MEMORY } from '@/lib/socria-prompt';
 import { EMPTY_MAP, sanitizeMap, sanitizeByRef } from '@/lib/logos';
+import { isShared } from '@/lib/share/server';
 import { sanitizeAttachments } from '@/lib/logos-attachments';
 import { MAX_FILE_TEXT } from '@/lib/file-kinds';
 import { sanitizeContexts } from '@/lib/logos-sources';
@@ -111,6 +112,21 @@ interface Sidecar {
  * Project id that is not theirs resolves to nothing everywhere it is read —
  * every Project lookup is scoped to the owner.
  */
+/**
+ * Two versions of one conversation's turns, joined without losing either:
+ * everything stored, then whatever the incoming copy adds after the point the
+ * two agree to. Turns are compared by role and text — the only identity a
+ * turn has.
+ */
+function mergeTurns(stored: Msg[], incoming: Msg[]): Msg[] {
+  const same = (a: Msg, b: Msg) => a.role === b.role && a.content === b.content;
+  let k = 0;
+  while (k < stored.length && k < incoming.length && same(stored[k], incoming[k])) k++;
+  if (k === stored.length) return incoming;
+  const extra = incoming.slice(k).filter((m) => !stored.some((s) => same(s, m)));
+  return [...stored, ...extra].slice(-MAX_MESSAGES_PER_CONVO);
+}
+
 function sanitizeProjectId(raw: unknown): string | null {
   return typeof raw === 'string' && /^[A-Za-z0-9_-]{1,80}$/.test(raw) ? raw : null;
 }
@@ -467,6 +483,24 @@ export async function PUT(req: NextRequest) {
     // is scoped to (id, user_id) so it can only ever touch your own row, and
     // if it matches nothing the insert either creates the row or fails on the
     // primary key because the id belongs to somebody else.
+    // A SHARED conversation is written by more than this browser: a
+    // collaborator's turns arrive through /api/shared/conversation. A whole-
+    // array save from here must not erase them, so the stored turns this
+    // client has not seen are kept, and this client's new ones follow them.
+    // Only when shared — an unshared conversation is saved exactly as before.
+    try {
+      if (await isShared('conversation', c.id)) {
+        const { data: stored } = await supabaseAdmin()
+          .from('conversations').select('messages').eq('id', c.id).eq('user_id', userId).maybeSingle();
+        const before = Array.isArray((stored as { messages?: unknown } | null)?.messages)
+          ? ((stored as { messages: Msg[] }).messages)
+          : [];
+        base.messages = mergeTurns(before, base.messages);
+      }
+    } catch {
+      /* sharing unreadable: save as before */
+    }
+
     const projectId = sanitizeProjectId(c.projectId);
     // Where the project id goes when its column is missing along with the
     // older ones: into the sidecar, like them, so it is not dropped.

@@ -198,7 +198,7 @@ function Web({ atlas, anchor, concepts, sel, onPick }: { atlas: Atlas; anchor: s
             transform={`translate(${p.x},${p.y})`} tabIndex={0} role="button" aria-label={`${n.type}: ${n.label}`}
             onClick={() => onPick(n.id)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onPick(n.id); } }}
             onPointerEnter={() => setHov(n.id)} onPointerLeave={() => setHov(null)}>
-            {n.id === sel && <circle className="ring" r={r + 5} />}
+            {n.id === sel && <circle className="sel-ring" r={r + 5} />}
             {n.kind === 'chat' || n.kind === 'project'
               ? <rect className="dot" x={-r} y={-r} width={r * 2} height={r * 2} rx={n.kind === 'project' ? 3 : r * 0.45} />
               : <circle className="dot" r={r} />}

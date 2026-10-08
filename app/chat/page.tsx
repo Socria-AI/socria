@@ -69,6 +69,9 @@ import { pickHint } from '@/lib/hints';
 import { AccountSheet } from '@/components/account/AccountSheet';
 import { TOUR_KEY, shouldRunTour } from '@/lib/tour';
 import { ProjectHome } from '@/components/projects/ProjectHome';
+import { JoinWithCode, ShareDialog } from '@/components/share/ShareDialog';
+import { SharedThread } from '@/components/share/SharedThread';
+import type { ResourceType } from '@/lib/share/roles';
 import { isSource } from '@/lib/checkout-attribution';
 import { track } from '@/lib/analytics';
 import { hasJourneyContent as journeyHasContent } from '@/lib/socria-prompt';
@@ -326,6 +329,12 @@ export default function ChatPage() {
    * reload and can be linked to.
    */
   const [homeProject, setHomeProject] = useState<string | null>(null);
+  /** a shared Core conversation open together (components/share/SharedThread), ?shared= */
+  const [sharedOpen, setSharedOpen] = useState<string | null>(null);
+  /** what is shared with this person — Projects and conversations (/api/shared) */
+  const [sharedItems, setSharedItems] = useState<{ type: ResourceType; id: string; kind: 'chat' | 'logos' | 'project'; title: string; role: string; owner: string }[]>([]);
+  /** the Share sheet, open for one thing */
+  const [shareFor, setShareFor] = useState<{ type: ResourceType; id: string; title: string } | null>(null);
   /** The person's Projects — the folders in the rail. Signed-in only. */
   const [projects, setProjects] = useState<RailProject[]>([]);
   /** true once the list has actually been fetched — Logos files nothing against a list that has not arrived */
@@ -1643,6 +1652,7 @@ export default function ChatPage() {
     // Project must not quietly file it under that Project.
     setProjectEntry(null);
     setHomeProject(null);
+    setSharedOpen(null);
     const id = uid();
     const fresh: Conversation = {
       id,
@@ -2060,6 +2070,7 @@ export default function ChatPage() {
 
   /** Open a Project's home, and its folder with it, so its chats are in view too. */
   function openProjectHome(id: string) {
+    setSharedOpen(null);
     setHomeProject(id);
     setOpenFolders((o) => (o.includes(id) ? o : [...o, id]));
     setFindOpen(false);
@@ -2081,15 +2092,47 @@ export default function ChatPage() {
     } catch {}
   }, [homeProject]);
 
+  // ?shared= follows the shared thread the same way.
+  const sharedWas = useRef<string | null>(null);
+  useEffect(() => {
+    try {
+      const u = new URL(window.location.href);
+      if (sharedOpen) u.searchParams.set('shared', sharedOpen);
+      else if (sharedWas.current) u.searchParams.delete('shared');
+      sharedWas.current = sharedOpen;
+      if (u.href !== window.location.href) window.history.replaceState({}, '', u.pathname + u.search);
+    } catch {}
+  }, [sharedOpen]);
+
+  // What others have shared with them — read when they arrive and whenever
+  // the Share sheet closes (they may just have left something).
+  const loadShared = useCallback(async () => {
+    if (!isSignedIn) return;
+    try {
+      const res = await fetch('/api/shared', { cache: 'no-store' });
+      const j = await res.json().catch(() => null);
+      if (res.ok && Array.isArray(j?.items)) setSharedItems(j.items);
+    } catch {}
+  }, [isSignedIn]);
+  useEffect(() => {
+    void loadShared();
+  }, [loadShared]);
+
   /** Into a conversation from Project Home: Core here, Logos on its own surface. */
   function openFromHome(id: string, kind: 'chat' | 'logos') {
+    // Not one of theirs: it is a shared Project's conversation, opened together.
+    const mine = kind === 'logos' ? logosSessions.some((x) => x.id === id) : conversations.some((c) => c.id === id);
     if (kind === 'logos') {
       chooseModel('logos');
-      window.location.assign(`/chat?s=${encodeURIComponent(id)}`);
+      window.location.assign(mine ? `/chat?s=${encodeURIComponent(id)}` : `/chat?model=logos-3&s=${encodeURIComponent(id)}&shared=1`);
       return;
     }
     setHomeProject(null);
     setProjectEntry(null);
+    if (!mine) {
+      setSharedOpen(id);
+      return;
+    }
     setActiveId(id);
   }
 
@@ -2142,6 +2185,7 @@ export default function ChatPage() {
    */
   function newChatIn(p: RailProject) {
     setHomeProject(null);
+    setSharedOpen(null);
     setProjectEntry({ id: p.id, name: p.name });
     setActiveId(null);
     setModel('core-4');
@@ -2209,6 +2253,8 @@ export default function ChatPage() {
     const want = params.get('model');
     const homeAt = params.get('p');
     if (homeAt && /^[A-Za-z0-9_-]{1,80}$/.test(homeAt) && !isLogosSurface(want)) setHomeProject(homeAt);
+    const sharedAt = params.get('shared');
+    if (sharedAt && /^[A-Za-z0-9_-]{1,120}$/.test(sharedAt) && !isLogosSurface(want)) setSharedOpen(sharedAt);
 
     // A first message chosen on /explore, for Core. Into the composer and
     // never sent. When Logos is being routed — by the link, or by the model
@@ -2378,6 +2424,20 @@ export default function ChatPage() {
       <>
       {/* The Project settings sheet is the page's, not a surface's — it has
           to be reachable from the Logos rail's folders too. */}
+      {shareFor && (
+        <ShareDialog
+          type={shareFor.type}
+          id={shareFor.id}
+          title={shareFor.title}
+          open
+          onClose={() => { setShareFor(null); void loadShared(); }}
+          onUpgrade={() => window.location.assign('/one')}
+          onLeft={() => {
+            if (shareFor.type === 'project' && homeProject === shareFor.id) setHomeProject(null);
+            if (sharedOpen === shareFor.id) setSharedOpen(null);
+          }}
+        />
+      )}
       {sheet && (
         <ProjectSheet
           id={sheet}
@@ -2536,6 +2596,7 @@ export default function ChatPage() {
               setActiveId(item.id);
               setProjectEntry(null);
               setHomeProject(null);
+              setSharedOpen(null);
               setSidebarOpen(false);
             }}
             onDoubleClick={startRename}
@@ -2726,6 +2787,20 @@ export default function ChatPage() {
             void send(text);
           }}
           onSkip={() => firstRun.reach('socria.intro', { skipped: true })}
+        />
+      )}
+      {shareFor && (
+        <ShareDialog
+          type={shareFor.type}
+          id={shareFor.id}
+          title={shareFor.title}
+          open
+          onClose={() => { setShareFor(null); void loadShared(); }}
+          onUpgrade={() => window.location.assign('/one')}
+          onLeft={() => {
+            if (shareFor.type === 'project' && homeProject === shareFor.id) setHomeProject(null);
+            if (sharedOpen === shareFor.id) setSharedOpen(null);
+          }}
         />
       )}
       {sheet && (
@@ -2963,6 +3038,42 @@ export default function ChatPage() {
               )}
             </section>
           )}
+          {/* SHARED WITH YOU — Projects and conversations others opened to
+              this person, and the one field for an invite code. Below their
+              own Projects: their own work comes first. */}
+          {!hydrating && isSignedIn && !railFiltering && (
+            <section className="s-proj s-shared" aria-label="Shared with you">
+              <div className="s-proj-h">
+                <p className="s-when">Shared with you</p>
+              </div>
+              {sharedItems.map((it) => (
+                <div key={`sh-${it.type}-${it.id}`} className="s-row">
+                  <button
+                    type="button"
+                    className={`s-open${(it.type === 'project' ? homeProject : sharedOpen) === it.id ? ' is-home' : ''}`}
+                    title={`${it.title} — shared by ${it.owner}`}
+                    onClick={() => {
+                      if (it.type === 'project') openProjectHome(it.id);
+                      else if (it.kind === 'logos') window.location.assign(`/chat?model=logos-3&s=${encodeURIComponent(it.id)}&shared=1`);
+                      else {
+                        setHomeProject(null);
+                        setSharedOpen(it.id);
+                        setSidebarOpen(false);
+                      }
+                    }}
+                  >
+                    <span className="s-glyph" aria-hidden="true">{it.type === 'project' ? FOLDER_ICON : '◦'}</span>
+                    <span className="t">{it.title || 'Untitled'}</span>
+                    <span className="n" title={`Shared by ${it.owner}`}>{it.owner.slice(0, 1).toUpperCase()}</span>
+                  </button>
+                </div>
+              ))}
+              {!sharedItems.length && <p className="s-none">When someone shares with you, it appears here.</p>}
+              <div className="s-joincode">
+                <JoinWithCode />
+              </div>
+            </section>
+          )}
           {hydrating ? (
             <p className="s-none">Loading sessions…</p>
           ) : allRail.length === 0 ? (
@@ -3072,6 +3183,19 @@ export default function ChatPage() {
                 the feature was simply unreachable. It is a button now, and
                 the shortcut is a shortcut rather than the only door. Shown
                 once there is a conversation to search. */}
+            {/* Share this conversation — once it exists and is theirs. */}
+            {isSignedIn && hasMessages && activeId && !homeProject && !sharedOpen && conversations.some((c) => c.id === activeId) && (
+              <button
+                type="button"
+                className="sh-open"
+                onClick={() => setShareFor({ type: 'conversation', id: activeId, title: conversations.find((c) => c.id === activeId)?.title ?? 'This conversation' })}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <circle cx="18" cy="5" r="2.5" /><circle cx="6" cy="12" r="2.5" /><circle cx="18" cy="19" r="2.5" /><path d="M8.2 10.8l7.6-4.4M8.2 13.2l7.6 4.4" />
+                </svg>
+                Share
+              </button>
+            )}
             {hasMessages && (
               <span className="app-root app-inline">
                 {liveHint === 'find' && (
@@ -3127,9 +3251,17 @@ export default function ChatPage() {
           </div>
         </div>
 
-        {homeProject ? (
+        {sharedOpen && !homeProject ? (
+          <SharedThread
+            id={sharedOpen}
+            onClose={() => setSharedOpen(null)}
+            onShare={(title) => setShareFor({ type: 'conversation', id: sharedOpen, title })}
+            onUpgrade={() => window.location.assign('/one')}
+          />
+        ) : homeProject ? (
           <ProjectHome
             id={homeProject}
+            onShare={isSignedIn ? () => setShareFor({ type: 'project', id: homeProject, title: projects.find((x) => x.id === homeProject)?.name ?? sharedItems.find((x) => x.id === homeProject)?.title ?? 'This Project' }) : undefined}
             onOpenChat={openFromHome}
             onNewChat={(kind) => newFromHome(homeProject, kind)}
             onSettings={() => setSheet(homeProject)}

@@ -501,6 +501,19 @@ create table if not exists share_activity (
 );
 create index if not exists share_activity_resource_idx on share_activity (resource_type, resource_id, created_at desc);
 
+-- Who is looking at a shared thing right now, and where their pointer is —
+-- Think Together's presence. One row per person per resource, overwritten on
+-- every heartbeat; a row older than half a minute is somebody who has gone.
+create table if not exists share_presence (
+  resource_type text not null,
+  resource_id text not null,
+  user_id text not null,
+  display_name text,
+  cursor jsonb,
+  seen_at bigint not null,
+  primary key (resource_type, resource_id, user_id)
+);
+
 -- ── Core 4: the per-person reasoning state ───────────────────────────
 --
 -- Five tables, one responsibility each (lib/core4/store.ts;

@@ -645,8 +645,12 @@ export async function logActivity(
 export async function noteChange(userId: string, type: ResourceType, id: string, kind: string, summary: string): Promise<void> {
   const info = await resourceInfo(type, id).catch(() => null);
   if (!info) return;
-  const s = await shareFor(info.ownerId, type, id).catch(() => null);
-  if (s) await logActivity(s, userId, kind, summary);
+  // a conversation shared through its Project is recorded under the
+  // Project's share — the history of the Project includes its conversations
+  const s =
+    (await shareFor(info.ownerId, type, id).catch(() => null)) ??
+    (type === 'conversation' && info.projectId ? await shareFor(info.ownerId, 'project', info.projectId).catch(() => null) : null);
+  if (s) await logActivity({ id: s.id, resourceType: type, resourceId: id }, userId, kind, summary);
 }
 
 export async function activity(
@@ -654,9 +658,11 @@ export async function activity(
 ): Promise<{ who: string; kind: string; summary: string; at: number; you: boolean }[] | null> {
   const access = await shareAccess(viewerId, type, id);
   if (!access) return null;
-  const { data, error } = await supabaseAdmin().from('share_activity')
-    .select('user_id, display_name, kind, summary, created_at')
-    .eq('resource_type', type).eq('resource_id', id)
+  // A Project's history is everything under its share — its own changes and
+  // its conversations'. A conversation's is its own.
+  const projectShare = type === 'project' ? await shareFor(access.ownerId, 'project', id).catch(() => null) : null;
+  const q = supabaseAdmin().from('share_activity').select('user_id, display_name, kind, summary, created_at');
+  const { data, error } = await (projectShare ? q.eq('share_id', projectShare.id) : q.eq('resource_type', type).eq('resource_id', id))
     .order('created_at', { ascending: false }).limit(limit);
   if (error) return [];
   return ((data ?? []) as Record<string, unknown>[]).map((r) => ({
@@ -692,4 +698,5 @@ export async function purgeSharing(userId: string): Promise<void> {
   check(await db.from('share_members').delete().eq('user_id', userId));
   check(await db.from('share_comments').delete().eq('user_id', userId));
   check(await db.from('share_activity').delete().eq('user_id', userId));
+  check(await db.from('share_presence').delete().eq('user_id', userId));
 }

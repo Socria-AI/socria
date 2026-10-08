@@ -197,6 +197,11 @@ export async function GET(req: NextRequest) {
     .from('share_activity').select('resource_type, resource_id, kind, summary, created_at').eq('user_id', userId);
   const shareActivityErr = missingTable(shareActivityRaw) ? null : shareActivityRaw;
   out.yourSharedActivity = shareActivity ?? [];
+  // presence is a heartbeat, not a record — exported for completeness
+  const { data: presence, error: presenceRaw } = await db
+    .from('share_presence').select('resource_type, resource_id, seen_at').eq('user_id', userId);
+  const presenceErr = missingTable(presenceRaw) ? null : presenceRaw;
+  out.yourPresence = presence ?? [];
 
   out.core4Note =
     'core4State and reasoningLedger separate what you said from what Socria inferred: an ' +
@@ -231,6 +236,7 @@ export async function GET(req: NextRequest) {
     ['sharedWithYou', membershipsErr],
     ['yourComments', shareCommentsErr],
     ['yourSharedActivity', shareActivityErr],
+    ['yourPresence', presenceErr],
   ]
     .filter(([, e]) => !!e)
     .map(([name]) => name as string);

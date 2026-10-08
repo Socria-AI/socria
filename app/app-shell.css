@@ -715,3 +715,7 @@
   font-family:var(--font-sans, system-ui, sans-serif);font-size:.82rem;color:var(--ink-60, rgba(31,31,31,.6))}
 .app-root .mp-other:hover{background:rgba(var(--ink-rgb, 31, 31, 31), .04);color:var(--ink)}
 .app-root .mp-other.on{background:rgba(var(--moss-rgb, 94, 118, 51), .1);color:var(--ink)}
+
+/* Shared with you: the code field sits under the list, quietly */
+.app-root .s-shared .s-joincode{padding:6px 10px 2px}
+.app-root .s-shared .n{border-radius:999px;background:var(--moss-100, #e4eada);color:var(--moss-800, #38481f);min-width:18px;text-align:center}

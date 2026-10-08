@@ -27,7 +27,7 @@ const tables = [...schema.matchAll(/create table if not exists (\w+)/g)].map((m)
 // Tables keyed by owner AND member rather than by one user_id: sharing.
 // They are not in OWNED_TABLES (a flat `.eq('user_id')` would miss the
 // shares someone owns); they are reached by purgeSharing instead.
-const SHARED = new Set(['shares', 'share_members', 'share_comments', 'share_activity']);
+const SHARED = new Set(['shares', 'share_members', 'share_comments', 'share_activity', 'share_presence']);
 
 // The actual contents of the OWNED_TABLES literal, not just "the file
 // mentions this word". An earlier version of this test matched anywhere in

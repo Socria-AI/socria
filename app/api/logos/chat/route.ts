@@ -64,6 +64,7 @@ import { roleBlock } from '@/lib/onboarding-roles';
 import { nameBlock } from '@/lib/onboarding-name';
 import { wantedSimulation, bareRequest, hasSurface, simulationBlock } from '@/lib/model/wants';
 import { recall, remember, type RecallResult } from '@/lib/mind/pipeline';
+import { sharedTurn } from '@/lib/share/turn';
 import { extractionContext } from '@/lib/mind/activate';
 import { cleanId, logosMemoryText, logosPersistPolicy } from '@/lib/mind/logos-turn';
 import { waitUntil } from '@vercel/functions';
@@ -214,6 +215,16 @@ export async function POST(req: NextRequest) {
     // the person would call a conversation. A node-focus request is never a
     // beginning, whatever its history looks like.
     const sessionId = typeof body?.sessionId === 'string' ? body.sessionId : null;
+    // A SHARED line of thinking (lib/share/turn.ts): nobody's memory in or
+    // out, the Project's own context kept, a guest needs `ask`, and a guest's
+    // turns are counted by the guest allowance rather than as their chats.
+    const sharedCtx = await sharedTurn(userId ?? null, sessionId, plan);
+    if (sharedCtx.refuse) {
+      return NextResponse.json(
+        { error: sharedCtx.refuse.error, ...(sharedCtx.refuse.upgrade ? { upgrade: sharedCtx.refuse.upgrade } : {}) },
+        { status: sharedCtx.refuse.status }
+      );
+    }
     const userTurns = clean.filter((m: { role: string }) => m.role === 'user').length;
     //
     // …and it is counted ONCE PER CONVERSATION, not once per first-turn
@@ -225,7 +236,7 @@ export async function POST(req: NextRequest) {
     const alreadyCounted = isNewChat && (await chatAlreadyCounted(userId, sessionId));
     // Whether THIS request is the one that will pay for the conversation.
     // Checked here, charged further down — see the note at the charge itself.
-    const willCharge = isNewChat && !alreadyCounted;
+    const willCharge = isNewChat && !alreadyCounted && !sharedCtx.guest;
     // The sentence written in onboarding, sent for them on landing: free, once
     // per account ever (lib/usage.ts firstThoughtUsed). The claim is the
     // client's; the once-ever is the server's.
@@ -316,7 +327,7 @@ export async function POST(req: NextRequest) {
     // this surface, whose map can be saved as a picture. The recurrence line
     // is included only while the client says it is still owed.
     let memoryBlock = '';
-    if (userId && body?.understanding && !focusLabel) {
+    if (userId && body?.understanding && !focusLabel && !sharedCtx.shared) {
       const u = sanitizeUserUnderstanding(body.understanding);
       const caps = memoryCaps(plan);
       const now = Date.now();
@@ -359,7 +370,9 @@ export async function POST(req: NextRequest) {
     // thread — a node's side-thread is the same conversation seen narrower.
     // NEVER IN A SHARED ROOM: the other person's words are not this person's
     // to remember, and this person's memories are not the guest's to read.
-    const mindOn = !!userId && body?.mind === true && !focusLabel && !body?.collab && !twoPeople;
+    const mindOn = !!userId && body?.mind === true && !focusLabel && !body?.collab && !twoPeople && !sharedCtx.shared;
+    // shared: the Project's own frame instead of anybody's memory
+    if (sharedCtx.shared && sharedCtx.projectBlock && !focusLabel) memoryBlock = '\n\n' + sharedCtx.projectBlock;
     const mindConversation = mindOn ? cleanId(sessionId) : null;
     const mindProject = mindOn ? cleanId(body?.projectId) : null;
     const mindPolicy = mindOn

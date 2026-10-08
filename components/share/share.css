@@ -1,0 +1,84 @@
+/* components/share/share.css — the Share sheet, "Join with a code", and the
+   shared thread's people. Scoped under .sh-*; tokens only, so every theme
+   carries through. */
+
+.sh-scrim{position:fixed;inset:0;z-index:80;display:grid;place-items:center;padding:16px}
+.sh-back{position:absolute;inset:0;background:rgba(26,36,16,.38);backdrop-filter:blur(2px);animation:shFade .18s ease both}
+.sh-sheet{position:relative;width:min(540px,100%);max-height:calc(100dvh - 32px);overflow-y:auto;background:var(--paper);color:var(--ink);
+  border:1px solid var(--ink-12);border-radius:18px;padding:22px 22px 18px;box-shadow:0 40px 90px -40px rgba(26,36,16,.7);
+  animation:shIn .26s cubic-bezier(.2,.8,.2,1) both}
+@keyframes shFade{from{opacity:0}}
+@keyframes shIn{from{opacity:0;transform:translateY(10px) scale(.985)}}
+@media (prefers-reduced-motion: reduce){.sh-back,.sh-sheet{animation:none}}
+.sh-head{position:relative;padding-right:30px}
+.sh-kicker{font-family:var(--sans);font-size:10px;font-weight:600;letter-spacing:.2em;text-transform:uppercase;color:var(--moss-700)}
+.sh-head h2{margin:6px 0 0;font-family:var(--serif);font-weight:400;font-size:1.5rem;line-height:1.15;letter-spacing:-.01em;overflow-wrap:anywhere}
+.sh-x{position:absolute;top:-6px;right:-6px;border:none;background:none;font-size:22px;color:var(--ink-45);cursor:pointer;padding:6px 10px;border-radius:8px}
+.sh-x:hover{color:var(--ink);background:rgba(31,31,31,.05)}
+.sh-quiet{color:var(--ink-60);font-size:13.5px}
+.sh-err{color:#9b3b2a;font-size:13.5px;margin:12px 0 0}
+.sh-k{display:block;font-family:var(--sans);font-size:9.5px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-45);margin:20px 0 8px}
+.sh-sub{display:block;font-size:12px;color:var(--ink-45);margin-top:3px}
+.sh-btn{font-family:var(--sans);font-size:13px;font-weight:500;padding:8px 16px;border-radius:999px;border:1px solid var(--ink);background:var(--ink);color:var(--paper);
+  cursor:pointer;white-space:nowrap;transition:background .15s,border-color .15s}
+.sh-btn:hover:not(:disabled){background:var(--moss);border-color:var(--moss)}
+.sh-btn:disabled{opacity:.4;cursor:default}
+.sh-btn.ghost{background:transparent;color:var(--ink-70);border-color:var(--ink-16)}
+.sh-small{border:none;background:none;padding:0;margin-top:8px;font:inherit;font-size:12px;color:var(--ink-45);cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+.sh-small:hover{color:var(--ink)}
+.sh-one{margin-top:16px;display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;padding:12px 14px;border-radius:12px;background:var(--moss-50);border:1px solid var(--moss-100)}
+.sh-one p{margin:0;flex:1 1 240px;font-size:13.5px;line-height:1.5;color:var(--ink-70)}
+.sh-one b{font-weight:600;color:var(--ink)}
+
+.sh-add{display:flex;gap:8px;margin-top:18px}
+.sh-add input{flex:1;min-width:0;font:inherit;font-size:14px;padding:9px 12px;border:1px solid var(--ink-16);border-radius:10px;background:#fff;color:var(--ink)}
+.sh-add input:focus{outline:none;border-color:var(--moss);box-shadow:0 0 0 3px rgba(94,118,51,.14)}
+.sh-add select,.sh-role,.sh-access select{font:inherit;font-size:12.5px;padding:7px 8px;border:1px solid var(--ink-16);border-radius:10px;background:var(--paper);color:var(--ink);cursor:pointer}
+.sh-role.is-fixed{border-color:transparent;background:none;color:var(--ink-45);cursor:default;padding:7px 0}
+@media (max-width: 480px){.sh-add{flex-wrap:wrap}.sh-add input{flex-basis:100%}}
+.sh-sendlink{margin-top:10px;padding:10px 12px;border-radius:12px;border:1px dashed var(--ink-16)}
+.sh-sendlink p{margin:0 0 8px;font-size:12.5px;color:var(--ink-70)}
+.sh-copyrow{display:flex;gap:8px;margin-top:10px}
+.sh-copyrow input{flex:1;min-width:0;font-family:var(--sans);font-size:12px;padding:8px 10px;border:1px solid var(--ink-12);border-radius:10px;background:rgba(255,255,255,.6);color:var(--ink-70)}
+
+.sh-people ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+.sh-people li{display:flex;align-items:center;gap:10px;padding:6px 2px}
+.sh-people li.pending{opacity:.85}
+.sh-av{flex:0 0 auto;display:grid;place-items:center;width:30px;height:30px;border-radius:999px;background:var(--moss-100);color:var(--moss-800);font-family:var(--serif);font-size:15px}
+.sh-people li.pending .sh-av{background:transparent;border:1px dashed var(--ink-25);color:var(--ink-45)}
+.sh-who{flex:1;min-width:0;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sh-who em{font-style:normal;font-size:11px;color:var(--ink-45);margin-left:8px}
+.sh-rm{border:none;background:none;font-size:18px;line-height:1;color:var(--ink-45);cursor:pointer;padding:4px 6px;border-radius:6px}
+.sh-rm:hover{color:#9b3b2a;background:rgba(155,59,42,.07)}
+.sh-leave{border:1px solid var(--ink-16);background:none;border-radius:999px;font-size:12px;padding:5px 10px;color:var(--ink-70);cursor:pointer}
+
+.sh-access{display:flex;align-items:center;gap:12px}
+.sh-glyph{flex:0 0 auto;display:grid;place-items:center;width:34px;height:34px;border-radius:999px;background:rgba(31,31,31,.06);color:var(--ink-60);font-size:16px}
+.sh-glyph.on{background:var(--moss-100);color:var(--moss-800)}
+.sh-access-main{flex:1;min-width:0}
+.sh-access-main select{border-color:transparent;padding-left:0;font-weight:500;background:none}
+.sh-code{margin-top:16px;padding-top:14px;border-top:1px solid var(--ink-12)}
+.sh-switch{display:inline-flex;align-items:center;gap:8px;font-size:14px;cursor:pointer}
+.sh-switch input{accent-color:var(--moss);width:16px;height:16px}
+.sh-code-row{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:10px}
+.sh-codebox{display:inline-flex;align-items:baseline;gap:10px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:20px;letter-spacing:.14em;
+  padding:8px 14px;border-radius:12px;border:1px solid var(--ink-16);background:#fff;color:var(--ink);cursor:pointer}
+.sh-codebox i{font-family:var(--sans);font-style:normal;font-size:10.5px;letter-spacing:.08em;color:var(--moss-700)}
+.sh-privacy{margin:18px 0 0;font-size:12px;line-height:1.5;color:var(--ink-45)}
+.sh-foot{display:flex;align-items:center;justify-content:flex-end;gap:10px;margin-top:16px}
+.sh-stop{margin-right:auto;border:none;background:none;font:inherit;font-size:12.5px;color:#9b3b2a;cursor:pointer;padding:0}
+
+/* join with a code — sits in the rail */
+.sh-join{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.sh-join input{flex:1;min-width:0;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;letter-spacing:.1em;padding:6px 9px;border:1px solid var(--ink-16);border-radius:8px;background:#fff;color:var(--ink)}
+.sh-join button{font-size:12px;padding:6px 11px;border-radius:999px;border:1px solid var(--ink);background:var(--ink);color:var(--paper);cursor:pointer}
+.sh-join button:disabled{opacity:.35;cursor:default}
+.sh-join-err{flex-basis:100%;font-size:11.5px;color:#9b3b2a}
+
+/* the share button, wherever it sits */
+.sh-open{display:inline-flex;align-items:center;gap:6px;font-family:var(--sans);font-size:13px;padding:6px 12px;border-radius:999px;border:1px solid var(--ink-16);
+  background:rgba(255,255,255,.55);color:var(--ink-70);cursor:pointer;transition:border-color .15s,color .15s}
+.sh-open:hover{border-color:var(--ink);color:var(--ink)}
+.sh-open svg{width:14px;height:14px}
+.sh-faces{display:inline-flex;margin-left:2px}
+.sh-faces i{display:grid;place-items:center;width:20px;height:20px;border-radius:999px;margin-left:-5px;border:1.5px solid var(--paper);font-style:normal;font-size:10px;font-family:var(--serif);color:#fff}

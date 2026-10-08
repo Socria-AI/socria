@@ -100,6 +100,9 @@ revoke all on shares         from anon, authenticated;
 revoke all on share_members  from anon, authenticated;
 revoke all on share_comments from anon, authenticated;
 revoke all on share_activity from anon, authenticated;
+alter table share_presence enable row level security;
+alter table share_presence force row level security;
+revoke all on share_presence from anon, authenticated;
 
 -- lifecycle_emails is the one table here that holds a STATED PREFERENCE
 -- rather than something the person made: the `unsubscribed` row is somebody

@@ -26,6 +26,7 @@ import {
   type ConversationState,
 } from '@/lib/socria-prompt';
 import { recall, remember } from '@/lib/mind/pipeline';
+import { sharedTurn } from '@/lib/share/turn';
 import { getProject } from '@/lib/mind/store';
 import { extractionContext, type ActivatedSubgraph } from '@/lib/mind/activate';
 import type { MindNode } from '@/lib/mind/types';
@@ -204,6 +205,15 @@ export async function POST(req: NextRequest) {
     // client could otherwise hand itself a member's memory. The store is one
     // store for every plan; the plan is a window onto it (lib/person-memory.ts).
     const plan = userId ? await resolvePlanForRequest(req, userId) : 'free';
+    // A SHARED CONVERSATION (lib/share/turn.ts): nobody's personal memory in
+    // or out, the Project's own context kept, and a guest needs `ask`.
+    const sharedCtx = await sharedTurn(userId ?? null, body?.conversationId, plan);
+    if (sharedCtx.refuse) {
+      return NextResponse.json(
+        { error: sharedCtx.refuse.error, ...(sharedCtx.refuse.upgrade ? { upgrade: sharedCtx.refuse.upgrade } : {}) },
+        { status: sharedCtx.refuse.status }
+      );
+    }
     const caps = memoryCaps(plan);
     const now = Date.now();
     const contextText = Array.isArray(messages)
@@ -217,14 +227,14 @@ export async function POST(req: NextRequest) {
     // top-k flat entries for it would be the replaced architecture running
     // alongside the new one, and paying for it.
     const personMemory =
-      understanding && resolveModel(body?.model) !== 'core-4'
+      understanding && !sharedCtx.shared && resolveModel(body?.model) !== 'core-4'
         ? selectRelevant(visibleEntries(understanding.entries, plan, now), contextText, {
             now,
             n: caps.injectCore,
           })
         : null;
     const journey =
-      understanding && hasJourneyContent(understanding)
+      understanding && !sharedCtx.shared && hasJourneyContent(understanding)
         ? {
             understanding,
             conversationStart: rawUserTurns <= 1,
@@ -328,7 +338,9 @@ export async function POST(req: NextRequest) {
       // One indexed read, before any model call. A failed read lets the turn
       // through: a cap that eats somebody's conversation during a database blip
       // is worse than a few turns of overage.
-      const month = userId ? await conversationsThisMonth(userId, now) : { ids: [], ok: false };
+      // A guest's turn in someone else's shared conversation is counted by the
+      // guest allowance (lib/share/turn.ts), not as one of their own chats.
+      const month = userId && !sharedCtx.guest ? await conversationsThisMonth(userId, now) : { ids: [], ok: false };
       const allowance = core4ChatAllowed({
         plan: plan === 'one' ? 'one' : 'free',
         usedThisMonth: month.ids,
@@ -353,7 +365,7 @@ export async function POST(req: NextRequest) {
         content: withFiles ? briefly(m as ChatMsg) : m.content,
       }));
       const [recalled, prep] = await Promise.all([
-        userId
+        userId && !sharedCtx.shared
           ? recall(userId, lastTurn ? forMemory(lastTurn).slice(0, 2000) : last.content, {
               now: Date.now(),
               plan,
@@ -400,6 +412,10 @@ export async function POST(req: NextRequest) {
         mindGraphNodes = recalled.graph;
         projectBlock = recalled.projectBlock || null;
         inProject = !!recalled.project;
+      }
+      if (sharedCtx.shared) {
+        projectBlock = sharedCtx.projectBlock || null;
+        inProject = !!sharedCtx.projectBlock;
       }
     }
 
@@ -544,6 +560,8 @@ export async function POST(req: NextRequest) {
         fallbackModel: fallbackOpenAIModel(model),
         after: (reply: string) => {
           if (!userId) return;
+          // a shared conversation teaches nobody's memory (lib/share/turn.ts)
+          if (sharedCtx.shared) return;
           // Off the record (council D15): nothing from this conversation goes
           // into the Mind Graph.
           //
