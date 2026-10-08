@@ -1288,8 +1288,9 @@ export function LogosApp({
   // THE GUIDE NO LONGER OPENS ITSELF. A modal of miniature demonstrations
   // before a word has been said was Logos explaining itself in place of
   // doing the thing; the first map does the explaining now (the sequence
-  // below), on the person's own words. The guide stays behind the "?" in
-  // the header for anyone who wants the walk-through.
+  // below), on the person's own words. In Logos 2 the guide stays behind the
+  // "?" in the header for anyone who wants the walk-through; Logos 3 has no
+  // "?".
   void GUIDE_SEEN_KEY;
 
   function closeGuide() {
@@ -3888,32 +3889,40 @@ export function LogosApp({
                 header, pointing somewhere else, is how one product ends up
                 telling a person two things about what it remembers. */
             }
-            <button
-              type="button"
-              className="lg-guide-open"
-              onClick={() => setGuideOpen(true)}
-              aria-label="What Logos does"
-              title="What Logos does"
-            >
-              ?
-            </button>
-            <button
-              type="button"
-              className="lg-style-open"
-              onClick={() => {
-                setStyleDraftText(styleText);
-                setPersonaDraft(persona);
-                setStyleOpen(true);
-              }}
-              aria-label="How should Socria work with you?"
-              title="How should Socria work with you?"
-            >
-              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true">
-                <path d="M4 7h9M17 7h3M4 17h3M11 17h9" />
-                <circle cx="15" cy="7" r="2.2" />
-                <circle cx="9" cy="17" r="2.2" />
-              </svg>
-            </button>
+            {/* Logos 2 only. Logos 3's header keeps to the workspace: the
+                walk-through and the working-style sheet have no button here.
+                The sheet still opens from the note shown when the chat
+                changes how Socria works with you. */}
+            {!workspaceOn && (
+              <>
+                <button
+                  type="button"
+                  className="lg-guide-open"
+                  onClick={() => setGuideOpen(true)}
+                  aria-label="What Logos does"
+                  title="What Logos does"
+                >
+                  ?
+                </button>
+                <button
+                  type="button"
+                  className="lg-style-open"
+                  onClick={() => {
+                    setStyleDraftText(styleText);
+                    setPersonaDraft(persona);
+                    setStyleOpen(true);
+                  }}
+                  aria-label="How should Socria work with you?"
+                  title="How should Socria work with you?"
+                >
+                  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true">
+                    <path d="M4 7h9M17 7h3M4 17h3M11 17h9" />
+                    <circle cx="15" cy="7" r="2.2" />
+                    <circle cx="9" cy="17" r="2.2" />
+                  </svg>
+                </button>
+              </>
+            )}
             {/* Socria Rewards: the 5-Node Challenge, quietly, beside the map it is about. */}
             <ChallengeChip enabled={cloud} onOpenAccount={() => setAcctOpen(true)} />
             {/* Connected sources are dormant (see connectorsEnabled) — no
