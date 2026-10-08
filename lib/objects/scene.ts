@@ -29,7 +29,7 @@
 // PURE.
 
 import { register, type ObjectKind } from './core';
-import { centroid, localBox, measure, parsePoints, rotateAbout, toWorld, worldBox, type Box3, type Vec3 } from './scene-geometry';
+import { centroid, localBox, measure, parsePoints, revolveThroat, rotateAbout, toWorld, worldBox, type Box3, type Vec3 } from './scene-geometry';
 import { compileExpr } from '@/lib/logos-math';
 
 export type LengthUnit = 'm' | 'cm' | 'mm' | 'in' | 'ft';
@@ -869,6 +869,33 @@ export function nodeLine(s: SceneState, n: SceneNode, guarded = false): string {
   return `${n.id} “${n.name}”: ${SHAPE_WORD[n.shape]}, ${sizeOf(n, s.unit)}${assumed} at (${at}) ${s.unit}${rot}; ${n.color}${n.mat !== 'matte' ? ` ${n.mat}` : ''}; ${rest}${vol}${made}`;
 }
 
+/**
+ * What a shape's own geometry says, beyond its size: a revolved contour's
+ * narrowest radius (a nozzle's throat) and the area ratios to it; a wing's
+ * planform area and aspect ratio. Geometry only — no flow or lift is implied.
+ */
+function shapeFacts(n: SceneNode, unit: LengthUnit): string[] {
+  if (n.shape === 'revolve') {
+    const t = revolveThroat(n);
+    if (!t || !(t.rMin > 0)) return [];
+    // stretched unevenly across, its sections are ellipses: the radii are then its profile's
+    const even = Math.abs(n.scale[0] - n.scale[2]) < 1e-9;
+    const k = even ? n.scale[0] : 1;
+    return [
+      `narrowest radius ${lengthIn(t.rMin * k, unit)}${even ? '' : ' (of its profile, before the stretch)'} where its profile has y = ${Number(t.yMin.toPrecision(4))} (its throat); ends ${lengthIn(t.rStart * k, unit)} and ${lengthIn(t.rEnd * k, unit)}`,
+      `end-to-throat area ratios (r/r_min)²: ${Number(((t.rStart / t.rMin) ** 2).toPrecision(4))} and ${Number(((t.rEnd / t.rMin) ** 2).toPrecision(4))} — geometry only`,
+    ];
+  }
+  if (n.shape === 'airfoil') {
+    // its outline is in the part's own x–z plane (chord along x, thickness along z), extruded along y to its span
+    const c = n.dims.c * n.scale[0];
+    const b = n.dims.h * n.scale[1];
+    const thick = (n.dims.t / 100) * n.dims.c * n.scale[2];
+    return [`planform area ${(c * b).toPrecision(4)} m²; aspect ratio b²/S = ${(b / c).toPrecision(4)}; thickest ${lengthIn(thick, unit)} (${Number(((100 * thick) / c).toPrecision(3))}% of the chord) — geometry only, no lift is computed`];
+  }
+  return [];
+}
+
 /** A part's mass, where its density is known: ρ times the volume, exactly as the volume is. */
 export function massOf(n: SceneNode): { kg: number; how: 'exact' | 'numerical'; nominal: boolean } | null {
   if (n.density === undefined) return null;
@@ -975,6 +1002,7 @@ export const SCENE: ObjectKind<SceneState> = {
       ...(m.area !== null ? [`surface area ${m.area.toPrecision(4)} m²${m.how === 'numerical' ? ' (numerical)' : ''}`] : []),
       ...(m.note ? [m.note] : []),
       ...(c && n.density !== undefined ? [`its centroid is at (${toWorld(n, c).map((v) => lengthIn(v, s.unit).replace(/ \w+$/, '')).join(', ')}) ${s.unit}`] : []),
+      ...shapeFacts(n, s.unit),
       ...dependents(s, n.id).map((d) => `${byId(s, d)?.name} rests on it`),
     ];
   },

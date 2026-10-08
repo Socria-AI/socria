@@ -15,6 +15,7 @@ const sections = [
   { id: 'between', heading: 'What Socria does between you' },
   { id: 'yours', heading: 'Whose words are whose' },
   { id: 'limits', heading: 'What it does not do' },
+  { id: 'engineering', heading: 'Engineering examples' },
 ];
 
 export function Logos3() {
@@ -120,6 +121,14 @@ export function Logos3() {
           <Link href="/docs/logos-2">that page</Link>. Logos 3 has no depth modes either.
         </li>
       </ul>
+
+      <H2 id="engineering">Engineering examples</H2>
+      <p>
+        What Logos 3 can build for engineering work — engines, mechanisms and vibration, circuits, beams and columns,
+        cooling and flow, rockets and orbits, reactions, control loops, and geometry in the experimental Live 3D panel — is
+        on <Link href="/docs/logos-3-engineering">Engineering in Logos 3</Link>: the words to ask with, the model the
+        engine builds, live, and the numbers it computes.
+      </p>
     </Article>
   );
 }

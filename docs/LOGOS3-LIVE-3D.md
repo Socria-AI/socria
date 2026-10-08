@@ -72,6 +72,15 @@ Two additions from the Engineering Atlas:
     above the base for a cone, the area centroid for an outline. Parts with
     no density are counted, not guessed.
   - Nothing is loaded or stressed: no strength is modelled.
+- **What a shape's geometry says**, among its facts:
+  - a revolved contour's narrowest radius (a nozzle's throat), where its
+    profile has it, and the end-to-throat area ratios (r/r_min)²;
+  - an airfoil's planform area, aspect ratio b²/S and thickness.
+
+  Both are geometry only, and say so: no flow, thrust or lift is computed.
+  Each follows a stretch: an airfoil stretched in thickness is thicker, and
+  a revolved shape stretched unevenly across gives its profile's radii and
+  says so.
 
 ### A part keeps its identity
 
@@ -129,7 +138,10 @@ What it reads:
 - edits: move, lift, rotate (about an axis, upside down, on its side),
   scale, "make it 2 m tall", "taller by 0.5", "twice as big", paint,
   "set the radius of the sphere to 2", "the box's height to 3", copy
-  ("3 times to the right"), stack, rename, remove, clear, display unit;
+  ("3 times to the right", or "6 times around a circle of radius 0.4",
+  "around the origin", "around the flange": the copies stand evenly round
+  the circle, each turned to face out as the first did), stack, rename,
+  remove, clear, display unit;
 - arrangements: a row, a stack or tower, a ring or a grid of N;
 - shapes given by an equation, as listed above.
 
@@ -223,8 +235,8 @@ change it. The panel says so, and `onObject` refuses the operation.
   not interpreted, and a description is not read by a language model.
 - **Equation-shapes are in metres:** surfaces, tubes and revolved shapes are
   read in metres whatever the display unit.
-- **No physics:** no mass, no material other than how it looks, no
-  stability, no loads.
+- **No physics:** a mass is density × volume and nothing more. No
+  stability, no loads, no strength, no flow.
 - **The reply model reads the scene as text.** It does not see the picture.
 - **Limits:** 48 parts per scene and 24 states of undo.
 - **WebGL is required** for the 3D view. Without it the panel says so, and

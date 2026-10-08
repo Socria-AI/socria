@@ -84,6 +84,12 @@ export const DOC_PAGES: DocPage[] = [
     group: 'The models',
   },
   {
+    slug: 'logos-3-engineering',
+    title: 'Engineering in Logos 3',
+    blurb: 'Engines, mechanisms, circuits, structures, flows, flight, reactions and control — what to ask for, what the engine builds, and the numbers it computes, each checked.',
+    group: 'The models',
+  },
+  {
     slug: 'thinking-map',
     title: 'The Thinking Map',
     blurb: 'Node types, relationships, the four lenses, and the four moves a node opens.',

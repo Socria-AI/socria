@@ -561,3 +561,36 @@
   display: block; margin-top: 4px; font-style: italic; color: var(--moss-700, #4b5f2a);
 }
 @media (max-width: 700px) { .docs-root .d-gallery { grid-template-columns: 1fr; } }
+
+/* Logos 3: engineering examples — each a proposal the engine built, with its check */
+.docs-root .d-eng {
+  margin: 22px 0 30px; padding: 2px 0 6px;
+  scroll-margin-top: 80px;
+}
+.docs-root .d-eng + .d-eng { border-top: 1px dashed var(--d-line); padding-top: 18px; }
+.docs-root .d-eng h3 { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.docs-root .d-eng-tag {
+  font-size: 11px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--d-ink-45); border: 1px solid var(--d-line); border-radius: 999px; padding: 1px 8px;
+}
+.docs-root .d-eng-lead { color: var(--d-ink-70); }
+.docs-root .d-eng-ask {
+  display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap;
+  margin: 6px 0 12px; padding: 10px 14px;
+  background: var(--d-card); border: 1px solid var(--d-line); border-left: 3px solid var(--d-moss);
+  border-radius: 6px;
+}
+.docs-root .d-eng-ask-k {
+  flex: none; font-size: 11px; font-weight: 650; letter-spacing: 0.08em; text-transform: uppercase; color: var(--d-moss-deep);
+}
+.docs-root .d-eng-ask-q { font-family: var(--d-serif); font-size: 1.05rem; line-height: 1.45; }
+.docs-root .d-eng-computed { color: var(--d-ink); }
+.docs-root .d-eng-read { font-size: 13px; color: var(--d-ink-45); margin-bottom: 8px; }
+.docs-root .d-eng-live { margin: 12px 0 4px; min-height: 120px; }
+.docs-root .d-eng-wait {
+  display: grid; place-items: center; height: 120px;
+  border: 1px dashed var(--d-line); border-radius: 8px; color: var(--d-ink-45); font-size: 13px;
+}
+.docs-root table.d-eng-parts { width: 100%; font-size: 13px; }
+.docs-root table.d-eng-parts td:nth-child(3) { color: var(--d-ink-70); }
+.docs-root .d-eng-facts { font-size: 13px; color: var(--d-ink-70); }

@@ -580,3 +580,21 @@ export function toWorld(s: ShapeLike, p: Vec3): Vec3 {
   const q = p.map((v, i) => v * s.scale[i]);
   return [0, 1, 2].map((i) => R[i][0] * q[0] + R[i][1] * q[1] + R[i][2] * q[2] + s.pos[i]) as Vec3;
 }
+
+/** A revolved shape's narrowest and end radii, from its own r(y): a nozzle's throat and its two ends. */
+export function revolveThroat(s: ShapeLike): { rMin: number; yMin: number; rStart: number; rEnd: number } | null {
+  const c = s.exprs?.r ? compileExpr(s.exprs.r, ['y']) : null;
+  if (!c) return null;
+  const { y0, y1 } = s.dims;
+  const n = 2000;
+  let best = { r: Infinity, y: y0 };
+  for (let i = 0; i <= n; i++) {
+    const y = y0 + ((y1 - y0) * i) / n;
+    const r = c.eval({ y });
+    if (Number.isFinite(r) && r < best.r) best = { r, y };
+  }
+  const rStart = c.eval({ y: y0 });
+  const rEnd = c.eval({ y: y1 });
+  if (![best.r, rStart, rEnd].every(Number.isFinite)) return null;
+  return { rMin: best.r, yMin: best.y, rStart, rEnd };
+}

@@ -855,6 +855,8 @@ function readCreate(c: Clause, st: Ctx): string | null {
   const before = st.s;
   const t = c.text;
   // what shape, and how many
+  // what it is made of first: a shape given by an equation consumes the rest of the clause
+  const matter = readMatter(c);
   const param = readParametric(c, st.unit);
   if (param && 'problem' in param) return param.problem;
   let shape: SceneShape | null = param ? param.shape : null;
@@ -893,7 +895,6 @@ function readCreate(c: Clause, st: Ctx): string | null {
   }
   if (count > MAX_NODES) return `A scene holds at most ${MAX_NODES} parts.`;
   const name = c.take(/\b(?:called|named)\s+["“]?([a-z][\w ]{0,30}?)["”]?(?=$|\s*[,;]|\s+(?:with|at|on|and)\b)/i)?.[1];
-  const matter = readMatter(c);
   const look = readLook(c);
   if (shape === 'prism') {
     const adj = c.take(/\b(triangular|square|pentagonal|hexagonal|heptagonal|octagonal)\b/i);
@@ -1136,6 +1137,45 @@ function readEdit(c: Clause, st: Ctx): string | null {
   if (copyRef) {
     const id = copyRef.ids[0];
     const node = st.s.nodes.find((n) => n.id === id)!;
+    // AROUND A CIRCLE: "copy it 6 times around a circle of radius 0.4", "… around the origin",
+    // "… around the crankcase" — each copy turned to face the same way about the centre
+    const around = c.take(/\baround\b/i);
+    if (around) {
+      let cx: number | null = null;
+      let cz: number | null = null;
+      let R: number | null = null;
+      const withR = c.take(new RegExp(`^\\s*(?:a\\s+circle\\s+)?(?:of|with)\\s+(?:a\\s+)?radius\\s*(?:of)?\\s*${NUM_RE}\\s*${UNIT_RE}?`, 'i'));
+      const origin = !withR && c.take(/^\s*(?:a\s+circle\s+)?(?:about\s+)?(?:the\s+)?(?:origin|centre|center|middle|vertical(?:\s+axis)?|y[\s-]axis)\b/i);
+      if (withR) R = (numOf(withR[1]) ?? NaN) * unitOf(withR[2], st.unit);
+      else if (origin) {
+        cx = 0;
+        cz = 0;
+      } else {
+        const rest = c.work.slice(c.work.search(/\S|$/));
+        const words = refAt(rest, st.s);
+        if (words) {
+          const ref = resolve(words.phrase, st.s, st.ctx, st.recent);
+          if (!ref) return missing(st, words.phrase);
+          const at = st.s.nodes.find((n) => n.id === ref.ids[0])!;
+          cx = at.pos[0];
+          cz = at.pos[2];
+          const start = c.work.search(/\S/);
+          c.work = c.work.slice(0, start) + ' '.repeat(words.len) + c.work.slice(start + words.len);
+        } else {
+          c.take(/^\s*a\s+circle\b/i);
+          cx = 0;
+          cz = 0;
+        }
+      }
+      if (R === null) R = Math.hypot(node.pos[0] - cx!, node.pos[2] - cz!);
+      if (!(R > 1e-9)) return 'It stands at the centre of that circle — move it out first, or give the circle’s radius.';
+      const args: SceneOp['args'] = { id, count: copies, ring: R, ...(cx !== null ? { cx, cz: cz! } : {}) };
+      const before = st.s;
+      const why = run(st, 'copy', args);
+      if (why) return why;
+      touch(lastAdded(before, st.s));
+      return `✓copy ${copyRef.said} ×${copies} around a circle of radius ${lengthWord(R, st.unit)}`;
+    }
     const b = worldBox(node)!;
     const ext: Vec3 = [b.max[0] - b.min[0], b.max[1] - b.min[1], b.max[2] - b.min[2]];
     const dir = readDirections(c, st.unit);

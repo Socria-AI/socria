@@ -9,7 +9,7 @@
 // docs.css carries the re-scoped demo chrome that makes both sets sit in a
 // wiki figure.
 
-import { useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { MathBoard } from '@/components/MathBoard';
 import { MathPlot } from '@/components/MathPlot';
 import { MathViz } from '@/components/MathViz';
@@ -25,6 +25,7 @@ import { ModelView } from '@/components/model/ModelView';
 import { buildProposal } from '@/lib/model/propose';
 import { editsState, EMPTY_WORKSPACE, modelFor, openFromProposal } from '@/lib/model/docs';
 import { oscillator } from '@/lib/model/library';
+import { ENGINEERING } from '@/lib/model/engineering';
 import type { SocriaModel } from '@/lib/socria-prompt';
 import type { SynthesisData } from '@/lib/synthesis';
 import { SOCRIA_MODELS } from '@/lib/socria-prompt';
@@ -710,5 +711,56 @@ export function DemoRefusal() {
         </p>
       </div>
     </DocsFrame>
+  );
+}
+
+/* ── Logos 3: the engineering examples, running ────────────────────── */
+//
+// Each example is the proposal a reply would send, opened through the same
+// on-ramp the conversation uses (openFromProposal). Mounted only as it nears the
+// screen: a page of twenty-seven running models would otherwise integrate all
+// of them before the reader reached the second.
+
+export function DemoEngineering({ id }: { id: string }) {
+  const host = useRef<HTMLDivElement>(null);
+  const [near, setNear] = useState(false);
+  useEffect(() => {
+    const el = host.current;
+    if (!el || near) return;
+    if (typeof IntersectionObserver === 'undefined') {
+      setNear(true);
+      return;
+    }
+    const io = new IntersectionObserver((es) => {
+      if (es.some((e) => e.isIntersecting)) {
+        setNear(true);
+        io.disconnect();
+      }
+    }, { rootMargin: '600px 0px' });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [near]);
+  const opened = useMemo(() => {
+    if (!near) return null;
+    const ex = ENGINEERING.find((e) => e.id === id);
+    return ex ? openFromProposal(EMPTY_WORKSPACE, ex.model(), { at: 0 }) : null;
+  }, [near, id]);
+  const ex = ENGINEERING.find((e) => e.id === id);
+  return (
+    <div ref={host} className="d-eng-live">
+      {!opened ? (
+        <div className="d-eng-wait">{ex ? `${ex.title} — starting…` : 'No such example.'}</div>
+      ) : opened.doc ? (
+        <DocsFrame label="Built by the engine from the proposal above — move a control and it is solved again" height={ex && ex.model().params.length > 3 ? 700 : 600}>
+          <ModelView model={modelFor(opened.doc)} edits={editsState(opened.workspace) ?? undefined} />
+        </DocsFrame>
+      ) : (
+        <DocsFrame label="The engine declined to build this one" bare>
+          <div className="d-carddemo">
+            <p className="d-pickernote">{opened.says}</p>
+          </div>
+        </DocsFrame>
+      )}
+    </div>
   );
 }
