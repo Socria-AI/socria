@@ -137,6 +137,9 @@ console.log('\n=== what no style changes, said in every one ===');
       ok(`${k}: what is theirs stays theirs`, /- What is theirs\./.test(b));
       ok(`${k}: they steer`, /a style never decides for them, pressures them, or talks them out of their own judgement/.test(b));
       ok(`${k}: depth is separate`, /Depth sets how far the thinking goes; this sets how it sounds/.test(b));
+      // Core 4 also holds this register in code (voice.ts heldVoice); Logos has
+      // no per-turn register, so for Logos this line is the whole protection.
+      ok(`${k}: somebody struggling gets no pressure and no jokes, whatever the style`, /every style goes quiet: no pressure and no jokes/.test(b));
       ok(`${k}: their words in the conversation win`, /their words win for that conversation/.test(b));
       ok(`${k}: the same mind underneath`, /Underneath every style you are the same/.test(b));
     }
