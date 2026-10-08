@@ -33,7 +33,7 @@ export interface SurfaceContract {
   type: SurfaceType;
   title: string;
   /** which part of the canonical state it is a representation of */
-  represents: 'conversation' | 'map' | 'model' | 'selection' | 'history';
+  represents: 'conversation' | 'map' | 'model' | 'selection' | 'history' | 'object';
   /** what a person can select in it */
   emits: FocusKind[];
   /** what selections elsewhere it follows */
@@ -53,6 +53,8 @@ export const SURFACES: Record<SurfaceType, SurfaceContract> = {
   params: { type: 'params', title: 'Parameters', represents: 'model', emits: ['param', 'input'], responds: ['param', 'input'], duplicable: false, canBeStale: false, heavy: false },
   inspector: { type: 'inspector', title: 'Inspector', represents: 'selection', emits: ['object'], responds: ['node', 'object', 'param', 'input'], duplicable: false, canBeStale: false, heavy: false },
   trace: { type: 'trace', title: 'Trace', represents: 'history', emits: [], responds: [], duplicable: false, canBeStale: false, heavy: false },
+  // Live 3D (experimental): a scene object of thought, drawn in 3D and built by describing it
+  scene: { type: 'scene', title: 'Live 3D', represents: 'object', emits: ['object'], responds: ['object'], duplicable: true, canBeStale: false, heavy: true },
 };
 
 // ── what this line of thinking holds, as the workspace needs to know it ──
@@ -76,6 +78,8 @@ export interface WorkspaceFacts {
   activeDoc: string | null;
   /** a picture with no model document behind it — a simulation, a plot */
   viz: 'simulation' | 'picture' | null;
+  /** Live 3D scenes among the objects of thought */
+  scenes: { id: string; name: string; parts: number }[];
 }
 
 export function factsFrom(map: ThinkingMap | null | undefined): WorkspaceFacts {
@@ -105,6 +109,9 @@ export function factsFrom(map: ThinkingMap | null | undefined): WorkspaceFacts {
     docs,
     activeDoc: ws?.active ?? null,
     viz: m.viz ? (m.viz.kind === 'simulation' ? 'simulation' : 'picture') : null,
+    scenes: (m.objects?.objs ?? [])
+      .filter((o) => o.kind === 'scene')
+      .map((o) => ({ id: o.id, name: o.name, parts: ((o.states[o.at] as { nodes?: unknown[] } | undefined)?.nodes ?? []).length })),
   };
 }
 
@@ -179,7 +186,16 @@ export function suggestViews(facts: WorkspaceFacts, layout: WorkspaceLayout): Vi
     push({ type: 'inspector', label: 'Inspector', why: 'what the selected idea is and what it connects to', score: 58 });
   }
 
-  const order: SurfaceType[] = ['model', 'params', 'inspector', 'map', 'chat', 'trace'];
+  // A scene is offered where there is one; starting one is always possible, and
+  // said to be what it is — a preview of shapes, not a model of anything physical.
+  for (const sc of facts.scenes) {
+    push({ type: 'scene', config: { obj: sc.id }, label: `Live 3D · ${sc.name}`, why: `${sc.parts} part${sc.parts === 1 ? '' : 's'}, built by describing them — a geometric preview`, score: 86 });
+  }
+  if (!facts.scenes.length) {
+    push({ type: 'scene', label: 'Live 3D · experimental', why: 'describe shapes and they are built as you type — a geometric preview, not a simulation', score: 30 });
+  }
+
+  const order: SurfaceType[] = ['model', 'params', 'inspector', 'map', 'scene', 'chat', 'trace'];
   return out.sort((a, b) => Number(a.open) - Number(b.open) || b.score - a.score || order.indexOf(a.type) - order.indexOf(b.type));
 }
 

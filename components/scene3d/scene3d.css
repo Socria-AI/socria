@@ -1,0 +1,243 @@
+/* Live 3D (experimental) — components/scene3d/ScenePanel.tsx.
+   Drawn in the Logos tokens; every class is s3-, so nothing here can reach
+   another surface. */
+
+.s3 {
+  container-type: inline-size;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--lg-panel);
+  color: var(--lg-ink);
+  font-family: var(--lg-sans);
+  font-size: 13px;
+}
+
+.s3-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--lg-line);
+}
+.s3-title { font-weight: 600; letter-spacing: 0.01em; }
+.s3-exp {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--lg-ink-60);
+  border: 1px solid var(--lg-line);
+  border-radius: 999px;
+  padding: 1px 7px;
+}
+/* what the scene is not, always in view */
+.s3-preview {
+  font-size: 11.5px;
+  color: var(--lg-tension);
+  background: rgba(156, 91, 60, 0.08);
+  border-radius: 4px;
+  padding: 2px 8px;
+}
+.s3-sp { flex: 1 1 auto; }
+.s3-tools { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.s3-tools button,
+.s3-tools select,
+.s3-say button,
+.s3-insp footer button {
+  font: inherit;
+  font-size: 12px;
+  color: var(--lg-ink);
+  background: transparent;
+  border: 1px solid var(--lg-line);
+  border-radius: 6px;
+  padding: 3px 9px;
+  cursor: pointer;
+}
+.s3-tools button.is-on { background: var(--lg-primary); color: var(--lg-paper); border-color: var(--lg-primary); }
+.s3-tools button:disabled,
+.s3-tools select:disabled,
+.s3-say button:disabled { opacity: 0.4; cursor: default; }
+
+/* the view and the description beside (or above) the parts */
+.s3-body { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.s3-main { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.s3-stage {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 220px;
+  overflow: hidden;
+}
+.s3-canvas { position: absolute !important; inset: 0; touch-action: none; }
+.s3-wait {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  text-align: center;
+  color: var(--lg-ink-60);
+}
+.s3-empty {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(460px, calc(100% - 32px));
+  padding: 16px 18px;
+  background: color-mix(in srgb, var(--lg-panel) 92%, transparent);
+  border: 1px solid var(--lg-line);
+  border-radius: 10px;
+  pointer-events: auto;
+}
+.s3-empty p { margin: 0 0 8px; color: var(--lg-ink-60); }
+.s3-empty ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.s3-empty button {
+  font: inherit;
+  text-align: left;
+  width: 100%;
+  color: var(--lg-ink);
+  background: transparent;
+  border: 1px dashed var(--lg-line);
+  border-radius: 6px;
+  padding: 5px 8px;
+  cursor: pointer;
+}
+.s3-empty button:hover { border-style: solid; }
+
+/* the size of the selected part, beside it in the scene */
+.s3-tag {
+  white-space: nowrap;
+  font-family: var(--lg-sans);
+  font-size: 11.5px;
+  color: #fff;
+  background: rgba(30, 32, 36, 0.82);
+  border-radius: 5px;
+  padding: 2px 7px;
+  pointer-events: none;
+  transform: translateY(-100%);
+}
+
+.s3-say {
+  display: flex;
+  gap: 6px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--lg-line);
+}
+.s3-say input {
+  flex: 1 1 auto;
+  min-width: 0;
+  font: inherit;
+  font-size: 14px;
+  color: var(--lg-ink);
+  background: var(--lg-paper);
+  border: 1px solid var(--lg-line);
+  border-radius: 8px;
+  padding: 7px 10px;
+}
+.s3-say input:focus { outline: 2px solid color-mix(in srgb, var(--lg-primary) 40%, transparent); outline-offset: 0; }
+.s3-say button[type='submit'] { background: var(--lg-primary); color: var(--lg-paper); border-color: var(--lg-primary); }
+
+/* the description, read back clause by clause */
+.s3-read {
+  list-style: none;
+  margin: 0;
+  padding: 0 12px 8px;
+  display: grid;
+  gap: 3px;
+  max-height: 120px;
+  overflow: auto;
+}
+.s3-read li { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; line-height: 1.35; }
+.s3-read li.is-problem { color: var(--lg-tension); }
+.s3-mark { width: 1em; flex: none; }
+.s3-skip { color: var(--lg-tension); font-size: 12px; }
+.s3-note { color: var(--lg-ink-60); font-size: 12px; }
+.s3-read .s3-note::before { content: '· '; }
+
+.s3-side {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+  align-content: start;
+  gap: 10px;
+  padding: 0 12px 12px;
+  max-height: 44%;
+  overflow: auto;
+}
+.s3-side:empty { display: none; }
+/* wide enough: the parts take a column of their own, and the view keeps its height */
+@container (min-width: 820px) {
+  .s3-body { flex-direction: row; }
+  .s3-side { grid-template-columns: minmax(0, 1fr); width: 330px; flex: none; max-height: none; border-left: 1px solid var(--lg-line); padding: 2px 12px 12px; }
+}
+.s3-side h4,
+.s3-insp h5 { margin: 8px 0 4px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--lg-ink-60); font-weight: 600; }
+.s3-below h4 span { font-weight: 400; }
+
+.s3-parts ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.s3-parts button {
+  font: inherit;
+  width: 100%;
+  display: grid;
+  grid-template-columns: 12px auto 1fr;
+  gap: 2px 8px;
+  align-items: baseline;
+  text-align: left;
+  color: var(--lg-ink);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 4px 6px;
+  cursor: pointer;
+}
+.s3-parts button:hover { border-color: var(--lg-line); }
+.s3-parts button.is-sel { border-color: var(--lg-primary); background: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.06); }
+.s3-sw { width: 11px; height: 11px; border-radius: 3px; border: 1px solid var(--lg-ink-24); align-self: center; }
+.s3-pn { font-weight: 600; }
+.s3-ps { color: var(--lg-ink-60); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.s3-pr { grid-column: 2 / -1; color: var(--lg-ink-40); font-size: 11.5px; }
+.s3-def { grid-column: 2 / -1; justify-self: start; font-size: 10.5px; color: var(--lg-ink-60); border: 1px dashed var(--lg-ink-24); border-radius: 4px; padding: 0 5px; }
+
+.s3-insp {
+  border: 1px solid var(--lg-line);
+  border-radius: 8px;
+  padding: 4px 10px 10px;
+  margin-top: 8px;
+  align-self: start;
+}
+.s3-insp header { display: flex; align-items: end; gap: 8px; }
+.s3-kind { color: var(--lg-ink-40); font-size: 11.5px; padding-bottom: 6px; }
+.s3-x { margin-left: auto; font: inherit; font-size: 16px; color: var(--lg-ink-60); background: none; border: 0; cursor: pointer; }
+.s3-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.s3-f { display: grid; gap: 1px; position: relative; min-width: 70px; flex: 1 1 70px; }
+.s3-f.is-wide { flex: 1 1 100%; }
+.s3-f > span { font-size: 10.5px; color: var(--lg-ink-60); }
+.s3-f input,
+.s3-f select {
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--lg-ink);
+  background: var(--lg-paper);
+  border: 1px solid var(--lg-line);
+  border-radius: 5px;
+  padding: 3px 6px;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+.s3-f input[type='color'] { padding: 0 2px; height: 26px; }
+.s3-f em { position: absolute; right: 6px; bottom: 4px; font-style: normal; font-size: 11px; color: var(--lg-ink-40); pointer-events: none; }
+.s3-measure p { margin: 2px 0; }
+.s3-how { margin-left: 8px; font-size: 10.5px; border-radius: 4px; padding: 0 5px; border: 1px solid var(--lg-line); color: var(--lg-ink-60); }
+.s3-how.is-numerical { border-style: dashed; }
+.s3-insp footer { display: flex; gap: 6px; margin-top: 10px; }
+.s3-insp footer .is-danger { color: var(--lg-tension); }
+
+.s3-steps ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; color: var(--lg-ink-60); font-size: 12px; }
+.s3-steps .s3-note { display: block; }
+
+@container (max-width: 560px) {
+  .s3-side { grid-template-columns: minmax(0, 1fr); }
+  .s3-preview { order: 9; }
+}

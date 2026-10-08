@@ -72,7 +72,7 @@ import { kindOf, objOf, currentOf, type ThoughtObject } from '@/lib/objects';
 
 /** What a person did to an object of thought, on its way up to be computed. */
 export type ObjectAction =
-  | { type: 'op'; obj: string; op: string; args: Record<string, string | number>; suggested?: boolean }
+  | { type: 'op'; obj: string; op: string; args: Record<string, string | number>; suggested?: boolean; at?: number }
   | { type: 'seek'; obj: string; at: number }
   | { type: 'select'; obj: string; part: string | null }
   | { type: 'view'; obj: string; view: string };

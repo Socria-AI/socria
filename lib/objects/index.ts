@@ -9,6 +9,7 @@
 
 import './matrix';
 import './function';
+import './scene';
 import { apply, create, currentOf, kindOf, objOf, originSaid, stepWho, EMPTY_SPACE, type ObjectOrigin, type ObjectSpace, type ThoughtObject, type Step } from './core';
 import { diffCells, findMatrices, matrixTeX, readMatrixOp, type MatrixState } from './matrix';
 import { findFunctions } from './function';
@@ -17,6 +18,7 @@ import type { LogosNode, ThinkingMap } from '@/lib/logos';
 export * from './core';
 export { matrixTeX, equationsOf, findMatrices, readMatrixOp, sayOp, echelon, reduced, beneath, lead, diffCells, type MatrixState } from './matrix';
 export { compileState, extremes, slopeAt, findFunctions, type FunctionState } from './function';
+export { SCENE, SCENE_OPS, DIMS, SHAPES, MATERIALS, settle, sanitizeScene, nodeLine, sizeOf, lengthIn, sceneBox, dependents, fitKey, UNIT_M, type SceneState, type SceneNode, type SceneShape, type MaterialKind, type LengthUnit } from './scene';
 
 export const spaceOf = (map: ThinkingMap | null | undefined): ObjectSpace => map?.objects ?? EMPTY_SPACE;
 
@@ -128,7 +130,7 @@ export function describeObject(o: ThoughtObject, opts: { guarded: boolean; histo
   const k = kindOf(o.kind);
   if (!k) return [];
   const cur = currentOf(o);
-  const lines = [`${k.label} ${o.name} — ${k.shape(cur)}, ${originSaid(o)}.`];
+  const lines = [`${k.label} ${o.name} — ${k.shape(cur)}, ${originSaid(o)}${o.trimmed ? ` (its earliest ${o.trimmed} step${o.trimmed === 1 ? ' is' : 's are'} no longer kept)` : ''}.`];
   const steps = o.steps.slice(0, o.at);
   if (steps.length) {
     lines.push(`Steps so far (each one computed by the workspace):`);
@@ -149,6 +151,7 @@ export function describeObject(o: ThoughtObject, opts: { guarded: boolean; histo
 export function objectsBlock(space: ObjectSpace | undefined, opts: { guarded: boolean; lastStep?: { obj: string; step: Step } | null; refused?: string | null }): string {
   if (!space?.objs.length) return '';
   const parts = space.objs.map((o) => describeObject(o, { guarded: opts.guarded }).join('\n'));
+  const scene = space.objs.some((o) => o.kind === 'scene');
   const rules = [
     'These are COMPUTED by the workspace and shown to the person as the objects themselves. Never do arithmetic on them yourself and never write out a resulting matrix or value: if a step should be taken, the person takes it (they can type an operation like "R2 ← R2 − 3R1", or use the controls under the matrix) and the workspace computes it.',
     opts.lastStep
@@ -158,9 +161,17 @@ export function objectsBlock(space: ObjectSpace | undefined, opts: { guarded: bo
     opts.guarded
       ? 'They are LEARNING. They choose the operations — that is the thinking being practised. Do not name the next operation or the multiplier. Ask what they want to eliminate, which entry they are aiming at, what they notice in the new row. When a step did not do what it seems to have been for, point at the entry and ask; never correct it for them.'
       : 'You may suggest an operation when it helps; write it in the workspace’s notation (R3 ← R3 − 5R1) and say it is a suggestion — it will be offered to them to try, not applied.',
+    scene
+      ? 'A SCENE is a geometric preview the person builds by describing it in the Live 3D panel: shapes, sizes and positions, computed exactly, and nothing more. It is not a physical model — never say it would stand, balance, hold a load, float or survive anything, and never give a mass or a strength. If they want to know that, say it needs a physical model, which the scene is not.'
+      : '',
   ].filter(Boolean);
-  const text = `\n\nOBJECTS IN THE WORKSPACE\n${parts.join('\n\n')}\n\n${rules.join('\n')}\n`;
-  return text.length > MAX_BLOCK ? text.slice(0, MAX_BLOCK) + '\n…\n' : text;
+  // The rules are never what gets cut: a large scene shortens its own description instead.
+  const tail = `\n\n${rules.join('\n')}\n`;
+  const head = `\n\nOBJECTS IN THE WORKSPACE\n`;
+  let body = parts.join('\n\n');
+  const room = Math.max(400, MAX_BLOCK - head.length - tail.length);
+  if (body.length > room) body = body.slice(0, room) + '\n…';
+  return head + body + tail;
 }
 
 /** What the extractor is told: the objects exist, by id, and must not be copied into nodes. */

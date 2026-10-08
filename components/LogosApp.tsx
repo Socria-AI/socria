@@ -22,6 +22,7 @@ import { readName } from '@/lib/onboarding-name';
 import {
   apply as applyObjectOp,
   bindNodes,
+  create as createObject,
   discover,
   mergeSpaces,
   objOf,
@@ -131,9 +132,11 @@ import {
 import type { Model } from '@/lib/model/schema';
 import { DOCK_SIDES, Workspace, type DockSide } from '@/components/workspace/Workspace';
 import { InspectorPanel, ModelPanel, ParamsPanel, TracePanel } from '@/components/workspace/panels';
+import { ScenePanel } from '@/components/scene3d/ScenePanel';
 import {
   addPanel,
   configurePanel,
+  maximize,
   panelsOf,
   sanitizeLayout,
   singleLayout,
@@ -2832,7 +2835,12 @@ export function LogosApp({
   function onObject(a: ObjectAction): { ok: boolean; why?: string } | void {
     const space = spaceOf(mapRef.current);
     if (a.type === 'op') {
-      const r = applyObjectOp(space, a.obj, a.op, a.args, { by: 'person', suggested: a.suggested });
+      // someone who may only read or comment on a shared line of thinking cannot change its objects
+      if (togetherRef.current?.active && togetherRef.current.role !== 'owner' && togetherRef.current.role !== 'editor') {
+        return { ok: false, why: 'You can look at this line of thinking, but not change it.' };
+      }
+      // the steps one description makes share its moment, so undo takes the description back whole
+      const r = applyObjectOp(space, a.obj, a.op, a.args, { by: 'person', suggested: a.suggested, ...(a.at ? { at: a.at } : {}) });
       if (!r.ok) return { ok: false, why: r.why };
       commitObjects(r.space, r.obj);
       return { ok: true };
@@ -2846,6 +2854,18 @@ export function LogosApp({
       const v = a.part ? { obj: a.obj, part: a.part } : null;
       setObjSel(v);
       if (workspaceOn) setFocus(v ? { kind: 'part', ...v } : null);
+      return;
+    }
+    if (a.type === 'view' && a.view === '3d') {
+      // A SCENE, OPENED WHERE IT IS WORKED ON: its Live 3D panel — the one
+      // already showing it, else a new one beside what is there.
+      if (!workspaceOn || !wsLayout) return;
+      const ps = panelsOf(wsLayout);
+      const there = ps.find((p) => p.type === 'scene' && p.config?.obj === a.obj) ?? ps.find((p) => p.type === 'scene' && !p.config?.obj);
+      if (there) {
+        const pinned = there.config?.obj ? wsLayout : configurePanel(wsLayout, there.id, { obj: a.obj });
+        changeLayout(ps.length > 1 ? maximize(pinned, there.id) : pinned);
+      } else changeLayout(addPanel(wsLayout, { type: 'scene', config: { obj: a.obj } }, 1.6, 0.5).layout);
       return;
     }
     if (a.type === 'view' && a.view === 'plane') {
@@ -3450,6 +3470,22 @@ export function LogosApp({
   const firstOf = (t: PanelNode['type']) => (wsLayout ? panelsOf(wsLayout).find((x) => x.type === t)?.id ?? null : null);
   const focusBrief = workspaceOn ? describeFocus(focus, map) : null;
 
+  /** A new, empty scene — made when the first description in a Live 3D panel is built — and the panel pinned to it. */
+  function createScene(panelId: string): string | null {
+    const space = spaceOf(mapRef.current);
+    const scenes = space.objs.filter((o) => o.kind === 'scene').length;
+    const made = createObject(space, 'scene', { nodes: [], next: 1, unit: 'm' }, { name: scenes ? `Scene${scenes + 1}` : 'Scene', origin: 'person' });
+    if (!made) return null;
+    commitObjects(made.space, made.obj);
+    if (wsLayout) changeLayout(configurePanel(wsLayout, panelId, { obj: made.obj.id }));
+    return made.obj.id;
+  }
+  const sceneOf = (p: PanelNode): ThoughtObject | null => {
+    const objs = map.objects?.objs ?? [];
+    const pinned = p.config?.obj ? objs.find((o) => o.id === p.config!.obj && o.kind === 'scene') : null;
+    return pinned ?? (p.config?.obj ? null : objs.find((o) => o.kind === 'scene') ?? null);
+  };
+
   function renderPanel(p: PanelNode) {
     switch (p.type) {
       case 'chat':
@@ -3492,6 +3528,21 @@ export function LogosApp({
         return <InspectorPanel map={map} doc={panelDoc(p)} focus={focus} onFocus={setFocus} onAsk={stableAskLabel} />;
       case 'trace':
         return <TracePanel doc={panelDoc(p)} onUndo={stableUndo} onRedo={stableRedo} onRestore={stableRestore} />;
+      case 'scene': {
+        // LIVE 3D (experimental): a scene object of thought, built by describing it
+        const sc = sceneOf(p);
+        return (
+          <ScenePanel
+            obj={sc}
+            selected={sc && objSel?.obj === sc.id ? objSel.part : null}
+            onSelect={(part) => sc && onObject({ type: 'select', obj: sc.id, part })}
+            onOp={(id, op, args, at) => onObject({ type: 'op', obj: id, op, args, at }) ?? { ok: false, why: 'Nothing here can compute that.' }}
+            onCreate={() => createScene(p.id)}
+            onSeek={(id, at) => onObject({ type: 'seek', obj: id, at })}
+            readOnly={togetherReadOnly}
+          />
+        );
+      }
     }
   }
 
@@ -3515,6 +3566,10 @@ export function LogosApp({
         return { title: 'Inspector', sub: focusBrief?.label };
       case 'trace':
         return { title: 'Trace', sub: docTitle };
+      case 'scene': {
+        const sc = sceneOf(p);
+        return { title: 'Live 3D', sub: sc ? `${sc.name} · experimental` : 'experimental' };
+      }
     }
   }
 

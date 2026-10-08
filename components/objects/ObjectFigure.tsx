@@ -22,6 +22,8 @@ import {
   type ThoughtObject,
 } from '@/lib/objects';
 import { TeX } from '@/components/TeX';
+import { planOf } from '@/lib/objects/scene-plan';
+import type { SceneState } from '@/lib/objects/scene';
 import './objects.css';
 
 export type FigureMode = 'live' | 'trail' | 'card';
@@ -48,7 +50,65 @@ export interface FigureProps {
 export function ObjectFigure(p: FigureProps) {
   if (p.obj.kind === 'matrix') return <MatrixFigure {...p} />;
   if (p.obj.kind === 'function') return <FunctionFigure {...p} />;
+  if (p.obj.kind === 'scene') return <SceneFigure {...p} />;
   return null;
+}
+
+// ── scene ────────────────────────────────────────────────────────────
+
+/**
+ * A Live 3D scene on the map: its plan — every part's outline seen from
+ * above, computed from its geometry (lib/objects/scene-plan.ts) — and the
+ * way into the 3D view, where it is built and worked on.
+ */
+function SceneFigure({ obj, at, mode, sel, onSelect, onView }: FigureProps) {
+  const st = (obj.states[at] ?? currentOf(obj)) as SceneState;
+  const step = at > 0 ? obj.steps[at - 1] : null;
+  const plan = useMemo(() => planOf(st), [st]);
+  const W = mode === 'live' ? 336 : 150;
+  const H = mode === 'live' ? 150 : 64;
+  const b = plan.bounds;
+  const pad = 6;
+  const span = b ? Math.max(b[2] - b[0], b[3] - b[1], 1e-6) : 1;
+  const k = b ? Math.min((W - 2 * pad) / Math.max(b[2] - b[0], span * 0.2), (H - 2 * pad) / Math.max(b[3] - b[1], span * 0.2)) : 1;
+  const ox = b ? W / 2 - ((b[0] + b[2]) / 2) * k : W / 2;
+  const oz = b ? H / 2 - ((b[1] + b[3]) / 2) * k : H / 2;
+  const d = (ring: [number, number][]) => ring.map(([x, z], i) => `${i ? 'L' : 'M'}${(ox + x * k).toFixed(1)} ${(oz + z * k).toFixed(1)}`).join(' ') + ' Z';
+  return (
+    <div className={`obj obj-scene obj-${mode}`}>
+      <Head obj={obj} at={at} mode={mode} />
+      {st.nodes.length ? (
+        <svg className="obj-plan" width={W} height={H} viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`${obj.name} seen from above: ${st.nodes.length} part${st.nodes.length === 1 ? '' : 's'}`}>
+          {plan.parts.map((pp) => (
+            <path
+              key={pp.id}
+              d={pp.rings.map(d).join(' ')}
+              fillRule="evenodd"
+              fill={pp.color}
+              fillOpacity={0.55}
+              stroke={sel === pp.id ? 'var(--lg-primary)' : 'var(--lg-ink-60)'}
+              strokeWidth={sel === pp.id ? 1.6 : 0.8}
+              strokeDasharray={pp.silhouette ? undefined : '3 2'}
+              onClick={mode === 'live' && onSelect ? () => onSelect(sel === pp.id ? null : pp.id) : undefined}
+            />
+          ))}
+        </svg>
+      ) : (
+        <p className="obj-scene-empty">Nothing built yet.</p>
+      )}
+      {mode === 'live' && (
+        <footer className="obj-scene-foot">
+          <span>Seen from above · a geometric preview</span>
+          {onView && (
+            <button type="button" onClick={() => onView('3d')}>
+              Open in 3D
+            </button>
+          )}
+        </footer>
+      )}
+      {mode === 'trail' && step && <p className="obj-scene-step">{step.said}</p>}
+    </div>
+  );
 }
 
 /** "-1/2" as a typeset fraction; whole numbers as they are; a real minus sign. */

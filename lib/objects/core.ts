@@ -62,6 +62,8 @@ export interface ThoughtObject<S = unknown> {
   steps: Step[];
   /** which state is current — stepping back moves this, it erases nothing */
   at: number;
+  /** how many of the earliest states are no longer kept (the history is capped from its start) */
+  trimmed?: number;
 }
 
 export interface ObjectSpace {
@@ -117,6 +119,15 @@ export interface ObjectKind<S = unknown> {
   size: (state: S, mode: 'live' | 'trail' | 'card') => { w: number; h: number };
   /** a one-line name for the state's shape: "3 × 4 matrix" */
   shape: (state: S) => string;
+  /**
+   * How many arguments an operation may carry, and how long a text argument
+   * may be, when a stored history is re-read. Eight short arguments are
+   * enough for a row operation; a scene's "add a box 2 × 1 × 3 on the table"
+   * carries more. Absent: 8 and 60.
+   */
+  argLimits?: { count: number; length: number };
+  /** states kept for one object of this kind; absent, MAX_STATES. A scene's states are large, so it keeps fewer. */
+  maxStates?: number;
 }
 
 // ── the registry ─────────────────────────────────────────────────────
@@ -135,6 +146,7 @@ export const EMPTY_SPACE: ObjectSpace = { objs: [] };
 export const MAX_OBJECTS = 8;
 /** States kept per object. The oldest go first; a long elimination is ~10 steps. */
 export const MAX_STATES = 40;
+const capOf = (k: ObjectKind<any> | null) => Math.max(2, Math.min(MAX_STATES, k?.maxStates ?? MAX_STATES));
 
 export const currentOf = <S>(o: ThoughtObject<S>): S => o.states[Math.min(Math.max(0, o.at), o.states.length - 1)];
 export const objOf = (space: ObjectSpace | null | undefined, id: string | null | undefined): ThoughtObject | null =>
@@ -213,12 +225,19 @@ export function apply(
   };
   let states = [...obj.states.slice(0, obj.at + 1), after];
   let steps = [...obj.steps.slice(0, obj.at), step];
-  // keep the start, drop the oldest middle states past the cap
-  while (states.length > MAX_STATES) {
-    states = [states[0], ...states.slice(2)];
+  let trimmed = obj.trimmed ?? 0;
+  // Past the cap the OLDEST states go, the start among them. What is kept must
+  // still be a chain in which each state follows from the one before by its
+  // step — that is what sanitizeSpace re-computes on every load. Keeping the
+  // start and dropping states after it broke the chain at the gap, and the
+  // next load cut the whole history back to the start.
+  const cap = capOf(k);
+  while (states.length > cap) {
+    states = states.slice(1);
     steps = steps.slice(1);
+    trimmed++;
   }
-  const next: ThoughtObject = { ...obj, states, steps, at: states.length - 1 };
+  const next: ThoughtObject = { ...obj, states, steps, at: states.length - 1, ...(trimmed ? { trimmed } : {}) };
   return { ok: true, space: { objs: space.objs.map((o) => (o.id === id ? next : o)) }, obj: next, step };
 }
 
@@ -262,15 +281,16 @@ export function sanitizeSpace(raw: unknown): ObjectSpace | undefined {
     const kept: unknown[] = [first];
     const steps: Step[] = [];
     const rawSteps = Array.isArray(o.steps) ? o.steps : [];
-    for (let i = 0; i < rawSteps.length && kept.length < MAX_STATES; i++) {
+    for (let i = 0; i < rawSteps.length && kept.length < capOf(k); i++) {
       const s = rawSteps[i] as Record<string, unknown> | null;
       const def = s && typeof s.op === 'string' ? k.ops[s.op] : null;
       if (!s || !def) break;
       const args: Record<string, string | number> = {};
       if (s.args && typeof s.args === 'object') {
-        for (const [a, v] of Object.entries(s.args as Record<string, unknown>).slice(0, 8)) {
+        const lim = k.argLimits ?? { count: 8, length: 60 };
+        for (const [a, v] of Object.entries(s.args as Record<string, unknown>).slice(0, lim.count)) {
           if (typeof v === 'number' && Number.isFinite(v)) args[a] = v;
-          else if (typeof v === 'string' && v.length <= 60) args[a] = v;
+          else if (typeof v === 'string' && v.length <= lim.length) args[a] = v;
         }
       }
       const before = kept[kept.length - 1];
@@ -297,6 +317,7 @@ export function sanitizeSpace(raw: unknown): ObjectSpace | undefined {
     }
     const name = typeof o.name === 'string' && /^[A-Za-z][A-Za-z0-9_']{0,7}$/.test(o.name) ? o.name : id;
     const at = typeof o.at === 'number' ? Math.min(Math.max(0, Math.round(o.at)), kept.length - 1) : kept.length - 1;
+    const trimmed = typeof o.trimmed === 'number' && Number.isInteger(o.trimmed) && o.trimmed > 0 && o.trimmed < 1e6 ? o.trimmed : 0;
     ids.add(id);
     out.push({
       id,
@@ -306,6 +327,7 @@ export function sanitizeSpace(raw: unknown): ObjectSpace | undefined {
       states: kept,
       steps,
       at,
+      ...(trimmed ? { trimmed } : {}),
     });
   }
   return out.length ? { objs: out } : undefined;

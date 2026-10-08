@@ -19,7 +19,7 @@
 // PURE. Every operation takes a layout and returns a new one; the shell
 // renders it and the suite holds it.
 
-export const SURFACE_TYPES = ['chat', 'map', 'model', 'params', 'inspector', 'trace'] as const;
+export const SURFACE_TYPES = ['chat', 'map', 'model', 'params', 'inspector', 'trace', 'scene'] as const;
 export type SurfaceType = (typeof SURFACE_TYPES)[number];
 
 /** What a panel is pointed at, beyond its type. All optional, all small. */
@@ -30,6 +30,8 @@ export interface PanelConfig {
   view?: string;
   /** a lens of the Thinking Map */
   lens?: string;
+  /** an object of thought the panel is pinned to — a Live 3D scene (lib/objects/scene.ts) */
+  obj?: string;
 }
 
 export interface PanelNode {
@@ -85,7 +87,11 @@ export function isOpen(layout: WorkspaceLayout, type: SurfaceType, config?: Pane
   return panelsOf(layout).some(
     (p) =>
       p.type === type &&
-      (!config || ((config.doc ?? '') === (p.config?.doc ?? '') && (config.view ?? '') === (p.config?.view ?? '') && (config.lens ?? '') === (p.config?.lens ?? '')))
+      (!config ||
+        ((config.doc ?? '') === (p.config?.doc ?? '') &&
+          (config.view ?? '') === (p.config?.view ?? '') &&
+          (config.lens ?? '') === (p.config?.lens ?? '') &&
+          (config.obj ?? '') === (p.config?.obj ?? '')))
   );
 }
 
@@ -429,7 +435,7 @@ export function sanitizeLayout(raw: unknown): WorkspaceLayout | null {
     if (!c || typeof c !== 'object') return undefined;
     const o = c as Record<string, unknown>;
     const out: PanelConfig = {};
-    for (const k of ['doc', 'view', 'lens'] as const) {
+    for (const k of ['doc', 'view', 'lens', 'obj'] as const) {
       const v = o[k];
       if (typeof v === 'string' && /^[\w:.@-]{1,64}$/.test(v)) out[k] = v;
     }

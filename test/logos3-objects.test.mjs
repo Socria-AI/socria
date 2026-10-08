@@ -151,7 +151,11 @@ console.log('\n=== history: step back, step again, nothing silently lost ===');
   ok('a new step from there replaces what came after', again.obj.states.length === 3 && again.obj.steps[1].said === 'R3 ← R3 − 5R1' && again.obj.at === 2);
   let many = start();
   for (let t = 0; t < 60; t++) many = O.apply(many, 'A', 'swap', { i: 1 + (t % 2), j: 3 }, { by: 'person' }).space;
-  ok('a long history is capped, keeping the start', many.objs[0].states.length === O.MAX_STATES && JSON.stringify(nums(many.objs[0].states[0])) === JSON.stringify(A0));
+  ok('a long history is capped from its start, and says how much went', many.objs[0].states.length === O.MAX_STATES && many.objs[0].trimmed === 61 - O.MAX_STATES);
+  // the cap once kept the start and dropped the states after it — a chain with a gap, which the next load cut back to the start
+  const reread = O.sanitizeSpace(JSON.parse(JSON.stringify(many))).objs[0];
+  ok('… and what is kept is still a chain that survives storage', reread.states.length === O.MAX_STATES && reread.trimmed === many.objs[0].trimmed && JSON.stringify(nums(O.currentOf(reread))) === JSON.stringify(nums(O.currentOf(many.objs[0]))));
+  ok('… which the conversation is told', /earliest 21 steps are no longer kept/.test(O.describeObject(many.objs[0], { guarded: false })[0]));
 }
 
 console.log('\n=== nothing can claim to be computed that was not ===');

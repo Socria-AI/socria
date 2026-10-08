@@ -62,7 +62,8 @@ export function describeFocus(focus: Focus, map: ThinkingMap | null | undefined)
     return clip({
       kind: 'part',
       label: `${part.label} of ${o.name}`,
-      of: `${k.label.toLowerCase()} ${o.name}`,
+      // "scene Scene" says nothing twice; a name that already says its kind is enough
+      of: o.name.toLowerCase().startsWith(k.label.toLowerCase()) ? o.name : `${k.label.toLowerCase()} ${o.name}`,
       lines: [...lines, ...(last ? [`the last step on ${o.name}: ${last.said} (${last.by === 'person' ? 'their choice' : 'Socria’s'}; computed)`] : [])],
     });
   }

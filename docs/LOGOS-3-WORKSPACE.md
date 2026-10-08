@@ -186,27 +186,27 @@ Tests: `test/logos3-chat-notes.test.mjs`. Verified in Chromium:
   reload;
 - a phone at 390px.
 
-## 13. Notes in the conversation; the chrome put away
+## 14. Live 3D (experimental)
 
-**Notes on the work sit in the conversation.** Three notes used to be strips
-across the top of the map:
-- what the engine did with a model this turn proposed, which may be a
-  refusal or a variable it left out;
-- a cue to something worth finding;
-- the first map's save-as-image nudge.
+A scene, built by describing it. "+ View" offers **Live 3D**: a panel with a
+3D view, a line to describe what to build or change, the parts, and an
+inspector. What is typed is read as it is typed, and the scene it would make
+is drawn at once, with what would change ghosted. Nothing is in the scene
+until Enter.
 
-In Logos 3 they sit under Socria's latest reply instead. They appear in the
-thread when the conversation is open, and under the reply's preview when it is
-folded. Each can be put away. Logos 2 keeps its strips.
+The scene is an object of thought, kind `scene` (`lib/objects/scene.ts`). It
+lives in the map, so it persists and syncs with the line of thinking, and the
+conversation is told about it. Selecting a part is the workspace's shared
+focus: "About box of Scene". The map's Work lens draws the scene as a plan
+seen from above, with each step in its trail and an "Open in 3D" button.
 
-**The chats bar and header, put away.** A control at the far right of the
-header hides both. One small button in the top-right corner brings them back.
-The choice is kept per browser (`socria.logos.chrome.v1`). The ≡ at the top
-left still hides the chats bar on its own.
+It says what it is. The panel, the facts and the reply model's rules all
+call it a geometric preview: shapes, sizes and positions, computed exactly.
+Nothing in it is weighed, stressed or simulated, and the reply model is told
+never to say it would stand, hold or float.
 
-Tests: `test/logos3-chat-notes.test.mjs`. Verified in Chromium: no strip over
-the map; the notes in place, folded and open; dismissing; hide and restore,
-kept across a reload; a phone at 390px.
+The full account is in `docs/LOGOS3-LIVE-3D.md`. Tests:
+`test/logos3-scene.test.mjs`.
 
 ## Next
 

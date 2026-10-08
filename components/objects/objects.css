@@ -137,6 +137,15 @@
 .logos-root .obj-param-v { min-width: 38px; text-align: right; font-variant-numeric: tabular-nums; font-family: var(--font-stix, serif); }
 .logos-root .obj-mini { display: block; font-family: var(--font-stix, serif); font-size: 11px; color: var(--lg-ink-60); text-align: center; }
 
+/* a Live 3D scene on the map: its plan, seen from above (lib/objects/scene-plan.ts) */
+.logos-root .obj-plan { display: block; margin: 6px auto; background: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.035); border-radius: 6px; }
+.logos-root .obj-plan path { cursor: pointer; }
+.logos-root .obj-trail .obj-plan path, .logos-root .obj-card .obj-plan path { cursor: default; }
+.logos-root .obj-scene-empty { margin: 10px 0; font-size: 12.5px; color: var(--lg-ink-60); }
+.logos-root .obj-scene-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 11.5px; color: var(--lg-ink-60); }
+.logos-root .obj-scene-foot button { font: inherit; font-size: 12px; color: var(--lg-paper); background: var(--lg-primary); border: 0; border-radius: 6px; padding: 3px 10px; cursor: pointer; }
+.logos-root .obj-scene-step { margin: 2px 0 0; font-size: 11px; color: var(--lg-ink-60); text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 150px; }
+
 /* the step between two states in the Work lens's trail */
 .logos-root .lg-conn.lg-tone-suggested .lg-edge { stroke-dasharray: 4 3; }
 .logos-root .lg-conn.lg-tone-undone { opacity: 0.35; }
