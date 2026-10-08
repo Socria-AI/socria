@@ -41,6 +41,7 @@ import { DOMAIN_FROM_SAYS } from './kinds';
 import { inputsOf } from './derive';
 import { runFor } from './system';
 import { pdeRunFor } from './pde';
+import { buckinghamPi } from '@/lib/numeric/dimensional';
 import { feigenbaumOf, mapBehaviour } from './iterate';
 import { viewsFor, unavailable, worth } from './views';
 
@@ -166,6 +167,22 @@ export function inspectModel(model: Model): Inspection {
   }
   if (model.time) {
     state.push({ label: 'Clock', value: `t = ${model.time.t} of ${model.time.min}–${model.time.max}${model.time.units ? ` ${model.time.units}` : ''}` });
+  }
+  // THE GROUPS WITH NO DIMENSION, from the units the parameters carry (Buckingham Π): any law among these
+  // quantities is a law among these groups. Only when two or more units are read and a group exists.
+  {
+    const withUnits = model.params.filter((p) => p.units).map((p) => ({ name: p.id, unit: p.units! }));
+    if (withUnits.length >= 2) {
+      const pi = buckinghamPi(withUnits);
+      if (pi.groups.length && pi.read.length >= 2) {
+        state.push({
+          label: 'Dimensionless groups',
+          value: `${pi.groups.map((g) => g.text).join('; ')} — Buckingham’s Π: ${pi.read.length} quantities spanning ${pi.rank} dimension${pi.rank === 1 ? '' : 's'} make ${pi.groups.length} group${pi.groups.length === 1 ? '' : 's'} with none${pi.unread.length ? `; ${pi.unread.map((u) => `${u.name} (${u.unit})`).join(', ')} not read` : ''}`,
+          origin: 'computation',
+          fidelity: 'model-derived',
+        });
+      }
+    }
   }
   // The values the model currently computes — read from the objects that hold
   // one, rather than recomputed here.

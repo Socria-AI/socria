@@ -28,6 +28,8 @@ const MODULES = [
   'lib/numeric/spectral.ts',
   'lib/numeric/dynamics.ts',
   'lib/numeric/fields.ts',
+  'lib/numeric/dimensional.ts',
+  'lib/numeric/bvp.ts',
   'lib/logos-structure.ts',
   'lib/view-request.ts',
   'lib/logos.ts',
