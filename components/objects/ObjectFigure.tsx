@@ -23,6 +23,7 @@ import {
 } from '@/lib/objects';
 import { TeX } from '@/components/TeX';
 import { planOf } from '@/lib/objects/scene-plan';
+import { analyseMatrix } from '@/lib/objects/matrix-analysis';
 import type { SceneState } from '@/lib/objects/scene';
 import './objects.css';
 
@@ -144,12 +145,80 @@ function Head({ obj, at, mode, children }: { obj: ThoughtObject; at: number; mod
 
 // ── matrix ───────────────────────────────────────────────────────────
 
+/** What a matrix IS — rank, subspaces, factorizations, eigenvalues — computed from its entries (lib/objects/matrix-analysis.ts). */
+function MatrixAnalysisView({ st }: { st: MatrixState }) {
+  const a = useMemo(() => analyseMatrix(st), [st]);
+  if (!a) return <p className="obj-an-none">These entries could not be read as numbers.</p>;
+  const sp = a.subspaces;
+  const row = (label: string, dim: string, basis: string[], none: string) => (
+    <li>
+      <span className="obj-an-k">{label}</span>
+      <span className="obj-an-d">{dim}</span>
+      <span className="obj-an-v">
+        {basis.length
+          ? basis.map((v, i) => (
+              <span key={i} className="obj-an-vec">
+                {v}
+                {i < basis.length - 1 ? ', ' : ''}
+              </span>
+            ))
+          : none}
+      </span>
+    </li>
+  );
+  return (
+    <div className="obj-an" aria-label="What this matrix is">
+      <p className="obj-an-rank">
+        {a.m} × {a.n}, rank <strong>{a.rank}</strong>
+        {a.square ? (
+          <>
+            {' '}· det {a.square.det}
+            {a.square.invertible ? ' · invertible' : ' · singular'}
+          </>
+        ) : null}
+      </p>
+      <ul className="obj-an-sub">
+        {row('Column space', `dim ${sp.dims.column}`, sp.column, 'only zero')}
+        {row('Row space', `dim ${sp.dims.row}`, sp.row, 'only zero')}
+        {row('Null space', `dim ${sp.dims.null}`, sp.null, 'only zero')}
+        {row('Left null space', `dim ${sp.dims.leftNull}`, sp.leftNull, 'only zero')}
+      </ul>
+      {a.rank > 0 && (
+        <p className="obj-an-line">
+          <span className="obj-an-k">A = CR</span> C = column{a.cr.pivots.length === 1 ? '' : 's'} {a.cr.pivots.map((j) => j + 1).join(', ')}; R = [{a.cr.R.map((r) => r.join(' ')).join('; ')}]
+        </p>
+      )}
+      {a.square && (
+        <p className="obj-an-line">
+          <span className="obj-an-k">Eigenvalues</span> {a.square.eigen.join('; ')}
+          {a.square.diagonalizable ? '' : ' — not diagonalizable'}
+        </p>
+      )}
+      <p className="obj-an-line">
+        <span className="obj-an-k">Singular values</span> {a.singular.join(', ')}
+        {a.condition ? ` · condition ${a.condition}` : ''}
+      </p>
+      {a.plane && (
+        <p className="obj-an-line">
+          <span className="obj-an-k">On the plane</span> {a.plane}
+        </p>
+      )}
+      {a.system && (
+        <p className="obj-an-line obj-an-sys">
+          <span className="obj-an-k">Ax = b</span> {a.system.replace(/^Ax = b /, '')}
+        </p>
+      )}
+      <p className="obj-an-note">Computed from the entries — exact fractions where elimination keeps them, four figures where it cannot.</p>
+    </div>
+  );
+}
+
 function MatrixFigure({ obj, at, mode, guarded, sel, onSelect, onOp, readOp, onSeek, suggestions, onView }: FigureProps) {
   const st = (obj.states[at] ?? currentOf(obj)) as MatrixState;
   const prev = at > 0 ? (obj.states[at - 1] as MatrixState) : null;
   const step = at > 0 ? obj.steps[at - 1] : null;
   const k = kindOf('matrix')!;
-  const [view, setView] = useState<'grid' | 'equations'>('grid');
+  const [view, setView] = useState<'grid' | 'equations' | 'analysis'>('grid');
   const [draft, setDraft] = useState('');
   const [said, setSaid] = useState<{ ok: boolean; text: string } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -237,7 +306,9 @@ function MatrixFigure({ obj, at, mode, guarded, sel, onSelect, onOp, readOp, onS
       if (dot >= 0) el.setSelectionRange(dot, dot);
     });
   };
-  const views = k.views.filter((v) => !v.unavailable || !v.unavailable(st));
+  // what it IS is not shown while someone is working it out by hand — the steps are theirs
+  const views = k.views.filter((v) => (!v.unavailable || !v.unavailable(st)) && !(guarded && v.id === 'analysis'));
+  const shown = guarded && view === 'analysis' ? 'grid' : view;
 
   return (
     <div className="obj obj-matrix is-live" role="group" aria-label={`Matrix ${obj.name}, ${k.shape(st)}`}>
@@ -252,10 +323,10 @@ function MatrixFigure({ obj, at, mode, guarded, sel, onSelect, onOp, readOp, onS
                 key={v.id}
                 type="button"
                 role="tab"
-                aria-selected={v.id === view}
-                className={v.id === view ? 'is-on' : ''}
+                aria-selected={v.id === shown}
+                className={v.id === shown ? 'is-on' : ''}
                 title={v.shows}
-                onClick={() => (v.id === 'grid' || v.id === 'equations' ? setView(v.id) : onView?.(v.id))}
+                onClick={() => (v.id === 'grid' || v.id === 'equations' || v.id === 'analysis' ? setView(v.id) : onView?.(v.id))}
               >
                 {v.label}
               </button>
@@ -264,7 +335,9 @@ function MatrixFigure({ obj, at, mode, guarded, sel, onSelect, onOp, readOp, onS
         )}
       </Head>
 
-      {view === 'equations' ? (
+      {shown === 'analysis' ? (
+        <MatrixAnalysisView st={st} />
+      ) : shown === 'equations' ? (
         <ol className="obj-eqs">
           {equationsOf(st).map((e, i) => (
             <li key={i}>

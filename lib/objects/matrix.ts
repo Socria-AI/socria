@@ -17,6 +17,7 @@
 
 import { register, type ObjectKind, type Part } from './core';
 import { add, div, eq, isZero, mul, neg, parseQ, q, safe, say, show, tex as qtex, ZERO, ONE, type Q } from './rational';
+import { analysisFacts } from './matrix-analysis';
 
 export interface MatrixState {
   /** entries as exact rational text, rows first */
@@ -449,6 +450,8 @@ export const MATRIX: ObjectKind<MatrixState> = {
     } else {
       out.push('Not yet in row echelon form — some row leads further left than the one above it.');
     }
+    // WHAT IT IS, computed — but not while someone is working it out by hand: the steps are theirs
+    if (!guarded) out.push(...analysisFacts(s));
     return out;
   },
   text: (s) => s.rows.map((r) => `[ ${r.map((v) => v.padStart(width(s))).join('  ')} ]`).join('\n'),
@@ -500,6 +503,12 @@ export const MATRIX: ObjectKind<MatrixState> = {
       shows: 'the same rows read as linear equations — each row operation is an equation operation',
       interactions: ['select an equation'],
       unavailable: (s) => (s.rows[0].length < 2 ? 'a single column is a vector, not a system' : null),
+    },
+    {
+      id: 'analysis',
+      label: 'What it is',
+      shows: 'its rank and four subspaces with their bases, A = CR, the determinant, eigenvalues and singular values, and what Ax = b has — computed from the entries',
+      interactions: ['read it beside the elimination'],
     },
     {
       id: 'plane',
