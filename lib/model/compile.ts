@@ -46,6 +46,7 @@ import { LIMITS, type P3, type Primitive } from './primitives';
 import { sampledOver, type Fidelity, type Model, type ModelObject } from './schema';
 import { runFor, seriesOf, stateAt } from './system';
 import { pdePrimitives, pdeRunFor } from './pde';
+import { mapPrimitives, mapRunFor } from './iterate';
 import { operationsOn, route } from './solve';
 import { bindings, known, symbolTable, unbound } from './symbols';
 import { estimate } from './estimate';
@@ -405,6 +406,16 @@ export function buildObject(model: Model, o: ModelObject, opts?: { detail?: numb
       return NOTHING(o, `not computed: ${got.missing.map((m) => m.because ?? m.what).join('; ')} — supplying ${got.missing.length === 1 ? 'it' : 'them'} would let this run`);
     }
     const drawn = pdePrimitives(model, o, got.run, layer);
+    return { of: o.id, primitives: drawn.primitives, note: drawn.note, fidelity: 'numerically-computed' };
+  }
+
+  // ── A MAP, STEPPED ─────────────────────────────────────────────────
+  if (o.map) {
+    const got = mapRunFor(model, o);
+    if (!got.ok) {
+      return NOTHING(o, `not computed: ${got.missing.map((m) => m.because ?? m.what).join('; ')} — supplying ${got.missing.length === 1 ? 'it' : 'them'} would let this run`);
+    }
+    const drawn = mapPrimitives(o, got.run, layer);
     return { of: o.id, primitives: drawn.primitives, note: drawn.note, fidelity: 'numerically-computed' };
   }
 

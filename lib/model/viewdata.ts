@@ -35,6 +35,7 @@ import type { Primitive } from './primitives';
 import type { Model, ModelObject } from './schema';
 import { RENDERED, viewsFor, type ViewSpec } from './views';
 import { portraitOf } from './phase';
+import { bifurcationOf, cobwebOf, sectionOf } from './iterate';
 import { unitOf, unitOfObject, withUnit } from './units';
 
 /** What a view that is READ rather than looked at contains. */
@@ -95,6 +96,9 @@ export function frameFor(model: Model, id: string): VisualizationSpec | null {
   if (o?.pde && (v.family === 'field' || v.family === 'surface')) {
     return buildSpec(model, { only: [o.id], view: v.family === 'surface' ? '3d' : '2d' });
   }
+  if (o?.map && v.family === 'phase') return mapFrame(model, o, 'cobweb');
+  if (o && v.family === 'bifurcation') return mapFrame(model, o, 'bifurcation');
+  if (o && v.family === 'section') return mapFrame(model, o, 'section');
   if (v.family === 'residual' && o) return residualFrame(model, o);
   if (v.family === 'phase' && o) return phaseFrame(model, o);
   if (v.family === 'interval' && o) return intervalFrame(model, o);
@@ -463,6 +467,43 @@ function residualFrame(model: Model, o: ModelObject): VisualizationSpec | null {
  * plane is the whole state — the field, the nullclines, other paths and the
  * fixed points, each classified. A projection says it is one.
  */
+/** A map's own pictures, and a flow's section: each computed from the run, in its own box. */
+function mapFrame(model: Model, o: ModelObject, which: 'cobweb' | 'bifurcation' | 'section'): VisualizationSpec | null {
+  if (which === 'cobweb') {
+    const c = cobwebOf(model, o);
+    if (!c) return null;
+    const name = o.map!.states[0].name;
+    return reframe(model, o, {
+      primitives: c.primitives,
+      box: { x: c.box.x, y: c.box.y, z: [0, 1] },
+      axisNames: [withUnit(`${name}ₙ`, unitOf(model, name)), withUnit(`${name}ₙ₊₁`, unitOf(model, name)), ''],
+      note: c.note,
+      fidelity: 'numerically-computed',
+    });
+  }
+  if (which === 'bifurcation') {
+    const b = bifurcationOf(model, o);
+    if (!b) return null;
+    const name = o.map!.states[0].name;
+    return reframe(model, o, {
+      primitives: b.primitives,
+      box: { x: b.box.x, y: b.box.y, z: [0, 1] },
+      axisNames: [withUnit(b.param.label, b.param.units), withUnit(name, unitOf(model, name)), ''],
+      note: b.note,
+      fidelity: 'numerically-computed',
+    });
+  }
+  const s = sectionOf(model, o);
+  if (!s) return null;
+  return reframe(model, o, {
+    primitives: s.primitives,
+    box: { x: s.box.x, y: s.box.y, z: [0, 1] },
+    axisNames: [withUnit(s.names[0], unitOf(model, s.names[0])), withUnit(s.names[1], unitOf(model, s.names[1])), ''],
+    note: s.note,
+    fidelity: 'numerically-computed',
+  });
+}
+
 function phaseFrame(model: Model, o: ModelObject): VisualizationSpec | null {
   const p = portraitOf(model, o);
   if (!p) return null;

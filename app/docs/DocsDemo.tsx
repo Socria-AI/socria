@@ -26,6 +26,7 @@ import { buildProposal } from '@/lib/model/propose';
 import { editsState, EMPTY_WORKSPACE, modelFor, openFromProposal } from '@/lib/model/docs';
 import { oscillator } from '@/lib/model/library';
 import { ENGINEERING } from '@/lib/model/engineering';
+import { DYNAMICS } from '@/lib/model/dynamics-examples';
 import type { SocriaModel } from '@/lib/socria-prompt';
 import type { SynthesisData } from '@/lib/synthesis';
 import { SOCRIA_MODELS } from '@/lib/socria-prompt';
@@ -742,10 +743,10 @@ export function DemoEngineering({ id }: { id: string }) {
   }, [near]);
   const opened = useMemo(() => {
     if (!near) return null;
-    const ex = ENGINEERING.find((e) => e.id === id);
+    const ex = [...ENGINEERING, ...DYNAMICS].find((e) => e.id === id);
     return ex ? openFromProposal(EMPTY_WORKSPACE, ex.model(), { at: 0 }) : null;
   }, [near, id]);
-  const ex = ENGINEERING.find((e) => e.id === id);
+  const ex = [...ENGINEERING, ...DYNAMICS].find((e) => e.id === id);
   return (
     <div ref={host} className="d-eng-live">
       {!opened ? (

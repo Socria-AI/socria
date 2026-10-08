@@ -41,6 +41,7 @@ import { DOMAIN_FROM_SAYS } from './kinds';
 import { inputsOf } from './derive';
 import { runFor } from './system';
 import { pdeRunFor } from './pde';
+import { feigenbaumOf, mapBehaviour } from './iterate';
 import { viewsFor, unavailable, worth } from './views';
 
 /** One fact, with where it came from attached rather than implied. */
@@ -454,6 +455,26 @@ export function inspectObject(model: Model, id: string): Inspection | null {
           facts.push({ label: 'How', value: `${b.how}; ${b.lyapunov.method}`, of: o.id });
         }
         sections.push(section('behaviour', 'How it behaves', b.fixed.length ? `${b.fixed.length} fixed point${b.fixed.length === 1 ? '' : 's'}` : b.autonomous ? 'no fixed point found' : 'driven by time', facts));
+      }
+    }
+
+    // HOW A MAP BEHAVES — the period it settles into, how fast nearby starts separate, its fixed points
+    if (o.map) {
+      const b = mapBehaviour(model, o);
+      if (b) {
+        const facts: Fact[] = [{ label: 'What it does', value: b.says, of: o.id, fidelity: 'numerically-computed' }];
+        if (b.lyapunov) facts.push({ label: 'Lyapunov exponents', value: `${b.lyapunov.map((v) => sig(v)).join(', ')} per step — products of Jacobians along the orbit`, of: o.id, fidelity: 'numerically-computed' });
+        for (const fp of b.fixed) {
+          facts.push({
+            label: fp.type[0].toUpperCase() + fp.type.slice(1),
+            value: `a fixed point at (${fp.at.map((v) => sig(v)).join(', ')}) — multipliers ${fp.multipliers}; ${fp.stable === true ? 'nearby starts settle onto it' : fp.stable === false ? 'nearby starts leave it' : 'the linearization cannot decide'}`,
+            of: o.id,
+            fidelity: 'numerically-computed',
+          });
+        }
+        const fb = feigenbaumOf(model, o);
+        if (fb) facts.push({ label: 'Period doubling', value: fb.says, of: o.id, fidelity: 'numerically-computed' });
+        sections.push(section('behaviour', 'How it behaves', b.says, facts));
       }
     }
 

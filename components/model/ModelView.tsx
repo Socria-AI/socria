@@ -97,6 +97,42 @@ const HEAT = new WeakMap<object, HeatImage | null>();
 /** Ids inside one frame's SVG must not meet another frame's on the same page: url(#…) takes the first in the document. */
 let FRAMES = 0;
 
+/** A colour the page names by variable, as a canvas can paint it. */
+function resolveColor(css: string): string {
+  const m = /^var\((--[\w-]+)(?:,\s*([^)]+))?\)$/.exec(css.trim());
+  if (!m || typeof document === 'undefined') return css;
+  const v = getComputedStyle(document.documentElement).getPropertyValue(m[1]).trim();
+  return v || m[2] || '#354620';
+}
+
+const CLOUDS = new WeakMap<object, { key: string; href: string }>();
+
+/** Thousands of points as one image the size of the frame, at the screen's own resolution; made once per size. */
+function cloudImage(prim: Extract<Primitive, { p: 'points' }>, W: number, H: number, place: (p: P3) => { x: number; y: number }, color: string): string | null {
+  const key = `${Math.round(W)}x${Math.round(H)}:${color}`;
+  const held = CLOUDS.get(prim);
+  if (held && held.key === key) return held.href;
+  const dpr = Math.min(2, typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1);
+  const cv = document.createElement('canvas');
+  cv.width = Math.max(1, Math.round(W * dpr));
+  cv.height = Math.max(1, Math.round(H * dpr));
+  const ctx = cv.getContext('2d');
+  if (!ctx) return null;
+  ctx.scale(dpr, dpr);
+  ctx.fillStyle = color;
+  const r = prim.r ?? 1;
+  for (const p of prim.at) {
+    const q = place(p);
+    if (!Number.isFinite(q.x) || !Number.isFinite(q.y)) continue;
+    ctx.beginPath();
+    ctx.arc(q.x, q.y, r, 0, 2 * Math.PI);
+    ctx.fill();
+  }
+  const href = cv.toDataURL();
+  CLOUDS.set(prim, { key, href });
+  return href;
+}
+
 /** An end of a colour scale, to three figures — and zero when it is round-off against the range. */
 function scaleEnd(v: number, span: number): string {
   if (Math.abs(v) < 1e-9 * Math.max(Math.abs(span), 1e-300)) return '0';
@@ -907,6 +943,19 @@ export function ModelView({
           }
 
           case 'points': {
+            // A CLOUD OF THOUSANDS — a bifurcation diagram, an attractor — is drawn as one image in the plane: tens of
+            // thousands of circles are a document too heavy to redraw when a control moves
+            if (flat && prim.at.length > 4000 && typeof document !== 'undefined') {
+              const href = cloudImage(prim, a.W, a.H, (p) => at(p), resolveColor(stroke));
+              if (href) {
+                put(0, (
+                  <g key={`p${pi}`} data-obj={prim.of} opacity={dim ? 0.3 : 1}>
+                    <image href={href} x={0} y={0} width={a.W} height={a.H} preserveAspectRatio="none" style={{ pointerEvents: 'none' }} />
+                  </g>
+                ));
+                break;
+              }
+            }
             put(0, (
               <g key={`p${pi}`} data-obj={prim.of} opacity={dim ? 0.3 : 1}>
                 {prim.at.map((p, i) => {

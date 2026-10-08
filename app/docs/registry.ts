@@ -90,6 +90,12 @@ export const DOC_PAGES: DocPage[] = [
     group: 'The models',
   },
   {
+    slug: 'logos-3-dynamics',
+    title: 'Dynamics and chaos in Logos 3',
+    blurb: 'Maps and flows: the road to chaos and Feigenbaum’s δ, a strange attractor, the Lorenz butterfly cut by a Poincaré section, and predator–prey cycles — each built live, each number computed.',
+    group: 'The models',
+  },
+  {
     slug: 'thinking-map',
     title: 'The Thinking Map',
     blurb: 'Node types, relationships, the four lenses, and the four moves a node opens.',

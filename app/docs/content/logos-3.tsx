@@ -130,6 +130,8 @@ export function Logos3() {
         builds, live, and the numbers it computes. The same page has{' '}
         <Link href="/docs/logos-3-engineering#live3d">CAD-style designs built in the Live 3D panel</Link> — a bearing, an
         I-beam, a truss, a heat sink, a rotor and more — each drawn in 3D from the words that describe it.
+        Maps and chaos — the road to chaos and Feigenbaum’s δ, a strange attractor, the Lorenz butterfly cut by a
+        Poincaré section — are on <Link href="/docs/logos-3-dynamics">Dynamics and chaos in Logos 3</Link>.
       </p>
     </Article>
   );

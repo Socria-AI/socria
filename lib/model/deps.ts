@@ -137,6 +137,17 @@ export function referencesOf(o: ModelObject): Set<string> {
     add(o.gravity.softening);
   }
 
+  // A map: its states, where each starts, and each one's next value — and the
+  // parameter its bifurcation diagram sweeps.
+  if (o.map) {
+    for (const st of o.map.states ?? []) {
+      out.add(st.name.toLowerCase());
+      add(st.init);
+    }
+    for (const e of Object.values(o.map.next ?? {})) add(e);
+    if (o.map.sweep) out.add(o.map.sweep.toLowerCase());
+  }
+
   // A field: how each species starts and spreads, what carries it, how it
   // reacts, what its ends or edges hold, and how long it runs. The species are
   // references in their own right, as a system's states are.

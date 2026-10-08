@@ -42,6 +42,7 @@ import { readMechanism } from './mechanism';
 import { expressionOf, marginalOf } from './derive';
 import { readSystem, type Missing } from './system';
 import { readPde } from './pde';
+import { readMap } from './iterate';
 import { COORDINATES, sampledOver, type Fidelity, type Model, type ModelObject } from './schema';
 
 /**
@@ -122,7 +123,8 @@ export type SolverKind =
   | 'optimisation'
   | 'stochastic'
   | 'graph'
-  | 'pde';
+  | 'pde'
+  | 'iteration';
 
 export interface Solver {
   id: string;
@@ -333,6 +335,22 @@ export const FIELD: Solver = {
     'exact Fourier series for a rod held or insulated, conservation on closed lines and planes, a pulse round a ring, Burgers’ shock speed, a Fisher front and the discrete decay of a periodic mode (test/numeric-fields, test/model-pde)',
 };
 
+export const ITERATION: Solver = {
+  does: ['simulate'],
+  id: 'map',
+  label: 'Map iterator',
+  kind: 'iteration',
+  produces: 'numerically-computed',
+  method:
+    'steps x_{n+1} = f(x_n) exactly, then reads what it does: the period it settles into, Lyapunov exponents from products of Jacobians, fixed points and their multipliers, the cobweb and the bifurcation diagram (lib/model/iterate.ts, lib/numeric/dynamics.ts)',
+  handles: (_m, o) => !!o.map,
+  requires: (m, o) => {
+    const read = readMap(m, o);
+    return read.ok ? [] : read.missing;
+  },
+  checkedAgainst: 'the logistic map’s period doubling at r = 3 and 1 + √6, its Lyapunov exponent ln 2 at r = 4, the Hénon attractor’s exponent, and fixed points with their multipliers (test/numeric-dynamics, test/model-map)',
+};
+
 export const ODE: Solver = {
   does: ['simulate'],
   id: 'rk4',
@@ -346,7 +364,7 @@ export const ODE: Solver = {
   // and how each one changes" — the integrator's requirement, in front of the
   // solver's real reason. A system with an `equations` block and no `system`
   // block is the algebra solver's.
-  handles: (_m, o) => !!o.system || o.kind === 'trajectory' || (o.kind === 'system' && !o.equations),
+  handles: (_m, o) => !!o.system || o.kind === 'trajectory' || (o.kind === 'system' && !o.equations && !o.map && !o.pde),
   requires: (m, o) => {
     if (o.system) {
       const read = readSystem(m, o);
@@ -628,7 +646,7 @@ export const FUTURE: Solver[] = [
 // build report read "Symbolic differentiator runs spec__response" for a surface
 // that the sampler had evaluated. Differentiating a relationship is a secondary
 // thing to do with it; working out what it says is the primary one.
-export const SOLVERS: Solver[] = [ALGEBRA, GRAVITY, ASSEMBLY, FIELD, ODE, ESTIMATION, DATA, SAMPLING, CALCULUS, ...FUTURE];
+export const SOLVERS: Solver[] = [ALGEBRA, GRAVITY, ASSEMBLY, FIELD, ITERATION, ODE, ESTIMATION, DATA, SAMPLING, CALCULUS, ...FUTURE];
 
 // ── routing ─────────────────────────────────────────────────────────
 
@@ -873,7 +891,8 @@ export function statedFormally(model: Model): ModelObject[] {
       !!o.estimation ||
       !!o.gravity ||
       !!o.equations ||
-      !!o.pde
+      !!o.pde ||
+      !!o.map
   );
 }
 
@@ -906,7 +925,7 @@ export function capabilityOf(model: Model): Capability {
     runnable.filter((o) => SOLVERS.find((s) => s.id === o.solver)?.kind === kind);
 
   const stated = statedFormally(model);
-  const dynamic = [...by('ode'), ...by('assembly'), ...by('pde')];
+  const dynamic = [...by('ode'), ...by('assembly'), ...by('pde'), ...by('iteration')];
   const grounded = by('estimation').length
     ? by('estimation')
     : by('data').filter((o) => {

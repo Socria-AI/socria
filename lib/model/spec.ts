@@ -227,7 +227,7 @@ export function aspectOf(model: Model): 'equal' | 'fit' {
   // pictures where a length is a length.
   const relations = model.objects.some((o) => !!o.equations);
   // a field along a line is drawn as position against time; across a plane it is a map, and a length is a length
-  const history = model.objects.some((o) => !!o.pde && !o.pde.y);
+  const history = model.objects.some((o) => (!!o.pde && !o.pde.y) || !!o.map);
   return graph || relations || history ? 'fit' : 'equal';
 }
 
@@ -371,6 +371,11 @@ function axisNamesFor(model: Model): [string, string, string] {
     // (lib/model/units.ts). A shape sampled over a parameter (a torus over s
     // and u) has coordinate axes, and keeps the letters.
     const o = drawnObject(model);
+    if (o?.map) {
+      const st = o.map.states;
+      const named = (s: (typeof st)[number]) => withUnit(s.name, s.units ?? unitOf(model, s.name));
+      return st.length === 1 ? ['n', named(st[0]), 'z'] : [named(st[0]), named(st[1]), st[2] ? named(st[2]) : 'z'];
+    }
     if (o?.pde) {
       const sp = o.pde.species[shownSpecies(o)];
       const value = withUnit(sp?.name ?? 'u', sp?.units ?? unitOf(model, sp?.name ?? ''));
@@ -462,6 +467,8 @@ const AS_REPRESENTATION: Partial<Record<ViewFamily, Representation>> = {
   field: 'field',
   trajectory: 'simulation',
   phase: 'plot2d',
+  bifurcation: 'plot2d',
+  section: 'plot2d',
   timeline: 'timeline',
   animation: 'simulation',
   mechanism: 'mechanism',
@@ -519,6 +526,18 @@ export function chooseRepresentation(model: Model): Choice {
   // position across, time up, the value as colour; across a plane, the plane at
   // the clock's time. Either can be turned into its surface; the plane is what
   // is read.
+  // A MAP IS SEEN IN THE PLANE: one state against its step number, or two against each other.
+  const stepped = model.objects.find((o) => !!o.map);
+  if (stepped) {
+    const one = stepped.map!.states.length === 1;
+    return {
+      kind: 'simulation',
+      dimensionality: 2,
+      why: one ? 'one quantity, stepped: its value against the step number shows the whole orbit' : 'a map of several states: the states it visits, in its first two, are its attractor',
+      alternatives: ['plot2d'],
+    };
+  }
+
   const field = model.objects.find((o) => !!o.pde);
   if (field) {
     const line = !field.pde!.y;

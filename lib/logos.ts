@@ -951,7 +951,16 @@ WHAT TO PUT IN IT, by what they described. These are the blocks that exist, not 
   something explained by something else → "estimation": the outcome, what explains it, and the data IF THEY GAVE YOU ANY
   quantities that must ALL HOLD AT ONCE → "equations": what to solve for, and the relations that hold between them
   a quantity at EVERY POINT of a line or a plane, changing in time → "pde": its extent, its species, how each starts, spreads, is carried and reacts, and what its ends or edges do
+  something that STEPS — once a generation, a year, a cycle — rather than flowing → "map": its states, where each starts, and each one's value at the next step
   a shape or a function            → objects with expressions
+
+A SYSTEM THAT STEPS IS A "map" BLOCK — x at step n + 1 from x at step n: a population counted once a generation, the logistic map, the Hénon map, compound interest, a discretized controller. A "system" is for rates (dx/dt); a map gives the NEXT VALUE itself.
+     {"id": "pop", "kind": "system", "label": "Population",
+      "map": {"states": [{"name": "x", "init": 0.2}], "next": {"x": "r*x*(1 - x)"}, "steps": 400, "sweep": "r"}}
+  - Every state needs "init" and a "next" expression (in the states, n and the parameters). "steps" defaults to 200, and is said.
+  - "sweep" names the parameter its BIFURCATION DIAGRAM runs across — give that parameter a "min" and "max" in "params"; without "sweep" the first parameter "next" uses is swept. A map that depends on n has no diagram.
+  - The engine draws the iterates, a COBWEB for a one-state map, and the bifurcation diagram; it reports the period it settles into, its Lyapunov exponents, its fixed points with their multipliers, and — for a one-humped map — Feigenbaum's δ computed from its own superstable cycles. Tell the person what it found.
+  - A flow of three or more states with no t in its rates gets a POINCARÉ SECTION view automatically; propose the flow as a "system".
 
 A FIELD IS A "pde" BLOCK, and it is the one to reach for when the thing varies over SPACE as well as time: heat along a rod or across a plate, a dye or a pollutant spreading in a channel, a reaction front, a shock in a flow or in traffic, an invading population, spots and stripes on a reacting surface. A "system" cannot hold these — its states change in time only.
      {"id": "rod", "kind": "field", "label": "Temperature along the rod",

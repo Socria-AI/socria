@@ -41,6 +41,7 @@ import { estimate } from './estimate';
 import { route, operationsOn } from './solve';
 import { symbolTable, freeInputs, type Quantity } from './symbols';
 import { restsOn } from './deps';
+import { sweepOf } from './iterate';
 import type { Fidelity, Model, ModelObject } from './schema';
 
 /**
@@ -56,6 +57,8 @@ export type ViewFamily =
   | 'field'
   | 'trajectory'
   | 'phase'
+  | 'bifurcation'
+  | 'section'
   | 'mechanism'
   | 'timeline'
   | 'animation'
@@ -164,7 +167,7 @@ export const RENDERED = new Set<ViewFamily>([
   // frames — the compiler's own geometry, narrowed to the object
   'surface', 'curve', 'scatter', 'field', 'trajectory', 'timeline', 'mechanism', 'network',
   // frames — computed here from what already ran
-  'contour', 'slice', 'residual', 'interval', 'phase',
+  'contour', 'slice', 'residual', 'interval', 'phase', 'bifurcation', 'section',
   // read
   'equation', 'table', 'matrix', 'structure', 'derivative', 'sensitivity', 'diagnostic', 'text',
 ]);
@@ -183,6 +186,8 @@ const FAMILY_TITLE: Record<ViewFamily, string> = {
   field: 'Field',
   trajectory: 'Path',
   phase: 'Phase portrait',
+  bifurcation: 'Bifurcation diagram',
+  section: 'Poincaré section',
   mechanism: 'Mechanism',
   timeline: 'Against time',
   animation: 'Over time',
@@ -202,7 +207,7 @@ const FAMILY_TITLE: Record<ViewFamily, string> = {
 
 const OCCUPIES_EXTENT = new Set<ViewFamily>([
   'surface', 'curve', 'scatter', 'contour', 'slice', 'field', 'trajectory',
-  'phase', 'mechanism', 'timeline', 'animation', 'residual', 'interval', 'network',
+  'phase', 'bifurcation', 'section', 'mechanism', 'timeline', 'animation', 'residual', 'interval', 'network',
 ]);
 
 /**
@@ -380,6 +385,34 @@ export function viewsFor(model: Model): ViewSpec[] {
       });
     }
 
+    // ── a system that steps ───────────────────────────────────────
+    if (o.map && RUNS(model, o)) {
+      const one = o.map.states.length === 1;
+      add({
+        id: `trajectory:${o.id}`, family: 'trajectory', label: o.label, of: o.id, dimensionality: 2, variant: 'Iterates',
+        because: 'a map, stepped from where it starts',
+        shows: one ? 'each step’s value against the step number' : 'the states it visits, in its first two',
+        fidelity: 'numerically-computed', can: ['select', 'point'], primary: true,
+      });
+      if (one) {
+        add({
+          id: `phase:${o.id}`, family: 'phase', label: `${o.label} — cobweb`, of: o.id, dimensionality: 2, variant: 'Cobweb',
+          because: 'a map of one state can be walked between its graph and the diagonal',
+          shows: 'the orbit as a walk: up to y = f(x), across to y = x — it spirals into a fixed point, closes on a cycle, or never repeats',
+          fidelity: 'numerically-computed', can: ['select'],
+        });
+      }
+      const sw = sweepOf(model, o);
+      if (sw && !Object.values(o.map.next).some((e) => /(^|[^A-Za-z0-9_])n([^A-Za-z0-9_(]|$)/.test(e))) {
+        add({
+          id: `bifurcation:${o.id}`, family: 'bifurcation', label: `${o.label} — as ${sw.label} sweeps`, of: o.id, dimensionality: 2,
+          because: `${sw.label} is a control with a range, and the map does not depend on n`,
+          shows: `where the map settles at every value of ${sw.label} across its range — one value, two, four, … and chaos`,
+          fidelity: 'numerically-computed', can: ['select'],
+        });
+      }
+    }
+
     // ── something that evolves ────────────────────────────────────
     if ((o.system || o.kind === 'trajectory') && RUNS(model, o)) {
       const states = o.system?.states.length ?? 0;
@@ -395,6 +428,25 @@ export function viewsFor(model: Model): ViewSpec[] {
           id: `phase:${o.id}`, family: 'phase', label: `${o.label} — phase portrait`, of: o.id, dimensionality: 2,
           because: `the state has ${states} components, so it has a shape in its own space`,
           shows: 'the states against each other rather than against time — where a system settles, circles or diverges',
+          fidelity: 'numerically-computed', can: ['select'],
+        });
+      }
+      // A SECTION ONLY WHERE THE PATH KEEPS COMING BACK: the run's own third state must cross its mean upward at
+      // least three times — an epidemic that burns out crosses once, and its section would be an empty frame
+      const crossings = (() => {
+        const got = states >= 3 ? runFor(model, o) : null;
+        if (!got || !got.ok) return 0;
+        const z = got.run.y.map((r) => r[2]);
+        const mean = z.reduce((a, b) => a + b, 0) / z.length;
+        let n = 0;
+        for (let i = 1; i < z.length; i++) if (z[i - 1] < mean && z[i] >= mean) n++;
+        return n;
+      })();
+      if (states >= 3 && crossings >= 3 && o.system && !Object.values(o.system.rhs).some((e) => /(^|[^A-Za-z0-9_])t([^A-Za-z0-9_(]|$)/.test(e))) {
+        add({
+          id: `section:${o.id}`, family: 'section', label: `${o.label} — Poincaré section`, of: o.id, dimensionality: 2,
+          because: `the state has ${states} components and its law does not depend on the time, so its path pierces a plane over and over`,
+          shows: 'where the path crosses a plane, as dots — a few points are a cycle, a curve a torus, a dust that never repeats a strange attractor',
           fidelity: 'numerically-computed', can: ['select'],
         });
       }

@@ -101,6 +101,8 @@ const MODULES = [
   'lib/model/phase.ts',
   'lib/model/engineering.ts',
   'lib/model/pde.ts',
+  'lib/model/iterate.ts',
+  'lib/model/dynamics-examples.ts',
   'lib/model/inspect.ts',
   'lib/model/algebra.ts',
   'lib/model/equations.ts',

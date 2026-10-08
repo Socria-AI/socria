@@ -14,6 +14,7 @@ import { Logos } from './logos';
 import { Logos2 } from './logos-2';
 import { Logos3 } from './logos-3';
 import { Logos3Engineering } from './logos-3-engineering';
+import { Logos3Dynamics } from './logos-3-dynamics';
 import { ThinkingMapDoc } from './thinking-map';
 import { Economics } from './economics';
 import { Mathematics } from './mathematics';
@@ -33,6 +34,7 @@ export const CONTENT: Record<string, ComponentType> = {
   'logos-2': Logos2,
   'logos-3': Logos3,
   'logos-3-engineering': Logos3Engineering,
+  'logos-3-dynamics': Logos3Dynamics,
   'thinking-map': ThinkingMapDoc,
   mathematics: Mathematics,
   economics: Economics,

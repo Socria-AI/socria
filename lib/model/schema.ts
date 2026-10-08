@@ -271,6 +271,15 @@ export interface ModelObject {
    * states that are spread over space.
    */
   pde?: PdeDecl;
+  /**
+   * A SYSTEM THAT STEPS RATHER THAN FLOWS — see iterate.ts.
+   *
+   * x_{n+1} = f(x_n): a population counted once a generation, an interest rate
+   * compounded once a year, the logistic map, the Hénon map, a discretized
+   * controller. Its own block because its time is a count, not a clock, and
+   * the pictures that matter — the cobweb, the bifurcation diagram — are its.
+   */
+  map?: MapDecl;
 
   /** anything a domain wants to carry that the engine must not interpret */
   meta?: Record<string, string | number | boolean>;
@@ -318,6 +327,18 @@ export interface SystemDecl {
   /** a quantity that ought not to change, for the integrator to be judged by */
   invariant?: string;
   method?: 'rk4';
+}
+
+/** A system that steps: each state's value at step n + 1, from the states at step n. */
+export interface MapDecl {
+  /** the states, with where each starts — absent is refused, as for a system */
+  states: StateVarDecl[];
+  /** name → its value at the next step, in the states, n and the parameters */
+  next: Record<string, string>;
+  /** how many steps to take */
+  steps?: number;
+  /** the parameter its bifurcation diagram sweeps, across its control's range; the first one `next` uses, if not said */
+  sweep?: string;
 }
 
 /** An end of a line: a value held there, or a flux into the domain through it (0 is insulated). Either may be an expression in t. */
@@ -945,6 +966,9 @@ export const MODEL_CAPS = {
   fieldSpecies: 4,
   /** species the sanitiser keeps, above the run cap, so too many is refused with its true count */
   fieldSpeciesKept: 8,
+  /** states one map may step — lib/model/iterate.ts runs at most this many */
+  mapStates: 8,
+  mapStatesKept: 16,
 } as const;
 
 /**
@@ -1163,6 +1187,44 @@ export function sanitizeObject(
         ...(Object.keys(observe).length ? { observe } : {}),
         ...(expr(sys.invariant) ? { invariant: expr(sys.invariant) } : {}),
         method: 'rk4',
+      };
+    }
+  }
+
+  // A MAP: states that step. Read like a system's states — nothing defaulted —
+  // with each state's next value in place of its rate.
+  const mapd = r.map as Record<string, unknown> | undefined;
+  if (mapd && typeof mapd === 'object' && Array.isArray(mapd.states)) {
+    const states: StateVarDecl[] = [];
+    for (const raw of capped(mapd.states, MODEL_CAPS.mapStatesKept, `map states in ${id}`, drop)) {
+      if (!raw || typeof raw !== 'object') continue;
+      const q = raw as Record<string, unknown>;
+      const name = text(q.name, 24);
+      if (!nameOk(name) || collidesWith(states.map((x) => x.name), name)) continue;
+      const init = initOf(q.init);
+      states.push({
+        name,
+        ...(init !== null ? { init } : {}),
+        ...(text(q.units, 24) ? { units: text(q.units, 24) } : {}),
+        ...(text(q.means, 160) ? { means: text(q.means, 160) } : {}),
+      });
+    }
+    const next: Record<string, string> = {};
+    if (mapd.next && typeof mapd.next === 'object') {
+      for (const [k, v] of capped(Object.entries(mapd.next as Record<string, unknown>), MODEL_CAPS.mapStatesKept, `next values in ${id}`, drop)) {
+        const key = text(k, 24);
+        const val = expr(v);
+        if (nameOk(key) && val) next[key] = val;
+      }
+    }
+    if (states.length && Object.keys(next).length) {
+      const steps = num(mapd.steps);
+      const sweep = text(mapd.sweep, 24);
+      out.map = {
+        states,
+        next,
+        ...(steps !== null && steps > 0 ? { steps: Math.min(20_000, Math.floor(steps)) } : {}),
+        ...(sweep && nameOk(sweep) ? { sweep } : {}),
       };
     }
   }
