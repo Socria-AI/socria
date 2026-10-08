@@ -44,6 +44,10 @@ import { DraftResponsePanel } from '@/components/DraftResponsePanel';
 import { LogosGuide, GUIDE_SEEN_KEY } from '@/components/LogosGuide';
 import { Tour } from '@/components/Tour';
 import { MindAtlas } from '@/components/mind/MindAtlas';
+import { ShareDialog } from '@/components/share/ShareDialog';
+import { useSharedSession } from '@/components/share/useSharedSession';
+import { RemoteCursors, useMapPointer } from '@/components/share/RemoteCursors';
+import { hueOf } from '@/components/share/SharedThread';
 import { LOGOS_TOUR, LOGOS_TOUR_KEY, shouldRunTour } from '@/lib/tour';
 import { LogosMark } from '@/components/LogosMark';
 import { AccountControl } from '@/components/account/AccountControl';
@@ -1605,6 +1609,11 @@ export function LogosApp({
   const roomRef = useRef(room);
   roomRef.current = room;
 
+  /** sessions that are someone else's, opened here because they were shared */
+  const foreignIdsRef = useRef<Set<string>>(new Set());
+  /** the shared-session sync for the active line of thinking (useSharedSession) */
+  const togetherRef = useRef<ReturnType<typeof useSharedSession> | null>(null);
+
   const persist = useCallback(
     async (s: LogosSession) => {
       // A SHARED ROOM IS NOT SAVED TO ANYBODY'S CONVERSATION ROW. The host's
@@ -1614,6 +1623,17 @@ export function LogosApp({
       // the shared record, and every row in it carries who wrote it. The same
       // after leaving: the session still in memory is the merged one.
       if (roomRef.current?.active || sharedIdsRef.current.has(s.id)) return;
+      // A SHARED line of thinking is written through the share routes, never
+      // as a whole row: turns are appended and the map is sent against the
+      // version it was drawn on, so two people working at once both land
+      // (lib/share/sync.ts). Someone else's is never saved as one's own.
+      const t = togetherRef.current;
+      if (t?.active && s.id === activeIdRef.current) {
+        void t.push({ messages: s.messages, map: s.map });
+        t.keepOwn(s.draft, s.contexts);
+        return;
+      }
+      if (foreignIdsRef.current.has(s.id)) return;
       if (!cloud) {
         saveLocal(sessionsRef.current);
         return;
@@ -1656,6 +1676,48 @@ export function LogosApp({
     [applySessions, persist]
   );
   patchSessionRef.current = patchSession;
+
+  // THINK TOGETHER: the active line of thinking, if it is shared, kept in step
+  // with everyone else who has it open — turns, the map, its models, objects
+  // and plots (all of which live in the map), presence and pointers.
+  const together = useSharedSession({
+    // Any Logos surface, not only Logos 3: a line of thinking in a shared
+    // Project can be opened on Logos 2 too, and a whole-row save from there
+    // would write over a collaborator's map. The hook does nothing more than
+    // one read for a session nobody else can reach.
+    enabled: !!isSignedIn && !room.active,
+    sessionId: activeId,
+    getLocal: () => {
+      const cur = sessionsRef.current.find((x) => x.id === activeIdRef.current);
+      return cur ? { messages: cur.messages as never, map: cur.map } : null;
+    },
+    busy,
+    onRemote: (r) => {
+      const id = activeIdRef.current;
+      if (!id) return;
+      patchSession(
+        id,
+        (cur) => ({
+          ...cur,
+          messages: r.messages as never,
+          map: (r.map as LogosSession['map']) ?? cur.map,
+          title: r.title || cur.title,
+        }),
+        false
+      );
+      const cur = sessionsRef.current.find((x) => x.id === id);
+      if (cur) {
+        mapRef.current = cur.map;
+        chronRef.current = [...cur.messages];
+      }
+    },
+  });
+  togetherRef.current = together;
+  /** may this person add to the shared line of thinking open now? */
+  const togetherReadOnly = together.active && together.role !== 'owner' && together.role !== 'editor';
+  const [shareOpen, setShareOpen] = useState(false);
+  // this person's pointer over the shared map, in map coordinates
+  useMapPointer(together.active, together.point);
   /** Update the active session and save it. */
   const patchActive = useCallback(
     (fn: (s: LogosSession) => LogosSession, save = true) => patchSession(activeIdRef.current, fn, save),
@@ -1720,13 +1782,44 @@ export function LogosApp({
       let wanted: string | null = null;
       // …or a new line of thinking begun from a Project's home: /chat?in=<id>
       let startIn: string | null = null;
+      let sharedLink = false;
       try {
         const q = new URLSearchParams(window.location.search);
         wanted = q.get('s');
+        sharedLink = q.get('shared') === '1';
         const pin = q.get('in');
         startIn = pin && /^[A-Za-z0-9_-]{1,80}$/.test(pin) ? pin : null;
       } catch {}
 
+      // SOMEONE ELSE'S line of thinking, shared with them (/chat?s=<id>&shared=1):
+      // read through the share gate and opened alongside their own — never
+      // saved to their conversations (persist() skips it), always written
+      // through the share routes (useSharedSession).
+      if (wanted && sharedLink && isSignedIn && !list.some((x) => x.id === wanted)) {
+        try {
+          const r = await fetch(`/api/shared/conversation/${encodeURIComponent(wanted)}`, { cache: 'no-store' });
+          const j = r.ok ? await r.json() : null;
+          const c = j?.conversation;
+          if (c && c.kind === 'logos') {
+            foreignIdsRef.current.add(c.id);
+            list = [
+              {
+                ...emptySession(),
+                id: c.id,
+                title: c.title || UNTITLED,
+                messages: Array.isArray(c.messages) ? c.messages : [],
+                map: c.map ?? { ...EMPTY_MAP },
+                projectId: c.projectId ?? null,
+                updatedAt: Number(c.updatedAt) || Date.now(),
+              },
+              ...list,
+            ];
+          }
+        } catch {
+          /* not reachable: they land on their own sessions */
+        }
+      }
+      if (cancelled) return;
       if (list.length === 0) list = [emptySession()];
       let sorted = sortSessions(list);
       // A first message chosen elsewhere goes into a line of thinking of its
@@ -2741,6 +2834,10 @@ export function LogosApp({
   async function send(text: string, atts: Attachment[] = []) {
     const content = text.trim();
     if ((!content && !atts.length) || busy || !activeIdRef.current) return;
+    if (togetherRef.current?.active && togetherRef.current.role !== 'owner' && togetherRef.current.role !== 'editor') {
+      setError(togetherRef.current.role === 'commenter' ? 'You can read and comment on this line of thinking, but not add to it.' : 'You can read this line of thinking, but not add to it.');
+      return;
+    }
 
     const objTurn = takeObjects(content, atts);
 
@@ -3486,7 +3583,26 @@ export function LogosApp({
                 bare href back to it re-rendered this and looked like a dead
                 button. Hand back the Core model they came from. */}
             {/* Logos 3: who is here, and how to bring someone in. */}
-            {collab && <CollabBar room={room} />}
+            {/* THINK TOGETHER: who is here, and the one way to bring someone in.
+                A room joined by its old code keeps its own bar. */}
+            {collab && room.active ? (
+              <CollabBar room={room} />
+            ) : isSignedIn && SOCRIA_MODELS[model]?.workspace && activeId ? (
+              <span className="tg-bar">
+                {together.active && together.people.length > 1 && (
+                  <span className="tg-faces" aria-label={`${together.people.length} here now`}>
+                    {together.people.slice(0, 5).map((p) => (
+                      <i key={p.id} style={{ background: hueOf(p.id) }} title={p.you ? 'You' : `${p.name} · ${p.role}`}>
+                        {p.name.trim()[0]?.toUpperCase() ?? '?'}
+                      </i>
+                    ))}
+                  </span>
+                )}
+                <button type="button" className="sh-open" onClick={() => setShareOpen(true)}>
+                  Share
+                </button>
+              </span>
+            ) : null}
             <button type="button" className="lg-back" onClick={leaveForChat} aria-label="Back to Socria chat">
               <span className="lg-lbl-long">Socria chat</span>
               <span className="lg-lbl-short" aria-hidden="true">Chat</span> <span aria-hidden="true">→</span>
@@ -3770,6 +3886,12 @@ export function LogosApp({
             </div>
           )}
 
+          {togetherReadOnly && (
+            <p className="tg-note" role="note">
+              {together.role === 'commenter' ? 'You can read and comment on this line of thinking.' : 'You can read this line of thinking.'}
+              {together.owner ? ` It is ${together.owner}’s.` : ''}
+            </p>
+          )}
           <LogosComposer
             value={input}
             onChange={setInput}
@@ -4223,6 +4345,24 @@ export function LogosApp({
         />
       )}
       <LogosGuide open={guideOpen} onClose={closeGuide} />
+      {shareOpen && activeId && (
+        <ShareDialog
+          type="conversation"
+          id={activeId}
+          title={active?.title && active.title !== UNTITLED ? active.title : 'A line of thinking'}
+          open
+          onClose={() => {
+            setShareOpen(false);
+            together.recheck();
+          }}
+          onUpgrade={() => window.location.assign('/one')}
+          onLeft={() => {
+            setShareOpen(false);
+            if (activeIdRef.current && foreignIdsRef.current.has(activeIdRef.current)) window.location.assign('/chat');
+          }}
+        />
+      )}
+      {together.active && <RemoteCursors people={together.people} />}
       <Tour open={tourOpen} steps={LOGOS_TOUR} onDone={endTour} />
       {styleOpen && (
         <div className="lg-style-scrim" role="dialog" aria-modal="true" aria-label="How should Socria work with you?">

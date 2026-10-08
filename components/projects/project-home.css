@@ -218,3 +218,17 @@
 .ph-root .ph-skel .d{width:100%;height:280px;border-radius:16px}
 @keyframes phSk{to{background-position:-200% 0}}
 @media (prefers-reduced-motion: reduce){.ph-root .ph-skel i{animation:none}}
+
+/* ---------- together (a shared Project only) ---------- */
+.ph-root .ph-faces{display:inline-flex;align-items:center;padding-left:6px;margin-right:4px}
+.ph-root .ph-faces i{display:grid;place-items:center;width:28px;height:28px;border-radius:999px;margin-left:-7px;border:2px solid var(--paper);font-style:normal;font-family:var(--serif);font-size:13px;color:#fff}
+.ph-root .ph-together{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);gap:20px 34px}
+@container ph (max-width: 640px){.ph-root .ph-together{grid-template-columns:minmax(0,1fr)}}
+.ph-root .ph-people,.ph-root .ph-activity{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.ph-root .ph-people li{display:flex;align-items:center;gap:10px;font-size:14px}
+.ph-root .ph-people li.pending{opacity:.7}
+.ph-root .ph-people .av{display:grid;place-items:center;width:28px;height:28px;border-radius:999px;background:var(--moss-100);color:var(--moss-800);font-family:var(--serif);font-size:14px;flex:0 0 auto}
+.ph-root .ph-people .n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ph-root .ph-people .r{font-size:12px;color:var(--ink-45)}
+.ph-root .ph-activity li{display:flex;justify-content:space-between;gap:12px;font-size:13.5px;line-height:1.4;padding:4px 0;border-bottom:1px solid var(--ink-12)}
+.ph-root .ph-activity time{flex:0 0 auto;font-size:11.5px;color:var(--ink-45)}

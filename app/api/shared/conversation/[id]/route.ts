@@ -27,8 +27,9 @@ import { createHash } from 'node:crypto';
 import { enforceRateLimit } from '@/lib/rate-limit';
 import { supabaseAdmin } from '@/lib/supabase';
 import { sanitizeMap } from '@/lib/logos';
+import { sanitizeContexts } from '@/lib/logos-sources';
 import { can, type Role } from '@/lib/share/roles';
-import { displayNameOf, noteChange, shareAccess } from '@/lib/share/server';
+import { displayNameOf, isShared, noteChange, shareAccess } from '@/lib/share/server';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -66,6 +67,9 @@ export async function GET(req: NextRequest, { params }: Ctx) {
   if (since && updatedAt <= since) return NextResponse.json({ unchanged: true, updatedAt });
   return NextResponse.json({
     role: access.role,
+    // does anybody besides the owner reach it — the owner's client syncs
+    // through this route only while it is shared
+    shared: access.role !== 'owner' || (await isShared('conversation', params.id).catch(() => false)),
     owner: await displayNameOf(access.ownerId),
     may: { ask: can(access.role, 'ask'), edit: can(access.role, 'edit'), comment: can(access.role, 'comment'), share: can(access.role, 'share') },
     conversation: {
@@ -92,9 +96,14 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   const wantsAppend = Array.isArray(body?.append) && body.append.length > 0;
   const wantsMap = body?.map !== undefined;
   const wantsTitle = typeof body?.title === 'string';
+  // The Draft Space and the material attached to nodes are the OWNER'S own
+  // writing and sources, kept with their session: only they may write them
+  // here (their client saves a shared session through this route alone).
+  const wantsOwn = body?.draft !== undefined || body?.contexts !== undefined;
+  if (wantsOwn && access.role !== 'owner') return NextResponse.json({ error: 'Only the owner keeps a draft here.' }, { status: 403 });
   if (wantsAppend && !can(access.role, 'ask')) return NextResponse.json({ error: 'You can read this, but not add to it.' }, { status: 403 });
   if ((wantsMap || wantsTitle) && !can(access.role, 'edit')) return NextResponse.json({ error: 'You can read this, but not change it.' }, { status: 403 });
-  if (!wantsAppend && !wantsMap && !wantsTitle) return NextResponse.json({ error: 'Nothing to change.' }, { status: 400 });
+  if (!wantsAppend && !wantsMap && !wantsTitle && !wantsOwn) return NextResponse.json({ error: 'Nothing to change.' }, { status: 400 });
 
   const name = await displayNameOf(userId);
   const by = byOf(access.shareId ?? params.id, userId, name, access.role);
@@ -122,6 +131,13 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     if (append.length) patch.messages = messages;
     if (wantsMap) patch.map = sanitizeMap(body.map);
     if (wantsTitle) patch.title = String(body.title).replace(/\s+/g, ' ').trim().slice(0, 200) || row.title;
+    if (body?.draft !== undefined) {
+      const d = body.draft;
+      patch.draft = d && typeof d === 'object' && typeof d.html === 'string'
+        ? { title: typeof d.title === 'string' ? d.title.slice(0, 200) : '', html: d.html.slice(0, 200_000) }
+        : null;
+    }
+    if (body?.contexts !== undefined) patch.contexts = sanitizeContexts(body.contexts);
     const { error, count } = await supabaseAdmin()
       .from('conversations')
       .update(patch, { count: 'exact' })

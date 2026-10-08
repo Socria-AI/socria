@@ -42,6 +42,7 @@ import { emptyWorkspace } from '@/lib/workspace/store';
 import { query } from '@/lib/workspace/portable';
 import type { MindGraph } from '@/lib/mind/types';
 import { MindAtlas } from './MindAtlas';
+import { MindShare } from '@/components/share/MindShare';
 import { isOffered, lastCoreModel } from '@/lib/socria-model-store';
 import './mind-graph.css';
 
@@ -743,6 +744,8 @@ export function MindGraphView() {
   const [note, setNote] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [view, setView] = useState<'graph' | 'list' | 'everything'>('list');
+  /** the Share sheet: a Project, never this memory (components/share/MindShare) */
+  const [sharing, setSharing] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
   /** what is waiting on a change they made — see lib/workspace/impact.ts */
   const [waiting, setWaiting] = useState<Waiting[]>([]);
@@ -1024,6 +1027,7 @@ export function MindGraphView() {
           <a className="up-btn" href="/api/workspace?download=1" download>
             Export as a file
           </a>
+          <button className="up-btn" onClick={() => setSharing(true)}>Share</button>
         </div>
 
         {/* Asking, rather than scrolling. Runs the workspace's own query. */}
@@ -1059,6 +1063,7 @@ export function MindGraphView() {
       </div>
 
       {note && <p className="mem-note" role="status">{note}</p>}
+      <MindShare open={sharing} onClose={() => setSharing(false)} />
 
       <div className={`mem-body${node ? ' has-panel' : ''}`}>
         <main className="mem-main">

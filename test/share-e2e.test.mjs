@@ -259,6 +259,20 @@ console.log('=== two people at once ===');
   ok('the cheap poll says when nothing moved', since.json?.unchanged === true);
 }
 
+console.log('=== who syncs, and what only the owner writes ===');
+{
+  as('alice');
+  const own = await call(R.sharedConvo.GET, 'GET', '/api/shared/conversation/c-diary', undefined, { id: 'c-diary' });
+  ok('an unshared conversation reads as not shared — its owner saves it as before', own.status === 200 && own.json.shared === false);
+  const proj = await call(R.sharedConvo.GET, 'GET', '/api/shared/conversation/c-lit', undefined, { id: 'c-lit' });
+  ok('a conversation in a shared Project reads as shared, for its owner too', proj.json.shared === true && proj.json.role === 'owner');
+  const draft = await call(R.sharedConvo.POST, 'POST', '/api/shared/conversation/c-lit', { draft: { title: 'Notes', html: '<p>my draft</p>' } }, { id: 'c-lit' });
+  ok('the owner keeps their Draft Space through the shared route', draft.status === 200 && db.rows('conversations').find((c) => c.id === 'c-lit').draft?.html === '<p>my draft</p>', draft.text);
+  as('bob');
+  ok('an editor cannot write the owner\'s draft', (await call(R.sharedConvo.POST, 'POST', '/api/shared/conversation/c-lit', { draft: { title: 'x', html: 'x' } }, { id: 'c-lit' })).status === 403);
+  ok('  and the guest\'s view of a shared conversation says so', (await call(R.sharedConvo.GET, 'GET', '/api/shared/conversation/c-lit', undefined, { id: 'c-lit' })).json?.shared === true);
+}
+
 console.log('=== privacy in a shared conversation ===');
 {
   globalThis.__extract = [];

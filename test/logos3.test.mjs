@@ -80,7 +80,9 @@ console.log('\n=== the surface ===');
 {
   const app = read('components/LogosApp.tsx');
   ok('the room is on exactly when the model says so', /const collab = !!SOCRIA_MODELS\[model\]\?\.collab;/.test(app) && /enabled: collab,/.test(app));
-  ok('the bar is in the header', /\{collab && <CollabBar room=\{room\} \/>\}/.test(app));
+  // Think Together is now begun from Share (docs/SHARING.md); a room joined by
+  // its old code keeps its own bar in the header.
+  ok('the bar is in the header while a room is live; Share otherwise', /collab && room\.active \? \(\s*<CollabBar room=\{room\} \/>/.test(app) && /setShareOpen\(true\)/.test(app));
   ok('a sent turn is stamped and broadcast, in the room only', /const sent = inShared \? roomRef\.current\.onLocalMessage\(turn\) : turn;/.test(app));
   ok('the map is attributed before it is shown', /roomRef\.current\.onLocalMap\(/.test(app));
   ok('a shared room is never saved to one account', /if \(roomRef\.current\?\.active \|\| sharedIdsRef\.current\.has\(s\.id\)\) return;/.test(app));

@@ -70,7 +70,7 @@ export function ShareDialog({
     try {
       const res = await fetch(`/api/share?type=${type}&id=${encodeURIComponent(id)}`, { cache: 'no-store' });
       const j = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(j?.error || 'Sharing could not be opened.');
+      if (!res.ok || !j?.owner || !Array.isArray(j?.members)) throw new Error(j?.error || 'Sharing could not be opened.');
       setState(j as State);
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Sharing could not be opened.');

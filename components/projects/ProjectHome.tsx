@@ -37,6 +37,7 @@ import {
 } from '@/lib/project-home';
 import { ROLE_WORD, can, type Role } from '@/lib/share/roles';
 import { ProjectVisual } from './ProjectVisual';
+import { hueOf } from '@/components/share/SharedThread';
 import './project-home.css';
 
 interface HomeChatRow {
@@ -141,6 +142,48 @@ export function ProjectHome({
   const [resFilter, setResFilter] = useState<Resource['kind'] | 'all'>('all');
   const [renaming, setRenaming] = useState<{ id: string; title: string } | null>(null);
   const [picker, setPicker] = useState(false);
+  // COLLABORATIVE, only once shared: who has access, who is here now, and
+  // what has changed. A personal Project shows none of it.
+  const [people, setPeople] = useState<{ owner: string; members: { id: string; name: string; role: string; pending: boolean; you: boolean }[] } | null>(null);
+  const [here, setHere] = useState<{ id: string; name: string; you: boolean }[]>([]);
+  const [activity, setActivity] = useState<{ who: string; summary: string; at: number; you: boolean }[]>([]);
+  useEffect(() => {
+    let live = true;
+    setPeople(null);
+    setHere([]);
+    setActivity([]);
+    void (async () => {
+      const res = await fetch(`/api/share?type=project&id=${encodeURIComponent(id)}`, { cache: 'no-store' }).catch(() => null);
+      const j = res && res.ok ? await res.json().catch(() => null) : null;
+      if (!live || !j) return;
+      const shared = j.role !== 'owner' || (j.members?.length ?? 0) > 0 || !!j.link || !!j.code;
+      if (!shared) return;
+      setPeople({ owner: j.owner?.name ?? '', members: j.members ?? [] });
+      const a = await fetch(`/api/shared/activity?type=project&id=${encodeURIComponent(id)}`, { cache: 'no-store' }).catch(() => null);
+      const aj = a && a.ok ? await a.json().catch(() => null) : null;
+      if (live && aj?.activity) setActivity(aj.activity);
+    })();
+    return () => {
+      live = false;
+    };
+  }, [id, refreshKey]);
+  useEffect(() => {
+    if (!people) return;
+    let live = true;
+    const beat = async () => {
+      if (document.hidden) return;
+      const res = await fetch('/api/shared/presence', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'project', id }) }).catch(() => null);
+      const j = res && res.ok ? await res.json().catch(() => null) : null;
+      if (live && j?.present) setHere(j.present);
+    };
+    void beat();
+    const t = setInterval(beat, 6000);
+    return () => {
+      live = false;
+      clearInterval(t);
+      void fetch('/api/shared/presence', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'project', id, leave: true }) }).catch(() => null);
+    };
+  }, [people, id]);
 
   const load = useCallback(async () => {
     try {
@@ -300,6 +343,13 @@ export function ProjectHome({
             ) : null}
           </div>
           <div className="ph-head-acts">
+            {here.length > 1 && (
+              <span className="ph-faces" aria-label={`${here.length} here now`}>
+                {here.slice(0, 5).map((p) => (
+                  <i key={p.id} style={{ background: hueOf(p.id) }} title={p.you ? 'You' : p.name}>{p.name.trim()[0]?.toUpperCase() ?? '?'}</i>
+                ))}
+              </span>
+            )}
             {onShare && (
               <button className="ph-btn ghost" onClick={onShare}>
                 Share
@@ -485,6 +535,31 @@ export function ProjectHome({
                 </li>
               ))}
             </ul>
+          </Section>
+        )}
+
+        {/* ── together: only for a shared Project ── */}
+        {people && (
+          <Section id="together" title="People and activity" count={people.members.length + 1} folded={folded('together')} onFold={fold}>
+            <div className="ph-together">
+              <ul className="ph-people">
+                <li><span className="av">{people.owner.trim()[0]?.toUpperCase() ?? '?'}</span><span className="n">{people.owner}</span><span className="r">Owner</span></li>
+                {people.members.map((m) => (
+                  <li key={m.id} className={m.pending ? 'pending' : ''}>
+                    <span className="av">{m.name.trim()[0]?.toUpperCase() ?? '?'}</span>
+                    <span className="n">{m.you ? `${m.name} (you)` : m.name}{m.pending ? ' · invited' : ''}</span>
+                    <span className="r">{ROLE_WORD[m.role as Role] ?? m.role}</span>
+                  </li>
+                ))}
+              </ul>
+              {activity.length > 0 && (
+                <ul className="ph-activity">
+                  {activity.slice(0, 12).map((a, i) => (
+                    <li key={i}><span>{a.you ? a.summary.replace(/^\S+/, 'You') : a.summary}</span><time>{ago(a.at, Date.now())}</time></li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </Section>
         )}
 

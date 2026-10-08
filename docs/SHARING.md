@@ -114,6 +114,51 @@ In a conversation more than one person can read:
 - a composer only for editors and the owner. Viewers and commenters are told
   what they can do.
 
+## Think Together in Logos
+
+A shared line of thinking stays in step on every screen that has it open
+(`components/share/useSharedSession.ts`, `lib/share/sync.ts`). That covers its
+turns and its map, which holds the nodes, the models, the objects of thought
+and the plots. Everyone works on the same canonical state: the owner's row,
+written only through the share routes.
+
+- **Out.** `persist()` sends what this client has that the server does not:
+  new turns are appended, and the map is sent against the version it was drawn
+  on. Everything goes through one queue, so a client never races itself. A
+  shared session is never saved as a whole row, and someone else's session is
+  never saved as your own.
+- **In.** A cheap poll. A newer version replaces the screen only when nothing
+  of this client's is still unsent and no reply is streaming. A stale map comes
+  back with the current one, which is adopted.
+- **Presence and pointers.**
+  - Faces beside **Share** show who is here.
+  - Each person's pointer is sent in map coordinates
+    (`toWorld` / `toScreen`, using each screen's own camera). It lands on the
+    same card for everyone, whatever each person has panned or zoomed to.
+- **Roles.** A viewer or commenter reads and is told so; sending is refused in
+  the interface and on the server.
+- **The owner's Draft Space** is kept through the same route. Only the owner
+  can write it.
+- **Opening a shared session.** `/chat?model=logos-3&s=<id>&shared=1` opens
+  someone else's line of thinking through the share gate.
+- **Which surfaces sync.** Any Logos surface: a session in a shared Project may
+  be opened on Logos 2 too. A room joined by its old code keeps its own bar;
+  otherwise **Share** is the way in.
+
+## A shared Project
+
+- The same Project Home, plus **People and activity**: who has access, who is
+  on the home now, and what changed (its conversations' changes included).
+- A personal Project shows none of this.
+
+## The Mind graph's Share
+
+On the Memory page, **Share** says plainly that what Socria remembers about you
+is never shared. It offers your Projects instead: sharing a Project shares its
+conversations, maps, models and goals, which is the part of the graph that is
+about the work. A collaborator's view of a Project's graph holds only the
+Project's own content (`projectGraph(…, personal = false)`).
+
 ## API
 
 | Route | |
@@ -128,6 +173,10 @@ In a conversation more than one person can read:
 
 Tests:
 
+- `test/share-sync.test.mjs`: the sync decisions, two clients converging, and
+  pointers landing on the same card.
+- `test/think-together.test.mjs`: the wiring in Logos, Project Home and the
+  Memory page.
 - `test/share-e2e.test.mjs`: five people through the real routes. It covers
   permissions, revocation, simultaneous writes, the stale-tab merge, map
   conflicts, privacy of memories and emails, presence, history and incognito.

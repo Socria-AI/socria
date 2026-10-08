@@ -82,3 +82,23 @@
 .sh-open svg{width:14px;height:14px}
 .sh-faces{display:inline-flex;margin-left:2px}
 .sh-faces i{display:grid;place-items:center;width:20px;height:20px;border-radius:999px;margin-left:-5px;border:1.5px solid var(--paper);font-style:normal;font-size:10px;font-family:var(--serif);color:#fff}
+
+/* live pointers on a shared Logos map */
+.rc-layer{position:fixed;inset:0;pointer-events:none;z-index:40}
+.rc-cursor{position:absolute;left:0;top:0;transition:transform .45s cubic-bezier(.2,.8,.2,1);will-change:transform}
+.rc-cursor svg{display:block;filter:drop-shadow(0 1px 1px rgba(0,0,0,.18))}
+.rc-cursor span{position:absolute;left:14px;top:16px;font-family:var(--sans);font-size:11px;font-weight:500;color:#fff;padding:2px 7px;border-radius:999px;white-space:nowrap}
+@media (prefers-reduced-motion: reduce){.rc-cursor{transition:none}}
+
+/* who is here, beside the Share button in Logos */
+.tg-bar{display:inline-flex;align-items:center;gap:8px}
+.tg-faces{display:inline-flex;padding-left:6px}
+.tg-faces i{display:grid;place-items:center;width:24px;height:24px;border-radius:999px;margin-left:-6px;border:2px solid var(--lg-paper, var(--paper));
+  font-style:normal;font-family:var(--serif);font-size:12px;color:#fff}
+.tg-note{margin:0 0 8px;font-size:12.5px;color:var(--lg-ink-60, var(--ink-60));text-align:center}
+
+/* the Memory page's Share: a list of Projects */
+.ms-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+.ms-list button{width:100%;display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 10px;border:none;border-radius:10px;background:none;font:inherit;font-size:14.5px;color:var(--ink);cursor:pointer;text-align:left}
+.ms-list button:hover{background:rgba(31,31,31,.05)}
+.ms-list i{font-style:normal;font-size:12px;color:var(--moss-700)}
