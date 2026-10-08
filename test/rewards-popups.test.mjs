@@ -101,7 +101,7 @@ console.log('=== the popups: once per surface, into a quiet room ===');
   const page = read('app/chat/page.tsx');
   const mounts = page.match(/<RewardsPopups /g) || [];
   ok('mounted twice in the page — once in each branch, so once on screen', mounts.length === 2);
-  ok('…Core with the way into Logos, Logos without', /<RewardsPopups enabled=\{!!isSignedIn\} quiet=\{rewardsQuiet\} surface="core" onOpenLogos=\{openLogosForChallenge\} \/>/.test(page) && /<RewardsPopups enabled=\{!!isSignedIn\} quiet=\{rewardsQuiet\} surface="logos" \/>/.test(page));
+  ok('…Core with the way into Logos, Logos without', /<RewardsPopups enabled=\{!!isSignedIn\} quiet=\{rewardsQuiet\} surface="core" onOpenLogos=\{openNewestLogos\} \/>/.test(page) && /<RewardsPopups enabled=\{!!isSignedIn\} quiet=\{rewardsQuiet\} surface="logos" \/>/.test(page));
   ok('quiet waits for everything to be known, and for nothing else to be open', /const rewardsQuiet =\s*isLoaded && !hydrating && planState\.known && !spokeThisVisit && !anythingOpen && !findOpen;/.test(page));
   ok('once the One invitation, the tour or onboarding has spoken, the popups wait for another visit', /if \(onePrompt \|\| tourOpen \|\| tourAfter \|\| autoSend\) setSpokeThisVisit\(true\);/.test(page));
   ok('the challenge opens the newest Logos on offer', /if \(isOffered\('logos-3'\)\) \{\s*setModel\('logos-3'\);\s*chooseModel\('logos-3'\);/.test(page));

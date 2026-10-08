@@ -1,7 +1,7 @@
 'use client';
-// components/Logos2Cover.tsx
+// components/LogosCover.tsx
 //
-// The cover of Logos 2: what it is, shown by being it.
+// The cover of Logos: what it is, shown by being it.
 //
 // This is the one introduction the product keeps for its environment. It
 // takes the slot the Core 4 announcement held in the chat — the pill beside
@@ -9,22 +9,40 @@
 // without an account meets on the Logos surface itself, so the two doors say
 // the same thing in the same words.
 //
+// WHICH LOGOS. Logos 3 wherever it is offered; Logos 2 where it is not yet
+// (production, before the logos3 gate opens). The caller says which, and the
+// cover names it, shows it and opens it — never one name over the other's
+// surface.
+//
 // THE STAGE IS THE REAL THING, which is the only rule that keeps a cover
-// honest: it mounts the product's own ModelView on a model the engine built
-// and validated from the library — the saddle — with its own controls. Move
-// `a` here and the surface recomputes the way it will inside. Not a film of
-// the feature, not a drawing of it: the feature, in a smaller frame.
+// honest. For Logos 3 it is one of the showcase's items (lib/logos3-showcase.ts)
+// — a request somebody could type, and what the product builds from it, built
+// here by the product's own code (components/logos3/LiveExample.tsx): a model
+// through the engine's on-ramp, or a design through Live 3D's reader. It takes
+// them in turn, one per opening, so a second look is a different kind of
+// problem. For Logos 2 it is the saddle the engine builds from the library.
+// Move a value and it recomputes the way it will inside. Not a film of the
+// feature, not a drawing of it: the feature, in a smaller frame.
 //
 // AND ALMOST NO PROSE AROUND IT. A title, one standfirst, the terms, and the
 // way in. The terms are read from the plan table rather than written here, so
 // "two lines of thinking a month" cannot go stale while the number it
 // describes changes underneath it.
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { ModelView } from '@/components/model/ModelView';
 import { ModelGlyph } from '@/components/ModelGlyph';
+import { LiveFigure } from '@/components/logos3/LiveExample';
 import { modelById } from '@/lib/model/library';
+import { COVER_SHOWCASE, showcaseAt } from '@/lib/logos3-showcase';
 import { PLANS } from '@/lib/entitlements';
+
+export type CoverVersion = 'logos-2' | 'logos-3';
+
+/** Which showcase item the next opening shows — per browser, so it moves on each time. */
+export const COVER_TURN_KEY = 'socria.cover.turn.v1';
+
+const useBeforePaint = typeof window === 'undefined' ? useEffect : useLayoutEffect;
 
 /** "Two", for the terms line — a numeral past what reads as a word. */
 function spell(n: number | null): string {
@@ -39,9 +57,22 @@ export function freeTerms(): string {
   return `${spell(n)} line${n === 1 ? '' : 's'} of thinking a month, free. Socria One for every one after.`;
 }
 
-export function Logos2Cover({
+/** The next turn of the showcase, remembered so the following opening shows another. */
+function takeTurn(): number {
+  try {
+    const raw = Number(localStorage.getItem(COVER_TURN_KEY));
+    const i = Number.isFinite(raw) && raw >= 0 ? Math.floor(raw) : 0;
+    localStorage.setItem(COVER_TURN_KEY, String(i + 1));
+    return i;
+  } catch {
+    return 0;
+  }
+}
+
+export function LogosCover({
   as,
   open = true,
+  version = 'logos-3',
   isSignedIn,
   onClose,
   onStart,
@@ -51,10 +82,12 @@ export function Logos2Cover({
   /** a sheet over the chat, or the gate on the Logos surface itself */
   as: 'modal' | 'gate';
   open?: boolean;
+  /** the Logos this cover introduces: the one on offer here */
+  version?: CoverVersion;
   isSignedIn: boolean;
   /** modal only: closed, with whether they asked not to see it again */
   onClose?: (dontShowAgain: boolean) => void;
-  /** modal only: open Logos 2, or go to sign-in — the caller decides which */
+  /** modal only: open Logos, or go to sign-in — the caller decides which */
   onStart?: () => void;
   /** gate only: where signing in goes */
   primaryHref?: string;
@@ -65,9 +98,18 @@ export function Logos2Cover({
   const [keyOpen, setKeyOpen] = useState(false);
   const [key, setKey] = useState('');
   const [keyError, setKeyError] = useState(false);
-  // Built once per cover. The library sanitises on the way out, exactly as a
-  // model arriving from a conversation would be.
-  const model = useMemo(() => modelById('saddle'), []);
+  const [turn, setTurn] = useState(0);
+  const three = version === 'logos-3';
+  const name = three ? 'Logos 3' : 'Logos 2';
+  // Logos 2: built once per cover. The library sanitises on the way out, exactly
+  // as a model arriving from a conversation would be.
+  const saddle = useMemo(() => (three ? null : modelById('saddle')), [three]);
+  const item = showcaseAt(COVER_SHOWCASE, turn);
+
+  // a different example each time it opens
+  useBeforePaint(() => {
+    if (open && three) setTurn(takeTurn());
+  }, [open, three]);
 
   useEffect(() => {
     if (!open || as !== 'modal' || !onClose) return;
@@ -88,7 +130,7 @@ export function Logos2Cover({
   };
 
   const card = (
-    <div className={`core3-modal-card j3-card l2-card${as === 'gate' ? ' is-gate' : ''}`} onClick={(e) => e.stopPropagation()}>
+    <div className={`core3-modal-card j3-card l2-card${as === 'gate' ? ' is-gate' : ''}${three ? ' is-l3' : ''}`} onClick={(e) => e.stopPropagation()}>
       {as === 'modal' && onClose && (
         <button type="button" onClick={() => onClose(dontShow)} className="core3-modal-close" aria-label="Close">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -100,32 +142,69 @@ export function Logos2Cover({
 
       <div className="j3-masthead">
         <span className="j3-brand">Socria</span>
-        <span className="j3-folio">Logos 2</span>
+        <span className="j3-folio">{name}</span>
       </div>
 
       <div className="l2-head">
-        <h2 id="logos2-cover-title" className="j3-title reveal-in" style={{ animationDelay: '60ms' }}>
-          Your thinking, as a model <span className="j3-title-em">you can move.</span>
-        </h2>
-        <p className="j3-standfirst reveal-in" style={{ animationDelay: '130ms' }}>
-          Say what you are working through. Logos 2 builds a model of it beside you — quantities,
-          relationships, what depends on what. Move a value and what depends on it moves. Ask about
-          anything on it by name.
-        </p>
+        {three ? (
+          <>
+            <h2 id="logos-cover-title" className="j3-title reveal-in" style={{ animationDelay: '60ms' }}>
+              Say what you are working through. <span className="j3-title-em">Watch it get built.</span>
+            </h2>
+            <p className="j3-standfirst reveal-in" style={{ animationDelay: '130ms' }}>
+              Logos 3 is one workspace for a hard problem: the conversation, a map of your reasoning, models the
+              engine solves, and designs drawn in 3D from your words — side by side. Move a value and what depends on
+              it moves. Ask about anything on it by name.
+            </p>
+          </>
+        ) : (
+          <>
+            <h2 id="logos-cover-title" className="j3-title reveal-in" style={{ animationDelay: '60ms' }}>
+              Your thinking, as a model <span className="j3-title-em">you can move.</span>
+            </h2>
+            <p className="j3-standfirst reveal-in" style={{ animationDelay: '130ms' }}>
+              Say what you are working through. Logos 2 builds a model of it beside you — quantities,
+              relationships, what depends on what. Move a value and what depends on it moves. Ask about
+              anything on it by name.
+            </p>
+          </>
+        )}
       </div>
 
-      {/* The real thing: a sentence, and the model the engine built from one like it. */}
+      {/* The real thing: a sentence, and what the product builds from one like it. */}
       <div className="l2-stage reveal-in lg-tokens" style={{ animationDelay: '200ms' }}>
-        <p className="l2-said">
-          <span className="l2-said-k">You</span>
-          Why is a saddle point not a maximum, when it looks like a top from one side?
-        </p>
-        <div className="l2-frame">
-          {model && <ModelView model={model} fill />}
-        </div>
-        <p className="l2-cue">
-          Live, and the engine&rsquo;s own. <em>Move a or b.</em>
-        </p>
+        {three ? (
+          <>
+            <p className="l2-said">
+              <span className="l2-said-k">You</span>
+              {item.said}
+            </p>
+            <div className={`l2-frame${item.kind === 'scene' ? ' is-scene' : ''}`} key={item.id}>
+              <LiveFigure item={item} />
+            </div>
+            <div className="l2-cue l3-cue">
+              <span>
+                <strong>{item.title}.</strong> <em>{item.cue}</em>
+              </span>
+              <button type="button" className="l3-next" onClick={() => setTurn(takeTurn())}>
+                Another example <span aria-hidden="true">→</span>
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <p className="l2-said">
+              <span className="l2-said-k">You</span>
+              Why is a saddle point not a maximum, when it looks like a top from one side?
+            </p>
+            <div className="l2-frame">
+              {saddle && <ModelView model={saddle} fill />}
+            </div>
+            <p className="l2-cue">
+              Live, and the engine&rsquo;s own. <em>Move a or b.</em>
+            </p>
+          </>
+        )}
       </div>
 
       <div className="j3-body l2-body">
@@ -145,19 +224,19 @@ export function Logos2Cover({
             <a href={primaryHref} className="core3-modal-primary">
               <span className="core3-modal-primary-shine" aria-hidden />
               <span className="tl-primary-mark" aria-hidden>
-                <ModelGlyph model="logos-2" size={15} />
+                <ModelGlyph model={version} size={15} />
               </span>
-              <span className="core3-modal-primary-label">Sign in to open Logos 2</span>
+              <span className="core3-modal-primary-label">Sign in to open {name}</span>
               <span aria-hidden className="core3-modal-primary-arrow">→</span>
             </a>
           ) : (
             <button type="button" onClick={onStart} className="core3-modal-primary">
               <span className="core3-modal-primary-shine" aria-hidden />
               <span className="tl-primary-mark" aria-hidden>
-                <ModelGlyph model="logos-2" size={15} />
+                <ModelGlyph model={version} size={15} />
               </span>
               <span className="core3-modal-primary-label">
-                {isSignedIn ? 'Open Logos 2' : 'Sign in to open Logos 2'}
+                {isSignedIn ? `Open ${name}` : `Sign in to open ${name}`}
               </span>
               <span aria-hidden className="core3-modal-primary-arrow">→</span>
             </button>
@@ -209,7 +288,7 @@ export function Logos2Cover({
 
   if (as === 'gate') {
     return (
-      <div className="lg-gate l2-gate" role="region" aria-labelledby="logos2-cover-title">
+      <div className="lg-gate l2-gate" role="region" aria-labelledby="logos-cover-title">
         {card}
       </div>
     );
@@ -220,7 +299,7 @@ export function Logos2Cover({
       onClick={() => onClose?.(dontShow)}
       role="dialog"
       aria-modal="true"
-      aria-labelledby="logos2-cover-title"
+      aria-labelledby="logos-cover-title"
     >
       {card}
     </div>

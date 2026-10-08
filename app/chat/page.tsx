@@ -38,6 +38,7 @@ import { copyText } from '@/lib/copy-text';
 import { ACCEPT_ATTR } from '@/lib/file-kinds';
 import { AttachmentChips, PaperclipIcon, useChatAttachments } from '@/components/ChatAttachments';
 import { failureText } from '@/lib/upstream-error';
+import { GATE_CHANGED } from '@/lib/feature-gates';
 import { isOffered,
   MODEL_KEY,
   autoModel,
@@ -86,8 +87,8 @@ import {
   searchRail,
   shouldShowSearch,
 } from '@/lib/session-rail';
-import { TryLogos2Pill } from '@/components/TryLogos2Pill';
-import { Logos2Cover } from '@/components/Logos2Cover';
+import { TryLogosPill } from '@/components/TryLogosPill';
+import { LogosCover, type CoverVersion } from '@/components/LogosCover';
 import { IntroCore4Modal } from '@/components/IntroCore4Modal';
 import { RichText } from '@/components/RichText';
 import { splitInline } from '@/lib/rich-text';
@@ -578,8 +579,8 @@ export default function ChatPage() {
   }, [onePrompt, tourOpen, tourAfter, autoSend]);
   const rewardsQuiet =
     isLoaded && !hydrating && planState.known && !spokeThisVisit && !anythingOpen && !findOpen;
-  /** The challenge's way in from Core: the newest Logos on offer. */
-  const openLogosForChallenge = () => {
+  /** Into the newest Logos on offer: the cover's way in, and the challenge's. */
+  const openNewestLogos = () => {
     if (isOffered('logos-3')) {
       setModel('logos-3');
       chooseModel('logos-3');
@@ -587,6 +588,17 @@ export default function ChatPage() {
     }
     openLogos();
   };
+  // The Logos the cover and the pill introduce: Logos 3 wherever it is offered.
+  // Read after mount — the gates live in this browser, and the server cannot see them.
+  // Starts from what holds without this browser's gates (the same on the server), so a
+  // deployment that offers Logos 3 to everybody never paints "Logos 2" first.
+  const [coverVersion, setCoverVersion] = useState<CoverVersion>(() => (isOffered('logos-3', []) ? 'logos-3' : 'logos-2'));
+  useEffect(() => {
+    const read = () => setCoverVersion(isOffered('logos-3') ? 'logos-3' : 'logos-2');
+    read();
+    window.addEventListener(GATE_CHANGED, read);
+    return () => window.removeEventListener(GATE_CHANGED, read);
+  }, []);
 
   /** Checkout, from the prompt. The trigger rides along so the webhook can count it. */
   const startOneCheckout = useCallback(async () => {
@@ -1128,11 +1140,11 @@ export default function ChatPage() {
       } catch {}
       setLogosDismissed(true);
       setLogosModalOpen(false);
-      openLogos();
+      openNewestLogos();
       return;
     }
     setLogosModalOpen(false);
-    router.push('/sign-in?redirect_url=%2Fchat%3Fmodel%3Dlogos-2');
+    router.push(`/sign-in?redirect_url=%2Fchat%3Fmodel%3D${coverVersion}`);
   }
 
   /**
@@ -2908,11 +2920,13 @@ export default function ChatPage() {
         onStart={handleCore4IntroStart}
         isSignedIn={hasAccount}
       />
-      {/* The Logos 2 cover: the one introduction the chat keeps for the
-          environment. Opened by the pill, and by picking Logos 2 without an
-          account. The same card is the gate on the Logos surface itself. */}
-      <Logos2Cover
+      {/* The Logos cover: the one introduction the chat keeps for the
+          environment — Logos 3 wherever it is offered. Opened by the pill,
+          and by picking Logos without an account. The same card is the gate
+          on the Logos surface itself. */}
+      <LogosCover
         as="modal"
+        version={coverVersion}
         open={logosModalOpen}
         onClose={handleLogosModalClose}
         onStart={handleLogosModalTry}
@@ -2961,7 +2975,7 @@ export default function ChatPage() {
       </div>
       {/* Socria Rewards: a friend's link opened before sign-up, a friend's first real conversations */}
       <RewardsSync enabled={!!isSignedIn} />
-      <RewardsPopups enabled={!!isSignedIn} quiet={rewardsQuiet} surface="core" onOpenLogos={openLogosForChallenge} />
+      <RewardsPopups enabled={!!isSignedIn} quiet={rewardsQuiet} surface="core" onOpenLogos={openNewestLogos} />
       <AccountSheet
         open={acctOpen}
         onClose={() => setAcctOpen(false)}
@@ -3282,12 +3296,14 @@ export default function ChatPage() {
               </span>
             )}
             <div className="hidden sm:block">
-              {/* The standing invitation is Logos 2's: the surface a person
-                  would not guess from a text box. It stays until they say
-                  "don't show again" on the cover itself, and disappears on
-                  the surface it is inviting them to. Core 4's introduction is
-                  still one press away in the picker. */}
-              <TryLogos2Pill
+              {/* The standing invitation is Logos's: the surface a person
+                  would not guess from a text box — Logos 3 wherever it is
+                  offered. It stays until they say "don't show again" on the
+                  cover itself, and disappears on the surface it is inviting
+                  them to. Core 4's introduction is still one press away in
+                  the picker. */}
+              <TryLogosPill
+                version={coverVersion}
                 currentModel={model}
                 visible={!logosDismissed}
                 onOpen={() => setLogosModalOpen(true)}

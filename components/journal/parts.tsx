@@ -481,7 +481,7 @@ const DOOR_ASKS = [
  * touches before they have decided anything.
  */
 export function Door({
-  issue = 'Issue No. 4 · Logos 2 · MMXXVI',
+  issue = 'Issue No. 4 · Logos 3 · MMXXVI',
   to = '/chat',
 }: {
   issue?: string;

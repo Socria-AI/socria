@@ -210,7 +210,8 @@ const MODULES = [
   'lib/first-session.ts',
   'components/MapPoster.tsx',
   'components/LogosRail.tsx',
-  'components/Logos2Cover.tsx',
+  'components/LogosCover.tsx',
+  'lib/logos3-showcase.ts',
   'lib/lifecycle.ts',
   'lib/email.ts',
   'lib/socria-prompt.ts',
@@ -280,6 +281,8 @@ export async function buildAll() {
           // needs an anchor and an img. See the two shims beside this file.
           'next/link': join(here, 'next-link-shim.mjs'),
           'next/image': join(here, 'next-image-shim.mjs'),
+          // A browser-only piece loaded on demand renders its loading state under test.
+          'next/dynamic': join(here, 'next-dynamic-shim.mjs'),
         },
         // undici uses dynamic require() internally, which does not survive
         // being bundled into ESM. It is a real dependency at runtime, so let

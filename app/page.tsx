@@ -21,9 +21,9 @@ import { JournalIssue } from '@/components/journal/JournalIssue';
 import './journal.css';
 
 export const metadata: Metadata = {
-  title: 'Socria Logos 2 — AI that makes you better at thinking',
+  title: 'Socria Logos 3 — AI that makes you better at thinking',
   description:
-    'Introducing Logos 2: say what you are thinking and it becomes a model beside you — one you can read, move, compute where it can be computed, and ask about by name. Issue No. 4 of the Socria Journal.',
+    'Introducing Logos 3: say what you are working through and it becomes a workspace beside you — a map of your reasoning, models the engine solves, and designs drawn in 3D from your words — that you can move, compute and ask about by name. Issue No. 4 of the Socria Journal.',
 };
 
 export default function Page() {

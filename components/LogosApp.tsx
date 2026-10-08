@@ -192,7 +192,7 @@ import {
 } from '@/lib/logos';
 import { owesExtraction } from '@/lib/conversation-surface';
 import { FirstRunIntro } from '@/components/onboarding/FirstRunIntro';
-import { Logos2Cover } from '@/components/Logos2Cover';
+import { LogosCover } from '@/components/LogosCover';
 import { useFirstRun } from '@/components/useFirstRun';
 import { wantsIntro } from '@/lib/first-run';
 import { computationFacts, whatChanged } from '@/lib/model/inspect';
@@ -427,7 +427,7 @@ export function LogosApp({
   /** which opening or scenario this tab began from, for the activation event */
   const startIdRef = useRef<string | null>(null);
   /** where the sign-in gate should bring them back to — set on mount, so the query survives */
-  const [gateHref, setGateHref] = useState('/sign-in?redirect_url=%2Fchat%3Fmodel%3Dlogos-2');
+  const [gateHref, setGateHref] = useState(`/sign-in?redirect_url=%2Fchat%3Fmodel%3D${model === 'logos-3' ? 'logos-3' : 'logos-2'}`);
   /** what Socria knows about this person, for the prompt and the viewer (accounts only) */
   const [understanding, setUnderstanding] = useState<UserUnderstanding | null>(null);
   const understandingRef = useRef<UserUnderstanding | null>(null);
@@ -3613,13 +3613,13 @@ export function LogosApp({
 
   if (!hasAccess) {
     // THE COVER IS THE GATE. The same card the chat opens from its pill —
-    // the real ModelView on an engine-built model, the terms read from the
-    // plan table, the way in — so the two doors into Logos 2 say the same
+    // the real thing built live, the terms read from the plan table, the way
+    // in — naming the Logos this surface is, so the two doors say the same
     // thing in the same words. The access key stays behind its disclosure.
     return (
       <div className="logos-root">
         {authSettled && (
-          <Logos2Cover as="gate" isSignedIn={false} primaryHref={gateHref} onUnlock={unlockWith} />
+          <LogosCover as="gate" version={model === 'logos-3' ? 'logos-3' : 'logos-2'} isSignedIn={false} primaryHref={gateHref} onUnlock={unlockWith} />
         )}
       </div>
     );

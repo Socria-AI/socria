@@ -12,7 +12,7 @@
 //
 // Ported from the Claude Design prototype's journal-issue.jsx. The structure
 // and the words are the design's; the links point at real routes instead of
-// flat .html files, Core 4 reads Logos 2 where the issue names the product,
+// flat .html files, Logos 3 is named where the issue names the product,
 // and the price is read from the one place it lives.
 //
 // A CLIENT COMPONENT, because drivers.ts does direct DOM work — splitting
@@ -45,7 +45,7 @@ export function JournalIssue() {
 
       {/* THE DOOR — the composer is the cover. The headline it displaces
           closes the issue, which is where it was always going. */}
-      <Door issue="Issue No. 4 · Logos 2 · MMXXVI" />
+      <Door issue="Issue No. 4 · Logos 3 · MMXXVI" />
 
       {/* THE ANCHOR THE DOOR POINTS AT. "Or watch it work first" is the one
           way past the composer for somebody not ready to type, and it was a
@@ -109,11 +109,11 @@ export function JournalIssue() {
               is exactly what you want, and this is not an argument against it.
             </p>
             <p>
-              Logos 2 does that work too — the research, the calculation, the verification, the
+              Logos 3 does that work too — the research, the calculation, the verification, the
               critique — <em>in full.</em> What it holds back is the one step that would have made
-              you more capable for having taken it: the conclusion. And it draws the rest beside
-              you, as a model you can move, so that step is yours to take with the structure in
-              view.
+              you more capable for having taken it: the conclusion. And it builds the rest beside
+              you — a map of your reasoning, a model you can move, a design you can turn — so that
+              step is yours to take with the structure in view.
             </p>
           </div>
           <p className="differs-close rv d2">

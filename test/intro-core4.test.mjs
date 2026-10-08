@@ -63,15 +63,15 @@ console.log('\n=== opened, it is the demonstration and nothing else ===');
   ok('and the way out is still two controls', /core3-modal-checkbox/.test(modal) && /core3-modal-primary/.test(modal));
 }
 
-console.log('\n=== the standing invitation is Logos 2’s; Core 4’s is one press away ===');
+console.log('\n=== the standing invitation is Logos’s; Core 4’s is one press away ===');
 {
   // The slot beside the composer belongs to the environment now — the surface
   // a person would not guess from a text box. Core 4's announcement is not
   // gone: picking Core 4 without an account still opens it.
-  const pill = read('components/TryLogos2Pill.tsx');
-  ok('the pill is Logos 2’s', /Try Logos 2/.test(pill) && /ModelGlyph model="logos-2"/.test(pill));
+  const pill = read('components/TryLogosPill.tsx');
+  ok('the pill is Logos’s — Logos 3 wherever it is offered', /Try \{name\}/.test(pill) && /ModelGlyph model=\{version\}/.test(pill) && /<TryLogosPill\s+version=\{coverVersion\}/.test(chat));
   ok('  and the Core 4 pill is gone', !/TryCore4Pill/.test(chat));
-  ok('it opens the Logos 2 cover', /onOpen=\{\(\) => setLogosModalOpen\(true\)\}/.test(chat));
+  ok('it opens the Logos cover', /onOpen=\{\(\) => setLogosModalOpen\(true\)\}/.test(chat));
   ok('nobody is invited to where they already are', /SOCRIA_MODELS\[currentModel\]\.logosSurface/.test(pill));
   ok('“don’t show again” takes the pill with it',
     /visible=\{!logosDismissed\}/.test(chat) && /setLogosDismissed\(true\)/.test(chat));
