@@ -66,7 +66,7 @@ export const EVENTS = [
   // which broad kind of thinking they picked in onboarding — an id from
   // lib/onboarding-roles.ts, never their words
   'onboarding_role_chosen',
-  // how they like to think, which is the model they start on: 'core-4' | 'logos-2'
+  // how they like to think, which is the model they start on: 'core-4' | 'logos-2' | 'logos-3'
   'onboarding_model_chosen',
   'progressive_trace_discovered',
   'progressive_view_discovered',

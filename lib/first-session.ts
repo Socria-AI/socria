@@ -24,6 +24,11 @@
 //   goes out under their name without their hand on it is not their thinking,
 //   and the map it draws is not theirs either.
 //
+//   LOGOS 3 LEADS WITH A MODEL. Logos 3 builds what a person describes, so
+//   its first card is a system to build — a spring that will not settle —
+//   with the same five parts as the rest, and an assumption the model itself
+//   will test. The other three are shared (LOGOS3_OPENINGS, openingsFor).
+//
 //   NOT THE COVER'S STORY. The Logos 2 cover shows a model built from a saddle; the old tour assembled a map from a job
 //   offer and a raise. Someone who watched that and then meets the same
 //   sentence on the intro learns that Socria knows one story. These four are
@@ -123,10 +128,34 @@ export const OPENINGS: Opening[] = [
   },
 ];
 
-/** The opening with this id, or null. */
+/**
+ * Logos 3's first card: a system to build. The person names it, asks for it to
+ * be built so they can change it, and states an assumption the model will put
+ * to the test — more damping does not always settle a spring faster; past
+ * critical damping it settles more slowly, which the model shows rather than
+ * says. The same five parts as every opening: a claim, an assumption, a value,
+ * a constraint and the tension between them.
+ */
+export const MODEL_OPENING: Opening = {
+  id: 'spring',
+  label: 'A spring that won’t settle',
+  message:
+    'In my vibrations class we have a 1 kg mass on a 20 N/m spring with a 0.6 N·s/m damper, released from 1 m. Build it so I can change the damping and watch what happens. I think more damping always makes it settle faster, but I am assuming that and have not checked. I care about seeing why, not just the formula, and the problem set is due Thursday, so those pull against each other.',
+  shows: 'Logos will look for the system to build, and the assumption you have not checked.',
+};
+
+/** Logos 3's four: the model first, in the place of the derivative, then the three shared. */
+export const LOGOS3_OPENINGS: Opening[] = [MODEL_OPENING, ...OPENINGS.filter((o) => o.id !== 'limit')];
+
+/** The openings a surface offers: Logos 3 (the workspace) leads with a model to build. */
+export function openingsFor(workspace: boolean): Opening[] {
+  return workspace ? LOGOS3_OPENINGS : OPENINGS;
+}
+
+/** The opening with this id, or null — from either set, so a link resolves wherever it lands. */
 export function openingFor(id: string | null | undefined): Opening | null {
   if (!id) return null;
-  return OPENINGS.find((o) => o.id === id) ?? null;
+  return OPENINGS.find((o) => o.id === id) ?? (MODEL_OPENING.id === id ? MODEL_OPENING : null);
 }
 
 /**

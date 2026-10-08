@@ -6,6 +6,12 @@
 // It demonstrates rather than lists: each step animates the actual behaviour
 // in miniature, because "the map reorganizes as you think" means nothing as a
 // sentence and is obvious the moment you watch two nodes fold into one.
+//
+// Logos 3 walks a different path through the same idea (STEPS_3): what it
+// adds is said where it happens — a model built from a description, the chat
+// box that works everything, the views opened beside the map, and a second
+// person with Socria between you. What it shares with Logos 2 (the map, the
+// cards, your own material, the draft) is said in the same words.
 
 import { useEffect, useState } from 'react';
 
@@ -148,6 +154,82 @@ const MathDemo = (
   </div>
 );
 
+/* ── Logos 3, in miniature ─────────────────────────────────────────── */
+
+const Built = (
+  <div className="lgg-demo lgg-built">
+    <div className="lgg-bubble lgg-bubble-user">A mass on a spring, with a damper. Let me change the damping.</div>
+    <div className="lgg-built-model">
+      <svg viewBox="0 0 220 64" className="lgg-built-plot" aria-hidden="true">
+        <line x1="0" y1="32" x2="220" y2="32" className="lgg-built-axis" />
+        <path className="lgg-built-curve" d="M0 6 C 12 6, 14 56, 26 56 S 40 14, 52 14 S 66 48, 78 48 S 92 22, 104 22 S 118 40, 130 40 S 144 28, 156 28 S 170 35, 182 35 S 196 31, 220 32" />
+      </svg>
+      <div className="lgg-built-slider">
+        <span>damping c</span>
+        <i><b /></i>
+        <em>0.6 N·s/m</em>
+      </div>
+      <p className="lgg-built-said">computed by the engine, not written by the AI</p>
+    </div>
+  </div>
+);
+
+// R2 − 3R1 on [1 2 1; 3 8 1; 0 4 1]: the second row becomes [0 2 −2]. Every
+// cell has its place in the grid, so the new row lands exactly on the old one.
+const ONEBOX_ROWS = [
+  ['1', '2', '1'],
+  ['3', '8', '1'],
+  ['0', '4', '1'],
+];
+const OneBox = (
+  <div className="lgg-demo lgg-onebox">
+    <div className="lgg-onebox-grid" aria-hidden="true">
+      {ONEBOX_ROWS.flatMap((row, r) =>
+        row.map((v, c) => (
+          <span key={`${r}.${c}`} className={r === 1 ? 'is-row' : undefined} style={{ gridRow: r + 1, gridColumn: c + 1 }}>
+            {v}
+          </span>
+        ))
+      )}
+      {['0', '2', '−2'].map((v, c) => (
+        <span key={`n${c}`} className="is-new" style={{ gridRow: 2, gridColumn: c + 1 }}>
+          {v}
+        </span>
+      ))}
+    </div>
+    <div className="lgg-onebox-box">
+      <span>R2 ← R2 − 3R1</span>
+      <i>↵</i>
+    </div>
+    <p className="lgg-onebox-said">computed exactly · undo takes it back</p>
+  </div>
+);
+
+const Views = (
+  <div className="lgg-demo lgg-views">
+    <span className="lgg-views-add">+ View</span>
+    <div className="lgg-views-tiles">
+      <span className="is-map">Map</span>
+      <span className="is-model">Model</span>
+      <span className="is-params">Parameters</span>
+      <span className="is-3d">Live 3D</span>
+    </div>
+  </div>
+);
+
+const Together = (
+  <div className="lgg-demo lgg-together">
+    <div className="lgg-together-people">
+      <span className="lgg-together-a">Maya</span>
+      <span className="lgg-together-b">Sam</span>
+    </div>
+    <div className="lgg-bubble lgg-bubble-logos lgg-together-note">
+      <span className="lgg-who">Socria</span>
+      You both assume the budget is fixed. Maya is weighing speed, Sam is weighing risk.
+    </div>
+  </div>
+);
+
 const STEPS: Step[] = [
   {
     kicker: 'Start here',
@@ -207,7 +289,49 @@ const STEPS: Step[] = [
   },
 ];
 
-export function LogosGuide({ open, onClose }: { open: boolean; onClose: () => void }) {
+/**
+ * Logos 3's walk. Shared steps are the same objects, so a change to how the
+ * map or the draft is described changes both walks at once.
+ */
+const at = (title: string) => STEPS.find((x) => x.title === title)!;
+const STEPS_3: Step[] = [
+  at('Think out loud.'),
+  at('Your thinking takes shape beside you.'),
+  {
+    kicker: 'Say what it is',
+    title: 'Describe it, and it’s built.',
+    body: 'Describe a system — a spring, a circuit, a beam, a population — and Logos builds a live model of it, with units. Move a slider and everything that depends on it moves.',
+    example: 'The model is computed by an engine, not written by the AI, and checked against exact results where they exist. When something is missing, it asks rather than guessing.',
+    demo: Built,
+  },
+  {
+    kicker: 'One box',
+    title: 'The chat works everything.',
+    body: 'Ask a question, or say what to do: “R2 ← R2 − 3R1” on a matrix, “a = 2” on a curve, “make it twice as tall” in Live 3D. Each step is computed exactly, and undo takes it back.',
+    example: 'The buttons and sliders are there when your hands are faster. You never have to learn them.',
+    demo: OneBox,
+  },
+  {
+    kicker: '+ View',
+    title: 'Open what you need beside it.',
+    body: 'The map, a model, its parameters, the inspector, a model’s history or Live 3D, side by side. Select something in one and the others follow.',
+    example: 'Live 3D is experimental: a geometric preview with exact sizes and masses, not a physical simulation.',
+    demo: Views,
+  },
+  at('Nothing on the map is inert.'),
+  {
+    kicker: 'Together',
+    title: 'Think it through with someone.',
+    body: 'Share a line of thinking and work in it together: one map, one set of models. Socria sits between you and names where you agree, where you differ, and what neither of you has asked.',
+    example: 'It does not take sides. Owners, editors, commenters and viewers each get what they should.',
+    demo: Together,
+  },
+  at('Paste notes. Drop images.'),
+  at('Turn it into something.'),
+];
+
+export function LogosGuide({ open, onClose, edition = 2 }: { open: boolean; onClose: () => void; edition?: 2 | 3 }) {
+  const STEPS_SHOWN = edition === 3 ? STEPS_3 : STEPS;
   const [i, setI] = useState(0);
 
   useEffect(() => {
@@ -219,19 +343,19 @@ export function LogosGuide({ open, onClose }: { open: boolean; onClose: () => vo
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
-      if (e.key === 'ArrowRight') setI((v) => Math.min(v + 1, STEPS.length - 1));
+      if (e.key === 'ArrowRight') setI((v) => Math.min(v + 1, STEPS_SHOWN.length - 1));
       if (e.key === 'ArrowLeft') setI((v) => Math.max(v - 1, 0));
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
+  }, [open, onClose, STEPS_SHOWN.length]);
 
   if (!open) return null;
-  const step = STEPS[i];
-  const last = i === STEPS.length - 1;
+  const step = STEPS_SHOWN[i];
+  const last = i === STEPS_SHOWN.length - 1;
 
   return (
-    <div className="lgg-veil" role="dialog" aria-modal="true" aria-label="What Logos does">
+    <div className="lgg-veil" role="dialog" aria-modal="true" aria-label={edition === 3 ? 'What Logos 3 does' : 'What Logos does'}>
       <div className="lgg">
         <header className="lgg-head">
           <span className="lgg-kicker">{step.kicker}</span>
@@ -253,7 +377,7 @@ export function LogosGuide({ open, onClose }: { open: boolean; onClose: () => vo
 
         <footer className="lgg-foot">
           <div className="lgg-dots">
-            {STEPS.map((s, n) => (
+            {STEPS_SHOWN.map((s, n) => (
               <button
                 key={s.title}
                 type="button"

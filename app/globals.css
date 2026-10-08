@@ -5525,7 +5525,79 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
   .logos-root .lgg-veil { animation: none !important; }
   .logos-root .lgg-wire { stroke-dashoffset: 0; }
   .logos-root .lgg-merge-a, .logos-root .lgg-merge-b { display: none; }
+  /* Logos 3: the end state, still — the curve drawn, the new row in place */
+  .logos-root .lgg-built-curve { stroke-dashoffset: 0; }
+  .logos-root .lgg-onebox-grid .is-row { opacity: 0; }
 }
+
+/* Logos 3 — a model, built from a sentence */
+.logos-root .lgg-built { padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; }
+.logos-root .lgg-built .lgg-bubble-user { align-self: flex-end; }
+.logos-root .lgg-built-model {
+  background: var(--lg-paper); border: 1px solid var(--lg-line); border-radius: 10px; padding: 6px 10px;
+  animation: lggRise 0.5s 0.6s cubic-bezier(0.16,1,0.3,1) both;
+}
+.logos-root .lgg-built-plot { display: block; width: 100%; height: 44px; }
+.logos-root .lgg-built-axis { stroke: var(--lg-line); stroke-width: 1; }
+.logos-root .lgg-built-curve {
+  fill: none; stroke: var(--lg-primary); stroke-width: 1.6;
+  stroke-dasharray: 600; stroke-dashoffset: 600; animation: lggDraw 1.4s 0.9s ease-out forwards;
+}
+.logos-root .lgg-built-slider { display: flex; align-items: center; gap: 8px; font-size: 10px; color: var(--lg-ink-60); margin-top: 2px; }
+.logos-root .lgg-built-slider i { flex: 1; height: 3px; border-radius: 2px; background: var(--lg-line); position: relative; }
+.logos-root .lgg-built-slider b { position: absolute; top: -4px; left: 22%; width: 11px; height: 11px; border-radius: 50%; background: var(--lg-primary); }
+.logos-root .lgg-built-slider em { font-style: normal; font-variant-numeric: tabular-nums; color: var(--lg-ink); }
+.logos-root .lgg-built-said { margin: 4px 0 0; font-size: 9.5px; color: var(--lg-ink-40); }
+
+/* Logos 3 — one box: a row operation, typed, computed in place */
+.logos-root .lgg-onebox { padding: 14px 18px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.logos-root .lgg-onebox-grid {
+  display: grid; grid-template-columns: repeat(3, 30px); grid-auto-rows: 22px; place-items: center;
+  font-family: var(--font-stix, Georgia, serif); font-size: 15px; color: var(--lg-ink);
+  padding: 2px 10px; border-left: 1.5px solid var(--lg-ink-60); border-right: 1.5px solid var(--lg-ink-60); border-radius: 3px;
+  font-variant-numeric: tabular-nums;
+}
+.logos-root .lgg-onebox-grid .is-row { animation: lggGone 0.35s 1.5s both; }
+.logos-root .lgg-onebox-grid .is-new { color: var(--lg-primary); font-weight: 600; animation: lggCome 0.45s 1.65s both; }
+@keyframes lggGone { to { opacity: 0; transform: translateY(-6px); } }
+@keyframes lggCome { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.logos-root .lgg-onebox-box {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; width: min(260px, 100%);
+  padding: 7px 8px 7px 12px; border-radius: 10px; background: var(--lg-paper); border: 1px solid var(--lg-line);
+  font-family: var(--font-stix, Georgia, serif); font-size: 13px; color: var(--lg-ink);
+  animation: lggRise 0.45s 0.3s both;
+}
+.logos-root .lgg-onebox-box i { font-style: normal; font-size: 11px; color: var(--lg-paper); background: var(--lg-primary); border-radius: 999px; padding: 2px 7px; }
+.logos-root .lgg-onebox-said { margin: 0; font-size: 9.5px; color: var(--lg-ink-40); animation: lggRise 0.4s 2s both; }
+
+/* Logos 3 — + View: what opens beside the map */
+.logos-root .lgg-views { padding: 12px 16px 14px; display: flex; flex-direction: column; gap: 8px; }
+.logos-root .lgg-views-add {
+  align-self: flex-end; font-size: 11px; color: var(--lg-ink-60); background: var(--lg-paper);
+  border: 1px solid var(--lg-line); border-radius: 999px; padding: 3px 10px; animation: lggPop 0.35s 0.1s both;
+}
+.logos-root .lgg-views-tiles { flex: 1; min-height: 0; display: grid; grid-template-columns: 1.3fr 1fr; grid-template-rows: repeat(3, 1fr); gap: 6px; }
+.logos-root .lgg-views-tiles span {
+  border: 1px solid var(--lg-line); border-radius: 8px; background: var(--lg-paper);
+  font-size: 9.5px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--lg-ink-40); padding: 6px 8px;
+}
+.logos-root .lgg-views-tiles .is-map { grid-column: 1; grid-row: 1 / 4; animation: lggPop 0.4s 0.2s both; }
+.logos-root .lgg-views-tiles .is-model { grid-column: 2; grid-row: 1; animation: lggPop 0.4s 0.55s both; }
+.logos-root .lgg-views-tiles .is-params { grid-column: 2; grid-row: 2; animation: lggPop 0.4s 0.8s both; }
+.logos-root .lgg-views-tiles .is-3d { grid-column: 2; grid-row: 3; animation: lggPop 0.4s 1.05s both; }
+
+/* Logos 3 — two people, Socria between them */
+.logos-root .lgg-together { padding: 16px 18px; display: flex; flex-direction: column; justify-content: center; gap: 12px; }
+.logos-root .lgg-together-people { display: flex; gap: 8px; }
+.logos-root .lgg-together-people span {
+  display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--lg-ink);
+  padding: 4px 10px 4px 5px; border-radius: 999px; background: var(--lg-paper); border: 1px solid var(--lg-line);
+}
+.logos-root .lgg-together-people span::before { content: ''; width: 16px; height: 16px; border-radius: 50%; background: var(--lg-primary); opacity: 0.75; }
+.logos-root .lgg-together-people .lgg-together-b::before { background: var(--lg-accent); }
+.logos-root .lgg-together-a { animation: lggPop 0.35s 0.1s both; }
+.logos-root .lgg-together-b { animation: lggPop 0.35s 0.35s both; }
+.logos-root .lgg-together-note { max-width: 100%; }
 
 /* the door back to the walkthrough. Shape, size and hover come from the
    header's one icon-button rule; a "?" is a glyph rather than an icon, so

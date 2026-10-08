@@ -2289,8 +2289,10 @@ export default function ChatPage() {
       // without one meets Logos's own gate, which says so, and the sentence is
       // kept in the chat's composer behind it.
       if (carried.surface === 'logos') {
-        setModel('logos-2');
-        chooseModel('logos-2');
+        // the Logos they chose in onboarding — Logos 3 only while it is still offered to this browser
+        const logos = carried.model === 'logos-3' && isOffered('logos-3') ? 'logos-3' : 'logos-2';
+        setModel(logos);
+        chooseModel(logos);
       }
     }
     // The tour decision moved out of this mount effect — see the effect

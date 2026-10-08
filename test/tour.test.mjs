@@ -4,7 +4,7 @@
 // control that is not on screen. Refusing to stop. None of them is a
 // drawing bug, which is why none of this file is about drawing.
 
-import { TOUR_STEPS, TOUR_KEY, ROMAN, shouldRunTour, nextStep, inkRect, CORE_TOUR, LOGOS_TOUR, LOGOS_TOUR_KEY, placeNote } from './.tmp/tour.mjs';
+import { TOUR_STEPS, TOUR_KEY, ROMAN, shouldRunTour, nextStep, inkRect, CORE_TOUR, LOGOS_TOUR, LOGOS3_TOUR, LOGOS_TOUR_KEY, placeNote } from './.tmp/tour.mjs';
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -31,9 +31,11 @@ console.log('=== the steps — stupidly simple ===');
 {
   ok('Core: three notes', CORE_TOUR.length === 3, String(CORE_TOUR.length));
   ok('Logos: four notes', LOGOS_TOUR.length === 4, String(LOGOS_TOUR.length));
+  ok('Logos 3: four notes too', LOGOS3_TOUR.length === 4, String(LOGOS3_TOUR.length));
+  ok('  the map, the one box, + View, and Core 4', LOGOS3_TOUR.map((s) => s.anchor).join() === 'map,composer,views,model');
   ok('"Take the tour again" on the chat replays the Core one', TOUR_STEPS === CORE_TOUR);
   ok('two keys, so taking one does not spend the other', TOUR_KEY !== LOGOS_TOUR_KEY);
-  for (const [name, steps] of [['core', CORE_TOUR], ['logos', LOGOS_TOUR]]) {
+  for (const [name, steps] of [['core', CORE_TOUR], ['logos', LOGOS_TOUR], ['logos3', LOGOS3_TOUR]]) {
     ok(`${name}: anchors are unique`, new Set(steps.map((s) => s.anchor)).size === steps.length);
     ok(`${name}: enough numerals for them`, ROMAN.length >= steps.length);
     for (const s of steps) {
@@ -64,6 +66,12 @@ console.log('=== every anchor exists where its tour runs ===');
     const lit = logos.includes(`data-tour="${s.anchor}"`) || logos.includes(`'${s.anchor}'`);
     ok(`logos: data-tour ${s.anchor} is rendered`, lit, s.anchor);
   }
+  const logos3 = logos + read('components/workspace/Workspace.tsx');
+  for (const s of LOGOS3_TOUR) {
+    const lit = logos3.includes(`data-tour="${s.anchor}"`) || logos3.includes(`'${s.anchor}'`);
+    ok(`logos 3: data-tour ${s.anchor} is rendered`, lit, s.anchor);
+  }
+  ok('"+ View" is the views anchor', /className="ws-add-btn" data-tour="views"/.test(read('components/workspace/Workspace.tsx')));
   // The map's own anchor only on the real map, not the small one in a card.
   ok('the map anchor is not on an embedded map', /data-tour=\{embedded \? undefined : 'map'\}/.test(read('components/ThinkingMap.tsx')));
 }
@@ -75,7 +83,7 @@ console.log('=== onboarding starts it, after the first answer ===');
   ok('  and asks the rule, with the screen state', /shouldRunTour\(\{[\s\S]{0,200}blocked: anythingOpen/.test(chat));
   ok('  and reads whether it was already taken', /localStorage\.getItem\(TOUR_KEY\)/.test(chat));
   const app = read('components/LogosApp.tsx');
-  ok('Logos mounts its own tour', /<Tour open=\{tourOpen\} steps=\{LOGOS_TOUR\} onDone=\{endTour\} \/>/.test(app));
+  ok('Logos mounts its own tour — Logos 3 its own notes', /<Tour open=\{tourOpen\} steps=\{workspaceOn \? LOGOS3_TOUR : LOGOS_TOUR\} onDone=\{endTour\} \/>/.test(app));
   ok('  after the answer', /const hasReply = messages\.some\(\(m\) => m\.role === 'assistant'\)/.test(app));
   ok('  never over the guide, a sheet, or the first map rising', /const screenBusy = guideOpen \|\| styleOpen \|\| emerging/.test(app));
   ok('  and gives the map a moment, never forever', /mapDrawn \? 900 : 6000/.test(app));

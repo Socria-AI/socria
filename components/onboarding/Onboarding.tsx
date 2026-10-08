@@ -54,7 +54,8 @@ export function Onboarding() {
   useEffect(() => setClearing(replay), [replay]);
 
   // WHERE THEY LAND is what they answered: talking it through opens Core 4,
-  // seeing it laid out opens Logos 2. No answer opens the automatic default.
+  // seeing it laid out opens Logos — 3 where it is offered, 2 where it is not
+  // (the intro asks which). No answer opens the automatic default.
   const go = useCallback(
     (model: StartModel | null | undefined) => {
       if (model) chooseModel(model);
@@ -79,7 +80,9 @@ export function Onboarding() {
         carry(typeof sessionStorage !== 'undefined' ? sessionStorage : null, {
           text,
           intent,
-          surface: model === 'logos-2' ? 'logos' : 'core',
+          surface: model === 'logos-2' || model === 'logos-3' ? 'logos' : 'core',
+          // which Logos, so the chat opens the one they chose rather than its default
+          ...(model === 'logos-3' ? { model } : {}),
           // it goes straight through: they land on Socria's answer to their own
           // question, and the tour starts from there
           send: true,

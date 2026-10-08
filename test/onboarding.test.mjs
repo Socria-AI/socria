@@ -31,11 +31,24 @@ console.log('=== one onboarding, no Logos-only sequence ===');
   ok('how they like to think is the choice of model: Core 4 or Logos 2', /model: 'core-4', title: 'Talk it through'/.test(intro) && /model: 'logos-2', title: 'See it laid out'/.test(intro));
   ok('  asked only where no surface is chosen yet', /askModel = false/.test(intro) && /if \(b === 'how' && !askModel\) continue/.test(intro));
   ok('  and says which model it is, and that it can change', /Socria Core 4/.test(intro) && /switch any time from the model menu/.test(intro));
+  ok('where Logos 3 is offered, seeing it laid out is Logos 3', /model: 'logos-3', title: 'See it laid out'/.test(intro) && /Socria Logos 3/.test(intro) && /const HOW = logos3 \? HOW_3 : HOW_2/.test(intro));
+  ok('  decided by the one rule every menu uses, read after mount', /setLogos3\(isOffered\('logos-3'\)\)/.test(intro) && /import \{ isOffered \} from '@\/lib\/socria-model-store'/.test(intro));
+  ok('  and it says what Logos 3 adds: built models, and someone else', /models you can move, alone or with someone/.test(intro));
+  ok('  the Logos door suggests whichever Logos is offered', /isLogos\(suggest\) && isLogos\(h\.model\)/.test(intro));
   const ob = read('components/onboarding/Onboarding.tsx');
   ok('/onboarding asks it of anyone who can open both', /askModel=\{isSignedIn !== false\}/.test(ob));
   ok('  and lands them on what they chose', /router\.push\(model \? `\/chat\?model=\$\{model\}` : '\/chat'\)/.test(ob) && /chooseModel\(model\)/.test(ob));
-  ok('  with the sentence in that surface\'s composer', /surface: model === 'logos-2' \? 'logos' : 'core'/.test(ob));
+  ok('  with the sentence in that surface\'s composer', /surface: model === 'logos-2' \|\| model === 'logos-3' \? 'logos' : 'core'/.test(ob));
+  ok('  and the Logos they chose carried with it', /\.\.\.\(model === 'logos-3' \? \{ model \} : \{\}\)/.test(ob));
+  const chatPage = read('app/chat/page.tsx');
+  ok('  which the chat opens, while it is still offered — else Logos 2', /carried\.model === 'logos-3' && isOffered\('logos-3'\) \? 'logos-3' : 'logos-2'/.test(chatPage));
   ok('the account\'s first name starts the name field', /defaultName=\{user\?\.firstName \?\? null\}/.test(ob));
+  const guide = read('components/LogosGuide.tsx');
+  ok('the "?" guide has a Logos 3 walk, and Logos 3 opens it', /edition === 3 \? STEPS_3 : STEPS/.test(guide) && /<LogosGuide open=\{guideOpen\} onClose=\{closeGuide\} edition=\{workspaceOn \? 3 : 2\} \/>/.test(read('components/LogosApp.tsx')));
+  ok('  saying what Logos 3 adds, each shown in miniature', ['Describe it, and it’s built.', 'The chat works everything.', 'Open what you need beside it.', 'Think it through with someone.'].every((t) => guide.includes(`title: '${t}'`)) && /demo: Built/.test(guide) && /demo: OneBox/.test(guide) && /demo: Views/.test(guide) && /demo: Together/.test(guide));
+  ok('  sharing Logos 2\'s steps as the same objects', /const at = \(title: string\) => STEPS\.find/.test(guide) && (guide.match(/\bat\('/g) || []).length >= 5);
+  ok('  and honest that Live 3D is a preview', /a geometric preview with exact sizes and masses, not a physical simulation/.test(guide));
+  ok('Logos 3\'s first screen says what it builds', /a model you can move, a matrix you\s+can work, a shape in Live 3D/.test(read('components/LogosApp.tsx')));
   ok('the starting points are large cards with icons and a line each', /className=\{`ob-way/.test(intro) && /ob-way-d/.test(intro) && /<ObIcon/.test(intro));
 }
 

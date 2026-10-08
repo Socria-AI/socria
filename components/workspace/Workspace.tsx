@@ -369,7 +369,7 @@ export function Workspace(props: WorkspaceProps) {
   // ── the top row: the host's header, a suggestion, + View ──────────
   const addView = (
     <span className="ws-add">
-      <button type="button" className="ws-add-btn" aria-haspopup="menu" aria-expanded={adding} onClick={() => setAdding((v) => !v)}>
+      <button type="button" className="ws-add-btn" data-tour="views" aria-haspopup="menu" aria-expanded={adding} onClick={() => setAdding((v) => !v)}>
         + View
       </button>
       {adding && (

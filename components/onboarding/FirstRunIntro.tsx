@@ -12,7 +12,8 @@
 //   who       what they mostly think about (lib/onboarding-roles.ts)
 //   how       how they like to think something through — which IS the choice
 //             of model: talking it through (Core 4) or seeing it laid out
-//             (Logos 2), asked as a preference rather than a product menu
+//             (Logos 3 where it is offered, Logos 2 where it is not), asked as
+//             a preference rather than a product menu
 //   thought   the question, a field, and five starting points worded for them
 //
 // Whatever they write goes, verbatim, into the composer of the surface they
@@ -27,6 +28,7 @@ import { ObIcon } from './ObIcon';
 import { ROLES, readRole, roleOf, writeRole, type IntentId, type Role } from '@/lib/onboarding-roles';
 import { readName, sanitizeName, writeName } from '@/lib/onboarding-name';
 import { track } from '@/lib/analytics';
+import { isOffered } from '@/lib/socria-model-store';
 import '@/app/onboarding/onboarding.css';
 
 /* ── words, rising on mount. Nothing here depends on scroll. ── */
@@ -71,11 +73,22 @@ export const INTENTS: Intent[] = [
 ];
 
 /** How they like to think — and so which model they start on. */
-export type StartModel = 'core-4' | 'logos-2';
-const HOW: { model: StartModel; title: string; line: string; name: string }[] = [
-  { model: 'core-4', title: 'Talk it through', line: 'A conversation that asks the questions you would skip, and leaves the thinking to you.', name: 'Socria Core 4' },
+export type StartModel = 'core-4' | 'logos-2' | 'logos-3';
+type How = { model: StartModel; title: string; line: string; name: string };
+const TALK: How = { model: 'core-4', title: 'Talk it through', line: 'A conversation that asks the questions you would skip, and leaves the thinking to you.', name: 'Socria Core 4' };
+const HOW_2: How[] = [
+  TALK,
   { model: 'logos-2', title: 'See it laid out', line: 'The same conversation, with your reasoning drawn as a live map beside it.', name: 'Socria Logos 2' },
 ];
+// LOGOS 3, WHERE IT IS OFFERED (lib/socria-model-store isOffered: everywhere but
+// production, and on production once its code is entered). It is the same
+// "see it laid out", and says the two things it adds: what you describe is
+// built beside the map, and someone can think it through with you.
+const HOW_3: How[] = [
+  TALK,
+  { model: 'logos-3', title: 'See it laid out', line: 'Your reasoning drawn as a live map, and what you describe built beside it: models you can move, alone or with someone.', name: 'Socria Logos 3' },
+];
+const isLogos = (m: StartModel | null | undefined) => m === 'logos-2' || m === 'logos-3';
 
 const MAX = 2000;
 type Beat = 'premise' | 'name' | 'who' | 'how' | 'thought';
@@ -109,6 +122,10 @@ export function FirstRunIntro({
   const area = useRef<HTMLTextAreaElement>(null);
   const nameRef = useRef<HTMLInputElement>(null);
   const known = useRef<{ name: string | null; role: Role | null }>({ name: null, role: null });
+  // Read after mount: what is offered depends on this browser (its opened gates), which the server cannot see.
+  const [logos3, setLogos3] = useState(false);
+  useEffect(() => setLogos3(isOffered('logos-3')), []);
+  const HOW = logos3 ? HOW_3 : HOW_2;
 
   useEffect(() => {
     const n = readName();
@@ -283,7 +300,8 @@ export function FirstRunIntro({
                   type="button"
                   role="radio"
                   aria-checked={model === h.model}
-                  className={`ob-howc${model === h.model || (!model && suggest === h.model) ? ' is-on' : ''}`}
+                  // the Logos page's door suggests Logos — whichever Logos this browser is offered
+                  className={`ob-howc${model === h.model || (!model && (suggest === h.model || (isLogos(suggest) && isLogos(h.model)))) ? ' is-on' : ''}`}
                   onClick={() => pickHow(h.model)}
                 >
                   <HowPicture kind={h.model} />
@@ -374,6 +392,25 @@ export function FirstRunIntro({
 
 /** A small picture of each way of thinking — what the screen will look like. */
 function HowPicture({ kind }: { kind: StartModel }) {
+  if (kind === 'logos-3') {
+    // the conversation, the map, and a model built beside them
+    return (
+      <svg className="ob-howc-pic" viewBox="0 0 160 84" aria-hidden="true">
+        <rect x="6" y="12" width="40" height="12" rx="6" className="b1" />
+        <rect x="6" y="30" width="32" height="12" rx="6" className="b2" />
+        <rect x="6" y="48" width="36" height="12" rx="6" className="b1" />
+        <line x1="54" y1="6" x2="54" y2="78" className="rule" />
+        <path d="M74 18 L100 13 M74 18 L88 34 M100 13 L88 34" className="edge" />
+        <rect x="62" y="11" width="22" height="13" rx="3" className="n" />
+        <rect x="92" y="6" width="22" height="13" rx="3" className="n" />
+        <rect x="77" y="29" width="22" height="13" rx="3" className="n on" />
+        <rect x="64" y="48" width="88" height="30" rx="4" className="n" />
+        <path d="M68 52 C 74 52, 76 74, 82 74 S 90 57, 96 57 S 104 70, 110 70 S 118 61, 124 61 S 132 66, 138 66 S 144 63, 148 64" className="curve" />
+        <circle cx="128" cy="20" r="6" className="who" />
+        <circle cx="140" cy="20" r="6" className="who b" />
+      </svg>
+    );
+  }
   if (kind === 'core-4') {
     return (
       <svg className="ob-howc-pic" viewBox="0 0 160 84" aria-hidden="true">

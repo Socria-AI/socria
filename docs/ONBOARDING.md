@@ -13,7 +13,8 @@ ONE ONBOARDING, FOR ALL OF SOCRIA (components/onboarding/FirstRunIntro.tsx)
   who       "What do you mostly think about?"             lib/onboarding-roles.ts
             Studying · Building · Researching · Making · Leading · Helping people · Life, mostly
   how       "How do you like to think something through?"
-            Talk it through → Core 4  ·  See it laid out → Logos 2
+            Talk it through → Core 4  ·  See it laid out → Logos 3 where it is
+            offered, Logos 2 where it is not
   thought   "What are you trying to figure out, <name>?"  five starting points as cards,
             ordered and worded for what they think about
 
@@ -26,6 +27,36 @@ yet (/onboarding, for anyone who can open both); over the chat or over Logos the
 surface is the answer. There is no Logos-only sequence any more: the three-beat
 coach marks over a first map (lib/onboarding.ts, components/FirstMap.tsx) were
 removed. The first map still rises card by card once, with nothing to press.
+
+## Logos 3, where it is offered
+
+Logos 3 is offered everywhere but production, and on production once its code
+has been entered (`isOffered('logos-3')` in `lib/socria-model-store.ts`, the
+one rule every menu uses). Wherever it is, onboarding says so, and nowhere else
+does it. Opening Logos 3 to everyone changes all of this at once, with no copy
+to edit.
+
+- **The model question.** "See it laid out" names *Socria Logos 3*: "Your
+  reasoning drawn as a live map, and what you describe built beside it: models
+  you can move, alone or with someone." Its picture adds a model and a second
+  person to the map. The choice is carried through the handover
+  (`Carried.model` in `lib/onboarding-script.ts`), so the chat opens the Logos
+  that was chosen rather than its default — and Logos 2 if Logos 3 is no longer
+  offered by the time they land.
+- **The first screen.** "Think out loud" adds what Logos 3 builds: a model you
+  can move, a matrix you can work, a shape in Live 3D. Its first opening is a
+  system to build — *A spring that won't settle* — in the place of the
+  derivative (`LOGOS3_OPENINGS`); its assumption ("more damping always settles
+  it faster") is one the model itself shows to be wrong past critical damping.
+- **The tour** (`LOGOS3_TOUR`): the map; the one box ("Ask, or say what to
+  build"); "+ View" (`data-tour="views"`, where a model, its parameters or
+  Live 3D open beside the map); switching to Core 4.
+- **The "?" guide** (`LogosGuide edition={3}`): the map and its cards, then
+  what Logos 3 adds, each shown in miniature — a model built from a sentence
+  (computed by the engine, not the AI); the chat working everything (a row
+  operation computed in place); the views beside the map; and thinking it
+  through with someone, Socria between you. Shared steps are the same objects
+  as Logos 2's, so the two walks cannot drift apart.
 
 The name and the answer to "what do you think about" live in this browser, are
 changeable under Manage Account, and reach Socria as one sanitised line each —

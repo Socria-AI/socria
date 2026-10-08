@@ -11,6 +11,7 @@
 //   a `?start=` cleanup that erases the other parameters' input;
 //   a poster with a card missing, an edge missing, or "undefined" in it.
 
+import { readFileSync } from 'node:fs';
 import {
   FIRST_MAP_KEY,
   FIRST_MAP_NODES,
@@ -26,6 +27,9 @@ import {
   readStart,
   startMessage,
   SCENARIO_STARTS,
+  LOGOS3_OPENINGS,
+  MODEL_OPENING,
+  openingsFor,
 } from './.tmp/first-session.mjs';
 // The Explore page is not on every branch. Where it is, the suite checks the
 // module's own copy of the scenario starts against the page's data; where it
@@ -94,6 +98,26 @@ console.log('=== four openings, each a complete first message ===');
 
   ok('the lead invites editing', OPENING_LEAD === 'Start from this — change anything.');
   ok('lead never counts down', !/\d/.test(OPENING_LEAD));
+}
+
+console.log('\n=== Logos 3 leads with a model to build ===');
+{
+  ok('four, as on Logos 2', LOGOS3_OPENINGS.length === 4);
+  ok('the model first, in the place of the derivative', LOGOS3_OPENINGS[0] === MODEL_OPENING && !LOGOS3_OPENINGS.some((o) => o.id === 'limit'));
+  ok('  the other three are the same objects', LOGOS3_OPENINGS.slice(1).every((o) => OPENINGS.includes(o)));
+  ok('each surface gets its own', openingsFor(true) === LOGOS3_OPENINGS && openingsFor(false) === OPENINGS);
+  const o = MODEL_OPENING;
+  const n = words(o.message);
+  ok('the spring: 40–90 words', n >= 40 && n <= 90, `${n} words`);
+  ok('  first person', /\b(I|my|My)\b/.test(o.message));
+  ok('  asks for the thing to be built, and what to change', /Build it so I can change the damping/.test(o.message));
+  ok('  with numbers the engine can build from, in units', /1 kg/.test(o.message) && /20 N\/m/.test(o.message) && /0\.6 N·s\/m/.test(o.message));
+  ok('  the five parts', /assum/i.test(o.message) && /\bI think\b/.test(o.message) && /\bcare\b/.test(o.message) && /\bdue\b/.test(o.message) && /\b(pull|against)\b/.test(o.message));
+  ok('  label short, shows what Logos looks for, promises no answer', words(o.label) <= 6 && /^Logos will look for /.test(o.shows) && !/answer|solve|tell you|fix/i.test(o.shows));
+  ok('  no id collision', !OPENINGS.some((x) => x.id === o.id));
+  ok('  and it resolves like any other', startMessage('spring') === o.message && openingFor('spring') === o && openingValue('spring') === 'spring');
+  const app = readFileSync(new URL('../components/LogosApp.tsx', import.meta.url), 'utf8');
+  ok('Logos shows the openings for its surface', /openingsFor\(workspaceOn\)\.map/.test(app));
 }
 
 console.log('\n=== a start id resolves to a message, or to nothing ===');

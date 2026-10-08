@@ -25,6 +25,8 @@ export interface Carried {
   intent: string | null;
   /** which composer it was written for; absent means the chat */
   surface?: 'core' | 'logos';
+  /** which Logos, when they chose one in onboarding; absent means Logos 2 */
+  model?: 'logos-2' | 'logos-3';
   /** send it on landing rather than leaving it in the composer — onboarding does */
   send?: boolean;
 }
@@ -38,6 +40,7 @@ export function carry(store: Pick<Storage, 'setItem'> | null | undefined, c: Car
         text: c.text.slice(0, 2000),
         intent: c.intent ?? null,
         ...(c.surface ? { surface: c.surface } : {}),
+        ...(c.model === 'logos-3' || c.model === 'logos-2' ? { model: c.model } : {}),
         ...(c.send ? { send: true } : {}),
       })
     );
@@ -64,6 +67,7 @@ export function takeCarried(store: Pick<Storage, 'getItem' | 'removeItem'>): Car
       text: v.text.slice(0, 2000),
       intent: typeof v.intent === 'string' ? v.intent.slice(0, 80) : null,
       ...(v.surface === 'logos' || v.surface === 'core' ? { surface: v.surface } : {}),
+      ...(v.model === 'logos-2' || v.model === 'logos-3' ? { model: v.model } : {}),
       ...(v.send === true ? { send: true } : {}),
     };
   } catch {

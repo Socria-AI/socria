@@ -53,7 +53,7 @@ import { useComments } from '@/components/share/comments/useComments';
 import { CommentPins, CommentsButton, CommentsPanel } from '@/components/share/comments/Comments';
 import { excerpt, nodeAnchor, openByAnchor, readAnchor } from '@/lib/share/comments';
 import { hueOf } from '@/lib/share/hue';
-import { LOGOS_TOUR, LOGOS_TOUR_KEY, shouldRunTour } from '@/lib/tour';
+import { LOGOS3_TOUR, LOGOS_TOUR, LOGOS_TOUR_KEY, shouldRunTour } from '@/lib/tour';
 import { LogosMark } from '@/components/LogosMark';
 import { AccountControl } from '@/components/account/AccountControl';
 import { AccountSheet } from '@/components/account/AccountSheet';
@@ -72,7 +72,7 @@ import { nthBucket } from '@/lib/analytics';
 import {
   FIRST_MAP_KEY,
   FIRST_MAP_NOTE,
-  OPENINGS,
+  openingsFor,
   OPENING_LEAD,
   firstMapCrossed,
   openingValue,
@@ -3906,10 +3906,19 @@ export function LogosApp({
             {messages.length === 0 && !streaming && (
               <div className="lg-intro">
                 <h1>Think out loud.</h1>
-                <p>
-                  Type what you’re working through. Logos asks questions back,
-                  and draws the shape of your reasoning on the right as you go.
-                </p>
+                {workspaceOn ? (
+                  <p>
+                    Type what you’re working through. Logos asks questions back,
+                    draws the shape of your reasoning as you go, and builds what
+                    you describe beside it: a model you can move, a matrix you
+                    can work, a shape in Live 3D.
+                  </p>
+                ) : (
+                  <p>
+                    Type what you’re working through. Logos asks questions back,
+                    and draws the shape of your reasoning on the right as you go.
+                  </p>
+                )}
                 {noSessions && !input ? (
                   // Nothing has ever been said here. The chips would send a
                   // line too thin to draw; these are four complete first
@@ -3917,7 +3926,7 @@ export function LogosApp({
                   // person edits them into their own situation first.
                   <div className="lg-openings">
                     <p className="lg-openings-lead">{OPENING_LEAD}</p>
-                    {OPENINGS.map((o) => (
+                    {openingsFor(workspaceOn).map((o) => (
                       <button
                         key={o.id}
                         type="button"
@@ -4630,7 +4639,7 @@ export function LogosApp({
           onSkip={() => firstRun.reach('socria.intro', { skipped: true })}
         />
       )}
-      <LogosGuide open={guideOpen} onClose={closeGuide} />
+      <LogosGuide open={guideOpen} onClose={closeGuide} edition={workspaceOn ? 3 : 2} />
       {shareOpen && activeId && (
         <ShareDialog
           type="conversation"
@@ -4691,7 +4700,7 @@ export function LogosApp({
           }}
         />
       )}
-      <Tour open={tourOpen} steps={LOGOS_TOUR} onDone={endTour} />
+      <Tour open={tourOpen} steps={workspaceOn ? LOGOS3_TOUR : LOGOS_TOUR} onDone={endTour} />
       {styleOpen && (
         <div className="lg-style-scrim" role="dialog" aria-modal="true" aria-label="How should Socria work with you?">
           <div className="lg-style-back" onClick={() => setStyleOpen(false)} aria-hidden="true" />

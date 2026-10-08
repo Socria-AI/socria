@@ -42,6 +42,19 @@ export const LOGOS_TOUR: TourStep[] = [
   { anchor: 'model', place: 'above', title: 'Switch any time', body: 'Rather just talk it through? <em>Pick Core 4 here.</em>' },
 ];
 
+/**
+ * Logos 3's notes: the same map, then what is new — the one box that builds
+ * as well as asks, and "+ View", where a model, its parameters or Live 3D
+ * open beside the map. Four, like Logos 2's; the card note gives its place to
+ * "+ View" because a card is the one thing a first map always teaches itself.
+ */
+export const LOGOS3_TOUR: TourStep[] = [
+  { anchor: 'map', place: 'left', title: 'This is your map', body: 'What you say is drawn here <em>as you talk.</em>' },
+  { anchor: 'composer', place: 'above', title: 'One box for everything', body: 'Ask, or say what to build. <em>It is built beside you.</em>' },
+  { anchor: 'views', place: 'below', title: 'Open views beside it', body: 'A model, its parameters, Live 3D: <em>+ View.</em>' },
+  { anchor: 'model', place: 'above', title: 'Switch any time', body: 'Rather just talk it through? <em>Pick Core 4 here.</em>' },
+];
+
 /** The chat's tour — what "Take the tour again" replays. */
 export const TOUR_STEPS: TourStep[] = CORE_TOUR;
 

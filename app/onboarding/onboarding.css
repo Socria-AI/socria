@@ -276,6 +276,9 @@
 .ob-howc-pic .edge{fill:none;stroke:rgba(94,118,51,.55);stroke-width:1.2}
 .ob-howc-pic .n{fill:#fff;stroke:rgba(32,32,27,.28);stroke-width:1}
 .ob-howc-pic .n.on{fill:rgba(94,118,51,.2);stroke:var(--moss)}
+.ob-howc-pic .curve{fill:none;stroke:var(--moss);stroke-width:1.4}
+.ob-howc-pic .who{fill:rgba(94,118,51,.45)}
+.ob-howc-pic .who.b{fill:rgba(38,70,83,.4)}
 .ob-howc-t{font-family:var(--serif);font-size:clamp(1.4rem,2.4vw,1.7rem);line-height:1.05}
 .ob-howc-d{font-family:var(--font-sans, system-ui, sans-serif),Inter,system-ui,sans-serif;font-size:.88rem;line-height:1.4;color:var(--ink-60)}
 .ob-howc-n{margin-top:6px;font-family:var(--font-sans, system-ui, sans-serif),Inter,system-ui,sans-serif;font-size:.68rem;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--moss-700)}
