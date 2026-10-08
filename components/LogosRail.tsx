@@ -36,6 +36,7 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Logo } from './Logo';
+import { RewardsBadges } from './rewards/RewardsBadges';
 import { MapGlyph } from './MapGlyph';
 import { NodeTile } from './NodeTile';
 import { relTime, type LogosSession } from '@/lib/logos-sessions';
@@ -105,6 +106,7 @@ export function LogosRail({
   onCreateProject,
   onMoveSession,
   onMoveChat,
+  rewards = false,
 }: {
   sessions: LogosSession[];
   /**
@@ -140,6 +142,8 @@ export function LogosRail({
   onDelete: (id: string) => void;
   onRename: (id: string, title: string) => void;
   onToggle: () => void;
+  /** signed in: Socria Rewards' marks beside the Socria mark (components/rewards/RewardsBadges.tsx) */
+  rewards?: boolean;
 }) {
   const [query, setQuery] = useState('');
   const [mapsOnly, setMapsOnly] = useState(false);
@@ -445,6 +449,7 @@ export function LogosRail({
     <aside className="s-bar" data-open={open ? 'yes' : 'no'} aria-label="Your sessions">
       <div className="s-top">
         <Logo />
+        <RewardsBadges enabled={rewards} />
         <button className="s-close" onClick={onToggle} aria-label="Close sidebar">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
             <line x1="18" y1="6" x2="6" y2="18" />

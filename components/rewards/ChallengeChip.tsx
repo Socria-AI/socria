@@ -45,7 +45,20 @@ function Dots({ n, of }: { n: number; of: number }) {
   );
 }
 
-export function ChallengeChip({ enabled, onOpenAccount }: { enabled: boolean; onOpenAccount?: () => void }) {
+export function ChallengeChip({
+  enabled,
+  onOpenAccount,
+  progress = true,
+}: {
+  enabled: boolean;
+  onOpenAccount?: () => void;
+  /**
+   * Show the challenge in progress. False while the rail is on screen: its
+   * mark beside the Socria mark already says it (RewardsBadges), and one
+   * thing said twice on a screen is noise. The completion is still said here.
+   */
+  progress?: boolean;
+}) {
   const { view } = useRewards({ enabled });
   const [open, setOpen] = useState(false);
   const [hidden, setHidden] = useState(true);
@@ -62,7 +75,7 @@ export function ChallengeChip({ enabled, onOpenAccount }: { enabled: boolean; on
   const c = view?.enabled ? view.challenge : undefined;
   const target = c && 'target' in c ? c.target : 5;
   const days = view?.limits?.challengeDays ?? 7;
-  const showOpen = c?.state === 'open' && !hidden;
+  const showOpen = c?.state === 'open' && !hidden && progress;
   const showDone = c?.state === 'done' && !doneSeen;
 
   // first sight, and first progress — once per browser, shape only

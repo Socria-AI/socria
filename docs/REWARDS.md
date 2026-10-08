@@ -87,6 +87,68 @@ Limits:
 
 All of these are configurable (see Configuration).
 
+## Where it shows
+
+**Rewards stack.** Do both, the challenge and a friend who starts using
+Socria, and that's 7 + 7 = 14 days of Socria One, one after the other. Each
+reward extends the window from where it ends, never from now (promo-engine
+rule 2), and no more than `REWARDS_BANK_CAP_DAYS` (30) can be waiting at once
+(rule 3). `test/rewards.test.mjs` pins it through the service, in both orders:
+"do both: the challenge and a friend stack, end to end". The popups say so,
+with the sum and the cap; they don't decide it.
+
+**The marks.** Two small marks sit beside the Socria mark at the top of the
+rail, on Core and in Logos (`components/rewards/RewardsBadges.tsx`):
+
+- a gift for Give 7, Get 7, while the person has a link to give;
+- a five-node ring for the 5-Node Challenge while it's open to them. The ring
+  fills with their progress.
+
+They're the one loud thing in a quiet rail: 24px buttons with a turning ring,
+a glint and a sparkle. All of that motion stops under reduced motion. Signed
+out, or with Rewards off, there are no marks. A completed challenge, or a
+member it can't help, loses its mark.
+
+In Logos, the header's challenge chip (`ChallengeChip`) shows progress only
+while the rail is put away, so the challenge is never said twice on one
+screen. It still says the completion.
+
+**The popups** (`components/rewards/RewardsPopups.tsx`) are a plate in the
+family of the Socria One invitation, deep moss and gold instead of Prussian
+blue, each with a picture:
+
+- **Give 7, Get 7.** Two gifts, one going each way. Below them, the person's
+  link with Copy, the stacking line, and the fine print: the activation rule,
+  the monthly limit, and what happens to a member's days.
+- **The 5-Node Challenge.** A small map lit as far as their best map has come,
+  progress as the server counted it, and the way into Logos. From Core the
+  button opens the newest Logos on offer; in Logos it goes back to the map.
+- **Complete.** On Core only (Logos has its chip), once per browser, in the
+  answer that granted it.
+
+A popup opens in one of three ways:
+
+1. **A mark is pressed.** It opens at once and is never rationed.
+2. **The challenge completes** (Core).
+3. **The person arrives.** This is decided in `lib/rewards/popup-rule.ts`,
+   which is pure and tested:
+   - **Once a visit at most.** The decision is made once per tab session
+     (sessionStorage). If the visit can't be remembered, nothing opens by
+     itself.
+   - **Rarely.** Never two within 20 hours of each other. The same one no
+     sooner than 3 days. "Not now" rests it 10 days, and doing what it asked
+     (copying the link, opening Logos) rests it 14.
+   - **They take turns.** The one shown longest ago goes first. Of two never
+     shown, the challenge goes first.
+   - **Only into a quiet room.** It waits until everything is known and the
+     page is settled. It doesn't open if the One invitation, the tour or
+     onboarding's first exchange has spoken this visit. It never opens over
+     an open dialog (`[aria-modal="true"]`), the tour or Find.
+
+The memory is this browser's (`socria.rewards.popup.v1`) and holds times only.
+Like every `socria.` key, it's swept on sign-out. No countdowns, streaks or
+"only today", the same as everywhere else Rewards appears.
+
 ## Architecture
 
 ```
@@ -104,7 +166,9 @@ app/api/rewards/route.ts           POST: attribute, check, grant, report (the on
 app/api/rewards/invite/route.ts    POST: a signed-out person opened a Think Together room link
 app/r/[code]/route.ts              GET: the referral link
 app/api/cron/rewards/route.ts      GET: daily sweep (CRON_SECRET)
-components/rewards/                useRewards, ChallengeChip (Logos), RewardsPanel (account), RewardsSync
+components/rewards/                useRewards, ChallengeChip (Logos), RewardsPanel (account), RewardsSync,
+                                   RewardsBadges (the rail's marks), RewardsPopups (the popups)
+lib/rewards/popup-rule.ts          PURE: when a popup may open by itself
 ```
 
 ### Data
@@ -263,7 +327,9 @@ Never a code, an id, a name or an address.
 | `rewards_challenge_started` | the Logos chip, first time progress > 0 |
 | `rewards_challenge_completed` | server, when qualification is first met |
 | `rewards_challenge_reward_granted` | server, with `outcome` |
-| `rewards_referral_link_copied` | the account panel |
+| `rewards_referral_link_copied` | the account panel (`surface: account`) or the Give 7 popup (`popup`) |
+| `rewards_popup_viewed` | a popup opened: `kind` (`give` / `challenge`), `trigger` (`visit` / `icon`), `surface` |
+| `rewards_popup_dismissed` | closed without acting: the same, with `outcome` (`closed` / `not_now`) |
 | `rewards_referral_link_opened` | server, `/r/<code>` or an invitation (`surface`) |
 | `rewards_referral_signup_completed` | server, on attribution (`surface`) |
 | `rewards_referral_activation_completed` | server, once per friend |
@@ -373,9 +439,11 @@ Entitlements are exactly as before.
 
 ## Tests
 
-- `test/rewards.test.mjs` (128 checks) covers:
+- `test/rewards.test.mjs` (133 checks) covers:
   - the engine: stacking, the cap, banking, pausing, expiry, the monthly limit,
     UTC months;
+  - doing both: the challenge and a friend's activation stack to fourteen days
+    in either order, and the cap still holds with more friends;
   - idempotency under randomised concurrency, and crash recovery;
   - paid-subscriber protection;
   - five-node qualification, including invalid, empty, duplicate and
@@ -385,7 +453,15 @@ Entitlements are exactly as before.
   - every attribution refusal, including self-referral;
   - A → B → C chains and direct-only rewards;
   - monthly caps through the program, and the status the panel shows.
-- `test/rewards-wiring.test.mjs` (73 checks) covers:
+- `test/rewards-popups.test.mjs` (60 checks) covers:
+  - the popup rule: what may open by itself, the gaps, turns, "Not now" and
+    acting, a clock set back, and a tolerant memory;
+  - the marks in both rails, signed in only, and Logos saying the challenge
+    once;
+  - one popup per surface, only into a quiet room, once a visit;
+  - what the popups say: the offers, the stacking sum and cap, members, the
+    monthly limit, no urgency, and reduced motion.
+- `test/rewards-wiring.test.mjs` (77 checks) covers:
   - the plan resolver's order;
   - checkout, the webhook, /one and the account sheet;
   - read-only plan checks;

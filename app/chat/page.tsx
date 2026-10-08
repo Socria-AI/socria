@@ -69,6 +69,8 @@ import { Hint, useSeenHints } from '@/components/Hint';
 import { pickHint } from '@/lib/hints';
 import { AccountSheet } from '@/components/account/AccountSheet';
 import { RewardsSync } from '@/components/rewards/RewardsSync';
+import { RewardsBadges } from '@/components/rewards/RewardsBadges';
+import { RewardsPopups } from '@/components/rewards/RewardsPopups';
 import { TOUR_KEY, shouldRunTour } from '@/lib/tour';
 import { ProjectHome } from '@/components/projects/ProjectHome';
 import { JoinWithCode, ShareDialog } from '@/components/share/ShareDialog';
@@ -562,6 +564,29 @@ export default function ChatPage() {
     welcomed.current = true;
     askOne('welcome-back');
   }, [isLoaded, hydrating, planState.known, planState.plan, isSignedIn, tourOpen, anythingOpen, askOne]);
+
+  // ── Socria Rewards may greet someone arriving — into a quiet room only ──
+  //
+  // Once something else has spoken this visit (the One invitation, the tour,
+  // onboarding's first exchange), the rewards popups keep quiet until the next
+  // one; and they never open over a sheet, Find, or a prompt. The rest of the
+  // rationing — once a visit, days apart, "Not now" honoured — is
+  // lib/rewards/popup-rule.ts.
+  const [spokeThisVisit, setSpokeThisVisit] = useState(false);
+  useEffect(() => {
+    if (onePrompt || tourOpen || tourAfter || autoSend) setSpokeThisVisit(true);
+  }, [onePrompt, tourOpen, tourAfter, autoSend]);
+  const rewardsQuiet =
+    isLoaded && !hydrating && planState.known && !spokeThisVisit && !anythingOpen && !findOpen;
+  /** The challenge's way in from Core: the newest Logos on offer. */
+  const openLogosForChallenge = () => {
+    if (isOffered('logos-3')) {
+      setModel('logos-3');
+      chooseModel('logos-3');
+      return;
+    }
+    openLogos();
+  };
 
   /** Checkout, from the prompt. The trigger rides along so the webhook can count it. */
   const startOneCheckout = useCallback(async () => {
@@ -2507,6 +2532,9 @@ export default function ChatPage() {
           }}
         />
       )}
+      {/* The rewards popups, for the Logos rail's marks — Logos's own sheets and
+          tour are seen by the popup itself (it never opens over a dialog). */}
+      <RewardsPopups enabled={!!isSignedIn} quiet={rewardsQuiet} surface="logos" />
       <LogosApp
         initialInput={carriedText}
         // onboarding's sentence is sent for them, and the tour follows the reply
@@ -2933,6 +2961,7 @@ export default function ChatPage() {
       </div>
       {/* Socria Rewards: a friend's link opened before sign-up, a friend's first real conversations */}
       <RewardsSync enabled={!!isSignedIn} />
+      <RewardsPopups enabled={!!isSignedIn} quiet={rewardsQuiet} surface="core" onOpenLogos={openLogosForChallenge} />
       <AccountSheet
         open={acctOpen}
         onClose={() => setAcctOpen(false)}
@@ -2954,6 +2983,8 @@ export default function ChatPage() {
       <aside data-tour="sessions" className="s-bar" data-open={sidebarOpen ? 'yes' : 'no'}>
         <div className="s-top">
           <Logo />
+          {/* Give 7, Get 7 and the 5-Node Challenge, beside the mark (components/rewards/RewardsBadges.tsx) */}
+          <RewardsBadges enabled={!!isSignedIn} />
           <button
             className="s-close"
             onClick={() => setSidebarOpen(false)}

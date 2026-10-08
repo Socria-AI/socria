@@ -222,6 +222,7 @@ const MODULES = [
   'lib/rewards/challenge-rule.ts',
   'lib/rewards/referral-rule.ts',
   'lib/rewards/rewards-service.ts',
+  'lib/rewards/popup-rule.ts',
 ];
 
 export async function buildAll() {

@@ -1,0 +1,285 @@
+/* components/rewards/rewards-pop.css
+ *
+ * Socria Rewards at the top of the rail, and the popups those marks open.
+ *
+ * THE MARKS are the one loud thing in a quiet rail, on purpose and at the
+ * smallest size that still reads: 24px buttons holding 16px drawings, a ring
+ * that turns, a glint, a node that breathes. They read the rail's own tokens
+ * (--ink-*, --app-paper), so paper, white, dark and the Socria One blue all
+ * follow; the gold is the reward's colour on every ground.
+ *
+ * THE POPUPS are a plate in the family of the Socria One invitation
+ * (globals.css, .lg-op-*): the same inner rule, grain, tracked eyebrow and
+ * serif title, on a deep moss ground with gold instead of Prussian blue with
+ * cream — a reward, not a sale. The plate carries its own colours, so it is
+ * the same plate whichever theme it opens over.
+ *
+ * Every animation here stops for anybody who has asked their system for less
+ * motion; the drawings are complete without it.
+ */
+
+/* ── the marks, beside the Socria mark ────────────────────────────────── */
+.app-root .s-top .rwb { margin-right: auto; }
+.rwb { display: inline-flex; align-items: center; gap: 3px; margin-left: 2px; }
+.rwb-i {
+  position: relative; isolation: isolate;
+  display: grid; place-items: center;
+  width: 24px; height: 24px; padding: 0; border: 0; border-radius: 50%;
+  background: transparent; cursor: pointer; line-height: 0;
+  transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.rwb-i:hover { transform: scale(1.14); }
+.rwb-i:active { transform: scale(0.94); }
+.rwb-i:focus-visible { outline: 2px solid var(--moss, #5e7633); outline-offset: 1px; }
+.rwb-svg { position: relative; z-index: 1; overflow: visible; }
+
+/* a soft gold glow that breathes behind both */
+.rwb-i::after {
+  content: ''; position: absolute; inset: 2px; border-radius: 50%; z-index: -2;
+  background: radial-gradient(circle, rgba(247, 213, 120, 0.6), rgba(247, 213, 120, 0) 72%);
+  animation: rwbGlow 2.8s ease-in-out infinite;
+}
+.rwb-chal::after { animation-delay: 1.4s; }
+
+/* the gift: a ring of the reward's colours, always turning */
+.rwb-give::before {
+  content: ''; position: absolute; inset: 0; border-radius: 50%; z-index: -1;
+  background: conic-gradient(from 0deg, #F7DF94, #E3AE45, #9CB874, #8FB3C4, #E79B86, #F7DF94);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 1.7px), #000 calc(100% - 1.5px));
+          mask: radial-gradient(farthest-side, transparent calc(100% - 1.7px), #000 calc(100% - 1.5px));
+  animation: rwbTurn 3.6s linear infinite;
+}
+.rwb-give .rwb-lid { transform-box: fill-box; transform-origin: 50% 100%; animation: rwbLid 4.2s ease-in-out infinite; }
+.rwb-ribbon { fill: #5e7633; }
+
+/* the challenge: its ring is their progress; a glint runs round it */
+.rwb-glint {
+  fill: none; stroke: #FFF3C9; stroke-width: 2.2; stroke-linecap: round;
+  filter: drop-shadow(0 0 1.5px rgba(247, 213, 120, 0.95));
+  transform-box: view-box; transform-origin: 12px 12px;
+  animation: rwbTurn 2.4s linear infinite;
+}
+.rwb-track { fill: none; stroke: var(--ink-12, rgba(31, 31, 31, 0.12)); stroke-width: 1.7; }
+.rwb-arc { fill: none; stroke: #D9A13A; stroke-width: 1.9; stroke-linecap: round; transition: stroke-dasharray 0.6s cubic-bezier(0.16, 1, 0.3, 1); }
+.rwb-links { fill: none; stroke: var(--ink-25, rgba(31, 31, 31, 0.25)); stroke-width: 0.9; stroke-linejoin: round; }
+.rwb-node { fill: var(--app-paper, #F5F3EB); stroke: var(--ink-45, rgba(31, 31, 31, 0.45)); stroke-width: 0.9; }
+.rwb-node.on { fill: #E3AE45; stroke: #B9761F; }
+.rwb-node.next { stroke: #D9A13A; stroke-width: 1.2; transform-box: fill-box; transform-origin: center; animation: rwbNext 1.6s ease-in-out infinite; }
+
+/* sparkles: four-pointed, gold, a beat apart */
+.rwb-spark {
+  position: absolute; z-index: 2; width: 6px; height: 6px; pointer-events: none;
+  background: #F7D778;
+  clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%);
+  filter: drop-shadow(0 0 2px rgba(247, 215, 120, 0.9));
+  opacity: 0; transform: scale(0);
+  animation: rwbSpark 3.2s ease-in-out infinite;
+}
+.rwb-spark.s1 { top: -1px; right: -1px; }
+.rwb-spark.s2 { bottom: 0; left: -1px; width: 5px; height: 5px; animation-delay: 1.6s; }
+.rwb-chal .rwb-spark.s1 { animation-delay: 0.8s; }
+
+@keyframes rwbTurn { to { transform: rotate(1turn); } }
+@keyframes rwbGlow { 0%, 100% { opacity: 0.35; transform: scale(0.82); } 50% { opacity: 1; transform: scale(1.12); } }
+@keyframes rwbLid {
+  0%, 76%, 100% { transform: none; }
+  80% { transform: translateY(-1.8px) rotate(-8deg); }
+  85% { transform: translateY(-0.8px) rotate(6deg); }
+  90% { transform: translateY(-0.3px) rotate(-2deg); }
+}
+@keyframes rwbNext { 0%, 100% { fill: var(--app-paper, #F5F3EB); transform: scale(1); } 50% { fill: #F7DF94; transform: scale(1.25); } }
+@keyframes rwbSpark {
+  0%, 62%, 100% { opacity: 0; transform: scale(0) rotate(0deg); }
+  72% { opacity: 1; transform: scale(1.15) rotate(45deg); }
+  84% { opacity: 0; transform: scale(0.2) rotate(90deg); }
+}
+
+/* ── the popups ───────────────────────────────────────────────────────── */
+.rwp-scrim {
+  --rwp-cream: #F3ECD8;
+  --rwp-cream-70: rgba(243, 236, 216, 0.72);
+  --rwp-cream-50: rgba(243, 236, 216, 0.5);
+  --rwp-gold: #F0C866;
+  --rwp-gold-2: #E3AE45;
+  --rwp-serif: var(--font-serif, Georgia, serif), 'Instrument Serif', Georgia, serif;
+  position: fixed; inset: 0; z-index: 96;
+  display: flex; align-items: flex-end; justify-content: center;
+  font-family: var(--font-sans, system-ui, -apple-system, 'Segoe UI', sans-serif);
+}
+.rwp-back {
+  position: absolute; inset: 0;
+  background: rgba(14, 20, 9, 0.52);
+  backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+  animation: rwpFade 0.2s ease both;
+}
+.rwp-sheet {
+  position: relative; z-index: 1;
+  width: 100%; max-height: 92vh; overflow-y: auto;
+  padding: 18px 22px calc(22px + env(safe-area-inset-bottom, 0px));
+  background:
+    radial-gradient(90% 70% at 50% 0%, rgba(240, 200, 102, 0.16), transparent 62%),
+    radial-gradient(120% 90% at 70% 8%, #3d5726 0%, #2a3f1b 36%, #1d2c12 66%, #141f0c 100%);
+  color: var(--rwp-cream);
+  border-radius: 14px 14px 0 0;
+  box-shadow: 0 -30px 80px -30px rgba(0, 0, 0, 0.7);
+  text-align: center;
+  animation: rwpUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.rwp-sheet::before {
+  content: ''; position: absolute; inset: 9px; pointer-events: none;
+  border: 1px solid rgba(243, 236, 216, 0.14); border-radius: 8px 8px 0 0;
+}
+.rwp-sheet::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  border-radius: inherit; opacity: 0.5; mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
+}
+.rwp-sheet > * { position: relative; z-index: 1; }
+@media (min-width: 640px) {
+  .rwp-scrim { align-items: center; padding: 24px; }
+  .rwp-sheet {
+    width: min(440px, 100%);
+    padding: 22px 36px 28px;
+    border: 1px solid rgba(243, 236, 216, 0.22); border-radius: 3px;
+    box-shadow: 0 60px 140px -60px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(240, 200, 102, 0.06);
+    animation: rwpIn 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  .rwp-sheet::before { inset: 10px; border-radius: 0; }
+}
+.rwp-x {
+  position: absolute; top: 14px; right: 14px; z-index: 2;
+  display: grid; place-items: center; width: 30px; height: 30px; padding: 0;
+  border: 0; border-radius: 50%; background: transparent; color: var(--rwp-cream-50); cursor: pointer;
+}
+.rwp-x:hover { color: var(--rwp-cream); background: rgba(243, 236, 216, 0.08); }
+
+.rwp-visual { display: block; width: 100%; max-width: 320px; height: auto; margin: 6px auto 8px; overflow: visible; }
+.rwp-eyebrow {
+  margin: 0 0 8px; font-size: 9.5px; font-weight: 600;
+  letter-spacing: 0.28em; text-transform: uppercase; color: var(--rwp-gold);
+}
+.rwp-title {
+  margin: 0 0 10px; font-family: var(--rwp-serif); font-weight: 400;
+  font-size: clamp(26px, 7vw, 32px); line-height: 1.08; letter-spacing: -0.015em; color: var(--rwp-cream);
+}
+.rwp-title em {
+  font-style: italic; color: transparent;
+  background: linear-gradient(100deg, #FBE7A6 0%, #F0C866 30%, #FFF4CF 48%, #E3AE45 66%, #FBE7A6 100%);
+  background-size: 220% 100%;
+  -webkit-background-clip: text; background-clip: text;
+  animation: rwpSheen 4.5s ease-in-out infinite;
+  padding: 0 0.04em;
+}
+.rwp-body { margin: 0 auto 14px; max-width: 34ch; font-size: 14px; line-height: 1.5; color: var(--rwp-cream-70); }
+.rwp-note { margin: 0 auto 12px; max-width: 38ch; font-size: 12.5px; line-height: 1.5; color: var(--rwp-cream-50); }
+.rwp-fine { margin: 10px auto 0; max-width: 40ch; font-size: 11.5px; line-height: 1.5; color: var(--rwp-cream-50); }
+
+/* the link and its copy */
+.rwp-link { display: flex; gap: 8px; align-items: stretch; margin: 0 0 12px; }
+.rwp-link input {
+  flex: 1 1 auto; min-width: 0; padding: 0 12px; height: 40px;
+  font: inherit; font-size: 13px; color: var(--rwp-cream);
+  background: rgba(0, 0, 0, 0.22); border: 1px solid rgba(243, 236, 216, 0.2); border-radius: 999px;
+  text-overflow: ellipsis;
+}
+.rwp-link input:focus { outline: none; border-color: rgba(240, 200, 102, 0.6); box-shadow: 0 0 0 3px rgba(240, 200, 102, 0.14); }
+.rwp-go {
+  flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-height: 40px; padding: 0 18px; border: 0; border-radius: 999px; cursor: pointer;
+  font: inherit; font-size: 13.5px; font-weight: 600; color: #1d2710;
+  background: linear-gradient(180deg, #FBE7A6, #E9B94F);
+  box-shadow: 0 8px 22px -10px rgba(240, 200, 102, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.55);
+  transition: transform 0.15s, filter 0.15s;
+}
+.rwp-go:hover { filter: brightness(1.05); transform: translateY(-1px); }
+.rwp-go:active { transform: none; }
+.rwp-go:focus-visible, .rwp-not:focus-visible, .rwp-x:focus-visible { outline: 2px solid var(--rwp-gold); outline-offset: 2px; }
+.rwp-acts { display: flex; align-items: center; justify-content: center; gap: 18px; margin-top: 14px; flex-wrap: wrap; }
+.rwp-not { background: none; border: 0; padding: 6px 2px; font: inherit; font-size: 13px; color: var(--rwp-cream-70); cursor: pointer; text-decoration: underline; text-decoration-color: rgba(243, 236, 216, 0.3); text-underline-offset: 4px; }
+.rwp-not:hover { color: var(--rwp-cream); }
+
+/* progress, said as a bar and a count */
+.rwp-meter { display: flex; align-items: center; justify-content: center; gap: 12px; margin: 0 0 10px; }
+.rwp-meter-bar { position: relative; width: 120px; height: 6px; border-radius: 999px; background: rgba(243, 236, 216, 0.14); overflow: hidden; }
+.rwp-meter-bar i { position: absolute; inset: 0 auto 0 0; border-radius: inherit; background: linear-gradient(90deg, #E3AE45, #FBE7A6); box-shadow: 0 0 10px rgba(240, 200, 102, 0.7); transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1); }
+.rwp-meter-n { font-size: 12.5px; color: var(--rwp-cream-70); font-variant-numeric: tabular-nums; }
+
+/* rewards stack: seven, then seven — drawn as the days they are */
+.rwp-stack {
+  display: flex; flex-direction: column; align-items: center; gap: 7px;
+  margin: 4px auto 0; padding: 11px 12px 10px; max-width: 340px;
+  border-radius: 10px; background: rgba(0, 0, 0, 0.16); border: 1px solid rgba(243, 236, 216, 0.1);
+}
+.rwp-stack-cells { display: inline-flex; align-items: center; gap: 3px; }
+.rwp-stack-cells i {
+  width: 11px; height: 11px; border-radius: 3px;
+  background: rgba(243, 236, 216, 0.12);
+  animation: rwpDay 0.4s calc(0.5s + var(--i, 0) * 0.07s) cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+.rwp-stack-cells i.a { --on: #9CB874; }
+.rwp-stack-cells i.b { --on: #F0C866; }
+.rwp-stack-cells b { margin: 0 4px; font-weight: 600; font-size: 12px; color: var(--rwp-cream-70); }
+.rwp-stack-t { font-size: 11.5px; line-height: 1.45; color: var(--rwp-cream-70); max-width: 36ch; }
+
+/* ── the pictures ── */
+.rwp-halo { animation: rwpHalo 3.2s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+.rwp-halo.h2 { animation-delay: 1.6s; }
+.rwp-arc { fill: none; stroke: rgba(240, 200, 102, 0.42); stroke-width: 1.4; stroke-dasharray: 3 5; animation: rwpFlow 1.6s linear infinite; }
+.rwp-arc.b { stroke: rgba(190, 220, 140, 0.4); }
+.rwp-mote { fill: #FFF1C2; filter: drop-shadow(0 0 4px rgba(247, 213, 120, 0.95)); }
+.rwp-mote.b { fill: #D7E8B4; filter: drop-shadow(0 0 4px rgba(170, 205, 120, 0.95)); }
+.rwp-shadow { fill: rgba(0, 0, 0, 0.28); }
+.rwp-ribbon { fill: #4a6a2a; }
+.rwp-bow { fill: #6f8f3c; }
+.rwp-gift { animation: rwpBob 3.4s ease-in-out infinite; }
+.rwp-gift.late { animation-delay: 1.7s; }
+.rwp-lid { transform-box: fill-box; transform-origin: 50% 100%; animation: rwpLid 3.4s ease-in-out infinite; }
+.rwp-gift.late .rwp-lid { animation-delay: 1.7s; }
+.rwp-plus { font-family: var(--rwp-serif); font-style: italic; font-size: 22px; text-anchor: middle; fill: var(--rwp-gold); filter: drop-shadow(0 0 6px rgba(240, 200, 102, 0.55)); }
+.rwp-plus.b { fill: #CFE3A8; filter: drop-shadow(0 0 6px rgba(170, 205, 120, 0.5)); }
+.rwp-cap { font-size: 8.5px; font-weight: 600; letter-spacing: 0.22em; text-transform: uppercase; text-anchor: middle; fill: var(--rwp-cream-50); }
+.rwp-sparks path { fill: #FBE7A6; transform-box: fill-box; transform-origin: center; opacity: 0; animation: rwpSpark 2.6s var(--d, 0s) ease-in-out infinite; }
+
+.rwp-edge { stroke: rgba(243, 236, 216, 0.2); stroke-width: 1.3; stroke-dasharray: 0.04 0.035; fill: none; }
+.rwp-edge.on {
+  stroke: #F0C866; stroke-width: 1.6; stroke-dasharray: 1; stroke-dashoffset: 1;
+  filter: drop-shadow(0 0 3px rgba(240, 200, 102, 0.7));
+  animation: rwpDraw 0.7s calc(0.15s + var(--i, 0) * 0.16s) ease-out forwards;
+}
+.rwp-node { transform-box: fill-box; transform-origin: center; animation: rwpPop 0.5s calc(0.1s + var(--i, 0) * 0.14s) cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+.rwp-node-card { fill: rgba(243, 236, 216, 0.04); stroke: rgba(243, 236, 216, 0.3); stroke-width: 1.1; stroke-dasharray: 3 3; }
+.rwp-node.on .rwp-node-card { fill: #F3ECD8; stroke: #F0C866; stroke-width: 1.4; stroke-dasharray: none; filter: drop-shadow(0 0 7px rgba(240, 200, 102, 0.55)); }
+.rwp-node.next .rwp-node-card { stroke: #F0C866; stroke-width: 1.3; animation: rwpNext 1.5s ease-in-out infinite; }
+.rwp-node-line { fill: #2a3f1b; }
+.rwp-node-line.dim { fill: rgba(42, 63, 27, 0.45); }
+.rwp-seal { animation: rwpSeal 3.6s ease-in-out infinite; }
+.rwp-seal-rule { fill: none; stroke: rgba(29, 39, 16, 0.4); stroke-width: 0.8; stroke-dasharray: 1.5 1.5; }
+.rwp-seal-n { font-family: var(--rwp-serif); font-style: italic; font-size: 15px; text-anchor: middle; fill: #1d2710; }
+.rwp-seal-d { font-size: 5.5px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; text-anchor: middle; fill: #1d2710; }
+.rwp-seal-ghost { fill: none; stroke: rgba(240, 200, 102, 0.35); stroke-width: 0.8; transform-box: fill-box; transform-origin: center; animation: rwbTurn 14s linear infinite; }
+.rwp-map.is-done .rwp-node.on .rwp-node-card { animation: rwpFlash 1.2s calc(0.6s + var(--i, 0) * 0.1s) ease-out both; }
+
+@keyframes rwpFade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes rwpUp { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes rwpIn { from { transform: translateY(10px) scale(0.97); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes rwpSheen { 0%, 100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+@keyframes rwpDay { from { background: rgba(243, 236, 216, 0.12); transform: scale(0.6); } to { background: var(--on); transform: none; box-shadow: 0 0 6px color-mix(in srgb, var(--on) 60%, transparent); } }
+@keyframes rwpHalo { 0%, 100% { opacity: 0.55; transform: scale(0.9); } 50% { opacity: 1; transform: scale(1.06); } }
+@keyframes rwpFlow { to { stroke-dashoffset: -16; } }
+@keyframes rwpBob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2.5px); } }
+@keyframes rwpLid { 0%, 70%, 100% { transform: none; } 78% { transform: translateY(-4px) rotate(-6deg); } 86% { transform: translateY(-1.5px) rotate(4deg); } }
+@keyframes rwpSpark { 0%, 55%, 100% { opacity: 0; transform: scale(0.2) rotate(0deg); } 70% { opacity: 1; transform: scale(1) rotate(45deg); } 85% { opacity: 0; transform: scale(0.3) rotate(90deg); } }
+@keyframes rwpDraw { to { stroke-dashoffset: 0; } }
+@keyframes rwpPop { from { opacity: 0; transform: scale(0.6); } to { opacity: 1; transform: none; } }
+@keyframes rwpNext { 0%, 100% { stroke-opacity: 0.45; } 50% { stroke-opacity: 1; } }
+@keyframes rwpSeal { 0%, 100% { transform: rotate(-6deg); } 50% { transform: rotate(6deg) scale(1.05); } }
+@keyframes rwpFlash { 0% { filter: drop-shadow(0 0 0 rgba(240, 200, 102, 0)); } 40% { filter: drop-shadow(0 0 14px rgba(240, 200, 102, 1)); } 100% { filter: drop-shadow(0 0 7px rgba(240, 200, 102, 0.55)); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .rwb-i, .rwb-i::before, .rwb-i::after, .rwb-i *,
+  .rwp-sheet, .rwp-back, .rwp-sheet *, .rwp-title em { animation: none !important; transition: none !important; }
+  .rwb-spark, .rwb-glint, .rwp-mover { display: none; }
+  .rwp-stack-cells i { background: var(--on); }
+  .rwp-edge.on { stroke-dashoffset: 0; }
+  .rwp-sparks path { opacity: 0.8; }
+}

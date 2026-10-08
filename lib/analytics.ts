@@ -88,6 +88,11 @@ export const EVENTS = [
   'rewards_referral_reward_granted',
   'rewards_promo_expired',
   'rewards_promo_converted',
+  // a Socria Rewards popup (components/rewards/RewardsPopups.tsx): which one
+  // (`kind`: 'give' | 'challenge'), how it opened (`trigger`: 'visit' | 'icon'),
+  // where (`surface`), and for a dismissal how (`outcome`: 'closed' | 'not_now')
+  'rewards_popup_viewed',
+  'rewards_popup_dismissed',
 ] as const;
 export type AnalyticsEvent = (typeof EVENTS)[number];
 

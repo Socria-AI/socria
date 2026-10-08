@@ -433,6 +433,46 @@ console.log('=== a paying referrer is rewarded without touching their subscripti
   ok('a Think Together invitation is remembered as the way in', (await store.getReferral('G')).via === 'invite');
 }
 
+console.log('=== do both: the challenge and a friend stack, end to end ===');
+{
+  const load = async () => [{ id: 's', map: fiveMap(), messages: mine() }];
+  // the challenge first, then a friend they invited becomes active
+  const store = memoryStore();
+  const d = deps(store);
+  const ch = await checkChallenge(d, 'H', load);
+  ok('the challenge: seven days from now', ch.state === 'done' && (await store.getAccount('H')).until === T0 + 7 * DAY);
+  const code = await ensureCode(d, 'H');
+  await attributeReferral(d, { userId: 'HF', cookie: { code, at: clock - 3600_000 }, via: 'link', referred: person('hf@hf.org'), referrerEmails });
+  clock = T0 + 2 * DAY;
+  const act = await checkActivation(d, 'HF', async () => talk2());
+  ok('…a friend active two days later: seven more, after the first seven — fourteen in all', act.state === 'rewarded' && (await store.getAccount('H')).until === T0 + 14 * DAY);
+  const st = await rewardsStatus(d, 'H', { challengeSessions: load, activity: async () => [] });
+  ok('…and what they see says twelve days left, from two rewards', st.promo.active && st.promo.daysLeft === 12 && st.history.length === 2 && st.history.every((h) => h.days === 7));
+  clock = T0;
+
+  // the other order lands on the same day
+  const s2 = memoryStore();
+  const d2 = deps(s2);
+  const code2 = await ensureCode(d2, 'K');
+  await attributeReferral(d2, { userId: 'KF', cookie: { code: code2, at: clock - 3600_000 }, via: 'link', referred: person('kf@kf.org'), referrerEmails });
+  await checkActivation(d2, 'KF', async () => talk2());
+  clock = T0 + DAY;
+  await checkChallenge(d2, 'K', load);
+  ok('a friend first, the challenge second: the same fourteen days', (await s2.getAccount('K')).until === T0 + 14 * DAY);
+  clock = T0;
+
+  // both, and more friends: the cap still holds
+  const s3 = memoryStore();
+  const d3 = deps(s3);
+  await checkChallenge(d3, 'Z', load);
+  const code3 = await ensureCode(d3, 'Z');
+  for (let i = 0; i < 4; i++) {
+    await attributeReferral(d3, { userId: `ZF${i}`, cookie: { code: code3, at: clock - 3600_000 }, via: 'link', referred: person(`zf${i}@z.org`), referrerEmails });
+    await checkActivation(d3, `ZF${i}`, async () => talk2());
+  }
+  ok('the challenge and four friends: thirty-five days asked for, thirty given — the cap', remainingMs(await s3.getAccount('Z'), clock) === 30 * DAY);
+}
+
 console.log('=== what the person sees ===');
 {
   const store = memoryStore();

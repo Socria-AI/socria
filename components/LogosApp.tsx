@@ -3941,8 +3941,9 @@ export function LogosApp({
                 </button>
               </>
             )}
-            {/* Socria Rewards: the 5-Node Challenge, quietly, beside the map it is about. */}
-            <ChallengeChip enabled={cloud} onOpenAccount={() => setAcctOpen(true)} />
+            {/* Socria Rewards: the 5-Node Challenge, quietly, beside the map it is about —
+                while the rail (and its mark beside the Socria mark) is put away. */}
+            <ChallengeChip enabled={cloud} progress={!(railOpen && !chromeHidden)} onOpenAccount={() => setAcctOpen(true)} />
             {/* Connected sources are dormant (see connectorsEnabled) — no
                 door to a room that isn't open. */}
             {CONNECTORS_ON && (
@@ -5048,6 +5049,7 @@ export function LogosApp({
         <div className="app-root lg-railhost">
           <LogosRail
             sessions={sessions}
+            rewards={cloud}
             chats={chats}
             onOpenChat={onOpenChat}
             activeId={activeId}
