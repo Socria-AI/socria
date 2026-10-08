@@ -33,7 +33,7 @@ export interface SurfaceContract {
   type: SurfaceType;
   title: string;
   /** which part of the canonical state it is a representation of */
-  represents: 'conversation' | 'map' | 'model' | 'selection' | 'history' | 'object';
+  represents: 'conversation' | 'map' | 'model' | 'selection' | 'history' | 'object' | 'memory';
   /** what a person can select in it */
   emits: FocusKind[];
   /** what selections elsewhere it follows */
@@ -55,6 +55,8 @@ export const SURFACES: Record<SurfaceType, SurfaceContract> = {
   trace: { type: 'trace', title: 'Trace', represents: 'history', emits: [], responds: [], duplicable: false, canBeStale: false, heavy: false },
   // Live 3D (experimental): a scene object of thought, drawn in 3D and built by describing it in the chat
   scene: { type: 'scene', title: 'Live 3D', represents: 'object', emits: ['object'], responds: ['object'], duplicable: true, canBeStale: false, heavy: true },
+  // Mind: this line of thinking among every other, and what Socria remembers (lib/mind/atlas.ts)
+  mind: { type: 'mind', title: 'Mind', represents: 'memory', emits: [], responds: [], duplicable: false, canBeStale: true, heavy: true },
 };
 
 // ── what this line of thinking holds, as the workspace needs to know it ──
@@ -80,6 +82,8 @@ export interface WorkspaceFacts {
   viz: 'simulation' | 'picture' | null;
   /** Live 3D scenes among the objects of thought */
   scenes: { id: string; name: string; parts: number }[];
+  /** there is an account whose memory this line of thinking joins — the Mind view is offered */
+  mind?: boolean;
 }
 
 export function factsFrom(map: ThinkingMap | null | undefined): WorkspaceFacts {
@@ -195,7 +199,13 @@ export function suggestViews(facts: WorkspaceFacts, layout: WorkspaceLayout): Vi
     push({ type: 'scene', label: 'Live 3D · experimental', why: 'describe shapes in the chat and they are drawn as you type — a geometric preview, not a simulation', score: 30 });
   }
 
-  const order: SurfaceType[] = ['model', 'params', 'inspector', 'map', 'scene', 'chat', 'trace'];
+  // Where this line of thinking sits among all the others, and what Socria
+  // remembers — offered to an account, whose memory it joins.
+  if (facts.mind) {
+    push({ type: 'mind', label: 'Mind', why: 'this line of thinking among all your others, and what Socria remembers', score: 54 });
+  }
+
+  const order: SurfaceType[] = ['model', 'params', 'inspector', 'map', 'scene', 'chat', 'trace', 'mind'];
   return out.sort((a, b) => Number(a.open) - Number(b.open) || b.score - a.score || order.indexOf(a.type) - order.indexOf(b.type));
 }
 

@@ -76,17 +76,46 @@ draws.
 
 ## Where it is seen
 
-- **Logos 3 → Mind** (map header).
-  - *This chat* puts the chat in the middle, what is in it on the inner ring,
-    and on the outer ring the other chats, the Project and the memories those
-    lead to (`radialLayout`). Beside it is a list of every connected chat,
-    what it shares with this one, and a way into it (`relatedChats`).
-  - *Everything* shows the whole atlas in folders.
-- **Memory page → Everything.** The same atlas, drawn by the Memory page's
-  own folder graph. It is also shown on an empty Memory page, because chats
-  and maps connect before any memory exists. Correcting a memory still
-  happens in Graph and List; the atlas is read-only.
-- **`/chat?c=<id>`** opens one particular Core chat, and `?s=<id>` one Logos
-  session. The atlas uses these, and Project Home will too.
+**The Memory page opens on it.** "Everything" is the first view and the
+default, drawn as one constellation (`components/mind/MindConstellation.tsx`,
+laid out by `lib/mind/constellation.ts`):
 
-Tests: `test/mind-atlas.test.mjs` and `test/mind-logos.test.mjs`.
+- **The core:** what Socria remembers, written in the middle as a block of
+  words, the most connected at its centre. Each memory's dot sits on the side
+  facing the chats it was learned in, so its threads leave toward them.
+- **The ring:** every chat, Core and Logos, on an ellipse around it. A Logos
+  line of thinking is drawn as its own map in miniature. Chats are grouped
+  into their Project's arc, newest first, with the Project's name along the
+  arc.
+- **Satellites:** a model, plot or object made in one chat sits just inside
+  it, tethered to it. A Live 3D scene is one of these.
+- **Bridges:** an idea, plot or model found in two or more chats sits
+  between them, with a thread to each.
+- **Folded:** an idea on one map only is part of that map's tile. It is
+  listed when the chat is chosen, and counted, never dropped.
+
+Hovering anything lights what it touches and dims the rest. Choosing a chat
+opens a panel with what is on its map, what was made in it, what Socria
+remembers from it and its Project, plus a way into it. The drawing measures
+its container and lays out at that size, so its words are their real size
+in a panel as on the page. What does not fit in a small core becomes a dot
+at its edge, labelled on hover.
+
+Graph and List are one press away. Correcting a memory still happens there;
+the atlas is read-only. On an empty Memory page the atlas is shown too,
+because chats and maps connect before any memory exists.
+
+**Logos 3 → + View → Mind.** A workspace view, offered to an account
+(`mind` in `lib/workspace/surfaces.ts`), read through the `logos` scope.
+
+- *This chat* puts the chat in the middle, what is in it on the inner ring,
+  and on the outer ring the other chats, the Project and the memories those
+  lead to (`radialLayout`). Beside it is a list of every connected chat,
+  what it shares with this one, and a way into it (`relatedChats`).
+- *Everything* is the same constellation, at panel size.
+
+**`/chat?c=<id>`** opens one particular Core chat, and `?s=<id>` one Logos
+session. The atlas uses these, and Project Home will too.
+
+Tests: `test/mind-atlas.test.mjs`, `test/mind-constellation.test.mjs` and
+`test/mind-logos.test.mjs`.

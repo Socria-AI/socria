@@ -1,0 +1,104 @@
+/* components/mind/mind-constellation.css
+   The atlas as a constellation (components/mind/MindConstellation.tsx).
+
+   Paper and ink, the moss for what is the person's, and the Memory page's own
+   four-colour code for memories. Things made in a chat keep the atlas's
+   purple. Every fill that is not the paper is a translucent tint, so the
+   picture holds on every theme, dark included. */
+
+.mc-root{margin:0;min-width:0}
+.mc-svg{display:block;width:100%;height:auto;overflow:visible;touch-action:manipulation;user-select:none}
+.mc-root.is-panel .mc-svg{max-height:100%}
+
+/* the ground: a soft light at the middle, and two hairline guides */
+.mc-glow-in{stop-color:var(--moss);stop-opacity:.1}
+.mc-glow-out{stop-color:var(--moss);stop-opacity:0}
+.mc-core-glow{pointer-events:none}
+.mc-guide{fill:none;stroke:var(--ink-12);stroke-width:1;stroke-dasharray:1 5;pointer-events:none}
+.mc-guide.is-core{stroke-dasharray:1 4;opacity:.8}
+.mc-caption{font-family:var(--sans);font-size:9px;font-weight:600;letter-spacing:.24em;text-transform:uppercase;
+  fill:var(--ink-45);pointer-events:none}
+
+/* Projects: an arc just inside the ring, its name along it */
+.mc-arc-line{fill:none;stroke:var(--moss);stroke-opacity:.5;stroke-width:1.4;stroke-linecap:round}
+.mc-arc-label{font-family:var(--sans);font-size:8.5px;font-weight:600;letter-spacing:.2em;fill:var(--moss-700);
+  pointer-events:none}
+
+/* the threads */
+.mc-threads{transition:opacity .25s}
+.mc-svg.has-focus .mc-threads{opacity:.2}
+.mc-thread{fill:none;pointer-events:none;stroke-linecap:round}
+.mc-thread.k-fiber{stroke:var(--ink);stroke-opacity:.13;stroke-width:.8}
+.mc-thread.k-bridge{stroke:var(--moss);stroke-opacity:.42;stroke-width:.95}
+.mc-thread.k-tether{stroke:#8A5A9E;stroke-opacity:.55;stroke-width:1}
+.mc-thread.k-mind{stroke:var(--moss);stroke-opacity:.34;stroke-width:1}
+.mc-lit .mc-thread{stroke:var(--moss);stroke-opacity:.95;stroke-width:1.6}
+.mc-lit .mc-thread.k-tether{stroke:#8A5A9E}
+
+/* every node */
+.mc-node{cursor:pointer;transition:opacity .2s}
+.mc-svg.has-focus .mc-node:not(.is-near){opacity:.26}
+.mc-node:focus{outline:none}
+.mc-node:focus-visible .mc-tile,.mc-node:focus-visible .mc-dot,.mc-node:focus-visible .mc-core-chat,
+.mc-node:focus-visible .mc-made{stroke:var(--ink);stroke-width:2}
+
+/* a line of thinking: its map in a tile */
+.mc-tile{fill:var(--paper);stroke:var(--moss);stroke-opacity:.55;stroke-width:1.1;transition:fill .2s,stroke-opacity .2s}
+.mc-tile-edge{stroke:var(--moss);stroke-width:.75;stroke-opacity:.5;stroke-linecap:round}
+.mc-tile-hub{fill:var(--moss)}
+.mc-tile-node{fill:var(--moss);fill-opacity:.8}
+.mc-chat:hover .mc-tile,.mc-chat.is-sel .mc-tile{fill:rgba(94,118,51,.1);stroke-opacity:1}
+.mc-chat.is-sel .mc-tile{stroke:var(--ink);stroke-width:1.5}
+
+/* a Core chat */
+.mc-core-chat{fill:var(--paper);stroke:var(--ink-60);stroke-width:1.3;transition:stroke .2s}
+.mc-chat:hover .mc-core-chat,.mc-chat.is-sel .mc-core-chat{stroke:var(--ink);stroke-width:1.6}
+
+/* memories: the four-colour code, ringed in paper so they read as points */
+.mc-mem .mc-dot{stroke:var(--paper);stroke-width:1.6;transition:r .2s}
+.mc-mem.c-person .mc-dot{fill:var(--moss)}
+.mc-mem.c-evidence .mc-dot{fill:#3A6EA5}
+.mc-mem.c-question .mc-dot{fill:#E0A92A}
+.mc-mem.c-neutral .mc-dot{fill:var(--ink);fill-opacity:.55}
+.mc-mem.c-project .mc-dot{fill:rgba(176,122,31,.22);stroke:#B07A1F;stroke-width:1.2}
+.mc-mem.is-faded{opacity:.5}
+.mc-mem.is-sel .mc-dot{stroke:var(--ink);stroke-width:1.8}
+
+/* what two or more chats share: a dotted halo, the sign of a bridge */
+.mc-halo{fill:none;stroke:var(--moss);stroke-opacity:.45;stroke-width:1;stroke-dasharray:1.5 2.2}
+.mc-bridge .mc-dot{fill:var(--paper);stroke:var(--ink-60);stroke-width:1.3}
+.mc-bridge.is-sel .mc-halo,.mc-bridge:hover .mc-halo{stroke-opacity:1}
+
+/* made in a chat: a model, a plot, an object */
+.mc-made,.mc-made-bg{fill:rgba(138,90,158,.14);stroke:#8A5A9E;stroke-width:1.1}
+.mc-made-line{fill:none;stroke:#8A5A9E;stroke-width:1.1;stroke-linecap:round;stroke-linejoin:round}
+.mc-sat.is-sel .mc-made,.mc-sat.is-sel .mc-made-bg{stroke:var(--ink);stroke-width:1.5}
+
+/* labels: a paper halo, so they stay legible over threads */
+/* a node's label is part of it: hovering the words is hovering the thing */
+.mc-label{font-family:var(--sans);font-size:11px;fill:var(--ink-70);paint-order:stroke;stroke:var(--paper);stroke-width:3.2px;
+  stroke-linejoin:round}
+.mc-label.is-chat{font-family:var(--serif);font-size:12.5px;fill:var(--ink-60)}
+.mc-label.is-chat.is-logos{fill:var(--ink)}
+.mc-label.is-bridge{font-family:var(--serif);font-style:italic;font-size:12px;fill:var(--ink-70)}
+.mc-label.is-made{font-family:var(--serif);font-style:italic;font-size:11.5px;fill:#6E4682}
+.mc-label.is-mem{font-size:11px;fill:var(--ink-70)}
+.mc-node.is-sel .mc-label,.mc-node:hover .mc-label{fill:var(--ink)}
+
+/* the key, under the picture */
+.mc-legend{display:flex;flex-wrap:wrap;align-items:center;gap:6px 18px;margin:8px 0 0;padding-top:10px;
+  border-top:1px solid var(--ink-12);font-family:var(--sans);font-size:11.5px;color:var(--ink-60)}
+.mc-legend > span{display:inline-flex;align-items:center;gap:6px}
+.mc-legend svg{display:block;overflow:visible}
+.mc-key-mem{gap:3px !important}
+.mc-key-mem i{display:inline-block;width:8px;height:8px;border-radius:50%}
+.mc-key-mem i.c-person{background:var(--moss)}
+.mc-key-mem i.c-evidence{background:#3A6EA5}
+.mc-key-mem i.c-question{background:#E0A92A}
+.mc-key-mem i.c-neutral{background:var(--ink);opacity:.55}
+.mc-legend .mc-dot.is-key{fill:var(--paper);stroke:var(--ink-60);stroke-width:1.2}
+.mc-dropped{font-style:italic}
+
+@media (prefers-reduced-motion: reduce){
+  .mc-threads,.mc-node,.mc-tile,.mc-core-chat{transition:none}
+}

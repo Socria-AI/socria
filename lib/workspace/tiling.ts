@@ -19,7 +19,7 @@
 // PURE. Every operation takes a layout and returns a new one; the shell
 // renders it and the suite holds it.
 
-export const SURFACE_TYPES = ['chat', 'map', 'model', 'params', 'inspector', 'trace', 'scene'] as const;
+export const SURFACE_TYPES = ['chat', 'map', 'model', 'params', 'inspector', 'trace', 'scene', 'mind'] as const;
 export type SurfaceType = (typeof SURFACE_TYPES)[number];
 
 /** What a panel is pointed at, beyond its type. All optional, all small. */

@@ -743,7 +743,10 @@ export function MindGraphView() {
   const [storage, setStorage] = useState<StorageFault | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [view, setView] = useState<'graph' | 'list' | 'everything'>('list');
+  // Everything first: every chat, map, model and memory, connected — the
+  // picture of what Socria holds. Graph and List are where a memory is
+  // corrected, one press away.
+  const [view, setView] = useState<'graph' | 'list' | 'everything'>('everything');
   /** the Share sheet: a Project, never this memory (components/share/MindShare) */
   const [sharing, setSharing] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
@@ -1017,9 +1020,9 @@ export function MindGraphView() {
             {forgotten > 0 && <><span className="sep">·</span><b>{forgotten}</b> forgotten</>}
           </span>
           <span className="seg" role="group" aria-label="View">
+            <button aria-pressed={view === 'everything'} onClick={() => setView('everything')}>Everything</button>
             <button aria-pressed={view === 'graph'} onClick={() => setView('graph')}>Graph</button>
             <button aria-pressed={view === 'list'} onClick={() => setView('list')}>List</button>
-            <button aria-pressed={view === 'everything'} onClick={() => setView('everything')}>Everything</button>
           </span>
           {uploadControl}
           {/* The whole thing as one file: objects, connections and where each

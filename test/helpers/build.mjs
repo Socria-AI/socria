@@ -190,6 +190,7 @@ const MODULES = [
   'lib/mind/extract.ts',
   'lib/mind/ingest-text.ts',
   'lib/mind/atlas.ts',
+  'lib/mind/constellation.ts',
   'lib/mind/logos-turn.ts',
   'lib/project-home.ts',
   'lib/project-visual.ts',

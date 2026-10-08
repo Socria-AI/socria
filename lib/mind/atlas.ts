@@ -411,11 +411,15 @@ export function buildAtlas(input: AtlasInput): Atlas {
       if (!o || typeof o.id !== 'string') continue;
       const id = `o:${c.id}:${o.id}`;
       const kind = typeof o.kind === 'string' ? o.kind : 'object';
+      // A Live 3D scene is a model of shapes; say so. And a name that only
+      // repeats the kind ("Scene", "Matrix") is not said twice.
+      const word = kind === 'scene' ? 'Live 3D' : titleCase(kind);
+      const name = clipLabel(o.name, 24);
       nodes.set(id, {
         id,
         kind: 'object',
         type: 'Object',
-        label: `${titleCase(kind)} ${clipLabel(o.name, 24)}`.trim(),
+        label: name.toLowerCase() === kind.toLowerCase() ? (kind === 'scene' ? 'Live 3D scene' : word) : `${word} ${name}`.trim(),
         sub: `${(o.steps?.length ?? 0)} step${o.steps?.length === 1 ? '' : 's'}`,
         chats: [c.id],
       });

@@ -3523,7 +3523,7 @@ export function LogosApp({
   const focusRef = useRef<Focus>(null);
   focusRef.current = focus;
   const [wsDismissed, setWsDismissed] = useState<Set<string>>(() => new Set());
-  const wsFacts = useMemo(() => factsFrom(map), [map]);
+  const wsFacts = useMemo(() => ({ ...factsFrom(map), mind: cloud }), [map, cloud]);
   // Something to look at besides the map: a built model, or a picture.
   const wsHasModel = wsFacts.docs.length > 0 || !!wsFacts.viz;
   useEffect(() => {
@@ -3802,6 +3802,24 @@ export function LogosApp({
           />
         );
       }
+      case 'mind':
+        // WHERE THIS LINE OF THINKING SITS among every other, and what Socria
+        // remembers (lib/mind/atlas.ts) — read through the logos scope, so
+        // nothing private arrives here at all.
+        return (
+          <div className="lg-mind-host">
+            <MindAtlas
+              scope="logos"
+              embedded
+              focusChat={activeId}
+              refreshKey={`${activeId}:${messages.length}:${busy ? 1 : 0}`}
+              onOpenChat={(id, surface) => {
+                if (surface === 'logos') switchSession(id);
+                else onOpenChat?.(id);
+              }}
+            />
+          </div>
+        );
     }
   }
 
@@ -3829,6 +3847,8 @@ export function LogosApp({
         const sc = sceneOf(p);
         return { title: 'Live 3D', sub: sc ? `${sc.name} · experimental` : 'experimental' };
       }
+      case 'mind':
+        return { title: 'Mind', sub: 'what this connects to' };
     }
   }
 

@@ -10,15 +10,18 @@
 //               things lead to. "What else have I thought about this in" as a
 //               picture, with the answer listed beside it — every connected
 //               chat, what it shares with this one, and a way into it.
-//   EVERYTHING  the whole of it in folders — memories by type, chats, plots,
-//               models, objects, Projects — drawn by the Memory page's own
-//               graph, so the two pages are one picture at two distances.
+//   EVERYTHING  the whole of it as one constellation (MindConstellation):
+//               memory in the middle, every chat around it — a Logos line of
+//               thinking drawn as its own map, filed in its Project's arc —
+//               what was made in each chat beside it, and threaded between
+//               them whatever two chats share.
 //
 // Read-only. Correcting a memory happens on the Memory page, where every row
 // can be changed or forgotten; this is where you see how things connect.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Graph, type Node as GraphNode } from './MindGraphView';
+import { MindConstellation } from './MindConstellation';
+import { contentsOf } from '@/lib/mind/constellation';
 import {
   neighbourhood,
   radialLayout,
@@ -27,6 +30,9 @@ import {
   type Atlas,
   type AtlasNode,
 } from '@/lib/mind/atlas';
+// The Memory page's own styles (.mem-root, the segmented control): the atlas
+// is drawn inside one in Logos too, where nothing else brings them in.
+import './mind-graph.css';
 import './mind-atlas.css';
 
 const KIND_WORD: Record<AtlasNode['kind'], string> = {
@@ -180,14 +186,7 @@ export function MindAtlas({
               </div>
             )
           ) : a.nodes.length ? (
-            <Graph
-              nodes={a.nodes.map(asGraphNode)}
-              edges={a.edges.map((e) => [e.from, e.to, relLabel(e.rel)])}
-              sel={sel}
-              onSel={setSel}
-              // drawn nearer its real size in a panel, so its words stay legible
-              width={embedded ? 620 : 1000}
-            />
+            <MindConstellation atlas={a} sel={sel} onSel={setSel} onOpenChat={open} embedded={embedded} />
           ) : (
             <div className="ma-empty">
               <p><b>Nothing yet.</b></p>
@@ -208,9 +207,12 @@ export function MindAtlas({
                 {selected.sub && selected.kind !== 'chat' && <p className="ma-sub">{selected.sub}</p>}
                 {selected.status && selected.status !== 'active' && <p className="ma-status">{selected.status}</p>}
                 {selected.kind === 'chat' ? (
-                  <button className="ma-open" onClick={() => open(selected.chats[0])}>
-                    Open this {selected.surface === 'core' ? 'chat' : 'line of thinking'} →
-                  </button>
+                  <>
+                    <button className="ma-open" onClick={() => open(selected.chats[0])}>
+                      Open this {selected.surface === 'core' ? 'chat' : 'line of thinking'} →
+                    </button>
+                    <ChatHolds atlas={a} chatId={selected.chats[0]} onSel={setSel} />
+                  </>
                 ) : selected.chats.length > 0 ? (
                   <>
                     <p className="ma-k">In {selected.chats.length} {selected.chats.length === 1 ? 'chat' : 'chats'}</p>
@@ -226,7 +228,7 @@ export function MindAtlas({
                     </ul>
                   </>
                 ) : null}
-                {links.length > 0 && (
+                {links.length > 0 && selected.kind !== 'chat' && (
                   <>
                     <p className="ma-k">Connected</p>
                     <ul className="ma-links">
@@ -279,6 +281,76 @@ export function MindAtlas({
   );
 }
 
+/** What one chat holds, read from the atlas: its map, what was made in it, what was learned from it. */
+function ChatHolds({ atlas, chatId, onSel }: { atlas: Atlas; chatId: string; onSel: (id: string) => void }) {
+  const h = useMemo(() => contentsOf(atlas, chatId), [atlas, chatId]);
+  const made = [...h.models, ...h.plots, ...h.objects];
+  if (!h.ideas.length && !made.length && !h.memories.length) {
+    return <p className="ma-quiet">Nothing from it is joined to the rest yet.</p>;
+  }
+  const word = (k: AtlasNode['kind']) => (k === 'model' ? 'model' : k === 'plot' ? 'plot' : 'object');
+  const project = atlas.edges.find((e) => e.rel === 'filed_in' && e.from === `c:${chatId}`);
+  const projectName = project ? atlas.nodes.find((n) => n.id === project.to)?.label : null;
+  return (
+    <div className="ma-holds">
+      {projectName && (
+        <p className="ma-filed">
+          Filed in <button type="button" onClick={() => onSel(project!.to)}>{projectName}</button>
+        </p>
+      )}
+      {h.ideas.length > 0 && (
+        <>
+          <p className="ma-k">On its map · {h.ideas.length}</p>
+          <p className="ma-chips">
+            {h.ideas.slice(0, 16).map((n) => (
+              <button
+                key={n.id}
+                type="button"
+                className={n.chats.length > 1 ? 'is-shared' : undefined}
+                title={n.chats.length > 1 ? `Also in ${n.chats.length - 1} other ${n.chats.length === 2 ? 'chat' : 'chats'}` : undefined}
+                onClick={() => onSel(n.id)}
+              >
+                {n.label}
+              </button>
+            ))}
+            {h.ideas.length > 16 && <i>+{h.ideas.length - 16}</i>}
+          </p>
+        </>
+      )}
+      {made.length > 0 && (
+        <>
+          <p className="ma-k">Made here</p>
+          <ul className="ma-links">
+            {made.map((n) => (
+              <li key={n.id}>
+                <button type="button" onClick={() => onSel(n.id)}>
+                  <span className="r">{word(n.kind)}</span>
+                  <span className="t">{n.label}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      {h.memories.length > 0 && (
+        <>
+          <p className="ma-k">Remembered from it</p>
+          <ul className="ma-links">
+            {h.memories.slice(0, 10).map((n) => (
+              <li key={n.id}>
+                <button type="button" onClick={() => onSel(n.id)}>
+                  <span className="r">{n.type.toLowerCase()}</span>
+                  <span className="t">{n.label}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </div>
+  );
+}
+
 function Count({ n, one, many }: { n: number; one: string; many: string }) {
   if (!n) return null;
   return (
@@ -286,27 +358,6 @@ function Count({ n, one, many }: { n: number; one: string; many: string }) {
       <b>{n}</b> {n === 1 ? one : many}
     </span>
   );
-}
-
-/** The Memory page's graph draws rows; an atlas node is given the shape of one. */
-function asGraphNode(n: AtlasNode): GraphNode {
-  return {
-    id: n.id,
-    type: n.type,
-    label: n.label,
-    content: n.sub ?? '',
-    aliases: [],
-    status: n.status ?? 'active',
-    confidence: 1,
-    certainty: 1,
-    importance: 0.5,
-    seen: Math.max(1, n.chats.length),
-    private: false,
-    provenance: [],
-    createdAt: 0,
-    updatedAt: n.at ?? 0,
-    lastAccessed: 0,
-  };
 }
 
 // ── one chat's neighbourhood ────────────────────────────────────────
