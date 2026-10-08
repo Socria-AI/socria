@@ -323,6 +323,9 @@ export interface ProjectContainer {
   description: string;
   instructions: string;
   archived: boolean;
+  /** Project Home's mark — a glyph id and a colour key (lib/project-home.ts) */
+  icon?: string | null;
+  color?: string | null;
   createdAt: number;
   updatedAt: number;
 }

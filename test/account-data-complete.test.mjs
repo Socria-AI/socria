@@ -24,9 +24,10 @@ const ok = (n, c, x = '') => (c ? (pass++, console.log('  ok   ' + n)) : (fail++
 
 const tables = [...schema.matchAll(/create table if not exists (\w+)/g)].map((m) => m[1]);
 
-// Every table this product has is owned by exactly one person now: the shared
-// Logos 2 rooms, which were the one exception, are not in this release.
-const SHARED = new Set([]);
+// Tables keyed by owner AND member rather than by one user_id: sharing.
+// They are not in OWNED_TABLES (a flat `.eq('user_id')` would miss the
+// shares someone owns); they are reached by purgeSharing instead.
+const SHARED = new Set(['shares', 'share_members', 'share_comments', 'share_activity']);
 
 // The actual contents of the OWNED_TABLES literal, not just "the file
 // mentions this word". An earlier version of this test matched anywhere in
@@ -74,7 +75,7 @@ console.log('=== every table is deleted with the account ===');
 ok('the schema declares tables', tables.length > 0, `${tables.length}`);
 for (const t of tables) {
   if (SHARED.has(t)) {
-    ok(`${t} — reached by the room purge`, /purgeUserFromRooms/.test(del));
+    ok(`${t} — reached by the sharing purge`, /await purgeSharing\(userId\)/.test(del));
   } else {
     // Not merely "the name appears somewhere": it must appear inside the
     // OWNED_TABLES literal, which is the list the delete loop iterates. A

@@ -20,6 +20,7 @@ import {
   projectGoals, projectIndex, syncAnchor, type ProjectContainer,
 } from '@/lib/mind/projects';
 import { clip, normalize } from '@/lib/mind/types';
+import { cleanColor, cleanIcon } from '@/lib/project-home';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -88,7 +89,12 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
   if (project instanceof NextResponse) return project;
 
   const body = await req.json().catch(() => null);
-  const patch: { name?: string; description?: string; instructions?: string; archived?: boolean } = {};
+  const patch: { name?: string; description?: string; instructions?: string; archived?: boolean; icon?: string | null; color?: string | null } = {};
+  // Project Home's mark: only values from the fixed lists, or null to clear.
+  if (body?.icon !== undefined) patch.icon = body.icon === null ? null : cleanIcon(body.icon);
+  if (body?.color !== undefined) patch.color = body.color === null ? null : cleanColor(body.color);
+  if (patch.icon === null && body?.icon !== null) delete patch.icon;
+  if (patch.color === null && body?.color !== null) delete patch.color;
   if (body?.name !== undefined) {
     const name = cleanProjectName(body.name);
     if (!name) return NextResponse.json({ error: 'A Project needs a name.' }, { status: 400 });

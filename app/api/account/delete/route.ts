@@ -16,6 +16,7 @@ import { ACCESS_COOKIE } from '@/lib/access-codes-server';
 import { readSubscription, isCompCustomer } from '@/lib/subscriptions';
 import { stripe, stripeConfigured } from '@/lib/stripe';
 import { enforceRateLimit } from '@/lib/rate-limit';
+import { purgeSharing } from '@/lib/share/server';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -180,6 +181,26 @@ export async function DELETE(req: NextRequest) {
       );
     }
     deleted.push(table);
+  }
+
+  // Sharing is keyed by owner and by member rather than by one user_id, so
+  // it has its own purge (lib/share/server.ts): every share they own with
+  // everything hanging off it, every membership, comment and history line of
+  // theirs. Fails closed like the loop above.
+  try {
+    await purgeSharing(userId);
+    deleted.push('shares', 'share_members', 'share_comments', 'share_activity');
+  } catch (e) {
+    console.error('account delete: sharing purge failed', e);
+    return NextResponse.json(
+      {
+        error:
+          'Could not delete everything, so nothing further was removed and your account still exists. Please email hellosocria@gmail.com and we will finish it by hand.',
+        failedAt: 'shares',
+        deleted,
+      },
+      { status: 500 }
+    );
   }
 
   // The identity last.

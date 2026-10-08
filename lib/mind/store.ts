@@ -444,6 +444,8 @@ function rowToProject(r: Record<string, unknown>): ProjectContainer {
     description: (r.description as string) ?? '',
     instructions: (r.instructions as string) ?? '',
     archived: !!r.archived,
+    icon: typeof r.icon === 'string' ? r.icon : null,
+    color: typeof r.color === 'string' ? r.color : null,
     createdAt: Number(r.created_at ?? 0),
     updatedAt: Number(r.updated_at ?? 0),
   };
@@ -494,16 +496,66 @@ export async function insertProject(userId: string, p: ProjectContainer): Promis
 export async function updateProject(
   userId: string,
   id: string,
-  patch: Partial<Pick<ProjectContainer, 'name' | 'description' | 'instructions' | 'archived'>> & { updatedAt: number }
+  patch: Partial<Pick<ProjectContainer, 'name' | 'description' | 'instructions' | 'archived' | 'icon' | 'color'>> & { updatedAt: number }
 ): Promise<boolean> {
   const row: Record<string, unknown> = { updated_at: patch.updatedAt };
   if (patch.name !== undefined) row.name = patch.name;
   if (patch.description !== undefined) row.description = patch.description;
   if (patch.instructions !== undefined) row.instructions = patch.instructions;
   if (patch.archived !== undefined) row.archived = patch.archived;
-  const { error, count } = await supabaseAdmin()
+  if (patch.icon !== undefined) row.icon = patch.icon;
+  if (patch.color !== undefined) row.color = patch.color;
+  let { error, count } = await supabaseAdmin()
     .from('mind_projects').update(row, { count: 'exact' }).eq('user_id', userId).eq('id', id);
+  // A database without the icon/colour columns yet: the rest still saves.
+  if (error && missingColumn(error) && ('icon' in row || 'color' in row)) {
+    delete row.icon;
+    delete row.color;
+    console.error('[socria/mind] mind_projects has no icon/color columns — re-run supabase/schema.sql.');
+    ({ error, count } = await supabaseAdmin()
+      .from('mind_projects').update(row, { count: 'exact' }).eq('user_id', userId).eq('id', id));
+  }
   return !error && !!count;
+}
+
+/**
+ * A Project's conversations with what Project Home reads from each: its kind,
+ * its map (read lightly — lib/mind/atlas.ts atlasMapOf), and whether its
+ * Draft Space has writing in it. Never the messages.
+ */
+export async function listProjectChats(
+  ownerId: string,
+  projectId: string
+): Promise<{ id: string; title: string; kind: 'chat' | 'logos'; updatedAt: number; createdAt: number; map: unknown; hasDraft: boolean }[]> {
+  const db = supabaseAdmin();
+  const tries = ['id, title, kind, map, draft, updated_at, created_at', 'id, title, kind, map, updated_at, created_at', 'id, title, updated_at'];
+  for (const cols of tries) {
+    const { data, error } = await db
+      .from('conversations').select(cols)
+      .eq('user_id', ownerId).eq('project_id', projectId)
+      .order('updated_at', { ascending: false }).limit(200);
+    if (error) {
+      if (missingColumn(error)) continue;
+      throw new MindStoreError(classifyStoreError(error), `conversations: ${error.message}`);
+    }
+    return ((data ?? []) as unknown as Record<string, unknown>[]).map((r) => {
+      // The Draft Space is { title, html } (lib/logos-sessions.ts); it counts
+      // when there are words in it, not when there is markup.
+      const draft = r.draft as { title?: unknown; html?: unknown } | null | undefined;
+      const words = (v: unknown) => (typeof v === 'string' ? v.replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').trim() : '');
+      const hasDraft = !!draft && (words(draft.html).length > 0 || words(draft.title).length > 0);
+      return {
+        id: String(r.id),
+        title: typeof r.title === 'string' ? r.title : '',
+        kind: r.kind === 'logos' ? 'logos' : 'chat',
+        updatedAt: Number(r.updated_at) || 0,
+        createdAt: Date.parse(String(r.created_at ?? '')) || Number(r.updated_at) || 0,
+        map: r.kind === 'logos' ? r.map ?? null : null,
+        hasDraft,
+      };
+    });
+  }
+  return [];
 }
 
 export async function deleteProjectRow(userId: string, id: string): Promise<boolean> {

@@ -214,7 +214,13 @@ export function atlasMapOf(raw: unknown): ThinkingMap | null {
   const r = raw as Record<string, any>;
   const str = (v: unknown, n: number) => (typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().slice(0, n) : '');
   const nodes = (Array.isArray(r.nodes) ? r.nodes : []).slice(0, 80)
-    .map((n: any) => ({ id: str(n?.id, 40), type: str(n?.type, 24), label: str(n?.label, 120) }))
+    .map((n: any) => ({
+      id: str(n?.id, 40), type: str(n?.type, 24), label: str(n?.label, 120),
+      // whose it is and whether it is settled — Project Home never counts a
+      // suggestion of Socria's as the person's own idea
+      ...(n?.origin ? { origin: str(n.origin, 16) } : {}),
+      ...(n?.status ? { status: str(n.status, 16) } : {}),
+    }))
     .filter((n: { id: string; label: string }) => n.id && n.label);
   const edges = (Array.isArray(r.edges) ? r.edges : []).slice(0, 160)
     .map((e: any) => ({ from: str(e?.from, 40), to: str(e?.to, 40), relation: str(e?.relation, 24) }))
@@ -232,8 +238,12 @@ export function atlasMapOf(raw: unknown): ThinkingMap | null {
   const objs = (Array.isArray(r.objects?.objs) ? r.objects.objs : []).slice(0, 12)
     .map((o: any) => ({ id: str(o?.id, 40), kind: str(o?.kind, 24), name: str(o?.name, 24), steps: Array.isArray(o?.steps) ? o.steps.slice(0, 200).map(() => ({})) : [] }))
     .filter((o: { id: string }) => o.id);
+  const context = str(r.context, 24);
+  const building = r.building && typeof r.building === 'object' ? str(r.building.kind, 24) : '';
   return {
     nodes, edges,
+    ...(context ? { context } : {}),
+    ...(building ? { building: { kind: building } } : {}),
     ...(viz && viz.kind ? { viz } : {}),
     ...(docs.length ? { models: { docs, active: null } } : {}),
     ...(objs.length ? { objects: { objs } } : {}),
@@ -507,7 +517,11 @@ export function relatedChats(atlas: Atlas, chatId: string, limit = 12): RelatedC
  * they touch. Bounded, so a hub never pulls in the whole graph.
  */
 export function neighbourhood(atlas: Atlas, chatId: string, limit = 80): Atlas {
-  const root = `c:${chatId}`;
+  return neighbourhoodOf(atlas, `c:${chatId}`, limit);
+}
+
+/** The same, around any node — a Project's home is drawn around the Project. */
+export function neighbourhoodOf(atlas: Atlas, root: string, limit = 80): Atlas {
   const keep = new Set<string>();
   if (!atlas.nodes.some((n) => n.id === root)) {
     return { nodes: [], edges: [], stats: { ...atlas.stats } };
@@ -575,7 +589,11 @@ const KIND_ORDER: Record<AtlasKind, number> = { project: 0, memory: 1, idea: 2, 
  * spaced, so no two places on a ring are closer than the ring allows.
  */
 export function radialLayout(nb: Atlas, chatId: string, W: number, H: number): Record<string, RadialPlace> {
-  const root = `c:${chatId}`;
+  return radialAround(nb, `c:${chatId}`, W, H);
+}
+
+/** The same drawing, around any node. */
+export function radialAround(nb: Atlas, root: string, W: number, H: number): Record<string, RadialPlace> {
   const out: Record<string, RadialPlace> = {};
   const cx = W / 2;
   const cy = H / 2;
@@ -644,4 +662,42 @@ export function radialLayout(nb: Atlas, chatId: string, W: number, H: number): R
     });
   }
   return out;
+}
+
+// ── a Project's part of the graph ───────────────────────────────────
+
+/**
+ * The slice of a Mind graph a Project's home may draw.
+ *
+ * For the OWNER: the anchor, everything tied to it, and the edges between
+ * them — the Project as their memory holds it, private memories left out
+ * (a home can be screen-shared and, once shared, read by others).
+ *
+ * For ANYBODY ELSE — a collaborator — only the anchor and the goals set on
+ * it. What Socria learned about the owner while they worked here is the
+ * owner's, not the Project's; a collaborator sees the Project's own content
+ * (its conversations, maps, plots, models and goals) and nothing of the
+ * person who made it.
+ */
+export function projectGraph(
+  graph: { nodes: MindNode[]; edges: MindEdge[] },
+  anchorId: string,
+  personal: boolean
+): { nodes: MindNode[]; edges: MindEdge[] } {
+  const nodes = graph.nodes ?? [];
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  if (!byId.has(anchorId)) return { nodes: [], edges: [] };
+  const keep = new Set<string>([anchorId]);
+  for (const e of graph.edges ?? []) {
+    const other = e.sourceId === anchorId ? e.targetId : e.targetId === anchorId ? e.sourceId : null;
+    if (!other) continue;
+    const n = byId.get(other);
+    if (!n || n.private) continue;
+    if (!personal && !(n.type === 'Goal' || n.type === 'Plan')) continue;
+    keep.add(other);
+  }
+  return {
+    nodes: nodes.filter((n) => keep.has(n.id)),
+    edges: (graph.edges ?? []).filter((e) => keep.has(e.sourceId) && keep.has(e.targetId)),
+  };
 }

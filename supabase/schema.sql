@@ -400,17 +400,106 @@ create table if not exists mind_projects (
 
 create index if not exists mind_projects_user_updated_idx on mind_projects (user_id, updated_at desc);
 create unique index if not exists mind_projects_user_name_idx on mind_projects (user_id, lower(name));
+-- Project Home: the mark a Project wears. Both nullable and both validated
+-- against fixed lists in lib/project-home.ts (a glyph id and a muted colour
+-- key), so nothing a browser sends is ever drawn as-is.
+alter table mind_projects add column if not exists icon text;
+alter table mind_projects add column if not exists color text;
 
 -- Conversations and files are CONTAINERS, and those do belong to a Project.
 -- Nullable: most conversations are in no Project, and deleting a Project
 -- sets these back to null rather than deleting the conversation.
 alter table conversations
   add column if not exists project_id text;
+-- Incognito: a conversation the person asked to keep out of everything —
+-- never shared, never remembered (lib/share/server.ts refuses to share it).
+alter table conversations
+  add column if not exists incognito boolean not null default false;
 create index if not exists conversations_user_project_idx on conversations (user_id, project_id);
 
 alter table mind_sources
   add column if not exists project_id text;
 create index if not exists mind_sources_user_project_idx on mind_sources (user_id, project_id);
+
+-- ── Sharing: people, links, codes, comments, history ─────────────────
+--
+-- One share per resource (a Project or a conversation), owned by the person
+-- whose rows it opens. The resource itself never changes owner: every read a
+-- collaborator makes is the owner's row, reached through lib/share/server.ts,
+-- which checks the role first. No token is stored: a link token is an HMAC of
+-- the share and a random nonce under a server secret (so the owner can copy
+-- it again, and rotating the nonce revokes it), and only its hash is kept for
+-- lookup. An emailed invite's token is stored hashed and nothing else.
+-- See lib/share/roles.ts for what each role may do.
+create table if not exists shares (
+  id text primary key,
+  resource_type text not null,
+  resource_id text not null,
+  owner_id text not null,
+  link_role text,
+  link_nonce text,
+  link_hash text,
+  code text,
+  code_role text,
+  created_at bigint not null,
+  updated_at bigint not null
+);
+create unique index if not exists shares_resource_idx on shares (owner_id, resource_type, resource_id);
+create index if not exists shares_lookup_idx on shares (resource_type, resource_id);
+create unique index if not exists shares_link_idx on shares (link_hash) where link_hash is not null;
+create unique index if not exists shares_code_idx on shares (code) where code is not null;
+
+create table if not exists share_members (
+  id text primary key,
+  share_id text not null,
+  user_id text,
+  email text,
+  role text not null,
+  via text not null,
+  invited_by text not null,
+  display_name text,
+  invite_hash text,
+  created_at bigint not null,
+  accepted_at bigint,
+  removed_at bigint
+);
+create index if not exists share_members_share_idx on share_members (share_id);
+create index if not exists share_members_user_idx on share_members (user_id);
+create unique index if not exists share_members_user_once on share_members (share_id, user_id)
+  where user_id is not null and removed_at is null;
+create unique index if not exists share_members_email_once on share_members (share_id, email)
+  where email is not null and user_id is null and removed_at is null;
+
+create table if not exists share_comments (
+  id text primary key,
+  share_id text not null,
+  resource_type text not null,
+  resource_id text not null,
+  anchor text not null default '',
+  parent_id text,
+  user_id text not null,
+  display_name text,
+  body text not null,
+  created_at bigint not null,
+  edited_at bigint,
+  resolved_at bigint,
+  resolved_by text,
+  deleted_at bigint
+);
+create index if not exists share_comments_resource_idx on share_comments (resource_type, resource_id, created_at);
+
+create table if not exists share_activity (
+  id text primary key,
+  share_id text not null,
+  resource_type text not null,
+  resource_id text not null,
+  user_id text not null,
+  display_name text,
+  kind text not null,
+  summary text not null,
+  created_at bigint not null
+);
+create index if not exists share_activity_resource_idx on share_activity (resource_type, resource_id, created_at desc);
 
 -- ── Core 4: the per-person reasoning state ───────────────────────────
 --

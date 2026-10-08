@@ -176,6 +176,28 @@ export async function GET(req: NextRequest) {
     .from('capability_evidence').select('*').eq('user_id', userId);
   out.capabilityEvidence = capability ?? [];
 
+  // Sharing: what they shared and with whom, what was shared with them, and
+  // what they wrote on shared things. A table that does not exist yet (a
+  // database that has not run the sharing migration) is an empty section,
+  // not a failed export.
+  const missingTable = (e: { code?: string } | null) => !!e && ['42P01', 'PGRST205'].includes(String(e.code));
+  const { data: shares, error: sharesRaw } = await db
+    .from('shares').select('id, resource_type, resource_id, link_role, code_role, created_at, updated_at').eq('owner_id', userId);
+  const sharesErr = missingTable(sharesRaw) ? null : sharesRaw;
+  out.sharesYouOwn = shares ?? [];
+  const { data: memberships, error: membershipsRaw } = await db
+    .from('share_members').select('share_id, role, via, created_at, accepted_at, removed_at').eq('user_id', userId);
+  const membershipsErr = missingTable(membershipsRaw) ? null : membershipsRaw;
+  out.sharedWithYou = memberships ?? [];
+  const { data: shareComments, error: shareCommentsRaw } = await db
+    .from('share_comments').select('resource_type, resource_id, anchor, body, created_at, edited_at, resolved_at').eq('user_id', userId);
+  const shareCommentsErr = missingTable(shareCommentsRaw) ? null : shareCommentsRaw;
+  out.yourComments = shareComments ?? [];
+  const { data: shareActivity, error: shareActivityRaw } = await db
+    .from('share_activity').select('resource_type, resource_id, kind, summary, created_at').eq('user_id', userId);
+  const shareActivityErr = missingTable(shareActivityRaw) ? null : shareActivityRaw;
+  out.yourSharedActivity = shareActivity ?? [];
+
   out.core4Note =
     'core4State and reasoningLedger separate what you said from what Socria inferred: an ' +
     'inferred field carries its confidence and the evidence it rests on, and a ledger entry ' +
@@ -205,6 +227,10 @@ export async function GET(req: NextRequest) {
     ['reasoningLinks', reasoningLinksErr],
     ['core4Turns', core4TurnsErr],
     ['capabilityEvidence', capabilityErr],
+    ['sharesYouOwn', sharesErr],
+    ['sharedWithYou', membershipsErr],
+    ['yourComments', shareCommentsErr],
+    ['yourSharedActivity', shareActivityErr],
   ]
     .filter(([, e]) => !!e)
     .map(([name]) => name as string);

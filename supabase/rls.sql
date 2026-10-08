@@ -86,6 +86,21 @@ revoke all on reasoning_links     from anon, authenticated;
 revoke all on core4_turns         from anon, authenticated;
 revoke all on capability_evidence from anon, authenticated;
 
+-- Sharing (schema.sql, "Sharing"). Reached only through lib/share/server.ts,
+-- which checks the role before every read and write.
+alter table shares         enable row level security;
+alter table shares         force row level security;
+alter table share_members  enable row level security;
+alter table share_members  force row level security;
+alter table share_comments enable row level security;
+alter table share_comments force row level security;
+alter table share_activity enable row level security;
+alter table share_activity force row level security;
+revoke all on shares         from anon, authenticated;
+revoke all on share_members  from anon, authenticated;
+revoke all on share_comments from anon, authenticated;
+revoke all on share_activity from anon, authenticated;
+
 -- lifecycle_emails is the one table here that holds a STATED PREFERENCE
 -- rather than something the person made: the `unsubscribed` row is somebody
 -- saying "stop". Readable, it says who has opted out of email; writable, it

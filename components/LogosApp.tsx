@@ -292,6 +292,7 @@ export function LogosApp({
   // then the rail is exactly what it was.
   chats,
   onOpenChat,
+  onOpenProject,
   // The person's Projects, and the three things a folder can do that only the
   // host knows how to do: open a chat in one, open its settings, make one.
   // Filing a LINE OF THINKING is this surface's own business (moveSession),
@@ -313,6 +314,8 @@ export function LogosApp({
   model?: SocriaModel;
   chats?: { id: string; title: string; updatedAt: number; projectId?: string | null }[];
   onOpenChat?: (id: string) => void;
+  /** a Project's folder name was pressed: open its home (on the Core surface) */
+  onOpenProject?: (id: string) => void;
   /** undefined until the host has loaded them — the rail shows no folders before that */
   projects?: RailProject[];
   onProjectSettings?: (id: string) => void;
@@ -1715,8 +1718,13 @@ export function LogosApp({
 
       // Deep-link from elsewhere in the app: /chat?s=<id>
       let wanted: string | null = null;
+      // …or a new line of thinking begun from a Project's home: /chat?in=<id>
+      let startIn: string | null = null;
       try {
-        wanted = new URLSearchParams(window.location.search).get('s');
+        const q = new URLSearchParams(window.location.search);
+        wanted = q.get('s');
+        const pin = q.get('in');
+        startIn = pin && /^[A-Za-z0-9_-]{1,80}$/.test(pin) ? pin : null;
       } catch {}
 
       if (list.length === 0) list = [emptySession()];
@@ -1726,6 +1734,18 @@ export function LogosApp({
       // newSession(), which asks and spends; nothing is spent until they send.
       if (pendingStart && !wanted && sorted[0].messages.length > 0) {
         sorted = [emptySession(), ...sorted];
+      }
+      // Begun from a Project's home: an empty session filed there, nothing
+      // spent until the first message — the same as pendingStart above.
+      if (startIn && !wanted) {
+        const fresh = { ...emptySession(), projectId: startIn };
+        sorted = [fresh, ...sorted];
+        wanted = fresh.id;
+        try {
+          const u = new URL(window.location.href);
+          u.searchParams.delete('in');
+          window.history.replaceState({}, '', u.pathname + u.search);
+        } catch {}
       }
       sessionsRef.current = sorted;
       setSessions(sorted);
@@ -4361,6 +4381,7 @@ export function LogosApp({
             onRename={renameSession}
             onToggle={() => setRailOpen((v) => !v)}
             projects={projects}
+            onOpenProject={onOpenProject}
             onNewInProject={(pid) => {
               newSession(pid);
               usedRail();

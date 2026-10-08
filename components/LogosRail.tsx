@@ -92,6 +92,7 @@ export function LogosRail({
   onRename,
   onToggle,
   projects,
+  onOpenProject,
   onNewInProject,
   onProjectSettings,
   onCreateProject,
@@ -112,6 +113,8 @@ export function LogosRail({
    */
   projects?: RailProject[];
   /** start a line of thinking inside this Project */
+  /** a folder's name was pressed: open the Project's home rather than only folding */
+  onOpenProject?: (projectId: string) => void;
   onNewInProject?: (projectId: string) => void;
   onProjectSettings?: (projectId: string) => void;
   /** make a Project; resolves to its id, or null if it could not be made */
@@ -377,8 +380,21 @@ export function LogosRail({
     return (
       <div key={`p-${pr.id}`}>
         <div className="s-row s-fold">
-          <button type="button" className="s-open" aria-expanded={open} onClick={() => toggleFolder(pr.id)} title={pr.name}>
-            <span className="chev" aria-hidden="true">{open ? '▾' : '▸'}</span>
+          <button
+            type="button"
+            className="s-open"
+            aria-expanded={open}
+            onClick={() => (onOpenProject ? onOpenProject(pr.id) : toggleFolder(pr.id))}
+            title={pr.name}
+          >
+            {/* With a home to open, the name opens it and the chevron only folds. */}
+            <span
+              className="chev"
+              aria-hidden="true"
+              onClick={onOpenProject ? (e) => { e.stopPropagation(); toggleFolder(pr.id); } : undefined}
+            >
+              {open ? '▾' : '▸'}
+            </span>
             <span className="s-glyph" aria-hidden="true">{FOLDER_ICON}</span>
             <span className="t">{pr.name}</span>
             {kids.length > 0 && <span className="n">{kids.length}</span>}

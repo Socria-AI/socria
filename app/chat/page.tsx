@@ -68,6 +68,7 @@ import { Hint, useSeenHints } from '@/components/Hint';
 import { pickHint } from '@/lib/hints';
 import { AccountSheet } from '@/components/account/AccountSheet';
 import { TOUR_KEY, shouldRunTour } from '@/lib/tour';
+import { ProjectHome } from '@/components/projects/ProjectHome';
 import { isSource } from '@/lib/checkout-attribution';
 import { track } from '@/lib/analytics';
 import { hasJourneyContent as journeyHasContent } from '@/lib/socria-prompt';
@@ -318,6 +319,13 @@ export default function ChatPage() {
    * session or opening another one.
    */
   const [projectEntry, setProjectEntry] = useState<{ id: string; name: string } | null>(null);
+  /**
+   * PROJECT HOME — the Project open in the main pane (components/projects/
+   * ProjectHome). Opening a Project's folder opens it; opening any chat, or
+   * starting one, closes it. Mirrored in the URL as ?p= so it survives a
+   * reload and can be linked to.
+   */
+  const [homeProject, setHomeProject] = useState<string | null>(null);
   /** The person's Projects — the folders in the rail. Signed-in only. */
   const [projects, setProjects] = useState<RailProject[]>([]);
   /** true once the list has actually been fetched — Logos files nothing against a list that has not arrived */
@@ -1634,6 +1642,7 @@ export default function ChatPage() {
     // An ordinary session. Starting one from the rail after arriving from a
     // Project must not quietly file it under that Project.
     setProjectEntry(null);
+    setHomeProject(null);
     const id = uid();
     const fresh: Conversation = {
       id,
@@ -2049,6 +2058,53 @@ export default function ChatPage() {
   const toggleFolder = (id: string) =>
     setOpenFolders((o) => (o.includes(id) ? o.filter((x) => x !== id) : [...o, id]));
 
+  /** Open a Project's home, and its folder with it, so its chats are in view too. */
+  function openProjectHome(id: string) {
+    setHomeProject(id);
+    setOpenFolders((o) => (o.includes(id) ? o : [...o, id]));
+    setFindOpen(false);
+    setSidebarOpen(false);
+  }
+
+  // ?p= follows the home, so a reload or a copied link lands in the same place.
+  // Only a home that WAS open is taken out of the URL: on the first render the
+  // home is still null because ?p= has not been read yet, and removing it then
+  // is how a link to a Project used to land on an empty chat.
+  const homeWas = useRef<string | null>(null);
+  useEffect(() => {
+    try {
+      const u = new URL(window.location.href);
+      if (homeProject) u.searchParams.set('p', homeProject);
+      else if (homeWas.current) u.searchParams.delete('p');
+      homeWas.current = homeProject;
+      if (u.href !== window.location.href) window.history.replaceState({}, '', u.pathname + u.search);
+    } catch {}
+  }, [homeProject]);
+
+  /** Into a conversation from Project Home: Core here, Logos on its own surface. */
+  function openFromHome(id: string, kind: 'chat' | 'logos') {
+    if (kind === 'logos') {
+      chooseModel('logos');
+      window.location.assign(`/chat?s=${encodeURIComponent(id)}`);
+      return;
+    }
+    setHomeProject(null);
+    setProjectEntry(null);
+    setActiveId(id);
+  }
+
+  /** A new conversation, filed in the Project from its first message. */
+  function newFromHome(pid: string, kind: 'chat' | 'logos') {
+    if (kind === 'logos') {
+      const m: SocriaModel = isOffered('logos-3') ? 'logos-3' : 'logos-2';
+      chooseModel(m);
+      window.location.assign(`/chat?model=${m}&in=${encodeURIComponent(pid)}`);
+      return;
+    }
+    const pr = projects.find((x) => x.id === pid);
+    newChatIn(pr ?? { id: pid, name: 'this Project', archived: false, updatedAt: 0 });
+  }
+
   /** Make a Project by name; its id, or null when it could not be made (said in the error line). */
   async function createProject(name: string): Promise<string | null> {
     try {
@@ -2085,6 +2141,7 @@ export default function ChatPage() {
    * the Mind Graph and so the only one a Project can focus.
    */
   function newChatIn(p: RailProject) {
+    setHomeProject(null);
     setProjectEntry({ id: p.id, name: p.name });
     setActiveId(null);
     setModel('core-4');
@@ -2150,6 +2207,8 @@ export default function ChatPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const want = params.get('model');
+    const homeAt = params.get('p');
+    if (homeAt && /^[A-Za-z0-9_-]{1,80}$/.test(homeAt) && !isLogosSurface(want)) setHomeProject(homeAt);
 
     // A first message chosen on /explore, for Core. Into the composer and
     // never sent. When Logos is being routed — by the link, or by the model
@@ -2371,6 +2430,13 @@ export default function ChatPage() {
           setProjectEntry(null);
           setSidebarOpen(false);
         }}
+        onOpenProject={(pid) => {
+          // A Project's home lives on the Core surface, beside its chats.
+          const back = lastCoreModel();
+          chooseModel(back);
+          setModel(back);
+          openProjectHome(pid);
+        }}
         onSwitchModel={(next) => {
           setModel(next);
           chooseModel(next);
@@ -2469,6 +2535,7 @@ export default function ChatPage() {
             onClick={() => {
               setActiveId(item.id);
               setProjectEntry(null);
+              setHomeProject(null);
               setSidebarOpen(false);
             }}
             onDoubleClick={startRename}
@@ -2583,8 +2650,25 @@ export default function ChatPage() {
             if (id) void moveChat(id, pr.id);
           }}
         >
-          <button type="button" className="s-open" aria-expanded={open} onClick={() => toggleFolder(pr.id)} title={pr.name}>
-            <span className="chev" aria-hidden="true">{open ? '▾' : '▸'}</span>
+          <button
+            type="button"
+            className={`s-open${homeProject === pr.id ? ' is-home' : ''}`}
+            aria-expanded={open}
+            aria-current={homeProject === pr.id ? 'page' : undefined}
+            onClick={() => openProjectHome(pr.id)}
+            title={pr.name}
+          >
+            {/* The chevron only folds; the name opens the Project's home. */}
+            <span
+              className="chev"
+              aria-hidden="true"
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleFolder(pr.id);
+              }}
+            >
+              {open ? '▾' : '▸'}
+            </span>
             <span className="s-glyph" aria-hidden="true">{FOLDER_ICON}</span>
             <span className="t">{pr.name}</span>
             {kids.length > 0 && <span className="n">{kids.length}</span>}
@@ -3043,6 +3127,19 @@ export default function ChatPage() {
           </div>
         </div>
 
+        {homeProject ? (
+          <ProjectHome
+            id={homeProject}
+            onOpenChat={openFromHome}
+            onNewChat={(kind) => newFromHome(homeProject, kind)}
+            onSettings={() => setSheet(homeProject)}
+            onRenamed={(id, kind, title) => {
+              if (kind === 'logos') setLogosSessions((ls) => ls.map((x) => (x.id === id ? { ...x, title } : x)));
+              else setConversations((cs) => cs.map((c) => (c.id === id ? { ...c, title } : c)));
+            }}
+            refreshKey={projects.find((x) => x.id === homeProject)?.updatedAt}
+          />
+        ) : (<>
         {/* The conversation and the find rail, side by side.
             `.chat-row` is the design's own container (app/app-shell.css:
             `flex:1;min-height:0;display:flex;position:relative`) and the
@@ -3619,6 +3716,7 @@ export default function ChatPage() {
             </div>
           </div>
         </div>
+        </>)}
       </div>
     </div>
   );

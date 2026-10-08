@@ -687,7 +687,11 @@
 .app-root .s-proj-h button{font-size:15px;line-height:1;color:var(--ink-45);padding:0 4px;background:none;border:none;cursor:pointer}
 .app-root .s-proj-h button:hover{color:var(--moss-700)}
 .app-root .s-fold .s-glyph{color:var(--moss-600)}
-.app-root .s-fold .chev{flex:0 0 auto;width:9px;margin-top:1px;color:var(--ink-45);font-size:9px}
+.app-root .s-fold .chev{flex:0 0 auto;width:14px;margin:-2px 0 0 -3px;padding:2px 0 2px 3px;color:var(--ink-45);font-size:9px;cursor:pointer;border-radius:4px}
+.app-root .s-fold .chev:hover{color:var(--ink);background:rgba(var(--ink-rgb, 31, 31, 31), .06)}
+/* the Project whose home is open in the main pane */
+.app-root .s-fold .s-open.is-home .t{color:var(--ink);font-weight:500}
+.app-root .s-fold:has(.s-open.is-home){background:rgba(var(--moss-rgb, 94, 118, 51), .1)}
 .app-root .s-fold.drop{background:rgba(var(--moss-rgb, 94, 118, 51), .14);outline:1px dashed var(--moss-600)}
 .app-root .s-kids{margin:0 0 4px 14px;padding-left:6px;border-left:1px solid var(--ink-12)}
 .app-root .s-kids .s-none{margin:6px 6px 8px;font-size:12px}
