@@ -119,11 +119,11 @@ export function DepthPersonality() {
           Facts, mathematics and computation are the same in every style. What
           is yours to work out stays yours, and the Answer Guard holds. You
           steer: no style decides for you or argues past a choice you have
-          made. Depth is untouched. And some moments keep their own register
-          whatever you chose — somebody struggling, a safety concern, real
-          time pressure, or you saying a reply gave too much away: a
-          Challenger does not push on a bad day, and a Companion does not joke
-          through one.
+          made. Depth is untouched. When you are struggling, every style goes
+          quiet: a Challenger does not push on a bad day, and a Companion does
+          not joke through one. In Core 4 a few other moments keep their own
+          register too, whatever you chose — a safety concern, real time
+          pressure, or you saying a reply gave too much away.
         </p>
       </Callout>
       <p>
