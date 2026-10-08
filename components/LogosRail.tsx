@@ -34,7 +34,6 @@
 // is a line of thinking, because that is what this surface makes.
 
 import { useMemo, useState } from 'react';
-import { FEEDBACK_URL } from '@/lib/feedback';
 import Link from 'next/link';
 import { Logo } from './Logo';
 import { MapGlyph } from './MapGlyph';
@@ -65,6 +64,15 @@ const FOLDER_ICON = (
     <path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h4.2l1.8 2h9A1.5 1.5 0 0 1 21 9.5v8A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5z" />
   </svg>
 );
+// The foot's Memory row: the Mind Graph, as three joined nodes (as in the Core rail).
+const MEMORY_ICON = (
+  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
+    <circle cx="6.5" cy="7" r="2.3" />
+    <circle cx="17.5" cy="8.5" r="2.3" />
+    <circle cx="11" cy="17.5" r="2.3" />
+    <path d="M8.8 7.3l6.4.9M7.4 9.1l2.7 6.3M16.2 10.4l-3.9 5.2" />
+  </svg>
+);
 const PLUS_ICON = (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
 );
@@ -84,7 +92,6 @@ export function LogosRail({
   activeId,
   open,
   syncing,
-  cloud,
   onSelect,
   onOpenChat,
   onNew,
@@ -126,8 +133,6 @@ export function LogosRail({
   activeId: string | null;
   open: boolean;
   syncing: boolean;
-  /** true when sessions are synced to the account rather than this browser */
-  cloud: boolean;
   onSelect: (id: string) => void;
   /** open a Core conversation: back to the chat surface, on that one */
   onOpenChat?: (id: string) => void;
@@ -564,26 +569,16 @@ export function LogosRail({
       </div>
 
       <div className="s-foot">
-        {/* The same footer links, in the same order, as the Core rail — the
-            memory link included, which used to be a button in the Logos header
-            and is now in the one place the product keeps it. /memory IS the
-            Mind Graph, and the older Cores' Journey is on that page too, with
-            the per-entry forget the header button used to carry. */}
-        <Link href="/memory" className="s-link">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="9" />
-            <path d="M12 8v4l2.5 2.5" strokeLinecap="round" />
-          </svg>
-          <span>What Socria remembers</span>
-        </Link>
-        <p className="s-vow">
-          {cloud
-            ? 'Synced across your devices. Your reasoning is yours.'
-            : 'Kept in this browser. Your reasoning is yours.'}
-        </p>
-        <a className="s-feedback" href={FEEDBACK_URL} target="_blank" rel="noopener noreferrer">
-          Send feedback <span aria-hidden="true">↗</span>
-        </a>
+        {/* The same rows, in the same style, as the Core rail's foot. Memory
+            only: importing history from other AIs feeds Core's answers, not
+            Logos's, so it is offered where it does something. /memory IS the
+            Mind Graph, and the older Cores' Journey is on that page too. */}
+        <nav className="s-foot-nav" aria-label="Memory">
+          <Link href="/memory" className="s-link">
+            {MEMORY_ICON}
+            <span>Memory</span>
+          </Link>
+        </nav>
       </div>
     </aside>
   );

@@ -31,7 +31,6 @@ import { MapGlyph } from '@/components/MapGlyph';
 import { NodeTile } from '@/components/NodeTile';
 import { LogosApp } from '@/components/LogosApp';
 import { ProjectSheet } from '@/components/projects/ProjectSheet';
-import { FEEDBACK_URL } from '@/lib/feedback';
 import type { Attachment } from '@/lib/logos-attachments';
 import { forRequest, wordsOnly } from '@/lib/chat-attachments';
 import { newMsgId, replyRefOf, type ReplyRef } from '@/lib/chat-thread';
@@ -186,6 +185,20 @@ interface RailProject {
 const FOLDER_ICON = (
   <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
     <path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h4.2l1.8 2h9A1.5 1.5 0 0 1 21 9.5v8A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5z" />
+  </svg>
+);
+// The rail foot's two rows: history coming in, and the Mind Graph.
+const IMPORT_ICON = (
+  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M12 4v10M8 10.5l4 4 4-4M5 19h14" />
+  </svg>
+);
+const MEMORY_ICON = (
+  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
+    <circle cx="6.5" cy="7" r="2.3" />
+    <circle cx="17.5" cy="8.5" r="2.3" />
+    <circle cx="11" cy="17.5" r="2.3" />
+    <path d="M8.8 7.3l6.4.9M7.4 9.1l2.7 6.3M16.2 10.4l-3.9 5.2" />
   </svg>
 );
 const PLUS_ICON = (
@@ -3137,65 +3150,41 @@ export default function ChatPage() {
           {/* Socria One, said once and left alone. The same plate as the
               /one cover, at the size of a sidebar row; it never moves and
               never changes what it says. A member sees what they hold. */}
-          {planState.known && (
-            <div style={{ marginBottom: 11 }}>
-              <OneFoot state={planState} />
-            </div>
-          )}
-          <button
-            type="button"
-            className="s-link"
-            onClick={() => {
-              setImportOpen(true);
-              setSidebarOpen(false);
-            }}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 3v12" />
-              <path d="M7 10l5 5 5-5" />
-              <path d="M4 19h16" />
-            </svg>
-            <span>
-              Import your history{' '}
-              {importedProfile ? (
-                <span className="yes">· active</span>
-              ) : (
-                <span className="no">from other AIs</span>
+          {planState.known && <OneFoot state={planState} />}
+          {/* Two rows and nothing else: where your history comes in, and
+              where what Socria remembers lives. Signing in is offered at the
+              top of the rail and in the header, and feedback is under Manage
+              Account, so neither is repeated here. */}
+          <nav className="s-foot-nav" aria-label="History and memory">
+            <button
+              type="button"
+              className="s-link"
+              title="Bring in your history from other AIs"
+              onClick={() => {
+                setImportOpen(true);
+                setSidebarOpen(false);
+              }}
+            >
+              {IMPORT_ICON}
+              <span>Import your history</span>
+              {importedProfile && (
+                <span className="s-link-on">
+                  <span className="sr-only">(in use)</span>
+                </span>
               )}
-            </span>
-          </button>
-          {/*
-            This used to open the Thinking Journey, which Core 4 does not read:
-            its memory is the Mind Graph, and the chip pointed at a different
-            store that happened to share the words "what Socria remembers". So
-            it showed a person one thing and told Socria another.
-            /memory IS the Mind Graph — the same rows the prompt was built
-            from — so the link now goes where the memory actually lives. The
-            Journey is on that page too (components/mind/JourneyRecord),
-            labelled as the older Cores' store: the chip carried the only
-            per-entry forget, and a deletion control does not get dropped on
-            the way past.
-          */}
-          <Link href="/memory" className="s-link" onClick={() => setSidebarOpen(false)}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="9" />
-              <path d="M12 8v4l2.5 2.5" strokeLinecap="round" />
-            </svg>
-            <span>What Socria remembers</span>
-          </Link>
-          <SignedIn>
-            <p className="s-vow">Synced across your devices. Your reasoning is yours.</p>
-          </SignedIn>
-          <SignedOut>
-            <SignInButton>
-              <button className="s-link">Sign in to sync across devices →</button>
-            </SignInButton>
-            <p className="s-vow">Nothing here is sent anywhere. Your reasoning is yours.</p>
-          </SignedOut>
-          {/* Signed in or not: anybody using it can tell us what is wrong. */}
-          <a className="s-feedback" href={FEEDBACK_URL} target="_blank" rel="noopener noreferrer">
-            Send feedback <span aria-hidden="true">↗</span>
-          </a>
+            </button>
+            {/*
+              /memory IS the Mind Graph — the same rows the prompt is built
+              from. It used to open the Thinking Journey, which Core 4 does
+              not read, so it showed a person one store and told Socria
+              another. The Journey is on that page too
+              (components/mind/JourneyRecord), with its per-entry forget.
+            */}
+            <Link href="/memory" className="s-link" onClick={() => setSidebarOpen(false)}>
+              {MEMORY_ICON}
+              <span>Memory</span>
+            </Link>
+          </nav>
         </div>
       </aside>
       </div>

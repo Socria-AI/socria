@@ -5033,7 +5033,6 @@ export function LogosApp({
             activeId={activeId}
             open={railOpen && !chromeHidden}
             syncing={hydrating}
-            cloud={cloud}
             onSelect={(id) => {
               switchSession(id);
               usedRail();

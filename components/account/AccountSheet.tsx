@@ -30,6 +30,7 @@ import { StudentAccess } from '@/components/StudentAccess';
 import { usePlan, type PlanState } from '@/components/usePlan';
 import { RewardsPanel } from '@/components/rewards/RewardsPanel';
 import { clearSocriaLocalData } from '@/lib/local-data';
+import { FEEDBACK_URL } from '@/lib/feedback';
 import { ThemePicker } from './ThemePicker';
 import { AccessCode } from './AccessCode';
 import { TestingTools } from './TestingTools';
@@ -192,6 +193,20 @@ export function AccountSheet({
                   <span className="t">Export or delete everything</span>
                   <span className="d">Verbatim, nothing summarised — and it does not come back</span>
                 </Link>
+              </div>
+            </div>
+
+            {/* Feedback lives here now; the sidebar's foot keeps to import
+                and memory. Signed out, /support has the address. */}
+            <div className="sec">
+              <span className="lbl">Feedback</span>
+              <div className="acts">
+                <a className="act" href={FEEDBACK_URL} target="_blank" rel="noopener noreferrer" onClick={onClose}>
+                  <span className="t">
+                    Send feedback <span aria-hidden="true">↗</span>
+                  </span>
+                  <span className="d">A short form: what is wrong, or what is missing</span>
+                </a>
               </div>
             </div>
 

@@ -225,8 +225,10 @@
 .app-root .s-none{margin:18px 6px;font-size:12.5px;color:var(--ink-45);line-height:1.45}
 .app-root .s-none em{font-family:var(--font-serif, Georgia, serif);font-style:italic}
 
-/* the tier, and the vow */
-.app-root .s-foot{padding:11px 14px 13px;border-top:1px solid var(--ink-16)}
+/* the foot: Socria One, then two quiet rows (import, memory) */
+.app-root .s-foot{padding:10px 12px 12px;border-top:1px solid var(--ink-16)}
+.app-root .s-foot > .one-mark.is-foot{margin-bottom:6px}
+.app-root .s-foot-nav{display:flex;flex-direction:column;gap:1px}
 .app-root .s-tier{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink-70);flex-wrap:wrap}
 .app-root .s-tier svg{flex:0 0 auto}
 .app-root .s-tier a{font-family:var(--font-serif, Georgia, serif);font-style:italic;font-size:12.5px;color:var(--prussian);
@@ -237,11 +239,6 @@
   display:grid;place-items:center;font-family:var(--font-serif, Georgia, serif);font-style:italic;font-size:.85rem;flex:0 0 auto}
 .app-root .s-tier.one .m{font-family:var(--font-sans, system-ui, -apple-system, 'Segoe UI', sans-serif);font-size:9.5px;font-weight:600;letter-spacing:.24em;
   text-transform:uppercase;color:var(--prussian);margin-left:auto}
-.app-root .s-feedback{display:inline-flex;align-items:center;gap:4px;margin:9px 0 0;font-size:11.5px;
-  color:var(--moss-700);text-decoration:none;border-bottom:1px solid rgba(var(--moss-rgb, 94, 118, 51), .3);padding-bottom:1px}
-.app-root .s-feedback:hover{color:var(--ink);border-color:var(--ink)}
-.app-root .s-vow{margin:8px 0 0;font-family:var(--font-serif, Georgia, serif);font-style:italic;font-size:10.5px;
-  color:var(--ink-45);line-height:1.4}
 
 /* ===== one control for model and depth, beside the send button ===== */
 .app-root .mp{position:relative;flex:0 0 auto;align-self:flex-end}
@@ -623,13 +620,17 @@
 .app-root .s-rename{flex:1;min-width:0;border-radius:6px;border:1px solid var(--moss-600);
   background:var(--surface, #fff);padding:4px 8px;font:inherit;font-size:13px;color:var(--ink);outline:none}
 
-/* the foot's own rows — import, memory, account */
-.app-root .s-link{display:flex;align-items:center;gap:8px;width:100%;text-align:left;
-  font-size:12.5px;color:var(--ink-70);padding:3px 0;transition:color .18s}
-.app-root .s-link:hover{color:var(--ink)}
-.app-root .s-link svg{flex:0 0 auto;color:var(--moss-700)}
-.app-root .s-link .yes{color:var(--moss-700);font-weight:500}
-.app-root .s-link .no{color:var(--ink-45)}
+/* the foot's own rows — the rail's row, a size quieter: a muted icon that
+   takes the moss on hover, and no second line */
+.app-root .s-link{display:flex;align-items:center;gap:9px;width:100%;text-align:left;
+  padding:6px 9px;border-radius:7px;font-size:12.5px;line-height:1.3;color:var(--ink-60);
+  text-decoration:none;transition:background .18s,color .18s}
+.app-root .s-link:hover{background:rgba(var(--ink-rgb, 31, 31, 31), .04);color:var(--ink)}
+.app-root .s-link:focus-visible{outline:2px solid var(--moss-600);outline-offset:1px}
+.app-root .s-link svg{flex:0 0 auto;color:var(--ink-45);transition:color .18s}
+.app-root .s-link:hover svg{color:var(--moss-700)}
+/* imported history in use: a dot, not a sentence */
+.app-root .s-link-on{flex:0 0 auto;width:5px;height:5px;margin-left:-2px;border-radius:50%;background:var(--moss-600)}
 .app-root .s-me{display:flex;align-items:center;gap:9px;margin-top:9px}
 .app-root .s-me .nm{flex:1;min-width:0;font-size:12.5px;color:var(--ink-70);
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
