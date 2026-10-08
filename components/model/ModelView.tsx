@@ -65,6 +65,94 @@ function frameOf(spec: VisualizationSpec): Frame3 {
 const d2 = (pts: { x: number; y: number }[]) =>
   pts.map((p, i) => `${i ? 'L' : 'M'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
 
+// ── A FIELD AS COLOUR ─────────────────────────────────────────────────
+//
+// A mesh that carries a value at every point (`scalar`) and asks to be filled
+// is drawn, flat, as that value in colour — one pixel a sample, scaled by the
+// browser — rather than as level sets. The colours are viridis, which reads in
+// order and in grey; a value that runs both sides of zero gets a diverging
+// scale centred on zero, so the sign is what the eye sees first.
+
+const VIRIDIS = ['#440154', '#482878', '#3e4989', '#31688e', '#26828e', '#1f9e89', '#35b779', '#6ece58', '#b5de2b', '#fde725'];
+const DIVERGING = ['#2166ac', '#4393c3', '#92c5de', '#d1e5f0', '#f7f7f7', '#fddbc7', '#f4a582', '#d6604d', '#b2182b'];
+const rgbOf = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+const RAMP_V = VIRIDIS.map(rgbOf);
+const RAMP_D = DIVERGING.map(rgbOf);
+function rampAt(ramp: number[][], f: number): number[] {
+  const g = Math.min(1, Math.max(0, Number.isFinite(f) ? f : 0)) * (ramp.length - 1);
+  const i = Math.min(ramp.length - 2, Math.floor(g));
+  const w = g - i;
+  return ramp[i].map((c, k) => Math.round(c + w * (ramp[i + 1][k] - c)));
+}
+
+interface HeatImage {
+  href: string;
+  x: [number, number];
+  y: [number, number];
+  lo: number;
+  hi: number;
+  diverging: boolean;
+}
+const HEAT = new WeakMap<object, HeatImage | null>();
+/** Ids inside one frame's SVG must not meet another frame's on the same page: url(#…) takes the first in the document. */
+let FRAMES = 0;
+
+/** An end of a colour scale, to three figures — and zero when it is round-off against the range. */
+function scaleEnd(v: number, span: number): string {
+  if (Math.abs(v) < 1e-9 * Math.max(Math.abs(span), 1e-300)) return '0';
+  return String(Number(v.toPrecision(3))).replace(/^-/, '−');
+}
+
+/** The mesh's values as an image, made once per mesh. Null where there is no canvas (on the server) or nothing to show. */
+function heatImage(prim: Extract<Primitive, { p: 'mesh' }>): HeatImage | null {
+  if (HEAT.has(prim)) return HEAT.get(prim)!;
+  let made: HeatImage | null = null;
+  const sc = prim.scalar;
+  const R = prim.rows.length;
+  const C = prim.rows[0]?.length ?? 0;
+  if (typeof document !== 'undefined' && sc && R > 1 && C > 1) {
+    let lo = Infinity;
+    let hi = -Infinity;
+    for (const row of sc) for (const v of row) if (v !== null && Number.isFinite(v)) { lo = Math.min(lo, v); hi = Math.max(hi, v); }
+    if (Number.isFinite(lo)) {
+      const diverging = lo < 0 && hi > 0 && Math.min(-lo, hi) / Math.max(-lo, hi) > 0.1;
+      if (diverging) { const m = Math.max(-lo, hi); lo = -m; hi = m; }
+      if (hi - lo < 1e-300) { hi = lo + 1; }
+      const cv = document.createElement('canvas');
+      cv.width = C;
+      cv.height = R;
+      const ctx = cv.getContext('2d');
+      if (ctx) {
+        const img = ctx.createImageData(C, R);
+        for (let r = 0; r < R; r++) {
+          // the first row is the lowest y, and the top of an image is its first row
+          const line = R - 1 - r;
+          for (let c = 0; c < C; c++) {
+            const v = sc[r]?.[c];
+            const k = 4 * (line * C + c);
+            if (v === null || v === undefined || !Number.isFinite(v)) { img.data[k + 3] = 0; continue; }
+            const [rr, gg, bb] = rampAt(diverging ? RAMP_D : RAMP_V, (v - lo) / (hi - lo));
+            img.data[k] = rr; img.data[k + 1] = gg; img.data[k + 2] = bb; img.data[k + 3] = 255;
+          }
+        }
+        ctx.putImageData(img, 0, 0);
+        const first = prim.rows[0];
+        const last = prim.rows[R - 1];
+        made = {
+          href: cv.toDataURL(),
+          x: [first[0]?.x ?? 0, first[C - 1]?.x ?? 1],
+          y: [first[0]?.y ?? 0, last[0]?.y ?? 1],
+          lo,
+          hi,
+          diverging,
+        };
+      }
+    }
+  }
+  HEAT.set(prim, made);
+  return made;
+}
+
 export function ModelView({
   model: initial,
   edits,
@@ -121,6 +209,9 @@ export function ModelView({
   // holds the thing being looked at, so a control moved in the chrome and a
   // control moved from the conversation land in the same place.
   const [model, setModel] = useState<Model>(initial);
+  const frameRef = useRef<string | null>(null);
+  if (!frameRef.current) frameRef.current = `mv${++FRAMES}`;
+  const frameId = frameRef.current;
   const [view, setView] = useState<ViewState>({});
   const [held, setHeld] = useState<Model | null>(null);
 
@@ -293,6 +384,9 @@ export function ModelView({
       // unexpanded specification do not exist until unpack runs, and a slider
       // whose initial value was never set reads its minimum.
       ...Object.fromEntries(inputsOf(unpack(initial)).map((q) => [`at:${q.id}`, q.at])),
+      // THE MODEL'S OWN PLAYBACK RATE. The frame's clock runs at `rate` model-time units a second, and a model
+      // never handed it one: a rod heating for two hours replayed in two hours. A parameter called rate keeps its name.
+      ...(initial.time?.rate && !initial.params.some((p) => p.id === 'rate') ? { rate: initial.time.rate } : {}),
     }),
     [initial]
   );
@@ -496,10 +590,16 @@ export function ModelView({
       // Flat, the floor of the plot is the bottom of the frame — or the top of
       // the panel strip, so the x axis and its numbers are not under it.
       const floor = panels.length ? panelTop - panelGap - 14 : a.H - pad;
-      const sx = (x: number) =>
-        pad + ((x - spec.box.x[0]) / (spec.box.x[1] - spec.box.x[0])) * (a.W - pad * 2);
-      const sy = (y: number) =>
-        floor - ((y - spec.box.y[0]) / (spec.box.y[1] - spec.box.y[0])) * (floor - pad);
+      // TO SCALE, a plane is one scale both ways, centred in the frame; otherwise each axis fills its side
+      const spanX = spec.box.x[1] - spec.box.x[0];
+      const spanY = spec.box.y[1] - spec.box.y[0];
+      const kx = (a.W - pad * 2) / spanX;
+      const ky = (floor - pad) / spanY;
+      const k1 = Math.min(kx, ky);
+      const offX = spec.toScale ? (a.W - pad * 2 - k1 * spanX) / 2 : 0;
+      const offY = spec.toScale ? (floor - pad - k1 * spanY) / 2 : 0;
+      const sx = (x: number) => pad + offX + (x - spec.box.x[0]) * (spec.toScale ? k1 : kx);
+      const sy = (y: number) => floor - offY - (y - spec.box.y[0]) * (spec.toScale ? k1 : ky);
       const centre = { x: a.W / 2, y: a.H / 2 };
       const spread = Math.min(a.W, a.H) * 0.42 * zoom;
       const at = (p: P3): Pt2 & { depth: number } => {
@@ -624,10 +724,15 @@ export function ModelView({
         });
         put(1e9 - 1, <g key="scale">{marks}</g>);
       } else {
+        // the rules run along the box's own edges — the frame's edges, unless a plane is drawn to scale
+        const left = sx(spec.box.x[0]);
+        const right = sx(spec.box.x[1]);
+        const base = sy(spec.box.y[0]);
+        const top = sy(spec.box.y[1]);
         put(1e9, (
           <g key="axes" className="eng-box">
-            <path d={`M${pad},${floor} L${a.W - pad},${floor}`} />
-            <path d={`M${pad},${pad} L${pad},${floor}`} />
+            <path d={`M${left.toFixed(1)},${base.toFixed(1)} L${right.toFixed(1)},${base.toFixed(1)}`} />
+            <path d={`M${left.toFixed(1)},${top.toFixed(1)} L${left.toFixed(1)},${base.toFixed(1)}`} />
           </g>
         ));
         const xt = niceTicks(spec.box.x[0], spec.box.x[1], a.W > 420 ? 5 : 3);
@@ -636,21 +741,21 @@ export function ModelView({
           <g key="scale">
             {xt.map((v) => (
               <g key={`x${v}`} className="eng-tick">
-                <path d={`M${sx(v).toFixed(1)},${floor} L${sx(v).toFixed(1)},${floor + 4}`} />
-                <text x={sx(v).toFixed(1)} y={floor + 14} textAnchor="middle">{tickLabel(v)}</text>
+                <path d={`M${sx(v).toFixed(1)},${base.toFixed(1)} L${sx(v).toFixed(1)},${(base + 4).toFixed(1)}`} />
+                <text x={sx(v).toFixed(1)} y={(base + 14).toFixed(1)} textAnchor="middle">{tickLabel(v)}</text>
               </g>
             ))}
             {yt.map((v) => (
               <g key={`y${v}`} className="eng-tick">
-                <path d={`M${pad - 4},${sy(v).toFixed(1)} L${pad},${sy(v).toFixed(1)}`} />
-                <text x={pad - 7} y={(sy(v) + 3).toFixed(1)} textAnchor="end">{tickLabel(v)}</text>
+                <path d={`M${(left - 4).toFixed(1)},${sy(v).toFixed(1)} L${left.toFixed(1)},${sy(v).toFixed(1)}`} />
+                <text x={(left - 7).toFixed(1)} y={(sy(v) + 3).toFixed(1)} textAnchor="end">{tickLabel(v)}</text>
               </g>
             ))}
             {nameOf(0) && (
-              <text className="eng-axis" x={a.W - pad} y={floor + 24} textAnchor="end">{nameOf(0)}</text>
+              <text className="eng-axis" x={right.toFixed(1)} y={(base + 24).toFixed(1)} textAnchor="end">{nameOf(0)}</text>
             )}
             {nameOf(1) && (
-              <text className="eng-axis" x={pad + 6} y={pad - 8} textAnchor="start">{nameOf(1)}</text>
+              <text className="eng-axis" x={(left + 6).toFixed(1)} y={(top - 8).toFixed(1)} textAnchor="start">{nameOf(1)}</text>
             )}
           </g>
         ));
@@ -673,6 +778,42 @@ export function ModelView({
 
         switch (prim.p) {
           case 'mesh': {
+            // A FIELD, FLAT, IS ITS COLOUR: one sample a pixel, and a scale that says what the colours are
+            if (flat && prim.fill && prim.scalar) {
+              const img = heatImage(prim);
+              if (img) {
+                const tl = at({ x: img.x[0], y: img.y[1], z: 0 });
+                const br = at({ x: img.x[1], y: img.y[0], z: 0 });
+                put(-1, (
+                  <g key={`m${pi}`} data-obj={prim.of} opacity={dim ? 0.4 : 1}>
+                    <image href={img.href} x={tl.x.toFixed(1)} y={tl.y.toFixed(1)} width={Math.max(1, br.x - tl.x).toFixed(1)} height={Math.max(1, br.y - tl.y).toFixed(1)} preserveAspectRatio="none" />
+                  </g>
+                ));
+                // THE SCALE, IN THE TOP MARGIN — above the picture, never over it: name, low end, colours, high end
+                const bw = 84;
+                const loT = scaleEnd(img.lo, img.hi - img.lo);
+                const hiT = scaleEnd(img.hi, img.hi - img.lo);
+                const cy = Math.max(10, pad / 2);
+                const xHi = a.W - pad;
+                const barR = xHi - hiT.length * 5.2 - 5;
+                const barL = barR - bw;
+                const xLo = barL - 4;
+                const xName = xLo - loT.length * 5.2 - 9;
+                const stops = (img.diverging ? DIVERGING : VIRIDIS).map((c, i, all) => <stop key={i} offset={`${(100 * i) / (all.length - 1)}%`} stopColor={c} />);
+                put(-1e9, (
+                  <g key={`cb${pi}`} className="eng-colorbar" style={{ pointerEvents: 'none' }}>
+                    <defs>
+                      <linearGradient id={`${frameId}-cbg-${pi}`} x1="0" x2="1" y1="0" y2="0">{stops}</linearGradient>
+                    </defs>
+                    <text x={xName} y={cy + 3} textAnchor="end" className="eng-axis">{nameOf(2) || 'value'}</text>
+                    <text x={xLo} y={cy + 3} textAnchor="end" className="eng-tick-label">{loT}</text>
+                    <rect x={barL} y={cy - 4} width={bw} height={8} fill={`url(#${frameId}-cbg-${pi})`} />
+                    <text x={barR + 5} y={cy + 3} textAnchor="start" className="eng-tick-label">{hiT}</text>
+                  </g>
+                ));
+                break;
+              }
+            }
             // FLATTENED, A SURFACE IS ITS LEVEL SETS. Not a wireframe seen
             // from above, which is a grid; the contours are what a surface
             // means in the plane, and they are computed from the same rows.

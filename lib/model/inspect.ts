@@ -40,6 +40,7 @@ import { freeInputs, symbolTable, withoutDomain, type Supply } from './symbols';
 import { DOMAIN_FROM_SAYS } from './kinds';
 import { inputsOf } from './derive';
 import { runFor } from './system';
+import { pdeRunFor } from './pde';
 import { viewsFor, unavailable, worth } from './views';
 
 /** One fact, with where it came from attached rather than implied. */
@@ -453,6 +454,21 @@ export function inspectObject(model: Model, id: string): Inspection | null {
           facts.push({ label: 'How', value: `${b.how}; ${b.lyapunov.method}`, of: o.id });
         }
         sections.push(section('behaviour', 'How it behaves', b.fixed.length ? `${b.fixed.length} fixed point${b.fixed.length === 1 ? '' : 's'}` : b.autonomous ? 'no fixed point found' : 'driven by time', facts));
+      }
+    }
+
+    // HOW A FIELD CHECKED ITSELF — conservation, the exact series where one exists — and what the engine chose
+    if (o.pde) {
+      const got = pdeRunFor(model, o);
+      if (got.ok) {
+        const r = got.run;
+        const facts: Fact[] = [
+          { label: 'Run', value: r.note, of: o.id, fidelity: 'numerically-computed' },
+          ...r.checks.map((c) => ({ label: 'Its own check', value: c.says, of: o.id, fidelity: 'numerically-computed' as Fidelity })),
+          ...r.chose.map((c) => ({ label: 'Chosen by the engine', value: c, of: o.id })),
+        ];
+        if (r.stopped) facts.push({ label: 'Stopped', value: `${r.stopped.why === 'diverged' ? 'the field left the numbers' : 'it reached its step budget'} at t = ${sig(r.stopped.at)}`, of: o.id });
+        sections.push(section('behaviour', 'How it ran', r.checks.length ? `${r.checks.length} check${r.checks.length === 1 ? '' : 's'} on itself` : 'no check of its own applies to this field', facts));
       }
     }
 

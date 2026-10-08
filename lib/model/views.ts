@@ -359,6 +359,27 @@ export function viewsFor(model: Model): ViewSpec[] {
       });
     }
 
+    // ── a quantity spread over space, stepped through time ─────────
+    if (o.pde && RUNS(model, o)) {
+      const line = !o.pde.y;
+      add({
+        id: `field:${o.id}`, family: 'field', label: o.label, of: o.id, dimensionality: 2,
+        variant: line ? 'Over space and time' : 'The field',
+        because: 'a quantity at every point, stepped through time by the field solver',
+        shows: line
+          ? 'the whole run at once: position across, time up, the value as colour — and a line at the clock’s time'
+          : 'the plane at the clock’s time, the value as colour; play the clock to replay the run',
+        fidelity: 'numerically-computed', can: ['select', 'point', 'play'], primary: true,
+      });
+      add({
+        id: `surface:${o.id}`, family: 'surface', label: o.label, of: o.id, dimensionality: 3,
+        variant: line ? 'Surface u(x, t)' : 'Surface u(x, y)',
+        because: 'the same values, as heights',
+        shows: line ? 'the run as a surface over position and time, to turn and read its slopes' : 'the field at the clock’s time as a surface over the plane',
+        fidelity: 'numerically-computed', can: ['select', 'rotate', 'play'],
+      });
+    }
+
     // ── something that evolves ────────────────────────────────────
     if ((o.system || o.kind === 'trajectory') && RUNS(model, o)) {
       const states = o.system?.states.length ?? 0;

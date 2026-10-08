@@ -950,7 +950,20 @@ WHAT TO PUT IN IT, by what they described. These are the blocks that exist, not 
   named quantities changing over time → "system": states, right-hand sides, observables
   something explained by something else → "estimation": the outcome, what explains it, and the data IF THEY GAVE YOU ANY
   quantities that must ALL HOLD AT ONCE → "equations": what to solve for, and the relations that hold between them
+  a quantity at EVERY POINT of a line or a plane, changing in time → "pde": its extent, its species, how each starts, spreads, is carried and reacts, and what its ends or edges do
   a shape or a function            → objects with expressions
+
+A FIELD IS A "pde" BLOCK, and it is the one to reach for when the thing varies over SPACE as well as time: heat along a rod or across a plate, a dye or a pollutant spreading in a channel, a reaction front, a shock in a flow or in traffic, an invading population, spots and stripes on a reacting surface. A "system" cannot hold these — its states change in time only.
+     {"id": "rod", "kind": "field", "label": "Temperature along the rod",
+      "pde": {"x": [0, 0.5], "n": 100,
+              "species": [{"name": "temp", "init": "tcold", "D": "alpha", "units": "°C"}],
+              "left": {"value": "thot"}, "right": {"flux": 0}, "tEnd": 7200}}
+  - ON A LINE: "x" only. Each species has "init" (an expression in x and the parameters), "D" (its diffusivity; leave it out for one that does not spread) and, for something CARRIED, "flux" — the F(u) in u_t + F(u)_x = …: "c*u" for a current, "u^2/2" for Burgers. "react" gives each species' rate in the species, x, t and the parameters: {"u": "r*u*(1 - u)"}.
+  - EVERY END MUST BE STATED for a species that spreads or is carried: {"value": …} holds it there (a number, a parameter, or an expression in t), {"flux": …} lets that much in (0 is INSULATED). Or "periodic": true for a ring. The engine refuses an end nobody stated rather than assume one — so state both.
+  - ON A PLANE: give "y" as well, and "edges": "periodic", "insulated" or "held" (held edges need each species' "edge" value). A plane is stepped by diffusion and reaction; transport ("flux") is for a line only. "show" names the species to draw when there are two; "dt" is the step if you need one (forward Euler is stable only below h²/(4D), and the engine refuses a step above that).
+  - NAMES ARE READ WITHOUT REGARD TO CASE: never call a species x, y or t — so not T for a temperature (that is t, time); use temp or theta.
+  - "tEnd" is how long to run. Leave it out and it runs to the end of "time", or for one diffusion time L²/D, and says so. Give "time" too, so the person can scrub it: {"t": 0, "min": 0, "max": tEnd}.
+  - The engine draws a line's whole history at once — position across, time up, the value as colour — or a plane at the clock's time, and checks itself: what a closed field holds is conserved, and a rod with plain ends is compared with its exact Fourier series. Tell the person what it checked.
 
 A SPECIFICATION WITH COEFFICIENT VALUES IS COMPUTABLE, EVEN WITH NO DATA AT ALL. If they give you values — "set β₁ to 2.5 and β₂ to 1.2 and show me how it behaves" — the simplest correct form is the NUMBERS THEMSELVES in "coefficients", keyed by the regressor's own name plus "intercept" for β₀:
 

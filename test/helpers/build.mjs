@@ -100,6 +100,7 @@ const MODULES = [
   'lib/model/viewdata.ts',
   'lib/model/phase.ts',
   'lib/model/engineering.ts',
+  'lib/model/pde.ts',
   'lib/model/inspect.ts',
   'lib/model/algebra.ts',
   'lib/model/equations.ts',

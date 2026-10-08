@@ -137,6 +137,29 @@ export function referencesOf(o: ModelObject): Set<string> {
     add(o.gravity.softening);
   }
 
+  // A field: how each species starts and spreads, what carries it, how it
+  // reacts, what its ends or edges hold, and how long it runs. The species are
+  // references in their own right, as a system's states are.
+  if (o.pde) {
+    for (const sp of o.pde.species ?? []) {
+      out.add(sp.name.toLowerCase());
+      add(sp.init);
+      add(sp.D);
+      add(sp.flux);
+      add(sp.edge);
+      for (const e of [sp.left, sp.right]) {
+        add(e?.value);
+        add(e?.flux);
+      }
+    }
+    for (const r of Object.values(o.pde.react ?? {})) add(r);
+    for (const e of [o.pde.left, o.pde.right]) {
+      add(e?.value);
+      add(e?.flux);
+    }
+    add(o.pde.tEnd);
+  }
+
   // A SYSTEM OF EQUATIONS refers to everything its relations mention, and to
   // its own unknowns. Without this a control appearing only inside the
   // relations reached nothing: verified, changing the tax in a market with a
@@ -222,7 +245,7 @@ export function affectedBy(model: Model, ids: readonly string[]): string[] {
   if (lower.includes('t')) {
     for (const o of model.objects) {
       const clocked =
-        !!o.system || !!o.mechanism || !!o.gravity || o.kind === 'trajectory' ||
+        !!o.system || !!o.mechanism || !!o.gravity || !!o.pde || o.kind === 'trajectory' ||
         typeof o.meta?.mech === 'string' || typeof o.meta?.gravity === 'string' ||
         (typeof o.meta?.of === 'string' && model.objects.some((c) => c.id === o.meta?.of && (!!c.system || !!c.mechanism || !!c.gravity)));
       if (clocked && !out.has(o.id)) {

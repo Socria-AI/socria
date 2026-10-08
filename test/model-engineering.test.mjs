@@ -2,7 +2,8 @@
 // builds, and every number its check states is held here to the closed form
 // it claims to match. If one of these fails, the docs are saying something the
 // engine does not do.
-import { ENGINEERING, SCENE_EXAMPLES, curveAt, curveExtremes, stateAt, stateMax, runEnd, withParam } from './.tmp/engineering.mjs';
+import { ENGINEERING, SCENE_EXAMPLES, curveAt, curveExtremes, stateAt, stateMax, runEnd, withParam, fieldRun, frontSpeed } from './.tmp/engineering.mjs';
+import { heatSeries } from './.tmp/fields.mjs';
 import { buildProposal } from './.tmp/propose.mjs';
 import { readScene } from './.tmp/scene-intent.mjs';
 import { SCENE, massOf, sceneMass } from './.tmp/scene.mjs';
@@ -118,6 +119,41 @@ console.log('=== control ===');
   const pi = ex('pi-motor').check(M('pi-motor'));
   ok('PI: rest at the target speed, with z* = bω_ref/(K·K_i)', /stable node at \(100, 4\)/.test(pi), pi);
   ok('… and the run gets there', rel(stateAt(M('pi-motor'), 'w', 4.99), 100, 1e-4));
+}
+
+console.log('=== fields: a rod, a shock, a front and a pattern ===');
+{
+  const rod = M('rod');
+  const run = fieldRun(rod);
+  const end = run.u[0].at(-1).at(-1);
+  const ref = heatSeries(() => 20, 0, 0.5, 1.2e-5, { left: 100, right: 'insulated' }, 400, 4000)(0.5, 7200);
+  ok('rod: the insulated end after two hours, against the quarter-wave series (Atlas benchmark 25)', rel(end, ref, 1e-4), `${end} vs ${ref}`);
+  ok('rod: the run states its own check against the series, and it is small', run.checks.some((c) => /series/.test(c.what) && c.value < 1e-3));
+  const cu = withParam(rod, 'alpha', 1.1e-4);
+  ok('rod: copper’s diffusivity heats the far end far sooner', fieldRun(cu).u[0].at(-1).at(-1) > end + 30);
+  const sh = fieldRun(M('shock'));
+  const grad = (k) => Math.max(...sh.u[0][k].map((v, i, u) => Math.abs(u[(i + 1) % u.length] - v))) / (sh.x[1] - sh.x[0]);
+  ok('shock: it steepens — the steepest slope grows twentyfold by t = 0.3', grad(30) > 20 * grad(0), `${grad(0)} → ${grad(30)}`);
+  ok('shock: on a ring ∫u dx is kept to round-off', sh.checks.some((c) => /∫u/.test(c.what) && c.value < 1e-12));
+  const fr = M('front');
+  const v = frontSpeed(fieldRun(fr));
+  ok('front: Fisher’s speed 2√(rD), approached from below', v > 1.9 && v < 2, v);
+  // At every corner the controls reach, the front stays at least two cells wide. Its speed stays below 2√(rD), and
+  // within 5% of Bramson's: x(t) = c*·t − (3/2)√(D/r)·ln t, so over the window measured the mean speed lags c* by
+  // (3/2)√(D/r)·ln(t₂/t₁)/(t₂ − t₁).
+  for (const [D, r] of [[2, 2], [0.5, 2], [2, 0.5], [0.5, 0.5]]) {
+    const run = fieldRun(withParam(withParam(fr, 'D', D), 'r', r));
+    const s2 = frontSpeed(run);
+    const c = 2 * Math.sqrt(D * r);
+    const L = 100;
+    const t1 = (0.3 * L) / c, t2 = (0.8 * L) / c;
+    const bramson = c - (1.5 * Math.sqrt(D / r) * Math.log(t2 / t1)) / (t2 - t1);
+    ok(`front at D = ${D}, r = ${r}: below 2√(rD) = ${c}, within 5% of Bramson's ${bramson.toFixed(3)}`, s2 < c && Math.abs(s2 - bramson) < 0.05 * bramson, s2);
+  }
+  const gs = fieldRun(M('patterns'));
+  const share = (k) => gs.u[1][k].filter((x) => x > 0.1).length / gs.u[1][k].length;
+  ok('patterns: v spreads from a 1.6% seed over more than a quarter of the plane', share(0) < 0.02 && share(gs.t.length - 1) > 0.25, share(gs.t.length - 1));
+  ok('patterns: the run is a plane of 64 × 64 cells, its frames kept for the clock', gs.dim === 2 && gs.x.length === 64 && gs.y.length === 64 && gs.t.length === 31);
 }
 
 console.log('=== Live 3D examples read as written, and measure ===');

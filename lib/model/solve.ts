@@ -41,6 +41,7 @@ import { readGravity } from './gravity';
 import { readMechanism } from './mechanism';
 import { expressionOf, marginalOf } from './derive';
 import { readSystem, type Missing } from './system';
+import { readPde } from './pde';
 import { COORDINATES, sampledOver, type Fidelity, type Model, type ModelObject } from './schema';
 
 /**
@@ -169,7 +170,7 @@ export const SAMPLING: Solver = {
   // nothing draws a region yet. Three true statements and one picture that
   // contradicted all of them. The kinds nothing draws are unsupported, and
   // the router says so (the fall-through below).
-  handles: (_m, o) => ['surface', 'volume', 'curve', 'line', 'ray', 'field'].includes(o.kind),
+  handles: (_m, o) => ['surface', 'volume', 'curve', 'line', 'ray', 'field'].includes(o.kind) && !o.pde,
   requires: (m, o) => {
     // A FIELD IS ITS COMPONENTS. `definition` alone is not a field, and the
     // compiler refuses one without fx and fy — so the router must too.
@@ -311,6 +312,25 @@ export const SAMPLING: Solver = {
     return gaps;
   },
   checkedAgainst: 'known closed forms for the benchmark surfaces (test/model-engine)',
+};
+
+export const FIELD: Solver = {
+  does: ['simulate'],
+  id: 'field',
+  label: 'Field solver',
+  kind: 'pde',
+  produces: 'numerically-computed',
+  method:
+    'steps a quantity spread over space: along a line, Crank–Nicolson diffusion with Rusanov transport and the reaction by Heun in Strang-split half steps; across a plane, forward Euler with the five-point Laplacian, refusing a step above its stability bound (lib/model/pde.ts, lib/numeric/fields.ts)',
+  // A FIELD IS ITS DECLARATION. Kind does not decide it: a `pde` block on a
+  // system, a field or a series is the same field, and nothing else claims it.
+  handles: (_m, o) => !!o.pde,
+  requires: (m, o) => {
+    const read = readPde(m, o);
+    return read.ok ? [] : read.missing;
+  },
+  checkedAgainst:
+    'exact Fourier series for a rod held or insulated, conservation on closed lines and planes, a pulse round a ring, Burgers’ shock speed, a Fisher front and the discrete decay of a periodic mode (test/numeric-fields, test/model-pde)',
 };
 
 export const ODE: Solver = {
@@ -464,7 +484,7 @@ export const CALCULUS: Solver = {
   produces: 'model-derived',
   method:
     'parses the expression into a tree and applies the derivative rules to it — exact where a derivative exists, and refused by name where one does not, which is the case for floor, sign, round, a remainder and the two-argument functions (lib/model/expr.ts)',
-  handles: (_m, o) => !!expressionOf(o) && !!o.over,
+  handles: (_m, o) => !!expressionOf(o) && !!o.over && !o.pde,
   requires: (m, o) => {
     const axes = ['x', 'y', 'z'].filter((k) => !!o.over?.[k]);
     const bad: Missing[] = [];
@@ -581,13 +601,13 @@ export const FUTURE: Solver[] = [
   },
   {
     does: ['simulate'],
-    id: 'pde',
-    label: 'Field solver',
+    id: 'fem',
+    label: 'Finite elements over a mesh',
     kind: 'pde',
     produces: 'numerically-computed',
-    method: 'would solve a partial differential equation over a mesh',
-    handles: (_m, o) => o.kind === 'field' && !!o.defs?.pde,
-    requires: () => [{ what: 'a PDE backend and a mesh', unlocks: 'heat, waves, flow and fields evolving in space as well as time' }],
+    method: 'would solve a partial differential equation — waves, elasticity, flow — over an unstructured mesh',
+    handles: (_m, o) => o.kind === 'mesh',
+    requires: () => [{ what: 'a finite-element backend and a mesh', unlocks: 'waves, stress in a part and flow around a shape — fields on a line or a rectangle are the field solver’s' }],
     future: true,
   },
 ];
@@ -608,7 +628,7 @@ export const FUTURE: Solver[] = [
 // build report read "Symbolic differentiator runs spec__response" for a surface
 // that the sampler had evaluated. Differentiating a relationship is a secondary
 // thing to do with it; working out what it says is the primary one.
-export const SOLVERS: Solver[] = [ALGEBRA, GRAVITY, ASSEMBLY, ODE, ESTIMATION, DATA, SAMPLING, CALCULUS, ...FUTURE];
+export const SOLVERS: Solver[] = [ALGEBRA, GRAVITY, ASSEMBLY, FIELD, ODE, ESTIMATION, DATA, SAMPLING, CALCULUS, ...FUTURE];
 
 // ── routing ─────────────────────────────────────────────────────────
 
@@ -852,7 +872,8 @@ export function statedFormally(model: Model): ModelObject[] {
       !!o.mechanism ||
       !!o.estimation ||
       !!o.gravity ||
-      !!o.equations
+      !!o.equations ||
+      !!o.pde
   );
 }
 
@@ -885,7 +906,7 @@ export function capabilityOf(model: Model): Capability {
     runnable.filter((o) => SOLVERS.find((s) => s.id === o.solver)?.kind === kind);
 
   const stated = statedFormally(model);
-  const dynamic = [...by('ode'), ...by('assembly')];
+  const dynamic = [...by('ode'), ...by('assembly'), ...by('pde')];
   const grounded = by('estimation').length
     ? by('estimation')
     : by('data').filter((o) => {
@@ -927,7 +948,7 @@ export function capabilityOf(model: Model): Capability {
     });
   }
   if (at < LEVELS.indexOf('dynamic')) {
-    short.push({ level: 'dynamic', missing: 'no system of differential equations and no mechanism to assemble one from' });
+    short.push({ level: 'dynamic', missing: 'no system of differential equations, no mechanism to assemble one from, and no field to step' });
   }
   if (at < LEVELS.indexOf('data-grounded')) {
     short.push({ level: 'data-grounded', missing: 'no object is attached to a data block or a fitted specification' });

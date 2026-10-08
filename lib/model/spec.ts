@@ -22,6 +22,7 @@ import { buildModel, buildObject, figureOf, type Built } from './compile';
 import { viewsFor, type ViewFamily } from './views';
 import { unpack } from './unpack';
 import { runFor, seriesOf } from './system';
+import { shownSpecies } from './pde';
 import { byKind, overallFidelity, worstFidelity, type Fidelity, type Model, type ModelObject } from './schema';
 import { unitOf, unitOfObject, withUnit } from './units';
 import { primaryView } from './views';
@@ -145,6 +146,12 @@ export interface VisualizationSpec {
   /** whether the box was made cubic; see Model.aspect */
   aspect: 'equal' | 'fit';
   /**
+   * Flat, drawn TO SCALE: one unit across is one unit up on the page. A map of
+   * a plane — a field over x and y — is a picture of a place, and stretching
+   * it to the frame would draw a square as a strip.
+   */
+  toScale?: boolean;
+  /**
    * Secondary views OF THE SAME COMPUTED STATE.
    *
    * THE POINT IS THE WORD 'same'. A mechanism beside a displacement-against-time
@@ -219,7 +226,9 @@ export function aspectOf(model: Model): 'equal' | 'fit' {
   // them unreadable while saying nothing true about either. Equal scales are for
   // pictures where a length is a length.
   const relations = model.objects.some((o) => !!o.equations);
-  return graph || relations ? 'fit' : 'equal';
+  // a field along a line is drawn as position against time; across a plane it is a map, and a length is a length
+  const history = model.objects.some((o) => !!o.pde && !o.pde.y);
+  return graph || relations || history ? 'fit' : 'equal';
 }
 
 /** The box made cubic about its own centre, for geometry. */
@@ -303,6 +312,7 @@ export function buildSpec(
     primitives,
     box: aspect === 'equal' ? equalise(box) : box,
     aspect,
+    ...(dimensionality === 2 && model.objects.some((o) => !!o.pde?.y && (!opts?.only || opts.only.includes(o.id))) ? { toScale: true } : {}),
     axisNames: axisNamesFor(model),
     layers,
     ...(model.time
@@ -361,6 +371,13 @@ function axisNamesFor(model: Model): [string, string, string] {
     // (lib/model/units.ts). A shape sampled over a parameter (a torus over s
     // and u) has coordinate axes, and keeps the letters.
     const o = drawnObject(model);
+    if (o?.pde) {
+      const sp = o.pde.species[shownSpecies(o)];
+      const value = withUnit(sp?.name ?? 'u', sp?.units ?? unitOf(model, sp?.name ?? ''));
+      return o.pde.y
+        ? [withUnit('x', unitOf(model, 'x')), withUnit('y', unitOf(model, 'y')), value]
+        : [withUnit('x', unitOf(model, 'x')), withUnit('t', model.time?.units ?? unitOf(model, 't')), value];
+    }
     if (o) {
       const graph = !!(o.defs?.z || o.defs?.f || o.definition || o.meta?.axes);
       if (graph) {
@@ -497,6 +514,23 @@ export function chooseRepresentation(model: Model): Choice {
 
   const has = (...k: Parameters<typeof byKind>[1][]) => byKind(model, ...k).length > 0;
   const count = (k: Parameters<typeof byKind>[1]) => byKind(model, k).length;
+
+  // A FIELD IS SEEN FLAT FIRST: along a line, the whole history at once —
+  // position across, time up, the value as colour; across a plane, the plane at
+  // the clock's time. Either can be turned into its surface; the plane is what
+  // is read.
+  const field = model.objects.find((o) => !!o.pde);
+  if (field) {
+    const line = !field.pde!.y;
+    return {
+      kind: 'field',
+      dimensionality: 2,
+      why: line
+        ? 'a quantity along a line, through time: position across, time up and the value as colour shows the whole run at once'
+        : 'a quantity over a plane: the plane, coloured by the value, at the clock’s time',
+      alternatives: ['surface3d', 'timeline'],
+    };
+  }
 
   // A graph of relationships is a graph. Putting a dependency structure in a
   // perspective box makes the edges cross more, not less.

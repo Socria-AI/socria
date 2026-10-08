@@ -558,7 +558,10 @@ export function transport1D(
  *   ends held at a and b: the straight line between them plus a sine series,
  *     u = s(x) + Σ bₘ e^{−D(mπ/L)²t} sin(mπ(x−x₀)/L), bₘ = (2/L)∫(u₀ − s) sin(…);
  *   both ends insulated: a cosine series about the mean,
- *     u = a₀ + Σ aₘ e^{−D(mπ/L)²t} cos(mπ(x−x₀)/L).
+ *     u = a₀ + Σ aₘ e^{−D(mπ/L)²t} cos(mπ(x−x₀)/L);
+ *   one end held at a value and the other insulated: quarter-wave modes about
+ *     that value, λₘ = (m − ½)π/L — sin(λₘ(x−x₀)) held on the left,
+ *     cos(λₘ(x−x₀)) held on the right.
  * The coefficients by Simpson's rule on the initial condition.
  */
 export function heatSeries(
@@ -566,24 +569,42 @@ export function heatSeries(
   x0: number,
   x1: number,
   D: number,
-  ends: { left: number; right: number } | 'insulated',
+  ends: { left: number | 'insulated'; right: number | 'insulated' } | 'insulated',
   modes = 200,
   quad = 4000
 ): (x: number, t: number) => number {
   const L = x1 - x0;
   const q = quad % 2 ? quad + 1 : quad;
   const h = L / q;
+  // the starting field is sampled once on the quadrature points, not once per mode
+  const xq = Array.from({ length: q + 1 }, (_, i) => x0 + i * h);
+  const u0q = xq.map(u0);
+  const at0 = new Map(xq.map((x, i) => [x, u0q[i]]));
+  const start = u0;
+  u0 = (x: number) => at0.get(x) ?? start(x);
   const simpson = (f: (x: number) => number) => {
     let s = 0;
-    for (let i = 0; i <= q; i++) s += (i === 0 || i === q ? 1 : i % 2 ? 4 : 2) * f(x0 + i * h);
+    for (let i = 0; i <= q; i++) s += (i === 0 || i === q ? 1 : i % 2 ? 4 : 2) * f(xq[i]);
     return (s * h) / 3;
   };
+  if (ends !== 'insulated' && ends.left === 'insulated' && ends.right === 'insulated') ends = 'insulated';
+  if (ends !== 'insulated' && (ends.left === 'insulated') !== (ends.right === 'insulated')) {
+    // one end held, the other insulated: quarter-wave modes about the held value
+    const heldLeft = ends.left !== 'insulated';
+    const a = (heldLeft ? ends.left : ends.right) as number;
+    const lam = (j: number) => ((j + 0.5) * Math.PI) / L;
+    const mode = (j: number, x: number) => (heldLeft ? Math.sin(lam(j) * (x - x0)) : Math.cos(lam(j) * (x - x0)));
+    const c = Array.from({ length: modes }, (_, j) => (2 / L) * simpson((x) => (u0(x) - a) * mode(j, x)));
+    return (x, t) => c.reduce((acc, cm, j) => acc + cm * Math.exp(-D * lam(j) ** 2 * t) * mode(j, x), a);
+  }
   if (ends === 'insulated') {
     const a0 = simpson(u0) / L;
     const a = Array.from({ length: modes }, (_, j) => ((2 / L) * simpson((x) => u0(x) * Math.cos(((j + 1) * Math.PI * (x - x0)) / L))));
     return (x, t) => a.reduce((acc, am, j) => acc + am * Math.exp(-D * (((j + 1) * Math.PI) / L) ** 2 * t) * Math.cos(((j + 1) * Math.PI * (x - x0)) / L), a0);
   }
-  const s = (x: number) => ends.left + ((ends.right - ends.left) * (x - x0)) / L;
+  const lv = ends.left as number;
+  const rv = ends.right as number;
+  const s = (x: number) => lv + ((rv - lv) * (x - x0)) / L;
   const b = Array.from({ length: modes }, (_, j) => ((2 / L) * simpson((x) => (u0(x) - s(x)) * Math.sin(((j + 1) * Math.PI * (x - x0)) / L))));
   return (x, t) => b.reduce((acc, bm, j) => acc + bm * Math.exp(-D * (((j + 1) * Math.PI) / L) ** 2 * t) * Math.sin(((j + 1) * Math.PI * (x - x0)) / L), s(x));
 }

@@ -162,9 +162,12 @@ export function Logos3Engineering() {
         </Def>
         <Def term="Views to open">
           A model offers what its structure supports: a curve its <em>Slope</em> and <em>Values</em>; a system its{' '}
-          <em>Path</em>, <em>Phase portrait</em> and <em>Against time</em>; a mechanism its <em>Mechanism</em>. The Inspector’s{' '}
-          <em>How it behaves</em> lists a system’s fixed points with their eigenvalues and, where it applies, Lyapunov
-          exponents. See <Link href="/docs/logos-2">Logos 2</Link> for the views in detail.
+          <em>Path</em>, <em>Phase portrait</em> and <em>Against time</em>; a mechanism its <em>Mechanism</em>; a field
+          along a line <em>Over space and time</em> — position across, time up, the value as colour — and across a plane{' '}
+          <em>The field</em> at the clock’s time, each with its <em>Surface</em>. The Inspector’s <em>How it behaves</em>{' '}
+          lists a system’s fixed points with their eigenvalues and, where it applies, Lyapunov exponents; for a field,{' '}
+          <em>How it ran</em> gives the checks it made on itself. See <Link href="/docs/logos-2">Logos 2</Link> for the
+          views in detail.
         </Def>
       </Defs>
       <Callout tag="Previews and formulas, not certification">
@@ -210,9 +213,9 @@ export function Logos3Engineering() {
       <H2 id="limits">Where it stops</H2>
       <ul>
         <li>
-          <strong>No finite elements, no CFD.</strong> Stress fields in a part, flow around a wing, heat moving through a
-          solid in two or three dimensions — none of these is computed. The models here are closed forms and ordinary
-          differential equations.
+          <strong>No finite elements, no CFD.</strong> Fields are computed on a line — heat, diffusion, reaction and
+          transport — and on a rectangle, by diffusion and reaction. Stress in a part, flow around a wing, and heat
+          through a solid of any real shape are not: there is no mesh of a part and no Navier–Stokes solver.
         </li>
         <li>
           <strong>Coefficients are inputs.</strong> A friction factor, a lift coefficient, a heat-transfer coefficient:

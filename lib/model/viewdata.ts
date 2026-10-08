@@ -91,6 +91,10 @@ export function frameFor(model: Model, id: string): VisualizationSpec | null {
   if (!v || !v.marks || !RENDERED.has(v.family)) return null;
   const o = (v.of ? model.objects.find((x) => x.id === v.of) : null) ?? null;
 
+  // A FIELD, FLAT OR AS HEIGHTS: the same run, and the view says which way it is seen
+  if (o?.pde && (v.family === 'field' || v.family === 'surface')) {
+    return buildSpec(model, { only: [o.id], view: v.family === 'surface' ? '3d' : '2d' });
+  }
   if (v.family === 'residual' && o) return residualFrame(model, o);
   if (v.family === 'phase' && o) return phaseFrame(model, o);
   if (v.family === 'interval' && o) return intervalFrame(model, o);

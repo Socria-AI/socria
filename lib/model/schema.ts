@@ -260,6 +260,17 @@ export interface ModelObject {
    * crossing — all of them are this, and all of them came back `unsupported`.
    */
   equations?: EquationsDecl;
+  /**
+   * A QUANTITY OVER SPACE AS WELL AS TIME — see pde.ts.
+   *
+   * Heat along a rod, a dye spreading through a channel, a front of an
+   * invading species, a shock in traffic, spots and stripes on a reacting
+   * plane: each is a field u(x, t) — or u(x, y, t) — stepped by diffusion,
+   * transport and reaction, with what happens at its ends or edges stated. A
+   * `system` is states that change in time only; this is the declaration for
+   * states that are spread over space.
+   */
+  pde?: PdeDecl;
 
   /** anything a domain wants to carry that the engine must not interpret */
   meta?: Record<string, string | number | boolean>;
@@ -307,6 +318,56 @@ export interface SystemDecl {
   /** a quantity that ought not to change, for the integrator to be judged by */
   invariant?: string;
   method?: 'rk4';
+}
+
+/** An end of a line: a value held there, or a flux into the domain through it (0 is insulated). Either may be an expression in t. */
+export interface PdeEndDecl {
+  value?: number | string;
+  flux?: number | string;
+}
+
+/** One quantity a field carries: a temperature, a concentration, a density. */
+export interface PdeSpeciesDecl {
+  name: string;
+  /**
+   * The starting field — an expression in x (and y) and the parameters — OR
+   * ABSENT, which is refused rather than read as zero: a field nobody started
+   * is not a field that starts flat.
+   */
+  init?: number | string;
+  /** diffusivity, a number or an expression in the parameters (on a line it may vary with x); absent, it does not spread */
+  D?: number | string;
+  /** on a line: the flux it is carried by, F(u) — `c*u` for a current, `u^2/2` for Burgers' equation */
+  flux?: string;
+  /** on a line, this species' own ends, where they differ from the block's */
+  left?: PdeEndDecl;
+  right?: PdeEndDecl;
+  /** on a plane whose edges are held: the value held there */
+  edge?: number | string;
+  units?: string;
+  means?: string;
+}
+
+export interface PdeDecl {
+  /** the extent along x; a second extent `y` makes it a plane */
+  x: [number, number];
+  y?: [number, number];
+  /** grid intervals per side */
+  n?: number;
+  species: PdeSpeciesDecl[];
+  /** each species' rate of reaction or source, in the species, x, (y), t and the parameters */
+  react?: Record<string, string>;
+  /** on a line: what happens at each end — unless the line is a ring */
+  left?: PdeEndDecl;
+  right?: PdeEndDecl;
+  periodic?: boolean;
+  /** on a plane: what happens at its edges */
+  edges?: 'periodic' | 'insulated' | 'held';
+  /** how long to run; absent, the model's clock, then one diffusion time, and said */
+  tEnd?: number | string;
+  dt?: number;
+  /** which species the picture shows; the first, if not said */
+  show?: string;
 }
 
 export interface BodyDecl {
@@ -880,6 +941,10 @@ export const MODEL_CAPS = {
   regressors: 20,
   /** keys in `defs`, `over`, `meta` and `depends` */
   keys: 16,
+  /** species one field may carry — lib/model/pde.ts runs at most this many */
+  fieldSpecies: 4,
+  /** species the sanitiser keeps, above the run cap, so too many is refused with its true count */
+  fieldSpeciesKept: 8,
 } as const;
 
 /**
@@ -1098,6 +1163,88 @@ export function sanitizeObject(
         ...(Object.keys(observe).length ? { observe } : {}),
         ...(expr(sys.invariant) ? { invariant: expr(sys.invariant) } : {}),
         method: 'rk4',
+      };
+    }
+  }
+
+  // A FIELD: its extent, its species and how each starts, spreads, is carried
+  // and reacts, and what happens at its ends or edges. Nothing here is
+  // defaulted — an end not stated is left unstated, for pde.ts to refuse by
+  // name — and the species are kept past the solver's cap so a field with too
+  // many is refused with its true count rather than run as a smaller one.
+  const pde = r.pde as Record<string, unknown> | undefined;
+  if (pde && typeof pde === 'object' && Array.isArray(pde.species)) {
+    const span = (v: unknown): [number, number] | null => {
+      if (!Array.isArray(v) || v.length !== 2) return null;
+      const a = num(v[0]);
+      const b = num(v[1]);
+      return a !== null && b !== null && b > a ? [a, b] : null;
+    };
+    const end = (v: unknown): PdeEndDecl | undefined => {
+      if (!v || typeof v !== 'object') return undefined;
+      const e = v as Record<string, unknown>;
+      const value = initOf(e.value);
+      if (value !== null) return { value };
+      const flux = initOf(e.flux);
+      if (flux !== null) return { flux };
+      return undefined;
+    };
+    const species: PdeSpeciesDecl[] = [];
+    for (const raw of capped(pde.species, MODEL_CAPS.fieldSpeciesKept, `species in ${id}`, drop)) {
+      if (!raw || typeof raw !== 'object') continue;
+      const q = raw as Record<string, unknown>;
+      const name = text(q.name, 24);
+      // A NAME THAT IS x, y OR t IS KEPT, for pde.ts to refuse by name: the grammar reads names without case, so a
+      // temperature called T is time, and dropping it here left a field with nothing in it and no reason given
+      if (!nameOk(name) || collidesWith(species.map((x) => x.name), name)) continue;
+      const init = initOf(q.init);
+      const D = initOf(q.D ?? q.d);
+      const left = end(q.left);
+      const right = end(q.right);
+      const edge = initOf(q.edge);
+      species.push({
+        name,
+        ...(init !== null ? { init } : {}),
+        ...(D !== null ? { D } : {}),
+        ...(expr(q.flux) ? { flux: expr(q.flux) } : {}),
+        ...(left ? { left } : {}),
+        ...(right ? { right } : {}),
+        ...(edge !== null ? { edge } : {}),
+        ...(text(q.units, 24) ? { units: text(q.units, 24) } : {}),
+        ...(text(q.means, 160) ? { means: text(q.means, 160) } : {}),
+      });
+    }
+    const react: Record<string, string> = {};
+    if (pde.react && typeof pde.react === 'object') {
+      for (const [k, v] of capped(Object.entries(pde.react as Record<string, unknown>), MODEL_CAPS.fieldSpeciesKept, `rates in ${id}`, drop)) {
+        const key = text(k, 24);
+        const val = expr(v);
+        if (nameOk(key) && val) react[key] = val;
+      }
+    }
+    const x = span(pde.x);
+    const y = span(pde.y);
+    if (x && species.length) {
+      const n = num(pde.n);
+      const dt = num(pde.dt);
+      const left = end(pde.left);
+      const right = end(pde.right);
+      const tEnd = initOf(pde.tEnd);
+      const edges = typeof pde.edges === 'string' && ['periodic', 'insulated', 'held'].includes(pde.edges) ? (pde.edges as PdeDecl['edges']) : undefined;
+      const show = text(pde.show, 24);
+      out.pde = {
+        x,
+        ...(y ? { y } : {}),
+        ...(n !== null && n >= 1 ? { n: Math.floor(n) } : {}),
+        species,
+        ...(Object.keys(react).length ? { react } : {}),
+        ...(left ? { left } : {}),
+        ...(right ? { right } : {}),
+        ...(pde.periodic === true ? { periodic: true } : {}),
+        ...(edges ? { edges } : {}),
+        ...(tEnd !== null ? { tEnd } : {}),
+        ...(dt !== null && dt > 0 ? { dt } : {}),
+        ...(show && species.some((sp) => sp.name.toLowerCase() === show.toLowerCase()) ? { show } : {}),
       };
     }
   }

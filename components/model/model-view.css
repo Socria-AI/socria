@@ -39,9 +39,17 @@
   fill: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.62);
   pointer-events: none;
 }
+/* A field's colour scale: what the colours mean, at the two ends of the range. */
+.eng-tick-label {
+  font-family: var(--sans, system-ui);
+  font-size: 8.5px;
+  font-variant-numeric: tabular-nums;
+  fill: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.62);
+}
 @media (prefers-color-scheme: dark) {
   .eng-tick text { fill: rgba(240, 238, 232, 0.5); }
   .eng-axis { fill: rgba(240, 238, 232, 0.62); }
+  .eng-tick-label { fill: rgba(240, 238, 232, 0.62); }
 }
 
 /* The hit area for a stroke-only mark: wide, transparent, behind the visible

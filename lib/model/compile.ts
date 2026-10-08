@@ -45,6 +45,7 @@ import {
 import { LIMITS, type P3, type Primitive } from './primitives';
 import { sampledOver, type Fidelity, type Model, type ModelObject } from './schema';
 import { runFor, seriesOf, stateAt } from './system';
+import { pdePrimitives, pdeRunFor } from './pde';
 import { operationsOn, route } from './solve';
 import { bindings, known, symbolTable, unbound } from './symbols';
 import { estimate } from './estimate';
@@ -392,6 +393,20 @@ export function buildObject(model: Model, o: ModelObject, opts?: { detail?: numb
   // have an answer. This is the same precedence the representation chooser
   // uses, and the two have to agree or the plane and its contents disagree.
   if (o.equations) return buildFigure(model, o, layer);
+
+  // ── A FIELD, STEPPED OVER SPACE AND TIME ───────────────────────────
+  //
+  // Before the switch for the same reason: the declaration decides, not the
+  // kind. The run is cached against the declaration and the parameters, so a
+  // frame drawn at a new clock time replays it rather than solving again.
+  if (o.pde) {
+    const got = pdeRunFor(model, o);
+    if (!got.ok) {
+      return NOTHING(o, `not computed: ${got.missing.map((m) => m.because ?? m.what).join('; ')} — supplying ${got.missing.length === 1 ? 'it' : 'them'} would let this run`);
+    }
+    const drawn = pdePrimitives(model, o, got.run, layer);
+    return { of: o.id, primitives: drawn.primitives, note: drawn.note, fidelity: 'numerically-computed' };
+  }
 
   switch (o.kind) {
     // ── a surface: z = f(x, y), or r(u, v), or a grid of measurements ──

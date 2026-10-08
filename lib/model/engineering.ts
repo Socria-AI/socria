@@ -20,9 +20,11 @@ import { compileExpr } from '@/lib/logos-math';
 import { scopeOf } from './compile';
 import { behaviourOf } from './phase';
 import { runFor } from './system';
+import { fieldAt, pdeRunFor, type PdeRun } from './pde';
+import { heatSeries } from '@/lib/numeric/fields';
 import { unpack } from './unpack';
 import { circuit, oscillator } from './library';
-import type { Model, ModelObject } from './schema';
+import type { Model, ModelObject, PdeDecl } from './schema';
 
 export type Discipline = 'Engines' | 'Mechanisms and vibration' | 'Electrical' | 'Structures' | 'Thermal and fluids' | 'Aerospace' | 'Chemical and process' | 'Control';
 
@@ -138,6 +140,34 @@ export function restSaid(m: Model): string {
 export const withParam = (m: Model, id: string, value: number): Model => ({ ...m, params: m.params.map((p) => (p.id === id ? { ...p, value } : p)) });
 const pv = (m: Model, id: string) => m.params.find((p) => p.id === id)?.value ?? NaN;
 
+/** The first field in the model, run by the engine. */
+export function fieldRun(m: Model): PdeRun | null {
+  const u = unpack(m);
+  const o = u.objects.find((q) => q.pde);
+  if (!o) return null;
+  const r = pdeRunFor(u, o);
+  return r.ok ? r.run : null;
+}
+
+/** A front's speed while it crosses the middle of its line — from 30% to 80% of the way, past its start and before its end. */
+export function frontSpeed(run: PdeRun, level = 0.5): number {
+  const L0 = run.x[0];
+  const L = run.x[run.x.length - 1] - L0;
+  const pts = run.t.map((t) => ({ t, x: frontAt(run, t, level) })).filter((p) => Number.isFinite(p.x) && p.x > L0 + 0.3 * L && p.x < L0 + 0.8 * L);
+  if (pts.length < 2) return NaN;
+  const a = pts[0];
+  const b = pts[pts.length - 1];
+  return (b.x - a.x) / (b.t - a.t);
+}
+
+/** Where a field along a line first falls below a level — a front's position, interpolated between nodes. */
+export function frontAt(run: PdeRun, t: number, level = 0.5, s = 0): number {
+  const u = fieldAt(run, s, t).u;
+  const i = u.findIndex((v) => v < level);
+  if (i <= 0) return NaN;
+  return run.x[i - 1] + ((u[i - 1] - level) / (u[i - 1] - u[i])) * (run.x[i] - run.x[i - 1]);
+}
+
 // ── a system, written once ──────────────────────────────────────────
 
 function system(o: {
@@ -163,6 +193,19 @@ function system(o: {
     depends: o.depends,
     fidelity: 'numerically-computed',
     provenance: { origin: 'computation', detail: 'RK4 on the stated equations' },
+  } as ModelObject;
+}
+
+function field(o: { id: string; label: string; meaning: string; pde: PdeDecl; depends: string[] }): ModelObject {
+  return {
+    id: o.id,
+    kind: 'field',
+    label: o.label,
+    meaning: o.meaning,
+    pde: o.pde,
+    depends: o.depends,
+    fidelity: 'numerically-computed',
+    provenance: { origin: 'computation', detail: 'the field solver on the stated equations' },
   } as ModelObject;
 }
 
@@ -582,6 +625,45 @@ export const ENGINEERING: EngineeringExample[] = [
     },
   },
   {
+    id: 'rod',
+    discipline: 'Thermal and fluids',
+    title: 'Heat along a rod',
+    ask: 'A steel rod 0.5 m long is at 20 °C. One end is put into boiling water and held at 100 °C; the other end is insulated. How does the heat travel along it over two hours?',
+    builds: 'The heat equation, ∂T/∂t = α ∂²T/∂x², on a line of 101 points: Crank–Nicolson in time, the left end held at 100 °C and the right insulated — a field, stepped over space and time.',
+    look: 'Over space and time: position across, time up, temperature as colour — the warmth creeps along the rod and slows as it goes. The line marks the clock’s time; open the surface to see the same run as heights. For these ends the exact series is known, and the run says how close it comes.',
+    model: () => ({
+      id: 'rod',
+      title: 'Heat along a rod',
+      domain: 'heat transfer',
+      equations: ['∂T/∂t = α ∂²T/∂x²', 'T(0, t) = T_hot,  ∂T/∂x(L, t) = 0'],
+      assumptions: ['One-dimensional conduction: no heat lost through the rod’s sides. Constant diffusivity α = k/(ρc).'],
+      params: [
+        param('alpha', 'thermal diffusivity', 1.2e-5, 1e-6, 1.2e-4, 'm²/s', 'Steel is about 1.2×10⁻⁵ m²/s; aluminium 9.7×10⁻⁵; copper 1.1×10⁻⁴.', 1e-6),
+        param('thot', 'hot end', 100, 20, 500, '°C', undefined, 1),
+        param('tcold', 'starting temperature', 20, -20, 100, '°C', undefined, 1),
+      ],
+      units: { temp: '°C', x: 'm' },
+      time: { t: 3600, min: 0, max: 7200, rate: 240, units: 's' },
+      objects: [
+        field({
+          id: 'rod',
+          label: 'Temperature along the rod',
+          meaning: 'The temperature at every point of the rod, stepped through time.',
+          pde: { x: [0, 0.5], n: 100, species: [{ name: 'temp', init: 'tcold', D: 'alpha', units: '°C', means: 'temperature' }], left: { value: 'thot' }, right: { flux: 0 }, tEnd: 7200 },
+          depends: ['alpha', 'thot', 'tcold'],
+        }),
+      ],
+    }),
+    check: (m) => {
+      const run = fieldRun(m);
+      if (!run) return 'not computed';
+      const end = fieldAt(run, 0, 7200).u.at(-1)!;
+      const ref = heatSeries(() => pv(m, 'tcold'), 0, 0.5, pv(m, 'alpha'), { left: pv(m, 'thot'), right: 'insulated' }, 200, 2000)(0.5, 7200);
+      const c = run.checks.find((x) => /series/.test(x.what));
+      return `After two hours the insulated end reads ${sig(end, 4)} °C; the exact series says ${sig(ref, 4)} °C. Across the whole run the engine stays within ${sig(100 * (c?.value ?? NaN), 2)}% of the series.`;
+    },
+  },
+  {
     id: 'tank',
     discipline: 'Thermal and fluids',
     title: 'A tank draining',
@@ -648,6 +730,46 @@ export const ENGINEERING: EngineeringExample[] = [
       objects: [curve({ id: 'dp', label: 'pressure drop', meaning: 'Loss along the pipe.', definition: 'f * (len / dia) * rho * v^2 / 2', over: { v: [0, 5] }, depends: ['f', 'len', 'dia', 'rho'], units: 'Pa' })],
     }),
     check: (m) => `At 2 m/s the engine gives ${sig(curveAt(m, 'dp', 2) / 1000, 3)} kPa; at 4 m/s, ${sig(curveAt(m, 'dp', 4) / 1000, 3)} kPa.`,
+  },
+  {
+    id: 'shock',
+    discipline: 'Thermal and fluids',
+    title: 'A shock forming',
+    ask: 'A smooth wave of velocity carries itself: faster parts catch up with slower ones. Show it steepening into a shock, with a little viscosity, on a loop.',
+    builds: 'Burgers’ equation, ∂u/∂t + ∂(u²/2)/∂x = ν ∂²u/∂x², on a ring of 400 points: the transport by Rusanov’s flux, the viscosity by Crank–Nicolson.',
+    look: 'Over space and time, the wave’s leading edge sharpens into a jump and then slowly decays — the viscosity sets how thin the jump is. Nothing leaves a ring, so ∫u dx is kept, and the run says how well.',
+    model: () => ({
+      id: 'shock',
+      title: 'A shock forming in Burgers’ equation',
+      domain: 'gas dynamics',
+      equations: ['∂u/∂t + u ∂u/∂x = ν ∂²u/∂x²'],
+      assumptions: ['One-dimensional; the simplest model of a shock — nonlinear steepening against viscous spreading.'],
+      params: [param('nu', 'viscosity', 0.002, 0.0002, 0.05, 'm²/s', undefined, 0.0002), param('amp', 'amplitude', 1, 0.2, 2, 'm/s', undefined, 0.1)],
+      units: { x: 'm', u: 'm/s' },
+      time: { t: 0.3, min: 0, max: 1, rate: 0.1, units: 's' },
+      objects: [
+        field({
+          id: 'flow',
+          label: 'Velocity on a loop',
+          meaning: 'A velocity field that carries itself, with viscosity.',
+          pde: { x: [0, 1], n: 400, periodic: true, species: [{ name: 'u', init: '0.5 + amp*sin(2*pi*x)', D: 'nu', flux: 'u^2/2', units: 'm/s' }], tEnd: 1 },
+          depends: ['nu', 'amp'],
+        }),
+      ],
+    }),
+    check: (m) => {
+      const run = fieldRun(m);
+      if (!run) return 'not computed';
+      const steepest = (t: number) => {
+        const u = fieldAt(run, 0, t).u;
+        let g = 0;
+        for (let i = 0; i < u.length; i++) g = Math.max(g, Math.abs(u[(i + 1) % u.length] - u[i]) / (run.x[1] - run.x[0]));
+        return g;
+      };
+      const tb = 1 / (2 * Math.PI * pv(m, 'amp'));
+      const c = run.checks.find((x) => /∫u/.test(x.what));
+      return `The steepest slope grows from ${sig(steepest(0), 3)} s⁻¹ at the start to ${sig(steepest(0.3), 3)} s⁻¹ by t = 0.3 s; without viscosity the wave would turn over at t = 1/(2πA) = ${sig(tb, 3)} s. On the ring ∫u dx is kept to ${c ? c.value.toExponential(1) : '—'} of itself.`;
+    },
   },
 
   // ── aerospace ─────────────────────────────────────────────────────
@@ -752,6 +874,86 @@ export const ENGINEERING: EngineeringExample[] = [
       objects: [curve({ id: 'k', label: 'rate constant', meaning: 'How fast the reaction goes at each temperature.', definition: 'pre * exp(0 - ea / (8.314462618 * temp))', over: { temp: [250, 500] }, depends: ['pre', 'ea'], units: '1/s' })],
     }),
     check: (m) => `From 300 K to 310 K the engine’s rate constant grows by a factor of ${sig(curveAt(m, 'k', 310) / curveAt(m, 'k', 300), 3)}.`,
+  },
+  {
+    id: 'front',
+    discipline: 'Chemical and process',
+    title: 'A reaction front',
+    ask: 'An autocatalytic product makes more of itself at rate r and diffuses with D along a long tube. Seed one end — how fast does the front travel?',
+    builds: 'Fisher–KPP: ∂u/∂t = D ∂²u/∂x² + r u(1 − u), on a line 100 long at 401 points — diffusion by Crank–Nicolson, the reaction by Heun in half steps either side (Strang splitting).',
+    look: 'Over space and time the front is a straight edge: it travels at a constant speed. Theory puts that speed at 2√(rD), approached from below — raise r or D and the edge leans over. The controls stop where the front would grow thinner than the grid can follow.',
+    model: () => ({
+      id: 'front',
+      title: 'A reaction front (Fisher–KPP)',
+      domain: 'reaction–diffusion',
+      equations: ['∂u/∂t = D ∂²u/∂x² + r u (1 − u)'],
+      assumptions: ['Dimensionless: u is the fraction converted. The front speed 2√(rD) is the long-time limit for a step-like start; the front is about √(D/r) wide, kept above the grid’s spacing.'],
+      params: [param('D', 'diffusivity', 1, 0.5, 2, undefined, undefined, 0.05), param('r', 'reaction rate', 1, 0.5, 2, undefined, undefined, 0.05)],
+      time: { t: 25, min: 0, max: 40, rate: 4 },
+      objects: [
+        field({
+          id: 'conv',
+          label: 'Fraction converted',
+          meaning: 'How far the reaction has gone at every point of the tube.',
+          pde: { x: [0, 100], n: 400, species: [{ name: 'u', init: 'step(5 - x)', D: 'D' }], left: { value: 1 }, right: { flux: 0 }, react: { u: 'r*u*(1 - u)' }, tEnd: 40 },
+          depends: ['D', 'r'],
+        }),
+      ],
+    }),
+    check: (m) => {
+      const run = fieldRun(m);
+      if (!run) return 'not computed';
+      const v = frontSpeed(run);
+      return `While the front — where u = ½ — crosses the middle of the tube it moves at ${sig(v, 3)} per unit time; theory says 2√(rD) = ${sig(2 * Math.sqrt(pv(m, 'r') * pv(m, 'D')), 3)}, approached from below as the front settles — the lag shrinks like (3/2)·√(D/r)/t.`;
+    },
+  },
+  {
+    id: 'patterns',
+    discipline: 'Chemical and process',
+    title: 'Patterns from a reaction',
+    ask: 'Two chemicals react, U + 2V → 3V; U is fed in and V removed, and both diffuse, V more slowly. What forms from a small disturbance?',
+    builds: 'Gray–Scott on a 64 × 64 periodic plane: ∂u/∂t = Dᵤ∇²u − uv² + F(1 − u) and ∂v/∂t = Dᵥ∇²v + uv² − (F + k)v, forward Euler within its stability bound, seeded in a small square at the centre.',
+    look: 'The plane at the clock’s time, v as colour — press play to watch the pattern grow out of the seed and fill the plane. F and k decide its form: spots, stripes or waves.',
+    model: () => ({
+      id: 'patterns',
+      title: 'Gray–Scott patterns',
+      domain: 'reaction–diffusion',
+      equations: ['∂u/∂t = Dᵤ∇²u − uv² + F(1 − u)', '∂v/∂t = Dᵥ∇²v + uv² − (F + k)v'],
+      assumptions: ['Pearson’s parameters: Dᵤ = 2×10⁻⁵, Dᵥ = 10⁻⁵ on a 1.25 × 1.25 square with periodic edges.'],
+      params: [param('F', 'feed rate', 0.037, 0.01, 0.08, undefined, undefined, 0.001), param('k', 'removal rate', 0.06, 0.04, 0.07, undefined, undefined, 0.001)],
+      time: { t: 2400, min: 0, max: 2400, rate: 120 },
+      objects: [
+        field({
+          id: 'gs',
+          label: 'The reacting plane',
+          meaning: 'Two concentrations at every point of a plane, reacting and diffusing.',
+          pde: {
+            x: [0, 1.25],
+            y: [0, 1.25],
+            n: 64,
+            edges: 'periodic',
+            show: 'v',
+            species: [
+              { name: 'u', D: 2e-5, init: '1 - 0.5*step(0.08 - abs(x - 0.625))*step(0.08 - abs(y - 0.625))' },
+              { name: 'v', D: 1e-5, init: '(0.25 + 0.02*sin(41*x)*sin(37*y))*step(0.08 - abs(x - 0.625))*step(0.08 - abs(y - 0.625))' },
+            ],
+            react: { u: '-u*v^2 + F*(1 - u)', v: 'u*v^2 - (F + k)*v' },
+            tEnd: 2400,
+            dt: 1,
+          },
+          depends: ['F', 'k'],
+        }),
+      ],
+    }),
+    check: (m) => {
+      const run = fieldRun(m);
+      if (!run) return 'not computed';
+      const share = (t: number) => {
+        const v = fieldAt(run, 1, t).u;
+        return v.filter((x) => x > 0.1).length / v.length;
+      };
+      return `The seed covers ${sig(100 * share(0), 2)}% of the plane; by t = 2400, v exceeds 0.1 over ${sig(100 * share(2400), 3)}% of it — the pattern has grown out of the seed. Where nothing was seeded, u = 1 and v = 0 is a solution, and the run leaves it alone until the pattern arrives.`;
+    },
   },
 
   // ── control ───────────────────────────────────────────────────────
