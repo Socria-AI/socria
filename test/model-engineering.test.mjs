@@ -8,6 +8,10 @@ import { buildProposal } from './.tmp/propose.mjs';
 import { readScene } from './.tmp/scene-intent.mjs';
 import { SCENE, massOf, sceneMass } from './.tmp/scene.mjs';
 import { sectionOf, worldBox, rotationMatrix } from './.tmp/scene-geometry.mjs';
+import { buildSpec } from './.tmp/spec.mjs';
+import { openFromProposal, EMPTY_WORKSPACE, modelFor } from './.tmp/docs.mjs';
+import { DYNAMICS } from './.tmp/dynamics-examples.mjs';
+import { sampledOver } from './.tmp/schema.mjs';
 
 let pass = 0, fail = 0;
 const ok = (n, c, x = '') => (c ? pass++ : (fail++, console.log('FAIL', n, x)));
@@ -26,6 +30,28 @@ console.log('=== every example builds through the on-ramp, and says what it comp
     ok(`${e.id} says what to ask, what it builds and what to look at`, e.ask.length > 30 && e.builds.length > 30 && e.look.length > 30);
   }
   ok('ids are unique', new Set(ENGINEERING.map((e) => e.id)).size === ENGINEERING.length);
+}
+
+console.log('=== every example DRAWS: the page shows marks, not a refusal ===');
+{
+  // Building and computing were checked; drawing was not — and three curves
+  // (lift and pipe loss over airspeed v, resonance over frequency w) built,
+  // computed their checks, and drew nothing on the docs page, because the
+  // sampler set aside v and w as coordinate letters and compiled without them.
+  for (const e of [...ENGINEERING, ...DYNAMICS]) {
+    const opened = openFromProposal(EMPTY_WORKSPACE, e.model(), { at: 0 });
+    if (!opened.doc) {
+      ok(`${e.id} opens in the workspace`, false, opened.says);
+      continue;
+    }
+    const spec = buildSpec(modelFor(opened.doc), { view: 'auto' });
+    const refused = spec.notes.filter((n) => n.problem);
+    ok(`${e.id} draws`, spec.primitives.length > 0 && refused.length === 0, refused.map((n) => n.problem).join('; '));
+  }
+  ok('a curve over a coordinate letter is a curve in it', sampledOver({ over: { v: [0, 100] } }, 1, ['x'])[0] === 'v' && sampledOver({ over: { w: [0, 10] } }, 1, ['x'])[0] === 'w');
+  ok('…a model’s own name still wins', sampledOver({ over: { P: [0, 50] } }, 1, ['x'])[0] === 'P');
+  ok('…parametric components keep their own parameter', sampledOver({ over: { s: [0, 1] }, defs: { px: 's', py: 's^2' } }, 1, ['x'])[0] === 'x');
+  ok('…and a partial naming is still not guessed at', sampledOver({ over: { v: [0, 1] } }, 2, ['x', 'y']).join() === 'x,y');
 }
 
 console.log('=== engines ===');

@@ -902,8 +902,20 @@ export const COORDINATES: readonly string[] = ['x', 'y', 'z', 'u', 'v', 's', 'w'
  * have disagreed and the disagreement has been silent.
  */
 export function sampledOver(o: ModelObject, want: number, fallback: readonly string[]): string[] {
-  const named = Object.keys(o.over ?? {}).filter((k) => !COORDINATES.includes(k));
-  return named.length === want ? named : [...fallback];
+  const keys = Object.keys(o.over ?? {});
+  const named = keys.filter((k) => !COORDINATES.includes(k));
+  if (named.length === want) return named;
+  // A MODEL'S OWN VARIABLE CAN BE A COORDINATE LETTER — airspeed `v`, angular
+  // frequency `w`, arc length `s`, time `t`. Filtered out above, the curve
+  // `0.5·ρ·v²·S·C_L` over `{v: [0, 100]}` fell back to `x`, compiled without
+  // `v`, and drew nothing ("would not compile"), while the same expression
+  // evaluated perfectly well everywhere else. Over a shape that is not
+  // parametric, a window over exactly as many names as the shape needs IS its
+  // variables, whatever their letters. Parametric components keep their own
+  // s, u and v, and are read by their own branch.
+  const parametric = !!(o.defs?.px || o.defs?.py || o.defs?.pz);
+  if (!parametric && named.length === 0 && keys.length === want) return keys;
+  return [...fallback];
 }
 
 /** What one manipulation did, so the conversation can say it without guessing. */
