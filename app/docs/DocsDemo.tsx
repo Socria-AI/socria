@@ -24,7 +24,9 @@ import { ThinkingMap as ThinkingMapView } from '@/components/ThinkingMap';
 import { ModelView } from '@/components/model/ModelView';
 import { buildProposal } from '@/lib/model/propose';
 import { editsState, EMPTY_WORKSPACE, modelFor, openFromProposal } from '@/lib/model/docs';
-import { oscillator } from '@/lib/model/library';
+import { modelById, oscillator } from '@/lib/model/library';
+import { LiveFigure } from '@/components/logos3/LiveExample';
+import type { ShowcaseItem } from '@/lib/logos3-showcase';
 import { ENGINEERING } from '@/lib/model/engineering';
 import { DYNAMICS } from '@/lib/model/dynamics-examples';
 import type { SocriaModel } from '@/lib/socria-prompt';
@@ -762,6 +764,73 @@ export function DemoEngineering({ id }: { id: string }) {
           </div>
         </DocsFrame>
       )}
+    </div>
+  );
+}
+
+/** Mounts its children once they are near the screen: a page of live figures must still scroll. */
+function WhenNear({ children, wait }: { children: ReactNode; wait: string }) {
+  const host = useRef<HTMLDivElement>(null);
+  const [near, setNear] = useState(false);
+  useEffect(() => {
+    const el = host.current;
+    if (!el || near) return;
+    if (typeof IntersectionObserver === 'undefined') {
+      setNear(true);
+      return;
+    }
+    const io = new IntersectionObserver((es) => {
+      if (es.some((e) => e.isIntersecting)) {
+        setNear(true);
+        io.disconnect();
+      }
+    }, { rootMargin: '600px 0px' });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [near]);
+  return <div ref={host} className="d-live-host">{near ? children : <div className="d-eng-wait">{wait}</div>}</div>;
+}
+
+/**
+ * A library model, live — what the gallery used to show as a screenshot. The
+ * same engine builds it here as in the workspace, and it moves.
+ */
+export function DemoLibraryFigure({ id, title }: { id: string; title: string }) {
+  const model = useMemo(() => modelById(id), [id]);
+  return (
+    <div className="d-live-fig">
+      <WhenNear wait={`${title} — starting…`}>
+        {/* inside the Logos surface wrapper, as DocsFrame puts every figure: the view's own styles live there */}
+        <div className="logos-root lg-demo d-live-surface">
+          {model ? <ModelView model={model} fill /> : <div className="d-eng-wait">No such model.</div>}
+        </div>
+      </WhenNear>
+    </div>
+  );
+}
+
+/** Logos 3 at work: a request somebody could type, and what the product builds from it, here. */
+export function DemoShowcase({ items }: { items: readonly ShowcaseItem[] }) {
+  return (
+    <div className="d-showcase">
+      {items.map((it) => (
+        <figure key={it.id} className="d-show">
+          <p className="d-show-said">
+            <span>You</span>
+            {it.said}
+          </p>
+          <div className={`d-show-frame${it.kind === 'scene' ? ' is-scene' : ''}`}>
+            <WhenNear wait={`${it.title} — starting…`}>
+              <div className="logos-root lg-demo d-live-surface">
+                <LiveFigure item={it} />
+              </div>
+            </WhenNear>
+          </div>
+          <figcaption>
+            <strong>{it.title}.</strong> {it.cue}
+          </figcaption>
+        </figure>
+      ))}
     </div>
   );
 }

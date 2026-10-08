@@ -10,13 +10,15 @@
 // than drawn by a language model, with an id that survives being edited,
 // revisions, undo and branches.
 //
-// The figures are the real components — a model that goes through the same
-// on-ramp a conversation's proposal does.
+// The figures are the real components, live on the page — a model that goes
+// through the same on-ramp a conversation's proposal does, and the library's
+// models drawn by the same ModelView. No screenshots: the screens they showed
+// were Logos 2's, and Logos 3 is the current Logos.
 
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { Article, H2, Callout, Defs, Def } from '../Article';
-import { DemoModelWorkspace, DemoRefusal } from '../DocsDemo';
+import { DemoLibraryFigure, DemoModelWorkspace, DemoRefusal } from '../DocsDemo';
 import { docPage } from '../registry';
 
 const page = docPage('logos-2')!;
@@ -33,36 +35,34 @@ const sections = [
   { id: 'access', heading: 'Access and plans' },
 ];
 
-/** A real screen, captured from the product rather than drawn for the page. */
-function Shot({ src, alt, children, wide }: { src: string; alt: string; children: ReactNode; wide?: boolean }) {
+/** A figure the product draws here, live — where a screenshot of it used to be. */
+function LiveShot({ id, title, children, wide }: { id: string; title: string; children: ReactNode; wide?: boolean }) {
   return (
     <figure className={`d-fig${wide ? ' is-wide' : ''}`}>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={`/docs/logos-2/${src}.png`} alt={alt} loading="lazy" />
+      <DemoLibraryFigure id={id} title={title} />
       <figcaption>{children}</figcaption>
     </figure>
   );
 }
 
 /** What each gallery model is, and the sentence that builds one like it. */
-const GALLERY: { src: string; title: string; ask: string; note: string }[] = [
-  { src: 'saddle', title: 'A saddle', ask: 'Model a saddle, z = a·x² − b·y²', note: 'A surface with its level sets, cross-sections and both partial derivatives. Push b below zero and it turns into a bowl.' },
-  { src: 'lorenz', title: 'The Lorenz attractor', ask: 'Show me why the Lorenz system is chaotic', note: 'Three coupled equations, integrated. Move ρ past about 24 and the butterfly appears.' },
-  { src: 'double-pendulum', title: 'A double pendulum', ask: 'Why is a double pendulum unpredictable?', note: 'Two arms, integrated as a system. Change the starting angle a little and the path parts company with itself.' },
-  { src: 'orbit', title: 'A two-body orbit', ask: 'What happens to an orbit if I change the launch speed?', note: 'Gravity between two bodies. Circle, ellipse, escape — from one control.' },
-  { src: 'oscillator', title: 'A mass on a spring, with damping', ask: 'Model a mass on a spring with damping', note: 'Assembled from parts into equations of motion. Every control carries its unit: kg, N/m, N·s/m.' },
-  { src: 'torus', title: 'A torus', ask: 'Draw a torus I can reshape', note: 'Parametric geometry with a camera you can turn, and the two radii as controls.' },
-  { src: 'volatility', title: 'An implied volatility surface', ask: 'Model a volatility smile across strike and maturity', note: 'A finance surface with named axes — strike, maturity in years, implied vol.' },
-  { src: 'wage-model', title: 'A regression, as a surface', ask: 'How much does an extra year of education raise wages?', note: 'A specification you can read every way: the fitted surface, residuals, coefficients, the slope in $/hour per year.' },
+const GALLERY: { id: string; title: string; ask: string; note: string }[] = [
+  { id: 'saddle', title: 'A saddle', ask: 'Model a saddle, z = a·x² − b·y²', note: 'A surface with its level sets, cross-sections and both partial derivatives. Push b below zero and it turns into a bowl.' },
+  { id: 'lorenz', title: 'The Lorenz attractor', ask: 'Show me why the Lorenz system is chaotic', note: 'Three coupled equations, integrated. Move ρ past about 24 and the butterfly appears.' },
+  { id: 'double-pendulum', title: 'A double pendulum', ask: 'Why is a double pendulum unpredictable?', note: 'Two arms, integrated as a system. Change the starting angle a little and the path parts company with itself.' },
+  { id: 'orbit', title: 'A two-body orbit', ask: 'What happens to an orbit if I change the launch speed?', note: 'Gravity between two bodies. Circle, ellipse, escape — from one control.' },
+  { id: 'oscillator', title: 'A mass on a spring, with damping', ask: 'Model a mass on a spring with damping', note: 'Assembled from parts into equations of motion. Every control carries its unit: kg, N/m, N·s/m.' },
+  { id: 'torus', title: 'A torus', ask: 'Draw a torus I can reshape', note: 'Parametric geometry with a camera you can turn, and the two radii as controls.' },
+  { id: 'vol-surface', title: 'An implied volatility surface', ask: 'Model a volatility smile across strike and maturity', note: 'A finance surface with named axes — strike, maturity in years, implied vol.' },
+  { id: 'multivariate-model', title: 'A regression, read every way', ask: 'Fit y on two predictors and show me what the fit leaves out', note: 'Fitted to data with known coefficients: the fitted surface, its residuals and coefficients with their errors, side by side.' },
 ];
 
 function Gallery() {
   return (
     <div className="d-gallery">
       {GALLERY.map((g) => (
-        <figure key={g.src} className="d-fig">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={`/docs/logos-2/${g.src}.png`} alt={g.title} loading="lazy" />
+        <figure key={g.id} className="d-fig">
+          <DemoLibraryFigure id={g.id} title={g.title} />
           <figcaption>
             <strong>{g.title}.</strong> {g.note}
             <span className="d-ask">&ldquo;{g.ask}&rdquo;</span>
@@ -76,6 +76,11 @@ function Gallery() {
 export function Logos2() {
   return (
     <Article page={page} sections={sections}>
+      <Callout tag="Logos 3 is the current Logos">
+        Everything on this page is in <Link href="/docs/logos-3">Logos 3</Link> too — with a workspace
+        around it: the map, the models and designs drawn in 3D from your words, side by side. The figures
+        here are built live on this page by the same engine, not screenshots of an older screen.
+      </Callout>
       <p>
         Logos 2 is the same surface as{' '}
         <Link href="/docs/logos">Logos</Link> — the conversation and the{' '}
@@ -86,11 +91,11 @@ export function Logos2() {
       </p>
 
       <H2 id="glance">At a glance</H2>
-      <Shot src="app-saddle" alt="Logos 2 with a saddle surface built beside the conversation" wide>
-        One sentence in, a model out. The conversation is on the left; on the
-        right the engine has built the saddle it describes — controls for a and
-        b, the surface with numbered axes, and the views of it underneath.
-      </Shot>
+      <LiveShot id="saddle" title="A saddle" wide>
+        One sentence in, a model out — this one, built on this page by the same
+        engine: controls for a and b, the surface with numbered axes. Move them.
+        In the product the conversation sits beside it.
+      </LiveShot>
       <ul>
         <li>
           <strong>Say what you are working through.</strong> Logos 2 maps the
@@ -121,19 +126,20 @@ export function Logos2() {
 
       <H2 id="gallery">What you can build</H2>
       <p>
-        Every picture below is the same renderer drawing a model the engine
-        built and solved — there is no saddle component and no attractor
-        component. Each caption ends with a sentence that builds one like it.
+        Every figure below is the same renderer drawing a model the engine
+        built and solved, live on this page — there is no saddle component and
+        no attractor component. Each caption ends with a sentence that builds
+        one like it.
       </p>
       <Gallery />
-      <Shot src="app-black-hole" alt="Logos 2 showing its Kerr black hole simulation" wide>
+      <p>
         Three things have a simulation of their own, with a camera and physics
         in three dimensions: a black hole, the expanding universe and an
         orbiting system. Ask for one — &ldquo;generate a black hole&rdquo; —
-        and Logos 2 opens it: a Kerr hole with its horizon, photon orbit and
-        innermost stable orbit, light traced as real geodesics, and mass, spin,
-        disc and rays as controls.
-      </Shot>
+        and it opens: a Kerr hole with its horizon, photon orbit and innermost
+        stable orbit, light traced as real geodesics, and mass, spin, disc and
+        rays as controls.
+      </p>
 
       <H2 id="try">Things to ask for</H2>
       <p>

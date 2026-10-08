@@ -80,7 +80,7 @@ export const DOC_PAGES: DocPage[] = [
   {
     slug: 'logos-3',
     title: 'Socria Logos 3',
-    blurb: 'Think together: two people in one line of thinking, one map and one set of models, with Socria between you.',
+    blurb: 'The current Logos: the conversation, the map, models the engine solves and designs drawn in 3D from your words, in one workspace — and room for a second person.',
     group: 'The models',
   },
   {

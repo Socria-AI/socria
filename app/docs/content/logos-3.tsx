@@ -1,15 +1,21 @@
-// Socria Logos 3 — Logos 2 with a second seat.
+// Socria Logos 3 — the current Logos: one workspace for a hard problem.
 //
-// The room was parked for the production cut and shipped as Logos 3. This
-// page says what it does and, as plainly, what happens to what two people
-// write in it — the part somebody inviting a colleague needs to know first.
+// The conversation, the Thinking Map, models the engine builds and solves,
+// designs Live 3D draws from words, and the room for a second person. This
+// page says what it is, shows what it builds — live, on the page, by the
+// product's own code (components/logos3/LiveExample.tsx) — and says, as
+// plainly, what happens to what two people write in it.
 
 import Link from 'next/link';
 import { Article, H2, Callout, Defs, Def } from '../Article';
+import { DemoShowcase } from '../DocsDemo';
+import { DOCS_SHOWCASE } from '@/lib/logos3-showcase';
 import { docPage } from '../registry';
 
 const page = docPage('logos-3')!;
 const sections = [
+  { id: 'workspace', heading: 'One workspace' },
+  { id: 'live', heading: 'What it builds, live' },
   { id: 'what', heading: 'Two people, one map' },
   { id: 'start', heading: 'Starting a room' },
   { id: 'between', heading: 'What Socria does between you' },
@@ -22,11 +28,45 @@ export function Logos3() {
   return (
     <Article page={page} sections={sections}>
       <p>
-        Logos 3 is <Link href="/docs/logos-2">Logos 2</Link> — the conversation, the live{' '}
-        <Link href="/docs/thinking-map">Thinking Map</Link> and the models the engine builds —
-        with room for a second person. Two people think in one line of thinking, and Socria
-        sits between them.
+        Logos 3 is the current Logos: one workspace for a hard problem. Say what you are working
+        through and it builds beside you — a live{' '}
+        <Link href="/docs/thinking-map">Thinking Map</Link> of your reasoning, models the engine
+        builds and solves, and designs drawn in 3D from your words — in tiles you arrange, with the
+        four <Link href="/docs/depth-personality">depth modes</Link> in the model picker. And there is
+        room for a second person: two people think in one line of thinking, and Socria sits between
+        them.
       </p>
+
+      <H2 id="workspace">One workspace</H2>
+      <ul>
+        <li>
+          <strong>The map</strong> draws your reasoning as you talk — claims, assumptions, tensions,
+          evidence — in your own words.
+        </li>
+        <li>
+          <strong>Models</strong> are built by the engine when what you describe is a system: a
+          mechanism, a field, a reaction, a set of equations, a relationship in data. Every control
+          recomputes them; everything the <Link href="/docs/logos-2">Logos 2 page</Link> describes —
+          the views, the inspector, editing by saying so, undo — is here.
+        </li>
+        <li>
+          <strong>Live 3D</strong> draws a part from its description — a bearing, a wing section, a
+          heat sink — with its measured volume and mass. A geometric preview, said to be one: nothing
+          is loaded or analysed.
+        </li>
+        <li>
+          <strong>Tiles you arrange.</strong> + View opens the map, a model, its parameters, Live 3D or
+          what Socria remembers beside each other, and the arrangement is kept.
+        </li>
+      </ul>
+
+      <H2 id="live">What it builds, live</H2>
+      <p>
+        Each figure below is built on this page by the product&rsquo;s own code from the request
+        above it — the model through the same on-ramp a conversation uses, the design by Live
+        3D&rsquo;s own reader. Move the controls; turn the design.
+      </p>
+      <DemoShowcase items={DOCS_SHOWCASE} />
 
       <H2 id="what">Two people, one map</H2>
       <p>
@@ -116,10 +156,9 @@ export function Logos3() {
           the other person reads later.
         </li>
         <li>
-          <strong>Everything else is Logos 2.</strong> The lenses, the moves on each card, the
-          models and what they cannot do yet are on{' '}
-          <Link href="/docs/logos-2">that page</Link> — except depth. Logos 3 has the four{' '}
-          <Link href="/docs/depth-personality">depth modes</Link>, in the model picker.
+          <strong>The model engine&rsquo;s limits are on the{' '}
+          <Link href="/docs/logos-2">Logos 2 page</Link></strong> — the lenses, the moves on each
+          card, the models and what they cannot do yet. All of it applies here.
         </li>
       </ul>
 

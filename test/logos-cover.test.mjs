@@ -13,7 +13,7 @@ import { readFileSync } from 'node:fs';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { createElement as h } from 'react';
 import { LogosCover, freeTerms } from './.tmp/LogosCover.mjs';
-import { COVER_SHOWCASE, showcaseAt } from './.tmp/logos3-showcase.mjs';
+import { COVER_SHOWCASE, DOCS_SHOWCASE, STAGE_DESIGN, STAGE_MODEL, showcaseAt } from './.tmp/logos3-showcase.mjs';
 import { ENGINEERING, SCENE_EXAMPLES } from './.tmp/engineering.mjs';
 import { DYNAMICS } from './.tmp/dynamics-examples.mjs';
 import { PLANS } from './.tmp/entitlements.mjs';
@@ -58,6 +58,23 @@ console.log('=== a different kind of problem each time ===');
   ok('and “Another example” takes the next at once', /onClick=\{\(\) => setTurn\(takeTurn\(\)\)\}/.test(src));
   ok('the homepage’s subjects are not the cover’s', !COVER_SHOWCASE.some((s) => ['resonance', 'truss', 'ibeam'].includes(s.id)));
   ok('the first is the most immediate: a design in 3D', COVER_SHOWCASE[0].kind === 'scene');
+}
+
+console.log('=== each surface its own subjects ===');
+{
+  const all = [...ENGINEERING, ...DYNAMICS];
+  const cover = new Set(COVER_SHOWCASE.map((s) => s.id));
+  const docs = new Set(DOCS_SHOWCASE.map((s) => s.id));
+  ok('the docs page shows none of the cover’s', [...docs].every((id) => !cover.has(id)));
+  ok('the homepage stage shows neither’s', ![STAGE_MODEL.id, STAGE_DESIGN.id].some((id) => cover.has(id) || docs.has(id)) && !cover.has('wing') && !docs.has('wing'));
+  ok('the docs items are examples the product carries, quoted word for word', DOCS_SHOWCASE.every((s) => s.said && s.said === (s.kind === 'scene' ? SCENE_EXAMPLES.find((e) => e.id === s.id)?.say : all.find((e) => e.id === s.id)?.ask)));
+  ok('the stage’s model is the lift example, asked for in its own words', STAGE_MODEL.said === all.find((e) => e.id === 'lift')?.ask);
+  ok('the stage’s wing is built from the very message shown', /<LiveFigure item=\{STAGE_DESIGN\} \/>/.test(read('components/journal/Stage.tsx')) && /<Message role="user" text=\{STAGE_DESIGN\.said\} \/>/.test(read('components/journal/Stage.tsx')));
+  const l2 = read('app/docs/content/logos-2.tsx');
+  ok('the Logos 2 page keeps no screenshots — its figures are live', !/\.png|<img/.test(l2) && /<DemoLibraryFigure id=\{g\.id\}/.test(l2));
+  ok('…and says Logos 3 is the current Logos', /Logos 3 is the current Logos/.test(l2));
+  ok('the Logos 3 page shows its own, live', /<DemoShowcase items=\{DOCS_SHOWCASE\} \/>/.test(read('app/docs/content/logos-3.tsx')));
+  ok('live figures sit inside the Logos surface wrapper, where the view’s styles live', (read('app/docs/DocsDemo.tsx').match(/logos-root lg-demo d-live-surface/g) || []).length === 2);
 }
 
 console.log('=== one card, two doors, the right name on each ===');

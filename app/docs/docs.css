@@ -542,7 +542,7 @@
 .docs-root .d-dim { color: var(--lg-ink-45, rgba(35,36,31,0.45)); font-size: 0.92em; }
 .docs-root .d-after-table { margin-top: -6px; }
 
-/* Logos 2: real screens captured from the product, and the model gallery. */
+/* Logos 2 and 3: the product's own figures, built live on the page, and the model gallery. */
 .docs-root .d-fig { margin: 22px 0; }
 .docs-root .d-fig img {
   display: block; width: 100%; height: auto;
@@ -561,6 +561,35 @@
   display: block; margin-top: 4px; font-style: italic; color: var(--moss-700, #4b5f2a);
 }
 @media (max-width: 700px) { .docs-root .d-gallery { grid-template-columns: 1fr; } }
+/* a live figure in place of a screenshot: the engine's own view, sized like one */
+.docs-root .d-live-fig {
+  position: relative; height: 360px; border: 1px solid var(--line, rgba(0,0,0,.1)); border-radius: 10px;
+  overflow: hidden; background: #f4f1e8;
+}
+.docs-root .d-gallery .d-live-fig { height: 300px; }
+.docs-root .d-fig.is-wide .d-live-fig { height: 440px; box-shadow: 0 10px 30px -18px rgba(0,0,0,.35); }
+.docs-root .d-live-host { position: absolute; inset: 0; }
+.docs-root .d-live-fig .eng-stack, .docs-root .d-show-frame .eng-stack { height: 100%; }
+.docs-root .d-live-fig .und, .docs-root .d-show-frame .und { display: none; }
+.docs-root .d-live-host > .d-eng-wait { height: 100%; border: 0; }
+.docs-root .d-live-surface { position: absolute; inset: 0; min-height: 0; height: 100%; }
+/* Logos 3 at work: request, live figure, caption */
+.docs-root .d-showcase { display: grid; grid-template-columns: 1fr 1fr; gap: 22px 22px; margin: 18px 0 8px; }
+@media (max-width: 760px) { .docs-root .d-showcase { grid-template-columns: 1fr; } }
+.docs-root .d-show { margin: 0; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.docs-root .d-show-said {
+  margin: 0; padding: 9px 12px; font-family: var(--d-serif); font-size: 0.98rem; line-height: 1.45;
+  background: var(--d-card); border: 1px solid var(--d-line); border-left: 3px solid var(--d-moss); border-radius: 6px;
+}
+.docs-root .d-show-said span {
+  margin-right: 8px; font-family: var(--d-sans, system-ui, sans-serif); font-size: 10.5px; font-weight: 650;
+  letter-spacing: 0.08em; text-transform: uppercase; color: var(--d-moss-deep);
+}
+.docs-root .d-show-frame { position: relative; height: 330px; border: 1px solid var(--d-line); border-radius: 10px; overflow: hidden; background: #f4f1e8; }
+.docs-root .d-show-frame.is-scene { background: radial-gradient(120% 90% at 50% 0%, rgba(94,118,51,.07), transparent 70%), #f6f3ec; }
+.docs-root .d-show-frame .lx-plan { display: block; width: 100%; height: 100%; padding: 14px; color: var(--d-ink-45); }
+.docs-root .d-show-frame .lx-wait { display: grid; place-items: center; height: 100%; font-size: 13px; color: var(--d-ink-45); }
+.docs-root .d-show figcaption { font-size: 14px; line-height: 1.55; color: var(--ink-60, rgba(0,0,0,.62)); }
 
 /* Logos 3: engineering examples — each a proposal the engine built, with its check */
 .docs-root .d-eng {

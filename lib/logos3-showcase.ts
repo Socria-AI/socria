@@ -66,3 +66,15 @@ export const STAGE_DESIGN: ShowcaseItem = {
   said: 'Now draw one wing: a NACA 2412 aluminium wing with chord 1.5 m and span 5.35 m.',
   cue: 'Drawn by Live 3D from that message. Drag to turn it.',
 };
+
+/**
+ * The Logos 3 docs page's own: four kinds of work none of the other surfaces
+ * show — a mechanism's two natural frequencies, a chain of reactions, heat
+ * moving along a rod, and a rotor drawn in 3D.
+ */
+export const DOCS_SHOWCASE: readonly ShowcaseItem[] = [
+  { id: 'two-mass', kind: 'model', title: 'Two masses, two natural frequencies', said: ask('two-mass'), cue: 'Integrated live; the engine finds both modes. Change a spring and both move.' },
+  { id: 'consecutive', kind: 'model', title: 'Consecutive reactions A → B → C', said: ask('consecutive'), cue: 'Integrated live. Move either rate and watch B’s peak move.' },
+  { id: 'rod', kind: 'model', title: 'Heat along a rod', said: ask('rod'), cue: 'The heat equation, solved on a grid as you watch.' },
+  { id: 'rotor', kind: 'scene', title: 'A three-bladed rotor', said: say('rotor'), cue: 'Drawn in 3D by Live 3D from the description above. Drag to turn it.' },
+];
