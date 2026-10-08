@@ -76,6 +76,7 @@ import { TOUR_KEY, shouldRunTour } from '@/lib/tour';
 import { ProjectHome } from '@/components/projects/ProjectHome';
 import { JoinWithCode, ShareDialog } from '@/components/share/ShareDialog';
 import { SharedThread } from '@/components/share/SharedThread';
+import { useConversationStyle } from '@/components/useConversationStyle';
 import { limitsFor } from '@/lib/entitlements';
 import type { ResourceType } from '@/lib/share/roles';
 import { isSource } from '@/lib/checkout-attribution';
@@ -330,6 +331,9 @@ function writeUsedFree(v: boolean) {
 
 export default function ChatPage() {
   const { isLoaded, isSignedIn, user } = useUser();
+  // How Socria talks with them (Manage Account → Personalization): the
+  // account's choice, kept current in this tab and sent with every turn.
+  const { style: conversationStyle, ref: conversationStyleRef } = useConversationStyle(!!isSignedIn);
   const router = useRouter();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   // Logos sessions live in the same store; listed here so one sidebar shows
@@ -1906,6 +1910,9 @@ export default function ChatPage() {
           role: readRole() ?? undefined,
           // what they asked to be called (sanitised again on the server)
           name: readName() ?? undefined,
+          // the Conversation Style chosen for the account — read at send
+          // time, so a change made mid-conversation shapes the next reply
+          conversationStyle: conversationStyleRef.current,
         }),
       });
 
@@ -3333,6 +3340,7 @@ export default function ChatPage() {
         {sharedOpen && !homeProject ? (
           <SharedThread
             id={sharedOpen}
+            conversationStyle={conversationStyle}
             onClose={() => setSharedOpen(null)}
             onShare={(title) => setShareFor({ type: 'conversation', id: sharedOpen, title })}
             onUpgrade={() => window.location.assign('/one')}

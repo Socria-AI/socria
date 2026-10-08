@@ -35,6 +35,7 @@ import { ThemePicker } from './ThemePicker';
 import { AccessCode } from './AccessCode';
 import { TestingTools } from './TestingTools';
 import { NameField, RolePicker } from './RolePicker';
+import { ConversationStylePicker } from './ConversationStylePicker';
 
 export function AccountSheet({
   open,
@@ -74,9 +75,16 @@ export function AccountSheet({
       if (e.key === 'Escape') onClose();
     };
     window.addEventListener('keydown', onKey);
-    ref.current?.querySelector('button')?.focus();
     return () => window.removeEventListener('keydown', onKey);
   }, [open, onClose, isOne]);
+
+  // Focus goes into the sheet when it OPENS, and only then. It sat in the
+  // effect above, which re-runs whenever the page behind hands down a new
+  // onClose — so any re-render of that page (a style chosen in this very
+  // sheet is one) pulled focus back to the close button mid-keystroke.
+  useEffect(() => {
+    if (open) ref.current?.querySelector('button')?.focus();
+  }, [open]);
 
   const retake = useCallback(() => {
     try {
@@ -152,14 +160,25 @@ export function AccountSheet({
               <ThemePicker isOne={isOne} onUpgrade={onClose} />
             </div>
 
+            {/* Personalization: how Socria talks with you and what it knows
+                to call you by. The style is the account's and follows you to
+                every device; the name and the role are kept in this browser,
+                as they always were. */}
             <div className="sec">
-              <span className="lbl">What Socria calls you</span>
-              <NameField />
-            </div>
-
-            <div className="sec">
-              <span className="lbl">What you mostly think about</span>
-              <RolePicker />
+              <span className="lbl">Personalization</span>
+              <div className="sub">
+                <h3 className="sub-h">Conversation style</h3>
+                <p className="sub-d">How Socria talks with you, in Core 4 and in Logos. Kept with your account, on every device.</p>
+                <ConversationStylePicker signedIn={!!user} />
+              </div>
+              <div className="sub">
+                <h3 className="sub-h">What Socria calls you</h3>
+                <NameField />
+              </div>
+              <div className="sub">
+                <h3 className="sub-h">What you mostly think about</h3>
+                <RolePicker />
+              </div>
             </div>
 
             {/* The university programme.

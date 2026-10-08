@@ -35,6 +35,7 @@ import { excerpt, messageAnchor, readAnchor } from '@/lib/share/comments';
 import { useComments } from './comments/useComments';
 import { callsSocria, mentionParts, newMsgId, replyRefOf, type ReplyRef } from '@/lib/chat-thread';
 import { copyText } from '@/lib/copy-text';
+import type { ConversationStyle } from '@/lib/conversation-style';
 import { CommentComposer, CommentThread, CommentsButton, CommentsPanel } from './comments/Comments';
 import './share.css';
 import './shared-thread.css';
@@ -75,11 +76,14 @@ const when = (t: number) => {
 
 export function SharedThread({
   id,
+  conversationStyle,
   onClose,
   onShare,
   onUpgrade,
 }: {
   id: string;
+  /** how this person asked Socria to talk with them — replies to their turns use it */
+  conversationStyle?: ConversationStyle;
   onClose: () => void;
   onShare?: (title: string) => void;
   onUpgrade?: () => void;
@@ -274,7 +278,13 @@ export function SharedThread({
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: 'core-4', conversationId: id, messages: turns.slice(-24), ...(convo.projectId ? { projectId: convo.projectId } : {}) }),
+        body: JSON.stringify({
+          model: 'core-4',
+          conversationId: id,
+          messages: turns.slice(-24),
+          ...(convo.projectId ? { projectId: convo.projectId } : {}),
+          ...(conversationStyle ? { conversationStyle } : {}),
+        }),
       });
       if (!res.ok) {
         const j = await res.json().catch(() => null);

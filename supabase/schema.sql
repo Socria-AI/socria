@@ -61,6 +61,15 @@ alter table user_profiles
 alter table user_profiles
   add column if not exists first_run jsonb not null default '{}'::jsonb;
 
+-- How Socria talks with this person (lib/conversation-style.ts): 'thinker',
+-- 'direct', 'companion' or 'challenger', chosen under Manage Account →
+-- Personalization and carried into Core 4 and Logos on every device. Null is
+-- never chosen, which is the Thinker. Validated by the only writer
+-- (/api/profile) rather than by a constraint, so a fifth style needs no
+-- migration. Safe to re-run.
+alter table user_profiles
+  add column if not exists conversation_style text;
+
 
 -- Per-user OAuth connections for Logos "Add context" (Google, Notion).
 -- The token bundle is stored encrypted in `secret` (AES-256-GCM via

@@ -206,7 +206,11 @@ export default function PrivacyPage() {
         at all, each message still passes through our server and on to our AI
         provider. It is not stored; it is not anonymous. Your personality
         settings, your custom instructions, and which maths solutions you chose
-        to reveal stay on your device either way, signed in or out.
+        to reveal stay on your device either way, signed in or out. The one
+        preference kept with your account is your Conversation Style (Manage
+        Account &rarr; Personalization) &mdash; which of four ways Socria talks
+        with you &mdash; so that it follows you to every device; it is part of
+        your export, and it is deleted with your account.
       </p>
 
       <h2 id="rights">Your choices</h2>

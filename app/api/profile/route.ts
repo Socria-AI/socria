@@ -1,6 +1,7 @@
 // app/api/profile/route.ts
-// GET /api/profile → { profile, understanding, firstRun } for the signed-in user
-// PUT /api/profile → save any of { profile, understanding, firstRun } (partial)
+// GET /api/profile → { profile, understanding, firstRun, conversationStyle } for the signed-in user
+// GET /api/profile?only=conversationStyle → { conversationStyle } (the cheap one a tab re-checks)
+// PUT /api/profile → save any of { profile, understanding, firstRun, conversationStyle } (partial)
 //
 // Backs the "import your history from other AIs" feature: the pasted profile
 // is stored per user so it follows them across devices. Anonymous users keep
@@ -17,41 +18,71 @@ import {
 } from '@/lib/socria-prompt';
 import { EMPTY_FIRST_RUN, mergeFirstRun, parseFirstRun } from '@/lib/first-run';
 import { isProduction } from '@/lib/environment';
+import { resolveConversationStyle } from '@/lib/conversation-style';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+/**
+ * A column the database does not have yet. Postgres says 42703 when a select
+ * names one; PostgREST says PGRST204 when a write does.
+ */
+function missingColumn(error: unknown): boolean {
+  const code = (error as { code?: string } | null)?.code;
+  return code === '42703' || code === 'PGRST204';
+}
+
+/**
+ * What the account says about its Conversation Style. null means the account
+ * cannot hold one yet (the column is not there), which the browser reads as
+ * "keep your own copy" — not as a choice of the default.
+ */
+function styleFrom(row: unknown, columnThere: boolean) {
+  if (!columnThere) return null;
+  return resolveConversationStyle((row as { conversation_style?: unknown } | null)?.conversation_style);
+}
+
+export async function GET(req: NextRequest) {
   const { userId } = auth();
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   try {
-    let { data, error } = await supabaseAdmin()
-      .from('user_profiles')
-      .select('profile, understanding, first_run')
-      .eq('user_id', userId)
-      .maybeSingle();
+    // The cheap read: an open tab coming back into view asks only this, so a
+    // style changed on another device is the one its next message uses.
+    if (req.nextUrl.searchParams.get('only') === 'conversationStyle') {
+      const { data, error } = await supabaseAdmin()
+        .from('user_profiles')
+        .select('conversation_style')
+        .eq('user_id', userId)
+        .maybeSingle();
+      if (error && !missingColumn(error)) {
+        console.error('GET profile (style) error:', error);
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+      return NextResponse.json({ conversationStyle: styleFrom(data, !error) });
+    }
+
     // Deploy-order tolerance: a column that hasn't been added to the database
     // yet (42703 undefined column) narrows the select rather than failing it,
-    // so existing sync keeps working. first_run is the newest and goes first.
-    if (error && (error as any).code === '42703') {
-      const retry = await supabaseAdmin()
+    // so existing sync keeps working. Newest first: conversation_style, then
+    // first_run, then understanding.
+    const selects = [
+      'profile, understanding, first_run, conversation_style',
+      'profile, understanding, first_run',
+      'profile, understanding',
+      'profile',
+    ];
+    let data: any = null;
+    let error: any = null;
+    let used = 0;
+    for (; used < selects.length; used++) {
+      ({ data, error } = await supabaseAdmin()
         .from('user_profiles')
-        .select('profile, understanding')
+        .select(selects[used])
         .eq('user_id', userId)
-        .maybeSingle();
-      data = retry.data as any;
-      error = retry.error;
-    }
-    if (error && (error as any).code === '42703') {
-      const retry = await supabaseAdmin()
-        .from('user_profiles')
-        .select('profile')
-        .eq('user_id', userId)
-        .maybeSingle();
-      data = retry.data as any;
-      error = retry.error;
+        .maybeSingle());
+      if (!(error && missingColumn(error))) break;
     }
     if (error) {
       console.error('GET profile error:', error);
@@ -75,7 +106,10 @@ export async function GET() {
           : null,
       // What they have been taught, as the account remembers it. Absent
       // (null) when the column is not there yet; the client then keeps its own.
-      firstRun: (data as any)?.first_run !== undefined ? parseFirstRun((data as any).first_run) : null,
+      firstRun: used <= 1 && (data as any)?.first_run !== undefined ? parseFirstRun((data as any).first_run) : null,
+      // How Socria talks with them (lib/conversation-style.ts). The Thinker
+      // when they never chose; null only when the account cannot hold it.
+      conversationStyle: styleFrom(data, used === 0),
     });
   } catch (e: any) {
     console.error('GET profile error:', e);
@@ -151,19 +185,40 @@ export async function PUT(req: NextRequest) {
         row.first_run = mergeFirstRun(parseFirstRun((cur as { first_run?: unknown } | null)?.first_run), incoming);
       }
     }
+    // How Socria talks with them (Manage Account → Personalization). A plain
+    // choice rather than a merge: the newest pick is the pick, and anything
+    // unknown is stored as the Thinker rather than as whatever was sent.
+    if ('conversationStyle' in b) {
+      row.conversation_style = resolveConversationStyle(b.conversationStyle);
+    }
     let { error } = await supabaseAdmin()
       .from('user_profiles')
       .upsert(row, { onConflict: 'user_id' });
-    if (error && (error as any).code === '42703' && 'first_run' in row) {
-      // Same tolerance on the write: without the column, write the rest.
-      delete row.first_run;
+    // Same tolerance on the write: without a column, write the rest, and say
+    // which part the account could not keep — the browser holds that one.
+    // The column the error names goes first; newest first otherwise.
+    const optional: [string, string][] = [
+      ['conversation_style', 'conversationStyle'],
+      ['first_run', 'firstRun'],
+    ];
+    const unsaved: string[] = [];
+    while (error && missingColumn(error)) {
+      const named = optional.find(([col]) => col in row && String((error as { message?: string }).message ?? '').includes(col));
+      const drop = named ?? optional.find(([col]) => col in row);
+      if (!drop) break;
+      delete row[drop[0]];
+      unsaved.push(drop[1]);
+      if (Object.keys(row).every((k) => k === 'user_id' || k === 'updated_at')) {
+        error = null;
+        break;
+      }
       ({ error } = await supabaseAdmin().from('user_profiles').upsert(row, { onConflict: 'user_id' }));
     }
     if (error) {
       console.error('PUT profile error:', error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
-    return NextResponse.json({ ok: true });
+    return NextResponse.json(unsaved.length ? { ok: true, unsaved } : { ok: true });
   } catch (e: any) {
     console.error('PUT profile error:', e);
     return NextResponse.json({ error: e?.message || 'Internal error' }, { status: 500 });

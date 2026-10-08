@@ -10,6 +10,8 @@
 //
 // Pure types and constants. No runtime dependencies.
 
+import type { ConversationStyle } from '../conversation-style';
+
 // ── provenance of anything Socria believes about the person ──────────
 
 /**
@@ -403,6 +405,13 @@ export type ReplyLength = 'concise' | 'standard' | 'detailed';
 export interface CommunicationPrefs {
   readability: Readability;
   length: ReplyLength;
+  /**
+   * Their Conversation Style (lib/conversation-style.ts), chosen once for the
+   * account. The same rule as the two above: it reaches the register
+   * (voice.ts) and, for the Direct, the proportion — and nothing that decides
+   * what work gets done. Absent is the Thinker, the voice as it already is.
+   */
+  style?: ConversationStyle;
 }
 
 export const DEFAULT_COMMUNICATION: CommunicationPrefs = { readability: 'standard', length: 'standard' };

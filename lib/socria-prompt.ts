@@ -5,6 +5,7 @@ import type { GateId } from './feature-gates';
 import { WHY_NOT_ANSWER } from './why-not-answer';
 import { WRONG_CHAT } from './wrong-chat';
 import { SAVED_VOICE_READING, SAVED_VOICE_RULE } from './memory-voice';
+import { conversationStyleBlock } from './conversation-style';
 import type { ThinkingContext } from './logos';
 import { THINKING_CONTEXTS } from './logos';
 import {
@@ -2365,7 +2366,15 @@ export function buildSystemPrompt(
    * else, bounded by the plan's window. A string for the same reason the
    * graph is one.
    */
-  project?: string | null
+  project?: string | null,
+  /**
+   * Their Conversation Style (lib/conversation-style.ts), as the request
+   * carried it — resolved here, so anything unknown is the Thinker. Core 4
+   * only: Core 3.1's depth modes already set its voice ("Voice: a rigorous
+   * interlocutor"), and a second voice beside them would be the depth dial
+   * and the style arguing about the same sentence.
+   */
+  conversationStyle?: unknown
 ): { prompt: string; model: SocriaModel; depth: ThinkingDepth } {
   const model = resolveModel(modelInput);
   const depth = resolveDepth(depthInput);
@@ -2434,8 +2443,18 @@ export function buildSystemPrompt(
   // the same decision. Of the context below it gets the imported profile,
   // the Project, the Mind Graph and the cognition block — not the thread
   // memory or the journey (see withContext).
+  //
+  // Their Conversation Style goes directly after the prompt it adjusts and
+  // ahead of every context block, so the per-turn decision stays the last
+  // thing the model reads. Empty for the Thinker: the prompt above IS that
+  // voice. (The style also reaches the per-turn register itself — see
+  // lib/core4/voice.ts applyConversationStyle — so the two never disagree.)
   if (model === 'core-4') {
-    return { prompt: withContext(CORE_4_PROMPT, { flatMemory: false, threadMemory: false, journey: false }), model, depth };
+    return {
+      prompt: withContext(CORE_4_PROMPT + conversationStyleBlock(conversationStyle, 'core'), { flatMemory: false, threadMemory: false, journey: false }),
+      model,
+      depth,
+    };
   }
 
   const depthLabel = THINKING_DEPTHS.find((d) => d.id === depth)!.label;

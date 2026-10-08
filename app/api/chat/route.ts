@@ -5,6 +5,7 @@
 
 import { roleBlock } from '@/lib/onboarding-roles';
 import { nameBlock } from '@/lib/onboarding-name';
+import { resolveConversationStyle } from '@/lib/conversation-style';
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { auth } from '@clerk/nextjs/server';
@@ -191,6 +192,11 @@ export async function POST(req: NextRequest) {
         },
       });
     }
+
+    // How they asked Socria to talk with them (Manage Account →
+    // Personalization), carried by the client like depth and the reply
+    // length. Resolved once, here: anything unknown is the Thinker.
+    const conversationStyle = resolveConversationStyle(body?.conversationStyle);
 
     // Cross-conversation journey: the client sends the user's evolving
     // understanding; a fresh conversation (first user turn) may open with a
@@ -399,6 +405,9 @@ export async function POST(req: NextRequest) {
                 length: ['concise', 'standard', 'detailed'].includes(String(body?.length))
                   ? (body.length as 'concise' | 'standard' | 'detailed')
                   : 'standard',
+                // Their Conversation Style: the register and, for the Direct,
+                // the proportion — the same reach as the two above.
+                style: conversationStyle,
               },
               now: Date.now(),
             }).catch((e) => {
@@ -432,7 +441,8 @@ export async function POST(req: NextRequest) {
       prepared
         ? { state: prepared.blocks.state + prepared.blocks.verify, move: prepared.blocks.move }
         : null,
-      projectBlock
+      projectBlock,
+      conversationStyle
     );
 
 
@@ -516,6 +526,9 @@ export async function POST(req: NextRequest) {
         // so these can no longer mean "Core 3.1 and nothing else".
         memoryInjected: model !== 'core-2' && !!body?.memory,
         profileInjected: model !== 'core-2' && !!body?.profile,
+        // Which Conversation Style shaped the voice (Core 4 only; the
+        // Thinker is the prompt as written).
+        conversationStyle: model === 'core-4' ? conversationStyle : null,
         journeyInjected: model !== 'core-2' && !!journey,
         mindNodes: mindSubgraph?.nodes.length ?? 0,
         mindEdges: mindSubgraph?.edges.length ?? 0,

@@ -19,6 +19,7 @@ import { renderMessageForModel, sanitizeAttachments } from '@/lib/logos-attachme
 import { renderContextsForNode, sanitizeNodeContextList } from '@/lib/logos-sources';
 import { guidanceBlock, resolveDepth, resolveGuard } from '@/lib/logos-guidance';
 import { styleBlock } from '@/lib/logos-style';
+import { conversationStyleBlock } from '@/lib/conversation-style';
 import { personalityBlock } from '@/lib/logos-personality';
 import { depthForPlan } from '@/lib/socria-one';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
@@ -208,6 +209,7 @@ export async function POST(req: NextRequest) {
         resolveGuard(body?.guard),
         'surface'
       ) +
+      conversationStyleBlock(body?.conversationStyle, 'logos', { structured: true }) +
       personalityBlock(body?.persona) +
       styleBlock(body?.style);
     const composed = await complete(guided, 'Compose the panel.', 700);

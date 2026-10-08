@@ -19,6 +19,7 @@ import {
 } from '@/lib/logos-draft';
 import { guidanceBlock, resolveDepth, resolveGuard } from '@/lib/logos-guidance';
 import { styleBlock } from '@/lib/logos-style';
+import { conversationStyleBlock } from '@/lib/conversation-style';
 import { personalityBlock } from '@/lib/logos-personality';
 import { buildQueryPrompt, runSearch } from '@/lib/logos-explore';
 import { enforceRateLimit } from '@/lib/rate-limit';
@@ -105,6 +106,7 @@ export async function POST(req: NextRequest) {
 
     const guide =
       guidanceBlock(resolveDepth(body?.depth), resolveGuard(body?.guard), 'surface') +
+      conversationStyleBlock(body?.conversationStyle, 'logos', { structured: true }) +
       personalityBlock(body?.persona) +
       styleBlock(body?.style);
     const composed = await complete(

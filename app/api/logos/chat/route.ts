@@ -40,6 +40,7 @@ import {
 import { renderContextsForNode, sanitizeNodeContextList } from '@/lib/logos-sources';
 import { guidanceBlock, resolveDepth, resolveGuard } from '@/lib/logos-guidance';
 import { styleBlock } from '@/lib/logos-style';
+import { conversationStyleBlock } from '@/lib/conversation-style';
 import { personalityBlock, personalityMaxTokens } from '@/lib/logos-personality';
 import {
   hasJourneyContent,
@@ -436,8 +437,10 @@ export async function POST(req: NextRequest) {
       // the answer agree (every plan opens all four today).
       guidanceBlock(depthForPlan(resolveDepth(body?.depth), plan), resolveGuard(body?.guard), 'chat') +
       // The hierarchy, in reading order: protected principles and depth
-      // (above), then their personality settings, then their free-text
-      // instructions — each block subordinating itself to what came before.
+      // (above), then the Conversation Style chosen for the account, then
+      // their personality settings, then their free-text instructions — each
+      // block subordinating itself to what came before.
+      conversationStyleBlock(body?.conversationStyle, 'logos') +
       personalityBlock(body?.persona) +
       styleBlock(body?.style) +
       // What they are looking at.

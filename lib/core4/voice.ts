@@ -45,6 +45,7 @@
 // to be visible is not a personality.
 
 import type { CognitiveState } from '../cognition/state';
+import type { ConversationStyle } from '../conversation-style';
 import type { ExplicitSignals, InterventionDecision, CommunicationPrefs, Readability } from './types';
 import { DEFAULT_COMMUNICATION } from './types';
 
@@ -92,15 +93,26 @@ const BREAKTHROUGH = /\b(?:it works|working now|finally|turns out|figured (?:it 
  * the emotional reading, then the work. Anything earlier wins, because a
  * register chosen for a person in difficulty must not be overridden by the fact
  * that the topic happens to be technical.
+ *
+ * Their Conversation Style comes in last, and only on the turns the work
+ * decides. The four registers the situation OWNS — safety, their own words
+ * about how it is landing, somebody finding this hard, real time pressure —
+ * are returned untouched by it: a Challenger does not push on somebody who is
+ * struggling, and a Companion does not joke through a safety turn.
  */
 export function voiceFor(input: VoiceInput): Voice {
-  return applyReadability(situationalVoice(input), (input.prefs ?? DEFAULT_COMMUNICATION).readability);
+  const prefs = input.prefs ?? DEFAULT_COMMUNICATION;
+  const held = heldVoice(input);
+  if (held) return applyReadability(held, prefs.readability);
+  return applyConversationStyle(applyReadability(workVoice(input), prefs.readability), prefs.style);
 }
 
-/** The register the SITUATION asks for, before their standing preference. */
-function situationalVoice(input: VoiceInput): Voice {
+/**
+ * The registers the situation owns outright, or null when none of them
+ * applies. Nothing standing — no setting, no style — moves these.
+ */
+function heldVoice(input: VoiceInput): Voice | null {
   const { state: s, signals: sig, decision: dec } = input;
-  const text = s.currentFocus ?? '';
 
   // SAFETY. No warmth performance, no humour, nothing but the thing they need.
   if (sig.safety || dec.reasonCode === 'safety') {
@@ -141,6 +153,14 @@ function situationalVoice(input: VoiceInput): Voice {
   if (sig.urgent || s.urgency === 'high') {
     return { warmth: 'neutral', edge: 'measured', play: 'none', density: 'spare', because: 'real time pressure' };
   }
+
+  return null;
+}
+
+/** The register the WORK asks for, once no held register applies. */
+function workVoice(input: VoiceInput): Voice {
+  const { state: s, decision: dec } = input;
+  const text = s.currentFocus ?? '';
 
   const highStakes = s.stakes.value === 'high';
   const expert = s.expertise.value === 'expert';
@@ -209,6 +229,52 @@ export function applyReadability(v: Voice, r: Readability): Voice {
   // urgent practical answer stays short for someone who reads papers for a
   // living. It lifts the ordinary case.
   return v.density === 'normal' ? { ...v, density: 'dense', because: `${v.because}; dense language preferred` } : v;
+}
+
+/**
+ * Their Conversation Style, applied to the register the work chose.
+ *
+ * ONE STEP, NEVER A JUMP, and only along the dimensions the style is about:
+ *
+ *   Direct      the conversational middle goes — normal density becomes
+ *               spare (a dense register stays dense: packed is direct too),
+ *               warm becomes a colleague's neutral, light humour goes dry
+ *   Companion   one step warmer, and humour one step lighter where the
+ *               situation allowed any (none stays none)
+ *   Challenger  the edge one step sharper, and humour no lighter than dry
+ *
+ * The Thinker is the register as the situation chose it. Applied after
+ * readability, so Simple + Direct is spare and Advanced + Direct is dense —
+ * readability decides how hard the prose is to read; the style decides only
+ * the middle it leaves.
+ */
+export function applyConversationStyle(v: Voice, style: ConversationStyle | undefined): Voice {
+  switch (style) {
+    case 'direct':
+      return {
+        warmth: v.warmth === 'warm' ? 'neutral' : v.warmth,
+        edge: v.edge,
+        play: v.play === 'light' ? 'dry' : v.play,
+        density: v.density === 'normal' ? 'spare' : v.density,
+        because: `${v.because}; the Direct style`,
+      };
+    case 'companion':
+      return {
+        ...v,
+        warmth: v.warmth === 'cool' ? 'neutral' : 'warm',
+        play: v.play === 'dry' ? 'light' : v.play,
+        because: `${v.because}; the Companion style`,
+      };
+    case 'challenger':
+      return {
+        ...v,
+        edge: v.edge === 'soft' ? 'measured' : 'sharp',
+        play: v.play === 'light' ? 'dry' : v.play,
+        because: `${v.because}; the Challenger style`,
+      };
+    default:
+      return v;
+  }
 }
 
 const WARMTH: Record<Warmth, string> = {

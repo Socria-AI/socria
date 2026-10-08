@@ -370,7 +370,12 @@ export function proportionFor(input: SelectInput, dec: InterventionDecision): Pr
   // someone who set Concise and then asks for the full derivation gets it,
   // which is why this sits after the explicit-signal checks above and not
   // before them.
-  const pref = input.prefs?.length ?? 'standard';
+  //
+  // The Direct style leans the same way Concise does, and only where they set
+  // no length of their own: a length they chose is the narrower instruction
+  // and wins over the character they chose.
+  const set = input.prefs?.length ?? 'standard';
+  const pref = set === 'standard' && input.prefs?.style === 'direct' ? 'concise' : set;
   if (pref === 'detailed') return 'normal';
 
   // A REQUEST IS ENOUGH ON ITS OWN. The first version also demanded concrete

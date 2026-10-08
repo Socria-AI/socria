@@ -157,17 +157,60 @@
 .acct-sheet .tt-note{margin:12px 0 0;font-size:.74rem;line-height:1.45;color:var(--ink-70)}
 .acct-sheet .tt-note code{font-size:.72rem}
 
-/* What you mostly think about */
+/* What you mostly think about, and what Socria calls you. Themed ink rather
+   than --line, which has no dark value — the pills had no edge on dark. */
 .acct-sheet .rp{display:flex;flex-wrap:wrap;gap:6px}
-.acct-sheet .rp-o{display:inline-flex;align-items:center;gap:6px;padding:6px 11px 6px 9px;border:1px solid var(--line, rgba(31,31,31,.14));border-radius:999px;
+.acct-sheet .rp-o{display:inline-flex;align-items:center;gap:6px;padding:6px 11px 6px 9px;border:1px solid var(--ink-16);border-radius:999px;
   background:none;cursor:pointer;font:inherit;font-size:.86rem;color:var(--ink)}
 .acct-sheet .rp-o svg{color:var(--moss-700, #3e5a23)}
 .acct-sheet .rp-o:hover{border-color:var(--moss, #5e7633)}
 .acct-sheet .rp-o.on{border-color:var(--moss, #5e7633);background:rgba(var(--moss-rgb, 94, 118, 51), .1)}
 .acct-sheet .rp-note{flex-basis:100%;margin:6px 0 0;font-size:.76rem;color:var(--ink-70)}
 .acct-sheet .rp-name{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.acct-sheet .rp-name input{flex:1;min-width:0;max-width:260px;border:0;border-bottom:1px solid var(--line, rgba(31,31,31,.18));background:none;padding:6px 2px;font:inherit;font-size:1rem;color:var(--ink);outline:none}
+.acct-sheet .rp-name input{flex:1;min-width:0;max-width:260px;border:0;border-bottom:1px solid var(--ink-25);background:none;padding:6px 2px;font:inherit;font-size:1rem;color:var(--ink);outline:none}
 .acct-sheet .rp-name input:focus{border-bottom-color:var(--moss, #5e7633)}
-.acct-sheet .rp-name button{border:1px solid var(--line, rgba(31,31,31,.18));background:none;border-radius:999px;padding:4px 12px;cursor:pointer;font:inherit;font-size:.82rem;color:var(--ink)}
+.acct-sheet .rp-name button{border:1px solid var(--ink-25);background:none;border-radius:999px;padding:4px 12px;cursor:pointer;font:inherit;font-size:.82rem;color:var(--ink)}
 .acct-sheet .rp-name button:disabled{opacity:.4;cursor:default}
 .acct-sheet .rp-bad{font-size:.76rem;color:var(--tension, #9c5b3c)}
+
+/* ── Personalization: one section, three parts ──────────────────────────
+   How Socria talks with you (the account's, every device), then what it calls
+   you and what you mostly think about (this browser's). Serif part heads under
+   the section's small-caps label, a dashed rule between the parts — the same
+   quiet rule the Testing section uses to set itself apart. */
+.acct-sheet .sub{padding:0 0 18px}
+.acct-sheet .sub + .sub{padding-top:16px;border-top:1px dashed var(--ink-16)}
+.acct-sheet .sub:last-child{padding-bottom:0}
+.acct-sheet .sub-h{margin:0 0 10px;font-family:var(--font-serif, Georgia, serif);font-weight:400;font-size:1.08rem;
+  letter-spacing:-.01em;line-height:1.2;color:var(--ink)}
+.acct-sheet .sub-d{margin:-6px 0 12px;font-size:.84rem;line-height:1.45;color:var(--ink-70);max-width:46ch}
+
+/* Conversation style: four characters, then the same message in each product's voice. */
+.acct-sheet .cs-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.acct-sheet .cs-o{display:flex;flex-direction:column;align-items:flex-start;gap:4px;text-align:left;padding:11px 13px 12px;
+  border:1px solid var(--ink-16);border-radius:14px;background:none;font:inherit;color:var(--ink);cursor:pointer;
+  transition:border-color .2s,background-color .2s}
+.acct-sheet .cs-o:hover{border-color:var(--moss, #5e7633)}
+.acct-sheet .cs-o:focus-visible{outline:2px solid var(--moss, #5e7633);outline-offset:2px}
+.acct-sheet .cs-o.on{border-color:var(--moss, #5e7633);background:rgba(var(--moss-rgb, 94, 118, 51), .08)}
+.acct-sheet .cs-name{display:flex;align-items:center;gap:7px;font-family:var(--font-serif, Georgia, serif);font-size:1rem;line-height:1.15}
+.acct-sheet .cs-o.on .cs-name{color:var(--moss-700, #3e5a23)}
+.acct-sheet .cs-tag{font-family:var(--font-sans, system-ui, sans-serif);font-size:.55rem;font-weight:600;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--ink-70);border:1px solid var(--ink-12);border-radius:999px;padding:1px 6px}
+.acct-sheet .cs-line{font-size:.78rem;line-height:1.4;color:var(--ink-70)}
+.acct-sheet .cs-sample{margin:12px 0 0;padding:12px 14px 11px;border-left:2px solid var(--moss, #5e7633);
+  background:rgba(var(--moss-rgb, 94, 118, 51), .045);border-radius:0 12px 12px 0}
+.acct-sheet .cs-ask,
+.acct-sheet .cs-say{margin:0;display:grid;grid-template-columns:52px minmax(0,1fr);gap:10px;align-items:baseline}
+.acct-sheet .cs-ask{font-size:.82rem;line-height:1.45;color:var(--ink-70);padding-bottom:9px;margin-bottom:9px;border-bottom:1px solid var(--ink-12)}
+.acct-sheet .cs-say + .cs-say{margin-top:8px}
+.acct-sheet .cs-who{font-family:var(--font-sans, system-ui, sans-serif);font-size:.56rem;font-weight:600;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--ink-70)}
+.acct-sheet .cs-q{font-family:var(--font-serif, Georgia, serif);font-style:italic;font-size:.93rem;line-height:1.45;color:var(--ink)}
+.acct-sheet .cs-cap{margin-top:10px;font-size:.72rem;color:var(--ink-70)}
+.acct-sheet .cs-note{margin:12px 0 0;font-family:var(--font-serif, Georgia, serif);font-style:italic;font-size:.88rem;line-height:1.45;
+  color:var(--ink-70);max-width:52ch}
+.acct-sheet .cs-status{min-height:1.25em;margin:6px 0 0;font-size:.78rem;line-height:1.4;color:var(--moss-700, #3e5a23)}
+.acct-sheet .cs-status.is-bad{color:var(--tension, #9c5b3c)}
+@media (max-width:440px){.acct-sheet .cs-grid{grid-template-columns:1fr}}
+@media (prefers-reduced-motion:reduce){.acct-sheet .cs-o{transition:none}}

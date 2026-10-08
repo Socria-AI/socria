@@ -58,6 +58,7 @@ import { LOGOS3_TOUR, LOGOS_TOUR, LOGOS_TOUR_KEY, shouldRunTour } from '@/lib/to
 import { LogosMark } from '@/components/LogosMark';
 import { AccountControl } from '@/components/account/AccountControl';
 import { AccountSheet } from '@/components/account/AccountSheet';
+import { useConversationStyle } from '@/components/useConversationStyle';
 import { ChallengeChip } from '@/components/rewards/ChallengeChip';
 import { PLAN_CHANGED, SESSION_SAVED } from '@/components/rewards/useRewards';
 import { ModelPicker } from '@/components/ModelPicker';
@@ -345,6 +346,9 @@ export function LogosApp({
   onMoveChat?: (id: string, projectId: string | null) => void;
 } = {}) {
   const { isLoaded, isSignedIn, user } = useUser();
+  // The account's Conversation Style (Manage Account → Personalization):
+  // carried by every generation request beside depth and the guard.
+  const { ref: conversationStyleRef } = useConversationStyle(!!isSignedIn);
   const [unlocked, setUnlocked] = useState(false);
   // Don't hang behind Clerk: if it never initializes (preview builds), fall
   // through to the key gate rather than showing nothing forever.
@@ -873,6 +877,9 @@ export function LogosApp({
     // chosen on Core 3.1 rode along into Logos with no control to see it by.
     depth: depthOn ? depthRef.current : ('balanced' as ThinkingDepth),
     guard: guardRef.current,
+    // the character chosen for the account, above the dials and the
+    // written instructions below it (lib/conversation-style.ts)
+    conversationStyle: conversationStyleRef.current,
     style: styleRef.current,
     persona: personaRef.current,
   });
