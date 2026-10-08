@@ -46,6 +46,9 @@ export interface CollabHandle {
   leave: () => void;
   /** call when the local person sends a message — stamps, applies, broadcasts */
   onLocalMessage: (m: LogosMsg) => LogosMsg;
+  /** call when Socria answers here — applies and broadcasts it, so it is in the
+      room's record on both screens and no later event can paint it away */
+  onLocalReply: (m: LogosMsg) => LogosMsg;
   /** call when the host's extractor produces a new map; returns it with each
       node attributed to whoever it was drawn from, so the local view and the
       broadcast agree. Returns the map unchanged when not in a room. */
@@ -158,7 +161,12 @@ export function useLogosCollab(opts: {
       // who is already here is a reply: when we first see someone's hello, we
       // answer with our own. The "before" check is the loop guard — we reply
       // to a newcomer, not to their reply to us.
-      stateRef.current = applyEvent(st, ev);
+      const next = applyEvent(st, ev);
+      // Our own event coming back, or one already here: nothing changed, and
+      // nothing is repainted — a repaint from the record used to be how an
+      // answer not yet in it was wiped off the screen.
+      if (next === st) return;
+      stateRef.current = next;
       flush();
       // No hello-reply any more. It existed because BroadcastChannel does not
       // replay, so a late joiner could only learn who was there by being
@@ -359,6 +367,17 @@ export function useLogosCollab(opts: {
     [emit]
   );
 
+  const onLocalReply = useCallback(
+    (m: LogosMsg): LogosMsg => {
+      if (!stateRef.current) return m;
+      const { by: _signed, ...words } = m;
+      const reply: LogosMsg = { ...words, role: 'assistant' };
+      emit({ kind: 'message', message: reply } as never);
+      return reply;
+    },
+    [emit]
+  );
+
   const onLocalMap = useCallback(
     (map: ThinkingMap): ThinkingMap => {
       if (!stateRef.current) return map;
@@ -401,6 +420,7 @@ export function useLogosCollab(opts: {
     leave,
     error,
     onLocalMessage,
+    onLocalReply,
     onLocalMap,
     onLocalNode,
     people,

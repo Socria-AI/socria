@@ -18,6 +18,7 @@
 
 import { sanitizeAttachments, wordCount, type Attachment } from './logos-attachments';
 import { MAX_FILE_TEXT } from './file-kinds';
+import { cleanReplyRef, quoteLine, type ReplyRef } from './chat-thread';
 
 /** Characters of attached text across the whole history — about 30k tokens. */
 export const ATTACHMENT_BUDGET = 120_000;
@@ -43,6 +44,18 @@ export interface ChatMsg {
   role: 'user' | 'assistant';
   content: string;
   attachments?: Attachment[];
+  /** the message this turn answers — a snapshot (lib/chat-thread.ts) */
+  replyTo?: ReplyRef;
+}
+
+/**
+ * A person's turn as the model reads it: when it replies to a particular
+ * message, one fixed-format quoted line first (lib/chat-thread.ts quoteLine),
+ * so "this one" is about the message they pressed Reply on.
+ */
+export function withQuote(m: { role: string; content: string; replyTo?: unknown }): string {
+  const ref = m.role === 'user' ? cleanReplyRef(m.replyTo) : undefined;
+  return ref ? `${quoteLine(ref)}\n${m.content}` : m.content;
 }
 
 /** Every message's attachments, made safe. The one entry point from a request. */
@@ -55,7 +68,7 @@ export function sanitizeChatMessages(raw: unknown[]): ChatMsg[] {
       const attachments = m.role === 'user' ? sanitizeAttachments(m.attachments, MAX_FILE_TEXT) : [];
       return {
         role: m.role,
-        content: m.content,
+        content: withQuote(m),
         ...(attachments.length ? { attachments } : {}),
       };
     });
@@ -190,13 +203,15 @@ export function hasSubstance(m: ChatMsg): boolean {
  * entirely and only the words go.
  */
 export function forRequest(messages: readonly ChatMsg[], takesFiles: boolean, budget = ATTACHMENT_BUDGET): ChatMsg[] {
-  if (!takesFiles) return messages.map((m) => ({ role: m.role, content: m.content }));
+  // what a turn answers travels with it; the server folds it into the model's copy
+  const ref = (m: ChatMsg) => (m.role === 'user' && m.replyTo ? { replyTo: m.replyTo } : {});
+  if (!takesFiles) return messages.map((m) => ({ role: m.role, content: m.content, ...ref(m) }));
   let left = budget;
   const out: ChatMsg[] = new Array(messages.length);
   for (let i = messages.length - 1; i >= 0; i--) {
     const m = messages[i];
     if (!m.attachments?.length) {
-      out[i] = { role: m.role, content: m.content };
+      out[i] = { role: m.role, content: m.content, ...ref(m) };
       continue;
     }
     const attachments = m.attachments.map((a) => {
@@ -212,7 +227,7 @@ export function forRequest(messages: readonly ChatMsg[], takesFiles: boolean, bu
       left -= Math.min(len, OPENING_CHARS);
       return { ...a, text: (a.text ?? '').slice(0, OPENING_CHARS), opening: true };
     });
-    out[i] = { role: m.role, content: m.content, attachments };
+    out[i] = { role: m.role, content: m.content, attachments, ...ref(m) };
   }
   return out;
 }

@@ -1,0 +1,174 @@
+/* components/logos-thread.css
+ *
+ * A Logos conversation, alone or in a group (components/LogosMessage.tsx), and
+ * the composer's reply chip and @socria offer (components/LogosComposer.tsx).
+ *
+ * Alone, the page reads as it always has: Socria's words on the paper, the
+ * person's in a bubble on the right. In a group it reads like a group chat:
+ * your words on the right; everyone else on the left with their initial and
+ * their name in their own colour (lib/share/hue.ts, chosen to read on every
+ * theme); Socria on the left with its mark, in a light card, saying whom it is
+ * answering. A run from one person shows the name and face once.
+ *
+ * Built only from the Logos tokens (--lg-*), so paper, white, dark and the
+ * Socria One blue all follow without a line here.
+ */
+
+.logos-root .lg-msg-main { position: relative; min-width: 0; }
+.logos-root .lg-msg-user .lg-msg-main {
+  display: flex; flex-direction: column; align-items: flex-end; flex: 1 1 auto;
+}
+
+/* ── a group ────────────────────────────────────────────────────────── */
+.logos-root .lg-msg.is-group { display: flex; align-items: flex-start; gap: 10px; margin: 18px 0 0; }
+.logos-root .lg-msg.is-group.is-cont { margin-top: 4px; }
+.logos-root .lg-msg.is-group .lg-msg-main { display: flex; flex-direction: column; align-items: flex-start; flex: 1 1 auto; }
+
+.logos-root .lg-msg-av {
+  flex: 0 0 28px; width: 28px; height: 28px; margin-top: 20px; border-radius: 50%;
+  display: grid; place-items: center;
+  font-size: 12px; font-weight: 600; line-height: 1; color: #fff;
+  background: var(--by, var(--lg-primary));
+  user-select: none;
+}
+.logos-root .lg-msg-av.is-socria { background: var(--lg-paper); border: 1px solid var(--lg-line); }
+.logos-root .lg-msg-av.is-socria img { width: 16px; height: 16px; display: block; }
+.logos-root .lg-msg.is-group.is-cont .lg-msg-av { visibility: hidden; height: 0; margin-top: 0; }
+
+.logos-root .lg-msg.is-group .lg-msg-who {
+  display: block; margin: 0 0 4px 2px;
+  font-size: 12px; font-weight: 600; letter-spacing: 0.01em; text-transform: none; opacity: 1;
+  color: var(--by, var(--lg-primary));
+}
+.logos-root .lg-msg-to { font-weight: 400; color: var(--lg-ink-40); letter-spacing: 0; text-transform: none; }
+
+/* everyone else, on the left */
+.logos-root .lg-msg.is-group.is-other { justify-content: flex-start; }
+.logos-root .lg-msg.is-group.is-other .lg-msg-main { max-width: min(calc(100% - 38px), 62ch); }
+.logos-root .lg-msg.is-group.is-other .lg-msg-stack { align-items: flex-start; margin-left: 0; max-width: 100%; }
+.logos-root .lg-msg.is-group.is-other .lg-msg-body {
+  max-width: 100%;
+  background: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.05);
+  border-radius: 4px 16px 16px 16px;
+}
+.logos-root .lg-msg.is-group.is-other.is-cont .lg-msg-body { border-radius: 16px; }
+
+/* you, on the right */
+.logos-root .lg-msg.is-group.is-mine { justify-content: flex-end; }
+.logos-root .lg-msg.is-group.is-mine .lg-msg-main { align-items: flex-end; max-width: min(80%, 62ch); margin-left: auto; }
+.logos-root .lg-msg.is-group.is-mine .lg-msg-stack { max-width: 100%; }
+.logos-root .lg-msg.is-group.is-mine .lg-msg-body { max-width: 100%; }
+.logos-root .lg-msg.is-group.is-mine.is-cont .lg-msg-body { border-radius: 16px; }
+
+/* Socria, on the left, in a light card */
+.logos-root .lg-msg.is-group.is-socria .lg-msg-main { max-width: min(calc(100% - 38px), 66ch); }
+.logos-root .lg-msg.is-group.is-socria .lg-msg-body {
+  max-width: 100%;
+  padding: 12px 16px;
+  background: var(--lg-paper);
+  border: 1px solid var(--lg-line);
+  border-radius: 4px 16px 16px 16px;
+}
+.logos-root .lg-msg.is-group.is-socria .lg-thinking { padding: 10px 14px; border: 1px solid var(--lg-line); border-radius: 4px 16px 16px 16px; background: var(--lg-paper); }
+.logos-root .lg-msg.is-elsewhere { opacity: 0.8; }
+
+/* ── what a message answers ─────────────────────────────────────────── */
+.logos-root .lg-msg-quote {
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  max-width: 100%; margin: 0 0 6px; padding: 4px 10px;
+  text-align: left; font: inherit; font-size: 12.5px; line-height: 1.45; color: var(--lg-ink-60);
+  background: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.035);
+  border: 0; border-left: 2px solid var(--by, var(--lg-primary)); border-radius: 4px 8px 8px 4px;
+  cursor: pointer;
+}
+.logos-root .lg-msg-quote b { color: var(--lg-ink); font-weight: 600; margin-right: 3px; }
+.logos-root .lg-msg-quote:hover:not(:disabled) { background: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.07); }
+.logos-root .lg-msg-quote:disabled { cursor: default; }
+.logos-root .lg-msg-quote:focus-visible { outline: 2px solid var(--lg-primary); outline-offset: 2px; }
+
+/* gone to by a quote: a brief ring, so the eye lands */
+.logos-root .lg-msg.is-flash .lg-msg-body,
+.logos-root .lg-synth-wrap.is-flash { animation: lgFlash 1.4s ease; }
+@keyframes lgFlash {
+  0%, 35% { box-shadow: 0 0 0 3px rgba(var(--lg-primary-rgb, 53, 70, 32), 0.28); }
+  100% { box-shadow: 0 0 0 0 rgba(var(--lg-primary-rgb, 53, 70, 32), 0); }
+}
+
+/* @socria, in what someone typed */
+.logos-root .lg-mention {
+  color: var(--lg-primary); font-weight: 600;
+  background: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.09);
+  border-radius: 4px; padding: 0 3px;
+}
+
+/* ── Reply and Copy ─────────────────────────────────────────────────────
+   A small bar that appears under the message on hover or keyboard focus,
+   over the gap below it — so it never adds height to the conversation. On a
+   touch screen there is no hover: it sits in the flow, always there. */
+.logos-root .lg-synth-wrap { position: relative; }
+.logos-root .lg-msg-acts {
+  position: absolute; top: calc(100% + 2px); left: 0; z-index: 3;
+  display: inline-flex; gap: 2px; padding: 2px;
+  background: var(--lg-paper); border: 1px solid var(--lg-line); border-radius: 999px;
+  box-shadow: 0 8px 20px -14px rgba(var(--lg-ink-rgb, 35, 36, 31), 0.5);
+  opacity: 0; pointer-events: none; transition: opacity 0.15s;
+}
+.logos-root .lg-msg.is-mine .lg-msg-acts { left: auto; right: 0; }
+.logos-root .lg-msg:hover .lg-msg-acts,
+.logos-root .lg-msg:focus-within .lg-msg-acts,
+.logos-root .lg-synth-wrap:hover > .lg-msg-acts,
+.logos-root .lg-synth-wrap:focus-within > .lg-msg-acts { opacity: 1; pointer-events: auto; }
+.logos-root .lg-synth-wrap > .lg-msg-acts { top: auto; bottom: -26px; }
+.logos-root .lg-msg-act {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 9px; border: 0; border-radius: 999px; background: none;
+  font: inherit; font-size: 11.5px; color: var(--lg-ink-60); cursor: pointer; white-space: nowrap;
+}
+.logos-root .lg-msg-act:hover,
+.logos-root .lg-msg-act:focus-visible { color: var(--lg-primary); background: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.08); outline: none; }
+.logos-root .lg-sr {
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
+}
+@media (hover: none) {
+  .logos-root .lg-msg-acts,
+  .logos-root .lg-synth-wrap > .lg-msg-acts {
+    position: static; margin-top: 4px; opacity: 0.85; pointer-events: auto;
+    background: none; border: 0; box-shadow: none; padding: 0;
+  }
+  .logos-root .lg-msg-act { padding: 7px 10px; min-height: 32px; }
+}
+
+/* ── the composer: replying, and finishing @socria ──────────────────── */
+.logos-root .lg-reply-chip {
+  display: flex; align-items: center; gap: 8px;
+  margin: 2px 2px 6px; padding: 6px 6px 6px 10px;
+  border-left: 2px solid var(--lg-primary); border-radius: 4px 8px 8px 4px;
+  background: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.05);
+  font-size: 12.5px; color: var(--lg-ink-60);
+}
+.logos-root .lg-reply-chip > svg { flex: 0 0 auto; color: var(--lg-primary); }
+.logos-root .lg-reply-text { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.logos-root .lg-reply-k { color: var(--lg-primary); font-weight: 600; font-size: 11.5px; }
+.logos-root .lg-reply-x { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.logos-root .lg-reply-cancel {
+  flex: 0 0 auto; width: 28px; height: 28px; border: 0; border-radius: 50%;
+  background: none; color: var(--lg-ink-40); font-size: 18px; line-height: 1; cursor: pointer;
+}
+.logos-root .lg-reply-cancel:hover,
+.logos-root .lg-reply-cancel:focus-visible { color: var(--lg-ink); background: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.06); outline: none; }
+.logos-root .lg-mention-offer {
+  display: inline-flex; align-items: center; gap: 8px;
+  margin: 0 0 6px 6px; padding: 5px 12px 5px 6px;
+  font: inherit; font-size: 12px; color: var(--lg-ink-60);
+  background: var(--lg-paper); border: 1px solid var(--lg-line); border-radius: 999px;
+  box-shadow: 0 8px 18px -12px rgba(var(--lg-ink-rgb, 35, 36, 31), 0.45);
+  cursor: pointer;
+}
+.logos-root .lg-mention-offer:hover { color: var(--lg-ink); }
+
+@media (prefers-reduced-motion: reduce) {
+  .logos-root .lg-msg.is-flash .lg-msg-body,
+  .logos-root .lg-synth-wrap.is-flash { animation: none; outline: 2px solid var(--lg-primary); outline-offset: 2px; }
+  .logos-root .lg-msg-acts { transition: none; }
+}

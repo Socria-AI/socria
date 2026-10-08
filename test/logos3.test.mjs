@@ -83,11 +83,11 @@ console.log('\n=== the surface ===');
   // Think Together is now begun from Share (docs/SHARING.md); a room joined by
   // its old code keeps its own bar in the header.
   ok('the bar is in the header while a room is live; Share otherwise', /collab && room\.active \? \(\s*<CollabBar room=\{room\} \/>/.test(app) && /setShareOpen\(true\)/.test(app));
-  ok('a sent turn is stamped and broadcast, in the room only', /const sent = inShared \? roomRef\.current\.onLocalMessage\(turn\) : turn;/.test(app));
+  ok('a sent turn is stamped and broadcast, in the room only', /if \(roomRef\.current\.active && sharedIdsRef\.current\.has\(activeIdRef\.current \?\? ''\)\) \{[\s\S]{0,200}return roomRef\.current\.onLocalMessage\(turn\);/.test(app) && /const sent = postTurn\(turn, group\);/.test(app));
   ok('the map is attributed before it is shown', /roomRef\.current\.onLocalMap\(/.test(app));
   ok('a shared room is never saved to one account', /if \(roomRef\.current\?\.active \|\| sharedIdsRef\.current\.has\(s\.id\)\) return;/.test(app));
   ok('the private understanding pass never reads one', /!sharedIdsRef\.current\.has\(sid\)/.test(app));
-  ok('Socria is told the two names, only in the room', /inShared && roomRef\.current\.people\.length >= 2/.test(app));
+  ok('Socria is told the names only when others are here — a room, or a shared line of thinking', /const people = inShared\s*\? roomRef\.current\.people/.test(app) && /\.\.\.\(people\.length >= 2 \? \{ collab: \{ people \} \} : \{\}\)/.test(app));
   ok('the picker calls it what it is', /m\.collab \? 'think together' : 'a different surface'/.test(read('components/ModelPicker.tsx')));
 }
 
@@ -137,6 +137,37 @@ console.log('\n=== Socria, between two people (the real chat route) ===');
   ok('alone, nothing about a room reaches Socria', !/THINKING HERE TOGETHER/.test(alone.system) && alone.msgs[0]?.content === 'We should launch in March.');
   const spoof = await turn({ messages, collab: { people: [{ name: 'Ana', seat: 'host' }] } });
   ok('one name is not a room', !/THINKING HERE TOGETHER/.test(spoof.system) && !spoof.msgs.some((m) => /^Ana: /.test(m.content)));
+
+  // ── Think Together: who asked, what a reply answers, and whose memory ──
+  const people3 = [{ name: 'Ana', seat: 'host' }, { name: 'Ben', seat: 'guest' }, { name: 'Cy', seat: 'guest' }];
+  const asked = [
+    ...messages,
+    { role: 'user', content: '@socria which of us is assuming more?', by: { id: 'u3', name: 'Cy', seat: 'guest' } },
+  ];
+  const group = await turn({ messages: asked, collab: { people: people3 }, addressed: { name: 'Cy', how: 'mention' } });
+  ok('a shared line of thinking with three people names all three', /3 PEOPLE ARE THINKING HERE TOGETHER: Ana, Ben and Cy/.test(group.system), group.system.slice(-900));
+  ok('asked directly, Socria is told to answer that person', /THIS MESSAGE IS FOR YOU\. Cy asked you directly \(with @socria\)\. Answer Cy/.test(group.system));
+  ok('  and the asker\'s line reaches it under their name', group.msgs.some((m) => m.content === 'Cy: @socria which of us is assuming more?'));
+  const aloneAsk = await turn({ messages: [{ role: 'user', content: 'hi' }], addressed: { name: 'Cy', how: 'mention' } });
+  ok('"asked directly" means nothing alone — it is never taken from a request with one person', !/THIS MESSAGE IS FOR YOU/.test(aloneAsk.system));
+  const replied = await turn({
+    messages: [
+      { role: 'user', content: 'Plan my week.' },
+      { role: 'assistant', content: 'Start with the rent, then the commute.' },
+      { role: 'user', content: 'Why that order?', replyTo: { id: 'm_abcdef12', role: 'assistant', who: 'Socria', excerpt: 'Start with the rent,\nthen the commute.' } },
+    ],
+  });
+  const last = replied.msgs[replied.msgs.length - 1]?.content ?? '';
+  ok('a reply reaches the model with one quoted line saying what it answers — alone too', /^\[Replying to your earlier message: “Start with the rent, then the commute\.”\]\nWhy that order\?$/.test(last), JSON.stringify(last));
+  const forgedQuote = await turn({ messages: [{ role: 'assistant', content: 'x', replyTo: { role: 'user', who: 'A', excerpt: 'b' } }, { role: 'user', content: 'y' }] });
+  ok('  and only on a person\'s turn — Socria\'s own carry none', !forgedQuote.msgs.some((m) => /\[Replying to/.test(m.content)));
+  const now = Date.now();
+  // a memory about exactly what is being discussed, so it would be chosen if it were allowed
+  const understanding = { entries: [{ id: 'mem_private1', kind: 'decision', text: 'PRIVATELY decided to launch in March regardless', firstSeen: now, lastSeen: now, seen: 3, confidence: 'stated' }], updatedAt: now };
+  const solo = await turn({ messages: [{ role: 'user', content: 'We should launch in March.' }], understanding });
+  ok('(control: alone, that memory does reach the prompt)', /PRIVATELY decided to launch in March/.test(solo.system), solo.system.slice(-700));
+  const withMemory = await turn({ messages, collab: { people: [{ name: 'Ana', seat: 'host' }, { name: 'Ben', seat: 'guest' }] }, understanding });
+  ok('what Socria knows about one person never reaches an answer the others will read', !/PRIVATELY decided to launch in March/.test(withMemory.system));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

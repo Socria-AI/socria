@@ -13,10 +13,21 @@ import type { Attachment } from './logos-attachments';
 import { sanitizeContexts, type NodeContexts } from './logos-sources';
 import type { ByRef } from './logos';
 import type { Synthesis } from './logos-synthesis';
+import type { ReplyRef } from './chat-thread';
 
 export interface LogosMsg {
+  /**
+   * Its name, given where it was made (lib/chat-thread.ts newMsgId) — how two
+   * screens agree which message is which, and what a reply points at. Turns
+   * written before ids existed have none, and are matched as they always were.
+   */
+  id?: string;
+  /** when it was said */
+  at?: number;
   role: 'user' | 'assistant';
   content: string;
+  /** the message this one answers — its own snapshot, so the quote outlives the original */
+  replyTo?: ReplyRef;
   /** notes and images brought into the conversation with this turn */
   attachments?: Attachment[];
   /** who wrote it, when two people are thinking together — see lib/collab.ts */

@@ -15,20 +15,20 @@ const app = read('components/LogosApp.tsx');
 const hook = read('components/share/useSharedSession.ts');
 
 console.log('=== a shared Logos session is written through the share routes ===');
-ok('the active shared session pushes its turns and map, never a whole-row save', /if \(t\?\.active && s\.id === activeIdRef\.current\) \{\s*void t\.push\(\{ messages: s\.messages, map: s\.map \}\);\s*t\.keepOwn\(s\.draft, s\.contexts\);\s*return;/.test(app));
+ok('the active shared session pushes its turns and map, never a whole-row save', /if \(t\?\.active && s\.id === activeIdRef\.current\) \{[\s\S]{0,120}void t\.push\(\);\s*t\.keepOwn\(s\.draft, s\.contexts\);\s*return;/.test(app));
 ok('someone else\'s session is never saved as one\'s own', /if \(foreignIdsRef\.current\.has\(s\.id\)\) return;/.test(app));
 ok('it is opened from a share link through the share gate', /sharedLink = q\.get\('shared'\) === '1'/.test(app) && /\/api\/shared\/conversation\/\$\{encodeURIComponent\(wanted\)\}/.test(app) && /foreignIdsRef\.current\.add\(c\.id\)/.test(app));
-ok('a newer version from someone else is put on screen without saving it back', /onRemote: \(r\) => \{[\s\S]{0,300}patchSession\([\s\S]{0,300}false\s*\);/.test(app));
-ok('the map — its nodes, models, objects and plots — is what syncs', /map: \(r\.map as LogosSession\['map'\]\) \?\? cur\.map/.test(app));
+ok('what the server holds is put on screen for the session it was read for, without saving it back', /onRemote: \(id, r\) => \{\s*patchSession\(\s*id,[\s\S]{0,300}false\s*\);/.test(app));
+ok('the map — its nodes, models, objects and plots — is what syncs, when the server\'s is taken', /map: r\.map !== undefined \? \(\(r\.map as LogosSession\['map'\]\) \?\? cur\.map\) : cur\.map/.test(app));
 ok('on any Logos surface, signed in, outside a code-joined room — a shared session is never saved whole', /enabled: !!isSignedIn && !room\.active,/.test(app));
 
 console.log('=== the sync itself ===');
 ok('turns and the map go out through one serialised queue', /const next = queue\.current\.then\(run, run\);/.test(hook));
-ok('a stale map is answered with the current one, which is adopted', /res\.status === 409 && j\?\.conflict/.test(hook) && /optsRef\.current\.onRemote\(remote\)/.test(hook));
+ok('a stale map is answered with the current one, which is adopted — the turns sent with it went in anyway', /const conflict = res\.status === 409 && !!j\?\.conflict;/.test(hook) && /take\(id, \{ messages: j\.messages, map: j\.map \?\? null, title: '', updatedAt: Number\(j\.updatedAt\) \|\| 0 \}, \{ takeMap: conflict \}\)/.test(hook));
 ok('a refused write (a viewer) stops retrying', /res\.status === 403[\s\S]{0,200}blocked\.current = true/.test(hook));
-ok('a poll only replaces the screen when nothing is pending and nothing is streaming', /mayAdopt\(seen\.current, remote\.updatedAt, local, optsRef\.current\.busy\)/.test(hook));
+ok('every row the server sends is joined with the screen, never laid over it', /const r = absorb\(base, remote, local \?\? \{ messages: \[\], map: null \}, \{ busy: optsRef\.current\.busy, takeMap: how\.takeMap \}\);/.test(hook) && /optsRef\.current\.onRemote\(id, \{\s*messages: r\.messages,/.test(hook));
 ok('presence leaves when the session closes', /leave: true/.test(hook));
-ok('the owner\'s draft goes through the same queue, and its version is recorded', /seen\.current = \{ \.\.\.seen\.current, version: Number\(j\.updatedAt\) \}/.test(hook));
+ok('the owner\'s draft goes through the same queue, and the row it answers with is taken in like any other', (() => { const k = hook.slice(hook.indexOf('const keepOwn'), hook.indexOf('const recheck')); return /queue\.current\.then\(run, run\)/.test(k) && /take\(id, \{ messages: j\.messages/.test(k); })());
 
 console.log('=== roles, in the interface as on the server ===');
 ok('a viewer or commenter cannot send', /togetherRef\.current\?\.active && togetherRef\.current\.role !== 'owner' && togetherRef\.current\.role !== 'editor'/.test(app));

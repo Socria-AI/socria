@@ -124,13 +124,17 @@ and the plots. Everyone works on the same canonical state: the owner's row,
 written only through the share routes.
 
 - **Out.** `persist()` sends what this client has that the server does not:
-  new turns are appended, and the map is sent against the version it was drawn
-  on. Everything goes through one queue, so a client never races itself. A
-  shared session is never saved as a whole row, and someone else's session is
+  turns the server has never held, **by id**, and the map against the version
+  it was drawn on. Everything goes through one queue, so a client never races
+  itself; a failed write is retried with backoff, and a retried turn lands once.
+  A shared session is never saved as a whole row, and someone else's session is
   never saved as your own.
-- **In.** A cheap poll. A newer version replaces the screen only when nothing
-  of this client's is still unsent and no reply is streaming. A stale map comes
-  back with the current one, which is adopted.
+- **In.** A cheap poll. Every row the server sends — to a poll, a write, or a
+  refused map — is **joined** with the screen, never laid over it: the server's
+  turns in its order, then this screen's turns the server has not had yet. A
+  stale map comes back with the current one, which is adopted; the turns sent
+  beside it are appended anyway. Why this changed, and the group-chat rules
+  (who Socria answers, Reply, Copy): `docs/THINK-TOGETHER.md`.
 - **Presence and pointers.**
   - Faces beside **Share** show who is here.
   - Each person's pointer is sent in map coordinates

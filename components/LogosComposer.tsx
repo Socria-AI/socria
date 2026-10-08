@@ -21,6 +21,8 @@ import {
   wordCount,
 } from '@/lib/logos-attachments';
 import { isImageFile, isTextFile, prepareImage, readTextFile } from '@/lib/logos-upload';
+import { mentionAt, type ReplyRef } from '@/lib/chat-thread';
+import './logos-thread.css';
 
 export interface Draft extends Attachment {
   id: string;
@@ -173,6 +175,9 @@ export function LogosComposer({
   busy,
   readImage,
   focusSignal,
+  replyTo,
+  onCancelReply,
+  group,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -187,6 +192,15 @@ export function LogosComposer({
   busy: boolean;
   /** hands an image to the vision pass; returns what Logos read in it */
   readImage: (dataUrl: string) => Promise<string>;
+  /** the message this one will answer — Reply on a message puts it here */
+  replyTo?: ReplyRef | null;
+  onCancelReply?: () => void;
+  /**
+   * Others are here: a message goes to everyone, and Socria answers when it
+   * is mentioned (@socria) or replied to. Talking to the others never waits
+   * on Socria, so sending stays open while it answers someone.
+   */
+  group?: boolean;
 }) {
   const taRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -199,7 +213,24 @@ export function LogosComposer({
   const dragDepth = useRef(0);
 
   const readying = drafts.some((d) => d.status === 'reading');
-  const canSend = (!!value.trim() || drafts.some((d) => d.status === 'ready')) && !busy && !readying;
+  const canSend = (!!value.trim() || drafts.some((d) => d.status === 'ready')) && (!busy || !!group) && !readying;
+  // "@so…" being typed in a group: offer to finish it as @socria
+  const [caret, setCaret] = useState(0);
+  const [mentionOff, setMentionOff] = useState(-1);
+  const mentionStart = group ? mentionAt(value, caret) : -1;
+  const offering = mentionStart >= 0 && mentionStart !== mentionOff;
+  function takeMention() {
+    const el = taRef.current;
+    if (mentionStart < 0) return;
+    const next = `${value.slice(0, mentionStart)}@socria ${value.slice(caret).replace(/^\s+/, '')}`;
+    const at = mentionStart + 8;
+    onChange(next);
+    setCaret(at);
+    requestAnimationFrame(() => {
+      el?.focus();
+      el?.setSelectionRange(at, at);
+    });
+  }
 
   function grow() {
     const el = taRef.current;
@@ -341,6 +372,36 @@ export function LogosComposer({
           if (e.dataTransfer?.files?.length) void takeFiles(e.dataTransfer.files);
         }}
       >
+        {replyTo && (
+          <div className="lg-reply-chip" role="status">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M9 14 4 9l5-5" />
+              <path d="M4 9h10a6 6 0 0 1 6 6v4" />
+            </svg>
+            <span className="lg-reply-text">
+              <span className="lg-reply-k">Replying to {replyTo.who}</span>
+              <span className="lg-reply-x">{replyTo.excerpt}</span>
+            </span>
+            {onCancelReply && (
+              <button type="button" className="lg-reply-cancel" aria-label={`Stop replying to ${replyTo.who}`} title="Stop replying (Esc)" onClick={onCancelReply}>
+                ×
+              </button>
+            )}
+          </div>
+        )}
+
+        {offering && (
+          <button
+            type="button"
+            className="lg-mention-offer"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={takeMention}
+          >
+            <span className="lg-mention">@socria</span>
+            <span>ask Socria — Tab to finish</span>
+          </button>
+        )}
+
         <AttachmentList
           items={drafts}
           onRemove={(id) => setDrafts((prev) => prev.filter((d) => d.id !== id))}
@@ -395,14 +456,41 @@ export function LogosComposer({
             // caret, so while Socria replied the person could not type — the
             // "I have to fold the conversation away to type" report. Only
             // sending waits for the reply (canSend); writing never does.
-            placeholder={busy ? 'Keep writing — you can send once Socria has replied' : 'What are you working through?'}
+            placeholder={
+              replyTo
+                ? `Reply to ${replyTo.who}…`
+                : group
+                  ? 'Message everyone — @socria to ask Socria'
+                  : busy
+                    ? 'Keep writing — you can send once Socria has replied'
+                    : 'What are you working through?'
+            }
             aria-busy={busy || undefined}
             onChange={(e) => {
               onChange(e.target.value);
+              setCaret(e.target.selectionStart ?? e.target.value.length);
               grow();
             }}
+            onSelect={(e) => setCaret(e.currentTarget.selectionStart ?? 0)}
             onPaste={onPaste}
             onKeyDown={(e) => {
+              if (offering && (e.key === 'Tab' || (e.key === 'Enter' && !e.shiftKey))) {
+                e.preventDefault();
+                takeMention();
+                return;
+              }
+              if (e.key === 'Escape') {
+                if (offering) {
+                  e.preventDefault();
+                  setMentionOff(mentionStart);
+                  return;
+                }
+                if (replyTo && onCancelReply) {
+                  e.preventDefault();
+                  onCancelReply();
+                  return;
+                }
+              }
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 if (canSend) {

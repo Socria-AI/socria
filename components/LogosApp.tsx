@@ -41,6 +41,7 @@ import { bridgeSurfaces, projectMap, projectMind } from '@/lib/workspace/adapter
 import { trace } from '@/lib/workspace/trace';
 import { LogosRail, type RailProject } from '@/components/LogosRail';
 import { AttachmentList, LogosComposer, type Draft } from '@/components/LogosComposer';
+import { LogosMessage, MsgActions, SocriaAnswering, SocriaPending, type Side } from '@/components/LogosMessage';
 import { DraftSpace, type DraftHandle, type DraftSelection } from '@/components/DraftSpace';
 import { DraftResponsePanel } from '@/components/DraftResponsePanel';
 import { LogosGuide, GUIDE_SEEN_KEY } from '@/components/LogosGuide';
@@ -63,6 +64,7 @@ import { ModelPicker } from '@/components/ModelPicker';
 import { CollabBar } from '@/components/CollabBar';
 import { useLogosCollab } from '@/components/useLogosCollab';
 import { cleanName, joinCodeFrom } from '@/lib/collab';
+import { callsSocria, landReply, mentionsSocria, newMsgId, replyRefOf, withArrived, withoutTurn, type ReplyRef } from '@/lib/chat-thread';
 import { SocriaOneModal } from '@/components/SocriaOneModal';
 import { OnePrompt } from '@/components/OnePrompt';
 import { useOnePrompt } from '@/components/useOnePrompt';
@@ -467,6 +469,8 @@ export function LogosApp({
   const [revealedIds, setRevealedIds] = useState<Set<string>>(new Set());
 
   const [input, setInput] = useState('');
+  /** the message the next one answers — set by Reply, shown above the composer */
+  const [replyTo, setReplyTo] = useState<ReplyRef | null>(null);
 
   // Seeded once, and only while the composer is still untouched: someone who
   // has started typing their own sentence must never have it replaced.
@@ -1658,6 +1662,8 @@ export function LogosApp({
     getSession: () => sessionsRef.current.find((x) => x.id === activeIdRef.current) ?? null,
     setSession: (shared) => {
       sharedIdsRef.current.add(shared.id);
+      // the other person's words reach the map too — the extractor reads this record
+      if (shared.id === activeIdRef.current) chronRef.current = withArrived(chronRef.current, shared.messages);
       // A guest with no session of its own adopts the host's; both then keep
       // the shared session as the active one, merged by the reducer.
       applySessions(
@@ -1691,7 +1697,8 @@ export function LogosApp({
       // (lib/share/sync.ts). Someone else's is never saved as one's own.
       const t = togetherRef.current;
       if (t?.active && s.id === activeIdRef.current) {
-        void t.push({ messages: s.messages, map: s.map });
+        // what the server lacks, read from the session when the write goes
+        void t.push();
         t.keepOwn(s.draft, s.contexts);
         return;
       }
@@ -1751,34 +1758,50 @@ export function LogosApp({
     // one read for a session nobody else can reach.
     enabled: !!isSignedIn && !room.active,
     sessionId: activeId,
-    getLocal: () => {
-      const cur = sessionsRef.current.find((x) => x.id === activeIdRef.current);
-      return cur ? { messages: cur.messages as never, map: cur.map } : null;
+    getLocal: (id) => {
+      const cur = sessionsRef.current.find((x) => x.id === id);
+      return cur ? { messages: cur.messages as never, map: cur.map, title: cur.title } : null;
     },
     busy,
-    onRemote: (r) => {
-      const id = activeIdRef.current;
-      if (!id) return;
+    // What the server holds, already JOINED with this screen (lib/share/sync.ts
+    // absorb) — for the session it was read for, never whichever is open now.
+    // Nothing said here is wiped by someone else's write landing first.
+    onRemote: (id, r) => {
       patchSession(
         id,
         (cur) => ({
           ...cur,
           messages: r.messages as never,
-          map: (r.map as LogosSession['map']) ?? cur.map,
+          map: r.map !== undefined ? ((r.map as LogosSession['map']) ?? cur.map) : cur.map,
           title: r.title || cur.title,
         }),
         false
       );
       const cur = sessionsRef.current.find((x) => x.id === id);
-      if (cur) {
+      if (cur && id === activeIdRef.current) {
         mapRef.current = cur.map;
-        chronRef.current = [...cur.messages];
+        // the extractor's record gains what arrived; a thread opened inside a
+        // node, kept only there, stays in it
+        chronRef.current = withArrived(chronRef.current, cur.messages);
       }
     },
   });
   togetherRef.current = together;
   /** may this person add to the shared line of thinking open now? */
   const togetherReadOnly = together.active && together.role !== 'owner' && together.role !== 'editor';
+  /**
+   * The name this person's words go under — the one the share routes and the
+   * room sign them with, so a quote of their message reads the same on every
+   * screen and in what Socria is shown.
+   */
+  const myName =
+    together.people.find((p) => p.you)?.name ||
+    (room.active ? room.me.name : '') ||
+    cleanName(user?.firstName || user?.username, 'Someone');
+  // a reply belongs to the conversation it was started in
+  useEffect(() => {
+    setReplyTo(null);
+  }, [activeId]);
   const [shareOpen, setShareOpen] = useState(false);
   // this person's pointer over the shared map, in map coordinates
   useMapPointer(together.active, together.point);
@@ -2681,7 +2704,7 @@ export function LogosApp({
       .filter((d) => d.status === 'ready')
       .map(({ id, status, error: _e, ...rest }) => rest);
     setDrafts([]);
-    void send(input, ready);
+    void send(input, ready, replyTo);
   }
 
   /**
@@ -2741,7 +2764,10 @@ export function LogosApp({
       const json = await res.json().catch(() => ({}));
       const syn = res.ok ? sanitizeSynthesis(json?.synthesis) : undefined;
       if (!syn) throw new Error(json?.error || 'Socria could not read the map just now. Try again in a moment.');
-      patchSession(sid, (x) => ({ ...x, messages: [...x.messages, { role: 'assistant', content: synthesisText(syn), synthesis: syn }] }));
+      const said: Msg = { id: newMsgId(), at: Date.now(), role: 'assistant', content: synthesisText(syn), synthesis: syn };
+      // in a room it goes through the room's record, so it is on both screens and stays there
+      if (roomRef.current.active && sharedIdsRef.current.has(sid ?? '')) roomRef.current.onLocalReply(said);
+      else patchSession(sid, (x) => ({ ...x, messages: [...x.messages, said] }));
       if (kind === 'selection') setPicked(new Set());
       if (workspaceOn) setDockOpen(false);
     } catch (e) {
@@ -2995,25 +3021,97 @@ export function LogosApp({
     }
   }
 
-  async function send(text: string, atts: Attachment[] = []) {
+  /**
+   * Is anyone else here right now? Then this is a group: people talk to each
+   * other, and Socria speaks when it is asked (lib/chat-thread.ts callsSocria).
+   * Alone — even in a shared line of thinking nobody else has open — every
+   * message is said to Socria, as always.
+   */
+  function groupNow(): boolean {
+    return (
+      (roomRef.current.active && roomRef.current.people.length >= 2) ||
+      (!!togetherRef.current?.active && togetherRef.current.people.some((p) => !p.you))
+    );
+  }
+
+  /** Put a message into the conversation everyone sees — through the room's record in a room. */
+  function postTurn(turn: Msg, save: boolean): Msg {
+    if (roomRef.current.active && sharedIdsRef.current.has(activeIdRef.current ?? '')) {
+      // stamped with who wrote it and broadcast; the room's record puts it on screen
+      return roomRef.current.onLocalMessage(turn);
+    }
+    // in a shared line of thinking it is signed here too, so it reads as theirs at once
+    // (the server signs it again, and its signature is the one kept)
+    const t = togetherRef.current;
+    const signed: Msg =
+      t?.active && t.me && turn.role === 'user'
+        ? { ...turn, by: { id: t.me, name: myName, seat: t.role === 'owner' ? 'host' : 'guest' } }
+        : turn;
+    patchActive((s) => ({ ...s, messages: [...s.messages, signed] }), save);
+    return signed;
+  }
+
+  /** A command's turn and what was done, said into the conversation (and the room's record, in a room). */
+  function postPair(turn: Msg, reply: Msg) {
+    if (roomRef.current.active && sharedIdsRef.current.has(activeIdRef.current ?? '')) {
+      const sent = roomRef.current.onLocalMessage(turn);
+      roomRef.current.onLocalReply({ ...reply, ...(groupNow() ? { replyTo: replyRefOf(sent, myName) } : {}) });
+    } else {
+      const sent = postTurn(turn, false);
+      patchActive((s) => ({ ...s, messages: [...s.messages, { ...reply, ...(groupNow() ? { replyTo: replyRefOf(sent, myName) } : {}) }] }));
+    }
+    chronRef.current = [...chronRef.current, turn, reply];
+  }
+
+  async function send(text: string, atts: Attachment[] = [], replying: ReplyRef | null = null) {
     const content = text.trim();
-    if ((!content && !atts.length) || busy || !activeIdRef.current) return;
+    if ((!content && !atts.length) || !activeIdRef.current) return;
     if (togetherRef.current?.active && togetherRef.current.role !== 'owner' && togetherRef.current.role !== 'editor') {
       setError(togetherRef.current.role === 'commenter' ? 'You can read and comment on this line of thinking, but not add to it.' : 'You can read this line of thinking, but not add to it.');
       return;
     }
 
+    // IN A GROUP, SOCRIA SPEAKS WHEN IT IS ASKED — @socria, or a reply to
+    // something it said. Anything else is said to the others: posted to
+    // everyone at once, with no model, no map pass, nothing spent. Alone,
+    // everything is said to Socria.
+    const group = groupNow();
+    const asks = callsSocria({ group, text: content, replyTo: replying });
+    if (!asks) {
+      setError(null);
+      setInput('');
+      setReplyTo(null);
+      const turn: Msg = {
+        id: newMsgId(),
+        at: Date.now(),
+        role: 'user',
+        content,
+        ...(atts.length ? { attachments: atts } : {}),
+        ...(replying ? { replyTo: replying } : {}),
+      };
+      const sent = postTurn(turn, true);
+      chronRef.current = [...chronRef.current, sent];
+      return;
+    }
+    // One answer at a time from this screen. Talking to the others never waits.
+    if (busy) {
+      if (group) setError('Socria is still answering — send this again in a moment.');
+      return;
+    }
+
     const objTurn = takeObjects(content, atts);
+    const pairOf = (said: string): [Msg, Msg] => [
+      { id: newMsgId(), at: Date.now(), role: 'user', content, ...(replying ? { replyTo: replying } : {}) },
+      { id: newMsgId(), at: Date.now(), role: 'assistant', content: said },
+    ];
 
     // A DESCRIPTION OF THE SCENE IS A COMMAND, like a command to the map: it was built just now, and what was
     // built is written into the conversation. Nothing goes to the model, and nothing is spent.
     if (objTurn.scene) {
       setError(null);
       setInput('');
-      const turn: Msg = { role: 'user', content };
-      const reply: Msg = { role: 'assistant', content: objTurn.scene.said };
-      patchActive((s) => ({ ...s, messages: [...s.messages, turn, reply] }));
-      chronRef.current = [...chronRef.current, turn, reply];
+      setReplyTo(null);
+      postPair(...pairOf(objTurn.scene.said));
       return;
     }
 
@@ -3031,10 +3129,8 @@ export function LogosApp({
         if (wsFacts.lenses.includes(want.lens)) {
           setError(null);
           setInput('');
-          const turn: Msg = { role: 'user', content };
-          const reply: Msg = { role: 'assistant', content: viewSaid(want.lens) };
-          patchActive((s) => ({ ...s, messages: [...s.messages, turn, reply] }));
-          chronRef.current = [...chronRef.current, turn, reply];
+          setReplyTo(null);
+          postPair(...pairOf(viewSaid(want.lens)));
           return;
         }
       }
@@ -3051,11 +3147,9 @@ export function LogosApp({
       if (cmd) {
         setError(null);
         setInput('');
+        setReplyTo(null);
         const said = 'edits' in cmd ? editMap(cmd.edits) ?? cmd.said : cmd.refused;
-        const turn: Msg = { role: 'user', content };
-        const reply: Msg = { role: 'assistant', content: said };
-        patchActive((s) => ({ ...s, messages: [...s.messages, turn, reply] }));
-        chronRef.current = [...chronRef.current, turn, reply];
+        postPair(...pairOf(said));
         return;
       }
     }
@@ -3084,6 +3178,7 @@ export function LogosApp({
 
     setError(null);
     setInput('');
+    setReplyTo(null);
     pendingStart = null;
 
     // Once, here, on the message as sent — never while typing. The reply
@@ -3099,23 +3194,42 @@ export function LogosApp({
     setDrift(v.flag ? { ...v, text: content } : null);
 
     const turn: Msg = {
+      id: newMsgId(),
+      at: Date.now(),
       role: 'user',
       content,
       ...(atts.length ? { attachments: atts } : {}),
+      ...(replying ? { replyTo: replying } : {}),
     };
     // In a shared room — and in the room's own session — the turn is stamped
     // with who wrote it and broadcast to the other person before anything
-    // else happens. Alone, it is the turn unchanged and nothing is sent.
+    // else happens. In a group it is posted to everyone at once, so the
+    // question is there while Socria answers it. Alone, it is held until the
+    // answer lands, and saved with it.
     const inShared = roomRef.current.active && sharedIdsRef.current.has(activeIdRef.current ?? '');
-    const sent = inShared ? roomRef.current.onLocalMessage(turn) : turn;
+    const sid = activeIdRef.current ?? '';
     const before = messages;
+    const sent = postTurn(turn, group);
     // The first thought, anywhere — once, ever (lib/first-run.ts).
     firstRun.reach('socria.thought');
-    const next = [...before, sent];
-    patchActive((s) => ({ ...s, messages: next }), false);
+    // the conversation as it stands now, with this turn — others' words included
+    const next = sessionsRef.current.find((x) => x.id === sid)?.messages ?? [...before, sent];
     chronRef.current = [...chronRef.current, sent];
     setBusy(true);
     setStreaming('');
+    // everyone else sees that an answer is coming
+    if (group) togetherRef.current?.asking(true);
+    // In a group, the one Socria is answering — by name, and how they asked.
+    const addressed = group
+      ? { name: myName, how: replying?.role === 'assistant' && !mentionsSocria(content) ? 'reply' : 'mention' }
+      : null;
+    const people = inShared
+      ? roomRef.current.people
+      : togetherRef.current?.active
+        ? togetherRef.current.people.map((p) => ({ name: p.name, seat: p.role === 'owner' ? ('host' as const) : ('guest' as const) }))
+        : [];
+    // Socria's memory of this person is theirs: never in an answer others will read.
+    const shared = inShared || !!togetherRef.current?.active || foreignIdsRef.current.has(sid);
 
     // A line of thinking begins: which one is this for the person? Shape
     // only — first, second, or later — so activation can be read without a
@@ -3126,8 +3240,7 @@ export function LogosApp({
       ).length;
       track('logos_session_started', { nth: nthBucket(prior + 1), surface: 'logos', signed_in: !!isSignedIn });
     }
-    const sid = activeIdRef.current ?? '';
-    const u = isSignedIn ? understandingRef.current : null;
+    const u = isSignedIn && !shared ? understandingRef.current : null;
     // The state of the picture at this instant. Taken before the request so
     // the same snapshot is both what the model was told and what its answer is
     // checked against — a control moved while the reply streams cannot make a
@@ -3174,7 +3287,7 @@ export function LogosApp({
           // LOGOS 3 REMEMBERS through the same Mind graph as Core 4: recalled
           // before the reply, learned from after it (app/api/logos/chat). Never
           // in a shared room — the other person's words are not theirs to keep.
-          ...(workspaceOn && cloud && !inShared
+          ...(workspaceOn && cloud && !shared
             ? { mind: true, ...(active?.projectId ? { projectId: active.projectId } : {}) }
             : {}),
           // the sentence onboarding sent for them: free, once per account
@@ -3194,20 +3307,25 @@ export function LogosApp({
             const b = mapRef.current ? briefOf(mapRef.current) : null;
             return b ? { building: b } : {};
           })(),
-          // Two people in the room: their names, so Socria answers as the
-          // layer between them. Names only — never who is signed in.
-          ...(inShared && roomRef.current.people.length >= 2
-            ? { collab: { people: roomRef.current.people } }
-            : {}),
+          // Two or more people here: their names, so Socria answers as the
+          // layer between them — and who asked it, so it answers them. Names
+          // only — never who is signed in.
+          ...(people.length >= 2 ? { collab: { people } } : {}),
+          ...(addressed && people.length >= 2 ? { addressed } : {}),
         }),
       });
       if (res.status === 402) {
-        // A boundary rather than a failure: the turn is put back in the
-        // composer so nothing they wrote is lost to a limit.
+        // A boundary rather than a failure. Alone, the turn is put back in the
+        // composer so nothing they wrote is lost to a limit. In a group it was
+        // already said to everyone, and stays said.
         const body = await res.json().catch(() => ({}));
         void refreshUsage(activeIdRef.current);
-        patchActive((sn) => ({ ...sn, messages: sn.messages.slice(0, -1) }), false);
-        setInput(content);
+        if (!group) {
+          patchSession(sid, (sn) => ({ ...sn, messages: withoutTurn(sn.messages, sent) }), false);
+          chronRef.current = withoutTurn(chronRef.current, sent);
+          setInput(content);
+          setReplyTo(replying);
+        }
         setBusy(false);
         // Same rule as the pre-flight above: the sheet once, then in place.
         if (!ask('chats-spent')) setError(body?.error || boundaryNote('chats'));
@@ -3246,10 +3364,23 @@ export function LogosApp({
       applyVizOps(parseVizOps(acc, sentViz), sid);
       acc = stripVizOps(acc);
       setStreaming('');
-      const landed: Msg[] = [...next, { role: 'assistant', content: acc }];
-      // Into the session that SENT, which may no longer be the active one.
-      patchSession(sid, (s) => ({ ...s, messages: landed }));
-      chronRef.current = [...chronRef.current, { role: 'assistant', content: acc }];
+      // Socria's answer, with its own name — and, in a group, the turn it answers,
+      // so everyone can see whom it is talking to.
+      const reply: Msg = {
+        id: newMsgId(),
+        at: Date.now(),
+        role: 'assistant',
+        content: acc,
+        ...(group ? { replyTo: replyRefOf(sent, myName) } : {}),
+      };
+      // Into the session that SENT, which may no longer be the active one —
+      // and into it as it is NOW. It used to be written as the copy taken when
+      // the question went, which erased whatever had arrived since: someone
+      // else's message, or the question itself after a sync. In a room it goes
+      // through the room's record, which is what puts it on both screens.
+      if (inShared) roomRef.current.onLocalReply(reply);
+      else patchSession(sid, (s) => ({ ...s, messages: landReply(s.messages, sent, reply) }));
+      chronRef.current = [...chronRef.current, reply];
       if (u && u.entries.length) recurrenceSaidRef.current.add(sid);
       // A thought completed. The proactive check runs from an effect rather
       // than here, so it sees the map this turn produced instead of the one
@@ -3259,16 +3390,19 @@ export function LogosApp({
       // shares with Core — every few turns, for accounts only, and never
       // from a line of thinking the map read as reflecting: that memory is
       // private, and Logos is the surface whose map can be shown to someone.
+      const landed = sessionsRef.current.find((x) => x.id === sid)?.messages ?? [...next, reply];
       const userTurns = landed.filter((m) => m.role === 'user').length;
       if (
         isSignedIn &&
         userTurns >= JOURNEY_EVERY_TURNS &&
         userTurns % JOURNEY_EVERY_TURNS === 0 &&
         mapRef.current.context !== 'reflecting' &&
-        // NEVER from a shared room. The understanding pass reads the whole
-        // conversation and writes what it concludes into this account's
-        // permanent profile — in a room it would fold the other person's
-        // words into a private record they cannot see, export or delete.
+        // NEVER from a line of thinking anyone else is in — a room, a shared
+        // line of thinking, someone else's. The understanding pass reads the
+        // whole conversation and writes what it concludes into this account's
+        // permanent profile: it would fold other people's words into a private
+        // record they cannot see, export or delete.
+        !shared &&
         !sharedIdsRef.current.has(sid)
       ) {
         void (async () => {
@@ -3295,21 +3429,28 @@ export function LogosApp({
       }
     } catch (e: any) {
       setStreaming('');
-      setError(e?.message || 'Something went wrong.');
-      patchActive((s) => ({ ...s, messages: before }), false);
-      // Drop the turn that never landed, by identity — a focused reply may
-      // have appended to the transcript while this was in flight.
-      chronRef.current = chronRef.current.filter((m) => m !== turn);
-      setInput(content);
-      // Hand the attachments back so a failed turn doesn't lose them.
-      if (atts.length) {
-        setDrafts((prev) => [
-          ...prev,
-          ...atts.map((a, i) => ({ ...a, id: `re_${Date.now()}_${i}`, status: 'ready' as const })),
-        ]);
+      if (group) {
+        // Said to everyone already; only Socria's answer failed. Ask again with @socria.
+        setError(`${e?.message || 'Something went wrong.'} Your message is posted — mention @socria to ask again.`);
+      } else {
+        setError(e?.message || 'Something went wrong.');
+        // The turn that never landed, taken out by its own name — whatever
+        // else arrived meanwhile stays.
+        patchSession(sid, (s) => ({ ...s, messages: withoutTurn(s.messages, sent) }), false);
+        chronRef.current = withoutTurn(chronRef.current, sent);
+        setInput(content);
+        setReplyTo(replying);
+        // Hand the attachments back so a failed turn doesn't lose them.
+        if (atts.length) {
+          setDrafts((prev) => [
+            ...prev,
+            ...atts.map((a, i) => ({ ...a, id: `re_${Date.now()}_${i}`, status: 'ready' as const })),
+          ]);
+        }
       }
     } finally {
       setBusy(false);
+      togetherRef.current?.asking(false);
     }
   }
 
@@ -3917,6 +4058,59 @@ export function LogosApp({
         )}
       </div>
     ) : null;
+  // ── WHO SAID WHAT ──────────────────────────────────────────────────
+  // A conversation more than one person is in reads like a group chat
+  // (components/LogosMessage.tsx): what this person said on the right, everyone
+  // else on the left under their name, Socria on the left with its mark.
+  const meId = room.active ? room.me.id : together.me;
+  function isMine(m: Msg): boolean {
+    if (m.role !== 'user') return false;
+    if (m.by) return !!meId && m.by.id === meId;
+    // unsigned: said before anyone else was here — the host's, the owner's
+    if (room.active) return room.me.seat === 'host';
+    if (together.active) return together.role === 'owner';
+    return !foreignIdsRef.current.has(activeId ?? '');
+  }
+  const groupView = room.active || together.active || messages.some((m) => m.role === 'user' && !!m.by && !isMine(m));
+  /** the name a message goes under, for everyone — what a reply's quote records */
+  function whoOf(m: Msg): string {
+    if (m.role === 'assistant') return 'Socria';
+    if (isMine(m)) return myName;
+    return m.by?.name || together.owner || 'Someone';
+  }
+  /** …and as this screen shows it */
+  const shownWho = (m: Msg) => (m.role === 'user' && isMine(m) ? 'You' : whoOf(m));
+  /** one author per run: Socria answering one person is one run, answering the next is another */
+  function authorKey(m: Msg): string {
+    if (m.role === 'assistant') return `socria:${groupView ? m.replyTo?.who ?? '' : ''}`;
+    if (isMine(m)) return 'me';
+    return m.by?.id ?? 'owner';
+  }
+  /** who else is waiting on an answer from Socria right now */
+  const answeringOthers = together.active ? together.people.filter((p) => !p.you && p.doing === 'asking').map((p) => p.name) : [];
+  /** is anyone else here now? Then Socria answers when asked */
+  const groupLive = (room.active && room.people.length >= 2) || (together.active && together.people.some((p) => !p.you));
+  /** Reply: the composer takes a quote of this message, and the caret */
+  function startReply(m: Msg) {
+    setReplyTo(replyRefOf(m, whoOf(m)));
+    setComposerFocus((f) => ({ n: (f?.n ?? 0) + 1 }));
+  }
+  /**
+   * To the message a quote points at. The thread scrolls itself — never
+   * scrollIntoView, which moves every scrollable ancestor and once pushed the
+   * Logos 3 composer out of reach.
+   */
+  function jumpTo(id: string) {
+    const t = threadRef.current;
+    const el = t?.querySelector<HTMLElement>(`[id="lg-m-${id}"]`);
+    if (!t || !el) return;
+    t.scrollTop += el.getBoundingClientRect().top - t.getBoundingClientRect().top - 16;
+    el.classList.remove('is-flash');
+    void el.offsetWidth;
+    el.classList.add('is-flash');
+    window.setTimeout(() => el.classList.remove('is-flash'), 1400);
+  }
+
   const convoBody = (
     <>
 
@@ -3990,64 +4184,48 @@ export function LogosApp({
               </div>
             )}
 
-            {messages.map((m, i) => m.synthesis ? (
-              <LogosSynthesis key={i} {...synthProps(m.synthesis, i === lastSynthIndex && i === messages.length - 1)} />
-            ) : (
-              <div
-                key={i}
-                className={`lg-msg lg-msg-${m.role}${m.by ? ' lg-msg-by' : ''}`}
-              >
-                {m.role === 'assistant' && <span className="lg-msg-who">Socria</span>}
-                {/* In a shared room a person's own line is signed with their
-                    name in their seat colour, so two voices never blur. */}
-                {m.role === 'user' && m.by && <span className="lg-msg-who lg-msg-mine">{m.by.name}</span>}
-                <div className="lg-msg-stack">
-                  {!!m.attachments?.length && <AttachmentList items={m.attachments} />}
-                  {m.content && (
-                    <div className="lg-msg-body">
-                      {m.role === 'assistant' ? (
-                        // Socria's prose carries the same small vocabulary
-                        // Core's does — a list, a numbered sequence, a bold
-                        // label, the one word in emphasis — and until this it
-                        // arrived as literal asterisks and hyphens. What the
-                        // person typed is never reinterpreted: their own
-                        // asterisks stay asterisks.
-                        <RichText text={m.content} math />
-                      ) : (
-                        <MathText>{m.content}</MathText>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
+            {messages.map((m, i) => {
+              if (m.synthesis) {
+                // Socria's reading of the map: copied or replied to like anything else it says
+                return (
+                  <div key={m.id ?? i} id={m.id ? `lg-m-${m.id}` : undefined} className="lg-synth-wrap">
+                    <LogosSynthesis {...synthProps(m.synthesis, i === lastSynthIndex && i === messages.length - 1)} />
+                    <MsgActions m={m} who="Socria" canReply={!togetherReadOnly} onReply={startReply} />
+                  </div>
+                );
+              }
+              const prev = i > 0 ? messages[i - 1] : null;
+              const side: Side = m.role === 'assistant' ? 'socria' : isMine(m) ? 'mine' : 'other';
+              return (
+                <LogosMessage
+                  key={m.id ?? i}
+                  m={m}
+                  side={side}
+                  who={shownWho(m)}
+                  group={groupView}
+                  cont={!!prev && !prev.synthesis && authorKey(prev) === authorKey(m)}
+                  hue={groupView && side === 'other' ? hueOf(authorKey(m)) : undefined}
+                  // Socria's answer right under the question it answers needs no quote of it
+                  showQuote={!!m.replyTo && (m.role === 'user' || !prev?.id || prev.id !== m.replyTo.id)}
+                  canReply={!togetherReadOnly && (m.role === 'assistant' || (groupView && side === 'other'))}
+                  onReply={startReply}
+                  onJump={jumpTo}
+                  toLabel={m.replyTo?.id && messages.some((x) => x.id === m.replyTo!.id && isMine(x)) ? 'You' : undefined}
+                />
+              );
+            })}
 
             {/* Logos 3: notes on the work, under the reply they belong to */}
             {chatNotes}
 
-            {streaming && (
-              <div className="lg-msg lg-msg-assistant">
-                <span className="lg-msg-who">Socria</span>
-                {/* Inline marks only while the words are still arriving.
-                    Blocks settle when the text stops: re-deciding "is this a
-                    list yet?" on every token makes a half-written reply jump
-                    about under somebody who is reading it. */}
-                <div className="lg-msg-body is-streaming">
-                  <Inline text={streaming} math />
-                </div>
-              </div>
-            )}
+            {/* someone else asked Socria; its answer is on its way to them */}
+            <SocriaAnswering names={answeringOthers} />
+
+            {streaming && <SocriaPending text={streaming} group={groupView} to={groupView ? 'You' : null} />}
 
             {synthBusy && <SynthesisPending scope={synthBusy} />}
 
-            {busy && !streaming && (
-              <div className="lg-msg lg-msg-assistant">
-                <span className="lg-msg-who">Socria</span>
-                <div className="lg-thinking" aria-label="Thinking">
-                  <span /> <span /> <span />
-                </div>
-              </div>
-            )}
+            {busy && !streaming && <SocriaPending text="" group={groupView} to={groupView ? 'You' : null} />}
 
             {gifted && !busy && !one && (
               <p className="lg-gift" role="note">
@@ -4219,6 +4397,9 @@ export function LogosApp({
             onSend={sendFromComposer}
             busy={busy}
             readImage={readImage}
+            replyTo={replyTo}
+            onCancelReply={() => setReplyTo(null)}
+            group={groupLive}
           />
 
           {/* Which mind you're talking to, and how deep it goes — kept beside
@@ -4570,7 +4751,12 @@ export function LogosApp({
   // history above them. The thing being thought about keeps the screen.
   const chatPanelOpen = !!wsLayout && panelsOf(wsLayout).some((x) => x.type === 'chat');
   // (no hooks here: this runs after the access gate's early return)
-  const lastReply = [...messages].reverse().find((x) => x.role === 'assistant')?.content ?? '';
+  // Alone, the peek is Socria's latest reply. In a group it is the latest
+  // message from anyone, under their name — someone's new line is not hidden
+  // behind an older answer from Socria.
+  const peekMsg = groupView ? [...messages].reverse().find((x) => !x.synthesis) : [...messages].reverse().find((x) => x.role === 'assistant');
+  const lastReply = peekMsg?.content ?? '';
+  const peekWho = streaming || !peekMsg ? 'Socria' : shownWho(peekMsg);
   const lastIsSynth = !!messages[messages.length - 1]?.synthesis;
   const peek = streaming || (busy || lastIsSynth ? '' : lastReply);
   // Beside the stage the history is always shown; below or above, on demand.
@@ -4586,8 +4772,8 @@ export function LogosApp({
         {messages.length > 0 && (
           <div className="ws-dock-row">
             {!dockShown && (peek || busy) ? (
-              <button type="button" className="ws-peek" onClick={() => setDockOpen(true)} aria-label="Socria’s latest reply — open the conversation">
-                <span className="ws-peek-who">Socria</span>
+              <button type="button" className="ws-peek" onClick={() => setDockOpen(true)} aria-label={`${peekWho === 'Socria' ? 'Socria’s latest reply' : 'The latest message'} — open the conversation`}>
+                <span className="ws-peek-who">{peekWho}</span>
                 {peek ? (
                   <span className="ws-peek-text">
                     <Inline text={peek} math />

@@ -34,6 +34,8 @@ import { ProjectSheet } from '@/components/projects/ProjectSheet';
 import { FEEDBACK_URL } from '@/lib/feedback';
 import type { Attachment } from '@/lib/logos-attachments';
 import { forRequest, wordsOnly } from '@/lib/chat-attachments';
+import { newMsgId, replyRefOf, type ReplyRef } from '@/lib/chat-thread';
+import { copyText } from '@/lib/copy-text';
 import { ACCEPT_ATTR } from '@/lib/file-kinds';
 import { AttachmentChips, PaperclipIcon, useChatAttachments } from '@/components/ChatAttachments';
 import { failureText } from '@/lib/upstream-error';
@@ -142,10 +144,14 @@ import {
 
 type Role = 'user' | 'assistant';
 interface Message {
+  /** its name, from where it was made (lib/chat-thread.ts) — what a reply points at */
+  id?: string;
   role: Role;
   content: string;
   /** Core 4: files and images sent with this turn, already read into text */
   attachments?: Attachment[];
+  /** the message this turn answers — Reply on one of Socria's messages */
+  replyTo?: ReplyRef;
 }
 interface Conversation {
   id: string;
@@ -354,6 +360,8 @@ export default function ChatPage() {
   /** A chat waiting to go into the folder being named from its menu. */
   const pendingMove = useRef<string | null>(null);
   const [input, setInput] = useState('');
+  /** the message the next one answers — Reply puts it above the box */
+  const [replyTo, setReplyTo] = useState<ReplyRef | null>(null);
   /** what to say when the picker has just moved this conversation to another surface */
   const [moveSaid, setMoveSaid] = useState<string | null>(null);
   /** the sentence written during onboarding, for whichever composer mounts */
@@ -467,6 +475,20 @@ export default function ChatPage() {
   const journeyRef = useRef<UserUnderstanding | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  // a reply belongs to the conversation it was started in
+  useEffect(() => {
+    setReplyTo(null);
+  }, [activeId]);
+  /** To the turn a reply's quote points at — lit, the way Find lights a result. */
+  const jumpToTurn = useCallback((id: string) => {
+    const el = document.querySelector<HTMLElement>(`[data-mid="${id}"]`);
+    if (!el) return;
+    el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    el.classList.remove('lit');
+    void el.offsetWidth;
+    el.classList.add('lit');
+    window.setTimeout(() => el.classList.remove('lit'), 1600);
+  }, []);
 
   const mode: 'cloud' | 'local' = isSignedIn ? 'cloud' : 'local';
 
@@ -1704,7 +1726,8 @@ export default function ChatPage() {
   async function send(
     content: string,
     start?: { convos: Conversation[]; id: string | null },
-    atts: Attachment[] = []
+    atts: Attachment[] = [],
+    replying: ReplyRef | null = null
   ): Promise<boolean> {
     const text = content.trim();
     if ((!text && !atts.length) || sending) return false;
@@ -1751,7 +1774,13 @@ export default function ChatPage() {
             ...c,
             messages: [
               ...c.messages,
-              { role: 'user' as Role, content: text, ...(atts.length ? { attachments: atts } : {}) },
+              {
+                id: newMsgId(),
+                role: 'user' as Role,
+                content: text,
+                ...(atts.length ? { attachments: atts } : {}),
+                ...(replying ? { replyTo: replying } : {}),
+              },
             ],
             updatedAt: Date.now(),
             title:
@@ -1933,7 +1962,7 @@ export default function ChatPage() {
               ...c,
               messages: [
                 ...c.messages,
-                { role: 'assistant' as Role, content: assistantText },
+                { id: newMsgId(), role: 'assistant' as Role, content: assistantText },
               ],
               updatedAt: Date.now(),
             }
@@ -2000,6 +2029,7 @@ export default function ChatPage() {
         setActiveId(rolledBack[0]?.id ?? null);
       }
       setInput(text);
+      setReplyTo(replying);
       return false;
     } finally {
       setSending(false);
@@ -2016,13 +2046,20 @@ export default function ChatPage() {
     if (!input.trim() && !atts.length) return;
     const kept = files.drafts;
     if (atts.length) files.setDrafts([]);
-    const ok = await send(input, undefined, atts);
+    const replying = replyTo;
+    setReplyTo(null);
+    const ok = await send(input, undefined, atts, replying);
     // A failed send hands the message back — its files with it.
     if (!ok && atts.length) files.setDrafts(kept);
     if (ok) files.setNotice(null);
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === 'Escape' && replyTo) {
+      e.preventDefault();
+      setReplyTo(null);
+      return;
+    }
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       void sendFromComposer();
@@ -3481,8 +3518,23 @@ export default function ChatPage() {
                 // supplied once by the list's wrapper, because `app-inline`
                 // is display:contents and an element with no box cannot be
                 // scrolled into view.
-                <div key={i} id={`turn-${i}`} className="turn-row">
-                  <Bubble role={m.role} content={body} attachments={m.attachments} />
+                <div key={m.id ?? i} id={`turn-${i}`} data-mid={m.id} className="turn-row">
+                  <Bubble
+                    role={m.role}
+                    content={body}
+                    attachments={m.attachments}
+                    replyTo={m.replyTo}
+                    copy={m.content}
+                    onReply={
+                      isAssistant
+                        ? () => {
+                            setReplyTo(replyRefOf(m, 'Socria'));
+                            requestAnimationFrame(() => textareaRef.current?.focus());
+                          }
+                        : undefined
+                    }
+                    onJump={jumpToTurn}
+                  />
                   {showChoices && (
                     <ChoiceChips
                       choices={choices}
@@ -3749,6 +3801,23 @@ export default function ChatPage() {
                 )}
               </div>
             )}
+            {replyTo && (
+              <div className="mb-2 flex items-center gap-2 rounded-lg border-l-2 border-moss-600 bg-moss-50/70 px-3 py-1.5 text-[12.5px] text-ink/70" role="status">
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[11.5px] font-semibold text-moss-700">Replying to {replyTo.who}</span>
+                  <span className="block truncate">{replyTo.excerpt}</span>
+                </span>
+                <button
+                  type="button"
+                  className="shrink-0 w-7 h-7 rounded-full text-ink/45 hover:text-ink hover:bg-ink/5"
+                  aria-label={`Stop replying to ${replyTo.who}`}
+                  title="Stop replying (Esc)"
+                  onClick={() => setReplyTo(null)}
+                >
+                  ×
+                </button>
+              </div>
+            )}
             <div
               className={`flex items-end gap-3 rounded-2xl border bg-surface px-4 py-3 focus-within:border-moss-600 transition-colors ${
                 dragging ? 'border-moss-600 ring-2 ring-moss-200' : 'border-ink/15'
@@ -3801,7 +3870,7 @@ export default function ChatPage() {
                 onChange={handleInputChange}
                 onKeyDown={handleKeyDown}
                 onPaste={handlePaste}
-                placeholder="Share what you're thinking through…"
+                placeholder={replyTo ? `Reply to ${replyTo.who}…` : "Share what you're thinking through…"}
                 rows={1}
                 disabled={sending}
                 className="flex-1 resize-none bg-transparent outline-none text-ink placeholder:text-ink/40 leading-relaxed py-1 max-h-[220px]"
@@ -3860,22 +3929,73 @@ export default function ChatPage() {
   );
 }
 
+/** Reply and Copy under a turn — real buttons, shown on hover and focus, and always on touch. */
+function TurnActions({ text, onReply, align }: { text: string; onReply?: () => void; align: 'start' | 'end' }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    // in the gap under the turn, so it adds no height to the conversation
+    <div className={`turn-acts absolute left-0 right-0 top-full pt-0.5 flex gap-1 ${align === 'end' ? 'justify-end' : 'justify-start'}`} role="group" aria-label="Actions for this message">
+      {onReply && (
+        <button type="button" className="turn-act" onClick={onReply} aria-label="Reply to Socria’s message">
+          Reply
+        </button>
+      )}
+      <button
+        type="button"
+        className="turn-act"
+        onClick={async () => {
+          if (await copyText(text)) {
+            setCopied(true);
+            window.setTimeout(() => setCopied(false), 1600);
+          }
+        }}
+        aria-label="Copy this message"
+      >
+        {copied ? 'Copied' : 'Copy'}
+      </button>
+      <span className="sr-only" role="status" aria-live="polite">{copied ? 'Copied' : ''}</span>
+    </div>
+  );
+}
+
 function Bubble({
   role,
   content,
   animate = false,
   attachments,
+  replyTo,
+  copy,
+  onReply,
+  onJump,
 }: {
   role: Role;
   content: string;
   animate?: boolean;
   attachments?: Attachment[];
+  /** what this turn answers, shown as a quote above it */
+  replyTo?: ReplyRef;
+  /** the words Copy takes — the whole message as it was said */
+  copy?: string;
+  onReply?: () => void;
+  onJump?: (id: string) => void;
 }) {
   const isUser = role === 'user';
+  const quote = replyTo ? (
+    <button
+      type="button"
+      onClick={() => replyTo.id && onJump?.(replyTo.id)}
+      disabled={!replyTo.id || !onJump}
+      className="turn-quote"
+      aria-label={`Replying to ${replyTo.who}: ${replyTo.excerpt}`}
+    >
+      <b>{replyTo.who}</b> {replyTo.excerpt}
+    </button>
+  ) : null;
 
   if (isUser) {
     return (
-      <div className="my-6 flex flex-col items-end gap-2">
+      <div className="turn-msg relative my-6 flex flex-col items-end gap-2">
+        {quote}
         {attachments?.length ? (
           <div className="max-w-[85%]">
             <AttachmentChips items={attachments} align="end" />
@@ -3886,6 +4006,7 @@ function Bubble({
             <div className="prose-socria text-ink">{content}</div>
           </div>
         ) : null}
+        {!animate && copy?.trim() ? <TurnActions text={copy} align="end" /> : null}
       </div>
     );
   }
@@ -3899,8 +4020,8 @@ function Bubble({
   );
 
   return (
-    <div className="my-6 flex justify-start">
-      <div className={hasCard ? 'w-full' : 'max-w-[85%]'}>
+    <div className="turn-msg my-6 flex justify-start">
+      <div className={`relative ${hasCard ? 'w-full' : 'max-w-[85%]'}`}>
         <div className="text-[10px] uppercase tracking-[0.16em] text-moss-700 mb-1.5 font-medium">
           Socria
         </div>
@@ -3920,6 +4041,7 @@ function Bubble({
             </div>
           );
         })}
+        {!animate && copy?.trim() ? <TurnActions text={copy} onReply={onReply} align="start" /> : null}
       </div>
     </div>
   );

@@ -29,6 +29,17 @@
 
 import { sanitizeBy, type CollabEvent, type CollabEventKind } from './collab';
 import { sanitizeMap, type LogosNode } from './logos';
+import { cleanAt, cleanMsgId, cleanReplyRef } from './chat-thread';
+import { sanitizeSynthesis } from './logos-synthesis';
+
+/** A message's own fields off the wire: its id, when, what it answers, a synthesis card — shaped, or absent. */
+function messageExtras(m: Record<string, unknown>, role: 'user' | 'assistant'): Record<string, unknown> {
+  const id = cleanMsgId(m.id);
+  const at = cleanAt(m.at);
+  const replyTo = cleanReplyRef(m.replyTo);
+  const synthesis = role === 'assistant' ? sanitizeSynthesis(m.synthesis) : undefined;
+  return { ...(id ? { id } : {}), ...(at ? { at } : {}), ...(replyTo ? { replyTo } : {}), ...(synthesis ? { synthesis } : {}) };
+}
 
 export interface Transport {
   /** send one event to everyone else in the room */
@@ -82,7 +93,7 @@ export function sanitizeEvent(raw: unknown): CollabEvent | null {
                 .filter((m): m is Record<string, unknown> => !!m && typeof m === 'object')
                 .filter((m) => (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
                 .slice(-200)
-                .map((m) => ({ role: m.role as 'user' | 'assistant', content: (m.content as string).slice(0, 12_000), ...(sanitizeBy(m.by) ? { by: sanitizeBy(m.by) } : {}) }))
+                .map((m) => ({ ...messageExtras(m, m.role as 'user' | 'assistant'), role: m.role as 'user' | 'assistant', content: (m.content as string).slice(0, 12_000), ...(sanitizeBy(m.by) ? { by: sanitizeBy(m.by) } : {}) }))
             : [],
           map: sanitizeMap(rs.map),
           updatedAt: typeof rs.updatedAt === 'number' ? rs.updatedAt : at,
@@ -95,7 +106,7 @@ export function sanitizeEvent(raw: unknown): CollabEvent | null {
     case 'message': {
       const m = r.message as Record<string, unknown> | undefined;
       if (!m || (m.role !== 'user' && m.role !== 'assistant') || typeof m.content !== 'string') return null;
-      return { id, at, by, kind, message: { role: m.role, content: m.content.slice(0, 12_000) } } as CollabEvent;
+      return { id, at, by, kind, message: { ...messageExtras(m, m.role), role: m.role, content: m.content.slice(0, 12_000) } } as CollabEvent;
     }
     case 'node.add': {
       // One node through the map sanitiser, so a node from the wire is exactly

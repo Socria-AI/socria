@@ -55,6 +55,7 @@ import {
   hasSubstance,
   renderForModel,
   sanitizeChatMessages,
+  withQuote,
   type ChatMsg,
 } from '@/lib/chat-attachments';
 
@@ -275,7 +276,8 @@ export async function POST(req: NextRequest) {
           typeof m.content === 'string'
       )
       .slice(-MAX_HISTORY)
-      .map((m: any) => ({ role: m.role, content: m.content }));
+      // a turn that replies to a particular message says which, in one quoted line
+      .map((m: any) => ({ role: m.role, content: withQuote(m) }));
 
     const socriaModel = resolveModel(body?.model);
 

@@ -195,6 +195,7 @@ const MODULES = [
   'lib/project-visual.ts',
   'lib/share/roles.ts',
   'lib/share/sync.ts',
+  'lib/chat-thread.ts',
   'lib/share/comments.ts',
   'lib/share/hue.ts',
   'lib/checkout-attribution.ts',

@@ -50,7 +50,7 @@ console.log('=== the route: Logos 3, an account, never in a room ===');
   ok('the write is registered before the stream closes', /waitUntil\(write\(\)\)[\s\S]{0,120}controller\.close\(\)/.test(route));
   ok('the graph replaces the flat list only when it has something to say', /if \(fromGraph\.trim\(\)\) memoryBlock = /.test(route));
   const app = read('components/LogosApp.tsx');
-  ok('the client asks for it on Logos 3 with an account, never in a shared room', /workspaceOn && cloud && !inShared\s*\?\s*\{ mind: true/.test(app));
+  ok('the client asks for it on Logos 3 with an account, never in a shared room or line of thinking', /workspaceOn && cloud && !shared\s*\?\s*\{ mind: true/.test(app) && /const shared = inShared \|\| !!togetherRef\.current\?\.active \|\| foreignIdsRef\.current\.has\(sid\);/.test(app));
   ok('  and says which Project the chat is filed in', /projectId: active\.projectId/.test(app));
   const atlas = read('app/api/mind/atlas/route.ts');
   ok('the atlas route reads no messages', !/messages/.test(atlas.split('async function loadChats')[1].split('export async function GET')[0].replace(/\/\/.*|\*.*$/gm, '')));

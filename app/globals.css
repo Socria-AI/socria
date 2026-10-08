@@ -8906,10 +8906,6 @@ a.one-mark.is-strip:hover { background: rgba(38, 72, 90, 0.075); }
 .logos-root .lg-head-collab .lg-head-note{display:none}
 .logos-root .lg-head-collab .lg-memory-btn{margin-left:auto}
 
-/* a person's own line, signed in their colour */
-.logos-root .lg-msg-mine{color:var(--by, var(--lg-primary));font-weight:600}
-.logos-root .lg-msg-by .lg-msg-body{box-shadow:inset 3px 0 0 var(--by, transparent);padding-left:12px}
-
 /* whose idea a node was */
 .logos-root .lg-node-by{width:8px;height:8px;border-radius:50%;flex:0 0 auto;margin-left:auto}
 /* Why a room refused — a wrong code, a full room, or not signed in. */

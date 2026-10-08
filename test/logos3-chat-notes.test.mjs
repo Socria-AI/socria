@@ -10,7 +10,7 @@ const css = readFileSync(new URL('../app/globals.css', import.meta.url), 'utf8')
 console.log('=== notes on the work, in the conversation ===');
 ok('one set of notes, for Logos 3 only', /const chatNotes =\s*workspaceOn && !busy && !mapping && \(buildNote \|\| found \|\| firstMapNote\)/.test(app));
 ok('  what the engine built, the cue, the save nudge', /lg-annot-k">The model</.test(app) && /\{found\.kicker\}/.test(app) && /\{FIRST_MAP_NOTE\}/.test(app));
-ok('  in the thread, under the latest reply and before a streaming one', /\{chatNotes\}\s*\n\s*\{streaming && \(/.test(app));
+ok('  in the thread, under the latest reply and before a streaming one', /\{chatNotes\}[\s\S]{0,240}\{streaming && <SocriaPending/.test(app));
 ok('  and under the reply\'s peek while the conversation is folded', /\{!dockShown && chatNotes\}/.test(app));
 ok('the map panel no longer carries them in Logos 3', /buildNote && !mapping && !workspaceOn/.test(app) && /found && !buildNote && !mapping && !workspaceOn/.test(app) && /firstMapNote && !workspaceOn/.test(app));
 ok('  each can still be put away', (app.match(/className="lg-annot-x"/g) ?? []).length === 3);

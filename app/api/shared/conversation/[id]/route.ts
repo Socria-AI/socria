@@ -16,10 +16,17 @@
 // are applied to the row as it stands and written only if it has not changed
 // since it was read (updated_at as the version); a lost race re-reads and
 // re-applies, so both sets of turns land, in arrival order. A MAP is a whole
-// structure rather than a list, so a map written against an older version
-// than the row's is refused with the current one (409) for the client to
-// merge — silently overwriting someone's map is the one thing this must not
-// do.
+// structure rather than a list, so a map written against any version but the
+// row's own is refused with the current one (409) for the client to merge —
+// silently overwriting someone's map is the one thing this must not do.
+//
+// TURNS ARE NEVER REFUSED WITH A MAP. Each turn carries its id
+// (lib/chat-thread.ts); one the row already holds is skipped, so a retried
+// write lands once. Turns sent beside a stale map are appended anyway and the
+// 409 answers for the map alone — refusing the words with the map is how a
+// person's turn, and Socria's answer to it, used to vanish. Every answer
+// carries the row's turns and map as they now stand, so a client never moves
+// past a version it has not seen (lib/share/sync.ts absorb).
 
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
@@ -30,6 +37,8 @@ import { sanitizeMap } from '@/lib/logos';
 import { sanitizeContexts } from '@/lib/logos-sources';
 import { can, type Role } from '@/lib/share/roles';
 import { displayNameOf, isShared, noteChange, shareAccess } from '@/lib/share/server';
+import { sanitizeSynthesis } from '@/lib/logos-synthesis';
+import { cleanAt, cleanMsgId, cleanReplyRef } from '@/lib/chat-thread';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -39,9 +48,14 @@ const MAX_MESSAGES = 200;
 const MAX_CONTENT = 40_000;
 const MAX_APPEND = 4;
 
+/** The alias a person's turns are signed with here — their account id never leaves. */
+function aliasOf(shareSalt: string, userId: string): string {
+  return createHash('sha256').update(`${shareSalt}:${userId}`).digest('hex').slice(0, 12);
+}
+
 /** An author mark that names the person without exposing their account id. */
 function byOf(shareSalt: string, userId: string, name: string, role: Role) {
-  return { id: createHash('sha256').update(`${shareSalt}:${userId}`).digest('hex').slice(0, 12), name: name.slice(0, 40), seat: role === 'owner' ? 'host' : 'guest' };
+  return { id: aliasOf(shareSalt, userId), name: name.slice(0, 40), seat: role === 'owner' ? 'host' : 'guest' };
 }
 
 async function load(ownerId: string, id: string) {
@@ -67,6 +81,9 @@ export async function GET(req: NextRequest, { params }: Ctx) {
   if (since && updatedAt <= since) return NextResponse.json({ unchanged: true, updatedAt });
   return NextResponse.json({
     role: access.role,
+    // the alias this caller's own turns are signed with, so their screen can
+    // tell what they said from what everyone else did
+    me: aliasOf(access.shareId ?? params.id, userId),
     // does anybody besides the owner reach it — the owner's client syncs
     // through this route only while it is shared
     shared: access.role !== 'owner' || (await isShared('conversation', params.id).catch(() => false)),
@@ -112,8 +129,16 @@ export async function POST(req: NextRequest, { params }: Ctx) {
         const r = (m && typeof m === 'object' ? m : {}) as Record<string, unknown>;
         const role = r.role === 'assistant' ? 'assistant' : 'user';
         const content = typeof r.content === 'string' ? r.content.slice(0, MAX_CONTENT) : '';
+        // its name, when it was said, what it answers — display data, shaped
+        const id = cleanMsgId(r.id);
+        const at = cleanAt(r.at);
+        const replyTo = cleanReplyRef(r.replyTo);
+        const synthesis = role === 'assistant' ? sanitizeSynthesis(r.synthesis) : undefined;
+        const extra = { ...(id ? { id } : {}), ...(at ? { at } : {}), ...(replyTo ? { replyTo } : {}) };
         // a person's turn is theirs, named; Socria's answer is Socria's
-        return role === 'user' ? { role, content, by } : { role, content };
+        return role === 'user'
+          ? { ...extra, role, content, by }
+          : { ...extra, role, content, ...(synthesis ? { synthesis } : {}) };
       }).filter((m) => m.content.trim())
     : [];
   const base = Number(body?.base) || 0;
@@ -122,14 +147,24 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     const row = await load(access.ownerId, params.id).catch(() => null);
     if (!row) return NextResponse.json({ error: 'No such conversation.' }, { status: 404 });
     const current = Number(row.updated_at) || 0;
-    if (wantsMap && base && base !== current) {
-      // someone else changed it since this map was drawn: merge, don't clobber
-      return NextResponse.json({ conflict: true, updatedAt: current, map: row.map ?? null, messages: row.messages ?? [] }, { status: 409 });
+    const held = Array.isArray(row.messages) ? (row.messages as Record<string, unknown>[]) : [];
+    // someone else changed it since this map was drawn: merge, don't clobber
+    const stale = wantsMap && base !== current;
+    // a turn the row already holds (a retried write) lands once
+    const have = new Set(held.map((m) => (m && typeof m.id === 'string' ? m.id : '')).filter(Boolean));
+    const fresh = append.filter((m) => !m.id || !have.has(m.id));
+    const writes = fresh.length > 0 || (wantsMap && !stale) || wantsTitle || wantsOwn;
+    if (!writes) {
+      // nothing new for the row: a stale map alone, or turns it already has
+      const answer = { updatedAt: current, prior: current, map: row.map ?? null, messages: held };
+      return stale
+        ? NextResponse.json({ conflict: true, ...answer }, { status: 409 })
+        : NextResponse.json({ ok: true, ...answer });
     }
-    const messages = [...(Array.isArray(row.messages) ? row.messages : []), ...append].slice(-MAX_MESSAGES);
+    const messages = [...held, ...fresh].slice(-MAX_MESSAGES);
     const patch: Record<string, unknown> = { updated_at: Math.max(Date.now(), current + 1) };
-    if (append.length) patch.messages = messages;
-    if (wantsMap) patch.map = sanitizeMap(body.map);
+    if (fresh.length) patch.messages = messages;
+    if (wantsMap && !stale) patch.map = sanitizeMap(body.map);
     if (wantsTitle) patch.title = String(body.title).replace(/\s+/g, ' ').trim().slice(0, 200) || row.title;
     if (body?.draft !== undefined) {
       const d = body.draft;
@@ -147,10 +182,20 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       return NextResponse.json({ error: 'That could not be saved just now.' }, { status: 500 });
     }
     if (count) {
-      if (append.some((m) => m.role === 'user')) await noteChange(userId, 'conversation', params.id, 'message', `${name} added to the conversation`);
-      if (wantsMap) await noteChange(userId, 'conversation', params.id, 'map', `${name} changed the map`);
+      if (fresh.some((m) => m.role === 'user')) await noteChange(userId, 'conversation', params.id, 'message', `${name} added to the conversation`);
+      if (wantsMap && !stale) await noteChange(userId, 'conversation', params.id, 'map', `${name} changed the map`);
       if (wantsTitle) await noteChange(userId, 'conversation', params.id, 'rename', `${name} renamed it`);
-      return NextResponse.json({ ok: true, updatedAt: patch.updated_at, messages: append.length ? messages : row.messages ?? [] });
+      // the row as it now stands; `prior` is the version this write replaced,
+      // so a client can tell whether anyone else wrote since it last looked
+      const answer = {
+        updatedAt: patch.updated_at,
+        prior: current,
+        map: patch.map !== undefined ? patch.map : row.map ?? null,
+        messages: fresh.length ? messages : held,
+      };
+      return stale
+        ? NextResponse.json({ conflict: true, ...answer }, { status: 409 })
+        : NextResponse.json({ ok: true, ...answer });
     }
     // lost a race with another writer: read again and re-apply
   }

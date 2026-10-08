@@ -5,6 +5,7 @@
 // POST /api/conversations          → bulk-upsert (used for localStorage → cloud migration)
 
 import { sanitizeSynthesis } from '@/lib/logos-synthesis';
+import { cleanAt, cleanMsgId, cleanReplyRef, type ReplyRef } from '@/lib/chat-thread';
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { supabaseAdmin } from '@/lib/supabase';
@@ -25,8 +26,11 @@ const MAX_MESSAGES_PER_CONVO = 200;
 const MAX_BULK_CONVOS = 200;
 
 type Msg = {
+  id?: string;
+  at?: number;
   role: 'user' | 'assistant';
   content: string;
+  replyTo?: ReplyRef;
   attachments?: ReturnType<typeof sanitizeAttachments>;
 };
 
@@ -51,9 +55,18 @@ function sanitizeMessages(raw: unknown): Msg[] {
       // A Logos synthesis: Socria's structured reading of the map, kept so it
       // re-renders as itself and so the next one can say what changed.
       const synthesis = m.role === 'assistant' ? sanitizeSynthesis(m.synthesis) : undefined;
+      // Its name, when it was said, and what it answers (lib/chat-thread.ts):
+      // how two screens agree which message is which, and how a reply keeps
+      // its quote. Display data — shaped and clipped, trusted for nothing.
+      const id = cleanMsgId(m.id);
+      const at = cleanAt(m.at);
+      const replyTo = cleanReplyRef(m.replyTo);
       return {
+        ...(id ? { id } : {}),
+        ...(at ? { at } : {}),
         role: m.role,
         content: m.content,
+        ...(replyTo ? { replyTo } : {}),
         ...(attachments.length ? { attachments } : {}),
         ...(by ? { by } : {}),
         ...(synthesis ? { synthesis } : {}),
@@ -115,11 +128,11 @@ interface Sidecar {
 /**
  * Two versions of one conversation's turns, joined without losing either:
  * everything stored, then whatever the incoming copy adds after the point the
- * two agree to. Turns are compared by role and text — the only identity a
- * turn has.
+ * two agree to. Turns are the same turn when they carry the same id; turns
+ * from before ids existed are compared by role and text, as they always were.
  */
 function mergeTurns(stored: Msg[], incoming: Msg[]): Msg[] {
-  const same = (a: Msg, b: Msg) => a.role === b.role && a.content === b.content;
+  const same = (a: Msg, b: Msg) => (a.id && b.id ? a.id === b.id : a.role === b.role && a.content === b.content);
   let k = 0;
   while (k < stored.length && k < incoming.length && same(stored[k], incoming[k])) k++;
   if (k === stored.length) return incoming;

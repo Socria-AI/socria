@@ -294,7 +294,15 @@ export function applyEvent(state: CollabState, ev: CollabEvent): CollabState {
       return { ...base, present: state.present.filter((p) => p.id !== ev.by.id) };
     case 'message': {
       if (!state.session) return base;
-      const message: LogosMsg = { ...ev.message, by: ev.by };
+      // A message keeps the id it was made with; one sent before ids existed
+      // takes its event's. The same message twice is one message.
+      const id = ev.message.id ?? ev.id;
+      if (state.session.messages.some((m) => m.id === id)) return base;
+      // A person's turn is signed by whoever sent it. Socria's answer is
+      // Socria's: the event's author is the person it answers, which the
+      // answer carries as what it replies to — never as a name over its words.
+      const { by: _signed, ...words } = ev.message;
+      const message: LogosMsg = ev.message.role === 'assistant' ? { ...words, id } : { ...words, id, by: ev.by };
       return {
         ...base,
         session: { ...state.session, messages: [...state.session.messages, message], updatedAt: ev.at },
@@ -384,8 +392,18 @@ export function contributions(map: ThinkingMap): Record<Seat, number> {
 
 // ── Socria, between two people ──────────────────────────────────────
 
+/** The most names a shared line of thinking hands the model at once. */
+export const GROUP_MAX = 8;
+
+/** "Ana", "Ana and Ben", "Ana, Ben and Chloe" */
+function nameList(names: string[]): string {
+  if (names.length <= 1) return names.join('');
+  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+}
+
 /**
- * The block appended to the Logos system prompt when two people are present.
+ * The block appended to the Logos system prompt when two or more people are
+ * present — the two seats of a room, or everyone in a shared line of thinking.
  *
  * Three rules it states in so many words, because a model follows what is
  * enumerated and invents what is not:
@@ -397,20 +415,37 @@ export function contributions(map: ThinkingMap): Record<Seat, number> {
  *     open and made precise, not resolved.
  */
 export function collabBlock(people: readonly Pick<Participant, 'name' | 'seat'>[]): string {
-  const named = people.slice(0, MAX_PEOPLE);
+  const named = people.slice(0, GROUP_MAX).map((p) => p.name).filter(Boolean);
   if (named.length < 2) return '';
-  const [a, b] = named;
+  const count = named.length === 2 ? 'TWO PEOPLE ARE' : `${named.length} PEOPLE ARE`;
+  const them = named.length === 2 ? 'them' : 'them all';
   return `
 
-TWO PEOPLE ARE THINKING HERE TOGETHER: ${a.name} and ${b.name}. Every message from a person is prefixed with their name, so you always know who said what.
+${count} THINKING HERE TOGETHER: ${nameList(named)}. Every message from a person is prefixed with their name, so you always know who said what. They also talk to each other here; you speak only when one of them asks you to.
 
-You are the shared reasoning layer between them — not a third voice in the discussion, and not a referee. Your whole job is to make what is between them visible:
-- CONNECTIONS: where something one of them said bears on something the other said, say so, naming both.
+You are the shared reasoning layer between ${them} — not a third voice in the discussion, and not a referee. Your whole job is to make what is between them visible:
+- CONNECTIONS: where something one of them said bears on something another said, say so, naming both.
 - DISAGREEMENTS: where they differ, say plainly what each is claiming and what each would have to believe for their claim to hold. Make the disagreement precise. Do not resolve it.
-- ASSUMPTIONS: what one of them is taking for granted that the other has not examined — name it and ask whether it is shared.
-- QUESTIONS: the question neither of them has asked yet, if there is one.
+- ASSUMPTIONS: what one of them is taking for granted that another has not examined — name it and ask whether it is shared.
+- QUESTIONS: the question none of them has asked yet, if there is one.
 
-Address them by name when it matters who said what. Never take a side. Never conclude for them, and never tell them who is right — that judgment is theirs, and the point of their being here together is to reach it themselves. Keep it short; two people are waiting to speak.`;
+Address them by name when it matters who said what. Never take a side. Never conclude for them, and never tell them who is right — that judgment is theirs, and the point of their being here together is to reach it themselves. Keep it short; other people are waiting to speak.`;
+}
+
+/**
+ * Appended after collabBlock when one person asked Socria directly — by
+ * mentioning @socria, or by replying to something Socria said. The person's
+ * name has been cleaned like every name from a browser; the rest is fixed
+ * text, so nothing a person typed can speak as an instruction here.
+ */
+export function addressedBlock(a: { name: string; how: 'mention' | 'reply' }): string {
+  const asked =
+    a.how === 'reply'
+      ? `${a.name} is replying to something you said earlier (it is quoted at the start of their message).`
+      : `${a.name} asked you directly (with @socria).`;
+  return `
+
+THIS MESSAGE IS FOR YOU. ${asked} Answer ${a.name}: take up what they actually asked, plainly and first, the way someone in the group who was asked would — then, only if it helps, what it connects to in what the others have said. Do not answer the others' messages unless ${a.name} asks you to. Everything above still holds: never take a side between them.`;
 }
 
 /** The thread as the model should read it: each human turn signed. */

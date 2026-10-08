@@ -57,7 +57,8 @@ import {
   visibleEntries,
 } from '@/lib/person-memory';
 import { mayUse } from '@/lib/route-guard';
-import { collabBlock, type Seat } from '@/lib/collab';
+import { GROUP_MAX, addressedBlock, collabBlock, type Seat } from '@/lib/collab';
+import { cleanReplyRef, quoteLine } from '@/lib/chat-thread';
 import { focusBlock, sanitizeFocus } from '@/lib/workspace/focus';
 import { objectsBlock, sanitizeSpace } from '@/lib/objects';
 import { roleBlock } from '@/lib/onboarding-roles';
@@ -153,14 +154,16 @@ export async function POST(req: NextRequest) {
       )
       .slice(-MAX_HISTORY);
 
-    // Two people, or one? A shared Logos 3 room passes `collab.people` — the
-    // two display names — and each human turn carries a `by`. When both are
-    // present, every human line is prefixed with its author's name so the
-    // model always knows who said what; alone, nothing changes. Names only —
-    // never who is signed in, never an id — and cleaned like every other
-    // field that arrives from a browser.
+    // Two people, or one? A shared Logos 3 room — or a line of thinking shared
+    // with others who are here now — passes `collab.people`, their display
+    // names, and each human turn carries a `by`. When two or more are present,
+    // every human line is prefixed with its author's name so the model always
+    // knows who said what; alone, nothing changes. Names only — never who is
+    // signed in, never an id — and cleaned like every other field that
+    // arrives from a browser.
     const cleanPerson = (v: unknown) =>
-      typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().slice(0, 40) : '';
+      // eslint-disable-next-line no-control-regex
+      typeof v === 'string' ? v.replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 40) : '';
     const collabPeople: { name: string; seat: Seat }[] = (() => {
       const people = (body?.collab as { people?: unknown } | undefined)?.people;
       if (!Array.isArray(people)) return [];
@@ -168,9 +171,18 @@ export async function POST(req: NextRequest) {
         .filter((p): p is Record<string, unknown> => !!p && typeof p === 'object')
         .map((p) => ({ name: cleanPerson(p.name), seat: (p.seat === 'host' ? 'host' : 'guest') as Seat }))
         .filter((p) => p.name)
-        .slice(0, 2);
+        .slice(0, GROUP_MAX);
     })();
     const twoPeople = collabPeople.length >= 2;
+    // In a group, Socria speaks when someone asks it — and answers that person.
+    // Who asked, and how: their cleaned name, and a mention or a reply.
+    const addressed = (() => {
+      const a = body?.addressed as { name?: unknown; how?: unknown } | undefined;
+      if (!twoPeople || !a || typeof a !== 'object') return null;
+      const name = cleanPerson(a.name);
+      const how = a.how === 'reply' ? 'reply' : a.how === 'mention' ? 'mention' : null;
+      return name && how ? { name, how: how as 'mention' | 'reply' } : null;
+    })();
     // The assistant turn just before this one was a synthesis.
     const repliesToSynthesis = (() => {
       for (let i = kept.length - 2; i >= 0; i--) if (kept[i]?.role === 'assistant') return isSynthesisText(kept[i].content);
@@ -186,9 +198,15 @@ export async function POST(req: NextRequest) {
           i === kept.length - 1
         );
         const name = twoPeople && m.role === 'user' ? cleanPerson(m.by?.name) : '';
+        // A turn that replies to a particular message says which, in the
+        // model's copy only: one fixed-format line, quoted and clipped
+        // (lib/chat-thread.ts quoteLine), so it can never read as anything
+        // but a quote.
+        const ref = m.role === 'user' ? cleanReplyRef(m.replyTo) : undefined;
+        const said = ref && rendered ? `${quoteLine(ref)}\n${rendered}` : rendered;
         return {
           role: m.role as 'user' | 'assistant',
-          content: name && rendered ? `${name}: ${rendered}` : rendered,
+          content: name && said ? `${name}: ${said}` : said,
         };
       })
       .filter((m) => m.content.trim());
@@ -327,7 +345,10 @@ export async function POST(req: NextRequest) {
     // this surface, whose map can be saved as a picture. The recurrence line
     // is included only while the client says it is still owed.
     let memoryBlock = '';
-    if (userId && body?.understanding && !focusLabel && !sharedCtx.shared) {
+    // Never with someone else here: what Socria knows about this person is
+    // theirs, and an answer in a room or a shared line of thinking is read by
+    // everyone in it.
+    if (userId && body?.understanding && !focusLabel && !sharedCtx.shared && !twoPeople) {
       const u = sanitizeUserUnderstanding(body.understanding);
       const caps = memoryCaps(plan);
       const now = Date.now();
@@ -482,6 +503,8 @@ export async function POST(req: NextRequest) {
       // disagreements, the assumptions and the open questions between what
       // each said, and does not take a side or conclude (lib/collab.ts).
       (twoPeople ? collabBlock(collabPeople) : '') +
+      // …and when one of them asked Socria directly, it answers that person.
+      (addressed ? addressedBlock(addressed) : '') +
       // ONCE. This was appended twice, so everything Socria remembers about
       // the person reached the model as two identical blocks — twice the
       // tokens, and twice the weight against the guidance above it.

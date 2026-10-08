@@ -12,6 +12,7 @@ import 'server-only';
 // server stamps authorship itself rather than believing a field.
 
 import { sanitizeMap } from './logos';
+import { cleanMsgId, cleanReplyRef } from './chat-thread';
 
 const MAX_MESSAGES = 200;
 const MAX_CONTENT = 12_000;
@@ -26,10 +27,17 @@ export function sanitizeSeedSession(raw: unknown): Record<string, unknown> | nul
         .filter((m): m is Record<string, unknown> => !!m && typeof m === 'object')
         .filter((m) => (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
         .slice(-MAX_MESSAGES)
-        .map((m) => ({
-          role: m.role as 'user' | 'assistant',
-          content: (m.content as string).slice(0, MAX_CONTENT),
-        }))
+        .map((m) => {
+          // its id and what it answers ride along — display data, shaped
+          const id = cleanMsgId(m.id);
+          const replyTo = cleanReplyRef(m.replyTo);
+          return {
+            ...(id ? { id } : {}),
+            role: m.role as 'user' | 'assistant',
+            content: (m.content as string).slice(0, MAX_CONTENT),
+            ...(replyTo ? { replyTo } : {}),
+          };
+        })
     : [];
   return {
     id: r.id.slice(0, 64),

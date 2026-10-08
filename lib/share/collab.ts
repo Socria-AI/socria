@@ -157,6 +157,8 @@ export interface Present {
   you: boolean;
   role: Role;
   cursor: { x: number; y: number; on?: string } | null;
+  /** waiting on an answer from Socria, so everyone else can see one is coming */
+  doing: 'asking' | null;
   at: number;
 }
 
@@ -168,9 +170,12 @@ export async function heartbeat(
   if (!access) throw new ShareError(404, 'No such thing.');
   const salt = access.shareId ?? id;
   const c = cursor && typeof cursor === 'object' ? (cursor as Record<string, unknown>) : null;
+  // what they are doing in the conversation rides with the pointer; it is one
+  // known word or nothing
+  const doing = c?.doing === 'asking' ? { doing: 'asking' as const } : {};
   const clean = c && Number.isFinite(c.x) && Number.isFinite(c.y)
-    ? { x: Math.max(-1e5, Math.min(1e5, Number(c.x))), y: Math.max(-1e5, Math.min(1e5, Number(c.y))), ...(typeof c.on === 'string' && /^[a-z]{1,16}$/.test(c.on) ? { on: c.on } : {}) }
-    : null;
+    ? { x: Math.max(-1e5, Math.min(1e5, Number(c.x))), y: Math.max(-1e5, Math.min(1e5, Number(c.y))), ...(typeof c.on === 'string' && /^[a-z]{1,16}$/.test(c.on) ? { on: c.on } : {}), ...doing }
+    : 'doing' in doing ? doing : null;
   const now = Date.now();
   const db = supabaseAdmin();
   const up = await db.from('share_presence').upsert({
@@ -196,6 +201,7 @@ export async function heartbeat(
         you: r.user_id === userId,
         role: roles.get(String(r.user_id))!,
         cursor: (r.cursor as Present['cursor']) ?? null,
+        doing: (r.cursor as { doing?: unknown } | null)?.doing === 'asking' ? ('asking' as const) : null,
         at: Number(r.seen_at),
       })),
   };
