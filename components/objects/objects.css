@@ -105,6 +105,8 @@
   font-family: var(--font-stix, serif); font-size: 15px; color: var(--lg-ink); outline: none;
 }
 .logos-root .obj-ops input:focus { border-bottom-color: var(--lg-primary); }
+.logos-root .obj-ops { flex-wrap: wrap; }
+.logos-root .obj-ops-hint { font-size: 12px; color: var(--lg-ink-40); font-family: var(--font-stix, serif); }
 .logos-root .obj-ops-go {
   background: var(--lg-primary); color: var(--lg-paper); border: 0; border-radius: 999px; padding: 4px 12px; cursor: pointer; font-size: 12px;
 }

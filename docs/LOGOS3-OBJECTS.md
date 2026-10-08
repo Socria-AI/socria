@@ -68,7 +68,7 @@ the person's words ──discover──▶ OBJECT (id, kind, origin)
 
 1. **The person writes the matrix.** It becomes object A, marked as theirs.
 2. **They select a row or an entry.** It becomes the conversation's focus ("Row 2 of A", with facts from state), so they can ask about it.
-3. **They choose an operation**, typed in the composer or in the figure. Templates give the form (`R3 ← R3 + ·R1`) and never the multiplier.
+3. **They choose an operation**, written in the chat box: the figure has no text box of its own. The template buttons under the matrix put an operation's form into the chat box (`R3 ← R3 + ·R1`), with the caret where the multiplier goes, and never the multiplier. A function's figure offers its forms the same way (`a = 2`, `look at x = 1`); its sliders and a click on its curve act directly.
 4. **Code computes the result exactly.**
    - The changed entries are marked, and their old values lift away.
    - The step is written beside the row it changed.
@@ -77,7 +77,7 @@ the person's words ──discover──▶ OBJECT (id, kind, origin)
 5. **A step that missed is computed honestly** and the note asks a question instead of giving the answer: *"Entry (3, 1) was 5 and is now 1, not 0. What multiple of R1 would make it vanish?"*
 6. **An irreversible operation is refused with the reason**, for example scaling a row by 0.
 7. **Step back and forward through states.** A new step taken from an earlier state replaces what came after it.
-8. **Socria replies.** When the step came from the composer, the reply is told what *their* step did: state, step and provenance, already computed. A step taken in the figure calls no model at all.
+8. **Socria replies.** For a step written in the chat, the reply is told what *their* step did: state, step and provenance, already computed. A step taken by the figure's own controls (a suggestion tried, a slider moved) calls no model at all.
 9. **Synthesis reads the transformation history** (for example "You chose R2 ← R2 − 3R1 on A — Entry (2, 1) is now 0. A — an entry beneath a leading entry still nonzero, at (3, 1).") rather than the chat.
 
 ### Human-first boundaries

@@ -53,7 +53,7 @@ export const SURFACES: Record<SurfaceType, SurfaceContract> = {
   params: { type: 'params', title: 'Parameters', represents: 'model', emits: ['param', 'input'], responds: ['param', 'input'], duplicable: false, canBeStale: false, heavy: false },
   inspector: { type: 'inspector', title: 'Inspector', represents: 'selection', emits: ['object'], responds: ['node', 'object', 'param', 'input'], duplicable: false, canBeStale: false, heavy: false },
   trace: { type: 'trace', title: 'Trace', represents: 'history', emits: [], responds: [], duplicable: false, canBeStale: false, heavy: false },
-  // Live 3D (experimental): a scene object of thought, drawn in 3D and built by describing it
+  // Live 3D (experimental): a scene object of thought, drawn in 3D and built by describing it in the chat
   scene: { type: 'scene', title: 'Live 3D', represents: 'object', emits: ['object'], responds: ['object'], duplicable: true, canBeStale: false, heavy: true },
 };
 
@@ -189,10 +189,10 @@ export function suggestViews(facts: WorkspaceFacts, layout: WorkspaceLayout): Vi
   // A scene is offered where there is one; starting one is always possible, and
   // said to be what it is — a preview of shapes, not a model of anything physical.
   for (const sc of facts.scenes) {
-    push({ type: 'scene', config: { obj: sc.id }, label: `Live 3D · ${sc.name}`, why: `${sc.parts} part${sc.parts === 1 ? '' : 's'}, built by describing them — a geometric preview`, score: 86 });
+    push({ type: 'scene', config: { obj: sc.id }, label: `Live 3D · ${sc.name}`, why: `${sc.parts} part${sc.parts === 1 ? '' : 's'}, built by describing them in the chat — a geometric preview`, score: 86 });
   }
   if (!facts.scenes.length) {
-    push({ type: 'scene', label: 'Live 3D · experimental', why: 'describe shapes and they are built as you type — a geometric preview, not a simulation', score: 30 });
+    push({ type: 'scene', label: 'Live 3D · experimental', why: 'describe shapes in the chat and they are drawn as you type — a geometric preview, not a simulation', score: 30 });
   }
 
   const order: SurfaceType[] = ['model', 'params', 'inspector', 'map', 'scene', 'chat', 'trace'];

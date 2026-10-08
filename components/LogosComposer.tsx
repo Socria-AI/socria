@@ -172,9 +172,12 @@ export function LogosComposer({
   onSend,
   busy,
   readImage,
+  focusSignal,
 }: {
   value: string;
   onChange: (v: string) => void;
+  /** text put into the box from elsewhere — a figure's template, a suggestion — brings the caret here, at `caret` or the end */
+  focusSignal?: { n: number; caret?: number } | null;
   /** show the maths control at all — decided by context, not by a setting */
   mathAvailable?: boolean;
   mathTopic?: MathTopic;
@@ -209,6 +212,16 @@ export function LogosComposer({
   // Text also arrives without a keystroke — a failed send hands the message
   // back, and the box has to come back with it.
   useLayoutEffect(grow, [value]);
+
+  // Something offered a sentence to finish — a row operation's shape, a scene to build — and the box is where
+  // it is finished and sent: the caret goes to the gap it left, or to the end.
+  useEffect(() => {
+    const el = taRef.current;
+    if (!focusSignal || !el) return;
+    el.focus();
+    const at = Math.min(focusSignal.caret ?? el.value.length, el.value.length);
+    el.setSelectionRange(at, at);
+  }, [focusSignal]);
 
   useEffect(() => {
     const onResize = () => grow();

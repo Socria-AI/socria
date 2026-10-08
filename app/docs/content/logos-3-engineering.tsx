@@ -87,7 +87,7 @@ function SceneBlock({ x }: { x: SceneExample }) {
         {x.title} <span className="d-eng-tag">{x.discipline}</span>
       </h3>
       <p className="d-eng-ask">
-        <span className="d-eng-ask-k">Type into Live 3D</span>
+        <span className="d-eng-ask-k">Type in the chat, with Live 3D open</span>
         <span className="d-eng-ask-q">{x.say}</span>
       </p>
       <p className="d-eng-read">
@@ -189,9 +189,10 @@ export function Logos3Engineering() {
 
       <H2 id="live3d">CAD-style designs in Live 3D</H2>
       <p>
-        Live 3D is an experimental panel in the Logos 3 workspace — <em>+ View → Live 3D</em>. Describe a shape and it is
-        drawn as you type; press Enter and it is built. Every part keeps its identity, every size is exact, and parts can
-        rest on one another. Give a part a material and it has a mass: density × its volume. It is a{' '}
+        Live 3D is an experimental panel in the Logos 3 workspace — <em>+ View → Live 3D</em>. It has no box of its own:
+        describe a shape in the chat and it is drawn in the panel as you type; send it and it is built, and what was
+        built is said in the conversation. Every part keeps its identity, every size is exact, and parts can rest on one
+        another. Give a part a material and it has a mass: density × its volume. It is a{' '}
         <strong>geometric preview</strong> — nothing in it is loaded, stressed or simulated — and it says so.
       </p>
       <p>

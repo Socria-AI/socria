@@ -82,7 +82,9 @@ All of it is hidden while a learner works the elimination by hand.
 ### Live 3D, from the CAD Atlas
 
 The panel already had: describe a scene, preview it, build it, undo it by
-description. This work added:
+description. The description is now typed in the chat, which is the only text
+box in Logos: the panel previews it as it is typed, and sending it builds it.
+This work added:
 - NACA four-digit airfoils (Atlas benchmark 29);
 - materials and nominal densities, with mass and centre of mass;
 - exact section properties of any extruded outline (area, centroid, second

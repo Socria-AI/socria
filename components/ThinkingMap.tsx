@@ -68,14 +68,16 @@ import {
 } from '@/lib/logos-layout';
 import { attachmentsOf, GRAMMARS, spineOf } from '@/lib/representation';
 import { ObjectFigure } from '@/components/objects/ObjectFigure';
-import { kindOf, objOf, currentOf, type ThoughtObject } from '@/lib/objects';
+import { objOf, type ThoughtObject } from '@/lib/objects';
 
 /** What a person did to an object of thought, on its way up to be computed. */
 export type ObjectAction =
   | { type: 'op'; obj: string; op: string; args: Record<string, string | number>; suggested?: boolean; at?: number }
   | { type: 'seek'; obj: string; at: number }
   | { type: 'select'; obj: string; part: string | null }
-  | { type: 'view'; obj: string; view: string };
+  | { type: 'view'; obj: string; view: string }
+  /** a sentence for the chat box, to be finished and sent there — the caret at `caret` */
+  | { type: 'draft'; text: string; caret?: number };
 import {
   IDENTITY,
   NO_INSETS,
@@ -1883,7 +1885,7 @@ export function ThinkingMap({
                       ? {
                           onOp: (op: string, args: Record<string, string | number>, suggested?: boolean) =>
                             onObject?.({ type: 'op', obj: o.id, op, args, suggested }) ?? { ok: false, why: 'Nothing here can compute that.' },
-                          readOp: (text: string) => kindOf(o.kind)?.readOp(text, currentOf(o)) ?? null,
+                          onDraft: (text: string, caret?: number) => onObject?.({ type: 'draft', text, ...(caret !== undefined ? { caret } : {}) }),
                           suggestions: objectSuggestions?.filter((x) => x.id === o.id),
                         }
                       : {})}

@@ -23,6 +23,7 @@ import {
   apply as applyObjectOp,
   bindNodes,
   create as createObject,
+  currentOf,
   discover,
   mergeSpaces,
   objOf,
@@ -133,6 +134,8 @@ import type { Model } from '@/lib/model/schema';
 import { DOCK_SIDES, Workspace, type DockSide } from '@/components/workspace/Workspace';
 import { InspectorPanel, ModelPanel, ParamsPanel, TracePanel } from '@/components/workspace/panels';
 import { ScenePanel } from '@/components/scene3d/ScenePanel';
+import { sceneTurn } from '@/lib/objects/scene-chat';
+import type { SceneState } from '@/lib/objects/scene';
 import {
   addPanel,
   configurePanel,
@@ -162,6 +165,8 @@ import { LENSES, type LensId } from '@/lib/logos-layout';
 
 /** Where a person's own Logos 3 arrangement is kept: this browser, never the session. */
 const WS_KEY = 'socria.logos3.workspace.v2';
+/** A scene with nothing in it: what the first description typed into the chat, with Live 3D open, is built on. */
+const EMPTY_SCENE: SceneState = { nodes: [], next: 1, unit: 'm' };
 /** Where the conversation dock sits around the stage. */
 const DOCK_KEY = 'socria.logos3.dock.v1';
 /** the chats bar and header, hidden from the top-right control — per browser */
@@ -545,6 +550,14 @@ export function LogosApp({
   const [objSel, setObjSel] = useState<{ obj: string; part: string } | null>(null);
   const objSelRef = useRef(objSel);
   objSelRef.current = objSel;
+  // the part a description in the conversation last made or changed in a Live 3D scene — what "it" means next
+  const sceneLastRef = useRef<string | null>(null);
+  // asks the composer to take focus, with the caret where a filled-in form wants it
+  const [composerFocus, setComposerFocus] = useState<{ n: number; caret?: number } | null>(null);
+  const draftToComposer = (text: string, caret?: number) => {
+    setInput(text);
+    setComposerFocus((f) => ({ n: (f?.n ?? 0) + 1, ...(caret !== undefined ? { caret } : {}) }));
+  };
   /** the object whose plane picture is on the Plot lens, so the picture follows it */
   const planeOfRef = useRef<string | null>(null);
   const sessionsRef = useRef<LogosSession[]>([]);
@@ -2827,8 +2840,75 @@ export function LogosApp({
         } else refused = r.why;
       }
     }
+    // THE SCENE, BY CONVERSATION. With a Live 3D panel open, a message that reads fully as a description of
+    // the scene is built — one step for the whole message, undone whole — and said in the conversation. One
+    // that is plainly a description but could only be read in part builds nothing, and says what was not
+    // read. Anything else is an ordinary message (lib/objects/scene-chat.ts).
+    let scene: { said: string } | null = null;
+    const open = space === space0 && !refused && !atts.length ? openScene(space) : null;
+    if (open) {
+      const st = open.obj ? (currentOf(open.obj) as SceneState) : EMPTY_SCENE;
+      const sel = objSelRef.current;
+      const turn = sceneTurn(content, st, { selected: sel && open.obj && sel.obj === open.obj.id ? sel.part : null, last: sceneLastRef.current });
+      if (turn?.kind === 'partial') scene = { said: turn.said };
+      else if (turn?.kind === 'build') {
+        let sp = space;
+        let id = open.obj?.id ?? null;
+        if (!id) {
+          const n = sp.objs.filter((o) => o.kind === 'scene').length;
+          const made = createObject(sp, 'scene', EMPTY_SCENE, { name: n ? `Scene${n + 1}` : 'Scene', origin: 'person' });
+          if (made) {
+            sp = made.space;
+            id = made.obj.id;
+          } else scene = { said: 'Nothing was built: a line of thinking holds at most eight objects, and this one is full.' };
+        }
+        if (id) {
+          // every operation of the description shares one moment, so undo takes the whole of it back
+          const at = Date.now();
+          let why: string | null = null;
+          let obj: ThoughtObject | null = null;
+          for (const o of turn.reading.ops) {
+            const r = applyObjectOp(sp, id, o.op, o.args, { by: 'person', at });
+            if (!r.ok) {
+              why = r.why;
+              break;
+            }
+            sp = r.space;
+            obj = r.obj;
+          }
+          if (why) scene = { said: `Nothing was built: ${why}` };
+          else {
+            space = sp;
+            touched = obj;
+            scene = { said: turn.said };
+            if (!open.obj && wsLayout) changeLayout(configurePanel(wsLayout, open.panel.id, { obj: id }));
+            const part = turn.reading.changes.added.at(-1) ?? turn.reading.changes.changed.at(-1) ?? null;
+            if (part) {
+              // what it made is in hand, as it would be had they clicked it — so "make it red" next is about it
+              sceneLastRef.current = part;
+              setObjSel({ obj: id, part });
+              if (workspaceOn) setFocus({ kind: 'part', obj: id, part });
+            }
+          }
+        }
+      }
+    }
     if (space !== space0) commitObjects(space, touched);
-    return { lastStep, refused, claims: found.claims };
+    return { lastStep, refused, claims: found.claims, scene };
+  }
+
+  /** The Live 3D panel the conversation builds in — the one showing the selected scene, else the first — and its scene, if it has one. */
+  function openScene(space: ObjectSpace): { panel: PanelNode; obj: ThoughtObject | null } | null {
+    if (!workspaceOn || !wsLayout) return null;
+    const ps = panelsOf(wsLayout).filter((p) => p.type === 'scene');
+    if (!ps.length) return null;
+    const objOfPanel = (p: PanelNode) => {
+      const pinned = p.config?.obj ? space.objs.find((o) => o.id === p.config!.obj && o.kind === 'scene') : null;
+      return pinned ?? (p.config?.obj ? null : space.objs.find((o) => o.kind === 'scene') ?? null);
+    };
+    const sel = objSelRef.current?.obj;
+    const panel = ps.find((p) => sel && objOfPanel(p)?.id === sel) ?? ps[0];
+    return { panel, obj: objOfPanel(panel) };
   }
 
   /** Something done TO an object in the workspace: computed here, and only here. */
@@ -2844,6 +2924,11 @@ export function LogosApp({
       if (!r.ok) return { ok: false, why: r.why };
       commitObjects(r.space, r.obj);
       return { ok: true };
+    }
+    if (a.type === 'draft') {
+      // a form a figure offers — a row operation's shape — goes into the chat box, where it is completed and sent
+      draftToComposer(a.text, a.caret);
+      return;
     }
     if (a.type === 'seek') {
       const next = seekObject(space, a.obj, a.at);
@@ -2896,6 +2981,18 @@ export function LogosApp({
     }
 
     const objTurn = takeObjects(content, atts);
+
+    // A DESCRIPTION OF THE SCENE IS A COMMAND, like a command to the map: it was built just now, and what was
+    // built is written into the conversation. Nothing goes to the model, and nothing is spent.
+    if (objTurn.scene) {
+      setError(null);
+      setInput('');
+      const turn: Msg = { role: 'user', content };
+      const reply: Msg = { role: 'assistant', content: objTurn.scene.said };
+      patchActive((s) => ({ ...s, messages: [...s.messages, turn, reply] }));
+      chronRef.current = [...chronRef.current, turn, reply];
+      return;
+    }
 
     // A VIEW ASKED FOR BY NAME — "show this as a structure", "organize it into
     // a mind map" (lib/view-request.ts). In Logos 3 the map, in that view,
@@ -3470,16 +3567,6 @@ export function LogosApp({
   const firstOf = (t: PanelNode['type']) => (wsLayout ? panelsOf(wsLayout).find((x) => x.type === t)?.id ?? null : null);
   const focusBrief = workspaceOn ? describeFocus(focus, map) : null;
 
-  /** A new, empty scene — made when the first description in a Live 3D panel is built — and the panel pinned to it. */
-  function createScene(panelId: string): string | null {
-    const space = spaceOf(mapRef.current);
-    const scenes = space.objs.filter((o) => o.kind === 'scene').length;
-    const made = createObject(space, 'scene', { nodes: [], next: 1, unit: 'm' }, { name: scenes ? `Scene${scenes + 1}` : 'Scene', origin: 'person' });
-    if (!made) return null;
-    commitObjects(made.space, made.obj);
-    if (wsLayout) changeLayout(configurePanel(wsLayout, panelId, { obj: made.obj.id }));
-    return made.obj.id;
-  }
   const sceneOf = (p: PanelNode): ThoughtObject | null => {
     const objs = map.objects?.objs ?? [];
     const pinned = p.config?.obj ? objs.find((o) => o.id === p.config!.obj && o.kind === 'scene') : null;
@@ -3529,16 +3616,25 @@ export function LogosApp({
       case 'trace':
         return <TracePanel doc={panelDoc(p)} onUndo={stableUndo} onRedo={stableRedo} onRestore={stableRestore} />;
       case 'scene': {
-        // LIVE 3D (experimental): a scene object of thought, built by describing it
+        // LIVE 3D (experimental): a scene object of thought, built by describing it in the chat. Only the
+        // panel a sent description would build in previews it.
         const sc = sceneOf(p);
+        const target = openScene(spaceOf(map))?.panel.id === p.id;
         return (
           <ScenePanel
             obj={sc}
             selected={sc && objSel?.obj === sc.id ? objSel.part : null}
             onSelect={(part) => sc && onObject({ type: 'select', obj: sc.id, part })}
-            onOp={(id, op, args, at) => onObject({ type: 'op', obj: id, op, args, at }) ?? { ok: false, why: 'Nothing here can compute that.' }}
-            onCreate={() => createScene(p.id)}
+            onOp={(id, op, args, at) => {
+              const r = onObject({ type: 'op', obj: id, op, args, at }) ?? { ok: false, why: 'Nothing here can compute that.' };
+              // a part moved or resized by hand is "it" for the next description, as one the conversation made is
+              if (r.ok && typeof args.id === 'string') sceneLastRef.current = args.id;
+              return r;
+            }}
             onSeek={(id, at) => onObject({ type: 'seek', obj: id, at })}
+            draft={target ? input : ''}
+            last={sceneLastRef.current}
+            onSuggest={(text) => draftToComposer(text)}
             readOnly={togetherReadOnly}
           />
         );
@@ -4081,6 +4177,7 @@ export function LogosApp({
           <LogosComposer
             value={input}
             onChange={setInput}
+            focusSignal={composerFocus}
             mathAvailable={mathAvailable}
             mathTopic={mathTopic}
             drafts={drafts}

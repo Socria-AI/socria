@@ -39,6 +39,7 @@ const MODULES = [
   'lib/canvas-store.ts',
   'lib/objects/index.ts',
   'lib/objects/scene-intent.ts',
+  'lib/objects/scene-chat.ts',
   'lib/objects/scene-geometry.ts',
   'lib/objects/scene-plan.ts',
   'lib/objects/scene.ts',

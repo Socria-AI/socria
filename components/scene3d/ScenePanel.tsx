@@ -1,14 +1,20 @@
 'use client';
 
-// LIVE 3D (experimental) — a scene object of thought, built by describing it.
+// LIVE 3D (experimental) — a scene object of thought, built by describing it
+// in the conversation.
 //
-// The person types; the description is read as they type (debounced) into the
-// scene kind's own operations (lib/objects/scene-intent.ts), and the scene
-// those operations WOULD compute is drawn at once, with what would change
-// ghosted. Nothing is in the scene until they press Enter: then the same
-// operations are applied, one step each, by the workspace — the preview and
-// the result are the same computation. A part keeps its id across every
-// edit; what the reader could not read is said back, clause by clause.
+// The panel has no box of its own: the chat box is where a person works in
+// Logos. What they are typing there is read as they type (debounced) into
+// the scene kind's own operations (lib/objects/scene-chat.ts), and the scene
+// those operations WOULD compute is drawn here at once, with what would
+// change ghosted. Nothing is in the scene until they send it: then the same
+// operations are applied by the workspace, as one step, and what was built is
+// said in the conversation — the preview and the result are the same
+// computation. A message that is not about the scene shows nothing here, and
+// one read only in part says, clause by clause, what could not be read.
+//
+// The view itself is handled directly: select, move, rotate and scale with
+// the gizmo, type a size into the inspector, undo and redo.
 //
 // Every number here is the scene's: sizes, positions, volumes. The panel says
 // what the scene is — a geometric preview — and what it is not: nothing in it
@@ -19,7 +25,7 @@ import dynamic from 'next/dynamic';
 import { Component, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { currentOf, type ThoughtObject } from '@/lib/objects';
 import { DIMS, EXPRS, MATERIALS, SHAPE_WORD, UNIT_M, massOf, measure, sceneMass, sizeOf, type LengthUnit, type SceneNode, type SceneState } from '@/lib/objects/scene';
-import { readScene, type Reading } from '@/lib/objects/scene-intent';
+import { sceneTurn, type SceneTurn } from '@/lib/objects/scene-chat';
 import type { GizmoMode } from './SceneCanvas';
 import './scene3d.css';
 
@@ -37,11 +43,15 @@ export interface ScenePanelProps {
   obj: ThoughtObject | null;
   selected: string | null;
   onSelect: (part: string | null) => void;
-  /** apply one operation to the scene — computed by the workspace; steps of one description share `at` */
+  /** apply one operation to the scene — computed by the workspace; an edit made by hand is one step */
   onOp: (objId: string, op: string, args: Record<string, string | number>, at: number) => { ok: boolean; why?: string };
-  /** make the scene object; its id, or null when the workspace has no room */
-  onCreate: () => string | null;
   onSeek: (objId: string, at: number) => void;
+  /** what is being typed in the chat box — drawn here as it would be built when sent */
+  draft?: string;
+  /** the part the conversation last made or changed: "it", when nothing is selected */
+  last?: string | null;
+  /** put a description into the chat box, to be finished and sent from there */
+  onSuggest?: (text: string) => void;
   readOnly?: boolean;
   dark?: boolean;
 }
@@ -53,7 +63,7 @@ class CanvasGuard extends Component<{ children: ReactNode }, { failed: boolean }
     return { failed: true };
   }
   render() {
-    if (this.state.failed) return <div className="s3-wait">The 3D view could not start in this browser (WebGL). The parts below, and describing them, still work.</div>;
+    if (this.state.failed) return <div className="s3-wait">The 3D view could not start in this browser (WebGL). The parts below, and describing them in the chat, still work.</div>;
     return this.props.children;
   }
 }
@@ -76,24 +86,23 @@ const num = (v: number) => Number(v.toPrecision(6)).toString();
 
 export function ScenePanel(p: ScenePanelProps) {
   const scene = p.obj ? (currentOf(p.obj) as SceneState) : EMPTY;
-  const [text, setText] = useState('');
-  const [reading, setReading] = useState<Reading | null>(null);
+  const [turn, setTurn] = useState<SceneTurn | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [mode, setMode] = useState<GizmoMode>('translate');
   const [snap, setSnap] = useState(true);
   const [fitKey, setFitKey] = useState(0);
-  const lastRef = useRef<string | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const draft = p.readOnly ? '' : (p.draft ?? '');
 
-  // READ AS THEY TYPE — a pause, then the whole description again, against the scene as it is now
+  // READ AS THEY TYPE IN THE CHAT — a pause, then the whole message again, against the scene as it is now
   useEffect(() => {
-    if (!text.trim()) {
-      setReading(null);
+    if (!draft.trim()) {
+      setTurn(null);
       return;
     }
-    const t = setTimeout(() => setReading(readScene(text, scene, { selected: p.selected, last: lastRef.current })), 180);
+    const t = setTimeout(() => setTurn(sceneTurn(draft, scene, { selected: p.selected, last: p.last ?? null })), 180);
     return () => clearTimeout(t);
-  }, [text, scene, p.selected]);
+  }, [draft, scene, p.selected, p.last]);
+  useEffect(() => setNotice(null), [draft]);
 
   // the first time there is something to see, frame it
   const hadParts = useRef(scene.nodes.length > 0);
@@ -102,39 +111,16 @@ export function ScenePanel(p: ScenePanelProps) {
     hadParts.current = scene.nodes.length > 0;
   }, [scene.nodes.length]);
 
-  const shown = reading && reading.ops.length ? reading.preview : scene;
+  // only what sending will build is drawn: a message read in part builds nothing, so nothing of it is ghosted
+  const building = turn?.kind === 'build' ? turn.reading : null;
+  const shown = building ? building.preview : scene;
   const sel = p.selected ? scene.nodes.find((n) => n.id === p.selected) ?? null : null;
-
-  function commit() {
-    if (p.readOnly || !reading || !reading.ops.length) return;
-    const id = p.obj?.id ?? p.onCreate();
-    if (!id) {
-      setNotice('A line of thinking holds at most eight objects, so a scene could not be made here.');
-      return;
-    }
-    const at = Date.now();
-    for (const o of reading.ops) {
-      const r = p.onOp(id, o.op, o.args, at);
-      if (!r.ok) {
-        setNotice(r.why ?? 'That could not be computed.');
-        break;
-      }
-    }
-    const touched = reading.changes.added.at(-1) ?? reading.changes.changed.at(-1) ?? null;
-    if (touched) {
-      lastRef.current = touched;
-      p.onSelect(touched);
-    }
-    setText('');
-    setReading(null);
-  }
 
   /** an edit made by hand — the inspector, the gizmo — as one step */
   function edit(op: string, args: Record<string, string | number>): boolean {
     if (p.readOnly || !p.obj) return false;
     const r = p.onOp(p.obj.id, op, args, Date.now());
     if (!r.ok) setNotice(r.why ?? 'That could not be computed.');
-    else if (typeof args.id === 'string') lastRef.current = args.id;
     return r.ok;
   }
 
@@ -186,7 +172,7 @@ export function ScenePanel(p: ScenePanelProps) {
           <SceneCanvas
             scene={shown}
             base={scene}
-            changes={reading && reading.ops.length ? reading.changes : null}
+            changes={building ? building.changes : null}
             selected={p.selected}
             onSelect={p.onSelect}
             mode={mode}
@@ -206,70 +192,49 @@ export function ScenePanel(p: ScenePanelProps) {
             dark={p.dark}
           />
         </CanvasGuard>
-        {!scene.nodes.length && !reading?.ops.length && (
+        {!scene.nodes.length && !building && (
           <div className="s3-empty">
-            <p>Describe something to build. It appears as you type, and is made when you press Enter.</p>
-            <ul>
-              {STARTS.map((s) => (
-                <li key={s}>
-                  <button type="button" disabled={p.readOnly} onClick={() => { setText(s); inputRef.current?.focus(); }}>
-                    {s}
-                  </button>
-                </li>
-              ))}
-            </ul>
+            <p>{p.readOnly ? 'Nothing has been built in this scene yet.' : 'Describe something in the chat to build it here. It appears as you type, and is made when you send it.'}</p>
+            {!p.readOnly && p.onSuggest && (
+              <ul>
+                {STARTS.map((s) => (
+                  <li key={s}>
+                    <button type="button" onClick={() => p.onSuggest!(s)}>
+                      {s}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         )}
       </div>
 
-      <form
-        className="s3-say"
-        onSubmit={(e) => {
-          e.preventDefault();
-          commit();
-        }}
-      >
-        <input
-          ref={inputRef}
-          value={text}
-          disabled={p.readOnly}
-          onChange={(e) => {
-            setText(e.target.value);
-            setNotice(null);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Escape') {
-              setText('');
-              setReading(null);
-            }
-          }}
-          placeholder={p.readOnly ? 'You can look at this scene, but not change it.' : sel ? `Describe a change — “make it twice as tall”, “paint it gold”, “copy it 3 times to the right”` : `Describe what to build — “a red box 2 m wide with a blue sphere on top”`}
-          aria-label="Describe what to build or change"
-          spellCheck={false}
-        />
-        <button type="submit" disabled={p.readOnly || !reading?.ops.length}>
-          Build
-        </button>
-      </form>
-
-      {(reading || notice) && (
-        <ol className="s3-read" aria-live="polite">
-          {notice && <li className="is-problem">{notice}</li>}
-          {reading?.clauses.map((c, i) => (
-            <li key={i} className={c.problem ? 'is-problem' : 'is-ok'}>
-              <span className="s3-mark" aria-hidden>
-                {c.problem ? '✗' : '✓'}
-              </span>
-              <span>{c.problem ?? c.understood}</span>
-              {c.skipped?.length ? <span className="s3-skip">not read: {c.skipped.join(', ')}</span> : null}
-              {c.notes?.map((n) => (
-                <span key={n} className="s3-note">
-                  {n}
+      {(turn || notice) && (
+        <div className="s3-read" aria-live="polite">
+          <ol>
+            {notice && <li className="is-problem">{notice}</li>}
+            {turn?.reading.clauses.map((c, i) => (
+              <li key={i} className={c.problem ? 'is-problem' : 'is-ok'}>
+                <span className="s3-mark" aria-hidden>
+                  {c.problem ? '✗' : '✓'}
                 </span>
-              ))}
-            </li>
-          ))}
-        </ol>
+                <span>{c.problem ?? c.understood}</span>
+                {c.skipped?.length ? <span className="s3-skip">not read: {c.skipped.join(', ')}</span> : null}
+                {c.notes?.map((n) => (
+                  <span key={n} className="s3-note">
+                    {n}
+                  </span>
+                ))}
+              </li>
+            ))}
+          </ol>
+          {turn && (
+            <p className="s3-next">
+              {turn.kind === 'build' ? 'Send it in the chat to build this. Undo takes it back whole.' : 'Sending this builds nothing until all of it reads.'}
+            </p>
+          )}
+        </div>
       )}
 
       </div>

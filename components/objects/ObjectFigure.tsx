@@ -4,8 +4,14 @@
 // in. What it shows is a VIEW of canonical state (lib/objects/); what a person
 // does to it comes back up as an operation (onOp), is computed there, and
 // returns as the next state. Nothing here keeps state of its own beyond what
-// the hand is in the middle of: a half-typed operation, which entries were
-// just changed (so the eye can follow the step), a slider mid-drag.
+// the hand is in the middle of: which entries were just changed (so the eye
+// can follow the step), a slider mid-drag.
+//
+// Nothing here is typed into, either. The chat box is where a person works in
+// Logos: an operation is written there ("R2 ← R2 − 3R1", "a = 2") and read
+// against the object in hand. A figure's own controls — the row-operation
+// forms, a suggestion to try — put their sentence INTO the chat box (onDraft)
+// or apply what is already settled (a slider, a click on the curve).
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -39,8 +45,8 @@ export interface FigureProps {
   onSelect?: (part: string | null) => void;
   /** an operation the person chose; the answer is whether it was computed, and why not if not */
   onOp?: (op: string, args: Record<string, string | number>, suggested?: boolean) => { ok: boolean; why?: string };
-  /** read an operation out of words — the same reader the composer uses */
-  readOp?: (text: string) => { op: string; args: Record<string, string | number> } | null;
+  /** put a sentence into the chat box, to be finished and sent there — the caret at `caret` */
+  onDraft?: (text: string, caret?: number) => void;
   onSeek?: (at: number) => void;
   /** operations Socria suggested, offered — never applied by themselves */
   suggestions?: { op: string; args: Record<string, string | number>; said: string }[];
@@ -213,15 +219,13 @@ function MatrixAnalysisView({ st }: { st: MatrixState }) {
   );
 }
 
-function MatrixFigure({ obj, at, mode, guarded, sel, onSelect, onOp, readOp, onSeek, suggestions, onView }: FigureProps) {
+function MatrixFigure({ obj, at, mode, guarded, sel, onSelect, onOp, onDraft, onSeek, suggestions, onView }: FigureProps) {
   const st = (obj.states[at] ?? currentOf(obj)) as MatrixState;
   const prev = at > 0 ? (obj.states[at - 1] as MatrixState) : null;
   const step = at > 0 ? obj.steps[at - 1] : null;
   const k = kindOf('matrix')!;
   const [view, setView] = useState<'grid' | 'equations' | 'analysis'>('grid');
-  const [draft, setDraft] = useState('');
-  const [said, setSaid] = useState<{ ok: boolean; text: string } | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [said, setSaid] = useState<string | null>(null);
 
   // THE STEP, FOLLOWED BY THE EYE. When the state changes under a live
   // figure, the entries that changed are marked and their old values lift
@@ -274,37 +278,18 @@ function MatrixFigure({ obj, at, mode, guarded, sel, onSelect, onOp, readOp, onS
   const tryOp = (op: string, args: Record<string, string | number>, suggested?: boolean) => {
     const r = onOp?.(op, args, suggested);
     if (!r) return;
-    if (r.ok) {
-      setDraft('');
-      setSaid(null);
-    } else setSaid({ ok: false, text: r.why ?? 'That could not be done.' });
+    setSaid(r.ok ? null : (r.why ?? 'That could not be done.'));
   };
-  const submit = () => {
-    const t = draft.trim();
-    if (!t) return;
-    const read = readOp?.(t);
-    if (!read) {
-      setSaid({ ok: false, text: 'Write a row operation — R2 ← R2 − 3R1, R1 ↔ R3, or R3 ← (1/2)R3.' });
-      return;
-    }
-    tryOp(read.op, read.args);
-  };
-  // Templates the person completes: the operation's FORM, with the rows they
-  // selected — never the multiplier, which is the thinking.
+  // Templates the person completes, in the chat box: the operation's FORM, with the rows they
+  // selected — never the multiplier, which is the thinking. The caret waits where it goes.
   const selRows = sel && /^r(\d+)$/.test(sel) ? Number(sel.slice(1)) : null;
   const template = (kind: 'swap' | 'scale' | 'comb') => {
     const a = selRows ?? 2;
     const b = a === 1 ? 2 : 1;
     const t = kind === 'swap' ? `R${a} ↔ R${b}` : kind === 'scale' ? `R${a} ← ·R${a}` : `R${a} ← R${a} + ·R${b}`;
-    setDraft(t);
     setSaid(null);
-    requestAnimationFrame(() => {
-      const el = inputRef.current;
-      if (!el) return;
-      el.focus();
-      const dot = t.indexOf('·');
-      if (dot >= 0) el.setSelectionRange(dot, dot);
-    });
+    const dot = t.indexOf('·');
+    onDraft?.(t, dot >= 0 ? dot : undefined);
   };
   // what it IS is not shown while someone is working it out by hand — the steps are theirs
   const views = k.views.filter((v) => (!v.unavailable || !v.unavailable(st)) && !(guarded && v.id === 'analysis'));
@@ -402,36 +387,17 @@ function MatrixFigure({ obj, at, mode, guarded, sel, onSelect, onOp, readOp, onS
         </p>
       )}
 
-      {onOp && (
-        <form
-          className="obj-ops"
-          onSubmit={(e) => {
-            e.preventDefault();
-            submit();
-          }}
-        >
-          <span className="obj-ops-tpl" aria-label="Operation forms">
-            <button type="button" onClick={() => template('swap')} title="Swap two rows">↔</button>
-            <button type="button" onClick={() => template('scale')} title="Multiply a row by a number">×k</button>
-            <button type="button" onClick={() => template('comb')} title="Add a multiple of another row">+k·R</button>
+      {onOp && onDraft && (
+        <p className="obj-ops">
+          <span className="obj-ops-tpl" aria-label="Start a row operation in the chat">
+            <button type="button" onClick={() => template('swap')} title="Swap two rows — finished in the chat">↔</button>
+            <button type="button" onClick={() => template('scale')} title="Multiply a row by a number — finished in the chat">×k</button>
+            <button type="button" onClick={() => template('comb')} title="Add a multiple of another row — finished in the chat">+k·R</button>
           </span>
-          <input
-            ref={inputRef}
-            value={draft}
-            onChange={(e) => {
-              setDraft(e.target.value);
-              setSaid(null);
-            }}
-            placeholder="R2 ← R2 − 3R1"
-            aria-label={`A row operation on ${obj.name}`}
-            spellCheck={false}
-          />
-          <button type="submit" className="obj-ops-go" disabled={!draft.trim()}>
-            Apply
-          </button>
-        </form>
+          <span className="obj-ops-hint">or write one in the chat: R2 ← R2 − 3R1</span>
+        </p>
       )}
-      {said && <p className="obj-refused" role="alert">{said.text}</p>}
+      {said && <p className="obj-refused" role="alert">{said}</p>}
 
       {!guarded && !!suggestions?.length && (
         <p className="obj-suggest">
@@ -503,13 +469,12 @@ function useCurve(st: FunctionState) {
   }, [st]);
 }
 
-function FunctionFigure({ obj, at, mode, guarded, sel, onSelect, onOp, readOp, onSeek }: FigureProps) {
+function FunctionFigure({ obj, at, mode, guarded, sel, onSelect, onOp, onDraft, onSeek }: FigureProps) {
   const st = (obj.states[at] ?? currentOf(obj)) as FunctionState;
   const step = at > 0 ? obj.steps[at - 1] : null;
   const [preview, setPreview] = useState<Record<string, number> | null>(null);
   const shown = preview ? { ...st, params: { ...st.params, ...preview } } : st;
   const c = useCurve(shown);
-  const [draft, setDraft] = useState('');
   const [said, setSaid] = useState<string | null>(null);
   const pick = (part: string) => onSelect?.(sel === part ? null : part);
   const fmt = (v: number) => String(Math.round(v * 1000) / 1000).replace(/^-/, '−');
@@ -616,25 +581,17 @@ function FunctionFigure({ obj, at, mode, guarded, sel, onSelect, onOp, readOp, o
           {step.note && <span className="obj-step-note">{step.note}</span>}
         </p>
       )}
-      {onOp && (
-        <form
-          className="obj-ops"
-          onSubmit={(e) => {
-            e.preventDefault();
-            const read = readOp?.(draft.trim());
-            if (!read) {
-              setSaid(`Try "${Object.keys(st.params)[0] ?? 'a'} = 2", "look at ${st.v} = 1", or "show −10 to 10".`);
-              return;
-            }
-            run(read.op, read.args);
-            setDraft('');
-          }}
-        >
-          <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder={`look at ${st.v} = 1`} aria-label={`Something to do to ${obj.name}`} spellCheck={false} />
-          <button type="submit" className="obj-ops-go" disabled={!draft.trim()}>
-            Apply
-          </button>
-        </form>
+      {onOp && onDraft && (
+        <p className="obj-ops">
+          <span className="obj-ops-hint">In the chat:</span>
+          <span className="obj-ops-tpl" aria-label="Start something to do to it in the chat">
+            {[...Object.keys(st.params).slice(0, 1).map((n) => `${n} = 2`), `look at ${st.v} = 1`, 'show −10 to 10'].map((t) => (
+              <button key={t} type="button" onClick={() => onDraft(t)} title="Put this in the chat box, to change and send">
+                {t}
+              </button>
+            ))}
+          </span>
+        </p>
       )}
       {said && <p className="obj-refused" role="alert">{said}</p>}
       {obj.states.length > 1 && onSeek && (

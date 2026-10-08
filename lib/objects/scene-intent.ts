@@ -162,7 +162,8 @@ class Clause {
   }
   /** content words not read */
   leftover(): string[] {
-    const stop = /^(?:a|an|the|and|with|of|to|it|its|that|this|is|be|please|now|also|then|me|i|we|want|need|like|some|just|make|put|place|add|create|build|draw|give|let|lets|let's|us|have|there|should|would|can|could|over|in|into|onto|on|at|for|from|by|as|so|one|more|very|really|nice|little|big|small|large|tiny|huge|new|another|other|same|which|who|where|here|space|scene|object|objects|thing|things|shape|shapes|part|parts|units?|axis|direction|side|sides|size)$/;
+    // the words of a polite request said in the conversation ("can you make it red, thanks") are not content
+    const stop = /^(?:a|an|the|and|with|of|to|it|its|that|this|is|be|please|pls|now|also|then|me|i|we|you|your|want|need|like|some|just|make|put|place|add|create|build|draw|give|let|lets|let's|us|have|there|should|would|can|could|over|in|into|onto|on|at|for|from|by|as|so|one|more|very|really|nice|little|big|small|large|tiny|huge|new|another|other|same|which|who|where|here|space|scene|object|objects|thing|things|shape|shapes|part|parts|units?|axis|direction|side|sides|size|ok|okay|thanks|thank|hey)$/;
     return this.work
       .replace(/[(),;:!?=+*/^×]/g, ' ')
       .replace(/(?<!\d)[.-]|\.(?!\d)/g, ' ')
@@ -853,7 +854,9 @@ function nounIn(work: string): { index: number; text: string; shape: SceneShape;
   return pick ? { index: pick.index, text: pick.text, shape: pick.shape, ...(pick.opts ? { opts: pick.opts } : {}) } : null;
 }
 
-const CREATE_VERB = /^\s*(?:(?:please|now|also|and|then|ok|okay|just)\s+)*(?:add|make|create|build|draw|put|place|set|stack|pile|insert|drop|lay|stand|give me|i want|i need|let'?s have|let'?s add|there is|there's|we need|show)(?![a-z])\s*/i;
+// said in the conversation, a request comes with its courtesies — "could you build me a ring of 9 balls" — and
+// the count after them is still the count
+const CREATE_VERB = /^\s*(?:(?:please|now|also|and|then|ok|okay|just|so|hey)\s+)*(?:(?:can|could|would|will)\s+you\s+(?:please\s+)?)?(?:(?:add|make|create|build|draw|put|place|set|stack|pile|insert|drop|lay|stand|show)(?:\s+(?:me|us)(?![a-z]))?|give (?:me|us)|i want|i need|i'd like|let'?s have|let'?s add|there is|there's|we need)(?![a-z])\s*/i;
 /** "a hexagonal prism": sides from the adjective */
 const POLY_ADJ: Record<string, number> = { triangular: 3, square: 4, pentagonal: 5, hexagonal: 6, heptagonal: 7, octagonal: 8 };
 
@@ -904,7 +907,13 @@ function readCreate(c: Clause, st: Ctx): string | null {
     if (w === 'several') c.notes.push('“several” read as 3');
   } else {
     const inline = new RegExp(`\\b${NUM_RE}\\s+(?:[a-z]+\\s+){0,3}?(?:cubes|boxes|spheres|balls|cylinders|cones|tori|stars|rings|prisms|pyramids|blocks|bricks|columns|pillars|discs|disks|capsules)\\b`, 'i').exec(t);
-    if (inline) count = Math.max(1, Math.round(numOf(inline[1]) ?? 1));
+    if (inline) {
+      count = Math.max(1, Math.round(numOf(inline[1]) ?? 1));
+      // the count was read, so it is not left over as a word nobody understood
+      const at = inline.index;
+      const len = inline[1].length;
+      if (c.work.slice(at, at + len) === t.slice(at, at + len)) c.work = c.work.slice(0, at) + ' '.repeat(len) + c.work.slice(at + len);
+    }
   }
   if (count > MAX_NODES) return `A scene holds at most ${MAX_NODES} parts.`;
   const name = earlyName ?? c.take(NAMED)?.[1];
@@ -1681,6 +1690,20 @@ export function clausesOf(text: string): string[] {
     }
   }
   return parts;
+}
+
+/**
+ * Whether a message starts the way a description of the scene does: with a verb the reader knows ("add",
+ * "make", "move", "there's"), or with a thing ("a", "two", "3 cubes"), and not asked as a question. Said
+ * in the conversation, a message that only MENTIONS a shape is not a description of one: "what is the
+ * volume of a sphere of radius 2?" reads in part as "add a sphere", and is a question. A request put
+ * politely ("could you add a sphere") still starts with its verb once the courtesy is set aside.
+ */
+export function readsAsDescription(text: string): boolean {
+  const t = String(text ?? '').trim().toLowerCase();
+  if (!t || /\?\s*$/.test(t)) return false;
+  const rest = t.replace(/^(?:(?:please|pls|now|and|also|then|ok|okay|so|just|hey|hi)[,!\s]+)*(?:(?:can|could|would|will) you\s+(?:please\s+)?)?/, '');
+  return new RegExp(`^(?:${VERBS}|give me|i want|i need|i'd like|let'?s|there is|there's|we need|show|stack|pile|drop|lay|stand|a|an|another|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|\\d+)(?![a-z'])`).test(rest);
 }
 
 export function readScene(text: string, state: SceneState, ctx: ReadContext = {}): Reading {

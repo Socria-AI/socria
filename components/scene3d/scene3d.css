@@ -44,7 +44,6 @@
 .s3-tools { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
 .s3-tools button,
 .s3-tools select,
-.s3-say button,
 .s3-insp footer button {
   font: inherit;
   font-size: 12px;
@@ -57,8 +56,7 @@
 }
 .s3-tools button.is-on { background: var(--lg-primary); color: var(--lg-paper); border-color: var(--lg-primary); }
 .s3-tools button:disabled,
-.s3-tools select:disabled,
-.s3-say button:disabled { opacity: 0.4; cursor: default; }
+.s3-tools select:disabled { opacity: 0.4; cursor: default; }
 
 /* the view and the description beside (or above) the parts */
 .s3-body { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
@@ -119,39 +117,26 @@
   transform: translateY(-100%);
 }
 
-.s3-say {
-  display: flex;
-  gap: 6px;
-  padding: 8px 12px;
-  border-top: 1px solid var(--lg-line);
-}
-.s3-say input {
-  flex: 1 1 auto;
-  min-width: 0;
-  font: inherit;
-  font-size: 14px;
-  color: var(--lg-ink);
-  background: var(--lg-paper);
-  border: 1px solid var(--lg-line);
-  border-radius: 8px;
-  padding: 7px 10px;
-}
-.s3-say input:focus { outline: 2px solid color-mix(in srgb, var(--lg-primary) 40%, transparent); outline-offset: 0; }
-.s3-say button[type='submit'] { background: var(--lg-primary); color: var(--lg-paper); border-color: var(--lg-primary); }
-
-/* the description, read back clause by clause */
+/* what is being typed in the chat, read back clause by clause */
 .s3-read {
-  list-style: none;
-  margin: 0;
-  padding: 0 12px 8px;
-  display: grid;
-  gap: 3px;
-  max-height: 120px;
+  padding: 6px 12px 8px;
+  border-top: 1px solid var(--lg-line);
+  max-height: 140px;
   overflow: auto;
 }
+.s3-read ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 3px;
+}
+.s3-next { margin: 4px 0 0; color: var(--lg-ink-60); font-size: 12px; }
 .s3-read li { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; line-height: 1.35; }
 .s3-read li.is-problem { color: var(--lg-tension); }
 .s3-mark { width: 1em; flex: none; }
+/* the mark stays beside what it marks, however long the sentence */
+.s3-read li > .s3-mark + span { flex: 1 1 14em; min-width: 0; }
 .s3-skip { color: var(--lg-tension); font-size: 12px; }
 .s3-note { color: var(--lg-ink-60); font-size: 12px; }
 .s3-read .s3-note::before { content: '· '; }

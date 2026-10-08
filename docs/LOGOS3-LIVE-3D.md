@@ -1,7 +1,9 @@
 # Live 3D (experimental)
 
-You describe a 3D scene and it is built as you type. The result is a real,
-editable scene graph that lives in the line of thinking. It is a
+You describe a 3D scene in the chat and it is drawn as you type, then built
+when you send it. The panel has no text box of its own: the chat box is how a
+person works in Logos. The result is a real, editable scene graph that lives
+in the line of thinking. It is a
 **geometric preview**: shapes, sizes and positions, computed exactly.
 Nothing in it is loaded, stressed or simulated (a mass, where a density is given, is density × volume and no more), and it says so in the
 panel, in its facts and in the reply model's rules. Physically validated
@@ -36,10 +38,11 @@ map card are all views of the scene's current state.
 | `lib/objects/scene-geometry.ts` | the geometry, computed: profiles, surface grids, revolved profiles, tube paths, extents, rotation (identical to `THREE.Euler 'XYZ'`), volume and area — exact formulas, or numerical and said to be |
 | `lib/objects/scene.ts` | the kind: nodes with stable ids, dimensions, placement, look and support (`on`); the operations; `settle`; the facts |
 | `lib/objects/scene-intent.ts` | the reader: a description into the kind's own operations, clause by clause |
+| `lib/objects/scene-chat.ts` | what a chat message does to the scene: build it, say what could not be read, or nothing |
 | `lib/objects/scene-plan.ts` | the scene seen from above, for the map card |
 | `components/scene3d/geometry.ts` | a part as Three.js geometry, built from the same functions |
 | `components/scene3d/SceneCanvas.tsx` | the React Three Fiber view: orbit, select, the transform gizmo, the preview ghosted |
-| `components/scene3d/ScenePanel.tsx` | the panel: describe, preview, Build; parts; inspector; undo by description |
+| `components/scene3d/ScenePanel.tsx` | the panel: the chat's draft previewed; parts; inspector; undo by description |
 
 ### Airfoils, and what parts are made of
 
@@ -178,11 +181,35 @@ What it refuses rather than guesses:
   place given goes beside what is already there, not inside it, and the note
   says so.
 
-### Built, and undone, by description
+### Built from the chat, and undone, by description
 
-Build applies the reading's operations through the workspace, one step each.
-All the steps of one description share a timestamp, so **Undo** takes the
-whole description back, and **Redo** puts it back. Edits made by hand are one
+With a Live 3D panel open, every message is first offered to the scene's
+reader (`sceneTurn`, in `lib/objects/scene-chat.ts`):
+
+- **It reads fully** — every clause understood, no word skipped. The
+  operations are applied and what was built is said in the conversation
+  ("Built in Live 3D: add 9 steel spheres in a ring …"). Nothing goes to the
+  reply model, and nothing is spent: a description is a command, like a
+  command to the map.
+- **It is plainly a description, but part of it could not be read.** It
+  starts with a verb the reader knows ("add", "make", "build me", "could you
+  put") or with a thing ("a", "3 cubes"), and is not a question. Nothing is
+  built, and what was not read is said, in the reader's own words. Building
+  the part that was read would make something nobody asked for.
+- **Anything else is an ordinary message.** "What is the volume of a sphere
+  of radius 2?" names a sphere and is a question, so it goes to the
+  conversation and the scene is not touched. So does a sentence that names a
+  shape among more than three words the reader does not know.
+
+While the message is being typed, the panel draws what sending it would
+build, with what would change ghosted, and reads it back clause by clause.
+It draws nothing for a message that would not build. Only the panel a
+description would build in previews it. The panel's starting points put
+their description into the chat box.
+
+The operations are applied through the workspace, one step each. All the
+steps of one description share a timestamp, so **Undo** takes the whole
+description back, and **Redo** puts it back. Edits made by hand are one
 step each:
 - **Inspector:** typing a size, a position, a turn, a stretch, a colour, a
   finish, an opacity or a support.
@@ -252,11 +279,11 @@ and a dragging finger only after it is clicked.
   numerical mass against π∫r² dy, the rotor's blades keeping their pitch.
 - Chromium, with WebGL through SwiftShader (`scripts/.probe-live3d*.mjs`,
   not kept):
-  - type, preview, Build;
+  - type in the chat, preview, send;
   - an edit to the selected part;
   - a ring of 8;
   - an inspector edit, then undo by description;
-  - a problem read back with Build disabled;
+  - a problem read back, and nothing built;
   - "+ View", the map card's plan, and "Open in 3D".
 
 ## Not yet

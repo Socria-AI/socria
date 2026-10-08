@@ -8,7 +8,8 @@ import { readFileSync } from 'node:fs';
 import * as THREE from 'three';
 import { create, apply, sanitizeSpace, kindOf, currentOf, SCENE, SCENE_OPS, settle, sanitizeScene, dependents, nodeLine, objectsBlock } from './.tmp/index.mjs';
 import { massOf, sceneMass } from './.tmp/scene.mjs';
-import { readScene, clausesOf } from './.tmp/scene-intent.mjs';
+import { readScene, clausesOf, readsAsDescription } from './.tmp/scene-intent.mjs';
+import { sceneTurn } from './.tmp/scene-chat.mjs';
 import { measure, rotationMatrix, eulerOf, rotateAbout, worldBox, localBox, profile, surfaceGrid, revolveProfile, tubePath, parsePoints, polygonArea, nacaSection, centroid, toWorld, sectionOf } from './.tmp/scene-geometry.mjs';
 import { planOf } from './.tmp/scene-plan.mjs';
 import { factsFrom, suggestViews } from './.tmp/surfaces.mjs';
@@ -538,6 +539,55 @@ console.log('=== a section’s area and second moments, exact ===');
   const st = sec('polygon', { h: 1 }, { pts: '0,0|0.3,0|0.3,0.1|0,0.1' }, [2, 1, 1]);
   ok('a stretch is followed: A·sx·sz, Ix·sx·sz³, Iz·sx³·sz', near(st.area, 0.06) && near(st.Ix, 2 * rect.Ix) && near(st.Iz, 8 * rect.Iz));
   ok('no section for a shape that is not an extrusion', sec('box', { w: 1, h: 1, d: 1 }) === null && sec('sphere', { r: 1 }) === null);
+}
+
+console.log('=== built from the conversation: the chat box is the only box ===');
+{
+  const turn = (text, sc = EMPTY, ctx = {}) => sceneTurn(text, sc, ctx);
+  const b = turn('a red box 2 m wide, then a blue sphere of radius 0.5 on top of it');
+  ok('a description that reads fully is built', b?.kind === 'build' && b.reading.preview.nodes.length === 2);
+  ok('… and what was built is said, clause by clause', /^Built in Live 3D: add a red box.*; add a blue sphere/.test(b?.said ?? ''), b?.said);
+  ok('the reading is the scene reader’s own: the same operations the preview drew', JSON.stringify(b?.reading.ops) === JSON.stringify(read('a red box 2 m wide, then a blue sphere of radius 0.5 on top of it').ops));
+  ok('a request put politely is still a description', turn('can you make a red cube please')?.kind === 'build' && turn('could you add a sphere?')?.kind === 'build');
+  ok('“build me …” keeps its count', /9 steel spheres in a ring/.test(turn('build me a ring of 9 steel balls')?.said ?? ''));
+  ok('… and so does “could you build us …”', /8 cylinders in a ring/.test(turn('could you build us a ring of 8 cylinders')?.said ?? ''));
+  const surf = turn('a surface z = sin(x)*cos(y)');
+  ok('a surface by its equation is built, with the range nobody gave said', surf?.kind === 'build' && /no range given/.test(surf.said));
+  // a question that names a shape is a question — it goes to the conversation, and the scene is not touched
+  for (const q of ['what is the volume of a sphere of radius 2?', "Can you explain how a cylinder's moment of inertia is derived?", 'compare a cylinder and a cone', 'how would a cone look if it was taller?', 'why is the flywheel so heavy?', 'show me how a gyroscope works', 'explain the four subspaces of this matrix', 'thanks!', 'hello']) {
+    ok(`an ordinary message is not the scene’s: “${q}”`, turn(q) === null, JSON.stringify(turn(q)?.problems ?? turn(q)?.said));
+  }
+  ok('… nor is a statement that happens to name one', turn('my house is shaped like a cube') === null);
+  ok('nothing to build, nothing said', turn('') === null && turn('   ') === null && turn('make it red') === null);
+  const part = turn('add a red box and make it glow');
+  ok('a description read only in part builds nothing', part?.kind === 'partial');
+  ok('… and says what could not be read, in the reader’s words', /^Nothing was built/.test(part?.said ?? '') && /“make it glow”: Make it what\?/.test(part?.said ?? ''), part?.said);
+  ok('… words skipped are named too', /not read — rounded, corners/.test(turn('add a box with rounded corners')?.said ?? ''));
+  ok('a message that names a shape among many other words is left to the conversation', turn('a lot of people think a sphere is the most efficient shape for a tank') === null);
+  const s0 = read('a red box').preview;
+  const edit = turn('make it twice as tall', s0, { selected: s0.nodes[0].id });
+  ok('with a part in hand, “it” is that part', edit?.kind === 'build' && edit.reading.changes.changed.includes(s0.nodes[0].id) && !edit.reading.changes.added.length);
+  ok('… and with none selected, the part the conversation last made', turn('paint it gold', s0, { last: s0.nodes[0].id })?.kind === 'build');
+  ok('what reads as a description, and what does not', readsAsDescription('add a cube') && readsAsDescription('could you add a sphere') && readsAsDescription('a ball bearing') && readsAsDescription('3 cubes in a row') && !readsAsDescription('what is a cube') && !readsAsDescription('add a cube?') && !readsAsDescription('the cube is nice') && !readsAsDescription('compare a cube and a sphere'));
+}
+
+console.log('=== the wiring: no box but the chat’s ===');
+{
+  const panel = readFileSync(new URL('../components/scene3d/ScenePanel.tsx', import.meta.url), 'utf8');
+  const app = readFileSync(new URL('../components/LogosApp.tsx', import.meta.url), 'utf8');
+  const fig = readFileSync(new URL('../components/objects/ObjectFigure.tsx', import.meta.url), 'utf8');
+  const composer = readFileSync(new URL('../components/LogosComposer.tsx', import.meta.url), 'utf8');
+  ok('Live 3D has no text box or Build button of its own', !/<input\b(?![^>]*type="(?:number|range)")[^>]*aria-label="Describe/.test(panel) && !/s3-say/.test(panel) && !/>\s*Build\s*</.test(panel));
+  ok('… it previews what is being typed in the chat, with the same reading', /sceneTurn\(draft, scene/.test(panel) && /draft=\{target \? input : ''\}/.test(app));
+  ok('… and only what sending will build is ghosted', /turn\?\.kind === 'build' \? turn\.reading : null/.test(panel));
+  ok('its starting points go into the chat box', /p\.onSuggest!\(s\)/.test(panel) && /onSuggest=\{\(text\) => draftToComposer\(text\)\}/.test(app));
+  ok('a description sent in the chat is built before the reply is asked anything', /const turn = sceneTurn\(content, st/.test(app) && app.indexOf('if (objTurn.scene)') > app.indexOf('const objTurn = takeObjects(content, atts)') && app.indexOf('if (objTurn.scene)') < app.indexOf('readViewRequest(content)'));
+  const local = app.slice(app.indexOf('if (objTurn.scene)'), app.indexOf('readViewRequest(content)'));
+  ok('… and is answered here, without the model', /patchActive/.test(local) && !/fetch\(/.test(local));
+  ok('every operation of one description shares a moment, so undo takes it back whole', /const at = Date\.now\(\);[\s\S]{0,400}applyObjectOp\(sp, id, o\.op, o\.args, \{ by: 'person', at \}\)/.test(app));
+  ok('the matrix and the function have no text box of their own', !/<input\b(?![^>]*type="range")/.test(fig.slice(fig.indexOf('function MatrixFigure'))) && !/<form/.test(fig));
+  ok('… their forms are finished in the chat box, the caret where the number goes', /onDraft\?\.\(t, dot >= 0 \? dot : undefined\)/.test(fig) && /if \(a\.type === 'draft'\)/.test(app));
+  ok('the chat box takes the caret when something is put in it', /focusSignal/.test(composer) && /setSelectionRange\(at, at\)/.test(composer));
 }
 
 console.log('=== the source keeps its promises ===');

@@ -249,7 +249,9 @@ export function SceneCanvas(p: SceneCanvasProps) {
           </div>
         </Html>
       )}
-      {target && p.onTransform && (
+      {/* only while the part is in the scene drawn — an undo that takes it away unmounts the gizmo in the same
+          render, rather than leaving it holding a part no longer in the scene graph until the effect catches up */}
+      {target && sel && !previewing && p.onTransform && (
         <TransformControls
           object={target}
           mode={p.mode}
