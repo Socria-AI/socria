@@ -34,6 +34,7 @@
 // PURE. No clock, no network, no React.
 
 import { normalizeExpr } from '@/lib/logos-math';
+import { fractionOf, realPow } from '@/lib/real-power';
 
 export type Expr =
   | { k: 'num'; v: number }
@@ -241,12 +242,34 @@ const PREC: Record<Expr['k'], number> = {
  * one parenthesis, and the alternative is a printer whose output its own
  * evaluator rejects.
  */
+/**
+ * A number as the evaluator will read it back — exactly enough to be the same
+ * number.
+ *
+ * Twelve significant figures is right for nearly everything: it turns float
+ * noise back into the number meant (0.30000000000000004 prints as 0.3). It is
+ * wrong for a fraction that has no short decimal. Two thirds printed as
+ * 0.666666666667 is no longer two thirds — and a power is only real for a
+ * negative base when its exponent IS a fraction with an odd denominator
+ * (lib/real-power.ts), so x^(2/3) folded and printed as x^0.666666666667, and
+ * its derivative as 0.666666666667 * x^-0.333333333333, lost the left half of
+ * both curves. Such a number prints as the fraction it is, in parentheses so
+ * it binds as one operand wherever it lands: x^(2/3), (2/3) * x^(-1/3).
+ */
+function printNum(v: number): string {
+  const short = Number(v.toPrecision(12));
+  if (Math.abs(short - v) <= 8 * Number.EPSILON * Math.abs(v)) return String(short);
+  const f = fractionOf(v);
+  if (f && f.q > 1) return `(${f.p}/${f.q})`;
+  return String(short);
+}
+
 export function print(e: Expr): string {
   const wrap = (child: Expr, need: number) =>
     PREC[child.k] < need || child.k === 'neg' ? `(${print(child)})` : print(child);
   switch (e.k) {
     case 'num':
-      return String(Number(e.v.toPrecision(12)));
+      return printNum(e.v);
     case 'name':
       return e.id;
     case 'neg':
@@ -388,7 +411,8 @@ export function simplify(e: Expr): Expr {
         if (isVal(b, 0)) return num(1);
         if (isVal(b, 1)) return a;
         if (isNum(a) && isNum(b)) {
-          const v = Math.pow(a.v, b.v);
+          // the same real-valued power the evaluator uses: (−8)^(2/3) is 4
+          const v = realPow(a.v, b.v);
           if (Number.isFinite(v)) return num(v);
         }
         return { k: 'pow', a, b };

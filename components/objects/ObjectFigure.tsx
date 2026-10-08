@@ -29,6 +29,7 @@ import {
 } from '@/lib/objects';
 import { TeX } from '@/components/TeX';
 import { planOf } from '@/lib/objects/scene-plan';
+import { sampleAdaptive } from '@/lib/logos-viz';
 import { analyseMatrix } from '@/lib/objects/matrix-analysis';
 import type { SceneState } from '@/lib/objects/scene';
 import './objects.css';
@@ -434,20 +435,33 @@ function MatrixFigure({ obj, at, mode, guarded, sel, onSelect, onOp, onDraft, on
 const GW = 340;
 const GH = 170;
 
+/**
+ * The curve, sampled the way every Logos plot is (lib/logos-viz.ts
+ * sampleAdaptive): refined where it bends, so a cusp is drawn as one; and with
+ * the pen lifted wherever the function has no real value, runs off to
+ * infinity, or jumps. It used to drop undefined points and join what was left,
+ * which drew a straight line across any gap — √(x²−1) got a bridge over
+ * (−1, 1) — and sized its window to the extreme sample, so one pole flattened
+ * the rest of the curve.
+ */
 function useCurve(st: FunctionState) {
   return useMemo(() => {
     const f = compileState(st);
     if (!f) return null;
     const n = 220;
-    const pts: [number, number][] = [];
-    for (let i = 0; i <= n; i++) {
-      const x = st.lo + ((st.hi - st.lo) * i) / n;
-      const y = f(x);
-      if (Number.isFinite(y)) pts.push([x, y]);
-    }
-    if (!pts.length) return null;
-    let y0 = Math.min(...pts.map((p) => p[1]));
-    let y1 = Math.max(...pts.map((p) => p[1]));
+    // An even first pass sizes the window. The full range keeps every real
+    // extreme — the tip of a cusp included — unless a few samples near a pole
+    // dwarf the rest, and then the robust 2nd–98th percentile range does.
+    const ys = sampleAdaptive(f, st.lo, st.hi, n)
+      .map((p) => p.y)
+      .filter((y) => Number.isFinite(y))
+      .sort((a, b) => a - b);
+    if (!ys.length) return null;
+    const lo = ys[Math.floor(ys.length * 0.02)];
+    const hi = ys[Math.min(ys.length - 1, Math.floor(ys.length * 0.98))];
+    const full = ys[ys.length - 1] - ys[0];
+    let y0 = full > 10 * Math.max(hi - lo, 1e-9) ? lo : ys[0];
+    let y1 = full > 10 * Math.max(hi - lo, 1e-9) ? hi : ys[ys.length - 1];
     if (y1 - y0 < 1e-9) {
       y0 -= 1;
       y1 += 1;
@@ -457,12 +471,17 @@ function useCurve(st: FunctionState) {
     y1 += pad;
     const sx = (x: number) => ((x - st.lo) / (st.hi - st.lo)) * GW;
     const sy = (y: number) => GH - ((y - y0) / (y1 - y0)) * GH;
+    const pts = sampleAdaptive(f, st.lo, st.hi, n, { xMin: st.lo, xMax: st.hi, yMin: y0, yMax: y1 });
+    const span = y1 - y0;
     let d = '';
     let pen = false;
-    for (let i = 0; i < pts.length; i++) {
-      const [x, y] = pts[i];
-      const jump = i > 0 && Math.abs(sy(y) - sy(pts[i - 1][1])) > GH * 0.9;
-      d += `${!pen || jump ? 'M' : 'L'}${sx(x).toFixed(1)},${sy(y).toFixed(1)} `;
+    for (const p of pts) {
+      // a gap, a pole, a jump: the pen lifts, as it does on every other plot
+      if (!Number.isFinite(p.y) || p.y < y0 - span || p.y > y1 + span) {
+        pen = false;
+        continue;
+      }
+      d += `${pen ? 'L' : 'M'}${sx(p.x).toFixed(1)},${sy(p.y).toFixed(1)} `;
       pen = true;
     }
     return { f, d, sx, sy, y0, y1 };

@@ -308,11 +308,105 @@ const KIND_OF: Record<string, { type: VizEntity['type']; what: string }> = {
   label: { type: 'label', what: 'a text label' },
 };
 
+/** A position on the x axis, to the window's own resolution. */
+function atX(x: number, width: number): string {
+  const step = Math.pow(10, Math.floor(Math.log10(Math.max(width, 1e-9) / 200)));
+  const r = Math.round(x / step) * step;
+  const v = Math.abs(r) < step / 2 ? 0 : r;
+  return String(Number(v.toPrecision(4))).replace('-', '−');
+}
+
+/** "0", "0 and 1", "−2, −1, 0 and 3 more" */
+function listOf(xs: string[]): string {
+  const shown = xs.slice(0, 3);
+  const more = xs.length - shown.length;
+  if (more > 0) return `${shown.join(', ')} and ${more} more`;
+  return shown.length > 1 ? `${shown.slice(0, -1).join(', ')} and ${shown[shown.length - 1]}` : shown[0] ?? '';
+}
+
+/**
+ * WHERE A CURVE IS DRAWN, read off the very points that were drawn: across
+ * the whole window or only part of it, and where the pen lifts — a pole, a
+ * jump, or a stretch with no real value.
+ *
+ * So an explanation of the curve can describe the curve that is there. When
+ * x^(2/3) was drawn only for x ≥ 0, the model explaining it had nothing but
+ * the formula and its own sense of what a fractional power does — and the
+ * picture and the explanation could disagree. Now both read from the same
+ * evaluation. It is what anyone looking can see, never a computed answer:
+ * where the curve is, not what it means.
+ */
+export function curveCoverage(
+  pts: readonly { x: number; y: number; brk?: 'jump' | 'pole' }[],
+  varName = 'x'
+): string | null {
+  if (!Array.isArray(pts) || pts.length < 2) return null;
+  const x0 = pts[0].x;
+  const x1 = pts[pts.length - 1].x;
+  const width = x1 - x0;
+  if (!(width > 0)) return null;
+  const v = varName || 'x';
+  const runs: [number, number][] = [];
+  const poles: number[] = [];
+  const jumps: number[] = [];
+  const holes: number[] = [];
+  let start: number | null = null;
+  let last = 0;
+  for (const p of pts) {
+    if (Number.isFinite(p.y)) {
+      if (start === null) start = p.x;
+      last = p.x;
+      continue;
+    }
+    if (start !== null) runs.push([start, last]);
+    start = null;
+    if (p.brk === 'jump') jumps.push(p.x);
+    else if (p.brk === 'pole' || p.y === Infinity || p.y === -Infinity) poles.push(p.x);
+    else holes.push(p.x);
+  }
+  if (start !== null) runs.push([start, last]);
+  if (!runs.length) return `nothing drawn: no real value anywhere in the window`;
+
+  const at = (x: number) => atX(x, width);
+  const near = width * 0.01;
+  const from = runs[0][0];
+  const to = runs[runs.length - 1][1];
+  const lead = from - x0 > near;
+  const trail = x1 - to > near;
+  const bits: string[] = [];
+  if (!lead && !trail) bits.push('drawn across the whole window');
+  else if (lead && !trail) bits.push(`drawn only from ${v} ≈ ${at(from)} rightward; nothing to its left`);
+  else if (!lead && trail) bits.push(`drawn only up to ${v} ≈ ${at(to)}; nothing to its right`);
+  else bits.push(`drawn only between ${v} ≈ ${at(from)} and ${at(to)}`);
+
+  // the breaks inside what is drawn, by kind; a wide gap is a stretch with no real value
+  const gaps: string[] = [];
+  for (let i = 0; i + 1 < runs.length; i++) {
+    const a = runs[i][1];
+    const b = runs[i + 1][0];
+    if (b - a > width * 0.02 && !poles.some((x) => x > a && x < b) && !jumps.some((x) => x > a && x < b)) {
+      gaps.push(`${at(a)} to ${at(b)}`);
+    }
+  }
+  const inside = (xs: number[]) => [...new Set(xs.filter((x) => x > from && x < to).map(at))];
+  const p = inside(poles);
+  const j = inside(jumps);
+  const h = inside(holes).filter((x) => !p.includes(x) && !j.includes(x));
+  if (p.length) bits.push(`runs off to infinity at ${v} ≈ ${listOf(p)}`);
+  if (j.length) bits.push(`jumps at ${v} ≈ ${listOf(j)}`);
+  if (gaps.length) bits.push(`no real value for ${v} from ${listOf(gaps)}`);
+  else if (h.length) bits.push(`a gap at ${v} ≈ ${listOf(h)}`);
+  if (bits.length === 1 && !lead && !trail) bits[0] = 'drawn unbroken across the whole window';
+  const said = bits.join('; ');
+  return said.length > 118 ? `${said.slice(0, 117)}…` : said;
+}
+
 /**
  * Turn the objects a plot actually drew into entities.
  *
  * `scene.expr` is the one piece of real meaning available — the expression the
- * figure is of — so it is attached to the marks and nothing more is claimed.
+ * figure is of — so it is attached to the marks, with where each curve is
+ * drawn (curveCoverage), and nothing more is claimed.
  */
 export function entitiesFromFrame(objects: VizObject[], scene?: VizScene | null): VizEntity[] {
   const out: VizEntity[] = [];
@@ -328,6 +422,8 @@ export function entitiesFromFrame(objects: VizObject[], scene?: VizScene | null)
     const bits: string[] = [];
     if (colour) bits.push(`drawn in a colour that encodes a computed quantity (${colour})`);
     else if (tone && TONE_WORDS[tone]) bits.push(`drawn in ${TONE_WORDS[tone]}`);
+    // where a curve is actually drawn, and where the pen lifts
+    const coverage = ob.o === 'curve' && Array.isArray(ob.pts) ? curveCoverage(ob.pts, scene?.varName) : null;
     out.push({
       id,
       type: kind.type,
@@ -336,6 +432,7 @@ export function entitiesFromFrame(objects: VizObject[], scene?: VizScene | null)
       // A plot draws what an expression says; nothing here is integrated.
       from: 'closed-form',
       ...(bits.length ? { appearance: bits.join('; ') } : {}),
+      ...(coverage ? { state: coverage } : {}),
     });
     if (out.length >= 48) break;
   }

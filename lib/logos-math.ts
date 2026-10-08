@@ -7,6 +7,15 @@
 // evaluator — NOT eval(). It only ever produces a number from a whitelisted
 // grammar (numbers, one variable, + - * / ^, unary minus, and a fixed set of
 // functions/constants), so a hostile string can compute a NaN, never run code.
+//
+// POWERS ARE REAL-VALUED (lib/real-power.ts). `^` used to be Math.pow, which
+// has no answer for a negative base and a fractional exponent — so x^(2/3),
+// x^(1/3) and \sqrt[3]{x} lost everything left of the origin. Every power here,
+// scalar, column and Taylor series alike, now takes x^(p/q) as the real q-th
+// root raised to the p: real for negative x when q is odd, absent when it is
+// even.
+
+import { fractionOf, realPow, realPowInto } from './real-power';
 
 // ── expression evaluator ────────────────────────────────────────────
 
@@ -348,7 +357,7 @@ export function compileExpr(raw: string, varNames: string[]): CompiledExpr | nul
         if (a === undefined || b === undefined) return NaN;
         st.push(
           tk.v === '+' ? a + b : tk.v === '-' ? a - b : tk.v === '*' ? a * b :
-          tk.v === '/' ? a / b : tk.v === '%' ? a % b : Math.pow(a, b)
+          tk.v === '/' ? a / b : tk.v === '%' ? a % b : realPow(a, b)
         );
       }
     }
@@ -430,7 +439,7 @@ export function compileVectorExpr(raw: string, varNames: string[]): VectorExpr |
       };
       const two = (op: string, a: Col, b: Col): Col => {
         if (typeof a === 'number' && typeof b === 'number') {
-          return op === '+' ? a + b : op === '-' ? a - b : op === '*' ? a * b : op === '/' ? a / b : op === '%' ? a % b : Math.pow(a, b);
+          return op === '+' ? a + b : op === '-' ? a - b : op === '*' ? a * b : op === '/' ? a / b : op === '%' ? a % b : realPow(a, b);
         }
         const r = temp();
         const A = typeof a === 'number' ? null : a;
@@ -462,10 +471,12 @@ export function compileVectorExpr(raw: string, varNames: string[]): VectorExpr |
             for (let i = 0; i < n; i++) r[i] = (A ? A[i] : sa) % (B ? B[i] : sb);
             break;
           default:
-            // powers: a square or a cube by multiplying, which is exact and fast
+            // powers: a square or a cube by multiplying, which is exact and fast;
+            // one exponent for the whole column has its fraction read once
             if (A && !B && sb === 2) for (let i = 0; i < n; i++) r[i] = A[i] * A[i];
             else if (A && !B && sb === 3) for (let i = 0; i < n; i++) r[i] = A[i] * A[i] * A[i];
-            else for (let i = 0; i < n; i++) r[i] = Math.pow(A ? A[i] : sa, B ? B[i] : sb);
+            else if (A && !B) realPowInto(A, sb, r);
+            else for (let i = 0; i < n; i++) r[i] = realPow(A ? A[i] : sa, B ? B[i] : sb);
         }
         return r;
       };
@@ -523,6 +534,8 @@ export function compileFunction(raw: string): CompiledFn | null {
 export interface PlotSample {
   x: number;
   y: number;
+  /** on a NaN sample put there by the sampler: why the pen lifts */
+  brk?: 'jump' | 'pole';
 }
 export interface PlotData {
   samples: PlotSample[];
@@ -533,14 +546,71 @@ export interface PlotData {
   yMax: number;
 }
 
+// ── breaks: jumps and poles ─────────────────────────────────────────
+//
+// A polyline joins every pair of neighbouring samples. Where a function jumps
+// (floor, a step, sign) or runs off to infinity between them (1/x, tan x,
+// x^(−1/3)), that join is a vertical stroke the function does not have. So
+// the samplers ask, of a pair that still changes too much to be one stroke
+// of the curve: is something BETWEEN them, and lift the pen there if so.
+
+/** One sampled point; a NaN y means "the pen lifts here". */
+export interface BreakPt {
+  x: number;
+  y: number;
+  /** on a NaN point a sampler put there: why the pen lifts */
+  brk?: 'jump' | 'pole';
+}
+
+/**
+ * Is there a break between two finite samples — a jump or a pole — rather
+ * than a steep stretch of a continuous curve? Found by bisection, always
+ * keeping the half that holds more of the change:
+ *
+ *   continuous  the change shrinks with the interval — even at a vertical
+ *               tangent, where x^(1/3) moves by h^(1/3)
+ *   jump        the change stays the size of the jump
+ *   pole        the change grows without bound
+ *
+ * So after narrowing to the float limit, a change that is still at least half
+ * what it was, and more than `minJump`, is a break. Returns the last points
+ * on either side of it, or null for a curve that is merely steep.
+ */
+export function findBreak(
+  f: (x: number) => number,
+  a: BreakPt,
+  b: BreakPt,
+  minJump: number
+): { left: BreakPt; right: BreakPt; kind: 'jump' | 'pole'; evals: number } | null {
+  if (!Number.isFinite(a.y) || !Number.isFinite(b.y)) return null;
+  const start = Math.abs(b.y - a.y);
+  let L = a;
+  let R = b;
+  let evals = 0;
+  for (let i = 0; i < 64; i++) {
+    const mx = (L.x + R.x) / 2;
+    if (!(mx > L.x && mx < R.x)) break;
+    const m = { x: mx, y: f(mx) };
+    evals++;
+    // nothing real in between: a pole, a hole, a gap — a break either way
+    if (!Number.isFinite(m.y)) return { left: L, right: R, kind: 'pole', evals };
+    if (Math.abs(m.y - L.y) >= Math.abs(R.y - m.y)) R = m;
+    else L = m;
+  }
+  const end = Math.abs(R.y - L.y);
+  if (!(end > minJump && end >= 0.5 * start)) return null;
+  // a jump keeps its size; a pole's change kept growing as the interval shrank
+  return { left: L, right: R, kind: end > 4 * start ? 'pole' : 'jump', evals };
+}
+
 /** Sample a compiled function into points + a sensible viewport, or null. */
 export function samplePlot(fn: CompiledFn, xMin = -10, xMax = 10, n = 240): PlotData | null {
-  const samples: PlotSample[] = [];
+  const raw: PlotSample[] = [];
   const ys: number[] = [];
   for (let i = 0; i <= n; i++) {
     const x = xMin + ((xMax - xMin) * i) / n;
     const y = fn.eval(x);
-    samples.push({ x, y });
+    raw.push({ x, y });
     if (Number.isFinite(y)) ys.push(y);
   }
   if (ys.length < 4) return null;
@@ -553,11 +623,116 @@ export function samplePlot(fn: CompiledFn, xMin = -10, xMax = 10, n = 240): Plot
   let yMax = Math.max(hi, 0);
   if (yMax - yMin < 1e-6) { yMin -= 1; yMax += 1; }
   const pad = (yMax - yMin) * 0.08;
+  // A neighbouring pair that changes by more than a fortieth of the window is
+  // either steep or broken; the break is found and the pen lifted across it.
+  const span = yMax - yMin + 2 * pad;
+  const samples: PlotSample[] = [];
+  let searches = 0;
+  for (let i = 0; i < raw.length; i++) {
+    const a = raw[i];
+    samples.push(a);
+    const b = raw[i + 1];
+    if (!b || searches >= 64 || !(Math.abs(b.y - a.y) > span / 40)) continue;
+    searches++;
+    const brk = findBreak(fn.eval, a, b, span / 80);
+    if (!brk) continue;
+    if (brk.left.x > a.x) samples.push(brk.left);
+    samples.push({ x: (brk.left.x + brk.right.x) / 2, y: NaN, brk: brk.kind });
+    if (brk.right.x < b.x) samples.push(brk.right);
+  }
   const out = { samples, varName: fn.varName, xMin, xMax, yMin: yMin - pad, yMax: yMax + pad };
   // A function that overflows the float range gives an infinite viewport, which
   // would render NaN SVG coordinates — refuse to plot it rather than break.
   if (!Number.isFinite(out.yMin) || !Number.isFinite(out.yMax)) return null;
   return out;
+}
+
+// ── where an expression has a real value ───────────────────────────
+
+/** The fractional powers an expression takes, which decide where it has a real value. */
+export interface PowersIn {
+  /** a power p/q with q odd (or a cube root): real on both sides of 0 */
+  oddRoot: boolean;
+  /** a power p/q with q even (or a square root): real only for x ≥ 0 */
+  evenRoot: boolean;
+  /** a constant exponent that is no fraction (π): real only for x ≥ 0 */
+  irrational: boolean;
+  /** an exponent that depends on a name — where it is real moves with it */
+  variable: boolean;
+}
+
+/**
+ * Read an expression's powers off its own token stream: constant exponents
+ * are evaluated (2/3, 0.5, −1/3), an exponent that mentions a name is
+ * reported as variable, and roots by name count as the powers they are.
+ * Null when the expression does not compile over `names`.
+ */
+export function powersIn(raw: string, names: string[]): PowersIn | null {
+  if (typeof raw !== 'string' || raw.length > 4000) return null;
+  const toks0 = tokenize(normalizeExpr(raw), new Set(names.map((v) => v.toLowerCase())));
+  if (!toks0 || !toks0.length) return null;
+  const rpn = toRpn(insertImplicitMult(toks0));
+  if (!rpn) return null;
+  const found: PowersIn = { oddRoot: false, evenRoot: false, irrational: false, variable: false };
+  // every value is a constant (with its number) or depends on a name
+  const st: { c: boolean; v: number }[] = [];
+  for (const tk of rpn) {
+    if (tk.t === 'num') st.push({ c: true, v: tk.v });
+    else if (tk.t === 'var') st.push({ c: false, v: NaN });
+    else if (tk.t === 'fn') {
+      if (FUNCS2[tk.v]) {
+        const b = st.pop();
+        const a = st.pop();
+        if (!a || !b) return null;
+        st.push({ c: a.c && b.c, v: a.c && b.c ? FUNCS2[tk.v](a.v, b.v) : NaN });
+      } else {
+        const a = st.pop();
+        if (!a) return null;
+        if (!a.c && (tk.v === 'sqrt')) found.evenRoot = true;
+        if (!a.c && (tk.v === 'cbrt')) found.oddRoot = true;
+        st.push({ c: a.c, v: a.c ? FUNCS[tk.v](a.v) : NaN });
+      }
+    } else if (tk.t === 'op') {
+      if (tk.v === 'u-') {
+        const a = st.pop();
+        if (!a) return null;
+        st.push({ c: a.c, v: -a.v });
+        continue;
+      }
+      const b = st.pop();
+      const a = st.pop();
+      if (!a || !b) return null;
+      if (tk.v === '^' && !a.c) {
+        if (!b.c) found.variable = true;
+        else if (!Number.isInteger(b.v)) {
+          const f = fractionOf(b.v);
+          if (!f) found.irrational = true;
+          else if (f.q % 2 === 1) found.oddRoot = true;
+          else found.evenRoot = true;
+        }
+      }
+      const both = a.c && b.c;
+      const v = !both
+        ? NaN
+        : tk.v === '+' ? a.v + b.v : tk.v === '-' ? a.v - b.v : tk.v === '*' ? a.v * b.v
+        : tk.v === '/' ? a.v / b.v : tk.v === '%' ? a.v % b.v : realPow(a.v, b.v);
+      st.push({ c: both, v });
+    }
+  }
+  return st.length === 1 ? found : null;
+}
+
+/**
+ * Does any of these expressions take a power whose real domain is worth
+ * saying — a fractional exponent, a root, an exponent that moves? Each is read
+ * over its own free names, so any scene's variables and parameters do.
+ */
+export function hasFractionalPowers(exprs: readonly (string | null | undefined)[]): boolean {
+  return exprs.some((e) => {
+    if (typeof e !== 'string' || !e.trim()) return false;
+    const p = powersIn(e, freeNames(e));
+    return !!p && (p.oddRoot || p.evenRoot || p.irrational || p.variable);
+  });
 }
 
 /** Does this node label / tex look like a single-variable function to plot? */
@@ -679,6 +854,20 @@ function sPowReal(a: Series, alpha: number): Series | null {
   }
   return w;
 }
+/**
+ * w = a^α for a fractional α on either side of zero, with the real-valued
+ * convention: for a[0] < 0 and α = p/q with q odd, a^α = (−1)^p · (−a)^α, and
+ * (−a)^α has the classical series. An even root of a negative number has none,
+ * and neither does a power at a[0] = 0 — that is a cusp or a vertical tangent.
+ */
+function sPowFrac(a: Series, alpha: number): Series | null {
+  if (a[0] > 0) return sPowReal(a, alpha);
+  if (!(a[0] < 0)) return null;
+  const f = fractionOf(alpha);
+  if (!f || f.q % 2 === 0) return null;
+  const w = sPowReal(sNeg(a), alpha);
+  return w && (f.p % 2 === 0 ? w : sNeg(w));
+}
 /** Integer powers by binary exponentiation — no positivity requirement. */
 function sPowInt(a: Series, p: number): Series | null {
   if (p < 0) {
@@ -716,7 +905,7 @@ function sFn(name: string, a: Series): Series | null {
       return l ? l.map((v) => v / Math.LN2) : null;
     }
     case 'sqrt': return sPowReal(a, 0.5);
-    case 'cbrt': return a[0] > 0 ? sPowReal(a, 1 / 3) : null;
+    case 'cbrt': return sPowFrac(a, 1 / 3);
     case 'sinh': {
       const e = sExp(a);
       const em = sExp(sNeg(a));
@@ -816,7 +1005,7 @@ export function taylorCoeffs(
         // varying, via exp/ln, which then imposes x > 0.
         const constant = b.slice(1).every((v) => v === 0);
         if (constant) {
-          out = Number.isInteger(b[0]) ? sPowInt(x, b[0]) : sPowReal(x, b[0]);
+          out = Number.isInteger(b[0]) ? sPowInt(x, b[0]) : sPowFrac(x, b[0]);
         } else {
           const l = sLn(x);
           out = l ? sExp(sMul(b, l)) : null;

@@ -196,6 +196,8 @@ const MODULES = [
   'lib/share/roles.ts',
   'lib/share/sync.ts',
   'lib/chat-thread.ts',
+  'lib/real-power.ts',
+  'lib/objects/function.ts',
   'lib/share/comments.ts',
   'lib/share/hue.ts',
   'lib/checkout-attribution.ts',

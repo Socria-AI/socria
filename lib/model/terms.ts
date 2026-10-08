@@ -54,6 +54,7 @@
 
 import { NAME } from './ids';
 import { derivativeOf, parse, print, type Expr } from './expr';
+import { realPow } from '@/lib/real-power';
 
 /** The operations a term may be. Recursive: a term's source may be a term. */
 export type TermOp =
@@ -338,7 +339,10 @@ export function termColumn(t: TermDecl, s: Sample): { ok: true; built: Built } |
     case 'ref':
       return pointwise((a) => a, [t.of ?? 'x']);
     case 'pow':
-      return pointwise((a) => Math.pow(a, t.by ?? 2), [t.of ?? 'x']);
+      // real-valued, like every other power (lib/real-power.ts): a cube-root
+      // term of a quantity that goes negative keeps its sign, a square root of
+      // one goes missing
+      return pointwise((a) => realPow(a, t.by ?? 2), [t.of ?? 'x']);
     case 'log':
       // A LOG OF A NON-POSITIVE NUMBER IS ABSENT, NOT ZERO. Substituting
       // log(x + 1) is a modelling decision and would be ours to make, which it

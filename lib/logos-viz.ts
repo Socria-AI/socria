@@ -29,7 +29,8 @@
 
 import type { Model } from './model/schema';
 import { revalidate } from './model/propose';
-import { compileExpr, freeNames, taylorCoeffs, type CompiledExpr } from './logos-math';
+import { compileExpr, freeNames, taylorCoeffs, type CompiledExpr, findBreak, hasFractionalPowers } from './logos-math';
+import { POWER_CONVENTION } from './real-power';
 import {
   contourSet,
   momentumTerms,
@@ -168,6 +169,8 @@ const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n
 export interface Pt {
   x: number;
   y: number;
+  /** on a NaN point the sampler put there: why the pen lifts — the curve jumps, or runs off to infinity */
+  brk?: 'jump' | 'pole';
 }
 
 export type VizObject =
@@ -782,18 +785,39 @@ export function sampleAdaptive(
   const span = view.yMax - view.yMin;
   if (!(span > 0)) return pts;
   const tol = span / 40; // ≈ 12px on a typical panel: below this the eye cannot tell
+  const bend = span / 1000; // ≈ ½px: a chord farther than this from the curve cuts a visible corner
   const far = span * 1.5; // beyond here the curve is off-frame and unseeable
 
   let budget = MAX_SAMPLES - pts.length;
+  // break searches are bounded on their own: each costs up to sixty evaluations
+  let searches = 0;
   const out: Pt[] = [];
 
   const refine = (a: Pt, b: Pt, depth: number) => {
-    if (depth <= 0 || budget <= 0) return;
     const af = Number.isFinite(a.y);
     const bf = Number.isFinite(b.y);
+    if (depth <= 0 || budget <= 0) {
+      // AT THE FINEST LEVEL, A CHANGE STILL TOO BIG TO BE ONE STROKE OF THE
+      // CURVE IS A BREAK — a jump (floor, a step) or a pole (1/x, x^(−1/3))
+      // between the two samples — or the steepest stretch of a curve that is
+      // merely steep (∛x at 0). findBreak tells them apart, and the pen lifts
+      // across a break instead of drawing a vertical stroke that isn't there.
+      if (af && bf && Math.abs(b.y - a.y) > tol && searches < 64) {
+        searches++;
+        const brk = findBreak(evalAt, a, b, tol / 2);
+        if (brk) {
+          budget -= brk.evals;
+          if (brk.left.x > a.x) out.push(brk.left);
+          out.push({ x: (brk.left.x + brk.right.x) / 2, y: NaN, brk: brk.kind });
+          if (brk.right.x < b.x) out.push(brk.right);
+        }
+      }
+      return;
+    }
     // One end defined and the other not: bisect toward the boundary so the
     // curve actually meets the edge of a pole instead of stopping short.
     const straddlesUndefined = af !== bf;
+    let m: Pt | null = null;
     if (!straddlesUndefined) {
       if (!af && !bf) return; // both undefined — nothing between them to draw
       // Both far off the same side of the frame: no visible detail between
@@ -801,12 +825,25 @@ export function sampleAdaptive(
       const aOut = a.y > view.yMax + far ? 1 : a.y < view.yMin - far ? -1 : 0;
       const bOut = b.y > view.yMax + far ? 1 : b.y < view.yMin - far ? -1 : 0;
       if (aOut !== 0 && aOut === bOut) return;
-      if (Math.abs(b.y - a.y) <= tol) return; // already smooth enough
+      if (Math.abs(b.y - a.y) <= tol) {
+        // SMALL CHANGE IS NOT THE SAME AS NO DETAIL. Either side of a cusp —
+        // x^(2/3) at 0 — the samples stand at the same height, and the chord
+        // between them cuts the point off flat. So look at the middle: a curve
+        // that is a straight line here passes through the chord's midpoint, a
+        // corner does not, and a corner is bisected toward like a jump.
+        const mx = (a.x + b.x) / 2;
+        if (!(mx > a.x && mx < b.x)) return;
+        m = { x: mx, y: evalAt(mx) };
+        budget--;
+        if (Number.isFinite(m.y) && Math.abs(m.y - (a.y + b.y) / 2) <= bend) return; // smooth enough
+      }
     }
     const mx = (a.x + b.x) / 2;
     if (!(mx > a.x && mx < b.x)) return; // float floor: cannot subdivide further
-    const m: Pt = { x: mx, y: evalAt(mx) };
-    budget--;
+    if (!m) {
+      m = { x: mx, y: evalAt(mx) };
+      budget--;
+    }
     refine(a, m, depth - 1);
     out.push(m);
     refine(m, b, depth - 1);
@@ -5760,10 +5797,14 @@ export function sceneBlock(scene: VizScene | null | undefined, vals?: Record<str
   if (!scene) return '';
   const said = describeScene(scene, vals);
   if (!said) return '';
+  // how a fractional power is drawn — a convention, not a result — so an
+  // explanation of the curve describes the curve the person is looking at
+  const shownExprs = [scene.expr, ...(scene.overlays ?? []).filter((o) => o.visible !== false).map((o) => o.expr)];
+  const powers = hasFractionalPowers(shownExprs) ? `\n\n${POWER_CONVENTION}` : '';
   return `
 
 === WHAT IS ON THEIR SCREEN ===
-Beside this conversation there is a live picture, and right now it shows ${said}.
+Beside this conversation there is a live picture, and right now it shows ${said}.${powers}
 
 They can see it, move its sliders and pan it. So "that spike", "the left half", "why is it flat there" and "what happens if I turn this up" are about THIS, and you may answer them as if you were looking at it too — because now you are.
 

@@ -18,6 +18,8 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { VizModelState, VizOp } from '@/lib/viz-model';
 import { entitiesFromFrame } from '@/lib/viz-semantics';
+import { hasFractionalPowers } from '@/lib/logos-math';
+import { POWER_CONVENTION_LINES } from '@/lib/real-power';
 import {
   autoParams,
   CORE_KINDS,
@@ -705,6 +707,8 @@ export function MathViz({
         c.swept
           ? `The animation sweeps ${c.swept.id}; it is ${c.playing ? 'running' : 'stopped'}.`
           : 'Nothing on it animates on its own.',
+        // how a fractional power is drawn, so an explanation of the curve matches it
+        ...(hasFractionalPowers([sc.expr, ...visible]) ? POWER_CONVENTION_LINES : []),
       ],
       equations: [sc.expr ?? '', ...visible].filter(Boolean).slice(0, 8),
       entities: c.frame ? entitiesFromFrame(c.frame.objects, sc) : [],
