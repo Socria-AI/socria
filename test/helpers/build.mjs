@@ -27,6 +27,7 @@ const MODULES = [
   'lib/numeric/roots.ts',
   'lib/numeric/spectral.ts',
   'lib/numeric/dynamics.ts',
+  'lib/numeric/fields.ts',
   'lib/logos-structure.ts',
   'lib/view-request.ts',
   'lib/logos.ts',
