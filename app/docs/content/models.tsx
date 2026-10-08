@@ -79,7 +79,7 @@ export function Models() {
                 readability and length instead</td>
               <td>None — no depth modes. It answers at one depth and puts the
                 effort into the map and the model</td>
-              <td>None, as Logos 2</td>
+              <td>All four modes, in the model picker</td>
             </tr>
             <tr>
               <td><strong>Memory</strong></td>

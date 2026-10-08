@@ -96,7 +96,6 @@ import { MathText } from '@/components/TeX';
 import { Inline, RichText } from '@/components/RichText';
 import {
   SOCRIA_MODELS,
-  THINKING_DEPTHS,
   type SocriaModel,
   type ThinkingDepth,
 } from '@/lib/socria-prompt';
@@ -389,10 +388,10 @@ export function LogosApp({
   // Depth: how deeply Logos helps you think (global). Answer Guard: which
   // learning sessions the person has chosen to reveal the solution for.
   const [depth, setDepth] = useState<ThinkingDepth>('balanced');
-  const [depthOpen, setDepthOpen] = useState(false);
-  // Depth modes are the model's to have, not the surface's: Logos 2 is
-  // registered without them (supportsDepth: false), so the composer shows no
-  // depth control and every request goes at the one depth it answers at.
+  // Depth modes are the model's to have, not the surface's: Logos 3 has them
+  // and offers them in the model picker, as Core 3.1 does; Logos 2 is
+  // registered without them (supportsDepth: false), so it shows no depth
+  // control and every request goes at the one depth it answers at.
   const depthOn = !!SOCRIA_MODELS[model]?.supportsDepth;
   const router = useRouter();
 
@@ -941,7 +940,6 @@ export function LogosApp({
       return;
     }
     setDepth(next);
-    setDepthOpen(false);
     try {
       localStorage.setItem(DEPTH_KEY, next);
     } catch {}
@@ -4457,47 +4455,6 @@ export function LogosApp({
                 Socria One
               </button>
             )}
-            {depthOn && (
-            <div className="lg-depth">
-              <button
-                type="button"
-                className="lg-depth-btn"
-                onClick={() => setDepthOpen((v) => !v)}
-                aria-haspopup="listbox"
-                aria-expanded={depthOpen}
-                title="Thinking depth — how deeply Logos helps you think"
-              >
-                {THINKING_DEPTHS.find((d) => d.id === depth)!.label}
-                <svg viewBox="0 0 24 24" width="9" height="9" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden="true">
-                  <path d="M6 9l6 6 6-6" />
-                </svg>
-              </button>
-              {depthOpen && (
-                <>
-                  <div className="lg-depth-scrim" onClick={() => setDepthOpen(false)} />
-                  <div className="lg-depth-menu is-up is-right" role="listbox">
-                    {THINKING_DEPTHS.map((d) => (
-                      <button
-                        key={d.id}
-                        type="button"
-                        role="option"
-                        aria-selected={depth === d.id}
-                        className={`lg-depth-opt${depth === d.id ? ' is-on' : ''}`}
-                        onClick={() => pickDepth(d.id)}
-                      >
-                        <span className="lg-depth-opt-label">
-                          {d.label}
-                          {!limits.allDepths && d.id !== FREE_DEPTH && <OneLock />}
-                        </span>
-                        <span className="lg-depth-opt-desc">{d.description}</span>
-                      </button>
-                    ))}
-                    <p className="lg-depth-foot">Depth changes how deeply Logos helps you think — never how quickly it gives answers.</p>
-                  </div>
-                </>
-              )}
-            </div>
-            )}
 
             {/* Logos is itself one of the models, so this is THE SAME SWITCH
                 the Core chat carries — the same component, so the button, the
@@ -4520,7 +4477,18 @@ export function LogosApp({
               </svg>
               {synthBusy === 'workspace' ? 'Reading your map…' : 'Synthesize'}
             </button>
-            <ModelPicker value={model} onChange={pickModel} isSignedIn={!!isSignedIn || unlocked} />
+            {/* Depth rides in the picker, as in the Core chat — one control,
+                two questions: which model, and how far it goes. Only where
+                the model has depth modes (Logos 3); Logos 2 shows the model
+                axis alone. */}
+            <ModelPicker
+              value={model}
+              onChange={pickModel}
+              isSignedIn={!!isSignedIn || unlocked}
+              depth={depthOn ? depth : undefined}
+              onDepth={depthOn ? pickDepth : undefined}
+              plan={planKnown ? plan : undefined}
+            />
           </div>
     </>
   );

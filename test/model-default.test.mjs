@@ -334,7 +334,7 @@ console.log('\n=== a withdrawn model: still there, not offered, not stranding an
 
   ok('the Core picker takes its list from the store', /offeredModels\(gates\)/.test(picker));
   ok('  and does not build one of its own', !rollsOwn(picker));
-  ok('the Logos picker is the same picker, so it shows the same list', /<ModelPicker value=\{model\}/.test(logos) && !/lg-model-btn/.test(logos));
+  ok('the Logos picker is the same picker, so it shows the same list', /<ModelPicker\s+value=\{model\}/.test(logos) && !/lg-model-btn/.test(logos));
   ok('  and does not build one of its own', !rollsOwn(logos));
   ok('offeredModels leaves out everything withdrawn, except what is kept under Other models',
     offeredModels().every((id) => (!MODELS[id].withdrawn || OTHER_MODELS.includes(id)) && !MODELS[id].soon));

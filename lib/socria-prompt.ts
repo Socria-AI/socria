@@ -1645,7 +1645,9 @@ export const SOCRIA_MODELS: Record<SocriaModel, ModelConfig> = {
   // thinking, one Thinking Map and one model workspace, Socria as the layer
   // between them. The room was parked for the production cut (see
   // docs/LOGOS-ROOMS-PARKED.md), wired back in on dev, and shipped from there.
-  // Same surface, same engine; `collab` is the difference.
+  // Same surface, same engine; `collab` is the difference. And depth: Logos 3
+  // has the four registers Core 3.1 has, chosen in the same model picker —
+  // the Logos routes have always read them (lib/logos-guidance.ts).
   'logos-3': {
     id: 'logos-3',
     label: 'Socria Logos 3',
@@ -1653,7 +1655,7 @@ export const SOCRIA_MODELS: Record<SocriaModel, ModelConfig> = {
     description:
       'Think together. Two people, one map and one set of models, Socria between you — naming the connections, the disagreements and the open questions.',
     defaultOpenAIModel: 'gpt-5.6-sol',
-    supportsDepth: false,
+    supportsDepth: true,
     requiresAuth: true,
     logosSurface: true,
     collab: true,

@@ -118,7 +118,8 @@ export function Logos3() {
         <li>
           <strong>Everything else is Logos 2.</strong> The lenses, the moves on each card, the
           models and what they cannot do yet are on{' '}
-          <Link href="/docs/logos-2">that page</Link>. Logos 3 has no depth modes either.
+          <Link href="/docs/logos-2">that page</Link> — except depth. Logos 3 has the four{' '}
+          <Link href="/docs/depth-personality">depth modes</Link>, in the model picker.
         </li>
       </ul>
 

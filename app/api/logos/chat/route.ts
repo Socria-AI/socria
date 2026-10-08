@@ -24,6 +24,7 @@ import {
 } from '@/lib/logos';
 import { renderMessageForModel, sanitizeAttachments } from '@/lib/logos-attachments';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
+import { depthForPlan } from '@/lib/socria-one';
 import { boundaryNote, limitOf } from '@/lib/entitlements';
 import { reportUpstream } from '@/lib/upstream-error';
 import { sanitizeViz, sceneBlock } from '@/lib/logos-viz';
@@ -431,7 +432,9 @@ export async function POST(req: NextRequest) {
 
     const guided =
       system +
-      guidanceBlock(resolveDepth(body?.depth), resolveGuard(body?.guard), 'chat') +
+      // Clamped by the plan like the map and explore routes, so the menu and
+      // the answer agree (every plan opens all four today).
+      guidanceBlock(depthForPlan(resolveDepth(body?.depth), plan), resolveGuard(body?.guard), 'chat') +
       // The hierarchy, in reading order: protected principles and depth
       // (above), then their personality settings, then their free-text
       // instructions — each block subordinating itself to what came before.

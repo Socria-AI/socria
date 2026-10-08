@@ -33,9 +33,21 @@ console.log('=== the model ===');
   const m = SOCRIA_MODELS['logos-3'];
   ok('Logos 3 is registered', !!m && m.short === 'Logos 3');
   ok('  as a Logos surface with the room in it', m.logosSurface && m.collab);
-  ok('  that needs an account and has no depth modes', m.requiresAuth && m.supportsDepth === false);
+  ok('  that needs an account and has the four depth modes', m.requiresAuth && m.supportsDepth === true);
   ok('  and says what it is for', /Think together/.test(m.description));
   ok('Logos 2 stays single-player', !SOCRIA_MODELS['logos-2'].collab);
+  ok('Logos 2 still answers at one depth', SOCRIA_MODELS['logos-2'].supportsDepth === false);
+}
+
+console.log('\n=== depth, in the model picker ===');
+{
+  const app = read('components/LogosApp.tsx');
+  const picker = app.slice(app.indexOf('<ModelPicker'), app.indexOf('/>', app.indexOf('<ModelPicker')));
+  ok('the Logos composer\'s model picker carries depth where the model has it', /depth=\{depthOn \? depth : undefined\}/.test(picker) && /onDepth=\{depthOn \? pickDepth : undefined\}/.test(picker));
+  ok('…with the plan, once it is known, so a lock is never flashed at a member', /plan=\{planKnown \? plan : undefined\}/.test(picker));
+  ok('one control, not two: the separate depth pill is gone', !/className="lg-depth"/.test(app));
+  ok('every Logos request carries the chosen depth when the model has depth modes', /depth: depthOn \? depthRef\.current : \('balanced' as ThinkingDepth\)/.test(app));
+  ok('the chat route clamps it by plan, as the map and explore routes do', /depthForPlan\(resolveDepth\(body\?\.depth\), plan\)/.test(read('app/api/logos/chat/route.ts')));
 }
 
 console.log('\n=== offered everywhere, production included ===');

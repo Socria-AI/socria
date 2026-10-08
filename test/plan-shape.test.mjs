@@ -76,7 +76,9 @@ console.log('\n=== the interface asks the table rather than the plan name ===');
 
   ok('LogosApp reads the plan table once, by name', /const limits = limitsFor\(plan\)/.test(logos));
   ok('the depth gate asks allDepths', /!limits\.allDepths && next !== FREE_DEPTH/.test(logos));
-  ok('the depth menu lock asks allDepths', /!limits\.allDepths && d\.id !== FREE_DEPTH/.test(logos));
+  // The depth menu is the shared model picker now (Logos 3 has depth): it is
+  // handed the plan and locks from the same table.
+  ok('the depth menu lock asks allDepths', /plan=\{planKnown \? plan : undefined\}/.test(logos) && /PLANS\[plan\]\.allDepths/.test(readFileSync(join(root, 'components/ModelPicker.tsx'), 'utf8')));
   ok('Draft Space asks draftSpace', /limits\.draftSpace/.test(logos));
   ok('the map boundary asks mapNodes', /meaningfulNodes\(map\) >= \(limits\.mapNodes \?\? Infinity\)/.test(logos));
   ok('the lens limit is passed as the number it is', /lensLimit=\{limits\.lenses\}/.test(logos));
