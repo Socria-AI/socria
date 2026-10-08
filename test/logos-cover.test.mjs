@@ -17,6 +17,10 @@ import { COVER_SHOWCASE, DOCS_SHOWCASE, STAGE_DESIGN, STAGE_MODEL, showcaseAt } 
 import { ENGINEERING, SCENE_EXAMPLES } from './.tmp/engineering.mjs';
 import { DYNAMICS } from './.tmp/dynamics-examples.mjs';
 import { PLANS } from './.tmp/entitlements.mjs';
+import { sceneTurn } from './.tmp/scene-chat.mjs';
+
+// The empty scene a chat turn starts from, as components/logos3/LiveExample.tsx writes it.
+const EMPTY_SCENE = { nodes: [], next: 1, unit: 'm' };
 
 let pass = 0, fail = 0;
 const ok = (n, c, x = '') => (c ? pass++ : (fail++, console.log('FAIL', n, x)));
@@ -70,6 +74,16 @@ console.log('=== each surface its own subjects ===');
   ok('the docs items are examples the product carries, quoted word for word', DOCS_SHOWCASE.every((s) => s.said && s.said === (s.kind === 'scene' ? SCENE_EXAMPLES.find((e) => e.id === s.id)?.say : all.find((e) => e.id === s.id)?.ask)));
   ok('the stage’s model is the lift example, asked for in its own words', STAGE_MODEL.said === all.find((e) => e.id === 'lift')?.ask);
   ok('the stage’s wing is built from the very message shown', /<LiveFigure item=\{STAGE_DESIGN\} \/>/.test(read('components/journal/Stage.tsx')) && /<Message role="user" text=\{STAGE_DESIGN\.said\} \/>/.test(read('components/journal/Stage.tsx')));
+  // THE PREVIEW IS NOT THE PRODUCT. LiveFigure draws readScene(...).preview,
+  // which skips words it cannot read; typed into the chat, the same line goes
+  // through sceneTurn, which builds nothing when a word is left unread. The
+  // homepage once showed "Now draw one wing: …" — drawn on the page, and
+  // 'not read — wing' in the product. Every scene line shown anywhere must
+  // build where a person would actually type it.
+  for (const s of [...COVER_SHOWCASE, ...DOCS_SHOWCASE, STAGE_DESIGN].filter((x) => x.kind === 'scene')) {
+    const turn = sceneTurn(s.said, EMPTY_SCENE);
+    ok(`${s.id}: typed into the chat, it builds — not only in the preview`, turn?.kind === 'build', turn ? turn.kind : 'null');
+  }
   const l2 = read('app/docs/content/logos-2.tsx');
   ok('the Logos 2 page keeps no screenshots — its figures are live', !/\.png|<img/.test(l2) && /<DemoLibraryFigure id=\{g\.id\}/.test(l2));
   ok('…and says Logos 3 is the current Logos', /Logos 3 is the current Logos/.test(l2));

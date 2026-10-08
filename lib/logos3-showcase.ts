@@ -63,7 +63,7 @@ export const STAGE_DESIGN: ShowcaseItem = {
   id: 'stage-wing',
   kind: 'scene',
   title: 'The wing, in 3D',
-  said: 'Now draw one wing: a NACA 2412 aluminium wing with chord 1.5 m and span 5.35 m.',
+  said: 'Now draw a NACA 2412 aluminium wing with chord 1.5 m and span 5.35 m.',
   cue: 'Drawn by Live 3D from that message. Drag to turn it.',
 };
 
