@@ -38,6 +38,7 @@ const MODULES = [
   'lib/objects/scene-intent.ts',
   'lib/objects/scene-geometry.ts',
   'lib/objects/scene-plan.ts',
+  'lib/objects/scene.ts',
   'lib/onboarding-roles.ts',
   'lib/onboarding-name.ts',
   'lib/theme.ts',

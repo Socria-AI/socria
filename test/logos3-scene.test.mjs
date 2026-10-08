@@ -6,9 +6,10 @@
 // and the scene says so.
 import { readFileSync } from 'node:fs';
 import * as THREE from 'three';
-import { create, apply, sanitizeSpace, kindOf, currentOf, SCENE, settle, sanitizeScene, dependents, nodeLine, objectsBlock } from './.tmp/index.mjs';
+import { create, apply, sanitizeSpace, kindOf, currentOf, SCENE, SCENE_OPS, settle, sanitizeScene, dependents, nodeLine, objectsBlock } from './.tmp/index.mjs';
+import { massOf, sceneMass } from './.tmp/scene.mjs';
 import { readScene, clausesOf } from './.tmp/scene-intent.mjs';
-import { measure, rotationMatrix, eulerOf, rotateAbout, worldBox, localBox, profile, surfaceGrid, revolveProfile, tubePath, parsePoints, polygonArea } from './.tmp/scene-geometry.mjs';
+import { measure, rotationMatrix, eulerOf, rotateAbout, worldBox, localBox, profile, surfaceGrid, revolveProfile, tubePath, parsePoints, polygonArea, nacaSection, centroid, toWorld } from './.tmp/scene-geometry.mjs';
 import { planOf } from './.tmp/scene-plan.mjs';
 import { factsFrom, suggestViews } from './.tmp/surfaces.mjs';
 import { singleLayout, sanitizeLayout, isOpen, addPanel } from './.tmp/tiling.mjs';
@@ -195,7 +196,7 @@ console.log('=== a long history survives storage ===');
 console.log('=== the scene says what it is, and what it is not ===');
 {
   const facts = SCENE.facts(now(), { guarded: false });
-  ok('a geometric preview, nothing simulated', /geometric preview/.test(facts[0]) && /nothing in it is weighed, stressed or simulated/.test(facts[0]));
+  ok('a geometric preview, nothing simulated', /geometric preview/.test(facts[0]) && /nothing in it is loaded, stressed or simulated/.test(facts[0]) && /mass only as density × volume/.test(facts[0]));
   const text = SCENE.text(now());
   ok('each part written out with its exact size and support', /sphere2 “sphere”: sphere, radius 0\.25 m/.test(text) && /rests on the floor/.test(text), text);
   ok('… once: the facts do not repeat the parts', !facts.some((f) => /sphere2 “sphere”/.test(f)));
@@ -418,6 +419,64 @@ console.log('=== in the workspace: offered, opened, kept ===');
   const back = sanitizeLayout(JSON.parse(JSON.stringify(laid)));
   ok('a layout keeps the scene its panel is pinned to', back && isOpen(back, 'scene', { obj: 'Scene' }) && !isOpen(back, 'scene', { obj: 'Scene2' }));
   ok('a scene panel survives a reload of the layout', sanitizeLayout({ v: 1, root: { kind: 'panel', id: 'p1', type: 'scene' } })?.root?.type === 'scene');
+}
+
+console.log('=== an airfoil, from the NACA formulas (Atlas benchmark 29) ===');
+{
+  const sec = nacaSection({ m: 0, p: 0, t: 12 }, 1, 400);
+  const A = Math.abs(polygonArea(sec));
+  // ∫₀¹ 2yₜ dξ = 10t[0.2969·⅔ − 0.1260/2 − 0.3516/3 + 0.2843/4 − 0.1036/5] = 0.68088·t
+  ok('NACA 0012: its area is ∫2yₜ = 0.68088·t·c²', near(A, 0.68088 * 0.12, 2e-3), A);
+  const tmax = Math.max(...[...Array(101).keys()].map((i) => { const x = i / 100 - 0.5; const zs = sec.filter((q) => Math.abs(q[0] - x) < 0.006).map((q) => q[1]); return zs.length > 1 ? Math.max(...zs) - Math.min(...zs) : 0; }));
+  ok('… 12% of the chord at its thickest', near(tmax, 0.12, 0.003), tmax);
+  ok('… and symmetric about its chord', near(Math.max(...sec.map((q) => q[1])), -Math.min(...sec.map((q) => q[1])), 1e-12));
+  const cam = nacaSection({ m: 2, p: 4, t: 12 }, 1, 400);
+  const mid = (x) => { const zs = cam.filter((q) => Math.abs(q[0] + 0.5 - x) < 0.004).map((q) => q[1]); return (Math.max(...zs) + Math.min(...zs)) / 2; };
+  ok('NACA 2412: the camber line peaks near 2% of the chord, at 40%', near(mid(0.4), 0.02, 0.002), mid(0.4));
+  const te = cam.reduce((a, q) => (q[0] > a[0] ? q : a));
+  ok('… and closes: the trailing edge is one point on the chord line', near(te[0], 0.5, 1e-12) && near(te[1], 0, 1e-12) && cam.filter((q) => near(q[0], 0.5, 1e-12)).length === 1);
+  ok('… with the leading edge, on the chord line, a vertex of it', cam.some((q) => near(q[0], -0.5, 1e-12) && near(q[1], 0, 1e-12)));
+  const r = read('a NACA 2412 airfoil with chord 1.5 m and span 4 m');
+  const af = r.preview.nodes[0];
+  ok('read: the four digits, the chord and the span', af.shape === 'airfoil' && af.dims.m === 2 && af.dims.p === 4 && af.dims.t === 12 && af.dims.c === 1.5 && af.dims.h === 4, JSON.stringify(af.dims));
+  ok('… said with its name', /an? NACA 2412 airfoil/.test(r.clauses[0].understood), r.clauses[0].understood);
+  // a cambered section's upper surface, offset normal to the camber, reaches a hair ahead of the chord's start
+  ok('it lies as a wing: chord along x, thickness up, span along z', (() => { const b = worldBox(af); return near(b.max[0] - b.min[0], 1.5, 1.5e-3) && near(b.max[2] - b.min[2], 4, 1e-9) && b.max[1] - b.min[1] < 0.25 && b.min[1] > -1e-9; })());
+  ok('its volume is the section times the span — numerical, and said', (() => { const m = measure(af); return m.how === 'numerical' && near(m.volume, Math.abs(polygonArea(profile(af).outer)) * 4, 1e-12) && /NACA section sampled/.test(m.note); })());
+  ok('an impossible section is refused, with the reason', /second digit/.test(read('a naca 2012 wing').clauses[0].problem ?? ''));
+  ok('the chord is a dimension to set', read('set the chord to 2', r.preview).preview.nodes[0].dims.c === 2);
+}
+
+console.log('=== what it is made of: mass and centre of mass ===');
+{
+  const r = read('a steel cube with side 1');
+  const n = r.preview.nodes[0];
+  ok('a named material takes its nominal density, marked nominal', n.material === 'steel' && n.density === 7850 && n.densityFrom === 'nominal');
+  ok('… and the reading says it is a typical value', r.clauses[0].notes?.some((x) => /nominal density of 7850/.test(x)));
+  ok('mass is ρ times the exact volume', near(massOf(n).kg, 7850, 1e-9) && massOf(n).nominal);
+  const g = read('a box 2 x 1 x 0.5 m, density 2700 kg/m3').preview.nodes[0];
+  ok('a density given is given', g.density === 2700 && g.densityFrom === 'given' && near(massOf(g).kg, 2700, 1e-9));
+  ok('a part with no density has no mass, rather than a guessed one', massOf(read('a box').preview.nodes[0]) === null);
+  ok('a colour that is also a metal is not taken for one', read('a gold torus').preview.nodes[0].density === undefined);
+  const cone = { shape: 'cone', dims: { r: 1, h: 4 }, pos: [0, 0, 0], rot: [0, 0, 0], scale: [1, 1, 1] };
+  ok('a cone’s centroid is a quarter of its height above its base', centroid(cone)[1] === -1);
+  const lshape = { shape: 'polygon', dims: { h: 1 }, exprs: { pts: '0,0|2,0|2,1|1,1|1,2|0,2' }, pos: [0, 0, 0], rot: [0, 0, 0], scale: [1, 1, 1] };
+  const cL = centroid(lshape);
+  // an L of three unit squares: its area centroid is (5/6, 5/6) from the corner; the outline is centred on its corners, (1, 1)
+  ok('an outline’s centroid is its area’s, not its corners’', near(cL[0], 5 / 6 - 1, 1e-12) && near(cL[2], 5 / 6 - 1, 1e-12), cL.join());
+  let s = read('a steel box 1 m wide, 1 tall and 1 deep, then an aluminium box 1 m wide, 1 tall and 1 deep to the right of it').preview;
+  const sm = sceneMass(s);
+  const a = s.nodes[0], b = s.nodes[1];
+  ok('the scene’s mass is the sum', near(sm.kg, 7850 + 2700, 1e-6) && sm.weighed === 2 && sm.nominal === 2);
+  ok('… and its centre of mass the weighted mean of the centroids', near(sm.at[0], (7850 * a.pos[0] + 2700 * b.pos[0]) / 10550, 1e-9) && near(sm.at[1], 0.5, 1e-9));
+  s = read('a cone', s).preview;
+  ok('a part with no density is counted, not weighed', sceneMass(s).unweighed === 1 && near(sceneMass(s).kg, 10550, 1e-6));
+  const facts = SCENE.facts(s, { guarded: false });
+  ok('the facts say the mass, the centre, and that the densities are nominal', facts.some((f) => /^mass 10\.55 t over the 2 parts with a density \(1 without one, not counted\)/.test(f) && /nominal densities/.test(f)), JSON.stringify(facts));
+  ok('guarded: no mass', !SCENE.facts(s, { guarded: true }).some((f) => /^mass/.test(f)));
+  ok('make it steel: an edit sets the material', read('make the cone 7800 kg/m3', s).preview.nodes[2].density === 7800);
+  ok('a material survives storage', sanitizeScene(JSON.parse(JSON.stringify(s))).nodes[0].density === 7850 && sanitizeScene(JSON.parse(JSON.stringify(s))).nodes[0].densityFrom === 'nominal');
+  ok('nonsense density refused', typeof SCENE_OPS.matter.check(s, { id: 'box1', density: -3 }) === 'string');
 }
 
 console.log('=== the source keeps its promises ===');

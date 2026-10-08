@@ -20,21 +20,22 @@
 //   operation  add · set · fit · move · moveTo · rotate · scale · look ·
 //              place · copy · rename · remove · transform · clear · unit
 //
-// WHAT IT IS NOT. A geometric preview — shapes, sizes, positions. Nothing
-// here is weighed, stressed, heated or simulated; no physical claim is made,
+// WHAT IT IS NOT. A geometric preview — shapes, sizes, positions, and mass
+// where a density is given (ρ × volume, and no more). Nothing here is loaded,
+// stressed, heated or simulated; no claim about how it behaves is made,
 // and the facts say so. The physically validated models live elsewhere
 // (lib/model/), with their own fidelity.
 //
 // PURE.
 
 import { register, type ObjectKind } from './core';
-import { localBox, measure, parsePoints, rotateAbout, worldBox, type Box3, type Vec3 } from './scene-geometry';
+import { centroid, localBox, measure, parsePoints, rotateAbout, toWorld, worldBox, type Box3, type Vec3 } from './scene-geometry';
 import { compileExpr } from '@/lib/logos-math';
 
 export type LengthUnit = 'm' | 'cm' | 'mm' | 'in' | 'ft';
 export const UNIT_M: Record<LengthUnit, number> = { m: 1, cm: 0.01, mm: 0.001, in: 0.0254, ft: 0.3048 };
 
-export const SHAPES = ['box', 'sphere', 'cylinder', 'cone', 'torus', 'plane', 'capsule', 'prism', 'star', 'ring', 'polygon', 'surface', 'revolve', 'tube'] as const;
+export const SHAPES = ['box', 'sphere', 'cylinder', 'cone', 'torus', 'plane', 'capsule', 'prism', 'star', 'ring', 'polygon', 'airfoil', 'surface', 'revolve', 'tube'] as const;
 export type SceneShape = (typeof SHAPES)[number];
 export const MATERIALS = ['matte', 'plastic', 'metal', 'glass', 'wire'] as const;
 export type MaterialKind = (typeof MATERIALS)[number];
@@ -58,6 +59,11 @@ export interface SceneNode {
   off?: [number, number];
   /** dimensions nobody gave — defaults, said as such */
   assumed?: string[];
+  /** what it is made of, when someone has said */
+  material?: string;
+  /** kg/m³ — given by the person, or the nominal value for a named material (said as such) */
+  density?: number;
+  densityFrom?: 'given' | 'nominal';
 }
 
 export interface SceneState {
@@ -68,6 +74,19 @@ export interface SceneState {
 }
 
 export const MAX_NODES = 48;
+
+/**
+ * NOMINAL DENSITIES, kg/m³ — typical room-temperature values for common
+ * materials, used only when a person names a material and gives no density,
+ * and always said to be nominal: they are typical values, not a material card,
+ * and a measured density replaces one. Words that are as often a colour as a
+ * material (gold, silver) and finishes (glass, plastic) are not read as one.
+ */
+export const NOMINAL_DENSITY: Record<string, number> = {
+  steel: 7850, 'stainless steel': 8000, iron: 7870, aluminium: 2700, aluminum: 2700, copper: 8960, brass: 8500, bronze: 8800,
+  titanium: 4510, lead: 11340, concrete: 2400, granite: 2700, marble: 2700, brick: 1900, wood: 600, oak: 750, pine: 500,
+  water: 1000, ice: 917, rubber: 1100, pla: 1240, abs: 1050, nylon: 1150, foam: 30, cork: 240,
+};
 
 // ── dimensions each shape has ───────────────────────────────────────
 
@@ -99,6 +118,8 @@ export const DIMS: Record<SceneShape, DimSpec[]> = {
   star: [N('n', 'points', 5, 3, 32), L('r', 'outer radius', 0.6), L('ri', 'inner radius', 0.3), L('h', 'thickness', 0.2)],
   ring: [L('R', 'outer radius', 0.6), L('r', 'inner radius', 0.4), L('h', 'thickness', 0.2)],
   polygon: [L('h', 'thickness', 0.2)],
+  // a NACA four-digit section (m p tt), extruded along its span
+  airfoil: [L('c', 'chord', 1), L('h', 'span', 2), N('m', 'max camber (% of chord)', 0, 0, 9), N('p', 'camber position (tenths of chord)', 0, 0, 9), N('t', 'thickness (% of chord)', 12, 1, 40)],
   surface: [C('x0', 'x from', -2), C('x1', 'x to', 2), C('y0', 'y from', -2), C('y1', 'y to', 2), N('n', 'grid', 48, 4, 128)],
   revolve: [C('y0', 'from height', 0), C('y1', 'to height', 2), N('n', 'samples', 64, 8, 200)],
   tube: [C('t0', 't from', 0), C('t1', 't to', 2 * Math.PI), L('r', 'tube radius', 0.05), N('n', 'samples', 200, 8, 1000)],
@@ -124,6 +145,7 @@ export const SHAPE_WORD: Record<SceneShape, string> = {
   star: 'star',
   ring: 'ring',
   polygon: 'shape',
+  airfoil: 'airfoil',
   surface: 'surface',
   revolve: 'revolved shape',
   tube: 'tube',
@@ -152,6 +174,7 @@ export function shapeProblem(shape: SceneShape, dims: Record<string, number>, ex
   if (shape === 'star' && dims.ri >= dims.r) return 'A star’s inner radius must be smaller than its outer radius.';
   if (shape === 'ring' && dims.r >= dims.R) return 'A ring’s inner radius must be smaller than its outer radius.';
   if (shape === 'capsule' && dims.h < 2 * dims.r) return 'A capsule must be at least as tall as its diameter.';
+  if (shape === 'airfoil' && dims.m > 0 && !(dims.p > 0)) return 'A cambered section needs where along the chord its camber peaks (the second digit).';
   if (shape === 'surface' && (dims.x1 <= dims.x0 || dims.y1 <= dims.y0)) return 'The surface’s range must run from a smaller number to a larger one.';
   if (shape === 'revolve' && dims.y1 <= dims.y0) return 'The revolved shape’s heights must run from a smaller number to a larger one.';
   if (shape === 'tube' && dims.t1 <= dims.t0) return 'The curve’s t must run from a smaller number to a larger one.';
@@ -213,6 +236,8 @@ function sanitizeNode(raw: unknown, ids: Set<string>): SceneNode | null {
     ...(typeof r.on === 'string' && (r.on === 'ground' || /^[a-z][a-z0-9]{0,23}$/.test(r.on)) ? { on: r.on } : {}),
     ...(off ? { off } : {}),
     ...(Array.isArray(r.assumed) ? { assumed: r.assumed.filter((k): k is string => typeof k === 'string' && DIMS[shape].some((d) => d.key === k)) } : {}),
+    ...(typeof r.material === 'string' && r.material.trim() && r.material.length <= 30 ? { material: r.material.trim() } : {}),
+    ...(num(r.density) !== null && (r.density as number) > 0.1 && (r.density as number) < 30000 ? { density: r.density as number, densityFrom: r.densityFrom === 'given' ? 'given' : 'nominal' } : {}),
   };
   ids.add(id);
   return node;
@@ -253,7 +278,10 @@ function sameNode(a: SceneNode, b: SceneNode): boolean {
     a.mat === b.mat &&
     close(a.opacity, b.opacity) &&
     a.on === b.on &&
-    vecSame(a.off ?? [], b.off ?? [])
+    vecSame(a.off ?? [], b.off ?? []) &&
+    a.material === b.material &&
+    a.density === b.density &&
+    a.densityFrom === b.densityFrom
   );
 }
 
@@ -414,7 +442,8 @@ function addOp(s: SceneState, a: Args): SceneState {
   const look = readPairs(getStr(a, 'look'));
   const id = `${shape === 'polygon' ? 'shape' : shape}${s.next}`;
   const at = readVec(getStr(a, 'at'));
-  const rot = readVec(getStr(a, 'rot')) ?? ([0, 0, 0] as Vec3);
+  // an airfoil lies as a wing does — chord along x, thickness up, span along z — which is its extrusion turned −90° about x
+  const rot = readVec(getStr(a, 'rot')) ?? ((shape === 'airfoil' ? [-90, 0, 0] : [0, 0, 0]) as Vec3);
   const node: SceneNode = {
     id,
     name: getStr(a, 'name') || freshNodeName(s, SHAPE_WORD[shape]),
@@ -680,6 +709,31 @@ export const SCENE_OPS: Record<string, { label: string; check: (s: SceneState, a
     apply: copyOp,
     say: (a) => (a.ring ? `copy ${getStr(a, 'id')} ×${a.count} around a circle of radius ${a.ring}` : `copy ${getStr(a, 'id')} ×${a.count ?? 1}, each (${a.dx ?? 0}, ${a.dy ?? 0}, ${a.dz ?? 0}) on`),
   },
+  matter: {
+    label: 'What it is made of',
+    check: (s, a) => {
+      const miss = need(s, a);
+      if (miss) return miss;
+      const name = getStr(a, 'name');
+      const rho = getNum(a, 'density');
+      if (name !== undefined && (!name.trim() || name.length > 30)) return 'A material, please.';
+      if (rho !== undefined && !(rho > 0.1 && rho < 30000)) return 'A density, in kg/m³, between 0.1 and 30 000.';
+      if (rho === undefined && !(name && NOMINAL_DENSITY[name.toLowerCase()] !== undefined)) return name ? `No nominal density is kept for ${name} — give one, in kg/m³.` : 'A material or a density, please.';
+      return null;
+    },
+    apply: (s, a) =>
+      withNode(s, getStr(a, 'id')!, (n) => {
+        const name = getStr(a, 'name');
+        const rho = getNum(a, 'density');
+        return {
+          ...n,
+          ...(name ? { material: name.toLowerCase() } : {}),
+          density: rho ?? NOMINAL_DENSITY[name!.toLowerCase()],
+          densityFrom: rho !== undefined ? 'given' : 'nominal',
+        };
+      }),
+    say: (a) => `${getStr(a, 'id')} is ${[getStr(a, 'name'), a.density !== undefined ? `${a.density} kg/m³` : ''].filter(Boolean).join(', ')}`,
+  },
   rename: {
     label: 'Rename',
     check: (s, a) => need(s, a) ?? (typeof a.name === 'string' && a.name.trim() && a.name.length <= 40 ? null : 'A name, please.'),
@@ -747,6 +801,7 @@ export function fitKey(shape: SceneShape, axis: 'x' | 'y' | 'z'): string | null 
     star: { y: 'h' },
     ring: { y: 'h' },
     polygon: { y: 'h' },
+    airfoil: { x: 'c', y: 'h' },
     plane: { x: 'w', z: 'd' },
   };
   return table[shape]?.[axis] ?? null;
@@ -787,6 +842,8 @@ export function sizeOf(n: SceneNode, unit: LengthUnit): string {
       return `radii ${u(d.R * s[0])} and ${u(d.r * s[0])}, ${u(d.h * s[1])} thick`;
     case 'polygon':
       return `${parsePoints(n.exprs?.pts)?.length ?? 0} corners, ${u(d.h * s[1])} thick`;
+    case 'airfoil':
+      return `NACA ${d.m}${d.p}${String(d.t).padStart(2, '0')}, chord ${u(d.c * s[0])}, span ${u(d.h * s[1])}`;
     case 'surface':
       return `z = ${n.exprs?.f} over x ∈ [${d.x0}, ${d.x1}], y ∈ [${d.y0}, ${d.y1}]`;
     case 'revolve':
@@ -804,8 +861,49 @@ export function nodeLine(s: SceneState, n: SceneNode, guarded = false): string {
   const rot = n.rot.some((v) => v !== 0) ? `, turned (${n.rot.map((v) => Number(v.toFixed(2))).join(', ')})°` : '';
   const vol = !guarded && m.volume !== null ? `; volume ${m.volume.toPrecision(4)} m³${m.how === 'numerical' ? ' (numerical)' : ''}` : '';
   const assumed = n.assumed?.length ? ` [default ${n.assumed.map((k) => DIMS[n.shape].find((d) => d.key === k)?.label ?? k).join(', ')}]` : '';
-  return `${n.id} “${n.name}”: ${SHAPE_WORD[n.shape]}, ${sizeOf(n, s.unit)}${assumed} at (${at}) ${s.unit}${rot}; ${n.color}${n.mat !== 'matte' ? ` ${n.mat}` : ''}; ${rest}${vol}`;
+  const mm = !guarded ? massOf(n) : null;
+  const made =
+    n.density !== undefined
+      ? `; ${n.material ?? 'material'} at ${n.density} kg/m³${n.densityFrom === 'given' ? '' : ' (nominal — a typical value, not a measurement)'}${mm ? `, mass ${kgSaid(mm.kg)}${mm.how === 'numerical' ? ' (numerical)' : ''}` : ''}`
+      : '';
+  return `${n.id} “${n.name}”: ${SHAPE_WORD[n.shape]}, ${sizeOf(n, s.unit)}${assumed} at (${at}) ${s.unit}${rot}; ${n.color}${n.mat !== 'matte' ? ` ${n.mat}` : ''}; ${rest}${vol}${made}`;
 }
+
+/** A part's mass, where its density is known: ρ times the volume, exactly as the volume is. */
+export function massOf(n: SceneNode): { kg: number; how: 'exact' | 'numerical'; nominal: boolean } | null {
+  if (n.density === undefined) return null;
+  const m = measure(n);
+  if (m.volume === null) return null;
+  return { kg: n.density * m.volume, how: m.how, nominal: n.densityFrom !== 'given' };
+}
+
+/**
+ * The scene's mass and centre of mass, over the parts whose density is known —
+ * each part's mass at its own centroid (scene-geometry.ts centroid), turned and
+ * placed. Parts with no density are counted, not guessed.
+ */
+export function sceneMass(s: SceneState): { kg: number; at: Vec3; weighed: number; unweighed: number; nominal: number; how: 'exact' | 'numerical' } | null {
+  let kg = 0;
+  const at: Vec3 = [0, 0, 0];
+  let weighed = 0;
+  let nominal = 0;
+  let numerical = false;
+  for (const n of s.nodes) {
+    const m = massOf(n);
+    const c = centroid(n);
+    if (!m || !c) continue;
+    const w = toWorld(n, c);
+    kg += m.kg;
+    for (let k = 0; k < 3; k++) at[k] += m.kg * w[k];
+    weighed++;
+    if (m.nominal) nominal++;
+    if (m.how === 'numerical') numerical = true;
+  }
+  if (!weighed || !(kg > 0)) return null;
+  return { kg, at: at.map((v) => v / kg) as Vec3, weighed, unweighed: s.nodes.length - weighed, nominal, how: numerical ? 'numerical' : 'exact' };
+}
+
+const kgSaid = (kg: number) => (kg >= 1000 ? `${(kg / 1000).toPrecision(4)} t` : kg >= 1 ? `${kg.toPrecision(4)} kg` : `${(kg * 1000).toPrecision(4)} g`);
 
 export function sceneBox(s: SceneState): Box3 | null {
   const bs = s.nodes.map((n) => worldBox(n)).filter((b): b is Box3 => !!b);
@@ -846,7 +944,7 @@ export const SCENE: ObjectKind<SceneState> = {
   },
   // The parts are the state, written out (text); the facts are what is true OF it.
   facts: (s, { guarded }) => {
-    const out = [`a geometric preview — shapes, sizes and positions only; nothing in it is weighed, stressed or simulated`, `${s.nodes.length} part${s.nodes.length === 1 ? '' : 's'}; lengths shown in ${s.unit}; y is up and the floor is y = 0`];
+    const out = [`a geometric preview — shapes, sizes and positions, and mass only as density × volume; nothing in it is loaded, stressed or simulated`, `${s.nodes.length} part${s.nodes.length === 1 ? '' : 's'}; lengths shown in ${s.unit}; y is up and the floor is y = 0`];
     const b = sceneBox(s);
     if (b) out.push(`everything fits in ${lengthIn(b.max[0] - b.min[0], s.unit)} × ${lengthIn(b.max[1] - b.min[1], s.unit)} × ${lengthIn(b.max[2] - b.min[2], s.unit)}`);
     if (guarded) out.push('volumes and areas withheld while the person works them out');
@@ -856,6 +954,12 @@ export const SCENE: ObjectKind<SceneState> = {
         .filter((x) => x.m.volume !== null)
         .map((x) => `${x.n.name} ${x.m.volume!.toPrecision(4)} m³${x.m.how === 'numerical' ? ' (numerical)' : ''}`);
       if (vols.length) out.push(`volumes: ${vols.join('; ')}`);
+      const sm = sceneMass(s);
+      if (sm) {
+        out.push(
+          `mass ${kgSaid(sm.kg)} over the ${sm.weighed} part${sm.weighed === 1 ? '' : 's'} with a density${sm.unweighed ? ` (${sm.unweighed} without one, not counted)` : ''}; centre of mass at (${sm.at.map((v) => lengthIn(v, s.unit).replace(/ \w+$/, '')).join(', ')}) ${s.unit}${sm.nominal ? ` — ${sm.nominal} of them on nominal densities, typical values rather than measurements` : ''}`
+        );
+      }
     }
     return out;
   },
@@ -865,7 +969,14 @@ export const SCENE: ObjectKind<SceneState> = {
     const n = byId(s, part);
     if (!n) return null;
     const m = measure(n);
-    return [nodeLine(s, n), ...(m.area !== null ? [`surface area ${m.area.toPrecision(4)} m²${m.how === 'numerical' ? ' (numerical)' : ''}`] : []), ...(m.note ? [m.note] : []), ...dependents(s, n.id).map((d) => `${byId(s, d)?.name} rests on it`)];
+    const c = centroid(n);
+    return [
+      nodeLine(s, n),
+      ...(m.area !== null ? [`surface area ${m.area.toPrecision(4)} m²${m.how === 'numerical' ? ' (numerical)' : ''}`] : []),
+      ...(m.note ? [m.note] : []),
+      ...(c && n.density !== undefined ? [`its centroid is at (${toWorld(n, c).map((v) => lengthIn(v, s.unit).replace(/ \w+$/, '')).join(', ')}) ${s.unit}`] : []),
+      ...dependents(s, n.id).map((d) => `${byId(s, d)?.name} rests on it`),
+    ];
   },
   views: [
     { id: '3d', label: '3D', shows: 'the scene itself, live — orbit, select, take hold and move', primary: true, interactions: ['orbit', 'select', 'drag', 'describe'] },
@@ -880,4 +991,4 @@ export const SCENE: ObjectKind<SceneState> = {
 
 register(SCENE);
 
-export { localBox, worldBox, measure };
+export { localBox, worldBox, measure, centroid, toWorld };

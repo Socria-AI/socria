@@ -202,7 +202,7 @@ seen from above, with each step in its trail and an "Open in 3D" button.
 
 It says what it is. The panel, the facts and the reply model's rules all
 call it a geometric preview: shapes, sizes and positions, computed exactly.
-Nothing in it is weighed, stressed or simulated, and the reply model is told
+Nothing in it is loaded, stressed or simulated (a mass, where a density is given, is density × volume and no more), and the reply model is told
 never to say it would stand, hold or float.
 
 The full account is in `docs/LOGOS3-LIVE-3D.md`. Tests:

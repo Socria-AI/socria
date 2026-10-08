@@ -82,7 +82,8 @@ function samples(n: SceneNode): Vec3[] {
     case 'prism':
     case 'star':
     case 'ring':
-    case 'polygon': {
+    case 'polygon':
+    case 'airfoil': {
       const p = profile(n);
       return p ? p.outer.flatMap(([x, z]) => [[x, -d.h / 2, z] as Vec3, [x, d.h / 2, z] as Vec3]) : [];
     }

@@ -73,7 +73,8 @@ export function geometryOf(s: ShapeLike): THREE.BufferGeometry | null {
     case 'prism':
     case 'star':
     case 'ring':
-    case 'polygon': {
+    case 'polygon':
+    case 'airfoil': {
       const p = profile(s);
       if (!p) return null;
       // The outline is in the part's x–z plane. A Shape is drawn in (u, v) and

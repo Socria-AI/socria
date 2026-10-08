@@ -162,7 +162,7 @@ export function objectsBlock(space: ObjectSpace | undefined, opts: { guarded: bo
       ? 'They are LEARNING. They choose the operations — that is the thinking being practised. Do not name the next operation or the multiplier. Ask what they want to eliminate, which entry they are aiming at, what they notice in the new row. When a step did not do what it seems to have been for, point at the entry and ask; never correct it for them.'
       : 'You may suggest an operation when it helps; write it in the workspace’s notation (R3 ← R3 − 5R1) and say it is a suggestion — it will be offered to them to try, not applied.',
     scene
-      ? 'A SCENE is a geometric preview the person builds by describing it in the Live 3D panel: shapes, sizes and positions, computed exactly, and nothing more. It is not a physical model — never say it would stand, balance, hold a load, float or survive anything, and never give a mass or a strength. If they want to know that, say it needs a physical model, which the scene is not.'
+      ? 'A SCENE is a geometric preview the person builds by describing it in the Live 3D panel: shapes, sizes and positions, computed exactly, and a mass only where a density was given (density × volume, nothing more). It is not a physical model — never say it would stand, balance, hold a load, float or survive anything, never give a strength, and give no mass the scene does not state. If they want to know that, say it needs a physical model, which the scene is not.'
       : '',
   ].filter(Boolean);
   // The rules are never what gets cut: a large scene shortens its own description instead.

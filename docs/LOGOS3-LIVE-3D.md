@@ -3,7 +3,7 @@
 You describe a 3D scene and it is built as you type. The result is a real,
 editable scene graph that lives in the line of thinking. It is a
 **geometric preview**: shapes, sizes and positions, computed exactly.
-Nothing in it is weighed, stressed or simulated, and it says so in the
+Nothing in it is loaded, stressed or simulated (a mass, where a density is given, is density × volume and no more), and it says so in the
 panel, in its facts and in the reply model's rules. Physically validated
 models live in `lib/model/` and have their own fidelity contract
 (`lib/model/science.ts`).
@@ -40,6 +40,38 @@ map card are all views of the scene's current state.
 | `components/scene3d/geometry.ts` | a part as Three.js geometry, built from the same functions |
 | `components/scene3d/SceneCanvas.tsx` | the React Three Fiber view: orbit, select, the transform gizmo, the preview ghosted |
 | `components/scene3d/ScenePanel.tsx` | the panel: describe, preview, Build; parts; inspector; undo by description |
+
+### Airfoils, and what parts are made of
+
+Two additions from the Engineering Atlas:
+
+- **An airfoil** (benchmark 29) is a NACA four-digit section computed from
+  its published formulas:
+  - the thickness polynomial with the closed-trailing-edge coefficient;
+  - the camber parabola either side of its peak;
+  - each surface offset normal to the camber line;
+  - cosine spacing along the chord.
+
+  It is extruded to its span and lies as a wing: chord along x, thickness
+  up, span along z. "A NACA 2412 airfoil with chord 1.5 m and span 4 m"
+  reads the four digits. A code that is not a section (2012: camber with
+  no position) is refused, with the reason. Its volume is numerical, and
+  says so: it is the 200-point polygon's area times the span. The checks:
+  - NACA 0012's area matches ∫2yₜ = 0.68088·t·c²;
+  - it is 12% thick;
+  - NACA 2412's camber peaks at 2% of the chord, at 40%.
+- **A material and a density** give a part a mass: density × its volume,
+  exact or numerical as the volume is.
+  - A named material ("steel", "aluminium", "oak") takes a nominal density.
+    It is said everywhere to be a typical value, not a measurement, and a
+    measured density replaces it.
+  - Words as often a colour as a material (gold, silver) are not read as
+    one.
+  - The scene's mass and centre of mass are taken over the parts with a
+    density. Each part's mass sits at its centroid: a quarter of the height
+    above the base for a cone, the area centroid for an outline. Parts with
+    no density are counted, not guessed.
+  - Nothing is loaded or stressed: no strength is modelled.
 
 ### A part keeps its identity
 
@@ -158,7 +190,7 @@ change it. The panel says so, and `onObject` refuses the operation.
 
 ## Verification
 
-- `test/logos3-scene.test.mjs` (183 checks), covering:
+- `test/logos3-scene.test.mjs` (211 checks), covering:
   - every volume and area against its formula, and the numerical ones
     against cases with closed forms (a revolved line is a cone, 9π);
   - the rotation matrix against `THREE.Matrix4.makeRotationFromEuler`,

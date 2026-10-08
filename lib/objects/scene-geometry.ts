@@ -77,8 +77,52 @@ export function parsePoints(raw: string | undefined): [number, number][] | null 
   return pts.length >= 3 && pts.length <= 64 ? pts : null;
 }
 
+/**
+ * A NACA four-digit section, from the published formulas (Abbott & von
+ * Doenhoff): thickness yₜ = 5t·c[0.2969√ξ − 0.1260ξ − 0.3516ξ² + 0.2843ξ³ −
+ * 0.1036ξ⁴] (the closed-trailing-edge coefficient), camber yc a parabola either
+ * side of its peak at p·c, and each surface offset along the normal to the
+ * camber line. Cosine spacing along the chord, so the leading edge — where the
+ * curvature is — gets its share of the points. The chord runs along x, centred
+ * on its middle; the section's thickness is the profile's second coordinate.
+ */
+export function nacaSection(digits: { m: number; p: number; t: number }, c: number, n = 100): [number, number][] {
+  const m = digits.m / 100;
+  const p = digits.p / 10;
+  const t = digits.t / 100;
+  const upper: [number, number][] = [];
+  const lower: [number, number][] = [];
+  for (let i = 0; i <= n; i++) {
+    const xi = (1 - Math.cos((Math.PI * i) / n)) / 2;
+    const yt = 5 * t * (0.2969 * Math.sqrt(xi) - 0.126 * xi - 0.3516 * xi ** 2 + 0.2843 * xi ** 3 - 0.1036 * xi ** 4);
+    let yc = 0;
+    let dyc = 0;
+    if (m > 0 && p > 0) {
+      if (xi < p) {
+        yc = (m / (p * p)) * (2 * p * xi - xi * xi);
+        dyc = ((2 * m) / (p * p)) * (p - xi);
+      } else {
+        yc = (m / ((1 - p) * (1 - p))) * (1 - 2 * p + 2 * p * xi - xi * xi);
+        dyc = ((2 * m) / ((1 - p) * (1 - p))) * (p - xi);
+      }
+    }
+    const th = Math.atan(dyc);
+    upper.push([c * (xi - yt * Math.sin(th)) - c / 2, c * (yc + yt * Math.cos(th))]);
+    lower.push([c * (xi + yt * Math.sin(th)) - c / 2, c * (yc - yt * Math.cos(th))]);
+  }
+  // trailing edge to leading edge over the top, back along the bottom: the two surfaces share
+  // both ends, so each end appears once — the trailing edge as the top's last point, the leading
+  // edge as the bottom's first
+  return [...upper.slice(1).reverse(), ...lower.slice(0, n)];
+}
+
 export function profile(s: ShapeLike): Profile | null {
   const d = s.dims;
+  if (s.shape === 'airfoil') {
+    if (d.m > 0 && !(d.p > 0)) return null;
+    const pts = ccw(nacaSection({ m: d.m, p: d.p, t: d.t }, d.c));
+    return { outer: pts, holes: [], area: Math.abs(polygonArea(pts)), perimeter: polygonPerimeter(pts) };
+  }
   if (s.shape === 'prism') {
     const n = Math.round(d.n);
     const pts: [number, number][] = Array.from({ length: n }, (_, i) => {
@@ -268,7 +312,8 @@ export function localBox(s: ShapeLike): Box3 | null {
     case 'prism':
     case 'star':
     case 'ring':
-    case 'polygon': {
+    case 'polygon':
+    case 'airfoil': {
       const p = profile(s);
       if (!p) return null;
       const xs = p.outer.map((q) => q[0]);
@@ -434,6 +479,11 @@ export function measure(s: ShapeLike): Measure {
       if (!p) return { volume: null, area: null, how: 'exact' };
       return out(p.area * d.h, 2 * p.area + p.perimeter * d.h);
     }
+    case 'airfoil': {
+      const p = profile(s);
+      if (!p) return { volume: null, area: null, how: 'numerical' };
+      return out(p.area * d.h, 2 * p.area + p.perimeter * d.h, 'numerical', `the NACA section sampled at ${2 * 100} points along its surface (cosine spacing); its area ${p.area.toPrecision(4)} m² and the rest are that polygon's`);
+    }
     case 'surface': {
       const g = surfaceGrid(s);
       return { volume: null, area: g && uniform ? g.area * as : null, how: 'numerical', note: g ? `an open surface — its area summed over the ${Math.round(d.n || 48)}² drawn grid${g.holes ? `; ${g.holes} cells left out where f is undefined` : ''}` : undefined };
@@ -455,4 +505,78 @@ export function measure(s: ShapeLike): Measure {
     }
   }
   return { volume: null, area: null, how: 'exact' };
+}
+
+// ── where the matter is ─────────────────────────────────────────────
+
+/**
+ * The centroid of the solid in its own frame (before scale, rotation and
+ * position): the origin for every shape symmetric about it; a quarter of the
+ * height above the base for a cone; the area centroid of an extruded outline
+ * (the outline is centred on its corners, which is not the same point);
+ * Simpson's rule for a revolved shape; the length-weighted middle of a tube's
+ * curve. Null for a shape that encloses no volume.
+ */
+export function centroid(s: ShapeLike): Vec3 | null {
+  const d = s.dims;
+  switch (s.shape) {
+    case 'box':
+    case 'sphere':
+    case 'cylinder':
+    case 'capsule':
+    case 'torus':
+    case 'prism':
+    case 'star':
+    case 'ring':
+      return [0, 0, 0];
+    case 'cone':
+      // the apex is at +h/2: the centroid of a solid cone is a quarter of the height above its base
+      return [0, -d.h / 4, 0];
+    case 'polygon':
+    case 'airfoil': {
+      const p = profile(s);
+      if (!p) return null;
+      const pts = p.outer;
+      let a = 0, cx = 0, cz = 0;
+      for (let i = 0; i < pts.length; i++) {
+        const [x1, z1] = pts[i];
+        const [x2, z2] = pts[(i + 1) % pts.length];
+        const k = x1 * z2 - x2 * z1;
+        a += k;
+        cx += (x1 + x2) * k;
+        cz += (z1 + z2) * k;
+      }
+      a /= 2;
+      return a ? [cx / (6 * a), 0, cz / (6 * a)] : null;
+    }
+    case 'revolve': {
+      const c = s.exprs?.r ? compileExpr(s.exprs.r, ['y']) : null;
+      if (!c) return null;
+      const r = (y: number) => Math.max(0, c.eval({ y }));
+      const mid = (d.y0 + d.y1) / 2;
+      const V = simpson((y) => Math.PI * r(y) ** 2, d.y0, d.y1);
+      const M = simpson((y) => Math.PI * r(y) ** 2 * (y - mid), d.y0, d.y1);
+      return V ? [0, M / V, 0] : null;
+    }
+    case 'tube': {
+      const pts = tubePath(s);
+      if (!pts) return null;
+      let L = 0;
+      const c: Vec3 = [0, 0, 0];
+      for (let i = 1; i < pts.length; i++) {
+        const l = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1], pts[i][2] - pts[i - 1][2]);
+        L += l;
+        for (let k = 0; k < 3; k++) c[k] += ((pts[i][k] + pts[i - 1][k]) / 2) * l;
+      }
+      return L ? (c.map((v) => v / L) as Vec3) : null;
+    }
+  }
+  return null;
+}
+
+/** A point in a part's own frame, in the scene. */
+export function toWorld(s: ShapeLike, p: Vec3): Vec3 {
+  const R = rotationMatrix(s.rot);
+  const q = p.map((v, i) => v * s.scale[i]);
+  return [0, 1, 2].map((i) => R[i][0] * q[0] + R[i][1] * q[1] + R[i][2] * q[2] + s.pos[i]) as Vec3;
 }

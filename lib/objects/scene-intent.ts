@@ -26,7 +26,7 @@
 // PURE.
 
 import { compileExpr } from '@/lib/logos-math';
-import { DIMS, EXPRS, MAX_NODES, SCENE_OPS, SHAPE_WORD, UNIT_M, fitKey, sceneBox, writePairs, type LengthUnit, type SceneNode, type SceneShape, type SceneState } from './scene';
+import { DIMS, EXPRS, MAX_NODES, NOMINAL_DENSITY, SCENE_OPS, SHAPE_WORD, UNIT_M, fitKey, sceneBox, writePairs, type LengthUnit, type SceneNode, type SceneShape, type SceneState } from './scene';
 import { worldBox, type Vec3 } from './scene-geometry';
 
 export interface SceneOp {
@@ -75,6 +75,7 @@ const SHAPE_NOUNS: [RegExp, SceneShape, { cube?: true; slab?: true }?][] = [
   [/\b(?:tor(?:us|i)|donuts?|doughnuts?)\b/, 'torus'],
   [/\b(?:planes?|floors?|grounds?|sheets?|tiles?)\b/, 'plane'],
   [/\b(?:capsules?|pills?)\b/, 'capsule'],
+  [/\b(?:air ?foils?|aerofoils?|wing sections?|wings?)\b/, 'airfoil'],
   [/\bstars?\b/, 'star'],
   [/\b(?:rings?|washers?|annul(?:us|i)|pipes?|hollow cylinders?)\b/, 'ring'],
   [/\b(?:prisms?|hexagons?|pentagons?|octagons?|heptagons?|triangles?|(?:\d+|three|four|five|six|seven|eight|nine|ten|twelve)-?(?:gons?|sided (?:prisms?|columns?|shapes?)))\b/, 'prism'],
@@ -184,6 +185,8 @@ interface DimReading {
   tube?: number;
   n?: number;
   depth?: number;
+  chord?: number;
+  span?: number;
 }
 
 function readDims(c: Clause, unit: LengthUnit): DimReading {
@@ -243,7 +246,7 @@ function readDims(c: Clause, unit: LengthUnit): DimReading {
   }
   // named dimension = NUM UNIT
   const named = new RegExp(
-    `(outer radius|inner radius|tube radius|ring radius|major radius|minor radius|radius|diameter|width|height|depth|length|thickness|side(?: length)?|size|edge)\\s*(?:of|=|:|is|to)?\\s*${NUM_RE}\\s*${UNIT_RE}?`,
+    `(outer radius|inner radius|tube radius|ring radius|major radius|minor radius|radius|diameter|width|height|depth|length|thickness|side(?: length)?|size|edge|chord|span)\\s*(?:of|=|:|is|to)?\\s*${NUM_RE}\\s*${UNIT_RE}?`,
     'gi'
   );
   const w1 = c.work;
@@ -260,6 +263,8 @@ function readDims(c: Clause, unit: LengthUnit): DimReading {
     else if (k === 'height') out.h = v;
     else if (k === 'depth') out.d = v;
     else if (k === 'thickness') out.depth = v;
+    else if (k === 'chord') out.chord = v;
+    else if (k === 'span') out.span = v;
     else out.side = v;
   }
   c.work = c.work.replace(named, (s) => ' '.repeat(s.length));
@@ -327,6 +332,32 @@ function readLook(c: Clause): { color?: string; mat?: string; opacity?: number; 
     said.push('matte');
   }
   return { ...out, said };
+}
+
+// ── what it is made of ──────────────────────────────────────────────
+
+const MATTER_WORDS = '(stainless steel|steel|iron|alumin(?:i)?um|copper|brass|bronze|titanium|lead|concrete|granite|marble|brick|wooden|wood|oak|pine|water|ice|rubber|pla|abs|nylon|foam|cork)';
+
+/**
+ * A material and a density: "steel", "made of oak", "density 7850 kg/m³",
+ * "2700 kg/m3". The material word is NOT consumed — it is also a look, and
+ * readLook takes it after — while a density is. A named material with no
+ * density given takes its nominal one (scene.ts NOMINAL_DENSITY), which the
+ * scene says is nominal.
+ */
+function readMatter(c: Clause): { name?: string; density?: number; said: string } | null {
+  const d =
+    c.take(new RegExp(`\\bdensity\\s*(?:of|=|:|is)?\\s*${NUM_RE}\\s*(?:kg\\s*\\/\\s*m(?:3|³|\\^3)|kg per cubic met(?:er|re)s?)?`, 'i')) ??
+    c.take(new RegExp(`\\b${NUM_RE}\\s*(?:kg\\s*\\/\\s*m(?:3|³|\\^3)|kg per cubic met(?:er|re)s?)`, 'i'));
+  const density = d ? numOf(d[1]) ?? undefined : undefined;
+  c.take(/\b(?:made (?:of|from|out of))\b/i);
+  const w = new RegExp(`\\b${MATTER_WORDS}\\b`, 'i').exec(c.work);
+  let name = w ? w[1].toLowerCase() : undefined;
+  if (name === 'wooden') name = 'wood';
+  if (name === 'aluminum') name = 'aluminium';
+  if (!name && density === undefined) return null;
+  if (density === undefined && name && NOMINAL_DENSITY[name] === undefined) return null;
+  return { ...(name ? { name } : {}), ...(density !== undefined ? { density } : {}), said: [name, density !== undefined ? `${density} kg/m³` : ''].filter(Boolean).join(', ') };
 }
 
 // ── which part is meant ─────────────────────────────────────────────
@@ -779,6 +810,12 @@ function dimArgs(shape: SceneShape, d: DimReading, cube: boolean): { dims: Recor
       if (d.depth !== undefined) dims.h = d.depth;
       else if (d.h !== undefined) dims.h = d.h;
       break;
+    case 'airfoil':
+      if (d.chord !== undefined) dims.c = d.chord;
+      else if (d.w !== undefined) dims.c = d.w;
+      if (d.span !== undefined) dims.h = d.span;
+      else if (d.d !== undefined) dims.h = d.d;
+      break;
   }
   return { dims, notes };
 }
@@ -856,10 +893,19 @@ function readCreate(c: Clause, st: Ctx): string | null {
   }
   if (count > MAX_NODES) return `A scene holds at most ${MAX_NODES} parts.`;
   const name = c.take(/\b(?:called|named)\s+["“]?([a-z][\w ]{0,30}?)["”]?(?=$|\s*[,;]|\s+(?:with|at|on|and)\b)/i)?.[1];
+  const matter = readMatter(c);
   const look = readLook(c);
   if (shape === 'prism') {
     const adj = c.take(/\b(triangular|square|pentagonal|hexagonal|heptagonal|octagonal)\b/i);
     if (adj && sidesFromNoun === undefined) sidesFromNoun = POLY_ADJ[adj[1].toLowerCase()];
+  }
+  // "NACA 2412": camber 2% at 40% of the chord, 12% thick — the four digits are the section
+  let naca: Record<string, number> | null = null;
+  if (shape === 'airfoil') {
+    const nm = c.take(/\bnaca[\s-]*(\d)(\d)(\d{2})\b/i);
+    if (nm) naca = { m: Number(nm[1]), p: Number(nm[2]), t: Number(nm[3]) };
+    else if (c.take(/\bsymmetric(?:al)?\b/i)) naca = { m: 0, p: 0 };
+    if (naca && naca.m > 0 && naca.p === 0) return `NACA ${nm![1]}${nm![2]}${nm![3]} is not a section: a cambered one needs where its camber peaks (the second digit).`;
   }
   const spacing = c.take(new RegExp(`\\b(?:spaced|every|apart by|spacing(?: of)?)\\s*${NUM_RE}\\s*${UNIT_RE}?(?:\\s+apart)?`, 'i'));
   const along = c.take(/\b(?:along|in)\s+(?:the\s+)?([xyz])(?:[\s-]?(?:axis|direction))?\b/i)?.[1]?.toLowerCase();
@@ -870,6 +916,7 @@ function readCreate(c: Clause, st: Ctx): string | null {
   if (place && 'problem' in place) return place.problem;
   if (sidesFromNoun !== undefined && d.n === undefined) d.n = sidesFromNoun;
   const { dims } = param ? { dims: param.dims } : dimArgs(shape, d, !!opts?.cube);
+  if (naca) Object.assign(dims, naca);
   const args: SceneOp['args'] = { shape };
   if (Object.keys(dims).length) args.dims = writePairs(dims);
   if (param) args.exprs = Object.entries(param.exprs).map(([k, v]) => `${k}=${v}`).join(';');
@@ -897,6 +944,12 @@ function readCreate(c: Clause, st: Ctx): string | null {
   if (why) return why;
   const made = lastAdded(before, st.s);
   let first = st.s.nodes.find((n) => n.id === made[0])!;
+  if (matter) {
+    const w0 = run(st, 'matter', { id: first.id, ...(matter.name ? { name: matter.name } : {}), ...(matter.density !== undefined ? { density: matter.density } : {}) });
+    if (w0) return w0;
+    first = st.s.nodes.find((n) => n.id === made[0])!;
+    if (matter.density === undefined) c.notes.push(`${matter.name}: a nominal density of ${NOMINAL_DENSITY[matter.name!]} kg/m³ — a typical value; give a measured one to replace it`);
+  }
   let beside = false;
   if (!place && !param && before.nodes.length) {
     // nowhere given, and the scene is not empty: beside what is there, on the floor, rather than inside it
@@ -962,7 +1015,9 @@ function readCreate(c: Clause, st: Ctx): string | null {
   c.notes.push(...(first.assumed?.length && Object.keys(dims).length ? [`${first.assumed.map((k) => DIMS[first.shape].find((x) => x.key === k)?.label ?? k).join(', ')}: default`] : []));
   const lookSaid = look.said.length ? `${look.said.join(' ')} ` : '';
   const word = opts?.cube ? 'cube' : SHAPE_WORD[first.shape];
-  const what = param ? param.said : `${count > 1 ? `${count} ` : 'a '}${lookSaid}${count > 1 ? plural(word) : word}`;
+  const named = naca ? `NACA ${naca.m}${naca.p}${String(naca.t ?? 12).padStart(2, '0')} ${word}` : word;
+  const phrase = `${lookSaid}${count > 1 ? plural(named) : named}`;
+  const what = param ? param.said : `${count > 1 ? `${count} ` : /^[aeiou]/i.test(phrase) ? 'an ' : 'a '}${phrase}`;
   const arranged = count > 1 && arrangement ? ` in a ${arrangement === 'circle' ? 'ring' : arrangement === 'tower' || arrangement === 'pile' || arrangement === 'column' ? 'stack' : arrangement === 'line' ? 'row' : arrangement}` : '';
   return `✓add ${what}${arranged}${sizeWords}${place ? ` ${place.said}` : ''}`;
 }
@@ -1003,7 +1058,7 @@ function verbRef(c: Clause, verbs: string, st: Ctx): VerbRef | null {
 const missing = (st: Ctx, phrase: string) =>
   st.s.nodes.length ? `There is nothing called “${phrase.replace(/^(?:the|all the|all|every|each)\s+/, '')}” in the scene.` : 'The scene is empty — describe something to build first.';
 
-const DIM_WORD = '(outer radius|inner radius|tube radius|ring radius|radius|diameter|width|height|depth|length|thickness|sides|points)';
+const DIM_WORD = '(outer radius|inner radius|tube radius|ring radius|radius|diameter|width|height|depth|length|thickness|sides|points|chord|span)';
 
 /** Verbs that only ever change what is there — a clause led by one never makes something new. */
 const EDIT_ONLY = new RegExp(`${LEAD}(?:move|shift|slide|push|pull|nudge|lift|raise|lower|rotate|turn|spin|tilt|twist|roll|flip|scale|resize|grow|shrink|enlarge|double|halve|triple|colou?r|paint|tint|dye|delete|remove|erase|duplicate|copy|clone|repeat|rename|call|name|change)(?![a-z])`, 'i');
@@ -1316,7 +1371,9 @@ function applyNamedDim(st: Ctx, ref: Ref, key: string, v: number, touch: (ids: s
     else if (key === 'inner radius') dimKey = has('ri') ? 'ri' : n.shape === 'ring' ? 'r' : null;
     else if (key === 'tube radius') dimKey = n.shape === 'torus' || n.shape === 'tube' ? 'r' : null;
     else if (key === 'sides' || key === 'points') dimKey = has('n') ? 'n' : null;
-    else if (key === 'thickness') dimKey = has('h') ? 'h' : null;
+    else if (key === 'thickness') dimKey = has('h') && n.shape !== 'airfoil' ? 'h' : null;
+    else if (key === 'chord') dimKey = has('c') ? 'c' : null;
+    else if (key === 'span') dimKey = n.shape === 'airfoil' ? 'h' : null;
     if (dimKey) {
       const why = run(st, 'set', { id, key: dimKey, value: val });
       if (why) return why;
@@ -1340,6 +1397,15 @@ const SIZE_ADJ: Record<string, ['x' | 'y' | 'z', 1 | -1]> = {
 
 function readMakeIt(c: Clause, st: Ctx, ref: Ref, touch: (ids: string[]) => void): string {
   const said: string[] = [];
+  const matter = readMatter(c);
+  if (matter) {
+    for (const id of ref.ids) {
+      const why = run(st, 'matter', { id, ...(matter.name ? { name: matter.name } : {}), ...(matter.density !== undefined ? { density: matter.density } : {}) });
+      if (why) return why;
+    }
+    said.push(matter.said);
+    if (matter.density === undefined) c.notes.push(`${matter.name}: a nominal density of ${NOMINAL_DENSITY[matter.name!]} kg/m³ — a typical value; give a measured one to replace it`);
+  }
   const look = readLook(c);
   for (const id of ref.ids) {
     if (look.color || look.mat || look.opacity !== undefined) {
@@ -1424,6 +1490,8 @@ function readMakeIt(c: Clause, st: Ctx, ref: Ref, touch: (ids: string[]) => void
     ['height', d.h],
     ['depth', d.d],
     ['thickness', d.depth],
+    ['chord', d.chord],
+    ['span', d.span],
   ];
   if (d.side !== undefined) {
     // "make the cube side 2": every edge of a box, the two of a plane

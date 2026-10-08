@@ -12,12 +12,13 @@
 //
 // Every number here is the scene's: sizes, positions, volumes. The panel says
 // what the scene is — a geometric preview — and what it is not: nothing in it
-// is weighed, stressed or simulated.
+// is loaded, stressed or simulated; a mass is density × volume, and only where a
+// density was given.
 
 import dynamic from 'next/dynamic';
 import { Component, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { currentOf, type ThoughtObject } from '@/lib/objects';
-import { DIMS, EXPRS, MATERIALS, SHAPE_WORD, UNIT_M, measure, sizeOf, type LengthUnit, type SceneNode, type SceneState } from '@/lib/objects/scene';
+import { DIMS, EXPRS, MATERIALS, SHAPE_WORD, UNIT_M, massOf, measure, sceneMass, sizeOf, type LengthUnit, type SceneNode, type SceneState } from '@/lib/objects/scene';
 import { readScene, type Reading } from '@/lib/objects/scene-intent';
 import type { GizmoMode } from './SceneCanvas';
 import './scene3d.css';
@@ -146,7 +147,7 @@ export function ScenePanel(p: ScenePanelProps) {
       <header className="s3-head">
         <span className="s3-title">Live 3D</span>
         <span className="s3-exp">experimental</span>
-        <span className="s3-preview" title="Shapes, sizes and positions, computed exactly. Nothing is weighed, stressed or simulated.">
+        <span className="s3-preview" title="Shapes, sizes and positions, computed exactly; mass only as density × volume. Nothing is loaded, stressed or simulated.">
           Geometric preview — not a physical simulation
         </span>
         <span className="s3-sp" />
@@ -296,11 +297,18 @@ export function ScenePanel(p: ScenePanelProps) {
 }
 
 function PartsList({ scene, selected, onSelect }: { scene: SceneState; selected: string | null; onSelect: (id: string | null) => void }) {
+  const weighed = useMemo(() => sceneMass(scene), [scene]);
   if (!scene.nodes.length) return null;
   return (
     <div className="s3-parts">
       <h4>
         Parts <span>{scene.nodes.length}</span>
+        {weighed && (
+          <span className="s3-mass" title={`over the ${weighed.weighed} part${weighed.weighed === 1 ? '' : 's'} with a density${weighed.nominal ? '; some on nominal densities' : ''}; centre of mass at (${weighed.at.map((v) => num(v / UNIT_M[scene.unit])).join(', ')}) ${scene.unit}`}>
+            {' '}· {weighed.kg >= 1000 ? `${num(weighed.kg / 1000)} t` : `${num(weighed.kg)} kg`}
+            {weighed.unweighed ? ` (${weighed.unweighed} unweighed)` : ''}
+          </span>
+        )}
       </h4>
       <ul>
         {scene.nodes.map((n) => {
@@ -353,6 +361,7 @@ function Inspector({ node: n, scene, readOnly, edit, onDone }: { node: SceneNode
   const u = scene.unit;
   const k = UNIT_M[u];
   const m = useMemo(() => measure(n), [n]);
+  const mass = useMemo(() => massOf(n), [n]);
   const transform = (patch: Partial<Record<'x' | 'y' | 'z' | 'rx' | 'ry' | 'rz' | 'sx' | 'sy' | 'sz', number>>) => {
     const base = { x: n.pos[0], y: n.pos[1], z: n.pos[2], rx: n.rot[0], ry: n.rot[1], rz: n.rot[2], sx: n.scale[0], sy: n.scale[1], sz: n.scale[2] };
     const next = { ...base, ...patch };
@@ -465,6 +474,28 @@ function Inspector({ node: n, scene, readOnly, edit, onDone }: { node: SceneNode
           <Field label="opacity" value={num(n.opacity)} disabled={readOnly} onCommit={(s) => { const v = numIn(s); return v !== null && edit('look', { id: n.id, opacity: v }); }} />
         </div>
       </section>
+      <section>
+        <h5>Made of</h5>
+        <div className="s3-row">
+          <Field
+            label="material"
+            value={n.material ?? ''}
+            disabled={readOnly}
+            onCommit={(v) => !!v && edit('matter', { id: n.id, name: v, ...(n.densityFrom === 'given' && n.density !== undefined ? { density: n.density } : {}) })}
+          />
+          <Field
+            label={n.densityFrom === 'nominal' ? 'density (nominal)' : 'density'}
+            value={n.density !== undefined ? num(n.density) : ''}
+            suffix="kg/m³"
+            disabled={readOnly}
+            onCommit={(v) => {
+              const d = numIn(v);
+              return d !== null && edit('matter', { id: n.id, ...(n.material ? { name: n.material } : {}), density: d });
+            }}
+          />
+        </div>
+        {n.densityFrom === 'nominal' && <p className="s3-note">A typical value for {n.material}, not a measurement — type a measured density to replace it.</p>}
+      </section>
       <section className="s3-measure">
         <h5>Measured</h5>
         <p>
@@ -472,8 +503,14 @@ function Inspector({ node: n, scene, readOnly, edit, onDone }: { node: SceneNode
           {m.area !== null ? ` · surface ${num(m.area / k ** 2)} ${u}²` : ''}
           <span className={`s3-how is-${m.how}`}>{m.how === 'exact' ? 'exact' : 'numerical'}</span>
         </p>
+        {mass && (
+          <p>
+            mass {mass.kg >= 1000 ? `${num(mass.kg / 1000)} t` : `${num(mass.kg)} kg`}
+            <span className={`s3-how is-${mass.how}`}>{mass.nominal ? 'nominal density' : mass.how === 'exact' ? 'exact' : 'numerical'}</span>
+          </p>
+        )}
         {m.note && <p className="s3-note">{m.note}</p>}
-        <p className="s3-note">Geometry only — no material, mass or strength is modelled.</p>
+        <p className="s3-note">{mass ? 'Mass is density × volume. Nothing is loaded or stressed — no strength is modelled.' : 'Give it a material or a density for its mass. Nothing is loaded or stressed — no strength is modelled.'}</p>
       </section>
       <footer>
         <button type="button" disabled={readOnly} onClick={() => edit('copy', { id: n.id, count: 1, dx: Math.max(0.25, 1.25 * (sizeOfX(n) || 1)) })}>
