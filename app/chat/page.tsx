@@ -71,6 +71,7 @@ import { TOUR_KEY, shouldRunTour } from '@/lib/tour';
 import { ProjectHome } from '@/components/projects/ProjectHome';
 import { JoinWithCode, ShareDialog } from '@/components/share/ShareDialog';
 import { SharedThread } from '@/components/share/SharedThread';
+import { limitsFor } from '@/lib/entitlements';
 import type { ResourceType } from '@/lib/share/roles';
 import { isSource } from '@/lib/checkout-attribution';
 import { track } from '@/lib/analytics';
@@ -575,7 +576,7 @@ export default function ChatPage() {
   const keyHeaders = (): Record<string, string> => ({});
   // What is attached to the message being written (Core 4). Read into text
   // as it is added; see components/ChatAttachments.tsx.
-  const files = useChatAttachments({ headers: keyHeaders, sessionId: () => activeId });
+  const files = useChatAttachments({ headers: keyHeaders, sessionId: () => activeId, uploadLimit: () => limitsFor(planState.plan === 'one' ? 'one' : 'free').uploadBytes });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
 

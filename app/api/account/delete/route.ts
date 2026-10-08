@@ -17,6 +17,7 @@ import { readSubscription, isCompCustomer } from '@/lib/subscriptions';
 import { stripe, stripeConfigured } from '@/lib/stripe';
 import { enforceRateLimit } from '@/lib/rate-limit';
 import { purgeSharing } from '@/lib/share/server';
+import { purgeUploads } from '@/lib/upload-store';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -202,6 +203,11 @@ export async function DELETE(req: NextRequest) {
       { status: 500 }
     );
   }
+
+  // Large uploads pass through private storage and are deleted as they are
+  // read; anything uploaded and never read goes too (best effort — at most
+  // an hour's worth, and the daily sweep catches what this misses).
+  await purgeUploads(userId);
 
   // The identity last.
   try {

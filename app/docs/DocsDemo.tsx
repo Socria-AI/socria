@@ -14,7 +14,7 @@ import { MathBoard } from '@/components/MathBoard';
 import { MathPlot } from '@/components/MathPlot';
 import { MathViz } from '@/components/MathViz';
 import { sanitizeViz, type VizScene } from '@/lib/logos-viz';
-import { COUNTER_SCOPE, PLANS, TIERED_COUNTERS, type Counter } from '@/lib/entitlements';
+import { COUNTER_SCOPE, PLANS, TIERED_COUNTERS, megabytes, type Counter } from '@/lib/entitlements';
 import { SOCRIA_ONE } from '@/lib/socria-one';
 import { ModelPicker } from '@/components/ModelPicker';
 import { SynthesisCard } from '@/components/SynthesisCard';
@@ -256,6 +256,11 @@ export function DemoLimitsTable() {
             <td>Draft Space</td>
             <td>{free.draftSpace ? 'Yes' : '—'}</td>
             <td>{one.draftSpace ? 'Yes' : '—'}</td>
+          </tr>
+          <tr>
+            <td>Largest document Socria reads</td>
+            <td>{megabytes(free.uploadBytes)}</td>
+            <td>{megabytes(one.uploadBytes)}</td>
           </tr>
           <tr>
             <td>Turns a thread&rsquo;s memory carries</td>

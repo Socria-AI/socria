@@ -16,7 +16,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { Attachment } from '@/lib/logos-attachments';
 import { MAX_ATTACHMENTS, guessOrigin, wordCount } from '@/lib/logos-attachments';
-import { MAX_FILE_TEXT, MAX_UPLOAD_BYTES, kindOfFile, refusalFor } from '@/lib/file-kinds';
+import { MAX_FILE_TEXT, kindOfFile, refusalFor } from '@/lib/file-kinds';
+import { DIRECT_UPLOAD_BYTES, limitsFor, megabytes } from '@/lib/entitlements';
 import { prepareImage } from '@/lib/logos-upload';
 
 export interface DraftAttachment extends Attachment {
@@ -59,7 +60,12 @@ function noteFrom(name: string, text: string, truncated = false): Omit<DraftAtta
  * The drafts for the message being written, and the one way files get in.
  * `headers` are the page's auth headers, passed through to both readers.
  */
-export function useChatAttachments(opts: { headers: () => Record<string, string>; sessionId: () => string | null }) {
+export function useChatAttachments(opts: {
+  headers: () => Record<string, string>;
+  sessionId: () => string | null;
+  /** the largest document this person may attach (lib/entitlements.ts uploadBytes); 4 MB when absent */
+  uploadLimit?: () => number;
+}) {
   const [drafts, setDrafts] = useState<DraftAttachment[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
   // Read at call time, so a file attached after switching conversations is
@@ -78,7 +84,7 @@ export function useChatAttachments(opts: { headers: () => Record<string, string>
       const id = nextId();
       let prepared;
       try {
-        prepared = await prepareImage(file);
+        prepared = await prepareImage(file, Math.max(12 * 1024 * 1024, optsRef.current.uploadLimit?.() ?? 0));
       } catch (e: any) {
         setNotice(e?.message || `${file.name} could not be opened.`);
         return;
@@ -109,16 +115,38 @@ export function useChatAttachments(opts: { headers: () => Record<string, string>
 
   const addDocument = useCallback(
     async (file: File) => {
-      if (file.size > MAX_UPLOAD_BYTES) {
-        setNotice(`${file.name} is too large — 4 MB is the limit for documents.`);
+      const limit = optsRef.current.uploadLimit?.() ?? DIRECT_UPLOAD_BYTES;
+      if (file.size > limit) {
+        const one = limitsFor('one').uploadBytes;
+        setNotice(
+          limit < one
+            ? `${file.name} is too large — ${megabytes(limit)} is the limit for documents. Socria One reads documents up to ${megabytes(one)}.`
+            : `${file.name} is too large — ${megabytes(limit)} is the limit for documents.`
+        );
         return;
       }
       const id = nextId();
       push({ id, kind: 'note', name: file.name, status: 'reading' });
       try {
-        const form = new FormData();
-        form.append('file', file);
-        const res = await fetch('/api/files/read', { method: 'POST', headers: optsRef.current.headers(), body: form });
+        let res: Response;
+        if (file.size > DIRECT_UPLOAD_BYTES) {
+          // TOO LARGE TO SEND THROUGH THE SERVER: straight to private storage
+          // with a one-time signed upload, then read from there (and deleted).
+          const json = { 'Content-Type': 'application/json', ...optsRef.current.headers() };
+          const prep = await fetch('/api/files/upload', { method: 'POST', headers: json, body: JSON.stringify({ name: file.name, size: file.size }) });
+          const signed = await prep.json().catch(() => ({}));
+          if (!prep.ok || !signed?.url || !signed?.path) throw new Error(signed?.error || 'the upload could not be prepared');
+          const body = new FormData();
+          body.append('cacheControl', '60');
+          body.append('', file);
+          const put = await fetch(signed.url, { method: 'PUT', headers: { 'x-upsert': 'false' }, body });
+          if (!put.ok) throw new Error('the upload did not finish — try again');
+          res = await fetch('/api/files/read', { method: 'POST', headers: json, body: JSON.stringify({ path: signed.path }) });
+        } else {
+          const form = new FormData();
+          form.append('file', file);
+          res = await fetch('/api/files/read', { method: 'POST', headers: optsRef.current.headers(), body: form });
+        }
         const json = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(json?.error || 'could not be read');
         const notes: { name: string; text: string; truncated: boolean }[] = json.notes ?? [];
@@ -170,7 +198,7 @@ export function useChatAttachments(opts: { headers: () => Record<string, string>
           } catch {
             setNotice(`${f.name} could not be read.`);
           }
-        } else if (kind === 'unsupported' && f.size <= MAX_UPLOAD_BYTES && !f.type.startsWith('image/')) {
+        } else if (kind === 'unsupported' && f.size <= (optsRef.current.uploadLimit?.() ?? DIRECT_UPLOAD_BYTES) && !f.type.startsWith('image/')) {
           // An unfamiliar extension may still be text; the server looks.
           await addDocument(f);
         } else setNotice(refusalFor(f.name));

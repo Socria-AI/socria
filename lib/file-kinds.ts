@@ -69,5 +69,10 @@ export const ACCEPT_ATTR = [
  */
 export const MAX_FILE_TEXT = 60_000;
 
-/** Vercel refuses request bodies over 4.5 MB, so the reader stops just short. */
-export const MAX_UPLOAD_BYTES = 4 * 1024 * 1024;
+/**
+ * Vercel refuses request bodies over 4.5 MB, so a file sent to the reader in
+ * the request stops just short. The number lives in the plan table
+ * (lib/entitlements.ts DIRECT_UPLOAD_BYTES); Socria One's larger files go
+ * through private storage instead.
+ */
+export { DIRECT_UPLOAD_BYTES as MAX_UPLOAD_BYTES } from './entitlements';

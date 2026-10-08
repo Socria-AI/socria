@@ -23,7 +23,7 @@ export default function PrivacyPage() {
         deleted.
       </p>
       <p className="lg-dates">
-        Effective August 2026 · Last updated September 2026 · Data controller:
+        Effective August 2026 · Last updated October 2026 · Data controller:
         Socria — <a href="mailto:hellosocria@gmail.com">hellosocria@gmail.com</a>
       </p>
 
@@ -280,6 +280,13 @@ export default function PrivacyPage() {
           row until they age out of their retention window and are overwritten.
         </li>
       </ul>
+      <p>
+        A document too large to send straight to our server (over 4&nbsp;MB,
+        which only Socria One reads) passes through private storage on its way
+        to being read. It is deleted from there the moment it has been read,
+        whether or not it could be; one that is never read, because the page
+        closed mid-upload, is deleted within a day.
+      </p>
       <p>
         Our own application logs record route names, error codes and counts.
         They do not contain your messages, and they never contain an access

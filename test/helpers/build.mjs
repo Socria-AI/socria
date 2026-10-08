@@ -185,6 +185,7 @@ const MODULES = [
   'lib/checkout-attribution.ts',
   'lib/person-memory.ts',
   'lib/file-kinds.ts',
+  'lib/upload-paths.ts',
   'lib/chat-attachments.ts',
   'lib/file-extract.ts',
   'lib/first-session.ts',

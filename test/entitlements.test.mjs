@@ -21,6 +21,8 @@ import {
   isSpent,
   remaining,
   boundaryNote,
+  DIRECT_UPLOAD_BYTES,
+  megabytes,
 } from './.tmp/entitlements.mjs';
 
 let pass = 0, fail = 0;
@@ -47,7 +49,7 @@ console.log('=== the axis: what differs is volume, not quality ===');
     f.memoryTurns === null && o.memoryTurns === null);
 }
 
-console.log('\n=== ...and exactly two rows do differ ===');
+console.log('\n=== ...and exactly these rows differ: chats, memory, document size ===');
 {
   ok('two free lines of thinking a month', f.counters.chats === 2);
   ok('chats is the only tiered counter',
@@ -57,6 +59,11 @@ console.log('\n=== ...and exactly two rows do differ ===');
   ok('One holds far more of them', (o.counters.chats ?? 0) >= 100);
   ok('memory carried between them is the other half',
     (f.memoryEntries ?? 0) > 0 && (o.memoryEntries ?? 0) > (f.memoryEntries ?? 0));
+  // and the size of a document: the platform's request limit on free, more
+  // on One, which uploads around the server through private storage
+  ok('free documents are capped at what a request can carry (4 MB)', f.uploadBytes === DIRECT_UPLOAD_BYTES && DIRECT_UPLOAD_BYTES === 4 * 1024 * 1024);
+  ok('Socria One reads documents up to 30 MB', o.uploadBytes === 30 * 1024 * 1024);
+  ok('  said in megabytes', megabytes(o.uploadBytes) === '30 MB' && megabytes(f.uploadBytes) === '4 MB');
 }
 
 console.log('\n=== no plan is a smaller product than the other ===');
@@ -66,6 +73,7 @@ console.log('\n=== no plan is a smaller product than the other ===');
   ok('One never has a ceiling free lacks',
     COUNTERS.every((c) => !(f.counters[c] === null && o.counters[c] !== null)));
   ok('One never carries less memory', (o.memoryEntries ?? Infinity) >= (f.memoryEntries ?? Infinity));
+  ok('One never takes smaller files', o.uploadBytes >= f.uploadBytes);
 }
 
 console.log('\n=== the month, counted ===');

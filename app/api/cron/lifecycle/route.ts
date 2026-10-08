@@ -37,6 +37,7 @@ import { timingSafeEqual } from 'node:crypto';
 import { clerkClient } from '@clerk/nextjs/server';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { trackServer } from '@/lib/analytics-server';
+import { sweepStaleUploads } from '@/lib/upload-store';
 import {
   emailBaseUrl,
   emailSecret,
@@ -183,6 +184,17 @@ export async function GET(req: NextRequest) {
   }
   if (!authorised(req, cronSecret)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  // Uploads that went to storage and were never read (a tab closed mid-way)
+  // are removed here, whatever the email switch says: nothing is meant to
+  // stay in that bucket longer than an hour (lib/upload-paths.ts).
+  if (req.nextUrl.searchParams.get('dry') !== '1') {
+    try {
+      await sweepStaleUploads();
+    } catch (e) {
+      console.error('[socria/cron] upload sweep failed', e);
+    }
   }
 
   // A dry run may proceed with the switch off: it sends nothing, and the

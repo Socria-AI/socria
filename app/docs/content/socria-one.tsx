@@ -11,6 +11,7 @@ import Link from 'next/link';
 import { Article, H2, Callout, Defs, Def } from '../Article';
 import { DemoLimitsTable } from '../DocsDemo';
 import { priceWithPeriod } from '@/lib/socria-one';
+import { PLANS, megabytes } from '@/lib/entitlements';
 import { docPage } from '../registry';
 
 const page = docPage('socria-one')!;
@@ -44,6 +45,14 @@ export function SocriaOne() {
         a free tier that clips every dimension at once does not read as a trial,
         it reads as a thin product, and nobody subscribes to more of something
         they have only watched be mediocre.
+      </p>
+      <p>
+        The one difference inside a line of thinking is the size of a
+        document. Anything up to {megabytes(PLANS.free.uploadBytes)} travels
+        straight to our server and is read there, on either plan. Socria One
+        carries larger documents, up to {megabytes(PLANS.one.uploadBytes)},
+        through private storage instead, and deletes each one the moment it
+        has been read.
       </p>
       <p>
         You subscribe from the <Link href="/one">Socria One page</Link> or

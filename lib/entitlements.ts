@@ -98,7 +98,24 @@ export interface Limits {
    * there have been several conversations to carry between.
    */
   readonly memoryEntries: number | null;
+  /**
+   * The largest document a person can attach, in bytes.
+   *
+   * The free tier's number is not a choice but a platform's: a request to
+   * one of our functions may carry about 4.5 MB, so a file that goes through
+   * the server must be smaller than that. Socria One's larger files go
+   * around the server instead — straight from the browser to private
+   * storage through a one-time signed upload, read from there, and deleted
+   * the moment they are read (app/api/files/upload, app/api/files/read).
+   */
+  readonly uploadBytes: number;
 }
+
+/** The most a file may weigh and still travel to our server in the request itself. */
+export const DIRECT_UPLOAD_BYTES = 4 * 1024 * 1024;
+
+/** A size in megabytes, as the limits are said: "4 MB", "30 MB". */
+export const megabytes = (bytes: number) => `${Math.round(bytes / (1024 * 1024))} MB`;
 
 /**
  * Fair use rather than infinity, on BOTH plans.
@@ -132,6 +149,7 @@ export const PLANS: Record<Plan, Limits> = {
     // than everything. See lib/person-memory.ts — this is a WINDOW onto one
     // store, not a smaller store, so nothing is lost by being on this plan.
     memoryEntries: 12,
+    uploadBytes: DIRECT_UPLOAD_BYTES,
   },
   one: {
     counters: {
@@ -149,6 +167,7 @@ export const PLANS: Record<Plan, Limits> = {
     draftSpace: true,
     memoryTurns: null,
     memoryEntries: 160,
+    uploadBytes: 30 * 1024 * 1024,
   },
 };
 

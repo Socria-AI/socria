@@ -74,9 +74,14 @@ export interface PreparedImage {
   name: string;
 }
 
-export async function prepareImage(file: File): Promise<PreparedImage> {
-  if (file.size > MAX_FILE_BYTES) {
-    throw new Error('That image is too large — 12MB is the limit.');
+/**
+ * `maxBytes` is the largest original accepted. It can be larger than what is
+ * sent, because every image is resized here before it leaves the browser —
+ * Socria One accepts originals up to its document limit.
+ */
+export async function prepareImage(file: File, maxBytes = MAX_FILE_BYTES): Promise<PreparedImage> {
+  if (file.size > maxBytes) {
+    throw new Error(`That image is too large — ${Math.round(maxBytes / (1024 * 1024))} MB is the limit.`);
   }
   const img = await loadImage(await readAsDataURL(file));
   let preview = '';
