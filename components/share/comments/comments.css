@@ -1,0 +1,114 @@
+/* components/share/comments/comments.css — comments on anything shared: the
+   panel (a drawer on a Logos map, inline on a Project, beside a shared
+   thread), its threads, the pins on map cards, and the Comments button.
+   Scoped under .cm-*; tokens only, so every theme carries through. Inside
+   Logos the Socria tokens take Logos's colours, as the rail does. */
+
+.logos-root :is(.cm-panel, .cm-open, .cm-pins) {
+  --ink: var(--lg-ink);
+  --ink-70: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.7);
+  --ink-60: var(--lg-ink-60);
+  --ink-45: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.45);
+  --ink-25: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.25);
+  --ink-16: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.16);
+  --ink-12: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.12);
+  --moss: var(--lg-primary);
+  --moss-700: var(--lg-primary);
+  --moss-50: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.085);
+  --moss-100: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.16);
+  --cm-paper: var(--lg-panel);
+}
+
+/* ── the panel ─────────────────────────────────────────────────────── */
+.cm-panel{--cm-paper:var(--paper);display:flex;flex-direction:column;min-height:0;color:var(--ink);font-family:var(--sans)}
+.cm-panel.is-drawer{position:fixed;top:64px;right:12px;bottom:12px;z-index:60;width:min(370px,calc(100vw - 24px));background:var(--cm-paper);
+  border:1px solid var(--ink-12);border-radius:16px;box-shadow:0 36px 80px -36px rgba(26,36,16,.55);animation:cmIn .22s cubic-bezier(.2,.8,.2,1) both}
+.cm-panel.is-inline{background:transparent}
+@keyframes cmIn{from{opacity:0;transform:translateX(12px)}}
+@media (prefers-reduced-motion: reduce){.cm-panel.is-drawer{animation:none}}
+@media (max-width: 640px){
+  .cm-panel.is-drawer{top:auto;left:0;right:0;bottom:0;width:auto;max-height:82dvh;border-radius:16px 16px 0 0;border-bottom:none}
+}
+
+.cm-head{display:flex;align-items:center;gap:10px;padding:14px 14px 10px 16px}
+.cm-panel.is-inline .cm-head{padding:0 0 10px}
+.cm-head h2{margin:0;flex:1;font-family:var(--serif);font-weight:400;font-size:1.15rem;letter-spacing:-.005em}
+.cm-panel.is-inline .cm-head h2{font-size:1rem}
+.cm-seg{display:inline-flex;padding:2px;border-radius:999px;background:var(--ink-12)}
+.cm-seg button{border:none;background:none;font:inherit;font-size:11.5px;padding:4px 9px;border-radius:999px;color:var(--ink-60);cursor:pointer;white-space:nowrap}
+.cm-seg button[aria-selected="true"]{background:var(--cm-paper);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.cm-x{border:none;background:none;font-size:20px;line-height:1;color:var(--ink-45);cursor:pointer;padding:4px 8px;border-radius:8px}
+.cm-x:hover{color:var(--ink);background:var(--ink-12)}
+
+.cm-scope{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 16px 8px;font-size:12.5px;color:var(--ink-70)}
+.cm-panel.is-inline .cm-scope{margin:0 0 8px}
+
+.cm-new{margin:0 14px 10px;padding:10px 10px 8px;border-radius:12px;border:1px solid var(--ink-12);background:var(--moss-50)}
+.cm-panel.is-inline .cm-new{margin:0 0 12px}
+.cm-on{display:flex;align-items:center;gap:6px;margin:0 2px 6px;font-size:11.5px;color:var(--ink-60);min-width:0}
+.cm-on b{font-weight:500;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:230px}
+.cm-on .cm-link{font-size:14px;line-height:1;padding:0 4px}
+.cm-hint{display:block;margin:6px 2px 0;font-size:11px;color:var(--ink-45)}
+.cm-readonly{margin:0 16px 10px;font-size:12.5px;color:var(--ink-60)}
+.cm-error{margin:0 16px 10px;font-size:12.5px;color:#9b3b2a}
+.cm-panel.is-inline :is(.cm-readonly,.cm-error){margin-left:0;margin-right:0}
+
+.cm-list{flex:1;min-height:0;overflow-y:auto;padding:2px 14px 16px;display:flex;flex-direction:column;gap:10px}
+.cm-panel.is-inline .cm-list{padding:0;overflow:visible}
+.cm-empty{margin:18px 4px;font-size:13px;color:var(--ink-45);text-align:center}
+
+/* ── a thread ──────────────────────────────────────────────────────── */
+.cm-thread{padding:10px 12px;border-radius:12px;border:1px solid var(--ink-12);background:var(--surface, #fff)}
+.logos-root .cm-thread{background:var(--lg-paper)}
+.cm-thread.is-resolved{opacity:.72}
+.cm-about{display:block;max-width:100%;margin:0 0 8px;padding:0;border:none;background:none;font:inherit;font-size:11.5px;
+  color:var(--moss-700);text-align:left;cursor:pointer;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.cm-about span{color:var(--ink-45)}
+.cm-about i{font-style:normal;margin-left:4px}
+.cm-about:disabled{cursor:default;color:var(--ink-60)}
+.cm-about:hover:not(:disabled){text-decoration:underline;text-underline-offset:2px}
+
+.cm-one + .cm-one{margin-top:10px}
+.cm-meta{display:flex;align-items:center;gap:7px;min-width:0}
+.cm-av{flex:0 0 auto;display:grid;place-items:center;width:20px;height:20px;border-radius:999px;color:#fff;font-family:var(--serif);font-size:11px}
+.cm-who{font-size:12.5px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cm-when{font-size:11px;color:var(--ink-45);white-space:nowrap}
+.cm-tag{margin-left:auto;font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--moss-700);
+  padding:2px 7px;border-radius:999px;background:var(--moss-50)}
+.cm-body{margin:4px 0 0 27px;font-size:13.5px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere}
+.cm-one.is-gone .cm-body{margin-left:0;font-style:italic;color:var(--ink-45)}
+.cm-acts{display:flex;flex-wrap:wrap;gap:4px 12px;margin:4px 0 0 27px}
+.cm-link{border:none;background:none;padding:0;font:inherit;font-size:11.5px;color:var(--ink-45);cursor:pointer}
+.cm-link:hover{color:var(--ink)}
+.cm-link.danger{color:#9b3b2a;font-weight:500}
+.cm-replies{margin:10px 0 0 9px;padding-left:12px;border-left:2px solid var(--moss-100)}
+.cm-replies .cm-compose{margin-top:8px}
+
+/* ── writing ───────────────────────────────────────────────────────── */
+.cm-compose{display:flex;flex-direction:column;gap:6px}
+.cm-compose textarea{width:100%;resize:none;font:inherit;font-size:13.5px;line-height:1.45;padding:7px 10px;border:1px solid var(--ink-16);border-radius:10px;
+  background:var(--surface, #fff);color:var(--ink);max-height:160px}
+.logos-root .cm-compose textarea{background:var(--lg-paper)}
+.cm-compose textarea:focus{outline:none;border-color:var(--moss);box-shadow:0 0 0 3px var(--moss-50)}
+.cm-compose-acts{display:flex;align-items:center;justify-content:flex-end;gap:12px}
+.cm-post{font:inherit;font-size:12px;font-weight:500;padding:5px 12px;border-radius:999px;border:1px solid var(--ink);background:var(--ink);color:var(--cm-paper, var(--paper));cursor:pointer}
+.cm-post:hover:not(:disabled){background:var(--moss);border-color:var(--moss)}
+.cm-post:disabled{opacity:.35;cursor:default}
+
+/* ── pins on a shared map ──────────────────────────────────────────── */
+.cm-pins{position:fixed;inset:0;pointer-events:none;z-index:38}
+.cm-pin{position:absolute;left:0;top:0;pointer-events:auto;display:inline-flex;align-items:center;gap:3px;padding:2px 7px 2px 5px;border-radius:999px;
+  border:1.5px solid var(--lg-paper, var(--paper));background:var(--moss);color:var(--lg-paper, var(--paper));font:600 11px/1.2 var(--sans);cursor:pointer;
+  box-shadow:0 4px 10px -4px rgba(0,0,0,.35);transition:transform .08s linear}
+.cm-pin svg{width:11px;height:11px;fill:currentColor}
+.cm-pin:hover{filter:brightness(1.08)}
+@media (prefers-reduced-motion: reduce){.cm-pin{transition:none}}
+
+/* ── the Comments button ───────────────────────────────────────────── */
+.cm-open{position:relative;display:inline-flex;align-items:center;gap:6px;font-family:var(--sans);font-size:13px;padding:6px 12px;border-radius:999px;
+  border:1px solid var(--ink-16);background:transparent;color:var(--ink-70);cursor:pointer;transition:border-color .15s,color .15s}
+.cm-open:hover,.cm-open.is-on{border-color:var(--ink);color:var(--ink)}
+.cm-open svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.4;stroke-linejoin:round}
+.cm-open .n{font-size:11px;font-weight:600;min-width:18px;padding:1px 5px;border-radius:999px;background:var(--moss-50);color:var(--moss-700);text-align:center}
+.cm-open .dot{position:absolute;top:2px;right:2px;width:8px;height:8px;border-radius:999px;background:var(--moss);border:1.5px solid var(--cm-paper, var(--paper))}
+@media (max-width: 520px){.cm-open{font-size:0;gap:4px;padding:7px 9px}.cm-open .n{font-size:11px}}

@@ -47,7 +47,10 @@ import { MindAtlas } from '@/components/mind/MindAtlas';
 import { ShareDialog } from '@/components/share/ShareDialog';
 import { useSharedSession } from '@/components/share/useSharedSession';
 import { RemoteCursors, useMapPointer } from '@/components/share/RemoteCursors';
-import { hueOf } from '@/components/share/SharedThread';
+import { useComments } from '@/components/share/comments/useComments';
+import { CommentPins, CommentsButton, CommentsPanel } from '@/components/share/comments/Comments';
+import { excerpt, nodeAnchor, openByAnchor, readAnchor } from '@/lib/share/comments';
+import { hueOf } from '@/lib/share/hue';
 import { LOGOS_TOUR, LOGOS_TOUR_KEY, shouldRunTour } from '@/lib/tour';
 import { LogosMark } from '@/components/LogosMark';
 import { AccountControl } from '@/components/account/AccountControl';
@@ -1718,6 +1721,17 @@ export function LogosApp({
   const [shareOpen, setShareOpen] = useState(false);
   // this person's pointer over the shared map, in map coordinates
   useMapPointer(together.active, together.point);
+  // COMMENTS on a shared line of thinking — on a card, or on the whole of it.
+  // Read by anyone it is shared with; written by commenters and up (the
+  // server decides, lib/share/collab.ts).
+  const comments = useComments('conversation', activeId, together.active);
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  /** the card whose threads the panel is showing, when opened from a pin */
+  const [commentsOn, setCommentsOn] = useState<string | null>(null);
+  useEffect(() => {
+    setCommentsOpen(false);
+    setCommentsOn(null);
+  }, [activeId]);
   /** Update the active session and save it. */
   const patchActive = useCallback(
     (fn: (s: LogosSession) => LogosSession, save = true) => patchSession(activeIdRef.current, fn, save),
@@ -3583,11 +3597,13 @@ export function LogosApp({
                 bare href back to it re-rendered this and looked like a dead
                 button. Hand back the Core model they came from. */}
             {/* Logos 3: who is here, and how to bring someone in. */}
-            {/* THINK TOGETHER: who is here, and the one way to bring someone in.
-                A room joined by its old code keeps its own bar. */}
+            {/* THINK TOGETHER: who is here, the comments, and the one way to
+                bring someone in — on Logos 3, and on any Logos surface once
+                the line of thinking is shared. A room joined by its old code
+                keeps its own bar. */}
             {collab && room.active ? (
               <CollabBar room={room} />
-            ) : isSignedIn && SOCRIA_MODELS[model]?.workspace && activeId ? (
+            ) : isSignedIn && activeId && (SOCRIA_MODELS[model]?.workspace || together.active) ? (
               <span className="tg-bar">
                 {together.active && together.people.length > 1 && (
                   <span className="tg-faces" aria-label={`${together.people.length} here now`}>
@@ -3597,6 +3613,16 @@ export function LogosApp({
                       </i>
                     ))}
                   </span>
+                )}
+                {together.active && (
+                  <CommentsButton
+                    state={comments}
+                    active={commentsOpen}
+                    onClick={() => {
+                      setCommentsOn(null);
+                      setCommentsOpen((o) => !o);
+                    }}
+                  />
                 )}
                 <button type="button" className="sh-open" onClick={() => setShareOpen(true)}>
                   Share
@@ -4363,6 +4389,48 @@ export function LogosApp({
         />
       )}
       {together.active && <RemoteCursors people={together.people} />}
+      {together.active && (
+        <CommentPins
+          counts={openByAnchor(comments.comments)}
+          onOpen={(id) => {
+            setCommentsOn(nodeAnchor(id));
+            setCommentsOpen(true);
+          }}
+        />
+      )}
+      {together.active && commentsOpen && (
+        <CommentsPanel
+          state={comments}
+          labelFor={(anchor) => {
+            const a = readAnchor(anchor);
+            if (a.kind === 'node') return map.nodes.find((n) => n.id === a.ref)?.label ?? null;
+            if (a.kind === 'message') {
+              const m = active?.messages[Number(a.ref)];
+              return m ? excerpt(m.content) : null;
+            }
+            return null;
+          }}
+          generalAnchor=""
+          generalLabel="this line of thinking"
+          hint="Select a card on the map to comment on it."
+          target={
+            focus?.kind === 'node' && commentsOn == null
+              ? { anchor: nodeAnchor(focus.id), label: map.nodes.find((n) => n.id === focus.id)?.label ?? 'this card' }
+              : null
+          }
+          onClearTarget={() => setFocus(null)}
+          focusAnchor={commentsOn}
+          onClearFocus={() => setCommentsOn(null)}
+          onJump={(anchor) => {
+            const a = readAnchor(anchor);
+            if (a.kind === 'node') setFocus({ kind: 'node', id: a.ref });
+          }}
+          onClose={() => {
+            setCommentsOpen(false);
+            setCommentsOn(null);
+          }}
+        />
+      )}
       <Tour open={tourOpen} steps={LOGOS_TOUR} onDone={endTour} />
       {styleOpen && (
         <div className="lg-style-scrim" role="dialog" aria-modal="true" aria-label="How should Socria work with you?">

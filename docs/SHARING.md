@@ -107,7 +107,8 @@ In a conversation more than one person can read:
 
 - every turn named;
 - who is here, and who is typing (presence heartbeat);
-- comments on any turn, which can be resolved;
+- comments on any turn, in threads (see **Comments** below), and a
+  **Comments** panel listing every thread with a link back to its turn;
 - the history;
 - live updates, through a cheap poll that answers `unchanged` when nothing
   moved;
@@ -143,13 +144,46 @@ written only through the share routes.
   someone else's line of thinking through the share gate.
 - **Which surfaces sync.** Any Logos surface: a session in a shared Project may
   be opened on Logos 2 too. A room joined by its old code keeps its own bar;
-  otherwise **Share** is the way in.
+  otherwise **Share** is the way in. Once a session is shared, the faces,
+  **Comments** and **Share** sit in the header on whichever Logos surface has
+  it open.
+- **Comments on the map.** A card with open threads carries a small pin with
+  their number. It follows the card through a pan or a zoom. Pressing it opens
+  that card's threads. With a card selected, the composer in the **Comments**
+  panel comments on that card; with nothing selected it comments on the whole
+  line of thinking.
 
 ## A shared Project
 
 - The same Project Home, plus **People and activity**: who has access, who is
   on the home now, and what changed (its conversations' changes included).
+- **Discussion**: comments on the Project itself, in threads.
 - A personal Project shows none of this.
+
+## Comments
+
+One set of parts (`components/share/comments/`) serves every shared thing. The
+arranging is pure (`lib/share/comments.ts`); every permission is decided on the
+server (`lib/share/collab.ts`). The interface only shows the buttons the role
+the server returned allows.
+
+- **Anchors.** A card (`node:<id>`), a turn (`message:<n>`), the Project
+  (`project`), or the whole conversation (`''`).
+- **Threads.** A top-level comment starts a thread. Replies are one level deep
+  and sit where their thread sits, whatever anchor they were sent with. A reply
+  to a resolved thread reopens it. Only the thread is resolved, never a reply
+  on its own.
+- **Who may do what.** Commenters and up write and reply. The author, an editor
+  or the owner resolves. Only the author edits. The author or the owner
+  deletes. A deleted comment that has replies stays, emptied, for them to hang
+  from.
+- **The panel** has Open, Resolved and All tabs. Open threads come first, then
+  the most recently active. Each thread names what it is about and links to
+  it.
+- **What is new.** The **Comments** button shows how many threads are open, and
+  a dot when someone else has commented since you last looked. When you last
+  looked is kept in this browser only.
+- **Live** by a five-second poll while the thing is open.
 
 ## The Mind graph's Share
 
@@ -167,7 +201,7 @@ Project's own content (`projectGraph(…, personal = false)`).
 | `POST /api/share/accept` | join by `{token}`, `{code}` or `{invite}` |
 | `GET /api/shared` | everything shared with me (claims emailed invitations first) |
 | `GET/POST /api/shared/conversation/[id]` | read a shared conversation; append turns, change its map or title |
-| `GET/POST/PATCH /api/shared/comments` | comments |
+| `GET/POST/PATCH /api/shared/comments` | comments and replies; each answer carries the reader's `role` |
 | `GET /api/shared/activity` | history (a Project's includes its conversations') |
 | `POST /api/shared/presence` | heartbeat and pointer; who else is here |
 

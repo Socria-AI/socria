@@ -234,6 +234,36 @@ as('bob');
 ok('an editor can resolve it', (await call(R.comments.PATCH, 'PATCH', '/api/shared/comments', { type: 'conversation', id: 'c-thesis', commentId: cid, resolve: true })).json?.comments?.[0]?.resolved === true);
 ok('  but not rewrite it', (await call(R.comments.PATCH, 'PATCH', '/api/shared/comments', { type: 'conversation', id: 'c-thesis', commentId: cid, body: 'edited' })).status === 403);
 
+console.log('=== threads: replies, resolving, editing, deleting ===');
+{
+  const C = (method, body) => call(R.comments[method], method, '/api/shared/comments', { type: 'conversation', id: 'c-thesis', ...body });
+  as('erin');
+  const listed = await call(R.comments.GET, 'GET', '/api/shared/comments?type=conversation&id=c-thesis');
+  ok('the list says what this person may do: their role comes with it', listed.json?.role === 'commenter' && Array.isArray(listed.json?.comments), listed.text.slice(0, 200));
+  const rep = await C('POST', { anchor: 'node:elsewhere', body: 'Fair — I take it back.', parentId: cid });
+  const reply = rep.json?.comments?.find((c) => c.parentId === cid);
+  ok('a reply joins the thread', rep.status === 200 && !!reply, rep.text.slice(0, 300));
+  ok('  and sits where the thread sits, whatever anchor it was sent with', reply?.anchor === 'message:1');
+  ok('  and reopens a resolved thread', rep.json?.comments?.find((c) => c.id === cid)?.resolved === false);
+  ok('a reply to a reply is refused: threads are one level deep', (await C('POST', { anchor: 'message:1', body: 'deeper', parentId: reply.id })).status === 404);
+  ok('a reply to a thread on something else is refused', (await call(R.comments.POST, 'POST', '/api/shared/comments', { type: 'conversation', id: 'c-lit', anchor: '', body: 'x', parentId: cid })).status === 404);
+  as('bob');
+  ok('a reply cannot be resolved on its own — the thread is', (await C('PATCH', { commentId: reply.id, resolve: true })).status === 400);
+  as('erin');
+  const ed = await C('PATCH', { commentId: reply.id, body: 'Fair. I take it back.' });
+  ok('its author edits a reply, and it says so', ed.json?.comments?.find((c) => c.id === reply.id)?.edited === true && ed.json.comments.find((c) => c.id === reply.id).body === 'Fair. I take it back.');
+  const del = await C('PATCH', { commentId: cid, remove: true });
+  const gone = del.json?.comments?.find((c) => c.id === cid);
+  ok('deleting a comment that has replies keeps its place, emptied', del.status === 200 && gone?.deleted === true && gone.body === '' && gone.author === '', del.text.slice(0, 300));
+  ok('  and the replies stay', del.json.comments.some((c) => c.id === reply.id && c.body === 'Fair. I take it back.'));
+  ok('a deleted comment takes no new replies', (await C('POST', { anchor: 'message:1', body: 'late', parentId: cid })).status === 404);
+  const del2 = await C('PATCH', { commentId: reply.id, remove: true });
+  ok('when the last reply goes too, the whole thread is gone', del2.status === 200 && !del2.json.comments.some((c) => c.id === cid || c.id === reply.id), del2.text.slice(0, 300));
+  as('alice');
+  const whole = await C('POST', { anchor: '', body: 'Overall: getting there.' });
+  ok('the owner may comment on the whole conversation, too', whole.status === 200 && whole.json.comments.some((c) => c.anchor === '' && c.mine));
+}
+
 console.log('=== two people at once ===');
 {
   const before = stored().messages.length;

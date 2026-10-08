@@ -173,6 +173,8 @@ const MODULES = [
   'lib/project-visual.ts',
   'lib/share/roles.ts',
   'lib/share/sync.ts',
+  'lib/share/comments.ts',
+  'lib/share/hue.ts',
   'lib/checkout-attribution.ts',
   'lib/person-memory.ts',
   'lib/file-kinds.ts',

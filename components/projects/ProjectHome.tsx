@@ -37,7 +37,9 @@ import {
 } from '@/lib/project-home';
 import { ROLE_WORD, can, type Role } from '@/lib/share/roles';
 import { ProjectVisual } from './ProjectVisual';
-import { hueOf } from '@/components/share/SharedThread';
+import { hueOf } from '@/lib/share/hue';
+import { useComments } from '@/components/share/comments/useComments';
+import { CommentsPanel } from '@/components/share/comments/Comments';
 import './project-home.css';
 
 interface HomeChatRow {
@@ -147,6 +149,8 @@ export function ProjectHome({
   const [people, setPeople] = useState<{ owner: string; members: { id: string; name: string; role: string; pending: boolean; you: boolean }[] } | null>(null);
   const [here, setHere] = useState<{ id: string; name: string; you: boolean }[]>([]);
   const [activity, setActivity] = useState<{ who: string; summary: string; at: number; you: boolean }[]>([]);
+  // the Project's discussion — comments on the Project itself, once it is shared
+  const discussion = useComments('project', id, !!people);
   useEffect(() => {
     let live = true;
     setPeople(null);
@@ -560,6 +564,19 @@ export function ProjectHome({
                 </ul>
               )}
             </div>
+          </Section>
+        )}
+
+        {/* ── discussion: only for a shared Project ── */}
+        {people && (
+          <Section id="discussion" title="Discussion" count={discussion.open} folded={folded('discussion')} onFold={fold}>
+            <CommentsPanel
+              variant="inline"
+              state={discussion}
+              labelFor={() => null}
+              generalAnchor="project"
+              generalLabel="this Project"
+            />
           </Section>
         )}
 

@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
   const id = cleanId(req.nextUrl.searchParams.get('id'));
   if (!type || !id) return NextResponse.json({ error: 'Nothing here.' }, { status: 400 });
   try {
-    return NextResponse.json({ comments: await listComments(userId, type, id) });
+    return NextResponse.json(await listComments(userId, type, id));
   } catch (e) {
     return fail(e);
   }
@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
   if (!type || !id) return NextResponse.json({ error: 'Nothing here.' }, { status: 400 });
   try {
     await addComment(userId, type, id, typeof b?.anchor === 'string' ? b.anchor : '', typeof b?.body === 'string' ? b.body : '', cleanId(b?.parentId));
-    return NextResponse.json({ comments: await listComments(userId, type, id) });
+    return NextResponse.json(await listComments(userId, type, id));
   } catch (e) {
     return fail(e);
   }
@@ -70,7 +70,7 @@ export async function PATCH(req: NextRequest) {
       ...(typeof b?.body === 'string' ? { body: b.body } : {}),
       ...(b?.remove === true ? { remove: true } : {}),
     });
-    return NextResponse.json({ comments: await listComments(userId, type, id) });
+    return NextResponse.json(await listComments(userId, type, id));
   } catch (e) {
     return fail(e);
   }

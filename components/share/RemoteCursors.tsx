@@ -9,7 +9,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { camFromTransform, toScreen, toWorld } from '@/lib/share/sync';
-import { hueOf } from './SharedThread';
+import { hueOf } from '@/lib/share/hue';
 
 const MAP = '.logos-root .lg-map:not(.is-embedded)';
 

@@ -18,23 +18,19 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { RichText } from '@/components/RichText';
 import { readActivity } from '@/lib/core4/activity';
 import { ROLE_WORD, type Role } from '@/lib/share/roles';
+import { hueOf } from '@/lib/share/hue';
+import { excerpt, messageAnchor, readAnchor } from '@/lib/share/comments';
+import { useComments } from './comments/useComments';
+import { CommentComposer, CommentThread, CommentsButton, CommentsPanel } from './comments/Comments';
 import './share.css';
 import './shared-thread.css';
 
 interface Msg { role: 'user' | 'assistant'; content: string; by?: { id: string; name: string; seat: string } }
 interface Convo { id: string; title: string; kind: 'chat' | 'logos'; messages: Msg[]; projectId: string | null; updatedAt: number }
-interface Comment { id: string; anchor: string; parentId: string | null; author: string; authorId: string; mine: boolean; body: string; at: number; edited: boolean; resolved: boolean }
 interface Present { id: string; name: string; you: boolean; role: Role; cursor: { x: number; y: number; on?: string } | null; at: number }
 
 const POLL_MS = 3000;
 const BEAT_MS = 5000;
-const HUES = ['#5e7633', '#B4694A', '#5C6B7A', '#A9822A', '#7D5A86', '#3A6EA5'];
-/** a person's colour, stable for their alias */
-export function hueOf(id: string): string {
-  let h = 0;
-  for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-  return HUES[h % HUES.length];
-}
 const when = (t: number) => {
   const d = (Date.now() - t) / 60000;
   if (d < 1) return 'just now';
@@ -58,22 +54,20 @@ export function SharedThread({
   const [role, setRole] = useState<Role | null>(null);
   const [owner, setOwner] = useState('');
   const [err, setErr] = useState<string | null>(null);
-  const [comments, setComments] = useState<Comment[]>([]);
   const [people, setPeople] = useState<Present[]>([]);
   const [input, setInput] = useState('');
   const [streaming, setStreaming] = useState<string | null>(null);
   const [sendErr, setSendErr] = useState<string | null>(null);
   const [openAt, setOpenAt] = useState<string | null>(null);
-  const [draft, setDraft] = useState('');
+  const [panel, setPanel] = useState(false);
   const [history, setHistory] = useState<{ who: string; summary: string; at: number; you: boolean }[] | null>(null);
   const updated = useRef(0);
   const typing = useRef(false);
   const bottom = useRef<HTMLDivElement>(null);
 
-  const may = useMemo(
-    () => ({ ask: role === 'owner' || role === 'editor', comment: role !== 'viewer' && !!role, resolve: role === 'owner' || role === 'editor' }),
-    [role]
-  );
+  const may = useMemo(() => ({ ask: role === 'owner' || role === 'editor' }), [role]);
+  // the comments, their threads, and what this person may do with them
+  const comments = useComments('conversation', id, true);
 
   const load = useCallback(async (quiet = false) => {
     try {
@@ -92,25 +86,17 @@ export function SharedThread({
     }
   }, [id]);
 
-  const loadComments = useCallback(async () => {
-    const res = await fetch(`/api/shared/comments?type=conversation&id=${encodeURIComponent(id)}`, { cache: 'no-store' }).catch(() => null);
-    const j = res && res.ok ? await res.json().catch(() => null) : null;
-    if (j?.comments) setComments(j.comments);
-  }, [id]);
-
   // first read, then the poll that keeps everyone in step
   useEffect(() => {
     updated.current = 0;
     setConvo(null);
     void load();
-    void loadComments();
     const t = setInterval(() => {
       if (document.hidden) return;
       void load(true);
-      void loadComments();
     }, POLL_MS);
     return () => clearInterval(t);
-  }, [load, loadComments]);
+  }, [load]);
 
   // presence: here, and typing or reading
   useEffect(() => {
@@ -194,28 +180,12 @@ export function SharedThread({
     }
   }
 
-  async function comment(anchor: string, parentId: string | null) {
-    const body = draft.trim();
-    if (!body) return;
-    const res = await fetch('/api/shared/comments', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: 'conversation', id, anchor, body, parentId }),
-    });
-    const j = await res.json().catch(() => null);
-    if (res.ok) {
-      setComments(j.comments);
-      setDraft('');
-    }
-  }
-  async function changeComment(commentId: string, change: Record<string, unknown>) {
-    const res = await fetch('/api/shared/comments', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: 'conversation', id, commentId, ...change }),
-    });
-    const j = await res.json().catch(() => null);
-    if (res.ok) setComments(j.comments);
+  /** from the panel to the turn a thread is about */
+  function jumpTo(anchor: string) {
+    const a = readAnchor(anchor);
+    if (a.kind !== 'message') return;
+    setOpenAt(anchor);
+    document.getElementById(`st-turn-${a.ref}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
   }
   async function showHistory() {
     if (history) return setHistory(null);
@@ -235,7 +205,7 @@ export function SharedThread({
 
   const others = people.filter((p) => !p.you);
   const typingNow = others.filter((p) => p.cursor?.on === 'typing');
-  const byAnchor = (a: string) => comments.filter((c) => c.anchor === a);
+  const threadsAt = (a: string) => comments.threads.filter((t) => t.root.anchor === a);
 
   return (
     <div className="st-root">
@@ -253,6 +223,7 @@ export function SharedThread({
               </i>
             ))}
           </span>
+          <CommentsButton state={comments} active={panel} onClick={() => setPanel((o) => !o)} />
           <button className="sh-open" onClick={() => void showHistory()} aria-pressed={!!history}>History</button>
           {onShare && <button className="sh-open" onClick={() => onShare(convo.title || 'Untitled')}>Share</button>}
         </div>
@@ -269,40 +240,46 @@ export function SharedThread({
       <div className="st-thread">
         <div className="st-wrap">
           {convo.messages.map((m, i) => {
-            const anchor = `message:${i}`;
-            const notes = byAnchor(anchor);
+            const anchor = messageAnchor(i);
+            const threads = threadsAt(anchor);
             const open = openAt === anchor;
-            const unresolved = notes.filter((c) => !c.resolved).length;
+            const unresolved = threads.filter((t) => t.open).length;
             return (
-              <div key={i} className={`st-turn ${m.role}`}>
+              <div key={i} id={`st-turn-${i}`} className={`st-turn ${m.role}`}>
                 <span className="st-who" style={m.by ? { color: hueOf(m.by.id) } : undefined}>
                   {m.role === 'assistant' ? 'Socria' : m.by?.name ?? owner}
                 </span>
                 <div className="st-body">{m.role === 'assistant' ? <RichText text={m.content} /> : <p>{m.content}</p>}</div>
-                {(may.comment || notes.length > 0) && (
-                  <button className={`st-cbtn${unresolved ? ' has' : ''}`} onClick={() => setOpenAt(open ? null : anchor)} aria-expanded={open}>
-                    {notes.length ? `${notes.length} ${notes.length === 1 ? 'comment' : 'comments'}` : 'Comment'}
+                {(comments.mayComment || threads.length > 0) && (
+                  <button
+                    className={`st-cbtn${unresolved ? ' has' : ''}`}
+                    onClick={() => {
+                      setOpenAt(open ? null : anchor);
+                      comments.markSeen();
+                    }}
+                    aria-expanded={open}
+                  >
+                    {threads.length
+                      ? unresolved
+                        ? `${unresolved} open ${unresolved === 1 ? 'comment' : 'comments'}`
+                        : `${threads.length} resolved`
+                      : 'Comment'}
                   </button>
                 )}
                 {open && (
                   <div className="st-comments">
-                    {notes.map((c) => (
-                      <div key={c.id} className={`st-c${c.resolved ? ' resolved' : ''}`}>
-                        <span className="a" style={{ color: hueOf(c.authorId) }}>{c.mine ? 'You' : c.author}</span>
-                        <p>{c.body}</p>
-                        <span className="m">
-                          {when(c.at)}{c.edited ? ' · edited' : ''}{c.resolved ? ' · resolved' : ''}
-                          {(may.resolve || c.mine) && <button onClick={() => void changeComment(c.id, { resolve: !c.resolved })}>{c.resolved ? 'Reopen' : 'Resolve'}</button>}
-                          {(c.mine || role === 'owner') && <button onClick={() => void changeComment(c.id, { remove: true })}>Delete</button>}
-                        </span>
-                      </div>
+                    {threads.map((t) => (
+                      <CommentThread key={t.root.id} thread={t} state={comments} />
                     ))}
-                    {may.comment && (
-                      <form className="st-cform" onSubmit={(e) => { e.preventDefault(); void comment(anchor, null); }}>
-                        <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Add a comment" aria-label="Comment" autoFocus />
-                        <button className="sh-btn" type="submit" disabled={!draft.trim()}>Post</button>
-                      </form>
+                    {comments.mayComment && (
+                      <CommentComposer
+                        autoFocus={!threads.length}
+                        placeholder="Comment on this turn"
+                        onSubmit={(body) => comments.add(anchor, body)}
+                        onCancel={() => setOpenAt(null)}
+                      />
                     )}
+                    {comments.error && <p className="sh-err">{comments.error}</p>}
                   </div>
                 )}
               </div>
@@ -317,6 +294,22 @@ export function SharedThread({
           <div ref={bottom} />
         </div>
       </div>
+
+      {panel && (
+        <CommentsPanel
+          state={comments}
+          labelFor={(anchor) => {
+            const a = readAnchor(anchor);
+            const m = a.kind === 'message' ? convo.messages[Number(a.ref)] : null;
+            return m ? excerpt(m.content) : null;
+          }}
+          generalAnchor=""
+          generalLabel="this conversation"
+          hint="Or comment on one turn, under it."
+          onJump={jumpTo}
+          onClose={() => setPanel(false)}
+        />
+      )}
 
       <footer className="st-foot">
         <div className="st-wrap">

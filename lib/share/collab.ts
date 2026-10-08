@@ -40,6 +40,8 @@ export interface CommentView {
   at: number;
   edited: boolean;
   resolved: boolean;
+  /** deleted, kept only as the place its replies hang from */
+  deleted?: boolean;
 }
 
 async function gate(userId: string, type: ResourceType, id: string): Promise<{ role: Role; salt: string }> {
@@ -48,28 +50,39 @@ async function gate(userId: string, type: ResourceType, id: string): Promise<{ r
   return { role: a.role, salt: a.shareId ?? id };
 }
 
-export async function listComments(userId: string, type: ResourceType, id: string): Promise<CommentView[]> {
-  const { salt } = await gate(userId, type, id);
+export async function listComments(
+  userId: string, type: ResourceType, id: string
+): Promise<{ role: Role; comments: CommentView[] }> {
+  const { role, salt } = await gate(userId, type, id);
   const { data, error } = await supabaseAdmin().from('share_comments').select('*')
     .eq('resource_type', type).eq('resource_id', id).order('created_at', { ascending: true }).limit(500);
   if (error) {
-    if (missing(error)) return [];
+    if (missing(error)) return { role, comments: [] };
     throw error;
   }
-  return ((data ?? []) as Record<string, unknown>[])
-    .filter((r) => !r.deleted_at)
-    .map((r) => ({
-      id: String(r.id),
-      anchor: String(r.anchor ?? ''),
-      parentId: (r.parent_id as string) ?? null,
-      author: String(r.display_name ?? 'Someone'),
-      authorId: alias(salt, String(r.user_id)),
-      mine: r.user_id === userId,
-      body: String(r.body),
-      at: Number(r.created_at),
-      edited: !!r.edited_at,
-      resolved: !!r.resolved_at,
-    }));
+  const rows = (data ?? []) as Record<string, unknown>[];
+  // A deleted comment that others replied to stays, emptied, as the place the
+  // replies hang from — a thread of answers to nothing reads as nonsense.
+  const answered = new Set(rows.filter((r) => !r.deleted_at && r.parent_id).map((r) => String(r.parent_id)));
+  const comments = rows
+    .filter((r) => !r.deleted_at || (!r.parent_id && answered.has(String(r.id))))
+    .map((r) => {
+      const gone = !!r.deleted_at;
+      return {
+        id: String(r.id),
+        anchor: String(r.anchor ?? ''),
+        parentId: (r.parent_id as string) ?? null,
+        author: gone ? '' : String(r.display_name ?? 'Someone'),
+        authorId: gone ? '' : alias(salt, String(r.user_id)),
+        mine: !gone && r.user_id === userId,
+        body: gone ? '' : String(r.body),
+        at: Number(r.created_at),
+        edited: !!r.edited_at,
+        resolved: !!r.resolved_at,
+        ...(gone ? { deleted: true } : {}),
+      };
+    });
+  return { role, comments };
 }
 
 export async function addComment(
@@ -80,18 +93,30 @@ export async function addComment(
   const text = body.replace(/\r/g, '').trim().slice(0, MAX_COMMENT);
   if (!text) throw new ShareError(400, 'Say something first.');
   if (!ANCHOR.test(anchor)) throw new ShareError(400, 'Comment on something that is here.');
+  // A REPLY joins its thread: its parent must be a live top-level comment on
+  // the same thing, and the reply sits where the thread sits. Replying to a
+  // resolved thread reopens it — an answer is a sign it was not done.
+  let where = anchor;
+  if (parentId) {
+    const { data: pd } = await supabaseAdmin().from('share_comments').select('*')
+      .eq('id', parentId).eq('resource_type', type).eq('resource_id', id).maybeSingle();
+    const parent = pd as Record<string, unknown> | null;
+    if (!parent || parent.deleted_at || parent.parent_id) throw new ShareError(404, 'That conversation thread is gone.');
+    where = String(parent.anchor ?? '');
+    if (parent.resolved_at) await supabaseAdmin().from('share_comments').update({ resolved_at: null, resolved_by: null }).eq('id', parentId);
+  }
   const shareId = (await shareAccess(userId, type, id))?.shareId ?? '';
   const name = await displayNameOf(userId);
   const { error } = await supabaseAdmin().from('share_comments').insert({
     id: `cm_${randomBytes(9).toString('base64url')}`,
     share_id: shareId, resource_type: type, resource_id: id,
-    anchor, parent_id: parentId, user_id: userId, display_name: name, body: text, created_at: Date.now(),
+    anchor: where, parent_id: parentId, user_id: userId, display_name: name, body: text, created_at: Date.now(),
   });
   if (error) {
     if (missing(error)) throw new ShareError(503, 'Comments are not set up on this deployment yet.');
     throw error;
   }
-  await noteChange(userId, type, id, 'comment', `${name} commented`);
+  await noteChange(userId, type, id, 'comment', parentId ? `${name} replied to a comment` : `${name} commented`);
 }
 
 export async function changeComment(
@@ -116,6 +141,7 @@ export async function changeComment(
     patch.edited_at = Date.now();
   }
   if (change.resolve !== undefined) {
+    if (row.parent_id) throw new ShareError(400, 'Resolve the thread, not a reply in it.');
     if (!mine && !can(role, 'edit')) throw new ShareError(403, 'Only its author, an editor or the owner can resolve it.');
     patch.resolved_at = change.resolve ? Date.now() : null;
     patch.resolved_by = change.resolve ? userId : null;
