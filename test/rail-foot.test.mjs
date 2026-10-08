@@ -64,6 +64,14 @@ console.log('\n=== feedback, under Manage Account ===');
   ok('and nowhere in either rail', !/FEEDBACK_URL/.test(read('app/chat/page.tsx')) && !/FEEDBACK_URL/.test(read('components/LogosRail.tsx')));
 }
 
+console.log('\n=== signing out, from the account page ===');
+{
+  const settings = read('components/account/AccountSettings.tsx');
+  const panel = read('components/account/SignOutPanel.tsx');
+  ok('the account page ends with Sign out', /<DevicesPanel \/>\s*<SignOutPanel \/>/.test(settings));
+  ok('it clears this browser\'s Socria data before signing out', /clearSocriaLocalData\(\);\s*void signOut\(\{ redirectUrl: '\/' \}\)/.test(panel));
+}
+
 console.log('\n=== the style ===');
 {
   const css = read('app/app-shell.css');

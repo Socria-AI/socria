@@ -6,7 +6,7 @@
 //
 // The order is the order somebody reads it in: who you are, how you are
 // reached, how you get in, what is guarding it, what is connected, where you
-// are signed in. Data and deletion stay on their own page — those are about
+// are signed in, and signing out. Data and deletion stay on their own page — those are about
 // what Socria holds rather than about the account, and they deserve the
 // distance.
 
@@ -17,6 +17,7 @@ import { PasswordPanel } from './PasswordPanel';
 import { TwoFactorPanel } from './TwoFactorPanel';
 import { ConnectionsPanel } from './ConnectionsPanel';
 import { DevicesPanel } from './DevicesPanel';
+import { SignOutPanel } from './SignOutPanel';
 
 export function AccountSettings() {
   return (
@@ -28,6 +29,7 @@ export function AccountSettings() {
         <TwoFactorPanel />
         <ConnectionsPanel />
         <DevicesPanel />
+        <SignOutPanel />
       </div>
     </CapabilitiesProvider>
   );
