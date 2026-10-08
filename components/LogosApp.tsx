@@ -140,7 +140,7 @@ import {
   type PanelNode,
   type WorkspaceLayout,
 } from '@/lib/workspace/tiling';
-import { arrangementsFor, factsFrom, suggestLayout, suggestViews, type LayoutSuggestion } from '@/lib/workspace/surfaces';
+import { arrangementsFor, factsFrom, showLens, suggestLayout, suggestViews, type LayoutSuggestion } from '@/lib/workspace/surfaces';
 import { describeFocus, type Focus } from '@/lib/workspace/focus';
 import { briefOf } from '@/lib/representation';
 import {
@@ -187,6 +187,7 @@ import { viewsFor } from '@/lib/model/views';
 import { affectedBy } from '@/lib/model/deps';
 import { readSeen, markSeen } from '@/lib/hints';
 import { applyMapEdits, dropRemoved, readMapCommand, type MapEdit } from '@/lib/map-edit';
+import { readViewRequest, viewSaid } from '@/lib/view-request';
 import type { ExploreResult, NodeMode } from '@/lib/logos-explore';
 import {
   emptySession,
@@ -2855,6 +2856,29 @@ export function LogosApp({
 
     const objTurn = takeObjects(content, atts);
 
+    // A VIEW ASKED FOR BY NAME — "show this as a structure", "organize it into
+    // a mind map" (lib/view-request.ts). In Logos 3 the map, in that view,
+    // takes over the stage. When the view already has something to draw, that
+    // is the whole answer and nothing goes to the model. When it does not yet
+    // — a timeline before the map has an order — the sentence goes on to
+    // Socria, whose map pass reorganizes the thinking into that shape, and
+    // the view opens as soon as it can.
+    if (workspaceOn && wsLayout && !atts.length && !objTurn.lastStep) {
+      const want = readViewRequest(content);
+      if (want) {
+        changeLayout(showLens(wsLayout, want.lens));
+        if (wsFacts.lenses.includes(want.lens)) {
+          setError(null);
+          setInput('');
+          const turn: Msg = { role: 'user', content };
+          const reply: Msg = { role: 'assistant', content: viewSaid(want.lens) };
+          patchActive((s) => ({ ...s, messages: [...s.messages, turn, reply] }));
+          chronRef.current = [...chronRef.current, turn, reply];
+          return;
+        }
+      }
+    }
+
     // A COMMAND TO THE MAP IS NOT A QUESTION FOR LOGOS. "Remove the node about
     // rent" used to go to the model, which answered in prose while the node
     // stayed. It is read here, against the map's own labels, and done — with
@@ -4188,6 +4212,7 @@ export function LogosApp({
               return next;
             })}
             initialLens={lens as LensId | undefined}
+            workspace={workspaceOn}
             onSelectNode={(id) => setFocus({ kind: 'node', id })}
             map={map}
             onAction={(mode, node) => {

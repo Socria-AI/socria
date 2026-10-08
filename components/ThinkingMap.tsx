@@ -36,6 +36,7 @@ import { MathViz } from './MathViz';
 import { MatrixLens } from './MatrixLens';
 import type { VizScene } from '@/lib/logos-viz';
 import { MathBoard } from './MathBoard';
+import { StructureView } from './StructureView';
 
 type TabsAt = 'top' | 'bottom' | 'left' | 'right';
 const TABS_KEY = 'socria.map.tabs.v1';
@@ -43,7 +44,7 @@ const TABS_KEY = 'socria.map.tabs.v1';
 export const VIEW_RESET = 'socria:view-reset';
 
 /** The lenses that are a canvas of cards — the plot, the Board and the table draw themselves to fit. */
-const isCanvasLens = (l: LensId) => l !== 'plot' && l !== 'board' && l !== 'matrix';
+const drawsCards = (l: LensId) => l !== 'plot' && l !== 'board' && l !== 'matrix';
 import { LogosMark } from './LogosMark';
 import { OneLock } from './OneLock';
 import {
@@ -166,7 +167,7 @@ export type MapNodeRef = { id: string; label: string; type: TMap['nodes'][number
 
 export function ThinkingMap({
   map,
-  initialLens = 'graph',
+  initialLens: askedLens,
   onAction,
   onNodePress,
   explored,
@@ -195,6 +196,7 @@ export function ThinkingMap({
   onObject,
   objectSel,
   objectSuggestions,
+  workspace,
 }: {
   map: TMap;
   initialLens?: LensId;
@@ -298,7 +300,22 @@ export function ThinkingMap({
   objectSel?: { obj: string; part: string } | null;
   /** operations Socria suggested in its last reply, offered on the object */
   objectSuggestions?: { id: string; op: string; args: Record<string, string | number>; said: string }[];
+  /**
+   * Logos 3: no Board, and Structure is a detailed outline that takes the
+   * whole panel (components/StructureView.tsx) rather than a canvas of cards.
+   */
+  workspace?: boolean;
 }) {
+  /** a canvas of cards, which pans, zooms and drags — every lens but those that draw themselves */
+  const isCanvasLens = (l: LensId) => drawsCards(l) && !(workspace && l === 'structure');
+  const initialLens: LensId = askedLens ?? 'graph';
+  /**
+   * A lens the panel was opened on — pinned from "+ View", or asked for by
+   * name ("show this as a structure"). It is shown whenever the map can draw
+   * it, ahead of the lens the map would lead with, until the person picks
+   * another tab. Without this the lead replaced it on the first render.
+   */
+  const askedRef = useRef<LensId | null>(askedLens ?? null);
   // ── THREE HANDS, THREE THINGS ────────────────────────────────────
   //   drag the canvas  → the camera (lib/canvas.ts), presentational
   //   drag a card      → the layout (lib/canvas-store.ts), this browser's
@@ -324,7 +341,7 @@ export function ThinkingMap({
   const lensRef = useRef<LensId>(initialLens);
   lensRef.current = lens;
   /** the lenses that are a canvas of cards — the rest draw themselves to fit */
-  const isCanvas = lens !== 'plot' && lens !== 'board' && lens !== 'matrix';
+  const isCanvas = isCanvasLens(lens);
 
   // ── the layout this browser keeps for this line of thinking ──────
   const canvasRef = useRef<CanvasDoc>(emptyCanvas());
@@ -981,7 +998,7 @@ export function ThinkingMap({
     return true;
   };
 
-  const lenses = useMemo(() => availableLenses(map), [map]);
+  const lenses = useMemo(() => availableLenses(map, { workspace }), [map, workspace]);
 
 
   // The lens this map leads with — the signature view for what it holds,
@@ -1021,6 +1038,11 @@ export function ThinkingMap({
       setLens(lead ?? lenses[0]);
       return;
     }
+    const asked = askedRef.current;
+    if (asked && !lensManual.current && lenses.includes(asked) && !(open && !open.has(asked))) {
+      if (lens !== asked) setLens(asked);
+      return;
+    }
     // The lens they were on no longer exists. Fall back to the one that IS
     // the answer for this map rather than to whatever sorts first.
     if (!lenses.includes(lens)) {
@@ -1050,7 +1072,7 @@ export function ThinkingMap({
 
   // ── static lenses ────────────────────────────────────────────────
   const staticLayout = useMemo(() => {
-    if (lens === 'graph' || lens === 'plot' || lens === 'board' || lens === 'matrix') return null;
+    if (lens === 'graph' || !drawsCards(lens) || (workspace && lens === 'structure')) return null;
     const { w, h } = size;
     if (lens === 'structure') return layoutStructure(map, w, h);
     if (lens === 'tensions') return layoutTensions(map, w, h);
@@ -1059,7 +1081,7 @@ export function ThinkingMap({
     if (lens === 'timeline') return layoutTimeline(map, w, h);
     if (lens === 'work') return layoutWork(map, w, h);
     return layoutEvidence(map, w, h);
-  }, [lens, map, size]);
+  }, [lens, map, size, workspace]);
 
   // ── graph lens: seed positions ───────────────────────────────────
   // Deterministic, so the same map opens the same way on every load; and
@@ -1481,6 +1503,7 @@ export function ThinkingMap({
                   title="Back to the map"
                   onClick={() => {
                     lensManual.current = true;
+                    askedRef.current = null;
                     setLens(closeTo);
                     setFocused(null);
                     setMenu(null);
@@ -1555,6 +1578,7 @@ export function ThinkingMap({
                   return;
                 }
                 lensManual.current = true;
+                askedRef.current = null;
                 setLens(l.id);
                 setFocused(null);
                 setMenu(null);
@@ -1703,6 +1727,19 @@ export function ThinkingMap({
         {lens === 'board' && (
           <MathBoard map={map} width={size.w} height={size.h} guarded={guarded} />
         )}
+        {/* Logos 3's Structure: the whole panel, in detail */}
+        {workspace && lens === 'structure' && (
+          <StructureView
+            map={map}
+            width={size.w}
+            height={size.h}
+            guarded={guarded}
+            onSelect={onSelectNode}
+            onAction={onAction}
+            researchLocked={researchLocked}
+            grounded={grounded}
+          />
+        )}
 
         {/* A comparison is a table, so it is a table — not cards, and not an
             SVG pretending to be one. Rebuilt from the map on every render for
@@ -1838,6 +1875,7 @@ export function ThinkingMap({
                       onObject?.({ type: 'view', obj: o.id, view });
                       if (view === 'plane' && lenses.includes('plot')) {
                         lensManual.current = true;
+                        askedRef.current = null;
                         setLens('plot');
                       }
                     }}

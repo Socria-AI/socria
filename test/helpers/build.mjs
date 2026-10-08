@@ -22,6 +22,8 @@ const MODULES = [
   'lib/logos-math.ts',
   'lib/logos-viz.ts',
   'lib/logos-layout.ts',
+  'lib/logos-structure.ts',
+  'lib/view-request.ts',
   'lib/logos.ts',
   'lib/representation.ts',
   'lib/logos-synthesis.ts',

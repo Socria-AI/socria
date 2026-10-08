@@ -161,4 +161,4 @@ There were four causes:
 - Dragging a card does not edit relations. Dropping a card onto another does nothing, by design.
 - There is no multi-select drag, no snapping and no rubber-band selection. Logos is not a whiteboard.
 - In laid-out lenses, a placed card keeps its place while the lens re-flows the others, so a placed card can end up near a re-flowed one. The graph lens separates them; laid-out lenses do not.
-- The plot, the Board and Compare draw themselves to fit, and are not canvases.
+- The plot, the Board, Compare and, in Logos 3, the Structure outline draw themselves to fit, and are not canvases.

@@ -369,7 +369,9 @@ export function CommentPins({ counts, onOpen }: { counts: Record<string, number>
       const next: { id: string; x: number; y: number; n: number }[] = [];
       if (map && box) {
         for (const id of ids) {
-          const el = map.querySelector<HTMLElement>(`.lg-node-pos[data-id="${CSS.escape(id)}"]`);
+          // a card on the canvas, or its row in the Structure outline
+          const sel = CSS.escape(id);
+          const el = map.querySelector<HTMLElement>(`.lg-node-pos[data-id="${sel}"], .lg-sv-row[data-id="${sel}"]`);
           if (!el) continue;
           const r = el.getBoundingClientRect();
           if (r.right < box.left || r.top > box.bottom || r.bottom < box.top || r.right > box.right + 8) continue;

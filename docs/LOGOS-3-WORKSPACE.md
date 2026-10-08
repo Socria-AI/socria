@@ -6,7 +6,7 @@ One canonical intellectual state, many representations, many arrangements, one h
 
 ## 1. How the Logos workspace was structured
 
-`components/LogosApp.tsx` (≈3,700 lines) rendered a fixed CSS grid: the rail, the conversation column, the Thinking Map column and an optional draft column. The map column was `ThinkingMap`, which itself switches between lenses (graph, structure, tensions, evidence, solve, plot, board, compare); the **plot lens** is where a built model is drawn, by `ModelView`, the one renderer for every model. On a phone a switcher shows one column at a time.
+`components/LogosApp.tsx` (≈3,700 lines) rendered a fixed CSS grid: the rail, the conversation column, the Thinking Map column and an optional draft column. The map column was `ThinkingMap`, which itself switches between lenses (graph, structure, tensions, evidence, solve, plot, board, compare — Logos 3 has no board; see §12); the **plot lens** is where a built model is drawn, by `ModelView`, the one renderer for every model. On a phone a switcher shows one column at a time.
 
 ## 2. Where canonical state lives
 
@@ -94,6 +94,68 @@ Rules that keep it that way:
 - Socria's suggestion is one quiet line, only when the conversation asks for a different arrangement ("compare", "evidence"), applied only if accepted.
 
 Verified in Chromium against the real engine with scripted model calls: fresh line (map + composer only), a decision drawn, the saddle built (the single surface switches to the model), Model with its controls, parameter `a` to −1.2 with the inspector card and the conversation focus, Keep open, close, One view, reload; a phone at 390px with no horizontal scroll; Logos 2 unchanged.
+
+## 12. Structure in place of the Board
+
+Logos 3 has no Board. The Board drew the working a second time, as if by
+hand, beside the Solution lens that already shows it step by step. Structure
+takes its place, for mathematics as well as for an argument (`availableLenses(map,
+{ workspace: true })`). Logos 2 keeps its Board.
+
+In Logos 3, Structure is not a canvas of small cards. It is a detailed
+outline that fills the panel (`components/StructureView.tsx`, read by the pure
+`lib/logos-structure.ts`):
+
+- **An argument, a decision, a plan.** The goal heads it. What serves the goal
+  hangs beneath it, and what supports each part hangs beneath that. Nesting
+  uses the same rules as the card layout (`HIERARCHY`). Each part shows:
+  - its kind, and how it hangs from its parent ("supports", "depends on");
+  - its note and its status (Supported, Settled, Open);
+  - who added it, when the session is shared;
+  - every other relation it has, as a link to the part it names. Conflicts
+    come first.
+- **Not connected yet.** Parts the goal does not reach are listed under this
+  heading, so a gap in the reasoning shows instead of hiding.
+- **Mathematics.** The outline follows the order a person works a problem:
+  what is given, what is being solved for, what the working uses, the working
+  itself (ordered by its step-to-step relations, each step naming the
+  operation that produced it), the checks, and where it lands. Under the
+  Answer Guard a concluding part is masked, as it is on its card.
+- **Selecting a part** works like selecting its card. The conversation becomes
+  about that part, its comment pin follows it, and Explore, Challenge,
+  Research and Trace are offered under it.
+
+**Asking for a view by name.** Phrases like "show this as a structure",
+"organize it into a mind map", "put it in a table" or "switch to the
+timeline" are read by `lib/view-request.ts`. The reader is conservative: a
+question about a structure is not a request to see one. The map then takes
+over the stage in that view (`showLens`):
+
+- a single surface becomes the map in that view;
+- in an arrangement of several panels, the map panel is pointed at the view
+  and maximised, so the arrangement comes back on restore.
+
+What happens to the message depends on whether the view can be drawn yet:
+
+- **It can.** The switch is the whole answer, and no model call is made.
+- **It can't yet** (a timeline before the map has an order). The sentence
+  still goes to Socria. Its map pass reorganizes the thinking into that shape
+  (`statedBuilding`, which now also knows "plot", "chart" and "concept map"),
+  and the view opens as soon as it can.
+
+A lens a panel was opened on, whether pinned from `+ View` or asked for by
+name, now holds whenever the map can draw it, until the person picks another
+tab. Before this change, the lens the map would lead with replaced it on the
+first render.
+
+Tests: `test/logos3-structure.test.mjs` (65 checks). Verified in Chromium:
+- maths on Logos 3 shows Structure and no Board;
+- the outline fills the panel;
+- "show this as a structure", "organize it into a mind map" and "switch to
+  the outline" each switch views with no model call;
+- links, selection and actions work;
+- dark theme renders correctly;
+- a 390px phone has no sideways scroll.
 
 ## Next
 

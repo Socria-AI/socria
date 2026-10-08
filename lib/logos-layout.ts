@@ -207,9 +207,15 @@ function isQuantitative(map: ThinkingMap): boolean {
 // worthwhile reading of the reasoning behind it, and five tabs over a
 // quadratic — two of them concept maps of the words around the algebra — is
 // four claims that are not true.
-export function availableLenses(map: ThinkingMap): LensId[] {
+export function availableLenses(map: ThinkingMap, opts: { workspace?: boolean } = {}): LensId[] {
   const out: LensId[] = [];
   const quant = isQuantitative(map);
+  // LOGOS 3 HAS NO BOARD. Its Structure lens is a detailed outline that takes
+  // the whole panel (lib/logos-structure.ts) and reads mathematics as well as
+  // an argument — what is given, what is asked, the working in order — so it
+  // is offered wherever there is more than one part, and the Board's
+  // hand-drawn copy of the same working is not.
+  const ws = !!opts.workspace;
 
   const shapes: LensId[] = [];
   // THE SHAPES WITH AN ORDER. A flow is offered whenever the map holds a
@@ -233,6 +239,7 @@ export function availableLenses(map: ThinkingMap): LensId[] {
     if (map.nodes.length) out.push('graph');
     if (map.nodes.length > 1) out.push('structure');
   }
+  const structureLate = ws && quant && map.nodes.length > 1;
   // Which tab sorts first is not which lens leads — leadLens decides that
   // from what is being built — but a map with no reading yet keeps its graph
   // first, and one whose reading is an ordered shape shows that shape first.
@@ -278,8 +285,10 @@ export function availableLenses(map: ThinkingMap): LensId[] {
     if (chainNodes.length >= 2 || chainEdges.length >= 1) out.unshift('solve');
     // Without a scene, a plottable node still earns the lens.
     if (!map.viz && !map.models?.docs.length && plottableNodes(map).length) out.push('plot');
-    if (map.nodes.length) out.push('board');
+    if (map.nodes.length && !ws) out.push('board');
   }
+  // In Logos 3, a quantitative map's Structure sits where the Board did.
+  if (structureLate) out.push('structure');
 
   // The objects of thought, drawn as themselves — offered whenever there is
   // one, first, because it is what the work is ABOUT (lib/objects/).
@@ -346,7 +355,7 @@ export function plottableNodes(map: ThinkingMap): { id: string; node: LogosNode;
 // "B depends on A" both put B above A — but "A leads to B" is the other way
 // round, since a consequence hangs beneath the choice that produced it.
 // 'revises' is a timeline relation, not a hierarchy, so it's excluded.
-const HIERARCHY: Partial<Record<LogosRelation, 'to-above' | 'from-above'>> = {
+export const HIERARCHY: Partial<Record<LogosRelation, 'to-above' | 'from-above'>> = {
   supports: 'to-above',
   depends: 'to-above',
   relates: 'to-above',

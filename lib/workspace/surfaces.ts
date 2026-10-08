@@ -24,7 +24,7 @@ import { availableLenses, LENSES, type LensId } from '@/lib/logos-layout';
 import { modelFor, current } from '@/lib/model/docs';
 import { viewsFor } from '@/lib/model/views';
 import { inputsOf } from '@/lib/model/derive';
-import { dominantPanel, isOpen, pairLayout, panelsOf, singleLayout, type PanelConfig, type SurfaceType, type WorkspaceLayout } from './tiling';
+import { addPanel, configurePanel, dominantPanel, isOpen, maximize, pairLayout, panelsOf, singleLayout, type PanelConfig, type SurfaceType, type WorkspaceLayout } from './tiling';
 
 /** What a person can point at, in any surface. */
 export type FocusKind = 'node' | 'object' | 'param' | 'input';
@@ -100,7 +100,8 @@ export function factsFrom(map: ThinkingMap | null | undefined): WorkspaceFacts {
   return {
     nodes: m.nodes.length,
     context: m.context ?? null,
-    lenses: availableLenses(m as ThinkingMap),
+    // the workspace is Logos 3's: no Board, a detailed Structure in its place
+    lenses: availableLenses(m as ThinkingMap, { workspace: true }),
     docs,
     activeDoc: ws?.active ?? null,
     viz: m.viz ? (m.viz.kind === 'simulation' ? 'simulation' : 'picture') : null,
@@ -121,11 +122,10 @@ export interface ViewSuggestion {
 }
 
 const LENS_WHY: Partial<Record<LensId, string>> = {
-  structure: 'what this is trying to accomplish, laid out as a structure',
+  structure: 'every part, what it serves and what it rests on, in detail',
   tensions: 'the places your reasons pull against each other',
   evidence: 'what each belief rests on',
   solve: 'the working, step by step',
-  board: 'the working, as you would write it by hand',
   matrix: 'each option against what matters',
 };
 
@@ -259,4 +259,22 @@ export function suggestLayout(
     if (!dismissed.has(s.id)) return s;
   }
   return null;
+}
+
+// ── a view asked for by name ──────────────────────────────────────
+
+/**
+ * "Show this as a structure": the Thinking Map, in that lens, takes over the
+ * workspace. A single surface simply becomes the map in that lens. In an
+ * arrangement of several panels the map panel (added if there is none) is
+ * pointed at the lens and given the whole workspace — maximized, so the
+ * arrangement is kept exactly as it was for when they restore it.
+ */
+export function showLens(layout: WorkspaceLayout, lens: LensId): WorkspaceLayout {
+  const ps = panelsOf(layout);
+  if (ps.length <= 1) return { ...singleLayout('map', { lens }) };
+  const map = ps.find((p) => p.type === 'map');
+  if (map) return maximize(configurePanel(layout, map.id, { lens }), map.id);
+  const added = addPanel(layout, { type: 'map', config: { lens } });
+  return added.id ? maximize(added.layout, added.id) : layout;
 }
