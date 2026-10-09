@@ -24,7 +24,13 @@ export type SurfaceType = (typeof SURFACE_TYPES)[number];
 
 /** What a panel is pointed at, beyond its type. All optional, all small. */
 export interface PanelConfig {
-  /** a model document, when the panel is pinned to one rather than the active one */
+  /**
+   * A model document, when the panel is pinned to one rather than the active
+   * one. On a 3D panel ('scene') it means THAT MODEL'S 3D VIEW: the solids the
+   * model holds, which the panel renders from the model — how a built model
+   * with solids opens its 3D view (surfaces.ts afterBuild). A 3D panel pinned
+   * with `obj` instead draws a Live 3D scene object.
+   */
   doc?: string;
   /** a representation of that model (lib/model/views.ts ids), pinned to this panel */
   view?: string;
@@ -502,4 +508,53 @@ export function dominantPanel(layout: WorkspaceLayout, aspect = 1.6): PanelNode 
 /** Two surfaces side by side, the first given more room. */
 export function pairLayout(a: { type: SurfaceType; config?: PanelConfig }, b: { type: SurfaceType; config?: PanelConfig }, share = 0.5): WorkspaceLayout {
   return { v: 1, root: S('s1', 'row', [share, 1 - share], [P('p1', a.type, a.config), P('p2', b.type, b.config)]), maximized: null, preset: null };
+}
+
+/** Surfaces side by side in one row, each given room in proportion to its weight (even when none are given). */
+export function rowLayout(panels: { type: SurfaceType; config?: PanelConfig }[], weights?: number[]): WorkspaceLayout {
+  const ps = panels.slice(0, LIMITS.panels).map((p, i) => P(`p${i + 1}`, p.type, p.config ? { ...p.config } : undefined));
+  if (!ps.length) return { v: 1, root: null, maximized: null, preset: null };
+  if (ps.length === 1) return { v: 1, root: ps[0], maximized: null, preset: null };
+  return { v: 1, root: S('s1', 'row', normalize(ps.map((_, i) => weights?.[i] ?? 1)), ps), maximized: null, preset: null };
+}
+
+/**
+ * Surfaces that serve another one — parameters, the inspector, the trace,
+ * the conversation. Opened beside it, they take the smaller share, so the thing
+ * being thought about keeps the room.
+ */
+export const SERVING: ReadonlySet<SurfaceType> = new Set<SurfaceType>(['params', 'inspector', 'trace', 'chat']);
+
+/** The share of a neighbour's room a surface takes when it opens beside it. */
+export function besideShare(type: SurfaceType): number {
+  return SERVING.has(type) ? 0.32 : 0.5;
+}
+
+/** The panels on screen: all of them, or only the one given the whole workspace. */
+export function visiblePanels(layout: WorkspaceLayout): PanelNode[] {
+  const ps = panelsOf(layout);
+  const max = layout.maximized ? ps.find((p) => p.id === layout.maximized) : null;
+  return max ? [max] : ps;
+}
+
+/**
+ * Share the room of some panels that sit side by side in one split, in
+ * proportion to weights — and leave their other siblings exactly the room they
+ * had. Nothing changes when the panels are not all children of one split.
+ */
+export function reshare(layout: WorkspaceLayout, ids: string[], weights: number[]): WorkspaceLayout {
+  if (ids.length < 2 || !layout.root) return layout;
+  const parent = parentOf(layout.root, ids[0]);
+  if (!parent || !ids.every((id) => parent.children.some((c) => c.id === id))) return layout;
+  const root = mapNode(layout.root, parent.id, (n) => {
+    const s = n as SplitNode;
+    const at = ids.map((id) => s.children.findIndex((c) => c.id === id));
+    const room = at.reduce((sum, i) => sum + s.sizes[i], 0);
+    const w = ids.map((_, k) => Math.max(1e-6, weights[k] ?? 1));
+    const total = w.reduce((a, b) => a + b, 0);
+    const sizes = [...s.sizes];
+    at.forEach((i, k) => (sizes[i] = (room * w[k]) / total));
+    return { ...s, sizes: normalize(sizes) };
+  });
+  return { ...layout, root };
 }

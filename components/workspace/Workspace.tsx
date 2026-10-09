@@ -12,8 +12,10 @@
 // each shows its name and its two controls (maximise, close) only while the
 // pointer is over it. There is no row of modes: the ways the workspace can be
 // arranged are offered inside "+ View", and only the ones that mean something
-// for what is here. The conversation is a composer beneath the stage (the
-// host's `dock`) until somebody wants more of it.
+// for what is here. "+ View" also lists every kind of view there is (All
+// views), each one opened or put away from there — a view with nothing to show
+// yet still opens, and the menu says why it is empty. The conversation is a
+// composer beneath the stage (the host's `dock`) until somebody wants more of it.
 //
 // THE HUMAN OWNS THE ARRANGEMENT. Nothing here moves unless a person moved it
 // or accepted a suggestion to. A suggestion is one quiet line with an Open and
@@ -21,7 +23,6 @@
 
 import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
-  addPanel,
   closePanel,
   dominantPanel,
   maximize,
@@ -36,7 +37,17 @@ import {
   type SurfaceType,
   type WorkspaceLayout,
 } from '@/lib/workspace/tiling';
-import type { Arrangement, LayoutSuggestion, ViewSuggestion } from '@/lib/workspace/surfaces';
+import {
+  closeView,
+  openBeside,
+  openView,
+  viewCatalogue,
+  type Arrangement,
+  type CatalogueEntry,
+  type LayoutSuggestion,
+  type ViewSuggestion,
+  type WorkspaceFacts,
+} from '@/lib/workspace/surfaces';
 import './workspace.css';
 
 type Zone = 'left' | 'right' | 'top' | 'bottom' | 'center';
@@ -44,9 +55,6 @@ type Zone = 'left' | 'right' | 'top' | 'bottom' | 'center';
 /** Where the conversation sits around the stage. The person's choice; kept per browser by the host. */
 export type DockSide = 'bottom' | 'top' | 'left' | 'right';
 export const DOCK_SIDES: readonly DockSide[] = ['bottom', 'top', 'left', 'right'];
-
-/** Surfaces that serve another one: opened beside it, they take the smaller share. */
-const BESIDE: ReadonlySet<SurfaceType> = new Set<SurfaceType>(['params', 'inspector', 'trace', 'chat']);
 
 export interface WorkspaceProps {
   layout: WorkspaceLayout;
@@ -59,6 +67,13 @@ export interface WorkspaceProps {
   views: ViewSuggestion[];
   /** the arrangements that mean something now (lib/workspace/surfaces.ts arrangementsFor) */
   arrangements: Arrangement[];
+  /**
+   * What this line of thinking holds (lib/workspace/surfaces.ts factsFrom).
+   * With it, "All views" says which views have nothing to show yet, and a view
+   * opened beside a model shows what it should — the map its reasoning, a 3D
+   * view the model's solids. Without it the views offered above stand in.
+   */
+  facts?: WorkspaceFacts | null;
   suggestion: LayoutSuggestion | null;
   onAccept: (s: LayoutSuggestion) => void;
   onDismiss: (s: LayoutSuggestion) => void;
@@ -87,18 +102,28 @@ function useNarrow(): boolean {
   return narrow;
 }
 
-/** "+ View": the representations worth opening, then the arrangements worth making. */
+/**
+ * "+ View": the representations worth opening, then every kind of view there
+ * is — each open one marked, with a × that puts it away — then the
+ * arrangements worth making.
+ */
 function ViewMenu({
   views,
+  catalogue,
   arrangements,
   onPick,
+  onView,
+  onRemove,
   onArrange,
   onClose,
   onReset,
 }: {
   views: ViewSuggestion[];
+  catalogue: CatalogueEntry[];
   arrangements: Arrangement[];
   onPick: (v: ViewSuggestion) => void;
+  onView: (e: CatalogueEntry) => void;
+  onRemove: (e: CatalogueEntry) => void;
   onArrange: (a: Arrangement) => void;
   onClose: () => void;
   onReset?: () => void;
@@ -118,9 +143,14 @@ function ViewMenu({
       window.removeEventListener('keydown', key);
     };
   }, [onClose]);
-  // Only what is not already on screen, and only the few that rank: the full
-  // registry is never a list a person should have to read.
-  const fresh = views.filter((v) => !v.open).slice(0, 6);
+  // What the state makes worth opening, first — only what is not already on
+  // screen, and only the few that rank. Every kind of view follows, in full.
+  const fresh = views.filter((v) => !v.open).slice(0, 4);
+  // Putting a view away takes its × with it; the row it was on keeps the focus.
+  const remove = (e: CatalogueEntry) => {
+    onRemove(e);
+    requestAnimationFrame(() => ref.current?.querySelector<HTMLButtonElement>(`[data-view="${e.id}"]`)?.focus());
+  };
   return (
     <div className="ws-menu" ref={ref} role="menu" aria-label="Open a view">
       {fresh.length > 0 && <p className="ws-menu-k">Open beside</p>}
@@ -130,14 +160,46 @@ function ViewMenu({
           <span className="ws-menu-w">{v.why}</span>
         </button>
       ))}
-      {arrangements.length > 0 && <p className={`ws-menu-k${fresh.length ? ' is-sub' : ''}`}>Arrange</p>}
+      <p className={`ws-menu-k${fresh.length ? ' is-sub' : ''}`} id="ws-all-views">All views</p>
+      <div className="ws-cat" role="group" aria-labelledby="ws-all-views">
+        {catalogue.map((e) => (
+          <div key={e.id} className={`ws-cat-row${e.isOpen ? ' is-open' : ''}`}>
+            <button
+              type="button"
+              role="menuitem"
+              className="ws-menu-row ws-cat-main"
+              data-view={e.id}
+              aria-label={e.isOpen ? `${e.name}, open — show it` : `Open ${e.name}${e.empty ? ` — ${e.empty}` : ''}`}
+              onClick={() => onView(e)}
+            >
+              <span className="ws-menu-l">
+                {e.name}
+                {e.isOpen && <span className="ws-cat-on">Open</span>}
+              </span>
+              <span className={`ws-menu-w${e.empty ? ' is-empty' : ''}`}>{e.empty ?? e.says}</span>
+            </button>
+            {e.isOpen && (
+              <button
+                type="button"
+                role="menuitem"
+                className="ws-cat-x"
+                aria-label={`Remove ${e.name} from the workspace`}
+                title={`Remove ${e.name}`}
+                onClick={() => remove(e)}
+              >
+                ×
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+      {arrangements.length > 0 && <p className="ws-menu-k is-sub">Arrange</p>}
       {arrangements.map((a) => (
         <button key={a.id} type="button" role="menuitem" className="ws-menu-row" data-arrangement={a.id} onClick={() => onArrange(a)}>
           <span className="ws-menu-l">{a.label}</span>
           <span className="ws-menu-w">{a.why}</span>
         </button>
       ))}
-      {!fresh.length && !arrangements.length && <p className="ws-menu-none">Everything worth opening is already here.</p>}
       {onReset && (
         <div className="ws-menu-reset">
           {!confirming ? (
@@ -211,14 +273,22 @@ export function Workspace(props: WorkspaceProps) {
     return () => window.removeEventListener('keydown', key);
   }, [layout.maximized, onLayout]);
 
+  const facts = props.facts ?? null;
   const open = useCallback(
     (v: { type: SurfaceType; config?: PanelConfig }) => {
-      const placed = addPanel(layoutRef.current, v, 1.6, BESIDE.has(v.type) ? 0.32 : 0.5);
+      const placed = openBeside(layoutRef.current, v, facts);
       onLayout(placed.layout);
       if (placed.id) setTab(placed.id);
     },
-    [onLayout]
+    [onLayout, facts]
   );
+  // EVERY KIND OF VIEW, open or not (lib/workspace/surfaces.ts viewCatalogue) — read while "+ View" is open.
+  const catalogue = adding ? viewCatalogue(layout, facts, facts ? null : views) : [];
+  const showView = (e: CatalogueEntry) => {
+    const placed = openView(layoutRef.current, e.id, facts);
+    if (placed.layout !== layoutRef.current) onLayout(placed.layout);
+    if (placed.id) setTab(placed.id);
+  };
 
   const panels = panelsOf(layout);
   const several = panels.length > 1;
@@ -375,11 +445,21 @@ export function Workspace(props: WorkspaceProps) {
       {adding && (
         <ViewMenu
           views={views}
+          catalogue={catalogue}
           arrangements={arrangements}
           onClose={() => setAdding(false)}
           onPick={(v) => {
             setAdding(false);
             open(v);
+          }}
+          onView={(e) => {
+            setAdding(false);
+            showView(e);
+          }}
+          onRemove={(e) => {
+            // the menu stays open, so several can be put away in turn
+            onLayout(closeView(layoutRef.current, e.id));
+            setTab(null);
           }}
           onArrange={(a) => {
             setAdding(false);

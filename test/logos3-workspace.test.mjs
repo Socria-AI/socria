@@ -211,7 +211,8 @@ console.log('\n=== simple at rest, powerful on demand ===');
   ok('Logos 3 starts on one surface — the model if there is one, else the map', /singleLayout\(wsHasModel \? 'model' : 'map'\)/.test(app));
   ok('the conversation is a composer beneath the stage until it is asked for', /className=\{`ws-dock lg-convo/.test(app) && /dock=\{wsDock\}/.test(app));
   ok('the inspector appears for a selection, and only then', /focus && focus\.kind !== 'node'/.test(app) && /overlay=\{wsCard\}/.test(app));
-  ok('the one surface follows the work, but an arrangement of several never moves', /ps\.length === 1 \? ps\[0\] : null/.test(app));
+  // by the count it used to keep, or by the build itself (lib/workspace/surfaces.ts afterBuild, tested in logos3-interface)
+  ok('the one surface follows the work, but an arrangement of several never moves', /ps\.length === 1 \? ps\[0\] : null/.test(app) || /afterBuild\(/.test(app));
 }
 
 console.log('\n=== the focus the conversation receives ===');

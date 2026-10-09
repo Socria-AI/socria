@@ -159,7 +159,10 @@ console.log('=== wired ===');
   ok('  and the outline is not a canvas of cards there', /drawsCards\(l\) && !\(workspace && l === 'structure'\)/.test(tm));
   const app = read('components/LogosApp.tsx');
   ok('Logos tells the map whether it is Logos 3', /workspace=\{workspaceOn\}/.test(app));
-  ok('a view asked for by name turns the stage, in Logos 3', /readViewRequest\(content\)/.test(app) && /changeLayout\(showLens\(wsLayout, want\.lens\)\)/.test(app) && /if \(workspaceOn && wsLayout/.test(app));
+  // read directly, or through readInterfaceRequest, which reads a lens exactly as readViewRequest does and applies it with showLens (layoutForRequest)
+  const asLens = /readViewRequest\(content\)/.test(app) && /changeLayout\(showLens\(wsLayout, want\.lens\)\)/.test(app);
+  const asInterface = /readInterfaceRequest\(content/.test(app) && /changeLayout\(layoutForRequest\(/.test(app);
+  ok('a view asked for by name turns the stage, in Logos 3', (asLens || asInterface) && /if \(workspaceOn && wsLayout/.test(app));
   ok('  and answers itself when the view can already be drawn', /wsFacts\.lenses\.includes\(want\.lens\)/.test(app));
   const pins = read('components/share/comments/Comments.tsx');
   ok('comment pins find a part in the outline as well as on the canvas', /\.lg-sv-row\[data-id=/.test(pins));

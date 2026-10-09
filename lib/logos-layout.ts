@@ -175,7 +175,13 @@ export function leadLens(lenses: LensId[], hasViz: boolean, building?: Building 
   // below: a process opens as a flow, a timeline on its axis, a decision as
   // its table. The structure has to be there for the lens to be offered at
   // all (availableLenses), so this never opens an empty frame.
-  const shaped = lensFor(building, lenses) as LensId | null;
+  //
+  // Where the plot is offered, the graph never takes the lead from it this
+  // way. The graph is offered beside a model only so that a map panel next to
+  // the model has the reasoning to show (availableLenses); before that, the
+  // two were never offered together, so leaving it out here keeps every map
+  // opening on exactly the lens it opened on before.
+  const shaped = lensFor(building, lenses.includes('plot') ? lenses.filter((l) => l !== 'graph') : lenses) as LensId | null;
   if (shaped) return shaped;
   if (hasViz && lenses.includes('plot')) return 'plot';
   // A map that is making a comparison opens on the comparison. Same reasoning
@@ -184,6 +190,32 @@ export function leadLens(lenses: LensId[], hasViz: boolean, building?: Building 
   // is the general view they can always step back to.
   if (lenses.includes('matrix')) return 'matrix';
   return lenses[0];
+}
+
+/**
+ * The lens a map panel shows BESIDE a model or a 3D view: the reasoning,
+ * never the model again.
+ *
+ * A map that holds a model leads with the plot, and the plot lens draws that
+ * model. Alone, that is the point of the map. Beside a model panel it is the
+ * same picture twice, which is what the old "Map beside the model"
+ * arrangement showed. So the map beside a model takes the lens it would lead
+ * with if the model were not drawn on it: the working for mathematics, the
+ * shape of what is being built, else the graph of how everything connects.
+ * The Work lens is left out too, because it draws the objects of thought —
+ * a Live 3D scene among them — which a 3D panel beside it already shows.
+ *
+ * Null when the map has no reading of its own yet (no ideas on it).
+ */
+export function reasoningLens(lenses: LensId[], building?: Building | null): LensId | null {
+  const own: LensId[] = lenses.filter((l) => l !== 'plot' && l !== 'work');
+  if (!own.length) return null;
+  if (own.includes('solve')) return 'solve';
+  const shaped = lensFor(building?.kind === 'model' ? null : building, own) as LensId | null;
+  if (shaped) return shaped;
+  if (own.includes('matrix')) return 'matrix';
+  for (const l of ['graph', 'structure', 'flow', 'timeline'] as LensId[]) if (own.includes(l)) return l;
+  return own[0];
 }
 
 /**
@@ -274,6 +306,17 @@ export function availableLenses(map: ThinkingMap, opts: { workspace?: boolean } 
   // on `viz` alone would have left a built model with nowhere to be drawn.
   if (map.viz || map.models?.docs.length) out.push('plot');
 
+  // A MODEL DOES NOT TAKE THE REASONING AWAY. Holding a model document makes a
+  // map quantitative, so that the plot leads and the model is what it opens
+  // on — but that also took the graph away, and the graph is the one lens
+  // that draws the reasoning around a model rather than the model again. A
+  // map panel opened beside a model panel fell back to the plot and showed
+  // the model twice. The graph stays offered (after the plot, so the plot
+  // still leads a map that is on its own — see leadLens); mathematics keeps
+  // its own readings below, and gets the graph only when it has none.
+  const holdsModel = !!map.models?.docs?.length;
+  if (holdsModel && map.context !== 'math' && map.nodes.length) out.push('graph');
+
   // The step-by-step readings. A solution chain and a worked Board are about
   // work being DONE — each state of the expression, the move that produced
   // it, and which steps have been checked. That is the map someone doing
@@ -293,6 +336,11 @@ export function availableLenses(map: ThinkingMap, opts: { workspace?: boolean } 
   // The objects of thought, drawn as themselves — offered whenever there is
   // one, first, because it is what the work is ABOUT (lib/objects/).
   if (map.objects?.objs.length) out.unshift('work');
+
+  // Beside a model there must be something to read besides the model: a map
+  // whose every lens draws the model or its objects (a single idea under a
+  // calculation, say) is offered the graph of what it does hold.
+  if (holdsModel && map.nodes.length && !out.some((l) => l !== 'plot' && l !== 'work')) out.push('graph');
 
   // Never nothing. Quantitative work that has produced no chain, no scene and
   // no board — a question just asked, an economics conversation still in

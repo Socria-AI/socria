@@ -134,6 +134,7 @@ const MODULES = [
   'lib/rooms-flag.ts',
   'lib/workspace/tiling.ts',
   'lib/workspace/surfaces.ts',
+  'lib/workspace/interface-request.ts',
   'lib/workspace/focus.ts',
   'lib/model/binding.ts',
   'lib/model/kinds.ts',

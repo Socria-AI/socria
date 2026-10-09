@@ -89,7 +89,7 @@
 /* ── menus ───────────────────────────────────────────────────────────── */
 .logos-root .ws-menu {
   position: absolute; z-index: 40; right: 8px; top: calc(100% + 2px);
-  width: min(360px, 80vw); max-height: min(440px, 70vh); overflow: auto;
+  width: min(360px, 80vw); max-height: min(560px, 76vh); overflow: auto;
   background: var(--lg-panel); border: 1px solid var(--lg-line); border-radius: 10px;
   box-shadow: 0 18px 50px -24px rgba(var(--ink-rgb, 31, 31, 31), 0.45); padding: 6px;
   font-family: var(--lg-sans);
@@ -106,6 +106,24 @@
 .logos-root .ws-menu-row.is-open { color: var(--lg-ink-60); }
 .logos-root .ws-menu-row.is-close { color: var(--lg-tension); }
 .logos-root .ws-menu-w { font-family: var(--serif); font-style: italic; font-size: 12.5px; color: var(--lg-ink-60); }
+
+/* All views: every kind of view, one row each. An open one is marked, and its
+   × puts it away; one with nothing to show yet says so, a shade quieter. */
+.logos-root .ws-cat { display: grid; gap: 1px; }
+.logos-root .ws-cat-row { display: flex; align-items: center; gap: 2px; border-radius: 7px; }
+.logos-root .ws-cat-row .ws-cat-main { flex: 1 1 auto; min-width: 0; }
+.logos-root .ws-cat-row .ws-menu-l { display: flex; align-items: baseline; gap: 8px; }
+.logos-root .ws-cat-on {
+  font-family: var(--lg-sans); font-style: normal; font-size: 9.5px; font-weight: 600;
+  letter-spacing: 0.12em; text-transform: uppercase; color: var(--lg-primary);
+}
+.logos-root .ws-menu-w.is-empty { color: var(--lg-ink-40); }
+.logos-root .ws-cat-x {
+  flex: 0 0 auto; width: 28px; height: 28px; margin-right: 2px; border: 1px solid transparent; border-radius: 999px;
+  background: none; cursor: pointer; font-family: var(--lg-sans); font-size: 16px; line-height: 1; color: var(--lg-ink-40);
+}
+.logos-root .ws-cat-x:hover, .logos-root .ws-cat-x:focus-visible { color: var(--lg-tension); border-color: var(--lg-line); }
+.logos-root .ws-cat-x:focus-visible, .logos-root .ws-cat-main:focus-visible { outline: 2px solid var(--lg-primary); outline-offset: -2px; }
 
 /* ── empty states ────────────────────────────────────────────────────── */
 .logos-root .ws-empty, .logos-root .ws-blank { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 24px; text-align: center; color: var(--lg-ink-60); }
