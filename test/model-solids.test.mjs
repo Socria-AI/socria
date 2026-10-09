@@ -19,6 +19,8 @@ import { viewsFor, primaryView } from './.tmp/views.mjs';
 import { panelFor, frameFor } from './.tmp/viewdata.mjs';
 import { buildSpec } from './.tmp/spec.mjs';
 import { measure } from './.tmp/scene-geometry.mjs';
+import { solidFromWords, spokenUnit } from './.tmp/solid-words.mjs';
+import { readFileSync } from 'node:fs';
 
 let pass = 0, fail = 0;
 const ok = (n, c, x = '') => (c ? pass++ : (fail++, console.log('FAIL', n, x)));
@@ -284,6 +286,37 @@ console.log('\n=== the model panel draws it in 3D, at true proportions ===');
   ok('a solid is a 3D picture', spec.dimensionality === 3, String(spec.dimensionality));
   ok('  with equal axes, so a cube is a cube', spec.aspect === 'equal', String(spec.aspect));
   ok('  and axes named in its unit', spec.axisNames?.some((a) => /\(m\)|m$/.test(a)), JSON.stringify(spec.axisNames));
+}
+
+console.log('\n=== when nothing proposed builds: the shape they stated, from their own words ===');
+{
+  const cube = solidFromWords('model a 2×2×2 meter cube');
+  const b = cube && buildProposal(cube.proposal);
+  ok('“model a 2×2×2 meter cube” is read as a cube', !!cube && cube.proposal.objects[0].solid.shape === 'box' && cube.proposal.objects[0].id === 'cube');
+  ok('  with one control for its side, 2 m', cube?.proposal.params.length === 1 && cube.proposal.params[0].id === 's' && cube.proposal.params[0].value === 2 && cube.proposal.params[0].units === 'm', JSON.stringify(cube?.proposal.params));
+  ok('  and it builds, 8 m³', !!b?.ok && near(valueOf(unpack(b.model), 'cube', 'volume'), 8));
+  ok('  said as read from their words', !!b?.ok && /shape reader/.test(obj(b.model, 'cube').provenance?.detail ?? ''));
+
+  const cone = solidFromWords('make a 3D model of a rocket nose cone 20 cm in diameter and 40 cm tall with sliders for diameter and height');
+  const cb = cone && buildProposal(cone.proposal);
+  const cm = cb?.ok ? unpack(cb.model) : null;
+  ok('the nose cone is read in the unit it was said in', !!cone && cone.proposal.objects[0].units === 'cm' && cone.proposal.params.find((p) => p.id === 'r')?.value === 10 && cone.proposal.params.find((p) => p.id === 'h')?.value === 40, JSON.stringify(cone?.proposal.params));
+  ok('  and builds, its volume in cm³', !!cm && near(valueOf(cm, 'cone', 'volume'), (Math.PI * 100 * 40) / 3, 1e-9) && measureOf(cm, 'cone', 'volume').units === 'cm^3');
+
+  const half = solidFromWords('a cone 40 cm tall');
+  const hb = half && buildProposal(half.proposal);
+  ok('only what was said: a height and no radius', !!half && !half.proposal.params.some((p) => p.id === 'r') && half.proposal.params.some((p) => p.id === 'h'));
+  ok('  builds, and names the radius it waits on', !!hb?.ok && /base radius/.test(hb.report.says), hb?.ok ? hb.report.says : hb?.refusal?.says);
+  const bare = solidFromWords('make a cube');
+  ok('a cube with no size is not given one', !!bare && bare.proposal.params.length === 0 && Object.keys(bare.proposal.objects[0].defs).length === 0);
+  const steel = solidFromWords('a steel cylinder of radius 5 cm and height 20 cm');
+  ok('a material read is carried to the solid', steel?.proposal.objects[0].solid.material === 'steel');
+  ok('a sentence that names no solid is nothing', solidFromWords('I am worried about the box') === null && solidFromWords('') === null && solidFromWords(undefined) === null);
+  ok('the unit is the one attached to a number', spokenUnit('a cone 20 cm across') === 'cm' && spokenUnit('three metres') === null && spokenUnit('2 m cube') === 'm' && spokenUnit('a 3 inch ball') === 'in');
+
+  const route = readFileSync('app/api/logos/map/route.ts', 'utf8');
+  ok('the map route reads it only for a construction nothing built', /if \(!answeredByScene\(\) && wantedBuild && !made\?\.doc\) \{\s*const read = solidFromWords\(said\);/.test(route));
+  ok('  and the engine still decides: it goes through openFromProposal', /const got = read \? openFromProposal\(models, read\.proposal/.test(route) && /reader: true/.test(route));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

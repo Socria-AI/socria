@@ -33,6 +33,7 @@ import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { enforceRateLimit } from '@/lib/rate-limit';
 import { mayUse } from '@/lib/route-guard';
 import { EMPTY_WORKSPACE, modelFor, openFromProposal } from '@/lib/model/docs';
+import { solidFromWords } from '@/lib/model/solid-words';
 import {
   wantedSimulation,
   correctionNote,
@@ -409,6 +410,8 @@ export async function POST(req: NextRequest) {
       unanswered?: string[];
       /** built from the second pass rather than the first */
       secondPass?: boolean;
+      /** read from the person's own words by the shape reader, because nothing proposed built */
+      reader?: boolean;
     } | null = null;
     // At the top level now, not inside the picture — see sanitizeMap. Read
     // from the sanitised map so the legacy inlet is already hoisted.
@@ -468,6 +471,24 @@ export async function POST(req: NextRequest) {
         }
       } catch (e) {
         console.warn('logos map: second pass failed', e);
+      }
+    }
+    // ── AND IF STILL NOTHING BUILDS: THE SHAPE THEY STATED ──────────
+    //
+    // "Model a 2 × 2 × 2 metre cube": construct, a model — and both passes
+    // wrote nothing down. The person stated a shape and its sizes, and Live
+    // 3D's reader has the grammar for that, so its reading is proposed to the
+    // engine like any other proposal (lib/model/solid-words.ts). Only for a
+    // construction nothing built; only what they said, each size a control.
+    let byReader = false;
+    if (!answeredByScene() && wantedBuild && !made?.doc) {
+      const read = solidFromWords(said);
+      const got = read ? openFromProposal(models, read.proposal, { at: Date.now() }) : null;
+      if (read && got?.doc) {
+        proposal = read.proposal;
+        made = got;
+        byReader = true;
+        console.info('logos map: nothing proposed built; %s, and it built', read.says);
       }
     }
     if (proposal) {
@@ -539,6 +560,7 @@ export async function POST(req: NextRequest) {
           return left.length ? { unanswered: left } : {};
         })(),
         ...(secondPass ? { secondPass: true } : {}),
+        ...(byReader ? { reader: true } : {}),
       };
     } else if (answeredByScene()) {
       build = null;

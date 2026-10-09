@@ -385,9 +385,9 @@ export function askBlock(ask: TurnAsk | null): string {
 
   if (isBuilding(ask.action) && ask.artifact !== 'answer' && ask.artifact !== 'map') {
     lines.push(
-      'THEY ASKED FOR A THING TO BE MADE, NOT DESCRIBED. The engine is building it as you write; the surface will show it and will say plainly if it could not be built.',
+      'THEY ASKED FOR A THING TO BE MADE, NOT DESCRIBED. The engine is asked to build it while you write; the surface will show it, or say plainly that it could not be built.',
       'So: do not write "the model you are envisioning", "you would likely see", "imagine a chart where" or any other description of an artifact in place of the artifact. That is the failure this rule exists to stop.',
-      'And do not claim it exists either — you are not the thing that knows. Say what you are having built and what they will be able to do with it, in one or two sentences, and let the model itself be the answer.',
+      'And do not claim it exists, or that it "is being created" — you are not the thing that knows, and progress is a claim too. Say what they asked for and what they will be able to do with it, in one or two sentences, never a number the engine computes, and let the model itself be the answer.',
       'If part of what they asked for genuinely cannot be built, the surface says so; do not pre-empt it with an apology.'
     );
   }

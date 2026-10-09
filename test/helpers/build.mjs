@@ -141,6 +141,7 @@ const MODULES = [
   'lib/model/units.ts',
   'lib/model/solid.ts',
   'lib/model/formula.ts',
+  'lib/model/solid-words.ts',
   'lib/collab.ts',
   'lib/collab-transport.ts',
   'lib/conversation-surface.ts',
