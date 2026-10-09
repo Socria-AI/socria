@@ -19,6 +19,7 @@ import {
   relevantKinds,
   hasWaited,
   pickPopup,
+  countOpen,
 } from './.tmp/popup-rule.mjs';
 import { EVENTS } from './.tmp/analytics.mjs';
 
@@ -34,47 +35,83 @@ const both = { enabled: true, give: true, challenge: true };
 const empty = () => readPopupMemory(null);
 
 console.log('=== what may open by itself ===');
+// A roll the test names: each call takes the next value.
+const roll = (...vals) => { let i = 0; return () => vals[Math.min(i++, vals.length - 1)]; };
+const arrived = (m = empty(), opens = 5) => ({ ...m, opens });
 {
   ok('two popups, the challenge first', POPUP_KINDS.length === 2 && POPUP_KINDS[0] === 'challenge' && POPUP_KINDS[1] === 'give');
-  ok('rewards off, or signed out: nothing', pickPopup({ enabled: false, give: true, challenge: true }, empty(), T0) === null && relevantKinds({ enabled: false, give: true, challenge: true }).length === 0);
-  ok('nothing to offer: nothing', pickPopup({ enabled: true, give: false, challenge: false }, empty(), T0) === null);
-  ok('never shown: the challenge first — something to do here', pickPopup(both, empty(), T0) === 'challenge');
-  ok('the challenge done (or a member): the gift alone', pickPopup({ enabled: true, give: true, challenge: false }, empty(), T0) === 'give');
-  ok('no link: the challenge alone', pickPopup({ enabled: true, give: false, challenge: true }, empty(), T0) === 'challenge');
+  ok('rewards off, or signed out: nothing', pickPopup({ enabled: false, give: true, challenge: true }, arrived(), T0, roll(0)) === null && relevantKinds({ enabled: false, give: true, challenge: true }).length === 0);
+  ok('nothing to offer: nothing', pickPopup({ enabled: true, give: false, challenge: false }, arrived(), T0, roll(0)) === null);
+  ok('a browser\'s first two arrivals: nothing, whatever the roll', [1, 2].every((n) => pickPopup(both, arrived(empty(), n), T0, roll(0, 0)) === null));
+  ok('the third: the challenge, without a roll — its week is short', pickPopup(both, arrived(empty(), 3), T0, roll(0.99)) === 'challenge');
+  ok('…but not again on the third if it was already shown', pickPopup(both, arrived(remember(empty(), 'challenge', 'shown', T0 - 10 * DAY), 3), T0, roll(0.99)) === null);
 }
 
-console.log('=== rarely: gaps, turns, "Not now" ===');
+console.log('=== the roll: 1 in 3, the challenge 60%, 1 in 4 once only the gift is left ===');
 {
-  let m = remember(empty(), 'challenge', 'shown', T0);
-  ok('the next visit within the day: nothing at all', pickPopup(both, m, T0 + 6 * HOUR) === null && pickPopup(both, m, T0 + POPUP_RULES.anyGapMs - 1) === null);
-  ok('a day later: the other one — they take turns', pickPopup(both, m, T0 + POPUP_RULES.anyGapMs) === 'give');
-  m = remember(m, 'give', 'shown', T0 + DAY);
-  ok('both shown recently: nothing', pickPopup(both, m, T0 + 2 * DAY) === null);
-  ok('three days after the challenge: it again, the one shown longest ago', pickPopup(both, m, T0 + 3 * DAY + HOUR) === 'challenge');
-  const alone = remember(empty(), 'give', 'shown', T0);
-  ok('one kind alone waits its own gap, not just a day', pickPopup({ enabled: true, give: true, challenge: false }, alone, T0 + 2 * DAY) === null && pickPopup({ enabled: true, give: true, challenge: false }, alone, T0 + POPUP_RULES.sameGapMs) === 'give');
-  const notNow = remember(remember(empty(), 'challenge', 'shown', T0), 'challenge', 'notNow', T0);
-  ok('"Not now" rests that one ten days', !hasWaited(notNow, 'challenge', T0 + 9 * DAY) && hasWaited(notNow, 'challenge', T0 + POPUP_RULES.notNowMs));
-  ok('…and the other still takes its turn', pickPopup(both, notNow, T0 + 2 * DAY) === 'give');
-  const acted = remember(remember(empty(), 'give', 'shown', T0), 'give', 'acted', T0);
+  ok('the chances are what was agreed', POPUP_RULES.chance === 1 / 3 && POPUP_RULES.giveOnlyChance === 1 / 4 && POPUP_RULES.challengeWeight === 0.6);
+  ok('a roll above 1 in 3: nothing this arrival', pickPopup(both, arrived(), T0, roll(0.34)) === null);
+  ok('under it, both waiting: the challenge 60% of the time…', pickPopup(both, arrived(), T0, roll(0.1, 0.59)) === 'challenge');
+  ok('…and the gift the rest', pickPopup(both, arrived(), T0, roll(0.1, 0.61)) === 'give');
+  const giveOnly = { enabled: true, give: true, challenge: false };
+  ok('only the gift left: 1 in 4', pickPopup(giveOnly, arrived(), T0, roll(0.26)) === null && pickPopup(giveOnly, arrived(), T0, roll(0.24)) === 'give');
+  ok('no link: the challenge alone', pickPopup({ enabled: true, give: false, challenge: true }, arrived(), T0, roll(0.1)) === 'challenge');
+  // over many arrivals, the share is what the rule says
+  let rng = 7;
+  const r = () => ((rng = (rng * 1103515245 + 12345) % 2147483648) / 2147483648);
+  let opened = 0, chal = 0;
+  for (let i = 0; i < 6000; i++) {
+    const k = pickPopup(both, arrived(), T0, r);
+    if (k) { opened++; if (k === 'challenge') chal++; }
+  }
+  ok('about a third of arrivals open one', Math.abs(opened / 6000 - 1 / 3) < 0.03, opened / 6000);
+  ok('about 60% of those are the challenge', Math.abs(chal / opened - 0.6) < 0.04, chal / opened);
+}
+
+console.log('=== rarely: a day apart, three a week, four days each, "Not now" ===');
+{
+  const yes = roll(0, 0);
+  let m = arrived(remember(empty(), 'challenge', 'shown', T0));
+  ok('the next arrival within the day: nothing at all', pickPopup(both, m, T0 + 6 * HOUR, roll(0, 0)) === null && pickPopup(both, m, T0 + POPUP_RULES.anyGapMs - 1, roll(0, 0)) === null);
+  ok('a day later, the challenge still resting: the gift', pickPopup(both, m, T0 + POPUP_RULES.anyGapMs, roll(0, 0)) === 'give');
+  ok('the same popup again no sooner than four days', !hasWaited(m, 'challenge', T0 + 4 * DAY - 1) && hasWaited(m, 'challenge', T0 + POPUP_RULES.sameGapMs) && POPUP_RULES.sameGapMs === 4 * DAY);
+  // three in a week, whichever kinds
+  let w = arrived(empty());
+  for (const [k, at] of [['challenge', T0], ['give', T0 + 1 * DAY], ['give', T0 + 5 * DAY]]) w = remember(w, k, 'shown', at);
+  ok('three this week: no fourth, whatever the roll', pickPopup(both, w, T0 + 6 * DAY, yes) === null && POPUP_RULES.weekCap === 3);
+  ok('…until the first falls out of the week', pickPopup(both, w, T0 + 7 * DAY + HOUR, roll(0, 0)) === 'challenge');
+  let g = arrived(empty());
+  for (const at of [T0, T0 + 4 * DAY]) g = remember(g, 'give', 'shown', at);
+  ok('only the gift left: two a week', pickPopup({ enabled: true, give: true, challenge: false }, g, T0 + 6 * DAY + 23 * HOUR, roll(0)) === null && POPUP_RULES.giveOnlyWeekCap === 2);
+  const notNow = remember(remember(arrived(), 'challenge', 'shown', T0), 'challenge', 'notNow', T0);
+  ok('"Not now" rests that one four days', !hasWaited(notNow, 'challenge', T0 + 4 * DAY - 1) && hasWaited(notNow, 'challenge', T0 + 4 * DAY) && POPUP_RULES.notNowMs === 4 * DAY);
+  ok('…and the other still takes its turn', pickPopup(both, notNow, T0 + 2 * DAY, roll(0, 0)) === 'give');
+  let thrice = arrived();
+  for (const at of [T0, T0 + 5 * DAY, T0 + 10 * DAY]) thrice = remember(remember(thrice, 'challenge', 'shown', at), 'challenge', 'notNow', at);
+  ok('three "Not now"s in a row: two months', !hasWaited(thrice, 'challenge', T0 + 10 * DAY + 59 * DAY) && hasWaited(thrice, 'challenge', T0 + 10 * DAY + POPUP_RULES.notNowRunMs) && POPUP_RULES.notNowRunMs === 60 * DAY);
+  const forgiven = remember(thrice, 'challenge', 'acted', T0 + 11 * DAY);
+  ok('acting on it starts the count again', (forgiven.notNowRun.challenge ?? 0) === 0);
+  const acted = remember(remember(arrived(), 'give', 'shown', T0), 'give', 'acted', T0);
   ok('done what it asked (copied the link): fourteen days', !hasWaited(acted, 'give', T0 + 13 * DAY) && hasWaited(acted, 'give', T0 + POPUP_RULES.actedMs));
-  const future = remember(empty(), 'challenge', 'shown', T0 + 100 * DAY);
-  ok('a clock set back does not silence them for good', hasWaited(future, 'challenge', T0) && pickPopup(both, future, T0) === 'give');
-  ok('the rules are days, not minutes', POPUP_RULES.anyGapMs >= 12 * HOUR && POPUP_RULES.sameGapMs >= 3 * DAY && POPUP_RULES.notNowMs > POPUP_RULES.sameGapMs && POPUP_RULES.actedMs >= POPUP_RULES.notNowMs);
+  const future = arrived(remember(empty(), 'challenge', 'shown', T0 + 100 * DAY));
+  ok('a clock set back does not silence them for good', hasWaited(future, 'challenge', T0) && pickPopup(both, future, T0, roll(0, 0.9)) === 'give');
+  ok('the rules are days, not minutes', POPUP_RULES.anyGapMs >= 12 * HOUR && POPUP_RULES.sameGapMs >= 3 * DAY && POPUP_RULES.notNowMs >= 3 * DAY && POPUP_RULES.actedMs >= POPUP_RULES.notNowMs);
 }
 
 console.log('=== the memory: tolerant, and only what it is for ===');
 {
-  const m = remember(remember(empty(), 'give', 'shown', T0), 'challenge', 'notNow', T0 + 1);
+  const m = countOpen(remember(remember(remember(empty(), 'give', 'shown', T0), 'challenge', 'notNow', T0 + 1), 'challenge', 'notNow', T0 + 2));
   const back = readPopupMemory(writePopupMemory(m));
-  ok('round-trips', back.shown.give === T0 && back.notNow.challenge === T0 + 1);
-  ok('garbage is an empty memory, never a throw', ['{', 'null', '[]', '"x"', '{"shown":{"give":"soon","evil":5,"challenge":-3}}'].every((raw) => {
+  ok('round-trips', back.shown.give === T0 && back.notNow.challenge === T0 + 2 && back.notNowRun.challenge === 2 && back.history.length === 1 && back.opens === 1);
+  ok('an arrival is counted', countOpen(countOpen(empty())).opens === 2);
+  ok('garbage is an empty memory, never a throw', ['{', 'null', '[]', '"x"', '{"shown":{"give":"soon","evil":5,"challenge":-3},"history":"x","opens":-4,"notNowRun":{"give":-1}}'].every((raw) => {
     const r = readPopupMemory(raw);
-    return Object.keys(r.shown).length === 0 && Object.keys(r.notNow).length === 0 && Object.keys(r.acted).length === 0;
+    return Object.keys(r.shown).length === 0 && Object.keys(r.notNow).length === 0 && Object.keys(r.acted).length === 0 && r.history.length === 0 && r.opens === 0 && Object.keys(r.notNowRun).length === 0;
   }));
-  ok('remember never mutates', (() => { const a = empty(); remember(a, 'give', 'shown', T0); return a.shown.give === undefined; })());
+  ok('remember never mutates', (() => { const a = empty(); remember(a, 'give', 'shown', T0); return a.shown.give === undefined && a.history.length === 0; })());
   ok('the shared empty memory is not written through', (() => { remember(EMPTY_POPUP_MEMORY, 'give', 'shown', T0); return EMPTY_POPUP_MEMORY.shown.give === undefined; })());
-  ok('it holds times, never content', !/progress|link|code|email|name/i.test(writePopupMemory(m)));
+  ok('it holds times and counts, never content', !/progress|link|code|email|name/i.test(writePopupMemory(m)));
+  ok('the history keeps a fortnight', remember(remember(empty(), 'give', 'shown', T0), 'give', 'shown', T0 + 20 * DAY).history.length === 1);
 }
 
 console.log('=== the marks: both rails, beside the Socria mark ===');
@@ -106,7 +143,10 @@ console.log('=== the popups: once per surface, into a quiet room ===');
   ok('once the One invitation, the tour or onboarding has spoken, the popups wait for another visit', /if \(onePrompt \|\| tourOpen \|\| tourAfter \|\| autoSend\) setSpokeThisVisit\(true\);/.test(page));
   ok('the challenge opens the newest Logos on offer', /if \(isOffered\('logos-3'\)\) \{\s*setModel\('logos-3'\);\s*chooseModel\('logos-3'\);/.test(page));
   const pop = read('components/rewards/RewardsPopups.tsx');
-  ok('by itself only through the rule', /const kind = pickPopup\(factsOf\(view\), memory, now\);/.test(pop));
+  ok('by itself only through the rule, the arrival counted first', /const memory = countOpen\(readPopupMemory\(readFlag\(POPUP_MEMORY_KEY\)\)\);/.test(pop) && /const kind = pickPopup\(factsOf\(view\), memory, now\);/.test(pop));
+  ok('…and the count kept whether or not anything opened', /writeFlag\(POPUP_MEMORY_KEY, writePopupMemory\(kind \? remember\(memory, kind, 'shown', now\) : memory\)\);/.test(pop));
+  ok('the challenge is a small card, not a plate over the page', /if \(kind === 'challenge'\) \{\s*return <ChallengeCard/.test(pop) && /<div className="rwp-card" role="dialog" aria-labelledby=/.test(pop) && !/className="rwp-card"[^>]*aria-modal/.test(pop));
+  ok('…which takes focus only when the person pressed the mark', /asked=\{open\.trigger === 'icon'\}/.test(pop) && /if \(asked\) goRef\.current\?\.focus/.test(pop));
   ok('…once a visit, decided on arrival', /if \(visitSpoken\(\)\) return;\s*\/\/[^\n]*\n\s*markVisit\(\);/.test(pop));
   ok('…never over a dialog or the tour', /document\.querySelector\('\[aria-modal="true"\], \.tour-layer'\)/.test(pop) && /if \(screenTaken\(\)\) return;/.test(pop));
   ok('…after the room has been settled a moment', /POPUP_RULES\.settleMs/.test(pop));
@@ -124,8 +164,8 @@ console.log('=== what they say ===');
 {
   const pop = read('components/rewards/RewardsPopups.tsx');
   const code = pop.split('\n').filter((l) => !/^\s*\/\//.test(l)).join('\n');
-  ok('the offers in their own words', /Give <em>\{limits\.give\}<\/em>\. Get <em>\{limits\.get\}<\/em>\./.test(pop) && /Create a \{c\.target\}-node mind map\. Get \{limits\.challenge\} days of Socria One free\./.test(pop));
-  ok('progress is the server\'s count', /Progress: \{c\.progress\}\/\{c\.target\} nodes/.test(pop));
+  ok('the offers in their own words', /Give <em>\{limits\.give\}<\/em>\. Get <em>\{limits\.get\}<\/em>\./.test(pop) && /Map <em>\{c\.target\}<\/em> ideas\. Get <em>\{days\}<\/em> days of Socria One\./.test(pop));
+  ok('progress is the server\'s count', /\{c\.progress\}\/\{c\.target\}/.test(pop) && /aria-valuenow=\{c\.progress\}/.test(pop));
   ok('do both and they stack — the sum is said, and the cap', /Do both and they stack: \$\{a\} \+ \$\{b\} = \$\{a \+ b\} days of Socria One, one after the other — up to \$\{limits\.cap\} days waiting at once\./.test(pop));
   ok('a member is told their days wait, and the subscription is never changed', /Your subscription is never changed\./.test(pop));
   ok('past the monthly limit, it says friends still get theirs', /friends still get their \$\{limits\.give\} days/.test(pop));
@@ -134,6 +174,8 @@ console.log('=== what they say ===');
   ok('every animation stops for reduced motion', /@media \(prefers-reduced-motion: reduce\)/.test(css) && /animation: none !important/.test(css) && /\.rwb-spark, \.rwb-glint, \.rwp-mover \{ display: none; \}/.test(css));
   ok('the marks are small: 24px buttons', /width: 24px; height: 24px;/.test(css));
   ok('…and sit right after the wordmark, pushing the close button away', /\.app-root \.s-top \.rwb \{ margin-right: auto; \}/.test(css));
+  ok('…a little to its right', /\.rwb \{ display: inline-flex; align-items: center; gap: 3px; margin-left: 12px; \}/.test(css));
+  ok('the small card stops its motion too', /@media \(prefers-reduced-motion: reduce\) \{ \.rwp-card \{ animation: none; \} \}/.test(css));
   ok('no SVG group is both positioned by attribute and moved by CSS', !/className="rwp-(gift|node|seal)[^"]*"[^>]*transform=|transform=[^>]*className="rwp-(gift|node|seal)/.test(pop));
 }
 

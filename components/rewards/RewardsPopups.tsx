@@ -27,6 +27,7 @@ import { useCallback, useEffect, useId, useRef, useState, type CSSProperties, ty
 import { track } from '@/lib/analytics';
 import {
   POPUP_RULES,
+  countOpen,
   pickPopup,
   readPopupMemory,
   remember,
@@ -123,10 +124,11 @@ export function RewardsPopups({
       // decided once a visit, on arrival — not again an hour into it when a gap has run out
       markVisit();
       const now = Date.now();
-      const memory = readPopupMemory(readFlag(POPUP_MEMORY_KEY));
+      // the arrival is counted whether or not anything opens: the roll is per arrival
+      const memory = countOpen(readPopupMemory(readFlag(POPUP_MEMORY_KEY)));
       const kind = pickPopup(factsOf(view), memory, now);
+      writeFlag(POPUP_MEMORY_KEY, writePopupMemory(kind ? remember(memory, kind, 'shown', now) : memory));
       if (!kind) return;
-      writeFlag(POPUP_MEMORY_KEY, writePopupMemory(remember(memory, kind, 'shown', now)));
       back.current = null;
       setOpen({ kind, trigger: 'visit' });
       track('rewards_popup_viewed', { kind, trigger: 'visit', surface });
@@ -178,7 +180,13 @@ export function RewardsPopups({
   if (!open || !view?.enabled || stale) return null;
   // the challenge, completed while its popup was open, is shown complete
   const kind: Shown = open.kind === 'challenge' && c?.state === 'done' ? 'done' : open.kind;
-  return <Popup kind={kind} view={view} onClose={close} onAct={act} onOpenLogos={onOpenLogos} surface={surface} />;
+  // THE CHALLENGE IS A SMALL CARD, not a plate over the page: a note beside the
+  // mark it came from, which the person can read and put away without the room
+  // going dark. Asked for or by itself, the same card.
+  if (kind === 'challenge') {
+    return <ChallengeCard view={view} onClose={close} onOpenLogos={onOpenLogos} surface={surface} asked={open.trigger === 'icon'} />;
+  }
+  return <Popup kind={kind} view={view} onClose={close} onAct={act} />;
 }
 
 /** Give 7, Get 7 on a deployment whose Rewards tables do not exist yet: what it is, and what it needs. */
@@ -225,15 +233,11 @@ function Popup({
   view,
   onClose,
   onAct,
-  onOpenLogos,
-  surface,
 }: {
   kind: Shown;
   view: RewardsView;
   onClose: (how: 'closed' | 'not_now' | 'acted') => void;
   onAct: () => void;
-  onOpenLogos?: () => void;
-  surface: 'core' | 'logos';
 }) {
   const id = useId().replace(/:/g, '');
   const goRef = useRef<HTMLButtonElement>(null);
@@ -265,9 +269,8 @@ function Popup({
         </button>
         {kind === 'give' ? (
           <Give view={view} limits={limits} id={id} goRef={goRef} onClose={onClose} onAct={onAct} />
-        ) : kind === 'challenge' ? (
-          <Challenge view={view} limits={limits} id={id} goRef={goRef} onClose={onClose} onOpenLogos={onOpenLogos} surface={surface} />
         ) : (
+          // the challenge itself is the small card (ChallengeCard); the plate is for its completion
           <Done view={view} limits={limits} id={id} goRef={goRef} onClose={onClose} />
         )}
       </div>
@@ -355,63 +358,93 @@ function Give({ view, limits, id, goRef, onClose, onAct }: PartProps & { onAct: 
 
 // ── the 5-Node Challenge ─────────────────────────────────────────────
 
-function Challenge({ view, limits, id, goRef, onClose, onOpenLogos, surface }: PartProps & { onOpenLogos?: () => void; surface: 'core' | 'logos' }) {
+// ── the challenge, as a small card ──────────────────────────────────
+
+/**
+ * The 5-Node Challenge as a small card under the marks — not modal, no scrim,
+ * and it takes focus only when the person pressed the mark that opened it.
+ * The same numbers as everywhere else, from the server.
+ */
+function ChallengeCard({
+  view,
+  onClose,
+  onOpenLogos,
+  surface,
+  asked,
+}: {
+  view: RewardsView;
+  onClose: (how: 'closed' | 'not_now' | 'acted') => void;
+  onOpenLogos?: () => void;
+  surface: 'core' | 'logos';
+  asked: boolean;
+}) {
+  const id = useId().replace(/:/g, '');
+  const goRef = useRef<HTMLButtonElement>(null);
   const c = view.challenge;
+  const days = view.limits?.challengeDays ?? 7;
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose('closed');
+    };
+    window.addEventListener('keydown', onKey);
+    if (asked) goRef.current?.focus({ preventScroll: true });
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose, asked]);
   if (c?.state !== 'open') return null;
   return (
-    <>
-      <ChallengeVisual n={c.progress} of={c.target} days={limits.challenge} />
-      <p className="rwp-eyebrow">The 5-Node Challenge</p>
-      <h2 id={`${id}-t`} className="rwp-title">
-        Map <em>{c.target}</em> ideas. Get <em>{limits.challenge}</em> days.
-      </h2>
-      <p id={`${id}-b`} className="rwp-body">
-        Create a {c.target}-node mind map. Get {limits.challenge} days of Socria One free.
+    <div className="rwp-card" role="dialog" aria-labelledby={`${id}-t`} aria-describedby={`${id}-b`}>
+      <button type="button" className="rwp-card-x" onClick={() => onClose('closed')} aria-label="Close">
+        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+          <path d="M18 6 6 18M6 6l12 12" />
+        </svg>
+      </button>
+      <p className="rwp-card-eyebrow">The 5-Node Challenge</p>
+      <p id={`${id}-t`} className="rwp-card-title">
+        Map <em>{c.target}</em> ideas. Get <em>{days}</em> days of Socria One.
       </p>
       <div
-        className="rwp-meter"
+        className="rwp-card-meter"
         role="progressbar"
         aria-valuemin={0}
         aria-valuemax={c.target}
         aria-valuenow={c.progress}
         aria-label="5-Node Challenge progress"
       >
-        <span className="rwp-meter-bar">
+        <span className="rwp-card-bar">
           <i style={{ width: `${(100 * c.progress) / Math.max(1, c.target)}%` }} />
         </span>
-        <span className="rwp-meter-n">
-          Progress: {c.progress}/{c.target} nodes
+        <span className="rwp-card-n">
+          {c.progress}/{c.target}
         </span>
       </div>
-      <p className="rwp-note">
+      <p id={`${id}-b`} className="rwp-card-note">
         {c.needsOwnWords
-          ? 'Your map is there — add a sentence of your own to that conversation. A starting card sent as it is doesn’t count as your words.'
-          : 'Think something through in Logos. Five connected ideas from what you say is all it takes — no card needed, nothing to share.'}
+          ? 'Your map is there — add a sentence of your own to that conversation.'
+          : 'Think something through in Logos: five connected ideas from what you say.'}
       </p>
-      <Stack limits={limits} member={false} />
-      <div className="rwp-acts">
-        <button type="button" className="rwp-not" onClick={() => onClose('not_now')}>
+      <div className="rwp-card-acts">
+        <button type="button" className="rwp-card-not" onClick={() => onClose('not_now')}>
           Not now
         </button>
         {surface === 'core' && onOpenLogos ? (
           <button
             ref={goRef}
             type="button"
-            className="rwp-go"
+            className="rwp-card-go"
             onClick={() => {
               onClose('acted');
               onOpenLogos();
             }}
           >
-            Start a map in Logos <span aria-hidden="true">→</span>
+            Start a map <span aria-hidden="true">→</span>
           </button>
         ) : (
-          <button ref={goRef} type="button" className="rwp-go" onClick={() => onClose('acted')}>
+          <button ref={goRef} type="button" className="rwp-card-go" onClick={() => onClose('acted')}>
             Back to my map <span aria-hidden="true">→</span>
           </button>
         )}
       </div>
-    </>
+    </div>
   );
 }
 

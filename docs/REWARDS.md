@@ -120,9 +120,11 @@ blue, each with a picture:
 - **Give 7, Get 7.** Two gifts, one going each way. Below them, the person's
   link with Copy, the stacking line, and the fine print: the activation rule,
   the monthly limit, and what happens to a member's days.
-- **The 5-Node Challenge.** A small map lit as far as their best map has come,
-  progress as the server counted it, and the way into Logos. From Core the
-  button opens the newest Logos on offer; in Logos it goes back to the map.
+- **The 5-Node Challenge.** A small card under the marks rather than a
+  plate: not modal, no scrim, taking focus only when its mark was pressed.
+  The offer, progress as the server counted it, one line on what counts,
+  "Not now", and the way into Logos. From Core the button opens the newest
+  Logos on offer; in Logos it goes back to the map.
 - **Complete.** On Core only (Logos has its chip), once per browser, in the
   answer that granted it.
 
@@ -135,17 +137,24 @@ A popup opens in one of three ways:
    - **Once a visit at most.** The decision is made once per tab session
      (sessionStorage). If the visit can't be remembered, nothing opens by
      itself.
-   - **Rarely.** Never two within 20 hours of each other. The same one no
-     sooner than 3 days. "Not now" rests it 10 days, and doing what it asked
-     (copying the link, opening Logos) rests it 14.
-   - **They take turns.** The one shown longest ago goes first. Of two never
-     shown, the challenge goes first.
+   - **A browser's first two arrivals: nothing.** On the third, the
+     challenge, if it is open and has never been shown — its week is short.
+   - **Then a roll on each arrival.** 1 in 3; 1 in 4 once only the gift is
+     left (the challenge done, or a member). When both may open, the
+     challenge 60% of the time, the gift 40%.
+   - **Caps.** Never two within 20 hours, and no more than three in seven
+     days (two once only the gift is left). The same one no sooner than 4
+     days. "Not now" rests it 4 days; three "Not now"s in a row rest it 60
+     days. Doing what it asked (copying the link, opening Logos) rests it 14
+     days and starts the "Not now" count again.
    - **Only into a quiet room.** It waits until everything is known and the
      page is settled. It doesn't open if the One invitation, the tour or
      onboarding's first exchange has spoken this visit. It never opens over
      an open dialog (`[aria-modal="true"]`), the tour or Find.
 
-The memory is this browser's (`socria.rewards.popup.v1`) and holds times only.
+The memory is this browser's (`socria.rewards.popup.v1`) and holds times and
+counts only: when each was shown, put away or acted on, a fortnight of shows
+for the week's cap, the "Not now" run, and how many arrivals there have been.
 Like every `socria.` key, it's swept on sign-out. No countdowns, streaks or
 "only today", the same as everywhere else Rewards appears.
 
@@ -459,9 +468,11 @@ exist. Entitlements are exactly as before.
   - every attribution refusal, including self-referral;
   - A → B → C chains and direct-only rewards;
   - monthly caps through the program, and the status the panel shows.
-- `test/rewards-popups.test.mjs` (60 checks) covers:
-  - the popup rule: what may open by itself, the gaps, turns, "Not now" and
-    acting, a clock set back, and a tolerant memory;
+- `test/rewards-popups.test.mjs` (78 checks) covers:
+  - the popup rule: the quiet first arrivals, the roll and the 60/40 split
+    (with a 6,000-arrival simulation), the day gap and the week's cap, four
+    days each, "Not now" and three in a row, acting, a clock set back, and
+    a tolerant memory;
   - the marks in both rails, signed in only, and Logos saying the challenge
     once;
   - one popup per surface, only into a quiet room, once a visit;

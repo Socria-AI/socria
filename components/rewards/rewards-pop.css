@@ -20,7 +20,8 @@
 
 /* ── the marks, beside the Socria mark ────────────────────────────────── */
 .app-root .s-top .rwb { margin-right: auto; }
-.rwb { display: inline-flex; align-items: center; gap: 3px; margin-left: 2px; }
+/* a little further from the Socria mark, so the two read as two things */
+.rwb { display: inline-flex; align-items: center; gap: 3px; margin-left: 12px; }
 .rwb-i {
   position: relative; isolation: isolate;
   display: grid; place-items: center;
@@ -283,3 +284,52 @@
   .rwp-edge.on { stroke-dashoffset: 0; }
   .rwp-sparks path { opacity: 0.8; }
 }
+
+/* ── the challenge, as a small card under the marks ───────────────────── */
+.rwp-card {
+  --rwp-cream: #F3ECD8;
+  --rwp-cream-70: rgba(243, 236, 216, 0.72);
+  --rwp-cream-50: rgba(243, 236, 216, 0.5);
+  --rwp-gold: #F0C866;
+  position: fixed; z-index: 58; top: 58px; left: 16px;
+  width: min(300px, calc(100vw - 32px));
+  padding: 13px 15px 12px;
+  font-family: var(--font-sans, system-ui, -apple-system, 'Segoe UI', sans-serif);
+  color: var(--rwp-cream);
+  background:
+    radial-gradient(90% 80% at 30% 0%, rgba(240, 200, 102, 0.14), transparent 62%),
+    linear-gradient(160deg, #3d5726 0%, #2a3f1b 55%, #1d2c12 100%);
+  border: 1px solid rgba(243, 236, 216, 0.16); border-radius: 12px;
+  box-shadow: 0 22px 50px -24px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(240, 200, 102, 0.05);
+  animation: rwpCardIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.rwp-card-x {
+  position: absolute; top: 8px; right: 8px; display: grid; place-items: center;
+  width: 24px; height: 24px; padding: 0; border: 0; border-radius: 50%;
+  background: transparent; color: var(--rwp-cream-50); cursor: pointer;
+}
+.rwp-card-x:hover { color: var(--rwp-cream); background: rgba(243, 236, 216, 0.08); }
+.rwp-card-eyebrow { margin: 0 0 5px; font-size: 9px; font-weight: 600; letter-spacing: 0.26em; text-transform: uppercase; color: var(--rwp-gold); }
+.rwp-card-title {
+  margin: 0 22px 9px 0; font-family: var(--font-serif, Georgia, serif), 'Instrument Serif', Georgia, serif;
+  font-size: 18px; line-height: 1.18; color: var(--rwp-cream);
+}
+.rwp-card-title em { font-style: italic; color: #FBE7A6; }
+.rwp-card-meter { display: flex; align-items: center; gap: 9px; margin: 0 0 7px; }
+.rwp-card-bar { flex: 1 1 auto; height: 5px; border-radius: 999px; background: rgba(243, 236, 216, 0.14); overflow: hidden; }
+.rwp-card-bar i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #E3AE45, #FBE7A6); }
+.rwp-card-n { font-size: 11.5px; font-variant-numeric: tabular-nums; color: var(--rwp-cream-70); }
+.rwp-card-note { margin: 0 0 10px; font-size: 12px; line-height: 1.45; color: var(--rwp-cream-50); }
+.rwp-card-acts { display: flex; align-items: center; justify-content: flex-end; gap: 12px; }
+.rwp-card-not { background: none; border: 0; padding: 4px 2px; font: inherit; font-size: 12px; color: var(--rwp-cream-70); cursor: pointer; }
+.rwp-card-not:hover { color: var(--rwp-cream); }
+.rwp-card-go {
+  display: inline-flex; align-items: center; gap: 5px; min-height: 30px; padding: 0 13px;
+  border: 0; border-radius: 999px; cursor: pointer; font: inherit; font-size: 12.5px; font-weight: 600; color: #1d2710;
+  background: linear-gradient(180deg, #FBE7A6, #E9B94F);
+  box-shadow: 0 6px 16px -8px rgba(240, 200, 102, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+.rwp-card-go:hover { filter: brightness(1.05); }
+.rwp-card-go:focus-visible, .rwp-card-not:focus-visible, .rwp-card-x:focus-visible { outline: 2px solid var(--rwp-gold); outline-offset: 2px; }
+@keyframes rwpCardIn { from { opacity: 0; transform: translateY(-6px) scale(0.98); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .rwp-card { animation: none; } }
