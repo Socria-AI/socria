@@ -11,10 +11,11 @@
 // environment variable is text somebody typed, and a typo must not become
 // "unlimited".
 //
-// ON OR OFF. Rewards are on everywhere but production, and on production only
-// once REWARDS_ENABLED=1 is set — because turning them on there means the
-// tables exist (supabase/schema.sql) and somebody decided to start giving
-// Socria One away. REWARDS_ENABLED=0 turns them off anywhere.
+// ON OR OFF. Rewards are on everywhere, production included — the owner
+// decided to start (9 October 2026); until then production waited for
+// REWARDS_ENABLED=1. REWARDS_ENABLED=0 turns them off anywhere. On a database
+// without the reward tables (supabase/schema.sql) the programme answers
+// "unavailable" and stays out of sight, so being on never breaks a page.
 //
 // PURE: reads only the env object it is handed.
 
@@ -83,15 +84,8 @@ export const DISPOSABLE_DOMAINS = [
   'throwawaymail.com',
 ];
 
-function isProductionEnv(env: Env): boolean {
-  const v = env.NEXT_PUBLIC_VERCEL_ENV || env.VERCEL_ENV;
-  if (v === 'production' || v === 'preview' || v === 'development') return v === 'production';
-  return env.NODE_ENV === 'production';
-}
-
 export function rewardsConfig(env: Env = typeof process !== 'undefined' ? (process.env as Env) : {}): RewardsConfig {
-  const flag = env.REWARDS_ENABLED;
-  const enabled = flag === '0' ? false : flag === '1' ? true : !isProductionEnv(env);
+  const enabled = env.REWARDS_ENABLED !== '0';
   const extra = (env.REWARDS_BLOCKED_EMAIL_DOMAINS || '')
     .split(',')
     .map((s) => s.trim().toLowerCase().replace(/^@/, ''))

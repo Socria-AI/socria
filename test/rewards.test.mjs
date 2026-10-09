@@ -39,8 +39,9 @@ console.log('=== configuration: defaults, overrides, and nothing becomes unlimit
   ok('limits are configurable', c2.referral.monthlyCap === 6 && c2.bankCapDays === 45 && c2.challenge.nodes === 7);
   const junk = rewardsConfig({ REWARDS_REFERRAL_MONTHLY_CAP: 'lots', REWARDS_BANK_CAP_DAYS: '99999', REWARDS_CHALLENGE_DAYS: '-3' });
   ok('a typo is the default, an extreme is clamped', junk.referral.monthlyCap === 4 && junk.bankCapDays === 365 && junk.challenge.days === 1);
-  ok('on outside production by default', rewardsConfig({ VERCEL_ENV: 'preview' }).enabled && rewardsConfig({ NODE_ENV: 'development' }).enabled);
-  ok('off on production until switched on', !rewardsConfig({ VERCEL_ENV: 'production' }).enabled && rewardsConfig({ VERCEL_ENV: 'production', REWARDS_ENABLED: '1' }).enabled);
+  ok('on everywhere by default', rewardsConfig({ VERCEL_ENV: 'preview' }).enabled && rewardsConfig({ NODE_ENV: 'development' }).enabled);
+  ok('production included', rewardsConfig({ VERCEL_ENV: 'production' }).enabled && rewardsConfig({ NEXT_PUBLIC_VERCEL_ENV: 'production', NODE_ENV: 'production' }).enabled && rewardsConfig({ VERCEL_ENV: 'production', REWARDS_ENABLED: '1' }).enabled);
+  ok('  and REWARDS_ENABLED=0 still turns it off there', !rewardsConfig({ VERCEL_ENV: 'production', REWARDS_ENABLED: '0' }).enabled);
   ok('and REWARDS_ENABLED=0 turns it off anywhere', !rewardsConfig({ VERCEL_ENV: 'preview', REWARDS_ENABLED: '0' }).enabled);
   ok('disposable inboxes are blocked, and more can be added', cfg.referral.blockedDomains.includes('mailinator.com') && rewardsConfig({ REWARDS_BLOCKED_EMAIL_DOMAINS: '@burner.example, not a domain' }).referral.blockedDomains.includes('burner.example') && DISPOSABLE_DOMAINS.length > 5);
 }

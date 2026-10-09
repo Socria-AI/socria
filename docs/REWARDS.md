@@ -407,7 +407,7 @@ All optional. These defaults are the offer as written.
 
 | variable | default | meaning |
 |---|---|---|
-| `REWARDS_ENABLED` | on outside production; **off in production** | `1` turns it on, `0` turns it off anywhere |
+| `REWARDS_ENABLED` | **on everywhere**, production included | `0` turns it off anywhere |
 | `REWARDS_CHALLENGE_NODES` | 5 | nodes in one connected map |
 | `REWARDS_CHALLENGE_DAYS` | 7 | days for completing it |
 | `REWARDS_CHALLENGE_MIN_WORDS` | 5 | own words required in that session |
@@ -426,16 +426,22 @@ All optional. These defaults are the offer as written.
 
 ## Turning it on
 
+Rewards are on by default everywhere, production included (since 9 October
+2026; before that, production waited for `REWARDS_ENABLED=1`). What a
+database needs:
+
 1. Run the "Socria Rewards" section of `supabase/schema.sql`, then
    `supabase/rls.sql`. Both are safe to re-run.
 2. Deploy. `vercel.json` adds the `/api/cron/rewards` daily cron, which uses
    the existing `CRON_SECRET`.
-3. Set `REWARDS_ENABLED=1` on production when you decide to start.
+
+`REWARDS_ENABLED=0` turns the programme off anywhere.
 
 No Stripe configuration is needed or changed.
 
-Without the tables, Rewards answers "unavailable" and stays out of sight.
-Entitlements are exactly as before.
+Without the tables, Rewards answers "unavailable" and stays out of sight:
+on production, the gift and the challenge do not appear until the tables
+exist. Entitlements are exactly as before.
 
 ## Tests
 
