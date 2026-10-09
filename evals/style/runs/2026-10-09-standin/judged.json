@@ -1,0 +1,58 @@
+{
+  "right": 44,
+  "all": 48,
+  "per": {
+    "thinker": {
+      "right": 10,
+      "all": 12
+    },
+    "direct": {
+      "right": 11,
+      "all": 12
+    },
+    "companion": {
+      "right": 12,
+      "all": 12
+    },
+    "challenger": {
+      "right": 11,
+      "all": 12
+    }
+  },
+  "byProduct": {
+    "core": {
+      "right": 22,
+      "all": 24
+    },
+    "logos": {
+      "right": 22,
+      "all": 24
+    }
+  },
+  "confusion": {
+    "thinker": {
+      "thinker": 10,
+      "direct": 1,
+      "companion": 0,
+      "challenger": 1
+    },
+    "direct": {
+      "thinker": 1,
+      "direct": 11,
+      "companion": 0,
+      "challenger": 0
+    },
+    "companion": {
+      "thinker": 0,
+      "direct": 0,
+      "companion": 12,
+      "challenger": 0
+    },
+    "challenger": {
+      "thinker": 1,
+      "direct": 0,
+      "companion": 0,
+      "challenger": 11
+    }
+  }
+}

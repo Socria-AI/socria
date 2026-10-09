@@ -1,0 +1,14 @@
+{
+  "core/c1": {"A": "thinker", "B": "challenger", "C": "companion", "D": "direct"},
+  "core/c2": {"A": "thinker", "B": "direct", "C": "challenger", "D": "companion"},
+  "core/c3": {"A": "companion", "B": "challenger", "C": "thinker", "D": "direct"},
+  "core/c4": {"A": "challenger", "B": "companion", "C": "thinker", "D": "direct"},
+  "core/c5": {"A": "thinker", "B": "challenger", "C": "direct", "D": "companion"},
+  "core/c6": {"A": "challenger", "B": "companion", "C": "direct", "D": "thinker"},
+  "logos/l1": {"A": "thinker", "B": "direct", "C": "challenger", "D": "companion"},
+  "logos/l2": {"A": "challenger", "B": "thinker", "C": "direct", "D": "companion"},
+  "logos/l3": {"A": "challenger", "B": "direct", "C": "companion", "D": "thinker"},
+  "logos/l4": {"A": "thinker", "B": "companion", "C": "challenger", "D": "direct"},
+  "logos/l5": {"A": "thinker", "B": "challenger", "C": "direct", "D": "companion"},
+  "logos/l6": {"A": "companion", "B": "direct", "C": "thinker", "D": "challenger"}
+}

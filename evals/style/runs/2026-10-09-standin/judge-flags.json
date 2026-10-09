@@ -1,0 +1,18 @@
+{
+  "flags": [],
+  "confidence": {
+    "core/c1": "low",
+    "core/c2": "medium",
+    "core/c3": "medium",
+    "core/c4": "low",
+    "core/c5": "low",
+    "core/c6": "low",
+    "logos/l1": "high",
+    "logos/l2": "medium",
+    "logos/l3": "medium",
+    "logos/l4": "high",
+    "logos/l5": "high",
+    "logos/l6": "low"
+  },
+  "notes": "Direct was easy everywhere (always the shortest, statement-only reply), companion usually opened by naming something the person got right or added a playful line, and the Logos challenger was signposted by 'the part to distrust' or 'what result would change your mind'. The hard split was Core thinker vs challenger: no Core reply asks a question and both lead with the weak point and steelman, so I separated them on relentless rebuttal and evidence/test framing (challenger) versus Socratic reframes and dry humour (thinker); c5 has no warmth cues at all, and in c6/l6 the quieted styles nearly converge."
+}

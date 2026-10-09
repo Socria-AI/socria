@@ -155,9 +155,30 @@ It also checks what must not change:
 
 ## Results
 
-- **Recorded runs.** None of the production models has been run yet. The
-  sandbox this was built in cannot reach the model API. To run them, use
-  `node evals/style/run.mjs live --out <dir>` with a key, then `score`.
-- **Stand-in runs.** The run in which subagents play the model, with a blind
-  judge, is recorded here when it completes. It measures the prompts with a
-  capable model, not with the production models.
+**Production models.** No run is recorded yet. The sandbox this was built in
+cannot reach the model API. To run one, use
+`node evals/style/run.mjs live --out <dir>` with a key, then `score` and
+`judged`.
+
+**Stand-in, 2026-10-09** (`evals/style/runs/2026-10-09-standin/`). Subagents
+played the model exactly as each prompt said, and a blind judge matched the
+replies to styles. This measures the prompts with a capable model, not the
+production model.
+
+- **Matching.** The blind reader matched 44 of 48 replies to their style
+  (92%; chance is 25%), 22/24 on each product. The only misreads were the
+  two turns where the person is struggling, where every style is designed to
+  go quiet. Outside them it was 40/40.
+- **Guardrails.** Nothing was flagged: no factual or mathematical error, no
+  deciding for the person, no flattery, no pushing on or joking at someone
+  struggling, no mockery.
+- **A finding that changed the prompts.** In round 1, the Logos Challenger
+  pushed on "I'm about to give up". Logos has no per-turn register, so the
+  struggling-person line was added to every style block. In round 2 the same
+  turn reads "Before you put it down, let's look at it together…".
+- **Length.**
+  - The Core Direct is about a third of the default's length: 69 words a
+    reply against 212.
+  - The Logos Direct is only slightly shorter than the Logos default (58
+    against 64). The default is already two to four sentences, so the Direct
+    differs there by asking nothing and building first.
