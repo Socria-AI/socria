@@ -30,11 +30,11 @@ removed. The first map still rises card by card once, with nothing to press.
 
 ## Logos 3, where it is offered
 
-Logos 3 is offered everywhere but production, and on production once its code
-has been entered (`isOffered('logos-3')` in `lib/socria-model-store.ts`, the
-one rule every menu uses). Wherever it is, onboarding says so, and nowhere else
-does it. Opening Logos 3 to everyone changes all of this at once, with no copy
-to edit.
+Logos 3 is offered on every deployment, production included
+(`isOffered('logos-3')` in `lib/socria-model-store.ts`, the one rule every menu
+uses). Until 9 October 2026 production listed it only once its access code had
+been entered; opening it to everyone changed all of this at once, with no copy
+to edit. Where Logos 3 is not offered, onboarding falls back to Logos 2.
 
 - **The model question.** "See it laid out" names *Socria Logos 3*: "Your
   reasoning drawn as a live map, and what you describe built beside it: models

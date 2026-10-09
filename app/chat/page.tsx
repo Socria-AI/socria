@@ -2468,8 +2468,8 @@ export default function ChatPage() {
     // being ignored: the link was somebody's intent to open the environment, and
     // dropping them on whatever they happened to be on last answers a different
     // question.
-    // The same for a model behind an access code nobody here has entered
-    // (Logos 3 on production): the nearest surface of its kind, Logos 2.
+    // The same for a model behind an access code nobody here has entered (a
+    // model naming a `gate`; none does today): the nearest surface of its kind.
     const asked =
       typeof want === 'string' && want in SOCRIA_MODELS && (SOCRIA_MODELS[want as SocriaModel].withdrawn || !isOffered(want as SocriaModel))
         ? withdrawnTo(want as SocriaModel)

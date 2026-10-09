@@ -80,8 +80,8 @@ const HOW_2: How[] = [
   TALK,
   { model: 'logos-2', title: 'See it laid out', line: 'The same conversation, with your reasoning drawn as a live map beside it.', name: 'Socria Logos 2' },
 ];
-// LOGOS 3, WHERE IT IS OFFERED (lib/socria-model-store isOffered: everywhere but
-// production, and on production once its code is entered). It is the same
+// LOGOS 3, WHERE IT IS OFFERED (lib/socria-model-store isOffered: every
+// deployment, production included; HOW_2 is the fallback). It is the same
 // "see it laid out", and says the two things it adds: what you describe is
 // built beside the map, and someone can think it through with you.
 const HOW_3: How[] = [

@@ -1661,8 +1661,9 @@ export const SOCRIA_MODELS: Record<SocriaModel, ModelConfig> = {
     logosSurface: true,
     collab: true,
     workspace: true,
-    // On production, opened by the code entered under Manage Account.
-    gate: 'logos3',
+    // No `gate`: open to everyone on production. It was listed there only once
+    // its code had been entered under Manage Account (lib/feature-gates.ts);
+    // that gate still exists, and opens nothing until a model names it again.
   },
   // Core 4 — built, and selectable. It carried `soon` while it was an
   // announcement, which made the picker grey it out; that flag came off when

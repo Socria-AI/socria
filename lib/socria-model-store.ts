@@ -162,6 +162,14 @@ export function isOffered(model: SocriaModel, gates: readonly GateId[] = openGat
  */
 export const OTHER_MODELS: readonly SocriaModel[] = ['core-2', 'core-3', 'logos'];
 
+/**
+ * Whether any model waits behind a feature gate. While none does, an access
+ * code has nothing to open, and Manage Account does not ask for one.
+ */
+export function anyModelGated(): boolean {
+  return (Object.keys(SOCRIA_MODELS) as SocriaModel[]).some((m) => !!SOCRIA_MODELS[m].gate);
+}
+
 /** Every model a menu may show, in registry order. */
 export function offeredModels(gates: readonly GateId[] = openGates()): SocriaModel[] {
   return (Object.keys(SOCRIA_MODELS) as SocriaModel[]).filter((m) => isOffered(m, gates));

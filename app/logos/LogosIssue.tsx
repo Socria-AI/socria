@@ -355,7 +355,8 @@ export function LogosIssue() {
             Bring a question you have been carrying. Watch your own thinking take a shape.
           </p>
           <div className="row rv d2">
-            <Link className="btn-xl" href="/chat?model=logos">
+            {/* The newest Logos; a deployment that does not offer it opens the nearest one. */}
+            <Link className="btn-xl" href="/chat?model=logos-3">
               Open Logos <span aria-hidden="true">→</span>
             </Link>
             <Link className="btn-link" href="/one">

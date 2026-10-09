@@ -89,7 +89,7 @@ console.log('\n=== replaying onboarding, for testing ===');
   ok('replaying the notes takes back found.* and the hints seen', Object.keys(withoutMilestones(rec, REPLAYS.found.milestones).at).every((m) => !m.startsWith('found.')) && REPLAYS.found.keys.includes('socria.hints.seen.v1'));
   const ob = read('components/onboarding/Onboarding.tsx');
   ok('/onboarding?replay=1 resets, then loads clean — never on production', /params\?\.get\('replay'\) === '1' && !isProduction\(\)/.test(ob) && /window\.location\.replace/.test(ob));
-  ok('the Logos page\'s door leans toward seeing it laid out', /suggest=\{toLogos \? 'logos-2' : null\}/.test(ob));
+  ok('the Logos page\'s door leans toward seeing it laid out', /suggest=\{toLogos \? 'logos-3' : null\}/.test(ob));
   const sheet = read('components/account/AccountSheet.tsx');
   const tools = read('components/account/TestingTools.tsx');
   ok('Manage Account has a Testing section', /<TestingTools onClose=\{onClose\} \/>/.test(sheet) && /<span className="lbl">Testing<\/span>/.test(tools));

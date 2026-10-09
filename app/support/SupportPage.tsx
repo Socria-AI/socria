@@ -177,6 +177,10 @@ export function SupportPage() {
                 </div>
                 <div>
                   <span className="dt" />
+                  Logos 3<span className="st">Open to everyone</span>
+                </div>
+                <div>
+                  <span className="dt" />
                   Logos 2<span className="st">Working</span>
                 </div>
                 <div>

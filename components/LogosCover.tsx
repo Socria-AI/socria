@@ -9,10 +9,10 @@
 // without an account meets on the Logos surface itself, so the two doors say
 // the same thing in the same words.
 //
-// WHICH LOGOS. Logos 3 wherever it is offered; Logos 2 where it is not yet
-// (production, before the logos3 gate opens). The caller says which, and the
-// cover names it, shows it and opens it — never one name over the other's
-// surface.
+// WHICH LOGOS. Logos 3 wherever it is offered, which is now every deployment;
+// Logos 2 only where it is not (a model gated again, or withdrawn). The caller
+// says which, and the cover names it, shows it and opens it — never one name
+// over the other's surface.
 //
 // THE STAGE IS THE REAL THING, which is the only rule that keeps a cover
 // honest. For Logos 3 it is one of the showcase's items (lib/logos3-showcase.ts)

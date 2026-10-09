@@ -73,8 +73,9 @@ export function Onboarding() {
       // choose between two things they cannot open yet.
       askModel={isSignedIn !== false}
       defaultName={user?.firstName ?? null}
-      // the Logos page's own door leans toward seeing it laid out
-      suggest={toLogos ? 'logos-2' : null}
+      // the Logos page's own door leans toward seeing it laid out — Logos 3, or
+      // whichever Logos this browser is offered (FirstRunIntro matches any Logos)
+      suggest={toLogos ? 'logos-3' : null}
       onStart={(text, intent, model) => {
         firstRun.reach('socria.intro');
         carry(typeof sessionStorage !== 'undefined' ? sessionStorage : null, {

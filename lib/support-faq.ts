@@ -63,14 +63,14 @@ export const TOPICS: FaqTopic[] = [
         q: 'Do I need an account to use it?',
         a: [
           'For Core 2 and Core 3.1, no — they work signed out for a handful of sessions, and the conversation stays in this browser rather than being saved anywhere.',
-          'Core 4 and Logos 2 need an account. Core 4 keeps a record of the reasoning itself, and a Thinking Map has to be kept somewhere.',
+          'Core 4 and Logos need an account. Core 4 keeps a record of the reasoning itself, and a Thinking Map has to be kept somewhere.',
         ],
       },
       {
         q: 'Which model should I pick?',
         a: [
           '<b>Core 4</b> for almost everything. It decides each turn which part of the work is yours, does the research and the checking in full, and hands back the step that would have made you more capable for taking it.',
-          '<b>Logos 2</b> when you want to see your reasoning drawn as a map beside the conversation. <b>Core 3.1</b> if you would rather set the depth yourself.',
+          '<b>Logos 3</b> when you want to see your reasoning drawn as a map beside the conversation, with what you describe built as models you can move — alone or with someone. <b>Core 3.1</b> if you would rather set the depth yourself.',
         ],
       },
       {

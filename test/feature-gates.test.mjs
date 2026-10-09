@@ -1,17 +1,20 @@
-// Feature gates — an access code entered under Manage Account opens Logos 3
-// on production (lib/feature-gates.ts, lib/feature-gates-server.ts).
+// Feature gates — an access code entered under Manage Account opens a model
+// that names a gate, on production (lib/feature-gates.ts,
+// lib/feature-gates-server.ts). Logos 3 was the first; it is open to everyone
+// now, so no model names a gate and Manage Account does not ask for a code.
 //
 // Held here: the code is checked on the server, in any case and spacing; it
 // never ships to the browser; what a browser or an account remembers can only
-// name a gate that exists; and Logos 3 is hidden on production until its gate
-// is open, while dev and preview list it freely.
+// name a gate that exists; a gated model would be hidden on production until
+// its gate is open; and Logos 3 is no longer gated.
 
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { accountGates, gateOpen, normalizeCode, openGates } from './.tmp/feature-gates.mjs';
 import { gateForCode } from './.tmp/feature-gates-server.mjs';
-import { isOffered, offeredModels } from './.tmp/socria-model-store.mjs';
+import { anyModelGated, isOffered, offeredModels } from './.tmp/socria-model-store.mjs';
+import { SOCRIA_MODELS } from './.tmp/socria-prompt.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (p) => readFileSync(join(root, p), 'utf8');
@@ -40,9 +43,18 @@ ok('an account’s gates are read from its metadata, and only real ones', accoun
 console.log('\n=== Logos 3 on production ===');
 const env = process.env.VERCEL_ENV;
 process.env.VERCEL_ENV = 'production';
-ok('hidden until its gate is open', !isOffered('logos-3', []) && !offeredModels([]).includes('logos-3'));
-ok('listed once it is', isOffered('logos-3', ['logos3']) && offeredModels(['logos3']).includes('logos-3'));
+ok('open to everyone: listed with no code entered', isOffered('logos-3', []) && offeredModels([]).includes('logos-3'));
+ok('  and still listed for someone who entered the old code', isOffered('logos-3', ['logos3']));
 ok('Logos 2 and the Cores are not gated', isOffered('logos-2', []) && isOffered('core-4', []));
+ok('no model names a gate, so there is nothing for a code to open', !anyModelGated() && Object.values(SOCRIA_MODELS).every((m) => !m.gate));
+{
+  // The rule itself stays, for the next model that names a gate. (Each module
+  // under test is bundled with its own copy of the registry, so the rule is
+  // read from the source rather than exercised with a borrowed gate.)
+  const store = read('lib/socria-model-store.ts');
+  ok('a gated model would be hidden on production until its gate is open', /!\(m\.gate && isProduction\(\) && !gates\.includes\(m\.gate\)\)/.test(store));
+  ok('  and Manage Account would ask for its code', /some\(\(m\) => !!SOCRIA_MODELS\[m\]\.gate\)/.test(store));
+}
 process.env.VERCEL_ENV = 'preview';
 ok('dev and preview list it freely', isOffered('logos-3', []));
 if (env === undefined) delete process.env.VERCEL_ENV; else process.env.VERCEL_ENV = env;
@@ -50,7 +62,7 @@ if (env === undefined) delete process.env.VERCEL_ENV; else process.env.VERCEL_EN
 console.log('\n=== wiring ===');
 ok('the code never ships to the browser', !/LOGOS3['"]/.test(read('lib/feature-gates.ts')) && !/LOGOS3['"]/.test(read('components/account/AccessCode.tsx')) && /import 'server-only'/.test(read('lib/feature-gates-server.ts')));
 ok('the route checks it, signed in and rate-limited', /gateForCode\(body\?\.code\)/.test(read('app/api/access/gate/route.ts')) && /enforceRateLimit/.test(read('app/api/access/gate/route.ts')) && /Unauthorized|Sign in/.test(read('app/api/access/gate/route.ts')));
-ok('Manage Account has the field', /<AccessCode onOpened=\{onClose\} \/>/.test(read('components/account/AccountSheet.tsx')));
+ok('Manage Account has the field, shown only while a model is gated', /\{anyModelGated\(\) && \(\s*<div className="sec">\s*<span className="lbl">Access code<\/span>\s*<AccessCode onOpened=\{onClose\} \/>/.test(read('components/account/AccountSheet.tsx')));
 ok('the model menu re-reads what it offers when a gate opens', /GATE_CHANGED/.test(read('components/ModelPicker.tsx')));
 ok('a link to Logos 3 obeys the same rule as the menu', /isOffered\(m as SocriaModel\)/.test(read('app/chat/page.tsx')));
 

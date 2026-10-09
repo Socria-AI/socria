@@ -54,16 +54,13 @@ console.log('\n=== offered everywhere, production included ===');
 {
   for (const env of ['production', 'preview']) {
     withEnv({ NEXT_PUBLIC_VERCEL_ENV: env, VERCEL_ENV: env }, () => {
-      // On production it opens with its access code (Manage Account → Access
-      // code, test/feature-gates.test.mjs); everywhere else it is simply there.
-      if (env === 'production') {
-        ok('on production, hidden until its access code is entered', !isOffered('logos-3', []) && isOffered('logos-3', ['logos3']));
-      } else {
-        ok(`offered on ${env}`, isOffered('logos-3', []) && offeredModels([]).includes('logos-3'));
-      }
+      // No access code any more: it used to open on production only with one
+      // (test/feature-gates.test.mjs); now it is simply there, everywhere.
+      ok(`offered on ${env}, with no code entered`, isOffered('logos-3', []) && offeredModels([]).includes('logos-3'));
     });
   }
   ok('it is not marked dev-only any more', !SOCRIA_MODELS['logos-3'].devOnly);
+  ok('  nor behind a gate', !SOCRIA_MODELS['logos-3'].gate);
   ok('/chat opens a ?model= link by the same rule as the menus', /isOffered\(m as SocriaModel\)/.test(read('app/chat/page.tsx')));
   // The mechanism stays, for the next model that needs it.
   ok('a dev-only model would still be held back on production', /!\(m\.devOnly && isProduction\(\)\)/.test(read('lib/socria-model-store.ts')));

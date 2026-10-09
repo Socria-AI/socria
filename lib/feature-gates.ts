@@ -2,8 +2,11 @@
 //
 // FEATURE GATES — what a code entered under Manage Account opens.
 //
-// Some surfaces ship to production before they are open to everyone: Logos 3
-// is listed only for people who have entered its code. The code is checked on
+// Some surfaces ship to production before they are open to everyone: a model
+// that names a gate (`gate` in SOCRIA_MODELS) is listed there only for people
+// who have entered its code. Logos 3 was the first, and is now open to all, so
+// today no model names one; the `logos3` gate is kept, opening nothing, so a
+// code somebody already entered stays harmless. The code is checked on
 // the server (app/api/access/gate/route.ts), so it never ships in the browser
 // bundle; what the browser keeps is only the fact that a gate was opened —
 // in this browser (localStorage) and, for an account, on the account itself

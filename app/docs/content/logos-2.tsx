@@ -396,8 +396,10 @@ export function Logos2() {
       <H2 id="access">Access and plans</H2>
       <p>
         Logos 2 needs an account. Pick it from the model menu beside the chat
-        box, or open it from the <em>Try Logos 2</em> invitation; leaving it
-        returns you to whichever Core model you were on.
+        box; leaving it returns you to whichever Core model you were on. The{' '}
+        <em>Try Logos 3</em> invitation beside the chat opens{' '}
+        <Link href="/docs/logos-3">Logos 3</Link>, which is everything here
+        with a second seat and thinking depth.
       </p>
       <Callout tag="Free, then Socria One">
         Two lines of thinking a month are free. After that, Logos 2 is part of{' '}
