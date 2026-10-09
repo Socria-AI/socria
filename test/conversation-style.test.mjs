@@ -29,7 +29,6 @@ import {
 } from './.tmp/conversation-style.mjs';
 import { buildSystemPrompt, THINKING_DEPTHS } from './.tmp/socria-prompt.mjs';
 import { guidanceBlock } from './.tmp/logos-guidance.mjs';
-import { personalityBlock, DEFAULT_PERSONALITY } from './.tmp/logos-personality.mjs';
 import { styleBlock } from './.tmp/logos-style.mjs';
 import { LOGOS_CHAT_PROMPT } from './.tmp/logos.mjs';
 import { EMPTY_STATE } from './.tmp/cognition-state.mjs';
@@ -101,8 +100,8 @@ console.log('\n=== the other three speak — differently from each other, and di
     ok(`${s}: Core and Logos are written for their own identity`, blocks[`${s}/core`] !== blocks[`${s}/logos`]);
     ok(`${s}/core points at Core 4's per-turn decision`, /The decision at the end of this prompt still sets the move, how many questions you may ask and what stays with them/.test(blocks[`${s}/core`]));
     ok(`${s}/logos points at the authorship boundary and the Answer Guard`, /authorship boundary and the Answer Guard hold exactly as stated above/.test(blocks[`${s}/logos`]));
-    ok(`${s}/logos defers to a dial they moved, on that dial's aspect`, /Any Personality setting below that they moved fine-tunes one aspect of this style and wins on that aspect/.test(blocks[`${s}/logos`]));
-    ok(`${s}/core says nothing about Logos's dials`, !/Personality setting/.test(blocks[`${s}/core`]));
+    ok(`${s}/logos lets their written instructions layer over it`, /Their written instructions, if any below, layer over this style\./.test(blocks[`${s}/logos`]));
+    ok(`${s}: no block mentions dials — the style is the one personality`, !/Personality setting|dial/i.test(blocks[`${s}/core`] + blocks[`${s}/logos`]));
   }
 
   // What each one observably asks for — the directions, not adjectives.
@@ -198,11 +197,11 @@ console.log('\n=== Logos: the order every surface reads, and depth untouched ===
   for (const d of THINKING_DEPTHS.map((x) => x.id)) {
     const g = guidanceBlock(d, guard, 'chat');
     for (const s of CONVERSATION_STYLES) {
-      const prompt = LOGOS_CHAT_PROMPT + g + conversationStyleBlock(s, 'logos') +
-        personalityBlock({ ...DEFAULT_PERSONALITY, challenge: 'supportive' }) + styleBlock('Talk casually.');
+      const prompt = LOGOS_CHAT_PROMPT + g + conversationStyleBlock(s, 'logos') + styleBlock('Talk casually.');
       const iG = prompt.indexOf(g), iS = s === 'thinker' ? iG + g.length : prompt.indexOf('=== CONVERSATION STYLE'),
-        iP = prompt.indexOf('=== SOCRIA PERSONALITY'), iI = prompt.indexOf("=== HOW THEY'VE ASKED YOU");
-      ok(`${d}/${s}: depth and guard, then style, then dials, then their words`, iG > 0 && iG < iS && iS <= iP && iP < iI);
+        iI = prompt.indexOf("=== HOW THEY'VE ASKED YOU");
+      ok(`${d}/${s}: depth and guard, then style, then their words`, iG > 0 && iG < iS && iS < iI);
+      ok(`${d}/${s}: and no personality dials in between`, !prompt.includes('=== SOCRIA PERSONALITY'));
     }
     ok(`${d}: the depth block is the same whichever style`, CONVERSATION_STYLES.every(() => guidanceBlock(d, guard, 'chat') === g));
   }
@@ -350,13 +349,16 @@ console.log('\n=== wired end to end: the account, the routes, the clients ===');
   ok('  and into the system prompt', /projectBlock,\s*conversationStyle\s*\)/.test(chat));
 
   const lchat = read('app/api/logos/chat/route.ts');
-  const order = ['guidanceBlock(depthForPlan', "conversationStyleBlock(body?.conversationStyle, 'logos')", 'personalityBlock(body?.persona)', 'styleBlock(body?.style)'].map((x) => lchat.indexOf(x));
-  ok('Logos chat: guidance, style, dials, instructions — in that order', order.every((i, k) => i > 0 && (k === 0 || i > order[k - 1])), order.join());
-  for (const r of ['explore', 'draft']) {
+  const order = ['guidanceBlock(depthForPlan', "conversationStyleBlock(body?.conversationStyle, 'logos')", 'styleBlock(body?.style)'].map((x) => lchat.indexOf(x));
+  ok('Logos chat: guidance, style, instructions — in that order', order.every((i, k) => i > 0 && (k === 0 || i > order[k - 1])), order.join());
+  for (const r of ['chat', 'explore', 'draft']) {
     const src = read(`app/api/logos/${r}/route.ts`);
-    const a = src.indexOf("conversationStyleBlock(body?.conversationStyle, 'logos', { structured: true })"), b = src.indexOf('personalityBlock(body?.persona)');
-    ok(`Logos ${r}: the panel form, ahead of the dials`, a > 0 && a < b);
+    ok(`Logos ${r}: no personality dials are read — the style is the one personality`, !/personalityBlock|body\?\.persona|logos-personality/.test(src));
+    if (r === 'chat') continue;
+    const a = src.indexOf("conversationStyleBlock(body?.conversationStyle, 'logos', { structured: true })"), b = src.indexOf('styleBlock(body?.style)');
+    ok(`Logos ${r}: the panel form, ahead of their words`, a > 0 && a < b);
   }
+  ok('the Logos chat prompt\'s length and formatting are defaults their style or words may change', /This is the DEFAULT length: their Conversation Style or their own instructions further down may ask for another, and then theirs wins\./.test(LOGOS_CHAT_PROMPT) && /Structure only when they ask for it — in the conversation, or in their own instructions further down —/.test(LOGOS_CHAT_PROMPT) && !/dial/i.test(LOGOS_CHAT_PROMPT));
   ok('the Logos map route stays as it was — a map is structure, not voice', !read('app/api/logos/map/route.ts').includes('conversationStyle'));
 
   const app = read('components/LogosApp.tsx');

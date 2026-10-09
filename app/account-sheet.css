@@ -220,11 +220,8 @@
 .acct-sheet .link-act.out{color:var(--ink-70)}
 .acct-sheet .link-act.out:hover{color:var(--machine, #8a3b2b)}
 
-/* Socria Personality: Logos's nine dials, in Logos's own tokens (.lg-tokens),
-   then the person's own words. */
-.acct-sheet .persona .lg-persona-grid{margin-top:10px}
-.acct-sheet .persona .lg-persona-reset{margin-top:8px}
-.acct-sheet .persona-words{display:flex;flex-direction:column;gap:7px;margin-top:16px}
+/* Your own words, in Logos: the standing instructions. */
+.acct-sheet .persona-words{display:flex;flex-direction:column;gap:7px;margin-top:4px}
 .acct-sheet .persona-words-h{font-family:var(--font-sans, system-ui, -apple-system, 'Segoe UI', sans-serif);font-size:.66rem;font-weight:600;
   letter-spacing:var(--tracking-label);text-transform:uppercase;color:var(--ink-70)}
 .acct-sheet .persona-words textarea{width:100%;resize:vertical;min-height:84px;background:var(--surface, #fff);border:1px solid var(--app-border);

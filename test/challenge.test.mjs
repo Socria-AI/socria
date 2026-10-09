@@ -18,12 +18,11 @@
 //   argument is the register; blunt about the PERSON ends the conversation the
 //   product exists to have. The prompt has to draw that line explicitly.
 //
-// And the personality dial has to survive the shift: if the default becomes
-// as hard as Rigorous, that option stops meaning anything and Supportive
-// stops being reachable.
+// And the default has to leave room: the Challenger style (lib/conversation-
+// style.ts) is where somebody goes for more push, so the default stops short
+// of pushing in every reply.
 
 import { LOGOS_CHAT_PROMPT as P } from './.tmp/logos.mjs';
-import { PERSONALITY_DIMENSIONS, personalityBlock, DEFAULT_PERSONALITY } from './.tmp/logos-personality.mjs';
 
 let pass = 0, fail = 0;
 const ok = (n, c, x = '') => (c ? pass++ : (fail++, console.log('FAIL', n, x)));
@@ -96,26 +95,13 @@ console.log('\n=== validation openers are gone ===');
     /a tell that one is coming/i.test(P));
 }
 
-console.log('\n=== the dial still has room on both sides ===');
+console.log('\n=== the default still leaves room to push harder ===');
 {
-  // If the new default is as hard as Rigorous, that option means nothing and
-  // Supportive is unreachable. Both must still be a real move from here.
-  const d = PERSONALITY_DIMENSIONS.find((x) => x.id === 'challenge');
-  ok('the dial still exists with three settings', d && d.options.length === 3);
-
-  const rigorous = d.options.find((o) => o.id === 'rigorous').line;
-  ok('Rigorous is still stronger than the default',
-    /every reply/i.test(rigorous), rigorous);
-  ok('the default is deliberately softer than that',
+  // The dials are gone — the Conversation Style is the one personality, and
+  // the Challenger is where somebody goes for more push. The default itself
+  // must stay short of "in every reply", or that style has nowhere to go.
+  ok('the default is deliberately softer than every-reply pushing',
     /you will see one most turns/i.test(P) && !/in every reply/i.test(P.split('NEVER MANUFACTURE')[0]));
-
-  const supportive = d.options.find((o) => o.id === 'supportive').line;
-  ok('Supportive still dials down', /only the objection that actually blocks it/i.test(supportive));
-
-  // And the default personality still contributes nothing: the harder
-  // baseline belongs to the PROMPT, not to a dial nobody moved.
-  ok('the default personality still adds no text',
-    personalityBlock(DEFAULT_PERSONALITY) === '');
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

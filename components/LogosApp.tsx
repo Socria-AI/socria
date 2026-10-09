@@ -100,21 +100,10 @@ import {
   type ThinkingDepth,
 } from '@/lib/socria-prompt';
 import type { GuardSignal } from '@/lib/logos-guidance';
-import { MAX_STYLE, STYLE_KEY, storeStyle, storedStyle } from '@/lib/logos-style';
-import {
-  DEFAULT_PERSONALITY,
-  PERSONALITY_CHANGED,
-  PERSONALITY_DIMENSIONS,
-  PERSONALITY_KEY,
-  isDefaultPersonality,
-  storePersonality,
-  storedPersonality,
-  type Personality,
-} from '@/lib/logos-personality';
+import { MAX_STYLE, STYLE_CHANGED, STYLE_KEY, storeStyle, storedStyle } from '@/lib/logos-style';
 import { chooseModel, lastCoreModel } from '@/lib/socria-model-store';
 import { buildStarters, PENDING_TYPES } from '@/lib/starters';
 import { billingError, billingLine } from '@/lib/billing-message';
-import { PersonalityDial } from '@/components/PersonalityDial';
 import { ContextPanel } from '@/components/ContextPanel';
 import { ConnectionsModal } from '@/components/ConnectionsModal';
 import type { Attachment, AttachmentOrigin } from '@/lib/logos-attachments';
@@ -259,9 +248,9 @@ function readVia(): string | undefined {
 // Custom instructions — how Socria should work with this person. The key is
 // product-wide by design so other surfaces can adopt it; today Logos is the
 // one that reads it.
-// The personality and the person's own instructions are kept by
-// lib/logos-personality.ts and lib/logos-style.ts, which Manage Account writes
-// through too (components/account/PersonalitySettings.tsx).
+// The person's own instructions are kept by lib/logos-style.ts, which Manage
+// Account writes through too (components/account/LogosInstructions.tsx). The
+// personality is the account's Conversation Style, the same one Core 4 uses.
 // The chat can update the standing instructions itself: when the person asks
 // Socria to REMEMBER a way of working, the model ends its reply with this
 // machine-read line, which the client strips and applies.
@@ -387,9 +376,6 @@ export function LogosApp({
   const [styleText, setStyleText] = useState('');
   const [styleOpen, setStyleOpen] = useState(false);
   const [styleDraftText, setStyleDraftText] = useState('');
-  // Socria Personality — the structured registers, above the free text.
-  const [persona, setPersona] = useState<Personality>(DEFAULT_PERSONALITY);
-  const [personaDraft, setPersonaDraft] = useState<Personality>(DEFAULT_PERSONALITY);
   // A quiet line under the composer when the chat updated the instructions.
   const [styleUpdatedNote, setStyleUpdatedNote] = useState(false);
   // Depth: how deeply Logos helps you think (global). Answer Guard: which
@@ -790,8 +776,6 @@ export function LogosApp({
   guardRef.current = guard;
   const styleRef = useRef('');
   styleRef.current = styleText;
-  const personaRef = useRef<Personality>(DEFAULT_PERSONALITY);
-  personaRef.current = persona;
   // ── the picture, as one half of a shared state ───────────────────
   //
   // WHAT THIS IS FOR. Somebody asked their black hole "what's the blue" and
@@ -880,11 +864,10 @@ export function LogosApp({
     // chosen on Core 3.1 rode along into Logos with no control to see it by.
     depth: depthOn ? depthRef.current : ('balanced' as ThinkingDepth),
     guard: guardRef.current,
-    // the character chosen for the account, above the dials and the
-    // written instructions below it (lib/conversation-style.ts)
+    // the character chosen for the account — the same one Core 4 uses —
+    // and the written instructions below it (lib/conversation-style.ts)
     conversationStyle: conversationStyleRef.current,
     style: styleRef.current,
-    persona: personaRef.current,
   });
 
   /**
@@ -927,27 +910,22 @@ export function LogosApp({
   function saveStyle() {
     const next = styleDraftText.trim();
     setStyleText(next);
-    setPersona(personaDraft);
     setStyleOpen(false);
     setStyleUpdatedNote(false);
     storeStyle(next);
-    storePersonality(personaDraft);
   }
 
   // Saved somewhere else — Manage Account, or Logos in another tab — and used
   // from the next message here, without a reload.
   useEffect(() => {
-    const read = () => {
-      setStyleText(storedStyle());
-      setPersona(storedPersonality());
-    };
+    const read = () => setStyleText(storedStyle());
     const fromOtherTab = (e: StorageEvent) => {
-      if (e.key === null || e.key === PERSONALITY_KEY || e.key === STYLE_KEY) read();
+      if (e.key === null || e.key === STYLE_KEY) read();
     };
-    window.addEventListener(PERSONALITY_CHANGED, read);
+    window.addEventListener(STYLE_CHANGED, read);
     window.addEventListener('storage', fromOtherTab);
     return () => {
-      window.removeEventListener(PERSONALITY_CHANGED, read);
+      window.removeEventListener(STYLE_CHANGED, read);
       window.removeEventListener('storage', fromOtherTab);
     };
   }, []);
@@ -1177,9 +1155,6 @@ export function LogosApp({
     load(() => {
       const st = storedStyle();
       if (st) setStyleText(st);
-    });
-    load(() => {
-      setPersona(storedPersonality());
     });
     const t = setTimeout(() => setAuthSettled(true), 1200);
     return () => clearTimeout(t);
@@ -3949,7 +3924,6 @@ export function LogosApp({
                   className="lg-style-open"
                   onClick={() => {
                     setStyleDraftText(styleText);
-                    setPersonaDraft(persona);
                     setStyleOpen(true);
                   }}
                   aria-label="How should Socria work with you?"
@@ -4348,19 +4322,18 @@ export function LogosApp({
           {styleUpdatedNote && (
             <div className="lg-one-note lg-style-note-bar" role="status">
               <span className="lg-one-note-text">
-                <b>Noted.</b> Socria updated how it works with you — see it under
-                the{' '}
+                <b>Noted.</b> Socria updated how it works with you — see it in
+                {' '}
                 <button
                   type="button"
                   className="lg-style-note-link"
                   onClick={() => {
                     setStyleDraftText(styleText);
-                    setPersonaDraft(persona);
                     setStyleOpen(true);
                     setStyleUpdatedNote(false);
                   }}
                 >
-                  personality settings
+                  your instructions
                 </button>
                 .
               </span>
@@ -4936,39 +4909,13 @@ export function LogosApp({
         <div className="lg-style-scrim" role="dialog" aria-modal="true" aria-label="How should Socria work with you?">
           <div className="lg-style-back" onClick={() => setStyleOpen(false)} aria-hidden="true" />
           <div className="lg-style-sheet">
-            <h2 className="lg-style-title">Socria Personality</h2>
+            {/* No dials here any more: Socria's personality is the account's
+                Conversation Style (Manage Account → Personalization), the same
+                one Core 4 uses. What is left is the person's own words. */}
+            <h2 className="lg-style-title">How should Socria work with you?</h2>
             <p className="lg-style-sub">
-              How Socria communicates while it thinks with you. How far the
-              thinking goes is Logos&rsquo;s to judge; this decides how it
-              sounds on the way.
-            </p>
-
-            <div className="lg-persona-grid">
-              {PERSONALITY_DIMENSIONS.map((d) => (
-                <PersonalityDial
-                  key={d.id}
-                  dimension={d}
-                  value={personaDraft[d.id] ?? d.options[0].id}
-                  onChange={(next) =>
-                    setPersonaDraft((prev) => ({ ...prev, [d.id]: next }))
-                  }
-                />
-              ))}
-            </div>
-            {!isDefaultPersonality(personaDraft) && (
-              <button
-                type="button"
-                className="lg-persona-reset"
-                onClick={() => setPersonaDraft(DEFAULT_PERSONALITY)}
-              >
-                Reset to Socria defaults
-              </button>
-            )}
-
-            <h3 className="lg-style-title2">How should Socria work with you?</h3>
-            <p className="lg-style-sub">
-              In your own words, layered over the settings above — whatever they
-              don&rsquo;t say.
+              In your own words, layered over your Conversation Style — set
+              under Manage Account, and the same in Core 4 and Logos.
             </p>
             <textarea
               className="lg-style-input"
@@ -4987,9 +4934,9 @@ export function LogosApp({
               instructions itself; what&rsquo;s written here is remembered.
             </p>
             <p className="lg-style-note">
-              This shapes Socria&rsquo;s personality, not its principles — your
-              thinking, your authorship and the learning guard stay yours on
-              every setting.
+              This shapes how Socria works with you, not its principles — your
+              thinking, your authorship and the learning guard stay yours
+              whatever you write.
             </p>
             <div className="lg-style-row">
               <button type="button" className="lg-style-save" onClick={saveStyle}>

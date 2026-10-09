@@ -1,11 +1,11 @@
-// Depth, Conversation Style, Personality, custom instructions — and the
-// hierarchy that keeps them honest. Checkable against lib/socria-prompt.ts,
-// lib/conversation-style.ts, lib/core4/voice.ts, lib/logos-personality.ts and
-// lib/logos-style.ts.
+// Depth, Conversation Style — the one personality, the same in Core 4 and
+// Logos — and custom instructions, with the hierarchy that keeps them honest.
+// Checkable against lib/socria-prompt.ts, lib/conversation-style.ts,
+// lib/core4/voice.ts and lib/logos-style.ts.
 
 import Link from 'next/link';
 import { Article, H2, Callout, Defs, Def, TableWrap } from '../Article';
-import { DemoControls, DemoPersonality } from '@/app/logos/LogosDemo';
+import { DemoControls } from '@/app/logos/LogosDemo';
 import { docPage } from '../registry';
 
 const page = docPage('depth-personality')!;
@@ -13,7 +13,6 @@ const sections = [
   { id: 'hierarchy', heading: 'The hierarchy' },
   { id: 'depth', heading: 'Thinking Depth' },
   { id: 'style', heading: 'Conversation Style' },
-  { id: 'personality', heading: 'Socria Personality' },
   { id: 'instructions', heading: 'Custom instructions' },
 ];
 
@@ -21,13 +20,13 @@ export function DepthPersonality() {
   return (
     <Article page={page} sections={sections}>
       <p>
-        Four layers of configuration shape how Socria works with you, and
+        Three layers of configuration shape how Socria works with you, and
         they answer different questions on purpose. <strong>Depth</strong>{' '}
         decides how far the thinking goes. <strong>Conversation Style</strong>{' '}
-        is the character Socria talks in, in Core 4 and in Logos alike.{' '}
-        <strong>Personality</strong> fine-tunes how Logos sounds on the way.{' '}
-        <strong>Custom instructions</strong> say, in your own words, whatever
-        the others don&rsquo;t.
+        is Socria&rsquo;s personality: the character it talks in, chosen once
+        and the same in Core 4 and in Logos. <strong>Custom
+        instructions</strong> say, in your own words, whatever the style
+        doesn&rsquo;t.
       </p>
 
       <H2 id="hierarchy">The hierarchy</H2>
@@ -38,16 +37,15 @@ export function DepthPersonality() {
           Answer Guard, transparency. No setting reaches these.
         </li>
         <li><strong>Thinking Depth</strong> — how deeply the thinking goes.</li>
-        <li><strong>Conversation Style</strong> — the character it talks in.</li>
-        <li><strong>Socria Personality</strong> — finer dials on how Logos communicates; a dial you moved wins on the one thing it sets.</li>
-        <li><strong>Custom instructions</strong> — your free-text preferences.</li>
+        <li><strong>Conversation Style</strong> — the personality, the same in Core 4 and Logos.</li>
+        <li><strong>Custom instructions</strong> — your free-text preferences, in Logos.</li>
         <li><strong>The conversation itself</strong> — what this moment needs. Asking for something different here wins for that conversation.</li>
       </ol>
       <Callout tag="Why depth and personality are separate">
         <p>
-          They are orthogonal on purpose: Abstract&nbsp;+&nbsp;Casual&nbsp;+&nbsp;Blunt
-          and Abstract&nbsp;+&nbsp;Academic&nbsp;+&nbsp;Gentle think equally
-          far, and feel nothing alike.
+          They are orthogonal on purpose: Deep&nbsp;+&nbsp;the Direct and
+          Deep&nbsp;+&nbsp;the Companion think equally far, and feel nothing
+          alike.
         </p>
       </Callout>
 
@@ -112,7 +110,9 @@ export function DepthPersonality() {
         the per-turn register — the warmth, edge, humour and density the turn
         is written in — and the Direct leans replies brief the way a Concise
         reply length does, unless you set a length yourself. In Logos it sits
-        above the Personality dials, which fine-tune it.
+        above your own instructions, which layer over it. There are no
+        separate personality dials any more: this is the one personality, so
+        Socria sounds like the same Socria in both.
       </p>
       <Callout tag="What no style changes">
         <p>
@@ -132,49 +132,14 @@ export function DepthPersonality() {
       </p>
 
 
-      <H2 id="personality">Socria Personality</H2>
-      <p>
-        In Logos, nine dials, each a small range of named registers rather
-        than a persona preset — every combination is still recognizably
-        Socria, wearing different manners. Each dial&rsquo;s default
-        contributes nothing: the default voice lives in the product itself,
-        and only departures from it add instruction. They refine your
-        Conversation Style: a dial you moved wins on the one thing it sets.
-      </p>
-      <TableWrap>
-        <table>
-          <thead>
-            <tr><th>Dial</th><th>Registers</th></tr>
-          </thead>
-          <tbody>
-            <tr><td>Base style</td><td>Socria · Friendly · Casual · Professional · Academic · Reserved</td></tr>
-            <tr><td>Warmth</td><td>Low · Default · High</td></tr>
-            <tr><td>Directness</td><td>Gentle · Default · Blunt</td></tr>
-            <tr><td>Challenge</td><td>Supportive · Balanced · Rigorous</td></tr>
-            <tr><td>Questioning</td><td>Fewer · Default · Exploratory</td></tr>
-            <tr><td>Length</td><td>Concise · Default · Detailed</td></tr>
-            <tr><td>Humor</td><td>None · Occasional · Frequent</td></tr>
-            <tr><td>Formatting</td><td>Minimal · Default · Structured</td></tr>
-            <tr><td>Language noticing</td><td>Subtle · Default · Frequent</td></tr>
-          </tbody>
-        </table>
-      </TableWrap>
-      <p>
-        The dials are real controls — click a tick, drag the needle, or use
-        the arrow keys — and a faint mark stays at Socria&rsquo;s default so a
-        moved dial reads as moved. A note on one of them:{' '}
-        <em>High warmth is never therapeutic</em>. Warmth shows in attention,
-        not in reflexive reassurance.
-      </p>
-      <DemoPersonality />
-
-
       <H2 id="instructions">Custom instructions</H2>
       <p>
-        Below the dials, a free-text field (up to 1,200 characters) layered
-        over the settings — &ldquo;talk casually, challenge my assumptions
-        more, for math act like a lab instructor.&rdquo; Two ways to change it
-        without opening the sheet:
+        In Logos, a free-text field (up to 1,200 characters) layered over your
+        Conversation Style — &ldquo;talk casually, challenge my assumptions
+        more, for math act like a lab instructor.&rdquo; It is under Manage
+        Account → Personalization, and behind &ldquo;How should Socria work
+        with you?&rdquo; in Logos. Two ways to change it without opening
+        either:
       </p>
       <Defs>
         <Def term="For one conversation">
@@ -188,9 +153,9 @@ export function DepthPersonality() {
         </Def>
       </Defs>
       <p>
-        However it is set, this layer shapes personality, not principles —
-        your authorship, the Answer Guard and the transparency moves hold on
-        every setting.
+        However it is set, this layer shapes how Socria works with you, not its
+        principles — your authorship, the Answer Guard and the transparency
+        moves hold whatever you write.
       </p>
     </Article>
   );

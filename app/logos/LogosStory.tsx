@@ -20,7 +20,6 @@ import {
   DemoGuard,
   DemoLenses,
   DemoMoves,
-  DemoPersonality,
   DemoSplit,
 } from './LogosDemo';
 
@@ -393,9 +392,8 @@ export function LogosStory() {
         <section className="spread sec short" data-folio="VIII" data-screen-label="Personality">
           <div className="wrap">
             <div className="spread-head"><span className="num">VIII.</span><span className="label">Personality</span></div>
-            <h2 className="fade">Nine settings for how it talks. Zero for what it decides.</h2>
-            <DemoPersonality />
-            <p className="own-words fade d2">…and instructions in your own words: <span className="q">“be blunt, skip the jargon, and never flatter me.”</span></p>
+            <h2 className="fade">One personality, chosen once — the same in Core 4. Zero settings for what it decides.</h2>
+            <p className="own-words fade d2">The Thinker, the Direct, the Companion or the Challenger — and instructions in your own words: <span className="q">“be blunt, skip the jargon, and never flatter me.”</span></p>
           </div>
         </section>
 

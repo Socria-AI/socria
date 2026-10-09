@@ -20,7 +20,6 @@ import { renderContextsForNode, sanitizeNodeContextList } from '@/lib/logos-sour
 import { guidanceBlock, resolveDepth, resolveGuard } from '@/lib/logos-guidance';
 import { styleBlock } from '@/lib/logos-style';
 import { conversationStyleBlock } from '@/lib/conversation-style';
-import { personalityBlock } from '@/lib/logos-personality';
 import { depthForPlan } from '@/lib/socria-one';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { boundaryNote, type Counter } from '@/lib/entitlements';
@@ -210,7 +209,6 @@ export async function POST(req: NextRequest) {
         'surface'
       ) +
       conversationStyleBlock(body?.conversationStyle, 'logos', { structured: true }) +
-      personalityBlock(body?.persona) +
       styleBlock(body?.style);
     const composed = await complete(guided, 'Compose the panel.', 700);
     const parsed = JSON.parse(composed.choices?.[0]?.message?.content || '{}');

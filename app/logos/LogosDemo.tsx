@@ -19,9 +19,7 @@ import { ThinkingMap } from '@/components/ThinkingMap';
 import { MathBoard } from '@/components/MathBoard';
 import { LogosMark } from '@/components/LogosMark';
 import { NodeGlyph } from '@/components/NodeGlyph';
-import { PersonalityDial } from '@/components/PersonalityDial';
 import { THINKING_DEPTHS } from '@/lib/socria-prompt';
-import { DEFAULT_PERSONALITY, PERSONALITY_DIMENSIONS } from '@/lib/logos-personality';
 import {
   DEMO_BOARD_STEPS,
   DEMO_DEPTH_ANSWERS,
@@ -472,33 +470,3 @@ export function DemoControls() {
   );
 }
 
-/** The personality settings, as the sheet actually presents them. */
-export function DemoPersonality() {
-  const [p, setP] = useState<Record<string, string>>({
-    ...DEFAULT_PERSONALITY,
-    base: 'casual',
-    directness: 'blunt',
-    challenge: 'rigorous',
-    questioning: 'fewer',
-  });
-  return (
-    <Frame label="The nine dials, as the app presents them — turn one" height={430}>
-      <div className="ui-personademo">
-        <h3 className="lg-style-title">Socria Personality</h3>
-        <p className="lg-style-sub">
-          How Socria communicates while it thinks with you. Depth stays separate.
-        </p>
-        <div className="lg-persona-grid">
-          {PERSONALITY_DIMENSIONS.map((d) => (
-            <PersonalityDial
-              key={d.id}
-              dimension={d}
-              value={p[d.id] ?? d.options[0].id}
-              onChange={(next) => setP((prev) => ({ ...prev, [d.id]: next }))}
-            />
-          ))}
-        </div>
-      </div>
-    </Frame>
-  );
-}

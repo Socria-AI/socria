@@ -27,11 +27,11 @@ Top wins:
    - Transparency and safety.
 2. **Thinking Depth.** How far the thinking goes. It is orthogonal to the
    style: Deep + Direct thinks as far as Deep + Companion.
-3. **Conversation Style.** This.
-4. **Logos's Personality dials.** A dial the person moved wins on the one
-   aspect it names.
-5. **Custom instructions.**
-6. **The conversation itself.** "Be more casual", said today, wins for that
+3. **Conversation Style.** This — and the one personality. Core 4 and Logos
+   share it; Logos's nine Personality dials were removed (9 October 2026) so
+   the two sound like the same Socria.
+4. **Custom instructions** (Logos).
+5. **The conversation itself.** "Be more casual", said today, wins for that
    conversation.
 
 ## How it reaches the model
@@ -75,8 +75,7 @@ There are two places, and both are needed.
 ### Logos
 
 `conversationStyleBlock(style, 'logos')` sits after the depth and guard
-guidance and before the Personality dials and custom instructions. It is
-used in three places:
+guidance and before the custom instructions. It is used in three places:
 
 - the chat route
 - Explore and Draft Space, in a `structured` form that keeps every field and

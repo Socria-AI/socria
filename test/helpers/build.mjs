@@ -81,7 +81,6 @@ const MODULES = [
   'lib/clerk-errors.ts',
   'lib/qr.ts',
   'lib/account-guards.ts',
-  'lib/logos-personality.ts',
   'lib/logos-style.ts',
   'lib/logos-guidance.ts',
   'lib/conversation-style.ts',

@@ -31,18 +31,20 @@
 //                                          Guard, Core 4's per-turn decision,
 //                                          transparency, safety
 //   2. Thinking Depth                     how far the thinking goes
-//   3. Conversation Style                 this module — how it sounds
-//   4. Logos's Personality dials          finer still: a dial they moved wins
-//                                          on the one aspect it names
-//   5. Custom instructions                their own words
-//   6. The conversation itself            "be more casual", said today, wins
+//   3. Conversation Style                 this module — how it sounds, and
+//                                          the one personality: Core 4 and
+//                                          Logos share it (Logos's nine
+//                                          Personality dials were removed so
+//                                          the two are the same)
+//   4. Custom instructions                their own words (Logos)
+//   5. The conversation itself            "be more casual", said today, wins
 //                                          for that conversation
 //
 // Depth and style stay orthogonal on purpose: Deep + Direct thinks as far as
 // Deep + Companion and sounds nothing like it.
 //
-// EVERY LINE IS A DIRECTION; THE LIMITS LIVE IN THE FOOTER. The lesson of the
-// Personality dials (lib/logos-personality.ts): an option whose second clause
+// EVERY LINE IS A DIRECTION; THE LIMITS LIVE IN THE FOOTER. The lesson of
+// Logos's old Personality dials: an option whose second clause
 // walks its first one back lands at the default every time. So each line says
 // what observably changes — the opener, the length, the phrase that goes —
 // and what no style may change is said once, together, at the end.
@@ -213,8 +215,7 @@ const PROTECTED: Record<StyleSurface, string> = {
  *           per-turn decision is still the last thing the model reads
  *           (lib/socria-prompt.ts buildSystemPrompt).
  *   Logos   directly after the depth and guard guidance and before the
- *           Personality dials and custom instructions, each of which
- *           subordinates itself to what came before it.
+ *           custom instructions, which subordinate themselves to it.
  */
 export function conversationStyleBlock(
   styleInput: unknown,
@@ -234,7 +235,7 @@ export function conversationStyleBlock(
   const label = STYLE_META[style].label.toUpperCase();
   const finer =
     surface === 'logos'
-      ? '\nAny Personality setting below that they moved fine-tunes one aspect of this style and wins on that aspect; their written instructions layer over both.'
+      ? '\nTheir written instructions, if any below, layer over this style.'
       : '';
   const shape = opts.structured
     ? '\nThis surface answers in a fixed structure: keep every field, and every limit on it, exactly as asked. The style shapes only the wording inside them.'

@@ -116,7 +116,7 @@ export const DOC_PAGES: DocPage[] = [
   {
     slug: 'depth-personality',
     title: 'Depth, Personality & instructions',
-    blurb: 'How far the thinking goes, the style it talks in, how it sounds on the way, and what always stays fixed.',
+    blurb: 'How far the thinking goes, the one personality it talks in — the same in Core 4 and Logos — your own instructions, and what always stays fixed.',
     group: 'The reasoning environment',
   },
   {

@@ -17,8 +17,6 @@
 //
 // "Customize Socria's personality, not its principles."
 
-import { PERSONALITY_CHANGED } from './logos-personality';
-
 export const MAX_STYLE = 1200;
 
 /** What the client may store and send. Plain text, bounded, no control chars. */
@@ -62,6 +60,13 @@ If they ask for something different IN the conversation itself, the living reque
 /** Kept in this browser, as they always were. */
 export const STYLE_KEY = 'socria.style.v1';
 
+/**
+ * Fired on window when the instructions are saved — from Logos's own sheet or
+ * from Manage Account — so an open Logos uses them from its next message,
+ * without a reload. Another tab hears the browser's own `storage` event.
+ */
+export const STYLE_CHANGED = 'socria:style';
+
 /** The saved instructions, or ''. Never throws. */
 export function storedStyle(store?: Pick<Storage, 'getItem'> | null): string {
   try {
@@ -72,11 +77,7 @@ export function storedStyle(store?: Pick<Storage, 'getItem'> | null): string {
   }
 }
 
-/**
- * Save them ('' removes them), and tell whoever is listening — the same event
- * as the personality (lib/logos-personality.ts PERSONALITY_CHANGED), because
- * the two are one sheet in Logos and one section in Manage Account.
- */
+/** Save them ('' removes them), and tell whoever is listening. */
 export function storeStyle(text: string): void {
   if (typeof window === 'undefined') return;
   const next = sanitizeStyle(text);
@@ -85,6 +86,6 @@ export function storeStyle(text: string): void {
     else window.localStorage.removeItem(STYLE_KEY);
   } catch {}
   try {
-    window.dispatchEvent(new Event(PERSONALITY_CHANGED));
+    window.dispatchEvent(new Event(STYLE_CHANGED));
   } catch {}
 }

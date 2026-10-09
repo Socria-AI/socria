@@ -37,7 +37,7 @@ import { anyModelGated } from '@/lib/socria-model-store';
 import { TestingTools } from './TestingTools';
 import { NameField, RolePicker } from './RolePicker';
 import { ConversationStylePicker } from './ConversationStylePicker';
-import { PersonalitySettings } from './PersonalitySettings';
+import { LogosInstructions } from './LogosInstructions';
 
 export function AccountSheet({
   open,
@@ -168,21 +168,21 @@ export function AccountSheet({
 
             {/* Personalization: how Socria talks with you and what it knows
                 to call you by. The style is the account's and follows you to
-                every device; the personality dials, your own words, the name
-                and the role are kept in this browser, as they always were. */}
+                every device; your own words, the name and the role are kept
+                in this browser, as they always were. */}
             <div className="sec">
               <span className="lbl">Personalization</span>
               <div className="sub">
                 <h3 className="sub-h">Conversation style</h3>
-                <p className="sub-d">How Socria talks with you, in Core 4 and in Logos. Kept with your account, on every device.</p>
+                <p className="sub-d">Socria&rsquo;s personality: how it talks with you, the same in Core 4 and in Logos. Kept with your account, on every device.</p>
                 <ConversationStylePicker signedIn={!!user} />
               </div>
-              {/* The dials and words Logos keeps behind its own Personality
-                  sheet — the same settings, from here too. */}
+              {/* The words Logos keeps behind its own sheet, from here too.
+                  No dials: the Conversation Style above is the personality. */}
               <div className="sub">
-                <h3 className="sub-h">Socria Personality, in Logos</h3>
-                <p className="sub-d">How it sounds while it thinks with you. A dial you move wins on the one thing it names; your own words come after the dials.</p>
-                <PersonalitySettings />
+                <h3 className="sub-h">Your own words, in Logos</h3>
+                <p className="sub-d">Standing instructions, layered over your Conversation Style.</p>
+                <LogosInstructions />
               </div>
               <div className="sub">
                 <h3 className="sub-h">What Socria calls you</h3>

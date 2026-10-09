@@ -449,13 +449,6 @@
   .docs-root .logos-root.lg-demo .ui-answerpane .lg-msg-assistant { animation: none; }
 }
 
-/* nine dials read as a panel across the frame, rather than three tall rows */
-.docs-root .logos-root.lg-demo .lg-persona-grid {
-  grid-template-columns: repeat(5, 1fr); gap: 18px 10px;
-}
-@media (max-width: 760px) {
-  .docs-root .logos-root.lg-demo .lg-persona-grid { grid-template-columns: repeat(3, 1fr); }
-}
 /* the frame reads as one of the page's exhibits, not a browser screenshot */
 .docs-root .ui-chrome {
   justify-content: flex-start; padding: 9px 16px; background: transparent;
@@ -476,8 +469,6 @@
 .docs-root .ui-menudemo { flex-direction: column; gap: 18px; padding: 22px 16px; justify-content: flex-start; overflow: auto; }
 @media (min-width: 900px) { .docs-root .ui-menudemo { flex-direction: row; align-items: flex-start; } }
 .docs-root .ui-ctrldemo { overflow: auto; }
-/* personality sheet inside a frame */
-.docs-root .ui-personademo { padding: 24px 26px; height: 100%; overflow: auto; }
 
 /* the thread inside a demo frame needs the app's own gutters, or a user
    bubble (right-aligned, 80% wide) runs off the edge of the frame */
