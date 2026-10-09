@@ -17,6 +17,7 @@
 // that breathes — and all of it stops for anybody who has asked their system
 // for less motion (rewards-pop.css).
 
+import { isProduction } from '@/lib/environment';
 import { useId } from 'react';
 import type { PopupKind } from '@/lib/rewards/popup-rule';
 import { useRewards } from './useRewards';
@@ -90,9 +91,40 @@ function ChallengeGlyph({ n, of }: { n: number; of: number }) {
   );
 }
 
+/**
+ * Rewards is switched on for this deployment and cannot run because its tables
+ * are missing — and this is not production. The one case the marks show
+ * without a working programme behind them, so the person setting it up can see
+ * where it lives and what it needs.
+ */
+export function rewardsSetupPending(view: { enabled: boolean; unavailable?: boolean } | null | undefined): boolean {
+  return !!view && !view.enabled && !!view.unavailable && !isProduction();
+}
+
 export function RewardsBadges({ enabled }: { enabled: boolean }) {
   const { view } = useRewards({ enabled });
   const id = useId().replace(/:/g, '');
+  // SWITCHED ON, BUT ITS TABLES ARE NOT IN THIS DATABASE YET. Off a production
+  // deployment that is somebody setting Socria up, and a gift that silently
+  // vanished told them nothing — so the gift stays beside the mark and its
+  // popup says what is missing (RewardsPopups, `setup`). On production an
+  // unavailable programme stays out of sight.
+  if (!view?.enabled && rewardsSetupPending(view)) {
+    return (
+      <span className="rwb" role="group" aria-label="Socria Rewards">
+        <button
+          type="button"
+          className="rwb-i rwb-give"
+          onClick={() => openRewardsPopup('give')}
+          aria-haspopup="dialog"
+          aria-label="Give 7, Get 7: not set up on this deployment yet"
+          title="Give 7, Get 7 — not set up on this deployment yet"
+        >
+          <GiftGlyph id={id} />
+        </button>
+      </span>
+    );
+  }
   if (!view?.enabled) return null;
   const c = view.challenge;
   const give = view.limits?.signupDays ?? 7;

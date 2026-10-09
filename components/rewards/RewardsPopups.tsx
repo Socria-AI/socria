@@ -34,7 +34,7 @@ import {
   type PopupFacts,
   type PopupKind,
 } from '@/lib/rewards/popup-rule';
-import { OPEN_REWARDS_POPUP, pentagon } from './RewardsBadges';
+import { OPEN_REWARDS_POPUP, pentagon, rewardsSetupPending } from './RewardsBadges';
 import { DONE_SEEN_KEY, readFlag, useRewards, writeFlag, type RewardsView } from './useRewards';
 import './rewards-pop.css';
 
@@ -160,9 +160,13 @@ export function RewardsPopups({
     [open, surface, act]
   );
 
+  // switched on and not yet set up here (RewardsBadges rewardsSetupPending):
+  // the gift's popup says what is missing rather than nothing happening
+  const setup = rewardsSetupPending(view);
   // a popup whose reward stopped meaning anything while it was open goes
   const stale =
     !!open &&
+    !(setup && open.kind === 'give') &&
     (!view?.enabled ||
       (open.kind === 'give' && !view.link) ||
       (open.kind === 'challenge' && c?.state !== 'open' && c?.state !== 'done'));
@@ -170,10 +174,50 @@ export function RewardsPopups({
     if (stale) setOpen(null);
   }, [stale]);
 
+  if (open && setup && open.kind === 'give') return <SetupPending onClose={() => close('closed')} />;
   if (!open || !view?.enabled || stale) return null;
   // the challenge, completed while its popup was open, is shown complete
   const kind: Shown = open.kind === 'challenge' && c?.state === 'done' ? 'done' : open.kind;
   return <Popup kind={kind} view={view} onClose={close} onAct={act} onOpenLogos={onOpenLogos} surface={surface} />;
+}
+
+/** Give 7, Get 7 on a deployment whose Rewards tables do not exist yet: what it is, and what it needs. */
+function SetupPending({ onClose }: { onClose: () => void }) {
+  const id = useId().replace(/:/g, '');
+  const goRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    goRef.current?.focus({ preventScroll: true });
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+  return (
+    <div className="rwp-scrim" role="dialog" aria-modal="true" aria-labelledby={`${id}-t`} aria-describedby={`${id}-b`}>
+      <div className="rwp-back" onClick={onClose} aria-hidden="true" />
+      <div className="rwp-sheet is-give">
+        <button type="button" className="rwp-x" onClick={onClose} aria-label="Close">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+            <path d="M18 6 6 18M6 6l12 12" />
+          </svg>
+        </button>
+        <p className="rwp-eyebrow">Socria Rewards · Give 7, Get 7</p>
+        <h2 className="rwp-title" id={`${id}-t`}>
+          Not set up on this deployment <em>yet</em>
+        </h2>
+        <p className="rwp-body" id={`${id}-b`}>
+          Rewards is switched on here, but its tables are not in this database, so there is no invite link to give. Run the Socria Rewards
+          block of <code>supabase/schema.sql</code> on this database and the link appears in this popup.
+        </p>
+        <div className="rwp-acts">
+          <button type="button" ref={goRef} className="rwp-go" onClick={onClose}>
+            Got it
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function Popup({
