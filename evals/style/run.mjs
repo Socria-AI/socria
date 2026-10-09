@@ -53,7 +53,7 @@ const OUT = resolve(arg('out') || join(root, 'evals/style/runs/scratch'));
 const inf = (value, confidence = 0.8) => ({ value, source: 'inferred', confidence, evidence: 'reader' });
 export const CORE = [
   ['c1', "I'm thinking of quitting my stable job to open a bakery. My savings would cover about eight months. Thoughts?", { taskKind: 'decide', work: 'judgment', latest: 'question', stakes: inf('high') }],
-  ['c2', 'Remote work obviously makes teams less productive — that is why every big company is ordering people back to the office.', { taskKind: 'explore', work: 'judgment', latest: 'claim', tensions: [{ a: 'remote work', b: 'productivity' }] }],
+  ['c2', 'Remote work obviously makes teams less productive — that is why every big company is ordering people back to the office.', { taskKind: 'explore', work: 'judgment', latest: 'claim', tensions: ['remote work against team productivity'] }],
   ['c3', "I'm studying for my calculus exam. Why is the derivative of x^2 equal to 2x? I want to understand it, not memorise it.", { taskKind: 'learn', work: 'explanation', latest: 'question', learningGoal: { value: 'yes', source: 'explicit', confidence: 1, evidence: 'I want to understand it' } }],
   ['c4', "honestly I can't tell if I even like my own novel anymore lol", { taskKind: 'explore', work: 'conversation', latest: 'reaction' }],
   ['c5', "What's the actual difference between weather and climate?", { taskKind: 'learn', work: 'information', latest: 'question' }],

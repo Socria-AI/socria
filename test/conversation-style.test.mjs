@@ -231,7 +231,7 @@ const rank = { warmth: (w) => ({ cool: 0, neutral: 1, warm: 2 })[w] };
 // The ordinary turns, where the work decides the register.
 const ORDINARY = [
   ['an open conversation', 'bro we\'re cooked', { taskKind: 'explore', work: 'conversation', latest: 'reaction' }],
-  ['a claim worth testing', 'Remote work obviously makes teams less productive.', { taskKind: 'explore', work: 'judgment', latest: 'claim', tensions: [{ a: 'remote', b: 'productivity' }] }],
+  ['a claim worth testing', 'Remote work obviously makes teams less productive.', { taskKind: 'explore', work: 'judgment', latest: 'claim', tensions: ['remote work against team productivity'] }],
   ['a consequential call', 'The raise timing rests on the churn figure and I want to pressure-test it.', { taskKind: 'decide', work: 'judgment', latest: 'request', stakes: inf('high') }],
   ['a thing that worked', 'It works! The cache bug was the TTL all along.', { taskKind: 'debug', work: 'diagnosis', latest: 'information' }],
   ['the plain default', 'I keep coming back to whether the second chapter earns its length.', { taskKind: 'create', work: 'creation', latest: 'information' }],
