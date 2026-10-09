@@ -37,6 +37,7 @@ import { anyModelGated } from '@/lib/socria-model-store';
 import { TestingTools } from './TestingTools';
 import { NameField, RolePicker } from './RolePicker';
 import { ConversationStylePicker } from './ConversationStylePicker';
+import { PersonalitySettings } from './PersonalitySettings';
 
 export function AccountSheet({
   open,
@@ -167,14 +168,21 @@ export function AccountSheet({
 
             {/* Personalization: how Socria talks with you and what it knows
                 to call you by. The style is the account's and follows you to
-                every device; the name and the role are kept in this browser,
-                as they always were. */}
+                every device; the personality dials, your own words, the name
+                and the role are kept in this browser, as they always were. */}
             <div className="sec">
               <span className="lbl">Personalization</span>
               <div className="sub">
                 <h3 className="sub-h">Conversation style</h3>
                 <p className="sub-d">How Socria talks with you, in Core 4 and in Logos. Kept with your account, on every device.</p>
                 <ConversationStylePicker signedIn={!!user} />
+              </div>
+              {/* The dials and words Logos keeps behind its own Personality
+                  sheet — the same settings, from here too. */}
+              <div className="sub">
+                <h3 className="sub-h">Socria Personality, in Logos</h3>
+                <p className="sub-d">How it sounds while it thinks with you. A dial you move wins on the one thing it names; your own words come after the dials.</p>
+                <PersonalitySettings />
               </div>
               <div className="sub">
                 <h3 className="sub-h">What Socria calls you</h3>
@@ -257,15 +265,6 @@ export function AccountSheet({
                   <span className="t">Show hints again</span>
                   <span className="d">The one-line notes beside new things</span>
                 </button>
-                <button type="button" className="act" onClick={() => {
-                    // A shared device must not hand the next person this
-                    // one's conversations, sessions or derived memory.
-                    clearSocriaLocalData();
-                    void signOut();
-                  }}>
-                  <span className="t">Sign out</span>
-                  <span className="d">Your maps wait on the others</span>
-                </button>
               </div>
             </div>
 
@@ -277,9 +276,29 @@ export function AccountSheet({
             <p className="vow">
               Export it, or delete it. What you have made is yours — leaving takes it with you.
             </p>
-            <button type="button" className="link-act" onClick={onClose}>
-              Done
-            </button>
+            <div className="foot-acts">
+              {/* SIGN OUT WHERE IT IS ALWAYS IN VIEW. It sat at the end of the
+                  last section, under the tour and the hints, and somebody
+                  looking for it did not find it. The footbar does not scroll.
+                  This browser's Socria data goes first: a shared device must
+                  not hand the next person this one's conversations, sessions
+                  or derived memory. */}
+              {user && (
+                <button
+                  type="button"
+                  className="link-act out"
+                  onClick={() => {
+                    clearSocriaLocalData();
+                    void signOut({ redirectUrl: '/' });
+                  }}
+                >
+                  Sign out
+                </button>
+              )}
+              <button type="button" className="link-act" onClick={onClose}>
+                Done
+              </button>
+            </div>
           </div>
         </div>
       </div>

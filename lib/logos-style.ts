@@ -17,6 +17,8 @@
 //
 // "Customize Socria's personality, not its principles."
 
+import { PERSONALITY_CHANGED } from './logos-personality';
+
 export const MAX_STYLE = 1200;
 
 /** What the client may store and send. Plain text, bounded, no control chars. */
@@ -53,4 +55,36 @@ These layer on top of any personality settings above — the finer brush for wha
 
 If they ask for something different IN the conversation itself, the living request wins for that conversation — these standing instructions are their default, not a cage.
 === END OF THEIR INSTRUCTIONS ===`;
+}
+
+// ── where they are kept ─────────────────────────────────────────────
+
+/** Kept in this browser, as they always were. */
+export const STYLE_KEY = 'socria.style.v1';
+
+/** The saved instructions, or ''. Never throws. */
+export function storedStyle(store?: Pick<Storage, 'getItem'> | null): string {
+  try {
+    const s = store ?? (typeof window !== 'undefined' ? window.localStorage : null);
+    return sanitizeStyle(s?.getItem(STYLE_KEY) ?? '');
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Save them ('' removes them), and tell whoever is listening — the same event
+ * as the personality (lib/logos-personality.ts PERSONALITY_CHANGED), because
+ * the two are one sheet in Logos and one section in Manage Account.
+ */
+export function storeStyle(text: string): void {
+  if (typeof window === 'undefined') return;
+  const next = sanitizeStyle(text);
+  try {
+    if (next) window.localStorage.setItem(STYLE_KEY, next);
+    else window.localStorage.removeItem(STYLE_KEY);
+  } catch {}
+  try {
+    window.dispatchEvent(new Event(PERSONALITY_CHANGED));
+  } catch {}
 }

@@ -320,3 +320,38 @@ These settings shape how you COMMUNICATE. They sit under the protected principle
 THEY OUTRANK THE DEFAULT VOICE. The voice described earlier — its usual two-to-four sentences, its avoidance of lists and headings — is the default for somebody who has set nothing. A setting here is somebody who has, so where the two disagree the setting wins: a LENGTH of Detailed really does mean longer than that default, and a FORMATTING of Structured really does mean lay it out. What they never outrank is the protected principles or Depth.
 === END PERSONALITY ===`;
 }
+
+// ── where it is kept, and who hears a change ────────────────────────
+
+/** Kept in this browser, as it always was. Swept on sign-out with the other socria.* keys. */
+export const PERSONALITY_KEY = 'socria.personality.v1';
+
+/**
+ * Fired on window when the personality or the person's own instructions are
+ * saved — from Logos's own sheet or from Manage Account — so an open Logos
+ * uses the new settings from its next message, without a reload. Another tab
+ * hears the browser's own `storage` event.
+ */
+export const PERSONALITY_CHANGED = 'socria:personality';
+
+/** The saved personality, or the defaults. Never throws. */
+export function storedPersonality(store?: Pick<Storage, 'getItem'> | null): Personality {
+  try {
+    const s = store ?? (typeof window !== 'undefined' ? window.localStorage : null);
+    return sanitizePersonality(JSON.parse(s?.getItem(PERSONALITY_KEY) || '{}'));
+  } catch {
+    return { ...DEFAULT_PERSONALITY };
+  }
+}
+
+/** Save it (the defaults are stored as nothing), and tell whoever is listening. */
+export function storePersonality(p: Personality): void {
+  if (typeof window === 'undefined') return;
+  try {
+    if (isDefaultPersonality(p)) window.localStorage.removeItem(PERSONALITY_KEY);
+    else window.localStorage.setItem(PERSONALITY_KEY, JSON.stringify(sanitizePersonality(p)));
+  } catch {}
+  try {
+    window.dispatchEvent(new Event(PERSONALITY_CHANGED));
+  } catch {}
+}

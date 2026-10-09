@@ -214,3 +214,30 @@
 .acct-sheet .cs-status.is-bad{color:var(--tension, #9c5b3c)}
 @media (max-width:440px){.acct-sheet .cs-grid{grid-template-columns:1fr}}
 @media (prefers-reduced-motion:reduce){.acct-sheet .cs-o{transition:none}}
+
+/* Sign out beside Done, in the footbar that never scrolls away. */
+.acct-sheet .sheet .footbar .foot-acts{display:flex;align-items:center;gap:18px}
+.acct-sheet .link-act.out{color:var(--ink-70)}
+.acct-sheet .link-act.out:hover{color:var(--machine, #8a3b2b)}
+
+/* Socria Personality: Logos's nine dials, in Logos's own tokens (.lg-tokens),
+   then the person's own words. */
+.acct-sheet .persona .lg-persona-grid{margin-top:10px}
+.acct-sheet .persona .lg-persona-reset{margin-top:8px}
+.acct-sheet .persona-words{display:flex;flex-direction:column;gap:7px;margin-top:16px}
+.acct-sheet .persona-words-h{font-family:var(--font-sans, system-ui, -apple-system, 'Segoe UI', sans-serif);font-size:.66rem;font-weight:600;
+  letter-spacing:var(--tracking-label);text-transform:uppercase;color:var(--ink-70)}
+.acct-sheet .persona-words textarea{width:100%;resize:vertical;min-height:84px;background:var(--surface, #fff);border:1px solid var(--app-border);
+  border-radius:12px;padding:11px 13px;font:inherit;font-size:.92rem;line-height:1.45;color:var(--ink);outline:none;
+  transition:border-color .2s,box-shadow .2s}
+.acct-sheet .persona-words textarea::placeholder{color:var(--ink-45)}
+.acct-sheet .persona-words textarea:focus{border-color:var(--moss);box-shadow:0 0 0 3px rgba(var(--moss-rgb, 94, 118, 51), .13)}
+.acct-sheet .persona-row{display:flex;align-items:center;gap:14px;margin-top:9px;flex-wrap:wrap}
+.acct-sheet .persona-save{padding:7px 16px;border-radius:999px;background:var(--moss-700);color:var(--app-paper);font-size:.86rem;font-weight:500;
+  transition:opacity .2s,background .2s}
+.acct-sheet .persona-save:disabled{opacity:.4;cursor:default}
+.acct-sheet .persona-save:not(:disabled):hover{background:var(--moss)}
+.acct-sheet .persona-clear{font-size:.86rem;color:var(--ink-70)}
+.acct-sheet .persona-clear:hover{color:var(--ink)}
+.acct-sheet .persona-note{font-family:var(--font-serif, Georgia, serif);font-style:italic;font-size:.86rem;color:var(--moss-700)}
+.acct-sheet .persona-fine{margin-top:10px;font-family:var(--font-serif, Georgia, serif);font-style:italic;font-size:.84rem;color:var(--ink-70);line-height:1.4}

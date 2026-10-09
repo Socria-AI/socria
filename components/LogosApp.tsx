@@ -101,12 +101,15 @@ import {
   type ThinkingDepth,
 } from '@/lib/socria-prompt';
 import type { GuardSignal } from '@/lib/logos-guidance';
-import { MAX_STYLE } from '@/lib/logos-style';
+import { MAX_STYLE, STYLE_KEY, storeStyle, storedStyle } from '@/lib/logos-style';
 import {
   DEFAULT_PERSONALITY,
+  PERSONALITY_CHANGED,
   PERSONALITY_DIMENSIONS,
+  PERSONALITY_KEY,
   isDefaultPersonality,
-  sanitizePersonality,
+  storePersonality,
+  storedPersonality,
   type Personality,
 } from '@/lib/logos-personality';
 import { chooseModel, lastCoreModel } from '@/lib/socria-model-store';
@@ -257,8 +260,9 @@ function readVia(): string | undefined {
 // Custom instructions — how Socria should work with this person. The key is
 // product-wide by design so other surfaces can adopt it; today Logos is the
 // one that reads it.
-const STYLE_KEY = 'socria.style.v1';
-const PERSONALITY_KEY = 'socria.personality.v1';
+// The personality and the person's own instructions are kept by
+// lib/logos-personality.ts and lib/logos-style.ts, which Manage Account writes
+// through too (components/account/PersonalitySettings.tsx).
 // The chat can update the standing instructions itself: when the person asks
 // Socria to REMEMBER a way of working, the model ends its reply with this
 // machine-read line, which the client strips and applies.
@@ -894,10 +898,7 @@ export function LogosApp({
     if (at === -1) return reply;
     const next = reply.slice(at + REMEMBER_MARK.length).trim().slice(0, MAX_STYLE);
     setStyleText(next);
-    try {
-      if (next) localStorage.setItem(STYLE_KEY, next);
-      else localStorage.removeItem(STYLE_KEY);
-    } catch {}
+    storeStyle(next);
     setStyleUpdatedNote(true);
     return reply.slice(0, at).trimEnd();
   }
@@ -930,13 +931,27 @@ export function LogosApp({
     setPersona(personaDraft);
     setStyleOpen(false);
     setStyleUpdatedNote(false);
-    try {
-      if (next) localStorage.setItem(STYLE_KEY, next);
-      else localStorage.removeItem(STYLE_KEY);
-      if (isDefaultPersonality(personaDraft)) localStorage.removeItem(PERSONALITY_KEY);
-      else localStorage.setItem(PERSONALITY_KEY, JSON.stringify(personaDraft));
-    } catch {}
+    storeStyle(next);
+    storePersonality(personaDraft);
   }
+
+  // Saved somewhere else — Manage Account, or Logos in another tab — and used
+  // from the next message here, without a reload.
+  useEffect(() => {
+    const read = () => {
+      setStyleText(storedStyle());
+      setPersona(storedPersonality());
+    };
+    const fromOtherTab = (e: StorageEvent) => {
+      if (e.key === null || e.key === PERSONALITY_KEY || e.key === STYLE_KEY) read();
+    };
+    window.addEventListener(PERSONALITY_CHANGED, read);
+    window.addEventListener('storage', fromOtherTab);
+    return () => {
+      window.removeEventListener(PERSONALITY_CHANGED, read);
+      window.removeEventListener('storage', fromOtherTab);
+    };
+  }, []);
 
   function pickDepth(next: ThinkingDepth) {
     // Every depth is open on every plan. The routes clamp through
@@ -1161,11 +1176,11 @@ export function LogosApp({
       if (localStorage.getItem(ONE_KEY_STORAGE) === '1') setPlan('one');
     });
     load(() => {
-      const st = localStorage.getItem(STYLE_KEY);
-      if (typeof st === 'string' && st.trim()) setStyleText(st);
+      const st = storedStyle();
+      if (st) setStyleText(st);
     });
     load(() => {
-      setPersona(sanitizePersonality(JSON.parse(localStorage.getItem(PERSONALITY_KEY) || '{}')));
+      setPersona(storedPersonality());
     });
     const t = setTimeout(() => setAuthSettled(true), 1200);
     return () => clearTimeout(t);
