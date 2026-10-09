@@ -55,6 +55,7 @@ import { inputsOf } from './derive';
 import { figureFor, solutionFor, type Figure } from './equations';
 import { namesIn } from './deps';
 import { unpack } from './unpack';
+import { dimValues, fmt, solidPrimitives, solidSays } from './solid';
 
 /** What compiling one object produced, and what may be said about it. */
 export interface Built {
@@ -370,6 +371,25 @@ export function buildObject(model: Model, o: ModelObject, opts?: { detail?: numb
     };
   }
 
+  // ── A FORMULA, OR A SOLID'S MEASURE: A NUMBER TO READ ─────────────
+  //
+  // Evaluated by formula.ts in dependency order and carried on `meta.value`;
+  // the router has already reported any gap above, so a value is here. It is
+  // read rather than drawn — not a missing picture.
+  if (o.meta?.role === 'formula' || o.meta?.role === 'measure') {
+    const v = typeof o.meta.value === 'number' ? o.meta.value : null;
+    return {
+      of: o.id,
+      primitives: [],
+      note:
+        v !== null
+          ? `${o.label} = ${fmt(v)}${o.units ? ` ${o.units}` : ''} — computed from ${o.definition} at the current values`
+          : `${o.label} = ${o.definition} — not a number yet: ${typeof o.meta.unevaluated === 'string' ? o.meta.unevaluated : 'something it names has no value'}`,
+      fidelity: v !== null ? 'model-derived' : (o.fidelity ?? 'conceptual'),
+      ...(v === null ? { problem: `not computed — ${typeof o.meta.unevaluated === 'string' ? o.meta.unevaluated : 'something it names has no value'}` } : {}),
+    };
+  }
+
   if ((o.meta?.role === 'marginal' && o.meta?.constant === true) || o.meta?.role === 'readout') {
     const expr = typeof o.meta.expr === 'string' ? (o.meta.expr as string) : (o.definition ?? '');
     const e = expr ? compileExpr(expr, names(model, ['x', 'y', 'z'])) : null;
@@ -420,6 +440,21 @@ export function buildObject(model: Model, o: ModelObject, opts?: { detail?: numb
   }
 
   switch (o.kind) {
+    // ── a body with a shape, sized by the model's quantities ──
+    case 'solid': {
+      const v = dimValues(model, o, scope);
+      const drawn = solidPrimitives(model, o, v).map((prim) => (layer ? { ...prim, layer } : prim));
+      const measures = model.objects
+        .filter((x) => x.meta?.of === o.id && x.meta?.role === 'measure' && typeof x.meta?.value === 'number')
+        .map((x) => `${String(x.meta!.measure).replace(/_/g, ' ')} ${fmt(x.meta!.value as number)}${x.units ? ` ${x.units}` : ''}`);
+      return {
+        of: o.id,
+        primitives: drawn,
+        note: `${o.label}: ${solidSays(model, o, v)}${measures.length ? `; ${measures.join(', ')}` : ''}`,
+        fidelity: 'model-derived',
+      };
+    }
+
     // ── a surface: z = f(x, y), or r(u, v), or a grid of measurements ──
     case 'surface':
     case 'volume': {

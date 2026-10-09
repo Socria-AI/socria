@@ -134,6 +134,52 @@ function trim(model: Model): Model {
   return { ...model, objects, params, ...(data ? { data } : {}), ...(dropped.length ? { dropped } : {}) };
 }
 
+/** The roles only an expander writes: the object is the engine's result, not a description. */
+const ENGINE_ROLES = new Set(['measure', 'formula', 'marginal', 'solution', 'response', 'readout']);
+/** The metadata only the engine writes: a computed number, and why there is none. */
+const ENGINE_META = ['value', 'unevaluated', 'adopted'];
+
+/**
+ * WHAT ONLY THE ENGINE MAY SAY, TAKEN OFF A PROPOSAL.
+ *
+ * A proposal DESCRIBES a model. A few fields on an object are not description
+ * but result: `meta.value` binds as a computed number (symbols.ts), a
+ * `computation` provenance says an engine produced the thing, and the
+ * expanders' roles — `measure`, `formula`, `solution`, `readout`, … — mark an
+ * object the engine wrote. Carried in on a proposal, any of them would hand
+ * the engine a volume, a coefficient or a solution it never computed, and the
+ * panel would show it as computed. So they come off here, on the way in.
+ *
+ * Only here. A model coming back from storage carries the engine's own
+ * results, and `unpack` recomputes those on every pass anyway.
+ *
+ * A NUMBER THE PROPOSAL STATES IS KEPT AS STATED — a control's value,
+ * `defs.value` — and binds as `declared`, never as `computed`. And an object
+ * that claimed a result loses the fidelity that came with the claim: it is
+ * `conceptual` until a solver earns it more (formula.ts, solid.ts).
+ */
+function unclaimed(model: Model): Model {
+  let changed = false;
+  const objects = model.objects.map((o): ModelObject => {
+    const role = typeof o.meta?.role === 'string' ? o.meta.role : '';
+    const claimsValue = !!o.meta && ENGINE_META.some((k) => k in o.meta!);
+    const claimsRole = ENGINE_ROLES.has(role);
+    const claimsComputation = o.provenance?.origin === 'computation';
+    if (!claimsValue && !claimsRole && !claimsComputation) return o;
+    changed = true;
+    const next: ModelObject = { ...o };
+    const meta = { ...(o.meta ?? {}) };
+    for (const k of ENGINE_META) delete meta[k];
+    if (claimsRole) delete meta.role;
+    if (Object.keys(meta).length) next.meta = meta;
+    else delete next.meta;
+    if (claimsComputation) delete next.provenance;
+    if (claimsValue || claimsComputation) next.fidelity = 'conceptual';
+    return next;
+  });
+  return changed ? { ...model, objects } : model;
+}
+
 /**
  * Stamp what a thing came from, where nothing said.
  *
@@ -245,7 +291,9 @@ export function buildProposal(raw: ModelProposal, opts?: { at?: number }): Built
   // TRIMMED BEFORE EXPANSION: the cap is on what was PROPOSED, and counting
   // the expander's own derived objects against it said "100 of 160" about a
   // proposal of eighty.
-  const model = attribute(unpack(trim(clean)));
+  // UNCLAIMED FIRST: what only the engine may say comes off before anything
+  // is expanded or judged, so no result rides in on the proposal.
+  const model = attribute(unpack(trim(unclaimed(clean))));
 
   const solvers = runnable(model);
   const missing = missingStructure(model);

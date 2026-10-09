@@ -43,7 +43,9 @@ import { expressionOf, marginalOf } from './derive';
 import { readSystem, type Missing } from './system';
 import { readPde } from './pde';
 import { readMap } from './iterate';
-import { COORDINATES, sampledOver, type Fidelity, type Model, type ModelObject } from './schema';
+import { COORDINATES, SOLID_SHAPES, sampledOver, type Fidelity, type Model, type ModelObject } from './schema';
+import { dimExprs, dimValues, missingDims, shapeTrouble } from './solid';
+import { evaluateFormulas, isFormula } from './formula';
 
 /**
  * WHAT SOMEBODY WANTS DONE TO A MODEL — as distinct from what the model is,
@@ -124,7 +126,9 @@ export type SolverKind =
   | 'stochastic'
   | 'graph'
   | 'pde'
-  | 'iteration';
+  | 'iteration'
+  | 'geometry'      // a body with a shape, drawn and measured from its dimensions
+  | 'formula';      // a quantity computed from a formula over the others
 
 export interface Solver {
   id: string;
@@ -157,6 +161,64 @@ export interface Solver {
 // ── the solvers that exist ──────────────────────────────────────────
 
 const has = (o: ModelObject, keys: readonly string[]) => keys.some((k) => !!o.defs?.[k]);
+
+/**
+ * THE BINDING RULE, ONCE: every name an expression mentions — other than the
+ * evaluator's own variables — must be a quantity the symbol table has a value
+ * for, written by its machine symbol. The sampler, the solid geometry and the
+ * formula evaluator all ask this one function, because every time two of them
+ * kept their own copy of it they disagreed in silence (see the comments below).
+ */
+function bindingGaps(m: Model, o: ModelObject, exprs: readonly (string | undefined)[], axes: ReadonlySet<string>): Missing[] {
+  const table = symbolTable(m);
+  const mentioned = new Set<string>();
+  for (const e of exprs) {
+    for (const n of namesIn(e)) if (!axes.has(n)) mentioned.add(n);
+  }
+  const gaps: Missing[] = [];
+  for (const n of mentioned) {
+    // BY MACHINE SYMBOL ONLY. `resolve` also matches display labels, so a
+    // control with id `rate` and label `r` made `exp(r*x)` route runnable —
+    // and the compiler, which binds machine symbols, refused it. A label
+    // that is not the id is reported as exactly that, with the id to write.
+    const q = table.by.get(table.fromMachine.get(n.toLowerCase()) ?? '');
+    const byLabel = !q ? resolve(table, n) : undefined;
+    if (byLabel && byLabel.machine !== n.toLowerCase()) {
+      gaps.push({
+        what: `the name ${byLabel.id} where the expression says ${n}`,
+        because: `“${n}” is the label of ${byLabel.id}, not its name — write ${byLabel.id} in the expression`,
+        unlocks: `evaluating ${o.label}`,
+      });
+      continue;
+    }
+    if (q && q.value !== undefined) continue;
+    // A FREE INPUT WITH A RANGE IS BOUND, and the scope binds it — at the
+    // cursor, which sits in the middle of that range until somebody moves it
+    // (compile.ts scopeOf, via inputsOf). Asking for a "value" for it is the
+    // router keeping its own copy of the binding rule and disagreeing with the
+    // compiler, which is the failure this file has now had three times.
+    //
+    // Measured: ∂log_wage/∂educ is β₁ + β₃·female in an interaction model, and
+    // it was reported as needing a value for female while the surface beside it
+    // evaluated that same expression perfectly. A free input with NO range is a
+    // real gap and is reported above, as a RANGE and never as a value.
+    if (q && q.supply === 'input' && q.domain) continue;
+    // A NAME WITH NOTHING BEHIND IT AT ALL is different from a quantity the
+    // model knows and has not been given a value, and the sentence says which.
+    gaps.push(
+      q
+        ? {
+            what: `a value for ${q.display}${q.display === q.id ? '' : ` (${q.id})`}`,
+            unlocks: `evaluating ${o.label} — the model has this quantity and nothing has given it a number`,
+          }
+        : {
+            what: `something called ${n}`,
+            unlocks: `evaluating ${o.label} — the expression mentions it and this model has no such quantity`,
+          }
+    );
+  }
+  return gaps;
+}
 
 export const SAMPLING: Solver = {
   does: ['evaluate'],
@@ -252,7 +314,6 @@ export const SAMPLING: Solver = {
       }
     }
 
-    const table = symbolTable(m);
     // THE SAMPLER'S OWN VARIABLES, which include whatever the model called them.
     // A fixed set of coordinate letters here meant `Q = 100 − 2P` over a range of
     // P was reported as needing "something called p" — a demand for a value for
@@ -265,55 +326,77 @@ export const SAMPLING: Solver = {
     const axes = new Set(
       [...COORDINATES, ...sampledOver(o, 1, []), ...sampledOver(o, 2, [])].map((a) => a.toLowerCase())
     );
-    const mentioned = new Set<string>();
-    for (const e of [o.definition, ...Object.values(o.defs ?? {})]) {
-      for (const n of namesIn(e)) if (!axes.has(n)) mentioned.add(n);
-    }
-    const gaps: Missing[] = [];
-    for (const n of mentioned) {
-      // BY MACHINE SYMBOL ONLY. `resolve` also matches display labels, so a
-      // control with id `rate` and label `r` made `exp(r*x)` route runnable —
-      // and the compiler, which binds machine symbols, refused it. A label
-      // that is not the id is reported as exactly that, with the id to write.
-      const q = table.by.get(table.fromMachine.get(n.toLowerCase()) ?? '');
-      const byLabel = !q ? resolve(table, n) : undefined;
-      if (byLabel && byLabel.machine !== n.toLowerCase()) {
-        gaps.push({
-          what: `the name ${byLabel.id} where the expression says ${n}`,
-          because: `“${n}” is the label of ${byLabel.id}, not its name — write ${byLabel.id} in the expression`,
-          unlocks: `evaluating ${o.label}`,
-        });
-        continue;
-      }
-      if (q && q.value !== undefined) continue;
-      // A FREE INPUT WITH A RANGE IS BOUND, and the scope binds it — at the
-      // cursor, which sits in the middle of that range until somebody moves it
-      // (compile.ts scopeOf, via inputsOf). Asking for a "value" for it is the
-      // router keeping its own copy of the binding rule and disagreeing with the
-      // compiler, which is the failure this file has now had three times.
-      //
-      // Measured: ∂log_wage/∂educ is β₁ + β₃·female in an interaction model, and
-      // it was reported as needing a value for female while the surface beside it
-      // evaluated that same expression perfectly. A free input with NO range is a
-      // real gap and is reported above, as a RANGE and never as a value.
-      if (q && q.supply === 'input' && q.domain) continue;
-      // A NAME WITH NOTHING BEHIND IT AT ALL is different from a quantity the
-      // model knows and has not been given a value, and the sentence says which.
-      gaps.push(
-        q
-          ? {
-              what: `a value for ${q.display}${q.display === q.id ? '' : ` (${q.id})`}`,
-              unlocks: `evaluating ${o.label} — the model has this quantity and nothing has given it a number`,
-            }
-          : {
-              what: `something called ${n}`,
-              unlocks: `evaluating ${o.label} — the expression mentions it and this model has no such quantity`,
-            }
-      );
-    }
-    return gaps;
+    return bindingGaps(m, o, [o.definition, ...Object.values(o.defs ?? {})], axes);
   },
   checkedAgainst: 'known closed forms for the benchmark surfaces (test/model-engine)',
+};
+
+/**
+ * A BODY WITH A SHAPE — see solid.ts.
+ *
+ * Draws the solid from its shape and dimension expressions, and its measures
+ * are computed by the closed-form formula for that shape (written out as
+ * formula quantities by solid.ts expandSolids, evaluated by FORMULA below).
+ * What it needs is said in the person's terms: the dimension a shape has and
+ * the solid does not give, a name nothing has a value for, or dimensions that
+ * do not make a body (a ring whose hole is wider than it is).
+ */
+export const GEOMETRY: Solver = {
+  does: ['evaluate'],
+  id: 'solid',
+  label: 'Solid geometry',
+  kind: 'geometry',
+  produces: 'model-derived',
+  method: 'draws a solid from its shape and dimension expressions, and computes its volume and areas by the closed-form formula for that shape (lib/model/solid.ts)',
+  handles: (_m, o) => o.kind === 'solid',
+  requires: (m, o) => {
+    if (!o.solid) {
+      return [{ what: `a shape for ${o.label}`, because: `a solid needs a shape: one of ${SOLID_SHAPES.join(', ')}`, unlocks: `drawing ${o.label} and computing its volume and areas` }];
+    }
+    const gone = missingDims(o);
+    if (gone.length) {
+      return gone.map((d) => ({
+        what: `the ${d.label} of ${o.label} (${d.key})`,
+        because: `a ${o.solid!.shape} is not fixed until its ${d.label} is — give it as a number or as a control it moves with`,
+        unlocks: `drawing ${o.label} and computing its measures`,
+      }));
+    }
+    const gaps = bindingGaps(m, o, Object.values(dimExprs(o) ?? {}), new Set(['t']));
+    if (gaps.length) return gaps;
+    const trouble = shapeTrouble(o.solid.shape, dimValues(m, o));
+    if (trouble) return [{ what: `dimensions that make a ${o.solid.shape}`, because: trouble, unlocks: `drawing ${o.label}` }];
+    return [];
+  },
+  checkedAgainst: 'closed-form volumes and areas, checked against Live 3D’s own measure() (test/model-solids.test.mjs)',
+};
+
+/**
+ * A QUANTITY DEFINED BY A FORMULA — see formula.ts.
+ *
+ * "Base area = π r²", "volume = base_area·h/3": evaluated from the other
+ * quantities' current values, in dependency order, every build. Runnable when
+ * every name it mentions has a value and the formula gives a real number there.
+ */
+export const FORMULA: Solver = {
+  does: ['evaluate'],
+  id: 'formula',
+  label: 'Formula evaluator',
+  kind: 'formula',
+  produces: 'model-derived',
+  method: 'evaluates a quantity’s formula from the current values of the quantities it names, in dependency order (lib/model/formula.ts)',
+  handles: (_m, o) => isFormula(o),
+  requires: (m, o) => {
+    const gaps = bindingGaps(m, o, [o.definition], new Set(['t']));
+    if (gaps.length) return gaps;
+    const why =
+      typeof o.meta?.unevaluated === 'string'
+        ? (o.meta.unevaluated as string)
+        : typeof o.meta?.value === 'number'
+          ? undefined
+          : evaluateFormulas(m).get(o.id)?.why;
+    return why ? [{ what: `a value for ${o.label}`, because: why, unlocks: `computing ${o.label}` }] : [];
+  },
+  checkedAgainst: 'chained formulas and the solids’ measures (test/model-solids.test.mjs)',
 };
 
 export const FIELD: Solver = {
@@ -646,7 +729,7 @@ export const FUTURE: Solver[] = [
 // build report read "Symbolic differentiator runs spec__response" for a surface
 // that the sampler had evaluated. Differentiating a relationship is a secondary
 // thing to do with it; working out what it says is the primary one.
-export const SOLVERS: Solver[] = [ALGEBRA, GRAVITY, ASSEMBLY, FIELD, ITERATION, ODE, ESTIMATION, DATA, SAMPLING, CALCULUS, ...FUTURE];
+export const SOLVERS: Solver[] = [ALGEBRA, GRAVITY, ASSEMBLY, FIELD, ITERATION, ODE, ESTIMATION, DATA, GEOMETRY, FORMULA, SAMPLING, CALCULUS, ...FUTURE];
 
 // ── routing ─────────────────────────────────────────────────────────
 
@@ -892,7 +975,11 @@ export function statedFormally(model: Model): ModelObject[] {
       !!o.gravity ||
       !!o.equations ||
       !!o.pde ||
-      !!o.map
+      !!o.map ||
+      // A SHAPE IS A FORMAL STATEMENT. A cone with a radius still to be given
+      // is a model waiting on one number, like a specification waiting on
+      // data — it is built, and what it needs is named.
+      !!o.solid
   );
 }
 

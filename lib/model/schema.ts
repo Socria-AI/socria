@@ -112,6 +112,9 @@ export const OBJECT_KINDS = [
   'point', 'particle', 'node', 'vector', 'tensor',
   // extended geometry
   'line', 'ray', 'curve', 'trajectory', 'plane', 'surface', 'volume', 'region', 'boundary',
+  // a bounded body in space — a cube, a cone, a cylinder — sized by its `solid`
+  // block and the expressions in `defs` (see lib/model/solid.ts)
+  'solid',
   // continua and structure
   'field', 'mesh', 'graph', 'distribution', 'dataset', 'series',
   // statements
@@ -280,6 +283,18 @@ export interface ModelObject {
    * the pictures that matter — the cobweb, the bifurcation diagram — are its.
    */
   map?: MapDecl;
+  /**
+   * A BODY WITH A SHAPE — see solid.ts.
+   *
+   * A cube two metres on a side, a nose cone 20 cm across and 40 cm tall, a
+   * washer, a capsule. The block names the shape; its dimensions are the
+   * expressions in `defs`, in the shape's own names (`r`, `h`, `w`…), so a
+   * dimension can be a number, a control (`h`) or a formula over controls
+   * (`d/2`) and a slider moves the body. Its volume, areas and slant height are
+   * written out by the engine as quantities computed from those same
+   * expressions (solid.ts expandSolids), never typed in by whoever proposed it.
+   */
+  solid?: SolidDecl;
 
   /** anything a domain wants to carry that the engine must not interpret */
   meta?: Record<string, string | number | boolean>;
@@ -493,6 +508,38 @@ export interface GravityDecl {
   plane?: 'xy';
   dt?: number;
   steps?: number;
+}
+
+/**
+ * The shapes a solid may take — the same catalogue Live 3D draws, plus the
+ * frustum, so a body built here can be opened there (solid.ts sceneOfModel).
+ */
+export const SOLID_SHAPES = ['box', 'cylinder', 'cone', 'frustum', 'sphere', 'torus', 'capsule', 'prism', 'ring'] as const;
+export type SolidShape = (typeof SOLID_SHAPES)[number];
+
+/**
+ * The words a proposal may use for a shape, and the shape each one is.
+ *
+ * GEOMETRY'S OWN VOCABULARY, not a list of objects: a cube is a box with equal
+ * sides, a ball is a sphere, a truncated cone is a frustum. What the thing is
+ * FOR — a nose cone, a flywheel, a die — is its label, never its shape.
+ */
+export const SOLID_WORDS: Record<string, SolidShape> = {
+  box: 'box', cube: 'box', cuboid: 'box', block: 'box', brick: 'box', 'rectangular prism': 'box', 'rectangular box': 'box',
+  cylinder: 'cylinder', disc: 'cylinder', disk: 'cylinder', rod: 'cylinder',
+  cone: 'cone',
+  frustum: 'frustum', 'truncated cone': 'frustum',
+  sphere: 'sphere', ball: 'sphere',
+  torus: 'torus', doughnut: 'torus', donut: 'torus',
+  capsule: 'capsule',
+  prism: 'prism', 'hexagonal prism': 'prism', 'triangular prism': 'prism', 'regular prism': 'prism',
+  ring: 'ring', washer: 'ring', annulus: 'ring', tube: 'ring', pipe: 'ring',
+};
+
+export interface SolidDecl {
+  shape: SolidShape;
+  /** what it is made of, as said — read for a look and, where named, a nominal density */
+  material?: string;
 }
 
 export interface EquationsDecl {
@@ -1043,13 +1090,21 @@ export function sanitizeObject(
   const label = text(r.label, 80);
   if (!ID.test(id) || !label) return null;
   const known = (OBJECT_KINDS as readonly string[]).includes(r.kind as string);
+  // A SHAPE'S NAME WRITTEN AS THE KIND IS A SOLID OF THAT SHAPE. `kind: "cone"`
+  // with a radius and a height is unambiguous about what was meant, and taking
+  // it as an annotation is exactly how "make a 3D model of a cone" came back as
+  // "nothing in that is written down as a relationship I can hold". Said, like
+  // every other reading the sanitiser makes.
+  const shapeKind = !known && typeof r.kind === 'string' ? SOLID_WORDS[r.kind.trim().toLowerCase()] : undefined;
   // AN UNKNOWN KIND IS SAID. It became an annotation in silence, so a typo —
   // `surfce` — produced a note on the model instead of a surface, and nothing
   // anywhere said why there was no picture.
-  if (!known && r.kind !== undefined) {
+  if (shapeKind) {
+    drop?.(`${id} was written as kind “${String(r.kind).slice(0, 24)}”, which is a shape — read as a solid ${shapeKind}`);
+  } else if (!known && r.kind !== undefined) {
     drop?.(`${id} has a kind this engine does not know (${String(r.kind).slice(0, 24)}) and is kept as an annotation`);
   }
-  const kind = known ? (r.kind as ObjectKind) : 'annotation';
+  const kind = shapeKind ? 'solid' : known ? (r.kind as ObjectKind) : 'annotation';
   const out: ModelObject = { id, kind, label };
 
   const opt = <K extends keyof ModelObject>(k: K, v: ModelObject[K]) => {
@@ -1435,6 +1490,32 @@ export function sanitizeObject(
         ...(dt !== null && dt > 0 ? { dt } : {}),
         ...(steps !== null && steps > 0 ? { steps: Math.min(20_000, Math.floor(steps)) } : {}),
       };
+    }
+  }
+
+  // ── A SOLID'S SHAPE ──────────────────────────────────────────────
+  //
+  // `solid: { shape: "cone" }`, the shorthand `solid: "cone"`, or a shape named
+  // as the kind (above). The shape must be one this engine draws; a word it
+  // does not know is said and the block is left off, so the object routes as
+  // the incomplete solid it is rather than as something else.
+  {
+    const rawSolid = r.solid;
+    const word =
+      typeof rawSolid === 'string'
+        ? rawSolid
+        : rawSolid && typeof rawSolid === 'object' && typeof (rawSolid as { shape?: unknown }).shape === 'string'
+          ? ((rawSolid as { shape: string }).shape as string)
+          : shapeKind ?? (kind === 'solid' && typeof r.shape === 'string' ? (r.shape as string) : '');
+    if (word) {
+      const shape = SOLID_WORDS[word.trim().toLowerCase()] ?? (SOLID_SHAPES as readonly string[]).find((x) => x === word.trim().toLowerCase());
+      if (shape) {
+        const material = rawSolid && typeof rawSolid === 'object' ? text((rawSolid as { material?: unknown }).material, 40) : '';
+        out.solid = { shape: shape as SolidShape, ...(material ? { material } : {}) };
+        if (out.kind !== 'solid') out.kind = 'solid';
+      } else {
+        drop?.(`${id} names a shape this engine does not draw (${word.slice(0, 24)}); the solids it draws are ${SOLID_SHAPES.join(', ')}`);
+      }
     }
   }
 

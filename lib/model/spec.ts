@@ -17,6 +17,7 @@
 // chooser returns its REASON along with its answer, the reason is shown, and
 // anyone can see when it chose badly.
 
+import { lengthUnit, unitOfSolid } from './solid';
 import { extentOf, pointsOf, type P3, type Primitive } from './primitives';
 import { buildModel, buildObject, figureOf, type Built } from './compile';
 import { viewsFor, type ViewFamily } from './views';
@@ -198,6 +199,9 @@ const DEFAULT_BOX: VisualizationSpec['box'] = { x: [-1, 1], y: [-1, 1], z: [-1, 
  */
 export function aspectOf(model: Model): 'equal' | 'fit' {
   if (model.aspect) return model.aspect;
+  // A SOLID IS A LENGTH IN EVERY DIRECTION. A cube drawn in a box stretched to
+  // fit is a slab, and nothing about the drawing would say so.
+  if (model.objects.some((o) => o.kind === 'solid' && !!o.solid)) return 'equal';
   // A GRAPH IS A GRAPH WHICHEVER WAY IT SAYS SO.
   //
   // This read `definition` only, and a response surface states its mathematics in
@@ -371,6 +375,16 @@ function axisNamesFor(model: Model): [string, string, string] {
     // (lib/model/units.ts). A shape sampled over a parameter (a torus over s
     // and u) has coordinate axes, and keeps the letters.
     const o = drawnObject(model);
+    // A SOLID'S AXES ARE LENGTHS IN ITS OWN UNIT: x (cm), y (cm), z (cm).
+    if (o?.kind === 'solid') {
+      const u = model.objects.map((x) => (x.kind === 'solid' ? unitOfSolid(model, x) : null)).find(Boolean) ?? null;
+      return [withUnit('x', u ?? undefined), withUnit('y', u ?? undefined), withUnit('z', u ?? undefined)];
+    }
+    // A PARAMETRIC SHAPE drawn in the model's own declared unit of length.
+    if (o && o.defs?.px && o.defs?.py && o.defs?.pz && !byKind(model, 'axis').length) {
+      const u = lengthUnit(model.units?.x) ?? lengthUnit(model.units?.length) ?? null;
+      if (u) return [withUnit('x', u), withUnit('y', u), withUnit('z', u)];
+    }
     if (o?.map) {
       const st = o.map.states;
       const named = (s: (typeof st)[number]) => withUnit(s.name, s.units ?? unitOf(model, s.name));
@@ -587,8 +601,15 @@ export function chooseRepresentation(model: Model): Choice {
   // evaluate is not — and that was the shape of the original failure, three
   // dimensions chosen from a kind label over two `surface` objects that had no
   // expression between them.
+  // A PARAMETRIC SURFACE (px, py, pz) AND A SOLID ARE THREE-DIMENSIONAL TOO.
+  // Only z = f(x, y) was counted, so a cone written as a parametric surface,
+  // or a part with a solid block, was flattened to a 2D plot of equation lines
+  // the moment any equations block sat beside it.
   const drawableSurface = model.objects.some(
-    (o) => (o.kind === 'surface' || o.kind === 'volume') && (!!o.definition || !!o.defs?.z || !!o.data)
+    (o) =>
+      ((o.kind === 'surface' || o.kind === 'volume') &&
+        (!!o.definition || !!o.defs?.z || !!o.data || !!(o.defs?.px && o.defs?.py && o.defs?.pz))) ||
+      (o.kind === 'solid' && !!o.solid)
   );
   if (!drawableSurface && model.objects.some((o) => !!o.equations)) {
     return {
@@ -596,6 +617,17 @@ export function chooseRepresentation(model: Model): Choice {
       dimensionality: 2,
       why: 'quantities related to one another by equations: the relationships are lines in the plane, and a third axis would be one nothing varies along',
       alternatives: ['table', 'equation'],
+    };
+  }
+
+  // A BODY IN SPACE: three dimensions, equal scales, the case a drawing of a
+  // part needs. Before anything that would read its measures as a graph.
+  if (has('solid')) {
+    return {
+      kind: 'surface3d',
+      dimensionality: 3,
+      why: 'a solid is a shape in space — its width, depth and height are lengths, drawn at one scale',
+      alternatives: ['table'],
     };
   }
 

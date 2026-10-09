@@ -139,6 +139,8 @@ const MODULES = [
   'lib/model/binding.ts',
   'lib/model/kinds.ts',
   'lib/model/units.ts',
+  'lib/model/solid.ts',
+  'lib/model/formula.ts',
   'lib/collab.ts',
   'lib/collab-transport.ts',
   'lib/conversation-surface.ts',

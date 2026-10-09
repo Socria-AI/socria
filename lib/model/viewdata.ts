@@ -37,6 +37,7 @@ import { RENDERED, viewsFor, type ViewSpec } from './views';
 import { portraitOf } from './phase';
 import { bifurcationOf, cobwebOf, sectionOf } from './iterate';
 import { unitOf, unitOfObject, withUnit } from './units';
+import { SOLID_DIMS, dimExprs, dimValues, solidSays, unitOfSolid } from './solid';
 
 /** What a view that is READ rather than looked at contains. */
 /** How a table column should be set: words, a number, an expression, or a quiet remark. */
@@ -369,6 +370,36 @@ function tableFor(model: Model, o: ModelObject | null, v: ViewSpec): PanelConten
       rows,
       kinds: [...index.map(() => 'text' as const), ...columns.map(() => 'number' as const)],
       note: `${block.columns[columns[0]]?.length ?? 0} observations, as supplied${rows.length < (block.columns[columns[0]]?.length ?? 0) ? `; the first ${rows.length} shown` : ''}`,
+    };
+  }
+
+  // A SOLID: its dimensions, then what follows from them — each measure at the
+  // current values, with the formula that produced it. Never a grid of mesh
+  // points, which is what a solid's drawing would have given.
+  if (o?.kind === 'solid' && o.solid) {
+    const v = dimValues(model, o);
+    const unit = unitOfSolid(model, o);
+    const exprs = dimExprs(o) ?? {};
+    const dims = SOLID_DIMS[o.solid.shape].map((d) => [
+      d.label,
+      v[d.key] === null || v[d.key] === undefined ? '—' : String(Number((v[d.key] as number).toPrecision(6))),
+      d.count ? '' : (unit ?? ''),
+      exprs[d.key] && !/^[-+]?\d*\.?\d+(e[-+]?\d+)?$/i.test(exprs[d.key].trim()) ? `${d.key} = ${exprs[d.key]}` : 'given',
+    ]);
+    const measures = model.objects
+      .filter((x) => x.meta?.role === 'measure' && x.meta?.of === o.id)
+      .map((x) => [
+        x.label,
+        typeof x.meta?.value === 'number' ? String(Number(x.meta.value.toPrecision(6))) : '—',
+        x.units ?? '',
+        typeof x.meta?.value === 'number' ? `${x.definition}` : String(x.meta?.unevaluated ?? 'no value yet'),
+      ]);
+    return {
+      kind: 'table',
+      columns: ['', 'value', 'units', 'from'],
+      rows: [...dims, ...measures],
+      kinds: ['text', 'number', 'note', 'note'],
+      note: `${solidSays(model, o, v)} — the measures are the closed-form formulas for a ${o.solid.shape}, at the current dimensions`,
     };
   }
 

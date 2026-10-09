@@ -37,6 +37,8 @@
 
 import { expandMarginals, expandReadouts } from './derive';
 import { expandEquations } from './equations';
+import { expandFormulas } from './formula';
+import { expandSolids } from './solid';
 import { expandEstimation } from './estimate';
 import { expandGravity } from './gravity';
 import { expand as expandMechanism } from './mechanism';
@@ -59,5 +61,10 @@ export function unpack(model: Model): Model {
   // until expandEstimation has run.
   // `readouts` after `marginals`: both read a relationship that an earlier
   // expander wrote, and a readout of a slope is a sensible thing to want.
-  return expandReadouts(expandMarginals(expandEquations(expandEstimation(expandGravity(expandMechanism(model))))));
+  // `solids` then `formulas`, after the equations and before the marginals: a
+  // solid writes its measures as formulas (solid.ts), and every formula —
+  // those, and any the model states itself — is evaluated in dependency order
+  // from the values the solvers above have just produced (formula.ts), so a
+  // surface or a slope that names one finds a number there.
+  return expandReadouts(expandMarginals(expandFormulas(expandSolids(expandEquations(expandEstimation(expandGravity(expandMechanism(model))))))));
 }

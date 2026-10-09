@@ -302,17 +302,45 @@ export function viewsFor(model: Model): ViewSpec[] {
   for (const o of model.objects) {
     const f = worth(model, o);
 
+    // ── a body with a shape ───────────────────────────────────────
+    //
+    // A SOLID IS ITS OWN KIND OF PICTURE: the body in three dimensions with its
+    // dimensions marked, and the numbers it has — its dimensions and the
+    // volume and areas computed from them (solid.ts). Neither is a level set or
+    // a cross-section of anything, so neither is offered.
+    if (o.kind === 'solid' && o.solid && DRAWS(model, o)) {
+      add({
+        id: `surface:${o.id}`, family: 'surface', label: o.label, of: o.id, dimensionality: 3, variant: 'Solid',
+        because: 'a body with a shape and dimensions, and its dimensions evaluate',
+        shows: `${o.label} in three dimensions, its dimensions marked and moving with the controls`,
+        fidelity: f, can: ['select', 'rotate'], primary: true,
+      });
+      add({
+        id: `table:${o.id}`, family: 'table', label: `${o.label} — measures`, of: o.id, dimensionality: 2, variant: 'Measures',
+        because: `a ${o.solid.shape} has a volume and areas, computed from its dimensions by the formulas for the shape`,
+        shows: 'each dimension and each measure at the current values, with how it was worked out',
+        fidelity: f, can: ['select'],
+      });
+    }
+
     // ── a quantity over two others ────────────────────────────────
     if ((o.kind === 'surface' || o.kind === 'volume') && DRAWS(model, o)) {
+      // A PARAMETRIC SURFACE IS A SHAPE, NOT A HEIGHT OVER A PLANE. A cone
+      // written as (u, v) ↦ (x, y, z) has no "value at (x, y)" — so level sets,
+      // a cross-section at a value of x and a grid of values are views of a
+      // relationship it does not state, and offering them drew the wrong thing.
+      const shape = !!(o.defs?.px && o.defs?.py && o.defs?.pz);
       add({
         id: `surface:${o.id}`, family: 'surface', label: o.label, of: o.id, dimensionality: 3,
-        because: 'one quantity varies over two others, and it evaluates',
-        shows: `${o.label} as a surface over its two inputs`,
+        because: shape ? 'a surface given by its parametric components, and they evaluate' : 'one quantity varies over two others, and it evaluates',
+        shows: shape ? `${o.label} as a shape in space, traced from its parameters` : `${o.label} as a surface over its two inputs`,
         fidelity: f, can: ['select', 'point', 'rotate'], primary: true,
       });
+    }
+    if ((o.kind === 'surface' || o.kind === 'volume') && DRAWS(model, o) && !(o.defs?.px && o.defs?.py && o.defs?.pz)) {
       // Contours and slices are the SAME computation seen differently, and both
       // are already implemented (compile.ts buildContours, buildSlice) — so they
-      // are available exactly when the surface is.
+      // are available exactly when the surface is z = f(x, y).
       add({
         id: `contour:${o.id}`, family: 'contour', label: `${o.label} — level sets`, of: o.id, dimensionality: 2,
         because: 'a surface has level sets, computed from the same expression rather than traced off the mesh',
@@ -562,6 +590,10 @@ export function viewsFor(model: Model): ViewSpec[] {
   // a view without anybody remembering to come here.
   for (const o of model.objects) {
     if (out.some((v) => v.of === o.id)) continue;
+    // A FORMULA OR A MEASURE IS ONE NUMBER, and a frame each would be a row of
+    // one-cell tables. They are read together: a solid's in its measures, the
+    // rest in the model's values below.
+    if (o.meta?.role === 'measure' || o.meta?.role === 'formula') continue;
     const ops = operationsOn(model, o).filter((v) => v.routed.status === 'runnable');
     if (!ops.length) continue;
     const family = FAMILY_OF_KIND[o.kind];
@@ -576,6 +608,22 @@ export function viewsFor(model: Model): ViewSpec[] {
   }
 
   // ── views of the MODEL rather than of one object ────────────────
+
+  // THE VALUES: every quantity worked out from a formula, read together. The
+  // primary view when nothing else draws — "base area = π r²" is a model, and
+  // its picture is the number.
+  const formulas = model.objects.filter((o) => o.meta?.role === 'formula');
+  if (formulas.length) {
+    add({
+      id: 'table:values', family: 'table', label: 'Values', of: '', subject: 'Values', dimensionality: 2,
+      because: `${formulas.length} quantit${formulas.length === 1 ? 'y is' : 'ies are'} worked out from formulas over the others`,
+      shows: 'each quantity this model holds a number for, at the current values — the controls, and what follows from them',
+      fidelity: formulas.some((o) => typeof o.meta?.value === 'number') ? 'model-derived' : 'conceptual',
+      can: ['select'],
+      primary: !out.some((v) => v.primary),
+    });
+  }
+
   const data = Object.entries(model.data ?? {});
   for (const [key, block] of data) {
     if (!block.columns || !Object.keys(block.columns).length) continue;
