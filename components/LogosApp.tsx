@@ -55,7 +55,6 @@ import { CommentPins, CommentsButton, CommentsPanel } from '@/components/share/c
 import { excerpt, nodeAnchor, openByAnchor, readAnchor } from '@/lib/share/comments';
 import { hueOf } from '@/lib/share/hue';
 import { LOGOS3_TOUR, LOGOS_TOUR, LOGOS_TOUR_KEY, shouldRunTour } from '@/lib/tour';
-import { LogosMark } from '@/components/LogosMark';
 import { AccountControl } from '@/components/account/AccountControl';
 import { AccountSheet } from '@/components/account/AccountSheet';
 import { useConversationStyle } from '@/components/useConversationStyle';
@@ -3914,8 +3913,9 @@ export function LogosApp({
                 <path d="M4 7h16M4 12h16M4 17h10" />
               </svg>
             </button>
+            {/* No mark here: the header keeps to the controls. The surface's
+                name stays for screen readers, which the mark never was. */}
             <span className="lg-word">
-              <LogosMark size={26} />
               <span className="lg-sr">Socria Logos</span>
             </span>
             <span className="lg-head-note">A reasoning environment</span>
