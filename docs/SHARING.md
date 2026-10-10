@@ -111,7 +111,15 @@ In a conversation more than one person can read:
   re-applies, so two people sending at once both land.
 - **A map** is a whole structure. A map written against an older version is
   refused with the current one (409), for the client to merge. Silently
-  overwriting someone's map must not happen.
+  overwriting someone's map must not happen. The client merges it part by part
+  against the map both sides last agreed on: nodes, model documents and objects
+  of thought by id, with what either side deleted kept deleted. It then sends
+  the merge (`lib/share/sync.ts mergeMaps`, `docs/THINK-TOGETHER.md`).
+- **The answer is the acknowledgement.** A write that went in says so
+  (`accepted: { map, turns }`), and its `updatedAt` is the version that holds
+  it. The client advances to that version, never by comparing the bytes it sent
+  with the sanitised bytes the server stored. Comparing bytes is how a client
+  came to be refused against its own write.
 - **The owner's ordinary save** of a shared conversation merges on the server
   (`mergeTurns` in `/api/conversations`). A stale tab cannot erase a
   collaborator's turns.
@@ -147,16 +155,23 @@ written only through the share routes.
 - **In.** A cheap poll. Every row the server sends — to a poll, a write, or a
   refused map — is **joined** with the screen, never laid over it: the server's
   turns in its order, then this screen's turns the server has not had yet. A
-  stale map comes back with the current one, which is adopted; the turns sent
-  beside it are appended anyway. Why this changed, and the group-chat rules
-  (who Socria answers, Reply, Copy): `docs/THINK-TOGETHER.md`.
+  stale map comes back with the current one, which is **merged** with this
+  screen's, part by part, and the merge is sent; the turns sent beside it are
+  appended anyway. A collaborator's slider move, scene step or newly built
+  model survives someone else's write landing first. What a merge could not
+  keep (a step on a part someone removed) comes back as `RemoteUpdate.lost`,
+  to be shown. Why this changed, and the group-chat rules (who Socria answers,
+  Reply, Copy): `docs/THINK-TOGETHER.md`.
 - **Presence and pointers.**
   - Faces beside **Share** show who is here.
   - Each person's pointer is sent in map coordinates
     (`toWorld` / `toScreen`, using each screen's own camera). It lands on the
     same card for everyone, whatever each person has panned or zoomed to.
 - **Roles.** A viewer or commenter reads and is told so; sending is refused in
-  the interface and on the server.
+  the interface and on the server. Their model, parameters and trace panels
+  are read-only (`readOnly`, `docs/LOGOS-3-WORKSPACE.md`). Their client never
+  sends a map and always shows the server's. A stray local change can no
+  longer freeze their screen on itself, as a refused slider drag used to.
 - **The owner's Draft Space** is kept through the same route. Only the owner
   can write it.
 - **Opening a shared session.** `/chat?model=logos-3&s=<id>&shared=1` opens
@@ -227,7 +242,11 @@ Project's own content (`projectGraph(…, personal = false)`).
 Tests:
 
 - `test/share-sync.test.mjs`: the sync decisions, two clients converging, and
-  pointers landing on the same card.
+  pointers landing on the same card. It also covers the map merge on real model
+  documents and Live 3D scenes, and the acknowledgement that keeps a client
+  from being refused against its own write.
+- `test/workspace-readonly.test.mjs`: the read-only panels, on their markup
+  and driven in a DOM.
 - `test/think-together.test.mjs`: the wiring in Logos, Project Home and the
   Memory page.
 - `test/share-e2e.test.mjs`: five people through the real routes. It covers

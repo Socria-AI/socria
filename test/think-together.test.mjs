@@ -24,9 +24,14 @@ ok('on any Logos surface, signed in, outside a code-joined room — a shared ses
 
 console.log('=== the sync itself ===');
 ok('turns and the map go out through one serialised queue', /const next = queue\.current\.then\(run, run\);/.test(hook));
-ok('a stale map is answered with the current one, which is adopted — the turns sent with it went in anyway', /const conflict = res\.status === 409 && !!j\?\.conflict;/.test(hook) && /take\(id, \{ messages: j\.messages, map: j\.map \?\? null, title: '', updatedAt: Number\(j\.updatedAt\) \|\| 0 \}, \{ takeMap: conflict \}\)/.test(hook));
+ok('a stale map is answered with the current one, which is MERGED with this screen\'s — the turns sent with it went in anyway', /const conflict = res\.status === 409 && !!j\?\.conflict;/.test(hook) && /take\(id, \{ messages: j\.messages, map: j\.map \?\? null, title: '', updatedAt: Number\(j\.updatedAt\) \|\| 0 \}, \{ conflict, sent \}\)/.test(hook));
+ok('  and a map that went in moves the version on the server\'s answer, not on its bytes', /const sent = o\.map !== undefined && !conflict && j\?\.accepted\?\.map !== false \? o\.map : undefined;/.test(hook) && !/mapKey\(o\.map\)/.test(hook));
 ok('a refused write (a viewer) stops retrying', /res\.status === 403[\s\S]{0,200}blocked\.current = true/.test(hook));
-ok('every row the server sends is joined with the screen, never laid over it', /const r = absorb\(base, remote, local \?\? \{ messages: \[\], map: null \}, \{ busy: optsRef\.current\.busy, takeMap: how\.takeMap \}\);/.test(hook) && /optsRef\.current\.onRemote\(id, \{\s*messages: r\.messages,/.test(hook));
+ok('  and from then on follows the shared map, as a viewer\'s role does from the start', /res\.status === 403[\s\S]{0,300}readOnly\.current = true/.test(hook) && /readOnly\.current = blocked\.current \|\| \(typeof j\.role === 'string' && !can\(j\.role as Role, 'edit'\)\)/.test(hook));
+ok('every row the server sends is joined with the screen, never laid over it', /const r = absorb\(base, remote, local \?\? \{ messages: \[\], map: null \}, \{ busy: optsRef\.current\.busy, conflict: how\.conflict, sent: how\.sent, readOnly: readOnly\.current \}\);/.test(hook) && /optsRef\.current\.onRemote\(id, \{\s*messages: r\.messages,/.test(hook));
+ok('  and the map put on screen is the one absorb decided — the merge, after a refusal', /\.\.\.\(r\.takeMap \? \{ map: r\.map \} : \{\}\)/.test(hook) && /\.\.\.\(r\.lost\?\.length \? \{ lost: r\.lost \} : \{\}\)/.test(hook));
+const route = read('app/api/shared/conversation/[id]/route.ts');
+ok('the route says what of a write went in', /accepted: \{ map: patch\.map !== undefined, turns: fresh\.length \}/.test(route));
 ok('presence leaves when the session closes', /leave: true/.test(hook));
 ok('the owner\'s draft goes through the same queue, and the row it answers with is taken in like any other', (() => { const k = hook.slice(hook.indexOf('const keepOwn'), hook.indexOf('const recheck')); return /queue\.current\.then\(run, run\)/.test(k) && /take\(id, \{ messages: j\.messages/.test(k); })());
 

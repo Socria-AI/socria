@@ -27,6 +27,14 @@
 // person's turn, and Socria's answer to it, used to vanish. Every answer
 // carries the row's turns and map as they now stand, so a client never moves
 // past a version it has not seen (lib/share/sync.ts absorb).
+//
+// THE ANSWER IS THE ACKNOWLEDGEMENT. A write that went in says so
+// (`accepted.map`), and its `updatedAt` is the version that holds it. The map
+// is stored sanitised, so its bytes are not the ones sent; a client advances
+// on this answer, never on comparing bytes — comparing them is how a client
+// came to be refused against its own write. A refused map (409) comes back
+// with the row's map, which the client merges with its own, part by part, and
+// sends again (lib/share/sync.ts mergeMaps).
 
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
@@ -156,7 +164,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     const writes = fresh.length > 0 || (wantsMap && !stale) || wantsTitle || wantsOwn;
     if (!writes) {
       // nothing new for the row: a stale map alone, or turns it already has
-      const answer = { updatedAt: current, prior: current, map: row.map ?? null, messages: held };
+      const answer = { updatedAt: current, prior: current, map: row.map ?? null, messages: held, accepted: { map: false, turns: 0 } };
       return stale
         ? NextResponse.json({ conflict: true, ...answer }, { status: 409 })
         : NextResponse.json({ ok: true, ...answer });
@@ -186,12 +194,15 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       if (wantsMap && !stale) await noteChange(userId, 'conversation', params.id, 'map', `${name} changed the map`);
       if (wantsTitle) await noteChange(userId, 'conversation', params.id, 'rename', `${name} renamed it`);
       // the row as it now stands; `prior` is the version this write replaced,
-      // so a client can tell whether anyone else wrote since it last looked
+      // so a client can tell whether anyone else wrote since it last looked,
+      // and `accepted` says what of the write went in — `updatedAt` is the
+      // version that holds it, which is what the client advances to
       const answer = {
         updatedAt: patch.updated_at,
         prior: current,
         map: patch.map !== undefined ? patch.map : row.map ?? null,
         messages: fresh.length ? messages : held,
+        accepted: { map: patch.map !== undefined, turns: fresh.length },
       };
       return stale
         ? NextResponse.json({ conflict: true, ...answer }, { status: 409 })

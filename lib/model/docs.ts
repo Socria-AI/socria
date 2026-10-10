@@ -62,16 +62,29 @@ export interface ModelDoc {
   branchedFrom?: { id: string; at: number };
   /** what the engine said when it was built */
   report?: BuildReport;
+  /**
+   * THE MODEL AS IT WAS BUILT, pinned once the revision cap has dropped it.
+   *
+   * `reset` means "back to how it was built", and it used to mean "back to the
+   * oldest revision still kept": after eight edits the built revision had been
+   * dropped and reset went to whatever came after it (h = 0.51 where the
+   * engine built 0.4). Absent while the built revision is still
+   * `revisions[0]`, so a document that never outgrew the cap carries no copy.
+   */
+  built?: Model;
   /** a one-line history a reader can follow: what each revision changed */
   log: {
+    /** the index in `revisions` of the revision this line produced */
     at: number;
     said: string;
     /**
      * What KIND of change this was, when it is one that coalesces.
      *
-     * Present only for selection and cursor moves, which happen continuously and
-     * must not leave undo stepping through a drag one frame at a time. Its
-     * absence means a structural edit, and those never merge.
+     * Present only for continuous changes — a control dragged, an input
+     * cursor, a selection, an open view — which must not leave undo stepping
+     * through a drag one frame at a time. It names the control, so a drag on d
+     * and a later drag on h are two revisions (`control:d`, `control:h`), not
+     * one. Its absence means a structural edit, and those never merge.
      */
     kind?: string;
   }[];
@@ -92,11 +105,20 @@ export const activeDoc = (ws: ModelWorkspace): ModelDoc | null => docOf(ws, ws.a
 export const canUndo = (doc: ModelDoc): boolean => doc.at > 0;
 export const canRedo = (doc: ModelDoc): boolean => doc.at < doc.revisions.length - 1;
 
-/** Append a revision, with the sentence that says what it was. */
-function revise(doc: ModelDoc, model: Model, said: string, opts?: { coalesce?: string }): ModelDoc {
+/**
+ * Append a revision, with the sentence that says what it was. `coalesce`: a
+ * continuous change, which replaces the top revision when that was the same
+ * change. `tag`: the line's kind, without coalescing now (a replayed change,
+ * which the next drag of the same control should coalesce with).
+ */
+function revise(doc: ModelDoc, model: Model, said: string, opts?: { coalesce?: string; tag?: string }): ModelDoc {
   // An edit made after an undo discards the revisions that were ahead: they are a
   // future that did not happen, and keeping them would make redo mean two things.
   const kept = doc.revisions.slice(0, doc.at + 1);
+  // …AND THE LINES THAT DESCRIBED THEM GO WITH THEM. They used to stay, each
+  // pointing at an index that now holds a different revision, so Trace offered
+  // "h → 0.8" and restored the edit that replaced it.
+  const log = doc.log.filter((l) => l.at <= doc.at);
 
   // COALESCED, FOR THE CHANGES A DRAG MAKES A HUNDRED OF.
   //
@@ -106,22 +128,34 @@ function revise(doc: ModelDoc, model: Model, said: string, opts?: { coalesce?: s
   // one pixel at a time, which is not what anybody means by undoing. So a change
   // of the SAME KIND, immediately after one of that kind, replaces the top
   // revision instead of appending: the history keeps where you ended up and not
-  // every point you passed through.
+  // every point you passed through. The kind names the control (`control:d`),
+  // so moving d and then h are two changes, two lines and two undos.
   //
   // Structural edits never coalesce. Removing a spring twice is two removals.
-  const top = doc.log[doc.log.length - 1];
+  const top = log[log.length - 1];
   if (opts?.coalesce && top?.kind === opts.coalesce && doc.at === doc.revisions.length - 1 && doc.revisions.length > 1) {
     const revisions = [...doc.revisions.slice(0, -1), model];
-    const log = [...doc.log.slice(0, -1), { at: revisions.length - 1, said, kind: opts.coalesce }];
-    return { ...doc, revisions, at: revisions.length - 1, log };
+    const lines = [...log.slice(0, -1), { at: revisions.length - 1, said, kind: opts.coalesce }];
+    return { ...doc, revisions, at: revisions.length - 1, log: lines };
   }
 
-  const revisions = [...kept, model].slice(-REVISION_CAP);
-  const log = [
-    ...doc.log.slice(-(REVISION_CAP * 2)),
-    { at: revisions.length - 1, said, ...(opts?.coalesce ? { kind: opts.coalesce } : {}) },
-  ];
-  return { ...doc, revisions, at: revisions.length - 1, log };
+  let revisions = [...kept, model];
+  const kind = opts?.coalesce ?? opts?.tag;
+  let lines = [...log, { at: revisions.length - 1, said, ...(kind ? { kind } : {}) }];
+  let built = doc.built;
+  const over = revisions.length - REVISION_CAP;
+  if (over > 0) {
+    // PAST THE CAP THE OLDEST GOES — and two things used to go wrong with it.
+    // The built revision went first, so reset stopped meaning "as built": it is
+    // pinned here before it leaves. And every line kept the index it was
+    // written with, so after the drop three lines pointed at the newest
+    // revision and Trace's buttons restored the wrong one: the lines shift with
+    // the revisions, and a line whose revision is gone goes too.
+    if (!built) built = revisions[0];
+    revisions = revisions.slice(over);
+    lines = lines.map((l) => ({ ...l, at: l.at - over })).filter((l) => l.at >= 0);
+  }
+  return { ...doc, revisions, at: revisions.length - 1, log: lines.slice(-(REVISION_CAP * 2)), ...(built ? { built } : {}) };
 }
 
 /**
@@ -170,7 +204,7 @@ export function open(
   ws: ModelWorkspace,
   model: Model,
   opts?: { report?: BuildReport; title?: string }
-): { workspace: ModelWorkspace; doc: ModelDoc } {
+): { workspace: ModelWorkspace; doc: ModelDoc; evicted?: Evicted[] } {
   const id = uniqueId(ws, model.id);
   const doc: ModelDoc = {
     id,
@@ -180,8 +214,41 @@ export function open(
     ...(opts?.report ? { report: { ...opts.report, id } } : {}),
     log: [{ at: 0, said: 'built from the conversation and validated by the engine' }],
   };
-  const docs = [...ws.docs.filter((d) => d.id !== id), doc].slice(-DOC_CAP);
-  return { workspace: { docs, active: id }, doc };
+  const { docs, evicted } = capDocs([...ws.docs.filter((d) => d.id !== id), doc]);
+  return { workspace: { docs, active: id }, doc, ...(evicted.length ? { evicted } : {}) };
+}
+
+/** A document the cap closed to make room for another: enough to say which. */
+export interface Evicted {
+  id: string;
+  title: string;
+}
+
+/**
+ * Keep the newest DOC_CAP documents, and SAY WHICH WENT.
+ *
+ * The seventh model used to delete the oldest silently — the document and
+ * every revision of it — and the build note said only that something was
+ * built. The cap stays (a session is not a library), but what it closes is
+ * returned, so whoever reports the build can say so in the same breath.
+ */
+function capDocs(all: ModelDoc[]): { docs: ModelDoc[]; evicted: Evicted[] } {
+  if (all.length <= DOC_CAP) return { docs: all, evicted: [] };
+  const gone = all.slice(0, all.length - DOC_CAP);
+  return { docs: all.slice(-DOC_CAP), evicted: gone.map((d) => ({ id: d.id, title: d.title })) };
+}
+
+/** The sentence that says a document was closed to make room — '' when none was. */
+export function evictionNote(evicted: readonly Evicted[] | undefined): string {
+  if (!evicted?.length) return '';
+  const names = evicted.map((d) => `“${d.title}” (${d.id})`);
+  const list = names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+  return `A line of thinking holds ${DOC_CAP} models at most, so to make room ${evicted.length === 1 ? 'the oldest' : 'the oldest ones'}, ${list}, ${evicted.length === 1 ? 'was' : 'were'} closed.`;
+}
+
+/** Which document the next build or copy would close, if the workspace is full. */
+export function nextEviction(ws: ModelWorkspace): ModelDoc | null {
+  return ws.docs.length >= DOC_CAP ? ws.docs[0] ?? null : null;
 }
 
 function uniqueId(ws: ModelWorkspace, wanted: string): string {
@@ -205,7 +272,11 @@ export function use(ws: ModelWorkspace, id: string): ModelWorkspace {
 }
 
 /** A copy under its own id, with the original untouched and the lineage recorded. */
-export function duplicate(ws: ModelWorkspace, id: string, opts?: { title?: string }): { workspace: ModelWorkspace; doc: ModelDoc | null } {
+export function duplicate(
+  ws: ModelWorkspace,
+  id: string,
+  opts?: { title?: string }
+): { workspace: ModelWorkspace; doc: ModelDoc | null; evicted?: Evicted[] } {
   const src = docOf(ws, id);
   if (!src) return { workspace: ws, doc: null };
   const newId = uniqueId(ws, `${src.id}-copy`);
@@ -219,11 +290,16 @@ export function duplicate(ws: ModelWorkspace, id: string, opts?: { title?: strin
     ...(src.report ? { report: { ...src.report, id: newId } } : {}),
     log: [{ at: 0, said: `copied from ${src.id} at revision ${src.at + 1}` }],
   };
-  return { workspace: { docs: [...ws.docs, doc].slice(-DOC_CAP), active: newId }, doc };
+  const { docs, evicted } = capDocs([...ws.docs, doc]);
+  return { workspace: { docs, active: newId }, doc, ...(evicted.length ? { evicted } : {}) };
 }
 
 /** The same thing as duplicate, named for what it is for: work you may throw away. */
-export function branch(ws: ModelWorkspace, id: string, name: string): { workspace: ModelWorkspace; doc: ModelDoc | null } {
+export function branch(
+  ws: ModelWorkspace,
+  id: string,
+  name: string
+): { workspace: ModelWorkspace; doc: ModelDoc | null; evicted?: Evicted[] } {
   return duplicate(ws, id, { title: name.slice(0, 90) || 'A branch' });
 }
 
@@ -239,10 +315,15 @@ export function redo(ws: ModelWorkspace, id: string): ModelWorkspace {
 
 /** Back to how it was built, kept as a new revision so the way back is not lost. */
 export function reset(ws: ModelWorkspace, id: string): ModelWorkspace {
-  return patch(ws, id, (doc) =>
-    doc.revisions.length ? revise(doc, doc.revisions[0], 'reset to how it was built') : doc
-  );
+  return patch(ws, id, (doc) => {
+    // the pinned build once the cap has dropped it, else the first revision
+    const built = builtOf(doc);
+    return built ? revise(doc, built, 'reset to how it was built') : doc;
+  });
 }
+
+/** The model as the engine built it (or as the copy began), however long the history since. */
+export const builtOf = (doc: ModelDoc): Model | null => doc.built ?? doc.revisions[0] ?? null;
 
 /** Back to a named earlier revision, also as a new revision. */
 export function restore(ws: ModelWorkspace, id: string, at: number): ModelWorkspace {
@@ -820,7 +901,8 @@ export function compareRevisions(doc: ModelDoc, a: number, b: number): Compariso
 
 /** This document against the state it was built in — "what have I changed?" */
 export function sinceBuilt(doc: ModelDoc): Comparison | null {
-  return doc.revisions.length > 1 ? compare(doc.revisions[0], current(doc)) : null;
+  const built = builtOf(doc);
+  return built && (doc.revisions.length > 1 || doc.built) ? compare(built, current(doc)) : null;
 }
 
 /**
@@ -857,7 +939,9 @@ export function sanitizeWorkspace(raw: unknown): ModelWorkspace {
   if (!raw || typeof raw !== 'object') return EMPTY_WORKSPACE;
   const r = raw as { docs?: unknown; active?: unknown };
   const docs: ModelDoc[] = [];
-  for (const d of Array.isArray(r.docs) ? r.docs.slice(0, DOC_CAP) : []) {
+  // The NEWEST are kept, as open() keeps them: this used to keep the first six,
+  // so a workspace that arrived over the cap lost the model just built.
+  for (const d of Array.isArray(r.docs) ? r.docs.slice(-DOC_CAP) : []) {
     if (!d || typeof d !== 'object') continue;
     const q = d as Record<string, unknown>;
     const id = typeof q.id === 'string' ? q.id.slice(0, 48) : '';
@@ -876,11 +960,15 @@ export function sanitizeWorkspace(raw: unknown): ModelWorkspace {
           // `kind` is what coalescing keys on. Dropped here, every selection
           // and cursor move after a round trip became its own revision, and
           // with eight kept the built revision was evicted — so "reset" no
-          // longer meant "as built".
-          ...(typeof e?.kind === 'string' && /^[a-z][a-z0-9_-]{0,23}$/i.test(e.kind) ? { kind: e.kind } : {}),
+          // longer meant "as built". It names the control (`control:d`,
+          // `at:educ`), so the colon and an id's length are part of it.
+          ...(typeof e?.kind === 'string' && LOG_KIND.test(e.kind) ? { kind: e.kind } : {}),
         };
       })
       .filter((l) => l.said);
+    // The build, pinned once the cap dropped it — re-validated like any
+    // revision, and simply not kept when it no longer computes.
+    const built = q.built ? revalidate(q.built) : null;
     docs.push({
       id,
       title: typeof q.title === 'string' ? q.title.slice(0, 90) : revisions[at].title,
@@ -893,6 +981,7 @@ export function sanitizeWorkspace(raw: unknown): ModelWorkspace {
             return bid ? { branchedFrom: { id: bid, at: typeof b.at === 'number' ? Math.floor(b.at) : 0 } } : {};
           })()
         : {}),
+      ...(built ? { built } : {}),
       log,
     });
   }
@@ -931,11 +1020,18 @@ export function openFromProposal(
    * the person. Re-deriving that from prose would be parsing our own English.
    */
   refusal?: Refusal;
+  /**
+   * The documents the cap closed to make room for this one, oldest first —
+   * absent when nothing was closed. `says` is the engine's report and is left
+   * as it is; the caller adds `evictionNote(evicted)` to what it tells the
+   * person, so a seventh model never deletes the first in silence.
+   */
+  evicted?: Evicted[];
 } {
   const built = buildProposal(proposal, opts);
   if (!built.ok) return { workspace: ws, doc: null, says: built.refusal.says, refusal: built.refusal };
   const made = open(ws, built.model, { report: built.report });
-  return { workspace: made.workspace, doc: made.doc, says: built.report.says };
+  return { workspace: made.workspace, doc: made.doc, says: built.report.says, ...(made.evicted ? { evicted: made.evicted } : {}) };
 }
 
 /** A built model, for the renderer: the current revision, expanded and ready. */
@@ -965,21 +1061,323 @@ export function adopt(ws: ModelWorkspace, id: string, model: Model, at = 0): Mod
   if (what === 'time') return ws;
   const clean = sanitizeModel({ ...model, lastChange: model.lastChange ? { ...model.lastChange, at } : undefined });
   if (!clean) return ws;
-  const kind = what === 'view' ? 'view' : what === 'select' ? 'select' : model.at && what.startsWith('at ') ? 'input' : 'control';
+  const sort = what === 'view' ? 'view' : what === 'select' ? 'select' : model.at && what.startsWith('at ') ? 'input' : 'control';
   const said =
-    kind === 'control' && model.lastChange
+    sort === 'control' && model.lastChange
       ? `${model.lastChange.what} to ${String(model.lastChange.to)}`
-      : kind === 'input'
+      : sort === 'input'
         ? what
-        : kind === 'view'
+        : sort === 'view'
           ? `opened ${String(model.lastChange?.to ?? model.view ?? 'a view')}`
           : `selected ${String(model.lastChange?.to ?? model.selected ?? 'nothing')}`;
-  return patch(ws, id, (d) => revise(d, clean, said, { coalesce: kind }));
+  return patch(ws, id, (d) => revise(d, clean, said, { coalesce: coalesceKey(sort, what) }));
 }
+
+/**
+ * What a continuous change coalesces WITH: the same control, not the same sort
+ * of control. Every slider move used to share the key 'control', so a drag on
+ * d and a later drag on h merged into one revision, the d line was overwritten
+ * and one Undo took both back. An input cursor shares setInput's key
+ * (`at:<id>`), so the panel and the conversation moving one cursor are one
+ * change. Selection and the open view stay one kind each: clicking around is
+ * one move, whichever object it lands on.
+ */
+function coalesceKey(sort: 'view' | 'select' | 'input' | 'control', what: string): string {
+  const id = (s: string) => s.replace(/[^A-Za-z0-9_]/g, '').slice(0, 48) || 'value';
+  if (sort === 'input') return `at:${id(what.slice(3))}`;
+  if (sort === 'control') return `control:${id(what)}`;
+  return sort;
+}
+
+/** The grammar of a log line's coalescing kind — `select`, `view`, `control:d`, `at:educ`. */
+const LOG_KIND = /^[a-z][a-z0-9_-]{0,15}(:[A-Za-z0-9_]{1,48})?$/i;
 
 /** For a host that has to store it: the workspace, plainly. */
 export function serializeWorkspace(ws: ModelWorkspace): { docs: ModelDoc[]; active: string | null } {
-  return { docs: ws.docs.map((d) => ({ ...d, revisions: d.revisions.map((m) => sanitizeModel(m) ?? m) })), active: ws.active };
+  return {
+    docs: ws.docs.map((d) => ({
+      ...d,
+      revisions: d.revisions.map((m) => sanitizeModel(m) ?? m),
+      ...(d.built ? { built: sanitizeModel(d.built) ?? d.built } : {}),
+    })),
+    active: ws.active,
+  };
+}
+
+// ── two screens, one workspace: the merge ───────────────────────────
+//
+// WHAT WAS LOST. A shared line of thinking sends its whole map against the
+// version it was drawn on, and a stale one used to be answered by adopting the
+// server's map WHOLESALE: a collaborator's slider move, the model they had just
+// built, an undo — gone from their own screen and never stored. The merge below
+// is what replaces that, for the model documents (lib/share/sync.ts does the
+// nodes and the objects of thought and calls this for `models`).
+//
+// THREE-WAY, BY IDENTITY. `base` is the workspace both sides last agreed on,
+// `mine` is this screen's, `theirs` is what the server now holds.
+//
+//   · a document only one side touched since the base is that side's;
+//   · one deleted on EITHER side stays deleted — never resurrected by the
+//     other side's copy (a delete is a decision, an unchanged copy is not);
+//   · one both sides touched keeps THEIR history and replays this screen's new
+//     revisions on top of it, field by field: a control I moved takes my value,
+//     one only they moved keeps theirs, so my d and their h both survive;
+//   · documents both sides created under one id are both kept, mine renamed.
+//
+// Revisions are compared by what they ARE (version, last change, controls,
+// cursors, selection, view, objects), never by their bytes: a document that has
+// been through the server's sanitiser is the same document in different bytes,
+// and reading those bytes as an edit would let a re-serialisation override
+// someone's change.
+
+/** JSON with its keys sorted, so two equal values are one string whatever order they were built in. */
+export function stableKey(v: unknown): string {
+  const seen = new WeakSet<object>();
+  const walk = (x: unknown): unknown => {
+    if (!x || typeof x !== 'object') return x;
+    if (seen.has(x as object)) return null;
+    seen.add(x as object);
+    if (Array.isArray(x)) return x.map(walk);
+    const out: Record<string, unknown> = {};
+    for (const k of Object.keys(x as Record<string, unknown>).sort()) {
+      const val = (x as Record<string, unknown>)[k];
+      if (val !== undefined) out[k] = walk(val);
+    }
+    return out;
+  };
+  try {
+    return JSON.stringify(walk(v)) ?? '';
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * A three-way merge of a list of things with ids: what each side did since the
+ * base, by id. A thing deleted on either side stays deleted; a thing added on
+ * either side is kept; a thing both sides changed — or both added under one id
+ * — is MINE (the caller chooses whose "mine" is), and its id is reported in
+ * `clashes`. Order: theirs, then what only mine added, in mine's order.
+ */
+export function mergeById<T>(
+  base: readonly T[] | null | undefined,
+  mine: readonly T[] | null | undefined,
+  theirs: readonly T[] | null | undefined,
+  idOf: (x: T) => string,
+  same: (a: T, b: T) => boolean = (a, b) => stableKey(a) === stableKey(b)
+): { items: T[]; clashes: string[] } {
+  const B = new Map((base ?? []).map((x) => [idOf(x), x]));
+  const M = new Map((mine ?? []).map((x) => [idOf(x), x]));
+  const T = new Map((theirs ?? []).map((x) => [idOf(x), x]));
+  const items: T[] = [];
+  const clashes: string[] = [];
+  const placed = new Set<string>();
+  for (const [id, t] of T) {
+    if (placed.has(id)) continue;
+    const b = B.get(id);
+    const m = M.get(id);
+    placed.add(id);
+    if (b !== undefined && m === undefined) continue; // deleted here since the base
+    if (m === undefined) {
+      items.push(t); // added there, or untouched and absent here only because it is new
+      continue;
+    }
+    if (b === undefined) {
+      // both added this id since the base
+      if (!same(m, t)) clashes.push(id);
+      items.push(same(m, t) ? t : m);
+      continue;
+    }
+    const mineChanged = !same(m, b);
+    const theirsChanged = !same(t, b);
+    if (mineChanged && theirsChanged && !same(m, t)) clashes.push(id);
+    items.push(mineChanged ? m : t);
+  }
+  for (const [id, m] of M) {
+    if (placed.has(id)) continue;
+    placed.add(id);
+    if (B.has(id)) continue; // deleted there since the base: stays deleted
+    items.push(m); // added here
+  }
+  return { items, clashes };
+}
+
+/** A record of numbers merged key by key, the same way. */
+function mergeRecord(
+  base: Record<string, number> | undefined,
+  mine: Record<string, number> | undefined,
+  theirs: Record<string, number> | undefined
+): Record<string, number> | undefined {
+  const keys = new Set([...Object.keys(base ?? {}), ...Object.keys(mine ?? {}), ...Object.keys(theirs ?? {})]);
+  const out: Record<string, number> = {};
+  for (const k of keys) {
+    const b = base?.[k];
+    const m = mine?.[k];
+    const t = theirs?.[k];
+    const v = m !== b ? m : t;
+    if (typeof v === 'number') out[k] = v;
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
+/** What a revision IS, independent of how it was serialised. */
+function revisionKey(m: Model): string {
+  return JSON.stringify([
+    m.version ?? 0,
+    m.lastChange?.what ?? '',
+    m.lastChange?.at ?? 0,
+    m.lastChange?.to ?? null,
+    (m.params ?? []).map((p) => [p.id, p.value]),
+    Object.entries(m.at ?? {}).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
+    m.selected ?? '',
+    m.view ?? '',
+    (m.objects ?? []).map((o) => o.id),
+  ]);
+}
+
+/** What a document IS: its revisions, its cursor, its name. */
+export function docKey(d: ModelDoc): string {
+  return JSON.stringify([d.title, d.at, d.revisions.map(revisionKey)]);
+}
+
+/**
+ * One revision of mine replayed on theirs: every part of the model I changed
+ * since `base` takes my value; everything else stays as they have it. Controls,
+ * cursors and objects merge by id. If the result is not a model the engine can
+ * hold, mine stands whole — a change of mine is never turned into nothing.
+ */
+function threeWayModel(base: Model, mine: Model, theirs: Model): Model {
+  const B = (sanitizeModel(base) ?? base) as unknown as Record<string, unknown>;
+  const M = (sanitizeModel(mine) ?? mine) as unknown as Record<string, unknown>;
+  const T = (sanitizeModel(theirs) ?? theirs) as unknown as Record<string, unknown>;
+  const out: Record<string, unknown> = { ...T };
+  const own = new Set(['id', 'params', 'objects', 'at', 'version', 'lastChange']);
+  for (const k of new Set([...Object.keys(B), ...Object.keys(M), ...Object.keys(T)])) {
+    if (own.has(k) || stableKey(M[k]) === stableKey(B[k])) continue;
+    if (M[k] === undefined) delete out[k];
+    else out[k] = M[k];
+  }
+  const id = (x: { id: string }) => x.id;
+  out.params = mergeById(B.params as Model['params'], M.params as Model['params'], T.params as Model['params'], id).items;
+  out.objects = mergeById(B.objects as Model['objects'], M.objects as Model['objects'], T.objects as Model['objects'], id).items;
+  const at = mergeRecord(B.at as Model['at'], M.at as Model['at'], T.at as Model['at']);
+  if (at) out.at = at;
+  else delete out.at;
+  out.version = Math.max(Number(M.version ?? 0), Number(T.version ?? 0)) + 1;
+  if (M.lastChange) out.lastChange = M.lastChange;
+  return sanitizeModel(out) ?? mine;
+}
+
+/** One document both sides changed: theirs, with this screen's new revisions replayed on top. */
+function mergeDoc(b: ModelDoc, m: ModelDoc, t: ModelDoc): ModelDoc {
+  const kb = docKey(b);
+  const km = docKey(m);
+  const kt = docKey(t);
+  if (km === kb || km === kt) return t; // nothing of mine in it, or the same as theirs
+  if (kt === kb) return m; // nothing of theirs
+
+  const known = new Set([...b.revisions.map(revisionKey), ...t.revisions.map(revisionKey)]);
+  const path = m.revisions.slice(0, m.at + 1); // what led to what is on this screen
+  let acc = t;
+  let replayed = 0;
+  path.forEach((r, i) => {
+    if (known.has(revisionKey(r))) return; // theirs or the base's: already there
+    const prev = i > 0 ? path[i - 1] : current(b);
+    const line = m.log.filter((l) => l.at === i).pop();
+    // never coalesced into theirs — each of mine stays its own revision — but
+    // tagged, so the next drag of the same control here joins it
+    acc = revise(acc, threeWayModel(prev, r, current(acc)), line?.said ?? 'a change made on another screen', line?.kind ? { tag: line.kind } : undefined);
+    replayed++;
+  });
+  // A move along the history here — an undo, a redo, a restore, a reset —
+  // makes no revision of its own that theirs lacks, but it changed what is
+  // current. Its effect is kept, on top of theirs, as one revision.
+  if (!replayed && revisionKey(current(m)) !== revisionKey(current(b))) {
+    const top = m.log[m.log.length - 1];
+    const said = top && top.at === m.at ? top.said : `back to revision ${m.at + 1}`;
+    acc = revise(acc, threeWayModel(current(b), current(m), current(acc)), said);
+  }
+  return m.title !== b.title ? { ...acc, title: m.title } : acc;
+}
+
+/** A document under another id: every revision, and the pinned build, carry the new one. */
+function renameDoc(d: ModelDoc, id: string): ModelDoc {
+  return {
+    ...d,
+    id,
+    revisions: d.revisions.map((r) => ({ ...r, id })),
+    ...(d.built ? { built: { ...d.built, id } } : {}),
+    ...(d.report ? { report: { ...d.report, id } } : {}),
+  };
+}
+
+export interface WorkspaceMerge {
+  workspace: ModelWorkspace;
+  /** what of `mine` could not be kept, in words a person can read */
+  lost: string[];
+  /** documents the cap closed to make room, oldest first */
+  evicted: Evicted[];
+  /** documents of mine that were renamed because theirs took the id: [old, new] */
+  renamed: [string, string][];
+}
+
+/**
+ * Merge three workspaces — the base both sides last agreed on, this screen's
+ * and the server's — by document id. See the section note above.
+ */
+export function mergeWorkspaces(
+  base: ModelWorkspace | null | undefined,
+  mine: ModelWorkspace | null | undefined,
+  theirs: ModelWorkspace | null | undefined
+): WorkspaceMerge {
+  const B = new Map((base?.docs ?? []).map((d) => [d.id, d]));
+  const M = new Map((mine?.docs ?? []).map((d) => [d.id, d]));
+  const T = new Map((theirs?.docs ?? []).map((d) => [d.id, d]));
+  const lost: string[] = [];
+  const renamed: [string, string][] = [];
+  const out: ModelDoc[] = [];
+
+  for (const t of theirs?.docs ?? []) {
+    const b = B.get(t.id);
+    const m = M.get(t.id);
+    if (b && !m) continue; // closed here since the base: it stays closed
+    if (!b || !m) {
+      out.push(t); // theirs alone (one of mine under the same id is placed below)
+      continue;
+    }
+    out.push(mergeDoc(b, m, t));
+  }
+  for (const m of mine?.docs ?? []) {
+    const b = B.get(m.id);
+    const t = T.get(m.id);
+    if (t) {
+      if (b || docKey(m) === docKey(t)) continue; // merged above, or the very same document
+      // both built a document under this id since the base: both are kept
+      const id = uniqueId({ docs: [...out, ...(mine?.docs ?? [])], active: null }, m.id);
+      out.push(renameDoc(m, id));
+      renamed.push([m.id, id]);
+      continue;
+    }
+    if (b) {
+      // closed there since the base — and not brought back by this copy of it
+      if (docKey(m) !== docKey(b)) lost.push(`“${m.title}” was closed on another screen, so what was changed in it here is not kept.`);
+      continue;
+    }
+    out.push(m); // made here since the base
+  }
+
+  const { docs, evicted } = capDocs(out);
+  for (const e of evicted) if (M.has(e.id) && !T.has(e.id)) lost.push(evictionNote([e]));
+
+  // Which document is shown: this screen's choice if it made one since the
+  // base, else theirs. An explicit null is a choice too (see sanitizeWorkspace).
+  const mineActive = mine?.active ?? null;
+  const pickedHere = mineActive !== (base?.active ?? null);
+  let active = pickedHere ? mineActive : (theirs?.active ?? null);
+  const moved = renamed.find(([from]) => from === active);
+  if (pickedHere && moved) active = moved[1];
+  if (active !== null && !docs.some((d) => d.id === active)) active = docs[docs.length - 1]?.id ?? null;
+  return { workspace: { docs, active }, lost, evicted, renamed };
 }
 
 // ── the verbs, applied ──────────────────────────────────────────────
@@ -1085,6 +1483,8 @@ export function applyModelOps(
         out = r.workspace;
         if (r.doc) {
           said.push(`copied as ${r.doc.id}; the original ${doc.id} is untouched`);
+          // the copy may have cost the oldest model its place — said, not done quietly
+          if (r.evicted?.length) said.push(evictionNote(r.evicted));
           changed = true;
         }
         break;
@@ -1095,6 +1495,7 @@ export function applyModelOps(
         out = r.workspace;
         if (r.doc) {
           said.push(`branched as ${r.doc.id} — “${r.doc.title}”; ${doc.id} is untouched`);
+          if (r.evicted?.length) said.push(evictionNote(r.evicted));
           changed = true;
         }
         break;

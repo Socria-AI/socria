@@ -232,6 +232,7 @@ const MODULES = [
   'lib/science/sensitivity.ts',
   'lib/science/records.ts',
   'lib/science/bundle.ts',
+  'components/workspace/panels.tsx',
   'lib/lifecycle.ts',
   'lib/email.ts',
   'lib/socria-prompt.ts',

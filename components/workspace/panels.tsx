@@ -15,6 +15,15 @@
 //
 // Each is memoised on what it reads, so a reply streaming into the
 // conversation does not redraw a 3D surface forty times a second.
+//
+// READ-ONLY, FOR SOMEONE WHO MAY ONLY LOOK. A viewer or commenter in a shared
+// line of thinking could drag a slider here: the write was refused (403) and
+// their screen stopped following the owner's. Every panel that writes the
+// model takes `readOnly`. With it, the controls are still shown — the values,
+// the history — but they are disabled, say "View only" when pointed at, and
+// no edit callback (onModel, onUndo, onRedo, onRestore) can fire. Selecting
+// something to read about it is not an edit and still works. Absent or false,
+// nothing changes.
 
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { ModelView } from '@/components/model/ModelView';
@@ -30,12 +39,36 @@ import { affectedBy } from '@/lib/model/deps';
 import { inspectModel, inspectObject, transparencyLine, type Inspection } from '@/lib/model/inspect';
 import { describeFocus, type Focus } from '@/lib/workspace/focus';
 
+/** What a control says when it may be looked at and not changed. */
+export const VIEW_ONLY = 'View only — you can look at this, but not change it';
+
+/**
+ * A fieldset that disables every control inside it, and adds nothing to the
+ * layout. How a panel whose controls belong to another component (ModelView's
+ * sliders, its view row) makes them inert without that component knowing:
+ * a disabled fieldset is the platform's own "these may not be used".
+ */
+const INERT_STYLE = {
+  display: 'flex',
+  flexDirection: 'column',
+  flex: 1,
+  minWidth: 0,
+  minHeight: 0,
+  margin: 0,
+  padding: 0,
+  border: 0,
+} as const;
+
 // ── Model ─────────────────────────────────────────────────────────
 
 /**
  * A model, or the picture a line of thinking holds when it has no model —
  * the same dispatch the map's plot lens makes, so a simulation is drawn by its
  * own surface and a formula by the plot renderer, never one dressed as the other.
+ *
+ * `readOnly`: the model is drawn as it is and can be turned and looked at,
+ * but its sliders, its view row and its selection are inert ("View only")
+ * and `onModel` is never called.
  */
 export const ModelPanel = memo(function ModelPanel({
   doc,
@@ -47,6 +80,7 @@ export const ModelPanel = memo(function ModelPanel({
   onAsk,
   onRead,
   ops,
+  readOnly = false,
 }: {
   doc: ModelDoc | null;
   edits?: VizModelState['edits'];
@@ -57,6 +91,8 @@ export const ModelPanel = memo(function ModelPanel({
   onAsk?: (id: string, label: string) => void;
   onRead?: (read: (() => VizModelState) | null) => void;
   ops?: { seq: number; ops: VizOp[] } | null;
+  /** may only look: controls shown but disabled, titled "View only", and onModel never fires */
+  readOnly?: boolean;
 }) {
   const model = useMemo(() => (doc ? modelFor(doc) : null), [doc]);
   const box = useRef<HTMLDivElement>(null);
@@ -70,22 +106,32 @@ export const ModelPanel = memo(function ModelPanel({
   }, []);
 
   if (model && doc) {
+    const view = (
+      <ModelView
+        model={model}
+        edits={edits}
+        fill
+        pinnedView={pinnedView}
+        // A panel pinned to one representation is that representation; the row
+        // of views and the account belong to the model's own panel and the inspector.
+        understand={pinnedView === undefined}
+        onPinView={readOnly ? undefined : onPinView}
+        // a viewer's touch never reaches the document — nor the server, which would refuse it
+        onModel={readOnly ? undefined : (m) => onModel(doc.id, m)}
+        onAsk={!readOnly && onAsk ? (id) => onAsk(id, model.objects.find((o) => o.id === id)?.label ?? id) : undefined}
+        onRead={onRead}
+        ops={ops}
+      />
+    );
     return (
-      <div className="ws-model lg-tokens" ref={box}>
-        <ModelView
-          model={model}
-          edits={edits}
-          fill
-          pinnedView={pinnedView}
-          // A panel pinned to one representation is that representation; the row
-          // of views and the account belong to the model's own panel and the inspector.
-          understand={pinnedView === undefined}
-          onPinView={onPinView}
-          onModel={(m) => onModel(doc.id, m)}
-          onAsk={onAsk ? (id) => onAsk(id, model.objects.find((o) => o.id === id)?.label ?? id) : undefined}
-          onRead={onRead}
-          ops={ops}
-        />
+      <div className={`ws-model lg-tokens${readOnly ? ' is-readonly' : ''}`} ref={box}>
+        {readOnly ? (
+          <fieldset disabled title={VIEW_ONLY} aria-label={`${model.title} — view only`} style={INERT_STYLE}>
+            {view}
+          </fieldset>
+        ) : (
+          view
+        )}
       </div>
     );
   }
@@ -110,16 +156,24 @@ export const ModelPanel = memo(function ModelPanel({
 
 // ── Parameters ────────────────────────────────────────────────────
 
+/**
+ * The model's controls and free inputs. `readOnly`: every slider is shown at
+ * its value but disabled and titled "View only", and `onModel` never fires;
+ * a control's name still selects it, which is reading, not editing.
+ */
 export const ParamsPanel = memo(function ParamsPanel({
   doc,
   focus,
   onModel,
   onFocus,
+  readOnly = false,
 }: {
   doc: ModelDoc | null;
   focus: Focus;
   onModel: (docId: string, m: Model) => void;
   onFocus: (f: Focus) => void;
+  /** may only look: sliders disabled, titled "View only", and onModel never fires */
+  readOnly?: boolean;
 }) {
   const model = useMemo(() => (doc ? modelFor(doc) : null), [doc]);
   const inputs = useMemo(() => (model ? inputsOf(model) : []), [model]);
@@ -127,8 +181,12 @@ export const ParamsPanel = memo(function ParamsPanel({
   if (!model.params.length && !inputs.length) return <div className="ws-empty"><p>{model.title} has nothing to adjust.</p></div>;
   const stated = current(doc);
 
-  const setP = (id: string, v: number) => onModel(doc.id, setParam(stated, id, v, Date.now()));
+  const setP = (id: string, v: number) => {
+    if (readOnly) return;
+    onModel(doc.id, setParam(stated, id, v, Date.now()));
+  };
   const setI = (id: string, v: number) => {
+    if (readOnly) return;
     const was = stated.at?.[id];
     onModel(doc.id, {
       ...stated,
@@ -141,8 +199,8 @@ export const ParamsPanel = memo(function ParamsPanel({
   const fmt = (v: number) => String(Number(v.toPrecision(4)));
 
   return (
-    <div className="ws-params">
-      <p className="ws-sub">{model.title}</p>
+    <div className={`ws-params${readOnly ? ' is-readonly' : ''}`}>
+      <p className="ws-sub">{model.title}{readOnly && <em className="ws-ro"> · view only</em>}</p>
       {model.params.length > 0 && <h3 className="ws-h">The model</h3>}
       {model.params.map((p) => (
         <div key={p.id} className={`ws-ctl${on('param', p.id) ? ' is-on' : ''}`}>
@@ -156,6 +214,8 @@ export const ParamsPanel = memo(function ParamsPanel({
             step={p.step ?? (p.max - p.min) / 100}
             value={p.value}
             aria-label={p.label}
+            disabled={readOnly}
+            {...(readOnly ? { title: VIEW_ONLY, 'aria-readonly': true } : {})}
             onChange={(e) => setP(p.id, +e.target.value)}
             onFocus={() => onFocus({ kind: 'param', doc: doc.id, id: p.id })}
           />
@@ -179,6 +239,8 @@ export const ParamsPanel = memo(function ParamsPanel({
             step={q.from === 'name' || q.from === 'type' ? 1 : (q.max - q.min) / 100}
             value={q.at}
             aria-label={q.label}
+            disabled={readOnly}
+            {...(readOnly ? { title: VIEW_ONLY, 'aria-readonly': true } : {})}
             onChange={(e) => setI(q.id, +e.target.value)}
             onFocus={() => onFocus({ kind: 'input', doc: doc.id, id: q.id })}
           />
@@ -314,27 +376,34 @@ export const InspectorPanel = memo(function InspectorPanel({
  * person can return to. Selections and opened views are canonical too but
  * they are not changes of mind, so they are left out of this reading of it —
  * and nothing about the workspace's arrangement is ever in it at all.
+ *
+ * `readOnly`: the history is shown, but Undo, Redo and every return-to-this-
+ * point are disabled and titled "View only", and none of their callbacks fires.
  */
 export const TracePanel = memo(function TracePanel({
   doc,
   onUndo,
   onRedo,
   onRestore,
+  readOnly = false,
 }: {
   doc: ModelDoc | null;
   onUndo: (docId: string) => void;
   onRedo: (docId: string) => void;
   onRestore: (docId: string, at: number) => void;
+  /** may only look: undo, redo and restore disabled, titled "View only", and never called */
+  readOnly?: boolean;
 }) {
   if (!doc) return <div className="ws-empty"><p>The trace follows a model, and there is none yet.</p></div>;
   const model = modelFor(doc);
   const entries = doc.log.filter((l) => l.kind !== 'select' && l.kind !== 'view');
+  const ro = readOnly ? { title: VIEW_ONLY } : {};
   return (
-    <div className="ws-trace">
+    <div className={`ws-trace${readOnly ? ' is-readonly' : ''}`}>
       <p className="ws-sub">{transparencyLine(model)}</p>
       <div className="ws-trace-acts">
-        <button type="button" disabled={doc.at <= 0} onClick={() => onUndo(doc.id)}>Undo</button>
-        <button type="button" disabled={doc.at >= doc.revisions.length - 1} onClick={() => onRedo(doc.id)}>Redo</button>
+        <button type="button" disabled={readOnly || doc.at <= 0} {...ro} onClick={() => !readOnly && onUndo(doc.id)}>Undo</button>
+        <button type="button" disabled={readOnly || doc.at >= doc.revisions.length - 1} {...ro} onClick={() => !readOnly && onRedo(doc.id)}>Redo</button>
       </div>
       <ol className="ws-trace-list" reversed>
         {[...entries].reverse().map((l, k) => {
@@ -342,7 +411,12 @@ export const TracePanel = memo(function TracePanel({
           const here = l.at === doc.at;
           return (
             <li key={`${l.at}-${k}`} className={`${here ? 'is-here' : ''}${l.at > doc.at ? ' is-ahead' : ''}`}>
-              <button type="button" disabled={!reachable || here} onClick={() => onRestore(doc.id, l.at)} title={here ? 'This is the model now' : 'Return the model to this point'}>
+              <button
+                type="button"
+                disabled={readOnly || !reachable || here}
+                onClick={() => !readOnly && onRestore(doc.id, l.at)}
+                title={readOnly ? VIEW_ONLY : here ? 'This is the model now' : 'Return the model to this point'}
+              >
                 <span className="ws-trace-said">{l.said}</span>
                 {here && <em>now</em>}
               </button>

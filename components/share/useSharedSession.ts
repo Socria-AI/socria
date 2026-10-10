@@ -23,12 +23,22 @@
 // goes through the same absorb, for the session it was asked about. A session
 // switched away from mid-request is left alone.
 //
+//   a refused map (409) is MERGED with this screen's, part by part, and the
+//            merge is what goes next (lib/share/sync.ts mergeMaps) — the old
+//            wholesale take cost a collaborator their slider moves, scene
+//            steps and the model they had just built
+//   a map that went in moves the version to the one the server's answer
+//            names, never to "whichever version stored the same bytes" — so
+//            a client cannot be refused against its own write
+//   a viewer or commenter never writes the map, so the server's is always
+//            the one shown and a stray local change cannot freeze the screen
+//
 // Inactive for a session nobody else can reach: an unshared line of thinking
 // is saved exactly as before.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { absorb, mapKey, outgoing, settled, unseen, type Seen, type SyncTurn } from '@/lib/share/sync';
-import type { Role } from '@/lib/share/roles';
+import { absorb, outgoing, settled, unseen, type Seen, type SyncTurn } from '@/lib/share/sync';
+import { can, type Role } from '@/lib/share/roles';
 
 export interface Present {
   id: string;
@@ -44,8 +54,19 @@ export interface Present {
 /** What a newer row changes on screen. */
 export interface RemoteUpdate {
   messages: SyncTurn[];
-  /** the server's map, when it should replace the one on screen */
+  /**
+   * The map the screen should now show, when it should change: the server's,
+   * or — after this client's map was refused — the server's merged with this
+   * screen's (it already holds everything of this screen's that could be
+   * kept). Put it on screen as it is; the hook sends it next.
+   */
   map?: unknown;
+  /**
+   * What of this screen's a merge could not keep — a step that no longer
+   * applies, a model someone else closed — in words. Worth showing the person
+   * (a note under the reply, say); absent when nothing was lost.
+   */
+  lost?: string[];
   title?: string;
 }
 
@@ -85,6 +106,8 @@ export function useSharedSession(opts: {
   const doing = useRef<'asking' | null>(null);
   /** the server refused this client's writes (its role does not allow them) */
   const blocked = useRef(false);
+  /** this client may not write the map: its role says so, or the server did (403) */
+  const readOnly = useRef(false);
   const beatRef = useRef<(() => void) | null>(null);
   const lastBeat = useRef(0);
   const ownKey = useRef('');
@@ -93,17 +116,22 @@ export function useSharedSession(opts: {
   const optsRef = useRef(opts);
   optsRef.current = opts;
 
-  /** A row from the server, taken in for session `id` and put on screen if anything changed. */
-  const take = useCallback((id: string, remote: Remote, how: { takeMap?: boolean } = {}) => {
+  /**
+   * A row from the server, taken in for session `id` and put on screen if
+   * anything changed. `conflict`: it answers a refused map, which is merged
+   * with this screen's. `sent`: it acknowledges this map, which went in.
+   */
+  const take = useCallback((id: string, remote: Remote, how: { conflict?: boolean; sent?: unknown } = {}) => {
     const local = optsRef.current.getLocal(id);
     const base = seen.current ?? unseen(local);
-    const r = absorb(base, remote, local ?? { messages: [], map: null }, { busy: optsRef.current.busy, takeMap: how.takeMap });
+    const r = absorb(base, remote, local ?? { messages: [], map: null }, { busy: optsRef.current.busy, conflict: how.conflict, sent: how.sent, readOnly: readOnly.current });
     seen.current = r.seen;
     const retitled = !!remote.title && remote.title !== local?.title;
     if (r.changed || retitled || !local) {
       optsRef.current.onRemote(id, {
         messages: r.messages,
-        ...(r.takeMap ? { map: remote.map } : {}),
+        ...(r.takeMap ? { map: r.map } : {}),
+        ...(r.lost?.length ? { lost: r.lost } : {}),
         ...(remote.title ? { title: remote.title } : {}),
       });
     }
@@ -131,7 +159,8 @@ export function useSharedSession(opts: {
       // more than one round when more is waiting than one write carries
       for (let round = 0; round < 3; round++) {
         const id = sid.current;
-        if (!id || !seen.current || blocked.current) return false;
+        // a role that may not change it never writes — nothing here could go in
+        if (!id || !seen.current || blocked.current || readOnly.current) return false;
         const local = optsRef.current.getLocal(id);
         if (!local) return false;
         const o = outgoing(seen.current, local);
@@ -153,22 +182,26 @@ export function useSharedSession(opts: {
           return false;
         }
         if (res.status === 403) {
-          // a viewer or commenter: their screen may change, the shared one may not
+          // a viewer or commenter: their screen may change, the shared one may
+          // not — and from now on it follows the shared one, whatever it holds
           blocked.current = true;
+          readOnly.current = true;
           return false;
         }
         const j = await res.json().catch(() => null);
         if (sid.current !== id || !seen.current) return false;
-        // someone changed the map first: theirs is taken, and the turns sent
-        // with it went in regardless — the server appends them either way
+        // someone changed the map first: theirs and this screen's are merged,
+        // part by part, and the merge goes in the next round — the turns sent
+        // with the refused map went in regardless, the server appends them
         const conflict = res.status === 409 && !!j?.conflict;
         if ((!res.ok && !conflict) || !Array.isArray(j?.messages)) {
           later(res.status === 429 ? Number(res.headers.get('Retry-After')) || 0 : 0);
           return false;
         }
-        // a map that went in is the server's map now
-        if (o.map !== undefined && !conflict) seen.current = { ...seen.current, map: mapKey(o.map) };
-        take(id, { messages: j.messages, map: j.map ?? null, title: '', updatedAt: Number(j.updatedAt) || 0 }, { takeMap: conflict });
+        // a map that went in is the server's map now, AT THE VERSION ITS ANSWER
+        // NAMES — whatever bytes the server stored it in
+        const sent = o.map !== undefined && !conflict && j?.accepted?.map !== false ? o.map : undefined;
+        take(id, { messages: j.messages, map: j.map ?? null, title: '', updatedAt: Number(j.updatedAt) || 0 }, { conflict, sent });
         retry.current.n = 0;
       }
       return true;
@@ -199,6 +232,8 @@ export function useSharedSession(opts: {
       setRole(j.role);
       setOwner(j.owner ?? '');
       setMe(typeof j.me === 'string' ? j.me : '');
+      // a role that may not change the map never sends one, and always shows the server's
+      readOnly.current = blocked.current || (typeof j.role === 'string' && !can(j.role as Role, 'edit'));
     }
     if (!j.unchanged) {
       if (!j.shared || !j.conversation) return;
@@ -212,7 +247,7 @@ export function useSharedSession(opts: {
     // anything of this screen's the server still lacks goes now — a write that
     // failed, or a reply that landed while this session was not the open one
     const local = optsRef.current.getLocal(id);
-    if (local && seen.current && !blocked.current && !settled(seen.current, local)) void push();
+    if (local && seen.current && !blocked.current && !readOnly.current && !settled(seen.current, local)) void push();
   }, [take, push]);
 
   // on opening a session: is it shared, and as what?
@@ -220,6 +255,7 @@ export function useSharedSession(opts: {
     sid.current = opts.enabled ? opts.sessionId : null;
     seen.current = null;
     blocked.current = false;
+    readOnly.current = false;
     ownKey.current = '';
     doing.current = null;
     if (retry.current.t) clearTimeout(retry.current.t);

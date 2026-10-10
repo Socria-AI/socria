@@ -208,6 +208,27 @@ never to say it would stand, hold or float.
 The full account is in `docs/LOGOS3-LIVE-3D.md`. Tests:
 `test/logos3-scene.test.mjs`.
 
+## 15. Read-only panels
+
+A viewer or commenter in a shared line of thinking could drag a slider in the
+Model, Parameters or Trace panel. The server refused the write (403), and their
+screen stopped following the owner's. Every panel that writes the model now
+takes `readOnly?: boolean` (`components/workspace/panels.tsx`):
+
+| Panel | With `readOnly` |
+|---|---|
+| `ModelPanel` | The model is drawn and can still be turned. Its controls (sliders, the view row, selection) sit inside a disabled `<fieldset>` titled "View only", and `onModel` is never called. |
+| `ParamsPanel` | Every slider is shown at its value, disabled and titled "View only", and `onModel` never fires. A control's name still selects it; that is reading, not editing. |
+| `TracePanel` | The history is shown. Undo, Redo and every return-to-this-point are disabled and titled "View only", and none of their callbacks fires. |
+
+Absent or false, every panel is exactly as before. The Inspector writes nothing
+and has no such prop. The title text is exported as `VIEW_ONLY`. The host
+passes `readOnly` when the person's role in the shared session cannot edit
+(viewer, commenter).
+
+Tests: `test/workspace-readonly.test.mjs`, on the markup and driven in a DOM,
+each check paired with the panel not read-only as its control.
+
 ## Next
 
 Sources and Evidence as their own surfaces; a Compare/Differences panel over `compareRevisions`; branch selection; per-panel cameras that survive remounts; suggestions from the conversation's own ask (`lib/model/ask.ts`) rather than keywords.

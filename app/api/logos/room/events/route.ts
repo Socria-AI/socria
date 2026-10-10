@@ -21,16 +21,20 @@ import {
   membersOf,
   membershipOf,
 } from '@/lib/logos-rooms-server';
-import { sanitizeEvent } from '@/lib/collab-transport';
+import { MAX_BATCH, MAX_BATCH_BYTES, sanitizeEvent } from '@/lib/collab-transport';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-/** Most events a client may post in one request. */
-const MAX_BATCH = 20;
-
-/** And how much they may weigh together, serialized. */
-const MAX_BATCH_BYTES = 512 * 1024;
+// The batch limits — at most MAX_BATCH events in one request, MAX_BATCH_BYTES
+// serialised — are the transport's own constants, so the client batches by the
+// very measure this route refuses by and a 413 is never a surprise.
+//
+// NOTHING REFUSED HERE IS REFUSED QUIETLY. An event the sanitiser rejects, or
+// one past the batch limit, is named in `dropped`; the transport reports it to
+// the room. An event that failed to be written (the database, not the event)
+// makes the whole answer a 503, which the transport tries again — a repeat of
+// one that did land is forgiven by its id.
 
 function notAMember(): NextResponse {
   // Deliberately indistinguishable from "no such room": a member of no room
@@ -107,7 +111,12 @@ export async function POST(req: NextRequest) {
   const me = await membershipOf(roomId, userId);
   if (!me) return notAMember();
 
-  const incoming = Array.isArray(body?.events) ? body.events.slice(0, MAX_BATCH) : [];
+  const all: unknown[] = Array.isArray(body?.events) ? body.events : [];
+  const incoming = all.slice(0, MAX_BATCH);
+  const idOf = (raw: unknown) =>
+    raw && typeof raw === 'object' && typeof (raw as { id?: unknown }).id === 'string' ? ((raw as { id: string }).id).slice(0, 80) : '';
+  // past the batch limit: not taken, and said so
+  const dropped: string[] = all.slice(MAX_BATCH).map(idOf).filter(Boolean);
 
   // A bound on the whole batch, not just its length. sanitizeEvent caps each
   // FIELD, but a member could still post MAX_BATCH events each carrying a
@@ -116,10 +125,11 @@ export async function POST(req: NextRequest) {
   // exchange produces and far below anything worth storing by accident.
   const approxBytes = JSON.stringify(incoming).length;
   if (approxBytes > MAX_BATCH_BYTES) {
-    return NextResponse.json({ error: 'That is too much at once.' }, { status: 413 });
+    return NextResponse.json({ error: 'That is too much at once.', size: approxBytes, limit: MAX_BATCH_BYTES }, { status: 413 });
   }
   const now = Date.now();
   let written = 0;
+  const failed: string[] = [];
 
   for (const raw of incoming) {
     // Same sanitiser the wire always used — a node through the map
@@ -128,10 +138,14 @@ export async function POST(req: NextRequest) {
     // The author is then OVERWRITTEN with the session user: a client may
     // describe what happened, never who did it.
     const ev = sanitizeEvent({
-      ...raw,
+      ...(raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {}),
       by: { id: userId, name: me.displayName, seat: me.seat },
     });
-    if (!ev) continue;
+    if (!ev) {
+      const rid = idOf(raw);
+      if (rid) dropped.push(rid);
+      continue;
+    }
 
     // A `hello` never carries a session any more. The room's starting point
     // lives on the room row (logos_rooms.seed_session), captured once at
@@ -152,7 +166,13 @@ export async function POST(req: NextRequest) {
       now
     );
     if (ok) written++;
+    else failed.push(id);
   }
 
-  return NextResponse.json({ ok: true, written });
+  if (failed.length) {
+    // the store, not the events: worth sending again, and a repeat of the
+    // ones that did land is forgiven by their ids
+    return NextResponse.json({ error: 'That could not be saved just now.', written, failed, ...(dropped.length ? { dropped } : {}) }, { status: 503 });
+  }
+  return NextResponse.json({ ok: true, written, ...(dropped.length ? { dropped } : {}) });
 }

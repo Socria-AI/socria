@@ -192,11 +192,12 @@ console.log('\n=== x. the document hears from the surface, and remembers it ==='
   const d = ws.docs[0];
   ok('a drag is one revision, not four', d.revisions.length === 2, String(d.revisions.length));
   ok('  holding where it ended', modelFor(d).params[0].value === 4);
-  ok('  with a kind the next drag coalesces with', d.log[d.log.length - 1].kind === 'control', JSON.stringify(d.log));
+  // the kind names the control dragged, so a drag on another control is a change of its own
+  ok('  with a kind the next drag coalesces with', d.log[d.log.length - 1].kind === 'control:a', JSON.stringify(d.log));
   const ticked = setTime(m, 1.5);
   ok('the clock is not a revision', adopt(ws, doc.id, ticked, 6) === ws);
   const stored = sanitizeWorkspace(JSON.parse(JSON.stringify(serializeWorkspace(ws))));
-  ok('the log kind survives storage', stored.docs[0].log[stored.docs[0].log.length - 1].kind === 'control', JSON.stringify(stored.docs[0].log));
+  ok('the log kind survives storage', stored.docs[0].log[stored.docs[0].log.length - 1].kind === 'control:a', JSON.stringify(stored.docs[0].log));
   const back = sanitizeModel(JSON.parse(JSON.stringify(m)));
   ok('lastChange survives storage', back.lastChange?.what === 'a' && back.lastChange?.to === 4, JSON.stringify(back.lastChange));
 }

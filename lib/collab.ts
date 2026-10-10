@@ -35,9 +35,20 @@
 // TRANSPORT-AGNOSTIC. Nothing here knows how an event travels. That lives in
 // lib/collab-transport.ts, which has two implementations — one for the same
 // browser (testable here) and one across devices — behind one interface.
+//
+// MODELS AND OBJECTS ARE THEIR OWN EVENTS. A room used to carry them only
+// inside the host's whole-map event, which REPLACED them: the last extraction
+// erased the other seat's model or scene, and a slider moved or a part added
+// never reached the other person at all. Now a model document travels as
+// `model.revision` and an object of thought as `object.step`, each applied by
+// id, and a `map` event only ADDS documents and objects it carries — it never
+// rolls one back and never removes one it does not mention. See the model
+// store below for how two seats agree on which copy of a document wins.
 
 import { sanitizeByRef, type ByRef, type LogosNode, type LogosNodeType, type Seat, type ThinkingMap } from './logos';
 import type { LogosMsg, LogosSession } from './logos-sessions';
+import { DOC_CAP, type ModelDoc } from './model/docs';
+import { MAX_OBJECTS, type ThoughtObject } from './objects';
 
 // ── people ──────────────────────────────────────────────────────────
 
@@ -144,8 +155,26 @@ export type CollabEvent =
   | (EventBase & { kind: 'node.add'; node: LogosNode })
   | (EventBase & { kind: 'node.edit'; nodeId: string; label: string })
   | (EventBase & { kind: 'node.remove'; nodeId: string })
-  /** the host's extraction landed; guests take the whole map */
-  | (EventBase & { kind: 'map'; map: ThinkingMap });
+  /**
+   * An extraction landed. Its nodes replace the extractor's (hand nodes stay);
+   * the documents and objects it carries are ADDED where the room does not
+   * have them yet, and nothing it leaves out is removed.
+   */
+  | (EventBase & { kind: 'map'; map: ThinkingMap })
+  /**
+   * ONE MODEL DOCUMENT, as it now stands — after a control moved, an undo, a
+   * restore, a verb from the conversation — or `null` once it is deleted.
+   * With `doc` absent and `active` set, only which document is shown changed.
+   * `stamp` orders two seats' copies of one document (see the model store).
+   */
+  | (EventBase & { kind: 'model.revision'; docId: string; doc?: ModelDoc | null; active?: boolean; stamp: number })
+  /**
+   * ONE OBJECT OF THOUGHT, as a step left it — a part added to a scene, a row
+   * operation — or as a look back along its history left it; `null` once it
+   * is removed. Its steps are computed again on arrival (lib/objects/core.ts
+   * sanitizeSpace), so nothing arrives claiming a state no step produced.
+   */
+  | (EventBase & { kind: 'object.step'; objId: string; obj: ThoughtObject | null; stamp: number });
 
 export type CollabEventKind = CollabEvent['kind'];
 
@@ -183,6 +212,121 @@ interface NodeCell {
   hand: boolean;
 }
 
+// ── the model and object store ──────────────────────────────────────
+//
+// A model document and an object of thought are each one value per id, and a
+// room has to agree on which copy of it is current whatever order the copies
+// arrived in. So each id keeps ONE cell — the winning copy, and what it won by
+// — and a copy replaces it only if it outranks it:
+//
+//   stamp   -1  the room's seed (what the session held when the room opened)
+//            0  carried by a `map` event — an extraction's copy, the weakest
+//               news there is: it may add a document the room lacks, or
+//               update a seed or another map's copy, never more
+//           ≥1  a `model.revision` or `object.step`: a person's own edit,
+//               stamped past every stamp its sender had seen (nextStamp), so an
+//               edit made after seeing another's always outranks it
+//   by      the event id, which breaks a tie on the stamp the same way on
+//           every seat
+//
+// The winner for an id is the highest (stamp, by) among every copy of it that
+// was ever sent — a maximum, so the order they arrive in cannot change it, and
+// two seats holding the same events hold the same documents. A deletion is a
+// copy whose value is null: it wins or loses like any other, so a stale
+// extraction (stamp 0) can never bring a deleted document back.
+//
+// The stamp rides in the event's PAYLOAD, not in `at`: the server stamps `at`
+// with its own clock on the way out, so the sender and the receiver of one
+// event would otherwise rank it differently.
+//
+// Order is fixed too: by the first event that ever mentioned the id (`intro`,
+// the smallest event id, again a minimum), so the documents list the same way
+// on both screens.
+
+/** One document or object: the copy that is current, and what it won by. */
+export interface PartCell<T> {
+  value: T | null;
+  /** -1 the seed, 0 a map's copy, ≥ 1 an edit's stamp */
+  stamp: number;
+  /** the id of the event that wrote it ('' for the seed) — breaks a tie on the stamp */
+  by: string;
+  /** the order key: the earliest event that ever mentioned this id */
+  intro: string;
+}
+
+const outranks = (a: { stamp: number; by: string }, b: { stamp: number; by: string }): boolean =>
+  a.stamp > b.stamp || (a.stamp === b.stamp && a.by > b.by);
+
+/** Offer one copy for an id; it is kept only if it outranks what is there. */
+function offer<T>(
+  cells: Record<string, PartCell<T>>,
+  id: string,
+  value: T | null,
+  stamp: number,
+  by: string,
+  intro: string = by
+): Record<string, PartCell<T>> {
+  const cur = cells[id];
+  if (!cur) return { ...cells, [id]: { value, stamp, by, intro } };
+  const first = intro < cur.intro ? intro : cur.intro;
+  if (!outranks({ stamp, by }, cur)) return first === cur.intro ? cells : { ...cells, [id]: { ...cur, intro: first } };
+  return { ...cells, [id]: { value, stamp, by, intro: first } };
+}
+
+/** The same rule for a single value — the document being shown, the picture. */
+function offerOne<T>(cell: PartCell<T> | undefined, value: T | null, stamp: number, by: string): PartCell<T> {
+  if (cell && !outranks({ stamp, by }, cell)) return cell;
+  return { value, stamp, by, intro: cell?.intro ?? by };
+}
+
+const seedIntro = (i: number) => `!${String(i).padStart(4, '0')}`;
+
+function seedParts(map: ThinkingMap | undefined): Pick<CollabState, 'docs' | 'objs' | 'active' | 'viz'> {
+  const docs: Record<string, PartCell<ModelDoc>> = {};
+  (map?.models?.docs ?? []).forEach((d, i) => {
+    docs[d.id] = { value: d, stamp: -1, by: '', intro: seedIntro(i) };
+  });
+  const objs: Record<string, PartCell<ThoughtObject>> = {};
+  (map?.objects?.objs ?? []).forEach((o, i) => {
+    objs[o.id] = { value: o, stamp: -1, by: '', intro: seedIntro(i) };
+  });
+  return {
+    docs,
+    objs,
+    ...(map?.models ? { active: { value: map.models.active, stamp: -1, by: '', intro: seedIntro(0) } } : {}),
+    ...(map?.viz ? { viz: { value: map.viz, stamp: -1, by: '', intro: seedIntro(0) } } : {}),
+  };
+}
+
+/** The live values of a store, in their fixed order. */
+function liveOf<T>(cells: Record<string, PartCell<T>> | undefined): T[] {
+  return Object.entries(cells ?? {})
+    .filter(([, c]) => c.value !== null)
+    .sort(([ia, a], [ib, b]) => (a.intro < b.intro ? -1 : a.intro > b.intro ? 1 : ia < ib ? -1 : ia > ib ? 1 : 0))
+    .map(([, c]) => c.value as T);
+}
+
+/** The map with its documents, objects and picture as the store holds them. */
+function partsInto(map: ThinkingMap, st: Pick<CollabState, 'docs' | 'objs' | 'active' | 'viz'>): ThinkingMap {
+  const out: ThinkingMap = { ...map };
+  // the newest DOC_CAP, as a workspace keeps them; the first MAX_OBJECTS, as a space keeps them
+  const docs = liveOf(st.docs).slice(-DOC_CAP);
+  if (docs.length) {
+    const want = st.active ? st.active.value : undefined;
+    // an explicit null is a choice (an answer drawn as a simulation); a name that is not here falls back to the newest
+    const active = want === null ? null : want && docs.some((d) => d.id === want) ? want : docs[docs.length - 1].id;
+    out.models = { docs, active };
+  } else delete out.models;
+  const objs = liveOf(st.objs).slice(0, MAX_OBJECTS);
+  if (objs.length) out.objects = { objs };
+  else delete out.objects;
+  if (st.viz) {
+    if (st.viz.value) out.viz = st.viz.value;
+    else delete out.viz;
+  }
+  return out;
+}
+
 export interface CollabState {
   code: string;
   me: Participant;
@@ -198,6 +342,33 @@ export interface CollabState {
   edits: Record<string, { label: string; at: number }>;
   /** node ids removed — grow-only; remove wins over a later add */
   removed: string[];
+  /** model documents by id: the current copy of each, and what it won by */
+  docs?: Record<string, PartCell<ModelDoc>>;
+  /** objects of thought by id, the same way */
+  objs?: Record<string, PartCell<ThoughtObject>>;
+  /** which document is shown (`value` is its id, or null by choice), and what set it */
+  active?: PartCell<string>;
+  /** the picture, and the map event that drew it */
+  viz?: PartCell<NonNullable<ThinkingMap['viz']>>;
+  /** the highest stamp this client has seen: its next edit is stamped past it */
+  clock?: number;
+}
+
+/**
+ * The stamp for an edit made here now: past every stamp this client has seen,
+ * so it outranks every copy it was looking at when it made it — and the wall
+ * clock otherwise, so two seats editing at once are ordered by when.
+ */
+export function nextStamp(state: Pick<CollabState, 'clock'> | null | undefined, now: number = Date.now()): number {
+  return Math.max(Math.floor(now), Math.floor(state?.clock ?? 0) + 1, 1);
+}
+
+/** The room's current copy of a model document, or of an object — and what it won by. */
+export function partOf(state: CollabState | null | undefined, kind: 'doc', id: string): PartCell<ModelDoc> | null;
+export function partOf(state: CollabState | null | undefined, kind: 'obj', id: string): PartCell<ThoughtObject> | null;
+export function partOf(state: CollabState | null | undefined, kind: 'doc' | 'obj', id: string): PartCell<unknown> | null {
+  if (!state) return null;
+  return (kind === 'doc' ? state.docs?.[id] : state.objs?.[id]) ?? null;
 }
 
 function seedCells(map: ThinkingMap | undefined): Record<string, NodeCell> {
@@ -241,6 +412,8 @@ export function initialState(code: string, me: Participant, session: LogosSessio
     cells: seedCells(session?.map),
     edits: {},
     removed: [],
+    ...seedParts(session?.map),
+    clock: 0,
   };
 }
 
@@ -271,8 +444,11 @@ function withPresent(present: readonly Participant[], p: Participant): Participa
  *    arrival order — there is no truer sequence to recover);
  *  - a node edit wins by `at`, so two clients that saw two edits in opposite
  *    orders still agree on the label;
- *  - a whole-map event replaces the map, keeping any `by` the extractor
- *    dropped, because the extractor does not know who said what.
+ *  - a whole-map event replaces the extractor's nodes, keeping any `by` the
+ *    extractor dropped, because the extractor does not know who said what —
+ *    and only ADDS the documents, objects and picture it carries;
+ *  - a model document or an object of thought is one copy per id, the one
+ *    with the highest (stamp, event id) — see the model store above.
  */
 export function applyEvent(state: CollabState, ev: CollabEvent): CollabState {
   if (state.seen.includes(ev.id)) return state;
@@ -286,7 +462,7 @@ export function applyEvent(state: CollabState, ev: CollabEvent): CollabState {
       // seeds its node store from the adopted map at the same moment.
       const adopt = state.session === null && ev.session && ev.participant.seat === 'host';
       if (adopt) {
-        return { ...base, present, session: ev.session!, cells: seedCells(ev.session!.map) };
+        return { ...base, present, session: ev.session!, cells: seedCells(ev.session!.map), ...seedParts(ev.session!.map) };
       }
       return { ...base, present };
     }
@@ -363,11 +539,44 @@ export function applyEvent(state: CollabState, ev: CollabEvent): CollabState {
         const by = state.cells[n.id]?.node.by ?? n.by ?? lastBy;
         cells[n.id] = { node: by ? { ...n, by } : n, addedAt: ev.at + i, hand: false };
       });
+      // THE DOCUMENTS, OBJECTS AND PICTURE IT CARRIES ARE OFFERED, NOT IMPOSED.
+      // This used to take the event's copies wholesale, so an extraction that
+      // carried no model erased the other seat's, and one that carried an
+      // older copy rolled back the other seat's slider. A map's copy ranks
+      // below any person's edit (stamp 0): it adds what the room lacks and
+      // replaces nothing a person changed; what it leaves out stays.
+      let docs = state.docs ?? {};
+      (ev.map.models?.docs ?? []).forEach((d, i) => {
+        docs = offer(docs, d.id, d, 0, ev.id, `${ev.id}:${String(i).padStart(2, '0')}`);
+      });
+      let objs = state.objs ?? {};
+      (ev.map.objects?.objs ?? []).forEach((o, i) => {
+        objs = offer(objs, o.id, o, 0, ev.id, `${ev.id}:${String(i).padStart(2, '0')}`);
+      });
+      const active = ev.map.models ? offerOne(state.active, ev.map.models.active, 0, ev.id) : state.active;
+      const viz = ev.map.viz ? offerOne(state.viz, ev.map.viz, 0, ev.id) : state.viz;
+      const parts = { docs, objs, active, viz };
       return {
         ...base,
         cells,
-        session: { ...state.session, map: deriveMap(ev.map, cells, state.edits, state.removed), updatedAt: ev.at },
+        ...parts,
+        session: { ...state.session, map: partsInto(deriveMap(ev.map, cells, state.edits, state.removed), parts), updatedAt: ev.at },
       };
+    }
+    case 'model.revision': {
+      if (!state.session) return base;
+      const clock = Math.max(state.clock ?? 0, ev.stamp);
+      const docs = ev.doc !== undefined ? offer(state.docs ?? {}, ev.docId, ev.doc ? { ...ev.doc, id: ev.docId } : null, ev.stamp, ev.id) : (state.docs ?? {});
+      const active = ev.active ? offerOne(state.active, ev.docId, ev.stamp, ev.id) : state.active;
+      const parts = { docs, objs: state.objs, active, viz: state.viz };
+      return { ...base, ...parts, clock, session: { ...state.session, map: partsInto(state.session.map, parts), updatedAt: ev.at } };
+    }
+    case 'object.step': {
+      if (!state.session) return base;
+      const clock = Math.max(state.clock ?? 0, ev.stamp);
+      const objs = offer(state.objs ?? {}, ev.objId, ev.obj ? { ...ev.obj, id: ev.objId } : null, ev.stamp, ev.id);
+      const parts = { docs: state.docs, objs, active: state.active, viz: state.viz };
+      return { ...base, ...parts, clock, session: { ...state.session, map: partsInto(state.session.map, parts), updatedAt: ev.at } };
     }
   }
 }
